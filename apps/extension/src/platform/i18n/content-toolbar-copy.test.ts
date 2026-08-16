@@ -54,20 +54,20 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Delay before screenshot',
   },
   'content.toolbar.viewportButton': {
-    ru: 'Размер страницы или окна для снимка',
-    en: 'Page or window size for screenshot',
+    ru: 'Размер окна для снимка',
+    en: 'Window size for screenshot',
   },
   'content.toolbar.viewportMenuTitle': {
-    ru: 'Размер страницы или окна',
-    en: 'Page or window size',
+    ru: 'Размер окна',
+    en: 'Window size',
   },
   'content.toolbar.viewportNativeLabel': {
     ru: 'Текущий размер',
     en: 'Current size',
   },
   'content.toolbar.viewportNativeHint': {
-    ru: 'Использовать текущий размер вкладки для снимков',
-    en: 'Use the current tab size for screenshots',
+    ru: 'Использовать текущий размер окна для снимков',
+    en: 'Use the current window size for screenshots',
   },
   'content.toolbar.cursorLabel': {
     ru: 'Навигация',

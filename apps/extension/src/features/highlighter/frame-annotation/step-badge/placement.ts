@@ -22,6 +22,14 @@ const ANCHOR_PLACEMENTS: Record<StepBadgeAnchor, StepBadgeManualPlacement> = {
   'bottom-right': { position: 1, side: 'bottom' },
 };
 
+const STEP_BADGE_BOUNDARY_SNAP_DISTANCE = 8;
+const STEP_BADGE_BOUNDARY_SIDES: readonly StepBadgeBoundarySide[] = [
+  'top',
+  'right',
+  'bottom',
+  'left',
+];
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, max));
 }
@@ -39,7 +47,47 @@ function getNormalOffset(
         : side === 'bottom'
           ? point.y - (frameRect.y + frameRect.height)
           : frameRect.x - point.x;
+  if (Math.abs(raw) <= STEP_BADGE_BOUNDARY_SNAP_DISTANCE) return 0;
   return Math.round(clamp(raw, -STEP_BADGE_NORMAL_OFFSET_LIMIT, STEP_BADGE_NORMAL_OFFSET_LIMIT));
+}
+
+function getSquaredDistanceToSide(
+  frameRect: StepBadgeFrameRect,
+  point: StepBadgePoint,
+  side: StepBadgeBoundarySide
+): number {
+  const right = frameRect.x + frameRect.width;
+  const bottom = frameRect.y + frameRect.height;
+  const boundaryPoint =
+    side === 'top'
+      ? { x: clamp(point.x, frameRect.x, right), y: frameRect.y }
+      : side === 'right'
+        ? { x: right, y: clamp(point.y, frameRect.y, bottom) }
+        : side === 'bottom'
+          ? { x: clamp(point.x, frameRect.x, right), y: bottom }
+          : { x: frameRect.x, y: clamp(point.y, frameRect.y, bottom) };
+  const deltaX = point.x - boundaryPoint.x;
+  const deltaY = point.y - boundaryPoint.y;
+  return deltaX * deltaX + deltaY * deltaY;
+}
+
+function getClosestBoundarySide(args: {
+  frameRect: StepBadgeFrameRect;
+  point: StepBadgePoint;
+  previousSide?: StepBadgeBoundarySide;
+}): StepBadgeBoundarySide {
+  const preferredSide = args.previousSide ?? 'top';
+  let closestSide = preferredSide;
+  let closestDistance = getSquaredDistanceToSide(args.frameRect, args.point, preferredSide);
+  for (const side of STEP_BADGE_BOUNDARY_SIDES) {
+    if (side === preferredSide) continue;
+    const distance = getSquaredDistanceToSide(args.frameRect, args.point, side);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestSide = side;
+    }
+  }
+  return closestSide;
 }
 
 function getPositionOnSide(
@@ -95,7 +143,7 @@ export function projectStepBadgeToFrameBoundary(args: {
   point: StepBadgePoint;
   previousSide?: StepBadgeBoundarySide;
 }): StepBadgeManualPlacement {
-  const side = args.previousSide ?? 'top';
+  const side = getClosestBoundarySide(args);
   const normalOffset = getNormalOffset(args.frameRect, args.point, side);
 
   return {

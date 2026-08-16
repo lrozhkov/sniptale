@@ -185,6 +185,9 @@ export function initializeContentUiRoots(shadowRoot: ShadowRoot): {
     (shadowRoot.getElementById(CONTENT_OVERLAY_ROOT_ID) as HTMLDivElement | null) ??
     createContentSurfaceRoot(shadowRoot, 'overlay');
 
+  appContainer.classList.add('sniptale-extension-surface');
+  overlayRoot.classList.add('sniptale-extension-surface');
+
   if (!appContainer.isConnected) {
     shadowRoot.appendChild(appContainer);
   }

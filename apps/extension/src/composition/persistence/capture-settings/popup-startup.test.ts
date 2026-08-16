@@ -46,6 +46,23 @@ it('loads the new top-level menu and tools destinations from the existing select
   });
 });
 
+it.each([
+  ['screenshots:tools', 'tools'],
+  ['video:area', 'video:tab'],
+] as const)(
+  'maps the retired %s destination to its current surface',
+  async (selection, expected) => {
+    getMock.mockResolvedValue({
+      sniptale_popup_startup: { selection, lastPage: 'menu' },
+    });
+    await expect(loadPopupStartupState()).resolves.toEqual({
+      selection: expected,
+      lastPage: 'menu',
+    });
+    expect(setMock).not.toHaveBeenCalled();
+  }
+);
+
 it('persists startup selection without overwriting the last page', async () => {
   getMock.mockResolvedValue({
     sniptale_popup_startup: { selection: 'remember-last', lastPage: 'video' },

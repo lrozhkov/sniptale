@@ -143,7 +143,7 @@ export function createAddFreeFrameHandler(
       isAutoMode: args.globalStepBadgeAutoModeRef.current,
       recalculateStepBadgesRef: args.recalculateStepBadgesRef,
     });
-    useFrameUIStore.getState().selectFrame(frameData.id);
+    useFrameUIStore.getState().clearSelection();
     return frameData;
   };
 }

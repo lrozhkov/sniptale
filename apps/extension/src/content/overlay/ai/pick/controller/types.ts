@@ -17,6 +17,7 @@ export interface UseAiPickControllerResult {
   handleCancelAIPrompt: () => void;
   handleCloseAIModal: () => void;
   handleDisableAiPickMode: () => void;
+  handleEnableAiPickMode: () => void;
   handleSubmitAIPrompt: (
     prompt: string,
     selectedData?: string,

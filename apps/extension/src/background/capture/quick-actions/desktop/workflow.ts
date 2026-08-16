@@ -10,6 +10,7 @@ import { transitionCaptureJob } from '../../jobs/state-machine';
 import type { QuickActionRuntimeContext } from '../flow/shared';
 import { acquireMediaMutationPermit } from '../../../mutation-exclusion/media-activity';
 import { assertQuickActionPolicy } from '../../../../features/quick-actions-presets/policy';
+import { chooseDesktopScreenshotSource } from '../../../../platform/media-utils/desktop-capture-source-picker';
 import {
   ensureOffscreenDocument,
   waitForOffscreenReady,
@@ -55,6 +56,20 @@ function cancelOffscreenFrame(requestId: string) {
     attachOffscreenCommandCapability({
       type: MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
       requestId,
+    })
+  );
+}
+
+function captureOffscreenFrame(args: {
+  imageFormat: QuickActionRuntimeContext['imageFormat'];
+  imageQuality: number;
+  requestId: string;
+  streamId: string;
+}) {
+  return getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+      ...args,
     })
   );
 }
@@ -116,6 +131,45 @@ export async function reserveDesktopQuickAction(args: {
     throw error;
   } finally {
     preparingTabIds.delete(args.tabId);
+  }
+}
+
+export async function selectAndCaptureDesktopQuickAction(args: {
+  context: QuickActionRuntimeContext;
+  tabId: number;
+  targetTab?: chrome.tabs.Tab;
+}): Promise<DesktopScreenshotSelection> {
+  const preparation = await reserveDesktopQuickAction({
+    context: args.context,
+    tabId: args.tabId,
+  });
+  try {
+    const source = await chooseDesktopScreenshotSource(args.targetTab);
+    if (source.status === 'failed') throw new Error(source.error);
+    if (source.status === 'cancelled') {
+      return { status: 'cancelled', ...preparation };
+    }
+
+    const response = await captureOffscreenFrame({
+      imageFormat: args.context.imageFormat,
+      imageQuality: args.context.imageQuality,
+      requestId: preparation.requestId,
+      streamId: source.selection.streamId,
+    });
+    if (!response?.success || response.result !== 'captured') {
+      throw new Error(response?.error || 'Desktop screenshot capture failed');
+    }
+    return {
+      status: 'selected',
+      ...preparation,
+      dataUrl: response.dataUrl,
+      height: response.height,
+      width: response.width,
+    };
+  } catch (error) {
+    const pending = pendingPreparations.get(preparation.reservationToken);
+    if (pending) await cancelPreparation(pending).catch(() => undefined);
+    throw error;
   }
 }
 

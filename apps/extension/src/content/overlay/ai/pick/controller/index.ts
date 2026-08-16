@@ -3,7 +3,7 @@ import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { addPagePreparationHistoryAppliedListener } from '../../../../parser/page-preparation/history';
 import { createAiPickControllerRuntimeContext, createCancelAiPromptHandler } from './context';
 import { handleCloseAIModal, resetAiPickControllerAfterHistoryApply } from './lifecycle';
-import { handleAiPickContentStart, handleDisableAiPickMode } from './mode';
+import { handleAiPickContentStart, handleDisableAiPickMode, handleEnableAiPickMode } from './mode';
 import { createAiSubmitRequestGate } from './submit/gate';
 import { submitAiPickPromptDeferred } from './submit/lazy';
 import type {
@@ -135,6 +135,7 @@ export function useAiPickController({
 
   const handleDisableAiPickModeAction = () => handleDisableAiPickMode(context);
   const handleAiPickContentStartAction = () => handleAiPickContentStart(context);
+  const handleEnableAiPickModeAction = () => handleEnableAiPickMode(context);
   const handleCancelAIPromptAction = createCancelAiPromptHandler({
     cancelActiveAiRequest,
     setIsAILoading: aiState.setIsAILoading,
@@ -148,6 +149,7 @@ export function useAiPickController({
     handleCancelAIPrompt: handleCancelAIPromptAction,
     handleCloseAIModal: handleCloseAIModalAction,
     handleDisableAiPickMode: handleDisableAiPickModeAction,
+    handleEnableAiPickMode: handleEnableAiPickModeAction,
     handleSubmitAIPrompt,
     isAILoading: aiState.isAILoading,
     isAIModalOpen: aiState.isAIModalOpen,

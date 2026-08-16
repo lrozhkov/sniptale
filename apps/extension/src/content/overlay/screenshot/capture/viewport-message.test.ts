@@ -27,6 +27,7 @@ function createRuntime(): ScreenshotControllerRuntime {
       setSaveDialogState: vi.fn(),
     },
     session: {
+      editingModeBaseline: null,
       navigationLockBaseline: false,
       runActive: false,
       runGeneration: 1,
@@ -34,6 +35,7 @@ function createRuntime(): ScreenshotControllerRuntime {
     scenario: {
       buildCapturePayload: vi.fn(createScenarioPayload),
     },
+    restoreEditingMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),

@@ -88,6 +88,10 @@ export function handleAiPickContentStart(context: AiPickControllerContext) {
     return;
   }
 
+  handleEnableAiPickMode(context);
+}
+
+export function handleEnableAiPickMode(context: AiPickControllerContext) {
   warmAIModal(context);
   warmAiPickRuntime();
   disableHighlighterMode();

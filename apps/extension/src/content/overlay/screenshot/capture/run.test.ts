@@ -86,10 +86,12 @@ function createRuntime(actionType: 'download_default' | 'scenario'): ScreenshotC
     },
     captureActionRef: { current: actionType },
     session: {
+      editingModeBaseline: null,
       navigationLockBaseline: false,
       runActive: false,
       runGeneration: 1,
     },
+    restoreEditingMode: vi.fn(),
     scenario: {
       buildCapturePayload: vi.fn(() => createScenarioPayload()),
       ensureCaptureReady: vi.fn(async () => undefined),

@@ -46,15 +46,23 @@ function mountQuickEditCursorStyle(): () => void {
       user-select: text !important;
       -webkit-user-select: text !important;
     }
-    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-toolbar,
-    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-toolbar *,
-    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-modal,
-    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-modal *,
-    .sniptale-toolbar,
-    .sniptale-toolbar *,
-    .sniptale-modal,
-    .sniptale-modal * {
+    .sniptale-extension-surface,
+    .sniptale-extension-surface * {
+      cursor: default !important;
+    }
+    .sniptale-extension-surface button:not(:disabled),
+    .sniptale-extension-surface button:not(:disabled) *,
+    .sniptale-extension-surface [role="button"]:not([aria-disabled="true"]),
+    .sniptale-extension-surface [role="button"]:not([aria-disabled="true"]) *,
+    .sniptale-extension-surface [role="menuitem"]:not([aria-disabled="true"]),
+    .sniptale-extension-surface [role="menuitem"]:not([aria-disabled="true"]) *,
+    .sniptale-extension-surface a[href],
+    .sniptale-extension-surface a[href] * {
       cursor: pointer !important;
+    }
+    .sniptale-extension-surface :is(input, textarea, select, [contenteditable]),
+    .sniptale-extension-surface [contenteditable] * {
+      cursor: auto !important;
     }
   `,
   });

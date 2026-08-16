@@ -18,7 +18,6 @@ import type {
 
 const videoModes: Partial<Record<PopupStartupSelection, CaptureMode>> = {
   'video:tab': CaptureMode.TAB,
-  'video:area': CaptureMode.TAB_CROP,
   'video:camera': CaptureMode.CAMERA,
   'video:screen': CaptureMode.SCREEN,
 };
@@ -27,7 +26,6 @@ const screenshotModes = {
   'screenshots:quick-actions': 'quick-actions',
   'screenshots:tab': 'tab',
   'screenshots:desktop': 'desktop',
-  'screenshots:tools': 'tools',
 } as const;
 
 export async function resolvePopupStartupRoute(): Promise<PopupStartupDescriptor> {
@@ -77,6 +75,5 @@ export async function resolvePopupStartupRoute(): Promise<PopupStartupDescriptor
     return { page: 'video', videoMode, recordingSnapshot, postRecordSnapshot };
   }
   const screenshotMode = screenshotModes[startup.selection as keyof typeof screenshotModes];
-  if (screenshotMode === 'tools') return { page: 'tools' };
   return screenshotMode ? { page: 'screenshots', screenshotMode } : { page: 'menu' };
 }

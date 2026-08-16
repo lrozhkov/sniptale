@@ -69,6 +69,7 @@ function createScreenshotParams(): ScreenshotControllerParams {
       disableQuickEditMode: vi.fn(),
       highlighterMode: false,
       quickEditMode: false,
+      restoreEditingMode: vi.fn(),
       setAiPickMode: vi.fn(),
       setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
@@ -95,10 +96,12 @@ function createScreenshotRuntime(): ScreenshotControllerRuntime {
     },
     captureActionRef: { current: 'download_default' },
     session: {
+      editingModeBaseline: null,
       navigationLockBaseline: true,
       runActive: false,
       runGeneration: 1,
     },
+    restoreEditingMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
@@ -145,9 +148,10 @@ function expectPrepareScreenshotModeDisablesEditingModes() {
   const session = createScreenshotControllerSession(false);
   vi.mocked(isLockEnabled).mockReturnValueOnce(false);
 
-  prepareScreenshotMode(params, session);
+  prepareScreenshotMode(params, session, 'selection');
 
   expect(session.navigationLockBaseline).toBe(false);
+  expect(session.editingModeBaseline).toBe('ai-pick');
   expect(params.editingModes.disableQuickEditMode).toHaveBeenCalledOnce();
   expect(params.editingModes.setQuickEditMode).toHaveBeenCalledWith(false);
   expect(params.editingModes.disableHighlighterMode).toHaveBeenCalledOnce();
@@ -162,9 +166,10 @@ function expectPrepareScreenshotModeCapturesUserLockBaseline() {
   const session = createScreenshotControllerSession(false);
   vi.mocked(isLockEnabled).mockReturnValueOnce(true).mockReturnValueOnce(true);
 
-  prepareScreenshotMode(params, session);
+  prepareScreenshotMode(params, session, 'visible');
 
   expect(session.navigationLockBaseline).toBe(true);
+  expect(session.editingModeBaseline).toBeNull();
   expect(params.editingModes.disableHighlighterMode).not.toHaveBeenCalled();
   expect(params.editingModes.disableAiPickMode).not.toHaveBeenCalled();
   expect(params.setNavigationLockEnabled).toHaveBeenCalledWith(true);
@@ -175,7 +180,7 @@ function expectPrepareScreenshotModeUsesAutoStartBaseline() {
   const session = createScreenshotControllerSession(true);
   vi.mocked(isLockEnabled).mockReturnValueOnce(true);
 
-  prepareScreenshotMode(params, session, {
+  prepareScreenshotMode(params, session, 'visible', {
     navigationLockBaseline: false,
   });
 

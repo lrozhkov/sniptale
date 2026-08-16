@@ -13,6 +13,7 @@ type ContentPinToTabSessionWriteResult =
 type ContentPinToTabSessionState = {
   pinToTab: boolean;
   pinToTabAvailable: boolean;
+  toolbarVisible: boolean;
 };
 type ContentPinToTabSessionMutation = {
   pinToTab?: boolean;
@@ -47,6 +48,7 @@ async function requestPinToTabSessionState(
   return {
     pinToTab: response.pinToTab,
     pinToTabAvailable: response.pinToTabAvailable,
+    toolbarVisible: typeof response.toolbarVisible === 'boolean' ? response.toolbarVisible : true,
   };
 }
 
@@ -55,7 +57,7 @@ export async function loadContentPinToTabSessionState(): Promise<ContentPinToTab
     return await requestPinToTabSessionState();
   } catch (error) {
     logger.warn('Failed to load authoritative pin-to-tab session state', error);
-    return { pinToTab: false, pinToTabAvailable: false };
+    return { pinToTab: false, pinToTabAvailable: false, toolbarVisible: true };
   }
 }
 

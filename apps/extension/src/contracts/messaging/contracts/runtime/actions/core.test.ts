@@ -90,6 +90,49 @@ it('rejects non-settings-transfer messages in the action-core contract', () => {
   ).toThrow();
 });
 
+it('bounds settings-transfer package, inspection, and import requests', () => {
+  const buildPackage = {
+    exportKind: 'selective' as const,
+    operation: 'build-export-package' as const,
+    selectedNodeIds: ['settings.interface'],
+    type: MessageType.SETTINGS_TRANSFER,
+  };
+  expect(settingsTransferContract.parseRequest(buildPackage)).toEqual(buildPackage);
+  expect(() =>
+    settingsTransferContract.parseRequest({ ...buildPackage, exportKind: 'unknown' })
+  ).toThrow();
+
+  const inspectImport = {
+    fileText: '{}',
+    operation: 'inspect-import' as const,
+    type: MessageType.SETTINGS_TRANSFER,
+  };
+  expect(settingsTransferContract.parseRequest(inspectImport)).toEqual(inspectImport);
+  expect(() => settingsTransferContract.parseRequest({ ...inspectImport, fileText: 42 })).toThrow();
+
+  const commitImport = {
+    decisions: {
+      'settings.interface': 'use-imported',
+      'settings.video': 'keep-local',
+      'settings.capture': 'import-as-copy',
+    },
+    destructiveConfirmed: true,
+    fileText: '{}',
+    fingerprint: 'a'.repeat(64),
+    operation: 'commit-import' as const,
+    selectedNodeIds: ['settings.interface'],
+    strategy: 'exact-restore' as const,
+    type: MessageType.SETTINGS_TRANSFER,
+  };
+  expect(settingsTransferContract.parseRequest(commitImport)).toEqual(commitImport);
+  expect(() =>
+    settingsTransferContract.parseRequest({
+      ...commitImport,
+      decisions: { 'settings.interface': 'unknown' },
+    })
+  ).toThrow();
+});
+
 it('parses strict popup screenshot capture requests and typed responses', () => {
   const request = {
     type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
@@ -446,6 +489,7 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
       reason: 'pin-to-tab',
       restored: true,
       success: true,
+      toolbarVisible: false,
     })
   ).toEqual({
     pinToTab: true,
@@ -453,6 +497,7 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
     reason: 'pin-to-tab',
     restored: true,
     success: true,
+    toolbarVisible: false,
   });
   expect(
     contentRuntimeWakeupContract.parseResponse({

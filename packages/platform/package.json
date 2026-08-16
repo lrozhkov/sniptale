@@ -10,6 +10,7 @@
     "./browser/callback": "./src/browser/callback.ts",
     "./browser/chrome-ai": "./src/browser/chrome-ai.ts",
     "./browser/clipboard": "./src/browser/clipboard.ts",
+    "./browser/commands": "./src/browser/commands.ts",
     "./browser/content-runtime-shim": "./src/browser/content-runtime-shim.ts",
     "./browser/context-menus": "./src/browser/context-menus.ts",
     "./browser/desktop-capture": "./src/browser/desktop-capture.ts",

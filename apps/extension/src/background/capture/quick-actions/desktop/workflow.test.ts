@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   acquireMutationPermit: vi.fn(),
   createJob: vi.fn(),
+  chooseSource: vi.fn(),
   executeDownload: vi.fn(),
   ensureOffscreen: vi.fn(),
   openEditor: vi.fn(),
@@ -11,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   sendRuntimeMessage: vi.fn(),
   transitionJob: vi.fn(),
   waitOffscreen: vi.fn(),
+}));
+vi.mock('../../../../platform/media-utils/desktop-capture-source-picker', () => ({
+  chooseDesktopScreenshotSource: mocks.chooseSource,
 }));
 vi.mock('../../../media-hub/assets', () => ({
   saveScreenshotToMediaHubFromDataUrl: mocks.saveAsset,
@@ -43,7 +47,11 @@ vi.mock('../../../routing-contracts/runtime-messaging/services', async (importOr
   >()),
   getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: mocks.sendRuntimeMessage }),
 }));
-import { reserveDesktopQuickAction, runDesktopQuickAction } from './workflow';
+import {
+  reserveDesktopQuickAction,
+  runDesktopQuickAction,
+  selectAndCaptureDesktopQuickAction,
+} from './workflow';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { DEFAULT_SETTINGS } from '../../../../composition/persistence/settings';
 import type { CaptureActionType, QuickAction } from '../../../../contracts/settings';
@@ -106,6 +114,10 @@ beforeEach(() => {
   mocks.releasePermit.mockReset();
   mocks.acquireMutationPermit.mockReturnValue(mocks.releasePermit);
   mocks.createJob.mockResolvedValue('job-1');
+  mocks.chooseSource.mockResolvedValue({
+    status: 'selected',
+    selection: { label: 'Window', streamId: 'stream-1' },
+  });
   mocks.saveAsset.mockResolvedValue('asset-1');
   mocks.executeDownload.mockResolvedValue(undefined);
   mocks.openEditor.mockResolvedValue(undefined);
@@ -172,6 +184,62 @@ it('releases the mutation permit when offscreen reservation fails', async () => 
   mocks.sendRuntimeMessage.mockResolvedValueOnce({ success: false, error: 'offscreen busy' });
   await expect(reserveDesktopQuickAction({ context: createContext(), tabId: 83 })).rejects.toThrow(
     'offscreen busy'
+  );
+  expect(mocks.releasePermit).toHaveBeenCalledOnce();
+});
+
+it('selects a desktop source and captures its frame through the reserved offscreen owner', async () => {
+  const context = createContext('edit');
+
+  await expect(
+    selectAndCaptureDesktopQuickAction({
+      context,
+      tabId: 84,
+      targetTab: { id: 84 } as chrome.tabs.Tab,
+    })
+  ).resolves.toEqual({
+    dataUrl: 'data:image/webp;base64,AA==',
+    height: 800,
+    requestId: expect.any(String),
+    reservationToken: expect.any(String),
+    status: 'selected',
+    width: 1200,
+  });
+
+  expect(mocks.chooseSource).toHaveBeenCalledWith({ id: 84 });
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      imageFormat: 'webp',
+      imageQuality: 80,
+      streamId: 'stream-1',
+      type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+    })
+  );
+});
+
+it('retains a cancelled selection for the quick-action cleanup transaction', async () => {
+  mocks.chooseSource.mockResolvedValueOnce({ status: 'cancelled' });
+
+  await expect(
+    selectAndCaptureDesktopQuickAction({ context: createContext('edit'), tabId: 85 })
+  ).resolves.toEqual({
+    requestId: expect.any(String),
+    reservationToken: expect.any(String),
+    status: 'cancelled',
+  });
+
+  expect(mocks.releasePermit).not.toHaveBeenCalled();
+});
+
+it('cancels both reservations when source selection fails', async () => {
+  mocks.chooseSource.mockResolvedValueOnce({ status: 'failed', error: 'Picker unavailable' });
+
+  await expect(
+    selectAndCaptureDesktopQuickAction({ context: createContext('edit'), tabId: 86 })
+  ).rejects.toThrow('Picker unavailable');
+
+  expect(mocks.sendRuntimeMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ type: MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME })
   );
   expect(mocks.releasePermit).toHaveBeenCalledOnce();
 });

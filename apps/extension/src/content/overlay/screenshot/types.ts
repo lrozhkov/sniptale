@@ -19,6 +19,13 @@ export type ScreenshotStartContext = {
   navigationLockBaseline?: boolean | undefined;
 };
 
+export type ScreenshotEditingMode =
+  | 'ai-pick'
+  | 'design-review'
+  | 'drawing'
+  | 'highlighter'
+  | 'quick-edit';
+
 export type ScreenshotType = 'visible' | 'full' | 'selection';
 
 export interface ScreenshotCaptureAdapter {
@@ -32,6 +39,7 @@ export interface ScreenshotControllerCapturePersistenceBridge {
 }
 
 export interface ScreenshotControllerRuntimeSession {
+  editingModeBaseline: ScreenshotEditingMode | null;
   navigationLockBaseline: boolean;
   runActive: boolean;
   runGeneration: number;
@@ -43,6 +51,7 @@ export interface ScreenshotControllerRuntime {
   captureActionRef: MutableRefObject<CaptureActionType>;
   session: ScreenshotControllerRuntimeSession;
   scenario?: ScreenshotControllerScenarioBridge;
+  restoreEditingMode: (mode: ScreenshotEditingMode) => void;
   setCaptureAction: (action: CaptureActionType) => void;
   setIsCompletelyHidden: (hidden: boolean) => void;
   setIsToolbarVisible: (visible: boolean) => void;

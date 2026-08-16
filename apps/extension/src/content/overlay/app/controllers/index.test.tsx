@@ -4,7 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 type ScreenshotControllerMockArgs = {
-  editingModes: Record<'disableAiPickMode' | 'disableQuickEditMode', () => void>;
+  editingModes: Record<'disableAiPickMode' | 'disableQuickEditMode', () => void> & {
+    restoreEditingMode: (mode: 'ai-pick' | 'drawing') => void;
+  };
 };
 type ToolbarModeControllerMockArgs = { disableAiPickMode: () => void };
 
@@ -16,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   disableDrawing: vi.fn(),
   drawingController: {
     finalizeInteraction: vi.fn(),
+    prepareActivation: vi.fn(() => true),
     session: { dispose: vi.fn() },
   },
   scenarioController: {
@@ -29,9 +32,11 @@ const mocks = vi.hoisted(() => ({
     handleTakeScreenshot: vi.fn(async () => undefined),
   },
   handleAiPickContentStart: vi.fn(),
+  handleEnableAiPickMode: vi.fn(),
   useAiPickController: vi.fn(() => ({
     kind: 'ai-controller',
     handleAiPickContentStart: mocks.handleAiPickContentStart,
+    handleEnableAiPickMode: mocks.handleEnableAiPickMode,
   })),
   useContentDrawingController: vi.fn(() => mocks.drawingController),
   useDrawingModeIntegration: vi.fn(() => ({
@@ -274,6 +279,7 @@ function expectControllerResult() {
   expect(latestControllers?.aiController).toEqual({
     kind: 'ai-controller',
     handleAiPickContentStart: expect.any(Function),
+    handleEnableAiPickMode: expect.any(Function),
   });
   expect(latestControllers?.drawingController).toBe(mocks.drawingController);
   expect(latestControllers?.modeController).toEqual({
@@ -365,6 +371,28 @@ async function expectDrawingModeWiring() {
   );
 }
 
+async function expectDrawingModeRestorationPreservesTool() {
+  const modeState = await renderHarness();
+  const screenshotArgs = mocks.useScreenshotController.mock.calls[0]?.[0];
+
+  screenshotArgs?.editingModes.restoreEditingMode('drawing');
+
+  expect(mocks.drawingController.prepareActivation).toHaveBeenCalledOnce();
+  expect(modeState.setDrawingMode).toHaveBeenCalledWith(true);
+  expect(modeState.setNavigationLockEnabled).toHaveBeenCalledWith(false);
+  expect(mocks.drawingController.finalizeInteraction).not.toHaveBeenCalled();
+}
+
+async function expectAiModeRestorationUsesEnableAction() {
+  await renderHarness();
+  const screenshotArgs = mocks.useScreenshotController.mock.calls[0]?.[0];
+
+  screenshotArgs?.editingModes.restoreEditingMode('ai-pick');
+
+  expect(mocks.handleEnableAiPickMode).toHaveBeenCalledOnce();
+  expect(mocks.handleAiPickContentStart).not.toHaveBeenCalled();
+}
+
 it(
   'groups controller ownership seams from mode-state into canonical controller hooks',
   expectControllerOwnerGrouping
@@ -378,3 +406,8 @@ it(
   expectScreenshotQuickEditDisableResetsDocumentMode
 );
 it('connects Drawing to the primary content runtime controller graph', expectDrawingModeWiring);
+it(
+  'restores Drawing after area selection without resetting its active tool',
+  expectDrawingModeRestorationPreservesTool
+);
+it('restores AI pick through its enable action', expectAiModeRestorationUsesEnableAction);

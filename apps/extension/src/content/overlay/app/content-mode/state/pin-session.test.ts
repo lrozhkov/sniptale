@@ -69,11 +69,13 @@ it('hydrates pin state through the authorized background owner', async () => {
     reason: 'pin-to-tab',
     restored: true,
     success: true,
+    toolbarVisible: false,
   });
 
   await expect(loadContentPinToTabSessionState()).resolves.toEqual({
     pinToTab: true,
     pinToTabAvailable: true,
+    toolbarVisible: false,
   });
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'CONTENT_RUNTIME_WAKEUP',
@@ -92,6 +94,7 @@ it('does not confuse scenario restoration with a user pin', async () => {
   await expect(loadContentPinToTabSessionState()).resolves.toEqual({
     pinToTab: false,
     pinToTabAvailable: true,
+    toolbarVisible: true,
   });
 });
 
@@ -101,6 +104,7 @@ it('fails closed and reports an invalid background response', async () => {
   await expect(loadContentPinToTabSessionState()).resolves.toEqual({
     pinToTab: false,
     pinToTabAvailable: false,
+    toolbarVisible: true,
   });
   expect(loggerMocks.warn).toHaveBeenCalledWith(
     'Failed to load authoritative pin-to-tab session state',

@@ -13,7 +13,6 @@ export function buildPopupStartupOptions(locale: AppLocale): Array<{
     'screenshots:tab',
     'screenshots:desktop',
     'video:tab',
-    'video:area',
     'video:camera',
     'video:screen',
     'tools',

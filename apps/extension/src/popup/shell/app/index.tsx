@@ -1,4 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { GalleryThumbnails, Paintbrush, TvMinimalPlay, Upload } from 'lucide-react';
 import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
 import type { AppLocale } from '../../../platform/i18n/types';
@@ -7,33 +8,26 @@ import { usePopupRouteController } from '../startup/use-route-controller';
 import { usePopupStartupReconciliation } from './use-startup-reconciliation';
 
 const pages: Array<{ page: PopupPage; icon: ReactNode }> = [
-  {
-    page: 'screenshots',
-    icon: (
-      <ShellIcon path="M4 7h3l1.5-2h7L17 7h3v11H4V7Zm8 3.25a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5Z" />
-    ),
-  },
-  { page: 'video', icon: <ShellIcon path="M4 6.5h11v11H4v-11Zm11 3.5 5-2.5v9L15 14v-4Z" /> },
-  { page: 'menu', icon: <ShellIcon path="M5 7h14M5 12h14M5 17h14" strokeOnly /> },
+  { page: 'screenshots', icon: <GalleryThumbnails aria-hidden="true" /> },
+  { page: 'video', icon: <TvMinimalPlay aria-hidden="true" /> },
+  { page: 'menu', icon: <ShellIcon path="M5 7h14M5 12h14M5 17h14" /> },
   {
     page: 'tools',
-    icon: (
-      <ShellIcon path="m14.7 6.3 3-3a5 5 0 0 1-6.4 6.4L5 16l3 3 6.3-6.3a5 5 0 0 1 6.4-6.4l-3 3-3-3Z" />
-    ),
+    icon: <Paintbrush aria-hidden="true" />,
   },
-  { page: 'export', icon: <ShellIcon path="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3" strokeOnly /> },
+  { page: 'export', icon: <Upload aria-hidden="true" /> },
 ];
 
-function ShellIcon({ path, strokeOnly = false }: { path: string; strokeOnly?: boolean }) {
+function ShellIcon({ path }: { path: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path
         d={path}
-        fill={strokeOnly ? 'none' : 'currentColor'}
-        stroke={strokeOnly ? 'currentColor' : 'none'}
-        strokeWidth={strokeOnly ? 1.8 : undefined}
-        strokeLinecap={strokeOnly ? 'round' : undefined}
-        strokeLinejoin={strokeOnly ? 'round' : undefined}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );

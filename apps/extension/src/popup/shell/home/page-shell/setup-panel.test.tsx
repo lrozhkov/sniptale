@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from 'react';
+import { act, type ComponentType, type ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanupRenderedNode, getContainer, renderNode } from './popup-home.test.helpers';
 import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
@@ -13,7 +13,11 @@ vi.mock('../../../../ui/popup-shell/inline-curtain/select', () => ({
     label: string;
     value: string;
     disabled?: boolean;
-    options: Array<{ value: string; label: string }>;
+    options: Array<{
+      value: string;
+      label: string;
+      icon?: ComponentType<{ className?: string }>;
+    }>;
     optionsPanel?: ReactNode;
     onChange(value: string): void;
   }) => (
@@ -30,6 +34,15 @@ vi.mock('../../../../ui/popup-shell/inline-curtain/select', () => ({
           </option>
         ))}
       </select>
+      <span data-testid={`${props.label}.icons`}>
+        {props.options.map(({ icon: Icon, value }) =>
+          Icon ? (
+            <span key={value} data-option-icon={value}>
+              <Icon />
+            </span>
+          ) : null
+        )}
+      </span>
       {props.optionsPanel}
     </label>
   ),
@@ -40,16 +53,21 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     centered?: boolean;
     label: string;
     disabled: boolean;
+    icon: ComponentType<{ className?: string }>;
     onClick(): void;
-  }) => (
-    <button
-      className={props.centered ? 'justify-center' : 'justify-start'}
-      disabled={props.disabled}
-      onClick={props.onClick}
-    >
-      {props.label}
-    </button>
-  ),
+  }) => {
+    const Icon = props.icon;
+    return (
+      <button
+        className={props.centered ? 'justify-center' : 'justify-start'}
+        disabled={props.disabled}
+        onClick={props.onClick}
+      >
+        <Icon />
+        {props.label}
+      </button>
+    );
+  },
 }));
 import { ScreenshotSetupPanel } from './setup-panel';
 
@@ -69,13 +87,21 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
   );
   expect(getContainer()?.textContent).not.toContain('popup.home.captureAreaLabel');
   expect(getContainer()?.textContent).not.toContain('popup.home.captureCountdownLabel');
-  expect(
-    Array.from(getContainer()?.querySelectorAll('option') ?? []).map((option) => option.value)
-  ).not.toContain('copy');
+  const afterCaptureValues = Array.from(getContainer()?.querySelectorAll('option') ?? []).map(
+    (option) => option.value
+  );
+  expect(afterCaptureValues).not.toContain('copy');
+  expect(afterCaptureValues).not.toContain('scenario');
   const captureButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
   expect(captureButton?.className).toContain('justify-start');
+  expect(
+    [...(getContainer()?.querySelectorAll('button') ?? [])]
+      .find((button) => button.textContent === 'popup.home.imageEditorLabel')
+      ?.querySelector('svg')
+      ?.getAttribute('data-ui')
+  ).toBe('popup.image-editor-icon');
   captureButton?.click();
   expect(onCapture).toHaveBeenCalledOnce();
 });
@@ -94,7 +120,7 @@ it('hides format and quality whenever clipboard delivery is selected', async () 
   expect(getContainer()?.textContent).not.toContain('popup.home.captureQualityLabel');
 });
 
-it('uses popup folder wording and omits scenario recording from post-capture actions', async () => {
+it('uses popup folder wording and offers scenario recording for tab captures', async () => {
   await renderNode(
     <ScreenshotSetupPanel
       config={DEFAULT_SCREENSHOT_SETUP_STATE.tab}
@@ -113,7 +139,16 @@ it('uses popup folder wording and omits scenario recording from post-capture act
     label: 'popup.home.captureChooseFolderLabel',
     value: 'ask_preset',
   });
-  expect(values.some((option) => option.value === 'scenario')).toBe(false);
+  expect(values).toContainEqual({
+    label: 'settings.quickActions.afterCaptureScenario',
+    value: 'scenario',
+  });
+  expect(
+    getContainer()?.querySelector('[data-option-icon="edit"] svg')?.getAttribute('data-ui')
+  ).toBe('popup.image-editor-icon');
+  expect(
+    getContainer()?.querySelector('[data-option-icon="scenario"] svg')?.getAttribute('class')
+  ).toContain('lucide-scroll-text');
 });
 
 it('renders tab settings, applies field changes, and disables a pending capture', async () => {

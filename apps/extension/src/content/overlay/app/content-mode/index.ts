@@ -47,7 +47,6 @@ export function useContentAppModeState() {
     scenarioPinned,
     screenshotMode: state.screenshotMode,
     setCurrentViewport: state.setCurrentViewport,
-    setIsToolbarVisible: state.setIsToolbarVisible,
     setScreenshotMode: state.setScreenshotMode,
   });
   useSessionPresetReset(state.screenshotMode, state.setSessionActivePresetId);

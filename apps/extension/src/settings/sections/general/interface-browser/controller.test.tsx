@@ -170,7 +170,6 @@ it('loads and persists the popup startup destination', async () => {
     'screenshots:tab',
     'screenshots:desktop',
     'video:tab',
-    'video:area',
     'video:camera',
     'video:screen',
     'tools',

@@ -104,8 +104,9 @@ body {
 }
 
 .popup-react-shell__tabs button svg {
-  width: 22px;
-  height: 22px;
+  width: 19px;
+  height: 19px;
+  stroke-width: 1.8;
   transition:
     color 160ms ease,
     transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);

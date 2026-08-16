@@ -128,6 +128,10 @@ export async function openSettingsPage(options: { route?: SettingsRoute } = {}):
   await openSettingsUrl(buildSettingsPageUrl(options.route));
 }
 
+export async function openExtensionShortcutsPage(): Promise<void> {
+  await browserTabs.create({ url: 'chrome://extensions/shortcuts' });
+}
+
 export async function openLegacySettingsPage(section: LegacySettingsSection): Promise<void> {
   await openSettingsUrl(buildLegacySettingsPageUrl(section));
 }

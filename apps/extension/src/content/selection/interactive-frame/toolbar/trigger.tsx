@@ -159,6 +159,8 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
           display: 'flex',
           flexDirection: position.direction,
           gap: FRAME_TRIGGER_CONTROL_GAP,
+          cursor: 'default',
+          pointerEvents: 'auto',
         }}
         onPointerEnter={onFocus}
         onPointerLeave={onBlur}

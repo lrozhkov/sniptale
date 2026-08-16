@@ -67,7 +67,6 @@ export function useQuickActionToastCountdown(
 function restorePinnedToolbarState(
   params: {
     setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
-    setIsToolbarVisible: (visible: boolean) => void;
     setScreenshotMode: (enabled: boolean) => void;
   },
   isCancelled: () => boolean
@@ -85,7 +84,6 @@ function restorePinnedToolbarState(
       }
 
       params.setScreenshotMode(true);
-      params.setIsToolbarVisible(true);
     })
     .catch((error) => {
       logger.error('Failed to restore pinned toolbar state', error);
@@ -97,17 +95,10 @@ export function usePinnedToolbarRestore(params: {
   scenarioPinned: boolean;
   screenshotMode: boolean;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
-  setIsToolbarVisible: (visible: boolean) => void;
   setScreenshotMode: (enabled: boolean) => void;
 }) {
-  const {
-    pinToTab,
-    scenarioPinned,
-    screenshotMode,
-    setCurrentViewport,
-    setIsToolbarVisible,
-    setScreenshotMode,
-  } = params;
+  const { pinToTab, scenarioPinned, screenshotMode, setCurrentViewport, setScreenshotMode } =
+    params;
 
   useEffect(() => {
     if (!pinToTab || scenarioPinned || screenshotMode) {
@@ -116,20 +107,10 @@ export function usePinnedToolbarRestore(params: {
 
     let cancelled = false;
 
-    restorePinnedToolbarState(
-      { setCurrentViewport, setIsToolbarVisible, setScreenshotMode },
-      () => cancelled
-    );
+    restorePinnedToolbarState({ setCurrentViewport, setScreenshotMode }, () => cancelled);
 
     return () => {
       cancelled = true;
     };
-  }, [
-    pinToTab,
-    scenarioPinned,
-    screenshotMode,
-    setCurrentViewport,
-    setIsToolbarVisible,
-    setScreenshotMode,
-  ]);
+  }, [pinToTab, scenarioPinned, screenshotMode, setCurrentViewport, setScreenshotMode]);
 }

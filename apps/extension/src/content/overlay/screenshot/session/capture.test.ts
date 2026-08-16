@@ -57,6 +57,7 @@ function createParams(
       disableQuickEditMode: vi.fn(),
       highlighterMode: false,
       quickEditMode: false,
+      restoreEditingMode: vi.fn(),
       setAiPickMode: vi.fn(),
       setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
@@ -89,6 +90,7 @@ function createArgs(overrides: Partial<FactoryArgs> = {}) {
         setSaveDialogState: vi.fn(),
       },
       captureActionRef: { current: 'download_default' },
+      restoreEditingMode: vi.fn(),
       session,
       setCaptureAction: vi.fn(),
       setIsCompletelyHidden: vi.fn(),
@@ -117,7 +119,12 @@ async function verifyCountdownStartBranch() {
   await createHandleTakeScreenshot(args)('selection');
 
   expect(syncCaptureActionMock).toHaveBeenCalledWith(args.params);
-  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(args.params, args.session, undefined);
+  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(
+    args.params,
+    args.session,
+    'selection',
+    undefined
+  );
   expect(startCountdownMock).toHaveBeenCalledTimes(1);
   expect(runImmediateScreenshotMock).not.toHaveBeenCalled();
   const countdownArgs = startCountdownMock.mock.calls[0]?.[0];
@@ -133,7 +140,12 @@ async function verifyImmediateViewportBranch() {
   await createHandleTakeScreenshot(args)('visible');
 
   expect(syncCaptureActionMock).toHaveBeenCalledWith(args.params);
-  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(args.params, args.session, undefined);
+  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(
+    args.params,
+    args.session,
+    'visible',
+    undefined
+  );
   expect(prepareScreenshotModeMock.mock.invocationCallOrder[0]).toBeLessThan(
     runImmediateScreenshotMock.mock.invocationCallOrder[0] ?? 0
   );
@@ -147,7 +159,12 @@ async function verifyAutoStartContextBranch() {
 
   await createHandleTakeScreenshot(args)('visible', undefined, startContext);
 
-  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(args.params, args.session, startContext);
+  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(
+    args.params,
+    args.session,
+    'visible',
+    startContext
+  );
   expect(runImmediateScreenshotMock).toHaveBeenCalledWith('visible', args, 1);
 }
 

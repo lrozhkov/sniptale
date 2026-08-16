@@ -9,7 +9,11 @@ import type {
   StepBadgeManualPlacement,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { STEP_BADGE_NORMAL_OFFSET_LIMIT } from '@sniptale/runtime-contracts/highlighter/step-badge';
-import { projectStepBadgeToFrameBoundary, type StepBadgeFrameRect } from './placement';
+import {
+  getStepBadgeBoundaryCenter,
+  projectStepBadgeToFrameBoundary,
+  type StepBadgeFrameRect,
+} from './placement';
 import {
   identityFrameAnnotationCoordinateSpace,
   type FrameAnnotationCoordinateSpace,
@@ -95,6 +99,7 @@ export function useStepBadgeBoundaryDrag(args: {
   const [draftPlacement, setDraftPlacement] = React.useState<StepBadgeManualPlacement | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   const pointerIdRef = React.useRef<number | null>(null);
+  const pointerGrabOffsetRef = React.useRef({ x: 0, y: 0 });
   const draftRef = React.useRef<StepBadgeManualPlacement | null>(null);
   const previousSideRef = React.useRef<StepBadgeBoundarySide>(args.initialPlacement.side);
   const observedPlacementRef = React.useRef(args.initialPlacement);
@@ -128,8 +133,14 @@ export function useStepBadgeBoundaryDrag(args: {
       const placement = projectStepBadgeToFrameBoundary({
         frameRect: args.frameRect,
         point: {
-          x: point.x - args.visualOffset.x * (args.visualScale ?? 1),
-          y: point.y - args.visualOffset.y * (args.visualScale ?? 1),
+          x:
+            point.x -
+            pointerGrabOffsetRef.current.x -
+            args.visualOffset.x * (args.visualScale ?? 1),
+          y:
+            point.y -
+            pointerGrabOffsetRef.current.y -
+            args.visualOffset.y * (args.visualScale ?? 1),
         },
         previousSide: previousSideRef.current,
       });
@@ -166,6 +177,17 @@ export function useStepBadgeBoundaryDrag(args: {
         // The transient portal can disappear while capture is being requested.
       }
       pointerIdRef.current = event.pointerId;
+      const coordinateSpace = args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
+      const pointer = coordinateSpace.clientPointToLogical({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const boundaryCenter = getStepBadgeBoundaryCenter(args.frameRect, args.initialPlacement);
+      const visualScale = args.visualScale ?? 1;
+      pointerGrabOffsetRef.current = {
+        x: pointer.x - (boundaryCenter.x + args.visualOffset.x * visualScale),
+        y: pointer.y - (boundaryCenter.y + args.visualOffset.y * visualScale),
+      };
       previousSideRef.current = args.initialPlacement.side;
       draftRef.current = args.initialPlacement;
       setIsDragging(true);

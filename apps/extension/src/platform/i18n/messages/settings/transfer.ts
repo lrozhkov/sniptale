@@ -81,7 +81,7 @@ export const settingsTransferMessages = defineMessageSource({
   domains: {
     interfacePreferences: message('Интерфейс и браузер', 'Interface and browser'),
     captureQuickActions: message('Быстрые действия', 'Quick actions'),
-    captureViewportPresets: message('Размеры экрана', 'Screen sizes'),
+    captureViewportPresets: message('Размер окна', 'Window size'),
     captureImage: message('Качество изображений', 'Image quality'),
     captureVideo: message('Профили видео', 'Video profiles'),
     captureAfterCapture: message('Действия после захвата', 'After-capture actions'),

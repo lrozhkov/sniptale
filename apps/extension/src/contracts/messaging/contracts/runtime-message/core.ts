@@ -218,6 +218,7 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
       pinToTabAvailable: boolean;
       restored?: boolean;
       reason?: 'pin-to-tab' | 'scenario';
+      toolbarVisible?: boolean;
     }>;
     [MessageType.ANNOTATION_FORK_SESSION]: RuntimeMessageResponse<{
       payload?: string;

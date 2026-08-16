@@ -23,6 +23,8 @@ describe('initializeContentUiRoots', () => {
 
     expect(appContainer.id).toBe(CONTENT_APP_CONTAINER_ID);
     expect(overlayRoot.id).toBe(CONTENT_OVERLAY_ROOT_ID);
+    expect(appContainer.classList.contains('sniptale-extension-surface')).toBe(true);
+    expect(overlayRoot.classList.contains('sniptale-extension-surface')).toBe(true);
     expect(overlayRoot.style.display).toBe('contents');
     expect(shadowRoot.getElementById(CONTENT_APP_CONTAINER_ID)).toBe(appContainer);
     expect(shadowRoot.getElementById(CONTENT_OVERLAY_ROOT_ID)).toBe(overlayRoot);

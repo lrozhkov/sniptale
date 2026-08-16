@@ -60,12 +60,12 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Allow camera access first',
   },
   modePresetLabel: {
-    ru: 'Вкладка с шаблоном размера',
-    en: 'Tab with size preset',
+    ru: 'Вкладка с заданным размером окна',
+    en: 'Tab with window size',
   },
   modePresetHint: {
-    ru: 'Запись вкладки с выбранным размером области страницы или окна браузера',
-    en: 'Record the tab with a selected page viewport or browser window size',
+    ru: 'Запись вкладки с выбранным размером окна',
+    en: 'Record the tab with a selected window size',
   },
   modeScreenLabel: {
     ru: 'Окно',
@@ -76,16 +76,16 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Choose a window, tab, or screen via the system picker',
   },
   presetRowLabel: {
-    ru: 'Размер',
-    en: 'Size',
+    ru: 'Размер окна',
+    en: 'Window size',
   },
   presetRowAria: {
-    ru: 'Выбор размера для записи',
-    en: 'Recording size selector',
+    ru: 'Выбор размера окна для записи',
+    en: 'Recording window size selector',
   },
   presetRowDescription: {
-    ru: 'Задаёт размер страницы или окна, который будет использован во время записи.',
-    en: 'Set the page or window size used while recording.',
+    ru: 'Задаёт размер окна на время записи.',
+    en: 'Set the window size used while recording.',
   },
   presetPlaceholder: {
     ru: 'Выберите шаблон',
@@ -96,20 +96,20 @@ export const popupVideoMessages = defineMessageSource({
     en: 'No presets configured',
   },
   presetNativeLabel: {
-    ru: 'Нативный размер',
-    en: 'Native size',
+    ru: 'Текущий размер',
+    en: 'Current size',
   },
   presetNativeDescription: {
-    ru: 'Не изменять область страницы или окно браузера',
-    en: 'Do not resize the page viewport or browser window',
+    ru: 'Не изменять размер окна',
+    en: 'Do not resize the window',
   },
   presetAria: {
-    ru: 'Шаблон размера записи',
-    en: 'Recording size preset',
+    ru: 'Шаблон размера окна для записи',
+    en: 'Recording window size preset',
   },
   manageSizePresets: {
-    ru: 'Управление шаблонами размеров…',
-    en: 'Manage presets…',
+    ru: 'Управление шаблонами размера окна…',
+    en: 'Manage window size presets…',
   },
   choosePresetError: {
     ru: 'Сначала выберите шаблон',

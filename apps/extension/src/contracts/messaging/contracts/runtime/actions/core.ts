@@ -159,6 +159,7 @@ type ContentRuntimeWakeupResponse = RuntimeMessageResponse<{
   pinToTabAvailable: boolean;
   reason?: 'pin-to-tab' | 'scenario';
   restored?: boolean;
+  toolbarVisible?: boolean;
 }>;
 
 const isContentRuntimeWakeupResponseEnvelope =
@@ -168,6 +169,7 @@ const isContentRuntimeWakeupResponseEnvelope =
       pinToTabAvailable: isBoolean,
       reason: isContentRuntimeWakeupReason,
       restored: isBoolean,
+      toolbarVisible: isBoolean,
     },
   });
 

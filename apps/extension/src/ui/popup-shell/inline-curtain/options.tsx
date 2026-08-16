@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import type { ComponentType } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -28,6 +29,7 @@ export type InlineCurtainOption = {
   group?: string;
   groupDescription?: string;
   meta?: string;
+  icon?: ComponentType<{ className?: string }>;
 };
 
 export function InlineCurtainNotice({ notice }: { notice?: string }) {
@@ -113,6 +115,7 @@ function InlineCurtainOptionButton({
   onHighlight: () => void;
   option: InlineCurtainOption;
 }) {
+  const Icon = option.icon;
   return (
     <button
       type="button"
@@ -132,18 +135,21 @@ function InlineCurtainOptionButton({
       onMouseEnter={onHighlight}
       aria-current={active ? 'true' : undefined}
     >
-      <span className="min-w-0">
-        <span className="block truncate font-medium" title={option.label}>
-          {option.label}
-        </span>
-        {option.description ? (
-          <span
-            className="block truncate text-[10px] text-[var(--sniptale-color-text-muted)]"
-            title={option.description}
-          >
-            {option.description}
+      <span className="flex min-w-0 items-center gap-2">
+        {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
+        <span className="min-w-0">
+          <span className="block truncate font-medium" title={option.label}>
+            {option.label}
           </span>
-        ) : null}
+          {option.description ? (
+            <span
+              className="block truncate text-[10px] text-[var(--sniptale-color-text-muted)]"
+              title={option.description}
+            >
+              {option.description}
+            </span>
+          ) : null}
+        </span>
       </span>
       {option.meta ? (
         <span className="shrink-0 text-[10px] tabular-nums text-[var(--sniptale-color-text-muted)]">

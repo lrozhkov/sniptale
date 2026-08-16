@@ -55,10 +55,12 @@ function createRuntime(
     },
     captureActionRef: { current: actionType },
     session: {
+      editingModeBaseline: null,
       navigationLockBaseline: false,
       runActive: false,
       runGeneration: 1,
     },
+    restoreEditingMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),

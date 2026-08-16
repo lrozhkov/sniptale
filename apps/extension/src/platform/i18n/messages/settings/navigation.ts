@@ -32,8 +32,8 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'Quick actions',
   },
   screenSizes: {
-    ru: 'Размеры экрана',
-    en: 'Screen sizes',
+    ru: 'Размер окна',
+    en: 'Window size',
   },
   mediaQuality: {
     ru: 'Изображения и видео',
@@ -81,8 +81,8 @@ export const settingsNavigationMessages = defineMessageSource({
       en: 'Configure capture commands and actions available without opening the editor.',
     },
     screenSizes: {
-      ru: 'Управляйте готовыми размерами области захвата и значением по умолчанию.',
-      en: 'Manage capture-area sizes and choose the default.',
+      ru: 'Управляйте шаблонами размера окна.',
+      en: 'Manage window size presets.',
     },
     mediaQuality: {
       ru: 'Настройте параметры изображений и профили качества видео.',

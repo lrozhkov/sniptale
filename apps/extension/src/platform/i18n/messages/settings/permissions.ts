@@ -132,8 +132,8 @@ export const settingsPermissionsMessages = defineMessageSource({
     en: 'Display size and work area',
   },
   requiredSystemDisplayDescription: {
-    ru: 'Проверяет, поместится ли выбранный размер окна Chrome на текущем экране, не меняя настройки дисплея.',
-    en: 'Checks whether the selected Chrome window size fits the current display without changing display settings.',
+    ru: 'Проверяет, поместится ли выбранный размер окна на текущем экране, не меняя настройки дисплея.',
+    en: 'Checks whether the selected window size fits the current display without changing display settings.',
   },
   requiredActiveTabName: {
     ru: 'Текущая вкладка',

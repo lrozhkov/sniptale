@@ -8,7 +8,9 @@ import type {
   ScreenshotCaptureAdapter,
   ScreenshotControllerCapturePersistenceBridge,
   ScreenshotControllerRuntime,
+  ScreenshotEditingMode,
   ScreenshotStartContext,
+  ScreenshotType,
 } from './types';
 import type { ScreenshotControllerSession } from './session/state';
 import { getContentRuntimeServices } from '../../application/runtime-services/services';
@@ -36,6 +38,7 @@ type ScreenshotEditingModeControls = {
   disableQuickEditMode: () => void;
   highlighterMode: boolean;
   quickEditMode: boolean;
+  restoreEditingMode: (mode: ScreenshotEditingMode) => void;
   setAiPickMode: (enabled: boolean) => void;
   setDesignReviewMode: (enabled: boolean) => void;
   setDrawingMode?: (enabled: boolean) => void;
@@ -174,12 +177,33 @@ export function cancelQuickActionCountdown(
 
 export function prepareScreenshotMode(
   params: ScreenshotControllerParams,
-  session: Pick<ScreenshotControllerSession, 'navigationLockBaseline'>,
+  session: Pick<ScreenshotControllerSession, 'editingModeBaseline' | 'navigationLockBaseline'>,
+  type: ScreenshotType,
   startContext: ScreenshotStartContext = {}
 ): void {
+  session.editingModeBaseline =
+    type === 'selection' ? resolveEditingModeBaseline(params.editingModes) : null;
   session.navigationLockBaseline = resolveNavigationLockBaseline(params, startContext);
   disableEditingModes(params);
   params.setNavigationLockEnabled(isLockEnabled());
+}
+
+function resolveEditingModeBaseline(
+  editingModes: ScreenshotEditingModeControls
+): ScreenshotEditingMode | null {
+  if (editingModes.aiPickMode) return 'ai-pick';
+  if (editingModes.designReviewMode) return 'design-review';
+  if (editingModes.drawingMode) return 'drawing';
+  if (editingModes.highlighterMode) return 'highlighter';
+  if (editingModes.quickEditMode) return 'quick-edit';
+  return null;
+}
+
+export function restoreScreenshotEditingMode(
+  mode: ScreenshotEditingMode,
+  actions: Record<ScreenshotEditingMode, () => void>
+): void {
+  actions[mode]();
 }
 
 function clearQuickActionOverlay(

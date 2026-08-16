@@ -10,6 +10,7 @@ export async function acquireDesktopStream(
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
+        ...(options.controlledCursorCaptureEnabled ? { cursor: 'never' as const } : {}),
         mandatory: {
           chromeMediaSource: 'desktop',
           chromeMediaSourceId: options.desktopStreamId,

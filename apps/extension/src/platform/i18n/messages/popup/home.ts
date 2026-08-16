@@ -28,6 +28,11 @@ export const popupHomeMessages = defineMessageSource({
     ru: 'Скопировать снимок видимой области вкладки',
     en: 'Copy the visible tab area to the clipboard',
   },
+  quickDesktopEditLabel: { ru: 'Экран или окно', en: 'Screen or window' },
+  quickDesktopEditHint: {
+    ru: 'Выбрать окно или весь экран и открыть снимок в редакторе',
+    en: 'Choose a window or the entire screen and open the capture in the editor',
+  },
   quickRecordTabLabel: { ru: 'Запись вкладки', en: 'Record tab' },
   quickRecordTabHint: {
     ru: 'Настроить и начать запись текущей вкладки',
@@ -80,10 +85,10 @@ export const popupHomeMessages = defineMessageSource({
     en: 'Choose which part of the current tab to include in the screenshot.',
   },
   captureChooseFolderLabel: { ru: 'Выбрать папку', en: 'Choose folder' },
-  captureSizeLabel: { ru: 'Размер', en: 'Size' },
+  captureSizeLabel: { ru: 'Размер окна', en: 'Window size' },
   captureSizeDescription: {
-    ru: 'Изменяет размер области страницы перед созданием снимка.',
-    en: 'Resize the page viewport before the screenshot is captured.',
+    ru: 'Изменяет размер окна перед созданием снимка.',
+    en: 'Resize the window before the screenshot is captured.',
   },
   captureCountdownLabel: { ru: 'Отсчёт', en: 'Countdown' },
   captureCountdownDescription: {

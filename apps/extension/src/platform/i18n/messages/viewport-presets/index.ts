@@ -3,24 +3,24 @@ import { defineMessageSource } from '../source';
 export const viewportPresetsMessages = defineMessageSource({
   section: {
     subtitle: {
-      ru: 'Размеры области страницы и окна браузера для снимков и записи',
-      en: 'Page viewport and browser window sizes for captures and recordings',
+      ru: 'Шаблоны размера окна для снимков и записи',
+      en: 'Window size presets for captures and recordings',
     },
     nativeOption: {
       ru: 'Текущий размер',
       en: 'Current size',
     },
     savedLabel: {
-      ru: 'Шаблоны размеров',
-      en: 'Size presets',
+      ru: 'Шаблоны размера окна',
+      en: 'Window size presets',
     },
     emptyTitle: {
       ru: 'Нет доступных шаблонов',
       en: 'No presets available',
     },
     emptyDescription: {
-      ru: 'Добавьте пользовательский размер области страницы или окна браузера',
-      en: 'Add a custom page viewport or browser window size',
+      ru: 'Добавьте пользовательский размер окна',
+      en: 'Add a custom window size',
     },
     addButton: {
       ru: 'Добавить шаблон',
@@ -59,26 +59,6 @@ export const viewportPresetsMessages = defineMessageSource({
     nameHint: {
       ru: 'До 80 символов.',
       en: 'Up to 80 characters.',
-    },
-    targetLabel: {
-      ru: 'Что изменять',
-      en: 'Resize',
-    },
-    targetViewport: {
-      ru: 'Область страницы',
-      en: 'Page viewport',
-    },
-    targetWindow: {
-      ru: 'Окно браузера',
-      en: 'Browser window',
-    },
-    targetViewportHint: {
-      ru: 'Меняет размер страницы внутри вкладки. Окно и масштаб браузера не изменяются.',
-      en: 'Changes the page size inside the tab. The browser window and zoom stay unchanged.',
-    },
-    targetWindowHint: {
-      ru: 'Меняет внешний размер окна Chrome, включая рамку и панели.',
-      en: 'Changes the outer Chrome window size, including its frame and toolbars.',
     },
     widthLabel: {
       ru: 'Ширина',
@@ -128,23 +108,15 @@ export const viewportPresetsMessages = defineMessageSource({
     },
   },
   groups: {
-    viewport: {
-      ru: 'Область страницы',
-      en: 'Page viewport',
-    },
     window: {
-      ru: 'Окно браузера',
-      en: 'Browser window',
+      ru: 'Размер окна',
+      en: 'Window size',
     },
   },
   hints: {
-    viewport: {
-      ru: 'Страница внутри вкладки; окно и масштаб не меняются.',
-      en: 'Page inside the tab; window and zoom stay unchanged.',
-    },
     window: {
-      ru: 'Внешний размер Chrome; снимок и видео могут отличаться.',
-      en: 'Outer Chrome size; capture and video dimensions may differ.',
+      ru: 'Внешний размер окна; размеры снимка и видео могут отличаться.',
+      en: 'Outer window size; capture and video dimensions may differ.',
     },
     systemPreset: {
       ru: 'Системный шаблон можно изменить, выключить или восстановить.',
@@ -190,29 +162,13 @@ export const viewportPresetsMessages = defineMessageSource({
       ru: 'Для записи экрана шаблоны недоступны: источник выбирается в системном окне.',
       en: 'Presets are unavailable for screen recording because the source is selected by the system picker.',
     },
-    cropViewportUnsupported: {
-      ru:
-        'Размер области страницы недоступен при записи выбранной области. ' +
-        'Используйте текущий размер или размер окна.',
-      en:
-        'Page viewport sizing is unavailable while recording a selected area. ' +
-        'Use the current size or a window size.',
-    },
-    viewportTooLarge: {
-      ru: 'Не помещается в текущей области вкладки.',
-      en: 'Does not fit the current tab area.',
-    },
     windowTooLarge: {
       ru: 'Не помещается в рабочей области текущего экрана.',
       en: 'Does not fit the current display work area.',
     },
     windowNotNormal: {
-      ru: 'Сначала верните окно браузера в обычный режим.',
-      en: 'Restore the browser window to its normal state first.',
-    },
-    zoomNot100: {
-      ru: 'Для точной записи области страницы установите масштаб вкладки 100%.',
-      en: 'Set the tab zoom to 100% for exact page-viewport recording.',
+      ru: 'Сначала верните окно в обычный режим.',
+      en: 'Restore the window to its normal state first.',
     },
     busy: {
       ru: 'Другая операция уже управляет размером этого окна.',

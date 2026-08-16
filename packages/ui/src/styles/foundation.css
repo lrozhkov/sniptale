@@ -37,6 +37,10 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+.sniptale-extension-surface {
+  cursor: default;
+}
+
 .sniptale-extension-surface,
 .sniptale-extension-surface * {
   font-family: var(--sniptale-font-sans);
@@ -53,8 +57,26 @@
 }
 
 :where(.sniptale-extension-surface)
-  :where(button:not(:disabled), [role='button']:not([aria-disabled='true'])) {
+  :where(
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    [role='menuitem']:not([aria-disabled='true']),
+    a[href]
+  ),
+:where(.sniptale-extension-surface)
+  :where(
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    [role='menuitem']:not([aria-disabled='true']),
+    a[href]
+  )
+  * {
   cursor: pointer;
+}
+
+:where(.sniptale-extension-surface) :where(input, textarea, select, [contenteditable]),
+:where(.sniptale-extension-surface) [contenteditable] * {
+  cursor: auto;
 }
 
 /* ========================================

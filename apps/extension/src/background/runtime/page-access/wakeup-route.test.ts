@@ -257,6 +257,7 @@ describe('routeContentRuntimeWakeupMessage pinned restore', () => {
       pinToTabAvailable: false,
       restored: false,
       success: true,
+      toolbarVisible: true,
     });
   });
 
@@ -269,6 +270,7 @@ describe('routeContentRuntimeWakeupMessage pinned restore', () => {
       pinToTabAvailable: false,
       restored: false,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pageAccessMocks.hasActivePageAccess).not.toHaveBeenCalled();
@@ -289,6 +291,7 @@ describe('routeContentRuntimeWakeupMessage pinned restore', () => {
       reason: 'pin-to-tab',
       restored: true,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pageAccessMocks.ensureActivePageAccessRuntime).toHaveBeenCalledWith(7);
@@ -307,6 +310,7 @@ describe('routeContentRuntimeWakeupMessage pinned restore', () => {
       pinToTab: true,
       restored: true,
       success: true,
+      toolbarVisible: false,
     });
 
     expect(screenshotModeMocks.enableScreenshotMode).not.toHaveBeenCalled();
@@ -337,6 +341,7 @@ describe('routeContentRuntimeWakeupMessage pin mutation', () => {
       reason: 'pin-to-tab',
       restored: true,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledWith(
@@ -376,6 +381,7 @@ describe('routeContentRuntimeWakeupMessage pin mutation', () => {
       pinToTabAvailable: false,
       restored: false,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledTimes(1);
@@ -431,6 +437,7 @@ describe('routeContentRuntimeWakeupMessage pin mutation', () => {
       pinToTabAvailable: true,
       restored: false,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledWith(
@@ -477,6 +484,7 @@ describe('routeContentRuntimeWakeupMessage pin mutation', () => {
       pinToTabAvailable: true,
       restored: false,
       success: true,
+      toolbarVisible: true,
     });
     await expect(restore).resolves.toBe(false);
     expect(authoritativePin).toBe(false);
@@ -527,6 +535,7 @@ describe('routeContentRuntimeWakeupMessage toolbar visibility mutation', () => {
       pinToTabAvailable: true,
       restored: false,
       success: true,
+      toolbarVisible: false,
     });
 
     expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledWith(
@@ -549,6 +558,7 @@ describe('routeContentRuntimeWakeupMessage toolbar visibility mutation', () => {
       pinToTabAvailable: true,
       restored: false,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pinStorageMocks.writePinToTabSessionStorageState).not.toHaveBeenCalled();
@@ -590,6 +600,7 @@ describe('routeContentRuntimeWakeupMessage toolbar visibility mutation', () => {
       pinToTab: true,
       restored: false,
       success: true,
+      toolbarVisible: false,
     });
     await expect(restore).resolves.toBe(true);
     expect(toolbarVisible).toBe(false);
@@ -618,6 +629,7 @@ describe('routeContentRuntimeWakeupMessage unavailable access', () => {
       pinToTabAvailable: true,
       restored: false,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pageAccessMocks.ensureActivePageAccessRuntime).not.toHaveBeenCalled();
@@ -639,6 +651,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
       reason: 'scenario',
       restored: true,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pinStorageMocks.readPinToTabSessionStorageState).toHaveBeenCalledWith(7);
@@ -670,6 +683,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
     await expect(routeWakeup(runtimeState)).resolves.toMatchObject({
       restored: true,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(screenshotModeMocks.enableScreenshotMode).toHaveBeenCalledWith(
@@ -700,6 +714,7 @@ describe('routeContentRuntimeWakeupMessage scenario surface restore', () => {
       reason: 'scenario',
       restored: true,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(pageAccessMocks.ensureActivePageAccessRuntime).toHaveBeenCalledWith(7);
@@ -728,6 +743,7 @@ describe('routeContentRuntimeWakeupMessage scenario surface restore', () => {
       reason: 'scenario',
       restored: true,
       success: true,
+      toolbarVisible: true,
     });
 
     expect(runtimeState.scenarioSessionService.updateSurfaceState).not.toHaveBeenCalled();

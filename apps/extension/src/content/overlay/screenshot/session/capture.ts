@@ -13,7 +13,7 @@ export function createHandleTakeScreenshot(args: CreateScreenshotControllerActio
     startContext?: ScreenshotStartContext
   ) => {
     await syncCaptureAction(args.params);
-    prepareScreenshotMode(args.params, args.session, startContext);
+    prepareScreenshotMode(args.params, args.session, type, startContext);
     const runToken = beginScreenshotRun(args.runtime);
 
     if (args.params.timerDelay > 0) {

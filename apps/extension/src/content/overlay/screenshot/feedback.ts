@@ -24,12 +24,17 @@ export function getQuickActionSuccessMessage(actionType: CaptureActionType): str
 export function restoreVisibleUiState(
   {
     session,
+    restoreEditingMode,
     setIsCompletelyHidden,
     setIsToolbarVisible,
     setNavigationLockEnabled,
   }: Pick<
     ScreenshotControllerRuntime,
-    'session' | 'setIsCompletelyHidden' | 'setIsToolbarVisible' | 'setNavigationLockEnabled'
+    | 'restoreEditingMode'
+    | 'session'
+    | 'setIsCompletelyHidden'
+    | 'setIsToolbarVisible'
+    | 'setNavigationLockEnabled'
   >,
   runToken?: number
 ) {
@@ -51,7 +56,13 @@ export function restoreVisibleUiState(
   }
 
   setNavigationLockEnabled(session.navigationLockBaseline);
+  const editingModeBaseline = session.editingModeBaseline;
+  session.editingModeBaseline = null;
+  if (editingModeBaseline) {
+    restoreEditingMode(editingModeBaseline);
+  }
   logger.debug('restoreVisibleUiState.complete', {
+    editingModeRestoredTo: editingModeBaseline,
     navigationLockRestoredTo: session.navigationLockBaseline,
   });
 }
