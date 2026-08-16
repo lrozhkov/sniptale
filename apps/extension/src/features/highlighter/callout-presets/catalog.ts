@@ -16,6 +16,25 @@ import {
 
 const surfacePaint = (id: ShowcaseSurfaceId) => getShowcaseSurface(id).fillPaint;
 
+function createFrameBoundBodyBadgeStyle() {
+  return {
+    badge: {
+      ...baseStyle.badge,
+      enabled: true,
+      text: '',
+      placement: 'body-start' as const,
+      shape: 'circle' as const,
+      backgroundColorSource: 'accent' as const,
+    },
+    colorBindings: {
+      ...baseStyle.colorBindings,
+      accent: 'frame-border' as const,
+      connector: 'frame-border' as const,
+      surfaceBorder: 'frame-border' as const,
+    },
+  };
+}
+
 const canonicalCatalog: readonly SystemCalloutPreset[] = [
   createSystemPreset('system-callout-bubble', 0, 'sniptale', {
     ...cloneCalloutVisualStyle(baseStyle),
@@ -327,21 +346,8 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
   }),
   createSystemPreset('system-callout-sticky', 5, 'paper', {
     ...cloneCalloutVisualStyle(baseStyle),
+    ...createFrameBoundBodyBadgeStyle(),
     accentEdge: { ...baseStyle.accentEdge, enabled: true, side: 'bottom', width: 3 },
-    badge: {
-      ...baseStyle.badge,
-      enabled: true,
-      text: '',
-      placement: 'body-start',
-      shape: 'circle',
-      backgroundColorSource: 'accent',
-    },
-    colorBindings: {
-      ...baseStyle.colorBindings,
-      accent: 'frame-border',
-      connector: 'frame-border',
-      surfaceBorder: 'frame-border',
-    },
     connector: {
       ...baseStyle.connector,
       frameMarker: 'diamond',
@@ -538,21 +544,8 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
   }),
   createSystemPreset('system-callout-editorial-proof', 11, 'editorial', {
     ...cloneCalloutVisualStyle(baseStyle),
+    ...createFrameBoundBodyBadgeStyle(),
     accentEdge: { ...baseStyle.accentEdge, enabled: true, side: 'right', width: 2 },
-    badge: {
-      ...baseStyle.badge,
-      enabled: true,
-      text: '',
-      placement: 'body-start',
-      shape: 'circle',
-      backgroundColorSource: 'accent',
-    },
-    colorBindings: {
-      ...baseStyle.colorBindings,
-      accent: 'frame-border',
-      connector: 'frame-border',
-      surfaceBorder: 'frame-border',
-    },
     connector: {
       ...baseStyle.connector,
       frameMarker: 'arrow',

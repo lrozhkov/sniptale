@@ -5,7 +5,6 @@ import type {
   SettingsTransferJsonValue,
 } from '../../contracts/settings-transfer';
 import {
-  cloneSettingsTransferJsonValue,
   hasOnlySettingsTransferProviderMetadataKeys,
   parseSettingsTransferModelMetadata,
   selectSettingsTransferProviderMetadata,
@@ -22,6 +21,7 @@ import { parseStoredSettings } from '../../composition/persistence/settings/guar
 import { SETTINGS_TRANSFER_DOMAIN_IDS } from './registry';
 import { failSettingsTransferDomain, SettingsTransferDomainError } from './domain-error';
 import { parseSettingsTransferStyleDomain } from './style-domain-parser';
+import { asSettingsRecord as asRecord, cloneJsonValue as json } from './json-value';
 
 export { SettingsTransferDomainError } from './domain-error';
 
@@ -360,16 +360,6 @@ function coreSettingsTransferData(
 
 function assignDefined(target: Record<string, unknown>, key: string, value: unknown): void {
   if (value !== undefined) target[key] = value;
-}
-
-function json(value: unknown): SettingsTransferJsonValue {
-  return cloneSettingsTransferJsonValue(value);
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

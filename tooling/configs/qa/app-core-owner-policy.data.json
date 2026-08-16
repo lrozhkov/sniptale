@@ -392,6 +392,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/managed-preset-order",
+      "ownerId": "persistence.managed-preset-order",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/media-library",
       "ownerId": "persistence.media-library",
       "ownerClass": "persistence"

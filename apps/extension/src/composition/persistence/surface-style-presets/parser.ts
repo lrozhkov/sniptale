@@ -6,6 +6,7 @@ import {
   getSystemSurfaceStylePresets,
   SYSTEM_SURFACE_STYLE_CATALOG_REVISION,
 } from '../../../features/highlighter/surface-style/system-presets';
+import { hasUniqueSequentialPresetOrder, restoreManagedPresetOrder } from '../managed-preset-order';
 import { createSurfaceStylePresetCatalog } from './catalog';
 import {
   SURFACE_STYLE_PRESET_MAX_BYTES,
@@ -97,7 +98,7 @@ function parseLegacyState(value: Record<string, unknown>) {
   });
 }
 
-function parseCurrentState(value: Record<string, unknown>) {
+function parseManagedPresets(value: Record<string, unknown>): ManagedSurfaceStylePreset[] | null {
   if (
     !Array.isArray(value['presets']) ||
     !record(value['defaultPresetIdBySurface']) ||
@@ -106,34 +107,51 @@ function parseCurrentState(value: Record<string, unknown>) {
     return null;
   const parsed = value['presets'].map((preset) => parsePreset(preset));
   if (parsed.some((preset) => preset === null)) return null;
-  const presets = parsed as ManagedSurfaceStylePreset[];
+  return parsed as ManagedSurfaceStylePreset[];
+}
+
+function finalizeManagedCatalog(
+  value: Record<string, unknown>,
+  presets: ManagedSurfaceStylePreset[]
+) {
+  const defaultPresetIds = value['defaultPresetIdBySurface'];
+  const favoriteIdsBySurface = value['favoriteIdsBySurface'];
+  if (!record(defaultPresetIds) || !record(favoriteIdsBySurface)) return null;
   const ids = new Set(presets.map((preset) => preset.id));
+  if (ids.size !== presets.length) return null;
+  const defaultPresetId = defaultPresetIds[SURFACE_STYLE_PRESET_SURFACE];
+  if (
+    typeof defaultPresetId !== 'string' ||
+    !presets.some((preset) => preset.id === defaultPresetId && preset.enabled)
+  )
+    return null;
+  const favoriteIds = parseFavoriteIds(favoriteIdsBySurface[SURFACE_STYLE_PRESET_SURFACE], ids);
+  return favoriteIds
+    ? createSurfaceStylePresetCatalog({
+        catalogRevision: value['catalogRevision'] as number,
+        defaultPresetId,
+        favoriteIds,
+        presets,
+      })
+    : null;
+}
+
+function parseCurrentState(value: Record<string, unknown>) {
+  const presets = parseManagedPresets(value);
+  if (!presets) return null;
   const canonicalSystemIds = new Set(systemPresets().map((preset) => preset.id));
   const systems = presets.filter((preset) => preset.origin === 'system');
-  const ordered = presets.toSorted((left, right) => left.order - right.order);
-  const defaultPresetId = value['defaultPresetIdBySurface'][SURFACE_STYLE_PRESET_SURFACE];
   if (
-    ids.size !== presets.length ||
-    ordered.some((preset, order) => preset.order !== order) ||
+    !hasUniqueSequentialPresetOrder(presets) ||
     systems.length !== canonicalSystemIds.size ||
     systems.some(
       (preset) => !canonicalSystemIds.has(preset.id) || !isSystemCustomizationValid(preset)
     ) ||
     presets.some((preset) => preset.origin === 'user' && preset.customized) ||
-    presets.filter((preset) => preset.origin === 'user').length > SURFACE_STYLE_PRESET_MAX_USERS ||
-    typeof defaultPresetId !== 'string' ||
-    !presets.some((preset) => preset.id === defaultPresetId && preset.enabled)
+    presets.filter((preset) => preset.origin === 'user').length > SURFACE_STYLE_PRESET_MAX_USERS
   )
     return null;
-  const rawFavorites = value['favoriteIdsBySurface'][SURFACE_STYLE_PRESET_SURFACE];
-  const favoriteIds = parseFavoriteIds(rawFavorites, ids);
-  if (!favoriteIds) return null;
-  return createSurfaceStylePresetCatalog({
-    catalogRevision: value['catalogRevision'] as number,
-    defaultPresetId,
-    favoriteIds,
-    presets,
-  });
+  return finalizeManagedCatalog(value, presets);
 }
 
 const PREVIOUS_SYSTEM_SURFACE_IDS = new Set([
@@ -145,17 +163,9 @@ const PREVIOUS_SYSTEM_SURFACE_IDS = new Set([
 ]);
 
 function parsePreviousSystemState(value: Record<string, unknown>) {
-  if (
-    !Array.isArray(value['presets']) ||
-    !record(value['defaultPresetIdBySurface']) ||
-    !record(value['favoriteIdsBySurface'])
-  )
-    return null;
-  const parsed = value['presets'].map((preset) => parsePreset(preset));
-  if (parsed.some((preset) => preset === null)) return null;
-  const previous = (parsed as ManagedSurfaceStylePreset[]).toSorted(
-    (left, right) => left.order - right.order
-  );
+  const parsed = parseManagedPresets(value);
+  if (!parsed) return null;
+  const previous = parsed.toSorted((left, right) => left.order - right.order);
   const previousIds = new Set(previous.map((preset) => preset.id));
   const previousSystemIds = new Set(
     previous.filter((preset) => preset.origin === 'system').map((preset) => preset.id)
@@ -179,22 +189,12 @@ function parsePreviousSystemState(value: Record<string, unknown>) {
       .filter((preset) => preset.origin === 'system' && preset.customized)
       .map((preset) => preset.id)
   );
-  const refreshed = systemPresets().filter((preset) => !customizedIds.has(preset.id));
-  let pending: ManagedSurfaceStylePreset[] = [];
-  let sawAnchor = false;
-  for (const preset of previous) {
-    if (preset.origin === 'user' || (preset.customized && customizedIds.has(preset.id))) {
-      pending.push(preset);
-      continue;
-    }
-    const anchor = refreshed.findIndex((candidate) => candidate.id === preset.id);
-    if (anchor >= 0 && pending.length > 0) {
-      refreshed.splice(sawAnchor ? anchor : 0, 0, ...pending);
-      pending = [];
-    }
-    if (anchor >= 0) sawAnchor = true;
-  }
-  refreshed.push(...pending);
+  const refreshed = restoreManagedPresetOrder({
+    copyPending: (preset) => preset,
+    customizedIds,
+    previous,
+    refreshed: systemPresets().filter((preset) => !customizedIds.has(preset.id)),
+  });
   const canonicalById = new Map(systemPresets().map((preset) => [preset.id, preset]));
   const presets = refreshed.map((preset, order) => {
     const positioned = { ...preset, order };
@@ -209,23 +209,7 @@ function parsePreviousSystemState(value: Record<string, unknown>) {
         !areSurfaceStylesEqual(positioned.style, canonical.style),
     };
   });
-  const ids = new Set(presets.map((preset) => preset.id));
-  if (ids.size !== presets.length) return null;
-  const defaultPresetId = value['defaultPresetIdBySurface'][SURFACE_STYLE_PRESET_SURFACE];
-  if (
-    typeof defaultPresetId !== 'string' ||
-    !presets.some((preset) => preset.id === defaultPresetId && preset.enabled)
-  )
-    return null;
-  const rawFavorites = value['favoriteIdsBySurface'][SURFACE_STYLE_PRESET_SURFACE];
-  const favoriteIds = parseFavoriteIds(rawFavorites, ids);
-  if (!favoriteIds) return null;
-  return createSurfaceStylePresetCatalog({
-    catalogRevision: value['catalogRevision'] as number,
-    defaultPresetId,
-    favoriteIds,
-    presets,
-  });
+  return finalizeManagedCatalog(value, presets);
 }
 
 export function parseStoredSurfaceStylePresetState(value: unknown) {

@@ -50,14 +50,18 @@ function createCalloutContentProps(
   };
 }
 
-function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCalloutCustomCss) {
-  const badge = props.settings.style.badge;
-  const badgeText = resolveCalloutBadgeText({
-    badgeText: badge.text,
+function resolveRenderedBadgeText(props: CalloutBodyProps) {
+  return resolveCalloutBadgeText({
+    badgeText: props.settings.style.badge.text,
     bodyHtml: props.settings.content.bodyHtml,
     titleEnabled: props.settings.style.title.enabled,
     titleText: props.settings.content.titleText,
   });
+}
+
+function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCalloutCustomCss) {
+  const badge = props.settings.style.badge;
+  const badgeText = resolveRenderedBadgeText(props);
   const showBodyBadge =
     badge.enabled && (badge.placement === 'body-start' || !props.settings.style.title.enabled);
   const content = <div {...createCalloutContentProps(props, customStyles)} />;
@@ -93,12 +97,7 @@ function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCallou
 
 function renderTitleMeasure(props: CalloutBodyProps, customStyles: ResolvedCalloutCustomCss) {
   const badge = props.settings.style.badge;
-  const badgeText = resolveCalloutBadgeText({
-    badgeText: badge.text,
-    bodyHtml: props.settings.content.bodyHtml,
-    titleEnabled: props.settings.style.title.enabled,
-    titleText: props.settings.content.titleText,
-  });
+  const badgeText = resolveRenderedBadgeText(props);
   const showTitleBadge =
     badge.enabled && (badge.placement === 'title-start' || badge.placement === 'title-end');
 

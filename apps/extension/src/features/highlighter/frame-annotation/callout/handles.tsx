@@ -129,6 +129,14 @@ function renderCalloutWidthHandle(
   );
 }
 
+function stopCalloutControlEvent(
+  event: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>
+) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
+}
+
 function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
   if (props.isEditing || !props.showSettingsHandle) return null;
   const label = translate('content.interactiveFrame.calloutSettings');
@@ -160,15 +168,9 @@ function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
           '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
         transition: 'opacity 120ms ease, color 120ms ease, border-color 120ms ease',
       })}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.nativeEvent.stopImmediatePropagation();
-      }}
+      onPointerDown={stopCalloutControlEvent}
       onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.nativeEvent.stopImmediatePropagation();
+        stopCalloutControlEvent(event);
         props.handleSettingsClick();
       }}
       onFocus={props.handleHandleFocus}
@@ -261,15 +263,9 @@ function renderCalloutTitleToggleHandle(props: CalloutInteractionHandleProps) {
           : '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
         transition: 'opacity 120ms ease, color 120ms ease, border-color 120ms ease',
       })}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.nativeEvent.stopImmediatePropagation();
-      }}
+      onPointerDown={stopCalloutControlEvent}
       onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.nativeEvent.stopImmediatePropagation();
+        stopCalloutControlEvent(event);
         props.handleTitleToggleClick();
       }}
       onFocus={props.handleHandleFocus}

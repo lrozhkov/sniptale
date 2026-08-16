@@ -184,7 +184,12 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
   ),
   transferable(
     'styles/annotations/tags/controller.ts',
-    ['createAnnotationTemplateTag', 'deleteAnnotationTemplateTag', 'mergeAnnotationTemplateTag'],
+    [
+      'createAnnotationTemplateTag',
+      'deleteAnnotationTemplateTag',
+      'mergeAnnotationTemplateTag',
+      'resetSystemAnnotationTemplateTag',
+    ],
     ['styles.tags']
   ),
   transferable(

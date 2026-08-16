@@ -102,6 +102,6 @@ describe('settings transfer package parser', () => {
     expect(() => cloneSettingsTransferJsonValue(undefined)).toThrow(TypeError);
     expect(
       stringifySettingsTransferPackage(parseSettingsTransferPackageText(packageText()))
-    ).toMatch(/^\{\n  "format":/u);
+    ).toMatch(/^\{\n {2}"format":/u);
   });
 });

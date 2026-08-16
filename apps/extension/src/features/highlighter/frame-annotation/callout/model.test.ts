@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { LegacyCalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCanonicalSystemCalloutPreset } from '../../callout-presets/catalog';
-import { applyCalloutSettingsPatch, cloneCalloutSettings, normalizeCalloutSettings } from './model';
+import {
+  applyCalloutSettingsPatch,
+  cloneCalloutSettings,
+  cloneForkedCalloutStyle,
+  createDefaultCalloutSettings,
+  normalizeCalloutSettings,
+} from './model';
 
 const legacy: LegacyCalloutSettings = {
   anchor: 'top-center',
@@ -112,5 +118,84 @@ describe('callout model', () => {
       spacing: { blockGap: 0, frameGap: 0, minimumEndSegment: 16, obstacleMargin: 0 },
     });
     expect(normalized.style.badge.enabled).toBe(false);
+  });
+
+  it('creates configured defaults and preserves user badge text when forking a preset', () => {
+    const canonical = getCanonicalSystemCalloutPreset('system-callout-bubble').style;
+    const created = createDefaultCalloutSettings(
+      canonical,
+      'preset-1',
+      {
+        anchor: 'bottom-center',
+        side: 'bottom',
+        connectorAttachments: {
+          block: { mode: 'free', perimeterPosition: 0.2 },
+          frame: { mode: 'free', perimeterPosition: 0.8 },
+        },
+      },
+      { titleText: 'Title' }
+    );
+    const forked = cloneForkedCalloutStyle(canonical, {
+      ...canonical,
+      badge: { ...canonical.badge, text: '42' },
+    });
+
+    expect(created).toMatchObject({
+      content: { bodyHtml: '', titleText: 'Title' },
+      placement: { anchor: 'bottom-center', side: 'bottom' },
+      sourcePresetId: 'preset-1',
+    });
+    expect(forked.badge.text).toBe('42');
+    expect(forked.badge).not.toBe(canonical.badge);
+    expect(createDefaultCalloutSettings().sourcePresetId).toBeUndefined();
+  });
+
+  it('applies placement, identity, and nested visual patches together', () => {
+    const current = {
+      ...createDefaultCalloutSettings(),
+      instanceId: 'instance-1',
+      sourcePresetId: 'preset-1',
+    };
+    const patched = applyCalloutSettingsPatch(current, {
+      content: { titleText: 'Patched' },
+      enabled: false,
+      instanceId: 'instance-2',
+      placement: {
+        connectorAttachments: {
+          block: { mode: 'free', perimeterPosition: 0.1 },
+          frame: { mode: 'free', perimeterPosition: 0.9 },
+        },
+        connectorWaypoint: { centerOffsetX: 4, centerOffsetY: 5 },
+        manualPlacement: { centerOffsetX: 2, centerOffsetY: 3 },
+      },
+      style: {
+        connector: {
+          cornerStyle: { kind: 'rounded', radius: 6 },
+          curve: { curvature: 0.6 },
+          spacing: { frameGap: 3 },
+        },
+        customCss: '[card]\nopacity: .9;',
+        surface: { fillPaint: { kind: 'solid', color: '#112233ff' } },
+        title: { fillPaint: { kind: 'solid', color: '#445566ff' } },
+      },
+    });
+
+    expect(patched).toMatchObject({
+      content: { titleText: 'Patched' },
+      enabled: false,
+      instanceId: 'instance-2',
+      sourcePresetId: 'preset-1',
+      placement: {
+        connectorWaypoint: { centerOffsetX: 4, centerOffsetY: 5 },
+        manualPlacement: { centerOffsetX: 2, centerOffsetY: 3 },
+      },
+      style: {
+        connector: {
+          cornerStyle: { kind: 'rounded', radius: 6 },
+          curve: { curvature: 0.6 },
+          spacing: { frameGap: 3 },
+        },
+      },
+    });
   });
 });

@@ -111,8 +111,10 @@ export const BASE_CALLOUT_VISUAL_STYLE: CalloutVisualStyle = {
   },
 };
 
-export function cloneCalloutVisualStyle(style: CalloutVisualStyle): CalloutVisualStyle {
-  const baseStyle = BASE_CALLOUT_VISUAL_STYLE;
+export function cloneCalloutVisualStyle(
+  style: CalloutVisualStyle,
+  baseStyle: CalloutVisualStyle = BASE_CALLOUT_VISUAL_STYLE
+): CalloutVisualStyle {
   return {
     accentEdge: { ...baseStyle.accentEdge, ...style.accentEdge },
     badge: { ...baseStyle.badge, ...style.badge },
