@@ -186,8 +186,9 @@ it('keeps qa:closeout as checkpoint plus qa:build commit handoff', () => {
   expect(source).toContain("wrapperId: 'qa:closeout'");
   expect(source).toContain('qa:closeout requires -m "commit message"');
   expect(source).toContain('runCheckpoint');
-  expect(handoffSource).toContain('(dependencies.npmRunner ?? runNpm)(');
-  expect(handoffSource).toContain("['run', '--silent', 'qa:build', '--', ...buildArgs]");
+  expect(handoffSource).toContain('runBuildChild(');
+  expect(handoffSource).toContain("path.join(trustedRoot, 'tooling/qa/wrappers/build.mjs')");
+  expect(handoffSource).toContain("runNpm(['run', '--silent', 'qa:build', '--', ...buildArgs]");
   expect(source).toContain("label: 'QA closeout'");
   expect(source).toContain('runObservedWrapper({');
   expect(source).toContain('blocking: true');

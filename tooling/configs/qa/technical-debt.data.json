@@ -14607,18 +14607,24 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "b76a595fd5d65465c10721ca394295c4753b5e4d5860ddf820576a56a045598f"
+        "contentHash": "13d091c60470199e042fe8c25a691f7e7b696426d893815e5e9cb626259dcb11"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/container.mjs",
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
         "binding:LANE_FILES",
         "binding:LANE_WRAPPERS",
+        "property:candidate",
+        "property:candidate[1]",
         "property:coverage",
         "property:coverage[1]",
         "property:release",
+        "property:release-audit",
+        "property:release-audit[1]",
         "property:security",
         "property:security[1]"
       ]
@@ -15742,14 +15748,17 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "9df2e2cd1aa73b320c0d4af38b4b197af05385960c49633b33afb75d14757724"
+        "contentHash": "274afb87a417adf2d31862c37aa4c5fa2503e8d45835ecf31e7dca6133408981"
       },
       "consumers": [
         "tooling/ci/container.mjs"
       ],
       "surfaces": [
         "binding:args",
-        "binding:environment"
+        "binding:environment",
+        "binding:phaseIds",
+        "property:command",
+        "property:resourceProfiles"
       ]
     },
     {
@@ -18427,6 +18436,7 @@
         "contentHash": "9494c36cfcf9ccb9c5e0ddfe76783e7353568ef72f2c875eb6410a4761b44e50"
       },
       "consumers": [
+        "tooling/ci/artifacts.mjs",
         "tooling/release/package-dist.mjs",
         "tooling/release/package-dist.test.ts"
       ],
@@ -18824,7 +18834,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/prepare-release-assets.mjs",
-        "contentHash": "40b8d2897d077825830e6ce69cb8fa67374e634bb56466cb34273ee0fffbf344"
+        "contentHash": "39f370682f75dc37d3fdd679c35b2f82422e7817df0620062c9152694c6305db"
       },
       "consumers": [
         "tooling/ci/prepare-release-assets.mjs"
@@ -18974,7 +18984,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/proof.mjs",
-        "contentHash": "7eb6b58195b298c5840b6e32e953750444a0c391e25406e3ea29f01e842615e9"
+        "contentHash": "89ca7d00363cb925943d06444a057f02c51cb2863e61df3e2dd5226d574af6d7"
       },
       "consumers": [
         "tooling/ci/proof.mjs"
@@ -18982,7 +18992,9 @@
       "surfaces": [
         "binding:currentAuthority",
         "binding:env",
-        "binding:proof"
+        "binding:proof",
+        "binding:resourceEnvironment",
+        "binding:resourceOptions"
       ]
     },
     {
@@ -19338,16 +19350,19 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "2fd3df347a35cef17a8e5d9a80631a91c0159e886e1d61787298fcb849301b10"
+        "contentHash": "1c96f1b7ba4cbac492c12abcd0908fb692e8e95fd0ca6dd189efcd9480c2c4c4"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
-        "binding:commands",
-        "binding:executed",
+        "binding:laneCommands",
+        "binding:licenseCommand",
+        "binding:phases",
         "property:coverage",
         "property:release",
+        "property:release-audit",
+        "property:resourceProfiles",
         "property:security"
       ]
     },
@@ -20240,6 +20255,7 @@
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.test.ts",
+        "tooling/ci/candidate-workspace.test.ts",
         "tooling/ci/ci-contract.test.ts",
         "tooling/qa/audits/canonical-sarif.test.ts",
         "tooling/qa/audits/execution-error.test.ts",

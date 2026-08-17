@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 import { expect, it } from 'vitest';
 
@@ -15,6 +15,9 @@ import {
   readExpectedReleaseAssetDigests,
 } from './release-verification.mjs';
 import { assertReleasePublisher, assertReleaseTagRuleset } from './release-tag-policy.mjs';
+import { verifyMainProof } from './verify-main-proof.mjs';
+import { verifyImageProof, writeImageProof } from './image-proof.mjs';
+import { finalizeCandidateReleaseArchive } from './artifacts.mjs';
 
 it('pins every external workflow action to a full commit SHA', () => {
   for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
@@ -25,11 +28,13 @@ it('pins every external workflow action to a full commit SHA', () => {
   }
 });
 
-it('keeps the GitHub gate on canonical wrappers without checkpoint', () => {
+it('runs one candidate-bound GitHub gate over the canonical local wrapper sequence', () => {
   const workflow = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
-  expect(workflow).toContain('qa-release:');
-  expect(workflow).toContain('security-audit:');
-  expect(workflow).toContain('coverage-audit:');
+  const lane = fs.readFileSync('tooling/ci/run-lane.mjs', 'utf8');
+  const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
+  const artifacts = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
+  expect(workflow).toContain('canonical-qa:');
+  expect(workflow).toContain('scheduled-security:');
   expect(workflow).toContain('pr-gate:');
   expect(workflow).toContain('name: pr-gate-authority');
   expect(workflow).toContain('checks: write');
@@ -39,14 +44,31 @@ it('keeps the GitHub gate on canonical wrappers without checkpoint', () => {
   expect(workflow).not.toContain('  pull_request:\n');
   expect(workflow).toContain('Check out trusted control plane');
   expect(workflow).toContain('SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control');
-  expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs release');
-  expect(workflow).not.toContain('qa:checkpoint');
+  expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs candidate');
+  expect(workflow).toContain('working-directory: trusted-control');
+  expect(workflow).toContain('run: npm ci --ignore-scripts');
+  expect(lane.indexOf("wrapper('release-harness')")).toBeLessThan(
+    lane.indexOf("wrapper('checkpoint')")
+  );
+  expect(lane.indexOf("wrapper('checkpoint')")).toBeLessThan(lane.indexOf("wrapper('closeout'"));
+  expect(lane).toContain("wrapper('release')");
+  expect(lane).toContain("wrapper('audit', '--profile', 'security')");
+  expect(lane).toContain("wrapper('audit', '--profile', 'coverage')");
+  expect(lane).toContain("if (lane !== 'candidate')");
+  expect(container).toContain('await finalizeCandidateReleaseArchive');
+  expect(container.indexOf("spawnSync('docker'")).toBeLessThan(
+    container.indexOf('await finalizeCandidateReleaseArchive')
+  );
+  expect(artifacts).not.toContain(
+    "import { createReleaseArchive } from '../release/package-dist.mjs'"
+  );
+  expect(artifacts).toContain("await import('../release/package-dist.mjs')");
   expect(workflow).toContain(
     "retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}"
   );
-  expect(workflow.match(/include-hidden-files: true/gu)).toHaveLength(3);
+  expect(workflow.match(/include-hidden-files: true/gu)).toHaveLength(2);
   expect(workflow).not.toContain("hashFiles('reports/.tmp/");
-  expect(workflow).toContain('needs: [qa-release, security-audit, coverage-audit]');
+  expect(workflow).toContain('needs: canonical-qa');
   expect(workflow).toContain('Refuse immutable tag replacement');
   expect(workflow).toContain('Refusing to replace existing immutable image tag');
   expect(workflow).toContain('Unable to prove immutable image tag absence');
@@ -105,6 +127,9 @@ it('fails release publication closed around live immutability and asset digests'
   expect(workflow).not.toContain('gh release edit');
   expect(workflow).not.toContain('gh release delete');
   expect(workflow).toContain('RELEASE_POLICY_READ_TOKEN');
+  expect(workflow).toContain('image-proof.mjs verify');
+  expect(workflow).toContain('docker pull "$SNIPTALE_CI_IMAGE"');
+  expect(workflow).not.toContain('ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}');
   expect(workflow).not.toContain('existing_draft=');
   expect(policy).toContain("api(repository, 'immutable-releases')");
   expect(policy).toContain('--recheck');
@@ -180,6 +205,63 @@ it('verifies the exact published asset set including SHA256SUMS itself', () => {
   expect(() => assertImmutableRelease({ ...published, id: 43 }, '42', 'v0.3.0', expected)).toThrow(
     'Published release identity'
   );
+});
+
+it('binds a reusable main proof to its exact commit, tree, files, and trusted controls', () => {
+  const root = createTempRoot('main-proof-');
+  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  const tree = spawnSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).stdout.trim();
+  writeFile(root, 'build/sniptale_0.3.1.zip', 'zip\n');
+  writeFile(root, '.tmp/licenses/sbom.cdx.json', '{}\n');
+  const files = ['build/sniptale_0.3.1.zip', '.tmp/licenses/sbom.cdx.json'].map((file) => ({
+    file,
+    sha256: crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(path.join(root, file)))
+      .digest('hex'),
+  }));
+  const manifest = {
+    schemaVersion: 1,
+    artifactKind: 'sniptale-ci-proof',
+    lane: 'candidate',
+    status: 'passed',
+    commit,
+    candidateTree: tree,
+    trustedControlSha: commit,
+    containerDigest: `sha256:${'a'.repeat(64)}`,
+    files,
+  };
+  writeFile(root, 'proof-manifest.json', `${JSON.stringify(manifest)}\n`);
+  const sums = [
+    ...files.map(({ file, sha256 }) => `${sha256}  ${file}`),
+    `${crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(path.join(root, 'proof-manifest.json')))
+      .digest('hex')}  proof-manifest.json`,
+  ];
+  writeFile(root, 'SHA256SUMS', `${sums.join('\n')}\n`);
+  expect(verifyMainProof(root, commit).zipFile).toBe('build/sniptale_0.3.1.zip');
+  writeFile(root, 'build/sniptale_unlisted.zip', 'unlisted\n');
+  expect(() => verifyMainProof(root, commit)).toThrow('physical artifact inventory is not exact');
+  fs.rmSync(path.join(root, 'build/sniptale_unlisted.zip'));
+  fs.appendFileSync(path.join(root, 'build/sniptale_0.3.1.zip'), 'drift\n');
+  expect(() => verifyMainProof(root, commit)).toThrow('Main proof digest mismatch');
+});
+
+it('binds the published QA image digest to the exact successful main workflow', () => {
+  const root = path.join(createTempRoot('image-proof-'), 'proof');
+  const identity = {
+    commit: 'a'.repeat(40),
+    digest: `sha256:${'b'.repeat(64)}`,
+    repository: 'lrozhkov/sniptale',
+    runId: '42',
+  };
+  writeImageProof(root, identity);
+  expect(verifyImageProof(root, identity).reference).toBe(
+    `ghcr.io/lrozhkov/sniptale-qa@${identity.digest}`
+  );
+  writeFile(root, 'extra.json', '{}\n');
+  expect(() => verifyImageProof(root, identity)).toThrow('inventory is not exact');
 });
 
 it('fails canonical artifact collection on missing reports and refuses overwrite', () => {
@@ -281,6 +363,78 @@ it('fails canonical artifact collection on missing reports and refuses overwrite
   });
   expect(collision.status).not.toBe(0);
   expect(collision.stderr).toContain('EEXIST');
+
+  const launcherRoot = createTempRoot('ci-artifact-launcher-');
+  writeFile(launcherRoot, '.tmp/coverage/canonical/lcov.info', 'forged launcher report\n');
+  const explicitRootScript = [
+    `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)};`,
+    `collectLaneArtifacts(${JSON.stringify({
+      lane: 'coverage',
+      repositoryRoot: root,
+      startedAtMs: 0,
+      status: 'passed',
+      command: [],
+      containerDigest: `sha256:${'a'.repeat(64)}`,
+    })});`,
+  ].join(' ');
+  const explicitRoot = spawnSync(
+    process.execPath,
+    ['--input-type=module', '--eval', explicitRootScript],
+    {
+      cwd: launcherRoot,
+      env: { ...process.env, GITHUB_SHA: 'b'.repeat(40), GITHUB_RUN_ID: '21' },
+      encoding: 'utf8',
+    }
+  );
+  expect(explicitRoot.status, explicitRoot.stderr).toBe(0);
+  expect(fs.existsSync(path.join(root, `build/ci-artifacts/coverage-${'b'.repeat(40)}-21`))).toBe(
+    true
+  );
+  expect(fs.existsSync(path.join(launcherRoot, 'build/ci-artifacts'))).toBe(false);
+});
+
+it('rejects a release ZIP replaced by a detached candidate child before trusted finalization', async () => {
+  const root = createTempRoot('ci-candidate-finalizer-');
+  writeFile(root, 'package.json', '{"name":"sniptale","version":"0.3.1"}\n');
+  writeFile(root, 'tracked.txt', 'candidate\n');
+  writeFile(root, 'dist/payload.js', 'canonical payload\n');
+  writeFile(root, 'build/sniptale_0.3.1.zip', 'canonical payload\n');
+  for (const args of [
+    ['init', '--quiet'],
+    ['config', 'user.name', 'CI Test'],
+    ['config', 'user.email', 'ci@example.test'],
+    ['add', 'package.json', 'tracked.txt'],
+    ['commit', '--quiet', '-m', 'candidate'],
+  ]) {
+    expect(spawnSync('git', args, { cwd: root }).status).toBe(0);
+  }
+  const archivePath = path.join(root, 'build/sniptale_0.3.1.zip');
+  const replacer = spawn(
+    process.execPath,
+    [
+      '--eval',
+      `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(archivePath)}, 'substituted payload\\n'), 25)`,
+    ],
+    { detached: true, stdio: 'ignore' }
+  );
+  replacer.unref();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  await expect(
+    finalizeCandidateReleaseArchive({
+      candidateRoot: root,
+      startedAtMs: 0,
+      archiveBuilder: async ({ repoRoot }) => {
+        const rebuilt = path.join(repoRoot, 'build/rebuilt.zip');
+        writeFile(
+          repoRoot,
+          'build/rebuilt.zip',
+          fs.readFileSync(path.join(repoRoot, 'dist/payload.js'))
+        );
+        return rebuilt;
+      },
+    })
+  ).rejects.toThrow('changed after canonical release validation');
 });
 
 it('rejects stale coverage outputs from an earlier run', () => {

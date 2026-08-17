@@ -47,6 +47,11 @@
       "sha256": "ea275a2cc153960b3d7f15cc248275ba32c430781dc283a71cbcb73cf629bf65"
     },
     {
+      "category": "archive-integration",
+      "path": "tooling/ci/artifacts.mjs",
+      "sha256": "13d091c60470199e042fe8c25a691f7e7b696426d893815e5e9cb626259dcb11"
+    },
+    {
       "category": "bundled-font",
       "path": "tooling/configs/qa/manifest-permissions.data.json",
       "sha256": "525440605e49f08ed7644058b22a39dfcb438964a1acb1f15c8ffaec99d7f0a7"

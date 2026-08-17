@@ -19,18 +19,20 @@ concurrency:
 
 env:
   CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+  TRUSTED_CONTROL_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
   QA_IMAGE: sniptale-qa:${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
-  qa-release:
+  canonical-qa:
     if: github.event_name != 'schedule' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - name: Check out trusted control plane
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          ref: ${{ env.TRUSTED_CONTROL_SHA }}
           path: trusted-control
           fetch-depth: 0
           persist-credentials: false
@@ -47,118 +49,61 @@ jobs:
           node-version: 22.12.0
           cache: npm
           cache-dependency-path: candidate/package-lock.json
-      - name: Run canonical release lane
+      - name: Install trusted control dependencies
+        working-directory: trusted-control
+        run: npm ci --ignore-scripts
+      - name: Run canonical local QA workflow
         working-directory: candidate
         env:
+          SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
           SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
           SNIPTALE_CI_IMAGE: ${{ env.QA_IMAGE }}
           SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control
-        run: node ../trusted-control/tooling/ci/container.mjs release
-      - name: Upload release proof
+          SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
+        run: node ../trusted-control/tooling/ci/container.mjs candidate
+      - name: Upload canonical proof
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: qa-release-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/ci-artifacts/release-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          if-no-files-found: warn
+          name: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          if-no-files-found: error
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
-  security-audit:
-    if: github.event_name != 'pull_request_target' || github.event.pull_request.draft == false
+  scheduled-security:
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - name: Check out trusted control plane
+      - name: Check out main
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
-          path: trusted-control
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Check out exact candidate
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ env.CANDIDATE_SHA }}
-          path: candidate
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 22.12.0
-          cache: npm
-          cache-dependency-path: candidate/package-lock.json
-      - name: Run canonical security lane
-        working-directory: candidate
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: Run scheduled security advisory check
         env:
-          SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
+          SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
           SNIPTALE_CI_IMAGE: ${{ env.QA_IMAGE }}
-          SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control
-        run: node ../trusted-control/tooling/ci/container.mjs security
-      - name: Upload security proof
+        run: node tooling/ci/container.mjs security
+      - name: Upload scheduled security proof
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: security-audit-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/ci-artifacts/security-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: scheduled-security-${{ github.sha }}-${{ github.run_id }}
+          path: build/ci-artifacts/security-${{ github.sha }}-${{ github.run_id }}
           if-no-files-found: warn
           include-hidden-files: true
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  coverage-audit:
-    if: github.event_name != 'schedule' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    steps:
-      - name: Check out trusted control plane
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
-          path: trusted-control
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Check out exact candidate
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ env.CANDIDATE_SHA }}
-          path: candidate
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 22.12.0
-          cache: npm
-          cache-dependency-path: candidate/package-lock.json
-      - name: Run canonical coverage lane
-        working-directory: candidate
-        env:
-          SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
-          SNIPTALE_CI_IMAGE: ${{ env.QA_IMAGE }}
-          SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control
-        run: node ../trusted-control/tooling/ci/container.mjs coverage
-      - name: Upload coverage proof
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: coverage-audit-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/ci-artifacts/coverage-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          if-no-files-found: warn
-          include-hidden-files: true
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
+          retention-days: 30
 
   security-results:
-    needs: security-audit
-    if: always() && needs.security-audit.result != 'skipped'
+    needs: canonical-qa
+    if: needs.canonical-qa.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       security-events: write
     steps:
       - name: Download canonical security reports
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          { name: 'security-audit-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
+        with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
       - name: Upload Semgrep SARIF
         uses: github/codeql-action/upload-sarif@988661ebb5e81487b3fb31b2185d2856c0a10679
         with: { sarif_file: reports/.tmp/semgrep/results.sarif, category: semgrep-canonical }
@@ -167,8 +112,8 @@ jobs:
         with: { sarif_file: reports/.tmp/codeql/results.filtered.sarif, category: codeql-canonical }
 
   coverage-results:
-    needs: coverage-audit
-    if: always() && needs.coverage-audit.result != 'skipped'
+    needs: canonical-qa
+    if: needs.canonical-qa.result == 'success'
     continue-on-error: true
     runs-on: ubuntu-24.04
     permissions:
@@ -176,8 +121,7 @@ jobs:
     steps:
       - name: Download canonical coverage
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          { name: 'coverage-audit-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
+        with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
       - name: Publish coverage display
         uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f
         with:
@@ -187,8 +131,8 @@ jobs:
           verbose: false
 
   publish-qa-image:
-    needs: [qa-release, security-audit, coverage-audit]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.qa-release.result == 'success' && needs.security-audit.result == 'success' && needs.coverage-audit.result == 'success'
+    needs: canonical-qa
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.canonical-qa.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -222,6 +166,7 @@ jobs:
             exit 1
           fi
       - name: Publish immutable and moving image tags
+        id: publish-image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
         with:
           context: .
@@ -231,12 +176,26 @@ jobs:
           tags: |
             ghcr.io/lrozhkov/sniptale-qa:sha-${{ github.sha }}
             ghcr.io/lrozhkov/sniptale-qa:main
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           sbom: true
           provenance: mode=max
+      - name: Record exact published image digest
+        env:
+          PUBLISHED_DIGEST: ${{ steps.publish-image.outputs.digest }}
+        run: node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "$PUBLISHED_DIGEST"
+      - name: Upload exact image proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qa-image-proof-${{ github.sha }}-${{ github.run_id }}
+          path: build/qa-image-proof
+          if-no-files-found: error
+          retention-days: 30
 
   pr-gate:
     name: pr-gate-authority
-    needs: [qa-release, security-audit, coverage-audit]
+    needs: canonical-qa
     if: always() && github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     permissions:
@@ -245,12 +204,10 @@ jobs:
       - name: Publish candidate-bound required check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_RESULT: ${{ needs.qa-release.result }}
-          SECURITY_RESULT: ${{ needs.security-audit.result }}
-          COVERAGE_RESULT: ${{ needs.coverage-audit.result }}
+          CANONICAL_RESULT: ${{ needs.canonical-qa.result }}
         run: |
           conclusion=failure
-          if [ "$RELEASE_RESULT" = success ] && [ "$SECURITY_RESULT" = success ] && [ "$COVERAGE_RESULT" = success ]; then
+          if [ "$CANONICAL_RESULT" = success ]; then
             conclusion=success
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
@@ -259,6 +216,6 @@ jobs:
             -f status=completed \
             -f conclusion="$conclusion" \
             -f output[title]="Canonical QA gate: $conclusion" \
-            -f output[summary]="release=$RELEASE_RESULT security=$SECURITY_RESULT coverage=$COVERAGE_RESULT" \
+            -f output[summary]="canonical-qa=$CANONICAL_RESULT" \
             >/dev/null
           test "$conclusion" = success

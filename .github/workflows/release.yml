@@ -16,7 +16,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
+      actions: read
       contents: write
+      packages: read
     steps:
       - name: Check out signed tag
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -27,22 +29,49 @@ jobs:
       - name: Validate tag, version, signature, and main ancestry
         env: { GH_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}' }
         run: node tooling/ci/release-policy.mjs
-      - name: Build locked QA image
-        env: { QA_IMAGE: 'sniptale-qa:${{ github.sha }}' }
-        run: docker build --platform linux/amd64 --file tooling/ci/Dockerfile --tag "$QA_IMAGE" .
-      - name: Run complete release proof
+      - name: Download exact successful main proof
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          runs=$(gh run list --workflow quality-gate.yml --branch main --commit "$GITHUB_SHA" --event push --status success --limit 20 --json databaseId,headSha)
+          main_run_id=$(jq -er --arg sha "$GITHUB_SHA" '[.[] | select(.headSha == $sha)] | if length == 1 then .[0].databaseId else error("expected exactly one successful main proof") end' <<<"$runs")
+          artifact_name="canonical-qa-${GITHUB_SHA}-${main_run_id}"
+          gh run download "$main_run_id" --name "$artifact_name" --dir build/main-proof
+          image_proof_name="qa-image-proof-${GITHUB_SHA}-${main_run_id}"
+          gh run download "$main_run_id" --name "$image_proof_name" --dir build/image-proof
+          node tooling/ci/verify-main-proof.mjs build/main-proof "$GITHUB_SHA"
+          image_ref=$(node tooling/ci/image-proof.mjs verify build/image-proof "$GITHUB_SHA" "$main_run_id")
+          echo "SNIPTALE_CI_IMAGE=$image_ref" >> "$GITHUB_ENV"
+          echo "MAIN_PROOF_RUN_ID=$main_run_id" >> "$GITHUB_ENV"
+      - name: Sign in to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          {
+            registry: ghcr.io,
+            username: '${{ github.actor }}',
+            password: '${{ secrets.GITHUB_TOKEN }}',
+          }
+      - name: Pull exact main QA image
+        run: |
+          docker pull "$SNIPTALE_CI_IMAGE"
+          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$SNIPTALE_CI_IMAGE")
+          if [ "$revision" != "$GITHUB_SHA" ]; then
+            echo "QA image revision does not match release commit" >&2
+            exit 1
+          fi
+      - name: Run release-only canonical audit
         env:
-          SNIPTALE_CI_IMAGE: 'sniptale-qa:${{ github.sha }}'
+          SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
           SNIPTALE_CI_SKIP_BUILD: '1'
-          SNIPTALE_RELEASE_AUDIT: '1'
-        run: npm run ci:release
+        run: node tooling/ci/container.mjs release-audit
       - name: Prepare immutable release assets
-        run: node tooling/ci/prepare-release-assets.mjs "build/ci-artifacts/release-${GITHUB_SHA}-${GITHUB_RUN_ID}"
+        run: node tooling/ci/prepare-release-assets.mjs build/main-proof "build/ci-artifacts/release-audit-${GITHUB_SHA}-${GITHUB_RUN_ID}" "$GITHUB_SHA"
       - name: Preserve release proof
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-${{ github.sha }}-${{ github.run_id }}
-          path: build/ci-artifacts/release-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            build/main-proof
+            build/ci-artifacts/release-audit-${{ github.sha }}-${{ github.run_id }}
           include-hidden-files: true
           retention-days: 30
       - name: Create draft, attach verified assets, and publish
@@ -50,7 +79,7 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_POLICY_READ_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}'
         run: |
-          asset_root="build/ci-artifacts/release-${GITHUB_SHA}-${GITHUB_RUN_ID}/release-assets"
+          asset_root="build/main-proof/release-assets"
           GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" node tooling/ci/release-policy.mjs --recheck
           lookup_error=$(mktemp)
           if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" >/dev/null 2>"$lookup_error"; then
