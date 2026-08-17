@@ -3,6 +3,9 @@ import type { Ref } from 'react';
 function withOfflineSnapshotCsp(srcDoc: string): string {
   const csp = [
     "default-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "navigate-to 'none'",
     'img-src blob: data:',
     'font-src blob: data:',
     "style-src 'unsafe-inline' blob:",

@@ -24,6 +24,7 @@ import { registerVoiceInputPorts } from '../../../voice-input/coordinator';
 import { registerVoiceInputTelemetryPorts } from '../../../voice-input/telemetry-port';
 import { registerAggregateEditorPresencePorts } from '../../../application/aggregate-promotion/ports';
 import { registerExtensionCommandListener } from '../../commands';
+import { registerSecurityE2EControl } from '../../../../platform/security-e2e-control';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeWiring' });
 
@@ -40,6 +41,9 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerVoiceInputTelemetryPorts();
   registerAggregateEditorPresencePorts();
   registerExtensionCommandListener(state);
+  if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
+    registerSecurityE2EControl();
+  }
   initializePageAccessLifecycle(logger);
   configureScreenshotPrivacyErasureCleanupPort({
     disableScreenshotMode: (tabId, runtimeState) =>

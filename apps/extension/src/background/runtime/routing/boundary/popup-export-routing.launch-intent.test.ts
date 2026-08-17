@@ -7,7 +7,18 @@ import {
 import { createBackgroundRuntimeState } from '../../../application/runtime-state';
 import { routePopupExportMessage } from './popup-export-routing';
 
+const { assertPopupTabRouteTargetDocumentMock } = vi.hoisted(() => ({
+  assertPopupTabRouteTargetDocumentMock: vi.fn(),
+}));
+
+vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capabilities/popup-tab/route-capabilities')>()),
+  assertPopupTabRouteTargetDocument: assertPopupTabRouteTargetDocumentMock,
+}));
+
 beforeEach(() => {
+  vi.clearAllMocks();
+  assertPopupTabRouteTargetDocumentMock.mockResolvedValue(undefined);
   resetPopupExportLaunchIntentsForTests();
 });
 

@@ -136,7 +136,7 @@ it('sanitizes restored web snapshot HTML before viewer rendering', () => {
   expect(html).toContain('data-sniptale-disabled-form="true"');
 });
 
-it('keeps safe navigation links in offline viewer HTML while removing resource URLs', () => {
+it('removes all navigation targets and external resource URLs from offline viewer HTML', () => {
   const html = sanitizeWebSnapshotHtml(
     [
       '<img src="blob:snapshot-image" srcset="blob:snapshot-image 1x, https://tracker.example/i.png 2x">',
@@ -153,8 +153,8 @@ it('keeps safe navigation links in offline viewer HTML while removing resource U
   );
 
   expect(html).toContain('src="blob:snapshot-image"');
-  expect(html).toContain('href="https://tracker.example/page"');
-  expect(html).toContain('href="mailto:support@example.com"');
+  expect(html).not.toContain('href="https://tracker.example/page"');
+  expect(html).not.toContain('href="mailto:support@example.com"');
   expect(html).toContain('src="data:image/png;base64,aW1n"');
   expect(html).not.toContain('srcset=');
   expect(html).not.toContain('https://tracker.example/style.css');

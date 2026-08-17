@@ -27,6 +27,7 @@ const {
   loggerWarnMock,
   loadSettingsMock,
   parseBackgroundRuntimeMessageMock,
+  assertPopupTabRouteTargetDocumentMock,
   routeCaptureMessageMock,
   routeAISecretUnlockMessageMock,
   routeAiSettingsMutationMessageMock,
@@ -61,6 +62,7 @@ const {
   loggerWarnMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   parseBackgroundRuntimeMessageMock: vi.fn(),
+  assertPopupTabRouteTargetDocumentMock: vi.fn(),
   routeCaptureMessageMock: vi.fn(),
   routeAISecretUnlockMessageMock: vi.fn(),
   routeAiSettingsMutationMessageMock: vi.fn(),
@@ -96,6 +98,15 @@ vi.mock('../../../apps/extension/src/background/page-access/service', async (imp
 vi.mock('../../../apps/extension/src/contracts/messaging/parsers/boundary', () => ({
   parseBackgroundRuntimeMessage: parseBackgroundRuntimeMessageMock,
 }));
+vi.mock(
+  '../../../apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities')
+    >()),
+    assertPopupTabRouteTargetDocument: assertPopupTabRouteTargetDocumentMock,
+  })
+);
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug: loggerDebugMock, error: loggerErrorMock, warn: loggerWarnMock }),
 }));
@@ -172,6 +183,7 @@ import { createScenarioSessionServiceStub } from './scenario-session-service.stu
 
 export {
   browserScriptingExecuteScriptMock,
+  assertPopupTabRouteTargetDocumentMock,
   ensureActivePageAccessRuntimeMock,
   hasActivePageAccessMock,
   browserTabsQueryMock,
@@ -266,6 +278,7 @@ function getRegisteredListener() {
 
 export function resetRuntimeMessagingMocks() {
   vi.clearAllMocks();
+  assertPopupTabRouteTargetDocumentMock.mockResolvedValue(undefined);
   mockRoutesAsUnhandled(isBackgroundInternalSignalMessageMock, isBackgroundTabMessageMock);
   mockRoutesAsUnhandled(isPopupExportViewerMessageMock, isRouteCaptureMessageMock);
   mockRoutesAsUnhandled(isScenarioMessageMock, isTabModeMessageMock);
@@ -275,7 +288,11 @@ export function resetRuntimeMessagingMocks() {
     isVideoRuntimeMessageMock
   );
   browserScriptingExecuteScriptMock.mockResolvedValue([
-    { frameId: 0, result: { assetId: 'snapshot-1', success: true, warnings: [] } },
+    {
+      documentId: 'document-1',
+      frameId: 0,
+      result: { assetId: 'snapshot-1', success: true, warnings: [] },
+    },
   ]);
   browserTabsGetMock.mockResolvedValue({ id: 1, url: 'https://example.test' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);

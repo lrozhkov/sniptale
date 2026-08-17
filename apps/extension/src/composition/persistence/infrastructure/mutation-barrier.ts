@@ -1,4 +1,5 @@
 // policyStateId: persistent-data-erasure-lease
+
 const PERSISTENCE_LOCK_NAME = 'sniptale:persistence:privacy-erasure';
 const PERSISTENCE_TRANSITION_LOCK_NAME = `${PERSISTENCE_LOCK_NAME}:transition`;
 

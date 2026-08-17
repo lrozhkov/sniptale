@@ -9,7 +9,10 @@ import { voiceInputCoordinatorMocks } from '../../../../../tooling/test/support/
 export const mocks = voiceInputCoordinatorMocks;
 
 vi.mock('@sniptale/platform/browser/runtime', () => ({
-  browserRuntime: { subscribeToConnections: vi.fn() },
+  browserRuntime: {
+    getContexts: (filter: chrome.runtime.ContextFilter) => mocks.getRuntimeContexts(filter),
+    subscribeToConnections: vi.fn(),
+  },
   runtimeInfo: {
     getURL: (path: string) => `chrome-extension://extension-id/${path}`,
   },
@@ -148,6 +151,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.acquireMediaMutationPermit.mockReturnValue(vi.fn());
   mocks.ensureOffscreenDocument.mockResolvedValue(true);
+  mocks.getRuntimeContexts.mockResolvedValue([
+    {
+      contextId: 'offscreen-context',
+      contextType: 'OFFSCREEN_DOCUMENT',
+      frameId: -1,
+      incognito: false,
+      tabId: -1,
+      windowId: -1,
+    },
+  ]);
   mocks.waitForOffscreenReady.mockResolvedValue(undefined);
   mocks.sendRuntimeMessage.mockResolvedValue({ success: true, result: 'accepted' });
 });

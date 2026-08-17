@@ -1938,6 +1938,18 @@
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
+      "id": "qa:e2e:build:release",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:build:security",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
       "id": "qa:e2e:critical",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1963,6 +1975,12 @@
     },
     {
       "id": "qa:e2e:install:deps",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:security",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The package script is a supported canonical QA operator entrypoint."

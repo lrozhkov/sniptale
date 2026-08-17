@@ -162,6 +162,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/platform/security-e2e-control",
+      "ownerId": "app-core.security-e2e-control",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/ui/color-selector",
       "ownerId": "app-core.editor-controls.color",
       "ownerClass": "app-core"

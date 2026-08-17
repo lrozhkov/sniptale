@@ -76,6 +76,8 @@ Blocking manual audit lane selected by an audit profile. It owns full product co
 
 Separate Playwright extension smoke. It is runtime acceptance proof, not a third product/harness wrapper mode and not automatically part of closeout.
 
+`qa:e2e:security` builds a production-mode artifact in the isolated `dist-release-e2e` directory and a release-like optional-permission artifact in `dist-security-e2e`, then runs the browser security regression suite. The production-surface scenario launches `dist-release-e2e` explicitly and proves that internal pages and security instrumentation are not web-exposed; the remaining scenarios launch the isolated instrumented artifact. The Linux native optional-permission proof requires `gcc`, X11/XTest development libraries, and an X server (the wrapper supplies Xvfb for headless runs). `qa:e2e:all` additionally builds and runs the ordinary smoke/critical artifact before the security scenarios.
+
 ## Blocking Lock And Handoffs
 
 `qa:release-harness`, `qa:checkpoint`, `qa:closeout`, `qa:build`, `qa:release`, and `qa:audit` use one blocking-wrapper lock. Do not start them in parallel. `qa:closeout` performs an authorized lock handoff to its child build; users should not start another wrapper while that chain is active.

@@ -174,6 +174,23 @@ it('rejects trace-enabled release markers and development endpoints', async () =
   );
 });
 
+it('rejects security E2E harness paths and control markers', async () => {
+  await expectVerifierRejects(
+    { path: 'tooling/test/harness/security-control.html' },
+    'test or development artifact'
+  );
+  await expectVerifierRejects(
+    { text: 'const port = "sniptale:security-e2e-control:v1";' },
+    'security E2E control marker'
+  );
+  for (const checkpoint of ['persistence-before-commit', 'popup-export-after-admission']) {
+    await expectVerifierRejects(
+      { text: `const checkpoint = "${checkpoint}";` },
+      'security E2E control marker'
+    );
+  }
+});
+
 it('rejects script web-accessible resources and unsafe CSP', async () => {
   await expectVerifierRejects(
     {

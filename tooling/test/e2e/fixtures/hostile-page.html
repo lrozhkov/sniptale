@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hostile capture fixture</title>
+  </head>
+  <body>
+    <main data-testid="hostile-page">
+      <p>Safe retained text</p>
+      <img src="/xss-image" onerror="fetch('/xss-beacon?source=onerror')" alt="hostile image" />
+      <a id="javascript-link" href="javascript:fetch('/xss-beacon?source=javascript-url')"
+        >unsafe link</a
+      >
+      <a
+        id="data-link"
+        href="data:text/html,&lt;script&gt;fetch('/xss-beacon?source=data')&lt;/script&gt;"
+        >data link</a
+      >
+      <a id="blob-link" href="blob:http://127.0.0.1/hostile">blob link</a>
+      <a id="file-link" href="file:///tmp/hostile">file link</a>
+      <a id="safe-link" href="/safe-navigation-target">safe retained link</a>
+      <a id="redirect-link" href="/redirect-to-hostile-origin" target="_blank">redirect link</a>
+      <svg onload="fetch('/xss-beacon?source=svg')"><circle r="10" /></svg>
+      <iframe srcdoc="<script>fetch('/xss-beacon?source=srcdoc')</script>"></iframe>
+      <form action="javascript:fetch('/xss-beacon?source=form')"><button>submit</button></form>
+      <div onclick="globalThis.__sniptaleXssSentinel = true">dangerous HTML</div>
+    </main>
+  </body>
+</html>

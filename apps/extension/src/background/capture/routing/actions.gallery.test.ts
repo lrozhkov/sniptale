@@ -14,6 +14,7 @@ const {
   releaseWebSnapshotStagedBlobsForSessionMock,
   releaseWebSnapshotSaveMock,
   registerWebSnapshotAssetSessionMock,
+  hasActivePageAccessMock,
   saveScreenshotToMediaHubFromDataUrlMock,
   saveWebSnapshotToMediaHubMock,
   stageWebSnapshotBlobChunkMock,
@@ -27,9 +28,15 @@ const {
   releaseWebSnapshotStagedBlobsForSessionMock: vi.fn(),
   releaseWebSnapshotSaveMock: vi.fn(),
   registerWebSnapshotAssetSessionMock: vi.fn(),
+  hasActivePageAccessMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
   saveWebSnapshotToMediaHubMock: vi.fn(),
   stageWebSnapshotBlobChunkMock: vi.fn(),
+}));
+
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
+  hasActivePageAccess: hasActivePageAccessMock,
 }));
 
 vi.mock('../../media-hub/assets', async (importOriginal) => ({
@@ -108,6 +115,7 @@ function createWebSnapshotSavePayload(): WebSnapshotSaveToGalleryPayload {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hasActivePageAccessMock.mockResolvedValue(true);
   consumeWebSnapshotStagedBlobMock.mockImplementation(
     ({ expectedKind }: { expectedKind: 'package' | 'screenshot' }) =>
       new Blob([expectedKind], {
@@ -317,5 +325,19 @@ it('reports web snapshot save failures through route errors', async () => {
   expect(releaseWebSnapshotStagedBlobsMock).toHaveBeenCalledWith({
     ...createWebSnapshotSavePayload(),
     tabId: 42,
+  });
+});
+
+it('rejects a web snapshot commit after page access is revoked', async () => {
+  const response = vi.fn();
+  hasActivePageAccessMock.mockResolvedValueOnce(false);
+
+  expect(handleSaveWebSnapshotToGallery(createWebSnapshotSavePayload(), 42, response)).toBe(true);
+  await flushPromises();
+
+  expect(saveWebSnapshotToMediaHubMock).not.toHaveBeenCalled();
+  expect(response).toHaveBeenCalledWith({
+    error: 'Page access was revoked before web snapshot commit',
+    success: false,
   });
 });

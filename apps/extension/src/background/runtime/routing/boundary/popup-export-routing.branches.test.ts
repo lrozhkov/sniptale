@@ -6,12 +6,19 @@ const {
   isOwnedSnapshotViewerPageMock,
   sendTabMessageMock,
   sendViewerPopupExportMessageMock,
+  assertPopupTabRouteTargetDocumentMock,
 } = vi.hoisted(() => ({
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
   isOwnedSnapshotViewerPageMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   sendViewerPopupExportMessageMock: vi.fn(),
+  assertPopupTabRouteTargetDocumentMock: vi.fn(),
+}));
+
+vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capabilities/popup-tab/route-capabilities')>()),
+  assertPopupTabRouteTargetDocument: assertPopupTabRouteTargetDocumentMock,
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', async (importOriginal) => ({
@@ -66,6 +73,7 @@ function createPopupExportOptions(includeFullPageScreenshot: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  assertPopupTabRouteTargetDocumentMock.mockResolvedValue(undefined);
   browserTabsGetMock.mockResolvedValue({ active: true, id: 62, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);

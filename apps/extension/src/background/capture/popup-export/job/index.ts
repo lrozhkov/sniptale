@@ -14,6 +14,7 @@ import {
 } from './runtime-state';
 import { clearPopupExportJobStatus, readPopupExportJobStatus } from './storage';
 import { acquirePopupExportMutationPermit } from './lifecycle-gate';
+import { securityE2ECheckpoint } from '../../../../platform/security-e2e-control';
 
 let activeJob: ActivePopupExportJob | null = null;
 
@@ -75,6 +76,9 @@ export async function startPopupExportJob(args: {
 
   const job = createPopupExportJob(args);
   activeJob = job;
+  if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
+    await securityE2ECheckpoint('popup-export-after-admission');
+  }
   const initialPublication = publishPopupExportJobStatus(job);
   job.completion = initialPublication
     .then(() =>

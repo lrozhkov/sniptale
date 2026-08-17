@@ -11,6 +11,11 @@ type LaunchedBrowser = {
   userDataDir: string;
 };
 
+type LaunchExtensionBrowserOptions = {
+  extensionBuildDir?: string;
+  userDataDir?: string;
+};
+
 async function reserveDebugPort(): Promise<number> {
   const { createServer } = await import('node:net');
 
@@ -70,8 +75,11 @@ async function dismissFirstRunPrompt(page: Page): Promise<void> {
   }
 }
 
-function getChromiumLaunchConfig(debugPort: number) {
-  const extensionPath = join(process.cwd(), 'dist');
+function getChromiumLaunchConfig(debugPort: number, extensionBuildDir?: string) {
+  const extensionPath = join(
+    process.cwd(),
+    extensionBuildDir ?? process.env.SNIPTALE_EXTENSION_BUILD_DIR ?? 'dist'
+  );
   const executablePath = chromium.executablePath();
 
   return {
@@ -102,10 +110,13 @@ function appendErrorChunk(stderr: string, chunk: Buffer): string {
   return stderr + chunk.toString();
 }
 
-export async function launchExtensionBrowser(): Promise<LaunchedBrowser> {
-  const userDataDir = await mkdtemp(join(tmpdir(), 'sniptale-pw-'));
+export async function launchExtensionBrowser(
+  options: LaunchExtensionBrowserOptions = {}
+): Promise<LaunchedBrowser> {
+  const ownsUserDataDir = options.userDataDir === undefined;
+  const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), 'sniptale-pw-')));
   const debugPort = await reserveDebugPort();
-  const launchConfig = getChromiumLaunchConfig(debugPort);
+  const launchConfig = getChromiumLaunchConfig(debugPort, options.extensionBuildDir);
 
   await ensureChromiumExecutable(launchConfig.executablePath);
 
@@ -143,12 +154,31 @@ export async function launchExtensionBrowser(): Promise<LaunchedBrowser> {
     };
   } catch (error) {
     browserProcess.kill('SIGKILL');
-    await rm(userDataDir, { recursive: true, force: true });
+    if (ownsUserDataDir) {
+      await rm(userDataDir, { recursive: true, force: true });
+    }
     const details = stderr.trim();
     const suffix = details ? `\nChromium stderr:\n${details}` : '';
     throw new Error(`${error instanceof Error ? error.message : String(error)}${suffix}`, {
       cause: error,
     });
+  }
+}
+
+export async function closeExtensionBrowser(
+  launched: LaunchedBrowser,
+  options: { removeUserDataDir?: boolean } = {}
+): Promise<void> {
+  await launched.browser.close().catch(() => undefined);
+  if (launched.browserProcess.exitCode === null && !launched.browserProcess.killed) {
+    const exit = new Promise<void>((resolve) =>
+      launched.browserProcess.once('exit', () => resolve())
+    );
+    launched.browserProcess.kill('SIGKILL');
+    await exit;
+  }
+  if (options.removeUserDataDir) {
+    await rm(launched.userDataDir, { recursive: true, force: true });
   }
 }
 

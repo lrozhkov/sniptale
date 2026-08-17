@@ -155,7 +155,7 @@ function sanitizeOfflineAttribute(
     return isSafeOfflineWebSnapshotSrcset(attribute.value, allowedObjectUrls) ? 'keep' : 'remove';
   }
   if (normalizedName === 'href' && isNavigationHrefAttribute(attribute)) {
-    return allowedObjectUrls.has(attribute.value.trim()) ? 'keep' : 'defer';
+    return 'remove';
   }
   if (URL_ATTRIBUTE_NAMES.has(normalizedName)) {
     return isSafeOfflineWebSnapshotUrl(attribute.value, allowedObjectUrls) ? 'keep' : 'remove';

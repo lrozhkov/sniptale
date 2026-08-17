@@ -68,10 +68,15 @@ it('routes web snapshot saves through content tabs and authorizes asset sessions
     authenticatedSnapshotAssetsEnabled: false,
   });
   browserScriptingExecuteScriptMock.mockResolvedValue([
-    { frameId: 0, result: { assetId: 'snapshot-1', success: true, warnings: [] } },
+    {
+      documentId: 'document-1',
+      frameId: 0,
+      result: { assetId: 'snapshot-1', success: true, warnings: [] },
+    },
   ]);
 
   expectListenerResult(true, listener, message, createSender(undefined, POPUP_URL), sendResponse);
+  await flushPromises();
   await flushPromises();
 
   expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith(
@@ -115,10 +120,15 @@ it('binds anonymous external asset authorization to the persisted setting', asyn
     authenticatedSnapshotAssetsEnabled: true,
   });
   browserScriptingExecuteScriptMock.mockResolvedValue([
-    { frameId: 0, result: { assetId: 'snapshot-1', success: true, warnings: [] } },
+    {
+      documentId: 'document-1',
+      frameId: 0,
+      result: { assetId: 'snapshot-1', success: true, warnings: [] },
+    },
   ]);
 
   expectListenerResult(true, listener, message, createSender(undefined, POPUP_URL), sendResponse);
+  await flushPromises();
   await flushPromises();
 
   expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith(

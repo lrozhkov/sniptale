@@ -115,7 +115,7 @@ it('re-sanitizes restored snapshot HTML before returning viewer srcdoc', async (
   expect(loaded.html).not.toContain('http-equiv="refresh"');
   expect(loaded.html).not.toContain('<iframe');
   expect(loaded.html).not.toContain('onerror');
-  expect(loaded.html).toContain('href="https://tracker.example/page"');
+  expect(loaded.html).not.toContain('href="https://tracker.example/page"');
   expect(loaded.html).not.toContain('https://tracker.example/pixel.png');
 });
 
@@ -141,7 +141,7 @@ it('keeps safe navigation links while stripping unresolved offline resource link
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
 
-  expect(loaded.html).toContain('href="https://example.com/details"');
+  expect(loaded.html).not.toContain('href="https://example.com/details"');
   expect(loaded.html).not.toContain('https://tracker.example/style.css');
   expect(loaded.html).not.toContain('https://tracker.example/map');
   expect(loaded.html).not.toContain('https://tracker.example/icon.svg');
