@@ -78,7 +78,7 @@ const LANE_WRAPPERS = {
 function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot) {
   const recordsRoot = path.join(repositoryRoot, '.tmp/qa-observability/runs');
   if (!fs.existsSync(recordsRoot)) return [];
-  const copied = [];
+  const available = [];
   for (const day of fs.readdirSync(recordsRoot)) {
     const dayRoot = path.join(recordsRoot, day);
     if (!fs.statSync(dayRoot).isDirectory()) continue;
@@ -86,24 +86,62 @@ function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot) {
       const source = path.join(dayRoot, name);
       const record = parseRunRecord(JSON.parse(fs.readFileSync(source, 'utf8')));
       if (Date.parse(record.startedAt) < startedAtMs) continue;
-      if (record.parentRunId !== null || !LANE_WRAPPERS[lane].has(record.wrapperId)) continue;
       const expectedRecord = `.tmp/qa-observability/runs/${record.startedAt.slice(0, 10)}/${record.runId}.json`;
       const relative = relativePath(source, repositoryRoot);
       if (relative !== expectedRecord)
         throw new Error(`Non-canonical run record path: ${relative}`);
-      copyFile(relative, destinationRoot, relative, { repositoryRoot });
-      copied.push(relative);
-      const absoluteLog = path.join(repositoryRoot, relativePath(record.log.path, repositoryRoot));
-      if (!fs.existsSync(absoluteLog))
-        throw new Error(`Canonical run log is missing: ${record.log.path}`);
-      if (
-        fs.statSync(absoluteLog).size !== record.log.byteCount ||
-        sha256(absoluteLog) !== record.log.digest
-      ) {
-        throw new Error(`Canonical run log identity drifted: ${record.log.path}`);
-      }
-      copyFile(record.log.path, destinationRoot, record.log.path, { repositoryRoot });
+      available.push({ record, relative });
     }
+  }
+  const topLevel = available.filter(
+    ({ record }) => record.parentRunId === null && LANE_WRAPPERS[lane].has(record.wrapperId)
+  );
+  const selected = [...topLevel];
+  if (lane === 'candidate') {
+    for (const parent of topLevel.filter(({ record }) => record.wrapperId === 'qa:closeout')) {
+      const evidence = parent.record.steps
+        .filter((step) => step.stepId === 'qa.rule.full-build' && step.outcome === 'problems-found')
+        .flatMap(
+          (step) => step.diagnostic?.evidence.filter((item) => item.kind === 'child-run') ?? []
+        );
+      for (const childEvidence of evidence) {
+        const matches = available.filter(
+          ({ record, relative }) =>
+            record.runId === childEvidence.runId &&
+            record.wrapperId === 'qa:build' &&
+            record.status === 'problems-found' &&
+            record.exitCode !== null &&
+            record.exitCode !== 0 &&
+            record.parentRunId === parent.record.runId &&
+            record.rootRunId === parent.record.rootRunId &&
+            relative === childEvidence.recordPath &&
+            record.log.path === childEvidence.logPath
+        );
+        if (matches.length !== 1) {
+          throw new Error(
+            `Expected exactly one canonical qa:build child for ${parent.record.runId}, found ${matches.length}.`
+          );
+        }
+        if (!selected.some(({ record }) => record.runId === matches[0].record.runId)) {
+          selected.push(matches[0]);
+        }
+      }
+    }
+  }
+  const copied = [];
+  for (const { record, relative } of selected) {
+    copyFile(relative, destinationRoot, relative, { repositoryRoot });
+    copied.push(relative);
+    const absoluteLog = path.join(repositoryRoot, relativePath(record.log.path, repositoryRoot));
+    if (!fs.existsSync(absoluteLog))
+      throw new Error(`Canonical run log is missing: ${record.log.path}`);
+    if (
+      fs.statSync(absoluteLog).size !== record.log.byteCount ||
+      sha256(absoluteLog) !== record.log.digest
+    ) {
+      throw new Error(`Canonical run log identity drifted: ${record.log.path}`);
+    }
+    copyFile(record.log.path, destinationRoot, record.log.path, { repositoryRoot });
   }
   return copied.sort();
 }

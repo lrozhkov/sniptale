@@ -14607,7 +14607,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "13d091c60470199e042fe8c25a691f7e7b696426d893815e5e9cb626259dcb11"
+        "contentHash": "d8fa6bc2ee3723997584063b6eb2dc3e1f504bb96bb56b7f2b29c1e89429b8fa"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",

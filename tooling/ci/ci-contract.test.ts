@@ -19,6 +19,56 @@ import { verifyMainProof } from './verify-main-proof.mjs';
 import { verifyImageProof, writeImageProof } from './image-proof.mjs';
 import { finalizeCandidateReleaseArchive } from './artifacts.mjs';
 
+function createEmptyRunRecord({
+  runId,
+  wrapperId,
+  rootRunId = runId,
+  parentRunId = null,
+  logText = '',
+}) {
+  return {
+    schemaVersion: 2,
+    runId,
+    rootRunId,
+    parentRunId,
+    ownerPid: 42,
+    wrapperId,
+    status: 'all-passed',
+    exitCode: 0,
+    startedAt: '2026-08-17T00:00:00.000Z',
+    finishedAt: '2026-08-17T00:00:01.000Z',
+    durationMs: 1000,
+    repository: {
+      head: 'a'.repeat(40),
+      treeFingerprint: 'b'.repeat(40),
+      diffFingerprint: 'c'.repeat(64),
+      changedFileCount: 0,
+      scope: 'workspace',
+      suite: null,
+      mode: 'default',
+      targetFiles: [],
+    },
+    correlation: {},
+    summary: {
+      stepCount: 0,
+      passed: 0,
+      problemsFound: 0,
+      skipped: 0,
+      errors: 0,
+      interrupted: 0,
+      problemCount: 0,
+      problemIds: [],
+    },
+    steps: [],
+    log: {
+      path: `.tmp/qa-logs/2026-08-17/${runId}.log`,
+      digest: crypto.createHash('sha256').update(logText).digest('hex'),
+      byteCount: Buffer.byteLength(logText),
+      truncated: false,
+    },
+  };
+}
+
 it('pins every external workflow action to a full commit SHA', () => {
   for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
     const source = fs.readFileSync(workflow, 'utf8');
@@ -302,47 +352,7 @@ it('fails canonical artifact collection on missing reports and refuses overwrite
   writeFile(
     root,
     `.tmp/qa-observability/runs/2026-08-17/${runId}.json`,
-    JSON.stringify({
-      schemaVersion: 2,
-      runId,
-      rootRunId: runId,
-      parentRunId: null,
-      ownerPid: 42,
-      wrapperId: 'qa:audit',
-      status: 'all-passed',
-      exitCode: 0,
-      startedAt: '2026-08-17T00:00:00.000Z',
-      finishedAt: '2026-08-17T00:00:01.000Z',
-      durationMs: 1000,
-      repository: {
-        head: 'a'.repeat(40),
-        treeFingerprint: 'b'.repeat(40),
-        diffFingerprint: 'c'.repeat(64),
-        changedFileCount: 0,
-        scope: 'workspace',
-        suite: null,
-        mode: 'default',
-        targetFiles: [],
-      },
-      correlation: {},
-      summary: {
-        stepCount: 0,
-        passed: 0,
-        problemsFound: 0,
-        skipped: 0,
-        errors: 0,
-        interrupted: 0,
-        problemCount: 0,
-        problemIds: [],
-      },
-      steps: [],
-      log: {
-        path: logPath,
-        digest: crypto.createHash('sha256').update('').digest('hex'),
-        byteCount: 0,
-        truncated: false,
-      },
-    })
+    JSON.stringify(createEmptyRunRecord({ runId, wrapperId: 'qa:audit' }))
   );
   const forgedRoot = createTempRoot('ci-artifact-forged-record-');
   fs.cpSync(root, forgedRoot, { recursive: true });
@@ -406,6 +416,198 @@ it('fails canonical artifact collection on missing reports and refuses overwrite
     true
   );
   expect(fs.existsSync(path.join(launcherRoot, 'build/ci-artifacts'))).toBe(false);
+});
+
+it('admits closeout child proof only through exact parent diagnostic evidence', () => {
+  const moduleUrl = new URL('./artifacts.mjs', import.meta.url).href;
+  const lineageRoot = createTempRoot('ci-artifact-child-lineage-');
+  const parentRunId = '218f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const childRunId = '318f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const siblingRunId = '418f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const mixedLineageRunId = '518f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const baseRecord = createEmptyRunRecord({ runId: parentRunId, wrapperId: 'qa:closeout' });
+  for (const record of [
+    {
+      ...baseRecord,
+      runId: parentRunId,
+      rootRunId: parentRunId,
+      wrapperId: 'qa:closeout',
+      status: 'problems-found',
+      exitCode: 1,
+      summary: {
+        stepCount: 1,
+        passed: 0,
+        problemsFound: 1,
+        skipped: 0,
+        errors: 0,
+        interrupted: 0,
+        problemCount: 1,
+        problemIds: ['qa.rule.full-build.process-exit'],
+      },
+      steps: [
+        {
+          stepId: 'qa.rule.full-build',
+          outcome: 'problems-found',
+          startedAt: '2026-08-17T00:00:00.000Z',
+          finishedAt: '2026-08-17T00:00:01.000Z',
+          durationMs: 1000,
+          controlIds: ['qa.rule.full-build'],
+          problemIds: ['qa.rule.full-build.process-exit'],
+          skipReasonId: null,
+          diagnostic: {
+            summary: 'failed',
+            locations: [],
+            remediation: 'inspect the canonical child build proof',
+            ruleDoc: 'docs/tooling/code-quality.md',
+            evidence: [
+              {
+                kind: 'child-run',
+                runId: childRunId,
+                recordPath: `.tmp/qa-observability/runs/2026-08-17/${childRunId}.json`,
+                logPath: `.tmp/qa-logs/2026-08-17/${childRunId}.log`,
+              },
+            ],
+          },
+        },
+      ],
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${parentRunId}.log`,
+        digest: crypto.createHash('sha256').update('parent\n').digest('hex'),
+        byteCount: 7,
+        truncated: false,
+      },
+    },
+    {
+      ...baseRecord,
+      runId: childRunId,
+      rootRunId: parentRunId,
+      parentRunId,
+      wrapperId: 'qa:build',
+      status: 'problems-found',
+      exitCode: 1,
+      summary: {
+        stepCount: 1,
+        passed: 0,
+        problemsFound: 1,
+        skipped: 0,
+        errors: 0,
+        interrupted: 0,
+        problemCount: 1,
+        problemIds: ['qa.rule.full-build.process-exit'],
+      },
+      steps: [
+        {
+          stepId: 'qa.rule.full-build',
+          outcome: 'problems-found',
+          startedAt: '2026-08-17T00:00:00.000Z',
+          finishedAt: '2026-08-17T00:00:01.000Z',
+          durationMs: 1000,
+          controlIds: ['qa.rule.full-build'],
+          problemIds: ['qa.rule.full-build.process-exit'],
+          skipReasonId: null,
+          diagnostic: {
+            summary: 'failed',
+            locations: [],
+            remediation: 'inspect the canonical build proof',
+            ruleDoc: 'docs/tooling/code-quality.md',
+            evidence: [],
+          },
+        },
+      ],
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${childRunId}.log`,
+        digest: crypto.createHash('sha256').update('child\n').digest('hex'),
+        byteCount: 6,
+        truncated: false,
+      },
+    },
+    {
+      ...baseRecord,
+      runId: siblingRunId,
+      rootRunId: parentRunId,
+      parentRunId,
+      wrapperId: 'qa:build',
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${siblingRunId}.log`,
+        digest: crypto.createHash('sha256').update('sibling\n').digest('hex'),
+        byteCount: 8,
+        truncated: false,
+      },
+    },
+    {
+      ...baseRecord,
+      runId: mixedLineageRunId,
+      rootRunId: '618f68b2-6e52-7cb0-bdb7-7f0a901c94de',
+      parentRunId,
+      wrapperId: 'qa:build',
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${mixedLineageRunId}.log`,
+        digest: crypto.createHash('sha256').update('mixed\n').digest('hex'),
+        byteCount: 6,
+        truncated: false,
+      },
+    },
+  ]) {
+    const logByRunId = {
+      [parentRunId]: 'parent\n',
+      [childRunId]: 'child\n',
+      [siblingRunId]: 'sibling\n',
+      [mixedLineageRunId]: 'mixed\n',
+    };
+    writeFile(lineageRoot, record.log.path, logByRunId[record.runId]);
+    writeFile(
+      lineageRoot,
+      `.tmp/qa-observability/runs/2026-08-17/${record.runId}.json`,
+      JSON.stringify(record)
+    );
+  }
+  const lineageScript = `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)}; collectLaneArtifacts({ lane: 'candidate', startedAtMs: 0, status: 'failed', command: [], containerDigest: 'sha256:${'a'.repeat(64)}' });`;
+  const lineage = spawnSync(process.execPath, ['--input-type=module', '--eval', lineageScript], {
+    cwd: lineageRoot,
+    env: { ...process.env, GITHUB_SHA: 'b'.repeat(40), GITHUB_RUN_ID: '22' },
+    encoding: 'utf8',
+  });
+  expect(lineage.status, lineage.stderr).toBe(0);
+  const lineageBundle = path.join(lineageRoot, `build/ci-artifacts/candidate-${'b'.repeat(40)}-22`);
+  expect(
+    fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${parentRunId}.log`))
+  ).toBe(true);
+  expect(fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${childRunId}.log`))).toBe(
+    true
+  );
+  expect(
+    fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${siblingRunId}.log`))
+  ).toBe(false);
+  expect(
+    fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${mixedLineageRunId}.log`))
+  ).toBe(false);
+
+  const successfulChildRoot = createTempRoot('ci-artifact-successful-child-');
+  fs.cpSync(lineageRoot, successfulChildRoot, { recursive: true });
+  writeFile(
+    successfulChildRoot,
+    `.tmp/qa-observability/runs/2026-08-17/${childRunId}.json`,
+    JSON.stringify(
+      createEmptyRunRecord({
+        runId: childRunId,
+        rootRunId: parentRunId,
+        parentRunId,
+        wrapperId: 'qa:build',
+        logText: 'child\n',
+      })
+    )
+  );
+  const successfulChild = spawnSync(
+    process.execPath,
+    ['--input-type=module', '--eval', lineageScript],
+    {
+      cwd: successfulChildRoot,
+      env: { ...process.env, GITHUB_SHA: 'b'.repeat(40), GITHUB_RUN_ID: '23' },
+      encoding: 'utf8',
+    }
+  );
+  expect(successfulChild.status).not.toBe(0);
+  expect(successfulChild.stderr).toContain('Expected exactly one canonical qa:build child');
 });
 
 it('rejects a release ZIP replaced by a detached candidate child before trusted finalization', async () => {
