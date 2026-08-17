@@ -71,6 +71,61 @@ jobs:
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
+  candidate-control-smoke:
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Detect candidate control-plane changes
+        id: controls
+        env:
+          CANDIDATE_CONTROL_PATTERN: '^(\.github/workflows/|tooling/(ci|qa)/|tooling/configs/(ci|qa)/|package(-lock)?\.json$)'
+        run: |
+          if git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA" | grep -Eq "$CANDIDATE_CONTROL_PATTERN"; then
+            echo 'required=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'required=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build informational candidate QA image
+        id: candidate-image
+        if: steps.controls.outputs.required == 'true'
+        env: { CANDIDATE_IMAGE: 'sniptale-candidate-control:${{ env.CANDIDATE_SHA }}' }
+        run: |
+          docker build --platform linux/amd64 --file tooling/ci/Dockerfile --tag "$CANDIDATE_IMAGE" .
+          image_digest=$(docker image inspect --format='{{.Id}}' "$CANDIDATE_IMAGE")
+          if ! printf '%s\n' "$image_digest" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
+            echo 'Candidate image digest is malformed' >&2
+            exit 1
+          fi
+          proof_file="$RUNNER_TEMP/candidate-control-${CANDIDATE_SHA}-${GITHUB_RUN_ID}.json"
+          if [ -e "$proof_file" ]; then
+            echo 'Refusing candidate control proof collision' >&2
+            exit 1
+          fi
+          set -o noclobber
+          jq -n \
+            --arg candidateSha "$CANDIDATE_SHA" \
+            --arg baseSha "$BASE_SHA" \
+            --arg imageDigest "$image_digest" \
+            '{schemaVersion: 1, informational: true, candidateSha: $candidateSha, baseSha: $baseSha, imageDigest: $imageDigest}' \
+            > "$proof_file"
+          echo "proof-file=$proof_file" >> "$GITHUB_OUTPUT"
+      - name: Upload informational candidate control proof
+        if: steps.controls.outputs.required == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: candidate-control-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          path: ${{ steps.candidate-image.outputs.proof-file }}
+          if-no-files-found: error
+          retention-days: 14
+
   scheduled-security:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-24.04
