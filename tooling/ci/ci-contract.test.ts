@@ -98,6 +98,13 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(lock.debian.snapshot).toMatch(/^\d{8}T\d{6}Z$/u);
   expect(dockerfile).toContain(`${lock.debian.archiveUrl} bookworm main`);
   expect(dockerfile).toContain(`${lock.debian.securityArchiveUrl} bookworm-security main`);
+  expect(dockerfile).toContain('Acquire::https::Verify-Peer "false";');
+  expect(
+    dockerfile.indexOf('apt-get install -y --no-install-recommends ca-certificates')
+  ).toBeLessThan(dockerfile.indexOf('rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap'));
+  expect(dockerfile.indexOf('rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap')).toBeLessThan(
+    dockerfile.lastIndexOf('apt-get update')
+  );
   expect(dockerfile).not.toContain('deb.debian.org');
   const dockerignore = fs.readFileSync('.dockerignore', 'utf8');
   for (const excluded of ['.git', '.env', '.tmp', 'build', 'node_modules']) {
