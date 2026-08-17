@@ -2,14 +2,16 @@ import fs from 'node:fs';
 import path, { posix } from 'node:path';
 
 import istanbulCoverage from 'istanbul-lib-coverage';
+import istanbulReport from 'istanbul-lib-report';
+import istanbulReports from 'istanbul-reports';
 
 import { isCoverageExcluded, isCoverageTargetFile } from './verify-test-coverage.registry.mjs';
 import { resolveCoverageThreshold } from './verify-test-coverage.thresholds.mjs';
 import { PRODUCT_SOURCE_ROOTS } from './quality.config.mjs';
-import { fromRelativePath, toRelativePath } from './shared.mjs';
 
 const { createCoverageMap, createCoverageSummary } = istanbulCoverage;
 const DEFAULT_REPORT_PATH = '.tmp/coverage/unit/coverage-final.json';
+export const CANONICAL_COVERAGE_DIRECTORY = '.tmp/coverage/canonical';
 const TOP_UNCOVERED_OWNER_LIMIT = 10;
 
 function walkFiles(directory, root) {
@@ -37,15 +39,21 @@ export function collectProductionCoverageFiles({
     .sort();
 }
 
-function readCoverageByRelativePath(reportPath) {
+function readCoverageByRelativePath(reportPath, root = process.cwd()) {
   const coverageMap = createCoverageMap(
-    JSON.parse(fs.readFileSync(fromRelativePath(reportPath), 'utf8'))
+    JSON.parse(fs.readFileSync(path.resolve(root, reportPath), 'utf8'))
   );
-  return new Map(
-    coverageMap
-      .files()
-      .map((filePath) => [toRelativePath(filePath), coverageMap.fileCoverageFor(filePath)])
-  );
+  const outsideRoot = [];
+  const byPath = new Map();
+  for (const filePath of coverageMap.files()) {
+    const relativePath = path.relative(root, path.resolve(filePath)).replaceAll(path.sep, '/');
+    if (relativePath === '..' || relativePath.startsWith('../') || path.isAbsolute(relativePath)) {
+      outsideRoot.push(filePath);
+      continue;
+    }
+    byPath.set(relativePath, coverageMap.fileCoverageFor(filePath));
+  }
+  return { byPath, outsideRoot };
 }
 
 function summarizeFiles(files, coverageByPath) {
@@ -113,16 +121,35 @@ function formatMetric(label, result) {
   return `${label}: files=${result.files}; missing=${result.missing}; lines=${lines.pct}%; branches=${branches.pct}%`;
 }
 
-export function collectCoverageAuditReport({ reportPath = DEFAULT_REPORT_PATH } = {}) {
-  if (!fs.existsSync(fromRelativePath(reportPath))) {
+export function collectCoverageAuditReport({
+  reportPath = DEFAULT_REPORT_PATH,
+  root = process.cwd(),
+} = {}) {
+  const absoluteReportPath = path.resolve(root, reportPath);
+  if (!fs.existsSync(absoluteReportPath)) {
     return {
       error: `Missing ${reportPath}.`,
       reportPath,
     };
   }
 
-  const coverageByPath = readCoverageByRelativePath(reportPath);
-  const productionFiles = collectProductionCoverageFiles();
+  let parsedCoverage;
+  try {
+    parsedCoverage = readCoverageByRelativePath(reportPath, root);
+  } catch (error) {
+    return {
+      error: `Malformed ${reportPath}: ${error instanceof Error ? error.message : String(error)}`,
+      reportPath,
+    };
+  }
+  if (parsedCoverage.outsideRoot.length > 0) {
+    return {
+      error: `Coverage contains paths outside repository root: ${parsedCoverage.outsideRoot.join(', ')}`,
+      reportPath,
+    };
+  }
+  const coverageByPath = parsedCoverage.byPath;
+  const productionFiles = collectProductionCoverageFiles({ root });
   const rolloutFiles = productionFiles.filter((file) => resolveCoverageThreshold(file) !== null);
   const outsideFiles = productionFiles.filter((file) => resolveCoverageThreshold(file) === null);
   const prod = summarizeFiles(productionFiles, coverageByPath);
@@ -136,6 +163,44 @@ export function collectCoverageAuditReport({ reportPath = DEFAULT_REPORT_PATH } 
     reportPath,
     rollout,
     topOutsideOwners: summarizeOutsideOwners(outsideFiles, coverageByPath),
+    productionFiles,
+  };
+}
+
+export function writeCanonicalCoverageArtifacts({
+  report = collectCoverageAuditReport(),
+  reportPath = DEFAULT_REPORT_PATH,
+  outputDirectory = CANONICAL_COVERAGE_DIRECTORY,
+  root = process.cwd(),
+} = {}) {
+  if (report.error) throw new Error(report.error);
+  if (report.prod.missing > 0) {
+    throw new Error(`Coverage is missing ${report.prod.missing} production file(s).`);
+  }
+  const { byPath, outsideRoot } = readCoverageByRelativePath(reportPath, root);
+  if (outsideRoot.length > 0) throw new Error('Coverage contains paths outside repository root.');
+  const filteredMap = createCoverageMap({});
+  for (const relativePath of report.productionFiles) {
+    const fileCoverage = byPath.get(relativePath);
+    if (!fileCoverage) throw new Error(`Coverage is missing production file: ${relativePath}`);
+    filteredMap.addFileCoverage(fileCoverage);
+  }
+  const absoluteOutput = path.resolve(root, outputDirectory);
+  fs.rmSync(absoluteOutput, { recursive: true, force: true });
+  fs.mkdirSync(absoluteOutput, { recursive: true });
+  const context = istanbulReport.createContext({ dir: absoluteOutput, coverageMap: filteredMap });
+  for (const [name, options] of [
+    ['json', { file: 'coverage-final.json' }],
+    ['json-summary', { file: 'coverage-summary.json' }],
+    ['lcovonly', { file: 'lcov.info', projectRoot: root }],
+    ['html', { subdir: 'html' }],
+  ]) {
+    istanbulReports.create(name, options).execute(context);
+  }
+  return {
+    directory: outputDirectory,
+    files: ['coverage-final.json', 'coverage-summary.json', 'lcov.info', 'html/index.html'],
+    summary: filteredMap.getCoverageSummary().toJSON(),
   };
 }
 

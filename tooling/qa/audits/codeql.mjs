@@ -10,6 +10,7 @@ import {
 import { CODEQL_BASELINE_PATH, CODEQL_CONFIG_PATH } from '../policy/index.mjs';
 import { resolveCodeqlExecutable, runToolCommand } from '../tools/tool-cli.mjs';
 import { applyCodeqlBaseline, formatCodeqlBaselineSummary } from './codeql-baseline.mjs';
+import { violationsToSarif, writeCanonicalSarifFile } from './canonical-sarif.mjs';
 import { AUDIT_ADAPTER_SKIP_REASONS } from './profiles/index.mjs';
 import {
   isAuditObject,
@@ -19,6 +20,7 @@ import {
 
 export const CODEQL_STANDARD_SUITE = 'javascript-security-and-quality.qls';
 export const CODEQL_CUSTOM_SUITE_PATH = 'tooling/qa/codeql/sniptale-custom.qls';
+export const CODEQL_FILTERED_SARIF_PATH = '.tmp/codeql/results.filtered.sarif';
 
 function toSarifViolations(parsed) {
   const runs = parsed.runs ?? [];
@@ -179,9 +181,19 @@ export function runCodeqlCheck({
     sourceRoot,
     violations: rawViolations,
   });
+  const filteredSarifPath = writeCanonicalSarifFile(
+    path.join(root, 'results.filtered.sarif'),
+    violationsToSarif({
+      toolName: 'CodeQL',
+      informationUri: 'https://codeql.github.com/',
+      violations: filtered.violations,
+      root: sourceRoot,
+    })
+  );
   return {
     skipped: false,
     sarifPath,
+    filteredSarifPath,
     summaryText: formatCodeqlBaselineSummary(filtered),
     violations: filtered.violations,
   };

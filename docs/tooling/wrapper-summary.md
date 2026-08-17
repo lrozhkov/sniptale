@@ -72,6 +72,12 @@ Blocking release-grade product proof. It requires applicable harness freshness, 
 
 Blocking manual audit lane selected by an audit profile. It owns full product coverage, repository evidence/topology inventory, supply-chain checks, and configured external engines with structured required/optional/excluded status. The report-only inventory controls atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm supply-chain controls persist sanitized result evidence at `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Green status means the control ran successfully, not that a report-only artifact contains zero findings. It is not a normal implementation gate and should not be run between ordinary implementation waves.
 
+The `coverage` profile requires only `full-product-coverage`. That owner filters the raw map to the canonical production scope and atomically publishes LCOV, JSON summary, filtered JSON, and HTML under `.tmp/coverage/canonical`; a missing production file, malformed map, or path outside the repository fails the control. The `security` profile retains its security-control contract. CI invokes these existing profiles rather than redefining their results.
+
+### Container-backed CI commands
+
+`ci:release`, `ci:security`, and `ci:coverage` run the corresponding canonical wrappers inside the single Linux/amd64 image defined by `tooling/ci/Dockerfile` and `tooling/configs/ci/toolchain.lock.json`. The container lane installs the repository without lifecycle scripts, collects only schema-validated allowlisted reports, and writes a hashed proof bundle under `build/ci-artifacts`. `ci:proof -- --pr <number>` runs only from a clean `origin/main` launcher, accepts an owner-authored PR, materializes candidate and trusted launcher commits into separate tracked-only temporary exports, runs all three lanes with one image identity, rechecks local and PR authority, and posts the proof digest; it never merges. GitHub policy changes use `ci:github:plan`, `ci:github:apply`, and `ci:github:restore -- --snapshot <path>`, with apply recording a sanitized rollback snapshot first.
+
 ### `qa:e2e`
 
 Separate Playwright extension smoke. It is runtime acceptance proof, not a third product/harness wrapper mode and not automatically part of closeout.

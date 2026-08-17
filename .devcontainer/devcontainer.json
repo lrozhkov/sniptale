@@ -1,0 +1,15 @@
+{
+  "name": "Sniptale canonical QA",
+  "build": {
+    "dockerfile": "../tooling/ci/Dockerfile",
+    "context": "..",
+    "options": ["--platform=linux/amd64"]
+  },
+  "remoteUser": "node",
+  "containerEnv": {
+    "PLAYWRIGHT_BROWSERS_PATH": "/opt/playwright",
+    "XDG_CACHE_HOME": "/workspace/.tmp/ci-cache",
+    "npm_config_cache": "/workspace/.tmp/npm-cache"
+  },
+  "postCreateCommand": "npm ci"
+}

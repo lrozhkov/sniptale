@@ -6,7 +6,11 @@ import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { fromRelativePath } from './shared.mjs';
 import { measureAsyncStep } from './step-timing.helpers.mjs';
 import { runUnitTests } from './verify-unit-tests.mjs';
-import { collectCoverageAuditReport, formatCoverageAuditReport } from './coverage-audit-report.mjs';
+import {
+  collectCoverageAuditReport,
+  formatCoverageAuditReport,
+  writeCanonicalCoverageArtifacts,
+} from './coverage-audit-report.mjs';
 
 const FULL_COVERAGE_DIRECTORY = '.tmp/coverage/unit';
 const FULL_COVERAGE_MAX_WORKERS = 6;
@@ -54,6 +58,17 @@ export async function collectFullCoverageAuditStep() {
     return withDuration(
       createFailureStep('Full product coverage', 'coverage report failed', {
         stderr: `${coverageReport.error}\n`,
+      }),
+      durationMs
+    );
+  }
+
+  try {
+    writeCanonicalCoverageArtifacts({ report: coverageReport });
+  } catch (error) {
+    return withDuration(
+      createFailureStep('Full product coverage', 'coverage publication failed', {
+        stderr: `${error instanceof Error ? error.message : String(error)}\n`,
       }),
       durationMs
     );

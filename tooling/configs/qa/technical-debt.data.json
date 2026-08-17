@@ -14599,6 +14599,31 @@
       ]
     },
     {
+      "id": "policy.source.artifacts-mjs.8960ee2c50",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/artifacts.mjs",
+        "contentHash": "b76a595fd5d65465c10721ca394295c4753b5e4d5860ddf820576a56a045598f"
+      },
+      "consumers": [
+        "tooling/ci/artifacts.mjs",
+        "tooling/ci/run-lane.mjs"
+      ],
+      "surfaces": [
+        "binding:LANE_FILES",
+        "binding:LANE_WRAPPERS",
+        "property:coverage",
+        "property:coverage[1]",
+        "property:release",
+        "property:security",
+        "property:security[1]"
+      ]
+    },
+    {
       "id": "policy.source.as-never-mjs.b9d7f35e08",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -15298,6 +15323,34 @@
       ]
     },
     {
+      "id": "policy.source.canonical-sarif-mjs.c5d23a15e8",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/audits/canonical-sarif.mjs",
+        "contentHash": "0d17c800e296587b1a3f105b38fd13c68d8d30cdb154222a95be998b6e619ef8"
+      },
+      "consumers": [
+        "tooling/qa/audits/canonical-sarif.mjs",
+        "tooling/qa/audits/canonical-sarif.test.ts",
+        "tooling/qa/audits/codeql.mjs",
+        "tooling/qa/audits/semgrep.mjs"
+      ],
+      "surfaces": [
+        "property:violationsToSarif/anonymous-32/artifactLocation",
+        "property:violationsToSarif/anonymous-32/locations",
+        "property:violationsToSarif/anonymous-32/message",
+        "property:violationsToSarif/anonymous-32/physicalLocation",
+        "property:violationsToSarif/anonymous-32/region",
+        "property:violationsToSarif/driver",
+        "property:violationsToSarif/runs",
+        "property:violationsToSarif/tool"
+      ]
+    },
+    {
       "id": "policy.source.cast-cleanup-content-mjs.6583b5daf0",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -15583,7 +15636,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/codeql.mjs",
-        "contentHash": "0c19c412c8e034239b7a3545d4d1efdc98e4629aaceb52487be5c5138fee052e"
+        "contentHash": "c53695db762537bc3f1f365b99c5fe334125a98c70d758115b12759f21c1efcb"
       },
       "consumers": [
         "tooling/qa/audits/codeql.mjs",
@@ -15678,6 +15731,25 @@
         "binding:RUN_ID_ENVIRONMENT_KEYS",
         "binding:RUN_STATUSES",
         "binding:STEP_OUTCOMES"
+      ]
+    },
+    {
+      "id": "policy.source.container-mjs.d92e7b99f2",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/container.mjs",
+        "contentHash": "9df2e2cd1aa73b320c0d4af38b4b197af05385960c49633b33afb75d14757724"
+      },
+      "consumers": [
+        "tooling/ci/container.mjs"
+      ],
+      "surfaces": [
+        "binding:args",
+        "binding:environment"
       ]
     },
     {
@@ -15812,6 +15884,27 @@
         "property:collectRepoAuditEvidence/smellFamilies",
         "property:collectRepoAuditEvidence/smellFindings",
         "property:collectRepoAuditEvidence/structuralMaintenance"
+      ]
+    },
+    {
+      "id": "policy.source.coverage-audit-report-mjs.eaf5a519c9",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/coverage-audit-report.mjs",
+        "contentHash": "e7a930d76fd28df38a47fdb02494e1e55bccf6b52a31faeb8cd5ef5c83e8336b"
+      },
+      "consumers": [
+        "tooling/qa/core/audit-coverage-step.mjs",
+        "tooling/qa/core/coverage-audit-report.mjs",
+        "tooling/qa/core/coverage-audit-report.test.ts",
+        "tooling/qa/core/technical-debt-coverage.mjs"
+      ],
+      "surfaces": [
+        "property:writeCanonicalCoverageArtifacts/files"
       ]
     },
     {
@@ -17075,6 +17168,28 @@
       ]
     },
     {
+      "id": "policy.source.github-policy-mjs.fc15f7db7b",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/github-policy.mjs",
+        "contentHash": "1ef4077c2070a30c210152cf7fb009424ac0b7ec7c2c73fe32da0eede51f167a"
+      },
+      "consumers": [
+        "tooling/ci/github-policy.mjs"
+      ],
+      "surfaces": [
+        "property:actions",
+        "property:apply/body",
+        "property:desired/bypass_actors",
+        "property:desired/ruleset",
+        "property:security"
+      ]
+    },
+    {
       "id": "policy.source.gitleaks-baseline-mjs.376ae85ff5",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17347,6 +17462,24 @@
       ],
       "surfaces": [
         "binding:FOCUSED_COVERAGE_OWNER_MAPPINGS"
+      ]
+    },
+    {
+      "id": "policy.source.install-toolchain-mjs.e8b1a1fdc8",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/install-toolchain.mjs",
+        "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee"
+      },
+      "consumers": [
+        "tooling/ci/install-toolchain.mjs"
+      ],
+      "surfaces": [
+        "binding:expected"
       ]
     },
     {
@@ -18683,6 +18816,25 @@
       ]
     },
     {
+      "id": "policy.source.prepare-release-assets-mjs.f5985e3fb3",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/prepare-release-assets.mjs",
+        "contentHash": "40b8d2897d077825830e6ce69cb8fa67374e634bb56466cb34273ee0fffbf344"
+      },
+      "consumers": [
+        "tooling/ci/prepare-release-assets.mjs"
+      ],
+      "surfaces": [
+        "binding:names",
+        "binding:sources"
+      ]
+    },
+    {
       "id": "policy.source.preview-audio-diagnostic-ts.d1b9ac8fb9",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -18811,6 +18963,26 @@
         "binding:RUNTIME_SECURITY_PREFIXES",
         "binding:UI_SURFACE_OWNERS",
         "binding:UX_DEFERRED_OWNERS"
+      ]
+    },
+    {
+      "id": "policy.source.proof-mjs.ab4f4fdeb9",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/proof.mjs",
+        "contentHash": "7eb6b58195b298c5840b6e32e953750444a0c391e25406e3ea29f01e842615e9"
+      },
+      "consumers": [
+        "tooling/ci/proof.mjs"
+      ],
+      "surfaces": [
+        "binding:currentAuthority",
+        "binding:env",
+        "binding:proof"
       ]
     },
     {
@@ -18953,6 +19125,24 @@
       ],
       "surfaces": [
         "property:resolveAuditProfile/controls"
+      ]
+    },
+    {
+      "id": "policy.source.release-policy-mjs.bd708f35c8",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/release-policy.mjs",
+        "contentHash": "3a6dec2cd74df85929954172b58cc16aab534dcb7e2061bec9ff5d7ec4f19250"
+      },
+      "consumers": [
+        "tooling/ci/release-policy.mjs"
+      ],
+      "surfaces": [
+        "binding:admission"
       ]
     },
     {
@@ -19120,6 +19310,28 @@
       ]
     },
     {
+      "id": "policy.source.run-lane-mjs.cffc49cb5f",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/run-lane.mjs",
+        "contentHash": "2fd3df347a35cef17a8e5d9a80631a91c0159e886e1d61787298fcb849301b10"
+      },
+      "consumers": [
+        "tooling/ci/run-lane.mjs"
+      ],
+      "surfaces": [
+        "binding:commands",
+        "binding:executed",
+        "property:coverage",
+        "property:release",
+        "property:security"
+      ]
+    },
+    {
       "id": "policy.source.run-record-mjs.d05cc8f502",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -19222,6 +19434,7 @@
         "contentHash": "80c5d8b5f30024e05086439d530bf82ae74f1ce57bd7340400159d57d45797d5"
       },
       "consumers": [
+        "tooling/qa/audits/canonical-sarif.mjs",
         "tooling/qa/audits/report-paths.mjs",
         "tooling/qa/core/verify-advisory.state.helpers.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",
@@ -19409,6 +19622,7 @@
         "contentHash": "e7622b5d408fc0714364744eee914a1f2e64470de54a6016de4f668d3e6feeed"
       },
       "consumers": [
+        "tooling/ci/artifacts.mjs",
         "tooling/qa/runtime/observability/index.mjs",
         "tooling/qa/runtime/observability/lifecycle.test.ts",
         "tooling/qa/runtime/observability/maintenance.mjs",
@@ -19432,7 +19646,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/profiles/schema.mjs",
-        "contentHash": "5e1709f97c9304087742d3959f5b2596f6ba8e7a19bc99d3bd1febce84c9116e"
+        "contentHash": "12374c50cb876c0e2c2ebb8cfe5456d8304e8c32d44d92a55294668d6a5a533f"
       },
       "consumers": [
         "tooling/qa/audits/profiles/index.mjs",
@@ -19519,7 +19733,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/semgrep.mjs",
-        "contentHash": "2ac9d9181413e2115f53222e2da8ea16005e56a17b4f09eac55bcb7f4e7a540d"
+        "contentHash": "aa4a2e8a5eb6bf038753adf87d3b7dc3bb7de46165f90aee030918edc8bd82a4"
       },
       "consumers": [
         "tooling/qa/audits/execution-error.test.ts",
@@ -20006,6 +20220,8 @@
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.test.ts",
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/qa/audits/canonical-sarif.test.ts",
         "tooling/qa/audits/execution-error.test.ts",
         "tooling/qa/audits/execution-evidence.test.ts",
         "tooling/qa/audits/osv/severity.test.ts",

@@ -18,6 +18,7 @@ describe('audit profile schema', () => {
 
     expect(registry.defaultProfile).toBe('repository');
     expect(registry.profiles.map(({ id }) => id).sort()).toEqual([
+      'coverage',
       'release',
       'repository',
       'security',
@@ -25,6 +26,16 @@ describe('audit profile schema', () => {
     for (const profile of registry.profiles) {
       expect(profile.controls.map(({ id }) => id).sort()).toEqual(canonicalIds);
     }
+  });
+
+  it('keeps the coverage profile isolated from every non-coverage control', () => {
+    const profile = resolveAuditProfile('coverage');
+    expect(profile.controls.get('full-product-coverage')?.requirement).toBe('required');
+    expect(
+      [...profile.controls.entries()]
+        .filter(([id]) => id !== 'full-product-coverage')
+        .every(([, control]) => control.requirement === 'excluded')
+    ).toBe(true);
   });
 
   it('requires security engines and worktree plus history secret scans for strict profiles', () => {
