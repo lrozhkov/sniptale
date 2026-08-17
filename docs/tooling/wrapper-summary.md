@@ -72,9 +72,17 @@ Blocking release-grade product proof. It requires applicable harness freshness, 
 
 Blocking manual audit lane selected by an audit profile. It owns full product coverage, repository evidence/topology inventory, supply-chain checks, and configured external engines with structured required/optional/excluded status. The report-only inventory controls atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm supply-chain controls persist sanitized result evidence at `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Green status means the control ran successfully, not that a report-only artifact contains zero findings. It is not a normal implementation gate and should not be run between ordinary implementation waves.
 
+The `coverage` profile requires only `full-product-coverage`. That owner filters the raw map to the canonical production scope and atomically publishes LCOV, JSON summary, filtered JSON, and HTML under `.tmp/coverage/canonical`; a missing production file, malformed map, or path outside the repository fails the control. The `security` profile retains its security-control contract. CI invokes these existing profiles rather than redefining their results.
+
+### Container-backed CI commands
+
+`ci:release`, `ci:security`, and `ci:coverage` remain narrow diagnostic container lanes over the corresponding canonical wrappers. Required PR and `main` proof uses one internal candidate lane: it materializes the exact candidate tree as a staged diff over its base, disables Git hooks, runs `qa:release-harness`, `qa:checkpoint`, and literal `qa:closeout`, requires the resulting clean commit tree and parent to match candidate and base, then runs `qa:release` plus security, license, and coverage controls. The trusted collector writes one hashed bundle containing phase receipts, base/candidate/tree and control identities, container digest, resolved bounded/release resource profiles, ZIP, SBOM, SARIF, and coverage reports. `ci:proof -- --pr <number> [--cpu N] [--memory-mib N] [--workers N]` invokes that same lane from a clean `origin/main` launcher, rechecks local and PR authority, and posts the proof digest; it never merges. A signed tag consumes the exact successful `main` bundle and immutable QA image, runs only the release audit, and publishes the already verified ZIP with both proof manifests. GitHub policy changes use `ci:github:plan`, `ci:github:apply`, and `ci:github:restore -- --snapshot <path>`, with apply recording a sanitized rollback snapshot first.
+
 ### `qa:e2e`
 
 Separate Playwright extension smoke. It is runtime acceptance proof, not a third product/harness wrapper mode and not automatically part of closeout.
+
+`qa:e2e:security` builds a production-mode artifact in the isolated `dist-release-e2e` directory and a release-like optional-permission artifact in `dist-security-e2e`, then runs the browser security regression suite. The production-surface scenario launches `dist-release-e2e` explicitly and proves that internal pages and security instrumentation are not web-exposed; the remaining scenarios launch the isolated instrumented artifact. The Linux native optional-permission proof requires `gcc`, X11/XTest development libraries, and an X server (the wrapper supplies Xvfb for headless runs). `qa:e2e:all` additionally builds and runs the ordinary smoke/critical artifact before the security scenarios.
 
 ## Blocking Lock And Handoffs
 

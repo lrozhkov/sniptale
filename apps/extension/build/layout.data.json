@@ -165,6 +165,12 @@
       "sourcePath": "tooling/test/harness/preview-audio-diagnostic.html",
       "rollupName": "testHarnessPreviewAudioDiagnostic",
       "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/security-control.html",
+      "sourcePath": "tooling/test/harness/security-control.html",
+      "rollupName": "testHarnessSecurityControl",
+      "mode": "security-e2e"
     }
   ],
   "requiredReleaseArtifacts": [
@@ -195,6 +201,8 @@
   "rootCommands": {
     "dev": "vite --config apps/extension/vite.config.ts",
     "qa:e2e:build": "vite build --config apps/extension/vite.config.ts --mode test-e2e",
+    "qa:e2e:build:release": "SNIPTALE_RELEASE_E2E_OUTPUT=1 vite build --config apps/extension/vite.config.ts --mode release",
+    "qa:e2e:build:security": "vite build --config apps/extension/vite.config.ts --mode security-e2e",
     "qa:raw:vite": "vite build --config apps/extension/vite.config.ts",
     "build": "tsc && vite build --config apps/extension/vite.config.ts",
     "build:release": "vite build --config apps/extension/vite.config.ts --mode release",

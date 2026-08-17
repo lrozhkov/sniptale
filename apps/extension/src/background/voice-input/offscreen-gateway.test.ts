@@ -4,6 +4,7 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 const mocks = vi.hoisted(() => ({
   acquirePermit: vi.fn(),
   ensureReady: vi.fn(),
+  getContexts: vi.fn(),
   releasePermit: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   waitForReady: vi.fn(),
@@ -35,17 +36,29 @@ vi.mock('../offscreen-document/service', async (importOriginal) => ({
   waitForOffscreenReady: mocks.waitForReady,
 }));
 
+vi.mock('@sniptale/platform/browser/runtime', () => ({
+  browserRuntime: { getContexts: mocks.getContexts },
+}));
+
 import { createVoiceInputOffscreenGateway } from './offscreen-gateway';
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.acquirePermit.mockReturnValue(mocks.releasePermit);
   mocks.ensureReady.mockResolvedValue(true);
+  mocks.getContexts.mockResolvedValue([]);
   mocks.sendRuntimeMessage.mockResolvedValue({ result: 'accepted', success: true });
   mocks.waitForReady.mockResolvedValue(undefined);
 });
 
 describe('voice input offscreen gateway', () => {
+  it('inspects the real offscreen context without creating one', async () => {
+    mocks.getContexts.mockResolvedValueOnce([{ contextType: 'OFFSCREEN_DOCUMENT' }]);
+
+    await expect(createVoiceInputOffscreenGateway().hasExistingDocument()).resolves.toBe(true);
+    expect(mocks.ensureReady).not.toHaveBeenCalled();
+  });
+
   it('creates the shared offscreen document and sends signed commands', async () => {
     const gateway = createVoiceInputOffscreenGateway();
     await gateway.ensureReady();

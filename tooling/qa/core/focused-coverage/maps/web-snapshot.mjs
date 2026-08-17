@@ -119,6 +119,8 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.branches.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.content-intent.test.ts',
+      'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.injected-loader.test.ts',
+      'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.launch-intent.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.viewer.test.ts',
     ],

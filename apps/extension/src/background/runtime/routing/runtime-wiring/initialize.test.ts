@@ -12,6 +12,7 @@ const {
   registerWindowBoundsListener,
   registerVoiceInputPorts,
   registerVoiceInputTelemetryPorts,
+  registerSecurityE2EControl,
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
@@ -24,6 +25,11 @@ const {
   registerWindowBoundsListener: vi.fn(),
   registerVoiceInputPorts: vi.fn(),
   registerVoiceInputTelemetryPorts: vi.fn(),
+  registerSecurityE2EControl: vi.fn(),
+}));
+vi.mock('../../../../platform/security-e2e-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/security-e2e-control')>()),
+  registerSecurityE2EControl,
 }));
 vi.mock('../../../application/aggregate-promotion/ports', () => ({
   registerAggregateEditorPresencePorts,
@@ -118,4 +124,17 @@ it('creates a disposable viewer port registry when runtime state omits it', () =
   initializeBackgroundRuntime(state);
 
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(expect.any(Map));
+});
+
+it('registers the security control only in the security E2E build', () => {
+  Object.defineProperty(globalThis, '__SNIPTALE_SECURITY_E2E__', {
+    configurable: true,
+    value: true,
+  });
+  try {
+    initializeBackgroundRuntime(createModeState());
+    expect(registerSecurityE2EControl).toHaveBeenCalledOnce();
+  } finally {
+    Reflect.deleteProperty(globalThis, '__SNIPTALE_SECURITY_E2E__');
+  }
 });

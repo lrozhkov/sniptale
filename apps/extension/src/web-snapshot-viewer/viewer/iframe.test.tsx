@@ -54,6 +54,8 @@ it('keeps srcdoc snapshots no-scripts so about:srcdoc script blocking is expecte
   const iframeElement = container?.querySelector('iframe');
 
   expect(iframeElement?.getAttribute('srcdoc')).toContain('<script>');
+  expect(iframeElement?.getAttribute('srcdoc')).toContain("form-action 'none'");
+  expect(iframeElement?.getAttribute('srcdoc')).toContain("navigate-to 'none'");
   expect(iframeElement?.getAttribute('sandbox')).toBe('allow-same-origin');
   expect(iframeElement?.getAttribute('sandbox')).not.toContain('allow-scripts');
   expect(iframeElement?.getAttribute('title')).toBe('Web Snapshot');

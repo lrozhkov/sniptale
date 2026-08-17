@@ -4,12 +4,12 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "44eaffc706ffc305dc679b25ad71868548da21f4ac3f724beea2761a2775e0aa"
+      "sha256": "c79cc62c3af55120635f5ea51fe335520c87db8f87de9924ee0313ab7140a32e"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "44eaffc706ffc305dc679b25ad71868548da21f4ac3f724beea2761a2775e0aa"
+      "sha256": "c79cc62c3af55120635f5ea51fe335520c87db8f87de9924ee0313ab7140a32e"
     },
     {
       "category": "bundled-font",
@@ -29,22 +29,27 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/vite.config.ts",
-      "sha256": "fa463a3b5599a876008ecac770ff24e947bd43da5e5185cb18ee844438fc9e51"
+      "sha256": "032be1fc93ca816965761bec00024e7d7e477cf63261534e2fccaef1e6856d33"
     },
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "3f7024acd53ec2a268b4e7069b77a2dc472c6c5a20114096623981f9ce6b992d"
+      "sha256": "273037a122914a67d61f842fd8939af06ca519ceec00ba48e6205010b1fb23bb"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "3f7024acd53ec2a268b4e7069b77a2dc472c6c5a20114096623981f9ce6b992d"
+      "sha256": "273037a122914a67d61f842fd8939af06ca519ceec00ba48e6205010b1fb23bb"
     },
     {
       "category": "bundled-font",
       "path": "packages/ui/src/styles/fonts.css",
       "sha256": "ea275a2cc153960b3d7f15cc248275ba32c430781dc283a71cbcb73cf629bf65"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/ci/artifacts.mjs",
+      "sha256": "13d091c60470199e042fe8c25a691f7e7b696426d893815e5e9cb626259dcb11"
     },
     {
       "category": "bundled-font",
@@ -129,7 +134,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/release/artifact-security.mjs",
-      "sha256": "314522548f8a93a731e740bec46b25b1a0d9d5385371cc10c5758eb6cdabd8ed"
+      "sha256": "b5ff7b3ea5766f80d8f3646a9ede0cc1edab08b8247d5c4a0aca3f93d3dd5c71"
     },
     {
       "category": "bundled-font",

@@ -25,7 +25,8 @@ const FORBIDDEN_FILE_PATTERNS = [
   { message: 'environment file', pattern: /(?:^|\/)\.env(?:\.|$)/u },
   {
     message: 'test or development artifact',
-    pattern: /(?:^|\/)(?:src\/test-harness|testHarness|designSystem)(?:\/|\.|-|$)/u,
+    pattern:
+      /(?:^|\/)(?:src\/test-harness|testHarness|designSystem|security-control)(?:\/|\.|-|$)/u,
   },
   {
     message: 'secret-like artifact',
@@ -36,6 +37,11 @@ const HASHED_UI_TOKENS_BUNDLE_PATTERN = /^assets\/tokens-[a-z0-9_-]{8}\.js$/iu;
 const FORBIDDEN_TEXT_PATTERNS = [
   { message: 'sourcemap reference', pattern: /sourceMappingURL=/u },
   { message: 'trace-enabled release marker', pattern: /__TRACE_MESSAGES__|VITE_TRACE_MESSAGES/u },
+  {
+    message: 'security E2E control marker',
+    pattern:
+      /__SNIPTALE_SECURITY_E2E__|sniptale:security-e2e-control:v1|persistence-before-commit|popup-export-after-admission/u,
+  },
   { message: 'development websocket endpoint', pattern: /wss?:\/\/(?:localhost|127\.0\.0\.1)/u },
   {
     message: 'development server endpoint',

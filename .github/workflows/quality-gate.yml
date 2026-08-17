@@ -1,17 +1,14 @@
 name: Quality gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches:
-      - main
+    branches: [main]
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,30 +17,205 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+  TRUSTED_CONTROL_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+  QA_IMAGE: sniptale-qa:${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
-  pr-gate:
-    name: pr-gate
-    if: github.event_name == 'push' || github.event.pull_request.draft == false
+  canonical-qa:
+    if: github.event_name != 'schedule' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
-      - name: Check out candidate
+      - name: Check out trusted control plane
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          ref: ${{ env.TRUSTED_CONTROL_SHA }}
+          path: trusted-control
           fetch-depth: 0
           persist-credentials: false
-
+      - name: Check out exact candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22.12.0
           cache: npm
+          cache-dependency-path: candidate/package-lock.json
+      - name: Install trusted control dependencies
+        working-directory: trusted-control
+        run: npm ci --ignore-scripts
+      - name: Run canonical local QA workflow
+        working-directory: candidate
+        env:
+          SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
+          SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
+          SNIPTALE_CI_IMAGE: ${{ env.QA_IMAGE }}
+          SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control
+          SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
+        run: node ../trusted-control/tooling/ci/container.mjs candidate
+      - name: Upload canonical proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
-      - name: Install dependencies
-        run: npm ci
+  scheduled-security:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: Run scheduled security advisory check
+        env:
+          SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
+          SNIPTALE_CI_IMAGE: ${{ env.QA_IMAGE }}
+        run: node tooling/ci/container.mjs security
+      - name: Upload scheduled security proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scheduled-security-${{ github.sha }}-${{ github.run_id }}
+          path: build/ci-artifacts/security-${{ github.sha }}-${{ github.run_id }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 30
 
-      - name: Validate GitHub controls
-        run: >-
-          npm run qa:raw:vitest --
-          tooling/qa/hooks/pre-push.test.ts
-          tooling/qa/hooks/pre-push-command-policy.test.ts
+  security-results:
+    needs: canonical-qa
+    if: needs.canonical-qa.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+    steps:
+      - name: Download canonical security reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@988661ebb5e81487b3fb31b2185d2856c0a10679
+        with: { sarif_file: reports/.tmp/semgrep/results.sarif, category: semgrep-canonical }
+      - name: Upload baseline-filtered CodeQL SARIF
+        uses: github/codeql-action/upload-sarif@988661ebb5e81487b3fb31b2185d2856c0a10679
+        with: { sarif_file: reports/.tmp/codeql/results.filtered.sarif, category: codeql-canonical }
+
+  coverage-results:
+    needs: canonical-qa
+    if: needs.canonical-qa.result == 'success'
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - name: Download canonical coverage
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
+      - name: Publish coverage display
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f
+        with:
+          files: reports/.tmp/coverage/canonical/lcov.info
+          use_oidc: true
+          fail_ci_if_error: false
+          verbose: false
+
+  publish-qa-image:
+    needs: canonical-qa
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.canonical-qa.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { persist-credentials: false }
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+      - name: Sign in to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          {
+            registry: ghcr.io,
+            username: '${{ github.actor }}',
+            password: '${{ secrets.GITHUB_TOKEN }}',
+          }
+      - name: Refuse immutable tag replacement
+        env: { IMMUTABLE_IMAGE: 'ghcr.io/lrozhkov/sniptale-qa:sha-${{ github.sha }}' }
+        run: |
+          lookup_error=$(mktemp)
+          if docker buildx imagetools inspect "$IMMUTABLE_IMAGE" >/dev/null 2>"$lookup_error"; then
+            echo "Refusing to replace existing immutable image tag: $IMMUTABLE_IMAGE" >&2
+            exit 1
+          elif ! grep -Eqi '(^|: )(manifest unknown|not found)(:|$)' "$lookup_error"; then
+            cat "$lookup_error" >&2
+            echo "Unable to prove immutable image tag absence" >&2
+            exit 1
+          fi
+      - name: Publish immutable and moving image tags
+        id: publish-image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        with:
+          context: .
+          file: tooling/ci/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/lrozhkov/sniptale-qa:sha-${{ github.sha }}
+            ghcr.io/lrozhkov/sniptale-qa:main
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          sbom: true
+          provenance: mode=max
+      - name: Record exact published image digest
+        env:
+          PUBLISHED_DIGEST: ${{ steps.publish-image.outputs.digest }}
+        run: node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "$PUBLISHED_DIGEST"
+      - name: Upload exact image proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qa-image-proof-${{ github.sha }}-${{ github.run_id }}
+          path: build/qa-image-proof
+          if-no-files-found: error
+          retention-days: 30
+
+  pr-gate:
+    name: pr-gate-authority
+    needs: canonical-qa
+    if: always() && github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    permissions:
+      checks: write
+    steps:
+      - name: Publish candidate-bound required check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CANONICAL_RESULT: ${{ needs.canonical-qa.result }}
+        run: |
+          conclusion=failure
+          if [ "$CANONICAL_RESULT" = success ]; then
+            conclusion=success
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f name=pr-gate \
+            -f head_sha="$CANDIDATE_SHA" \
+            -f status=completed \
+            -f conclusion="$conclusion" \
+            -f output[title]="Canonical QA gate: $conclusion" \
+            -f output[summary]="canonical-qa=$CANONICAL_RESULT" \
+            >/dev/null
+          test "$conclusion" = success

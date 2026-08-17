@@ -12,6 +12,7 @@ import { SEMGREP_RULES_PATH } from '../policy/index.mjs';
 import { resolveRepositoryWritePath } from '../policy/repository-contained-paths.mjs';
 import { resolveSemgrepCommand, runToolCommand } from '../tools/tool-cli.mjs';
 import { AuditExecutionError } from './execution-error.mjs';
+import { violationsToSarif, writeCanonicalSarif } from './canonical-sarif.mjs';
 import { AUDIT_ADAPTER_SKIP_REASONS } from './profiles/index.mjs';
 import { prepareSanitizedAuditReportPath, writeSanitizedAuditReport } from './report-paths.mjs';
 import {
@@ -23,6 +24,7 @@ import {
 
 const SEMGREP_SETTINGS_RELATIVE_PATH = '.tmp/semgrep/settings.yml';
 export const SEMGREP_REPORT_PATH = '.tmp/semgrep/results.json';
+export const SEMGREP_SARIF_PATH = '.tmp/semgrep/results.sarif';
 
 function toSemgrepViolation(result) {
   return {
@@ -89,10 +91,21 @@ function collectSemgrepResult(result, { reportPath, reportRoot, targetFiles }) {
     },
     { root: reportRoot }
   );
+  const sarifPath = writeCanonicalSarif(
+    SEMGREP_SARIF_PATH,
+    violationsToSarif({
+      toolName: 'Semgrep',
+      informationUri: 'https://semgrep.dev/',
+      violations,
+      root: reportRoot,
+    }),
+    { root: reportRoot }
+  );
   return {
     skipped: false,
     files: targetFiles,
     reportPath: resolveRepositoryWritePath(reportRoot, reportPath),
+    sarifPath,
     violations,
   };
 }

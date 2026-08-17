@@ -12,6 +12,16 @@ import { VoiceInputPortMessageType } from '@sniptale/runtime-contracts/voice-inp
 afterEach(() => vi.useRealTimers());
 
 describe('background voice input coordinator cleanup', () => {
+  it('does not create a cold offscreen document when no voice authority exists', async () => {
+    mocks.getRuntimeContexts.mockResolvedValueOnce([]);
+
+    const coordinator = createVoiceInputCoordinator();
+
+    await expect(coordinator.cleanupForPrivacyErasure()).resolves.toBe(true);
+    expect(mocks.ensureOffscreenDocument).not.toHaveBeenCalled();
+    expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  });
+
   it.each(['status', 'force-stop'] as const)(
     'returns failure when privacy cleanup %s never settles',
     async (pendingExchange) => {

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "repository": "lrozhkov/sniptale",
+  "releasePublisher": "lrozhkov",
+  "rulesetId": 19212699,
+  "actions": {
+    "enabled": true,
+    "allowed_actions": "selected",
+    "sha_pinning_required": true,
+    "selected": {
+      "github_owned_allowed": true,
+      "verified_allowed": false,
+      "patterns_allowed": [
+        "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+        "docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef",
+        "docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83",
+        "codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f"
+      ]
+    },
+    "workflow": {
+      "default_workflow_permissions": "read",
+      "can_approve_pull_request_reviews": false
+    }
+  },
+  "security": {
+    "vulnerabilityAlerts": true,
+    "automatedSecurityFixes": true,
+    "immutableReleases": true
+  },
+  "ruleset": {
+    "name": "Protect main",
+    "target": "branch",
+    "enforcement": "active",
+    "bypassOwner": { "login": "lrozhkov", "mode": "pull_request" },
+    "conditions": { "ref_name": { "exclude": [], "include": ["~DEFAULT_BRANCH"] } },
+    "rules": [
+      { "type": "deletion" },
+      { "type": "non_fast_forward" },
+      { "type": "required_linear_history" },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true,
+          "allowed_merge_methods": ["squash"]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "do_not_enforce_on_create": true,
+          "required_status_checks": [{ "context": "pr-gate", "integration_id": 15368 }]
+        }
+      }
+    ]
+  },
+  "releaseTagRuleset": {
+    "name": "Protect immutable release tags",
+    "target": "tag",
+    "enforcement": "active",
+    "bypass_actors": [],
+    "conditions": { "ref_name": { "exclude": [], "include": ["refs/tags/v*"] } },
+    "rules": [
+      { "type": "update", "parameters": { "update_allows_fetch_and_merge": false } },
+      { "type": "deletion" }
+    ]
+  }
+}

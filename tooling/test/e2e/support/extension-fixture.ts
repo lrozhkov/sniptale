@@ -16,6 +16,7 @@ type ExtensionPageOptions = {
 };
 
 type BrowserTarget = {
+  targetId?: string;
   type?: string;
   url?: string;
 };
@@ -24,6 +25,8 @@ type ExtensionFixture = {
   context: BrowserContext;
   extensionId: string;
   hostOrigin: string;
+  hostRequests: string[];
+  hostServer: Awaited<ReturnType<typeof startHostServer>>;
   launchedExtension: Awaited<ReturnType<typeof launchExtensionBrowser>>;
   openExtensionPage: (path: string, options?: ExtensionPageOptions) => Promise<Page>;
 };
@@ -121,6 +124,43 @@ async function resolveExtensionServiceWorkerUrl(
   }
 }
 
+async function resolveExtensionServiceWorkerTarget(
+  context: BrowserContext,
+  timeoutMs = 15_000
+): Promise<{ targetId: string; url: string }> {
+  const session = await createBrowserSession(context);
+  const deadline = Date.now() + timeoutMs;
+  try {
+    while (Date.now() < deadline) {
+      const response = (await session.send('Target.getTargets')) as {
+        targetInfos?: BrowserTarget[];
+      };
+      const target = response.targetInfos?.find(
+        (candidate) =>
+          candidate.type === 'service_worker' &&
+          candidate.url?.endsWith(EXTENSION_SERVICE_WORKER_PATH) &&
+          candidate.targetId
+      );
+      if (target?.targetId && target.url) return { targetId: target.targetId, url: target.url };
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error('Timed out waiting for extension service worker target');
+  } finally {
+    await closeBrowserSession(session);
+  }
+}
+
+export async function terminateExtensionServiceWorker(context: BrowserContext): Promise<string> {
+  const target = await resolveExtensionServiceWorkerTarget(context);
+  const session = await createBrowserSession(context);
+  try {
+    await session.send('Target.closeTarget', { targetId: target.targetId });
+  } finally {
+    await closeBrowserSession(session);
+  }
+  return target.targetId;
+}
+
 async function resolveExtensionId(context: BrowserContext): Promise<string> {
   return new URL(await resolveExtensionServiceWorkerUrl(context)).host;
 }
@@ -215,14 +255,27 @@ export const test = base.extend<ExtensionFixture>({
   },
 
   hostOrigin: [
-    async ({}, use) => {
-      const { server, origin } = await startHostServer();
+    async ({ hostServer }, use) => {
+      await use(hostServer.origin);
+    },
+    { scope: 'worker' },
+  ],
 
+  hostRequests: [
+    async ({ hostServer }, use) => {
+      await use(hostServer.requests);
+    },
+    { scope: 'worker' },
+  ],
+
+  hostServer: [
+    async ({}, use) => {
+      const hostServer = await startHostServer();
       try {
-        await use(origin);
+        await use(hostServer);
       } finally {
         await new Promise<void>((resolve, reject) => {
-          server.close((error) => {
+          hostServer.server.close((error) => {
             if (error) {
               reject(error);
               return;

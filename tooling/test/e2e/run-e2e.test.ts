@@ -23,6 +23,38 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
     ],
     suite: 'critical',
   });
+  expect(parseE2eOptions(['--suite', 'security'])).toMatchObject({
+    headed: false,
+    specs: expect.arrayContaining([
+      'tooling/test/e2e/security/production-surface.spec.ts',
+      'tooling/test/e2e/security/ipc-authorization.spec.ts',
+      'tooling/test/e2e/security/hostile-page.spec.ts',
+    ]),
+    suite: 'security',
+  });
+});
+
+it('builds both production and instrumented artifacts for the security suite', () => {
+  const builds: string[][] = [];
+  const commands: string[][] = [];
+  const result = runE2e({
+    argv: ['--suite', 'security'],
+    buildRunner: (args) => {
+      builds.push(args);
+      return { status: 0, stdout: '', stderr: '' };
+    },
+    commandRunner: (_command, args) => {
+      commands.push(args);
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+
+  expect(result.steps.map((step) => step.status)).toEqual(['ok', 'ok']);
+  expect(builds).toEqual([
+    ['run', 'qa:e2e:build:release'],
+    ['run', 'qa:e2e:build:security'],
+  ]);
+  expect(commands).toHaveLength(1);
 });
 
 it('rejects unknown or missing CLI values before building', () => {
@@ -89,6 +121,9 @@ it('keeps npm e2e scripts as thin aliases to the runner', () => {
   );
   expect(packageJson.scripts['qa:e2e:smoke:headed']).toBe(
     'node tooling/test/e2e/run-e2e.mjs --suite smoke --headed'
+  );
+  expect(packageJson.scripts['qa:e2e:security']).toBe(
+    'node tooling/test/e2e/run-e2e.mjs --suite security'
   );
   expect(packageJson.scripts['qa:e2e:smoke']).not.toContain('xvfb-run');
 });

@@ -1,7 +1,7 @@
 import { AUDIT_STEPS } from '../../core/qa-steps/definitions.data.mjs';
 
 export const AUDIT_PROFILE_SCHEMA_VERSION = 1;
-export const AUDIT_PROFILE_IDS = Object.freeze(['repository', 'security', 'release']);
+export const AUDIT_PROFILE_IDS = Object.freeze(['repository', 'security', 'coverage', 'release']);
 export const AUDIT_CONTROL_REQUIREMENTS = Object.freeze(['required', 'optional', 'excluded']);
 export const GITLEAKS_SCOPES = Object.freeze(['worktree', 'history']);
 
@@ -86,6 +86,20 @@ function assertCompleteReleaseProfile(profile) {
   }
 }
 
+function assertIsolatedCoverageProfile(profile) {
+  if (profile.id !== 'coverage') return;
+  const incorrectlyEnabled = profile.controls
+    .filter(({ id, requirement }) =>
+      id === 'full-product-coverage' ? requirement !== 'required' : requirement !== 'excluded'
+    )
+    .map(({ id }) => id);
+  if (incorrectlyEnabled.length > 0) {
+    throw new TypeError(
+      `audit profile coverage must require only full-product-coverage: ${incorrectlyEnabled.join(', ')}`
+    );
+  }
+}
+
 function parseGitleaksScopes(value, profileId) {
   if (!Array.isArray(value) || value.length === 0) {
     throw new TypeError(`audit profile ${profileId} gitleaksScopes must be a non-empty array`);
@@ -122,6 +136,7 @@ function parseProfile(value) {
   };
   assertCompleteControls(profile);
   assertRequiredSecurityEngines(profile);
+  assertIsolatedCoverageProfile(profile);
   assertCompleteReleaseProfile(profile);
   return profile;
 }

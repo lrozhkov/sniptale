@@ -11,6 +11,7 @@ const {
   commitWebSnapshotSaveMock,
   consumeWebSnapshotStagedBlobMock,
   deleteMediaLibraryAssetsBatchSafelyMock,
+  hasActivePageAccessMock,
   releaseWebSnapshotStagedBlobsMock,
   releaseWebSnapshotStagedBlobsForSessionMock,
   releaseWebSnapshotSaveMock,
@@ -24,12 +25,18 @@ const {
   commitWebSnapshotSaveMock: vi.fn(),
   consumeWebSnapshotStagedBlobMock: vi.fn(),
   deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
+  hasActivePageAccessMock: vi.fn(),
   releaseWebSnapshotStagedBlobsMock: vi.fn(),
   releaseWebSnapshotStagedBlobsForSessionMock: vi.fn(),
   releaseWebSnapshotSaveMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
   saveWebSnapshotToMediaHubMock: vi.fn(),
   stageWebSnapshotBlobChunkMock: vi.fn(),
+}));
+
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
+  hasActivePageAccess: hasActivePageAccessMock,
 }));
 
 vi.mock('../../media-hub/assets', async (importOriginal) => ({
@@ -114,6 +121,7 @@ async function flushPromises(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hasActivePageAccessMock.mockResolvedValue(true);
   consumeWebSnapshotStagedBlobMock.mockImplementation(
     ({ expectedKind }: { expectedKind: 'package' | 'screenshot' }) =>
       new Blob([expectedKind], {

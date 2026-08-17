@@ -47,6 +47,13 @@ it('maps physical app and harness sources to stable legacy output ids', () => {
   expect(extensionHtmlInputSource(layout, e2eInputs.testHarnessPopup)).toBe(
     path.resolve('tooling/test/harness/popup.html')
   );
+  expect(e2eInputs.testHarnessSecurityControl).toBeUndefined();
+  const securityInputs = extensionRollupInputs(layout, 'security-e2e');
+  expect(securityInputs.testHarnessSecurityControl).toBe(
+    path.join(appRoot, 'tooling/test/harness/security-control.html')
+  );
+  expect(securityInputs.testHarnessPopup).toBeUndefined();
+  expect(releaseInputs.testHarnessSecurityControl).toBeUndefined();
   expect(layout.manifestModuleInputs).toEqual([
     {
       sourceAbsolutePath: path.resolve('apps/extension/src/background/index.ts'),

@@ -1,5 +1,7 @@
 # Sniptale
 
+[![CI](https://github.com/lrozhkov/sniptale/actions/workflows/quality-gate.yml/badge.svg?branch=main&event=push)](https://github.com/lrozhkov/sniptale/actions/workflows/quality-gate.yml?query=branch%3Amain) [![Coverage](https://codecov.io/gh/lrozhkov/sniptale/branch/main/graph/badge.svg)](https://codecov.io/gh/lrozhkov/sniptale) [![Release](https://img.shields.io/github/v/release/lrozhkov/sniptale?sort=semver)](https://github.com/lrozhkov/sniptale/releases/latest) [![License](https://img.shields.io/github/license/lrozhkov/sniptale)](https://github.com/lrozhkov/sniptale/blob/main/LICENSE)
+
 **Snip the web. Tell the story.**
 
 Sniptale is a local-first Chromium (MV3 Extension) workspace for capturing, understanding, annotating, recording, editing, and exporting the web — built as an AI-first software-engineering experiment.

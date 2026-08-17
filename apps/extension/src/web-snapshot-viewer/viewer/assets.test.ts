@@ -196,7 +196,8 @@ it('loads a valid package and rewrites captured asset references to object URLs'
 
   expect(loaded.objectUrls).toEqual(['blob:snapshot-asset', 'blob:snapshot-asset']);
   expect(loaded.html).toContain('src="blob:snapshot-asset"');
-  expect(loaded.html).toContain('href="blob:snapshot-asset"');
+  expect(loaded.html).toContain('<a>Document</a>');
+  expect(loaded.html).not.toContain('href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
   expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
 });

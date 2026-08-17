@@ -9,6 +9,7 @@ import {
   runWithPersistenceMutationPermit,
   type PersistenceMutationPermit,
 } from '../mutation-barrier';
+import { securityE2ECheckpoint } from '../../../../platform/security-e2e-control';
 
 type PersistenceAwareBrowserStorageAreaAdapter = Omit<
   BrowserStorageAreaAdapter,
@@ -97,7 +98,12 @@ export function createStorageAreaAdapter(
         return Promise.reject(new Error(`chrome.storage.${areaName} is unavailable`));
       }
 
-      const write = () => stateManager.writeMany(getStateManagerDomain(areaName), items);
+      const write = async () => {
+        if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
+          await securityE2ECheckpoint('persistence-before-commit');
+        }
+        await stateManager.writeMany(getStateManagerDomain(areaName), items);
+      };
       await (guardMutations && !isActivePersistenceMutationPermit(permit)
         ? runWithPersistenceMutationPermit(write)
         : write());

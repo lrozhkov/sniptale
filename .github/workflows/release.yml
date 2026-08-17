@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      actions: read
+      contents: write
+      packages: read
+    steps:
+      - name: Check out signed tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 22.12.0, cache: npm }
+      - name: Validate tag, version, signature, and main ancestry
+        env: { GH_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}' }
+        run: node tooling/ci/release-policy.mjs
+      - name: Download exact successful main proof
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          runs=$(gh run list --workflow quality-gate.yml --branch main --commit "$GITHUB_SHA" --event push --status success --limit 20 --json databaseId,headSha)
+          main_run_id=$(jq -er --arg sha "$GITHUB_SHA" '[.[] | select(.headSha == $sha)] | if length == 1 then .[0].databaseId else error("expected exactly one successful main proof") end' <<<"$runs")
+          artifact_name="canonical-qa-${GITHUB_SHA}-${main_run_id}"
+          gh run download "$main_run_id" --name "$artifact_name" --dir build/main-proof
+          image_proof_name="qa-image-proof-${GITHUB_SHA}-${main_run_id}"
+          gh run download "$main_run_id" --name "$image_proof_name" --dir build/image-proof
+          node tooling/ci/verify-main-proof.mjs build/main-proof "$GITHUB_SHA"
+          image_ref=$(node tooling/ci/image-proof.mjs verify build/image-proof "$GITHUB_SHA" "$main_run_id")
+          echo "SNIPTALE_CI_IMAGE=$image_ref" >> "$GITHUB_ENV"
+          echo "MAIN_PROOF_RUN_ID=$main_run_id" >> "$GITHUB_ENV"
+      - name: Sign in to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with:
+          {
+            registry: ghcr.io,
+            username: '${{ github.actor }}',
+            password: '${{ secrets.GITHUB_TOKEN }}',
+          }
+      - name: Pull exact main QA image
+        run: |
+          docker pull "$SNIPTALE_CI_IMAGE"
+          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$SNIPTALE_CI_IMAGE")
+          if [ "$revision" != "$GITHUB_SHA" ]; then
+            echo "QA image revision does not match release commit" >&2
+            exit 1
+          fi
+      - name: Run release-only canonical audit
+        env:
+          SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
+          SNIPTALE_CI_SKIP_BUILD: '1'
+        run: node tooling/ci/container.mjs release-audit
+      - name: Prepare immutable release assets
+        run: node tooling/ci/prepare-release-assets.mjs build/main-proof "build/ci-artifacts/release-audit-${GITHUB_SHA}-${GITHUB_RUN_ID}" "$GITHUB_SHA"
+      - name: Preserve release proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            build/main-proof
+            build/ci-artifacts/release-audit-${{ github.sha }}-${{ github.run_id }}
+          include-hidden-files: true
+          retention-days: 30
+      - name: Create draft, attach verified assets, and publish
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_POLICY_READ_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}'
+        run: |
+          asset_root="build/main-proof/release-assets"
+          GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" node tooling/ci/release-policy.mjs --recheck
+          lookup_error=$(mktemp)
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" >/dev/null 2>"$lookup_error"; then
+            echo "Refusing to replace an existing release" >&2
+            exit 1
+          elif ! grep -q '(HTTP 404)' "$lookup_error"; then
+            cat "$lookup_error" >&2
+            exit 1
+          fi
+          created_release_id=''
+          cleanup_owned_release() {
+            if [ -z "$created_release_id" ]; then
+              return
+            fi
+            release_state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}" --jq '[.tag_name, .draft, .immutable] | @tsv' 2>/dev/null || true)
+            if [ "$release_state" = "${GITHUB_REF_NAME}"$'\ttrue\tfalse' ] || [ "$release_state" = "${GITHUB_REF_NAME}"$'\tfalse\tfalse' ]; then
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}"
+            fi
+          }
+          trap cleanup_owned_release ERR
+          release_json=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" -f tag_name="$GITHUB_REF_NAME" -f name="$GITHUB_REF_NAME" -F draft=true -F prerelease=false -F generate_release_notes=true)
+          release_id=$(jq -er --arg tag "$GITHUB_REF_NAME" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release_json")
+          created_release_id="$release_id"
+          node tooling/ci/upload-release-assets.mjs "$asset_root" "$release_id"
+          node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
+          node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+          trap - ERR

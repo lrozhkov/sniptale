@@ -22,6 +22,7 @@ import { executeInjectedWebSnapshotContentExport } from './popup-export-injected
 import type { FullPageExportCaptureAction } from '../../../../contracts/full-page-capture';
 import { cancelFullPageCaptureByExportRunId } from '../../../capture/full-page/cancellation';
 import { consumePopupExportLaunchIntent } from '../../../capture/annotation-export/popup-launch-intent';
+import { assertPopupTabRouteTargetDocument } from '../capabilities/popup-tab/route-capabilities';
 
 type PopupExportRouteArgs = Omit<TabRouteArgs, 'message'> & {
   message: PopupExportViewerMessage;
@@ -184,6 +185,10 @@ async function routeWebSnapshotSave(
 }
 
 async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<unknown> {
+  await assertPopupTabRouteTargetDocument({
+    tabId: args.resolvedTabId,
+    token: args.message.tabRouteCapabilityToken,
+  });
   if (args.message.type === MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT) {
     return {
       page: consumePopupExportLaunchIntent(args.resolvedTabId) ? ('export' as const) : null,

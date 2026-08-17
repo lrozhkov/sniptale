@@ -44,6 +44,7 @@ function contentRuntimeDefines(mode: string, buildId: string) {
   return {
     __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
     __SNIPTALE_CONTENT_RUNTIME_BUILD_ID__: JSON.stringify(buildId),
+    __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
     __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
     __TRACE_MESSAGES__: JSON.stringify(isTraceMessagesEnabledForMode(mode)),
     'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),
@@ -117,6 +118,7 @@ export function buildContentRuntimeShim(mode: string): Plugin {
         bundle: true,
         define: {
           __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
+          __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
           __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
           __TRACE_MESSAGES__: JSON.stringify(isTraceMessagesEnabledForMode(mode)),
           'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),
@@ -162,6 +164,7 @@ export function buildWebSnapshotInjectedRunner(mode: string): Plugin {
         bundle: true,
         define: {
           __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
+          __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
           __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
           __TRACE_MESSAGES__: JSON.stringify(isTraceMessagesEnabledForMode(mode)),
           'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),

@@ -18,6 +18,8 @@ import {
   stageWebSnapshotBlobChunk,
 } from './web-snapshot/staged-blobs';
 import { resolveWebSnapshotPayloadBlobs } from './web-snapshot/payload-blobs';
+import { hasActivePageAccess } from '../../page-access/service';
+import { securityE2ECheckpoint } from '../../../platform/security-e2e-control';
 
 function resolveWebSnapshotPayloadBlobsForSave(
   payload: WebSnapshotSaveToGalleryPayload,
@@ -125,14 +127,21 @@ export function handleSaveWebSnapshotToGallery(
   let savedAssetId: string | null = null;
 
   Promise.resolve()
-    .then(() => {
+    .then(async () => {
       beginWebSnapshotSave({
         sessionId: payload.snapshotSessionId,
         tabId: resolvedTabId,
       });
       saveStarted = true;
+      const blobs = resolveWebSnapshotPayloadBlobsForSave(payload, resolvedTabId);
+      if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
+        await securityE2ECheckpoint('persistence-before-commit');
+      }
+      if (!(await hasActivePageAccess(resolvedTabId))) {
+        throw new Error('Page access was revoked before web snapshot commit');
+      }
       return saveWebSnapshotToMediaHub({
-        ...resolveWebSnapshotPayloadBlobsForSave(payload, resolvedTabId),
+        ...blobs,
         payload,
       });
     })

@@ -11,6 +11,7 @@ const {
   sendViewerPopupExportMessageMock,
   cancelWebSnapshotCaptureRequestMock,
   deleteMediaLibraryAssetsBatchSafelyMock,
+  assertPopupTabRouteTargetDocumentMock,
 } = vi.hoisted(() => ({
   authorizeWebSnapshotCaptureRequestMock: vi.fn(),
   browserScriptingExecuteScriptMock: vi.fn(),
@@ -22,6 +23,12 @@ const {
   sendViewerPopupExportMessageMock: vi.fn(),
   cancelWebSnapshotCaptureRequestMock: vi.fn(),
   deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
+  assertPopupTabRouteTargetDocumentMock: vi.fn(),
+}));
+
+vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capabilities/popup-tab/route-capabilities')>()),
+  assertPopupTabRouteTargetDocument: assertPopupTabRouteTargetDocumentMock,
 }));
 
 vi.mock('@sniptale/platform/browser/scripting', async (importOriginal) => ({
@@ -100,6 +107,7 @@ async function flushRouteWork(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  assertPopupTabRouteTargetDocumentMock.mockResolvedValue(undefined);
   loadSettingsMock.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,

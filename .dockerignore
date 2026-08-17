@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+.tmp
+build
+coverage
+dist
+dist-*
+node_modules
+.playwright-browsers

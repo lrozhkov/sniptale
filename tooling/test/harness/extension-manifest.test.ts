@@ -7,11 +7,16 @@ const EXPECTED_DESCRIPTION =
 
 it('grants all-sites only to the isolated browser E2E artifact', () => {
   const e2eManifest = buildManifestForMode(sourceManifest, 'test-e2e');
+  const securityManifest = buildManifestForMode(sourceManifest, 'security-e2e');
   const releaseManifest = buildManifestForMode(sourceManifest, 'release');
 
   expect(e2eManifest).toEqual(expect.objectContaining({ host_permissions: ['<all_urls>'] }));
   expect(e2eManifest).not.toHaveProperty('optional_host_permissions');
   expect(releaseManifest).not.toHaveProperty('host_permissions');
+  expect(securityManifest).not.toHaveProperty('host_permissions');
+  expect(securityManifest).toEqual(
+    expect.objectContaining({ optional_host_permissions: ['<all_urls>'] })
+  );
   expect(releaseManifest).toEqual(
     expect.objectContaining({ optional_host_permissions: ['<all_urls>'] })
   );

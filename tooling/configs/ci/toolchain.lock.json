@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "platform": "linux/amd64",
+  "node": {
+    "version": "22.12.0",
+    "image": "node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213"
+  },
+  "debian": {
+    "snapshot": "20250115T000000Z",
+    "archiveUrl": "https://snapshot.debian.org/archive/debian/20250115T000000Z",
+    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20250115T000000Z",
+    "suites": ["bookworm", "bookworm-updates", "bookworm-security"]
+  },
+  "playwright": {
+    "version": "1.58.2",
+    "npmLockSha256": "672c5b3c11d0b5fa56beeb113957254abb2dfa24d9bd7715cb5a2543262e81c5",
+    "browser": "chromium",
+    "browserRevision": "1208",
+    "browserVersion": "145.0.7632.6",
+    "assets": [
+      {
+        "id": "chromium-1208",
+        "url": "https://cdn.playwright.dev/builds/cft/145.0.7632.6/linux64/chrome-linux64.zip",
+        "sha256": "b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38",
+        "executable": "chrome-linux64/chrome"
+      },
+      {
+        "id": "chromium_headless_shell-1208",
+        "url": "https://cdn.playwright.dev/builds/cft/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
+        "sha256": "2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e",
+        "executable": "chrome-headless-shell-linux64/chrome-headless-shell"
+      },
+      {
+        "id": "ffmpeg-1011",
+        "url": "https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-linux.zip",
+        "sha256": "ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc",
+        "executable": "ffmpeg-linux"
+      }
+    ]
+  },
+  "semgrep": { "version": "1.173.0" },
+  "codeql": {
+    "version": "2.26.3",
+    "url": "https://github.com/github/codeql-cli-binaries/releases/download/v2.26.3/codeql-linux64.zip",
+    "sha256": "cc0fed57d8441892b8fcf41b378f7ed925fb6e2783fa8f2d453717686e6c723e",
+    "querySuite": "javascript-security-and-quality.qls"
+  },
+  "osvScanner": {
+    "version": "2.5.1",
+    "url": "https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64",
+    "sha256": "f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be"
+  },
+  "gitleaks": {
+    "version": "8.30.1",
+    "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz",
+    "sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+  },
+  "actionlint": {
+    "version": "1.7.12",
+    "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz",
+    "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+  }
+}

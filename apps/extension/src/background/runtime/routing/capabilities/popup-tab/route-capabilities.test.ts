@@ -3,16 +3,19 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
 const {
+  browserScriptingExecuteScriptMock,
   browserTabsGetMock,
   hasActivePageAccessMock,
   hasPreauthorizedPopupTabRouteCapabilityRequestMessageMock,
 } = vi.hoisted(() => ({
+  browserScriptingExecuteScriptMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   hasActivePageAccessMock: vi.fn(),
   hasPreauthorizedPopupTabRouteCapabilityRequestMessageMock: vi.fn(),
 }));
 import {
   assertPopupTabRouteCapability,
+  assertPopupTabRouteTargetDocument,
   resetPopupTabRouteCapabilitiesForTests,
   routePopupTabRouteCapabilityRequest,
 } from './route-capabilities';
@@ -36,6 +39,12 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: {
     get: (...args: unknown[]) => browserTabsGetMock(...args),
+  },
+}));
+
+vi.mock('@sniptale/platform/browser/scripting', () => ({
+  browserScripting: {
+    executeScript: (...args: unknown[]) => browserScriptingExecuteScriptMock(...args),
   },
 }));
 
@@ -77,6 +86,8 @@ async function issueCapability(
 beforeEach(() => {
   resetPopupTabRouteCapabilitiesForTests();
   browserTabsGetMock.mockReset();
+  browserScriptingExecuteScriptMock.mockReset();
+  browserScriptingExecuteScriptMock.mockResolvedValue([{ documentId: 'document-7', frameId: 0 }]);
   hasActivePageAccessMock.mockReset();
   hasPreauthorizedPopupTabRouteCapabilityRequestMessageMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 7, url: 'https://example.test/page' });
@@ -171,6 +182,57 @@ it('consumes matching capabilities once and rejects replay', async () => {
       senderUrl: POPUP_URL,
     })
   ).toThrow('Invalid tab route capability');
+});
+
+it('rejects an admitted capability when Chromium reports a replacement document', async () => {
+  const issued = await issueCapability();
+  const message = {
+    tabId: 7,
+    tabRouteCapabilityToken: issued.capabilityToken as string,
+    tabRouteRequestId: 'route-req-1',
+    type: MessageType.EXPORT_POPUP_PREVIEW,
+  } as const;
+  assertPopupTabRouteCapability({ message, senderUrl: POPUP_URL });
+  browserScriptingExecuteScriptMock.mockResolvedValueOnce([
+    { documentId: 'replacement-document', frameId: 0 },
+  ]);
+
+  await expect(
+    assertPopupTabRouteTargetDocument({
+      tabId: 7,
+      token: issued.capabilityToken as string,
+    })
+  ).rejects.toThrow('Invalid tab route capability target document');
+  await expect(
+    assertPopupTabRouteTargetDocument({
+      tabId: 7,
+      token: issued.capabilityToken as string,
+    })
+  ).rejects.toThrow('Invalid tab route capability');
+});
+
+it('accepts the exact Chromium document once after admission', async () => {
+  const issued = await issueCapability();
+  const message = {
+    tabId: 7,
+    tabRouteCapabilityToken: issued.capabilityToken as string,
+    tabRouteRequestId: 'route-req-1',
+    type: MessageType.EXPORT_POPUP_PREVIEW,
+  } as const;
+  assertPopupTabRouteCapability({ message, senderUrl: POPUP_URL });
+
+  await expect(
+    assertPopupTabRouteTargetDocument({
+      tabId: 7,
+      token: issued.capabilityToken as string,
+    })
+  ).resolves.toBeUndefined();
+  await expect(
+    assertPopupTabRouteTargetDocument({
+      tabId: 7,
+      token: issued.capabilityToken as string,
+    })
+  ).rejects.toThrow('Invalid tab route capability');
 });
 
 it('binds popup launch-intent consumption to its exact operation and rejects replay', async () => {

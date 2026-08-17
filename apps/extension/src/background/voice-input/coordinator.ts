@@ -141,6 +141,13 @@ class VoiceInputCoordinator {
     const sessionAtDispatch = this.sessions.active;
     const requestId = `privacy-erasure:${this.createInternalSessionId()}`;
     try {
+      if (
+        !sessionAtDispatch &&
+        !(await withStopSettlementTimeout(this.gateway.hasExistingDocument()))
+      ) {
+        this.sessions.reset();
+        return true;
+      }
       await withStopSettlementTimeout(this.gateway.ensureReady());
       const status = await withStopSettlementTimeout(
         this.gateway.send({

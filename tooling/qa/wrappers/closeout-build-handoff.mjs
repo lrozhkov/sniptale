@@ -3,13 +3,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createFailureStep, createProcessStep } from '../core/focused-qa-results.mjs';
-import { runNpm } from '../core/shared.mjs';
+import { runCommand, runNpm } from '../core/shared.mjs';
 import { authorizeBlockingWrapperLockHandoff } from '../runtime/blocking-wrapper-lock.helpers.mjs';
 import { readRunRecords, resolveObservabilityRoot } from '../runtime/observability/index.mjs';
 import { timeSyncStep } from '../core/step-timing.helpers.mjs';
 
 const CLOSEOUT_BUILD_LOCK_ENV = 'SNIPTALE_QA_CLOSEOUT_BUILD_LOCK';
 const CLOSEOUT_BUILD_OWNER_PID_ENV = 'SNIPTALE_QA_CLOSEOUT_BUILD_OWNER_PID';
+
+function runBuildChild(buildArgs, options, dependencies) {
+  if (dependencies.npmRunner) {
+    return dependencies.npmRunner(['run', '--silent', 'qa:build', '--', ...buildArgs], options);
+  }
+  const trustedRoot = process.env.SNIPTALE_TRUSTED_CI_ROOT;
+  if (trustedRoot) {
+    const entrypoint = path.join(trustedRoot, 'tooling/qa/wrappers/build.mjs');
+    if (
+      !path.isAbsolute(entrypoint) ||
+      !fs.existsSync(entrypoint) ||
+      !fs.statSync(entrypoint).isFile()
+    ) {
+      throw new Error('Trusted qa:build entrypoint is unavailable.');
+    }
+    return runCommand(process.execPath, [entrypoint, ...buildArgs], options);
+  }
+  return runNpm(['run', '--silent', 'qa:build', '--', ...buildArgs], options);
+}
 
 function createLockHandoffToken() {
   return randomUUID();
@@ -91,8 +110,8 @@ export function collectBuildStep(buildArgs, runIdentity = {}, dependencies = {})
   });
   let processResult;
   const step = timeSyncStep(() => {
-    processResult = (dependencies.npmRunner ?? runNpm)(
-      ['run', '--silent', 'qa:build', '--', ...buildArgs],
+    processResult = runBuildChild(
+      buildArgs,
       {
         env: createCloseoutBuildHandoffEnv(handoffToken, process.pid, {
           parentRunId,
@@ -100,7 +119,8 @@ export function collectBuildStep(buildArgs, runIdentity = {}, dependencies = {})
           runId: childRunId,
         }),
         stdio: 'pipe',
-      }
+      },
+      dependencies
     );
     return createProcessStep('Full build', processResult);
   });

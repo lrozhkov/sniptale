@@ -36,7 +36,21 @@ async function serveRequest(
     if (requestUrl.pathname.startsWith('/fixtures/')) {
       const fixtureFile = join(fixtureRoot, requestUrl.pathname.replace('/fixtures/', ''));
       const html = await readFile(fixtureFile, 'utf8');
-      response.writeHead(200, { 'content-type': getContentType(requestUrl.pathname) });
+      response.writeHead(200, {
+        'content-type': getContentType(requestUrl.pathname),
+        ...(requestUrl.pathname === '/fixtures/hostile-page.html'
+          ? {
+              'content-security-policy': [
+                "default-src 'none'",
+                "img-src 'none'",
+                "style-src 'unsafe-inline'",
+                "script-src 'none'",
+                "frame-src 'none'",
+                "connect-src 'none'",
+              ].join('; '),
+            }
+          : {}),
+      });
       response.end(html);
       return;
     }
@@ -57,12 +71,18 @@ async function serveRequest(
  * Tiny static server for a real http origin.
  * Content scripts do not inject into about:blank or chrome-extension pages.
  */
-export async function startHostServer(): Promise<{ server: Server; origin: string }> {
+export async function startHostServer(): Promise<{
+  server: Server;
+  origin: string;
+  requests: string[];
+}> {
   const fixtureRoot = join(process.cwd(), 'tooling', 'test', 'e2e', 'fixtures');
   const fixturePath = join(fixtureRoot, 'host-page.html');
+  const requests: string[] = [];
 
   return await new Promise((resolve, reject) => {
     const server = createServer((request, response) => {
+      requests.push(request.url ?? '/');
       void serveRequest(request, response, fixtureRoot, fixturePath);
     });
 
@@ -77,6 +97,7 @@ export async function startHostServer(): Promise<{ server: Server; origin: strin
       resolve({
         server,
         origin: `http://127.0.0.1:${address.port}`,
+        requests,
       });
     });
   });

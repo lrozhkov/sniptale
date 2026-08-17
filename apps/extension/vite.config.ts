@@ -66,6 +66,7 @@ function buildDefines(mode: string) {
       createContentRuntimeBuildId(mode, manifest.version)
     ),
     __TRACE_MESSAGES__: JSON.stringify(isTraceMessagesEnabledForMode(mode)),
+    __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
     __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
     'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),
     __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
@@ -156,6 +157,11 @@ export default defineConfig(({ mode }) => ({
   define: buildDefines(mode),
   build: {
     outDir: BUILD_LAYOUT.outputRoot,
+    ...(mode === 'security-e2e'
+      ? { outDir: resolvePath(BUILD_LAYOUT.repositoryRoot, 'dist-security-e2e') }
+      : mode === 'release' && process.env.SNIPTALE_RELEASE_E2E_OUTPUT === '1'
+        ? { outDir: resolvePath(BUILD_LAYOUT.repositoryRoot, 'dist-release-e2e') }
+        : {}),
     emptyOutDir: true,
     // Vite's preload helper resolves chunk URLs against the host page inside content scripts.
     modulePreload: false,

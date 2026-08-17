@@ -1,5 +1,18 @@
 export const PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS = [
   {
+    owner: 'background-voice-input-coordinator',
+    productionFile: 'apps/extension/src/background/voice-input/coordinator.ts',
+    reason: 'Voice authority and privacy cleanup share this coordinator and its focused suites.',
+    testFiles: [
+      'apps/extension/src/background/voice-input/coordinator.boundaries.test.ts',
+      'apps/extension/src/background/voice-input/coordinator.privacy.test.ts',
+      'apps/extension/src/background/voice-input/coordinator.reconciliation.test.ts',
+      'apps/extension/src/background/voice-input/coordinator.rejected-start.test.ts',
+      'apps/extension/src/background/voice-input/coordinator.stop-cleanup.test.ts',
+      'apps/extension/src/background/voice-input/coordinator.test.ts',
+    ],
+  },
+  {
     allowCrossOwner: true,
     owner: 'local-data-erasure-media-strict-viewport-owner',
     productionFile:

@@ -852,6 +852,18 @@
   ],
   "executables": [
     {
+      "path": "tooling/ci/image-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/verify-main-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
       "path": "tooling/qa/audits/ast-grep.mjs",
       "disposition": "adapt",
       "owner": "qa-platform",
@@ -1938,6 +1950,18 @@
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
+      "id": "qa:e2e:build:release",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:build:security",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
       "id": "qa:e2e:critical",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1963,6 +1987,12 @@
     },
     {
       "id": "qa:e2e:install:deps",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:security",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The package script is a supported canonical QA operator entrypoint."
