@@ -52,10 +52,12 @@ function createRuntime(): ScreenshotControllerRuntime {
     },
     captureActionRef: { current: 'download_default' },
     session: {
+      editingModeBaseline: null,
       navigationLockBaseline: false,
       runActive: true,
       runGeneration: 1,
     },
+    restoreEditingMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),

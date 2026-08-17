@@ -160,7 +160,7 @@ it('emits only exact sync-key changes as resolved deep clones', async () => {
   expect(listener).toHaveBeenCalledOnce();
   const catalog = listener.mock.calls[0]![0];
   catalog.presets[0].style.surface.radius = 99;
-  expect(owner.getLoadedCalloutPresetCatalogSnapshot()?.presets[0]?.style.surface.radius).toBe(12);
+  expect(owner.getLoadedCalloutPresetCatalogSnapshot()?.presets[0]?.style.surface.radius).toBe(8);
   unsubscribe();
   expect(state.changeListener).toBeNull();
 });

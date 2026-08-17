@@ -40,7 +40,9 @@ it('edits an existing preset in the shared persistent modal', async () => {
     );
   });
 
-  expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe('Облачко');
+  expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe(
+    'Оранжевый Sniptale'
+  );
   expect(document.querySelector<HTMLElement>('[role="dialog"]')?.style.width).toBe('660px');
   expect(document.querySelector('.sniptale-highlighter-preset-editor-dialog')).not.toBeNull();
   expect(
@@ -53,6 +55,13 @@ it('edits an existing preset in the shared persistent modal', async () => {
   expect(navigation.at(-1)?.getAttribute('aria-label')).toBe('Позиция');
   expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(0);
   expect(document.body.textContent).toContain('Изменить шаблон комментария');
+  const nameInput = document.querySelector<HTMLInputElement>('input[maxlength="64"]');
+  const tagAssignment = document.querySelector(
+    '[data-ui="shared.annotation-template-tag-assignment"]'
+  );
+  expect(nameInput?.compareDocumentPosition(tagAssignment as Node)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
 
   await act(async () => root.unmount());
 });
@@ -126,7 +135,11 @@ it('shows localized badge weight options in the shared editor', async () => {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
-  const preset = createSystemCalloutPresetCatalog()[4]!;
+  const source = createSystemCalloutPresetCatalog()[4]!;
+  const preset = {
+    ...source,
+    style: { ...source.style, badge: { ...source.style.badge, enabled: false } },
+  };
 
   await act(async () => {
     root.render(

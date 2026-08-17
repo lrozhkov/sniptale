@@ -1,6 +1,7 @@
 export function SettingsSubpageTabs(props: {
   activeId: string;
   ariaLabel: string;
+  disabled?: boolean;
   items: readonly { id: string; label: string }[];
   onChange?: ((id: string) => void) | undefined;
 }) {
@@ -19,6 +20,7 @@ export function SettingsSubpageTabs(props: {
           <button
             key={item.id}
             type="button"
+            disabled={props.disabled}
             aria-current={active ? 'page' : undefined}
             onClick={() => props.onChange?.(item.id)}
             className={[

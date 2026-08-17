@@ -31,6 +31,7 @@ function createScreenshotRuntime(args: {
       : { captureAdapter: args.params.captureAdapter }),
     capturePersistence: args.params.capturePersistence,
     captureActionRef: args.params.captureActionRef,
+    restoreEditingMode: args.params.editingModes.restoreEditingMode,
     session: args.session,
     setCaptureAction: args.params.setCaptureAction,
     setIsCompletelyHidden: args.params.setIsCompletelyHidden,

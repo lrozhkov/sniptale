@@ -98,6 +98,7 @@ it('renders the exact centered tool order with two vertical dividers', () => {
   expect(actionIds).toEqual([
     'editor.floating.tool-rail.select',
     'content.toolbar.future-frame-style',
+    'content.toolbar.future-frame-style.menu',
     'editor.floating.tool-rail.pencil',
     'editor.floating.tool-rail.marker',
     'editor.floating.tool-rail.text',
@@ -148,6 +149,12 @@ it('uses the content frame controls with the same enable and popover behavior', 
     stepBadge: null,
   });
   expect(comments.getAttribute('aria-pressed')).toBe('true');
+  expect(document.querySelector('[data-ui="content.toolbar.future-callout-popover"]')).toBeNull();
+
+  await act(async () => {
+    getContentFrameButton('future-frame-callout.menu').click();
+    await Promise.resolve();
+  });
   expect(
     document.querySelector('[data-ui="content.toolbar.future-callout-popover"]')
   ).not.toBeNull();
@@ -185,7 +192,7 @@ it('activates the frame group from its persistent frame button', () => {
   renderToolRail(props);
 
   const frame = getContentFrameButton('future-frame-style');
-  act(() => frame.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  act(() => frame.click());
 
   expect(props.onActivateTool).toHaveBeenCalledWith('frame-annotation');
 });

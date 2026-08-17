@@ -23,6 +23,7 @@ import { registerWindowBoundsListener } from './window-bounds';
 import { registerVoiceInputPorts } from '../../../voice-input/coordinator';
 import { registerVoiceInputTelemetryPorts } from '../../../voice-input/telemetry-port';
 import { registerAggregateEditorPresencePorts } from '../../../application/aggregate-promotion/ports';
+import { registerExtensionCommandListener } from '../../commands';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeWiring' });
 
@@ -38,6 +39,7 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerVoiceInputPorts();
   registerVoiceInputTelemetryPorts();
   registerAggregateEditorPresencePorts();
+  registerExtensionCommandListener(state);
   initializePageAccessLifecycle(logger);
   configureScreenshotPrivacyErasureCleanupPort({
     disableScreenshotMode: (tabId, runtimeState) =>

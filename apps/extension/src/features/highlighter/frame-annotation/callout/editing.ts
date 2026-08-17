@@ -73,6 +73,7 @@ export function useFrameCalloutEditing(args: {
       applyFormatting: handlers.applyFormatting,
       blur: handlers.handleBlur,
       click: handlers.handleClick,
+      finish: handlers.finishEditing,
       input: handlers.handleInput,
       keyDown: handlers.handleKeyDown,
       paste: handlers.handlePaste,

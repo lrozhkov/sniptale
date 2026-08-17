@@ -56,5 +56,6 @@ describe('tool-icons', () => {
     for (const tool of Object.keys(TOOL_ICONS) as EditorTool[]) {
       expect(renderToStaticMarkup(<>{TOOL_ICONS[tool]}</>)).toContain('<svg');
     }
+    expect(renderToStaticMarkup(<>{TOOL_ICONS.pencil}</>)).toContain('lucide-pen-line');
   });
 });

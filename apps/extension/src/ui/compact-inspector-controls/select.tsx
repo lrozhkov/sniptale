@@ -101,7 +101,7 @@ function CompactSelectTriggerView<T extends string>({
           if (select.state.open) {
             select.actions.closeAndFocusTrigger();
           } else {
-            select.actions.openMenu();
+            select.actions.openMenu(undefined, false);
           }
         }
       }}
@@ -138,7 +138,7 @@ function CompactSelectMenuView<T extends string>({
       options={props.options}
       optionRefs={select.refs.optionRefs}
       value={props.value}
-      onSelect={select.actions.selectOption}
+      onSelect={(option) => select.actions.selectOption(option, false)}
       onOptionKeyDown={select.keyboard.handleOptionKeyDown}
       portalTarget={select.placement.portalTarget}
       style={select.placement.menuStyle}

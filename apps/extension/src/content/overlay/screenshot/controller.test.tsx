@@ -64,6 +64,7 @@ function createParams() {
       disableQuickEditMode: vi.fn(),
       highlighterMode: false,
       quickEditMode: false,
+      restoreEditingMode: vi.fn(),
       setAiPickMode: vi.fn(),
       setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),

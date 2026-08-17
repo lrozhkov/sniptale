@@ -95,6 +95,18 @@ export const settingsAppearanceMessages = defineMessageSource({
     ru: 'Что показывать при открытии основного меню',
     en: 'What to show when opening the main menu',
   },
+  keyboardShortcutsLabel: {
+    ru: 'Горячие клавиши',
+    en: 'Keyboard shortcuts',
+  },
+  keyboardShortcutsDescription: {
+    ru: 'Назначайте системные сочетания для снимков, инструментов, экспорта и редакторов.',
+    en: 'Assign system shortcuts for screenshots, tools, export, and editors.',
+  },
+  keyboardShortcutsButton: {
+    ru: 'Настроить в Chrome',
+    en: 'Configure in Chrome',
+  },
   popupStartupOptions: {
     'remember-last': {
       ru: 'Продолжить с последнего места',
@@ -104,9 +116,7 @@ export const settingsAppearanceMessages = defineMessageSource({
     'screenshots:quick-actions': { ru: 'Снимки — Действия', en: 'Screenshots — Shortcuts' },
     'screenshots:tab': { ru: 'Снимки — Вкладка', en: 'Screenshots — Tab' },
     'screenshots:desktop': { ru: 'Снимки — Окно', en: 'Screenshots — Window' },
-    'screenshots:tools': { ru: 'Снимки — Инструменты', en: 'Screenshots — Tools' },
     'video:tab': { ru: 'Видео — Вкладка', en: 'Video — Tab' },
-    'video:area': { ru: 'Видео — Область', en: 'Video — Area' },
     'video:camera': { ru: 'Видео — Камера', en: 'Video — Camera' },
     'video:screen': { ru: 'Видео — Окно или экран', en: 'Video — Window or screen' },
     tools: { ru: 'Инструменты', en: 'Tools' },
@@ -233,8 +243,8 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: 'Resize window',
   },
   contextMenuWindowResizeDescription: {
-    ru: 'Менять размер окна браузера по включённым оконным шаблонам.',
-    en: 'Resize the browser window using enabled window presets.',
+    ru: 'Менять размер окна по включённым шаблонам.',
+    en: 'Resize the window using enabled presets.',
   },
   contextMenuSettingsLabel: {
     ru: 'Настройки',

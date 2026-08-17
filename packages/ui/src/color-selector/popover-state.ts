@@ -16,6 +16,12 @@ type EyeDropperCtor = new () => {
   open: (options?: { signal?: AbortSignal }) => Promise<EyeDropperResult>;
 };
 
+const activeEyedropperSessions = new Set<AbortController>();
+
+export function isEyedropperSessionActive(): boolean {
+  return activeEyedropperSessions.size > 0;
+}
+
 function getEyeDropperCtor(): EyeDropperCtor | null {
   if (typeof window === 'undefined') return null;
   const candidate: unknown = Reflect.get(window, 'EyeDropper');
@@ -28,6 +34,9 @@ function clearEyedropperSession(args: {
   onEyedropperStateChangeRef: MutableRefObject<(active: boolean) => void>;
   setEyedropperPressed: Dispatch<SetStateAction<boolean>>;
 }) {
+  if (args.abortControllerRef.current) {
+    activeEyedropperSessions.delete(args.abortControllerRef.current);
+  }
   args.eyedropperActiveRef.current = false;
   args.setEyedropperPressed(false);
   args.onEyedropperStateChangeRef.current(false);
@@ -35,17 +44,23 @@ function clearEyedropperSession(args: {
 }
 
 function startEyedropperSession(args: {
+  abortController: AbortController;
   eyedropperActiveRef: MutableRefObject<boolean>;
   eyedropperTokenRef: MutableRefObject<number>;
-  onEyedropperStateChangeRef: MutableRefObject<(active: boolean) => void>;
-  setEyedropperPressed: Dispatch<SetStateAction<boolean>>;
 }) {
   const nextToken = args.eyedropperTokenRef.current + 1;
   args.eyedropperTokenRef.current = nextToken;
   args.eyedropperActiveRef.current = true;
-  args.setEyedropperPressed(true);
-  args.onEyedropperStateChangeRef.current(true);
+  activeEyedropperSessions.add(args.abortController);
   return nextToken;
+}
+
+function publishEyedropperSession(args: {
+  onEyedropperStateChangeRef: MutableRefObject<(active: boolean) => void>;
+  setEyedropperPressed: Dispatch<SetStateAction<boolean>>;
+}) {
+  args.onEyedropperStateChangeRef.current(true);
+  args.setEyedropperPressed(true);
 }
 
 function useEyedropperCleanup(args: {
@@ -64,7 +79,10 @@ function useEyedropperCleanup(args: {
   useEffect(
     () => () => {
       eyedropperTokenRef.current += 1;
-      abortControllerRef.current?.abort();
+      // EyeDropper is a browser-owned interaction once open() succeeds. React owners may
+      // legitimately rerender or unmount while Chrome is switching to that interaction;
+      // aborting here makes the native cursor flash and immediately disappear.
+      abortControllerRef.current = null;
       if (eyedropperActiveRef.current) {
         eyedropperActiveRef.current = false;
         onEyedropperStateChangeRef.current(false);
@@ -88,15 +106,21 @@ async function runEyedropperPick(args: {
   }
   if (args.eyedropperActiveRef.current) return;
 
-  let pick: Promise<EyeDropperResult>;
   const abortController = new AbortController();
+  args.abortControllerRef.current = abortController;
+  const nextToken = startEyedropperSession({ ...args, abortController });
+  let pick: Promise<EyeDropperResult>;
   try {
     pick = new EyeDropperClass().open({ signal: abortController.signal });
   } catch {
+    if (args.eyedropperTokenRef.current === nextToken) {
+      args.eyedropperActiveRef.current = false;
+      activeEyedropperSessions.delete(abortController);
+      args.abortControllerRef.current = null;
+    }
     return;
   }
-  args.abortControllerRef.current = abortController;
-  const nextToken = startEyedropperSession(args);
+  publishEyedropperSession(args);
 
   try {
     const result = await pick;
@@ -106,6 +130,7 @@ async function runEyedropperPick(args: {
   } catch {
     // User cancel keeps the picker state intact.
   } finally {
+    activeEyedropperSessions.delete(abortController);
     if (args.eyedropperTokenRef.current === nextToken) {
       clearEyedropperSession(args);
     }

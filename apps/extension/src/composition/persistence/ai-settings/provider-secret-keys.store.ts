@@ -4,6 +4,7 @@ import {
   importAesGcmKey,
 } from '@sniptale/platform/security/local-secret-crypto';
 import { AI_LOCAL_SECRET_KEY_STORAGE_KEY } from './constants';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import {
   AISecretPassphraseLockedError,
   readStoredAISecretProtection,
@@ -65,10 +66,14 @@ export async function resolveProviderSecretKeyForWrite(): Promise<{
   };
 }
 
-export async function removeTransparentKeyIfUnused(secretCount: number): Promise<void> {
+export async function removeTransparentKeyIfUnused(
+  secretCount: number,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   if (secretCount > 0 || (await readStoredAISecretProtection())) {
     return;
   }
 
-  await browserStorage.local.remove(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
+  if (permit) await browserStorage.local.remove(AI_LOCAL_SECRET_KEY_STORAGE_KEY, permit);
+  else await browserStorage.local.remove(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
 }

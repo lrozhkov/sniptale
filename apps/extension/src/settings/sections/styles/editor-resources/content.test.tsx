@@ -8,6 +8,12 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 }));
 vi.mock('./tools/view', () => ({ ToolPresetsSettings: () => <div>tools-owner</div> }));
 vi.mock('./palettes/view', () => ({ PalettesSettings: () => <div>palettes-owner</div> }));
+vi.mock('./surface-styles/view', () => ({
+  SurfaceStylePresetsSettings: () => <div>surfaces-owner</div>,
+}));
+vi.mock('./gradients/view', () => ({
+  GradientPresetsSettings: () => <div>gradients-owner</div>,
+}));
 import { EditorResourcesContent } from './content';
 it('composes tools and palettes as route-controlled subpages', () => {
   const node = document.createElement('div');
@@ -15,6 +21,19 @@ it('composes tools and palettes as route-controlled subpages', () => {
   act(() => root.render(<EditorResourcesContent view="palettes" />));
   expect(node.textContent).toContain('palettes-owner');
   expect(node.textContent).not.toContain('tools-owner');
+  act(() => root.unmount());
+});
+
+it.each([
+  ['surfaces', 'surfaces-owner'],
+  ['gradients', 'gradients-owner'],
+] as const)('renders %s as an independent resource subpage', (view, owner) => {
+  const node = document.createElement('div');
+  const root = createRoot(node);
+  act(() => root.render(<EditorResourcesContent view={view} />));
+  expect(node.textContent).toContain(owner);
+  expect(node.textContent).not.toContain('tools-owner');
+  expect(node.textContent).not.toContain('palettes-owner');
   act(() => root.unmount());
 });
 

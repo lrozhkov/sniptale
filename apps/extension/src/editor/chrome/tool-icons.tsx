@@ -10,7 +10,7 @@ import {
   Image as ImageIcon,
   Layers3,
   MousePointer2,
-  PencilLine,
+  PenLine,
   Shapes,
   SquareDashed,
   Type,
@@ -36,7 +36,7 @@ const TOOL_LABEL_KEYS = {
 
 const TOOL_ICON_COMPONENTS = {
   select: MousePointer2,
-  pencil: PencilLine,
+  pencil: PenLine,
   marker: Highlighter,
   'frame-annotation': SquareDashed,
   shape: Shapes,

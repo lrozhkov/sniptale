@@ -10,6 +10,8 @@ import {
   EditorToolbarDivider,
   EditorToolbarSection,
   EditorToolbarShell,
+  ImageEditorIcon,
+  ScenarioEditorIcon,
   ValueBadge,
 } from '@sniptale/ui/editor-chrome';
 
@@ -81,6 +83,18 @@ it('renders an interactive icon button with active state metadata', () => {
 
   expect(onMouseDown).toHaveBeenCalledTimes(1);
   expect(onClick).toHaveBeenCalledTimes(1);
+});
+
+it('renders the shared image and scenario editor application icons', () => {
+  render(
+    <div>
+      <ImageEditorIcon className="image-editor" />
+      <ScenarioEditorIcon className="scenario-editor" />
+    </div>
+  );
+
+  expect(container?.querySelector('svg.image-editor path[d*="18 22"]')).not.toBeNull();
+  expect(container?.querySelector('svg.scenario-editor')).not.toBeNull();
 });
 
 it('prevents clicks when the icon button is disabled', () => {

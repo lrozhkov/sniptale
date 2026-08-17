@@ -83,9 +83,11 @@ async function changeInput(label: string, value: string) {
 
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
   await act(async () => {
+    input.focus();
     descriptor?.set?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.blur();
   });
 }
 

@@ -4,7 +4,7 @@ import type {
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from '../../../features/highlighter/callout-presets/catalog';
+import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from '../../../features/highlighter/callout-presets/system-preset';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { areKnownAnnotationTemplateTagIds } from '../annotation-template-tags/known-ids';
 import {

@@ -49,7 +49,7 @@ it('toggles collapsible sections through the compact header button', () => {
   expect(onOpenChange).toHaveBeenCalledWith(true);
 });
 
-it('selects compact dropdown options without product select chrome', () => {
+it('selects compact dropdown options without product select chrome', async () => {
   const onChange = vi.fn();
 
   render(
@@ -75,8 +75,9 @@ it('selects compact dropdown options without product select chrome', () => {
   expect(listbox).not.toBeNull();
   expect(listbox!.querySelector('.sniptale-select-option')).toBeNull();
 
-  act(() => {
+  await act(async () => {
     listbox!.querySelectorAll<HTMLButtonElement>('[role="option"]')[0]!.click();
+    await Promise.resolve();
   });
 
   expect(onChange).toHaveBeenCalledWith('light');

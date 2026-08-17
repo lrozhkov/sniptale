@@ -2,7 +2,7 @@
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { createSolidPaint } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '.';
 
@@ -10,6 +10,39 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
+
+const gradientPresetState = vi.hoisted(() => ({ enabled: true }));
+
+vi.mock('../../composition/gradient-preset-resources/use-gradient-preset-catalog', () => ({
+  useGradientPresetCatalog: () => ({
+    presets: [
+      {
+        customized: false,
+        enabled: gradientPresetState.enabled,
+        favorite: false,
+        gradient: {
+          angle: 135,
+          interpolation: 'oklab',
+          repeat: { enabled: false, span: 1 },
+          stops: [
+            { id: 'template-start', color: '#f97316ff', position: 0, midpoint: 0.5 },
+            { id: 'template-end', color: '#ec4899ff', position: 1, midpoint: 0.5 },
+          ],
+          type: 'linear',
+        },
+        id: 'template-sunset',
+        isDefault: true,
+        name: 'Sunset',
+        order: 0,
+        origin: 'system',
+      },
+    ],
+  }),
+}));
+
+beforeEach(() => {
+  gradientPresetState.enabled = true;
+});
 
 function selectPaintMode(popup: Element, mode: 'solid' | 'linear' | 'radial' | 'conic') {
   popup.querySelector<HTMLButtonElement>(`[aria-label="highlighter.paintPicker.${mode}"]`)!.click();
@@ -78,7 +111,29 @@ it('uses one popup owner, switches modes, applies, and never nests a color popup
     1
   );
   expect(popup.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
+  expect(
+    popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
+      ?.textContent
+  ).toBe('');
+  expect(popup.firstElementChild?.firstElementChild?.tagName).toBe('STRONG');
+  expect(popup.firstElementChild?.lastElementChild?.getAttribute('role')).toBe('toolbar');
+  expect(
+    popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
+      ?.className
+  ).toContain('sniptale-glass-icon-button');
+  expect(
+    Array.from(popup.querySelectorAll<HTMLElement>('[role="toolbar"] > button')).map((button) =>
+      button.getAttribute('aria-label')
+    )
+  ).toEqual([
+    'highlighter.paintPicker.solid',
+    'highlighter.paintPicker.presets',
+    'highlighter.paintPicker.linear',
+    'highlighter.paintPicker.radial',
+    'highlighter.paintPicker.conic',
+  ]);
   act(() => selectPaintMode(popup, 'linear'));
+  expect(popup.querySelector('strong')?.textContent).toBe('highlighter.paintPicker.linear');
   expect(
     popup.querySelectorAll('[aria-label^="highlighter.paintPicker.gradientStop"]')
   ).toHaveLength(2);
@@ -90,6 +145,85 @@ it('uses one popup owner, switches modes, applies, and never nests a color popup
     kind: 'gradient',
     gradient: { type: 'linear' },
   });
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('copies a gradient template into the matching editable mode', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={onChange}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() =>
+    popup
+      .querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.presets"]')!
+      .click()
+  );
+  expect(popup.querySelector('[data-ui="shared.ui.paint-selector.templates"]')).not.toBeNull();
+  act(() =>
+    popup
+      .querySelector<HTMLButtonElement>(
+        '[aria-label="highlighter.paintPicker.copyPreset: Sunset"]'
+      )!
+      .click()
+  );
+  expect(popup.querySelector('strong')?.textContent).toBe('highlighter.paintPicker.linear');
+  expect(popup.querySelector('[data-ui="shared.ui.paint-selector.templates"]')).toBeNull();
+  act(() =>
+    Array.from(popup.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent === 'shared.ui.colorSelectorApply')!
+      .click()
+  );
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      kind: 'gradient',
+      gradient: expect.objectContaining({ type: 'linear' }),
+    })
+  );
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('selects a template in place without switching to the editor', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const layer = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.layer"]')!;
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() =>
+    popup
+      .querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.presets"]')!
+      .click()
+  );
+  act(() => popup.querySelector<HTMLButtonElement>('[aria-label="Sunset"]')!.click());
+
+  expect(popup.querySelector('[data-ui="shared.ui.paint-selector.templates"]')).not.toBeNull();
+  expect(popup.querySelector<HTMLButtonElement>('[aria-label="Sunset"]')?.ariaPressed).toBe('true');
+  expect(layer.style.width).toBe('328px');
+
   act(() => root.unmount());
   host.remove();
 });
@@ -117,6 +251,249 @@ it('limits modes and advanced gradient controls for legacy-backed consumers', ()
   act(() => selectPaintMode(popup, 'linear'));
   expect(popup.querySelector('summary')).toBeNull();
   act(() => root.unmount());
+  host.remove();
+});
+
+it('uses compact design-system selects and steppers for gradient controls', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() => selectPaintMode(popup, 'linear'));
+
+  expect(popup.querySelector('select')).toBeNull();
+  expect(popup.querySelectorAll('[data-ui="shared.ui.compact-select"]')).toHaveLength(2);
+  expect(
+    popup.querySelector('[aria-label="highlighter.paintPicker.position increase"]')
+  ).not.toBeNull();
+  expect(
+    popup.querySelector<HTMLInputElement>('[aria-label="highlighter.paintPicker.angle"]')
+      ?.parentElement?.className
+  ).toContain('!w-[6.25rem]');
+
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('keeps the paint popup open when selecting interpolation and repeat options', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() => selectPaintMode(popup, 'linear'));
+
+  const chooseOption = (triggerLabel: string, optionLabel: string) => {
+    act(() => popup.querySelector<HTMLButtonElement>(`[aria-label="${triggerLabel}"]`)!.click());
+    const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+      (button) => button.textContent?.includes(optionLabel)
+    )!;
+    act(() => {
+      option.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      option.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      option.click();
+    });
+    expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBe(popup);
+  };
+
+  chooseOption(
+    'highlighter.paintPicker.interpolation',
+    'highlighter.paintPicker.interpolationOklch'
+  );
+  chooseOption('highlighter.paintPicker.repeat', 'highlighter.paintPicker.repeatEnabled');
+
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('lets an owned compact listbox close itself on Escape before the paint popup', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() => selectPaintMode(popup, 'linear'));
+  const trigger = popup.querySelector<HTMLButtonElement>(
+    '[aria-label="highlighter.paintPicker.interpolation"]'
+  )!;
+  trigger.focus();
+  act(() => trigger.click());
+  expect(document.querySelector('[role="listbox"]')).not.toBeNull();
+
+  act(() =>
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+
+  expect(document.querySelector('[role="listbox"]')).toBeNull();
+  expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBe(popup);
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('keeps gradient templates compact and reveals the borderless copy action on row interaction', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() =>
+    popup
+      .querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.presets"]')!
+      .click()
+  );
+  const templates = popup.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.paint-selector.templates"]'
+  )!;
+  const copy = templates.querySelector<HTMLButtonElement>(
+    '[aria-label="highlighter.paintPicker.copyPreset: Sunset"]'
+  )!;
+  expect(templates.className).toContain('max-h-[11.25rem]');
+  expect(copy.className).toContain('opacity-0');
+  expect(copy.className).toContain('group-hover:opacity-100');
+  expect(copy.className).toContain('!border-0');
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('shows a localized empty state when no compatible gradient templates are enabled', () => {
+  gradientPresetState.enabled = false;
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() =>
+    popup
+      .querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.presets"]')!
+      .click()
+  );
+
+  expect(
+    popup.querySelector('[data-ui="shared.ui.paint-selector.templates-empty"]')?.textContent
+  ).toBe('highlighter.paintPicker.presetsEmpty');
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('does not expose pointer-opened select options as keyboard-focused controls', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  await act(nextFrame);
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  expect(document.activeElement).toBe(popup);
+  act(() => selectPaintMode(popup, 'linear'));
+  const trigger = popup.querySelector<HTMLButtonElement>(
+    '[aria-label="highlighter.paintPicker.interpolation"]'
+  )!;
+  act(() => trigger.click());
+  await act(nextFrame);
+  expect(document.activeElement).toBe(popup);
+
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('marks eyedropper activity synchronously before native outside events can dismiss the popup', () => {
+  vi.stubGlobal(
+    'EyeDropper',
+    class {
+      open() {
+        document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        return new Promise<{ sRGBHex: string }>(() => undefined);
+      }
+    }
+  );
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#ffffff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  const eyedropper = popup.querySelector<HTMLButtonElement>(
+    '[aria-label="shared.ui.colorSelectorEyedropper"]'
+  )!;
+  act(() => {
+    eyedropper.click();
+  });
+
+  expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBe(popup);
+  act(() => root.unmount());
+  vi.unstubAllGlobals();
   host.remove();
 });
 
@@ -277,6 +654,18 @@ it('traps focus in the dialog and restores it to the trigger on close', async ()
       'button:not(:disabled), input:not(:disabled), select:not(:disabled)'
     )
   );
+  expect(document.activeElement).toBe(popup);
+  act(() =>
+    popup.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(document.activeElement).toBe(focusable.at(-1));
   focusable.at(-1)!.focus();
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
   expect(document.activeElement).toBe(focusable[0]);

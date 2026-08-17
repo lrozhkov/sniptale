@@ -107,6 +107,14 @@ it('owns pause and editing state transitions', () => {
   expect(actions.isFrameEditing()).toBe(false);
   expect(actions.isPausedState()).toBe(false);
   expect(actions.isEnabled()).toBe(false);
+
+  actions.setCreationEnabled(false);
+  expect(actions.isCreationEnabled()).toBe(false);
+  expect(hoverController.hideHoverOverlay).toHaveBeenCalledOnce();
+  expect(hoverController.removeHoverOverlay).not.toHaveBeenCalled();
+  expect(hoverController.removeOverlayContainer).not.toHaveBeenCalled();
+  actions.setCreationEnabled(true);
+  expect(actions.isCreationEnabled()).toBe(true);
 });
 
 it('routes cache invalidation to the hover owner', () => {

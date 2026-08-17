@@ -7,6 +7,7 @@ const {
   executeDownloadBlob,
   nativeIngestionCleanupAdapter,
   registerInstallListener,
+  registerExtensionCommandListener,
   registerAggregateEditorPresencePorts,
   registerWindowBoundsListener,
   registerVoiceInputPorts,
@@ -18,6 +19,7 @@ const {
   executeDownloadBlob: vi.fn(),
   nativeIngestionCleanupAdapter: {},
   registerInstallListener: vi.fn(),
+  registerExtensionCommandListener: vi.fn(),
   registerAggregateEditorPresencePorts: vi.fn(),
   registerWindowBoundsListener: vi.fn(),
   registerVoiceInputPorts: vi.fn(),
@@ -48,6 +50,10 @@ vi.mock('./install', async (importOriginal) => ({
   registerInstallListener,
 }));
 vi.mock('./window-bounds', () => ({ registerWindowBoundsListener }));
+vi.mock('../../commands', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../commands')>()),
+  registerExtensionCommandListener,
+}));
 vi.mock('../../../voice-input/coordinator', () => ({
   cleanupVoiceInputForPrivacyErasure: vi.fn(),
   createVoiceInputCoordinator: vi.fn(),
@@ -94,6 +100,7 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(registerVoiceInputPorts).toHaveBeenCalledOnce();
   expect(registerVoiceInputTelemetryPorts).toHaveBeenCalledOnce();
   expect(registerAggregateEditorPresencePorts).toHaveBeenCalledOnce();
+  expect(registerExtensionCommandListener).toHaveBeenCalledWith(state);
   expect(nativeAppConnect).toHaveBeenCalledTimes(1);
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(state.webSnapshotViewerPorts);
   expect(initializeBackgroundContextMenus).toHaveBeenCalledWith({

@@ -45,7 +45,7 @@ function createAdjacentControlStyles(
     top: projected.y,
   };
   const position = getAdjacentControlGroupPosition({
-    controlCount: showSettingsHandle ? 2 : 1,
+    controlCount: showSettingsHandle ? 3 : 2,
     targetRect,
     uiScale,
     viewport,
@@ -60,7 +60,7 @@ function createAdjacentControlStyles(
     dragHandleStyle: { ...baseStyle, left: position.x },
     settingsHandleStyle: {
       ...baseStyle,
-      left: position.x + ADJACENT_CONTROL_BUTTON_SIZE + ADJACENT_CONTROL_GAP,
+      left: position.x + 2 * (ADJACENT_CONTROL_BUTTON_SIZE + ADJACENT_CONTROL_GAP),
     },
   };
 }
@@ -109,6 +109,9 @@ function createConnectorControlStyles(
   const routeControlPoint =
     dynamicTail?.kind === 'line' ? dynamicTail.routeControlPoint : undefined;
 
+  const projectedTailBaseStartPoint = projectPoint(tailBaseStartPoint, coordinateSpace);
+  const projectedTailBaseEndPoint = projectPoint(tailBaseEndPoint, coordinateSpace);
+
   return {
     curveStartHandleStyle: createFixedPointStyle(
       curveHandles?.start && coordinateSpace
@@ -131,10 +134,11 @@ function createConnectorControlStyles(
       zIndex,
       undefined
     ),
-    tailBaseEndHandleStyle: createFixedPointStyle(
-      projectPoint(tailBaseEndPoint, coordinateSpace),
-      zIndex,
-      undefined
+    tailBaseEndHandleStyle: createFixedPointStyle(projectedTailBaseEndPoint, zIndex, undefined),
+    tailBaseRangeHandleStyle: createRangeHandleStyle(
+      projectedTailBaseStartPoint,
+      projectedTailBaseEndPoint,
+      zIndex
     ),
     tailFrameHandleStyle: createFixedPointStyle(
       projectPoint(dynamicTail?.attachment.tipPoint, coordinateSpace),
@@ -151,6 +155,26 @@ function createConnectorControlStyles(
       zIndex + 1,
       { x: 12 * uiScale, y: -28 * uiScale }
     ),
+  };
+}
+
+function createRangeHandleStyle(
+  start: { x: number; y: number } | null | undefined,
+  end: { x: number; y: number } | null | undefined,
+  zIndex: number
+) {
+  if (!start || !end) return null;
+  const distance = Math.hypot(end.x - start.x, end.y - start.y);
+  const angle = Math.atan2(end.y - start.y, end.x - start.x) * (180 / Math.PI);
+  return {
+    position: 'fixed' as const,
+    left: (start.x + end.x) / 2 - distance / 2,
+    top: (start.y + end.y) / 2 - 4,
+    width: Math.max(12, distance),
+    height: 8,
+    transform: `rotate(${angle}deg)`,
+    transformOrigin: 'center',
+    zIndex,
   };
 }
 

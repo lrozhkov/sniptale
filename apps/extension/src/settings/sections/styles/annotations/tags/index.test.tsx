@@ -9,6 +9,7 @@ const controller = vi.hoisted(() => ({
     delete: vi.fn(async () => true),
     merge: vi.fn(async () => true),
     rename: vi.fn(async () => true),
+    reset: vi.fn(async () => true),
   },
   error: false,
   isLoading: false,

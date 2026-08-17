@@ -67,6 +67,7 @@ function createRuntime(
     },
     captureActionRef: { current: actionType },
     session: {
+      editingModeBaseline: null,
       navigationLockBaseline: false,
       runActive: true,
       runGeneration: 1,
@@ -77,6 +78,7 @@ function createRuntime(
       refreshSession: vi.fn(async () => undefined),
       saveSelectionCapture: vi.fn(async () => undefined),
     },
+    restoreEditingMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),

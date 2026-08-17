@@ -6,6 +6,7 @@ import {
   deleteAnnotationTemplateTag,
   mergeAnnotationTemplateTag,
   renameAnnotationTemplateTag,
+  resetSystemAnnotationTemplateTag,
 } from '../../../../../composition/persistence/annotation-template-tags';
 import {
   loadCalloutPresetCatalog,
@@ -100,6 +101,7 @@ export function useAnnotationTemplateTagsController() {
       merge: (sourceId: string, targetId: string) =>
         mutate(() => mergeAnnotationTemplateTag(sourceId, targetId)),
       rename: (id: string, label: string) => mutate(() => renameAnnotationTemplateTag(id, label)),
+      reset: (id: string) => mutate(() => resetSystemAnnotationTemplateTag(id)),
     },
   };
 }

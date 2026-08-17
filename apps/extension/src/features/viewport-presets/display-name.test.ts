@@ -46,3 +46,11 @@ it('localizes untouched system names by stable system key', () => {
   );
   expect(translateMock).toHaveBeenCalledWith('viewportPresets.systemNames.windowHd', 'ru');
 });
+
+it('uses safe readable fallbacks for incomplete transfer metadata', () => {
+  expect(getViewportPresetDisplayName({ kind: 'user' }, 'en')).toBe('');
+  expect(
+    getViewportPresetDisplayName({ kind: 'system', systemKey: 'future-system-preset' }, 'en')
+  ).toBe('future-system-preset');
+  expect(getViewportPresetDisplayName({ kind: 'system' }, 'en')).toBe('');
+});

@@ -6,7 +6,7 @@ import type {
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutStrokeDasharray } from '../../../features/highlighter/callout-stroke';
 import { getCalloutAccentEdgePath } from '../../../features/highlighter/callout-accent-edge';
-import { cloneCalloutVisualStyle } from '../../../features/highlighter/callout-presets/catalog';
+import { cloneCalloutVisualStyle } from '../../../features/highlighter/callout-presets/visual-style';
 import {
   projectCalloutLineCustomCss,
   resolveCalloutCustomCss,
@@ -18,6 +18,7 @@ import {
   type CalloutSurfaceGeometry,
 } from '../../../features/highlighter/frame-annotation/callout/surface-compositor';
 import { resolveFrameCalloutFontFamily } from '../../../features/highlighter/frame-annotation/callout/font-family';
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 
 const TARGET_COLOR = 'var(--sniptale-color-text-tertiary, #94a3b8)';
 
@@ -274,7 +275,10 @@ function CalloutPreviewCard(props: {
           {style.title.enabled ? (
             <div
               style={{
-                background: style.title.backgroundColor,
+                background:
+                  style.title.fillMode === 'unified'
+                    ? 'transparent'
+                    : serializePaintToCss(style.title.fillPaint),
                 borderBottom: [
                   `${Math.min(style.title.dividerWidth, 2)}px`,
                   style.title.dividerStyle,

@@ -36,6 +36,7 @@ it('renders the tool catalog surface', () => {
   const root = createRoot(node);
   act(() => root.render(<ToolPresetsSettings />));
   expect(node.textContent).toContain('settings.editor.toolPresetsTitle');
+  expect(node.textContent).not.toContain('surface-style-presets');
   act(() => root.unmount());
 });
 

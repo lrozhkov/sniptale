@@ -135,6 +135,26 @@ it('cycles the visible field group through HEX, RGB, and HSL from the label-row 
   expect(getTextInput('shared.ui.colorSelectorHue')).toBeUndefined();
 });
 
+it('places the compact opacity control after the active color-format fields', async () => {
+  renderSelector();
+  await clickButton('shared.ui.colorSelectorChooseColor');
+
+  const formatFields = document.body.querySelector(
+    '[data-ui="shared.ui.color-selector.mode-label-row"]'
+  )?.parentElement;
+  const opacity = document.body.querySelector('[data-ui="shared.ui.color-selector.opacity"]');
+  const opacityField = opacity?.querySelector<HTMLInputElement>('input[type="text"]');
+
+  expect(formatFields?.compareDocumentPosition(opacity!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(opacityField?.type).toBe('text');
+  expect(opacity?.querySelector('[data-appearance="plain"]')).not.toBeNull();
+  expect(opacityField?.parentElement?.className).toContain('group/compact-numeric');
+  expect(
+    opacity?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
+  ).not.toBeNull();
+  expect(opacity?.querySelector('.sniptale-color-selector-alpha-range')).toBeNull();
+});
+
 it('keeps the hover-highlight target on the label row instead of a visible mode button', async () => {
   renderSelector();
   await clickButton('shared.ui.colorSelectorChooseColor');

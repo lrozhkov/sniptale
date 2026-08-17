@@ -13,7 +13,12 @@ predicate isAllowedSecretStorageOwner(File file) {
 }
 
 predicate isAllowedSensitiveRetentionOwner(File file) {
-  file.getRelativePath() = "apps/extension/src/composition/persistence/video-preview-cache/mutations.ts"
+  file.getRelativePath() =
+    [
+      "apps/extension/src/composition/persistence/content-pin-session/annotation-fork.ts",
+      "apps/extension/src/composition/persistence/frame-annotation-raster-jobs/index.ts",
+      "apps/extension/src/composition/persistence/video-preview-cache/mutations.ts"
+    ]
 }
 
 predicate isAllowedSecretHeaderOwner(File file) {

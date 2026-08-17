@@ -1,5 +1,6 @@
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
+import type { SurfaceStyle } from '@sniptale/runtime-contracts/highlighter/surface-style';
 import { translate } from '../../platform/i18n';
 import { CompactPaintSelector } from '../paint-selector';
 import type { useSurfaceStyleSelectorController } from './controller';
@@ -8,7 +9,7 @@ import type { SurfaceStyleSelectorProps } from './types';
 
 type SurfaceStyleSelectorController = ReturnType<typeof useSurfaceStyleSelectorController>;
 const MODE_HEADER_CLASS_NAME = [
-  'grid gap-2 border-b pb-3',
+  'border-b pb-3',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_54%,transparent)]',
 ].join(' ');
 
@@ -20,20 +21,15 @@ export function SurfaceStyleSelectionPanel(props: {
   const [mode, setMode] = useState<'color' | 'surface'>(() =>
     controller.state.active ? 'surface' : 'color'
   );
-  useEffect(() => {
-    if (!controller.state.open) return;
-    setMode(controller.state.active ? 'surface' : 'color');
-  }, [controller.state.active, controller.state.open]);
+  const paintStartRef = useRef<SurfaceStyle | null>(null);
 
   return (
     <>
       <div className={MODE_HEADER_CLASS_NAME}>
-        <span className="text-[11px] font-semibold text-[var(--sniptale-color-text-muted)]">
-          {translate('content.callout.surfaceStyle.backgroundType')}
-        </span>
         <SegmentedSwitch
           activeId={mode}
           ariaLabel={translate('content.callout.surfaceStyle.backgroundType')}
+          density="compact"
           options={[
             { id: 'color', label: translate('content.callout.surfaceStyle.color') },
             { id: 'surface', label: translate('content.callout.surfaceStyle.surface') },
@@ -45,8 +41,19 @@ export function SurfaceStyleSelectionPanel(props: {
         {mode === 'color' ? (
           <CompactPaintSelector
             label={translate('content.callout.surfaceStyle.color')}
+            palette={selector.palette ?? []}
             title={translate('content.callout.surfaceStyle.color')}
             value={controller.state.draft.fillPaint}
+            onOpenChange={(open) => {
+              if (open) paintStartRef.current = structuredClone(selector.value);
+              else paintStartRef.current = null;
+            }}
+            onPreviewChange={(fillPaint) => {
+              selector.onChange({ fillPaint, surfaceCss: '' });
+            }}
+            onPreviewReset={() => {
+              if (paintStartRef.current) selector.onChange(paintStartRef.current);
+            }}
             onChange={(fillPaint) => {
               selector.onChange({ fillPaint, surfaceCss: '' });
             }}

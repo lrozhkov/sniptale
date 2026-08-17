@@ -28,7 +28,7 @@ it('renders a compact callout scene with a target, connector, and styled surface
   expect(markup).toContain('shared.callout-preview.target');
   expect(markup).toContain('<svg');
   expect(markup).toContain('M 21 15 L 0 31 L 21 24');
-  expect(markup).toContain('#2b3038ff');
+  expect(markup).toContain('#ffffffff');
   expect(markup).toContain('shared.callout-preview.surface-html');
   expect(markup).not.toContain('shared.callout-preview.connector');
   expect(markup).toContain('h-9 w-16');

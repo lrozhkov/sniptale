@@ -1,6 +1,6 @@
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 import { translate } from '../../platform/i18n';
-import { PickerInputField, PickerModeLabelRow } from './picker-controls';
+import { PickerModeLabelRow, PickerNumericInputField } from './picker-controls';
 
 type PickerChannelField = {
   ariaLabel: string;
@@ -13,7 +13,7 @@ function PickerChannelFieldGrid(props: { fields: readonly PickerChannelField[] }
   return (
     <div className="grid grid-cols-3 gap-2">
       {props.fields.map((field) => (
-        <PickerInputField
+        <PickerNumericInputField
           key={field.ariaLabel}
           ariaLabel={field.ariaLabel}
           max={field.max}

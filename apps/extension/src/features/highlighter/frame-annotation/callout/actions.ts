@@ -12,11 +12,13 @@ export function createFrameCalloutActions(args: {
 }): Pick<
   FrameCalloutInteractiveSurfaceProps,
   | 'onCurveChange'
+  | 'onBadgeTextChange'
   | 'onPositionChange'
   | 'onSettingsClick'
   | 'onTailBaseRangeChange'
   | 'onTailFramePositionChange'
   | 'onTitleChange'
+  | 'onTitleEnabledChange'
   | 'onWaypointChange'
   | 'onWidthChange'
 > & {
@@ -32,8 +34,18 @@ export function createFrameCalloutActions(args: {
     onStopEditing: args.onStopEditing,
     onContentChange: (bodyHtml) =>
       previewContent({ ...callout, content: { ...callout.content, bodyHtml } }),
+    onBadgeTextChange: (text) =>
+      previewContent({
+        ...callout,
+        style: { ...callout.style, badge: { ...callout.style.badge, text } },
+      }),
     onTitleChange: (titleText) =>
       previewContent({ ...callout, content: { ...callout.content, titleText } }),
+    onTitleEnabledChange: (enabled) =>
+      apply({
+        ...callout,
+        style: { ...callout.style, title: { ...callout.style.title, enabled } },
+      }),
     onDelete: args.onDelete,
     onSettingsClick: args.onSettingsClick,
     onPositionChange: (manualPlacement, behavior) =>

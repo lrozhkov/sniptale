@@ -4,17 +4,17 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "52260019cdddb595f181442afec8978b64feb7a4aca2251890515a4d5f68c11e"
+      "sha256": "44eaffc706ffc305dc679b25ad71868548da21f4ac3f724beea2761a2775e0aa"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "52260019cdddb595f181442afec8978b64feb7a4aca2251890515a4d5f68c11e"
+      "sha256": "44eaffc706ffc305dc679b25ad71868548da21f4ac3f724beea2761a2775e0aa"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/manifest.json",
-      "sha256": "72d5286987ef6e47f65fb7c06329aed27219eae773b877cb4f1a07f12f64fbc1"
+      "sha256": "c0606ef47faa80b52ad9239ec89512fe5a581bd12550ba9de86bacf2a15190f6"
     },
     {
       "category": "bundled-font",
@@ -34,12 +34,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "f1d96564c6db942c3c153d9e8dffb3d4dfb1e1ece6e4b97597e7d3e5db526b7f"
+      "sha256": "3f7024acd53ec2a268b4e7069b77a2dc472c6c5a20114096623981f9ce6b992d"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "f1d96564c6db942c3c153d9e8dffb3d4dfb1e1ece6e4b97597e7d3e5db526b7f"
+      "sha256": "3f7024acd53ec2a268b4e7069b77a2dc472c6c5a20114096623981f9ce6b992d"
     },
     {
       "category": "bundled-font",
@@ -84,7 +84,7 @@
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.mjs",
-      "sha256": "c46032a1920384c4acbd35442bd041d6ade32941a1c4349e48454b970d38d6e9"
+      "sha256": "a60a3857c8f7dcf56207add730c004e54861497094cb799c7b8e0f2c7452f201"
     },
     {
       "category": "validator-integration",

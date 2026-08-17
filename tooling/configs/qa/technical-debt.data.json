@@ -441,7 +441,7 @@
       "scope": {
         "count": 17,
         "family": "apps/extension/src/settings/sections/styles",
-        "lines": 349,
+        "lines": 347,
         "sampleFingerprint": "589894b8bf0c95f3c33f1d9bdd5efa64b2ccffadea7c54d5c01dda3884ec20f7"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
@@ -459,10 +459,10 @@
         "key": "apps/extension/src/features/highlighter/frame-annotation"
       },
       "scope": {
-        "count": 6,
+        "count": 5,
         "family": "apps/extension/src/features/highlighter/frame-annotation",
-        "lines": 54,
-        "sampleFingerprint": "42dc97543f07cd3a045a31a691c35082179ae60057d6b1ff371f8163c21580fa"
+        "lines": 45,
+        "sampleFingerprint": "f4b61eaa1cbe98486dd5ec8e84ec52d47edeaf27f3fa6e003313a4d61ad871a3"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -481,8 +481,8 @@
       "scope": {
         "count": 5,
         "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
-        "lines": 120,
-        "sampleFingerprint": "842751ee8be7f51fe28ab0368ed2e990410bc2707855f79bb69f89622d9c87d8"
+        "lines": 100,
+        "sampleFingerprint": "4df61b2df3fc8f1beb4427dc174956c686a4bff72506dff6bdfd98084b787d2e"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -599,10 +599,10 @@
         "key": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge"
       },
       "scope": {
-        "count": 2,
+        "count": 1,
         "family": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
-        "lines": 45,
-        "sampleFingerprint": "239116b5b15ca7c472c725c23b16a9f6eebd5506957616305fd098830a2ae047"
+        "lines": 22,
+        "sampleFingerprint": "36f20556aaf0a79b94f366ebe9ae5915c568a0da7dd7be7977ac282e382e59a1"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -947,26 +947,6 @@
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
     {
-      "id": "accepted.jscpd.features-highlighter-callout-presets-apps-extension-src-features-highlighter-frame-annotation.c7b1c86444f0",
-      "classification": "accepted-architecture",
-      "owner": "features-highlighter-callout-presets-apps-extension-src-features-highlighter-frame-annotation",
-      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
-      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
-      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
-      "reviewBy": "2027-08-12",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/features/highlighter/callout-presets <-> apps/extension/src/features/highlighter/frame-annotation"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/features/highlighter/callout-presets <-> apps/extension/src/features/highlighter/frame-annotation",
-        "lines": 10,
-        "sampleFingerprint": "c7b1c86444f047025fe6d328fc124a63859417cbacd35fdf732621d6778a51f9"
-      },
-      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
-    },
-    {
       "id": "accepted.jscpd.background-frame-annotation-raster-apps-extension-src-composition-frame-annotation-raster-client.00bf41e72976",
       "classification": "accepted-architecture",
       "owner": "background-frame-annotation-raster-apps-extension-src-composition-frame-annotation-raster-client",
@@ -1232,6 +1212,9 @@
         "apps/extension/src/background/application/runtime-state/index.ts",
         "apps/extension/src/background/application/runtime-state/job-state-authority.ts",
         "apps/extension/src/background/application/runtime-state/restart-semantics.ts",
+        "apps/extension/src/background/application/settings-transfer/route-descriptors.ts",
+        "apps/extension/src/background/application/settings-transfer/route.ts",
+        "apps/extension/src/background/application/settings-transfer/use-case.ts",
         "apps/extension/src/background/capture-surface/availability.ts",
         "apps/extension/src/background/capture-surface/display-geometry.ts",
         "apps/extension/src/background/capture-surface/index.ts",
@@ -1316,7 +1299,6 @@
         "apps/extension/src/background/capture/page-preparation/viewer-port-request-lifecycle.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
-        "apps/extension/src/background/capture/page-state/index.ts",
         "apps/extension/src/background/capture/popup-export/job/archive.ts",
         "apps/extension/src/background/capture/popup-export/job/execute.ts",
         "apps/extension/src/background/capture/popup-export/job/index.ts",
@@ -1578,6 +1560,7 @@
         "apps/extension/src/background/routing-contracts/runtime-messaging/mock.ts",
         "apps/extension/src/background/routing-contracts/runtime-messaging/services.ts",
         "apps/extension/src/background/routing-contracts/tab-mode-state.ts",
+        "apps/extension/src/background/runtime/commands/index.ts",
         "apps/extension/src/background/runtime/context-menu/action-helpers.ts",
         "apps/extension/src/background/runtime/context-menu/actions.ts",
         "apps/extension/src/background/runtime/context-menu/descriptors.ts",
@@ -1870,6 +1853,9 @@
         "apps/extension/src/background/application/runtime-state/index.ts",
         "apps/extension/src/background/application/runtime-state/job-state-authority.ts",
         "apps/extension/src/background/application/runtime-state/restart-semantics.ts",
+        "apps/extension/src/background/application/settings-transfer/route-descriptors.ts",
+        "apps/extension/src/background/application/settings-transfer/route.ts",
+        "apps/extension/src/background/application/settings-transfer/use-case.ts",
         "apps/extension/src/background/capture-surface/availability.ts",
         "apps/extension/src/background/capture-surface/display-geometry.ts",
         "apps/extension/src/background/capture-surface/index.ts",
@@ -1954,7 +1940,6 @@
         "apps/extension/src/background/capture/page-preparation/viewer-port-request-lifecycle.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
-        "apps/extension/src/background/capture/page-state/index.ts",
         "apps/extension/src/background/capture/popup-export/job/archive.ts",
         "apps/extension/src/background/capture/popup-export/job/execute.ts",
         "apps/extension/src/background/capture/popup-export/job/index.ts",
@@ -2216,6 +2201,7 @@
         "apps/extension/src/background/routing-contracts/runtime-messaging/mock.ts",
         "apps/extension/src/background/routing-contracts/runtime-messaging/services.ts",
         "apps/extension/src/background/routing-contracts/tab-mode-state.ts",
+        "apps/extension/src/background/runtime/commands/index.ts",
         "apps/extension/src/background/runtime/context-menu/action-helpers.ts",
         "apps/extension/src/background/runtime/context-menu/actions.ts",
         "apps/extension/src/background/runtime/context-menu/descriptors.ts",
@@ -2510,6 +2496,7 @@
         "apps/extension/src/composition/frame-annotation-controls/popover/surface.ts",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-fork.tsx",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-source.ts",
+        "apps/extension/src/composition/frame-annotation-controls/popover/toolbar-dismissal.ts",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/anchor-grid.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/auto-fields.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
@@ -2558,6 +2545,7 @@
         "apps/extension/src/composition/frame-annotation-controls/popover/surface.ts",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-fork.tsx",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-source.ts",
+        "apps/extension/src/composition/frame-annotation-controls/popover/toolbar-dismissal.ts",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/anchor-grid.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/auto-fields.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
@@ -2682,6 +2670,7 @@
         "apps/extension/src/composition/persistence/annotation-template-tags/owner.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/parser.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/storage.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/system-tags.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/tag-ids.ts"
       ],
       "rolloutFiles": [
@@ -2690,6 +2679,7 @@
         "apps/extension/src/composition/persistence/annotation-template-tags/owner.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/parser.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/storage.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/system-tags.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/tag-ids.ts"
       ],
       "unownedFocusedFiles": []
@@ -3097,6 +3087,18 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/managed-preset-order",
+      "disposition": "rollout",
+      "reason": "The shared managed-preset ordering algorithm has direct deterministic proof for validation, anchor restoration, and pending preset copying.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/managed-preset-order/index.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/managed-preset-order/index.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/media-library",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -3445,6 +3447,22 @@
         "apps/extension/src/composition/persistence/settings/context-menu.guards.ts",
         "apps/extension/src/composition/persistence/settings/guards.ts",
         "apps/extension/src/composition/persistence/settings/index.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/composition/persistence/settings-transfer",
+      "disposition": "rollout",
+      "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/settings-transfer/apply.ts",
+        "apps/extension/src/composition/persistence/settings-transfer/index.ts",
+        "apps/extension/src/composition/persistence/settings-transfer/read.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/settings-transfer/apply.ts",
+        "apps/extension/src/composition/persistence/settings-transfer/index.ts",
+        "apps/extension/src/composition/persistence/settings-transfer/read.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -5153,6 +5171,7 @@
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.validators.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/actions/settings-transfer-response-guard.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/core.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/index.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/mode.ts",
@@ -5231,6 +5250,7 @@
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.validators.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/actions/settings-transfer-response-guard.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/core.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/index.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/mode.ts",
@@ -5343,6 +5363,30 @@
       "rolloutFiles": [
         "apps/extension/src/contracts/settings/index.ts",
         "apps/extension/src/contracts/settings/library-lifecycle.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/contracts/settings-transfer",
+      "disposition": "rollout",
+      "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/contracts/settings-transfer/index.ts",
+        "apps/extension/src/contracts/settings-transfer/json-value.ts",
+        "apps/extension/src/contracts/settings-transfer/limits.ts",
+        "apps/extension/src/contracts/settings-transfer/model-metadata.ts",
+        "apps/extension/src/contracts/settings-transfer/package-parser.ts",
+        "apps/extension/src/contracts/settings-transfer/provider-metadata.ts",
+        "apps/extension/src/contracts/settings-transfer/types.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/contracts/settings-transfer/index.ts",
+        "apps/extension/src/contracts/settings-transfer/json-value.ts",
+        "apps/extension/src/contracts/settings-transfer/limits.ts",
+        "apps/extension/src/contracts/settings-transfer/model-metadata.ts",
+        "apps/extension/src/contracts/settings-transfer/package-parser.ts",
+        "apps/extension/src/contracts/settings-transfer/provider-metadata.ts",
+        "apps/extension/src/contracts/settings-transfer/types.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -5664,7 +5708,7 @@
         "apps/extension/src/editor/controller/events/draw-completion.ts",
         "apps/extension/src/editor/controller/events/draw-session-completion.ts",
         "apps/extension/src/editor/controller/events/drawing-draft.ts",
-        "apps/extension/src/editor/controller/events/drawing-pointer-gesture.ts",
+        "apps/extension/src/editor/controller/events/drawing-pointer-session.ts",
         "apps/extension/src/editor/controller/events/drawing.ts",
         "apps/extension/src/editor/controller/events/index.ts",
         "apps/extension/src/editor/controller/events/pan.ts",
@@ -5972,6 +6016,7 @@
         "apps/extension/src/editor/drawing/object/vector.ts",
         "apps/extension/src/editor/drawing/options.tsx",
         "apps/extension/src/editor/drawing/preferences.ts",
+        "apps/extension/src/editor/drawing/preview.ts",
         "apps/extension/src/editor/frame-annotation/callout-projection.tsx",
         "apps/extension/src/editor/frame-annotation/commands.ts",
         "apps/extension/src/editor/frame-annotation/creation-defaults.ts",
@@ -6611,7 +6656,7 @@
         "apps/extension/src/editor/controller/events/draw-completion.ts",
         "apps/extension/src/editor/controller/events/draw-session-completion.ts",
         "apps/extension/src/editor/controller/events/drawing-draft.ts",
-        "apps/extension/src/editor/controller/events/drawing-pointer-gesture.ts",
+        "apps/extension/src/editor/controller/events/drawing-pointer-session.ts",
         "apps/extension/src/editor/controller/events/drawing.ts",
         "apps/extension/src/editor/controller/events/index.ts",
         "apps/extension/src/editor/controller/events/pan.ts",
@@ -7723,6 +7768,8 @@
         "apps/extension/src/features/highlighter/callout-custom-css.ts",
         "apps/extension/src/features/highlighter/callout-presets/catalog.ts",
         "apps/extension/src/features/highlighter/callout-presets/display-name.ts",
+        "apps/extension/src/features/highlighter/callout-presets/system-preset.ts",
+        "apps/extension/src/features/highlighter/callout-presets/visual-style.ts",
         "apps/extension/src/features/highlighter/callout-stroke.ts",
         "apps/extension/src/features/highlighter/contracts/auto-blur.ts",
         "apps/extension/src/features/highlighter/contracts/index.ts",
@@ -7801,10 +7848,12 @@
         "apps/extension/src/features/highlighter/frame-annotation/step-badge/placement.ts",
         "apps/extension/src/features/highlighter/frame-annotation/surface-style.ts",
         "apps/extension/src/features/highlighter/frame-surface/index.ts",
+        "apps/extension/src/features/highlighter/gradient-presets/display-name.ts",
         "apps/extension/src/features/highlighter/presets/catalog.ts",
         "apps/extension/src/features/highlighter/presets/display-name.ts",
         "apps/extension/src/features/highlighter/presets/enabled-catalog.ts",
         "apps/extension/src/features/highlighter/presets/session-visible.ts",
+        "apps/extension/src/features/highlighter/showcase-resources.ts",
         "apps/extension/src/features/highlighter/step-badge-custom-css.ts",
         "apps/extension/src/features/highlighter/step-badge-presets/catalog.ts",
         "apps/extension/src/features/highlighter/step-badge-presets/display-name.ts",
@@ -7817,6 +7866,7 @@
         "apps/extension/src/features/highlighter/style/visual.ts",
         "apps/extension/src/features/highlighter/surface-style/card-projection.ts",
         "apps/extension/src/features/highlighter/surface-style/card-section.ts",
+        "apps/extension/src/features/highlighter/surface-style/display-name.ts",
         "apps/extension/src/features/highlighter/surface-style/operations.ts",
         "apps/extension/src/features/highlighter/surface-style/style.ts",
         "apps/extension/src/features/highlighter/surface-style/surface-css.ts",
@@ -7829,6 +7879,8 @@
         "apps/extension/src/features/highlighter/callout-custom-css.ts",
         "apps/extension/src/features/highlighter/callout-presets/catalog.ts",
         "apps/extension/src/features/highlighter/callout-presets/display-name.ts",
+        "apps/extension/src/features/highlighter/callout-presets/system-preset.ts",
+        "apps/extension/src/features/highlighter/callout-presets/visual-style.ts",
         "apps/extension/src/features/highlighter/callout-stroke.ts",
         "apps/extension/src/features/highlighter/contracts/auto-blur.ts",
         "apps/extension/src/features/highlighter/contracts/index.ts",
@@ -7907,10 +7959,12 @@
         "apps/extension/src/features/highlighter/frame-annotation/step-badge/placement.ts",
         "apps/extension/src/features/highlighter/frame-annotation/surface-style.ts",
         "apps/extension/src/features/highlighter/frame-surface/index.ts",
+        "apps/extension/src/features/highlighter/gradient-presets/display-name.ts",
         "apps/extension/src/features/highlighter/presets/catalog.ts",
         "apps/extension/src/features/highlighter/presets/display-name.ts",
         "apps/extension/src/features/highlighter/presets/enabled-catalog.ts",
         "apps/extension/src/features/highlighter/presets/session-visible.ts",
+        "apps/extension/src/features/highlighter/showcase-resources.ts",
         "apps/extension/src/features/highlighter/step-badge-custom-css.ts",
         "apps/extension/src/features/highlighter/step-badge-presets/catalog.ts",
         "apps/extension/src/features/highlighter/step-badge-presets/display-name.ts",
@@ -7923,6 +7977,7 @@
         "apps/extension/src/features/highlighter/style/visual.ts",
         "apps/extension/src/features/highlighter/surface-style/card-projection.ts",
         "apps/extension/src/features/highlighter/surface-style/card-section.ts",
+        "apps/extension/src/features/highlighter/surface-style/display-name.ts",
         "apps/extension/src/features/highlighter/surface-style/operations.ts",
         "apps/extension/src/features/highlighter/surface-style/style.ts",
         "apps/extension/src/features/highlighter/surface-style/surface-css.ts",
@@ -9510,11 +9565,11 @@
         "apps/extension/src/popup/recording/video/settings/quality-card/view.tsx",
         "apps/extension/src/popup/recording/video/setup/body.tsx",
         "apps/extension/src/popup/recording/video/setup/index.tsx",
+        "apps/extension/src/popup/recording/video/setup/options/area-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/capture-mode-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/index.tsx",
         "apps/extension/src/popup/recording/video/setup/options/media-device-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/media-probe-state.ts",
-        "apps/extension/src/popup/recording/video/setup/options/microphone-actual-settings.ts",
         "apps/extension/src/popup/recording/video/setup/options/microphone-gain-control.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-level-meter.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-probe.tsx",
@@ -9529,7 +9584,6 @@
         "apps/extension/src/popup/recording/video/setup/options/webcam-settings-panel.tsx",
         "apps/extension/src/popup/recording/video/setup/panel.tsx",
         "apps/extension/src/popup/recording/video/setup/primitives.tsx",
-        "apps/extension/src/popup/recording/video/setup/toggles/diagnostics-toggle.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/controlled-cursor.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/index.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/microphone.tsx",
@@ -9633,14 +9687,12 @@
         "apps/extension/src/popup/shell/home/page-shell/actions.ts",
         "apps/extension/src/popup/shell/home/page-shell/index.tsx",
         "apps/extension/src/popup/shell/home/page-shell/mode-selector.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/page-access-controls.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/empty-state.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/error-message.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/index.ts",
         "apps/extension/src/popup/shell/home/page-shell/sections/quick-actions-section.tsx",
         "apps/extension/src/popup/shell/home/page-shell/setup-fields.tsx",
         "apps/extension/src/popup/shell/home/page-shell/setup-panel.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/tools-panel.tsx",
         "apps/extension/src/popup/shell/home/page-shell/use-screenshot-setup.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/helpers.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/index.ts",
@@ -9648,8 +9700,10 @@
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
         "apps/extension/src/popup/shell/home/route.tsx",
+        "apps/extension/src/popup/shell/menu/route.tsx",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
+        "apps/extension/src/popup/shell/page-access/controls.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
@@ -9677,7 +9731,9 @@
         "apps/extension/src/popup/shell/startup/resource.ts",
         "apps/extension/src/popup/shell/startup/use-route-controller.ts",
         "apps/extension/src/popup/shell/tab-access/capabilities.ts",
-        "apps/extension/src/popup/shell/tab-access/index.ts"
+        "apps/extension/src/popup/shell/tab-access/index.ts",
+        "apps/extension/src/popup/shell/tools/panel.tsx",
+        "apps/extension/src/popup/shell/tools/route.tsx"
       ],
       "rolloutFiles": [
         "apps/extension/src/popup/diagnostics/performance/index.ts",
@@ -9725,11 +9781,11 @@
         "apps/extension/src/popup/recording/video/settings/quality-card/view.tsx",
         "apps/extension/src/popup/recording/video/setup/body.tsx",
         "apps/extension/src/popup/recording/video/setup/index.tsx",
+        "apps/extension/src/popup/recording/video/setup/options/area-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/capture-mode-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/index.tsx",
         "apps/extension/src/popup/recording/video/setup/options/media-device-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/media-probe-state.ts",
-        "apps/extension/src/popup/recording/video/setup/options/microphone-actual-settings.ts",
         "apps/extension/src/popup/recording/video/setup/options/microphone-gain-control.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-level-meter.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-probe.tsx",
@@ -9744,7 +9800,6 @@
         "apps/extension/src/popup/recording/video/setup/options/webcam-settings-panel.tsx",
         "apps/extension/src/popup/recording/video/setup/panel.tsx",
         "apps/extension/src/popup/recording/video/setup/primitives.tsx",
-        "apps/extension/src/popup/recording/video/setup/toggles/diagnostics-toggle.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/controlled-cursor.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/index.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/microphone.tsx",
@@ -9848,14 +9903,12 @@
         "apps/extension/src/popup/shell/home/page-shell/actions.ts",
         "apps/extension/src/popup/shell/home/page-shell/index.tsx",
         "apps/extension/src/popup/shell/home/page-shell/mode-selector.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/page-access-controls.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/empty-state.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/error-message.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/index.ts",
         "apps/extension/src/popup/shell/home/page-shell/sections/quick-actions-section.tsx",
         "apps/extension/src/popup/shell/home/page-shell/setup-fields.tsx",
         "apps/extension/src/popup/shell/home/page-shell/setup-panel.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/tools-panel.tsx",
         "apps/extension/src/popup/shell/home/page-shell/use-screenshot-setup.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/helpers.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/index.ts",
@@ -9863,8 +9916,10 @@
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
         "apps/extension/src/popup/shell/home/route.tsx",
+        "apps/extension/src/popup/shell/menu/route.tsx",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
+        "apps/extension/src/popup/shell/page-access/controls.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
@@ -9892,7 +9947,9 @@
         "apps/extension/src/popup/shell/startup/resource.ts",
         "apps/extension/src/popup/shell/startup/use-route-controller.ts",
         "apps/extension/src/popup/shell/tab-access/capabilities.ts",
-        "apps/extension/src/popup/shell/tab-access/index.ts"
+        "apps/extension/src/popup/shell/tab-access/index.ts",
+        "apps/extension/src/popup/shell/tools/panel.tsx",
+        "apps/extension/src/popup/shell/tools/route.tsx"
       ],
       "unownedFocusedFiles": []
     },
@@ -10645,6 +10702,7 @@
         "apps/extension/src/settings/runtime/native-app-client/index.ts",
         "apps/extension/src/settings/runtime/privacy-erasure-client/index.ts",
         "apps/extension/src/settings/runtime/privacy-erasure-client/transport.ts",
+        "apps/extension/src/settings/runtime/settings-transfer-client/index.ts",
         "apps/extension/src/settings/runtime/store/runtime.ts",
         "apps/extension/src/settings/runtime/store/useSettingsStore.ts",
         "apps/extension/src/settings/section-surface/classes.ts",
@@ -10665,6 +10723,7 @@
         "apps/extension/src/settings/section-surface/collection/types.ts",
         "apps/extension/src/settings/section-surface/index.ts",
         "apps/extension/src/settings/section-surface/loading-state.tsx",
+        "apps/extension/src/settings/section-surface/navigation-lock.tsx",
         "apps/extension/src/settings/section-surface/panel-controls.tsx",
         "apps/extension/src/settings/section-surface/range-field.tsx",
         "apps/extension/src/settings/section-surface/section-header-actions.tsx",
@@ -10933,6 +10992,18 @@
         "apps/extension/src/settings/sections/system/native-app/telemetry/index.tsx",
         "apps/extension/src/settings/sections/system/native-app/types.ts",
         "apps/extension/src/settings/sections/system/native-app/views.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/client.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/conflict-view.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/export-flow.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/import-flow.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/import-surface.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/index.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-model.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-navigation.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-node.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-toolbar.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/ui-helpers.ts",
         "apps/extension/src/settings/sections/system/voice-input/async.ts",
         "apps/extension/src/settings/sections/system/voice-input/content.tsx",
         "apps/extension/src/settings/sections/system/voice-input/controller-contract.ts",
@@ -10959,6 +11030,7 @@
         "apps/extension/src/settings/runtime/native-app-client/index.ts",
         "apps/extension/src/settings/runtime/privacy-erasure-client/index.ts",
         "apps/extension/src/settings/runtime/privacy-erasure-client/transport.ts",
+        "apps/extension/src/settings/runtime/settings-transfer-client/index.ts",
         "apps/extension/src/settings/runtime/store/runtime.ts",
         "apps/extension/src/settings/runtime/store/useSettingsStore.ts",
         "apps/extension/src/settings/section-surface/classes.ts",
@@ -10979,6 +11051,7 @@
         "apps/extension/src/settings/section-surface/collection/types.ts",
         "apps/extension/src/settings/section-surface/index.ts",
         "apps/extension/src/settings/section-surface/loading-state.tsx",
+        "apps/extension/src/settings/section-surface/navigation-lock.tsx",
         "apps/extension/src/settings/section-surface/panel-controls.tsx",
         "apps/extension/src/settings/section-surface/range-field.tsx",
         "apps/extension/src/settings/section-surface/section-header-actions.tsx",
@@ -11247,6 +11320,18 @@
         "apps/extension/src/settings/sections/system/native-app/telemetry/index.tsx",
         "apps/extension/src/settings/sections/system/native-app/types.ts",
         "apps/extension/src/settings/sections/system/native-app/views.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/client.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/conflict-view.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/export-flow.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/import-flow.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/import-surface.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/index.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-model.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-navigation.ts",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-node.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree-toolbar.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/tree.tsx",
+        "apps/extension/src/settings/sections/system/settings-transfer/ui-helpers.ts",
         "apps/extension/src/settings/sections/system/voice-input/async.ts",
         "apps/extension/src/settings/sections/system/voice-input/content.tsx",
         "apps/extension/src/settings/sections/system/voice-input/controller-contract.ts",
@@ -11279,7 +11364,8 @@
         "apps/extension/src/ui/annotation-template-query/floating-filter-menu.tsx",
         "apps/extension/src/ui/annotation-template-query/index.ts",
         "apps/extension/src/ui/annotation-template-query/model.ts",
-        "apps/extension/src/ui/annotation-template-query/state.ts"
+        "apps/extension/src/ui/annotation-template-query/state.ts",
+        "apps/extension/src/ui/annotation-template-query/tag-display-name.ts"
       ],
       "rolloutFiles": [],
       "unownedFocusedFiles": []
@@ -11535,6 +11621,7 @@
         "apps/extension/src/ui/paint-selector/mode-selector.tsx",
         "apps/extension/src/ui/paint-selector/mode-state.ts",
         "apps/extension/src/ui/paint-selector/popup.tsx",
+        "apps/extension/src/ui/paint-selector/template-panel.tsx",
         "apps/extension/src/ui/paint-selector/trigger.tsx"
       ],
       "rolloutFiles": [],
@@ -11551,9 +11638,10 @@
         "apps/extension/src/ui/popup-shell/action-button/types.ts",
         "apps/extension/src/ui/popup-shell/action-button/variants.tsx",
         "apps/extension/src/ui/popup-shell/action-footer/tokens.ts",
+        "apps/extension/src/ui/popup-shell/expanding-mode-button/index.tsx",
         "apps/extension/src/ui/popup-shell/footer/action.tsx",
-        "apps/extension/src/ui/popup-shell/footer/application-icons.tsx",
         "apps/extension/src/ui/popup-shell/footer/index.tsx",
+        "apps/extension/src/ui/popup-shell/footer/language-toggle.tsx",
         "apps/extension/src/ui/popup-shell/footer/theme-toggle.tsx",
         "apps/extension/src/ui/popup-shell/icon-state-button/index.tsx",
         "apps/extension/src/ui/popup-shell/inline-curtain/options.tsx",
@@ -12431,6 +12519,29 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/workflows/settings-transfer",
+      "disposition": "unmapped",
+      "reason": "This owner has focused suites but is outside the hard line-coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/workflows/settings-transfer/backup.ts",
+        "apps/extension/src/workflows/settings-transfer/domain-error.ts",
+        "apps/extension/src/workflows/settings-transfer/domain-parser.ts",
+        "apps/extension/src/workflows/settings-transfer/fingerprint.ts",
+        "apps/extension/src/workflows/settings-transfer/index.ts",
+        "apps/extension/src/workflows/settings-transfer/json-value.ts",
+        "apps/extension/src/workflows/settings-transfer/node-projection.ts",
+        "apps/extension/src/workflows/settings-transfer/package.ts",
+        "apps/extension/src/workflows/settings-transfer/planner.ts",
+        "apps/extension/src/workflows/settings-transfer/registry.ts",
+        "apps/extension/src/workflows/settings-transfer/selection.ts",
+        "apps/extension/src/workflows/settings-transfer/settings-coverage.ts",
+        "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+        "apps/extension/src/workflows/settings-transfer/tree.ts"
+      ],
+      "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/workflows/video",
       "disposition": "unmapped",
       "reason": "This owner family is outside the hard coverage rollout; add owner tests and an explicit rollout target before enabling thresholds.",
@@ -12509,6 +12620,7 @@
         "packages/platform/src/browser/callback.ts",
         "packages/platform/src/browser/chrome-ai.ts",
         "packages/platform/src/browser/clipboard.ts",
+        "packages/platform/src/browser/commands.ts",
         "packages/platform/src/browser/content-runtime-shim.ts",
         "packages/platform/src/browser/context-menus.ts",
         "packages/platform/src/browser/desktop-capture.ts",
@@ -12562,6 +12674,7 @@
         "packages/platform/src/observability/message-tracer/messaging.ts",
         "packages/platform/src/observability/message-tracer/runtime-blob-payload.ts",
         "packages/platform/src/observability/message-tracer/runtime.ts",
+        "packages/platform/src/observability/message-tracer/settings-transfer-payload.ts",
         "packages/platform/src/observability/message-tracer/transport.ts",
         "packages/platform/src/observability/message-tracer/types.ts",
         "packages/platform/src/observability/message-tracer/utils.ts",
@@ -12593,6 +12706,7 @@
         "packages/platform/src/browser/callback.ts",
         "packages/platform/src/browser/chrome-ai.ts",
         "packages/platform/src/browser/clipboard.ts",
+        "packages/platform/src/browser/commands.ts",
         "packages/platform/src/browser/content-runtime-shim.ts",
         "packages/platform/src/browser/context-menus.ts",
         "packages/platform/src/browser/desktop-capture.ts",
@@ -12646,6 +12760,7 @@
         "packages/platform/src/observability/message-tracer/messaging.ts",
         "packages/platform/src/observability/message-tracer/runtime-blob-payload.ts",
         "packages/platform/src/observability/message-tracer/runtime.ts",
+        "packages/platform/src/observability/message-tracer/settings-transfer-payload.ts",
         "packages/platform/src/observability/message-tracer/transport.ts",
         "packages/platform/src/observability/message-tracer/types.ts",
         "packages/platform/src/observability/message-tracer/utils.ts",
@@ -13171,7 +13286,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "7d1738e2ac27524bdf66cc2064c77e41beffcbe13e253d2eb4201fe51a34ddde"
+        "contentHash": "0a2c14bd86ed5dd0f358db64198c375c83319df59e4ad3b6c58498364573dafa"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -15855,7 +15970,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/definitions.mjs",
-        "contentHash": "c46032a1920384c4acbd35442bd041d6ade32941a1c4349e48454b970d38d6e9"
+        "contentHash": "a60a3857c8f7dcf56207add730c004e54861497094cb799c7b8e0f2c7452f201"
       },
       "consumers": [
         "tooling/qa/core/qa-controls/discovery.mjs",
@@ -17568,7 +17683,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "9170796bd62a4a0e239e284b4b23fc15068cab5f76f57d035ff74887847a9f56"
+        "contentHash": "f9bec28cf1f8aab30ffb6955ee409aa021ba3011731441a190d2c9543c0da9a0"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -17631,6 +17746,7 @@
         "property:testFiles[56]",
         "property:testFiles[57]",
         "property:testFiles[58]",
+        "property:testFiles[59]",
         "property:testFiles[6]",
         "property:testFiles[7]",
         "property:testFiles[8]",
@@ -18410,7 +18526,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
-        "contentHash": "7e06a04721b61f2ff6ed09de6864ce8ee86d3ed69cb6c078bd4f9237b487762d"
+        "contentHash": "dc040c1ee55e6b5d12d724ca9d599f09c11dbd7e2a6e0f8867883830d82a0697"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
@@ -18426,7 +18542,8 @@
         "property:testFiles[5]",
         "property:testFiles[6]",
         "property:testFiles[7]",
-        "property:testFiles[8]"
+        "property:testFiles[8]",
+        "property:testFiles[9]"
       ]
     },
     {
@@ -21242,7 +21359,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.code-steps.mjs",
-        "contentHash": "62308fa2aed3bb865b3f34a128849fa495b5418ce5fe3df5c3af17e068c7d2fe"
+        "contentHash": "b24c96a57fc114ab65aa65d9a6c59415a0fa504a959fd2f803ef791aa159ac01"
       },
       "consumers": [
         "tooling/qa/core/qa-steps/contract.mjs",
@@ -21253,7 +21370,8 @@
         "tooling/qa/wrappers/checkpoint.mjs"
       ],
       "surfaces": [
-        "binding:FOCUSED_CODE_VIOLATION_STEPS"
+        "binding:FOCUSED_CODE_VIOLATION_STEPS",
+        "binding:FOCUSED_CONTEXTUAL_VIOLATION_STEPS"
       ]
     },
     {
@@ -21325,7 +21443,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.execution.mjs",
-        "contentHash": "5504165c79100a369fcce6f8634a81e68f680a099745d659b3d92170499071be"
+        "contentHash": "e735507e52a28cfb331490cf6ff90c1d7b4ed543c9992c65af7eaff0f768e13b"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",
@@ -21821,7 +21939,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-multi-message-transitions.helpers.mjs",
-        "contentHash": "c30b9c64dcc26d2aa03a1be53b9d8d67260ed2c4ace86438df6006d323d563f1"
+        "contentHash": "eafdb620213902818b96f838ecfe43b41eab796315c55df87d98058bc75969fc"
       },
       "consumers": [
         "tooling/qa/core/verify-multi-message-transitions.helpers.mjs",

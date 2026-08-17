@@ -1,6 +1,6 @@
 import type { AppLocale, TranslationKey } from '../../../platform/i18n';
 import { translate } from '../../../platform/i18n';
-import type { BorderPreset, SystemBorderPresetKey } from '../contracts';
+import type { SystemBorderPresetKey } from '../contracts';
 
 const systemPresetNameKeys: Record<SystemBorderPresetKey, TranslationKey> = {
   'system-default': 'highlighter.systemPresets.accent',
@@ -11,15 +11,31 @@ const systemPresetNameKeys: Record<SystemBorderPresetKey, TranslationKey> = {
   'system-review': 'highlighter.systemPresets.review',
   'system-light-ui': 'highlighter.systemPresets.lightUi',
   'system-dark-ui': 'highlighter.systemPresets.darkUi',
+  'system-sunrise': 'highlighter.systemPresets.sunrise',
+  'system-sticky-note': 'highlighter.systemPresets.stickyNote',
+  'system-editorial-ink': 'highlighter.systemPresets.editorialInk',
+  'system-editorial-proof': 'highlighter.systemPresets.editorialProof',
+  'system-retro-sunset': 'highlighter.systemPresets.retroSunset',
+  'system-retro-arcade': 'highlighter.systemPresets.retroArcade',
+  'system-retro-memphis': 'highlighter.systemPresets.retroMemphis',
 };
 
-export function getBorderPresetDisplayName(preset: BorderPreset, locale?: AppLocale): string {
-  if (
-    preset.origin === 'system' &&
-    preset.systemPresetKey !== undefined &&
-    preset.customized !== true
-  ) {
-    return translate(systemPresetNameKeys[preset.systemPresetKey], locale);
+export function getBorderPresetDisplayName(
+  preset: {
+    customized?: boolean | undefined;
+    id?: string;
+    name: string;
+    origin?: string | undefined;
+    systemPresetKey?: string | undefined;
+  },
+  locale?: AppLocale
+): string {
+  const systemNameKey =
+    preset.systemPresetKey && preset.systemPresetKey in systemPresetNameKeys
+      ? systemPresetNameKeys[preset.systemPresetKey as SystemBorderPresetKey]
+      : undefined;
+  if (preset.origin === 'system' && systemNameKey !== undefined && preset.customized !== true) {
+    return translate(systemNameKey, locale);
   }
 
   return preset.name;

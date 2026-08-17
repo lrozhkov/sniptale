@@ -11,6 +11,7 @@ import {
 import { translate } from '../../../../../platform/i18n';
 import { settingsMetaLabelClassName, settingsModalClassName } from '../../../../section-surface';
 import type { useAnnotationTemplateTagsController } from './controller';
+import { getAnnotationTemplateTagDisplayName } from '../../../../../ui/annotation-template-query';
 
 type Controller = ReturnType<typeof useAnnotationTemplateTagsController>;
 
@@ -27,20 +28,26 @@ export function AnnotationTemplateTagEditor(props: {
   const [label, setLabel] = useState('');
   const [mergeTarget, setMergeTarget] = useState('');
   useEffect(() => {
-    setLabel(props.editor?.mode === 'edit' ? props.editor.tag.label : '');
+    setLabel(
+      props.editor?.mode === 'edit' ? getAnnotationTemplateTagDisplayName(props.editor.tag) : ''
+    );
     setMergeTarget('');
   }, [props.editor]);
   if (!props.editor) return null;
   const editingTag = props.editor.mode === 'edit' ? props.editor.tag : null;
   const options = props.controller.state.tags
-    .filter((tag) => tag.id !== editingTag?.id)
-    .map((tag) => ({ label: tag.label, value: tag.id }));
+    .filter((tag) => tag.id !== editingTag?.id && editingTag?.origin !== 'system')
+    .map((tag) => ({ label: getAnnotationTemplateTagDisplayName(tag), value: tag.id }));
   const save = async (event: FormEvent) => {
     event.preventDefault();
     const nextLabel = label.trim();
     if (!nextLabel) return;
     const saved = editingTag
-      ? await props.controller.actions.rename(editingTag.id, nextLabel)
+      ? editingTag.origin === 'system' &&
+        editingTag.customized !== true &&
+        nextLabel === getAnnotationTemplateTagDisplayName(editingTag)
+        ? true
+        : await props.controller.actions.rename(editingTag.id, nextLabel)
       : await props.controller.actions.create(nextLabel);
     if (saved) props.onClose();
   };
@@ -78,7 +85,7 @@ export function AnnotationTemplateTagEditor(props: {
             onChange={(event) => setLabel(event.currentTarget.value)}
             value={label}
           />
-          {editingTag && options.length > 0 ? (
+          {editingTag?.origin !== 'system' && options.length > 0 ? (
             <div className="mt-4 border-t border-[var(--sniptale-color-border-soft)] pt-4">
               <label className={settingsMetaLabelClassName}>
                 {translate('highlighter.templateTags.mergeTarget')}

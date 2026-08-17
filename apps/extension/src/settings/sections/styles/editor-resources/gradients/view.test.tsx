@@ -121,6 +121,8 @@ it('renders managed markers and routes table actions through the catalog owner',
   const node = document.createElement('div');
   const root = createRoot(node);
   act(() => root.render(<GradientPresetsSettings />));
+  expect(node.textContent).not.toContain('Шаблоны градиентов');
+  expect(node.textContent).not.toContain('Многоразовые шаблоны градиентов');
   expect(node.textContent).toContain('Предустановленный');
   expect(node.textContent).toContain('По умолчанию');
   expect(node.textContent).toContain('Изменён');

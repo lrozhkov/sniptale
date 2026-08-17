@@ -18,6 +18,7 @@ export const backgroundOwnedMessageTypes = [
   MessageType.NATIVE_APP_MUTATION,
   MessageType.PAGE_ACCESS,
   MessageType.ERASE_LOCAL_EXTENSION_DATA,
+  MessageType.SETTINGS_TRANSFER,
   MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
   MessageType.PROCESS_WITH_LLM,
   MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,

@@ -68,13 +68,26 @@ function applySequentialStatements(statements, states) {
   for (const statement of statements) {
     const openStates = nextStates.filter((state) => state.open);
     const closedStates = nextStates.filter((state) => !state.open);
-    nextStates = [
+    nextStates = compactMaxStates([
       ...closedStates,
       ...openStates.flatMap((state) => applyStatement(statement, state)),
-    ];
+    ]);
   }
 
   return nextStates;
+}
+
+function compactMaxStates(states) {
+  let maxOpen = null;
+  let maxClosed = null;
+  for (const state of states) {
+    if (state.open) {
+      if (maxOpen === null || state.count > maxOpen.count) maxOpen = state;
+    } else if (maxClosed === null || state.count > maxClosed.count) {
+      maxClosed = state;
+    }
+  }
+  return [maxClosed, maxOpen].filter(Boolean);
 }
 
 function applyBranch(statement, state) {

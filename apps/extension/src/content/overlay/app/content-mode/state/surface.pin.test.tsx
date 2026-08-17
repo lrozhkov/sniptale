@@ -60,6 +60,7 @@ beforeEach(() => {
   pinSessionMocks.load.mockResolvedValue({
     pinToTab: false,
     pinToTabAvailable: true,
+    toolbarVisible: true,
   });
   pinSessionMocks.write.mockReset();
   pinSessionMocks.write.mockImplementation(async (value: boolean) => ({
@@ -147,6 +148,45 @@ it('does not let a focus refresh started during a write overwrite its newer ackn
 
   expect(getLatestState().pinToTab).toBe(true);
   expect(getLatestState().pinToTabAvailable).toBe(true);
+});
+
+it('does not let a focus refresh restore stale visibility while collapse persistence is pending', async () => {
+  const visibilityWrite = createDeferred<void>();
+  const staleRefresh = createDeferred<{
+    pinToTab: boolean;
+    pinToTabAvailable: boolean;
+    toolbarVisible: boolean;
+  }>();
+  pinSessionMocks.load
+    .mockResolvedValueOnce({
+      pinToTab: true,
+      pinToTabAvailable: true,
+      toolbarVisible: true,
+    })
+    .mockReturnValueOnce(staleRefresh.promise);
+  pinSessionMocks.writeVisibility.mockReturnValueOnce(visibilityWrite.promise);
+  await renderHarness();
+
+  act(() => {
+    getLatestState().setPinnedToolbarVisible(false);
+    window.dispatchEvent(new Event('focus'));
+  });
+  expect(getLatestState().isToolbarVisible).toBe(false);
+
+  await act(async () => {
+    staleRefresh.resolve({
+      pinToTab: true,
+      pinToTabAvailable: true,
+      toolbarVisible: true,
+    });
+    await Promise.resolve();
+  });
+  await act(async () => {
+    visibilityWrite.resolve(undefined);
+    await Promise.resolve();
+  });
+
+  expect(getLatestState().isToolbarVisible).toBe(false);
 });
 
 it('reconciles an optimistic pin with the authoritative background value', async () => {

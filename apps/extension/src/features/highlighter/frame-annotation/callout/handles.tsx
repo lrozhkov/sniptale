@@ -1,4 +1,4 @@
-import { Move, Plus, Settings2 } from 'lucide-react';
+import { Heading, Move, Plus, Settings2 } from 'lucide-react';
 import type {
   CSSProperties,
   MouseEvent as ReactMouseEvent,
@@ -30,10 +30,13 @@ export type CalloutInteractionHandleProps = {
   handleResizeRightPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleResizeRightKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleSettingsClick: () => void;
+  handleTitleToggleClick: () => void;
   handleTailPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleTailKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleTailBaseEndPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleTailBaseEndKeyDown: (event: CalloutHandleKeyboardEvent) => void;
+  handleTailBaseRangePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  handleTailBaseRangeKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleTailFramePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleTailFrameKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleWaypointPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -52,6 +55,8 @@ export type CalloutInteractionHandleProps = {
   isTailDragging: boolean;
   isTailBaseEndDragging: boolean;
   isTailFrameDragging: boolean;
+  isTailBaseRangeDragging: boolean;
+  isTitleEnabled: boolean;
   isWaypointDragging: boolean;
   isPolylineWaypoint: boolean;
   portalTheme: AppTheme | null;
@@ -63,6 +68,7 @@ export type CalloutInteractionHandleProps = {
   tailHandleCursor: CSSProperties['cursor'];
   tailHandleStyle: CSSProperties | null;
   tailBaseEndHandleStyle: CSSProperties | null;
+  tailBaseRangeHandleStyle: CSSProperties | null;
   tailFrameHandleStyle: CSSProperties | null;
   waypointHandleStyle: CSSProperties | null;
   waypointAngle: number | null;
@@ -123,6 +129,14 @@ function renderCalloutWidthHandle(
   );
 }
 
+function stopCalloutControlEvent(
+  event: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>
+) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
+}
+
 function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
   if (props.isEditing || !props.showSettingsHandle) return null;
   const label = translate('content.interactiveFrame.calloutSettings');
@@ -154,15 +168,9 @@ function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
           '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
         transition: 'opacity 120ms ease, color 120ms ease, border-color 120ms ease',
       })}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.nativeEvent.stopImmediatePropagation();
-      }}
+      onPointerDown={stopCalloutControlEvent}
       onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.nativeEvent.stopImmediatePropagation();
+        stopCalloutControlEvent(event);
         props.handleSettingsClick();
       }}
       onFocus={props.handleHandleFocus}
@@ -217,6 +225,59 @@ function renderCalloutMoveHandle(props: CalloutInteractionHandleProps) {
   );
 }
 
+function renderCalloutTitleToggleHandle(props: CalloutInteractionHandleProps) {
+  const label = translate(
+    props.isTitleEnabled
+      ? 'content.interactiveFrame.hideCommentTitle'
+      : 'content.interactiveFrame.showCommentTitle'
+  );
+  return (
+    <button
+      data-sniptale-callout-control-frame-id={props.frameId}
+      type="button"
+      className="sniptale-callout-title-toggle-handle"
+      data-active={props.isTitleEnabled ? 'true' : undefined}
+      data-theme={props.portalTheme ?? undefined}
+      aria-pressed={props.isTitleEnabled}
+      aria-label={label}
+      title={label}
+      style={mergeThemeScopedStyle(props.portalTheme, {
+        ...removeFixedPlacement(props.dragHandleStyle),
+        width: 26,
+        height: 26,
+        padding: 0,
+        borderRadius: '50%',
+        border: '1px solid var(--sniptale-color-border-soft)',
+        background: 'var(--sniptale-color-surface-panel)',
+        color: props.isTitleEnabled
+          ? 'var(--sniptale-color-accent-emphasis)'
+          : 'var(--sniptale-color-text-primary)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        opacity: props.isHandleVisible ? 1 : 0,
+        pointerEvents: props.isHandleVisible ? 'auto' : 'none',
+        boxShadow: props.isTitleEnabled
+          ? '0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 30%, transparent)'
+          : '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
+        transition: 'opacity 120ms ease, color 120ms ease, border-color 120ms ease',
+      })}
+      onPointerDown={stopCalloutControlEvent}
+      onClick={(event) => {
+        stopCalloutControlEvent(event);
+        props.handleTitleToggleClick();
+      }}
+      onFocus={props.handleHandleFocus}
+      onBlur={props.handleHandleBlur}
+      onMouseEnter={props.handleMouseEnter}
+      onMouseLeave={props.handleMouseLeave}
+    >
+      <Heading aria-hidden="true" size={14} strokeWidth={1.6} />
+    </button>
+  );
+}
+
 function removeFixedPlacement(style: CSSProperties): CSSProperties {
   const { left: _left, top: _top, position: _position, zIndex: _zIndex, ...buttonStyle } = style;
   return buttonStyle;
@@ -248,9 +309,43 @@ function renderCalloutAdjacentControls(props: CalloutInteractionHandleProps) {
         onMouseLeave={props.handleMouseLeave}
       >
         {renderCalloutMoveHandle(groupedProps)}
+        {renderCalloutTitleToggleHandle(groupedProps)}
         {renderCalloutSettingsHandle(groupedProps)}
       </div>
     </div>
+  );
+}
+
+function renderCalloutTailBaseRangeHandle(props: CalloutInteractionHandleProps) {
+  if (props.isEditing || props.isGeometryHandleHidden || !props.tailBaseRangeHandleStyle)
+    return null;
+  const label = translate('content.interactiveFrame.moveCommentTailBase');
+  return (
+    <button
+      data-sniptale-callout-control-frame-id={props.frameId}
+      type="button"
+      className="sniptale-callout-tail-base-range-handle"
+      data-theme={props.portalTheme ?? undefined}
+      aria-label={label}
+      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+      title={label}
+      style={mergeThemeScopedStyle(props.portalTheme, {
+        ...props.tailBaseRangeHandleStyle,
+        padding: 0,
+        border: 0,
+        borderRadius: 999,
+        background: 'color-mix(in srgb, var(--sniptale-color-accent) 42%, transparent)',
+        cursor: props.isTailBaseRangeDragging ? 'grabbing' : props.tailHandleCursor,
+        opacity: props.isHandleVisible ? 1 : 0,
+        pointerEvents: props.isHandleVisible ? 'auto' : 'none',
+      })}
+      onPointerDown={props.handleTailBaseRangePointerDown}
+      onKeyDown={props.handleTailBaseRangeKeyDown}
+      onFocus={props.handleHandleFocus}
+      onBlur={props.handleHandleBlur}
+      onMouseEnter={props.handleMouseEnter}
+      onMouseLeave={props.handleMouseLeave}
+    />
   );
 }
 
@@ -414,6 +509,7 @@ export function renderCalloutInteractionHandles(props: CalloutInteractionHandleP
         side: 'right',
         style: props.resizeRightHandleStyle,
       })}
+      {renderCalloutTailBaseRangeHandle(props)}
       {renderCalloutTailHandle(props, {
         className: 'sniptale-callout-tail-base-start-handle',
         isDragging: props.isTailDragging,

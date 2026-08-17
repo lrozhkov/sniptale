@@ -101,6 +101,14 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Настройки комментария',
     en: 'Comment settings',
   },
+  showCommentTitle: {
+    ru: 'Показать заголовок комментария',
+    en: 'Show comment heading',
+  },
+  hideCommentTitle: {
+    ru: 'Скрыть заголовок комментария',
+    en: 'Hide comment heading',
+  },
   stepBadgeSettings: {
     ru: 'Настройки нумерации',
     en: 'Numbering settings',
@@ -116,6 +124,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
   moveCommentTailBaseEnd: {
     ru: 'Изменить ширину основания указателя: конечная точка',
     en: 'Adjust pointer base width: end point',
+  },
+  moveCommentTailBase: {
+    ru: 'Переместить основание указателя вдоль границы комментария',
+    en: 'Move the pointer base along the comment edge',
   },
   moveCommentTailEnd: {
     ru: 'Сместить конец указателя вдоль границы рамки',

@@ -12,6 +12,7 @@ import { routeNativeAppRuntimeMessage } from '../../native-app/route';
 import { routeContentRuntimeWakeupMessage } from '../../page-access/wakeup-route';
 import { routePopupExportJobMessage } from '../../../capture/popup-export/job/route';
 import { routeLocalDataErasureMessage } from '../../../application/privacy-erasure/route';
+import { routeSettingsTransferMessage } from '../../../application/settings-transfer/route';
 import { routePopupTabRouteCapabilityRequest } from '../capabilities/popup-tab/route-capabilities';
 import * as contentCaps from '../../../routing-contracts/capabilities/content-action/route';
 import type { ContentSenderBinding } from '../../../routing-contracts/capabilities/content-action/capability-store';
@@ -95,6 +96,8 @@ function getBackgroundOwnedRouteHandler(
       return routeLlmSessionAction;
     case 'local-data-erasure':
       return routeLocalDataErasureAction;
+    case 'settings-transfer':
+      return routeSettingsTransferAction;
     case 'native-app-runtime':
       return routeNativeAppRuntimeAction;
     case 'page-access':
@@ -227,6 +230,10 @@ function routeLocalDataErasureAction(action: BackgroundOwnedAction): ActionResul
       action.context.runtimeState
     )
   );
+}
+
+function routeSettingsTransferAction(action: BackgroundOwnedAction): ActionResult | null {
+  return keepOpen(routeSettingsTransferMessage(action.message, action.context.sendResponse));
 }
 
 function routeLlmAction(action: BackgroundOwnedAction): ActionResult | null {

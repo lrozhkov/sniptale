@@ -28,6 +28,13 @@ it('edits the automatic numbering type without exposing a concrete badge value',
   expect(document.body.textContent).toContain('АБВ');
   expect(document.querySelector('input[aria-label="Значение"]')).toBeNull();
   expect(document.querySelector('[data-field-label="Значение"]')).toBeNull();
+  const nameInput = document.querySelector<HTMLInputElement>('input[maxlength="64"]');
+  const tagAssignment = document.querySelector(
+    '[data-ui="shared.annotation-template-tag-assignment"]'
+  );
+  expect(nameInput?.compareDocumentPosition(tagAssignment as Node)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
 
   await act(async () =>
     [...document.querySelectorAll<HTMLButtonElement>('button')]

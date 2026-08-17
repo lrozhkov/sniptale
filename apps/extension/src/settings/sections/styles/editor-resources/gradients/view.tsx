@@ -69,14 +69,13 @@ export function GradientPresetsSettings() {
     if (action.type === 'delete') void resources.actions.onDelete(preset.id);
   };
   return (
-    <section className="mt-8">
+    <section>
       <SettingsCollection
         addAction={{
           label: translate('settings.editor.gradients.add'),
           onInvoke: () => setEditor('new'),
         }}
         ariaLabel={translate('settings.editor.gradients.title')}
-        description={translate('settings.editor.gradients.description')}
         items={items}
         onAction={onAction}
         onMove={(intent: SettingsCollectionMoveIntent) => {
@@ -90,7 +89,6 @@ export function GradientPresetsSettings() {
           void resources.actions.onReorder(ids);
         }}
         state={resources.presets.length > 0 ? 'ready' : 'loading'}
-        title={translate('settings.editor.gradients.title')}
       />
       <GradientPresetEditor
         onClose={() => setEditor(null)}

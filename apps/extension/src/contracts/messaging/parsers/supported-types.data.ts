@@ -34,6 +34,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.NATIVE_APP_MUTATION,
   MessageType.PAGE_ACCESS,
   MessageType.ERASE_LOCAL_EXTENSION_DATA,
+  MessageType.SETTINGS_TRANSFER,
   MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
   MessageType.FRAME_ANNOTATION_RASTERIZE,
   MessageType.EXECUTE_SAVE,

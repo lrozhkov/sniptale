@@ -1,9 +1,12 @@
-import { translate } from '../../../platform/i18n';
+import { translate, type AppLocale } from '../../../platform/i18n';
 
-export function getEditorSystemPresetDisplayName() {
-  return translate('shared.defaults.defaultEditorPresetName');
+export function getEditorSystemPresetDisplayName(locale?: AppLocale) {
+  return translate('shared.defaults.defaultEditorPresetName', locale);
 }
 
-export function getEditorPresetDisplayName(args: { isSystemDefault?: boolean; name: string }) {
-  return args.isSystemDefault === true ? getEditorSystemPresetDisplayName() : args.name;
+export function getEditorPresetDisplayName(
+  args: { isSystemDefault?: boolean; name: string },
+  locale?: AppLocale
+) {
+  return args.isSystemDefault === true ? getEditorSystemPresetDisplayName(locale) : args.name;
 }

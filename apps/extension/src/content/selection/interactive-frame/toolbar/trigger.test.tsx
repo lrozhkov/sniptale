@@ -191,6 +191,25 @@ describe('InteractiveFrameToolbarTrigger', () => {
     expect(icons.every((icon) => icon.style.display === 'block')).toBe(true);
   });
 
+  it('uses the system arrow in the gaps between mini controls', () => {
+    act(() => {
+      root.render(
+        <InteractiveFrameToolbarTrigger
+          frame={{ effectMode: 'border', height: 80, id: 'frame-1', width: 240, x: 100, y: 100 }}
+          isVisible
+          {...createTriggerProps()}
+        />
+      );
+    });
+
+    const bridge = document.querySelector<HTMLElement>('.sniptale-frame-toolbar-bridge');
+    expect(bridge?.style.cursor).toBe('default');
+    expect(bridge?.style.pointerEvents).toBe('auto');
+    expect(
+      document.querySelector<HTMLButtonElement>('.sniptale-frame-quick-action')?.style.cursor
+    ).toBe('pointer');
+  });
+
   it.each([
     ['border', 'lucide-square'],
     ['blur', 'lucide-droplet'],

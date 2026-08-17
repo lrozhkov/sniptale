@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import { editorInputClassName } from '../constants';
 import type { EditorState } from './types';
@@ -25,9 +26,11 @@ function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
 export function BorderPresetEditorFields({
   linkedTemplateOptions,
   state,
+  tagAssignment,
 }: {
   linkedTemplateOptions?: LinkedAnnotationTemplateOptions;
   state: EditorState;
+  tagAssignment?: ReactNode;
 }) {
   return (
     <div className="space-y-4">
@@ -47,6 +50,7 @@ export function BorderPresetEditorFields({
           ].join(' ')}
         />
       </div>
+      {tagAssignment}
       <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[176px_minmax(0,1fr)]">
         <EditorPreview state={state} />
         <HighlighterManualInspectorSurface>

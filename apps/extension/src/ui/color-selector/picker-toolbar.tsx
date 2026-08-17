@@ -1,4 +1,5 @@
 import { Ban, Pipette } from 'lucide-react';
+import type { MouseEvent, PointerEvent } from 'react';
 import { translate } from '../../platform/i18n';
 import { CompactRange } from '../compact-inspector-controls/primitives';
 
@@ -40,6 +41,13 @@ function EyedropperActionButton(props: {
   eyedropperPressed: boolean;
   handleEyedropperPick: () => Promise<void>;
 }) {
+  const containPress = (event: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+  };
+  const startPickAfterClick = () => {
+    queueMicrotask(() => void props.handleEyedropperPick());
+  };
   return (
     <button
       type="button"
@@ -47,7 +55,13 @@ function EyedropperActionButton(props: {
       aria-label={translate('shared.ui.colorSelectorEyedropper')}
       title={translate('shared.ui.colorSelectorEyedropper')}
       data-pressed={props.eyedropperPressed ? 'true' : 'false'}
-      onClick={() => void props.handleEyedropperPick()}
+      data-sniptale-activation-bridge="defer"
+      onPointerDown={containPress}
+      onMouseDown={containPress}
+      onClick={(event) => {
+        containPress(event);
+        startPickAfterClick();
+      }}
       data-ui="shared.ui.color-selector.eyedropper"
       className={[
         ICON_ACTION_CLASS_NAME,

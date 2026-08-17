@@ -4,23 +4,23 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=32, tool-noise=26.
-- Enforced source: jscpd=56, license=1, scc=1.
+- Classification: accepted-architecture=31, tool-noise=26.
+- Enforced source: jscpd=55, license=1, scc=1.
 
 ## Active structural debt
 
 
 ## Duplication
 
-- accepted-architecture=30, tool-noise=26. Every family is exact-count, exact-lines, and sample-fingerprinted.
+- accepted-architecture=29, tool-noise=26. Every family is exact-count, exact-lines, and sample-fingerprinted.
 - Highest-line actionable families:
 
 ## Focused coverage rollout
 
-- Owner disposition: partial=4, rollout=79, unmapped=26.
-- Registry disposition: partial=4, rollout=79, unmapped=26.
+- Owner disposition: partial=4, rollout=82, unmapped=27.
+- Registry disposition: partial=4, rollout=82, unmapped=27.
 - Owners with unowned focused rollout files:
-- `apps/extension/src/editor` — 2 focused rollout file(s) lack an owner; 896/953 production files are in rollout.
+- `apps/extension/src/editor` — 2 focused rollout file(s) lack an owner; 896/954 production files are in rollout.
 
 ## Registered policy dispositions
 

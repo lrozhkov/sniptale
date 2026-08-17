@@ -11,6 +11,7 @@ export const SETTINGS_SECTION_IDS = [
   'voice-input',
   'native-app',
   'access-data',
+  'settings-transfer',
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
@@ -22,16 +23,22 @@ export const SETTINGS_SECTION_VIEWS = {
   'media-quality': ['image', 'video'],
   saving: ['settings', 'storage', 'templates'],
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
-  'editor-resources': ['tools', 'palettes'],
+  'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
   'ai-connections': ['integrations', 'chrome-ai', 'security'],
   'ai-prompts': ['templates', 'prompts'],
   'voice-input': [],
   'native-app': ['connection', 'capture', 'commands', 'telemetry'],
   'access-data': ['permissions', 'privacy'],
+  'settings-transfer': [],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
 
 type SettingsRouteWithoutView = {
-  section: 'interface-browser' | 'quick-actions' | 'screen-sizes' | 'voice-input';
+  section:
+    | 'interface-browser'
+    | 'quick-actions'
+    | 'screen-sizes'
+    | 'voice-input'
+    | 'settings-transfer';
   view?: never;
 };
 
@@ -40,7 +47,7 @@ export type SettingsRoute =
   | { section: 'media-quality'; view?: 'image' | 'video' }
   | { section: 'saving'; view?: 'settings' | 'storage' | 'templates' }
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
-  | { section: 'editor-resources'; view?: 'tools' | 'palettes' }
+  | { section: 'editor-resources'; view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
   | { section: 'ai-prompts'; view?: 'templates' | 'prompts' }
   | { section: 'native-app'; view?: 'connection' | 'capture' | 'commands' | 'telemetry' }

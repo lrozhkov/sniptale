@@ -45,6 +45,10 @@ beforeEach(() => {
 describe('gradient preset catalog model', () => {
   it('supports complete system and user management with default invariants', () => {
     const base = createDefaultGradientPresetCatalog();
+    expect(base.presets).toHaveLength(12);
+    expect(new Set(base.presets.map((preset) => preset.gradient.type))).toEqual(
+      new Set(['linear', 'radial', 'conic'])
+    );
     const gradient = structuredClone(base.presets[0]!.gradient);
     const first = addUserGradientPreset(base, {
       id: 'user-1',
@@ -150,10 +154,120 @@ describe('gradient preset catalog model', () => {
       favoriteIdsBySurface: { 'highlighter-frame-fill': ['user-1', 'missing'] },
     });
     expect(parsed.unsafeForWrite).toBe(false);
-    expect(parsed.catalog.revision).toBe(2);
+    expect(parsed.catalog.revision).toBe(3);
     expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual(['user-1']);
   });
+});
 
+it('migrates the actual revision 2 catalog without discarding system customization', () => {
+  const current = createDefaultGradientPresetCatalog();
+  const previousSystems = current.presets
+    .filter((preset) =>
+      [
+        'system-sunset',
+        'system-ocean',
+        'system-aurora',
+        'system-radial-glow',
+        'system-conic-spectrum',
+      ].includes(preset.id)
+    )
+    .map((preset, order) => ({ ...preset, order }))
+    .map((preset) => {
+      if (preset.id === 'system-ocean') {
+        return {
+          ...preset,
+          gradient: {
+            ...preset.gradient,
+            stops: [
+              { id: 'system-ocean-0', color: '#0f172aff', position: 0, midpoint: 0.5 },
+              { id: 'system-ocean-1', color: '#2563ebff', position: 1, midpoint: 0.5 },
+            ],
+          },
+        };
+      }
+      if (preset.id === 'system-radial-glow') {
+        return {
+          ...preset,
+          gradient: {
+            ...preset.gradient,
+            radius: { x: 0.65, y: 0.65 },
+            stops: [
+              { id: 'system-radial-glow-0', color: '#facc15cc', position: 0, midpoint: 0.5 },
+              { id: 'system-radial-glow-1', color: '#f9731600', position: 1, midpoint: 0.5 },
+            ],
+          },
+        };
+      }
+      return preset;
+    });
+  const customizedSunset = {
+    ...previousSystems[0]!,
+    customized: true,
+    name: 'My sunset',
+    gradient: { ...previousSystems[0]!.gradient, angle: 42 },
+  };
+  const disabledAurora = {
+    ...previousSystems[2]!,
+    customized: true,
+    enabled: false,
+    order: 0,
+  };
+  customizedSunset.order = 2;
+  const user = {
+    ...previousSystems[0]!,
+    customized: false,
+    id: 'user-kept',
+    name: 'Kept',
+    order: 5,
+    origin: 'user' as const,
+  };
+  const parsed = parseGradientPresetCatalog({
+    revision: 2,
+    presets: [
+      disabledAurora,
+      previousSystems[1],
+      customizedSunset,
+      previousSystems[3],
+      previousSystems[4],
+      user,
+    ],
+    defaultPresetIdBySurface: { 'highlighter-frame-fill': 'system-sunset' },
+    favoriteIdsBySurface: {
+      'highlighter-frame-fill': ['system-sunset', 'system-ocean', 'user-kept'],
+    },
+  });
+
+  expect(parsed.unsafeForWrite).toBe(false);
+  expect(parsed.catalog.presets).toHaveLength(13);
+  expect(parsed.catalog.presets.find((preset) => preset.id === 'system-sunset')).toMatchObject({
+    customized: true,
+    name: 'My sunset',
+    gradient: { angle: 42 },
+  });
+  expect(parsed.catalog.presets.find((preset) => preset.id === 'system-aurora')).toMatchObject({
+    customized: true,
+    enabled: false,
+  });
+  expect(parsed.catalog.presets.find((preset) => preset.id === 'system-ocean')?.gradient).toEqual(
+    current.presets.find((preset) => preset.id === 'system-ocean')?.gradient
+  );
+  expect(parsed.catalog.presets.findIndex((preset) => preset.id === 'system-aurora')).toBeLessThan(
+    parsed.catalog.presets.findIndex((preset) => preset.id === 'system-sunset')
+  );
+  expect(parsed.catalog.presets.at(-1)?.id).toBe('user-kept');
+  expect(parsed.catalog.defaultPresetIdBySurface['highlighter-frame-fill']).toBe('system-sunset');
+  expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual([
+    'system-sunset',
+    'system-ocean',
+    'user-kept',
+  ]);
+  expect(parseGradientPresetCatalog(parsed.catalog)).toEqual({
+    catalog: parsed.catalog,
+    unsafeForWrite: false,
+  });
+});
+
+describe('gradient preset catalog cloning and metadata', () => {
   it('clones favorite collections without sharing mutable state', () => {
     const catalog = createDefaultGradientPresetCatalog();
     catalog.favoriteIdsBySurface['highlighter-frame-fill'] = [catalog.presets[0]!.id];

@@ -12,8 +12,8 @@ describe('system border preset catalog', () => {
     const first = createSystemBorderPresetCatalog();
     const second = createSystemBorderPresetCatalog();
 
-    expect(new Set(first.map((preset) => preset.id)).size).toBe(8);
-    expect(new Set(first.map((preset) => preset.systemPresetKey)).size).toBe(8);
+    expect(new Set(first.map((preset) => preset.id)).size).toBe(15);
+    expect(new Set(first.map((preset) => preset.systemPresetKey)).size).toBe(15);
     expect(first.every((preset) => preset.id === preset.systemPresetKey)).toBe(true);
     expect(
       first.every(
@@ -25,8 +25,8 @@ describe('system border preset catalog', () => {
     ).toBe(true);
 
     first[0]!.padding.top = 50;
-    expect(second[0]!.padding.top).toBe(3);
-    expect(getCanonicalSystemBorderPreset('system-default')?.padding.top).toBe(3);
+    expect(second[0]!.padding.top).toBe(4);
+    expect(getCanonicalSystemBorderPreset('system-default')?.padding.top).toBe(4);
   });
 
   it('clones canonical Paint without retaining shared stop state', () => {

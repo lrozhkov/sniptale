@@ -54,6 +54,7 @@ describe('SettingsPopoverHeader', () => {
     );
 
     expect(markup).toContain('data-draggable="true"');
+    expect(markup).not.toContain('title="Settings"');
     expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).toContain('aria-label="Close"');
   });

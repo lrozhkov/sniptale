@@ -46,6 +46,9 @@ it('creates semantic canvas actions with shared icons for editor adapters', () =
   for (const kind of DESCRIPTOR_KINDS) {
     expect(markup).toContain(`data-ui="shared.canvas.insert.${kind}"`);
   }
+  expect(renderToStaticMarkup(<>{actions.find(({ id }) => id === 'pencil')?.icon}</>)).toContain(
+    'lucide-pen-line'
+  );
 });
 
 it('preserves file accept metadata and routes selected files through shared buttons', () => {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ANNOTATION_TEMPLATE_TAG_LIMITS } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { translate } from '../../../../../platform/i18n';
 import {
@@ -10,6 +11,7 @@ import {
 } from '../../../../section-surface';
 import { AnnotationTemplateTagEditor, type AnnotationTemplateTagEditorState } from './editor';
 import { useAnnotationTemplateTagsController } from './controller';
+import { getAnnotationTemplateTagDisplayName } from '../../../../../ui/annotation-template-query';
 
 export function AnnotationTemplateTagsSettings() {
   const controller = useAnnotationTemplateTagsController();
@@ -17,12 +19,18 @@ export function AnnotationTemplateTagsSettings() {
   const [deleteTagId, setDeleteTagId] = useState<string | null>(null);
   const items: readonly SettingsCollectionItem[] = controller.state.tags.map((tag) => ({
     id: tag.id,
-    title: tag.label,
+    title: getAnnotationTemplateTagDisplayName(tag),
     meta: translate('highlighter.templateTags.usage').replace(
       '{count}',
       String(controller.usage.get(tag.id) ?? 0)
     ),
-    capabilities: { delete: true, edit: true },
+    isBuiltIn: tag.origin === 'system',
+    capabilities: {
+      delete: tag.origin !== 'system',
+      edit: true,
+      reset: tag.origin === 'system' && tag.customized === true,
+    },
+    actionLabels: { reset: translate('highlighter.templateTags.reset') },
   }));
   const tagsById = new Map(controller.state.tags.map((tag) => [tag.id, tag]));
   const onAction = (action: SettingsCollectionAction) => {
@@ -30,6 +38,7 @@ export function AnnotationTemplateTagsSettings() {
     if (!tag) return;
     if (action.type === 'edit') setEditor({ mode: 'edit', tag });
     if (action.type === 'delete') setDeleteTagId(tag.id);
+    if (action.type === 'reset') void controller.actions.reset(tag.id);
   };
   const deleteTag = async () => {
     if (!deleteTagId) return;
@@ -41,7 +50,7 @@ export function AnnotationTemplateTagsSettings() {
     <section className={settingsSectionClassName}>
       <SettingsCollection
         addAction={{
-          disabled: controller.state.tags.length >= 32,
+          disabled: controller.state.tags.length >= ANNOTATION_TEMPLATE_TAG_LIMITS.maximumTags,
           label: translate('highlighter.templateTags.add'),
           onInvoke: () => setEditor({ mode: 'create' }),
         }}

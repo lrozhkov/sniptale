@@ -1,0 +1,18 @@
+{
+  "format": "sniptale-settings",
+  "formatVersion": 1,
+  "exportKind": "selective",
+  "exportedAt": "2026-08-16T12:00:00.000Z",
+  "source": {
+    "appVersion": "1.0.0"
+  },
+  "domains": {
+    "capture.image": {
+      "schemaVersion": 1,
+      "data": {
+        "format": "png",
+        "quality": 100
+      }
+    }
+  }
+}

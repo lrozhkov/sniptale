@@ -1,6 +1,9 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ExternalLink } from 'lucide-react';
 import { SettingsControlRow } from '../../../../section-surface';
+import { openExtensionShortcutsPage } from '../../../../../platform/navigation/extension-pages';
 
 import type { AppearanceSectionState } from './types';
 import { ContextMenuControls } from './context-menu-controls';
@@ -34,6 +37,21 @@ export function AppearanceControlsCard({ state }: { state: AppearanceSectionStat
           disabled={state.popupStartup.loading}
           aria-label={translate('settings.appearance.popupStartupAriaLabel', state.locale)}
         />
+      </SettingsControlRow>
+
+      <SettingsControlRow
+        label={translate('settings.appearance.keyboardShortcutsLabel', state.locale)}
+        description={translate('settings.appearance.keyboardShortcutsDescription', state.locale)}
+      >
+        <ProductActionButton
+          className="w-full justify-center gap-2"
+          compact
+          tone="secondary"
+          onClick={() => void openExtensionShortcutsPage()}
+        >
+          {translate('settings.appearance.keyboardShortcutsButton', state.locale)}
+          <ExternalLink aria-hidden="true" className="h-4 w-4" />
+        </ProductActionButton>
       </SettingsControlRow>
 
       <div className="pt-1">

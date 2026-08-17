@@ -10,6 +10,7 @@ type SegmentedSwitchProps<TId extends string> = {
   activeId: TId;
   ariaLabel: string;
   dataAttribute?: Record<string, string>;
+  density?: 'compact' | 'default';
   options: readonly SegmentedSwitchOption<TId>[];
   wrap?: boolean;
   onChange: (id: TId) => void;
@@ -72,23 +73,26 @@ function WrappedSegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<
 function InlineSegmentedSwitch<TId extends string>(
   props: SegmentedSwitchProps<TId> & { activeIndex: number }
 ) {
+  const compact = props.density === 'compact';
   return (
     <div
       aria-label={props.ariaLabel}
       className={[
-        'relative grid min-w-0 grid-flow-col overflow-hidden rounded-[10px] border p-1',
+        'relative grid min-w-0 grid-flow-col overflow-hidden border',
+        compact ? 'rounded-[8px] p-0.5' : 'rounded-[10px] p-1',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
       ].join(' ')}
       role="group"
-      style={getSwitchStyle(props.options.length, props.activeIndex)}
+      style={getSwitchStyle(props.options.length, props.activeIndex, compact)}
       {...props.dataAttribute}
     >
-      <SegmentedSwitchActiveBackground />
+      <SegmentedSwitchActiveBackground compact={compact} />
       {props.options.map((option) => (
         <InlineSegmentedSwitchOption
           key={option.id}
           active={option.id === props.activeId}
+          compact={compact}
           label={option.label}
           onClick={() => props.onChange(option.id)}
         />
@@ -99,6 +103,7 @@ function InlineSegmentedSwitch<TId extends string>(
 
 function InlineSegmentedSwitchOption(props: {
   active: boolean;
+  compact: boolean;
   label: string;
   onClick: () => void;
 }) {
@@ -112,7 +117,8 @@ function InlineSegmentedSwitchOption(props: {
         props.active
           ? getActiveSegmentedOptionClassName()
           : getControlSegmentedOptionClassName({ active: props.active, density: 'compact' }),
-        'relative z-10 min-w-0 justify-center overflow-hidden !h-8 !min-h-8 !rounded-[7px] px-2',
+        'relative z-10 min-w-0 justify-center overflow-hidden px-2',
+        props.compact ? '!h-7 !min-h-7 !rounded-[6px]' : '!h-8 !min-h-8 !rounded-[7px]',
       ].join(' ')}
     >
       <span className="block min-w-0 max-w-full truncate">{props.label}</span>
@@ -148,27 +154,29 @@ function getActiveSegmentedOptionClassName() {
   ].join(' ');
 }
 
-function getSwitchStyle(groupCount: number, activeIndex: number) {
+function getSwitchStyle(groupCount: number, activeIndex: number, compact: boolean) {
   return {
     '--sniptale-group-count': groupCount,
     '--sniptale-group-index': activeIndex,
+    '--sniptale-group-inset': compact ? '0.125rem' : '0.25rem',
     gridTemplateColumns: `repeat(${groupCount}, minmax(0, 1fr))`,
   } as React.CSSProperties;
 }
 
-function SegmentedSwitchActiveBackground() {
+function SegmentedSwitchActiveBackground(props: { compact: boolean }) {
   return (
     <span
       aria-hidden="true"
       className={[
-        'pointer-events-none absolute bottom-1 top-1 rounded-[8px]',
+        'pointer-events-none absolute',
+        props.compact ? 'bottom-0.5 top-0.5 rounded-[6px]' : 'bottom-1 top-1 rounded-[8px]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_78%,var(--sniptale-color-accent)_10%)]',
         'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_24%,transparent)]',
         'transition-transform duration-200 ease-out motion-reduce:transition-none',
       ].join(' ')}
       style={{
-        left: '0.25rem',
-        width: 'calc((100% - 0.5rem) / var(--sniptale-group-count))',
+        left: 'var(--sniptale-group-inset)',
+        width: 'calc((100% - var(--sniptale-group-inset) * 2) / var(--sniptale-group-count))',
         transform: 'translateX(calc(var(--sniptale-group-index) * 100%))',
       }}
     />

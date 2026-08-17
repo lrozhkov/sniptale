@@ -6,6 +6,7 @@ import type {
   LegacyCalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCanonicalSystemCalloutPreset } from '../../callout-presets/catalog';
+import { cloneCalloutVisualStyle } from '../../callout-presets/visual-style';
 import { clonePaint, createSolidPaint } from '@sniptale/foundation/paint';
 
 export type { CalloutSettingsPatch } from '@sniptale/runtime-contracts/highlighter/callout';
@@ -38,38 +39,7 @@ function cloneConnectorAttachments(placement: Partial<CalloutPlacement>) {
 }
 
 export function cloneCalloutStyle(style: CalloutVisualStyle): CalloutVisualStyle {
-  return {
-    accentEdge: { ...DEFAULT_STYLE.accentEdge, ...style.accentEdge },
-    badge: { ...DEFAULT_STYLE.badge, ...style.badge },
-    colorBindings: { ...DEFAULT_STYLE.colorBindings, ...style.colorBindings },
-    connector: {
-      ...DEFAULT_STYLE.connector,
-      ...style.connector,
-      cornerStyle: {
-        ...DEFAULT_STYLE.connector.cornerStyle,
-        ...style.connector?.cornerStyle,
-      },
-      curve: {
-        ...DEFAULT_STYLE.connector.curve,
-        ...style.connector?.curve,
-        ...(style.connector?.curve?.startHandle
-          ? { startHandle: { ...style.connector.curve.startHandle } }
-          : {}),
-        ...(style.connector?.curve?.endHandle
-          ? { endHandle: { ...style.connector.curve.endHandle } }
-          : {}),
-      },
-      spacing: { ...DEFAULT_STYLE.connector.spacing, ...style.connector?.spacing },
-    },
-    customCss: style.customCss ?? DEFAULT_STYLE.customCss,
-    surface: {
-      ...DEFAULT_STYLE.surface,
-      ...style.surface,
-      fillPaint: clonePaint(style.surface?.fillPaint ?? DEFAULT_STYLE.surface.fillPaint),
-    },
-    title: { ...DEFAULT_STYLE.title, ...style.title },
-    typography: { ...DEFAULT_STYLE.typography, ...style.typography },
-  };
+  return cloneCalloutVisualStyle(style, DEFAULT_STYLE);
 }
 
 export function cloneForkedCalloutStyle(
@@ -181,7 +151,11 @@ export function applyCalloutSettingsPatch(
         ...patch.style?.surface,
         fillPaint: clonePaint(patch.style?.surface?.fillPaint ?? settings.style.surface.fillPaint),
       },
-      title: { ...settings.style.title, ...patch.style?.title },
+      title: {
+        ...settings.style.title,
+        ...patch.style?.title,
+        fillPaint: clonePaint(patch.style?.title?.fillPaint ?? settings.style.title.fillPaint),
+      },
       typography: { ...settings.style.typography, ...patch.style?.typography },
     },
   };

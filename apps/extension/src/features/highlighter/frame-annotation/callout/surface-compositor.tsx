@@ -309,7 +309,8 @@ function renderOuterShadows(
               result="offset"
             />
             <feFlood floodColor={shadow.color} result="color" />
-            <feComposite in="color" in2="offset" operator="in" />
+            <feComposite in="color" in2="offset" operator="in" result="colored-shadow" />
+            <feComposite in="colored-shadow" in2="SourceAlpha" operator="out" />
           </filter>
         </defs>
         <Shape geometry={geometry} fill="#000" filter={`url(#callout-shadow-${id}-${index})`} />
@@ -626,6 +627,15 @@ type CalloutSurfaceCompositorProps = {
   visualScale: number;
 };
 
+function composeResolvedSurfaceShadows(
+  nativeShadows: ProjectedSurfaceShadow[],
+  resolvedBoxShadow: string
+): ProjectedSurfaceShadow[] {
+  const customShadows = parseResolvedCalloutBoxShadow(resolvedBoxShadow);
+  if (customShadows === null) return nativeShadows;
+  return [...nativeShadows, ...customShadows];
+}
+
 function useResolvedSurfaceEffects(
   projection: CalloutSurfaceProjection,
   cssContext: CalloutSurfaceCssContext
@@ -652,7 +662,7 @@ function useResolvedSurfaceEffects(
       },
       shadows:
         customBoxShadow !== undefined
-          ? (parseResolvedCalloutBoxShadow(computed.boxShadow) ?? [])
+          ? composeResolvedSurfaceShadows(projection.shadows, computed.boxShadow)
           : projection.shadows,
     });
   }, [customBoxShadow, customOutline, projection.outline, projection.shadows, resolutionKey]);
@@ -661,7 +671,11 @@ function useResolvedSurfaceEffects(
     outline: customOutline && hasResolution ? resolved.outline : projection.outline,
     probeRef,
     shadows:
-      customBoxShadow === undefined ? projection.shadows : hasResolution ? resolved.shadows : [],
+      customBoxShadow === undefined
+        ? projection.shadows
+        : hasResolution
+          ? resolved.shadows
+          : projection.shadows,
   };
 }
 

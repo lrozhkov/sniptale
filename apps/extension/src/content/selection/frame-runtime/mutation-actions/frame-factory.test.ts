@@ -239,7 +239,7 @@ describe('frame mutation action frame factory', () => {
     expect(hostLayoutServiceRef.current.getNode('frame-1')).toBe(label);
   });
 
-  it('selects a newly drawn free frame and closes the previous toolbar owner', () => {
+  it('closes the previous toolbar without selecting a newly drawn free frame', () => {
     const { options } = createOptions();
     useFrameUIStore.getState().selectFrame('previous-frame');
     const { calculateFrameCoords: _calculateFrameCoords, ...freeOptions } = options;
@@ -258,8 +258,29 @@ describe('frame mutation action frame factory', () => {
 
     expect(useFrameUIStore.getState()).toMatchObject({
       hoveredFrameId: null,
-      selectedFrameId: 'free-frame',
+      selectedFrameId: null,
     });
+  });
+
+  it('starts the default comment editor without selecting a newly drawn free frame', () => {
+    const { options } = createOptions();
+    setFutureFrameCallout(createDefaultCalloutSettings());
+    const { calculateFrameCoords: _calculateFrameCoords, ...freeOptions } = options;
+    const addFreeFrame = createAddFreeFrameHandler({
+      ...freeOptions,
+      generateFrameId: () => 'free-frame',
+    });
+
+    addFreeFrame({
+      x: 20,
+      y: 30,
+      width: 120,
+      height: 90,
+      pagePlacement: { pageX: 20, pageY: 30, iframePath: [] },
+    });
+
+    expect(consumeFrameCalloutEditRequest('free-frame')).toBe(true);
+    expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
   });
 
   it('copies the enabled session comment into a new frame and requests immediate editing', () => {

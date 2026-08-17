@@ -27,6 +27,7 @@ it('consumes a Chrome desktop stream id with native cursor exclusion', async () 
   expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
     audio: false,
     video: {
+      cursor: 'never',
       mandatory: {
         chromeMediaSource: 'desktop',
         chromeMediaSourceId: 'one-shot-stream',

@@ -8,9 +8,10 @@ import { useSettingsRoute } from './history';
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 let latest: ReturnType<typeof useSettingsRoute> | null = null;
+let navigationBlocked = false;
 
 function Harness() {
-  latest = useSettingsRoute();
+  latest = useSettingsRoute({ navigationBlocked });
   return null;
 }
 
@@ -20,6 +21,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   latest = null;
+  navigationBlocked = false;
 });
 
 afterEach(() => {
@@ -53,4 +55,22 @@ it('pushes user navigation and reparses browser navigation', () => {
     dispatchEvent(new PopStateEvent('popstate'));
   });
   expect(latest?.route).toEqual({ section: 'access-data', view: 'privacy' });
+});
+
+it('keeps the mounted route for programmatic and browser navigation while blocked', () => {
+  history.replaceState(null, '', '/settings.html?section=settings-transfer');
+  act(() => root?.render(createElement(Harness)));
+  navigationBlocked = true;
+  act(() => root?.render(createElement(Harness)));
+
+  act(() => latest?.navigate({ section: 'interface-browser' }));
+  expect(latest?.route).toEqual({ section: 'settings-transfer' });
+  expect(location.search).toContain('section=settings-transfer');
+
+  act(() => {
+    history.replaceState(null, '', '/settings.html?section=access-data');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  expect(latest?.route).toEqual({ section: 'settings-transfer' });
+  expect(location.search).toContain('section=settings-transfer');
 });

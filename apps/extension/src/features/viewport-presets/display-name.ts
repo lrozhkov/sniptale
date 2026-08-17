@@ -1,6 +1,6 @@
 import type { AppLocale, TranslationKey } from '../../platform/i18n';
 import { translate } from '../../platform/i18n';
-import type { SystemViewportPresetKey, ViewportPreset } from './contracts';
+import type { SystemViewportPresetKey } from './contracts';
 
 const nameKeys: Record<SystemViewportPresetKey, TranslationKey> = {
   windowHd: 'viewportPresets.systemNames.windowHd',
@@ -9,8 +9,20 @@ const nameKeys: Record<SystemViewportPresetKey, TranslationKey> = {
   windowFullHd: 'viewportPresets.systemNames.windowFullHd',
 };
 
-export function getViewportPresetDisplayName(preset: ViewportPreset, locale?: AppLocale): string {
-  if (preset.kind === 'user') return preset.name;
+export function getViewportPresetDisplayName(
+  preset: {
+    kind: string;
+    name?: string;
+    nameOverride?: string;
+    systemKey?: string;
+  },
+  locale?: AppLocale
+): string {
+  if (preset.kind === 'user') return preset.name ?? '';
   if (preset.nameOverride) return preset.nameOverride;
-  return translate(nameKeys[preset.systemKey], locale);
+  const key =
+    preset.systemKey && preset.systemKey in nameKeys
+      ? nameKeys[preset.systemKey as SystemViewportPresetKey]
+      : undefined;
+  return key ? translate(key, locale) : (preset.systemKey ?? '');
 }

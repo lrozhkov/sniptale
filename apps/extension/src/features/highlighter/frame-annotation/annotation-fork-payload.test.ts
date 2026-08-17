@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createGradientPaint } from '@sniptale/foundation/paint';
+import { createGradientPaint, createSolidPaint } from '@sniptale/foundation/paint';
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { DEFAULT_BORDER_PRESET } from '../style/defaults';
 import { createDefaultFrameCallout, createDefaultFrameStepBadge } from './defaults';
@@ -8,6 +8,79 @@ import {
   parseAnnotationForkDraftPayload,
   serializeAnnotationForkDraftPayload,
 } from './annotation-fork-payload';
+
+it('accepts a legacy v1 callout title background and rewrites it to canonical Paint', () => {
+  const legacyPayload: unknown = JSON.parse(
+    serializeAnnotationForkDraftPayload({ callout: createDefaultFrameCallout() })
+  );
+  if (typeof legacyPayload !== 'object' || legacyPayload === null || !('drafts' in legacyPayload)) {
+    throw new Error('Expected serialized annotation drafts');
+  }
+  const drafts = legacyPayload.drafts;
+  if (typeof drafts !== 'object' || drafts === null || !('callout' in drafts)) {
+    throw new Error('Expected serialized callout draft');
+  }
+  const callout = drafts.callout;
+  if (typeof callout !== 'object' || callout === null || !('style' in callout)) {
+    throw new Error('Expected serialized callout style');
+  }
+  const style = callout.style;
+  if (typeof style !== 'object' || style === null || !('title' in style)) {
+    throw new Error('Expected serialized callout title');
+  }
+  const title = style.title as Record<string, unknown>;
+  if (typeof title !== 'object' || title === null) {
+    throw new Error('Expected serialized callout title settings');
+  }
+  delete title['fillPaint'];
+  delete title['fillMode'];
+  Object.assign(title, { backgroundColor: '#123456' });
+
+  const payload = JSON.stringify(legacyPayload);
+  expect(parseAnnotationForkDraftPayload(payload)).toMatchObject({
+    callout: { style: { title: { fillMode: 'separate', fillPaint: createSolidPaint('#123456') } } },
+  });
+
+  const canonical = canonicalizeAnnotationForkDraftPayload(payload);
+  expect(canonical).not.toBeNull();
+  const canonicalPayload: unknown = JSON.parse(canonical!);
+  if (
+    typeof canonicalPayload !== 'object' ||
+    canonicalPayload === null ||
+    !('drafts' in canonicalPayload)
+  ) {
+    throw new Error('Expected canonical annotation drafts');
+  }
+  const canonicalDrafts = canonicalPayload.drafts;
+  if (
+    typeof canonicalDrafts !== 'object' ||
+    canonicalDrafts === null ||
+    !('callout' in canonicalDrafts)
+  ) {
+    throw new Error('Expected canonical callout draft');
+  }
+  const canonicalCallout = canonicalDrafts.callout;
+  if (
+    typeof canonicalCallout !== 'object' ||
+    canonicalCallout === null ||
+    !('style' in canonicalCallout)
+  ) {
+    throw new Error('Expected canonical callout style');
+  }
+  const canonicalStyle = canonicalCallout.style;
+  if (
+    typeof canonicalStyle !== 'object' ||
+    canonicalStyle === null ||
+    !('title' in canonicalStyle)
+  ) {
+    throw new Error('Expected canonical callout title');
+  }
+  expect(canonicalStyle.title).toMatchObject({
+    fillMode: 'separate',
+    fillPaint: createSolidPaint('#123456'),
+  });
+  expect(canonicalStyle.title).not.toHaveProperty('backgroundColor');
+});
 
 it('round-trips canonical gradient Paint and rejects unknown nested paint fields', () => {
   let id = 0;
@@ -67,7 +140,12 @@ it('round-trips canonical gradient Paint and rejects unknown nested paint fields
 
   const offsetBadge = {
     ...createDefaultFrameStepBadge(),
-    manualPlacement: { normalOffset: -32, position: 0.4, side: 'right' as const },
+    manualPlacement: {
+      normalOffset: -32,
+      position: 0.4,
+      side: 'right' as const,
+      tangentialOffset: 24,
+    },
   };
   const offsetPayload = serializeAnnotationForkDraftPayload({ stepBadge: offsetBadge });
   expect(parseAnnotationForkDraftPayload(offsetPayload)).toMatchObject({
@@ -91,6 +169,33 @@ it('round-trips canonical gradient Paint and rejects unknown nested paint fields
   }
   Object.assign(invalidStepBadge.manualPlacement as object, { normalOffset: 49 });
   expect(parseAnnotationForkDraftPayload(JSON.stringify(invalidOffset))).toBeNull();
+
+  const invalidTangentialOffset: unknown = JSON.parse(offsetPayload);
+  if (
+    typeof invalidTangentialOffset !== 'object' ||
+    invalidTangentialOffset === null ||
+    !('drafts' in invalidTangentialOffset)
+  ) {
+    throw new Error('Expected annotation drafts');
+  }
+  const tangentialDrafts = invalidTangentialOffset.drafts;
+  if (
+    typeof tangentialDrafts !== 'object' ||
+    tangentialDrafts === null ||
+    !('stepBadge' in tangentialDrafts)
+  ) {
+    throw new Error('Expected step badge draft');
+  }
+  const tangentialStepBadge = tangentialDrafts.stepBadge;
+  if (
+    typeof tangentialStepBadge !== 'object' ||
+    tangentialStepBadge === null ||
+    !('manualPlacement' in tangentialStepBadge)
+  ) {
+    throw new Error('Expected manual placement');
+  }
+  Object.assign(tangentialStepBadge.manualPlacement as object, { tangentialOffset: 49 });
+  expect(parseAnnotationForkDraftPayload(JSON.stringify(invalidTangentialOffset))).toBeNull();
 
   const invalidMode: unknown = JSON.parse(payload);
   if (typeof invalidMode !== 'object' || invalidMode === null || !('drafts' in invalidMode)) {

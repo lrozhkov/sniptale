@@ -54,6 +54,58 @@ import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 import { contentActionRuntimeContracts } from './content-action';
 import { pageAccessRuntimeContracts } from './page-access';
 import { isScreenshotImageFormat } from '@sniptale/runtime-contracts/capture/action';
+import type { SettingsTransferMessage } from '../../../../settings-transfer';
+import { SETTINGS_TRANSFER_MAX_BYTES } from '../../../../settings-transfer';
+import { isSettingsTransferResponse } from './settings-transfer-response-guard';
+
+function isSettingsTransferMessage(value: unknown): value is SettingsTransferMessage {
+  if (!isRecord(value) || value['type'] !== MessageType.SETTINGS_TRANSFER) return false;
+  const operation = value['operation'];
+  if (operation === 'read-export-tree') return Object.keys(value).length === 2;
+  if (operation === 'build-export-package') {
+    return (
+      Object.keys(value).length === 4 &&
+      (value['exportKind'] === 'backup' || value['exportKind'] === 'selective') &&
+      isStringArray(value['selectedNodeIds'])
+    );
+  }
+  if (operation === 'inspect-import') {
+    return Object.keys(value).length === 3 && isBoundedSettingsTransferText(value['fileText']);
+  }
+  if (operation !== 'commit-import') return false;
+  return (
+    Object.keys(value).length === 8 &&
+    isBoundedSettingsTransferText(value['fileText']) &&
+    (value['strategy'] === 'safe-merge' ||
+      value['strategy'] === 'overwrite-matching' ||
+      value['strategy'] === 'exact-restore') &&
+    isStringArray(value['selectedNodeIds']) &&
+    isString(value['fingerprint']) &&
+    value['fingerprint'].length === 64 &&
+    isBoolean(value['destructiveConfirmed']) &&
+    isRecord(value['decisions']) &&
+    Object.keys(value['decisions']).length <= 50_000 &&
+    Object.keys(value['decisions']).every(isSettingsTransferNodeId) &&
+    Object.values(value['decisions']).every(
+      (decision) =>
+        decision === 'keep-local' || decision === 'use-imported' || decision === 'import-as-copy'
+    )
+  );
+}
+
+function isBoundedSettingsTransferText(value: unknown): value is string {
+  return (
+    isString(value) && new TextEncoder().encode(value).byteLength <= SETTINGS_TRANSFER_MAX_BYTES
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length <= 50_000 && value.every(isSettingsTransferNodeId);
+}
+
+function isSettingsTransferNodeId(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= 512;
+}
 
 function isAiSettingsNavigationSection(value: unknown): value is 'ai-connections' | 'ai-prompts' {
   return value === 'ai-connections' || value === 'ai-prompts';
@@ -107,6 +159,7 @@ type ContentRuntimeWakeupResponse = RuntimeMessageResponse<{
   pinToTabAvailable: boolean;
   reason?: 'pin-to-tab' | 'scenario';
   restored?: boolean;
+  toolbarVisible?: boolean;
 }>;
 
 const isContentRuntimeWakeupResponseEnvelope =
@@ -116,6 +169,7 @@ const isContentRuntimeWakeupResponseEnvelope =
       pinToTabAvailable: isBoolean,
       reason: isContentRuntimeWakeupReason,
       restored: isBoolean,
+      toolbarVisible: isBoolean,
     },
   });
 
@@ -237,6 +291,13 @@ function isFrameAnnotationRasterResponse(
 }
 
 export const runtimeActionCoreMessageContracts = {
+  [MessageType.SETTINGS_TRANSFER]: {
+    parseRequest: createGuardParser('runtime SETTINGS_TRANSFER message', isSettingsTransferMessage),
+    parseResponse: createGuardParser(
+      'runtime SETTINGS_TRANSFER response',
+      isSettingsTransferResponse
+    ),
+  },
   [MessageType.AI_SETTINGS_NAVIGATION]: {
     parseRequest: createGuardParser(
       'runtime AI_SETTINGS_NAVIGATION message',

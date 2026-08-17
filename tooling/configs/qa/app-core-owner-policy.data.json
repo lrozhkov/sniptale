@@ -62,6 +62,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/contracts/settings-transfer",
+      "ownerId": "app-core.settings-transfer-contract",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/contracts/video",
       "ownerId": "app-core.video-wire",
       "ownerClass": "app-core"
@@ -277,6 +282,11 @@
       "ownerClass": "workflow"
     },
     {
+      "sourcePrefix": "apps/extension/src/workflows/settings-transfer",
+      "ownerId": "workflow.settings-transfer",
+      "ownerClass": "workflow"
+    },
+    {
       "sourcePrefix": "apps/extension/src/workflows/video",
       "ownerId": "workflow.video",
       "ownerClass": "workflow"
@@ -382,6 +392,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/managed-preset-order",
+      "ownerId": "persistence.managed-preset-order",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/media-library",
       "ownerId": "persistence.media-library",
       "ownerClass": "persistence"
@@ -424,6 +439,11 @@
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/settings",
       "ownerId": "persistence.settings",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/settings-transfer",
+      "ownerId": "persistence.settings-transfer",
       "ownerClass": "persistence"
     },
     {

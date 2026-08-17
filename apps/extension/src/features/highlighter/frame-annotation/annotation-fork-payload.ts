@@ -165,23 +165,27 @@ const calloutShape: ExactShape = {
       ),
       fillPaint: paintShape,
     },
-    title: leaf(
-      'backgroundColor',
-      'direction',
-      'dividerColor',
-      'dividerStyle',
-      'dividerWidth',
-      'enabled',
-      'fontFamily',
-      'fontSize',
-      'fontStyle',
-      'fontWeight',
-      'letterSpacing',
-      'lineHeight',
-      'textAlign',
-      'textColor',
-      'textDecoration'
-    ),
+    title: {
+      ...leaf(
+        'backgroundColor',
+        'direction',
+        'dividerColor',
+        'dividerStyle',
+        'dividerWidth',
+        'enabled',
+        'fontFamily',
+        'fontSize',
+        'fontStyle',
+        'fontWeight',
+        'letterSpacing',
+        'lineHeight',
+        'textAlign',
+        'textColor',
+        'textDecoration',
+        'fillMode'
+      ),
+      fillPaint: paintShape,
+    },
     typography: leaf(
       'direction',
       'fontFamily',
@@ -212,7 +216,7 @@ const stepBadgeShape: ExactShape = {
     'sourcePresetId',
     'type'
   ),
-  manualPlacement: leaf('normalOffset', 'position', 'side'),
+  manualPlacement: leaf('normalOffset', 'position', 'side', 'tangentialOffset'),
   style: leaf(
     'backgroundColor',
     'backgroundColorSource',

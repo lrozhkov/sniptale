@@ -40,6 +40,9 @@ it('keeps pencil quick options beside its icon without extending the toolbar flo
       'button[data-ui^="content.toolbar.drawing."]:not([data-ui^="content.toolbar.drawing-options."])'
     )
   ).toHaveLength(7);
+  expect(
+    host.querySelector('[data-ui="content.toolbar.drawing.pencil"] .lucide-pen-line')
+  ).not.toBeNull();
   expect([...host.children].map((element) => element.getAttribute('data-ui'))).toEqual([
     'content.toolbar.drawing-tools-group',
     'content.toolbar.drawing-actions-divider',

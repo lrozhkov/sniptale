@@ -35,6 +35,9 @@ const offscreenDesktopPrepareContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME];
 const offscreenDesktopCaptureContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME];
+const settingsTransferContract = runtimeActionCoreMessageContracts[MessageType.SETTINGS_TRANSFER];
+const promoteAggregateContract =
+  runtimeActionCoreMessageContracts[MessageType.PROMOTE_AGGREGATE_TO_LIBRARY];
 
 const desktopSelection = {
   dataUrl:
@@ -55,6 +58,80 @@ const validScreenshotConfig = {
   imageQuality: null,
   exitAfterCapture: false,
 } as const;
+
+it('rejects non-settings-transfer messages in the action-core contract', () => {
+  for (const value of [null, {}, { type: MessageType.SETTINGS_TRANSFER, operation: 'unknown' }]) {
+    expect(() => settingsTransferContract.parseRequest(value)).toThrow();
+  }
+  expect(
+    settingsTransferContract.parseRequest({
+      type: MessageType.SETTINGS_TRANSFER,
+      operation: 'read-export-tree',
+    })
+  ).toMatchObject({ operation: 'read-export-tree' });
+  expect(() => annotationForkSessionContract.parseRequest(null)).toThrow();
+  expect(() =>
+    annotationForkSessionContract.parseRequest({
+      type: MessageType.ANNOTATION_FORK_SESSION,
+      operation: 'unknown',
+    })
+  ).toThrow();
+  expect(
+    promoteAggregateContract.parseRequest({
+      type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
+      aggregate: { id: 'image-1', kind: 'image' },
+    })
+  ).toMatchObject({ aggregate: { id: 'image-1', kind: 'image' } });
+  expect(() =>
+    promoteAggregateContract.parseRequest({
+      type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
+      aggregate: { id: '', kind: 'other' },
+    })
+  ).toThrow();
+});
+
+it('bounds settings-transfer package, inspection, and import requests', () => {
+  const buildPackage = {
+    exportKind: 'selective' as const,
+    operation: 'build-export-package' as const,
+    selectedNodeIds: ['settings.interface'],
+    type: MessageType.SETTINGS_TRANSFER,
+  };
+  expect(settingsTransferContract.parseRequest(buildPackage)).toEqual(buildPackage);
+  expect(() =>
+    settingsTransferContract.parseRequest({ ...buildPackage, exportKind: 'unknown' })
+  ).toThrow();
+
+  const inspectImport = {
+    fileText: '{}',
+    operation: 'inspect-import' as const,
+    type: MessageType.SETTINGS_TRANSFER,
+  };
+  expect(settingsTransferContract.parseRequest(inspectImport)).toEqual(inspectImport);
+  expect(() => settingsTransferContract.parseRequest({ ...inspectImport, fileText: 42 })).toThrow();
+
+  const commitImport = {
+    decisions: {
+      'settings.interface': 'use-imported',
+      'settings.video': 'keep-local',
+      'settings.capture': 'import-as-copy',
+    },
+    destructiveConfirmed: true,
+    fileText: '{}',
+    fingerprint: 'a'.repeat(64),
+    operation: 'commit-import' as const,
+    selectedNodeIds: ['settings.interface'],
+    strategy: 'exact-restore' as const,
+    type: MessageType.SETTINGS_TRANSFER,
+  };
+  expect(settingsTransferContract.parseRequest(commitImport)).toEqual(commitImport);
+  expect(() =>
+    settingsTransferContract.parseRequest({
+      ...commitImport,
+      decisions: { 'settings.interface': 'unknown' },
+    })
+  ).toThrow();
+});
 
 it('parses strict popup screenshot capture requests and typed responses', () => {
   const request = {
@@ -150,6 +227,22 @@ it('resolves desktop encoding policy before the popup opens the picker', () => {
 });
 
 it('parses exact offscreen desktop frame responses and rejects malformed dimensions', () => {
+  const captureRequest = {
+    type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+    capabilityToken: 'desktop-capability',
+    requestId: 'request-1',
+    streamId: 'desktop-stream-1',
+    imageFormat: 'png',
+    imageQuality: 80,
+  } as const;
+  expect(offscreenDesktopCaptureContract.parseRequest(captureRequest)).toEqual(captureRequest);
+  expect(() =>
+    offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, requestId: '' })
+  ).toThrow();
+  expect(() =>
+    offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, imageQuality: 101 })
+  ).toThrow();
+
   expect(
     offscreenDesktopPrepareContract.parseResponse({ success: true, result: 'accepted' })
   ).toEqual({ success: true, result: 'accepted' });
@@ -396,6 +489,7 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
       reason: 'pin-to-tab',
       restored: true,
       success: true,
+      toolbarVisible: false,
     })
   ).toEqual({
     pinToTab: true,
@@ -403,6 +497,7 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
     reason: 'pin-to-tab',
     restored: true,
     success: true,
+    toolbarVisible: false,
   });
   expect(
     contentRuntimeWakeupContract.parseResponse({

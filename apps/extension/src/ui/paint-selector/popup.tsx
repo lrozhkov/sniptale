@@ -1,8 +1,9 @@
 import { createPortal } from 'react-dom';
-import type { RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import {
   createSolidPaint,
   updateGradientStop,
+  type GradientStop,
   type GradientType,
   type Paint,
   type PaintStopIdFactory,
@@ -24,7 +25,7 @@ import { ColorSelectorSwatchSection } from '../color-selector/swatch-section';
 import { GradientEditor } from './gradient-editor';
 import { resolvePaintSelectorLayerStyle } from './lifecycle';
 import { PaintModeSelector } from './mode-selector';
-import { Palette } from 'lucide-react';
+import { GradientTemplatePanel } from './template-panel';
 
 const POPUP_CLASS_NAME = [
   'overflow-hidden rounded-[16px] border',
@@ -34,13 +35,8 @@ const POPUP_CLASS_NAME = [
   'shadow-[0_20px_48px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_18%,transparent)]',
 ].join(' ');
 const POPUP_HEADER_CLASS_NAME = [
-  'mb-3 grid gap-3 border-b pb-3',
+  'mb-3 flex min-w-0 items-center gap-3 border-b pb-3',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_54%,transparent)]',
-].join(' ');
-const POPUP_ICON_CLASS_NAME = [
-  'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
-  'text-[var(--sniptale-color-accent)]',
 ].join(' ');
 const EDITOR_SECTION_CLASS_NAME = [
   'min-w-0 rounded-[12px] border p-3',
@@ -71,6 +67,7 @@ type PaintSelectorPopupProps = {
   selectStop: (id: string | null) => void;
   title: string;
 };
+type PaintSelectorSection = 'paint' | 'templates';
 
 export function PaintSelectorPortal(
   props: PaintSelectorPopupProps & {
@@ -82,15 +79,27 @@ export function PaintSelectorPortal(
 ) {
   const portalTarget =
     typeof document === 'undefined' ? null : resolveThemeSafePortalTarget(props.rootRef.current);
+  if (!props.open || !portalTarget) return null;
+  return createPortal(<PaintSelectorLayer {...props} />, portalTarget);
+}
+
+function PaintSelectorLayer(
+  props: PaintSelectorPopupProps & {
+    layerRef: RefObject<HTMLDivElement | null>;
+    open: boolean;
+    ownerId: string;
+    rootRef: RefObject<HTMLDivElement | null>;
+  }
+) {
+  const [section, setSection] = useState<PaintSelectorSection>('paint');
   const theme = useResolvedPortalTheme(props.rootRef.current);
   const layerStyle = resolvePaintSelectorLayerStyle(
     useColorSelectorLayerStyle(props.rootRef.current, props.open),
     props.rootRef.current,
-    props.draft.kind
+    section === 'templates' ? 'solid' : props.draft.kind
   );
-  if (!props.open || !portalTarget) return null;
   const { layerRef, open: _open, ownerId, rootRef: _rootRef, ...popupProps } = props;
-  return createPortal(
+  return (
     <ColorSelectorFloatingLayer
       layerRef={layerRef}
       ownerId={ownerId}
@@ -98,13 +107,108 @@ export function PaintSelectorPortal(
       ui="shared.ui.paint-selector.layer"
       style={layerStyle}
     >
-      <PaintSelectorPopup {...popupProps} />
-    </ColorSelectorFloatingLayer>,
-    portalTarget
+      <PaintSelectorPopup section={section} setSection={setSection} {...popupProps} />
+    </ColorSelectorFloatingLayer>
   );
 }
 
-function PaintSelectorPopup(props: PaintSelectorPopupProps) {
+function getPaintSelectorHeading(
+  section: PaintSelectorSection,
+  mode: 'solid' | GradientType
+): string {
+  if (section === 'templates') return translate('highlighter.paintPicker.presets');
+  if (mode === 'solid') return translate('highlighter.paintPicker.solid');
+  if (mode === 'linear') return translate('highlighter.paintPicker.linear');
+  if (mode === 'radial') return translate('highlighter.paintPicker.radial');
+  return translate('highlighter.paintPicker.conic');
+}
+
+function PaintSelectorPopupHeader(props: {
+  activeSection: PaintSelectorSection;
+  allowedModes?: readonly ('solid' | GradientType)[];
+  mode: 'solid' | GradientType;
+  onModeChange: (mode: 'solid' | GradientType) => void;
+  onShowTemplates: () => void;
+}) {
+  return (
+    <div className={POPUP_HEADER_CLASS_NAME}>
+      <strong className="min-w-0 flex-1 truncate text-left text-sm">
+        {getPaintSelectorHeading(props.activeSection, props.mode)}
+      </strong>
+      <PaintModeSelector
+        {...(props.allowedModes === undefined ? {} : { allowedModes: props.allowedModes })}
+        activeSection={props.activeSection}
+        mode={props.mode}
+        onChange={props.onModeChange}
+        onShowTemplates={props.onShowTemplates}
+      />
+    </div>
+  );
+}
+
+function PaintSelectorEditorContent(props: {
+  changeColor: (color: string) => void;
+  eyedropper: ReturnType<typeof useEyedropper>;
+  palette: readonly string[];
+  popup: PaintSelectorPopupProps;
+  selected: GradientStop | null;
+}) {
+  const { popup } = props;
+  return (
+    <div
+      className={
+        popup.draft.kind === 'gradient'
+          ? 'grid gap-4 min-[560px]:grid-cols-[minmax(0,1fr)_280px]'
+          : 'mx-auto max-w-[280px]'
+      }
+    >
+      {popup.draft.kind === 'gradient' ? (
+        <div className={EDITOR_SECTION_CLASS_NAME}>
+          <GradientEditor
+            createId={popup.createId}
+            gradient={popup.draft.gradient}
+            showAdvancedControls={popup.showGradientAdvancedControls !== false}
+            selectedStopId={popup.selectedStopId}
+            onSelectStop={popup.selectStop}
+            onChange={(gradient) => popup.preview({ kind: 'gradient', gradient })}
+          />
+        </div>
+      ) : null}
+      <div className={COLOR_SECTION_CLASS_NAME}>
+        {popup.draft.kind === 'solid' && props.palette.length > 0 ? (
+          <ColorSelectorSwatchSection
+            colors={props.palette}
+            gridClassName="grid grid-cols-10 justify-items-center gap-1.5"
+            label={translate('shared.ui.colorSelectorPalette')}
+            onSelect={props.changeColor}
+            selectedColor={popup.draft.color}
+            title={popup.title}
+          />
+        ) : null}
+        <ColorEditorPanel
+          key={props.selected?.id ?? 'solid'}
+          allowAlpha
+          color={
+            props.selected?.color ??
+            (popup.draft.kind === 'solid' ? popup.draft.color : '#000000ff')
+          }
+          formatMode={popup.formatMode}
+          eyedropper={props.eyedropper}
+          onCycleFormatMode={popup.onCycleFormatMode}
+          onSelectTransparent={() => props.changeColor('#00000000')}
+          onColorChange={props.changeColor}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PaintSelectorPopup(
+  props: PaintSelectorPopupProps & {
+    section: PaintSelectorSection;
+    setSection: (section: PaintSelectorSection) => void;
+  }
+) {
   const selected =
     props.draft.kind === 'gradient'
       ? (props.draft.gradient.stops.find((stop) => stop.id === props.selectedStopId) ??
@@ -126,66 +230,45 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
     <div
       role="dialog"
       aria-label={props.title}
-      className={POPUP_CLASS_NAME}
+      className={`${POPUP_CLASS_NAME} outline-none`}
       data-ui="shared.ui.paint-selector.popup"
+      tabIndex={-1}
     >
-      <div className={POPUP_HEADER_CLASS_NAME}>
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className={POPUP_ICON_CLASS_NAME}>
-            <Palette aria-hidden="true" size={16} />
-          </span>
-          <strong className="min-w-0 truncate text-sm">{props.title}</strong>
-        </div>
-        <PaintModeSelector
-          {...(props.allowedModes === undefined ? {} : { allowedModes: props.allowedModes })}
-          mode={mode}
-          onChange={props.onModeChange}
-        />
-      </div>
-      <div
-        className={
-          props.draft.kind === 'gradient'
-            ? 'grid gap-4 min-[560px]:grid-cols-[minmax(0,1fr)_280px]'
-            : 'mx-auto max-w-[280px]'
-        }
-      >
-        {props.draft.kind === 'gradient' ? (
-          <div className={EDITOR_SECTION_CLASS_NAME}>
-            <GradientEditor
-              createId={props.createId}
-              gradient={props.draft.gradient}
-              showAdvancedControls={props.showGradientAdvancedControls !== false}
-              selectedStopId={props.selectedStopId}
-              onSelectStop={props.selectStop}
-              onChange={(gradient) => props.preview({ kind: 'gradient', gradient })}
-            />
-          </div>
-        ) : null}
-        <div className={COLOR_SECTION_CLASS_NAME}>
-          {props.draft.kind === 'solid' && palette.length > 0 ? (
-            <ColorSelectorSwatchSection
-              colors={palette}
-              gridClassName="grid grid-cols-10 justify-items-center gap-1.5"
-              label={translate('shared.ui.colorSelectorPalette')}
-              onSelect={changeColor}
-              selectedColor={props.draft.color}
-              title={props.title}
-            />
-          ) : null}
-          <ColorEditorPanel
-            key={selected?.id ?? 'solid'}
-            allowAlpha
-            color={
-              selected?.color ?? (props.draft.kind === 'solid' ? props.draft.color : '#000000ff')
-            }
-            formatMode={props.formatMode}
-            eyedropper={eyedropper}
-            onCycleFormatMode={props.onCycleFormatMode}
-            onSelectTransparent={() => changeColor('#00000000')}
-            onColorChange={changeColor}
+      <PaintSelectorPopupHeader
+        {...(props.allowedModes === undefined ? {} : { allowedModes: props.allowedModes })}
+        activeSection={props.section}
+        mode={mode}
+        onModeChange={(nextMode) => {
+          props.setSection('paint');
+          props.onModeChange(nextMode);
+        }}
+        onShowTemplates={() => props.setSection('templates')}
+      />
+      {props.section === 'templates' ? (
+        <div className={EDITOR_SECTION_CLASS_NAME}>
+          <GradientTemplatePanel
+            {...(props.allowedModes === undefined ? {} : { allowedModes: props.allowedModes })}
+            {...(props.draft.kind === 'gradient' ? { activeGradient: props.draft.gradient } : {})}
+            onSelect={(gradient) => {
+              props.preview({ kind: 'gradient', gradient });
+              props.selectStop(gradient.stops[0]?.id ?? null);
+            }}
+            onCopy={(gradient) => {
+              props.preview({ kind: 'gradient', gradient });
+              props.selectStop(gradient.stops[0]?.id ?? null);
+              props.setSection('paint');
+            }}
           />
         </div>
-      </div>
+      ) : (
+        <PaintSelectorEditorContent
+          changeColor={changeColor}
+          eyedropper={eyedropper}
+          palette={palette}
+          popup={props}
+          selected={selected ?? null}
+        />
+      )}
       <div className="mt-3">
         <PickerFooter onApply={props.apply} onCancel={props.cancel} />
       </div>

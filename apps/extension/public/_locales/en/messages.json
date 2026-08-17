@@ -1,0 +1,19 @@
+{
+  "command_tools_open": { "message": "Tools: Open the page toolbar" },
+  "command_tools_drawing": { "message": "Tools: Draw on the page" },
+  "command_tools_annotations": { "message": "Tools: Add annotations" },
+  "command_tools_quick_edit": { "message": "Tools: Quick-edit page text" },
+  "command_tools_design_review": { "message": "Tools: Review page design" },
+  "command_tools_video_recording": { "message": "Tools: Open video recording controls" },
+  "command_capture_visible": { "message": "Screenshot: Capture the visible area" },
+  "command_capture_full_page": { "message": "Screenshot: Capture the full page" },
+  "command_capture_selection": { "message": "Screenshot: Select an area to capture" },
+  "command_capture_visible_edit": { "message": "Screenshot: Capture the visible area and edit" },
+  "command_capture_visible_copy": { "message": "Screenshot: Copy the visible area" },
+  "command_capture_desktop_edit": { "message": "Screenshot: Capture a window or screen and edit" },
+  "command_export_current_tab": { "message": "Export the current tab with saved settings" },
+  "command_open_library": { "message": "Open the Sniptale library" },
+  "command_open_image_editor": { "message": "Open the image editor" },
+  "command_open_video_editor": { "message": "Open the video editor" },
+  "command_open_scenario_editor": { "message": "Open the scenario editor" }
+}

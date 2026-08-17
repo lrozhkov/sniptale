@@ -35,4 +35,25 @@ describe('floating interaction layer registration', () => {
     expect(getOwnedFloatingInteractionLayers(scope, document)).toEqual([]);
     expect(getOwnedFloatingInteractionLayers(document.createElement('div'), document)).toEqual([]);
   });
+
+  it('follows nested floating owners through multiple portal levels', () => {
+    const scope = document.createElement('div');
+    const paintOwner = document.createElement('div');
+    paintOwner.setAttribute(FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE, 'paint');
+    scope.append(paintOwner);
+    const paintLayer = document.createElement('div');
+    paintLayer.setAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE, 'paint');
+    const selectOwner = document.createElement('div');
+    selectOwner.setAttribute(FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE, 'select');
+    paintLayer.append(selectOwner);
+    const selectLayer = document.createElement('div');
+    selectLayer.setAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE, 'select');
+    document.body.append(scope, paintLayer, selectLayer);
+
+    expect(getOwnedFloatingInteractionLayers(scope, document)).toEqual([paintLayer, selectLayer]);
+
+    scope.remove();
+    paintLayer.remove();
+    selectLayer.remove();
+  });
 });

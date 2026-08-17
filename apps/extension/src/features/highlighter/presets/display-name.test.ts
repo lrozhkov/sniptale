@@ -7,8 +7,8 @@ describe('border preset display name', () => {
   it('resolves untouched system names dynamically from a trusted key', () => {
     const preset = createSystemBorderPresetCatalog()[0]!;
 
-    expect(getBorderPresetDisplayName(preset, 'ru')).toBe('Акцент');
-    expect(getBorderPresetDisplayName(preset, 'en')).toBe('Accent');
+    expect(getBorderPresetDisplayName(preset, 'ru')).toBe('Оранжевый Sniptale');
+    expect(getBorderPresetDisplayName(preset, 'en')).toBe('Sniptale Orange');
     expect(preset.name).toBe('system-default');
   });
 

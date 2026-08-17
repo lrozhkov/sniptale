@@ -5,11 +5,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CompactSelect } from '../../../ui/compact-inspector-controls';
 import { initializeContentUiRoots } from '../../platform/dom-host';
+import { installContentUiActivationBridge } from '../../runtime/ui-activation-bridge';
 
 vi.mock('../../platform/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/trusted-events')>()),
   isTrustedKeyboardEvent: vi.fn(() => true),
   isTrustedMouseEvent: vi.fn(() => true),
+  isTrustedPointerEvent: vi.fn(() => true),
 }));
 
 import { startDesignReviewPicker, type DesignReviewPickerRuntime } from './picker';
@@ -44,11 +46,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('keeps a real CompactSelect option inside the Design Review inspector boundary', () => {
+it('keeps a real CompactSelect option inside the Design Review inspector boundary', async () => {
   const contentHost = document.createElement('div');
   const contentRoot = contentHost.attachShadow({ mode: 'open' });
   document.body.append(contentHost);
   initializeContentUiRoots(contentRoot);
+  installContentUiActivationBridge(contentRoot);
 
   const popover = document.createElement('aside');
   popover.dataset['ui'] = 'content.design-review.popover';
@@ -88,7 +91,18 @@ it('keeps a real CompactSelect option inside the Design Review inspector boundar
   );
 
   expect(option).toBeDefined();
-  act(() => option?.click());
+  await act(async () => {
+    option?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, button: 0, composed: true })
+    );
+    await Promise.resolve();
+    expect(onChange).not.toHaveBeenCalled();
+    option?.dispatchEvent(
+      new MouseEvent('pointerup', { bubbles: true, button: 0, composed: true })
+    );
+    option?.click();
+    await Promise.resolve();
+  });
 
   expect(onChange).toHaveBeenCalledWith('inline');
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();

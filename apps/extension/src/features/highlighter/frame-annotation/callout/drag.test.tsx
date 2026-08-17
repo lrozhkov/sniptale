@@ -177,6 +177,18 @@ describe('useCalloutDrag', () => {
     );
   });
 
+  it('moves connector geometry with the comment during Ctrl arrow-key operations', () => {
+    renderHarness();
+    const event = { ...keyboardEvent('ArrowRight'), ctrlKey: true };
+
+    act(() => drag?.handleKeyDown(event));
+
+    expect(onPositionChange).toHaveBeenCalledWith(
+      { centerOffsetX: 95, centerOffsetY: 80 },
+      { translateConnectorGeometry: true }
+    );
+  });
+
   it('constrains pointer movement to the dominant axis while Shift is held', () => {
     renderHarness();
     startDrag();

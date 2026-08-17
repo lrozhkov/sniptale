@@ -4,6 +4,7 @@ export {
   SettingsSectionHeaderActionsProvider,
 } from './section-header-actions';
 export { SettingsSubpageTabs } from './subpage-tabs';
+export { SettingsNavigationLockProvider, useSettingsNavigationLock } from './navigation-lock';
 export { SettingsRangeField } from './range-field';
 export { SettingsControlRow } from './panel-controls';
 export { SettingsCollection } from './collection';

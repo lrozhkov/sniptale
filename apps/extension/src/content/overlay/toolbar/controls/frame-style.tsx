@@ -30,6 +30,7 @@ import {
   persistAnnotationForkDrafts,
   selectAnnotationForkDrafts,
 } from './annotation-fork-session';
+import { setHighlighterCreationEnabled } from '../../../selection/highlighter';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
@@ -43,6 +44,7 @@ export function FutureFrameStyleControls(props: {
   toolbarMenuState: ToolbarMenuState;
 }) {
   const [style, setStyle] = useState(props.futureFrameStyle);
+  const [frameActive, setFrameActive] = useState(true);
   const [forkDraftsHydrated, setForkDraftsHydrated] = useState(false);
   const activeForkDraftsRef = useRef<ReturnType<typeof selectAnnotationForkDrafts>>({});
   const localForkRevisionRef = useRef(0);
@@ -110,6 +112,7 @@ export function FutureFrameStyleControls(props: {
     <FrameAnnotationCreationControls
       activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
       context="content"
+      frameActive={frameActive}
       calloutTemplateSourceControl={{
         onChange: (source) => setAnnotationTemplateSource('callout', source),
         value: templateSources.callout,
@@ -138,6 +141,10 @@ export function FutureFrameStyleControls(props: {
         if (next.stepBadge !== previous.futureStepBadge) {
           props.futureFrameStepBadgeActions?.set(next.stepBadge);
         }
+      }}
+      onFrameActiveChange={(active) => {
+        setHighlighterCreationEnabled(active);
+        setFrameActive(active);
       }}
       onMenuChange={(menu) => props.toolbarMenuState.setActiveMenuType(toToolbarMenu(menu))}
       portalTarget={resolveContentPortalTarget()}

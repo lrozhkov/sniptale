@@ -9,6 +9,8 @@ import { getViewportPresetDisplayName } from '../../../../features/viewport-pres
 import { formatViewportPresetDimensions } from '../../../../features/viewport-presets/format';
 import { orderViewportPresetsForSelector } from '../../../../features/viewport-presets/operations';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
+import { Copy, Download, FolderOpen, Images, Save } from 'lucide-react';
 
 const captureActions: CaptureActionType[] = [
   'download_default',
@@ -16,8 +18,19 @@ const captureActions: CaptureActionType[] = [
   'ask_system',
   'edit',
   'copy',
+  'scenario',
   'save_to_library',
 ];
+
+const actionIcons: Record<CaptureActionType, NonNullable<InlineCurtainOption['icon']>> = {
+  download_default: Download,
+  ask_preset: FolderOpen,
+  ask_system: Save,
+  edit: ImageEditorIcon,
+  copy: Copy,
+  scenario: ScenarioEditorIcon,
+  save_to_library: Images,
+};
 
 const actionKeys: Record<CaptureActionType, Parameters<typeof translate>[0]> = {
   download_default: 'settings.quickActions.afterCaptureDownloadDefault',
@@ -71,11 +84,7 @@ export function TabCaptureSizeField(
         value: item.id,
         label: getViewportPresetDisplayName(item),
         meta: formatViewportPresetDimensions(item.width, item.height),
-        group: translate(
-          item.target === 'window'
-            ? 'viewportPresets.groups.window'
-            : 'viewportPresets.groups.viewport'
-        ),
+        group: translate('viewportPresets.groups.window'),
       })),
   ]);
 
@@ -126,7 +135,7 @@ export function AfterCaptureField(props: CaptureFieldProps) {
       description={translate('popup.home.afterCaptureDescription')}
       options={captureActions
         .filter((value) => !allowed || allowed.has(value))
-        .map((value) => ({ value, label: translate(actionKeys[value]) }))}
+        .map((value) => ({ value, label: translate(actionKeys[value]), icon: actionIcons[value] }))}
       onChange={(value) => props.patch({ afterCapture: value as CaptureActionType })}
     />
   );

@@ -193,15 +193,17 @@ it('exposes eyedropper pressed state, resolves picked colors, and clears on unmo
   expect(onEyedropperStateChange).toHaveBeenLastCalledWith(false);
 });
 
-it('starts the native eyedropper before publishing React state and aborts only with its root', async () => {
+it('starts the native eyedropper before React state and does not abort it with its root', async () => {
   const calls: string[] = [];
   let resolvePick: ((result: { sRGBHex: string }) => void) | null = null;
+  let receivedSignal: AbortSignal | undefined;
   const onEyedropperStateChange = vi.fn((active: boolean) => calls.push(`state:${active}`));
   vi.stubGlobal(
     'EyeDropper',
     class {
-      open(...args: unknown[]) {
-        calls.push(`open:${args.length}`);
+      open(options?: { signal?: AbortSignal }) {
+        calls.push(`open:${options ? 1 : 0}`);
+        receivedSignal = options?.signal;
         return new Promise<{ sRGBHex: string }>((resolve) => {
           resolvePick = resolve;
         });
@@ -220,7 +222,9 @@ it('starts the native eyedropper before publishing React state and aborts only w
   expect(calls.slice(0, 2)).toEqual(['open:1', 'state:true']);
   act(() => root?.unmount());
   expect(calls).toContain('state:false');
+  expect(receivedSignal?.aborted).toBe(false);
   await act(async () => resolvePick?.({ sRGBHex: '#abcdef' }));
+  expect(receivedSignal?.aborted).toBe(false);
 });
 
 it('returns early when the EyeDropper constructor is unavailable', async () => {

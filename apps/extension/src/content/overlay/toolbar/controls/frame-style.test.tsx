@@ -152,7 +152,7 @@ it('opens one dynamic effect menu and projects mode changes from that menu', () 
   renderControls(createStyle('border'), onFutureFrameEffectModeChange);
 
   const effectButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.future-frame-style"]'
+    '[data-ui="content.toolbar.future-frame-style.menu"]'
   );
   act(() => effectButton?.click());
 
@@ -188,7 +188,30 @@ it('projects a mode change made from an existing frame', () => {
   expect(onFutureFrameEffectModeChange).not.toHaveBeenCalled();
 });
 
-it('enables future comments and opens their settings from the toolbar button', () => {
+it('hides annotation defaults when frame creation is off while keeping the frame control', () => {
+  const callout = createDefaultCalloutSettings();
+  const stepBadge = createDefaultFrameStepBadge();
+  renderControls(
+    { ...createStyle('border'), futureCallout: callout, futureStepBadge: stepBadge },
+    vi.fn()
+  );
+
+  const frameButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.future-frame-style"]'
+  );
+  act(() => frameButton?.click());
+
+  expect(frameButton?.getAttribute('aria-pressed')).toBe('false');
+  expect(
+    container?.querySelector('[data-ui="content.toolbar.future-frame-style.menu"]')
+  ).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.toolbar.future-frame-callout"]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="content.toolbar.future-frame-step-badge"]')
+  ).toBeNull();
+});
+
+it('uses the large comment button for state and the arrow only for its menu', () => {
   const settings = createDefaultCalloutSettings();
   const onEnableFutureFrameCallout = vi.fn(() => settings);
   const onFutureFrameCalloutChange = vi.fn();
@@ -221,6 +244,13 @@ it('enables future comments and opens their settings from the toolbar button', (
   expect(onEnableFutureFrameCallout).toHaveBeenCalledOnce();
   expect(onFutureFrameCalloutChange).toHaveBeenCalledWith(settings);
   expect(button?.getAttribute('aria-pressed')).toBe('true');
+  expect(popoverMocks.calloutProps).toMatchObject({ isOpen: false, settings });
+
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.future-frame-callout.menu"]')
+      ?.click()
+  );
   expect(popoverMocks.calloutProps).toMatchObject({
     isOpen: true,
     settings,
@@ -228,7 +258,7 @@ it('enables future comments and opens their settings from the toolbar button', (
   });
 });
 
-it('enables future numbering and opens the shared settings menu', () => {
+it('uses the large numbering button for state and the arrow only for its menu', () => {
   const settings = createDefaultFrameStepBadge();
   const enable = vi.fn(() => settings);
   const set = vi.fn();
@@ -255,6 +285,13 @@ it('enables future numbering and opens the shared settings menu', () => {
   expect(enable).toHaveBeenCalledOnce();
   expect(set).toHaveBeenCalledWith(settings);
   expect(button?.getAttribute('aria-pressed')).toBe('true');
+  expect(popoverMocks.stepBadgeProps).toMatchObject({ isOpen: false, settings });
+
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.future-frame-step-badge.menu"]')
+      ?.click()
+  );
   expect(popoverMocks.stepBadgeProps).toMatchObject({
     isOpen: true,
     settings,

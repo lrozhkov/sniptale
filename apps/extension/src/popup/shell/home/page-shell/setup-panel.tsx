@@ -1,4 +1,4 @@
-import { Camera, Image, Images } from 'lucide-react';
+import { Camera, Images } from 'lucide-react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n/popup';
@@ -12,6 +12,7 @@ import {
 } from './setup-fields';
 import { openImageEditor, openLibrary } from '../../navigation/actions';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
+import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
 
 export function ScreenshotSetupPanel(props: {
   config: ScreenshotCaptureConfig;
@@ -58,7 +59,7 @@ export function ScreenshotSetupPanel(props: {
             onClick={props.onCapture}
           />
           <PopupActionButton
-            icon={Image}
+            icon={ImageEditorIcon}
             label={translate('popup.home.imageEditorLabel')}
             iconClassName="text-[var(--sniptale-color-text-secondary)]"
             compact

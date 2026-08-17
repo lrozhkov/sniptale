@@ -109,9 +109,12 @@ export function resolveFrameCalloutTemplate(
   const preset = getLoadedCalloutPresetCatalogSnapshot()?.presets.find(
     (candidate) => candidate.id === presetId
   );
-  return preset
-    ? createDefaultCalloutSettings(preset.style, preset.id, preset.placement, preset.content)
-    : structuredClone(fallback);
+  if (!preset) return structuredClone(fallback);
+
+  return {
+    ...createDefaultCalloutSettings(preset.style, preset.id, preset.placement, preset.content),
+    enabled: fallback.enabled,
+  };
 }
 
 export function resolveFrameStepBadgeTemplate(
@@ -126,7 +129,10 @@ export function resolveFrameStepBadgeTemplate(
   const preset = getLoadedStepBadgePresetCatalogSnapshot()?.presets.find(
     (candidate) => candidate.id === presetId
   );
-  return preset
-    ? createStepBadgeSettingsFromTemplate(preset.settings, preset.id)
-    : cloneStepBadgeSettings(fallback);
+  if (!preset) return cloneStepBadgeSettings(fallback);
+
+  return {
+    ...createStepBadgeSettingsFromTemplate(preset.settings, preset.id),
+    enabled: fallback.enabled,
+  };
 }

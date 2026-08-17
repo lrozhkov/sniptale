@@ -1,26 +1,33 @@
 import { expect, it } from 'vitest';
-import {
-  cloneCalloutPreset,
-  createSystemCalloutPresetCatalog,
-  SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
-} from './catalog';
+import { createSystemCalloutPresetCatalog } from './catalog';
+import { cloneCalloutPreset } from './visual-style';
+import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from './system-preset';
 
-it('creates the six stable system callout presets with independent styles', () => {
+it('creates fifteen stable system callout presets with independent styles', () => {
   const presets = createSystemCalloutPresetCatalog();
   expect(presets.map((preset) => preset.id)).toEqual([
     'system-callout-bubble',
     'system-callout-card',
-    'system-callout-text',
+    'system-callout-ribbon',
     'system-callout-pointer-note',
-    'system-callout-header-card',
     'system-callout-framed-note',
+    'system-callout-sticky',
+    'system-callout-header-card',
+    'system-callout-text',
+    'system-callout-terminal',
+    'system-callout-editorial-caption',
+    'system-callout-editorial-quote',
+    'system-callout-editorial-proof',
+    'system-callout-retro-sunset',
+    'system-callout-retro-arcade',
+    'system-callout-retro-memphis',
   ]);
   expect(
     presets.every((preset) => preset.basedOnRevision === SYSTEM_CALLOUT_PRESET_CATALOG_REVISION)
   ).toBe(true);
-  expect(presets.every((preset) => preset.style.badge.text === '')).toBe(true);
+  expect(presets.filter((preset) => preset.style.badge.enabled)).toHaveLength(10);
   presets[0]!.style.surface.radius = 99;
-  expect(createSystemCalloutPresetCatalog()[0]!.style.surface.radius).toBe(12);
+  expect(createSystemCalloutPresetCatalog()[0]!.style.surface.radius).toBe(8);
 });
 
 it('deep-clones every nested visual role', () => {
@@ -79,14 +86,20 @@ it('provides distinct annotation roles and a ring-dot endpoint preset', () => {
   });
   expect(info.style).toMatchObject({
     connector: { frameMarker: 'square', routing: 'polyline', width: 2 },
-    surface: { fillPaint: { kind: 'solid', color: '#f8fafcff' }, borderColor: '#486581' },
-    title: { backgroundColor: '#243B53', dividerColor: '#243B53', dividerWidth: 2, enabled: true },
+    surface: { fillPaint: { kind: 'solid', color: '#111827dc' }, borderColor: '#22D3EE' },
+    title: {
+      dividerColor: '#22D3EE',
+      dividerWidth: 2,
+      enabled: true,
+      fillMode: 'separate',
+      fillPaint: { kind: 'solid', color: '#d946efff' },
+    },
   });
   expect(warning.style).toMatchObject({
     accentEdge: { color: '#D99000', enabled: true, side: 'left' },
     connector: { color: '#8A5A00', frameMarker: 'diamond', width: 2 },
-    surface: { fillPaint: { kind: 'solid', color: '#fff9e8ff' }, borderColor: '#E8C56A' },
-    title: { dividerColor: '#D99000', dividerWidth: 2, enabled: true },
+    surface: { fillPaint: { kind: 'solid', color: '#fff7edfa' }, borderColor: '#E8C56A' },
+    title: { dividerColor: '#0F766E', dividerWidth: 2, enabled: true },
   });
   expect(warning.style.connector.frameMarker).not.toBe('arrow');
 });

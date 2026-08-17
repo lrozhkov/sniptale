@@ -22,6 +22,13 @@ export const POPUP_RECORDING_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/popup/shell/runtime/actions.test.tsx'],
   },
   {
+    owner: 'popup-recording-start-hook',
+    productionFile: 'apps/extension/src/popup/shell/runtime/start/run.ts',
+    exclusive: true,
+    reason: 'Popup recording start gating and workflow delegation have adjacent hook proof.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/start/run.test.tsx'],
+  },
+  {
     owner: 'popup-video-route',
     productionFile: 'apps/extension/src/popup/recording/video/route.tsx',
     exclusive: true,

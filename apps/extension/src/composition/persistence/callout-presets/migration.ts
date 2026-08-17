@@ -3,12 +3,12 @@ import type {
   CalloutPresetCatalog,
   SystemCalloutPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
+import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from '../../../features/highlighter/callout-presets/system-preset';
 import {
   cloneCalloutPreset,
   cloneCalloutVisualStyle,
-  createSystemCalloutPresetCatalog,
-  SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
-} from '../../../features/highlighter/callout-presets/catalog';
+} from '../../../features/highlighter/callout-presets/visual-style';
 import { CALLOUT_PRESET_STORAGE_SCHEMA_VERSION, type StoredCalloutPresetCatalog } from './parser';
 import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
@@ -35,7 +35,6 @@ function resolveDefaultId(presets: CalloutPreset[], requestedId?: string): strin
 export function resolveStoredCalloutPresetCatalog(
   stored: StoredCalloutPresetCatalog
 ): CalloutPresetCatalog {
-  const hasStoredCatalog = Object.keys(stored).length > 0;
   const placementById = new Map((stored.placements ?? []).map((item) => [item.id, item]));
   const overrideByKey = new Map(
     (stored.systemOverrides ?? [])
@@ -56,9 +55,9 @@ export function resolveStoredCalloutPresetCatalog(
     if (!override) {
       return {
         ...canonical,
-        enabled: placement?.enabled ?? (!hasStoredCatalog || !customized),
+        enabled: placement?.enabled ?? true,
         order: placement?.order ?? nextOrder + index,
-        tagIds: [...(placement?.tagIds ?? [])],
+        tagIds: [...(placement?.tagIds !== undefined ? placement.tagIds : canonical.tagIds)],
       };
     }
     return {
@@ -71,6 +70,7 @@ export function resolveStoredCalloutPresetCatalog(
       order: placement?.order ?? nextOrder + index,
       placement: { ...(override.placement ?? canonical.placement) },
       style: cloneCalloutVisualStyle(override.style),
+      tagIds: [...(placement?.tagIds !== undefined ? placement.tagIds : canonical.tagIds)],
     };
   });
 

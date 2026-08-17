@@ -17,7 +17,7 @@ it('projects Paint, backdrop, and foreground through explicit semantic roles', (
   expect(projection.contentStyle).toEqual({ color: '#123456' });
 });
 
-it('gives an explicit custom shadow exclusive authority over native elevation', () => {
+it('retains native elevation for runtime composition with custom shadows', () => {
   const withShadow = createSystemCalloutPresetCatalog()[0]!.style;
   withShadow.surface.shadow = 12;
   withShadow.surface.shadowColor = '#ff0000';
@@ -27,12 +27,17 @@ it('gives an explicit custom shadow exclusive authority over native elevation', 
 
   withShadow.customCss = '[card]\nbox-shadow: none;';
   expect(resolveCalloutSurfaceProjection(withShadow)).toEqual(
-    expect.objectContaining({ customBoxShadow: 'none', shadows: [] })
+    expect.objectContaining({
+      customBoxShadow: 'none',
+      shadows: [expect.objectContaining({ blur: 12, color: '#ff0000', inset: false })],
+    })
   );
 
   withShadow.customCss = '[card]\nbox-shadow: inset 0 1px 0 #ffffff59;';
   const projection = resolveCalloutSurfaceProjection(withShadow);
-  expect(projection.shadows).toEqual([]);
+  expect(projection.shadows).toEqual([
+    expect.objectContaining({ blur: 12, color: '#ff0000', inset: false }),
+  ]);
   expect(projection.customBoxShadow).toBe('inset 0 1px 0 #ffffff59');
   expect(parseResolvedCalloutBoxShadow('inset rgb(255, 255, 255) 0px 1px 0px 0px')).toEqual([
     {
@@ -47,12 +52,17 @@ it('gives an explicit custom shadow exclusive authority over native elevation', 
 
   withShadow.customCss = '[card]\nbox-shadow: red 0 2px 4px;';
   expect(resolveCalloutSurfaceProjection(withShadow)).toEqual(
-    expect.objectContaining({ customBoxShadow: 'red 0 2px 4px', shadows: [] })
+    expect.objectContaining({
+      customBoxShadow: 'red 0 2px 4px',
+      shadows: [expect.objectContaining({ blur: 12, color: '#ff0000', inset: false })],
+    })
   );
 
   withShadow.customCss = '[card]\nbox-shadow: 0 0.5em 1em red;';
   const unresolved = resolveCalloutSurfaceProjection(withShadow);
-  expect(unresolved.shadows).toEqual([]);
+  expect(unresolved.shadows).toEqual([
+    expect.objectContaining({ blur: 12, color: '#ff0000', inset: false }),
+  ]);
   expect(unresolved.customBoxShadow).toBe('0 0.5em 1em red');
 });
 

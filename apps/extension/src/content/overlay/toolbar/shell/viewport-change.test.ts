@@ -30,9 +30,7 @@ vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) =>
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) =>
-    key === 'content.toolbar.viewportChangeError'
-      ? 'Не удалось изменить размер области страницы'
-      : key,
+    key === 'content.toolbar.viewportChangeError' ? 'Не удалось изменить размер окна' : key,
 }));
 
 import { handleToolbarViewportChange } from '.';
@@ -95,7 +93,7 @@ describe('toolbar viewport change action', () => {
     );
     expect(viewportChangeMocks.showToast).toHaveBeenNthCalledWith(
       2,
-      'Не удалось изменить размер области страницы',
+      'Не удалось изменить размер окна',
       'error'
     );
     expect(consoleError).toHaveBeenCalledTimes(2);

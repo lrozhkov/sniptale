@@ -79,7 +79,13 @@ describe('quick edit cursor enablement', () => {
     expect(stylesheet).toMatch(
       /body\.sniptale-quick-edit-document-mode[\s\S]*?user-select:\s*text\s*!important;/
     );
-    expect(stylesheet).toContain('body.sniptale-quick-edit-document-mode .sniptale-toolbar');
+    expect(stylesheet).toContain('.sniptale-extension-surface *');
+    expect(stylesheet).toMatch(
+      /\.sniptale-extension-surface[\s\S]*?cursor:\s*default\s*!important;/
+    );
+    expect(stylesheet).toMatch(
+      /\.sniptale-extension-surface[\s\S]*?button:not\(:disabled\)[\s\S]*?cursor:\s*pointer\s*!important;/
+    );
 
     const style = document.createElement('style');
     const paragraph = document.createElement('p');
@@ -87,7 +93,7 @@ describe('quick edit cursor enablement', () => {
     const toolbarButton = document.createElement('button');
 
     style.textContent = stylesheet;
-    toolbar.className = 'sniptale-toolbar';
+    toolbar.className = 'sniptale-toolbar sniptale-extension-surface';
     toolbar.append(toolbarButton);
     document.head.append(style);
     document.body.append(paragraph, toolbar);

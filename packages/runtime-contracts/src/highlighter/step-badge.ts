@@ -15,6 +15,16 @@ export const SYSTEM_STEP_BADGE_PRESET_KEYS = [
   'system-compact',
   'system-large',
   'system-letters',
+  'system-pill',
+  'system-stamp',
+  'system-neon-orbit',
+  'system-neon-square',
+  'system-editorial-counter',
+  'system-editorial-index',
+  'system-editorial-mark',
+  'system-retro-sunset',
+  'system-retro-arcade',
+  'system-retro-memphis',
 ] as const;
 
 export type SystemStepBadgePresetKey = (typeof SYSTEM_STEP_BADGE_PRESET_KEYS)[number];
@@ -34,6 +44,7 @@ export type StepBadgeAnchor =
 export type StepBadgeOffsetDirection = 'up' | 'down' | 'left' | 'right';
 export type StepBadgeBoundarySide = 'top' | 'right' | 'bottom' | 'left';
 export const STEP_BADGE_NORMAL_OFFSET_LIMIT = 48;
+export const STEP_BADGE_TANGENTIAL_OFFSET_LIMIT = 48;
 
 export interface StepBadgeManualPlacement {
   side: StepBadgeBoundarySide;
@@ -41,6 +52,8 @@ export interface StepBadgeManualPlacement {
   position: number;
   /** Signed CSS-pixel distance from the side: positive outward, negative inward. */
   normalOffset?: number;
+  /** Signed CSS-pixel distance beyond a side endpoint, enabling placement outside a corner. */
+  tangentialOffset?: number;
 }
 export type StepBadgeSizeLevel =
   | 0

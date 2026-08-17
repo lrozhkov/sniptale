@@ -24,6 +24,8 @@ export type SurfaceStyleSelectorActions = {
 export type SurfaceStyleSelectorProps = {
   actions: SurfaceStyleSelectorActions;
   disabled?: boolean;
+  fieldLabel?: string;
+  palette?: readonly string[];
   presentation?: 'management' | 'selection';
   onChange: (style: SurfaceStyle) => void;
   onOpenChange?: (open: boolean) => void;

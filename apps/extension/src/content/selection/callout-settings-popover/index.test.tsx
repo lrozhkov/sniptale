@@ -4,6 +4,39 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock(
+  '../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog',
+  () => ({
+    useSurfaceStylePresetCatalog: () => ({
+      actions: {
+        onCreate: vi.fn(),
+        onDelete: vi.fn(),
+        onDuplicate: vi.fn(),
+        onEdit: vi.fn(),
+        onRename: vi.fn(),
+        onReorder: vi.fn(),
+        onReset: vi.fn(),
+        onToggleFavorite: vi.fn(),
+        onUpdate: vi.fn(),
+      },
+      catalog: { catalogRevision: 1, unsafeForWrite: false },
+      presets: [
+        {
+          customized: false,
+          enabled: true,
+          favorite: false,
+          id: 'plain',
+          isDefault: true,
+          name: 'Plain',
+          order: 0,
+          origin: 'system',
+          style: { fillPaint: { kind: 'solid', color: '#ffffffff' }, surfaceCss: '' },
+        },
+      ],
+    }),
+  })
+);
+
 import { CalloutSettingsPopover } from '.';
 
 class TestPointerEvent extends MouseEvent {
@@ -72,6 +105,10 @@ describe('CalloutSettingsPopover', () => {
       '[data-ui="content.callout-settings.popover"]'
     )!;
     const header = popover.querySelector<HTMLElement>('.sniptale-settings-popover-header')!;
+    expect(header.getAttribute('data-draggable')).toBe('true');
+    expect(header.querySelector('.sniptale-toolbar-menu-title > span')?.hasAttribute('title')).toBe(
+      false
+    );
     header.setPointerCapture = vi.fn();
     header.releasePointerCapture = vi.fn();
     const initialLeft = Number.parseFloat(popover.style.left);
@@ -217,6 +254,82 @@ describe('CalloutSettingsPopover', () => {
     });
 
     expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-ui="content.callout-settings.popover"]')).not.toBeNull();
+  });
+
+  it('keeps the complete Surface and LNR editors open when interpolation changes', async () => {
+    await act(async () => {
+      root?.render(
+        <CalloutSettingsPopover
+          anchorEl={anchorEl}
+          frameId="frame-1"
+          frameRect={{ x: 100, y: 100, width: 180, height: 100 }}
+          isOpen
+          onClose={vi.fn()}
+        />
+      );
+      await Promise.resolve();
+    });
+
+    const backgroundSection = document.querySelector<HTMLButtonElement>(
+      '[aria-label="Фон и тень"]'
+    );
+    expect(backgroundSection).not.toBeNull();
+    await act(async () => backgroundSection?.click());
+    const surfaceTrigger = document.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.surface-style-selector.trigger"]'
+    );
+    expect(surfaceTrigger).not.toBeNull();
+    await act(async () => surfaceTrigger?.click());
+    const currentSurfaceTrigger = document.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.surface-style-selector.trigger"]'
+    );
+    expect(currentSurfaceTrigger).toBe(surfaceTrigger);
+    expect(currentSurfaceTrigger?.getAttribute('aria-expanded')).toBe('true');
+    const surfaceDialog = document.querySelector<HTMLElement>(
+      '[data-ui="shared.ui.surface-style-selector"] [role="dialog"]'
+    );
+    expect(surfaceDialog).not.toBeNull();
+    await act(async () =>
+      [...(surfaceDialog?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+        .find((button) => button.textContent === 'Цвет')
+        ?.click()
+    );
+    await act(async () =>
+      surfaceDialog
+        ?.querySelector<HTMLButtonElement>('[data-ui="shared.ui.paint-selector.trigger"]')
+        ?.click()
+    );
+    const paintPopup = document.querySelector<HTMLElement>(
+      '[data-ui="shared.ui.paint-selector.popup"]'
+    );
+    expect(paintPopup).not.toBeNull();
+    await act(async () =>
+      paintPopup?.querySelector<HTMLButtonElement>('[aria-label="Линейный"]')?.click()
+    );
+    await act(async () =>
+      paintPopup?.querySelector<HTMLDetailsElement>('details')?.setAttribute('open', '')
+    );
+    const interpolation = paintPopup?.querySelector<HTMLButtonElement>(
+      '[aria-label="Интерполяция"]'
+    );
+    expect(interpolation).not.toBeNull();
+    await act(async () => interpolation?.click());
+    const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (candidate) => candidate.textContent?.includes('OKLCH')
+    );
+    expect(option).toBeDefined();
+    await act(async () => {
+      option?.dispatchEvent(new TestPointerEvent('pointerdown', { bubbles: true, pointerId: 9 }));
+      option?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      option?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      option?.click();
+    });
+
+    expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBe(paintPopup);
+    expect(
+      document.querySelector('[data-ui="shared.ui.surface-style-selector"] [role="dialog"]')
+    ).toBe(surfaceDialog);
     expect(document.querySelector('[data-ui="content.callout-settings.popover"]')).not.toBeNull();
   });
 });

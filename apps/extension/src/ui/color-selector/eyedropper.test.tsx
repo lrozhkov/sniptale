@@ -98,6 +98,18 @@ describe('shared/ui/color-selector eyedropper', () => {
     expect(getButton('shared.ui.colorSelectorEyedropper')).toBeUndefined();
   });
 
+  it('defers the content activation bridge until the eyedropper press is released', async () => {
+    installResolvableEyedropper();
+    renderSelector();
+    await clickButton('shared.ui.colorSelectorChooseColor');
+
+    expect(
+      getButton('shared.ui.colorSelectorEyedropper')?.getAttribute(
+        'data-sniptale-activation-bridge'
+      )
+    ).toBe('defer');
+  });
+
   it('ignores outside-close while eyedropper is active and previews the picked color only', async () => {
     const onChange = vi.fn();
     const onPreviewChange = vi.fn();
@@ -121,6 +133,33 @@ describe('shared/ui/color-selector eyedropper', () => {
 
     expect(onPreviewChange).toHaveBeenCalledWith('#ff8800');
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('starts the native eyedropper only after the complete click transaction', async () => {
+    const open = vi.fn(() => new Promise<{ sRGBHex: string }>(() => undefined));
+    vi.stubGlobal(
+      'EyeDropper',
+      class {
+        open() {
+          return open();
+        }
+      }
+    );
+
+    renderSelector();
+    await clickButton('shared.ui.colorSelectorChooseColor');
+    await act(async () => {
+      const button = getButton('shared.ui.colorSelectorEyedropper');
+      button?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      button?.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+      button?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+      expect(open).not.toHaveBeenCalled();
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+      expect(open).not.toHaveBeenCalled();
+      await Promise.resolve();
+    });
+
+    expect(open).toHaveBeenCalledOnce();
   });
 
   it('keeps the root-owned native eyedropper active while the picker rerenders', async () => {
@@ -148,8 +187,27 @@ describe('shared/ui/color-selector eyedropper', () => {
     await flushPromises();
 
     expect(receivedSignal?.aborted).toBe(false);
+    expect(getButton('shared.ui.colorSelectorEyedropper')?.disabled).toBe(true);
     await act(async () => resolvePick?.({ sRGBHex: '#14b8a6' }));
     expect(onPreviewChange).toHaveBeenCalledWith('#14b8a6');
+  });
+
+  it('marks the native session active before open can synchronously emit an outside event', async () => {
+    vi.stubGlobal(
+      'EyeDropper',
+      class {
+        open() {
+          document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          return new Promise<{ sRGBHex: string }>(() => undefined);
+        }
+      }
+    );
+
+    renderSelector();
+    await clickButton('shared.ui.colorSelectorChooseColor');
+    await clickButton('shared.ui.colorSelectorEyedropper');
+
+    expect(getButton('shared.ui.colorSelectorApply')).toBeDefined();
   });
 
   it('keeps the picker open when eyedropper is canceled', async () => {

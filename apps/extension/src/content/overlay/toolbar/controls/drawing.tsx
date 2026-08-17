@@ -3,7 +3,7 @@ import {
   Droplet,
   Highlighter,
   MousePointer2,
-  Pencil,
+  PenLine,
   Shapes,
   Type,
   ArrowUpRight,
@@ -22,7 +22,7 @@ import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing
 
 type DrawingToolDescriptor = {
   tool: DrawingTool;
-  icon: typeof Pencil;
+  icon: typeof PenLine;
   label: Parameters<typeof translate>[0];
   modifierHint?: Parameters<typeof translate>[0];
 };
@@ -36,7 +36,7 @@ const tools: readonly DrawingToolDescriptor[] = [
   },
   {
     tool: 'pencil',
-    icon: Pencil,
+    icon: PenLine,
     label: 'content.toolbar.drawingPencil',
     modifierHint: 'content.toolbar.drawingStrokeModifierHint',
   },
@@ -82,7 +82,7 @@ export interface ToolbarDrawingControlsOwner {
 function DrawingToolControl(props: {
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
-  icon: typeof Pencil;
+  icon: typeof PenLine;
   label: DrawingToolDescriptor['label'];
   modifierHint: DrawingToolDescriptor['modifierHint'];
   optionsTool: ReturnType<typeof resolveDrawingQuickOptionsTool>;

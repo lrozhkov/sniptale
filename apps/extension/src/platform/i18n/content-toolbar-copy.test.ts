@@ -54,20 +54,20 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Delay before screenshot',
   },
   'content.toolbar.viewportButton': {
-    ru: 'Размер страницы или окна для снимка',
-    en: 'Page or window size for screenshot',
+    ru: 'Размер окна для снимка',
+    en: 'Window size for screenshot',
   },
   'content.toolbar.viewportMenuTitle': {
-    ru: 'Размер страницы или окна',
-    en: 'Page or window size',
+    ru: 'Размер окна',
+    en: 'Window size',
   },
   'content.toolbar.viewportNativeLabel': {
     ru: 'Текущий размер',
     en: 'Current size',
   },
   'content.toolbar.viewportNativeHint': {
-    ru: 'Использовать текущий размер вкладки для снимков',
-    en: 'Use the current tab size for screenshots',
+    ru: 'Использовать текущий размер окна для снимков',
+    en: 'Use the current window size for screenshots',
   },
   'content.toolbar.cursorLabel': {
     ru: 'Навигация',
@@ -113,6 +113,22 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Режим работы',
     en: 'Working mode',
   },
+  'content.toolbar.panelHorizontal': {
+    ru: 'Горизонтальный вид',
+    en: 'Horizontal view',
+  },
+  'content.toolbar.panelHorizontalHint': {
+    ru: 'Расположить кнопки в одну строку',
+    en: 'Arrange buttons in one row',
+  },
+  'content.toolbar.panelVertical': {
+    ru: 'Вертикальный вид',
+    en: 'Vertical view',
+  },
+  'content.toolbar.panelVerticalHint': {
+    ru: 'Расположить секции друг под другом',
+    en: 'Stack sections vertically',
+  },
   'content.toolbar.compactMenusHint': {
     ru: 'Скрыть описания и уменьшить высоту пунктов меню',
     en: 'Hide descriptions and reduce the height of menu items',
@@ -130,12 +146,12 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   'content.toolbar.hideToolbar': {
-    ru: 'Свернуть панель',
-    en: 'Collapse toolbar',
+    ru: 'Свернуть',
+    en: 'Collapse',
   },
   'content.toolbar.screenshotDisable': {
-    ru: 'Закрыть панель',
-    en: 'Close toolbar',
+    ru: 'Закрыть',
+    en: 'Close',
   },
   'content.autoBlur.autoApplyEnableHint': {
     ru: 'Автоматически размывать найденные данные перед каждым снимком',

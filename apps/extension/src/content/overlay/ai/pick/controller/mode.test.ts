@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { handleAiPickContentStart, handleDisableAiPickMode } from './mode';
+import { handleAiPickContentStart, handleDisableAiPickMode, handleEnableAiPickMode } from './mode';
 import { createAiSubmitRequestGate } from './submit/gate';
 import type { AiPickControllerContext } from './types';
 
@@ -208,6 +208,17 @@ function registerAiPickStartTests() {
     'does not enable ai-pick state when document-mode cleanup fails',
     expectDocumentModeCleanupFailureBlocksAiActivation
   );
+
+  it('force-enables ai-pick when restoring a previously active mode', () => {
+    const context = createContext({ aiPickMode: true });
+    enableAiPickModeDeferredMock.mockResolvedValue(undefined);
+
+    handleEnableAiPickMode(context);
+
+    expect(context.setAiPickMode).toHaveBeenCalledWith(true);
+    expect(clearAllSniptaleIdsMock).not.toHaveBeenCalled();
+    expect(context.cancelActiveAiRequest).not.toHaveBeenCalled();
+  });
 }
 
 function registerAiPickSourceTests() {

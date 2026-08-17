@@ -524,12 +524,18 @@ describe('FrameSettingsPopover preset selection', () => {
         `button[aria-label="${translate('highlighter.editor.fillSection')}"]`
       )!
     );
+    await act(async () => Promise.resolve());
 
-    const trigger = document.querySelector<HTMLButtonElement>(
-      `button[aria-label="${translate('highlighter.editor.fillColorLabel')}"]`
+    const surfaceTrigger = document.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('content.callout.surfaceStyle.title')}"]`
     );
-    expect(trigger).not.toBeNull();
-    act(() => trigger?.click());
+    expect(surfaceTrigger).not.toBeNull();
+    act(() => surfaceTrigger?.click());
+    const paintTrigger = document.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('content.callout.surfaceStyle.color')}"]`
+    );
+    expect(paintTrigger).not.toBeNull();
+    act(() => paintTrigger?.click());
     const paintField = document.querySelector<HTMLInputElement>(
       '[data-ui="shared.ui.paint-selector.layer"] input'
     );
@@ -612,7 +618,7 @@ describe('FrameSettingsPopover preset selection', () => {
         (candidate) => candidate.textContent === secondPreset.name
       );
       expect(option).not.toBeNull();
-      act(() => {
+      await act(async () => {
         option?.dispatchEvent(
           new MouseEvent('mousemove', {
             bubbles: true,
@@ -623,6 +629,7 @@ describe('FrameSettingsPopover preset selection', () => {
         );
         option?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
         option?.click();
+        await Promise.resolve();
       });
 
       expect(onClose).not.toHaveBeenCalled();

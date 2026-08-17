@@ -2,6 +2,7 @@ import type {
   AnnotationTemplateTag,
   AnnotationTemplateTagId,
 } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
+import { getAnnotationTemplateTagDisplayName } from './tag-display-name';
 
 type AnnotationTemplateQueryItem = {
   id: string;
@@ -22,7 +23,9 @@ export function queryAnnotationTemplates<T extends AnnotationTemplateQueryItem>(
 }): T[] {
   const normalizedQuery = normalizeAnnotationTemplateQuery(args.query);
   const activeTagIds = new Set(args.activeFilterTagIds);
-  const tagsById = new Map(args.tags.map((tag) => [tag.id, tag.label]));
+  const tagsById = new Map(
+    args.tags.map((tag) => [tag.id, getAnnotationTemplateTagDisplayName(tag)])
+  );
   const matches = (item: T) => {
     const matchesTags =
       activeTagIds.size === 0 || item.tagIds.some((tagId) => activeTagIds.has(tagId));

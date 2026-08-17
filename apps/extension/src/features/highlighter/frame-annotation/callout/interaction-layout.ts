@@ -505,6 +505,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
       curveStartDrag: connector.curveStartDrag,
       drag: placement.drag,
       tailBaseEndDrag: connector.tailBaseRange.endDrag,
+      tailBaseRangeDrag: connector.tailBaseRange.rangeDrag,
       tailBaseStartDrag:
         baseLayout.dynamicTail?.kind === 'line'
           ? connector.lineBaseDrag

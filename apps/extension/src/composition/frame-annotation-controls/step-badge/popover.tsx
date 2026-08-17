@@ -22,12 +22,12 @@ import {
   createStepBadgeTemplateFromSettings,
 } from '../../../features/highlighter/step-badge-presets/catalog';
 import { getLinkedStepBadgeDiameter } from '../../../features/highlighter/step-badge-presets/style';
-import { usePopoverEscapeClose, usePopoverOutsideClose } from '../popover/hooks';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
 import { usePopoverInteractionDismissal } from '../popover/interaction-dismissal';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import type { TemplateSourceControl } from '../popover/template-source';
+import { useToolbarSettingsPopoverDismissal } from '../popover/toolbar-dismissal';
 
 const FUTURE_ID = 'future-frame-step-badge';
 export function FutureStepBadgeSettingsPopover(props: {
@@ -70,16 +70,11 @@ export function FutureStepBadgeSettingsPopover(props: {
   useEffect(() => {
     if (props.isOpen) setLocal(props.settings);
   }, [props.isOpen, props.settings]);
-  usePopoverOutsideClose({
-    isOpen: dismissal.isDismissalEnabled,
+  useToolbarSettingsPopoverDismissal({
+    anchorEl: props.anchorEl,
+    enabled: dismissal.isDismissalEnabled,
     onClose: props.onClose,
     popoverRef,
-    shouldIgnoreOutsideEvent: (event) => isEventWithinElement(event, props.anchorEl),
-  });
-  usePopoverEscapeClose({
-    anchorEl: props.anchorEl,
-    isOpen: dismissal.isDismissalEnabled,
-    onClose: props.onClose,
   });
   const commit = (patch: Partial<StepBadgeSettings>) => {
     const next = {
@@ -173,14 +168,6 @@ export function FutureStepBadgeSettingsPopover(props: {
           : {})}
       />
     </ContentPopoverAdapter>
-  );
-}
-
-function isEventWithinElement(event: Event, element: Element | null): boolean {
-  if (!element) return false;
-  return (
-    event.composedPath().includes(element) ||
-    (event.target instanceof Node && element.contains(event.target))
   );
 }
 

@@ -4,7 +4,7 @@ import type {
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { AppLocale } from '@sniptale/platform/i18n/config';
-import { cloneCalloutVisualStyle } from '../../../features/highlighter/callout-presets/catalog';
+import { cloneCalloutVisualStyle } from '../../../features/highlighter/callout-presets/visual-style';
 import { getCalloutPresetDisplayName } from '../../../features/highlighter/callout-presets/display-name';
 
 export function useCalloutPresetEditorDraft(args: {

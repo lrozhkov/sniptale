@@ -41,6 +41,7 @@ function createCalloutActions(args: {
 }): Pick<
   React.ComponentProps<typeof Callout>,
   | 'onContentChange'
+  | 'onBadgeTextChange'
   | 'onCurveChange'
   | 'onDelete'
   | 'onPositionChange'
@@ -50,6 +51,7 @@ function createCalloutActions(args: {
   | 'onTailBaseRangeChange'
   | 'onTailFramePositionChange'
   | 'onTitleChange'
+  | 'onTitleEnabledChange'
   | 'onWaypointChange'
   | 'onWidthChange'
 > {

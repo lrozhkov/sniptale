@@ -83,6 +83,7 @@ it('keeps highlighter alphabets and shared anchors canonical', () => {
     normalOffset?: number;
     position: number;
     side: 'top' | 'right' | 'bottom' | 'left';
+    tangentialOffset?: number;
   }>();
 });
 
@@ -96,7 +97,7 @@ it('clones annotation template tag state without sharing mutable arrays', () => 
 
   expect(ANNOTATION_TEMPLATE_TAG_LIMITS).toEqual({
     maximumLabelLength: 32,
-    maximumTags: 32,
+    maximumTags: 37,
     maximumTagsPerTemplate: 8,
   });
   expect(clone).toEqual(source);

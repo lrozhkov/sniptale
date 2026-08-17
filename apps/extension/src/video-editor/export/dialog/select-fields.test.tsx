@@ -142,7 +142,7 @@ it('hides MP4 from format options when capability probing marks it unavailable',
   expect(options).not.toContain('videoEditor.exportDialog.formatMp4Label');
 });
 
-it('fits an arbitrary source into the selected standard resolution without distortion', () => {
+it('fits an arbitrary source into the selected standard resolution without distortion', async () => {
   const onChange = vi.fn();
 
   act(() => {
@@ -173,7 +173,10 @@ it('fits an arbitrary source into the selected standard resolution without disto
   const option = Array.from(
     document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')
   ).find((button) => button.textContent === '1080p');
-  act(() => option?.click());
+  await act(async () => {
+    option?.click();
+    await Promise.resolve();
+  });
 
   expect(onChange).toHaveBeenCalledWith({
     height: 1080,
@@ -182,7 +185,7 @@ it('fits an arbitrary source into the selected standard resolution without disto
   });
 });
 
-it('resolves every selection from immutable source dimensions without sequential drift', () => {
+it('resolves every selection from immutable source dimensions without sequential drift', async () => {
   const onChange = vi.fn();
   const sourceDimensions = { height: 479, width: 853 };
   const settings: VideoProjectExportSettings = {
@@ -209,7 +212,7 @@ it('resolves every selection from immutable source dimensions without sequential
       );
     });
   };
-  const selectResolution = (label: string) => {
+  const selectResolution = async (label: string) => {
     const trigger = container?.querySelector<HTMLButtonElement>(
       '[aria-label="videoEditor.exportDialog.resolutionLabel"]'
     );
@@ -217,11 +220,14 @@ it('resolves every selection from immutable source dimensions without sequential
     const option = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')
     ).find((button) => button.textContent === label);
-    act(() => option?.click());
+    await act(async () => {
+      option?.click();
+      await Promise.resolve();
+    });
   };
 
   renderFields(settings);
-  selectResolution('480p');
+  await selectResolution('480p');
   expect(onChange).toHaveBeenLastCalledWith({
     height: 480,
     resolution: VideoResolutionPreset.P480,
@@ -234,7 +240,7 @@ it('resolves every selection from immutable source dimensions without sequential
     resolution: VideoResolutionPreset.P480,
     width: 854,
   });
-  selectResolution('1080p');
+  await selectResolution('1080p');
   expect(onChange).toHaveBeenLastCalledWith({
     height: 1080,
     resolution: VideoResolutionPreset.P1080,
@@ -247,7 +253,7 @@ it('resolves every selection from immutable source dimensions without sequential
     resolution: VideoResolutionPreset.P1080,
     width: 1924,
   });
-  selectResolution('videoEditor.exportDialog.resolutionSource');
+  await selectResolution('videoEditor.exportDialog.resolutionSource');
   expect(onChange).toHaveBeenLastCalledWith({
     height: 478,
     resolution: VideoResolutionPreset.SOURCE,

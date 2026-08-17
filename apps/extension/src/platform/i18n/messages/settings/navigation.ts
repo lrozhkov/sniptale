@@ -32,8 +32,8 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'Quick actions',
   },
   screenSizes: {
-    ru: 'Размеры экрана',
-    en: 'Screen sizes',
+    ru: 'Размер окна',
+    en: 'Window size',
   },
   mediaQuality: {
     ru: 'Изображения и видео',
@@ -67,6 +67,10 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Доступ и данные',
     en: 'Access and data',
   },
+  settingsTransfer: {
+    ru: 'Импорт и экспорт',
+    en: 'Import and export',
+  },
   descriptions: {
     interfaceBrowser: {
       ru: 'Настройте тему, язык и поведение браузерных функций.',
@@ -77,8 +81,8 @@ export const settingsNavigationMessages = defineMessageSource({
       en: 'Configure capture commands and actions available without opening the editor.',
     },
     screenSizes: {
-      ru: 'Управляйте готовыми размерами области захвата и значением по умолчанию.',
-      en: 'Manage capture-area sizes and choose the default.',
+      ru: 'Управляйте шаблонами размера окна.',
+      en: 'Manage window size presets.',
     },
     mediaQuality: {
       ru: 'Настройте параметры изображений и профили качества видео.',
@@ -120,6 +124,10 @@ export const settingsNavigationMessages = defineMessageSource({
       ru: 'Управляйте разрешениями, конфиденциальностью и локальными данными.',
       en: 'Manage permissions, privacy, and local data.',
     },
+    settingsTransfer: {
+      ru: 'Создавайте резервные копии и переносите выбранные настройки.',
+      en: 'Create backups and transfer selected settings.',
+    },
   },
   views: {
     settings: { ru: 'Настройки', en: 'Settings' },
@@ -135,6 +143,8 @@ export const settingsNavigationMessages = defineMessageSource({
     tags: { ru: 'Теги', en: 'Tags' },
     tools: { ru: 'Инструменты', en: 'Tools' },
     palettes: { ru: 'Палитры', en: 'Palettes' },
+    surfaces: { ru: 'Поверхности', en: 'Surfaces' },
+    gradients: { ru: 'Градиенты', en: 'Gradients' },
     connection: { ru: 'Подключение', en: 'Connection' },
     capture: { ru: 'Захват', en: 'Capture' },
     commands: { ru: 'Команды', en: 'Commands' },

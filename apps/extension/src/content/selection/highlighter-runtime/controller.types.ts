@@ -36,6 +36,7 @@ export interface HighlighterController {
   enableMode: () => void;
   invalidateFrameCache: () => void;
   isEnabled: () => boolean;
+  isCreationEnabled: () => boolean;
   isFrameEditing: () => boolean;
   isPausedState: () => boolean;
   pause: () => void;
@@ -48,5 +49,6 @@ export interface HighlighterController {
   ) => void;
   removeHighlight: (id: string) => void;
   resume: () => void;
+  setCreationEnabled: (enabled: boolean) => void;
   setFrameEditing: () => void;
 }

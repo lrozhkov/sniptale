@@ -6,6 +6,7 @@ export {
   normalizeAnnotationTemplateTagLabel,
   parseAnnotationTemplateTagState,
   renameAnnotationTemplateTag,
+  resetSystemAnnotationTemplateTag,
   setActiveAnnotationTemplateTagFilter,
   setAnnotationTemplateTagIds,
   subscribeToAnnotationTemplateTagState,

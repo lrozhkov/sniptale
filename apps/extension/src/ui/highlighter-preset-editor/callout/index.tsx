@@ -22,6 +22,7 @@ import { usePresetEditorModalLifecycle } from '../modal-lifecycle';
 import { Eye } from 'lucide-react';
 import { editorInputClassName, editorPreviewFrameClassName } from '../constants';
 import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
+import { clonePaint } from '@sniptale/foundation/paint';
 
 function getPresetPlacement(anchor: CalloutAnchor): CalloutPreset['placement'] {
   if (anchor === 'middle-left') return { anchor, side: 'left' };
@@ -44,7 +45,11 @@ function applyStylePatch(style: CalloutVisualStyle, patch: CalloutSettingsPatch)
     },
     customCss: patch.style?.customCss ?? style.customCss,
     surface: { ...style.surface, ...patch.style?.surface },
-    title: { ...style.title, ...patch.style?.title },
+    title: {
+      ...style.title,
+      ...patch.style?.title,
+      fillPaint: clonePaint(patch.style?.title?.fillPaint ?? style.title.fillPaint),
+    },
     typography: { ...style.typography, ...patch.style?.typography },
   };
 }
@@ -77,10 +82,12 @@ function PresetEditorBody(props: {
   name: string;
   placement: CalloutPreset['placement'];
   setName: (value: string) => void;
+  setTagIds: (value: string[]) => void;
   setContent: (value: CalloutPreset['content']) => void;
   setPlacement: (value: CalloutPreset['placement']) => void;
   setStyle: (value: CalloutVisualStyle) => void;
   style: CalloutVisualStyle;
+  tagIds: string[];
 }) {
   return (
     <ProductModalBody compact className="space-y-4">
@@ -99,6 +106,7 @@ function PresetEditorBody(props: {
           value={props.name}
         />
       </div>
+      <AnnotationTemplateTagAssignment onChange={props.setTagIds} value={props.tagIds} />
       <div
         className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[176px_minmax(0,1fr)]"
         data-ui="shared.callout-preset-editor.layout"
@@ -221,14 +229,13 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
           name={draft.name}
           placement={draft.placement}
           setName={draft.setName}
+          setTagIds={setTagIds}
           setContent={draft.setContent}
           setPlacement={draft.setPlacement}
           setStyle={draft.setStyle}
           style={draft.style}
+          tagIds={tagIds}
         />
-        <div className="px-4 pb-4">
-          <AnnotationTemplateTagAssignment onChange={setTagIds} value={tagIds} />
-        </div>
         <PresetEditorFooter
           canReset={source.origin === 'system' && source.customized === true}
           isSaving={props.isSaving}

@@ -22,6 +22,8 @@ import { getCaptureActionOptions, getCaptureActionTooltip, ToolbarCaptureButtons
 import type { ToolbarCaptureActionsProps } from '../types';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import type { ToolbarMenuState } from '../state/menu';
+import { Images } from 'lucide-react';
+import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -97,7 +99,13 @@ function registerCaptureActionOptionTests() {
   });
 
   it('provides a distinct icon for every after-capture action', () => {
-    expect(getCaptureActionOptions().every((option) => 'icon' in option)).toBe(true);
+    const options = getCaptureActionOptions();
+    expect(options.every((option) => 'icon' in option)).toBe(true);
+    expect(options.find((option) => option.value === 'edit')?.icon.type).toBe(ImageEditorIcon);
+    expect(options.find((option) => option.value === 'save_to_library')?.icon.type).toBe(Images);
+    expect(options.find((option) => option.value === 'scenario')?.icon.type).toBe(
+      ScenarioEditorIcon
+    );
   });
 
   it('returns the scenario tooltip label', () => {
@@ -135,6 +143,20 @@ function registerCaptureActionOptionTests() {
       'content.toolbar.capture-full-button',
       'content.toolbar.capture-full-settings-button',
     ]);
+  });
+
+  it('matches the popup menu screenshot icon set', () => {
+    const buttons = renderCaptureButtons();
+
+    expect(
+      buttons.querySelector('[data-ui="content.toolbar.capture-visible-button"] svg')?.classList
+    ).toContain('lucide-app-window');
+    expect(
+      buttons.querySelector('[data-ui="content.toolbar.capture-full-button"] svg')?.classList
+    ).toContain('lucide-unfold-vertical');
+    expect(
+      buttons.querySelector('[data-ui="content.toolbar.capture-selection-button"] svg')?.classList
+    ).toContain('lucide-crop');
   });
 }
 

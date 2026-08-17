@@ -18,22 +18,20 @@ const PRESET_IDLE_CLASS_NAME = [
   'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_35%,var(--sniptale-color-border-soft))]',
 ].join(' ');
 const PREVIEW_CLASS_NAME = [
-  'mb-1.5 block h-11 overflow-hidden rounded-[8px] border bg-white shadow-sm',
+  'block h-6 w-9 shrink-0 overflow-hidden rounded-[6px] border bg-white shadow-sm',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]',
 ].join(' ');
 const SELECTED_MARK_CLASS_NAME = [
-  'absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full',
-  'bg-[var(--sniptale-color-accent)] text-white shadow-sm',
+  'flex h-5 w-5 shrink-0 items-center justify-center',
+  'text-[var(--sniptale-color-accent-emphasis)]',
 ].join(' ');
 const ACTIONS_CLASS_NAME = [
   'mt-1.5 flex flex-wrap gap-1 border-t pt-1.5',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_46%,transparent)]',
 ].join(' ');
 const PRESET_BUTTON_CLASS_NAME = [
-  'relative w-full rounded-[8px] text-left text-xs outline-none',
-  'focus-visible:ring-2 focus-visible:ring-offset-1',
-  'focus-visible:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_65%,transparent)]',
-  'focus-visible:ring-offset-[var(--sniptale-color-surface-panel)]',
+  'relative flex w-full items-center gap-2 rounded-[8px] text-left text-xs outline-none',
+  'focus-visible:shadow-[inset_0_0_0_1px_var(--sniptale-color-border-accent-strong)]',
 ].join(' ');
 
 export function SurfaceStylePresetGrid(props: {
@@ -57,14 +55,20 @@ export function SurfaceStylePresetGrid(props: {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div
+      className={
+        props.selectionOnly
+          ? 'grid max-h-[12rem] grid-cols-1 gap-1 overflow-y-auto overscroll-contain pr-1'
+          : 'grid grid-cols-1 gap-2 sm:grid-cols-2'
+      }
+    >
       {props.presets.map((preset) => {
         const selected = matchSurfaceStylePreset(props.draft, [preset]) !== null;
         return (
           <div
             key={preset.id}
             className={[
-              'group min-w-0 rounded-[11px] border p-1.5 transition',
+              'group min-w-0 rounded-[9px] border p-1 transition',
               selected ? PRESET_SELECTED_CLASS_NAME : PRESET_IDLE_CLASS_NAME,
             ].join(' ')}
           >
@@ -94,15 +98,15 @@ export function SurfaceStylePresetGrid(props: {
                   }}
                 />
               </span>
-              {selected ? (
-                <span className={SELECTED_MARK_CLASS_NAME}>
-                  <Check aria-hidden="true" size={12} strokeWidth={3} />
-                </span>
-              ) : null}
-              <span className="block truncate px-0.5 font-medium">
+              <span className="min-w-0 flex-1 truncate px-0.5 font-medium">
                 {!props.selectionOnly && preset.favorite ? '★ ' : ''}
                 {preset.name}
               </span>
+              {selected ? (
+                <span className={SELECTED_MARK_CLASS_NAME}>
+                  <Check aria-hidden="true" size={16} strokeWidth={2} />
+                </span>
+              ) : null}
             </button>
             {!props.selectionOnly ? (
               <div className={ACTIONS_CLASS_NAME}>

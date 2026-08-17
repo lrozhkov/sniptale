@@ -75,14 +75,13 @@ export function SurfaceStylePresetsSettings() {
     if (action.type === 'delete') void resources.actions.onDelete(preset.id);
   };
   return (
-    <section className="mt-8">
+    <section>
       <SettingsCollection
         addAction={{
           label: translate('settings.editor.surfaceStyles.add'),
           onInvoke: () => setEditor('new'),
         }}
         ariaLabel={translate('settings.editor.surfaceStyles.title')}
-        description={translate('settings.editor.surfaceStyles.description')}
         items={items}
         onAction={onAction}
         onMove={(intent: SettingsCollectionMoveIntent) => {
@@ -96,7 +95,6 @@ export function SurfaceStylePresetsSettings() {
           void resources.actions.onReorderAll(ids);
         }}
         state={catalog ? 'ready' : 'loading'}
-        title={translate('settings.editor.surfaceStyles.title')}
       />
       <SurfaceStylePresetEditor
         onClose={() => setEditor(null)}

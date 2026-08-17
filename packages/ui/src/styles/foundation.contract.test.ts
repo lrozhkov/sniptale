@@ -16,4 +16,12 @@ describe('styles.foundation contract', () => {
     expect(foundationStylesheet).toContain('.sniptale-extension-surface [contenteditable] * {');
     expect(foundationStylesheet).toContain('user-select: text;');
   });
+
+  it('keeps native cursors across extension-owned surfaces', () => {
+    expect(foundationStylesheet).toMatch(/\.sniptale-extension-surface\s*{\s*cursor:\s*default;/);
+    expect(foundationStylesheet).toContain("[role='menuitem']:not([aria-disabled='true'])");
+    expect(foundationStylesheet).toContain('a[href]');
+    expect(foundationStylesheet).toContain('cursor: pointer;');
+    expect(foundationStylesheet).toContain('cursor: auto;');
+  });
 });

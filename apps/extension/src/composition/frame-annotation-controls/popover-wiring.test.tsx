@@ -293,6 +293,7 @@ afterEach(() => {
   act(() => root.unmount());
   document.body.replaceChildren();
   vi.clearAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -324,6 +325,100 @@ it('keeps parent Escape dismissal disabled until the nested Surface layer closes
   await act(async () =>
     document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
   );
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('closes the toolbar callout menu on an outside page click', async () => {
+  vi.useFakeTimers();
+  const onClose = vi.fn();
+  await act(async () =>
+    root.render(
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen
+        onChange={vi.fn()}
+        onClose={onClose}
+        onDisable={vi.fn()}
+        portalTarget={portal}
+        settings={createDefaultFrameCallout()}
+      />
+    )
+  );
+  act(() => vi.advanceTimersByTime(150));
+  document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+
+  expect(onClose).toHaveBeenCalledOnce();
+  vi.useRealTimers();
+});
+
+it('closes the toolbar frame menu on an outside page click', async () => {
+  vi.useFakeTimers();
+  const onClose = vi.fn();
+  const settings = createDefaultHighlighterSettings();
+  await act(async () =>
+    root.render(
+      <FrameAnnotationCreationFramePopover
+        anchorEl={anchor}
+        isOpen
+        onChange={vi.fn()}
+        onClose={onClose}
+        portalTarget={portal}
+        settings={{
+          blurSettings: settings.defaultBlurSettings,
+          borderSettings: settings.borderPresets[0]!,
+          effectMode: settings.defaultEffectMode,
+          focusSettings: settings.defaultFocusSettings,
+        }}
+      />
+    )
+  );
+  act(() => vi.advanceTimersByTime(150));
+  document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('closes the toolbar frame menu when the pointer moves far from it', async () => {
+  vi.useFakeTimers();
+  const onClose = vi.fn();
+  const settings = createDefaultHighlighterSettings();
+  await act(async () =>
+    root.render(
+      <FrameAnnotationCreationFramePopover
+        anchorEl={anchor}
+        isOpen
+        onChange={vi.fn()}
+        onClose={onClose}
+        portalTarget={portal}
+        settings={{
+          blurSettings: settings.defaultBlurSettings,
+          borderSettings: settings.borderPresets[0]!,
+          effectMode: settings.defaultEffectMode,
+          focusSettings: settings.defaultFocusSettings,
+        }}
+      />
+    )
+  );
+  const popover = portal.querySelector<HTMLElement>(
+    '[data-ui="frame-annotation.creation.frame-popover"]'
+  );
+  expect(popover).not.toBeNull();
+  vi.spyOn(popover!, 'getBoundingClientRect').mockReturnValue({
+    bottom: 100,
+    height: 100,
+    left: 0,
+    right: 100,
+    top: 0,
+    width: 100,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  act(() => vi.advanceTimersByTime(300));
+  document.dispatchEvent(
+    new MouseEvent('mousemove', { bubbles: true, clientX: 500, clientY: 500 })
+  );
+
   expect(onClose).toHaveBeenCalledOnce();
 });
 

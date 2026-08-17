@@ -164,6 +164,20 @@ function expectStepBadgePlacementChangesInvalidateDescriptors() {
       buildFrameRenderDescriptors([changedFrame], frameStates)
     )
   ).toBe(false);
+
+  const diagonallyChangedFrame = structuredClone(initialFrame);
+  diagonallyChangedFrame.stepBadge!.manualPlacement = {
+    position: 1,
+    side: 'top',
+    tangentialOffset: 24,
+  };
+
+  expect(
+    areFrameRenderDescriptorsEqual(
+      buildFrameRenderDescriptors([initialFrame], frameStates),
+      buildFrameRenderDescriptors([diagonallyChangedFrame], frameStates)
+    )
+  ).toBe(false);
 }
 
 function expectStepBadgeStyleChangesInvalidateDescriptors() {

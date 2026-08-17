@@ -11,6 +11,8 @@ import { FloatingFilterMenu, useFloatingFilterMenu } from './floating-filter-men
 const FILTER_TRIGGER_BASE_CLASS_NAME = [
   'inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg',
   'border px-2 text-xs transition-colors',
+  'focus-visible:outline-none focus-visible:ring-2',
+  'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 const FILTER_TRIGGER_ACTIVE_CLASS_NAME = [
   'border-[var(--sniptale-color-border-accent-strong)]',
@@ -122,6 +124,48 @@ export function AnnotationTemplateQueryResults(props: { children: ReactNode; loa
     >
       <div className={props.loading ? 'invisible' : undefined}>{props.children}</div>
     </div>
+  );
+}
+
+export function AnnotationTemplateQuerySurface(props: {
+  activeFilterTagIds: readonly AnnotationTemplateTagId[];
+  children: ReactNode;
+  disabled?: boolean;
+  hasResults: boolean;
+  loading: boolean;
+  onActiveFilterTagIdsChange: (tagIds: AnnotationTemplateTagId[]) => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
+  onQueryChange: (query: string) => void;
+  query: string;
+  tags: readonly AnnotationTemplateTag[];
+}) {
+  return (
+    <>
+      <AnnotationTemplateQueryControls
+        activeFilterTagIds={props.activeFilterTagIds}
+        compact
+        {...(props.disabled !== undefined ? { disabled: props.disabled } : {})}
+        onActiveFilterTagIdsChange={props.onActiveFilterTagIdsChange}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
+        onQueryChange={props.onQueryChange}
+        query={props.query}
+        tags={props.tags}
+      />
+      <AnnotationTemplateQueryResults loading={props.loading}>
+        {props.hasResults ? (
+          props.children
+        ) : (
+          <AnnotationTemplateQueryEmpty
+            hasFilter={props.activeFilterTagIds.length > 0}
+            onClearFilter={() => props.onActiveFilterTagIdsChange([])}
+            onClearQuery={() => props.onQueryChange('')}
+            query={props.query}
+          />
+        )}
+      </AnnotationTemplateQueryResults>
+    </>
   );
 }
 

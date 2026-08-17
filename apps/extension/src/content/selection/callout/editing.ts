@@ -64,6 +64,7 @@ function createCalloutEditingResult(args: {
     floatingToolbarRect: args.floatingToolbarRect,
     handleBlur: args.handlers.handleBlur,
     handleClick: args.handlers.handleClick,
+    finishEditing: args.handlers.finishEditing,
     handleInput: args.handlers.handleInput,
     handleKeyDown: args.handlers.handleKeyDown,
     handlePaste: args.handlers.handlePaste,

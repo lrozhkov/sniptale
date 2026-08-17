@@ -13,8 +13,12 @@ import {
   AI_PROVIDERS_KEY,
   AI_PROVIDER_SECRETS_KEY,
 } from './constants';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { removeTransparentKeyIfUnused } from './provider-secret-keys.store.ts';
-import { createAIProviderSecretAdditionalData } from './provider-secret-binding';
+import {
+  createAIProviderSecretAdditionalData,
+  hasAIProviderSecretBindingChanged,
+} from './provider-secret-binding';
 import {
   readPlaintextProviderSecretFromState,
   readProviderSecretKeyState,
@@ -32,6 +36,95 @@ import {
 const logger = createLogger({ namespace: 'SharedAiStorage' });
 
 export type { AIProviderUpsertInput } from './provider-secret-upsert-plan';
+
+export class AIProviderTransferRollbackError extends Error {}
+
+export interface AIProviderTransferMutationPlan {
+  readonly clearedProviderIds: string[];
+  readonly missingProviderIds: string[];
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+export async function prepareAIProviderTransferMutation(args: {
+  importedProviders: readonly AIProvider[];
+  permit?: PersistenceMutationPermit;
+}): Promise<AIProviderTransferMutationPlan> {
+  const keys = [
+    AI_PROVIDERS_KEY,
+    AI_PROVIDER_SECRETS_KEY,
+    AI_LOCAL_SECRET_KEY_STORAGE_KEY,
+  ] as const;
+  const before = await browserStorage.local.get([...keys]);
+  const parsedProviders = parseStoredAIProviders(before[AI_PROVIDERS_KEY]);
+  const currentProviders = parsedProviders.value;
+  const currentSecrets = parseStoredProviderSecretMap(before[AI_PROVIDER_SECRETS_KEY]) ?? {};
+  const clearedProviderIds: string[] = [];
+  const missingProviderIds: string[] = [];
+  const nextProviders = args.importedProviders.map((imported) => {
+    const current = currentProviders.find((provider) => provider.id === imported.id);
+    const bindingMatches = current ? !hasAIProviderSecretBindingChanged(current, imported) : false;
+    const preservesSecret = Boolean(
+      current?.hasStoredApiKey && bindingMatches && currentSecrets[imported.id]
+    );
+    if (current?.hasStoredApiKey && !preservesSecret) clearedProviderIds.push(current.id);
+    if (!preservesSecret) missingProviderIds.push(imported.id);
+    return {
+      ...imported,
+      hasStoredApiKey: preservesSecret,
+    };
+  });
+  const nextProviderIds = new Set(nextProviders.map((provider) => provider.id));
+  for (const current of currentProviders) {
+    if (current.hasStoredApiKey && !nextProviderIds.has(current.id))
+      clearedProviderIds.push(current.id);
+  }
+  const retainedSecretIds = new Set(
+    nextProviders.filter((provider) => provider.hasStoredApiKey).map((provider) => provider.id)
+  );
+  for (const secretId of Object.keys(currentSecrets)) {
+    if (!retainedSecretIds.has(secretId)) clearedProviderIds.push(secretId);
+  }
+  const nextSecrets = Object.fromEntries(
+    Object.entries(currentSecrets).filter(([providerId]) => retainedSecretIds.has(providerId))
+  );
+  const next = {
+    [AI_PROVIDERS_KEY]: nextProviders,
+    [AI_PROVIDER_SECRETS_KEY]: nextSecrets,
+  };
+  const restore = async () => {
+    const present = Object.fromEntries(
+      keys.filter((key) => key in before).map((key) => [key, before[key]])
+    );
+    const missing = keys.filter((key) => !(key in before));
+    if (Object.keys(present).length > 0) await browserStorage.local.set(present, args.permit);
+    if (missing.length > 0) await browserStorage.local.remove([...missing], args.permit);
+    const verified = await browserStorage.local.get([...keys]);
+    if (JSON.stringify(verified) !== JSON.stringify(present)) {
+      throw new AIProviderTransferRollbackError(
+        'AI provider transfer rollback verification failed'
+      );
+    }
+  };
+  return {
+    clearedProviderIds: [...new Set(clearedProviderIds)],
+    missingProviderIds: [...new Set(missingProviderIds)],
+    async commit() {
+      try {
+        await browserStorage.local.set(next, args.permit);
+        await removeTransparentKeyIfUnused(Object.keys(nextSecrets).length, args.permit);
+      } catch (error) {
+        try {
+          await restore();
+        } catch {
+          throw new AIProviderTransferRollbackError('AI provider transfer rollback failed');
+        }
+        throw error;
+      }
+    },
+    rollback: restore,
+  };
+}
 
 export async function readStoredProviderMetadata(): Promise<AIProvider[]> {
   const result = await browserStorage.local.get([AI_PROVIDERS_KEY]);

@@ -236,10 +236,17 @@
 .sniptale-frame-toolbar-trigger:hover,
 .sniptale-frame-toolbar-trigger:focus-visible,
 .sniptale-frame-quick-action:hover,
-.sniptale-frame-quick-action:focus-visible {
+.sniptale-frame-quick-action:focus-visible,
+.sniptale-callout-title-toggle-handle:hover,
+.sniptale-callout-title-toggle-handle:focus-visible {
   border-color: var(--sniptale-color-accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent) !important;
   outline: none;
+}
+
+.sniptale-callout-title-toggle-handle[data-active='true'] {
+  border-color: var(--sniptale-color-accent) !important;
+  color: var(--sniptale-color-accent-emphasis) !important;
 }
 
 .sniptale-frame-quick-action[data-active='true'] {

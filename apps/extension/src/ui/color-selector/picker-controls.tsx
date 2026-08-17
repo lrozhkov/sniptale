@@ -1,5 +1,7 @@
 import { translate } from '../../platform/i18n';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
+import { NumericValueField } from '../compact-inspector-controls/numeric';
+import { CompactInput } from '../compact-inspector-controls/primitives';
 
 const TEXT_ACTION_CLASS_NAME = [
   'inline-flex h-9 items-center justify-center rounded-[10px] border-none px-3',
@@ -14,7 +16,7 @@ const TEXT_ACTION_CLASS_NAME = [
 ].join(' ');
 
 const MODE_LABEL_CLASS_NAME =
-  'text-[12px] font-semibold uppercase text-[var(--sniptale-color-text-secondary)]';
+  'text-center text-[12px] font-semibold uppercase text-[var(--sniptale-color-text-secondary)]';
 const MODE_SWITCH_OVERLAY_CLASS_NAME = [
   'absolute inset-0 z-10 rounded-[8px] border-none bg-transparent outline-none transition',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_56%,transparent)]',
@@ -35,7 +37,7 @@ function getFormatLabel(mode: ColorSelectorFormatMode) {
       return translate('shared.ui.colorSelectorHsl');
   }
 }
-export function PickerInputField(props: {
+function PickerInputField(props: {
   max?: number;
   min?: number;
   onChange: (value: string) => void;
@@ -45,7 +47,7 @@ export function PickerInputField(props: {
   ariaLabel: string;
 }) {
   return (
-    <input
+    <CompactInput
       aria-label={props.ariaLabel}
       type={props.type ?? 'number'}
       min={props.min}
@@ -53,14 +55,30 @@ export function PickerInputField(props: {
       spellCheck={props.spellCheck}
       value={props.value}
       onChange={(event) => props.onChange(event.target.value)}
-      className={[
-        'h-9 w-full rounded-[10px] border px-2 text-sm',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_60%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_80%,transparent)]',
-        'text-[color:var(--sniptale-color-text-primary)] caret-[color:var(--sniptale-color-accent)]',
-        'outline-none transition placeholder:text-[color:var(--sniptale-color-text-muted)]',
-        'focus:border-[color:var(--sniptale-color-border-accent-strong)]',
-      ].join(' ')}
+      className="h-8 px-2 text-xs"
+    />
+  );
+}
+
+export function PickerNumericInputField(props: {
+  ariaLabel: string;
+  max?: number;
+  min?: number;
+  onChange: (value: string) => void;
+  unit?: '' | '%';
+  value: number | string;
+}) {
+  const numericValue = Number(props.value);
+  return (
+    <NumericValueField
+      className="w-full border-[color:var(--sniptale-color-border-soft)] bg-transparent"
+      label={props.ariaLabel}
+      max={props.max}
+      min={props.min}
+      unit={props.unit ?? ''}
+      value={Number.isFinite(numericValue) ? numericValue : null}
+      onPreviewValue={(value) => props.onChange(String(value))}
+      onCommitValue={(value) => props.onChange(String(value))}
     />
   );
 }

@@ -105,6 +105,10 @@ vi.mock('../../sections/system/access-data', () => {
   settingsPageDelayMocks.loadedSectionModules.push('access-data');
   return { AccessDataSection: markerComponent('permissions-section') };
 });
+vi.mock('../../sections/system/settings-transfer', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('settings-transfer');
+  return { SettingsTransferSection: markerComponent('settings-transfer-section') };
+});
 
 vi.mock('../navigation/sidebar', () => ({
   SettingsSidebar: (props: { onTabChange: (tab: string) => void }) => {
@@ -206,6 +210,7 @@ describe('SettingsPage delayed loading', () => {
         'voice-input',
         'native-app',
         'access-data',
+        'settings-transfer',
       ])
     );
   });

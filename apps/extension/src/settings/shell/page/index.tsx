@@ -2,7 +2,11 @@ import { Suspense, useState, useEffect } from 'react';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
 import { useCommandPaletteHotkey } from '../../../ui/command-palette/hotkey';
 import { DelayedSettingsCenteredLoadingState } from '../../section-surface/loading-state';
-import { SettingsSectionHeaderActionsProvider } from '../../section-surface';
+import {
+  SettingsNavigationLockProvider,
+  SettingsSectionHeaderActionsProvider,
+  useSettingsNavigationLock,
+} from '../../section-surface';
 import { SettingsSidebar } from '../navigation/sidebar';
 import { SettingsCommandPalette } from '../command-palette';
 import { settingsPageContentClassName, settingsPageLayoutClassName } from '../../section-surface';
@@ -21,6 +25,7 @@ import {
 import { useSettingsRoute } from '../route/history';
 
 function SettingsPageSurface(props: {
+  navigationLocked: boolean;
   onRouteChange: (route: SettingsRoute) => void;
   route: SettingsRoute;
 }) {
@@ -33,6 +38,7 @@ function SettingsPageSurface(props: {
     <div data-ui="settings.page.layout" className={settingsPageLayoutClassName}>
       <SettingsSidebar
         activeTab={props.route.section}
+        disabled={props.navigationLocked}
         onTabChange={(section) => props.onRouteChange({ section })}
       />
       <main
@@ -84,19 +90,26 @@ function SettingsPageStyles() {
 
 function SettingsPageMain() {
   const { loadSettings } = useSettingsStore();
-  const { navigate, route } = useSettingsRoute();
+  const { locked: navigationLocked } = useSettingsNavigationLock();
+  const { navigate, route } = useSettingsRoute({ navigationBlocked: navigationLocked });
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   usePageLocaleMetadata('settings.navigation.documentTitle');
 
   useCommandPaletteHotkey({
     isOpen: commandPaletteOpen,
-    onOpen: () => setCommandPaletteOpen(true),
+    onOpen: () => {
+      if (!navigationLocked) setCommandPaletteOpen(true);
+    },
     onClose: () => setCommandPaletteOpen(false),
   });
 
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
+
+  useEffect(() => {
+    if (navigationLocked) setCommandPaletteOpen(false);
+  }, [navigationLocked]);
 
   useEffect(() => {
     const preloadTimeoutId = window.setTimeout(() => {
@@ -117,9 +130,13 @@ function SettingsPageMain() {
         'text-[var(--sniptale-color-text-primary)]'
       }
     >
-      <SettingsPageSurface route={route} onRouteChange={navigate} />
+      <SettingsPageSurface
+        route={route}
+        navigationLocked={navigationLocked}
+        onRouteChange={navigate}
+      />
       <SettingsCommandPalette
-        isOpen={commandPaletteOpen}
+        isOpen={commandPaletteOpen && !navigationLocked}
         activeTab={route.section}
         onClose={() => setCommandPaletteOpen(false)}
         onTabChange={(section) => navigate({ section })}
@@ -135,7 +152,9 @@ export function SettingsPage() {
     <AISecretUnlockPage />
   ) : (
     <SettingsSectionHeaderActionsProvider>
-      <SettingsPageMain />
+      <SettingsNavigationLockProvider>
+        <SettingsPageMain />
+      </SettingsNavigationLockProvider>
     </SettingsSectionHeaderActionsProvider>
   );
 }

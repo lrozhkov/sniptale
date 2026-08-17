@@ -58,13 +58,20 @@ it('routes reorder/default/blur/focus through canonical owner commands', async (
   await ordering.handleMoveBefore('system-default', 'system-marker');
   expect(mocks.reorder).toHaveBeenCalledWith([
     'system-soft-highlight',
+    'system-sunrise',
     'system-default',
     'system-marker',
     'system-success',
+    'system-sticky-note',
     'system-attention',
     'system-review',
-    'system-light-ui',
     'system-dark-ui',
+    'system-light-ui',
+    'system-editorial-ink',
+    'system-editorial-proof',
+    'system-retro-sunset',
+    'system-retro-arcade',
+    'system-retro-memphis',
   ]);
   await settings.handleSetDefaultPreset('system-soft-highlight');
   await settings.handleUpdateBlurSettings({ amount: 8, blurType: 'solid', showBorder: true });

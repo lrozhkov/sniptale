@@ -16,6 +16,8 @@ import {
 import { useScenarioController } from '../../../content/overlay/scenario/controller';
 import { useContentScreenshotAutoStart } from '../../../content/overlay/screenshot/auto-start';
 import { useScreenshotController } from '../../../content/overlay/screenshot/controller';
+import { restoreScreenshotEditingMode } from '../../../content/overlay/screenshot/mode';
+import type { ScreenshotEditingMode } from '../../../content/overlay/screenshot/types';
 import { useToolbarModeController } from '../../../content/overlay/toolbar/mode-controller';
 import {
   useContentDrawingController,
@@ -126,7 +128,8 @@ function usePreparationScreenshotController(
   modeState: ContentAppModeState,
   aiController: PreparationSurfaceControllers['aiController'],
   scenarioController: PreparationSurfaceControllers['scenarioController'],
-  drawingController: ContentDrawingController
+  drawingController: ContentDrawingController,
+  restoreEditingMode: (mode: ScreenshotEditingMode) => void
 ): PreparationSurfaceControllers['screenshotController'] {
   return useScreenshotController({
     captureAdapter,
@@ -151,6 +154,7 @@ function usePreparationScreenshotController(
       },
       highlighterMode: modeState.highlighterMode,
       quickEditMode: modeState.quickEditMode,
+      restoreEditingMode,
       setAiPickMode: modeState.setAiPickMode,
       setDesignReviewMode: modeState.setDesignReviewMode,
       ...(modeState.setDrawingMode === undefined
@@ -250,13 +254,6 @@ function usePreparationControllers(
     modeState,
     ports,
   });
-  const screenshotController = usePreparationScreenshotController(
-    captureAdapter,
-    modeState,
-    aiController,
-    scenarioController,
-    drawingController
-  );
   const autoBlurController = useAutoBlurController({
     autoApplyAllowed: false,
     frameManager,
@@ -284,6 +281,25 @@ function usePreparationControllers(
       return aiController.handleAiPickContentStart(...args);
     },
   };
+  const screenshotController = usePreparationScreenshotController(
+    captureAdapter,
+    modeState,
+    aiController,
+    scenarioController,
+    drawingController,
+    (mode) =>
+      restoreScreenshotEditingMode(mode, {
+        'ai-pick': drawingAwareAiController.handleEnableAiPickMode,
+        'design-review': () => modeController.handleToggleDesignReviewMode(true),
+        drawing: () => {
+          if (!drawingController.prepareActivation()) return;
+          modeState.setDrawingMode?.(true);
+          modeState.setNavigationLockEnabled(false);
+        },
+        highlighter: () => modeController.handleToggleHighlighterMode(true),
+        'quick-edit': () => modeController.handleToggleQuickEditMode(true),
+      })
+  );
   const videoRecordingController = useVideoRecordingSurfaceController({
     onModeRequested: (enabled) => modeState.setVideoRecordingMode?.(enabled),
     onToolbarRequested: () => modeState.setIsToolbarVisible(true),

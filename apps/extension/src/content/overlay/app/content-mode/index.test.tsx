@@ -131,7 +131,7 @@ function registerPinnedToolbarWindowStorageRestoreTest() {
 }
 
 function registerPinnedToolbarBackgroundRestoreTest() {
-  it('hydrates pin-to-tab through background and makes the restored toolbar visible', async () => {
+  it('hydrates a collapsed pin-to-tab toolbar without expanding it during status restore', async () => {
     storageMocks.sendRuntimeMessage
       .mockResolvedValueOnce({
         pinToTab: true,
@@ -139,6 +139,7 @@ function registerPinnedToolbarBackgroundRestoreTest() {
         reason: 'pin-to-tab',
         restored: true,
         success: true,
+        toolbarVisible: false,
       })
       .mockResolvedValueOnce({
         success: true,
@@ -162,7 +163,7 @@ function registerPinnedToolbarBackgroundRestoreTest() {
     });
     expect(getLatestState().pinToTab).toBe(true);
     expect(getLatestState().screenshotMode).toBe(true);
-    expect(getLatestState().isToolbarVisible).toBe(true);
+    expect(getLatestState().isToolbarVisible).toBe(false);
     expect(getLatestState().currentViewport).toEqual({ width: 1440, height: 900 });
   });
 }

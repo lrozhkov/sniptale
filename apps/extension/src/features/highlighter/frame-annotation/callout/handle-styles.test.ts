@@ -23,8 +23,9 @@ it('places both comment controls left and below a callout at the top-right viewp
     viewport: { height: 600, width: 800 },
   });
 
-  expect(styles.dragHandleStyle).toMatchObject({ left: 658, top: 46 });
+  expect(styles.dragHandleStyle).toMatchObject({ left: 628, top: 46 });
   expect(styles.settingsHandleStyle).toMatchObject({ left: 688, top: 46 });
+  expect(styles.tailBaseRangeHandleStyle).not.toBeNull();
 });
 
 it.each([4, 0.5, 0.2])('keeps centered comment handles anchored at ui scale %s', (uiScale) => {
@@ -58,4 +59,25 @@ it.each([4, 0.5, 0.2])('keeps centered comment handles anchored at ui scale %s',
     expect(Number(styles.tailHandleStyle.left) + 6).toBeCloseTo(tailPoint.x);
     expect(Number(styles.tailHandleStyle.top) + 6).toBeCloseTo(tailPoint.y);
   }
+});
+
+it('uses the compact control count and omits the shared wedge range for a line connector', () => {
+  const settings = createDefaultCalloutSettings();
+  settings.style.connector.kind = 'line';
+  const layout = getCalloutLayoutState({
+    dimensions: { height: 40, width: 80 },
+    frameRect: { height: 80, width: 120, x: 200, y: 200 },
+    isEditing: false,
+    settings,
+    zIndex: 20,
+  });
+
+  const styles = createCalloutHandleStyles({
+    layout,
+    showSettingsHandle: false,
+    viewport: { height: 600, width: 800 },
+  });
+
+  expect(styles.tailBaseRangeHandleStyle).toBeNull();
+  expect(styles.dragHandleStyle.left).toEqual(expect.any(Number));
 });

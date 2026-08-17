@@ -12,7 +12,10 @@ import {
   writeContentPinToTabToolbarVisibilityState,
 } from './pin-session';
 
-function useContentPinToTabState() {
+function useContentPinToTabState(
+  restoreToolbarVisibility: (visible: boolean) => void,
+  createToolbarVisibilityRefreshGuard: () => () => boolean
+) {
   const [pinToTab, setPinToTabState] = useState(readContentPinToTabSessionState);
   const [pinToTabAvailable, setPinToTabAvailable] = useState(false);
   const confirmedPinToTabRef = useRef(pinToTab);
@@ -63,6 +66,7 @@ function useContentPinToTabState() {
     const refreshGeneration = refreshGenerationRef.current + 1;
     refreshGenerationRef.current = refreshGeneration;
     const startedAtGeneration = writeGenerationRef.current;
+    const isToolbarVisibilityRefreshCurrent = createToolbarVisibilityRefreshGuard();
 
     void loadContentPinToTabSessionState().then((state) => {
       if (
@@ -74,8 +78,11 @@ function useContentPinToTabState() {
 
       setPinToTabAvailable(state.pinToTabAvailable);
       commitConfirmedPinToTabState(state.pinToTab);
+      if (state.pinToTab && isToolbarVisibilityRefreshCurrent()) {
+        restoreToolbarVisibility(state.toolbarVisible);
+      }
     });
-  }, [commitConfirmedPinToTabState]);
+  }, [commitConfirmedPinToTabState, createToolbarVisibilityRefreshGuard, restoreToolbarVisibility]);
 
   useEffect(() => {
     const handleFocus = () => refreshPinToTabState();
@@ -115,6 +122,7 @@ function useContentVisibilityState() {
   const [isToolbarVisible, setToolbarVisibleState] = useState(false);
   const confirmedToolbarVisibilityRef = useRef(false);
   const visibilityWriteGenerationRef = useRef(0);
+  const pendingVisibilityWriteGenerationRef = useRef<number | null>(null);
   const projectToolbarVisibility = useCallback((value: boolean) => {
     setToolbarVisibleState(value);
   }, []);
@@ -137,18 +145,32 @@ function useContentVisibilityState() {
     dataUrl: string;
     filename: string;
   } | null>(null);
-  const { pinToTab, pinToTabAvailable, setPinToTab } = useContentPinToTabState();
+  const createToolbarVisibilityRefreshGuard = useCallback(() => {
+    const startedAtGeneration = visibilityWriteGenerationRef.current;
+    const overlapsPendingWrite = pendingVisibilityWriteGenerationRef.current !== null;
+    return () =>
+      !overlapsPendingWrite && visibilityWriteGenerationRef.current === startedAtGeneration;
+  }, []);
+  const { pinToTab, pinToTabAvailable, setPinToTab } = useContentPinToTabState(
+    setIsToolbarVisible,
+    createToolbarVisibilityRefreshGuard
+  );
   const setPinnedToolbarVisible = useCallback(
     (value: boolean) => {
       const writeGeneration = visibilityWriteGenerationRef.current + 1;
       visibilityWriteGenerationRef.current = writeGeneration;
+      pendingVisibilityWriteGenerationRef.current = writeGeneration;
       projectToolbarVisibility(value);
       void writeContentPinToTabToolbarVisibilityState(value)
         .then(() => {
           confirmedToolbarVisibilityRef.current = value;
+          if (pendingVisibilityWriteGenerationRef.current === writeGeneration) {
+            pendingVisibilityWriteGenerationRef.current = null;
+          }
         })
         .catch(() => {
           if (visibilityWriteGenerationRef.current === writeGeneration) {
+            pendingVisibilityWriteGenerationRef.current = null;
             projectToolbarVisibility(confirmedToolbarVisibilityRef.current);
           }
         });

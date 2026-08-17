@@ -19,6 +19,7 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   runtimeInfo: {
     getManifest: () => ({
       version: '0.0.0-test',
+      version_name: '0.0.0-test alpha',
     }),
   },
 }));
@@ -69,7 +70,7 @@ describe('SettingsSidebar', () => {
     );
     expect(container?.querySelector('[data-ui="settings.sidebar.header"] h1')).toBeNull();
     expect(container?.querySelector('[data-ui="settings.sidebar.footer"]')?.textContent).toContain(
-      'Sniptale v0.0.0-test'
+      'Sniptale v0.0.0-test alpha'
     );
     expect(container?.querySelectorAll('button')).toHaveLength(SETTINGS_NAV_ITEMS.length);
     expect(container?.querySelector('[data-ui="settings.sidebar.nav-list"]')?.className).toContain(

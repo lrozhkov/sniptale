@@ -88,7 +88,10 @@ describe('auto-blur-modal/controls', () => {
     );
     act(() => templateSelect?.click());
     const option = document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')[1];
-    act(() => option?.click());
+    await act(async () => {
+      option?.click();
+      await Promise.resolve();
+    });
 
     expect(setBlurSettings).toHaveBeenCalledWith({
       amount: 12,

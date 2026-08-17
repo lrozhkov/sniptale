@@ -4,10 +4,18 @@ import { act, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSolidPaint } from '@sniptale/foundation/paint';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { translate } from '../../platform/i18n';
+
+const paintSelectorProps = vi.hoisted(() => vi.fn());
 
 vi.mock('../paint-selector', async (importOriginal) => ({
   ...(await importOriginal()),
-  CompactPaintSelector: (props: { onOpenChange?: (open: boolean) => void }) => {
+  CompactPaintSelector: (props: {
+    onOpenChange?: (open: boolean) => void;
+    onPreviewChange?: (paint: ReturnType<typeof createSolidPaint>) => void;
+    onPreviewReset?: () => void;
+  }) => {
+    paintSelectorProps(props);
     const [open, setOpen] = useState(false);
     useEffect(() => {
       if (!open) return;
@@ -82,6 +90,97 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="root"></div>';
 });
 
+it('renders the field label and selector on one compact row', async () => {
+  const root = createRoot(document.querySelector('#root')!);
+  await act(async () =>
+    root.render(
+      <SurfaceStyleSelector
+        actions={actions}
+        fieldLabel="Surface style"
+        presentation="selection"
+        presets={presets}
+        value={style('#fff')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const selector = document.querySelector('[data-ui="shared.ui.surface-style-selector"]')!;
+  expect(selector.firstElementChild?.textContent).toContain('Surface style');
+  expect(
+    selector.firstElementChild?.querySelector(
+      '[data-ui="shared.ui.surface-style-selector.trigger"]'
+    )
+  ).not.toBeNull();
+  await act(async () => root.unmount());
+});
+
+it('publishes paint previews live and restores the opening surface on cancel', async () => {
+  const onChange = vi.fn();
+  const root = createRoot(document.querySelector('#root')!);
+  await act(async () =>
+    root.render(
+      <SurfaceStyleSelector
+        actions={actions}
+        presentation="selection"
+        presets={presets}
+        value={style('#fff')}
+        onChange={onChange}
+      />
+    )
+  );
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[aria-expanded="false"]')!.click()
+  );
+  await act(async () =>
+    Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent === translate('content.callout.surfaceStyle.color'))!
+      .click()
+  );
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-ui="paint-mock"]')!.click()
+  );
+  const paint = paintSelectorProps.mock.calls.at(-1)?.[0];
+  await act(async () => paint.onPreviewChange?.(createSolidPaint('#123456')));
+  expect(onChange).toHaveBeenLastCalledWith(style('#123456'));
+  await act(async () => paint.onPreviewReset?.());
+  expect(onChange).toHaveBeenLastCalledWith(style('#fff'));
+  await act(async () => root.unmount());
+});
+
+it('keeps the Color editor active when a picked color matches the Plain surface preset', async () => {
+  function StatefulSelector() {
+    const [value, setValue] = useState(style('#123456'));
+    return (
+      <SurfaceStyleSelector
+        actions={actions}
+        presentation="selection"
+        presets={presets}
+        value={value}
+        onChange={setValue}
+      />
+    );
+  }
+
+  const root = createRoot(document.querySelector('#root')!);
+  await act(async () => root.render(<StatefulSelector />));
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[aria-expanded="false"]')!.click()
+  );
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-ui="paint-mock"]')!.click()
+  );
+  const paint = paintSelectorProps.mock.calls.at(-1)?.[0];
+  await act(async () => paint.onPreviewChange?.(createSolidPaint('#fff')));
+
+  expect(document.querySelector('[data-ui="paint-mock"]')).not.toBeNull();
+  expect(
+    [...document.querySelectorAll<HTMLButtonElement>('[aria-pressed="true"]')].some(
+      (button) => button.textContent === translate('content.callout.surfaceStyle.color')
+    )
+  ).toBe(true);
+  await act(async () => root.unmount());
+});
+
 it('previews the complete surface and exposes the selected preset state', async () => {
   const root = createRoot(document.querySelector('#root')!);
   await act(async () =>
@@ -102,13 +201,22 @@ it('previews the complete surface and exposes the selected preset state', async 
     '[data-ui="shared.ui.surface-style-selector.preview"]'
   )!;
   expect(trigger.textContent).toContain('Glass');
+  expect(trigger.textContent).not.toContain(translate('content.callout.surfaceStyle.title'));
   expect(preview.style.backdropFilter).toBe('blur(16px)');
   await act(async () => trigger.click());
   const selected = [...document.querySelectorAll<HTMLButtonElement>('[aria-pressed="true"]')].find(
     (button) => button.textContent?.includes('Glass')
   );
   expect(selected).not.toBeUndefined();
-  expect(selected?.className).toContain('focus-visible:ring-2');
+  expect(selected?.className).toContain('focus-visible:shadow-');
+  expect(selected?.querySelector('span')?.className).toContain('h-6 w-9');
+  expect(selected?.querySelector('.lucide-check')?.parentElement?.className).toContain(
+    'text-[var(--sniptale-color-accent-emphasis)]'
+  );
+  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain(
+    translate('content.callout.surfaceStyle.backgroundType')
+  );
+  expect(document.querySelector('[role="dialog"]')?.className).toContain('outline-none');
   await act(async () => root.unmount());
 });
 
@@ -140,7 +248,7 @@ it('matches semantically, drafts a preset, and applies only on Apply', async () 
       .querySelector<HTMLButtonElement>('[aria-label="Дублировать"], [aria-label="Duplicate"]')!
       .click()
   );
-  expect(actions.onDuplicate).toHaveBeenCalledWith('plain', 'Plain — копия');
+  expect(actions.onDuplicate).toHaveBeenCalledWith('plain', 'Plain (копия)');
   await act(async () =>
     document.querySelector<HTMLButtonElement>('[data-ui="surface-style.apply"]')!.click()
   );

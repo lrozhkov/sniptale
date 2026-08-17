@@ -89,6 +89,7 @@ vi.mock('./surface', () => ({
           })
         }
       />
+      <button data-action="title" onClick={props['handleTitleToggleClick']} />
     </div>
   ),
 }));
@@ -124,6 +125,7 @@ afterEach(() => {
 
 it('routes both pointer and keyboard resize handles through the shared interaction layout', async () => {
   const onWidthChange = vi.fn();
+  const onTitleEnabledChange = vi.fn();
   const noop = vi.fn();
   await act(async () =>
     root.render(
@@ -134,6 +136,7 @@ it('routes both pointer and keyboard resize handles through the shared interacti
             applyFormatting: noop,
             blur: noop,
             click: noop,
+            finish: noop,
             input: noop,
             keyDown: noop,
             paste: noop,
@@ -148,11 +151,14 @@ it('routes both pointer and keyboard resize handles through the shared interacti
         isFrameEditing={false}
         isSettingsOpen={false}
         onCurveChange={noop}
+        onBadgeTextChange={noop}
         onPositionChange={noop}
         onSettingsClick={noop}
+        onStartEditing={noop}
         onTailBaseRangeChange={noop}
         onTailFramePositionChange={noop}
         onTitleChange={noop}
+        onTitleEnabledChange={onTitleEnabledChange}
         onWaypointChange={noop}
         onWidthChange={onWidthChange}
         portalTarget={document.body}
@@ -188,7 +194,8 @@ it('routes both pointer and keyboard resize handles through the shared interacti
     );
   });
   expect(host.firstElementChild?.getAttribute('data-drag-left')).not.toBe('');
-  expect(host.querySelectorAll('button')).toHaveLength(5);
+  expect(host.querySelectorAll('button')).toHaveLength(6);
+  expect(onTitleEnabledChange).toHaveBeenCalledWith(true);
   expect(noop).toHaveBeenCalledWith(
     expect.any(Object),
     expect.objectContaining({ translateConnectorGeometry: true })

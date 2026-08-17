@@ -4,10 +4,8 @@ import type {
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
-import {
-  cloneCalloutVisualStyle,
-  getCanonicalSystemCalloutPreset,
-} from '../../../features/highlighter/callout-presets/catalog';
+import { getCanonicalSystemCalloutPreset } from '../../../features/highlighter/callout-presets/catalog';
+import { cloneCalloutVisualStyle } from '../../../features/highlighter/callout-presets/visual-style';
 
 interface CalloutPresetUpdate {
   content?: CalloutPreset['content'];
@@ -188,7 +186,7 @@ export function resetSystemPreset(
     current.name === canonical.name &&
     JSON.stringify(current.placement) === JSON.stringify(canonical.placement) &&
     JSON.stringify(current.style) === JSON.stringify(canonical.style) &&
-    current.tagIds.length === 0
+    JSON.stringify(current.tagIds) === JSON.stringify(canonical.tagIds)
   ) {
     return null;
   }

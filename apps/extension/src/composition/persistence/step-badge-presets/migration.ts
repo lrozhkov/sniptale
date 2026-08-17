@@ -45,7 +45,7 @@ export function resolveStoredStepBadgePresetCatalog(
           SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION)
         : SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION,
       customized,
-      tagIds: [...(placement?.tagIds ?? [])],
+      tagIds: [...(placement?.tagIds !== undefined ? placement.tagIds : canonical.tagIds)],
     };
   });
   const users: StepBadgePreset[] = (stored.userPresets ?? []).map((preset, index) => {

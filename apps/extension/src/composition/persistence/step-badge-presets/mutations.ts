@@ -109,12 +109,17 @@ export function resetSystemStepBadgePreset(catalog: StepBadgePresetCatalog, id: 
   const current = catalog.presets.find((preset) => preset.id === id);
   if (!current?.systemPresetKey) return null;
   const canonical = getCanonicalSystemStepBadgePreset(current.systemPresetKey);
+  const reset = { ...canonical, enabled: current.enabled !== false, order: current.order };
+  if (
+    current.customized !== true &&
+    current.name === reset.name &&
+    JSON.stringify(current.settings) === JSON.stringify(reset.settings) &&
+    JSON.stringify(current.tagIds) === JSON.stringify(reset.tagIds)
+  ) {
+    return null;
+  }
   return {
     ...catalog,
-    presets: catalog.presets.map((preset) =>
-      preset.id === id
-        ? { ...canonical, enabled: current.enabled !== false, order: current.order }
-        : preset
-    ),
+    presets: catalog.presets.map((preset) => (preset.id === id ? reset : preset)),
   };
 }

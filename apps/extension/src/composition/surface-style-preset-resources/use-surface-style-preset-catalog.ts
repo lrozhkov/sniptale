@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SurfaceStyle } from '@sniptale/runtime-contracts/highlighter/surface-style';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import { translate, useAppLocale, type AppLocale } from '../../platform/i18n';
+import { getSurfaceStylePresetDisplayName } from '../../features/highlighter/surface-style/display-name';
+import { translate, useAppLocale } from '../../platform/i18n';
 import {
   addSurfaceStylePreset,
   deleteSurfaceStylePreset,
@@ -25,35 +26,6 @@ const createId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? `surface-${crypto.randomUUID()}`
     : `surface-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-function canonicalSystemName(
-  id: string
-):
-  | 'content.callout.surfaceStyle.system.plain'
-  | 'content.callout.surfaceStyle.system.frostedLight'
-  | 'content.callout.surfaceStyle.system.frostedDark'
-  | 'content.callout.surfaceStyle.system.clearTint'
-  | 'content.callout.surfaceStyle.system.softElevated'
-  | null {
-  const suffix = id
-    .replace('system-surface-', '')
-    .replace(/-([a-z])/gu, (_match, letter: string) => letter.toUpperCase());
-  const keys = {
-    plain: 'content.callout.surfaceStyle.system.plain',
-    frostedLight: 'content.callout.surfaceStyle.system.frostedLight',
-    frostedDark: 'content.callout.surfaceStyle.system.frostedDark',
-    clearTint: 'content.callout.surfaceStyle.system.clearTint',
-    softElevated: 'content.callout.surfaceStyle.system.softElevated',
-  } as const;
-  return suffix in keys ? keys[suffix as keyof typeof keys] : null;
-}
-
-function systemName(id: string, storedName: string, locale: AppLocale): string {
-  const key = canonicalSystemName(id);
-  return key && storedName === key.replace('content.callout.', '')
-    ? translate(key, locale)
-    : storedName;
-}
 
 export function useSurfaceStylePresetCatalog() {
   const locale = useAppLocale();
@@ -109,7 +81,7 @@ export function useSurfaceStylePresetCatalog() {
       catalog,
       presets: (catalog?.presets ?? []).map((preset) => ({
         ...preset,
-        name: preset.origin === 'system' ? systemName(preset.id, preset.name, locale) : preset.name,
+        name: getSurfaceStylePresetDisplayName(preset, locale),
         favorite: catalog?.favoriteIds.includes(preset.id) ?? false,
         isDefault: catalog?.defaultPresetId === preset.id,
       })),

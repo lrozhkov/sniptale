@@ -55,12 +55,12 @@ it('serializes concurrent mutations and re-reads the latest persisted state', as
   const add = module.addBorderPreset(userPreset);
   const disable = module.setBorderPresetEnabled('system-default', false);
   await vi.waitFor(() => expect(syncSetMock).toHaveBeenCalledOnce());
-  expect(syncGetMock).toHaveBeenCalledOnce();
+  expect(syncGetMock).toHaveBeenCalledTimes(2);
 
   firstWrite.resolve();
   await Promise.all([add, disable]);
 
-  expect(syncGetMock).toHaveBeenCalledTimes(2);
+  expect(syncGetMock).toHaveBeenCalledTimes(3);
   expect(syncSetMock).toHaveBeenCalledTimes(2);
   const stored = storageState.value as HighlighterSettings;
   expect(stored.borderPresets.some((preset) => preset.id === 'user-1')).toBe(true);

@@ -20,6 +20,7 @@ export function createScreenshotControllerSession(
     countdownLock: null,
     countdownRunToken: null,
     countdownTimeout: null,
+    editingModeBaseline: null,
     navigationLockBaseline,
     pendingType: null,
     runActive: false,

@@ -6,7 +6,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   contextMenu: vi.fn(() => <div data-ui="context-menu" />),
+  openExtensionShortcutsPage: vi.fn(),
   themeChips: vi.fn(() => <div data-ui="theme-chips" />),
+}));
+
+vi.mock('../../../../../platform/navigation/extension-pages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/navigation/extension-pages')>()),
+  openExtensionShortcutsPage: mocks.openExtensionShortcutsPage,
 }));
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -135,4 +141,10 @@ it('renders appearance owners and routes locale controls', () => {
   expect(state.popupStartup.updateSelection).toHaveBeenCalledWith('video:screen');
   expect(mocks.themeChips).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
   expect(mocks.contextMenu).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
+
+  const shortcutButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
+    button.textContent?.includes('settings.appearance.keyboardShortcutsButton')
+  );
+  act(() => shortcutButton?.click());
+  expect(mocks.openExtensionShortcutsPage).toHaveBeenCalledOnce();
 });

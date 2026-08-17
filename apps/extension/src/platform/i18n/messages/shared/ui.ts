@@ -42,8 +42,8 @@ export const sharedUiMessages = defineMessageSource({
     en: 'B',
   },
   colorSelectorAlpha: {
-    ru: 'Альфа',
-    en: 'Alpha',
+    ru: 'Прозрачность',
+    en: 'Opacity',
   },
   colorSelectorHex: {
     ru: 'HEX',

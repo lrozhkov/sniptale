@@ -65,9 +65,22 @@ vi.mock('../../sections/capture/quick-actions', () => {
 vi.mock('../../sections/styles/annotations', () => {
   return { AnnotationsSection: markerComponent('highlighter-section') };
 });
+vi.mock('../../sections/system/settings-transfer', async () => {
+  const { useSettingsNavigationLock } = await import('../../section-surface/navigation-lock');
+  return {
+    SettingsTransferSection: () => {
+      const { setLocked } = useSettingsNavigationLock();
+      return (
+        <button type="button" onClick={() => setLocked(true)}>
+          lock-navigation
+        </button>
+      );
+    },
+  };
+});
 
 vi.mock('../navigation/sidebar', () => ({
-  SettingsSidebar: (props: { onTabChange: (tab: string) => void }) => {
+  SettingsSidebar: (props: { disabled?: boolean; onTabChange: (tab: string) => void }) => {
     settingsPageMocks.settingsSidebarMock(props);
     return (
       <div data-ui="settings.sidebar">
@@ -81,8 +94,14 @@ vi.mock('../navigation/sidebar', () => ({
           'ai-prompts',
           'quick-actions',
           'access-data',
+          'settings-transfer',
         ].map((tab) => (
-          <button key={tab} type="button" onClick={() => props.onTabChange(tab)}>
+          <button
+            key={tab}
+            type="button"
+            disabled={props.disabled}
+            onClick={() => props.onTabChange(tab)}
+          >
             {tab}
           </button>
         ))}
@@ -270,5 +289,25 @@ describe('SettingsPage navigation', () => {
     await flushLazySettingsSection();
 
     expect(container?.textContent).toContain('quickactions-section');
+  });
+
+  it('keeps the transfer report owner mounted while shell navigation is locked', async () => {
+    await renderPage();
+    await act(async () => clickButton('settings-transfer'));
+    await flushLazySettingsSection();
+    await act(async () => clickButton('lock-navigation'));
+
+    const sidebarProps = settingsPageMocks.settingsSidebarMock.mock.lastCall?.[0] as {
+      disabled?: boolean;
+    };
+    expect(sidebarProps.disabled).toBe(true);
+    await act(async () => clickButton('quick-actions'));
+    expect(container?.textContent).toContain('lock-navigation');
+
+    const hotkeyArgs = settingsPageMocks.useCommandPaletteHotkeyMock.mock.lastCall?.[0] as {
+      onOpen: () => void;
+    };
+    await act(async () => hotkeyArgs.onOpen());
+    expect(container?.querySelector('[data-testid="settings-command-palette"]')).toBeNull();
   });
 });

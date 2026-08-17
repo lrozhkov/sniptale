@@ -20,7 +20,10 @@ import type { EffectMode } from '../../../features/highlighter/contracts';
 import type { ContentDrawingController } from '../../drawing/controller';
 import type { ToolbarVideoRecordingProps } from '../toolbar/types';
 
-type ContentAppAiController = Omit<UseAiPickControllerResult, 'handleCancelAIPrompt'> & {
+type ContentAppAiController = Omit<
+  UseAiPickControllerResult,
+  'handleCancelAIPrompt' | 'handleEnableAiPickMode'
+> & {
   handleCancelAIPrompt?: UseAiPickControllerResult['handleCancelAIPrompt'];
 };
 

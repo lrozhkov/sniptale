@@ -62,6 +62,10 @@ export const backgroundMessages = defineMessageSource({
       ru: 'Ошибка захвата',
       en: 'Capture error',
     },
+    commandFailed: {
+      ru: 'Не удалось выполнить команду. Попробуйте еще раз.',
+      en: 'The command could not be completed. Try again.',
+    },
     recordingUnavailable: {
       ru: 'Запись недоступна для текущей вкладки',
       en: 'Recording is unavailable for the current tab',

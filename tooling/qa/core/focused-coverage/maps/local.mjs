@@ -1,5 +1,18 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'settings-transfer-workflow',
+    productionPrefix: 'apps/extension/src/workflows/settings-transfer/',
+    exclusive: true,
+    reason:
+      'Settings transfer behavior is exercised by its owner-local package and registry suites.',
+    testFiles: [
+      'apps/extension/src/workflows/settings-transfer/planner.test.ts',
+      'apps/extension/src/workflows/settings-transfer/registry.test.ts',
+      'apps/extension/src/workflows/settings-transfer/selection.test.ts',
+      'apps/extension/src/workflows/settings-transfer/settings-coverage.test.ts',
+    ],
+  },
+  {
     owner: 'background-service-worker-entrypoint',
     productionFile: 'apps/extension/src/background/index.ts',
     reason: 'The service-worker entrypoint is exercised by its bounded runtime bootstrap suite.',

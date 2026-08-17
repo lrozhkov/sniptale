@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Sniptale",
-  "version": "0.2.0",
-  "version_name": "0.2.0",
+  "version": "0.3.0",
+  "version_name": "0.3.0 alpha",
   "minimum_chrome_version": "140",
   "description": "Workspace for capturing, understanding, annotating, recording, editing, and exporting the web.",
+  "default_locale": "en",
   "incognito": "not_allowed",
   "permissions": [
     "storage",
@@ -43,6 +44,25 @@
   "action": {
     "default_popup": "apps/extension/src/popup/index.html",
     "default_title": "Open Sniptale"
+  },
+  "commands": {
+    "tools-open": { "description": "__MSG_command_tools_open__" },
+    "tools-drawing": { "description": "__MSG_command_tools_drawing__" },
+    "tools-annotations": { "description": "__MSG_command_tools_annotations__" },
+    "tools-quick-edit": { "description": "__MSG_command_tools_quick_edit__" },
+    "tools-design-review": { "description": "__MSG_command_tools_design_review__" },
+    "tools-video-recording": { "description": "__MSG_command_tools_video_recording__" },
+    "capture-visible": { "description": "__MSG_command_capture_visible__" },
+    "capture-full-page": { "description": "__MSG_command_capture_full_page__" },
+    "capture-selection": { "description": "__MSG_command_capture_selection__" },
+    "capture-visible-edit": { "description": "__MSG_command_capture_visible_edit__" },
+    "capture-visible-copy": { "description": "__MSG_command_capture_visible_copy__" },
+    "capture-desktop-edit": { "description": "__MSG_command_capture_desktop_edit__" },
+    "export-current-tab": { "description": "__MSG_command_export_current_tab__" },
+    "open-library": { "description": "__MSG_command_open_library__" },
+    "open-image-editor": { "description": "__MSG_command_open_image_editor__" },
+    "open-video-editor": { "description": "__MSG_command_open_video_editor__" },
+    "open-scenario-editor": { "description": "__MSG_command_open_scenario_editor__" }
   },
   "icons": {
     "16": "icons/icon-16.png",

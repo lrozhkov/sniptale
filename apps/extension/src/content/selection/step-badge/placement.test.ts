@@ -158,28 +158,75 @@ describe('step badge boundary placement', () => {
     expect(getStepBadgeBoundaryCenter(frameRect, placement)).toEqual({ x: 238, y: 52 });
   });
 
-  it('preserves the anchored side and clamps inward and outward movement', () => {
+  it('preserves both pointer axes outside a frame corner for diagonal placement', () => {
+    const placement = projectStepBadgeToFrameBoundary({
+      frameRect,
+      point: { x: 320, y: 60 },
+      previousSide: 'top',
+    });
+
+    expect(placement).toEqual({
+      normalOffset: 20,
+      position: 1,
+      side: 'top',
+      tangentialOffset: 20,
+    });
+    expect(getStepBadgeBoundaryCenter(frameRect, placement)).toEqual({ x: 320, y: 60 });
+  });
+
+  it('moves freely between all frame sides while preserving the current side at an exact corner', () => {
+    expect(
+      projectStepBadgeToFrameBoundary({
+        frameRect,
+        point: { x: 320, y: 140 },
+        previousSide: 'right',
+      })
+    ).toEqual({ normalOffset: 20, position: 0.5, side: 'right' });
+    expect(
+      projectStepBadgeToFrameBoundary({
+        frameRect,
+        point: { x: 220, y: 220 },
+        previousSide: 'top',
+      })
+    ).toEqual({ normalOffset: 20, position: 0.6, side: 'bottom' });
+    expect(
+      projectStepBadgeToFrameBoundary({
+        frameRect,
+        point: { x: 80, y: 170 },
+        previousSide: 'bottom',
+      })
+    ).toEqual({ normalOffset: 20, position: 0.75, side: 'left' });
     expect(
       projectStepBadgeToFrameBoundary({
         frameRect,
         point: { x: 302, y: 78 },
         previousSide: 'right',
       })
-    ).toEqual({ normalOffset: 2, position: 0, side: 'right' });
+    ).toEqual({ position: 0, side: 'right' });
+  });
+
+  it('magnetically snaps near the perimeter and detaches inward or outward within the offset strip', () => {
     expect(
       projectStepBadgeToFrameBoundary({
         frameRect,
-        point: { x: 20, y: 140 },
-        previousSide: 'right',
+        point: { x: 105, y: 170 },
+        previousSide: 'top',
       })
-    ).toEqual({ normalOffset: -48, position: 0.5, side: 'right' });
+    ).toEqual({ position: 0.75, side: 'left' });
     expect(
       projectStepBadgeToFrameBoundary({
         frameRect,
-        point: { x: 400, y: 140 },
-        previousSide: 'right',
+        point: { x: 116, y: 170 },
+        previousSide: 'left',
       })
-    ).toEqual({ normalOffset: 48, position: 0.5, side: 'right' });
+    ).toEqual({ normalOffset: -16, position: 0.75, side: 'left' });
+    expect(
+      projectStepBadgeToFrameBoundary({
+        frameRect,
+        point: { x: 84, y: 170 },
+        previousSide: 'left',
+      })
+    ).toEqual({ normalOffset: 16, position: 0.75, side: 'left' });
   });
 
   it('renders signed normal offsets consistently at page zoom', () => {

@@ -340,7 +340,7 @@ describe('getCalloutLayoutState connector geometry', () => {
     });
 
     expect(layout.resolvedSide).toBe('top');
-    expect(layout.calloutPos).toEqual({ x: 210, y: -178 });
+    expect(layout.calloutPos).toEqual({ x: 210, y: -180 });
   });
 
   it('does not clamp a manual callout back into the viewport during scroll', () => {

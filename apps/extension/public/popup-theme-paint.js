@@ -1,3 +1,5 @@
+/* global document, window */
+
 (() => {
   const storageKey = 'sniptale-theme-preference';
   const localeStorageKey = 'sniptale-locale-preference';

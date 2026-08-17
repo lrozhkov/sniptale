@@ -5,6 +5,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { InlineCurtainSelect } from './select';
 
+function TestOptionIcon({ className }: { className?: string }) {
+  return <svg className={className} data-testid="option-icon" />;
+}
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -21,7 +25,7 @@ function renderSelect(onChange = vi.fn(), value = 'b') {
         label="Mic"
         onChange={onChange}
         options={[
-          { value: 'a', label: 'Default input device with a long name' },
+          { value: 'a', label: 'Default input device with a long name', icon: TestOptionIcon },
           {
             value: 'b',
             label: 'Studio microphone with a long name',
@@ -137,6 +141,9 @@ it('opens over a theme-aware blurred backdrop and dismisses from the covered are
   expect(container?.querySelector('[title="Full device path"]')).not.toBeNull();
   expect(container?.querySelector('[aria-current="true"]')?.className).toContain(
     'var(--sniptale-color-accent)'
+  );
+  expect(container?.querySelector('[data-testid="option-icon"]')?.getAttribute('class')).toContain(
+    'h-4 w-4'
   );
 
   act(() => backdrop?.click());

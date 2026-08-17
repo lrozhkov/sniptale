@@ -54,8 +54,13 @@ it('updates untouched systems and preserves customized system snapshots', () => 
 
 it('migrates absent tag metadata and compactly round-trips assigned tags', () => {
   const legacy = resolveStoredStepBadgePresetCatalog({});
-  expect(legacy.presets.every((preset) => preset.tagIds.length === 0)).toBe(true);
+  expect(legacy.presets).toHaveLength(15);
+  expect(legacy.presets.every((preset) => preset.tagIds.length === 1)).toBe(true);
   legacy.presets[0]!.tagIds = ['tag-one'];
+  expect(resolveStoredStepBadgePresetCatalog(serializeStepBadgePresetCatalog(legacy))).toEqual(
+    legacy
+  );
+  legacy.presets[0]!.tagIds = [];
   expect(resolveStoredStepBadgePresetCatalog(serializeStepBadgePresetCatalog(legacy))).toEqual(
     legacy
   );

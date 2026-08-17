@@ -1,12 +1,12 @@
 import { defineMessageSource } from '../../source';
 
 const VIEWPORT_CONFLICT_ERROR_RU = [
-  'Размер страницы сейчас нельзя изменить: вкладка или окно заняты другой операцией.',
+  'Размер окна сейчас нельзя изменить: окно занято другой операцией.',
   'Завершите текущий снимок или запись и повторите попытку.',
 ].join(' ');
 
 const VIEWPORT_CONFLICT_ERROR_EN = [
-  'The page size cannot be changed while another operation controls this tab or window.',
+  'The window size cannot be changed while another operation controls this window.',
   'Finish the current capture or recording and try again.',
 ].join(' ');
 
@@ -28,8 +28,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Could not apply the size:',
   },
   viewportChangeError: {
-    ru: 'Не удалось изменить размер области страницы',
-    en: 'Could not change the page viewport size',
+    ru: 'Не удалось изменить размер окна',
+    en: 'Could not change the window size',
   },
   navigationLockManaged: {
     ru: 'Блокировка автоматически управляется в режимах выделения/редактирования',
@@ -264,20 +264,20 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Toolbar settings',
   },
   panelHorizontal: {
-    ru: 'Горизонтальная панель',
-    en: 'Horizontal toolbar',
+    ru: 'Горизонтальный вид',
+    en: 'Horizontal view',
   },
   panelHorizontalHint: {
-    ru: 'Разместить кнопки панели в одну строку',
-    en: 'Arrange toolbar buttons in one row',
+    ru: 'Расположить кнопки в одну строку',
+    en: 'Arrange buttons in one row',
   },
   panelVertical: {
-    ru: 'Вертикальная панель',
-    en: 'Vertical toolbar',
+    ru: 'Вертикальный вид',
+    en: 'Vertical view',
   },
   panelVerticalHint: {
-    ru: 'Разместить секции панели друг под другом',
-    en: 'Stack toolbar sections vertically',
+    ru: 'Расположить секции друг под другом',
+    en: 'Stack sections vertically',
   },
   compactMenus: {
     ru: 'Компактный вид меню',
@@ -304,12 +304,12 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   hideToolbar: {
-    ru: 'Свернуть панель',
-    en: 'Collapse toolbar',
+    ru: 'Свернуть',
+    en: 'Collapse',
   },
   screenshotDisable: {
-    ru: 'Закрыть панель',
-    en: 'Close toolbar',
+    ru: 'Закрыть',
+    en: 'Close',
   },
   screenshotDisableError: {
     ru: 'Не удалось закрыть панель. Повторите попытку.',

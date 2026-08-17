@@ -71,7 +71,7 @@ it('honors trigger prevention, outside pointer close, and forwarded refs', async
     await Promise.resolve();
   });
   await act(async () => {
-    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await Promise.resolve();
   });
   expect(document.body.querySelector('[role="listbox"]')).toBeNull();

@@ -12,7 +12,10 @@ import { lintWithEslint } from './verify-eslint.mjs';
 import { runFocusedDeadExportsCheck } from './verify-focused.dead-exports.helpers.mjs';
 import { runFocusedOxlintStep } from './verify-focused.oxlint-step.helpers.mjs';
 import { formatDeadExportsReport } from './verify-dead-exports.mjs';
-import { FOCUSED_CODE_VIOLATION_STEPS } from './verify-focused.code-steps.mjs';
+import {
+  FOCUSED_CODE_VIOLATION_STEPS,
+  FOCUSED_CONTEXTUAL_VIOLATION_STEPS,
+} from './verify-focused.code-steps.mjs';
 import { runFocusedUnitTests } from './verify-focused.test-steps.mjs';
 import {
   runDependencyGraphTriggeredChecks,
@@ -112,15 +115,17 @@ async function runFocusedCodeSteps(codeFiles, targetFiles) {
       )
     );
   }
-  steps.push(
-    await timeAsyncStep(async () =>
-      createViolationStep(
-        'Messaging',
-        'Messaging guardrail violations found:',
-        runMessagingCheck({ files: behavioralCodeFiles, targetFiles })
+  for (const { label, header } of FOCUSED_CONTEXTUAL_VIOLATION_STEPS) {
+    steps.push(
+      await timeAsyncStep(async () =>
+        createViolationStep(
+          label,
+          header,
+          runMessagingCheck({ files: behavioralCodeFiles, targetFiles })
+        )
       )
-    )
-  );
+    );
+  }
   return steps;
 }
 

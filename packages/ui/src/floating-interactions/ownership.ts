@@ -17,7 +17,35 @@ export function getOwnedFloatingInteractionLayers(
   );
   if (ownerIds.size === 0) return [];
 
-  return [
+  const candidates = [
     ...composedRoot.querySelectorAll<HTMLElement>(FLOATING_INTERACTION_OWNED_LAYER_SELECTOR),
-  ].filter((layer) => ownerIds.has(layer.getAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE)!));
+  ];
+  const ownedLayers: HTMLElement[] = [];
+  const visitedLayers = new Set<HTMLElement>();
+  let foundNestedOwner = true;
+
+  while (foundNestedOwner) {
+    foundNestedOwner = false;
+    for (const layer of candidates) {
+      if (
+        visitedLayers.has(layer) ||
+        !ownerIds.has(layer.getAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE)!)
+      ) {
+        continue;
+      }
+      visitedLayers.add(layer);
+      ownedLayers.push(layer);
+      for (const owner of layer.querySelectorAll<HTMLElement>(
+        FLOATING_INTERACTION_OWNER_SELECTOR
+      )) {
+        const ownerId = owner.getAttribute(FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE);
+        if (ownerId && !ownerIds.has(ownerId)) {
+          ownerIds.add(ownerId);
+          foundNestedOwner = true;
+        }
+      }
+    }
+  }
+
+  return ownedLayers;
 }

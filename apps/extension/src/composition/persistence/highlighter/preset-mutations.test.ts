@@ -114,7 +114,7 @@ describe('highlighter preset mutation guards', () => {
       tagIds: ['tag-one'],
     })!;
     expect(resetSystemBorderPresetToCanonical(tagged, system.id)?.borderPresets[0]!.tagIds).toEqual(
-      []
+      ['system-tag-sniptale']
     );
   });
 

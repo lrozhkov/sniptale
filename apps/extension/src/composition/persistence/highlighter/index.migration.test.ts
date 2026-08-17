@@ -60,7 +60,7 @@ describe('highlighter system catalog persistence migration', () => {
     if (typeof storageState.value !== 'object' || storageState.value === null) {
       throw new Error('Expected migrated highlighter settings object');
     }
-    expect(Reflect.get(storageState.value, 'borderPresets')).toHaveLength(8);
+    expect(Reflect.get(storageState.value, 'borderPresets')).toHaveLength(15);
   });
 
   it.each([

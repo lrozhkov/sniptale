@@ -6,16 +6,17 @@ import {
   ClipboardCopy,
   Crop,
   Film,
-  Image,
   Images,
-  LayoutPanelTop,
+  MessageSquarePlus,
   MonitorPlay,
+  MonitorUp,
   Paintbrush,
-  PanelTopOpen,
-  ScrollText,
+  Pencil,
+  UnfoldVertical,
 } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../platform/i18n/popup';
 import PopupFooter from '../footer';
@@ -33,6 +34,7 @@ import { useActiveTabCapabilities } from '../tab-access/capabilities';
 import { usePopupPageAccessRuntime, type PopupPageAccessRuntime } from '../runtime/page-access';
 import { PageAccessControls } from '../page-access/controls';
 import type { PopupStartupDescriptor } from '../startup/descriptor';
+import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 
 type MenuAction = {
   icon: ComponentType<{ className?: string }>;
@@ -59,8 +61,27 @@ function buildCaptureConfig(
 const workspaceActions = [
   { icon: Images, labelKey: 'popup.home.libraryLabel', onClick: () => openLibrary() },
   { icon: Film, labelKey: 'popup.home.videoEditorLabel', onClick: openVideoEditor },
-  { icon: Image, labelKey: 'popup.home.imageEditorLabel', onClick: openImageEditor },
-  { icon: ScrollText, labelKey: 'popup.home.scenarioEditorLabel', onClick: openScenarioEditor },
+  { icon: ImageEditorIcon, labelKey: 'popup.home.imageEditorLabel', onClick: openImageEditor },
+  {
+    icon: ScenarioEditorIcon,
+    labelKey: 'popup.home.scenarioEditorLabel',
+    onClick: openScenarioEditor,
+  },
+] as const;
+
+const pageToolActions = [
+  {
+    icon: Pencil,
+    labelKey: 'content.toolbar.drawingLabel',
+    hintKey: 'content.toolbar.drawingEnable',
+    mode: 'drawing',
+  },
+  {
+    icon: MessageSquarePlus,
+    labelKey: 'content.toolbar.highlighterLabel',
+    hintKey: 'content.toolbar.highlighterEnable',
+    mode: 'highlighter',
+  },
 ] as const;
 
 const MENU_SURFACE_CLASS_NAME = [
@@ -86,8 +107,9 @@ const WORKSPACE_BUTTON_CLASS_NAME = [
 ].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
-  'group flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[12px]',
-  'border border-transparent bg-transparent px-1.5 py-2 text-center transition-colors',
+  'group grid min-h-[58px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
+  'gap-1.5 rounded-[12px] border border-transparent bg-transparent px-1.5 py-1.5',
+  'text-center transition-colors',
   'text-[var(--sniptale-color-text-secondary)]',
   'hover:border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)] disabled:cursor-not-allowed disabled:opacity-45',
@@ -115,7 +137,7 @@ function getCaptureActions(): MenuAction[] {
       mode: 'visible',
     },
     {
-      icon: LayoutPanelTop,
+      icon: UnfoldVertical,
       label: translate('popup.home.captureFullLabel'),
       hint: translate('popup.home.captureFullHint'),
       mode: 'full',
@@ -139,13 +161,15 @@ export function MenuRoute({
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const disabledReason = capabilities.screenshotMode.reason ?? pageAccess.disabledReason;
+  const desktopDisabledReason = capabilities.videoByMode?.[CaptureMode.SCREEN]?.reason ?? null;
 
   const capture = async (
     actionKey: string,
     mode: ScreenshotCaptureConfig['screenshotMode'],
     afterCapture: ScreenshotCaptureConfig['afterCapture'] = 'download_default'
   ) => {
-    if (disabledReason || pendingAction) return;
+    const captureDisabledReason = mode === 'desktop' ? desktopDisabledReason : disabledReason;
+    if (captureDisabledReason || pendingAction) return;
     setError(null);
     setPendingAction(actionKey);
     try {
@@ -157,10 +181,10 @@ export function MenuRoute({
       setPendingAction(null);
     }
   };
-  const openToolbar = async () => {
+  const openToolbar = async (workingMode: ToolbarWorkingMode) => {
     setError(null);
     try {
-      await openScreenshotMode();
+      await openScreenshotMode(workingMode);
     } catch (openError) {
       setError(
         openError instanceof Error ? openError.message : translate('popup.home.openPrepError')
@@ -186,6 +210,7 @@ export function MenuRoute({
           onCapture={capture}
         />
         <MenuQuickScenarios
+          desktopDisabledReason={desktopDisabledReason}
           disabledReason={disabledReason}
           pendingAction={pendingAction}
           recordDisabledReason={capabilities.videoByMode?.[CaptureMode.TAB]?.reason ?? null}
@@ -268,6 +293,7 @@ function MenuCaptureActions(props: {
 }
 
 function MenuQuickScenarios(props: {
+  desktopDisabledReason: string | null;
   disabledReason: string | null;
   pendingAction: string | null;
   recordDisabledReason: string | null;
@@ -294,6 +320,13 @@ function MenuQuickScenarios(props: {
       onClick: () => void props.onCapture('copy-tab', 'visible', 'copy'),
     },
     {
+      icon: MonitorUp,
+      label: translate('popup.home.quickDesktopEditLabel'),
+      title: props.desktopDisabledReason ?? translate('popup.home.quickDesktopEditHint'),
+      disabled: Boolean(props.desktopDisabledReason) || props.pendingAction !== null,
+      onClick: () => void props.onCapture('edit-desktop', 'desktop', 'edit'),
+    },
+    {
       icon: MonitorPlay,
       label: translate('popup.home.quickRecordTabLabel'),
       title: props.recordDisabledReason ?? translate('popup.home.quickRecordTabHint'),
@@ -303,7 +336,7 @@ function MenuQuickScenarios(props: {
   ];
 
   return (
-    <div className="mt-2 grid grid-cols-3 gap-1">
+    <div className="mt-2 grid grid-cols-4 gap-1">
       {scenarios.map(({ icon: Icon, label, ...scenario }) => (
         <button
           key={label}
@@ -314,7 +347,9 @@ function MenuQuickScenarios(props: {
           onClick={scenario.onClick}
         >
           <Icon className={`h-[18px] w-[18px] ${HOVER_LIFT_CLASS_NAME}`} />
-          <span className={`text-[9px] font-medium leading-tight ${HOVER_LIFT_CLASS_NAME}`}>
+          <span
+            className={`min-h-5 text-[9px] font-medium leading-[10px] ${HOVER_LIFT_CLASS_NAME}`}
+          >
             {label}
           </span>
         </button>
@@ -328,7 +363,7 @@ function MenuWorkspace({
   onOpenToolbar,
 }: {
   disabledReason: string | null;
-  onOpenToolbar(): Promise<void>;
+  onOpenToolbar(mode: ToolbarWorkingMode): Promise<void>;
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -345,32 +380,47 @@ function MenuWorkspace({
           <span className={HOVER_LIFT_CLASS_NAME}>{translate(labelKey)}</span>
         </button>
       ))}
-      <div className="col-span-2" data-ui="popup.menu.toolbar-action">
-        <MenuToolbarButton disabledReason={disabledReason} onOpen={onOpenToolbar} />
-      </div>
+      {pageToolActions.map(({ icon: Icon, labelKey, hintKey, mode }) => (
+        <MenuToolbarButton
+          key={mode}
+          disabledReason={disabledReason}
+          hintKey={hintKey}
+          icon={Icon}
+          labelKey={labelKey}
+          mode={mode}
+          onOpen={onOpenToolbar}
+        />
+      ))}
     </div>
   );
 }
 
 function MenuToolbarButton({
   disabledReason,
+  hintKey,
+  icon: Icon,
+  labelKey,
+  mode,
   onOpen,
 }: {
   disabledReason: string | null;
-  onOpen(): Promise<void>;
+  hintKey: 'content.toolbar.drawingEnable' | 'content.toolbar.highlighterEnable';
+  icon: ComponentType<{ className?: string }>;
+  labelKey: 'content.toolbar.drawingLabel' | 'content.toolbar.highlighterLabel';
+  mode: ToolbarWorkingMode;
+  onOpen(mode: ToolbarWorkingMode): Promise<void>;
 }) {
   return (
     <button
       type="button"
       className={`${WORKSPACE_BUTTON_CLASS_NAME} w-full`}
-      title={disabledReason ?? translate('popup.home.toolsOpenHint')}
+      data-ui={`popup.menu.tool-action.${mode}`}
+      title={disabledReason ?? translate(hintKey)}
       disabled={Boolean(disabledReason)}
-      onClick={() => void onOpen()}
+      onClick={() => void onOpen(mode)}
     >
-      <PanelTopOpen
-        className={`h-4 w-4 text-[var(--sniptale-color-accent)] ${HOVER_LIFT_CLASS_NAME}`}
-      />
-      <span className={HOVER_LIFT_CLASS_NAME}>{translate('popup.home.toolsOpenLabel')}</span>
+      <Icon className={`h-4 w-4 text-[var(--sniptale-color-accent)] ${HOVER_LIFT_CLASS_NAME}`} />
+      <span className={HOVER_LIFT_CLASS_NAME}>{translate(labelKey)}</span>
     </button>
   );
 }

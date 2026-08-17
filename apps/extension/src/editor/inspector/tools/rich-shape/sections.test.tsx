@@ -82,13 +82,16 @@ function clickContainingText(text: string) {
   }
   button.click();
 }
-function selectOptionAt(label: string, index: number) {
+async function selectOptionAt(label: string, index: number) {
   act(() => clickByLabel(label));
   const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]'))[index];
   if (!option) {
     throw new Error(`Missing option ${index} for ${label}`);
   }
-  act(() => option.click());
+  await act(async () => {
+    option.click();
+    await Promise.resolve();
+  });
 }
 
 function createLineTextEffectsProps() {
@@ -112,12 +115,12 @@ function renderLineTextEffects(props: RichShapeControlsProps) {
     </>
   );
 }
-function editLineTextEffects() {
+async function editLineTextEffects() {
   act(() => change('editor.compact.strokeWidth', '9'));
-  selectOptionAt('editor.compact.richShapeLineCap', 1);
-  selectOptionAt('editor.compact.richShapeLineJoin', 2);
-  selectOptionAt('editor.compact.richShapeBeginArrowhead', 1);
-  selectOptionAt('editor.compact.richShapeEndArrowhead', 4);
+  await selectOptionAt('editor.compact.richShapeLineCap', 1);
+  await selectOptionAt('editor.compact.richShapeLineJoin', 2);
+  await selectOptionAt('editor.compact.richShapeBeginArrowhead', 1);
+  await selectOptionAt('editor.compact.richShapeEndArrowhead', 4);
   act(() => clickByLabel('editor.compact.textAlignRight'));
   act(() => clickByLabel('editor.compact.verticalAlignBottom'));
   act(() => clickContainingText('editor.compact.enabledShort'));
@@ -200,11 +203,11 @@ it('covers fill transparency recovery and gradient stop editing', () => {
   );
 });
 
-it('covers line endings, text alignment, and effect values', () => {
+it('covers line endings, text alignment, and effect values', async () => {
   const props = createLineTextEffectsProps();
 
   renderLineTextEffects(props);
-  editLineTextEffects();
+  await editLineTextEffects();
 
   expectLineTextEffectsPatches(props);
 });
@@ -215,7 +218,7 @@ it('hides rough line controls for non-rough-capable disabled shapes', () => {
   expect(document.querySelector('[aria-label="editor.compact.richShapeRoughness"]')).toBeNull();
 });
 
-it('covers text fallback alignment, font options, and inset number controls', () => {
+it('covers text fallback alignment, font options, and inset number controls', async () => {
   const props = createProps({
     shape: createDefaultRichShapeObject({
       text: {
@@ -233,7 +236,7 @@ it('covers text fallback alignment, font options, and inset number controls', ()
       .querySelector<HTMLButtonElement>('[aria-label="editor.compact.textAlignLeft"]')
       ?.getAttribute('aria-pressed')
   ).toBe('true');
-  selectOptionAt('editor.compact.font', 1);
+  await selectOptionAt('editor.compact.font', 1);
   act(() => change('editor.compact.fontSize', '24'));
   act(() => change('editor.compact.richShapeInsetTopShort', '12'));
 

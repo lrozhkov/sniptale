@@ -1,6 +1,12 @@
 import { expect, it } from 'vitest';
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
-import { parseStoredCalloutPresetCatalog } from './parser';
+import { parseCalloutVisualStyle, parseStoredCalloutPresetCatalog } from './parser';
+
+it('accepts every shipped showcase callout style at the storage boundary', () => {
+  for (const preset of createSystemCalloutPresetCatalog()) {
+    expect(parseCalloutVisualStyle(preset.style), preset.id).not.toBeNull();
+  }
+});
 
 it('parses bounded new-session defaults and rejects malformed values', () => {
   const valid = parseStoredCalloutPresetCatalog({
@@ -21,7 +27,11 @@ it('parses bounded new-session defaults and rejects malformed values', () => {
 });
 
 it('parses compact catalog rows and preserves transparent colors', () => {
-  const style = createSystemCalloutPresetCatalog()[2]!.style;
+  const source = createSystemCalloutPresetCatalog()[2]!.style;
+  const style = {
+    ...source,
+    surface: { ...source.surface, fillPaint: { kind: 'solid' as const, color: '#00000000' } },
+  };
   const parsed = parseStoredCalloutPresetCatalog({
     schemaVersion: 1,
     systemCatalogRevision: 1,

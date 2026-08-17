@@ -43,6 +43,7 @@ vi.mock('../fill-paint-field', () => ({
       {label}
     </button>
   ),
+  HighlighterFillSurfaceField: () => <div data-testid="surface-selector" />,
 }));
 
 import { EditorBasicSettings } from './basic-settings';

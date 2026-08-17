@@ -80,7 +80,10 @@ const runtimeMocks = vi.hoisted(() => {
     modeState: null as ContentAppModeState | null,
     registerFrameCallbacks: vi.fn(),
     resolveAiPickSource: vi.fn(),
-    useAiPickController: vi.fn(() => ({ handleDisableAiPickMode: vi.fn() })),
+    useAiPickController: vi.fn(() => ({
+      handleDisableAiPickMode: vi.fn(),
+      handleEnableAiPickMode: vi.fn(),
+    })),
     useAutoBlurController: vi.fn(() => ({})),
     useContentScreenshotAutoStart: vi.fn(),
     useScenarioController: vi.fn(createScenarioController),

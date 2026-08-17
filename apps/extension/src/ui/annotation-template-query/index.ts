@@ -4,6 +4,7 @@ export {
   AnnotationTemplateQueryControls,
   AnnotationTemplateQueryEmpty,
   AnnotationTemplateQueryResults,
+  AnnotationTemplateQuerySurface,
 } from './filter';
 export {
   normalizeAnnotationTemplateQuery,
@@ -12,3 +13,4 @@ export {
   resolveAnnotationTemplateTags,
 } from './model';
 export { useAnnotationTemplateTagState } from './state';
+export { getAnnotationTemplateTagDisplayName } from './tag-display-name';

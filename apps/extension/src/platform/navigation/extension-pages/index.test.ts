@@ -86,6 +86,16 @@ describe('extension page settings helpers', () => {
     expect(browserWindowsUpdateMock).toHaveBeenCalledWith(9, { focused: true });
     expect(browserTabsCreateMock).not.toHaveBeenCalled();
   });
+
+  it('opens Chrome extension shortcut settings', async () => {
+    const { openExtensionShortcutsPage } = await import('./index');
+
+    await openExtensionShortcutsPage();
+
+    expect(browserTabsCreateMock).toHaveBeenCalledWith({
+      url: 'chrome://extensions/shortcuts',
+    });
+  });
 });
 
 async function expectOwnedSettingsPageIdentity() {

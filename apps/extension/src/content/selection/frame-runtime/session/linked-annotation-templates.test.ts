@@ -167,6 +167,16 @@ it('uses templates linked to the frame while preserving toolbar templates as fal
   );
 });
 
+it('preserves the toolbar numbering state when resolving a linked frame template', () => {
+  const stepBadgeFallback = createSessionStepBadgeSettings();
+  stepBadgeFallback.enabled = false;
+
+  expect(resolveFrameStepBadgeTemplate(stepBadgeFallback, linkedBorderSettings())).toMatchObject({
+    enabled: false,
+    sourcePresetId: snapshots.stepBadges!.presets[2]!.id,
+  });
+});
+
 it('lets an explicit toolbar selection override both linked frame templates', () => {
   setAnnotationTemplateSource('callout', 'forced');
   setAnnotationTemplateSource('stepBadge', 'forced');

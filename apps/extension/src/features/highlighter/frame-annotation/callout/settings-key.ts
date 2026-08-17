@@ -4,6 +4,7 @@ export function createCalloutSettingsKey(settings: CalloutSettings) {
   return [
     settings.content.bodyHtml,
     settings.content.titleText,
+    settings.style.badge.text,
     settings.style.typography.maxWidth,
     settings.style.typography.fontSize,
     settings.style.typography.fontFamily,
@@ -15,6 +16,8 @@ export function createCalloutSettingsKey(settings: CalloutSettings) {
     settings.style.surface.paddingY,
     settings.style.surface.borderWidth,
     settings.style.title.enabled,
+    settings.style.title.fillMode,
+    JSON.stringify(settings.style.title.fillPaint),
     settings.style.title.fontSize,
     settings.style.title.dividerWidth,
   ].join('|');

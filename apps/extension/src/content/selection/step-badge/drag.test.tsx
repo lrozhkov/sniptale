@@ -65,6 +65,88 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe('useStepBadgeBoundaryDrag perimeter switching', () => {
+  it('crosses frame corners and commits to the nearest perimeter side', () => {
+    const handle = host.querySelector('button') as HTMLButtonElement;
+    handle.setPointerCapture = vi.fn();
+
+    act(() =>
+      handle.dispatchEvent(
+        createPointerEvent('pointerdown', { clientX: 150, clientY: 80, pointerId: 13 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 320, clientY: 140, pointerId: 13 })
+      )
+    );
+
+    expect(JSON.parse(handle.dataset['draft'] ?? '{}')).toEqual({
+      normalOffset: 20,
+      position: 0.5,
+      side: 'right',
+    });
+
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointerup', { clientX: 320, clientY: 140, pointerId: 13 })
+      )
+    );
+    expect(onPositionChange).toHaveBeenLastCalledWith({
+      normalOffset: 20,
+      position: 0.5,
+      side: 'right',
+    });
+  });
+
+  it('preserves an off-center grab while moving diagonally away from a frame corner', () => {
+    act(() => root.render(<Harness initialPlacement={{ position: 1, side: 'top' }} />));
+    const handle = host.querySelector('button') as HTMLButtonElement;
+    handle.setPointerCapture = vi.fn();
+
+    act(() =>
+      handle.dispatchEvent(
+        createPointerEvent('pointerdown', { clientX: 286, clientY: 94, pointerId: 14 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 306, clientY: 114, pointerId: 14 })
+      )
+    );
+
+    expect(JSON.parse(handle.dataset['draft'] ?? '{}')).toEqual({
+      normalOffset: 20,
+      position: 0.1667,
+      side: 'right',
+    });
+  });
+
+  it('keeps a badge diagonally outside a corner on both pointer axes', () => {
+    act(() => root.render(<Harness initialPlacement={{ position: 1, side: 'top' }} />));
+    const handle = host.querySelector('button') as HTMLButtonElement;
+    handle.setPointerCapture = vi.fn();
+
+    act(() =>
+      handle.dispatchEvent(
+        createPointerEvent('pointerdown', { clientX: 300, clientY: 80, pointerId: 15 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 320, clientY: 60, pointerId: 15 })
+      )
+    );
+
+    expect(JSON.parse(handle.dataset['draft'] ?? '{}')).toEqual({
+      normalOffset: 20,
+      position: 1,
+      side: 'top',
+      tangentialOffset: 20,
+    });
+  });
+});
+
 describe('useStepBadgeBoundaryDrag', () => {
   it('renders live constrained geometry and commits only once on release', () => {
     const handle = host.querySelector('button') as HTMLButtonElement;
@@ -297,6 +379,6 @@ describe('useStepBadgeBoundaryDrag', () => {
       )
     );
 
-    expect(onPositionChange).toHaveBeenLastCalledWith({ position: 0.5, side: 'top' });
+    expect(onPositionChange).toHaveBeenLastCalledWith({ position: 0.65, side: 'top' });
   });
 });

@@ -1,0 +1,25 @@
+{
+  "command_tools_open": { "message": "Инструменты: открыть панель страницы" },
+  "command_tools_drawing": { "message": "Инструменты: рисовать на странице" },
+  "command_tools_annotations": { "message": "Инструменты: добавить аннотации" },
+  "command_tools_quick_edit": { "message": "Инструменты: быстро изменить текст" },
+  "command_tools_design_review": { "message": "Инструменты: проверить дизайн страницы" },
+  "command_tools_video_recording": { "message": "Инструменты: открыть управление записью" },
+  "command_capture_visible": { "message": "Снимок: захватить видимую область" },
+  "command_capture_full_page": { "message": "Снимок: захватить всю страницу" },
+  "command_capture_selection": { "message": "Снимок: выбрать область для захвата" },
+  "command_capture_visible_edit": {
+    "message": "Снимок: захватить видимую область и отредактировать"
+  },
+  "command_capture_visible_copy": { "message": "Снимок: скопировать видимую область" },
+  "command_capture_desktop_edit": {
+    "message": "Снимок: захватить окно или экран и отредактировать"
+  },
+  "command_export_current_tab": {
+    "message": "Экспортировать текущую вкладку с сохраненными настройками"
+  },
+  "command_open_library": { "message": "Открыть библиотеку Sniptale" },
+  "command_open_image_editor": { "message": "Открыть редактор изображений" },
+  "command_open_video_editor": { "message": "Открыть видеоредактор" },
+  "command_open_scenario_editor": { "message": "Открыть редактор сценариев" }
+}

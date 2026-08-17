@@ -2,6 +2,7 @@ import { getActiveTraceObserver } from './runtime';
 import type { TraceConfig, TraceContext, TraceEvent, TraceMessageEvent } from './types';
 import { sanitizeLlmTracePayload } from './llm-payload';
 import { sanitizeRuntimeBlobTracePayload } from './runtime-blob-payload';
+import { sanitizeSettingsTransferTracePayload } from './settings-transfer-payload';
 import { sanitizeTraceErrorText } from './utils';
 import {
   isVoiceInputTraceMessageType,
@@ -171,8 +172,11 @@ function extractMessageType(message: unknown): string | undefined {
 }
 
 function sanitizeMessageTracePayload(messageType: string, payload: unknown): unknown {
-  return sanitizeRuntimeBlobTracePayload(
-    sanitizeLlmTracePayload(messageType, sanitizeVoiceInputTracePayload(messageType, payload))
+  return sanitizeSettingsTransferTracePayload(
+    messageType,
+    sanitizeRuntimeBlobTracePayload(
+      sanitizeLlmTracePayload(messageType, sanitizeVoiceInputTracePayload(messageType, payload))
+    )
   );
 }
 

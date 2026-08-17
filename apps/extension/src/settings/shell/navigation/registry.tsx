@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Zap,
+  ArrowLeftRight,
   type LucideIcon,
 } from 'lucide-react';
 import type { TranslationKey } from '../../../platform/i18n';
@@ -131,6 +132,12 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         label: 'settings.navigation.accessData',
         icon: ShieldCheck,
       },
+      {
+        id: 'settings-transfer',
+        description: 'settings.navigation.descriptions.settingsTransfer',
+        label: 'settings.navigation.settingsTransfer',
+        icon: ArrowLeftRight,
+      },
     ],
   },
 ] as const;
@@ -196,5 +203,9 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   'access-data': {
     load: () => import('../../sections/system/access-data'),
     exportName: 'AccessDataSection',
+  },
+  'settings-transfer': {
+    load: () => import('../../sections/system/settings-transfer'),
+    exportName: 'SettingsTransferSection',
   },
 };

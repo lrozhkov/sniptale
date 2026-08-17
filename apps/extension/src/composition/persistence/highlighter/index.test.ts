@@ -156,8 +156,9 @@ describe('highlighter persistence owner', () => {
     expect(stored.catalogCustomized).toBe(true);
     expect(stored.borderPresets[0]).toMatchObject({
       customized: false,
-      name: 'system-default',
+      systemPresetKey: 'system-default',
     });
+    expect(stored.borderPresets[0]).not.toHaveProperty('name');
   });
 
   it('does not freeze localized names for reorder or default changes', async () => {
@@ -179,8 +180,11 @@ describe('highlighter persistence owner', () => {
     const stored = storageState.value as HighlighterSettings;
     expect(stored.borderPresets.find((preset) => preset.id === 'system-default')).toMatchObject({
       customized: false,
-      name: 'system-default',
+      systemPresetKey: 'system-default',
     });
+    expect(
+      stored.borderPresets.find((preset) => preset.id === 'system-default')
+    ).not.toHaveProperty('name');
     expect(stored.catalogCustomized).toBe(true);
   });
 
@@ -216,11 +220,18 @@ describe('highlighter persistence owner', () => {
     await expect(module.resetSystemBorderPreset('system-default')).resolves.toBe(true);
 
     expect((storageState.value as HighlighterSettings).borderPresets[0]).toMatchObject({
-      color: '#F97316',
       customized: false,
       enabled: false,
-      name: 'system-default',
       order: 7,
+      systemPresetKey: 'system-default',
+    });
+    expect((storageState.value as HighlighterSettings).borderPresets[0]).not.toHaveProperty(
+      'color'
+    );
+    expect((await module.loadHighlighterSettings()).borderPresets[0]).toMatchObject({
+      color: '#F97316',
+      customized: false,
+      name: 'system-default',
     });
     expect((storageState.value as HighlighterSettings).defaultBorderPresetId).toBe(
       'system-soft-highlight'
@@ -237,7 +248,7 @@ describe('highlighter persistence owner', () => {
     await expect(module.deleteBorderPreset('system-default')).resolves.toBe(false);
     await expect(module.deleteBorderPreset('user-1')).resolves.toBe(true);
 
-    expect((storageState.value as HighlighterSettings).borderPresets).toHaveLength(8);
+    expect((storageState.value as HighlighterSettings).borderPresets).toHaveLength(15);
   });
 
   it('updates blur and focus fields without marking the preset catalog customized', async () => {

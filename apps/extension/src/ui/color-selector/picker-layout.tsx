@@ -4,7 +4,7 @@ import {
   PickerRgbFields,
   PickerToolbar,
 } from './picker-sections';
-import { PickerInputField } from './picker-controls';
+import { NumericRow } from '../compact-inspector-controls/numeric';
 import { translate } from '../../platform/i18n';
 import type {
   useEyedropper,
@@ -88,34 +88,6 @@ export function PickerControls(props: {
         onSelectTransparent={props.onSelectTransparent}
         resolvedColor={props.color.resolvedColor}
       />
-      {props.allowAlpha !== false ? (
-        <div className="grid grid-cols-[1fr_72px] items-center gap-2">
-          <input
-            aria-label={translate('shared.ui.colorSelectorAlpha')}
-            type="range"
-            min={0}
-            max={100}
-            value={props.color.alphaPercent}
-            onChange={(event) => props.onAlphaChange(event.target.value)}
-            className="sniptale-color-selector-alpha-range h-9 w-full"
-            style={{
-              backgroundColor: '#fff',
-              backgroundImage: [
-                `linear-gradient(to right, transparent, ${props.color.resolvedColor.slice(0, 7)})`,
-                'conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0)',
-              ].join(', '),
-              backgroundSize: '100% 100%, 12px 12px',
-            }}
-          />
-          <PickerInputField
-            ariaLabel={translate('shared.ui.colorSelectorAlpha')}
-            min={0}
-            max={100}
-            value={props.color.alphaPercent}
-            onChange={props.onAlphaChange}
-          />
-        </div>
-      ) : null}
       <PickerFields
         formatMode={props.formatMode}
         hslInputs={props.hslInputs}
@@ -123,6 +95,21 @@ export function PickerControls(props: {
         onCycleFormatMode={props.onCycleFormatMode}
         rgbInputs={props.rgbInputs}
       />
+      {props.allowAlpha !== false ? (
+        <div data-ui="shared.ui.color-selector.opacity">
+          <NumericRow
+            appearance="plain"
+            label={translate('shared.ui.colorSelectorAlpha')}
+            min={0}
+            max={100}
+            unit="%"
+            value={props.color.alphaPercent}
+            scrub={{ min: 0, max: 100, step: 1 }}
+            onPreviewValue={(value) => props.onAlphaChange(String(value))}
+            onCommitValue={(value) => props.onAlphaChange(String(value))}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

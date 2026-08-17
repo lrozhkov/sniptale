@@ -72,7 +72,7 @@ describe('border-preset-editor-state draft setters', () => {
     expect(setters.setName).toHaveBeenNthCalledWith(1, 'Preset');
     expect(setters.setName).toHaveBeenNthCalledWith(2, '');
     expect(setters.setWidth).toHaveBeenNthCalledWith(1, 5);
-    expect(setters.setWidth).toHaveBeenNthCalledWith(2, 3);
+    expect(setters.setWidth).toHaveBeenNthCalledWith(2, 2);
     expect(setters.setCustomCss).toHaveBeenNthCalledWith(1, 'color: red;');
     expect(setters.setCustomCss).toHaveBeenNthCalledWith(2, '');
     expect(setters.setInheritCustomCss).toHaveBeenNthCalledWith(1, true);

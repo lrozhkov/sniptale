@@ -41,7 +41,8 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
   const margin = MARGIN * uiScale;
   const gap = GAP * uiScale;
   const width = Math.min(args.width * uiScale, window.innerWidth - margin * 2);
-  const height = args.height * uiScale;
+  const measuredHeight = args.popoverRef.current?.offsetHeight;
+  const height = (measuredHeight && measuredHeight > 0 ? measuredHeight : args.height) * uiScale;
   const mainToolbar = args.anchorEl.closest<HTMLElement>(
     '.sniptale-toolbar, .sniptale-glass-toolbar'
   );

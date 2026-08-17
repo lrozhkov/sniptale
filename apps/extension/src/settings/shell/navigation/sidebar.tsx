@@ -6,6 +6,7 @@ import { settingsPageSidebarClassName } from '../../section-surface';
 
 interface SettingsSidebarProps {
   activeTab: SettingsTab;
+  disabled?: boolean;
   onTabChange: (tab: SettingsTab) => void;
 }
 
@@ -33,7 +34,8 @@ function getSettingsSidebarFooterLabel() {
   const brand = translate('settings.navigation.footerBrand');
 
   try {
-    const version = runtimeInfo.getManifest().version;
+    const manifest = runtimeInfo.getManifest();
+    const version = manifest.version_name || manifest.version;
     return version ? `${brand} v${version}` : brand;
   } catch {
     return brand;
@@ -42,6 +44,7 @@ function getSettingsSidebarFooterLabel() {
 
 function SettingsSidebarItem(props: {
   activeTab: SettingsTab;
+  disabled?: boolean;
   item: SettingsNavItem;
   onTabChange: (tab: SettingsTab) => void;
 }) {
@@ -51,6 +54,7 @@ function SettingsSidebarItem(props: {
     <button
       key={props.item.id}
       type="button"
+      disabled={props.disabled}
       aria-current={isActive ? 'page' : undefined}
       onClick={() => props.onTabChange(props.item.id)}
       className={`
@@ -79,7 +83,7 @@ function SettingsSidebarItem(props: {
   );
 }
 
-export function SettingsSidebar({ activeTab, onTabChange }: SettingsSidebarProps) {
+export function SettingsSidebar({ activeTab, disabled, onTabChange }: SettingsSidebarProps) {
   return (
     <nav
       data-ui="settings.sidebar"
@@ -117,6 +121,7 @@ export function SettingsSidebar({ activeTab, onTabChange }: SettingsSidebarProps
                 <SettingsSidebarItem
                   key={item.id}
                   activeTab={activeTab}
+                  {...(disabled === undefined ? {} : { disabled })}
                   item={item}
                   onTabChange={onTabChange}
                 />

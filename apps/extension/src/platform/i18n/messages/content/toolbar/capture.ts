@@ -174,8 +174,8 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     en: 'Pause CSS animations and playing video while the screenshot is captured',
   },
   fullPageCustomViewportHint: {
-    ru: 'Снимок использует активный пользовательский размер страницы.',
-    en: 'Capture uses the active custom page viewport.',
+    ru: 'Снимок использует активный пользовательский размер окна.',
+    en: 'Capture uses the active custom window size.',
   },
   fullPageSettingsSaveError: {
     ru: 'Не удалось сохранить параметры снимка всей страницы',
@@ -206,20 +206,20 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     en: 'Delay before screenshot',
   },
   viewportButton: {
-    ru: 'Размер страницы или окна для снимка',
-    en: 'Page or window size for screenshot',
+    ru: 'Размер окна для снимка',
+    en: 'Window size for screenshot',
   },
   viewportMenuTitle: {
-    ru: 'Размер страницы или окна',
-    en: 'Page or window size',
+    ru: 'Размер окна',
+    en: 'Window size',
   },
   viewportNativeLabel: {
     ru: 'Текущий размер',
     en: 'Current size',
   },
   viewportNativeHint: {
-    ru: 'Использовать текущий размер вкладки для снимков',
-    en: 'Use the current tab size for screenshots',
+    ru: 'Использовать текущий размер окна для снимков',
+    en: 'Use the current window size for screenshots',
   },
   localHtmlSaveLabel: {
     ru: 'Сохранить подготовленную HTML-страницу',

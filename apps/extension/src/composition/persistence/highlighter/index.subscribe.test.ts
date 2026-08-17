@@ -81,7 +81,7 @@ it('subscribes to sync changes, ignores unrelated events, and returns detached s
   snapshot?.borderPresets.splice(0, 1);
 
   expect(listener).toHaveBeenCalledOnce();
-  expect(module.getLoadedHighlighterSettingsSnapshot()?.borderPresets).toHaveLength(8);
+  expect(module.getLoadedHighlighterSettingsSnapshot()?.borderPresets).toHaveLength(15);
 
   unsubscribe();
   storageMocks.emitChange(

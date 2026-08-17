@@ -91,6 +91,18 @@ it('keeps current content until a cold navigation commits and only then persists
   expect(menuButton?.textContent).toBe('');
   expect(menuButton?.getAttribute('aria-label')).toBeTruthy();
   expect(
+    container.querySelector('button[data-page="screenshots"] svg')?.getAttribute('class')
+  ).toContain('lucide-gallery-thumbnails');
+  expect(container.querySelector('button[data-page="video"] svg')?.getAttribute('class')).toContain(
+    'lucide-tv-minimal-play'
+  );
+  expect(container.querySelector('button[data-page="tools"] svg')?.getAttribute('class')).toContain(
+    'lucide-paintbrush'
+  );
+  expect(
+    container.querySelector('button[data-page="export"] svg')?.getAttribute('class')
+  ).toContain('lucide-upload');
+  expect(
     [...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.app.tabs"] button')].every(
       (button) => button.textContent === '' && Boolean(button.getAttribute('aria-label'))
     )

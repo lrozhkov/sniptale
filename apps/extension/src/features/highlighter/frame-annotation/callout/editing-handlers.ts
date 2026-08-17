@@ -206,14 +206,19 @@ function useCalloutPointerHandlers(
       event.nativeEvent.stopImmediatePropagation();
 
       if (!args.isEditing) {
-        const titleInput =
+        const inlineInput =
           event.target instanceof HTMLInputElement &&
-          event.target.matches('[data-sniptale-callout-title="true"]')
+          event.target.matches(
+            '[data-sniptale-callout-title="true"], [data-ui="content.callout.badge"]'
+          )
             ? event.target
             : null;
         args.onStartEditing();
-        if (titleInput) {
-          window.requestAnimationFrame(() => titleInput.focus({ preventScroll: true }));
+        if (inlineInput) {
+          window.requestAnimationFrame(() => {
+            inlineInput.focus({ preventScroll: true });
+            inlineInput.setSelectionRange(inlineInput.value.length, inlineInput.value.length);
+          });
         }
         return;
       }
@@ -264,7 +269,7 @@ function isPointerEventWithinEditable(
 ): boolean {
   if (
     event.target instanceof Element &&
-    event.target.closest('[data-sniptale-callout-title="true"]')
+    event.target.closest('[data-sniptale-callout-title="true"], [data-ui="content.callout.badge"]')
   ) {
     return true;
   }

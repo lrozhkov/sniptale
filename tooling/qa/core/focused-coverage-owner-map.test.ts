@@ -30,17 +30,10 @@ it('keeps popup runtime owners on their adjacent proof instead of the broad popu
   const runtimeRoot = 'apps/extension/src/popup/shell/runtime';
 
   expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/start/run.ts`)).toEqual([
-    `${runtimeRoot}/start.test.tsx`,
+    `${runtimeRoot}/start/run.test.tsx`,
   ]);
   expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/actions.ts`)).toEqual([
     `${runtimeRoot}/actions.test.tsx`,
-  ]);
-  expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/effects.ts`)).toEqual([
-    `${runtimeRoot}/effects.test.tsx`,
-    `${runtimeRoot}/media-device-effects.test.tsx`,
-  ]);
-  expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/state.ts`)).toEqual([
-    `${runtimeRoot}/state.test.tsx`,
   ]);
 });
 

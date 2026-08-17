@@ -16,6 +16,7 @@ const RAIL_CLASS_NAME = [
 ].join(' ');
 const MIDPOINT_CLASS_NAME =
   'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-white bg-black/60 shadow';
+const STOP_DRAG_THRESHOLD_PX = 3;
 
 export function GradientRail(props: {
   createId: PaintStopIdFactory;
@@ -25,7 +26,7 @@ export function GradientRail(props: {
   onSelect: (id: string) => void;
 }) {
   const railRef = useRef<HTMLDivElement | null>(null);
-  const draggedStopRef = useRef<string | null>(null);
+  const draggedStopRef = useRef<{ id: string; startX: number } | null>(null);
   const positionFromEvent = (event: PointerEvent) => {
     const rect = railRef.current!.getBoundingClientRect();
     return Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width)));
@@ -35,7 +36,7 @@ export function GradientRail(props: {
     props.onChange(updateGradientStop(props.gradient, id, { position: positionFromEvent(event) }));
   };
   const finishStopDrag = (event: PointerEvent<HTMLButtonElement>, id: string) => {
-    if (draggedStopRef.current !== id) return;
+    if (draggedStopRef.current?.id !== id) return;
     draggedStopRef.current = null;
     const rect = railRef.current?.getBoundingClientRect();
     if (rect && (event.clientY < rect.top - 28 || event.clientY > rect.bottom + 52)) {
@@ -126,12 +127,20 @@ export function GradientRail(props: {
             onClick={() => props.onSelect(stop.id)}
             onPointerDown={(event) => {
               event.stopPropagation();
-              draggedStopRef.current = stop.id;
-              props.onSelect(stop.id);
-              updateFromPointer(event, stop.id);
+              if (props.selectedStopId !== stop.id) {
+                props.onSelect(stop.id);
+                return;
+              }
+              draggedStopRef.current = { id: stop.id, startX: event.clientX };
+              event.currentTarget.setPointerCapture(event.pointerId);
             }}
             onPointerMove={(event) => {
-              if (event.currentTarget.hasPointerCapture(event.pointerId))
+              const drag = draggedStopRef.current;
+              if (
+                drag?.id === stop.id &&
+                Math.abs(event.clientX - drag.startX) >= STOP_DRAG_THRESHOLD_PX &&
+                event.currentTarget.hasPointerCapture(event.pointerId)
+              )
                 updateFromPointer(event, stop.id);
             }}
             onPointerUp={(event) => finishStopDrag(event, stop.id)}

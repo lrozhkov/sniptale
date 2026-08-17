@@ -37,11 +37,69 @@ function buildCursorStyleText(): string {
     *::after {
       cursor: ${cursorUrl} !important;
     }
+    .sniptale-extension-surface,
+    .sniptale-extension-surface *,
+    .sniptale-extension-surface *::before,
+    .sniptale-extension-surface *::after {
+      cursor: default !important;
+    }
+    .sniptale-extension-surface :is(
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]),
+      [role="menuitem"]:not([aria-disabled="true"]),
+      a[href]
+    ),
+    .sniptale-extension-surface :is(
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]),
+      [role="menuitem"]:not([aria-disabled="true"]),
+      a[href]
+    ) *,
+    .sniptale-extension-surface :is(
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]),
+      [role="menuitem"]:not([aria-disabled="true"]),
+      a[href]
+    )::before,
+    .sniptale-extension-surface :is(
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]),
+      [role="menuitem"]:not([aria-disabled="true"]),
+      a[href]
+    )::after,
+    .sniptale-extension-surface :is(
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]),
+      [role="menuitem"]:not([aria-disabled="true"]),
+      a[href]
+    ) *::before,
+    .sniptale-extension-surface :is(
+      button:not(:disabled),
+      [role="button"]:not([aria-disabled="true"]),
+      [role="menuitem"]:not([aria-disabled="true"]),
+      a[href]
+    ) *::after {
+      cursor: pointer !important;
+    }
+    .sniptale-extension-surface :is(input, textarea, [contenteditable]),
+    .sniptale-extension-surface [contenteditable] * {
+      cursor: auto !important;
+    }
     .sniptale-interactive-frame {
       cursor: pointer !important;
     }
     .sniptale-action-toolbar,
     .sniptale-action-toolbar * {
+      cursor: default !important;
+    }
+    .sniptale-action-toolbar button:not(:disabled),
+    .sniptale-action-toolbar button:not(:disabled) * {
+      cursor: pointer !important;
+    }
+    .sniptale-frame-toolbar-bridge {
+      cursor: default !important;
+    }
+    .sniptale-frame-toolbar-bridge button {
       cursor: pointer !important;
     }
     .sniptale-resize-handle[data-direction="nw"],

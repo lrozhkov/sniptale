@@ -9,6 +9,13 @@ export const SYSTEM_BORDER_PRESET_KEYS = [
   'system-review',
   'system-light-ui',
   'system-dark-ui',
+  'system-sunrise',
+  'system-sticky-note',
+  'system-editorial-ink',
+  'system-editorial-proof',
+  'system-retro-sunset',
+  'system-retro-arcade',
+  'system-retro-memphis',
 ] as const;
 
 export type SystemBorderPresetKey = (typeof SYSTEM_BORDER_PRESET_KEYS)[number];

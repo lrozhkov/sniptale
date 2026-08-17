@@ -153,6 +153,14 @@ function authorizeLocalDataErasureRoute(
     : reject('Unauthorized local data erasure sender');
 }
 
+function authorizeSettingsTransferRoute(
+  request: BackgroundOwnedAuthorizationRequest
+): IpcAuthorizationResult {
+  return classifySettingsPageSenderUrl(request.sender.url) === 'ordinary-settings-page'
+    ? AUTHORIZED
+    : reject('Unauthorized settings transfer sender');
+}
+
 function authorizeAggregatePromotionRoute(
   request: BackgroundOwnedAuthorizationRequest
 ): IpcAuthorizationResult {
@@ -323,6 +331,8 @@ function getBackgroundOwnedAuthorizationHandler(
       return authorizeLlmSessionRequestRoute;
     case 'local-data-erasure':
       return authorizeLocalDataErasureRoute;
+    case 'settings-transfer':
+      return authorizeSettingsTransferRoute;
     case 'native-app-runtime':
       return authorizeNativeAppRoute;
     case 'page-access':

@@ -50,6 +50,14 @@ This policy covers AI credentials and request history, secret-bearing network tr
 - Web-snapshot credentialed asset fetches are same-origin only. User-enabled external assets use background-owned anonymous fetches with `credentials: 'omit'`, reject obvious private targets and redirects, and fail as warnings. DNS rebinding remains a residual browser limitation because `fetch` does not expose the resolved IP.
 - Snapshot save UI discloses retained screenshot, sanitized content, source metadata, diagnostics, warnings, and enabled asset captures; authenticated or external asset capture requires explicit acknowledgement.
 
+## Settings transfer
+
+- Settings transfer is an explicit user-initiated local JSON export/import for persisted controls currently rendered by the Settings page. It is separate from media-library and project backup and never reads projects, media, caches, permission grants, runtime status, or action state.
+- Exported AI provider metadata may include provider identity, connection type, display name, and base URL. Provider credentials, the stored-credential presence flag, passphrases, encrypted envelopes, local or derived cryptographic material, KDF/protection metadata, and secret-transition state are excluded from the package, preview, report, diagnostics, and logs.
+- Device identifiers, including the selected voice microphone, are excluded. Import explicitly restores the system-default microphone selection. Prompt text and private base URLs are included only after the user initiates export and the UI discloses those classes.
+- Import treats the file as hostile input: it enforces a 2 MiB UTF-8 limit, depth 32, 50,000 JSON nodes, format and domain schema versions, per-domain parsing, dependency closure, and storage-quota preflight before a background-owned commit. The ordinary owned Settings page is the only authorized sender.
+- Import reports use fixed outcome and reason fields and never include raw exceptions or secret values. Commit revalidates current state and compensates completed storage writes; an unverified rollback is surfaced as a blocking failure.
+
 ## Diagnostics
 
 - Persisted, exported, logged, or traced diagnostics pass through `packages/platform/src/observability/diagnostics/sanitizer.ts`.

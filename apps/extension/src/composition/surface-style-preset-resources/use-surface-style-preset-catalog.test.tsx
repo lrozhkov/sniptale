@@ -99,7 +99,7 @@ it('loads localized systems and ignores a stale initial load after a subscriptio
   await act(async () => publish(newer));
   await act(async () => resolveLoad(createSurfaceStylePresetCatalog({ catalogRevision: 0 })));
   expect(latest.catalog?.catalogRevision).toBe(2);
-  expect(latest.presets[0]?.name).toBe('Обычный');
+  expect(latest.presets[0]?.name).toBe('Чистый белый');
 });
 
 it('maps every catalog action and typed failure to controlled feedback', async () => {

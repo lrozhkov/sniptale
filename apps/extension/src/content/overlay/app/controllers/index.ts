@@ -9,6 +9,8 @@ import type { ContentCoreControllers } from '../view-state/types';
 import { useContentScreenshotAutoStart } from '../../screenshot/auto-start';
 import { useScenarioController } from '../../scenario/controller';
 import type { ScreenshotControllerParams } from '../../screenshot/bridge';
+import { restoreScreenshotEditingMode } from '../../screenshot/mode';
+import type { ScreenshotEditingMode } from '../../screenshot/types';
 import { useScreenshotController } from '../../screenshot/controller';
 import { useToolbarModeController } from '../../toolbar/mode-controller';
 import {
@@ -82,7 +84,8 @@ function useContentToolbarModeController(modeState: ContentAppModeStateValue) {
 function useContentScreenshotController(
   modeState: ContentAppModeStateValue,
   scenarioController: ReturnType<typeof useScenarioController>,
-  drawingController: ContentDrawingController
+  drawingController: ContentDrawingController,
+  restoreEditingMode: (mode: ScreenshotEditingMode) => void
 ) {
   const captureActionRef =
     modeState.captureActionRef as ScreenshotControllerParams['captureActionRef'];
@@ -109,6 +112,7 @@ function useContentScreenshotController(
       },
       highlighterMode: modeState.highlighterMode,
       quickEditMode: modeState.quickEditMode,
+      restoreEditingMode,
       setAiPickMode: modeState.setAiPickMode,
       setDesignReviewMode: modeState.setDesignReviewMode,
       ...(modeState.setDrawingMode === undefined
@@ -221,7 +225,19 @@ export function useContentAppControllers(
   const screenshotController = useContentScreenshotController(
     modeState,
     scenarioController,
-    drawingController
+    drawingController,
+    (mode) =>
+      restoreScreenshotEditingMode(mode, {
+        'ai-pick': aiController.handleEnableAiPickMode,
+        'design-review': () => modeController.handleToggleDesignReviewMode(true),
+        drawing: () => {
+          if (!drawingController.prepareActivation()) return;
+          modeState.setDrawingMode?.(true);
+          modeState.setNavigationLockEnabled(false);
+        },
+        highlighter: () => modeController.handleToggleHighlighterMode(true),
+        'quick-edit': () => modeController.handleToggleQuickEditMode(true),
+      })
   );
   const videoRecordingController = useVideoRecordingSurfaceController({
     onModeRequested: (enabled) => modeState.setVideoRecordingMode?.(enabled),

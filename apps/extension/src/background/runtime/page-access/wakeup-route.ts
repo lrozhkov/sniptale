@@ -33,6 +33,7 @@ type ContentRuntimeWakeupResponse = {
   reason?: 'pin-to-tab' | 'scenario';
   restored?: boolean;
   success: boolean;
+  toolbarVisible?: boolean;
 };
 
 type ContentRuntimeWakeupMessage = {
@@ -364,11 +365,13 @@ async function enablePreparationForWakeup(
 async function createSupersededWakeupResponse(
   tabId: number
 ): Promise<ContentRuntimeWakeupResponse> {
+  const state = await readUserPinnedSessionState(tabId);
   return {
-    pinToTab: await readPinToTabSessionStorageState(tabId),
+    pinToTab: state.userPinned,
     pinToTabAvailable: await hasPinnedToolbarAllSitesAccess(),
     restored: false,
     success: true,
+    toolbarVisible: state.toolbarVisible,
   };
 }
 
@@ -445,11 +448,23 @@ async function handleContentRuntimeWakeup(args: {
   }
 
   if (userPinState.visibilityMutation) {
-    return { pinToTab: userPinned, pinToTabAvailable, restored: false, success: true };
+    return {
+      pinToTab: userPinned,
+      pinToTabAvailable,
+      restored: false,
+      success: true,
+      toolbarVisible: userPinState.toolbarVisible,
+    };
   }
 
   if (!restorableUserPin && !scenarioState.shouldRestore) {
-    return { pinToTab: userPinned, pinToTabAvailable, restored: false, success: true };
+    return {
+      pinToTab: userPinned,
+      pinToTabAvailable,
+      restored: false,
+      success: true,
+      toolbarVisible: userPinState.toolbarVisible,
+    };
   }
 
   const restored = await restoreRuntimeForWakeup({
@@ -465,7 +480,13 @@ async function handleContentRuntimeWakeup(args: {
   }
 
   if (!restored) {
-    return { pinToTab: userPinned, pinToTabAvailable, restored: false, success: true };
+    return {
+      pinToTab: userPinned,
+      pinToTabAvailable,
+      restored: false,
+      success: true,
+      toolbarVisible: userPinState.toolbarVisible,
+    };
   }
 
   return {
@@ -474,6 +495,7 @@ async function handleContentRuntimeWakeup(args: {
     reason: restorableUserPin ? 'pin-to-tab' : 'scenario',
     restored: true,
     success: true,
+    toolbarVisible: scenarioState.shouldEnablePreparation ? true : userPinState.toolbarVisible,
   };
 }
 

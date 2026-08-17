@@ -1,5 +1,8 @@
 import { VERIFY_ALL_VIOLATION_STEPS } from '../verify-all.violation-steps.mjs';
-import { FOCUSED_CODE_VIOLATION_STEPS } from '../verify-focused.code-steps.mjs';
+import {
+  FOCUSED_CODE_VIOLATION_STEPS,
+  FOCUSED_CONTEXTUAL_VIOLATION_STEPS,
+} from '../verify-focused.code-steps.mjs';
 import { FOCUSED_TRIGGERED_STEP_DEFINITIONS } from '../verify-focused-triggered.helpers.mjs';
 import {
   AUDIT_STEPS,
@@ -87,6 +90,9 @@ const NON_MANUAL_STEP_OCCURRENCES = Object.freeze([
     FOCUSED_CODE_VIOLATION_STEPS,
     FOCUSED_VIOLATION_STEP_TOOLS,
     'focused-guardrail'
+  ),
+  ...FOCUSED_CONTEXTUAL_VIOLATION_STEPS.map(({ id, label, tool }) =>
+    createQaStepOccurrence({ id, label, tool, lane: 'focused-guardrail', kind: 'guardrail' })
   ),
   ...createTriggeredOccurrences(),
   ...createTupleOccurrences(HARNESS_STEPS, 'harness', 'tool'),

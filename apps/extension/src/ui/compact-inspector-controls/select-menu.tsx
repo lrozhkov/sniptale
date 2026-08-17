@@ -59,6 +59,7 @@ export function CompactSelectMenu<T extends string>({
       role="listbox"
       data-theme={theme ?? undefined}
       data-floating-ui-root="true"
+      data-sniptale-activation-bridge="defer"
       {...{ [FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE]: ownerId }}
       style={mergeFloatingInteractionLayerStyle(style)}
       onPointerDown={stopCompactSelectMenuEventPropagation}
@@ -170,6 +171,7 @@ function CompactSelectMenuOptionDescription<T extends string>({
 function handleOptionPointerDown(event: PointerEvent<HTMLButtonElement>) {
   event.preventDefault();
   event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
 }
 
 function handleOptionClick<T extends string>(
@@ -179,6 +181,7 @@ function handleOptionClick<T extends string>(
 ) {
   event.preventDefault();
   event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
   onSelect(option);
 }
 
