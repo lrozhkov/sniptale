@@ -130,6 +130,9 @@ it('rejects release tag ruleset exclusions and parameter drift', () => {
     fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8')
   ).releaseTagRuleset;
   expect(() => assertReleaseTagRuleset(structuredClone(expected), expected)).not.toThrow();
+  const githubCanonical = structuredClone(expected);
+  delete githubCanonical.rules[0].parameters;
+  expect(() => assertReleaseTagRuleset(githubCanonical, expected)).not.toThrow();
   const excludedTag = structuredClone(expected);
   excludedTag.conditions.ref_name.exclude.push('refs/tags/v0.3.0');
   expect(() => assertReleaseTagRuleset(excludedTag, expected)).toThrow(
@@ -138,6 +141,11 @@ it('rejects release tag ruleset exclusions and parameter drift', () => {
   const mutableUpdate = structuredClone(expected);
   mutableUpdate.rules[0].parameters.update_allows_fetch_and_merge = true;
   expect(() => assertReleaseTagRuleset(mutableUpdate, expected)).toThrow(
+    'Immutable release tag ruleset drifted'
+  );
+  const malformedUpdate = structuredClone(expected);
+  malformedUpdate.rules[0].parameters.update_allows_fetch_and_merge = 'false';
+  expect(() => assertReleaseTagRuleset(malformedUpdate, expected)).toThrow(
     'Immutable release tag ruleset drifted'
   );
 });

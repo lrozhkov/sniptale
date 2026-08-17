@@ -2,7 +2,16 @@ import { isDeepStrictEqual } from 'node:util';
 
 function normalizeRules(rules) {
   return [...(rules ?? [])]
-    .map(({ type, parameters }) => (parameters === undefined ? { type } : { type, parameters }))
+    .map(({ type, parameters }) => {
+      if (type === 'update') {
+        if (parameters !== undefined) return { type, parameters };
+        return {
+          type,
+          parameters: { update_allows_fetch_and_merge: false },
+        };
+      }
+      return parameters === undefined ? { type } : { type, parameters };
+    })
     .sort((left, right) => left.type.localeCompare(right.type));
 }
 

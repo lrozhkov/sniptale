@@ -19146,6 +19146,26 @@
       ]
     },
     {
+      "id": "policy.source.release-tag-policy-mjs.fc405dd06c",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/release-tag-policy.mjs",
+        "contentHash": "67acba14a18623101aada12773b285b1889f360a35df3da191017c3d59098a64"
+      },
+      "consumers": [
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/release-policy.mjs",
+        "tooling/ci/release-tag-policy.mjs"
+      ],
+      "surfaces": [
+        "property:normalizeRules/anonymous-5/parameters"
+      ]
+    },
+    {
       "id": "policy.source.report-mjs.2d012ea5b7",
       "classification": "tool-filter",
       "owner": "qa-platform",
