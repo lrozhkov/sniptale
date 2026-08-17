@@ -119,6 +119,7 @@ describe('DataSelectionPreviewHeader', () => {
         ?.click()
     );
     expect(setShowSelectedOnly).toHaveBeenCalledWith(expect.any(Function));
+    expect(handleToggleSpoiler).toHaveBeenCalledTimes(1);
   });
 
   it('shows a dedicated clear action only for a non-empty filter', async () => {

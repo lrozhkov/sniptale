@@ -158,7 +158,9 @@ function createButtons() {
 }
 
 function expectSharedModalState(state: EditorState) {
-  expect(fieldsPropsSpy).toHaveBeenCalledWith({ state });
+  expect(fieldsPropsSpy).toHaveBeenCalledWith(
+    expect.objectContaining({ state, tagAssignment: expect.any(Object) })
+  );
   expect(modalPropsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
       isOpen: true,

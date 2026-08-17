@@ -44,6 +44,10 @@ export function isHighlighterEnabled(): boolean {
   return highlighterControllerOwner.getOwnerIfCreated()?.isEnabled() ?? false;
 }
 
+export function isHighlighterCreationEnabled(): boolean {
+  return highlighterControllerOwner.getOwnerIfCreated()?.isCreationEnabled() ?? true;
+}
+
 export function isHighlighterPausedState(): boolean {
   return highlighterControllerOwner.getOwnerIfCreated()?.isPausedState() ?? false;
 }
@@ -58,6 +62,10 @@ export function pauseHighlighter(): void {
 
 export function resumeHighlighter(): void {
   highlighterControllerOwner.getOwner().resume();
+}
+
+export function setHighlighterCreationEnabled(enabled: boolean): void {
+  highlighterControllerOwner.getOwner().setCreationEnabled(enabled);
 }
 
 export function setFrameEditing(): void {

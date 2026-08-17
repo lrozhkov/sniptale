@@ -166,6 +166,37 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
     left: '100%',
     transform: expect.stringContaining('scale(0.5)'),
   });
+  const cornerStyle = getStepBadgeStyle({
+    borderColor: '#000',
+    borderWidth: 2,
+    settings: { ...badge, manualPlacement: { position: 1, side: 'top' } },
+    zIndex: 2,
+    clickable: true,
+  });
+  const diagonalStyle = getStepBadgeStyle({
+    borderColor: '#000',
+    borderWidth: 2,
+    settings: {
+      ...badge,
+      manualPlacement: {
+        normalOffset: 20,
+        position: 1,
+        side: 'top',
+        tangentialOffset: 20,
+      },
+    },
+    zIndex: 2,
+    clickable: true,
+  });
+  const readTranslation = (transform: string | undefined) => {
+    const match = transform?.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\)/);
+    return match ? [Number(match[1]), Number(match[2])] : [];
+  };
+  const [cornerX, cornerY] = readTranslation(cornerStyle.transform);
+  const [diagonalX, diagonalY] = readTranslation(diagonalStyle.transform);
+  expect(diagonalStyle).toMatchObject({ left: '100%', top: 0 });
+  expect(diagonalX! - cornerX!).toBeCloseTo(20);
+  expect(diagonalY! - cornerY!).toBeCloseTo(-20);
   for (const side of ['top', 'bottom', 'left'] as const) {
     expect(
       getStepBadgeStyle({

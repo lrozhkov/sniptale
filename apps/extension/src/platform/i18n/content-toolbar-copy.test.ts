@@ -113,6 +113,22 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Режим работы',
     en: 'Working mode',
   },
+  'content.toolbar.panelHorizontal': {
+    ru: 'Горизонтальный вид',
+    en: 'Horizontal view',
+  },
+  'content.toolbar.panelHorizontalHint': {
+    ru: 'Расположить кнопки в одну строку',
+    en: 'Arrange buttons in one row',
+  },
+  'content.toolbar.panelVertical': {
+    ru: 'Вертикальный вид',
+    en: 'Vertical view',
+  },
+  'content.toolbar.panelVerticalHint': {
+    ru: 'Расположить секции друг под другом',
+    en: 'Stack sections vertically',
+  },
   'content.toolbar.compactMenusHint': {
     ru: 'Скрыть описания и уменьшить высоту пунктов меню',
     en: 'Hide descriptions and reduce the height of menu items',
@@ -130,12 +146,12 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   'content.toolbar.hideToolbar': {
-    ru: 'Свернуть панель',
-    en: 'Collapse toolbar',
+    ru: 'Свернуть',
+    en: 'Collapse',
   },
   'content.toolbar.screenshotDisable': {
-    ru: 'Закрыть панель',
-    en: 'Close toolbar',
+    ru: 'Закрыть',
+    en: 'Close',
   },
   'content.autoBlur.autoApplyEnableHint': {
     ru: 'Автоматически размывать найденные данные перед каждым снимком',

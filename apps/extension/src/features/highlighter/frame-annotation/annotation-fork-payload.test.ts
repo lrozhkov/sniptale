@@ -140,7 +140,12 @@ it('round-trips canonical gradient Paint and rejects unknown nested paint fields
 
   const offsetBadge = {
     ...createDefaultFrameStepBadge(),
-    manualPlacement: { normalOffset: -32, position: 0.4, side: 'right' as const },
+    manualPlacement: {
+      normalOffset: -32,
+      position: 0.4,
+      side: 'right' as const,
+      tangentialOffset: 24,
+    },
   };
   const offsetPayload = serializeAnnotationForkDraftPayload({ stepBadge: offsetBadge });
   expect(parseAnnotationForkDraftPayload(offsetPayload)).toMatchObject({
@@ -164,6 +169,33 @@ it('round-trips canonical gradient Paint and rejects unknown nested paint fields
   }
   Object.assign(invalidStepBadge.manualPlacement as object, { normalOffset: 49 });
   expect(parseAnnotationForkDraftPayload(JSON.stringify(invalidOffset))).toBeNull();
+
+  const invalidTangentialOffset: unknown = JSON.parse(offsetPayload);
+  if (
+    typeof invalidTangentialOffset !== 'object' ||
+    invalidTangentialOffset === null ||
+    !('drafts' in invalidTangentialOffset)
+  ) {
+    throw new Error('Expected annotation drafts');
+  }
+  const tangentialDrafts = invalidTangentialOffset.drafts;
+  if (
+    typeof tangentialDrafts !== 'object' ||
+    tangentialDrafts === null ||
+    !('stepBadge' in tangentialDrafts)
+  ) {
+    throw new Error('Expected step badge draft');
+  }
+  const tangentialStepBadge = tangentialDrafts.stepBadge;
+  if (
+    typeof tangentialStepBadge !== 'object' ||
+    tangentialStepBadge === null ||
+    !('manualPlacement' in tangentialStepBadge)
+  ) {
+    throw new Error('Expected manual placement');
+  }
+  Object.assign(tangentialStepBadge.manualPlacement as object, { tangentialOffset: 49 });
+  expect(parseAnnotationForkDraftPayload(JSON.stringify(invalidTangentialOffset))).toBeNull();
 
   const invalidMode: unknown = JSON.parse(payload);
   if (typeof invalidMode !== 'object' || invalidMode === null || !('drafts' in invalidMode)) {

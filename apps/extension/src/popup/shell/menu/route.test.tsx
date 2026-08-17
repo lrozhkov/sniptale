@@ -120,6 +120,21 @@ it('runs canonical transient screenshot downloads without persisting quick actio
   });
 });
 
+it('uses the shared screenshot icon set for visible, full-page, and selection capture', async () => {
+  const { MenuRoute } = await import('./route');
+  act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
+
+  expect(
+    container.querySelector('[title="popup.home.captureVisibleHint"] svg')?.getAttribute('class')
+  ).toContain('lucide-app-window');
+  expect(
+    container.querySelector('[title="popup.home.captureFullHint"] svg')?.getAttribute('class')
+  ).toContain('lucide-unfold-vertical');
+  expect(
+    container.querySelector('[title="popup.home.captureSelectionHint"] svg')?.getAttribute('class')
+  ).toContain('lucide-crop');
+});
+
 it('wires the workspace, direct page tools and menu-only footer', async () => {
   const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
@@ -232,6 +247,16 @@ it('runs the secondary capture scenarios in their displayed order', async () => 
   expect(
     [...(quickScenarioGrid?.querySelectorAll('button') ?? [])].map((button) => button.textContent)
   ).toEqual(quickScenarioLabels);
+  expect(
+    [...(quickScenarioGrid?.querySelectorAll('button') ?? [])].every((button) =>
+      button.className.includes('grid-rows-[18px_20px]')
+    )
+  ).toBe(true);
+  expect(
+    [...(quickScenarioGrid?.querySelectorAll('button span') ?? [])].every((label) =>
+      label.className.includes('min-h-5')
+    )
+  ).toBe(true);
 });
 
 it('keeps window or screen capture available when only tab capture is blocked', async () => {

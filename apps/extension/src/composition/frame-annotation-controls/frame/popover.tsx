@@ -3,7 +3,6 @@ import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import type { BlurType } from '../../../features/highlighter/contracts';
 import { FrameSettingsPopoverContent } from './views';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
-import { usePopoverEscapeClose } from '../popover/hooks';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import { getBorderPresetCssValidation } from '../../../ui/highlighter-preset-editor/useBorderPresetEditorState/validation';
@@ -11,6 +10,7 @@ import { useFrameCreationPopoverState } from './popover-state';
 import type { FrameAnnotationStyleSettings } from '../contracts';
 import { useLinkedAnnotationTemplateOptions } from './linked-template-options';
 import { usePopoverInteractionDismissal } from '../popover/interaction-dismissal';
+import { useToolbarSettingsPopoverDismissal } from '../popover/toolbar-dismissal';
 
 export type { FrameAnnotationStyleSettings } from '../contracts';
 
@@ -39,10 +39,11 @@ export function FrameAnnotationCreationFramePopover(props: {
     width: SETTINGS_POPOVER_WIDTH,
   });
 
-  usePopoverEscapeClose({
+  useToolbarSettingsPopoverDismissal({
     anchorEl: props.anchorEl,
-    isOpen: dismissal.isDismissalEnabled,
+    enabled: dismissal.isDismissalEnabled,
     onClose: props.onClose,
+    popoverRef,
   });
   const handleFocusBlurChange = (blurAmount: number) => {
     state.border.apply({ focusSettings: { ...props.settings.focusSettings, blurAmount } });

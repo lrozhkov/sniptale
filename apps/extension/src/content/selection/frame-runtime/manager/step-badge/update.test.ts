@@ -31,6 +31,24 @@ it(
   expectGlobalStepBadgeSettingsUpdate
 );
 
+it('recalculates the value when numbering is enabled for a frame without a badge', async () => {
+  const recalculateStepBadges = vi.fn();
+  let frames = [createFrame('frame-1')];
+  const updateFrameStepBadge = createUpdateFrameStepBadge({
+    globalStepBadgeSettingsRef: { current: { autoMode: false } },
+    recalculateStepBadgesRef: { current: recalculateStepBadges },
+    setFrames: (update) => {
+      frames = typeof update === 'function' ? update(frames) : update;
+    },
+  });
+
+  updateFrameStepBadge('frame-1', { enabled: true });
+  await vi.runAllTimersAsync();
+
+  expect(frames[0]?.stepBadge).toMatchObject({ enabled: true, value: '' });
+  expect(recalculateStepBadges).toHaveBeenCalledOnce();
+});
+
 it('keeps manual boundary placement local to the selected frame', () => {
   let frames = [
     createFrameDataFixture('frame-1', {

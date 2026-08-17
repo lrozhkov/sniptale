@@ -3,7 +3,10 @@ import type {
   StepBadgeAnchor,
   StepBadgeSettings,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
-import { STEP_BADGE_NORMAL_OFFSET_LIMIT } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import {
+  STEP_BADGE_NORMAL_OFFSET_LIMIT,
+  STEP_BADGE_TANGENTIAL_OFFSET_LIMIT,
+} from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { resolveBorderShadowVisual } from '../style';
 import { resolveStepBadgeVisualStyle } from '../step-badge-presets/style';
 import { getStepBadgeVisualMetrics } from './step-badge-metrics';
@@ -30,13 +33,17 @@ function resolvePosition(settings: StepBadgeSettings) {
       -STEP_BADGE_NORMAL_OFFSET_LIMIT,
       Math.min(STEP_BADGE_NORMAL_OFFSET_LIMIT, manual.normalOffset ?? 0)
     );
+    const tangentialOffset = Math.max(
+      -STEP_BADGE_TANGENTIAL_OFFSET_LIMIT,
+      Math.min(STEP_BADGE_TANGENTIAL_OFFSET_LIMIT, manual.tangentialOffset ?? 0)
+    );
     if (manual.side === 'top')
       return {
         top: 0,
         left: value,
         translateX: -0.5,
         translateY: -0.5,
-        normalX: 0,
+        normalX: tangentialOffset,
         normalY: -normalOffset,
       };
     if (manual.side === 'right')
@@ -46,7 +53,7 @@ function resolvePosition(settings: StepBadgeSettings) {
         translateX: -0.5,
         translateY: -0.5,
         normalX: normalOffset,
-        normalY: 0,
+        normalY: tangentialOffset,
       };
     if (manual.side === 'bottom')
       return {
@@ -54,7 +61,7 @@ function resolvePosition(settings: StepBadgeSettings) {
         left: value,
         translateX: -0.5,
         translateY: -0.5,
-        normalX: 0,
+        normalX: tangentialOffset,
         normalY: normalOffset,
       };
     return {
@@ -63,7 +70,7 @@ function resolvePosition(settings: StepBadgeSettings) {
       translateX: -0.5,
       translateY: -0.5,
       normalX: -normalOffset,
-      normalY: 0,
+      normalY: tangentialOffset,
     };
   }
   const anchor = settings.anchor ?? settings.corner ?? 'top-left';

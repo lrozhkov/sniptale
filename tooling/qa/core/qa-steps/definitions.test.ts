@@ -3,7 +3,10 @@ import fs from 'node:fs';
 import { expect, it } from 'vitest';
 
 import { VERIFY_ALL_VIOLATION_STEPS } from '../verify-all.violation-steps.mjs';
-import { FOCUSED_CODE_VIOLATION_STEPS } from '../verify-focused.code-steps.mjs';
+import {
+  FOCUSED_CODE_VIOLATION_STEPS,
+  FOCUSED_CONTEXTUAL_VIOLATION_STEPS,
+} from '../verify-focused.code-steps.mjs';
 import { FOCUSED_TRIGGERED_STEP_DEFINITIONS } from '../verify-focused-triggered.helpers.mjs';
 import {
   QA_RULE_DEFINITIONS,
@@ -23,7 +26,9 @@ it('covers executable focused and release guardrail definitions without a shadow
     VERIFY_ALL_VIOLATION_STEPS.map(([label]) => label)
   );
   expect(labels(lanes['focused-guardrail'])).toEqual(
-    FOCUSED_CODE_VIOLATION_STEPS.map(([label]) => label)
+    FOCUSED_CODE_VIOLATION_STEPS.map(([label]) => label).concat(
+      FOCUSED_CONTEXTUAL_VIOLATION_STEPS.map(({ label }) => label)
+    )
   );
   expect(labels(lanes['focused-triggered'])).toEqual(
     FOCUSED_TRIGGERED_STEP_DEFINITIONS.map(({ label }) => label)

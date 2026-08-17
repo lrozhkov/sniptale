@@ -84,7 +84,8 @@ function areStepBadgePlacementsEqual(
   return (
     left.position === right.position &&
     left.side === right.side &&
-    (left.normalOffset ?? 0) === (right.normalOffset ?? 0)
+    (left.normalOffset ?? 0) === (right.normalOffset ?? 0) &&
+    (left.tangentialOffset ?? 0) === (right.tangentialOffset ?? 0)
   );
 }
 

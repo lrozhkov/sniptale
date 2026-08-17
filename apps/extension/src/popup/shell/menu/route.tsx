@@ -7,12 +7,12 @@ import {
   Crop,
   Film,
   Images,
-  LayoutPanelTop,
   MessageSquarePlus,
   MonitorPlay,
   MonitorUp,
   Paintbrush,
   Pencil,
+  UnfoldVertical,
 } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
@@ -34,7 +34,7 @@ import { useActiveTabCapabilities } from '../tab-access/capabilities';
 import { usePopupPageAccessRuntime, type PopupPageAccessRuntime } from '../runtime/page-access';
 import { PageAccessControls } from '../page-access/controls';
 import type { PopupStartupDescriptor } from '../startup/descriptor';
-import { ImageEditorIcon, ScenarioEditorIcon } from '../editor-icons';
+import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 
 type MenuAction = {
   icon: ComponentType<{ className?: string }>;
@@ -107,8 +107,9 @@ const WORKSPACE_BUTTON_CLASS_NAME = [
 ].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
-  'group flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[12px]',
-  'border border-transparent bg-transparent px-1.5 py-2 text-center transition-colors',
+  'group grid min-h-[58px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
+  'gap-1.5 rounded-[12px] border border-transparent bg-transparent px-1.5 py-1.5',
+  'text-center transition-colors',
   'text-[var(--sniptale-color-text-secondary)]',
   'hover:border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)] disabled:cursor-not-allowed disabled:opacity-45',
@@ -136,7 +137,7 @@ function getCaptureActions(): MenuAction[] {
       mode: 'visible',
     },
     {
-      icon: LayoutPanelTop,
+      icon: UnfoldVertical,
       label: translate('popup.home.captureFullLabel'),
       hint: translate('popup.home.captureFullHint'),
       mode: 'full',
@@ -346,7 +347,9 @@ function MenuQuickScenarios(props: {
           onClick={scenario.onClick}
         >
           <Icon className={`h-[18px] w-[18px] ${HOVER_LIFT_CLASS_NAME}`} />
-          <span className={`text-[9px] font-medium leading-tight ${HOVER_LIFT_CLASS_NAME}`}>
+          <span
+            className={`min-h-5 text-[9px] font-medium leading-[10px] ${HOVER_LIFT_CLASS_NAME}`}
+          >
             {label}
           </span>
         </button>

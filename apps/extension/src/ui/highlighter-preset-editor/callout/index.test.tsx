@@ -55,6 +55,13 @@ it('edits an existing preset in the shared persistent modal', async () => {
   expect(navigation.at(-1)?.getAttribute('aria-label')).toBe('Позиция');
   expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(0);
   expect(document.body.textContent).toContain('Изменить шаблон комментария');
+  const nameInput = document.querySelector<HTMLInputElement>('input[maxlength="64"]');
+  const tagAssignment = document.querySelector(
+    '[data-ui="shared.annotation-template-tag-assignment"]'
+  );
+  expect(nameInput?.compareDocumentPosition(tagAssignment as Node)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
 
   await act(async () => root.unmount());
 });

@@ -34,7 +34,8 @@ function getSettingsSidebarFooterLabel() {
   const brand = translate('settings.navigation.footerBrand');
 
   try {
-    const version = runtimeInfo.getManifest().version;
+    const manifest = runtimeInfo.getManifest();
+    const version = manifest.version_name || manifest.version;
     return version ? `${brand} v${version}` : brand;
   } catch {
     return brand;

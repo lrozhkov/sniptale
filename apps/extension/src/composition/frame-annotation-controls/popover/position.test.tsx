@@ -90,6 +90,42 @@ it.each([
   }
 );
 
+it('keeps a measured settings menu adjacent above a bottom toolbar', () => {
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  toolbar.dataset['displayMode'] = 'horizontal';
+  const anchor = document.createElement('button');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(
+    createRect({ left: 50, top: 708, width: 500, height: 50 })
+  );
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(
+    createRect({ left: 100, top: 715, width: 40, height: 36 })
+  );
+  const popover = document.createElement('div');
+  Object.defineProperty(popover, 'offsetHeight', { configurable: true, value: 320 });
+  const popoverRef = { current: popover };
+  let style: CSSProperties | null = null;
+
+  function Harness() {
+    style = useFrameAnnotationSettingsPopoverPosition({
+      anchorEl: anchor,
+      height: 600,
+      isOpen: true,
+      popoverRef,
+      width: 400,
+    });
+    return null;
+  }
+
+  const root = createRoot(document.createElement('div'));
+  act(() => root.render(<Harness />));
+  expect(style).toMatchObject({ left: 100, top: 385, width: 400 });
+  act(() => root.unmount());
+});
+
 function createRect(input: { left: number; top: number; width: number; height: number }): DOMRect {
   return {
     ...input,

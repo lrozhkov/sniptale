@@ -158,6 +158,22 @@ describe('step badge boundary placement', () => {
     expect(getStepBadgeBoundaryCenter(frameRect, placement)).toEqual({ x: 238, y: 52 });
   });
 
+  it('preserves both pointer axes outside a frame corner for diagonal placement', () => {
+    const placement = projectStepBadgeToFrameBoundary({
+      frameRect,
+      point: { x: 320, y: 60 },
+      previousSide: 'top',
+    });
+
+    expect(placement).toEqual({
+      normalOffset: 20,
+      position: 1,
+      side: 'top',
+      tangentialOffset: 20,
+    });
+    expect(getStepBadgeBoundaryCenter(frameRect, placement)).toEqual({ x: 320, y: 60 });
+  });
+
   it('moves freely between all frame sides while preserving the current side at an exact corner', () => {
     expect(
       projectStepBadgeToFrameBoundary({

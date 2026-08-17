@@ -10,6 +10,7 @@ import {
   registerHighlighterFrameCallbacks,
   removeHighlighterFrame,
   resetHighlighterHoverUi,
+  suspendHighlighterCreationUi,
 } from './state';
 import { createHoverControllerStub } from './controller.test-support';
 
@@ -23,6 +24,7 @@ it('creates a fresh runtime state with cleared callbacks and flags', () => {
       removeFrame: null,
     },
     cleanupEventListeners: null,
+    isCreationEnabled: true,
     isFrameEditing: false,
     isModeEnabled: false,
     isPaused: false,
@@ -49,6 +51,10 @@ it('exposes live callback and state accessors to the hover owner', () => {
   expect(createHighlighterStateGetters(state).isModeEnabled()).toBe(true);
   expect(createHighlighterStateGetters(state).isPaused()).toBe(true);
   expect(createHighlighterStateGetters(state).isFrameEditing()).toBe(true);
+
+  state.isPaused = false;
+  state.isCreationEnabled = false;
+  expect(createHighlighterStateGetters(state).isPaused()).toBe(true);
 });
 
 it('returns false until frame callbacks are registered', () => {
@@ -94,4 +100,17 @@ it('applies the shared hover teardown policy', () => {
   expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(1);
   expect(hoverController.removeHoverOverlay).toHaveBeenCalledTimes(1);
   expect(hoverController.removeOverlayContainer).toHaveBeenCalledTimes(1);
+});
+
+it('suspends creation without removing the reusable hover runtime', () => {
+  const hoverController = createHoverControllerStub();
+
+  suspendHighlighterCreationUi(hoverController);
+
+  expect(hoverController.cancelDrawing).toHaveBeenCalledWith('teardown');
+  expect(hoverController.cancelPendingHoverFrame).toHaveBeenCalledOnce();
+  expect(hoverController.clearHoverTracking).toHaveBeenCalledOnce();
+  expect(hoverController.hideHoverOverlay).toHaveBeenCalledOnce();
+  expect(hoverController.removeHoverOverlay).not.toHaveBeenCalled();
+  expect(hoverController.removeOverlayContainer).not.toHaveBeenCalled();
 });

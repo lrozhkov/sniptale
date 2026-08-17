@@ -144,6 +144,32 @@ function expectBuildFramePreservesManualBadgeValue() {
   });
 }
 
+function expectBuildFrameOmitsDisabledBadge() {
+  const args = createBuildArgs();
+  args.sessionStepBadgeTemplateRef.current = createStepBadgeTemplate();
+  args.sessionStepBadgeTemplateRef.current.enabled = false;
+
+  const linkedFrame = buildFrameForAdd(args);
+  const freeFrame = buildFreeFrameForAdd({
+    globalEffectModeRef: args.globalEffectModeRef,
+    globalStepBadgeAutoModeRef: args.globalStepBadgeAutoModeRef,
+    sessionBlurSettingsRef: args.sessionBlurSettingsRef,
+    sessionFocusSettingsRef: args.sessionFocusSettingsRef,
+    sessionStepBadgeTemplateRef: args.sessionStepBadgeTemplateRef,
+    generateFrameId: () => 'free-frame',
+    input: {
+      x: 30,
+      y: 40,
+      width: 150,
+      height: 90,
+      pagePlacement: { iframePath: [], pageX: 130, pageY: 240 },
+    },
+  });
+
+  expect(linkedFrame.stepBadge).toBeUndefined();
+  expect(freeFrame.stepBadge).toBeUndefined();
+}
+
 describe('frame-mutation-actions-frame-build', () => {
   it(
     'builds a frame with session defaults, selected border preset, and auto badge clearing',
@@ -153,6 +179,7 @@ describe('frame-mutation-actions-frame-build', () => {
     'preserves the template badge value in manual mode',
     expectBuildFramePreservesManualBadgeValue
   );
+  it('omits numbering when it is disabled in the main toolbar', expectBuildFrameOmitsDisabledBadge);
   it('builds a free frame with session defaults and no DOM anchor', () => {
     const args = createBuildArgs();
     const frame = buildFreeFrameForAdd({

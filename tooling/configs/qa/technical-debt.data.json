@@ -2496,6 +2496,7 @@
         "apps/extension/src/composition/frame-annotation-controls/popover/surface.ts",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-fork.tsx",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-source.ts",
+        "apps/extension/src/composition/frame-annotation-controls/popover/toolbar-dismissal.ts",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/anchor-grid.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/auto-fields.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
@@ -2544,6 +2545,7 @@
         "apps/extension/src/composition/frame-annotation-controls/popover/surface.ts",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-fork.tsx",
         "apps/extension/src/composition/frame-annotation-controls/popover/template-source.ts",
+        "apps/extension/src/composition/frame-annotation-controls/popover/toolbar-dismissal.ts",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/anchor-grid.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/auto-fields.tsx",
         "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
@@ -9603,7 +9605,6 @@
         "apps/extension/src/popup/shell/bootstrap/runtime.ts",
         "apps/extension/src/popup/shell/bootstrap/video.ts",
         "apps/extension/src/popup/shell/command-palette/route-first.tsx",
-        "apps/extension/src/popup/shell/editor-icons.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
@@ -9820,7 +9821,6 @@
         "apps/extension/src/popup/shell/bootstrap/runtime.ts",
         "apps/extension/src/popup/shell/bootstrap/video.ts",
         "apps/extension/src/popup/shell/command-palette/route-first.tsx",
-        "apps/extension/src/popup/shell/editor-icons.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
@@ -15970,7 +15970,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/definitions.mjs",
-        "contentHash": "c46032a1920384c4acbd35442bd041d6ade32941a1c4349e48454b970d38d6e9"
+        "contentHash": "a60a3857c8f7dcf56207add730c004e54861497094cb799c7b8e0f2c7452f201"
       },
       "consumers": [
         "tooling/qa/core/qa-controls/discovery.mjs",
@@ -18526,7 +18526,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
-        "contentHash": "7e06a04721b61f2ff6ed09de6864ce8ee86d3ed69cb6c078bd4f9237b487762d"
+        "contentHash": "dc040c1ee55e6b5d12d724ca9d599f09c11dbd7e2a6e0f8867883830d82a0697"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
@@ -18542,7 +18542,8 @@
         "property:testFiles[5]",
         "property:testFiles[6]",
         "property:testFiles[7]",
-        "property:testFiles[8]"
+        "property:testFiles[8]",
+        "property:testFiles[9]"
       ]
     },
     {
@@ -21358,7 +21359,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.code-steps.mjs",
-        "contentHash": "62308fa2aed3bb865b3f34a128849fa495b5418ce5fe3df5c3af17e068c7d2fe"
+        "contentHash": "b24c96a57fc114ab65aa65d9a6c59415a0fa504a959fd2f803ef791aa159ac01"
       },
       "consumers": [
         "tooling/qa/core/qa-steps/contract.mjs",
@@ -21369,7 +21370,8 @@
         "tooling/qa/wrappers/checkpoint.mjs"
       ],
       "surfaces": [
-        "binding:FOCUSED_CODE_VIOLATION_STEPS"
+        "binding:FOCUSED_CODE_VIOLATION_STEPS",
+        "binding:FOCUSED_CONTEXTUAL_VIOLATION_STEPS"
       ]
     },
     {
@@ -21441,7 +21443,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.execution.mjs",
-        "contentHash": "5504165c79100a369fcce6f8634a81e68f680a099745d659b3d92170499071be"
+        "contentHash": "e735507e52a28cfb331490cf6ff90c1d7b4ed543c9992c65af7eaff0f768e13b"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",

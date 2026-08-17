@@ -15,11 +15,11 @@ import {
 } from '../../../features/highlighter/frame-annotation/callout/model';
 import { createCalloutSaveSection } from './save-section';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
-import { usePopoverEscapeClose } from '../popover/hooks';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import type { TemplateSourceControl } from '../popover/template-source';
 import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
+import { useToolbarSettingsPopoverDismissal } from '../popover/toolbar-dismissal';
 
 export function FutureCalloutSettingsPopover(props: {
   anchorEl: HTMLElement | null;
@@ -67,10 +67,11 @@ export function FutureCalloutSettingsPopover(props: {
     if (props.isOpen) setLocalSettings(props.settings);
     else setNestedLayerOpen(false);
   }, [props.isOpen, props.settings]);
-  usePopoverEscapeClose({
+  useToolbarSettingsPopoverDismissal({
     anchorEl: props.anchorEl,
-    isOpen: props.isOpen && !nestedLayerOpen,
+    enabled: props.isOpen && !nestedLayerOpen,
     onClose: props.onClose,
+    popoverRef,
   });
 
   const commit = (next: CalloutSettings) => {

@@ -199,6 +199,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+  cursor: default;
 }
 
 .sniptale-ai-modal-root .sniptale-spoiler-header:hover {
@@ -220,6 +221,8 @@
 }
 
 .sniptale-ai-spoiler-header-tools {
+  position: relative;
+  z-index: 1;
   display: flex;
   min-width: 0;
   flex: 0 1 auto;

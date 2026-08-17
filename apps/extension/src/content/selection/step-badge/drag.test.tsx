@@ -121,6 +121,30 @@ describe('useStepBadgeBoundaryDrag perimeter switching', () => {
       side: 'right',
     });
   });
+
+  it('keeps a badge diagonally outside a corner on both pointer axes', () => {
+    act(() => root.render(<Harness initialPlacement={{ position: 1, side: 'top' }} />));
+    const handle = host.querySelector('button') as HTMLButtonElement;
+    handle.setPointerCapture = vi.fn();
+
+    act(() =>
+      handle.dispatchEvent(
+        createPointerEvent('pointerdown', { clientX: 300, clientY: 80, pointerId: 15 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 320, clientY: 60, pointerId: 15 })
+      )
+    );
+
+    expect(JSON.parse(handle.dataset['draft'] ?? '{}')).toEqual({
+      normalOffset: 20,
+      position: 1,
+      side: 'top',
+      tangentialOffset: 20,
+    });
+  });
 });
 
 describe('useStepBadgeBoundaryDrag', () => {

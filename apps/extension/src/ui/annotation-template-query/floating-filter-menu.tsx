@@ -99,6 +99,8 @@ export function useFloatingFilterMenu(open: boolean, setOpen: Dispatch<SetStateA
 
 type FloatingFilterMenuProps = {
   activeFilterTagIds: readonly AnnotationTemplateTagId[];
+  clearLabel?: string;
+  maximumSelected?: number;
   menuRef: RefObject<HTMLDivElement | null>;
   onActiveFilterTagIdsChange: (tagIds: AnnotationTemplateTagId[]) => void;
   open: boolean;
@@ -110,6 +112,7 @@ type FloatingFilterMenuProps = {
 
 function FilterMenuOption(props: {
   active: boolean;
+  disabled: boolean;
   onToggle(): void;
   tag: AnnotationTemplateTag;
 }) {
@@ -125,6 +128,7 @@ function FilterMenuOption(props: {
           : 'hover:bg-[var(--sniptale-color-surface-hover)]',
       ].join(' ')}
       data-active={props.active ? 'true' : 'false'}
+      disabled={props.disabled}
       onClick={props.onToggle}
       role="menuitemcheckbox"
       type="button"
@@ -138,7 +142,10 @@ function FilterMenuOption(props: {
 }
 
 function FilterMenuContent(
-  props: Pick<FloatingFilterMenuProps, 'activeFilterTagIds' | 'onActiveFilterTagIdsChange' | 'tags'>
+  props: Pick<
+    FloatingFilterMenuProps,
+    'activeFilterTagIds' | 'clearLabel' | 'maximumSelected' | 'onActiveFilterTagIdsChange' | 'tags'
+  >
 ) {
   const activeFilterTagIdsRef = useRef<readonly AnnotationTemplateTagId[]>(
     props.activeFilterTagIds
@@ -146,6 +153,13 @@ function FilterMenuContent(
   activeFilterTagIdsRef.current = props.activeFilterTagIds;
   const toggle = (tagId: AnnotationTemplateTagId) => {
     const activeFilterTagIds = activeFilterTagIdsRef.current;
+    if (
+      !activeFilterTagIds.includes(tagId) &&
+      props.maximumSelected !== undefined &&
+      activeFilterTagIds.length >= props.maximumSelected
+    ) {
+      return;
+    }
     const next = activeFilterTagIds.includes(tagId)
       ? activeFilterTagIds.filter((id) => id !== tagId)
       : [...activeFilterTagIds, tagId];
@@ -162,6 +176,11 @@ function FilterMenuContent(
       {props.tags.map((tag) => (
         <FilterMenuOption
           active={props.activeFilterTagIds.includes(tag.id)}
+          disabled={
+            !props.activeFilterTagIds.includes(tag.id) &&
+            props.maximumSelected !== undefined &&
+            props.activeFilterTagIds.length >= props.maximumSelected
+          }
           key={tag.id}
           onToggle={() => toggle(tag.id)}
           tag={tag}
@@ -179,7 +198,7 @@ function FilterMenuContent(
           onClick={clear}
           type="button"
         >
-          {translate('highlighter.templateTags.clearFilter')}
+          {props.clearLabel ?? translate('highlighter.templateTags.clearFilter')}
         </button>
       ) : null}
     </>
@@ -211,6 +230,8 @@ export function FloatingFilterMenu(props: FloatingFilterMenuProps) {
     >
       <FilterMenuContent
         activeFilterTagIds={props.activeFilterTagIds}
+        {...(props.clearLabel === undefined ? {} : { clearLabel: props.clearLabel })}
+        {...(props.maximumSelected === undefined ? {} : { maximumSelected: props.maximumSelected })}
         onActiveFilterTagIdsChange={props.onActiveFilterTagIdsChange}
         tags={props.tags}
       />

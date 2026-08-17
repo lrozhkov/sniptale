@@ -9,8 +9,8 @@ import { getViewportPresetDisplayName } from '../../../../features/viewport-pres
 import { formatViewportPresetDimensions } from '../../../../features/viewport-presets/format';
 import { orderViewportPresetsForSelector } from '../../../../features/viewport-presets/operations';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 import { Copy, Download, FolderOpen, Images, Save } from 'lucide-react';
-import { ImageEditorIcon, ScenarioEditorIcon } from '../../editor-icons';
 
 const captureActions: CaptureActionType[] = [
   'download_default',

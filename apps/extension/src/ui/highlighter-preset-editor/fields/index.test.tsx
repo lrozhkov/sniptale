@@ -97,7 +97,10 @@ function createState(overrides: Partial<BorderPresetEditorTestState> = {}) {
   };
 }
 
-async function renderFields(state: ReturnType<typeof createState>) {
+async function renderFields(
+  state: ReturnType<typeof createState>,
+  tagAssignment?: React.ReactNode
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -105,7 +108,7 @@ async function renderFields(state: ReturnType<typeof createState>) {
   }
 
   await act(async () => {
-    root?.render(<BorderPresetEditorFields state={state} />);
+    root?.render(<BorderPresetEditorFields state={state} tagAssignment={tagAssignment} />);
   });
 }
 
@@ -244,6 +247,16 @@ afterEach(() => {
 });
 
 describe('BorderPresetEditorFields', () => {
+  it('places tag assignment immediately after the preset name', async () => {
+    await renderFields(createState(), <div data-testid="tag-assignment">tags</div>);
+
+    const nameInput = queryFieldElements().nameInput;
+    const assignment = container?.querySelector('[data-testid="tag-assignment"]');
+    expect(nameInput.compareDocumentPosition(assignment as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
   it('renders preview, toggles style and shadow, and wires every editable field', async () => {
     const state = createState();
 

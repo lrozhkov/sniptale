@@ -35,6 +35,7 @@ export function DataSelectionPreviewHeader({
   toggleExpandAll,
   toggleSelectAll,
 }: DataSpoilerHeaderProps) {
+  const stopHeaderToggle = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
     <div className="sniptale-spoiler-header">
       <button
@@ -52,7 +53,12 @@ export function DataSelectionPreviewHeader({
         </span>
       </button>
       {isDataSpoilerOpen ? (
-        <div className="sniptale-ai-spoiler-header-tools">
+        <div
+          className="sniptale-ai-spoiler-header-tools"
+          onClick={stopHeaderToggle}
+          onMouseDown={stopHeaderToggle}
+          onPointerDown={stopHeaderToggle}
+        >
           <label className="sniptale-ai-data-search">
             <Search aria-hidden="true" size={13} />
             <input

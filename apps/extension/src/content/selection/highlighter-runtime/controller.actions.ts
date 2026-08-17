@@ -6,6 +6,7 @@ import {
   registerHighlighterFrameCallbacks,
   removeHighlighterFrame,
   resetHighlighterHoverUi,
+  suspendHighlighterCreationUi,
   type HighlighterRuntimeState,
 } from './state';
 
@@ -88,6 +89,7 @@ export function createHighlighterStateActions(props: {
       props.logger.log('Frame editing cleared');
     },
     isEnabled: () => props.state.isModeEnabled,
+    isCreationEnabled: () => props.state.isCreationEnabled,
     isFrameEditing: () => props.state.isFrameEditing,
     isPausedState: () => props.state.isPaused,
     pause: () => {
@@ -97,6 +99,12 @@ export function createHighlighterStateActions(props: {
     resume: () => {
       props.state.isPaused = false;
       props.logger.log('Highlighter resumed');
+    },
+    setCreationEnabled: (enabled: boolean) => {
+      if (props.state.isCreationEnabled === enabled) return;
+      props.state.isCreationEnabled = enabled;
+      if (!enabled) suspendHighlighterCreationUi(props.hoverController);
+      props.logger.log(`Highlighter frame creation ${enabled ? 'enabled' : 'disabled'}`);
     },
     setFrameEditing: () => {
       if (props.state.isFrameEditing) return;

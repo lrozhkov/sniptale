@@ -83,6 +83,7 @@ it('keeps highlighter alphabets and shared anchors canonical', () => {
     normalOffset?: number;
     position: number;
     side: 'top' | 'right' | 'bottom' | 'left';
+    tangentialOffset?: number;
   }>();
 });
 

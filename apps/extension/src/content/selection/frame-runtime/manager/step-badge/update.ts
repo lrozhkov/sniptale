@@ -63,7 +63,10 @@ export function createUpdateFrameStepBadge(params: {
         const currentSettings =
           frame.stepBadge ??
           (settings.enabled
-            ? resolveFrameStepBadgeTemplate(fallback!, frame.borderSettings)
+            ? {
+                ...resolveFrameStepBadgeTemplate(fallback!, frame.borderSettings),
+                enabled: false,
+              }
             : DEFAULT_STEP_BADGE_SETTINGS);
         const newSettings = {
           ...currentSettings,

@@ -85,8 +85,10 @@ export function BorderPresetEditorContent({
           <BorderPresetEditorFields
             {...(linkedTemplateOptions ? { linkedTemplateOptions } : {})}
             state={state}
+            tagAssignment={
+              <AnnotationTemplateTagAssignment onChange={onTagIdsChange} value={tagIds} />
+            }
           />
-          <AnnotationTemplateTagAssignment onChange={onTagIdsChange} value={tagIds} />
         </ProductModalBody>
         <EditorFooter
           disabled={!state.name.trim() || state.hasBlockedProps || Boolean(state.cssError)}

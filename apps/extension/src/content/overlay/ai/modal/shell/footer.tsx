@@ -29,6 +29,12 @@ export function AIModalFooter({
   selectedModelId: string | null;
   totalTokens: number;
 }) {
+  const disclosureHint = getAIModalDisclosureHint({
+    availableModels,
+    providers,
+    selectedData,
+    selectedModelId,
+  });
   return (
     <ProductModalFooter>
       <AIModalTokenCounter totalTokens={totalTokens} />
@@ -52,17 +58,16 @@ export function AIModalFooter({
           <Settings2 aria-hidden="true" size={14} />
         </button>
       </div>
-      <AIModalDisclosure
-        availableModels={availableModels}
-        providers={providers}
-        selectedData={selectedData}
-        selectedModelId={selectedModelId}
-      />
       <div className="sniptale-ai-modal-footer-actions">
         <ProductActionButton onClick={onClose} tone="secondary">
           {translate('aiModal.cancelButton')}
         </ProductActionButton>
-        <ProductActionButton disabled={disabledSubmit} onClick={onSubmit} tone="primary">
+        <ProductActionButton
+          disabled={disabledSubmit}
+          onClick={onSubmit}
+          title={disclosureHint}
+          tone="primary"
+        >
           {translate('aiModal.submitShortcutTitle')}
         </ProductActionButton>
       </div>
@@ -70,7 +75,7 @@ export function AIModalFooter({
   );
 }
 
-function AIModalDisclosure({
+function getAIModalDisclosureHint({
   availableModels,
   providers,
   selectedData,
@@ -80,7 +85,7 @@ function AIModalDisclosure({
   providers: ReturnType<typeof useAIModalState>['providers'];
   selectedData: string;
   selectedModelId: string | null;
-}) {
+}): string {
   const model = availableModels.find((candidate) => candidate.id === selectedModelId);
   const provider = providers.find((candidate) => candidate.id === model?.providerId);
   const destination =
@@ -96,12 +101,7 @@ function AIModalDisclosure({
     )
     .replace('{destination}', destination)
     .replace('{model}', model?.displayName ?? translate('aiModal.modelNotSelected'));
-  return (
-    <div className="sniptale-ai-modal-disclosure" data-ui="ai-modal.disclosure">
-      {summary}
-      <span>{translate('aiModal.disclosureHistory')}</span>
-    </div>
-  );
+  return `${summary} ${translate('aiModal.disclosureHistory')}`;
 }
 
 function AIModalTokenCounter({ totalTokens }: { totalTokens: number }) {

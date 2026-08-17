@@ -246,7 +246,11 @@ function isOptionalStepBadgePlacement(value: unknown): boolean {
       (value['normalOffset'] === undefined ||
         (isFiniteNumber(value['normalOffset']) &&
           value['normalOffset'] >= -STEP_BADGE_NORMAL_OFFSET_LIMIT &&
-          value['normalOffset'] <= STEP_BADGE_NORMAL_OFFSET_LIMIT)))
+          value['normalOffset'] <= STEP_BADGE_NORMAL_OFFSET_LIMIT)) &&
+      (value['tangentialOffset'] === undefined ||
+        (isFiniteNumber(value['tangentialOffset']) &&
+          value['tangentialOffset'] >= -STEP_BADGE_TANGENTIAL_OFFSET_LIMIT &&
+          value['tangentialOffset'] <= STEP_BADGE_TANGENTIAL_OFFSET_LIMIT)))
   );
 }
 
@@ -559,4 +563,7 @@ import { isReservedFrameCssProperty } from '../style/decoration';
 import type { AppliedBorderSettings, BlurSettings } from '@sniptale/ui/highlighter-style/types';
 import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 import { createSolidPaint, parsePaint } from '@sniptale/foundation/paint';
-import { STEP_BADGE_NORMAL_OFFSET_LIMIT } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import {
+  STEP_BADGE_NORMAL_OFFSET_LIMIT,
+  STEP_BADGE_TANGENTIAL_OFFSET_LIMIT,
+} from '@sniptale/runtime-contracts/highlighter/step-badge';

@@ -182,6 +182,19 @@ describe('useAIModalCoreState state assembly', () => {
     expect(getState().prompt).toBe('Updated prompt');
     expect(setLastPromptMock).toHaveBeenLastCalledWith('Updated prompt');
   });
+
+  it('resolves functional prompt updates before notifying the external store', async () => {
+    await renderHarness();
+
+    act(() => {
+      getState().setPrompt((prompt) => `${prompt} one`);
+      getState().setPrompt((prompt) => `${prompt} two`);
+    });
+
+    expect(getState().prompt).toBe('stored prompt one two');
+    expect(setLastPromptMock).toHaveBeenNthCalledWith(1, 'stored prompt one');
+    expect(setLastPromptMock).toHaveBeenNthCalledWith(2, 'stored prompt one two');
+  });
 });
 
 describe('useAIModalCoreState token accounting', () => {

@@ -303,6 +303,6 @@ function moveCalloutWithKeyboard(
       width,
       ...(args.visualScale === undefined ? {} : { visualScale: args.visualScale }),
     }),
-    { translateConnectorGeometry: false }
+    { translateConnectorGeometry: Boolean(event.ctrlKey) }
   );
 }

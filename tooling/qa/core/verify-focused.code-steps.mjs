@@ -27,6 +27,15 @@ import {
   SHARED_OWNER_PROOF_VIOLATION_STEPS,
 } from './verify-quality-contract-step-definitions.mjs';
 
+export const FOCUSED_CONTEXTUAL_VIOLATION_STEPS = [
+  {
+    id: 'messaging',
+    label: 'Messaging',
+    header: 'Messaging guardrail violations found:',
+    tool: 'verify-messaging.mjs',
+  },
+];
+
 export const FOCUSED_CODE_VIOLATION_STEPS = [
   ...SHARED_CONTRACT_VIOLATION_STEPS,
   [

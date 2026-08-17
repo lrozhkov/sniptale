@@ -7,10 +7,12 @@ export {
   invalidateFrameCache,
   hasHighlighterHoverPreviewTarget,
   isHighlighterEnabled,
+  isHighlighterCreationEnabled,
   isFrameEditing,
   isHighlighterPausedState,
   pauseHighlighter,
   registerFrameCallbacks,
   resumeHighlighter,
+  setHighlighterCreationEnabled,
   setFrameEditing,
 } from '../highlighter-runtime';

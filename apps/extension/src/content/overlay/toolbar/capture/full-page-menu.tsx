@@ -2,11 +2,11 @@ import React, { useCallback, useRef } from 'react';
 import {
   ChevronDown,
   EyeOff,
-  GalleryVertical,
   ImageDown,
   Pin,
   Repeat2,
   Snowflake,
+  UnfoldVertical,
 } from 'lucide-react';
 import {
   ProductToolbarMenu,
@@ -222,7 +222,7 @@ export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
         onClick={props.onPrimaryClick}
         title={translate('content.toolbar.fullPage')}
       >
-        <GalleryVertical size={20} strokeWidth={2} />
+        <UnfoldVertical size={20} strokeWidth={2} />
       </button>
       <button
         ref={triggerRef}

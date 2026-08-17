@@ -82,10 +82,12 @@ function PresetEditorBody(props: {
   name: string;
   placement: CalloutPreset['placement'];
   setName: (value: string) => void;
+  setTagIds: (value: string[]) => void;
   setContent: (value: CalloutPreset['content']) => void;
   setPlacement: (value: CalloutPreset['placement']) => void;
   setStyle: (value: CalloutVisualStyle) => void;
   style: CalloutVisualStyle;
+  tagIds: string[];
 }) {
   return (
     <ProductModalBody compact className="space-y-4">
@@ -104,6 +106,7 @@ function PresetEditorBody(props: {
           value={props.name}
         />
       </div>
+      <AnnotationTemplateTagAssignment onChange={props.setTagIds} value={props.tagIds} />
       <div
         className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[176px_minmax(0,1fr)]"
         data-ui="shared.callout-preset-editor.layout"
@@ -226,14 +229,13 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
           name={draft.name}
           placement={draft.placement}
           setName={draft.setName}
+          setTagIds={setTagIds}
           setContent={draft.setContent}
           setPlacement={draft.setPlacement}
           setStyle={draft.setStyle}
           style={draft.style}
+          tagIds={tagIds}
         />
-        <div className="px-4 pb-4">
-          <AnnotationTemplateTagAssignment onChange={setTagIds} value={tagIds} />
-        </div>
         <PresetEditorFooter
           canReset={source.origin === 'system' && source.customized === true}
           isSaving={props.isSaving}

@@ -31,6 +31,8 @@ export const highlighterMessages = defineMessageSource({
     noMatches: { ru: 'Подходящих шаблонов нет', en: 'No matching templates' },
     assignmentLabel: { ru: 'Теги', en: 'Tags' },
     assignmentEmpty: { ru: 'Теги ещё не созданы', en: 'No tags created yet' },
+    assignmentPlaceholder: { ru: 'Выберите теги', en: 'Select tags' },
+    clearAssignment: { ru: 'Снять все теги', en: 'Clear tags' },
     add: { ru: 'Создать тег', en: 'Create tag' },
     createTitle: { ru: 'Новый тег', en: 'New tag' },
     editTitle: { ru: 'Изменить тег', en: 'Edit tag' },

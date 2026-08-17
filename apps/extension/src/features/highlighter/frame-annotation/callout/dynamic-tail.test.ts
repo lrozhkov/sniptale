@@ -137,10 +137,7 @@ describe('getDynamicTailState', () => {
     });
 
     expect(shifted.attachment.framePoint.x).toBeGreaterThan(centered.attachment.framePoint.x);
-    expect(
-      shifted.attachment.framePoint.x - centered.attachment.framePoint.x
-    ).toBeGreaterThanOrEqual(16);
-    expect(shifted.attachment.framePoint.x - centered.attachment.framePoint.x).toBeLessThan(20);
+    expect(shifted.attachment.framePoint.x - centered.attachment.framePoint.x).toBeCloseTo(12.8);
     expect(shifted.path.startsWith('M ')).toBe(true);
   });
 

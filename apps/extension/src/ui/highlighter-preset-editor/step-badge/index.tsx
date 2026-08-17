@@ -216,21 +216,26 @@ function PresetEditorBody(props: {
   onPatch: (value: Partial<StepBadgeSettings>) => void;
   settings: StepBadgeSettings;
   setName: (value: string) => void;
+  setTagIds: (value: string[]) => void;
+  tagIds: string[];
 }) {
   const template = createStepBadgeTemplateFromSettings(props.settings, 29.16);
   return (
     <ProductModalBody compact className="space-y-4">
       <div className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-4">
         <StepBadgePresetPreview settings={template} />
-        <ProductField label={translate('highlighter.stepBadgePresets.editor.name')}>
-          <ProductInput
-            className="cursor-text"
-            maxLength={64}
-            style={{ cursor: 'text' }}
-            value={props.name}
-            onChange={(event) => props.setName(event.target.value)}
-          />
-        </ProductField>
+        <div className="space-y-4">
+          <ProductField label={translate('highlighter.stepBadgePresets.editor.name')}>
+            <ProductInput
+              className="cursor-text"
+              maxLength={64}
+              style={{ cursor: 'text' }}
+              value={props.name}
+              onChange={(event) => props.setName(event.target.value)}
+            />
+          </ProductField>
+          <AnnotationTemplateTagAssignment onChange={props.setTagIds} value={props.tagIds} />
+        </div>
       </div>
       <StepBadgePresetSettingsInspector onPatch={props.onPatch} settings={props.settings} />
     </ProductModalBody>
@@ -325,10 +330,14 @@ export function StepBadgePresetEditor(props: StepBadgePresetEditorProps) {
           )}
           onClose={props.onClose}
         />
-        <PresetEditorBody name={name} onPatch={patch} settings={settings} setName={setName} />
-        <div className="px-4 pb-4">
-          <AnnotationTemplateTagAssignment onChange={setTagIds} value={tagIds} />
-        </div>
+        <PresetEditorBody
+          name={name}
+          onPatch={patch}
+          settings={settings}
+          setName={setName}
+          setTagIds={setTagIds}
+          tagIds={tagIds}
+        />
         <PresetEditorFooter
           isSaving={props.isSaving}
           name={name}

@@ -13,7 +13,7 @@ type Point = { x: number; y: number };
 
 const BUBBLE_EDGE_MARGIN = 4;
 const BUBBLE_PORT_FOLLOW_RATIO = 0.32;
-const FRAME_PORT_FOLLOW_RATIO = 0.86;
+const FRAME_PORT_FOLLOW_RATIO = 0.64;
 const MAX_AUTO_BASE_EXPANSION = 0.75;
 const SIDE_HYSTERESIS = 0.12;
 const TIP_ROUNDING_RATIO = 0.08;
@@ -234,11 +234,12 @@ function getRoundedTriangleTip(args: {
   baseA: Point;
   baseB: Point;
   framePoint: Point;
+  roundingRatio: number;
   side: ConnectorSide;
   tipGap: number;
 }) {
   const tipPoint = offsetPoint(args.framePoint, getOutwardNormal(args.side), args.tipGap);
-  const halfRoundingRatio = TIP_ROUNDING_RATIO / 2;
+  const halfRoundingRatio = args.roundingRatio / 2;
   const vertexScale = 1 / (1 - halfRoundingRatio);
   const tipVertex = {
     x: (tipPoint.x - halfRoundingRatio * args.basePoint.x) * vertexScale,
@@ -246,8 +247,8 @@ function getRoundedTriangleTip(args: {
   };
 
   return {
-    tipA: interpolatePoint(tipVertex, args.baseA, TIP_ROUNDING_RATIO),
-    tipB: interpolatePoint(tipVertex, args.baseB, TIP_ROUNDING_RATIO),
+    tipA: interpolatePoint(tipVertex, args.baseA, args.roundingRatio),
+    tipB: interpolatePoint(tipVertex, args.baseB, args.roundingRatio),
     tipPoint,
     tipVertex,
   };
@@ -374,6 +375,14 @@ function getConnectorPoints(args: {
     ...(args.tailBasePosition === undefined ? {} : { position: args.tailBasePosition }),
     ...(args.tailBaseWidth === undefined ? {} : { width: args.tailBaseWidth }),
   });
+  const renderedBaseSpan = Math.hypot(base.baseB.x - base.baseA.x, base.baseB.y - base.baseA.y);
+  const roundingRatio =
+    args.tailBaseWidth === undefined
+      ? Math.min(
+          TIP_ROUNDING_RATIO,
+          (baseSpan * TIP_ROUNDING_RATIO) / Math.max(1, renderedBaseSpan)
+        )
+      : TIP_ROUNDING_RATIO;
   return {
     ...base,
     framePoint,
@@ -382,6 +391,7 @@ function getConnectorPoints(args: {
       baseA: base.baseA,
       baseB: base.baseB,
       framePoint,
+      roundingRatio,
       side: args.side,
       tipGap: args.tipGap ?? CALLOUT_GAP,
     }),

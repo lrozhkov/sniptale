@@ -264,20 +264,20 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Toolbar settings',
   },
   panelHorizontal: {
-    ru: 'Горизонтальная панель',
-    en: 'Horizontal toolbar',
+    ru: 'Горизонтальный вид',
+    en: 'Horizontal view',
   },
   panelHorizontalHint: {
-    ru: 'Разместить кнопки панели в одну строку',
-    en: 'Arrange toolbar buttons in one row',
+    ru: 'Расположить кнопки в одну строку',
+    en: 'Arrange buttons in one row',
   },
   panelVertical: {
-    ru: 'Вертикальная панель',
-    en: 'Vertical toolbar',
+    ru: 'Вертикальный вид',
+    en: 'Vertical view',
   },
   panelVerticalHint: {
-    ru: 'Разместить секции панели друг под другом',
-    en: 'Stack toolbar sections vertically',
+    ru: 'Расположить секции друг под другом',
+    en: 'Stack sections vertically',
   },
   compactMenus: {
     ru: 'Компактный вид меню',
@@ -304,12 +304,12 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   hideToolbar: {
-    ru: 'Свернуть панель',
-    en: 'Collapse toolbar',
+    ru: 'Свернуть',
+    en: 'Collapse',
   },
   screenshotDisable: {
-    ru: 'Закрыть панель',
-    en: 'Close toolbar',
+    ru: 'Закрыть',
+    en: 'Close',
   },
   screenshotDisableError: {
     ru: 'Не удалось закрыть панель. Повторите попытку.',

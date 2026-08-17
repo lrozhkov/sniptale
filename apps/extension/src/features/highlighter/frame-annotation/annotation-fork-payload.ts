@@ -216,7 +216,7 @@ const stepBadgeShape: ExactShape = {
     'sourcePresetId',
     'type'
   ),
-  manualPlacement: leaf('normalOffset', 'position', 'side'),
+  manualPlacement: leaf('normalOffset', 'position', 'side', 'tangentialOffset'),
   style: leaf(
     'backgroundColor',
     'backgroundColorSource',

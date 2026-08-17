@@ -28,6 +28,7 @@ export function FrameAnnotationCreationControls(props: {
   enableCallout?: () => CalloutSettings;
   enableStepBadge?: () => StepBadgeSettings;
   frameActive?: boolean;
+  onFrameActiveChange?: (active: boolean) => void;
   onChange: (settings: FrameAnnotationCreationSettings) => void;
   onMenuChange?: (menu: FrameAnnotationCreationMenu | null) => void;
   portalTarget?: HTMLElement | DocumentFragment | ShadowRoot;
@@ -65,13 +66,39 @@ export function FrameAnnotationCreationControls(props: {
   const showStepBadge = props.showStepBadge ?? true;
 
   const close = () => setActiveMenu(null);
-  const enableCallout = () => {
-    update({ callout: props.enableCallout?.() ?? createDefaultFrameCallout() });
-    setActiveMenu('callout');
+  const createCallout = () => props.enableCallout?.() ?? createDefaultFrameCallout();
+  const createStepBadge = () => props.enableStepBadge?.() ?? createDefaultFrameStepBadge();
+  const toggleCallout = () => {
+    const current = props.settings.callout;
+    update({
+      callout:
+        current && current.enabled !== false
+          ? null
+          : current
+            ? { ...current, enabled: true }
+            : createCallout(),
+    });
   };
-  const enableStepBadge = () => {
-    update({ stepBadge: props.enableStepBadge?.() ?? createDefaultFrameStepBadge() });
-    setActiveMenu('step-badge');
+  const toggleStepBadge = () => {
+    const current = props.settings.stepBadge;
+    update({
+      stepBadge:
+        current && current.enabled !== false
+          ? null
+          : current
+            ? { ...current, enabled: true }
+            : createStepBadge(),
+    });
+  };
+  const openCalloutMenu = () => {
+    if (!props.settings.callout) update({ callout: { ...createCallout(), enabled: false } });
+    toggle('callout');
+  };
+  const openStepBadgeMenu = () => {
+    if (!props.settings.stepBadge) {
+      update({ stepBadge: { ...createStepBadge(), enabled: false } });
+    }
+    toggle('step-badge');
   };
   const buttonGroups = (
     <>
@@ -82,6 +109,7 @@ export function FrameAnnotationCreationControls(props: {
         {...(props.dataUi ? { dataUi: props.dataUi } : {})}
         frameRef={frameRef}
         frameActive={frameActive}
+        onToggleFrame={() => props.onFrameActiveChange?.(!frameActive)}
         settings={props.settings}
         toggle={toggle}
       />
@@ -90,13 +118,14 @@ export function FrameAnnotationCreationControls(props: {
         calloutRef={calloutRef}
         contentContext={contentContext}
         disabled={props.disabled ?? false}
-        enableCallout={enableCallout}
-        enableStepBadge={enableStepBadge}
+        onCalloutMenu={openCalloutMenu}
+        onStepBadgeMenu={openStepBadgeMenu}
+        onToggleCallout={toggleCallout}
+        onToggleStepBadge={toggleStepBadge}
         settings={props.settings}
-        showCallout={showCallout}
-        showStepBadge={showStepBadge}
+        showCallout={frameActive && showCallout}
+        showStepBadge={frameActive && showStepBadge}
         stepBadgeRef={stepBadgeRef}
-        toggle={toggle}
       />
     </>
   );
@@ -109,8 +138,8 @@ export function FrameAnnotationCreationControls(props: {
         close={close}
         frameRef={frameRef}
         settings={props.settings}
-        showCallout={showCallout}
-        showStepBadge={showStepBadge}
+        showCallout={frameActive && showCallout}
+        showStepBadge={frameActive && showStepBadge}
         stepBadgeRef={stepBadgeRef}
         update={update}
         {...(props.portalTarget ? { portalTarget: props.portalTarget } : {})}

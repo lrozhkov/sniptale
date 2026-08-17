@@ -59,7 +59,7 @@ describe('frame annotation snapshot boundary', () => {
   it('round-trips bounded inward and outward step-badge offsets', () => {
     const stepBadge: StepBadgeSettings = {
       ...createDefaultFrameStepBadge(),
-      manualPlacement: { normalOffset: -32, position: 0.4, side: 'right' },
+      manualPlacement: { normalOffset: -32, position: 0.4, side: 'right', tangentialOffset: 24 },
     };
     const snapshot = createFrameAnnotationSnapshot(
       { id: 'frame-with-offset-badge', x: 0, y: 0, width: 100, height: 80, stepBadge },

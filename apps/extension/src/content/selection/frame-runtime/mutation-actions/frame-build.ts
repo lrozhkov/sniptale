@@ -111,12 +111,14 @@ function applyFrameBuildSettings(
     focusSettings: params.focusSettings,
     ...(linked ?? {}),
     ...(stepBadge === undefined ? {} : { stepBadge }),
-    ...(params.callout === null ? {} : { callout: structuredClone(params.callout) }),
+    ...(params.callout?.enabled === false || params.callout === null
+      ? {}
+      : { callout: structuredClone(params.callout) }),
   } satisfies FrameData;
 }
 
 function buildStepBadgeSettings(template: StepBadgeSettings | null, isAutoMode: boolean) {
-  if (!template) {
+  if (!template?.enabled) {
     return undefined;
   }
 

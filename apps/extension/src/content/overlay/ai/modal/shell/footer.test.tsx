@@ -115,10 +115,14 @@ it('shows an explicit blocking reason when no model is configured', async () => 
   );
 });
 
-it('discloses the selected destination, page-data inclusion, and metadata-only history', async () => {
+it('keeps the data disclosure in the submit hint instead of a visible footer row', async () => {
   await renderFooter();
-  const disclosure = container.querySelector('[data-ui="ai-modal.disclosure"]')?.textContent;
-  expect(disclosure).toContain('настроенный AI-провайдер');
-  expect(disclosure).toContain('промпт без данных страницы');
-  expect(disclosure).toContain('только метаданные запроса');
+  const submit = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('.sniptale-ai-modal-footer-actions > button')
+  ).find((button) => button.textContent === 'Отправить запрос');
+
+  expect(container.querySelector('[data-ui="ai-modal.disclosure"]')).toBeNull();
+  expect(submit?.title).toContain('настроенный AI-провайдер');
+  expect(submit?.title).toContain('промпт без данных страницы');
+  expect(submit?.title).toContain('только метаданные запроса');
 });

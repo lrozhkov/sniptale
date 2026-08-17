@@ -12,7 +12,7 @@ import {
 } from './setup-fields';
 import { openImageEditor, openLibrary } from '../../navigation/actions';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
-import { ImageEditorIcon } from '../../editor-icons';
+import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
 
 export function ScreenshotSetupPanel(props: {
   config: ScreenshotCaptureConfig;

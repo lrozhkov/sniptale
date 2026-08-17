@@ -8,6 +8,7 @@ type HighlighterFrameCallbacks = {
 
 export type HighlighterRuntimeState = {
   isModeEnabled: boolean;
+  isCreationEnabled: boolean;
   isPaused: boolean;
   isFrameEditing: boolean;
   cleanupEventListeners: (() => void) | null;
@@ -23,6 +24,7 @@ interface HighlighterHoverUiController {
 export function createHighlighterRuntimeState(): HighlighterRuntimeState {
   return {
     isModeEnabled: false,
+    isCreationEnabled: true,
     isPaused: false,
     isFrameEditing: false,
     cleanupEventListeners: null,
@@ -47,7 +49,7 @@ export function createHighlighterCallbacks(state: HighlighterRuntimeState) {
 export function createHighlighterStateGetters(state: HighlighterRuntimeState) {
   return {
     isModeEnabled: () => state.isModeEnabled,
-    isPaused: () => state.isPaused,
+    isPaused: () => state.isPaused || !state.isCreationEnabled,
     isFrameEditing: () => state.isFrameEditing,
   };
 }
@@ -102,4 +104,11 @@ export function resetHighlighterHoverUi(controller: HighlighterHoverUiController
   controller.tracking.clear();
   controller.overlay.removePreview();
   controller.overlay.removeContainer();
+}
+
+export function suspendHighlighterCreationUi(controller: HighlighterHoverUiController): void {
+  controller.input.cancelDrawing('teardown');
+  controller.tracking.cancelPendingFrame();
+  controller.tracking.clear();
+  controller.overlay.hidePreview();
 }

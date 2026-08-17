@@ -101,18 +101,14 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
       >
         <CanvasToolButtons actions={selectActions} dataUi="editor.floating.tool-rail" />
         <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-frame" />
-        <div
-          className="contents"
-          onPointerDown={() => {
-            if (props.hasImage && !frameAnnotationActive) {
-              props.onActivateTool('frame-annotation');
-            }
-          }}
-        >
+        <div className="contents">
           <FrameAnnotationCreationControls
             context="content"
             disabled={!props.hasImage}
             frameActive={frameAnnotationActive}
+            onFrameActiveChange={(active) =>
+              props.onActivateTool(active ? 'frame-annotation' : 'select')
+            }
             onChange={setFrameAnnotationCreationDefaults}
             settings={annotationDefaults}
             showCallout={frameAnnotationActive}
