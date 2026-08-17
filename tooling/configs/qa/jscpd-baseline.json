@@ -20,7 +20,7 @@
     {
       "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
       "count": 5,
-      "lines": 101,
+      "lines": 100,
       "sampleFingerprint": "4df61b2df3fc8f1beb4427dc174956c686a4bff72506dff6bdfd98084b787d2e",
       "debtId": "accepted.jscpd.composition-frame-annotation-controls-callout-apps-extension-src-composition-frame-annotation-co.842751ee8be7"
     },

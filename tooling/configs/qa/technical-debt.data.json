@@ -481,7 +481,7 @@
       "scope": {
         "count": 5,
         "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
-        "lines": 101,
+        "lines": 100,
         "sampleFingerprint": "4df61b2df3fc8f1beb4427dc174956c686a4bff72506dff6bdfd98084b787d2e"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
