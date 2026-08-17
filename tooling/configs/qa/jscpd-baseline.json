@@ -20,8 +20,8 @@
     {
       "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
       "count": 5,
-      "lines": 120,
-      "sampleFingerprint": "842751ee8be7f51fe28ab0368ed2e990410bc2707855f79bb69f89622d9c87d8",
+      "lines": 101,
+      "sampleFingerprint": "4df61b2df3fc8f1beb4427dc174956c686a4bff72506dff6bdfd98084b787d2e",
       "debtId": "accepted.jscpd.composition-frame-annotation-controls-callout-apps-extension-src-composition-frame-annotation-co.842751ee8be7"
     },
     {
@@ -68,9 +68,9 @@
     },
     {
       "family": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
-      "count": 2,
-      "lines": 45,
-      "sampleFingerprint": "239116b5b15ca7c472c725c23b16a9f6eebd5506957616305fd098830a2ae047",
+      "count": 1,
+      "lines": 22,
+      "sampleFingerprint": "36f20556aaf0a79b94f366ebe9ae5915c568a0da7dd7be7977ac282e382e59a1",
       "debtId": "accepted.jscpd.composition-frame-annotation-controls-frame-apps-extension-src-composition-frame-annotation-cont.239116b5b15c"
     },
     {

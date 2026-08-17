@@ -127,6 +127,48 @@ export function AnnotationTemplateQueryResults(props: { children: ReactNode; loa
   );
 }
 
+export function AnnotationTemplateQuerySurface(props: {
+  activeFilterTagIds: readonly AnnotationTemplateTagId[];
+  children: ReactNode;
+  disabled?: boolean;
+  hasResults: boolean;
+  loading: boolean;
+  onActiveFilterTagIdsChange: (tagIds: AnnotationTemplateTagId[]) => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
+  onQueryChange: (query: string) => void;
+  query: string;
+  tags: readonly AnnotationTemplateTag[];
+}) {
+  return (
+    <>
+      <AnnotationTemplateQueryControls
+        activeFilterTagIds={props.activeFilterTagIds}
+        compact
+        {...(props.disabled !== undefined ? { disabled: props.disabled } : {})}
+        onActiveFilterTagIdsChange={props.onActiveFilterTagIdsChange}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
+        onQueryChange={props.onQueryChange}
+        query={props.query}
+        tags={props.tags}
+      />
+      <AnnotationTemplateQueryResults loading={props.loading}>
+        {props.hasResults ? (
+          props.children
+        ) : (
+          <AnnotationTemplateQueryEmpty
+            hasFilter={props.activeFilterTagIds.length > 0}
+            onClearFilter={() => props.onActiveFilterTagIdsChange([])}
+            onClearQuery={() => props.onQueryChange('')}
+            query={props.query}
+          />
+        )}
+      </AnnotationTemplateQueryResults>
+    </>
+  );
+}
+
 export function AnnotationTemplateQueryEmpty(props: {
   hasFilter: boolean;
   onClearFilter: () => void;

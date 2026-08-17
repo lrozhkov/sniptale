@@ -4,6 +4,7 @@ export {
   AnnotationTemplateQueryControls,
   AnnotationTemplateQueryEmpty,
   AnnotationTemplateQueryResults,
+  AnnotationTemplateQuerySurface,
 } from './filter';
 export {
   normalizeAnnotationTemplateQuery,

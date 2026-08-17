@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
-import { AnnotationTemplateQueryResults } from './filter';
+import { AnnotationTemplateQueryResults, AnnotationTemplateQuerySurface } from './filter';
 
 it('reserves the results viewport and visually hides unfiltered children while tags load', () => {
   const loadingMarkup = renderToStaticMarkup(
@@ -19,4 +19,40 @@ it('reserves the results viewport and visually hides unfiltered children while t
     </AnnotationTemplateQueryResults>
   );
   expect(readyMarkup).toContain('Filtered preset');
+});
+
+it('owns the shared controls and empty result behavior for template lists', () => {
+  const emptyMarkup = renderToStaticMarkup(
+    <AnnotationTemplateQuerySurface
+      activeFilterTagIds={['review']}
+      hasResults={false}
+      loading={false}
+      onActiveFilterTagIdsChange={() => undefined}
+      onQueryChange={() => undefined}
+      query="missing"
+      tags={[]}
+    >
+      <span>Preset row</span>
+    </AnnotationTemplateQuerySurface>
+  );
+  expect(emptyMarkup).toContain('shared.annotation-template-query.controls');
+  expect(emptyMarkup).toContain('shared.annotation-template-query.results');
+  expect(emptyMarkup).toContain('Очистить поиск');
+  expect(emptyMarkup).toContain('Очистить фильтр');
+  expect(emptyMarkup).not.toContain('Preset row');
+
+  const populatedMarkup = renderToStaticMarkup(
+    <AnnotationTemplateQuerySurface
+      activeFilterTagIds={[]}
+      hasResults
+      loading={false}
+      onActiveFilterTagIdsChange={() => undefined}
+      onQueryChange={() => undefined}
+      query=""
+      tags={[]}
+    >
+      <span>Preset row</span>
+    </AnnotationTemplateQuerySurface>
+  );
+  expect(populatedMarkup).toContain('Preset row');
 });
