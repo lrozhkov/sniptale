@@ -27,7 +27,7 @@ type ContentPrivilegedActionActivationIssueResult =
   | { status: 'rate-limited' };
 
 type ContentPrivilegedActionActivationIssueHistoryRecord = {
-  issueTimes: number[];
+  issues: Array<{ issuedAtEpochMs: number; keyId: string }>;
 };
 
 const CONTENT_ACTION_ACTIVATION_KEYS_POLICY_ID = 'content-action-activation-keys';
@@ -98,14 +98,14 @@ function pruneExpiredActivationKeys(nowEpochMs = Date.now()): void {
 function pruneActivationIssueTimes(nowEpochMs: number): void {
   const cutoffEpochMs = nowEpochMs - CONTENT_PRIVILEGED_ACTION_ACTIVATION_ISSUE_RATE_WINDOW_MS;
   for (const [bindingKey, record] of contentPrivilegedActionActivationIssueHistory.entries()) {
-    const retainedIssueTimes = record.issueTimes.filter(
-      (issuedAtEpochMs) => issuedAtEpochMs > cutoffEpochMs
+    const retainedIssues = record.issues.filter(
+      ({ issuedAtEpochMs }) => issuedAtEpochMs > cutoffEpochMs
     );
-    if (retainedIssueTimes.length === 0) {
+    if (retainedIssues.length === 0) {
       contentPrivilegedActionActivationIssueHistory.delete(bindingKey);
     } else {
       contentPrivilegedActionActivationIssueHistory.set(bindingKey, {
-        issueTimes: retainedIssueTimes,
+        issues: retainedIssues,
       });
     }
   }
@@ -113,16 +113,17 @@ function pruneActivationIssueTimes(nowEpochMs: number): void {
 
 function canIssueActivationKeyForBinding(bindingKey: string, nowEpochMs: number): boolean {
   pruneActivationIssueTimes(nowEpochMs);
-  const retainedIssueTimes =
-    contentPrivilegedActionActivationIssueHistory.get(bindingKey)?.issueTimes ?? [];
-  if (retainedIssueTimes.length >= CONTENT_PRIVILEGED_ACTION_ACTIVATION_MAX_ISSUES_PER_WINDOW) {
-    return false;
-  }
+  const retainedIssues =
+    contentPrivilegedActionActivationIssueHistory.get(bindingKey)?.issues ?? [];
+  return retainedIssues.length < CONTENT_PRIVILEGED_ACTION_ACTIVATION_MAX_ISSUES_PER_WINDOW;
+}
 
+function recordActivationKeyIssue(bindingKey: string, keyId: string, nowEpochMs: number): void {
+  const retainedIssues =
+    contentPrivilegedActionActivationIssueHistory.get(bindingKey)?.issues ?? [];
   contentPrivilegedActionActivationIssueHistory.set(bindingKey, {
-    issueTimes: [...retainedIssueTimes, nowEpochMs],
+    issues: [...retainedIssues, { issuedAtEpochMs: nowEpochMs, keyId }],
   });
-  return true;
 }
 
 function hasActiveActivationKeyForBinding(bindingKey: string): boolean {
@@ -150,6 +151,7 @@ export function issueContentPrivilegedActionActivationKey(
 
   const keyId = createActivationSecret();
   const secret = createActivationSecret();
+  recordActivationKeyIssue(senderBindingKey, keyId, nowEpochMs);
   const expiresAtEpochMs =
     nowEpochMs + requirePolicyStateTtlMs(CONTENT_ACTION_ACTIVATION_KEYS_POLICY_ID);
   contentPrivilegedActionActivationKeys.set(keyId, {
@@ -181,6 +183,17 @@ export function consumeContentPrivilegedActionActivationProof(args: {
     record.tabId === args.senderBinding.tabId;
   if (authorized) {
     contentPrivilegedActionActivationKeys.delete(args.proof.keyId);
+    const issueHistory = contentPrivilegedActionActivationIssueHistory.get(record.bindingKey);
+    if (issueHistory) {
+      const retainedIssues = issueHistory.issues.filter(({ keyId }) => keyId !== args.proof.keyId);
+      if (retainedIssues.length === 0) {
+        contentPrivilegedActionActivationIssueHistory.delete(record.bindingKey);
+      } else {
+        contentPrivilegedActionActivationIssueHistory.set(record.bindingKey, {
+          issues: retainedIssues,
+        });
+      }
+    }
   }
   return authorized;
 }

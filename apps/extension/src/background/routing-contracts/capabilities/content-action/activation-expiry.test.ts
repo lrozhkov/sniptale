@@ -5,6 +5,7 @@ import {
   MessageType,
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import type * as ContentActionContract from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import type { ContentPrivilegedActionType } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import {
   resetContentPrivilegedActionCapabilitiesForTests,
   routeContentPrivilegedActionActivationKeyRequest,
@@ -55,13 +56,14 @@ function requestActivationKey(
 }
 
 function requestRuntimeToken(
-  activationProof: ContentActionContract.ContentPrivilegedActionActivationKey
+  activationProof: ContentActionContract.ContentPrivilegedActionActivationKey,
+  actionType: ContentPrivilegedActionType = CaptureMessageType.CAPTURE_VISIBLE
 ) {
   const sender = contentSender();
   const sendResponse = vi.fn();
   routeContentPrivilegedActionRuntimeTokenRequest(
     {
-      actionType: CaptureMessageType.CAPTURE_VISIBLE,
+      actionType,
       activationProof,
       requestId: 'request-1',
       type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN,
@@ -124,7 +126,26 @@ it('expires activation roots and allows the sender to claim a fresh root after p
   });
 });
 
-it('rate limits repeated activation root issuance for the same sender and purpose', () => {
+it('does not rate limit activation roots consumed by consecutive trusted actions', () => {
+  const actionTypes = [
+    CaptureMessageType.CAPTURE_VISIBLE,
+    MessageType.ENABLE_SCREENSHOT_MODE,
+    MessageType.TRIGGER_QUICK_ACTION,
+    MessageType.CONTENT_RUNTIME_WAKEUP,
+    MessageType.OPEN_EXPORT_MODAL,
+    MessageType.EXECUTE_SAVE,
+  ] as const;
+  for (const [index, actionType] of actionTypes.entries()) {
+    dateNowMock.mockReturnValue(1_000 + index * 31_000);
+    const activationKey = requireActivationKey(requestActivationKey());
+    expect(requestRuntimeToken(activationKey, actionType)).toMatchObject({ success: true });
+  }
+
+  dateNowMock.mockReturnValue(1_000 + 6 * 31_000);
+  expect(requestActivationKey()).toEqual(expect.objectContaining({ expiresAtEpochMs: 217_000 }));
+});
+
+it('rate limits repeated abandoned activation roots for the same sender and purpose', () => {
   for (let index = 0; index < 6; index += 1) {
     dateNowMock.mockReturnValue(1_000 + index * 31_000);
     expect(requestActivationKey()).toEqual(
@@ -135,6 +156,40 @@ it('rate limits repeated activation root issuance for the same sender and purpos
   const sendResponse = vi.fn();
   const sender = contentSender();
   dateNowMock.mockReturnValue(1_000 + 6 * 31_000);
+  routeContentPrivilegedActionActivationKeyRequest(
+    {
+      purpose: 'trusted-content-event',
+      type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY,
+    },
+    sender,
+    sendResponse,
+    resolveContentSenderBindingForTest(sender)
+  );
+
+  expect(sendResponse.mock.calls[0]?.[0]).toMatchObject({
+    error: 'Content action activation key rate limited',
+    success: false,
+  });
+});
+
+it('retains earlier abandoned-root strikes after a later trusted action succeeds', () => {
+  for (let index = 0; index < 5; index += 1) {
+    dateNowMock.mockReturnValue(1_000 + index * 31_000);
+    expect(requestActivationKey()).toBeDefined();
+  }
+
+  dateNowMock.mockReturnValue(156_000);
+  const consumedKey = requireActivationKey(requestActivationKey());
+  expect(requestRuntimeToken(consumedKey, MessageType.CONTENT_RUNTIME_WAKEUP)).toMatchObject({
+    success: true,
+  });
+
+  dateNowMock.mockReturnValue(187_000);
+  expect(requestActivationKey()).toBeDefined();
+
+  const sendResponse = vi.fn();
+  const sender = contentSender();
+  dateNowMock.mockReturnValue(218_000);
   routeContentPrivilegedActionActivationKeyRequest(
     {
       purpose: 'trusted-content-event',
