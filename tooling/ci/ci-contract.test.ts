@@ -35,6 +35,13 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   const artifacts = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
   expect(workflow).toContain('canonical-qa:');
   expect(workflow).toContain('scheduled-security:');
+  expect(workflow).toContain('candidate-control-smoke:');
+  expect(workflow).toContain('continue-on-error: true');
+  expect(workflow).toContain('informational: true');
+  expect(workflow).toContain('candidate-control-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}');
+  expect(workflow).toContain('proof_file="$RUNNER_TEMP/candidate-control-');
+  expect(workflow).toContain('path: ${{ steps.candidate-image.outputs.proof-file }}');
+  expect(workflow).not.toContain('build/candidate-control-proof');
   expect(workflow).toContain('pr-gate:');
   expect(workflow).toContain('name: pr-gate-authority');
   expect(workflow).toContain('checks: write');
@@ -69,6 +76,7 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(workflow.match(/include-hidden-files: true/gu)).toHaveLength(2);
   expect(workflow).not.toContain("hashFiles('reports/.tmp/");
   expect(workflow).toContain('needs: canonical-qa');
+  expect(workflow).not.toMatch(/pr-gate:[\s\S]*needs:\s*\[[^\]]*candidate-control-smoke/u);
   expect(workflow).toContain('Refuse immutable tag replacement');
   expect(workflow).toContain('Refusing to replace existing immutable image tag');
   expect(workflow).toContain('Unable to prove immutable image tag absence');
@@ -98,6 +106,13 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(lock.debian.snapshot).toMatch(/^\d{8}T\d{6}Z$/u);
   expect(dockerfile).toContain(`${lock.debian.archiveUrl} bookworm main`);
   expect(dockerfile).toContain(`${lock.debian.securityArchiveUrl} bookworm-security main`);
+  expect(dockerfile).toContain('Acquire::https::Verify-Peer "false";');
+  expect(
+    dockerfile.indexOf('apt-get install -y --no-install-recommends ca-certificates')
+  ).toBeLessThan(dockerfile.indexOf('rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap'));
+  expect(dockerfile.indexOf('rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap')).toBeLessThan(
+    dockerfile.lastIndexOf('apt-get update')
+  );
   expect(dockerfile).not.toContain('deb.debian.org');
   const dockerignore = fs.readFileSync('.dockerignore', 'utf8');
   for (const excluded of ['.git', '.env', '.tmp', 'build', 'node_modules']) {

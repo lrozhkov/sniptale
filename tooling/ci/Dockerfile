@@ -16,8 +16,14 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
       'Acquire::Check-Valid-Until "false";' \
       'Acquire::Check-Date "false";' \
       > /etc/apt/apt.conf.d/99sniptale-snapshot \
+    && printf '%s\n' \
+      'Acquire::https::Verify-Peer "false";' \
+      > /etc/apt/apt.conf.d/98sniptale-ca-bootstrap \
     && apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git jq python3 python3-venv tar unzip \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends curl git jq python3 python3-venv tar unzip \
     && rm -rf /var/lib/apt/lists/*
 
 COPY tooling/configs/ci/toolchain.lock.json /tmp/toolchain.lock.json
