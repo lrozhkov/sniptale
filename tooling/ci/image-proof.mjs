@@ -19,7 +19,7 @@ export function writeImageProof(root, { commit, digest, repository, runId }) {
   if (!/^\d+$/u.test(String(runId ?? '')) || repository !== 'lrozhkov/sniptale') {
     throw new Error('Image proof repository or workflow run identity is invalid.');
   }
-  fs.mkdirSync(root, { recursive: false });
+  fs.mkdirSync(root, { recursive: true });
   const proof = {
     schemaVersion: 1,
     artifactKind: 'sniptale-qa-image-proof',
