@@ -28,6 +28,9 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
   expect(source).toContain('item.name == compute["flavorName"]');
   expect(source).toContain('flavor.disk != 0');
   expect(source).toContain('int(image.min_disk or 0) > compute["bootVolumeGiB"]');
+  expect(source).toContain('result["message"] = " ".join(message.split())[:500]');
+  expect(source).toContain('record["failure"] = server_failure(');
+  expect(source).not.toContain('fault.get("details")');
   expect(source).toContain('tags=["preemptible"]');
   expect(source).toContain('delete_on_termination": True');
   expect(source).toContain('server unexpectedly has a public floating IP');
