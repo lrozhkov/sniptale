@@ -95,10 +95,17 @@ def select_resources(connection, policy: dict[str, Any]) -> dict[str, Any]:
     flavors = [
         item
         for item in connection.compute.flavors(details=True)
-        if item.vcpus == compute["vcpus"] and item.ram == compute["ramMiB"]
+        if item.name == compute["flavorName"]
     ]
     if len(flavors) != 1:
-        raise RuntimeError("Expected exactly one Selectel flavor for the canonical resource profile.")
+        raise RuntimeError("Configured Selectel flavor is unavailable or ambiguous.")
+    flavor = flavors[0]
+    if (
+        flavor.vcpus != compute["vcpus"]
+        or flavor.ram != compute["ramMiB"]
+        or flavor.disk != 0
+    ):
+        raise RuntimeError("Configured Selectel flavor drifted from the canonical resource profile.")
     images = []
     for image in connection.image.images(status="active"):
         properties = image.to_dict()
@@ -121,7 +128,7 @@ def select_resources(connection, policy: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("Configured Selectel boot volume type is unavailable.")
     return {
         "zone": zone,
-        "flavor": flavors[0],
+        "flavor": flavor,
         "image": images[0],
         "external_network": external[0],
         "volume_type": volume_types[0],
