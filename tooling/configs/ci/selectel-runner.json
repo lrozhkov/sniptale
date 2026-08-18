@@ -50,10 +50,7 @@
     "computeApiVersion": "2.72"
   },
   "imageSelector": {
-    "name": "Ubuntu 24.04 LTS",
-    "osDistro": "ubuntu",
-    "osVersion": "24.04",
-    "architectures": ["x86_64", "amd64"]
+    "name": "Ubuntu 24.04 LTS 64-bit"
   },
   "quotaCeiling": {
     "vcpus": 32,

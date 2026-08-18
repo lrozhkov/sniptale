@@ -108,18 +108,14 @@ def select_resources(connection, policy: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("Configured Selectel flavor drifted from the canonical resource profile.")
     images = []
     for image in connection.image.images(status="active"):
-        properties = image.to_dict()
-        architecture = properties.get("architecture")
-        if (
-            image.name == selector["name"]
-            and properties.get("os_distro") == selector["osDistro"]
-            and properties.get("os_version") == selector["osVersion"]
-            and architecture in selector["architectures"]
-        ):
+        if image.name == selector["name"]:
             images.append(image)
     images.sort(key=lambda item: str(item.created_at or ""), reverse=True)
     if not images:
         raise RuntimeError(f"No active {compute['operatingSystem']} amd64 image is available.")
+    image = images[0]
+    if int(image.min_disk or 0) > compute["bootVolumeGiB"]:
+        raise RuntimeError("Configured Selectel image no longer fits the canonical boot volume.")
     external = [item for item in connection.network.networks(is_router_external=True)]
     if len(external) != 1:
         raise RuntimeError("Expected exactly one Selectel external network.")
@@ -129,7 +125,7 @@ def select_resources(connection, policy: dict[str, Any]) -> dict[str, Any]:
     return {
         "zone": zone,
         "flavor": flavor,
-        "image": images[0],
+        "image": image,
         "external_network": external[0],
         "volume_type": volume_types[0],
     }
