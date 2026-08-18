@@ -13,6 +13,8 @@ it('keeps cloud protocols in the pinned official OpenStack SDK', () => {
   expect(source).toContain('connection.compute.create_server(');
   expect(source).toContain('connection.block_storage.create_volume(');
   expect(source).toContain('connection.network.create_port(');
+  expect(source).toContain('connection.compute.availability_zones(details=False)');
+  expect(source).not.toContain('availability_zones(details=True)');
   expect(source).not.toContain('/v2.0/');
   expect(source).not.toContain('/servers/detail');
   expect(source).not.toContain('quota-manager');

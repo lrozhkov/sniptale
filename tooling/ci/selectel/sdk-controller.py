@@ -87,7 +87,7 @@ def select_resources(connection, policy: dict[str, Any]) -> dict[str, Any]:
     zone = compute["availabilityZone"]
     zones = [
         item.name
-        for item in connection.compute.availability_zones(details=True)
+        for item in connection.compute.availability_zones(details=False)
         if item.state.get("available")
     ]
     if zone not in zones:
