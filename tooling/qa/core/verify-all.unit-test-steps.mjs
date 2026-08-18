@@ -5,6 +5,7 @@ import {
 } from './verify-test-coverage.advisory.mjs';
 import { runTestCoverageCheck } from './verify-test-coverage.mjs';
 import { recordSuccessfulUnitTestPlan, resolveReusableUnitTestPlan } from './unit-test-cache.mjs';
+import { recordSuccessfulFullUnitProof, resolveReusableFullUnitProof } from './unit-test-proof.mjs';
 import { runUnitTests } from './verify-unit-tests.mjs';
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { measureAsyncStep, measureSyncStep } from './step-timing.helpers.mjs';
@@ -60,7 +61,18 @@ async function collectDirectUnitTestStepResult({
   });
 }
 
-function recordPassedRelatedUnitTestPlan({ cacheSource, coveragePlan, pool, suite, targetFiles }) {
+function recordPassedRelatedUnitTestPlan({
+  cacheSource,
+  coveragePlan,
+  maxWorkers,
+  pool,
+  suite,
+  targetFiles,
+}) {
+  if (coveragePlan.forceFullSuite && !hasCoverage(coveragePlan)) {
+    recordSuccessfulFullUnitProof({ maxWorkers, pool, source: cacheSource, suite });
+    return;
+  }
   recordSuccessfulUnitTestPlan({
     targetFiles,
     relatedFiles: coveragePlan.relatedFiles,
@@ -74,7 +86,16 @@ function recordPassedRelatedUnitTestPlan({ cacheSource, coveragePlan, pool, suit
   });
 }
 
-function resolveReusableRelatedUnitTestPlan({ coveragePlan, pool, suite, targetFiles }) {
+function resolveReusableRelatedUnitTestPlan({
+  coveragePlan,
+  maxWorkers,
+  pool,
+  suite,
+  targetFiles,
+}) {
+  if (coveragePlan.forceFullSuite && !hasCoverage(coveragePlan)) {
+    return resolveReusableFullUnitProof({ maxWorkers, pool, suite });
+  }
   return resolveReusableUnitTestPlan({
     targetFiles,
     relatedFiles: coveragePlan.relatedFiles,
@@ -111,16 +132,24 @@ async function collectRelatedUnitTestStepResult({
   targetFiles,
   unitTestDetailOverride,
 }) {
-  const reusableUnitTestPlan = coveragePlan.forceFullSuite
-    ? { matched: false }
-    : resolveReusableRelatedUnitTestPlan({
-        coveragePlan,
-        pool,
-        suite,
-        targetFiles,
-      });
+  const reusableUnitTestPlan = resolveReusableRelatedUnitTestPlan({
+    coveragePlan,
+    maxWorkers,
+    pool,
+    suite,
+    targetFiles,
+  });
 
   if (reusableUnitTestPlan.matched) {
+    if (coveragePlan.forceFullSuite) {
+      recordSuccessfulFullUnitProof({
+        maxWorkers,
+        pool,
+        reusedFrom: reusableUnitTestPlan.proof.proofDigest,
+        source: cacheSource,
+        suite,
+      });
+    }
     return createReusableUnitTestStep(reusableUnitTestPlan, 0, unitTestDetailOverride);
   }
 
@@ -137,6 +166,7 @@ async function collectRelatedUnitTestStepResult({
   recordPassedRelatedUnitTestPlan({
     cacheSource,
     coveragePlan,
+    maxWorkers,
     pool,
     suite,
     targetFiles,
