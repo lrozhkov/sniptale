@@ -171,69 +171,6 @@
       "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
     },
     {
-      "id": "noise.gitleaks.data-handling-provider-metadata.56",
-      "classification": "tool-noise",
-      "owner": "security-documentation",
-      "risk": "Security terminology in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
-      "reason": "The exact historical finding describes excluded provider metadata and contains no credential value.",
-      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
-      "reviewBy": "2027-08-18",
-      "source": {
-        "kind": "gitleaks",
-        "key": "159c3084de72d16480c267fbd94883c2cc7cc9f7:docs/security/data-handling.md:generic-api-key:56"
-      },
-      "scope": {
-        "commit": "159c3084de72d16480c267fbd94883c2cc7cc9f7",
-        "file": "docs/security/data-handling.md",
-        "fingerprint": "159c3084de72d16480c267fbd94883c2cc7cc9f7:docs/security/data-handling.md:generic-api-key:56",
-        "line": 56,
-        "rule": "generic-api-key"
-      },
-      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
-    },
-    {
-      "id": "noise.gitleaks.release-source-redaction-example.217",
-      "classification": "tool-noise",
-      "owner": "release-documentation",
-      "risk": "A redaction example in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
-      "reason": "The exact historical finding is documentation for redacted release-source output and contains no usable credential.",
-      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
-      "reviewBy": "2027-08-18",
-      "source": {
-        "kind": "gitleaks",
-        "key": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217"
-      },
-      "scope": {
-        "commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
-        "file": "docs/architecture/release-source-architecture.md",
-        "fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
-        "line": 217,
-        "rule": "generic-api-key"
-      },
-      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
-    },
-    {
-      "id": "noise.gitleaks.secret-redaction-fixture.11",
-      "classification": "tool-noise",
-      "owner": "shared-security-tests",
-      "risk": "A synthetic redaction fixture in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
-      "reason": "The exact historical finding is a non-secret test input used to prove credential redaction.",
-      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
-      "reviewBy": "2027-08-18",
-      "source": {
-        "kind": "gitleaks",
-        "key": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11"
-      },
-      "scope": {
-        "commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
-        "file": "src/shared/security/secret-redaction.test.ts",
-        "fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
-        "line": 11,
-        "rule": "generic-api-key"
-      },
-      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
-    },
-    {
       "id": "accepted.codeql.locked-toolchain-download-write",
       "classification": "accepted-architecture",
       "owner": "qa-platform",
@@ -14880,7 +14817,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "b745d69981ed0d7399553cda42f4c0d8560107eca902005e05d90739382245e7"
+        "contentHash": "f65c8527386c544e3bedcab3161b307025dff2310cbcd3ea4aba84ca1db3e9aa"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
@@ -15915,11 +15852,12 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/codeql.mjs",
-        "contentHash": "a6fbe750703e5763415eb92b2107e93a3746675813962883e0cf32e43fd8d5e7"
+        "contentHash": "2fd414fc4fd7ddbc81038537430682433d6702720f76d7b2ed4881a089359ec7"
       },
       "consumers": [
         "tooling/qa/audits/codeql.mjs",
         "tooling/qa/audits/execution-evidence.test.ts",
+        "tooling/qa/core/codeql-proof.test.ts",
         "tooling/qa/core/verify-codeql-baseline.test.ts",
         "tooling/qa/core/verify-external-audit-results.test.ts",
         "tooling/qa/core/verify-external-audit-semantics.test-support.ts",
@@ -15927,8 +15865,29 @@
         "tooling/qa/wrappers/audit.steps.mjs"
       ],
       "surfaces": [
+        "property:collectReusableCodeqlResult/violations",
         "property:runCodeqlCheck/violations",
         "property:runCodeqlCommand/statuses"
+      ]
+    },
+    {
+      "id": "policy.source.codeql-proof-mjs.bdeec5c555",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/codeql-proof.mjs",
+        "contentHash": "a7eca87a77b57dff46cf6380445e9e124bc6e05f9f2d4d0ca084df0d8f90acb0"
+      },
+      "consumers": [
+        "tooling/qa/audits/codeql.mjs",
+        "tooling/qa/core/codeql-proof.mjs",
+        "tooling/qa/core/codeql-proof.test.ts"
+      ],
+      "surfaces": [
+        "property:recordSuccessfulCodeqlProof/producer"
       ]
     },
     {
@@ -16021,7 +15980,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "252b4697b31d7b60c2211bce30f73365e07f3ab17c174c298ea99ae963221203"
+        "contentHash": "b49a9718d860bbfb9d270a69dcfdee45b8143fe23ba19f3bb17de30a98cd9154"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -20535,6 +20494,8 @@
         "tooling/agent-tooling/agent-tooling.test.ts",
         "tooling/ci/candidate-workspace.test.ts",
         "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/codeql-proof-host.test.ts",
+        "tooling/ci/select-codeql-proof.test.ts",
         "tooling/ci/select-unit-proof.test.ts",
         "tooling/ci/unit-proof-host.test.ts",
         "tooling/qa/audits/canonical-sarif.test.ts",
@@ -20545,6 +20506,7 @@
         "tooling/qa/audits/security-result-contracts.test.ts",
         "tooling/qa/core/architecture-guardrails.policy-state.test.ts",
         "tooling/qa/core/architecture-inventory.test.ts",
+        "tooling/qa/core/codeql-proof.test.ts",
         "tooling/qa/core/coverage-audit-report.test.ts",
         "tooling/qa/core/dependency-graph-cache.test.ts",
         "tooling/qa/core/dependency-graph-runner.test.ts",

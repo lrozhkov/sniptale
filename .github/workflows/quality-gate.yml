@@ -66,7 +66,7 @@ jobs:
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             sniptale-controller:preflight preflight
       - name: Upload sanitized connectivity proof
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-connectivity-${{ github.sha }}-${{ github.run_id }}
           path: build/selectel-controller/preflight.json
@@ -92,9 +92,9 @@ jobs:
           ref: ${{ env.TRUSTED_CONTROL_SHA }}
           persist-credentials: false
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
       - name: Sign in to GHCR
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -127,7 +127,7 @@ jobs:
       - name: Build trusted main candidate image
         id: build
         if: github.event_name != 'pull_request_target' && github.event_name != 'schedule'
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: .
           file: tooling/ci/Dockerfile
@@ -144,7 +144,7 @@ jobs:
       - name: Build trusted main controller image
         id: build-controller
         if: github.event_name != 'pull_request_target' && github.event_name != 'schedule'
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: .
           file: tooling/ci/selectel/Dockerfile.controller
@@ -230,7 +230,7 @@ jobs:
           echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
       - name: Preserve sanitized controller record
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: build/selectel-controller/attempt-1.json
@@ -265,14 +265,22 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           { node-version: 22.12.0, cache: npm, cache-dependency-path: candidate/package-lock.json }
-      - name: Restore verified main unit proof
-        if: github.event_name == 'pull_request_target'
+      - name: Restore verified main QA proofs
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
-          proof_root="$RUNNER_TEMP/main-proof-${TRUSTED_CONTROL_SHA}"
-          unit_proof="$RUNNER_TEMP/unit-proof-${TRUSTED_CONTROL_SHA}.json"
-          restored=$(cd trusted-control && node tooling/ci/select-unit-proof.mjs restore "$TRUSTED_CONTROL_SHA" "$proof_root" "$unit_proof")
+          source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
+          proof_root="$RUNNER_TEMP/main-proof-${source_sha}"
+          unit_proof="$RUNNER_TEMP/unit-proof-${source_sha}.json"
+          restored=$(cd trusted-control && node tooling/ci/select-unit-proof.mjs restore "$source_sha" "$proof_root" "$unit_proof")
           if [ -n "$restored" ]; then echo "SNIPTALE_UNIT_PROOF_PATH=$unit_proof" >> "$GITHUB_ENV"; fi
+          codeql_root="$RUNNER_TEMP/main-codeql-proof-${source_sha}"
+          codeql_proof="$RUNNER_TEMP/codeql-proof-${source_sha}.json"
+          codeql_sarif="$RUNNER_TEMP/codeql-sarif-${source_sha}.sarif"
+          restored=$(cd trusted-control && node tooling/ci/select-codeql-proof.mjs restore "$source_sha" "$codeql_root" "$codeql_proof" "$codeql_sarif")
+          if [ -n "$restored" ]; then
+            echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
+            echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
+          fi
       - name: Run literal canonical local QA workflow
         working-directory: candidate
         env:
@@ -304,7 +312,7 @@ jobs:
             > build/candidate-control-proof.json
       - name: Upload informational candidate control proof
         if: always() && hashFiles('candidate/build/candidate-control-proof.json') != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: candidate-control-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: candidate/build/candidate-control-proof.json
@@ -312,7 +320,7 @@ jobs:
           retention-days: 14
       - name: Upload attempt proof
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: canonical-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
@@ -333,7 +341,7 @@ jobs:
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
       - name: Download attempt inputs
         if: needs.provision-1.outputs.has-record == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             pattern: '*-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
@@ -364,7 +372,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             name: 'selectel-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
@@ -387,7 +395,7 @@ jobs:
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-1.json
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-cleanup-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: attempt/attempt-1.json
@@ -444,7 +452,7 @@ jobs:
           echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
           echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: build/selectel-controller/attempt-2.json
@@ -477,6 +485,22 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           { node-version: 22.12.0, cache: npm, cache-dependency-path: candidate/package-lock.json }
+      - name: Restore verified main QA proofs
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
+          proof_root="$RUNNER_TEMP/main-proof-${source_sha}"
+          unit_proof="$RUNNER_TEMP/unit-proof-${source_sha}.json"
+          restored=$(cd trusted-control && node tooling/ci/select-unit-proof.mjs restore "$source_sha" "$proof_root" "$unit_proof")
+          if [ -n "$restored" ]; then echo "SNIPTALE_UNIT_PROOF_PATH=$unit_proof" >> "$GITHUB_ENV"; fi
+          codeql_root="$RUNNER_TEMP/main-codeql-proof-${source_sha}"
+          codeql_proof="$RUNNER_TEMP/codeql-proof-${source_sha}.json"
+          codeql_sarif="$RUNNER_TEMP/codeql-sarif-${source_sha}.sarif"
+          restored=$(cd trusted-control && node tooling/ci/select-codeql-proof.mjs restore "$source_sha" "$codeql_root" "$codeql_proof" "$codeql_sarif")
+          if [ -n "$restored" ]; then
+            echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
+            echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
+          fi
       - name: Run literal canonical local QA workflow
         working-directory: candidate
         env:
@@ -508,14 +532,14 @@ jobs:
             > build/candidate-control-proof.json
       - name: Upload informational candidate control proof
         if: always() && hashFiles('candidate/build/candidate-control-proof.json') != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: candidate-control-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: candidate/build/candidate-control-proof.json
           if-no-files-found: error
           retention-days: 14
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: canonical-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
@@ -535,7 +559,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
       - if: needs.provision-2.outputs.has-record == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             pattern: '*-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
@@ -567,7 +591,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             name: 'selectel-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
@@ -589,7 +613,7 @@ jobs:
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-2.json
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-cleanup-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: attempt/attempt-2.json
@@ -645,7 +669,7 @@ jobs:
           echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
           echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: build/selectel-controller/attempt-3.json
@@ -659,11 +683,11 @@ jobs:
     timeout-minutes: 180
     permissions: { actions: read, contents: read }
     env:
-      SNIPTALE_QA_CPU_TOKENS: '16'
-      SNIPTALE_QA_MEMORY_MIB: '24576'
-      SNIPTALE_QA_VITEST_MAX_WORKERS: '12'
+      SNIPTALE_QA_CPU_TOKENS: '12'
+      SNIPTALE_QA_MEMORY_MIB: '18432'
+      SNIPTALE_QA_VITEST_MAX_WORKERS: '8'
       SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'
-      SNIPTALE_QA_SECURITY_WORKERS: '8'
+      SNIPTALE_QA_SECURITY_WORKERS: '6'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -684,6 +708,22 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           { node-version: 22.12.0, cache: npm, cache-dependency-path: candidate/package-lock.json }
+      - name: Restore verified main QA proofs
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
+          proof_root="$RUNNER_TEMP/main-proof-${source_sha}"
+          unit_proof="$RUNNER_TEMP/unit-proof-${source_sha}.json"
+          restored=$(cd trusted-control && node tooling/ci/select-unit-proof.mjs restore "$source_sha" "$proof_root" "$unit_proof")
+          if [ -n "$restored" ]; then echo "SNIPTALE_UNIT_PROOF_PATH=$unit_proof" >> "$GITHUB_ENV"; fi
+          codeql_root="$RUNNER_TEMP/main-codeql-proof-${source_sha}"
+          codeql_proof="$RUNNER_TEMP/codeql-proof-${source_sha}.json"
+          codeql_sarif="$RUNNER_TEMP/codeql-sarif-${source_sha}.sarif"
+          restored=$(cd trusted-control && node tooling/ci/select-codeql-proof.mjs restore "$source_sha" "$codeql_root" "$codeql_proof" "$codeql_sarif")
+          if [ -n "$restored" ]; then
+            echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
+            echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
+          fi
       - name: Run literal canonical local QA workflow
         working-directory: candidate
         env:
@@ -715,14 +755,14 @@ jobs:
             > build/candidate-control-proof.json
       - name: Upload informational candidate control proof
         if: always() && hashFiles('candidate/build/candidate-control-proof.json') != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: candidate-control-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: candidate/build/candidate-control-proof.json
           if-no-files-found: error
           retention-days: 14
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: canonical-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
@@ -741,7 +781,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
       - if: needs.provision-3.outputs.has-record == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             pattern: '*-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
@@ -772,7 +812,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             name: 'selectel-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
@@ -794,7 +834,7 @@ jobs:
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-3.json
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-cleanup-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: attempt/attempt-3.json
@@ -825,7 +865,7 @@ jobs:
           echo 'classification=infrastructure-exhausted' >> "$GITHUB_OUTPUT"
       - name: Download terminal attempt proof
         if: steps.terminal.outputs.attempt != ''
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             name: 'canonical-attempt-${{ steps.terminal.outputs.attempt }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
@@ -843,7 +883,7 @@ jobs:
       - name: Upload canonical proof
         id: canonical-proof
         if: always() && hashFiles('selected/proof-manifest.json') != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: selected
@@ -912,7 +952,7 @@ jobs:
             --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" sweep
       - name: Upload sanitized sweep proof
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-sweep-${{ github.sha }}-${{ github.run_id }}
           path: build/selectel-controller/sweep.json
@@ -927,13 +967,13 @@ jobs:
       security-events: write
     steps:
       - name: Download canonical security reports
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
       - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@988661ebb5e81487b3fb31b2185d2856c0a10679
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
         with: { sarif_file: reports/.tmp/semgrep/results.sarif, category: semgrep-canonical }
       - name: Upload baseline-filtered CodeQL SARIF
-        uses: github/codeql-action/upload-sarif@988661ebb5e81487b3fb31b2185d2856c0a10679
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
         with: { sarif_file: reports/.tmp/codeql/results.filtered.sarif, category: codeql-canonical }
 
   coverage-results:
@@ -945,10 +985,10 @@ jobs:
       id-token: write
     steps:
       - name: Download canonical coverage
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
       - name: Publish coverage display
-        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           files: reports/.tmp/coverage/canonical/lcov.info
           use_oidc: true
@@ -969,9 +1009,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
       - name: Sign in to GHCR
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           {
             registry: ghcr.io,
@@ -1016,7 +1056,7 @@ jobs:
           PUBLISHED_DIGEST: ${{ steps.publish-image.outputs.digest }}
         run: node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "$PUBLISHED_DIGEST"
       - name: Upload exact image proof
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: qa-image-proof-${{ github.sha }}-${{ github.run_id }}
           path: build/qa-image-proof

@@ -228,6 +228,7 @@ export async function finalizeCandidateReleaseArchive({
 const LANE_FILES = {
   candidate: [
     '.tmp/qa/unit-proof.json',
+    '.tmp/qa/codeql-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',
@@ -242,6 +243,7 @@ const LANE_FILES = {
     '.tmp/licenses/sbom.cdx.json',
   ],
   'release-audit': [
+    '.tmp/qa/codeql-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',

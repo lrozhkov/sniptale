@@ -24,13 +24,24 @@ it('keeps cloud protocols in the pinned official OpenStack SDK', () => {
 it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () => {
   const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/selectel-runner.json', 'utf8'));
   expect(policy.compute.attemptPlacements).toMatchObject([
-    { attempt: 1, availabilityZone: 'ru-3a', flavorName: 'SL1.24-49152' },
-    { attempt: 2, availabilityZone: 'ru-3b', flavorName: 'SL1.24-49152' },
+    {
+      attempt: 1,
+      availabilityZone: 'ru-3a',
+      bootVolumeType: 'universal.ru-3a',
+      flavorName: 'SL1.24-49152',
+    },
+    {
+      attempt: 2,
+      availabilityZone: 'ru-3b',
+      bootVolumeType: 'basicssd.ru-3b',
+      flavorName: 'SL1.24-49152',
+    },
     {
       attempt: 3,
       availabilityZone: 'ru-3a',
-      flavorName: 'SL1.16-32768',
-      resourceProfile: { cpuTokens: 16, memoryMiB: 24576, vitestWorkers: 12 },
+      bootVolumeType: 'universal.ru-3a',
+      flavorName: 'SL1.12-24576',
+      resourceProfile: { cpuTokens: 12, memoryMiB: 18432, vitestWorkers: 8 },
     },
   ]);
   expect(policy.imageSelector).toEqual({ name: 'Ubuntu 24.04 LTS 64-bit' });

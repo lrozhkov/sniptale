@@ -55,7 +55,7 @@ jobs:
           echo "run-id=$main_run_id" >> "$GITHUB_OUTPUT"
           echo "qa-image=$image_ref" >> "$GITHUB_OUTPUT"
       - name: Sign in to GHCR
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -71,7 +71,7 @@ jobs:
           fi
           echo "reference=ghcr.io/lrozhkov/sniptale-controller@$digest" >> "$GITHUB_OUTPUT"
       - name: Preserve admitted main proof
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-input-${{ github.sha }}-${{ github.run_id }}
           path: build/main-proof
@@ -87,8 +87,14 @@ jobs:
     outputs:
       has-record: ${{ steps.record.outputs.exists }}
       label: ${{ steps.record.outputs.label }}
+      attempt: ${{ steps.record.outputs.attempt }}
       server-id: ${{ steps.record.outputs.server_id }}
       availability-zone: ${{ steps.record.outputs.availability_zone }}
+      cpu-tokens: ${{ steps.record.outputs.cpu_tokens }}
+      memory-mib: ${{ steps.record.outputs.memory_mib }}
+      vitest-workers: ${{ steps.record.outputs.vitest_workers }}
+      playwright-workers: ${{ steps.record.outputs.playwright_workers }}
+      security-workers: ${{ steps.record.outputs.security_workers }}
     permissions: { contents: read, packages: read }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -103,37 +109,64 @@ jobs:
           RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
           RUNNER_IMAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUNNER_IMAGE_USER: ${{ github.actor }}
-          SNIPTALE_ATTEMPT: '1'
           SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
           SNIPTALE_QA_IMAGE: ${{ needs.admission.outputs.qa-image }}
         run: |
           printf '%s' "$RUNNER_IMAGE_TOKEN" | docker login ghcr.io --username "$RUNNER_IMAGE_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
-            --env SNIPTALE_ATTEMPT --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_QA_IMAGE \
-            --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
-            "$CONTROLLER_IMAGE" provision
+          for attempt in 1 2 3; do
+            export SNIPTALE_ATTEMPT="$attempt"
+            if docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+              --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+              --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+              --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
+              --env SNIPTALE_ATTEMPT --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_QA_IMAGE \
+              --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
+              "$CONTROLLER_IMAGE" provision; then
+              printf '%s\n' "$attempt" > build/selectel-controller/selected-attempt.txt
+              exit 0
+            fi
+            record="build/selectel-controller/attempt-${attempt}.json"
+            if [ ! -f "$record" ]; then
+              echo "Provision attempt ${attempt} failed without a sanitized record" >&2
+              exit 1
+            fi
+            jq -e '
+              .status == "provision-failed" and
+              (.cleanup | type == "object") and
+              ([.cleanup[]] | all(. == "absent" or . == "deleted"))
+            ' "$record" >/dev/null
+          done
+          echo 'All bounded Selectel release placements were exhausted' >&2
+          exit 1
       - name: Export sanitized runner identity
         id: record
         if: always()
         run: |
-          record=build/selectel-controller/attempt-1.json
-          if [ ! -f "$record" ]; then
+          selected=build/selectel-controller/selected-attempt.txt
+          if [ ! -f "$selected" ]; then
             echo 'exists=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          attempt=$(cat "$selected")
+          record="build/selectel-controller/attempt-${attempt}.json"
           echo 'exists=true' >> "$GITHUB_OUTPUT"
+          echo "attempt=$attempt" >> "$GITHUB_OUTPUT"
           echo "label=$(jq -er .runnerLabel "$record")" >> "$GITHUB_OUTPUT"
           echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
           echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
+          echo "cpu_tokens=$(jq -er .resourceProfile.cpuTokens "$record")" >> "$GITHUB_OUTPUT"
+          echo "memory_mib=$(jq -er .resourceProfile.memoryMiB "$record")" >> "$GITHUB_OUTPUT"
+          echo "vitest_workers=$(jq -er .resourceProfile.vitestWorkers "$record")" >> "$GITHUB_OUTPUT"
+          echo "playwright_workers=$(jq -er .resourceProfile.playwrightWorkers "$record")" >> "$GITHUB_OUTPUT"
+          echo "security_workers=$(jq -er .resourceProfile.securityWorkers "$record")" >> "$GITHUB_OUTPUT"
       - name: Preserve sanitized controller record
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-selectel-${{ github.sha }}-${{ github.run_id }}
-          path: build/selectel-controller/attempt-1.json
+          path: |
+            build/selectel-controller/attempt-*.json
+            build/selectel-controller/selected-attempt.txt
           if-no-files-found: warn
           retention-days: 30
 
@@ -150,18 +183,37 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: 22.12.0, cache: npm }
+      - name: Download admitted main proof
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          {
+            name: 'release-input-${{ github.sha }}-${{ github.run_id }}',
+            path: admitted-main-proof,
+          }
+      - name: Restore verified main CodeQL proof
+        run: |
+          codeql_proof="$RUNNER_TEMP/codeql-proof-${GITHUB_SHA}.json"
+          codeql_sarif="$RUNNER_TEMP/codeql-sarif-${GITHUB_SHA}.sarif"
+          node tooling/ci/select-codeql-proof.mjs admitted-main-proof "$GITHUB_SHA" "$codeql_proof" "$codeql_sarif"
+          echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
+          echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
       - name: Run release-only canonical audit
         env:
           SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
           SNIPTALE_CI_IMAGE: ${{ needs.admission.outputs.qa-image }}
           SNIPTALE_CI_SKIP_BUILD: '1'
-          SNIPTALE_SELECTEL_ATTEMPT: '1'
+          SNIPTALE_SELECTEL_ATTEMPT: ${{ needs.provision.outputs.attempt }}
           SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision.outputs.server-id }}
           SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision.outputs.availability-zone }}
+          SNIPTALE_QA_CPU_TOKENS: ${{ needs.provision.outputs.cpu-tokens }}
+          SNIPTALE_QA_MEMORY_MIB: ${{ needs.provision.outputs.memory-mib }}
+          SNIPTALE_QA_VITEST_MAX_WORKERS: ${{ needs.provision.outputs.vitest-workers }}
+          SNIPTALE_QA_PLAYWRIGHT_WORKERS: ${{ needs.provision.outputs.playwright-workers }}
+          SNIPTALE_QA_SECURITY_WORKERS: ${{ needs.provision.outputs.security-workers }}
         run: node tooling/ci/container.mjs release-audit
       - name: Preserve release audit proof
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-audit-${{ github.sha }}-${{ github.run_id }}
           path: build/ci-artifacts/release-audit-${{ github.sha }}-${{ github.run_id }}
@@ -179,7 +231,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', persist-credentials: false }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: 'release-selectel-${{ github.sha }}-${{ github.run_id }}', path: attempt }
       - name: Delete release VM, volume, port, and JIT registration
         env:
@@ -193,16 +245,20 @@ jobs:
           GHCR_USER: ${{ github.actor }}
         run: |
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
+          attempt=$(cat attempt/selected-attempt.txt)
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-1.json
+            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup \
+            "/workspace/attempt/attempt-${attempt}.json"
       - name: Preserve cleanup proof
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-cleanup-${{ github.sha }}-${{ github.run_id }}
-          path: attempt/attempt-1.json
+          path: |
+            attempt/attempt-*.json
+            attempt/selected-attempt.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -222,7 +278,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: 22.12.0, cache: npm }
       - name: Download admitted main proof and release audit
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
             pattern: 'release-*-${{ github.sha }}-${{ github.run_id }}',
@@ -235,7 +291,7 @@ jobs:
       - name: Prepare immutable release assets
         run: node tooling/ci/prepare-release-assets.mjs build/main-proof build/release-audit "$GITHUB_SHA"
       - name: Preserve release proof
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-${{ github.sha }}-${{ github.run_id }}
           path: |
@@ -267,7 +323,41 @@ jobs:
             fi
           }
           trap cleanup_owned_release ERR
-          release_json=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" -f tag_name="$GITHUB_REF_NAME" -f name="$GITHUB_REF_NAME" -F draft=true -F prerelease=false -F generate_release_notes=true)
+          version=$(jq -er .version package.json)
+          zip_assets=("$asset_root"/*.zip)
+          if [ "${#zip_assets[@]}" -ne 1 ] || [ ! -f "${zip_assets[0]}" ]; then
+            echo "Expected exactly one verified extension ZIP" >&2
+            exit 1
+          fi
+          zip_name=$(basename "${zip_assets[0]}")
+          release_notes=$(mktemp)
+          cat > "$release_notes" <<EOF
+          Snip the web. Tell the story.
+
+          Fourth public alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
+
+          ## Highlights
+
+          - Added one canonical, reproducible QA path for local machines and GitHub, preserving the established release-harness, checkpoint, closeout, release, security, and coverage semantics.
+          - Added disposable preemptible Selectel runners with bounded multi-zone capacity fallback, explicit resource profiles, no public ingress, and mandatory cleanup proof.
+          - Added verified unit and CodeQL proof reuse, candidate-bound receipts, immutable QA images, SBOM and provenance, SARIF publication, coverage artifacts, and informational Codecov reporting.
+          - Improved CI failure diagnostics with retained wrapper run records, complete sanitized logs, report hashes, artifact download guidance, and deterministic proof manifests.
+          - Hardened release admission around signed tags, successful main proof, immutable release assets, checksums, CycloneDX SBOM, and exact artifact verification.
+
+          ## Install
+
+          Download **${zip_name}**, unpack it, open **chrome://extensions**, enable Developer mode, choose Load unpacked, and select the unpacked directory.
+
+          This is still an alpha preview (**v${version}-alpha**). Formats, workflows, and browser compatibility may change without backward compatibility; keep separate backups of important data.
+          EOF
+          release_request=$(mktemp)
+          jq -n \
+            --arg tag "$GITHUB_REF_NAME" \
+            --arg name "Sniptale ${version} alpha" \
+            --rawfile body "$release_notes" \
+            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false, generate_release_notes: false}' \
+            > "$release_request"
+          release_json=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$release_request")
           release_id=$(jq -er --arg tag "$GITHUB_REF_NAME" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release_json")
           created_release_id="$release_id"
           node tooling/ci/upload-release-assets.mjs "$asset_root" "$release_id"
