@@ -42,6 +42,7 @@
     "vcpus": 24,
     "ramMiB": 49152,
     "bootVolumeGiB": 180,
+    "bootVolumeType": "fast",
     "publicIp": false,
     "ingress": false,
     "preemptible": true,
