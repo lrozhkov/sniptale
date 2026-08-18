@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 
-import { collectLaneArtifacts } from './artifacts.mjs';
+import { collectLaneArtifacts, finalizeCandidateReleaseArchive } from './artifacts.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
@@ -64,7 +64,12 @@ const candidatePhaseCommands = new Map([
   ['candidate-licenses', licenseCommand],
   ['candidate-coverage', wrapper('audit', '--profile', 'coverage')],
 ]);
-if (![...Object.keys(laneCommands), ...candidatePhaseCommands.keys()].includes(lane)) {
+const candidateFinalizeLane = 'candidate-release-artifact';
+if (
+  ![...Object.keys(laneCommands), ...candidatePhaseCommands.keys(), candidateFinalizeLane].includes(
+    lane
+  )
+) {
   throw new Error('Usage: run-lane.mjs <release|release-audit|security|coverage|candidate-PHASE>');
 }
 if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
@@ -112,11 +117,32 @@ function runStandardLane() {
   return standardStatus;
 }
 const candidatePhaseCommand = candidatePhaseCommands.get(lane);
-let status = candidatePhaseCommand
-  ? runPhase(lane.slice('candidate-'.length), candidatePhaseCommand)
-  : runStandardLane();
+let status;
+if (lane === candidateFinalizeLane) {
+  const startedAtMs = Number(process.env.SNIPTALE_CANDIDATE_STARTED_AT_MS);
+  if (!Number.isSafeInteger(startedAtMs) || startedAtMs <= 0) {
+    throw new Error('Candidate artifact finalization requires a valid lane start time.');
+  }
+  try {
+    await finalizeCandidateReleaseArchive({
+      candidateRoot: process.cwd(),
+      startedAtMs,
+      temporaryParent: '/tmp',
+    });
+    status = 0;
+  } catch (error) {
+    process.stderr.write(
+      `Candidate release artifact finalization failed: ${error instanceof Error ? error.message : String(error)}\n`
+    );
+    status = 1;
+  }
+} else {
+  status = candidatePhaseCommand
+    ? runPhase(lane.slice('candidate-'.length), candidatePhaseCommand)
+    : runStandardLane();
+}
 
-if (!candidatePhaseCommand) {
+if (!candidatePhaseCommand && lane !== candidateFinalizeLane) {
   try {
     const artifactPath = collectLaneArtifacts({
       lane,

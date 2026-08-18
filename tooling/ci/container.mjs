@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { collectLaneArtifacts, finalizeCandidateReleaseArchive } from './artifacts.mjs';
+import { collectLaneArtifacts } from './artifacts.mjs';
 import {
   materializeCandidateWorkspace,
   restoreCandidateCommit,
@@ -78,6 +78,7 @@ const candidateWorkspace =
         candidateSha,
       })
     : null;
+const candidateStartedAtMs = Date.now();
 const unitProofHostPath = resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH);
 if (process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
   process.stderr.write('Reusable unit proof is unavailable; running the complete unit suite.\n');
@@ -113,6 +114,7 @@ if (candidateWorkspace) {
     `SNIPTALE_BASE_SHA=${candidateWorkspace.baseSha}`,
     `SNIPTALE_CANDIDATE_TREE=${candidateWorkspace.candidateTree}`,
     `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`,
+    `SNIPTALE_CANDIDATE_STARTED_AT_MS=${candidateStartedAtMs}`,
     'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only',
     'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only'
   );
@@ -211,6 +213,11 @@ const candidatePhaseDefinitions = [
   { id: 'security', command: 'qa:audit --profile security', authority: 'commit' },
   { id: 'licenses', command: 'license audit', authority: 'commit' },
   { id: 'coverage', command: 'qa:audit --profile coverage', authority: 'commit' },
+  {
+    id: 'release-artifact',
+    command: 'verify release ZIP from the trusted control plane',
+    authority: 'commit',
+  },
 ];
 
 function restoreCandidateAuthority(mode) {
@@ -273,7 +280,6 @@ function runCandidatePhases() {
   return { phases, status: failed ? 1 : 0 };
 }
 
-const candidateStartedAtMs = Date.now();
 const candidateResult = candidateWorkspace ? runCandidatePhases() : null;
 const standardResult = candidateWorkspace ? null : runContainer(lane);
 try {
@@ -281,10 +287,6 @@ try {
     const passed = candidateResult.status === 0;
     if (passed) {
       verifyCandidateFinalState({ ...candidateWorkspace, cwd: candidateWorkspace.workspace });
-      await finalizeCandidateReleaseArchive({
-        candidateRoot: candidateWorkspace.workspace,
-        startedAtMs: candidateStartedAtMs,
-      });
     }
     const selectelInfrastructure = process.env.SNIPTALE_SELECTEL_ATTEMPT
       ? {
