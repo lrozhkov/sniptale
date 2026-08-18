@@ -317,6 +317,24 @@ def write_record(destination: Path, record: dict[str, Any]):
     destination.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
 
+def server_failure(connection, server_id: str | None, failure: Exception):
+    result = {"kind": type(failure).__name__}
+    if not server_id:
+        return result
+    try:
+        server = connection.compute.get_server(server_id)
+    except exceptions.SDKException:
+        return result
+    fault = server.fault if isinstance(server.fault, dict) else {}
+    code = fault.get("code")
+    message = fault.get("message")
+    if isinstance(code, int):
+        result["code"] = code
+    if isinstance(message, str) and message.strip():
+        result["message"] = " ".join(message.split())[:500]
+    return result
+
+
 def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, Any]):
     result = {"runner": "absent", "server": "absent", "ports": "absent", "volumes": "absent"}
     if record.get("runnerId"):
@@ -435,6 +453,7 @@ def provision(policy: dict[str, Any]):
         "portIds": [],
         "volumeIds": [],
         "status": "provisioning",
+        "failure": None,
         "cleanup": None,
     }
     write_record(destination, record)
@@ -501,10 +520,16 @@ def provision(policy: dict[str, Any]):
         record["status"] = "online"
         write_record(destination, record)
         print(json.dumps({"record": str(destination.relative_to(ROOT)), "label": label}))
-    except Exception:
+    except Exception as failure:
+        record["failure"] = server_failure(connection, record["serverId"], failure)
         record["status"] = "provision-failed"
         record["cleanup"] = cleanup(connection, policy, token, record)
         write_record(destination, record)
+        if record["failure"].get("message"):
+            code = record["failure"].get("code", "unknown")
+            raise RuntimeError(
+                f"Selectel server build failed ({code}): {record['failure']['message']}"
+            ) from None
         raise
 
 
