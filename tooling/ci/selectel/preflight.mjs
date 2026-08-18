@@ -31,6 +31,12 @@ function volumeQuotaPair(value) {
   };
 }
 
+function assertQuotaPair(limit, used, label) {
+  if (limit === null || used === null || limit < 0 || used < 0 || (limit >= 0 && used > limit)) {
+    throw new Error(`OpenStack ${label} quota is missing or invalid.`);
+  }
+}
+
 function selectFlavor(flavors, policy) {
   const matches = flavors.filter(
     (flavor) => flavor?.vcpus === policy.compute.vcpus && flavor?.ram === policy.compute.ramMiB
@@ -78,16 +84,9 @@ function assertQuotas({ compute, volume }, policy) {
   const maxRam = numberField(cores, ['maxTotalRAMSize', 'ram']);
   const usedRam = numberField(cores, ['totalRAMUsed', 'ram_used']);
   const { limit: maxGigabytes, used: usedGigabytes } = volumeQuotaPair(volumes);
-  if (
-    [maxCores, usedCores, maxRam, usedRam, maxGigabytes, usedGigabytes].some(
-      (value) => value === null || value < 0
-    ) ||
-    (maxCores >= 0 && usedCores > maxCores) ||
-    (maxRam >= 0 && usedRam > maxRam) ||
-    (maxGigabytes >= 0 && usedGigabytes > maxGigabytes)
-  ) {
-    throw new Error('OpenStack quota response is missing required limits.');
-  }
+  assertQuotaPair(maxCores, usedCores, 'compute core');
+  assertQuotaPair(maxRam, usedRam, 'compute RAM');
+  assertQuotaPair(maxGigabytes, usedGigabytes, 'volume capacity');
   if (
     available(maxCores, usedCores) < policy.compute.vcpus ||
     available(maxRam, usedRam) < policy.compute.ramMiB ||

@@ -125,7 +125,7 @@ it('fails closed when quota usage is missing', async () => {
     return createFetch()(input);
   };
   await expect(collectSelectelPreflight({ root, env, fetchImpl })).rejects.toThrow(
-    'quota response is missing required limits'
+    'compute core quota is missing or invalid'
   );
 });
 
