@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -101,9 +100,17 @@ function assertQuotas({ compute, volume }, policy) {
   };
 }
 
-export async function collectSelectelPreflight({ root = process.cwd(), env, fetchImpl } = {}) {
-  const policy = readSelectelPolicy(root);
-  const session = await authenticateOpenStack({ env, fetchImpl });
+export async function collectSelectelPreflight({
+  root = process.cwd(),
+  env,
+  fetchImpl,
+  policy = readSelectelPolicy(root),
+} = {}) {
+  const session = await authenticateOpenStack({
+    env,
+    expectedProjectSha256: policy.controllerEnvironment.expectedProjectSha256,
+    fetchImpl,
+  });
   const request = (service, requestPath, operation) =>
     openStackJson(session, service, requestPath, { fetchImpl, operation });
   const [computeQuota, volumeQuota, flavorPayload, zonePayload, imagePayload, networkPayload] =
@@ -130,7 +137,7 @@ export async function collectSelectelPreflight({ root = process.cwd(), env, fetc
   return {
     schemaVersion: 1,
     artifactKind: 'sniptale-selectel-connectivity-proof',
-    projectFingerprint: crypto.createHash('sha256').update(session.projectId).digest('hex'),
+    project: session.projectFingerprint,
     region: session.region,
     availabilityZone,
     image: { id: image.id, name: image.name },

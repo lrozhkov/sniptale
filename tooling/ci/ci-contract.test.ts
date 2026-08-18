@@ -69,12 +69,21 @@ function createEmptyRunRecord({
   };
 }
 
-it('pins every external workflow action to a full commit SHA', () => {
+it('pins every external workflow action to an approved full commit SHA', () => {
+  const expectedPins = {
+    'actions/checkout@': 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+    'actions/setup-node@': 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
+  };
   for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
     const source = fs.readFileSync(workflow, 'utf8');
-    const uses = [...source.matchAll(/^\s*uses:\s*([^\s]+)$/gmu)].map((match) => match[1]);
+    const uses = [...source.matchAll(/^\s*uses:\s*([^\s#]+)/gmu)].map((match) => match[1]);
     expect(uses.length).toBeGreaterThan(0);
     for (const action of uses) expect(action).toMatch(/^[^@]+@[a-f0-9]{40}$/u);
+    for (const [prefix, pin] of Object.entries(expectedPins)) {
+      const occurrences = uses.filter((action) => action.startsWith(prefix));
+      expect(occurrences.length).toBeGreaterThan(0);
+      expect(occurrences.every((action) => action === pin)).toBe(true);
+    }
   }
 });
 

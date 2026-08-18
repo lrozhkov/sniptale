@@ -23,6 +23,7 @@ export function readSelectelPolicy(root = process.cwd()) {
     policy.lifecycle?.attempts !== 3 ||
     policy.lifecycle?.ttlSeconds !== 10800 ||
     policy.runner?.maxJobs !== 1 ||
+    !/^[a-f0-9]{64}$/u.test(policy.controllerEnvironment?.expectedProjectSha256 ?? '') ||
     !/^[a-f0-9]{64}$/u.test(policy.runner?.sha256 ?? '')
   ) {
     throw new Error('Malformed Selectel runner policy.');
