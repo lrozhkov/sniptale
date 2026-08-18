@@ -1,21 +1,33 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { generateCodeqlConfig } from '../codeql/config.mjs';
 import { runCodeqlCheck } from '../audits/codeql.mjs';
 import { createTempRoot, writeFile } from './test-helpers';
 
-const originalContainerDigest = process.env.SNIPTALE_CI_CONTAINER_DIGEST;
+const proofEnvironmentKeys = [
+  'SNIPTALE_CI_CONTAINER_DIGEST',
+  'SNIPTALE_TRUSTED_CI_ROOT',
+  'SNIPTALE_CODEQL_PROOF_PATH',
+  'SNIPTALE_CODEQL_SARIF_PATH',
+  'SNIPTALE_CODEQL_PROOF_AUTHORITY',
+] as const;
+const originalProofEnvironment = new Map(
+  proofEnvironmentKeys.map((key) => [key, process.env[key]])
+);
+
+beforeEach(() => {
+  for (const key of proofEnvironmentKeys) delete process.env[key];
+});
 
 afterEach(() => {
-  if (originalContainerDigest === undefined) delete process.env.SNIPTALE_CI_CONTAINER_DIGEST;
-  else process.env.SNIPTALE_CI_CONTAINER_DIGEST = originalContainerDigest;
-  delete process.env.SNIPTALE_TRUSTED_CI_ROOT;
-  delete process.env.SNIPTALE_CODEQL_PROOF_PATH;
-  delete process.env.SNIPTALE_CODEQL_SARIF_PATH;
-  delete process.env.SNIPTALE_CODEQL_PROOF_AUTHORITY;
+  for (const key of proofEnvironmentKeys) {
+    const original = originalProofEnvironment.get(key);
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  }
 });
 
 function createPolicyRoot() {
