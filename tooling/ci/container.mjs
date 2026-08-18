@@ -194,6 +194,7 @@ function runCandidatePhases() {
       continue;
     }
     const startedAt = new Date().toISOString();
+    process.stdout.write(`[ci:phase] start ${phase.id}\n`);
     try {
       if (phase.authority) restoreCandidateAuthority(phase.authority);
       const result =
@@ -208,6 +209,7 @@ function runCandidatePhases() {
         exitCode: status,
       });
       failed = status !== 0;
+      process.stdout.write(`[ci:phase] ${status === 0 ? 'passed' : 'failed'} ${phase.id}\n`);
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       phases.push({
@@ -219,6 +221,7 @@ function runCandidatePhases() {
         exitCode: 1,
       });
       failed = true;
+      process.stdout.write(`[ci:phase] failed ${phase.id}\n`);
     }
   }
   return { phases, status: failed ? 1 : 0 };

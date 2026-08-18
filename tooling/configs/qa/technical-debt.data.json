@@ -15989,7 +15989,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/constants.mjs",
-        "contentHash": "0fcf34cb99df9ba228f58e11647211248d98ac183285d009277407670d13ce32"
+        "contentHash": "522fd54675c59c10fbe9d253f718ce467bb470008823da4340f1d6b0b329b5a6"
       },
       "consumers": [
         "tooling/qa/runtime/observability/constants.mjs",
@@ -16021,7 +16021,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-      "contentHash": "581dcb20ea63b01becd1cd31c7e16d91d9cbdca42cad6801b403f252a92426a0"
+        "contentHash": "1e83e99ad4f3122c5bc5c67a1e9b5d22cbfc0582264278e7d51b96b6684912f8"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -19547,7 +19547,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/run-controller.mjs",
-        "contentHash": "0ff1afce65b057db1c3405c86797a27726bbe9857edece74afeae533fd962944"
+        "contentHash": "681ba451e80e0c884dc1efb839701e50141bd9fc42bdf88aab98da013ef7f2bd"
       },
       "consumers": [
         "tooling/qa/runtime/observability/run-controller.mjs",
@@ -19564,6 +19564,7 @@
         "property:interrupt/locations",
         "property:interrupt/problemIds",
         "property:sanitizeConsoleOutput/sensitiveValues",
+        "property:sanitizeConsoleTail/sensitiveValues",
         "property:writeLog/sensitiveValues"
       ]
     },
@@ -19741,7 +19742,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/sanitize.mjs",
-        "contentHash": "80c5d8b5f30024e05086439d530bf82ae74f1ce57bd7340400159d57d45797d5"
+        "contentHash": "e1d71f2c5d37f3bb741f6105ebde56c2f9bc2ab0069e61ba1a2aa3cc22c2b75f"
       },
       "consumers": [
         "tooling/qa/audits/canonical-sarif.mjs",
