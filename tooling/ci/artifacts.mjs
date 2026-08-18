@@ -352,6 +352,7 @@ export function collectLaneArtifacts({
   candidateTree = null,
   trustedControlSha = null,
   resourceProfiles = null,
+  infrastructure = null,
   repositoryRoot = root,
 }) {
   if (!['candidate', 'release', 'release-audit', 'security', 'coverage'].includes(lane)) {
@@ -383,6 +384,7 @@ export function collectLaneArtifacts({
     command,
     phases,
     resourceProfiles,
+    infrastructure,
     startedAt: new Date(startedAtMs).toISOString(),
     finishedAt: new Date().toISOString(),
     files: files.map((file) => ({ file, sha256: sha256(path.join(destinationRoot, file)) })),

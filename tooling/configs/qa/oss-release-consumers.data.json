@@ -49,7 +49,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/ci/artifacts.mjs",
-      "sha256": "d39833c1f22c584c47e6db15175783e5443935e46357d47cca919b53afaf9d74"
+      "sha256": "b745d69981ed0d7399553cda42f4c0d8560107eca902005e05d90739382245e7"
     },
     {
       "category": "bundled-font",

@@ -5,8 +5,8 @@
   "environment": "selectel-runner-controller",
   "repository": "lrozhkov/sniptale",
   "owners": {
-    "controller": "tooling/ci/selectel/controller.mjs",
-    "cloudInit": "tooling/ci/selectel/cloud-init.mjs",
+    "controller": "tooling/ci/selectel/sdk-controller.py",
+    "controllerImage": "tooling/ci/selectel/Dockerfile.controller",
     "attemptAdjudication": "tooling/ci/selectel/adjudication.mjs",
     "canonicalSemantics": "tooling/ci/container.mjs",
     "qualityWorkflow": ".github/workflows/quality-gate.yml",
@@ -23,8 +23,7 @@
       "SELECTEL_OS_REGION_NAME"
     ],
     "expectedProjectSha256": "1047ca5188dc076a7604ee16e568fdc75ae30f389199d1ba662407de70a187a0",
-    "expectedRegion": "ru-3",
-    "quotaManagerUrl": "https://ru-3.cloud.api.selcloud.ru/quota-manager"
+    "expectedRegion": "ru-3"
   },
   "runner": {
     "version": "2.336.0",
@@ -37,12 +36,13 @@
     "onlineTimeoutSeconds": 600
   },
   "compute": {
+    "availabilityZone": "ru-3a",
     "operatingSystem": "Ubuntu 24.04 LTS",
     "architecture": "x86_64",
     "vcpus": 24,
     "ramMiB": 49152,
-    "bootVolumeGiB": 180,
-    "bootVolumeType": "fast",
+    "bootVolumeGiB": 80,
+    "bootVolumeType": "fast.ru-3a",
     "publicIp": false,
     "ingress": false,
     "preemptible": true,

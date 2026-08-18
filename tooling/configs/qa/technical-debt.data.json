@@ -14880,7 +14880,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "d39833c1f22c584c47e6db15175783e5443935e46357d47cca919b53afaf9d74"
+        "contentHash": "b745d69981ed0d7399553cda42f4c0d8560107eca902005e05d90739382245e7"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
@@ -16021,7 +16021,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "eefa055d75c3e754d1ebefdf8ba1704e189126e21dab1807065d1e216aae3139"
+        "contentHash": "b69228f2960bdc606337fa5c065e1dcf6b7562b853c5d106873757e7c0ab6104"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -16031,6 +16031,7 @@
         "binding:candidatePhaseDefinitions",
         "binding:environment",
         "property:command",
+        "property:resourceProfile",
         "property:resourceProfiles"
       ]
     },
@@ -18543,31 +18544,6 @@
       ]
     },
     {
-      "id": "policy.source.openstack-client-mjs.5a036a51ae",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/ci/selectel/openstack-client.mjs",
-        "contentHash": "17bc7bbc3646bb0ef32857efc3be84cf312e3ed5c89b8cf593fe448ffdc57f1e"
-      },
-      "consumers": [
-        "tooling/ci/selectel/openstack-client.mjs",
-        "tooling/ci/selectel/preflight.mjs"
-      ],
-      "surfaces": [
-        "property:authenticateOpenStack/application_credential",
-        "property:authenticateOpenStack/auth",
-        "property:authenticateOpenStack/endpoints",
-        "property:authenticateOpenStack/headers",
-        "property:authenticateOpenStack/identity",
-        "property:authenticateOpenStack/methods",
-        "property:openStackJson/headers"
-      ]
-    },
-    {
       "id": "policy.source.options-ts.a78de0e68b",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -18841,7 +18817,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "playwright.config.ts",
-        "contentHash": "daba32ccd4c2753dca7711eb32189b84c16964e145b89fe88c674a454f2f2404"
+        "contentHash": "6bfcadfae0fc962b6524c3d7feaffd14f3c6112aa6cd59cde8b3c4d7a198e00a"
       },
       "consumers": [
         "playwright.config.ts"
@@ -19091,29 +19067,6 @@
       "surfaces": [
         "binding:RUNTIME_NAMES",
         "binding:UI_RUNTIME_NAMES"
-      ]
-    },
-    {
-      "id": "policy.source.preflight-mjs.56ed4baa50",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/ci/selectel/preflight.mjs",
-        "contentHash": "3ff5c1e349ed6cd6c858bb099e17ce0ad8499525c83e662f68d922e7c4cb3f20"
-      },
-      "consumers": [
-        "tooling/ci/selectel/preflight.mjs",
-        "tooling/ci/selectel/preflight.test.ts"
-      ],
-      "surfaces": [
-        "property:collectSelectelPreflight/externalNetwork",
-        "property:collectSelectelPreflight/flavor",
-        "property:collectSelectelPreflight/image",
-        "property:collectSelectelPreflight/requested",
-        "property:selectRunnerCapacity/quotas"
       ]
     },
     {
@@ -19492,7 +19445,8 @@
       "consumers": [
         "tooling/ci/ci-contract.test.ts",
         "tooling/ci/release-policy.mjs",
-        "tooling/ci/release-tag-policy.mjs"
+        "tooling/ci/release-tag-policy.mjs",
+        "tooling/ci/workflow-contract.test.ts"
       ],
       "surfaces": [
         "property:normalizeRules/anonymous-5/parameters"
