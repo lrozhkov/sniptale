@@ -22,6 +22,10 @@ it('keeps cloud protocols in the pinned official OpenStack SDK', () => {
 });
 
 it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () => {
+  const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/selectel-runner.json', 'utf8'));
+  expect(policy.compute.flavorName).toBe('SL1.24-49152');
+  expect(source).toContain('item.name == compute["flavorName"]');
+  expect(source).toContain('flavor.disk != 0');
   expect(source).toContain('tags=["preemptible"]');
   expect(source).toContain('delete_on_termination": True');
   expect(source).toContain('server unexpectedly has a public floating IP');

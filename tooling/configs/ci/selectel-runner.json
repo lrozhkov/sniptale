@@ -39,6 +39,7 @@
     "availabilityZone": "ru-3a",
     "operatingSystem": "Ubuntu 24.04 LTS",
     "architecture": "x86_64",
+    "flavorName": "SL1.24-49152",
     "vcpus": 24,
     "ramMiB": 49152,
     "bootVolumeGiB": 80,
