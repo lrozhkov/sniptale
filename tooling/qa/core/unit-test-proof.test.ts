@@ -1,9 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { createTempRoot, withCwd, writeFile, writeJson } from './test-helpers';
+
+const inheritedProofAuthority = process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
+
+beforeEach(() => {
+  delete process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
+});
+
+afterEach(() => {
+  if (inheritedProofAuthority == null) delete process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
+  else process.env.SNIPTALE_UNIT_PROOF_AUTHORITY = inheritedProofAuthority;
+});
 
 function createProofRoot() {
   const root = createTempRoot('unit-proof-');
