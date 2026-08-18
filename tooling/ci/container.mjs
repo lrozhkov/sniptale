@@ -149,6 +149,8 @@ function runContainer(containerLane) {
 
 const candidatePhaseDefinitions = [
   { id: 'install', command: 'npm ci --ignore-scripts' },
+  { id: 'provision-canvas', command: 'npm rebuild canvas' },
+  { id: 'verify-canvas', command: 'canvas 2d context smoke' },
   { id: 'provision-ast-grep', command: 'node node_modules/@ast-grep/cli/postinstall.js' },
   { id: 'verify-ast-grep', command: 'node_modules/.bin/ast-grep --version' },
   { id: 'release-harness', command: 'qa:release-harness', authority: 'diff' },
