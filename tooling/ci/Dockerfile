@@ -1,4 +1,4 @@
-FROM node:22.22.1-bookworm-slim@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d
+FROM node:22.16.0-bookworm-slim@sha256:048ed02c5fd52e86fda6fbd2f6a76cf0d4492fd6c6fee9e2c463ed5108da0e34
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
@@ -8,9 +8,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf '%s\n' \
-      'deb https://snapshot.debian.org/archive/debian/20250115T000000Z bookworm main' \
-      'deb https://snapshot.debian.org/archive/debian/20250115T000000Z bookworm-updates main' \
-      'deb https://snapshot.debian.org/archive/debian-security/20250115T000000Z bookworm-security main' \
+      'deb https://snapshot.debian.org/archive/debian/20250521T000000Z bookworm main' \
+      'deb https://snapshot.debian.org/archive/debian/20250521T000000Z bookworm-updates main' \
+      'deb https://snapshot.debian.org/archive/debian-security/20250521T000000Z bookworm-security main' \
       > /etc/apt/sources.list \
     && printf '%s\n' \
       'Acquire::Check-Valid-Until "false";' \

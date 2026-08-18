@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "22.22.1",
-    "image": "node:22.22.1-bookworm-slim@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d"
+    "version": "22.16.0",
+    "image": "node:22.16.0-bookworm-slim@sha256:048ed02c5fd52e86fda6fbd2f6a76cf0d4492fd6c6fee9e2c463ed5108da0e34"
   },
   "debian": {
-    "snapshot": "20250115T000000Z",
-    "archiveUrl": "https://snapshot.debian.org/archive/debian/20250115T000000Z",
-    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20250115T000000Z",
+    "snapshot": "20250521T000000Z",
+    "archiveUrl": "https://snapshot.debian.org/archive/debian/20250521T000000Z",
+    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20250521T000000Z",
     "suites": ["bookworm", "bookworm-updates", "bookworm-security"]
   },
   "playwright": {
