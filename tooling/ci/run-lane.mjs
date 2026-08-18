@@ -40,6 +40,17 @@ const laneCommands = {
 };
 const installCommands = [
   ['install', ['npm', ['ci', '--ignore-scripts']]],
+  ['provision-canvas', ['npm', ['rebuild', 'canvas']]],
+  [
+    'verify-canvas',
+    [
+      'node',
+      [
+        '-e',
+        "const { createCanvas } = require('canvas'); if (!createCanvas(1, 1).getContext('2d')) process.exit(1);",
+      ],
+    ],
+  ],
   ['provision-ast-grep', ['node', ['node_modules/@ast-grep/cli/postinstall.js']]],
   ['verify-ast-grep', ['node_modules/.bin/ast-grep', ['--version']]],
 ];

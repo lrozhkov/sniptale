@@ -771,6 +771,8 @@ it('rejects PR and local authority that changes while proof lanes run', () => {
   expect(proofSource).toContain("['checkout', '--quiet', '--detach', pr.headRefOid]");
   expect(proofSource).toContain('Fetched PR commit does not match GitHub PR authority');
   expect(laneSource).toContain("['ci', '--ignore-scripts']");
+  expect(laneSource).toContain("['rebuild', 'canvas']");
+  expect(laneSource).toContain("createCanvas(1, 1).getContext('2d')");
   expect(laneSource).toContain("['node_modules/@ast-grep/cli/postinstall.js']");
   expect(laneSource).toContain("['node_modules/.bin/ast-grep', ['--version']]");
   expect(laneSource).toContain('candidatePhaseCommands');
