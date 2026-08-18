@@ -141,7 +141,7 @@ if (trustedCiRoot) {
   baseContainerArgs.push(
     '--volume',
     `${controlRoot}:/opt/sniptale-trusted:ro`,
-    ...prepareTrustedControlDependencyMount({ executionRoot, trustedCiRoot })
+    ...prepareTrustedControlDependencyMount({ controlRoot, executionRoot, trustedCiRoot })
   );
 }
 if (unitProofHostPath) {
