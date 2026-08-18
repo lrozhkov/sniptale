@@ -230,6 +230,7 @@ const LANE_FILES = {
   candidate: [
     '.tmp/qa/unit-proof.json',
     '.tmp/qa/codeql-proof.json',
+    '.tmp/qa/coverage-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',
@@ -257,11 +258,13 @@ const LANE_FILES = {
     '.tmp/npm-audit/signatures.json',
     '.tmp/licenses/summary.json',
     '.tmp/licenses/sbom.cdx.json',
+    '.tmp/qa/coverage-proof.json',
   ],
   coverage: [
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',
+    '.tmp/qa/coverage-proof.json',
   ],
   security: [
     '.tmp/semgrep/results.json',
@@ -295,18 +298,35 @@ function createArtifactDestination(lane, repositoryRoot) {
 function collectLaneReports({ lane, startedAtMs, status, destinationRoot, repositoryRoot }) {
   const required = status === 'passed';
   for (const file of LANE_FILES[lane] ?? []) {
+    const heavyweightCandidateFile =
+      lane === 'candidate' &&
+      (file.includes('/codeql') ||
+        file.includes('/coverage/') ||
+        file.endsWith('coverage-proof.json'));
     const copied = copyFile(file, destinationRoot, file, {
       notBeforeMs: startedAtMs,
       repositoryRoot,
     });
-    if (required && !copied) throw new Error(`Required artifact is missing: ${file}`);
+    if (
+      required &&
+      !copied &&
+      (!heavyweightCandidateFile || process.env.SNIPTALE_CI_HEAVY_AUDIT === '1')
+    ) {
+      throw new Error(`Required artifact is missing: ${file}`);
+    }
   }
   if (lane === 'coverage' || lane === 'candidate' || lane === 'release-audit') {
     const copied = copyTree('.tmp/coverage/canonical/html', destinationRoot, {
       notBeforeMs: startedAtMs,
       repositoryRoot,
     });
-    if (required && !copied) throw new Error('Required coverage HTML is missing.');
+    if (
+      required &&
+      !copied &&
+      (lane !== 'candidate' || process.env.SNIPTALE_CI_HEAVY_AUDIT === '1')
+    ) {
+      throw new Error('Required coverage HTML is missing.');
+    }
   }
   if ((lane === 'release' || lane === 'candidate') && required) {
     copyFile(newestReleaseArchive(startedAtMs, repositoryRoot), destinationRoot, undefined, {
@@ -343,6 +363,13 @@ function writeProofManifest(destinationRoot, manifest) {
   fs.writeFileSync(path.join(destinationRoot, 'SHA256SUMS'), `${checksums.join('\n')}\n`, {
     flag: 'wx',
   });
+}
+
+function proofReuseStatus(destinationRoot, relativePath) {
+  const proofPath = path.join(destinationRoot, relativePath);
+  if (!fs.existsSync(proofPath)) return 'unavailable';
+  const proof = JSON.parse(fs.readFileSync(proofPath, 'utf8'));
+  return proof.reusedFrom ? 'reused' : 'fresh';
 }
 
 export function collectLaneArtifacts({
@@ -388,6 +415,11 @@ export function collectLaneArtifacts({
     phases,
     resourceProfiles,
     infrastructure,
+    proofReuse: {
+      unit: proofReuseStatus(destinationRoot, '.tmp/qa/unit-proof.json'),
+      codeql: proofReuseStatus(destinationRoot, '.tmp/qa/codeql-proof.json'),
+      coverage: proofReuseStatus(destinationRoot, '.tmp/qa/coverage-proof.json'),
+    },
     startedAt: new Date(startedAtMs).toISOString(),
     finishedAt: new Date().toISOString(),
     files: files.map((file) => ({ file, sha256: sha256(path.join(destinationRoot, file)) })),

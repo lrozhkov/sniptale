@@ -12,6 +12,11 @@ import {
   formatCoverageAuditReport,
   writeCanonicalCoverageArtifacts,
 } from './coverage-audit-report.mjs';
+import {
+  materializeReusableCoverageProof,
+  recordSuccessfulCoverageProof,
+  resolveReusableCoverageProof,
+} from './coverage-proof.mjs';
 
 const FULL_COVERAGE_DIRECTORY = '.tmp/coverage/unit';
 
@@ -36,6 +41,15 @@ function prepareFullCoverageDirectory() {
 export async function collectFullCoverageAuditStep({
   maxWorkers = resolveQaResourceProfile().vitestMaxWorkers,
 } = {}) {
+  const reusable = resolveReusableCoverageProof();
+  if (reusable.matched) {
+    materializeReusableCoverageProof(reusable);
+    recordSuccessfulCoverageProof({ reusedFrom: reusable.proof.producer ?? null });
+    return withDuration(
+      createOkStep('Full product coverage', `reused verified ${reusable.source}`),
+      0
+    );
+  }
   prepareFullCoverageDirectory();
   const { durationMs, value: unitResult } = await measureAsyncStep(() =>
     runUnitTests({
@@ -67,6 +81,7 @@ export async function collectFullCoverageAuditStep({
 
   try {
     writeCanonicalCoverageArtifacts({ report: coverageReport });
+    recordSuccessfulCoverageProof();
   } catch (error) {
     return withDuration(
       createFailureStep('Full product coverage', 'coverage publication failed', {

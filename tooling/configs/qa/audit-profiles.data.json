@@ -23,6 +23,26 @@
       ]
     },
     {
+      "id": "pr",
+      "description": "Fast required PR security and dependency controls without heavyweight CodeQL or coverage recomputation.",
+      "gitleaksScopes": ["worktree"],
+      "controls": [
+        { "id": "full-product-coverage", "requirement": "excluded" },
+        { "id": "audit-evidence", "requirement": "required" },
+        { "id": "topology-report", "requirement": "excluded" },
+        { "id": "npm-audit", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "osv-scanner", "requirement": "required" },
+        { "id": "gitleaks", "requirement": "required" },
+        { "id": "license-inventory", "requirement": "excluded" },
+        { "id": "ast-grep", "requirement": "excluded" },
+        { "id": "knip", "requirement": "excluded" },
+        { "id": "jscpd", "requirement": "excluded" },
+        { "id": "semgrep", "requirement": "required" },
+        { "id": "codeql", "requirement": "excluded" }
+      ]
+    },
+    {
       "id": "security",
       "description": "Security and supply-chain controls with all security engines and Git history scanning required.",
       "gitleaksScopes": ["worktree", "history"],

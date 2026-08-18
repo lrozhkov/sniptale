@@ -18,6 +18,7 @@ import {
 import { prepareTrustedControlDependencyMount } from './trusted-control-dependencies.mjs';
 import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
 import { resolveReusableCodeqlProofHostPaths } from './codeql-proof-host.mjs';
+import { resolveReusableCoverageProofHostPaths } from './coverage-proof-host.mjs';
 
 const lane = process.argv[2];
 if (!['candidate', 'release', 'release-audit', 'security', 'coverage'].includes(lane)) {
@@ -87,6 +88,10 @@ const codeqlProofHostPaths = resolveReusableCodeqlProofHostPaths({
   proofPath: process.env.SNIPTALE_CODEQL_PROOF_PATH,
   sarifPath: process.env.SNIPTALE_CODEQL_SARIF_PATH,
 });
+const coverageProofHostPaths = resolveReusableCoverageProofHostPaths({
+  proofPath: process.env.SNIPTALE_COVERAGE_PROOF_PATH,
+  reportsPath: process.env.SNIPTALE_COVERAGE_REPORTS_PATH,
+});
 if (
   (process.env.SNIPTALE_CODEQL_PROOF_PATH || process.env.SNIPTALE_CODEQL_SARIF_PATH) &&
   !codeqlProofHostPaths
@@ -116,7 +121,8 @@ if (candidateWorkspace) {
     `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`,
     `SNIPTALE_CANDIDATE_STARTED_AT_MS=${candidateStartedAtMs}`,
     'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only',
-    'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only'
+    'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only',
+    'SNIPTALE_COVERAGE_PROOF_AUTHORITY=external-only'
   );
 }
 if (unitProofHostPath) environment.push('SNIPTALE_UNIT_PROOF_PATH=/opt/sniptale-unit-proof.json');
@@ -124,6 +130,12 @@ if (codeqlProofHostPaths) {
   environment.push(
     'SNIPTALE_CODEQL_PROOF_PATH=/opt/sniptale-codeql-proof.json',
     'SNIPTALE_CODEQL_SARIF_PATH=/opt/sniptale-codeql-results.sarif'
+  );
+}
+if (coverageProofHostPaths) {
+  environment.push(
+    'SNIPTALE_COVERAGE_PROOF_PATH=/opt/sniptale-coverage-proof.json',
+    'SNIPTALE_COVERAGE_REPORTS_PATH=/opt/sniptale-coverage-reports'
   );
 }
 if (trustedCiRoot) environment.push('SNIPTALE_TRUSTED_CI_ROOT=/opt/sniptale-trusted');
@@ -139,6 +151,8 @@ for (const name of [
   'SNIPTALE_SELECTEL_ATTEMPT',
   'SNIPTALE_SELECTEL_SERVER_ID',
   'SNIPTALE_SELECTEL_AVAILABILITY_ZONE',
+  'SNIPTALE_SELECTEL_PROFILES_DIGEST',
+  'SNIPTALE_CI_HEAVY_AUDIT',
 ]) {
   if (process.env[name]) environment.push(`${name}=${process.env[name]}`);
 }
@@ -173,6 +187,14 @@ if (codeqlProofHostPaths) {
     `${codeqlProofHostPaths.proof}:/opt/sniptale-codeql-proof.json:ro`,
     '--volume',
     `${codeqlProofHostPaths.sarif}:/opt/sniptale-codeql-results.sarif:ro`
+  );
+}
+if (coverageProofHostPaths) {
+  baseContainerArgs.push(
+    '--volume',
+    `${coverageProofHostPaths.proof}:/opt/sniptale-coverage-proof.json:ro`,
+    '--volume',
+    `${coverageProofHostPaths.reports}:/opt/sniptale-coverage-reports:ro`
   );
 }
 for (const value of environment) baseContainerArgs.push('--env', value);
@@ -210,9 +232,15 @@ const candidatePhaseDefinitions = [
     authority: 'closeout',
   },
   { id: 'release', command: 'qa:release', authority: 'commit' },
-  { id: 'security', command: 'qa:audit --profile security', authority: 'commit' },
+  { id: 'pr-audit', command: 'qa:audit --profile pr', authority: 'commit' },
+  { id: 'receipts', command: 'validate available heavyweight receipts', authority: 'commit' },
+  ...(process.env.SNIPTALE_CI_HEAVY_AUDIT === '1'
+    ? [{ id: 'security', command: 'qa:audit --profile security', authority: 'commit' }]
+    : []),
   { id: 'licenses', command: 'license audit', authority: 'commit' },
-  { id: 'coverage', command: 'qa:audit --profile coverage', authority: 'commit' },
+  ...(process.env.SNIPTALE_CI_HEAVY_AUDIT === '1'
+    ? [{ id: 'coverage', command: 'qa:audit --profile coverage', authority: 'commit' }]
+    : []),
   {
     id: 'release-artifact',
     command: 'verify release ZIP from the trusted control plane',
@@ -291,7 +319,8 @@ try {
     const selectelInfrastructure = process.env.SNIPTALE_SELECTEL_ATTEMPT
       ? {
           provider: 'selectel',
-          attempt: Number(process.env.SNIPTALE_SELECTEL_ATTEMPT),
+          selectedProfileIndex: Number(process.env.SNIPTALE_SELECTEL_ATTEMPT),
+          profilesDigest: process.env.SNIPTALE_SELECTEL_PROFILES_DIGEST,
           serverId: process.env.SNIPTALE_SELECTEL_SERVER_ID,
           availabilityZone: process.env.SNIPTALE_SELECTEL_AVAILABILITY_ZONE,
           imageReference: process.env.SNIPTALE_CI_IMAGE,

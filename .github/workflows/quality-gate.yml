@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       selectel_connectivity_only:
-        description: Validate Selectel auth, catalog, quota, image, flavor, and network APIs without writes
+        description: Validate Selectel auth, catalog, profiles, image, flavor, and network APIs without writes
         required: false
         default: false
         type: boolean
@@ -25,48 +25,36 @@ concurrency:
 
 env:
   CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
   TRUSTED_CONTROL_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
-  QA_IMAGE: sniptale-qa:${{ github.event.pull_request.head.sha || github.sha }}
-  SNIPTALE_QA_CPU_TOKENS: '24'
-  SNIPTALE_QA_MEMORY_MIB: '36864'
-  SNIPTALE_QA_VITEST_MAX_WORKERS: '16'
-  SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'
-  SNIPTALE_QA_SECURITY_WORKERS: '8'
 
 jobs:
   selectel-controller-preflight:
     if: >-
-      github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
       inputs.selectel_connectivity_only == true
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: selectel-runner-controller
-    permissions:
-      contents: read
+    permissions: { contents: read }
     steps:
-      - name: Check out trusted controller
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', persist-credentials: false }
-      - name: Build pinned OpenStack SDK controller
-        run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:preflight .
-      - name: Validate Selectel connectivity without writes
+      - run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:preflight .
+      - name: Validate Selectel connectivity and runtime profiles without writes
         env:
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
         run: |
-          docker run --rm \
-            --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL \
-            --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME --env SELECTEL_QA_PROFILES \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             sniptale-controller:preflight preflight
-      - name: Upload sanitized connectivity proof
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
         with:
           name: selectel-connectivity-${{ github.sha }}-${{ github.run_id }}
           path: build/selectel-controller/preflight.json
@@ -82,49 +70,31 @@ jobs:
     outputs:
       reference: ${{ steps.reference.outputs.reference }}
       controller-reference: ${{ steps.reference.outputs.controller-reference }}
-    permissions:
-      contents: read
-      packages: write
+    permissions: { contents: read, packages: write }
     steps:
       - name: Check out trusted control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
-          ref: ${{ env.TRUSTED_CONTROL_SHA }}
-          persist-credentials: false
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
-      - name: Sign in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Resolve immutable trusted image
+          {
+            registry: ghcr.io,
+            username: '${{ github.actor }}',
+            password: '${{ secrets.GITHUB_TOKEN }}',
+          }
+      - name: Resolve immutable trusted images
         id: resolve
         if: github.event_name == 'pull_request_target' || github.event_name == 'schedule'
-        env: { TRUSTED_QA_IMAGE: 'ghcr.io/lrozhkov/sniptale-qa:sha-${{ env.TRUSTED_CONTROL_SHA }}' }
         run: |
-          digest=$(docker buildx imagetools inspect "$TRUSTED_QA_IMAGE" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
-          if ! printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
-            echo 'Unable to resolve immutable trusted QA image' >&2
-            exit 1
-          fi
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-      - name: Resolve immutable trusted controller image
-        id: resolve-controller
-        if: github.event_name == 'pull_request_target' || github.event_name == 'schedule'
-        env:
-          {
-            TRUSTED_CONTROLLER_IMAGE: 'ghcr.io/lrozhkov/sniptale-controller:sha-${{ env.TRUSTED_CONTROL_SHA }}',
-          }
-        run: |
-          digest=$(docker buildx imagetools inspect "$TRUSTED_CONTROLLER_IMAGE" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
-          if ! printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
-            echo 'Unable to resolve immutable trusted controller image' >&2
-            exit 1
-          fi
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-      - name: Build trusted main candidate image
+          for kind in qa controller; do
+            repository=sniptale-$kind
+            if [ "$kind" = qa ]; then repository=sniptale-qa; fi
+            digest=$(docker buildx imagetools inspect "ghcr.io/lrozhkov/${repository}:sha-${TRUSTED_CONTROL_SHA}" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
+            printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
+            echo "${kind}-digest=$digest" >> "$GITHUB_OUTPUT"
+          done
+      - name: Build trusted QA image
         id: build
         if: github.event_name != 'pull_request_target' && github.event_name != 'schedule'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
@@ -141,7 +111,7 @@ jobs:
           provenance: mode=max
           cache-from: type=gha,scope=sniptale-qa
           cache-to: type=gha,mode=max,scope=sniptale-qa
-      - name: Build trusted main controller image
+      - name: Build trusted controller image
         id: build-controller
         if: github.event_name != 'pull_request_target' && github.event_name != 'schedule'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
@@ -158,44 +128,42 @@ jobs:
           provenance: mode=max
           cache-from: type=gha,scope=sniptale-controller
           cache-to: type=gha,mode=max,scope=sniptale-controller
-      - name: Bind exact QA image reference
+      - name: Bind exact image references
         id: reference
         env:
-          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
-          RESOLVED_DIGEST: ${{ steps.resolve.outputs.digest }}
-          BUILT_CONTROLLER_DIGEST: ${{ steps.build-controller.outputs.digest }}
-          RESOLVED_CONTROLLER_DIGEST: ${{ steps.resolve-controller.outputs.digest }}
+          QA_DIGEST: ${{ steps.build.outputs.digest || steps.resolve.outputs['qa-digest'] }}
+          CONTROLLER_DIGEST: ${{ steps.build-controller.outputs.digest || steps.resolve.outputs['controller-digest'] }}
         run: |
-          digest=${BUILT_DIGEST:-$RESOLVED_DIGEST}
-          if ! printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
-            echo 'QA image digest is malformed' >&2
-            exit 1
-          fi
-          echo "reference=ghcr.io/lrozhkov/sniptale-qa@$digest" >> "$GITHUB_OUTPUT"
-          controller_digest=${BUILT_CONTROLLER_DIGEST:-$RESOLVED_CONTROLLER_DIGEST}
-          if ! printf '%s\n' "$controller_digest" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
-            echo 'Controller image digest is malformed' >&2
-            exit 1
-          fi
-          echo "controller-reference=ghcr.io/lrozhkov/sniptale-controller@$controller_digest" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$QA_DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$'
+          printf '%s\n' "$CONTROLLER_DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$'
+          echo "reference=ghcr.io/lrozhkov/sniptale-qa@$QA_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "controller-reference=ghcr.io/lrozhkov/sniptale-controller@$CONTROLLER_DIGEST" >> "$GITHUB_OUTPUT"
 
-  provision-1:
+  provision:
     needs: qa-image
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     environment: selectel-runner-controller
     outputs:
       has-record: ${{ steps.record.outputs.exists }}
       label: ${{ steps.record.outputs.label }}
+      profile-index: ${{ steps.record.outputs.profile_index }}
+      profiles-digest: ${{ steps.record.outputs.profiles_digest }}
       server-id: ${{ steps.record.outputs.server_id }}
       availability-zone: ${{ steps.record.outputs.availability_zone }}
+      cpu-tokens: ${{ steps.record.outputs.cpu_tokens }}
+      memory-mib: ${{ steps.record.outputs.memory_mib }}
+      vitest-workers: ${{ steps.record.outputs.vitest_workers }}
+      playwright-workers: ${{ steps.record.outputs.playwright_workers }}
+      security-workers: ${{ steps.record.outputs.security_workers }}
     permissions: { contents: read, packages: read }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - name: Provision disposable preemptible JIT runner
+      - name: Provision first available disposable runner
         env:
           CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
+          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
@@ -203,49 +171,50 @@ jobs:
           RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
           RUNNER_IMAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUNNER_IMAGE_USER: ${{ github.actor }}
-          SNIPTALE_ATTEMPT: '1'
           SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
+          SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
+          SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
           SNIPTALE_QA_IMAGE: ${{ needs.qa-image.outputs.reference }}
         run: |
           printf '%s' "$RUNNER_IMAGE_TOKEN" | docker login ghcr.io --username "$RUNNER_IMAGE_USER" --password-stdin >/dev/null
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_QA_PROFILES --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
-            --env SNIPTALE_ATTEMPT --env SNIPTALE_CANDIDATE_SHA \
+            --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_BASE_SHA --env SNIPTALE_TRUSTED_CONTROL_SHA \
             --env SNIPTALE_QA_IMAGE --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
             "$CONTROLLER_IMAGE" provision
-      - name: Export sanitized runner identity
+      - name: Export sanitized selected profile
         id: record
         if: always()
         run: |
-          record=build/selectel-controller/attempt-1.json
-          if [ ! -f "$record" ]; then
+          record=build/selectel-controller/provision.json
+          if [ ! -f "$record" ] || ! jq -e '.status == "online"' "$record" >/dev/null; then
             echo 'exists=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo 'exists=true' >> "$GITHUB_OUTPUT"
-          echo "label=$(jq -er .runnerLabel "$record")" >> "$GITHUB_OUTPUT"
-          echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
-          echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
+          for pair in label:runnerLabel profile_index:selectedProfileIndex profiles_digest:profilesDigest server_id:serverId availability_zone:availabilityZone cpu_tokens:resourceProfile.cpuTokens memory_mib:resourceProfile.memoryMiB vitest_workers:resourceProfile.vitestWorkers playwright_workers:resourceProfile.playwrightWorkers security_workers:resourceProfile.securityWorkers; do
+            output=${pair%%:*}; field=${pair#*:}
+            echo "$output=$(jq -er ".$field" "$record")" >> "$GITHUB_OUTPUT"
+          done
       - name: Preserve sanitized controller record
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: selectel-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: build/selectel-controller/attempt-1.json
+          name: selectel-provision-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          path: build/selectel-controller/provision.json
           if-no-files-found: warn
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
-  canonical-qa-1:
-    needs: [qa-image, provision-1]
-    if: needs.provision-1.result == 'success'
-    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision-1.outputs.label)) }}
+  canonical-qa:
+    needs: [qa-image, provision]
+    if: needs.provision.result == 'success'
+    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision.outputs.label)) }}
     timeout-minutes: 180
     permissions: { actions: read, contents: read }
     steps:
-      - name: Check out trusted control plane
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           {
             ref: '${{ env.TRUSTED_CONTROL_SHA }}',
@@ -253,8 +222,7 @@ jobs:
             fetch-depth: 0,
             persist-credentials: false,
           }
-      - name: Check out exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           {
             ref: '${{ env.CANDIDATE_SHA }}',
@@ -265,7 +233,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           { node-version: 22.12.0, cache: npm, cache-dependency-path: candidate/package-lock.json }
-      - name: Restore verified main QA proofs
+      - name: Restore verified main receipts when available
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
           source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
@@ -281,7 +249,15 @@ jobs:
             echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
             echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
           fi
-      - name: Run literal canonical local QA workflow
+          coverage_root="$RUNNER_TEMP/main-coverage-proof-${source_sha}"
+          coverage_proof="$RUNNER_TEMP/coverage-proof-${source_sha}.json"
+          coverage_reports="$RUNNER_TEMP/coverage-reports-${source_sha}"
+          restored=$(cd trusted-control && node tooling/ci/select-coverage-proof.mjs restore "$source_sha" "$coverage_root" "$coverage_proof" "$coverage_reports")
+          if [ -n "$restored" ]; then
+            echo "SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof" >> "$GITHUB_ENV"
+            echo "SNIPTALE_COVERAGE_REPORTS_PATH=$coverage_reports" >> "$GITHUB_ENV"
+          fi
+      - name: Run canonical local wrappers
         working-directory: candidate
         env:
           SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
@@ -290,81 +266,74 @@ jobs:
           SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
           SNIPTALE_CI_IMAGE: ${{ needs.qa-image.outputs.reference }}
           SNIPTALE_CI_SKIP_BUILD: '1'
-          SNIPTALE_SELECTEL_ATTEMPT: '1'
-          SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision-1.outputs.server-id }}
-          SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision-1.outputs.availability-zone }}
+          SNIPTALE_CI_HEAVY_AUDIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
+          SNIPTALE_SELECTEL_ATTEMPT: ${{ needs.provision.outputs.profile-index }}
+          SNIPTALE_SELECTEL_PROFILES_DIGEST: ${{ needs.provision.outputs.profiles-digest }}
+          SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision.outputs.server-id }}
+          SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision.outputs.availability-zone }}
+          SNIPTALE_QA_CPU_TOKENS: ${{ needs.provision.outputs.cpu-tokens }}
+          SNIPTALE_QA_MEMORY_MIB: ${{ needs.provision.outputs.memory-mib }}
+          SNIPTALE_QA_VITEST_MAX_WORKERS: ${{ needs.provision.outputs.vitest-workers }}
+          SNIPTALE_QA_PLAYWRIGHT_WORKERS: ${{ needs.provision.outputs.playwright-workers }}
+          SNIPTALE_QA_SECURITY_WORKERS: ${{ needs.provision.outputs.security-workers }}
         run: node ../trusted-control/tooling/ci/container.mjs candidate
-      - name: Build informational candidate controls on the disposable runner
+      - name: Build informational candidate controls
         if: always() && github.event_name == 'pull_request_target'
         continue-on-error: true
         working-directory: candidate
-        env: { SNIPTALE_ATTEMPT: '1' }
         run: |
           pattern='^(\.github/workflows/|tooling/(ci|qa)/|tooling/configs/(ci|qa)/|package(-lock)?\.json$)'
           if ! git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA" | grep -Eq "$pattern"; then exit 0; fi
           image="sniptale-candidate-control:${CANDIDATE_SHA}"
           docker build --platform linux/amd64 --file tooling/ci/Dockerfile --tag "$image" .
           digest=$(docker image inspect --format='{{.Id}}' "$image")
-          printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
-          jq -n --arg candidateSha "$CANDIDATE_SHA" --arg baseSha "$BASE_SHA" \
-            --arg imageDigest "$digest" --argjson attempt "$SNIPTALE_ATTEMPT" \
-            '{schemaVersion: 1, informational: true, candidateSha: $candidateSha, baseSha: $baseSha, imageDigest: $imageDigest, attempt: $attempt}' \
+          jq -n --arg candidateSha "$CANDIDATE_SHA" --arg baseSha "$BASE_SHA" --arg imageDigest "$digest" \
+            '{schemaVersion: 1, informational: true, candidateSha: $candidateSha, baseSha: $baseSha, imageDigest: $imageDigest}' \
             > build/candidate-control-proof.json
-      - name: Upload informational candidate control proof
-        if: always() && hashFiles('candidate/build/candidate-control-proof.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: candidate-control-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/candidate-control-proof.json
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload attempt proof
+      - name: Upload canonical proof before cleanup
+        id: canonical-proof
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  adjudicate-1:
-    needs: [provision-1, canonical-qa-1]
-    if: always()
-    runs-on: ubuntu-24.04
-    outputs:
-      classification: ${{ steps.result.outputs.classification }}
-      retry: ${{ steps.result.outputs.retry }}
-    permissions: { actions: read, contents: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - name: Download attempt inputs
-        if: needs.provision-1.outputs.has-record == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - name: Upload informational candidate control proof
+        if: always() && hashFiles('candidate/build/candidate-control-proof.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          {
-            pattern: '*-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
-            path: attempt,
-            merge-multiple: true,
-          }
-      - name: Classify attempt
-        id: result
+          name: candidate-control-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          path: candidate/build/candidate-control-proof.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish proof location and selected resources
+        if: always()
         env:
-          PROVISION_RESULT: ${{ needs.provision-1.result }}
-          QA_RESULT: ${{ needs.canonical-qa-1.result }}
+          ARTIFACT_NAME: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          ARTIFACT_URL: ${{ steps.canonical-proof.outputs.artifact-url }}
+          PROFILE_INDEX: ${{ needs.provision.outputs.profile-index }}
+          PROFILES_DIGEST: ${{ needs.provision.outputs.profiles-digest }}
         run: |
-          if [ "$PROVISION_RESULT" != success ] || [ ! -f attempt/attempt-1.json ]; then
-            result='{"classification":"infrastructure-interruption","retry":true}'
-          else
-            result=$(node tooling/ci/selectel/adjudication.mjs attempt attempt/attempt-1.json "$CANDIDATE_SHA" "$QA_RESULT")
-          fi
-          echo "classification=$(jq -er .classification <<<"$result")" >> "$GITHUB_OUTPUT"
-          echo "retry=$(jq -er .retry <<<"$result")" >> "$GITHUB_OUTPUT"
+          failed_phase=$(jq -r '.phases[]? | select(.status == "failed") | .id' candidate/build/ci-artifacts/candidate-${CANDIDATE_SHA}-${GITHUB_RUN_ID}/proof-manifest.json 2>/dev/null | head -n 1)
+          {
+            echo '### Canonical QA proof'
+            echo
+            echo "Selected profile index: $PROFILE_INDEX"
+            echo "Profiles digest: $PROFILES_DIGEST"
+            echo "Resource profile: cpu=${{ needs.provision.outputs.cpu-tokens }}, memoryMiB=${{ needs.provision.outputs.memory-mib }}, vitest=${{ needs.provision.outputs.vitest-workers }}, playwright=${{ needs.provision.outputs.playwright-workers }}, security=${{ needs.provision.outputs.security-workers }}"
+            echo "Failed phase: ${failed_phase:-none}"
+            echo "Artifact: [$ARTIFACT_NAME]($ARTIFACT_URL)"
+            echo
+            echo '```sh'
+            echo "gh run download $GITHUB_RUN_ID -n $ARTIFACT_NAME"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-  cleanup-1:
-    needs: [qa-image, provision-1, canonical-qa-1]
-    if: always() && needs.provision-1.outputs.has-record == 'true'
+  cleanup:
+    needs: [qa-image, provision, canonical-qa]
+    if: always() && needs.provision.outputs.has-record == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: selectel-runner-controller
@@ -375,8 +344,8 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
-            name: 'selectel-attempt-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
-            path: attempt,
+            name: 'selectel-provision-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
+            path: controller,
           }
       - name: Delete VM, volume, port, and JIT registration
         env:
@@ -393,535 +362,14 @@ jobs:
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-1.json
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: selectel-cleanup-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: attempt/attempt-1.json
-          if-no-files-found: error
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  provision-2:
-    needs: [qa-image, adjudicate-1, cleanup-1]
-    if: >-
-      always() && needs.adjudicate-1.outputs.retry == 'true' &&
-      (needs.cleanup-1.result == 'success' || needs.cleanup-1.result == 'skipped')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    environment: selectel-runner-controller
-    outputs:
-      has-record: ${{ steps.record.outputs.exists }}
-      label: ${{ steps.record.outputs.label }}
-      server-id: ${{ steps.record.outputs.server_id }}
-      availability-zone: ${{ steps.record.outputs.availability_zone }}
-    permissions: { contents: read, packages: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - name: Provision retry JIT runner
-        env:
-          CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
-          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
-          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
-          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
-          RUNNER_IMAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUNNER_IMAGE_USER: ${{ github.actor }}
-          SNIPTALE_ATTEMPT: '2'
-          SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
-          SNIPTALE_QA_IMAGE: ${{ needs.qa-image.outputs.reference }}
-        run: |
-          printf '%s' "$RUNNER_IMAGE_TOKEN" | docker login ghcr.io --username "$RUNNER_IMAGE_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
-            --env SNIPTALE_ATTEMPT --env SNIPTALE_CANDIDATE_SHA \
-            --env SNIPTALE_QA_IMAGE --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
-            "$CONTROLLER_IMAGE" provision
-      - name: Export sanitized runner identity
-        id: record
+            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/controller/provision.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
-        run: |
-          record=build/selectel-controller/attempt-2.json
-          if [ ! -f "$record" ]; then echo 'exists=false' >> "$GITHUB_OUTPUT"; exit 0; fi
-          echo 'exists=true' >> "$GITHUB_OUTPUT"
-          echo "label=$(jq -er .runnerLabel "$record")" >> "$GITHUB_OUTPUT"
-          echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
-          echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: selectel-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: build/selectel-controller/attempt-2.json
-          if-no-files-found: warn
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  canonical-qa-2:
-    needs: [qa-image, provision-2]
-    if: always() && needs.provision-2.result == 'success'
-    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision-2.outputs.label)) }}
-    timeout-minutes: 180
-    permissions: { actions: read, contents: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          {
-            ref: '${{ env.TRUSTED_CONTROL_SHA }}',
-            path: trusted-control,
-            fetch-depth: 0,
-            persist-credentials: false,
-          }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          {
-            ref: '${{ env.CANDIDATE_SHA }}',
-            path: candidate,
-            fetch-depth: 0,
-            persist-credentials: false,
-          }
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          { node-version: 22.12.0, cache: npm, cache-dependency-path: candidate/package-lock.json }
-      - name: Restore verified main QA proofs
-        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
-        run: |
-          source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
-          proof_root="$RUNNER_TEMP/main-proof-${source_sha}"
-          unit_proof="$RUNNER_TEMP/unit-proof-${source_sha}.json"
-          restored=$(cd trusted-control && node tooling/ci/select-unit-proof.mjs restore "$source_sha" "$proof_root" "$unit_proof")
-          if [ -n "$restored" ]; then echo "SNIPTALE_UNIT_PROOF_PATH=$unit_proof" >> "$GITHUB_ENV"; fi
-          codeql_root="$RUNNER_TEMP/main-codeql-proof-${source_sha}"
-          codeql_proof="$RUNNER_TEMP/codeql-proof-${source_sha}.json"
-          codeql_sarif="$RUNNER_TEMP/codeql-sarif-${source_sha}.sarif"
-          restored=$(cd trusted-control && node tooling/ci/select-codeql-proof.mjs restore "$source_sha" "$codeql_root" "$codeql_proof" "$codeql_sarif")
-          if [ -n "$restored" ]; then
-            echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
-            echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
-          fi
-      - name: Run literal canonical local QA workflow
-        working-directory: candidate
-        env:
-          SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
-          SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
-          SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control
-          SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
-          SNIPTALE_CI_IMAGE: ${{ needs.qa-image.outputs.reference }}
-          SNIPTALE_CI_SKIP_BUILD: '1'
-          SNIPTALE_SELECTEL_ATTEMPT: '2'
-          SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision-2.outputs.server-id }}
-          SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision-2.outputs.availability-zone }}
-        run: node ../trusted-control/tooling/ci/container.mjs candidate
-      - name: Build informational candidate controls on the disposable runner
-        if: always() && github.event_name == 'pull_request_target'
-        continue-on-error: true
-        working-directory: candidate
-        env: { SNIPTALE_ATTEMPT: '2' }
-        run: |
-          pattern='^(\.github/workflows/|tooling/(ci|qa)/|tooling/configs/(ci|qa)/|package(-lock)?\.json$)'
-          if ! git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA" | grep -Eq "$pattern"; then exit 0; fi
-          image="sniptale-candidate-control:${CANDIDATE_SHA}"
-          docker build --platform linux/amd64 --file tooling/ci/Dockerfile --tag "$image" .
-          digest=$(docker image inspect --format='{{.Id}}' "$image")
-          printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
-          jq -n --arg candidateSha "$CANDIDATE_SHA" --arg baseSha "$BASE_SHA" \
-            --arg imageDigest "$digest" --argjson attempt "$SNIPTALE_ATTEMPT" \
-            '{schemaVersion: 1, informational: true, candidateSha: $candidateSha, baseSha: $baseSha, imageDigest: $imageDigest, attempt: $attempt}' \
-            > build/candidate-control-proof.json
-      - name: Upload informational candidate control proof
-        if: always() && hashFiles('candidate/build/candidate-control-proof.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: candidate-control-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/candidate-control-proof.json
-          if-no-files-found: error
-          retention-days: 14
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: canonical-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          if-no-files-found: warn
-          include-hidden-files: true
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  adjudicate-2:
-    needs: [provision-2, canonical-qa-2]
-    if: always() && needs.provision-2.result != 'skipped'
-    runs-on: ubuntu-24.04
-    outputs:
-      classification: ${{ steps.result.outputs.classification }}
-      retry: ${{ steps.result.outputs.retry }}
-    permissions: { actions: read, contents: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - if: needs.provision-2.outputs.has-record == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            pattern: '*-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
-            path: attempt,
-            merge-multiple: true,
-          }
-      - id: result
-        env:
-          {
-            PROVISION_RESULT: '${{ needs.provision-2.result }}',
-            QA_RESULT: '${{ needs.canonical-qa-2.result }}',
-          }
-        run: |
-          if [ "$PROVISION_RESULT" != success ] || [ ! -f attempt/attempt-2.json ]; then
-            result='{"classification":"infrastructure-interruption","retry":true}'
-          else
-            result=$(node tooling/ci/selectel/adjudication.mjs attempt attempt/attempt-2.json "$CANDIDATE_SHA" "$QA_RESULT")
-          fi
-          echo "classification=$(jq -er .classification <<<"$result")" >> "$GITHUB_OUTPUT"
-          echo "retry=$(jq -er .retry <<<"$result")" >> "$GITHUB_OUTPUT"
-
-  cleanup-2:
-    needs: [qa-image, provision-2, canonical-qa-2]
-    if: always() && needs.provision-2.outputs.has-record == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    environment: selectel-runner-controller
-    permissions: { actions: read, contents: read, packages: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            name: 'selectel-attempt-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
-            path: attempt,
-          }
-      - env:
-          CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
-          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
-          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
-          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
-        run: |
-          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-2.json
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: selectel-cleanup-2-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: attempt/attempt-2.json
+          name: selectel-cleanup-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          path: controller/provision.json
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  provision-3:
-    needs: [qa-image, adjudicate-2, cleanup-2]
-    if: >-
-      always() && needs.adjudicate-2.outputs.retry == 'true' &&
-      (needs.cleanup-2.result == 'success' || needs.cleanup-2.result == 'skipped')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    environment: selectel-runner-controller
-    outputs:
-      has-record: ${{ steps.record.outputs.exists }}
-      label: ${{ steps.record.outputs.label }}
-      server-id: ${{ steps.record.outputs.server_id }}
-      availability-zone: ${{ steps.record.outputs.availability_zone }}
-    permissions: { contents: read, packages: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - name: Provision final retry JIT runner
-        env:
-          CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
-          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
-          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
-          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
-          RUNNER_IMAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUNNER_IMAGE_USER: ${{ github.actor }}
-          SNIPTALE_ATTEMPT: '3'
-          SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
-          SNIPTALE_QA_IMAGE: ${{ needs.qa-image.outputs.reference }}
-        run: |
-          printf '%s' "$RUNNER_IMAGE_TOKEN" | docker login ghcr.io --username "$RUNNER_IMAGE_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
-            --env SNIPTALE_ATTEMPT --env SNIPTALE_CANDIDATE_SHA \
-            --env SNIPTALE_QA_IMAGE --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
-            "$CONTROLLER_IMAGE" provision
-      - id: record
-        if: always()
-        run: |
-          record=build/selectel-controller/attempt-3.json
-          if [ ! -f "$record" ]; then echo 'exists=false' >> "$GITHUB_OUTPUT"; exit 0; fi
-          echo 'exists=true' >> "$GITHUB_OUTPUT"
-          echo "label=$(jq -er .runnerLabel "$record")" >> "$GITHUB_OUTPUT"
-          echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
-          echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: selectel-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: build/selectel-controller/attempt-3.json
-          if-no-files-found: warn
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  canonical-qa-3:
-    needs: [qa-image, provision-3]
-    if: always() && needs.provision-3.result == 'success'
-    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision-3.outputs.label)) }}
-    timeout-minutes: 180
-    permissions: { actions: read, contents: read }
-    env:
-      SNIPTALE_QA_CPU_TOKENS: '12'
-      SNIPTALE_QA_MEMORY_MIB: '18432'
-      SNIPTALE_QA_VITEST_MAX_WORKERS: '8'
-      SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'
-      SNIPTALE_QA_SECURITY_WORKERS: '6'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          {
-            ref: '${{ env.TRUSTED_CONTROL_SHA }}',
-            path: trusted-control,
-            fetch-depth: 0,
-            persist-credentials: false,
-          }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          {
-            ref: '${{ env.CANDIDATE_SHA }}',
-            path: candidate,
-            fetch-depth: 0,
-            persist-credentials: false,
-          }
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          { node-version: 22.12.0, cache: npm, cache-dependency-path: candidate/package-lock.json }
-      - name: Restore verified main QA proofs
-        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
-        run: |
-          source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
-          proof_root="$RUNNER_TEMP/main-proof-${source_sha}"
-          unit_proof="$RUNNER_TEMP/unit-proof-${source_sha}.json"
-          restored=$(cd trusted-control && node tooling/ci/select-unit-proof.mjs restore "$source_sha" "$proof_root" "$unit_proof")
-          if [ -n "$restored" ]; then echo "SNIPTALE_UNIT_PROOF_PATH=$unit_proof" >> "$GITHUB_ENV"; fi
-          codeql_root="$RUNNER_TEMP/main-codeql-proof-${source_sha}"
-          codeql_proof="$RUNNER_TEMP/codeql-proof-${source_sha}.json"
-          codeql_sarif="$RUNNER_TEMP/codeql-sarif-${source_sha}.sarif"
-          restored=$(cd trusted-control && node tooling/ci/select-codeql-proof.mjs restore "$source_sha" "$codeql_root" "$codeql_proof" "$codeql_sarif")
-          if [ -n "$restored" ]; then
-            echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
-            echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
-          fi
-      - name: Run literal canonical local QA workflow
-        working-directory: candidate
-        env:
-          SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
-          SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
-          SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control
-          SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
-          SNIPTALE_CI_IMAGE: ${{ needs.qa-image.outputs.reference }}
-          SNIPTALE_CI_SKIP_BUILD: '1'
-          SNIPTALE_SELECTEL_ATTEMPT: '3'
-          SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision-3.outputs.server-id }}
-          SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision-3.outputs.availability-zone }}
-        run: node ../trusted-control/tooling/ci/container.mjs candidate
-      - name: Build informational candidate controls on the disposable runner
-        if: always() && github.event_name == 'pull_request_target'
-        continue-on-error: true
-        working-directory: candidate
-        env: { SNIPTALE_ATTEMPT: '3' }
-        run: |
-          pattern='^(\.github/workflows/|tooling/(ci|qa)/|tooling/configs/(ci|qa)/|package(-lock)?\.json$)'
-          if ! git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA" | grep -Eq "$pattern"; then exit 0; fi
-          image="sniptale-candidate-control:${CANDIDATE_SHA}"
-          docker build --platform linux/amd64 --file tooling/ci/Dockerfile --tag "$image" .
-          digest=$(docker image inspect --format='{{.Id}}' "$image")
-          printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
-          jq -n --arg candidateSha "$CANDIDATE_SHA" --arg baseSha "$BASE_SHA" \
-            --arg imageDigest "$digest" --argjson attempt "$SNIPTALE_ATTEMPT" \
-            '{schemaVersion: 1, informational: true, candidateSha: $candidateSha, baseSha: $baseSha, imageDigest: $imageDigest, attempt: $attempt}' \
-            > build/candidate-control-proof.json
-      - name: Upload informational candidate control proof
-        if: always() && hashFiles('candidate/build/candidate-control-proof.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: candidate-control-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/candidate-control-proof.json
-          if-no-files-found: error
-          retention-days: 14
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: canonical-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/ci-artifacts/candidate-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          if-no-files-found: warn
-          include-hidden-files: true
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  adjudicate-3:
-    needs: [provision-3, canonical-qa-3]
-    if: always() && needs.provision-3.result != 'skipped'
-    runs-on: ubuntu-24.04
-    outputs:
-      classification: ${{ steps.result.outputs.classification }}
-    permissions: { actions: read, contents: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - if: needs.provision-3.outputs.has-record == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            pattern: '*-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
-            path: attempt,
-            merge-multiple: true,
-          }
-      - id: result
-        env:
-          {
-            PROVISION_RESULT: '${{ needs.provision-3.result }}',
-            QA_RESULT: '${{ needs.canonical-qa-3.result }}',
-          }
-        run: |
-          if [ "$PROVISION_RESULT" != success ] || [ ! -f attempt/attempt-3.json ]; then
-            result='{"classification":"infrastructure-interruption","retry":true}'
-          else
-            result=$(node tooling/ci/selectel/adjudication.mjs attempt attempt/attempt-3.json "$CANDIDATE_SHA" "$QA_RESULT")
-          fi
-          echo "classification=$(jq -er .classification <<<"$result")" >> "$GITHUB_OUTPUT"
-
-  cleanup-3:
-    needs: [qa-image, provision-3, canonical-qa-3]
-    if: always() && needs.provision-3.outputs.has-record == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    environment: selectel-runner-controller
-    permissions: { actions: read, contents: read, packages: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            name: 'selectel-attempt-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
-            path: attempt,
-          }
-      - env:
-          CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
-          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
-          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
-          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
-        run: |
-          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-3.json
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: selectel-cleanup-3-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: attempt/attempt-3.json
-          if-no-files-found: error
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-
-  canonical-qa:
-    needs: [adjudicate-1, cleanup-1, adjudicate-2, cleanup-2, adjudicate-3, cleanup-3]
-    if: always()
-    runs-on: ubuntu-24.04
-    permissions: { actions: read, contents: read }
-    steps:
-      - name: Select terminal attempt
-        id: terminal
-        env:
-          ATTEMPT_1: ${{ needs.adjudicate-1.outputs.classification }}
-          ATTEMPT_2: ${{ needs.adjudicate-2.outputs.classification }}
-          ATTEMPT_3: ${{ needs.adjudicate-3.outputs.classification }}
-        run: |
-          for attempt in 1 2 3; do
-            eval "classification=\$ATTEMPT_$attempt"
-            if [ "$classification" = success ] || [ "$classification" = genuine-qa-failure ]; then
-              echo "attempt=$attempt" >> "$GITHUB_OUTPUT"
-              echo "classification=$classification" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-          echo 'classification=infrastructure-exhausted' >> "$GITHUB_OUTPUT"
-      - name: Download terminal attempt proof
-        if: steps.terminal.outputs.attempt != ''
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            name: 'canonical-attempt-${{ steps.terminal.outputs.attempt }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
-            path: selected,
-          }
-      - name: Require a complete successful attempt
-        env:
-          CLASSIFICATION: ${{ steps.terminal.outputs.classification }}
-          CLEANUP_1: ${{ needs.cleanup-1.result }}
-          CLEANUP_2: ${{ needs.cleanup-2.result }}
-          CLEANUP_3: ${{ needs.cleanup-3.result }}
-        run: |
-          test "$CLASSIFICATION" = success
-          ! printf '%s\n' "$CLEANUP_1" "$CLEANUP_2" "$CLEANUP_3" | grep -Eq 'failure|cancelled'
-      - name: Upload canonical proof
-        id: canonical-proof
-        if: always() && hashFiles('selected/proof-manifest.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: selected
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-      - name: Publish canonical proof location
-        if: always()
-        env:
-          ARTIFACT_NAME: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          ARTIFACT_URL: ${{ steps.canonical-proof.outputs.artifact-url }}
-          TERMINAL_ATTEMPT: ${{ steps.terminal.outputs.attempt }}
-          CLASSIFICATION: ${{ steps.terminal.outputs.classification }}
-          CLEANUP_1: ${{ needs.cleanup-1.result }}
-          CLEANUP_2: ${{ needs.cleanup-2.result }}
-          CLEANUP_3: ${{ needs.cleanup-3.result }}
-        run: |
-          server_id=$(jq -r '.infrastructure.serverId // "unavailable"' selected/proof-manifest.json 2>/dev/null || true)
-          resource_profile=$(jq -c '.infrastructure.resourceProfile // {}' selected/proof-manifest.json 2>/dev/null || true)
-          {
-            echo '### Canonical QA proof'
-            echo
-            echo "Attempt: ${TERMINAL_ATTEMPT:-none}"
-            echo "Classification: $CLASSIFICATION"
-            echo "Selectel server: ${server_id:-unavailable}"
-            echo "Resource profile: ${resource_profile:-unavailable}"
-            echo "Cleanup: attempt-1=$CLEANUP_1, attempt-2=$CLEANUP_2, attempt-3=$CLEANUP_3"
-            echo
-            if [ -n "$ARTIFACT_URL" ]; then
-              echo "Artifact: [$ARTIFACT_NAME]($ARTIFACT_URL)"
-            else
-              echo "Artifact upload did not produce a URL: $ARTIFACT_NAME"
-            fi
-            echo
-            echo '```sh'
-            echo "gh run download $GITHUB_RUN_ID -n $ARTIFACT_NAME"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
   scheduled-sweeper:
     needs: qa-image
@@ -931,8 +379,7 @@ jobs:
     environment: selectel-runner-controller
     permissions: { contents: read, packages: read }
     steps:
-      - name: Check out main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - name: Delete expired managed Selectel resources
         env:
@@ -950,9 +397,8 @@ jobs:
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" sweep
-      - name: Upload sanitized sweep proof
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: selectel-sweep-${{ github.sha }}-${{ github.run_id }}
           path: build/selectel-controller/sweep.json
@@ -963,32 +409,34 @@ jobs:
     needs: canonical-qa
     if: needs.canonical-qa.result == 'success'
     runs-on: ubuntu-24.04
-    permissions:
-      security-events: write
+    permissions: { security-events: write }
     steps:
-      - name: Download canonical security reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
-      - name: Upload Semgrep SARIF
+      - name: Detect available SARIF reports
+        id: reports
+        run: |
+          echo "semgrep=$([ -f reports/.tmp/semgrep/results.sarif ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "codeql=$([ -f reports/.tmp/codeql/results.filtered.sarif ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - if: steps.reports.outputs.semgrep == 'true'
         uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
         with: { sarif_file: reports/.tmp/semgrep/results.sarif, category: semgrep-canonical }
-      - name: Upload baseline-filtered CodeQL SARIF
+      - if: steps.reports.outputs.codeql == 'true'
         uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
         with: { sarif_file: reports/.tmp/codeql/results.filtered.sarif, category: codeql-canonical }
 
   coverage-results:
     needs: canonical-qa
-    if: needs.canonical-qa.result == 'success'
+    if: >-
+      needs.canonical-qa.result == 'success' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     continue-on-error: true
     runs-on: ubuntu-24.04
-    permissions:
-      id-token: write
+    permissions: { id-token: write }
     steps:
-      - name: Download canonical coverage
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: 'canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}', path: reports }
-      - name: Publish coverage display
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           files: reports/.tmp/coverage/canonical/lcov.info
           use_oidc: true
@@ -996,22 +444,17 @@ jobs:
           verbose: false
 
   publish-qa-image:
-    needs: [canonical-qa, qa-image]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.canonical-qa.result == 'success'
+    needs: [canonical-qa, cleanup, qa-image]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.canonical-qa.result == 'success' && needs.cleanup.result == 'success'
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
     steps:
-      - name: Check out main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
-      - name: Sign in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           {
             registry: ghcr.io,
@@ -1019,44 +462,26 @@ jobs:
             password: '${{ secrets.GITHUB_TOKEN }}',
           }
       - name: Refuse immutable tag replacement
-        env:
-          IMMUTABLE_IMAGE: ghcr.io/lrozhkov/sniptale-qa:sha-${{ github.sha }}
-          IMMUTABLE_CONTROLLER: ghcr.io/lrozhkov/sniptale-controller:sha-${{ github.sha }}
         run: |
-          for image in "$IMMUTABLE_IMAGE" "$IMMUTABLE_CONTROLLER"; do
+          for image in "ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}" "ghcr.io/lrozhkov/sniptale-controller:sha-${GITHUB_SHA}"; do
             lookup_error=$(mktemp)
             if docker buildx imagetools inspect "$image" >/dev/null 2>"$lookup_error"; then
-              echo "Refusing to replace existing immutable image tag: $image" >&2
-              exit 1
+              echo "Refusing to replace existing immutable image tag: $image" >&2; exit 1
             elif ! grep -Eqi '(^|: )(manifest unknown|not found)(:|$)' "$lookup_error"; then
-              cat "$lookup_error" >&2
-              echo "Unable to prove immutable image tag absence" >&2
-              exit 1
+              cat "$lookup_error" >&2; echo 'Unable to prove immutable image tag absence' >&2; exit 1
             fi
           done
-      - name: Publish immutable and moving image tags
+      - name: Publish immutable and moving tags
         id: publish-image
-        env: { SOURCE_IMAGE: '${{ needs.qa-image.outputs.reference }}' }
-        run: |
-          docker buildx imagetools create \
-            --tag "ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}" \
-            --tag 'ghcr.io/lrozhkov/sniptale-qa:main' \
-            "$SOURCE_IMAGE"
-          digest=${SOURCE_IMAGE##*@}
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-      - name: Publish immutable controller image tags
-        env: { SOURCE_IMAGE: '${{ needs.qa-image.outputs.controller-reference }}' }
-        run: |
-          docker buildx imagetools create \
-            --tag "ghcr.io/lrozhkov/sniptale-controller:sha-${GITHUB_SHA}" \
-            --tag 'ghcr.io/lrozhkov/sniptale-controller:main' \
-            "$SOURCE_IMAGE"
-      - name: Record exact published image digest
         env:
-          PUBLISHED_DIGEST: ${{ steps.publish-image.outputs.digest }}
-        run: node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "$PUBLISHED_DIGEST"
-      - name: Upload exact image proof
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          QA_SOURCE: ${{ needs.qa-image.outputs.reference }}
+          CONTROLLER_SOURCE: ${{ needs.qa-image.outputs.controller-reference }}
+        run: |
+          docker buildx imagetools create --tag "ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}" --tag ghcr.io/lrozhkov/sniptale-qa:main "$QA_SOURCE"
+          docker buildx imagetools create --tag "ghcr.io/lrozhkov/sniptale-controller:sha-${GITHUB_SHA}" --tag ghcr.io/lrozhkov/sniptale-controller:main "$CONTROLLER_SOURCE"
+          echo "digest=${QA_SOURCE##*@}" >> "$GITHUB_OUTPUT"
+      - run: node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "${{ steps.publish-image.outputs.digest }}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: qa-image-proof-${{ github.sha }}-${{ github.run_id }}
           path: build/qa-image-proof
@@ -1065,30 +490,23 @@ jobs:
 
   pr-gate:
     name: pr-gate-authority
-    needs: canonical-qa
+    needs: [canonical-qa, cleanup]
     if: >-
-      always() &&
-      github.event_name != 'schedule' &&
+      always() && github.event_name != 'schedule' &&
       (github.event_name != 'workflow_dispatch' || inputs.selectel_connectivity_only != true)
     runs-on: ubuntu-24.04
-    permissions:
-      checks: write
+    permissions: { checks: write }
     steps:
       - name: Publish candidate-bound required check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CANONICAL_RESULT: ${{ needs.canonical-qa.result }}
+          CLEANUP_RESULT: ${{ needs.cleanup.result }}
         run: |
           conclusion=failure
-          if [ "$CANONICAL_RESULT" = success ]; then
-            conclusion=success
-          fi
+          if [ "$CANONICAL_RESULT" = success ] && [ "$CLEANUP_RESULT" = success ]; then conclusion=success; fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            -f name=pr-gate \
-            -f head_sha="$CANDIDATE_SHA" \
-            -f status=completed \
-            -f conclusion="$conclusion" \
+            -f name=pr-gate -f head_sha="$CANDIDATE_SHA" -f status=completed -f conclusion="$conclusion" \
             -f output[title]="Canonical QA gate: $conclusion" \
-            -f output[summary]="canonical-qa=$CANONICAL_RESULT" \
-            >/dev/null
+            -f output[summary]="canonical-qa=$CANONICAL_RESULT cleanup=$CLEANUP_RESULT" >/dev/null
           test "$conclusion" = success

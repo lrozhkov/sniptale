@@ -29,8 +29,8 @@ it('keeps CodeQL scope, reuse authority, CI transport, and artifacts in one cont
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
   expect(() => assertCodeqlConfigIsFresh()).not.toThrow();
-  expect(quality.match(/Restore verified main QA proofs/gu)).toHaveLength(3);
-  expect(quality.match(/select-codeql-proof\.mjs restore/gu)).toHaveLength(3);
+  expect(quality.match(/Restore verified main receipts when available/gu)).toHaveLength(1);
+  expect(quality.match(/select-codeql-proof\.mjs restore/gu)).toHaveLength(1);
   expect(quality).toContain('SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof');
   expect(quality).toContain('SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif');
   expect(release).toContain('Restore verified main CodeQL proof');

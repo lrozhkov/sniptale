@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-coverage-proof-reuse-policy",
+  "proofPath": ".tmp/qa/coverage-proof.json",
+  "reportDirectory": ".tmp/coverage/canonical",
+  "productionRoots": ["apps/extension/src", "packages"],
+  "testRoots": ["apps/extension", "packages", "tooling/test"],
+  "configFiles": [
+    "package.json",
+    "package-lock.json",
+    "vitest.config.ts",
+    "tooling/configs/qa/coverage-proof-reuse.data.json",
+    "tooling/qa/core/audit-coverage-step.mjs",
+    "tooling/qa/core/coverage-audit-report.mjs",
+    "tooling/qa/core/coverage-proof.mjs",
+    "tooling/qa/core/verify-unit-tests.mjs",
+    "tooling/qa/core/verify-test-coverage.registry.mjs",
+    "tooling/qa/core/verify-test-coverage.thresholds.mjs",
+    "tooling/qa/core/quality.config.mjs"
+  ],
+  "reportFiles": ["coverage-final.json", "coverage-summary.json", "lcov.info", "html/index.html"],
+  "owners": {
+    "decision": "tooling/qa/core/coverage-proof.mjs",
+    "execution": "tooling/qa/core/audit-coverage-step.mjs",
+    "ciTransport": "tooling/ci/select-coverage-proof.mjs",
+    "ciMount": "tooling/ci/coverage-proof-host.mjs"
+  },
+  "consumers": [
+    "tooling/qa/core/coverage-proof.mjs",
+    "tooling/qa/core/audit-coverage-step.mjs",
+    "tooling/ci/coverage-proof-host.mjs",
+    "tooling/ci/select-coverage-proof.mjs",
+    "tooling/ci/validate-coverage-proof.mjs",
+    "tooling/ci/container.mjs",
+    "tooling/ci/artifacts.mjs",
+    ".github/workflows/quality-gate.yml",
+    ".github/workflows/release.yml"
+  ],
+  "modes": {
+    "local": "validated local receipt and complete canonical reports or full coverage fallback",
+    "candidate": "validated read-only successful-main receipt and reports or no heavyweight PR recomputation",
+    "release": "validated receipt and reports or blocking full coverage fallback"
+  },
+  "digests": [
+    "canonical production source inventory and contents",
+    "product and tooling test inventory and contents",
+    "coverage scope, thresholds, configuration, and owner implementation",
+    "package manifest and lockfile",
+    "QA image digest",
+    "every canonical JSON, LCOV, and HTML report file"
+  ],
+  "proof": "Only successfully validated full product coverage may write the receipt; every blocking consumer recomputes all input and report digests.",
+  "rollback": "Delete the disposable receipt or omit its read-only CI mounts to force full coverage.",
+  "collisionCheck": "Receipt and reports are materialized atomically only under canonical disposable paths."
+}

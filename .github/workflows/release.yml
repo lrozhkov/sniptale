@@ -7,13 +7,6 @@ on:
 permissions:
   contents: read
 
-env:
-  SNIPTALE_QA_CPU_TOKENS: '24'
-  SNIPTALE_QA_MEMORY_MIB: '36864'
-  SNIPTALE_QA_VITEST_MAX_WORKERS: '16'
-  SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'
-  SNIPTALE_QA_SECURITY_WORKERS: '8'
-
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -88,6 +81,7 @@ jobs:
       has-record: ${{ steps.record.outputs.exists }}
       label: ${{ steps.record.outputs.label }}
       attempt: ${{ steps.record.outputs.attempt }}
+      profiles-digest: ${{ steps.record.outputs.profiles_digest }}
       server-id: ${{ steps.record.outputs.server_id }}
       availability-zone: ${{ steps.record.outputs.availability_zone }}
       cpu-tokens: ${{ steps.record.outputs.cpu_tokens }}
@@ -104,53 +98,37 @@ jobs:
           CONTROLLER_IMAGE: ${{ needs.admission.outputs.controller-image }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
           RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
           RUNNER_IMAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUNNER_IMAGE_USER: ${{ github.actor }}
           SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
+          SNIPTALE_BASE_SHA: ${{ github.sha }}
+          SNIPTALE_TRUSTED_CONTROL_SHA: ${{ github.sha }}
           SNIPTALE_QA_IMAGE: ${{ needs.admission.outputs.qa-image }}
         run: |
           printf '%s' "$RUNNER_IMAGE_TOKEN" | docker login ghcr.io --username "$RUNNER_IMAGE_USER" --password-stdin >/dev/null
-          for attempt in 1 2 3; do
-            export SNIPTALE_ATTEMPT="$attempt"
-            if docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-              --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-              --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-              --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
-              --env SNIPTALE_ATTEMPT --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_QA_IMAGE \
-              --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
-              "$CONTROLLER_IMAGE" provision; then
-              printf '%s\n' "$attempt" > build/selectel-controller/selected-attempt.txt
-              exit 0
-            fi
-            record="build/selectel-controller/attempt-${attempt}.json"
-            if [ ! -f "$record" ]; then
-              echo "Provision attempt ${attempt} failed without a sanitized record" >&2
-              exit 1
-            fi
-            jq -e '
-              .status == "provision-failed" and
-              (.cleanup | type == "object") and
-              ([.cleanup[]] | all(. == "absent" or . == "deleted"))
-            ' "$record" >/dev/null
-          done
-          echo 'All bounded Selectel release placements were exhausted' >&2
-          exit 1
+          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_QA_PROFILES --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
+            --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_BASE_SHA --env SNIPTALE_TRUSTED_CONTROL_SHA \
+            --env SNIPTALE_QA_IMAGE --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
+            "$CONTROLLER_IMAGE" provision
       - name: Export sanitized runner identity
         id: record
         if: always()
         run: |
-          selected=build/selectel-controller/selected-attempt.txt
-          if [ ! -f "$selected" ]; then
+          record=build/selectel-controller/provision.json
+          if [ ! -f "$record" ] || ! jq -e '.status == "online"' "$record" >/dev/null; then
             echo 'exists=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          attempt=$(cat "$selected")
-          record="build/selectel-controller/attempt-${attempt}.json"
           echo 'exists=true' >> "$GITHUB_OUTPUT"
-          echo "attempt=$attempt" >> "$GITHUB_OUTPUT"
+          echo "attempt=$(jq -er .selectedProfileIndex "$record")" >> "$GITHUB_OUTPUT"
+          echo "profiles_digest=$(jq -er .profilesDigest "$record")" >> "$GITHUB_OUTPUT"
           echo "label=$(jq -er .runnerLabel "$record")" >> "$GITHUB_OUTPUT"
           echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
           echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
@@ -165,8 +143,7 @@ jobs:
         with:
           name: release-selectel-${{ github.sha }}-${{ github.run_id }}
           path: |
-            build/selectel-controller/attempt-*.json
-            build/selectel-controller/selected-attempt.txt
+            build/selectel-controller/provision.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -194,15 +171,27 @@ jobs:
         run: |
           codeql_proof="$RUNNER_TEMP/codeql-proof-${GITHUB_SHA}.json"
           codeql_sarif="$RUNNER_TEMP/codeql-sarif-${GITHUB_SHA}.sarif"
-          node tooling/ci/select-codeql-proof.mjs admitted-main-proof "$GITHUB_SHA" "$codeql_proof" "$codeql_sarif"
-          echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
-          echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
+          node tooling/ci/select-codeql-proof.mjs admitted-main-proof "$GITHUB_SHA" "$codeql_proof" "$codeql_sarif" || true
+          if [ -f "$codeql_proof" ] && [ -f "$codeql_sarif" ]; then
+            echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
+            echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
+          fi
+      - name: Restore verified main coverage proof
+        run: |
+          coverage_proof="$RUNNER_TEMP/coverage-proof-${GITHUB_SHA}.json"
+          coverage_reports="$RUNNER_TEMP/coverage-reports-${GITHUB_SHA}"
+          node tooling/ci/select-coverage-proof.mjs admitted-main-proof "$GITHUB_SHA" "$coverage_proof" "$coverage_reports" || true
+          if [ -f "$coverage_proof" ] && [ -d "$coverage_reports" ]; then
+            echo "SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof" >> "$GITHUB_ENV"
+            echo "SNIPTALE_COVERAGE_REPORTS_PATH=$coverage_reports" >> "$GITHUB_ENV"
+          fi
       - name: Run release-only canonical audit
         env:
           SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
           SNIPTALE_CI_IMAGE: ${{ needs.admission.outputs.qa-image }}
           SNIPTALE_CI_SKIP_BUILD: '1'
           SNIPTALE_SELECTEL_ATTEMPT: ${{ needs.provision.outputs.attempt }}
+          SNIPTALE_SELECTEL_PROFILES_DIGEST: ${{ needs.provision.outputs.profiles-digest }}
           SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision.outputs.server-id }}
           SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision.outputs.availability-zone }}
           SNIPTALE_QA_CPU_TOKENS: ${{ needs.provision.outputs.cpu-tokens }}
@@ -245,20 +234,17 @@ jobs:
           GHCR_USER: ${{ github.actor }}
         run: |
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
-          attempt=$(cat attempt/selected-attempt.txt)
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup \
-            "/workspace/attempt/attempt-${attempt}.json"
+            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup "/workspace/attempt/provision.json"
       - name: Preserve cleanup proof
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-cleanup-${{ github.sha }}-${{ github.run_id }}
           path: |
-            attempt/attempt-*.json
-            attempt/selected-attempt.txt
+            attempt/provision.json
           if-no-files-found: error
           retention-days: 30
 
@@ -340,7 +326,7 @@ jobs:
 
           - Added one canonical, reproducible QA path for local machines and GitHub, preserving the established release-harness, checkpoint, closeout, release, security, and coverage semantics.
           - Added disposable preemptible Selectel runners with bounded multi-zone capacity fallback, explicit resource profiles, no public ingress, and mandatory cleanup proof.
-          - Added verified unit and CodeQL proof reuse, candidate-bound receipts, immutable QA images, SBOM and provenance, SARIF publication, coverage artifacts, and informational Codecov reporting.
+          - Added verified unit, CodeQL, and coverage proof reuse, candidate-bound receipts, immutable QA images, SBOM and provenance, SARIF publication, coverage artifacts, and informational Codecov reporting.
           - Improved CI failure diagnostics with retained wrapper run records, complete sanitized logs, report hashes, artifact download guidance, and deterministic proof manifests.
           - Hardened release admission around signed tags, successful main proof, immutable release assets, checksums, CycloneDX SBOM, and exact artifact verification.
 

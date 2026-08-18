@@ -7,7 +7,6 @@
   "owners": {
     "controller": "tooling/ci/selectel/sdk-controller.py",
     "controllerImage": "tooling/ci/selectel/Dockerfile.controller",
-    "attemptAdjudication": "tooling/ci/selectel/adjudication.mjs",
     "canonicalSemantics": "tooling/ci/container.mjs",
     "qualityWorkflow": ".github/workflows/quality-gate.yml",
     "releaseWorkflow": ".github/workflows/release.yml"
@@ -20,7 +19,8 @@
     ],
     "variables": [
       "SELECTEL_OS_AUTH_URL",
-      "SELECTEL_OS_REGION_NAME"
+      "SELECTEL_OS_REGION_NAME",
+      "SELECTEL_QA_PROFILES"
     ],
     "expectedProjectSha256": "1047ca5188dc076a7604ee16e568fdc75ae30f389199d1ba662407de70a187a0",
     "expectedRegion": "ru-3"
@@ -36,62 +36,34 @@
     "onlineTimeoutSeconds": 600
   },
   "compute": {
-    "attemptPlacements": [
-      {
-        "attempt": 1,
-        "availabilityZone": "ru-3a",
-        "bootVolumeType": "universal.ru-3a",
-        "flavorName": "SL1.24-49152",
-        "vcpus": 24,
-        "ramMiB": 49152,
-        "resourceProfile": {
-          "id": "selectel-24vcpu-48g-v1",
-          "cpuTokens": 24,
-          "memoryMiB": 36864,
-          "vitestWorkers": 16,
-          "playwrightWorkers": 4,
-          "securityWorkers": 8,
-          "memoryReserveMiB": 12288
-        }
+    "allowedZones": ["ru-3a", "ru-3b"],
+    "allowedFlavors": {
+      "SL1.24-49152": { "vcpus": 24, "ramMiB": 49152 },
+      "SL1.12-24576": { "vcpus": 12, "ramMiB": 24576 }
+    },
+    "allowedVolumeTypesByZone": {
+      "ru-3a": ["universal.ru-3a"],
+      "ru-3b": ["basicssd.ru-3b"]
+    },
+    "allowedResourceProfilesByFlavor": {
+      "SL1.24-49152": {
+        "cpuTokens": 24,
+        "memoryMiB": 36864,
+        "vitestWorkers": 16,
+        "playwrightWorkers": 4,
+        "securityWorkers": 8
       },
-      {
-        "attempt": 2,
-        "availabilityZone": "ru-3b",
-        "bootVolumeType": "basicssd.ru-3b",
-        "flavorName": "SL1.24-49152",
-        "vcpus": 24,
-        "ramMiB": 49152,
-        "resourceProfile": {
-          "id": "selectel-24vcpu-48g-v1",
-          "cpuTokens": 24,
-          "memoryMiB": 36864,
-          "vitestWorkers": 16,
-          "playwrightWorkers": 4,
-          "securityWorkers": 8,
-          "memoryReserveMiB": 12288
-        }
-      },
-      {
-        "attempt": 3,
-        "availabilityZone": "ru-3a",
-        "bootVolumeType": "universal.ru-3a",
-        "flavorName": "SL1.12-24576",
-        "vcpus": 12,
-        "ramMiB": 24576,
-        "resourceProfile": {
-          "id": "selectel-12vcpu-24g-v1",
-          "cpuTokens": 12,
-          "memoryMiB": 18432,
-          "vitestWorkers": 8,
-          "playwrightWorkers": 4,
-          "securityWorkers": 6,
-          "memoryReserveMiB": 6144
-        }
+      "SL1.12-24576": {
+        "cpuTokens": 12,
+        "memoryMiB": 18432,
+        "vitestWorkers": 8,
+        "playwrightWorkers": 4,
+        "securityWorkers": 6
       }
-    ],
+    },
     "operatingSystem": "Ubuntu 24.04 LTS",
     "architecture": "x86_64",
-    "bootVolumeGiB": 80,
+    "allowedBootVolumeGiB": [80],
     "publicIp": false,
     "ingress": false,
     "preemptible": true,
@@ -113,7 +85,7 @@
     "securityGroupName": "sniptale-github-actions-no-ingress"
   },
   "lifecycle": {
-    "attempts": 3,
+    "maxProfiles": 10,
     "ttlSeconds": 10800,
     "nameTemplate": "sniptale-<run-id>-<attempt>",
     "requiredMetadata": [
@@ -159,9 +131,9 @@
     "jit-timeout",
     "cloud-init-failure",
     "runner-loss",
-    "infrastructure-interruption-retry",
+    "in-job-infrastructure-fallback",
     "genuine-qa-failure-no-retry",
-    "cross-attempt-receipt-rejection",
+    "post-online-qa-failure-no-fallback",
     "cleanup-failure",
     "expired-resource-sweep",
     "foreign-resource-preservation",

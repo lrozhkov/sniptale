@@ -864,13 +864,13 @@
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
-      "path": "tooling/ci/select-unit-proof.mjs",
+      "path": "tooling/ci/select-coverage-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
-      "path": "tooling/ci/selectel/adjudication.mjs",
+      "path": "tooling/ci/select-unit-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
@@ -1669,6 +1669,15 @@
         "tooling/qa/core/qa-controls/discovery.mjs",
         "tooling/qa/core/qa-controls/policy.mjs",
         "tooling/qa/core/retired-controls/validation.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/coverage-proof-reuse.data.json",
+      "consumers": [
+        "tooling/qa/core/coverage-proof.mjs"
       ],
       "disposition": "keep",
       "owner": "qa-platform",
