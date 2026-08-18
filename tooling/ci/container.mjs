@@ -15,6 +15,7 @@ import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
 } from '../qa/runtime/resource-profile.mjs';
+import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
 
 const lane = process.argv[2];
 if (!['candidate', 'release', 'release-audit', 'security', 'coverage'].includes(lane)) {
@@ -75,6 +76,10 @@ const candidateWorkspace =
         candidateSha,
       })
     : null;
+const unitProofHostPath = resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH);
+if (process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
+  process.stderr.write('Reusable unit proof is unavailable; running the complete unit suite.\n');
+}
 const executionRoot = candidateWorkspace?.workspace ?? root;
 const trustedControlSha =
   process.env.SNIPTALE_TRUSTED_CONTROL_SHA ??
@@ -95,9 +100,11 @@ if (candidateWorkspace) {
   environment.push(
     `SNIPTALE_BASE_SHA=${candidateWorkspace.baseSha}`,
     `SNIPTALE_CANDIDATE_TREE=${candidateWorkspace.candidateTree}`,
-    `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`
+    `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`,
+    'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only'
   );
 }
+if (unitProofHostPath) environment.push('SNIPTALE_UNIT_PROOF_PATH=/opt/sniptale-unit-proof.json');
 if (trustedCiRoot) environment.push('SNIPTALE_TRUSTED_CI_ROOT=/opt/sniptale-trusted');
 for (const name of [
   'GITHUB_RUN_ID',
@@ -126,6 +133,9 @@ const baseContainerArgs = [
 ];
 if (trustedCiRoot) {
   baseContainerArgs.push('--volume', `${controlRoot}:/opt/sniptale-trusted:ro`);
+}
+if (unitProofHostPath) {
+  baseContainerArgs.push('--volume', `${unitProofHostPath}:/opt/sniptale-unit-proof.json:ro`);
 }
 for (const value of environment) baseContainerArgs.push('--env', value);
 

@@ -858,6 +858,12 @@
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
+      "path": "tooling/ci/select-unit-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
       "path": "tooling/ci/verify-main-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1884,6 +1890,15 @@
       "disposition": "adapt",
       "owner": "qa-platform",
       "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/unit-proof-reuse.data.json",
+      "consumers": [
+        "tooling/qa/core/unit-test-proof.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
     },
     {
       "path": "tooling/configs/qa/validation-manifest.json",

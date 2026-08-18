@@ -243,10 +243,10 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee",
+        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
         "file": "tooling/ci/install-toolchain.mjs",
         "line": 42,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
@@ -264,10 +264,10 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
+        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
       },
       "scope": {
-        "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee",
+        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
         "file": "tooling/ci/install-toolchain.mjs",
         "line": 37,
         "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
@@ -14880,7 +14880,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "d8fa6bc2ee3723997584063b6eb2dc3e1f504bb96bb56b7f2b29c1e89429b8fa"
+        "contentHash": "d39833c1f22c584c47e6db15175783e5443935e46357d47cca919b53afaf9d74"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
@@ -16021,7 +16021,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "1e83e99ad4f3122c5bc5c67a1e9b5d22cbfc0582264278e7d51b96b6684912f8"
+        "contentHash": "eefa055d75c3e754d1ebefdf8ba1704e189126e21dab1807065d1e216aae3139"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -19624,7 +19624,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-      "contentHash": "13efa681ea076afaafbcec560c990ef66a7114e48efb4844f1f35c9f82f7397b"
+        "contentHash": "13efa681ea076afaafbcec560c990ef66a7114e48efb4844f1f35c9f82f7397b"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
@@ -20533,6 +20533,8 @@
         "tooling/agent-tooling/agent-tooling.test.ts",
         "tooling/ci/candidate-workspace.test.ts",
         "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/select-unit-proof.test.ts",
+        "tooling/ci/unit-proof-host.test.ts",
         "tooling/qa/audits/canonical-sarif.test.ts",
         "tooling/qa/audits/execution-error.test.ts",
         "tooling/qa/audits/execution-evidence.test.ts",
@@ -20564,6 +20566,7 @@
         "tooling/qa/core/shared-baseline.test.ts",
         "tooling/qa/core/test-helpers.ts",
         "tooling/qa/core/unit-test-cache.test.ts",
+        "tooling/qa/core/unit-test-proof.test.ts",
         "tooling/qa/core/verify-advisory.test-support.ts",
         "tooling/qa/core/verify-advisory.test.ts",
         "tooling/qa/core/verify-all.scope.test.ts",
@@ -20951,6 +20954,28 @@
       "surfaces": [
         "binding:TEST_SUFFIXES",
         "property:createUnitTestPlan/relatedFiles"
+      ]
+    },
+    {
+      "id": "policy.source.unit-test-proof-mjs.e3df726ad8",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/unit-test-proof.mjs",
+        "contentHash": "2b0ecc31da3b838db8631befc233230b1174f509b91ddb252b56f0dec80d7d5c"
+      },
+      "consumers": [
+        "tooling/qa/core/unit-test-proof.mjs",
+        "tooling/qa/core/unit-test-proof.test.ts",
+        "tooling/qa/core/verify-all.unit-test-steps.mjs",
+        "tooling/qa/core/verify-all.unit-test-steps.test.ts"
+      ],
+      "surfaces": [
+        "property:recordSuccessfulFullUnitProof/producer",
+        "property:resolveReusableFullUnitProof/plan"
       ]
     },
     {

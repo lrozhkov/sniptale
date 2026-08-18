@@ -4,7 +4,7 @@
   "description": "Constrained qa:audit CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
   "findings": [
     {
-      "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee",
+      "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
       "debtId": "accepted.codeql.locked-toolchain-download-write",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 42,
@@ -12,7 +12,7 @@
       "rule": "js/http-to-file-access"
     },
     {
-      "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee",
+      "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
       "debtId": "accepted.codeql.locked-toolchain-download-url",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 37,

@@ -227,6 +227,7 @@ export async function finalizeCandidateReleaseArchive({
 
 const LANE_FILES = {
   candidate: [
+    '.tmp/qa/unit-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',
@@ -274,7 +275,10 @@ const LANE_FILES = {
 
 function createArtifactDestination(lane, repositoryRoot) {
   const commit = safeSegment(
-    process.env.GITHUB_SHA ?? process.env.SNIPTALE_PROOF_SHA ?? 'local',
+    process.env.SNIPTALE_CANDIDATE_SHA ??
+      process.env.GITHUB_SHA ??
+      process.env.SNIPTALE_PROOF_SHA ??
+      'local',
     'commit'
   );
   const runId = safeSegment(process.env.GITHUB_RUN_ID ?? `${Date.now()}`, 'run id');

@@ -24,5 +24,5 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registered policy dispositions
 
-- permanent-policy=24, tool-filter=368.
+- permanent-policy=24, tool-filter=369.
 - Exact scopes, source hashes, owners, reasons, remediation, and expiry data remain in the machine registry.
