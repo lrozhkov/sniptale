@@ -4,15 +4,18 @@ import path from 'node:path';
 import { expect, it } from 'vitest';
 
 import { collectSelectelPreflight } from './preflight.mjs';
+import { readSelectelPolicy } from './policy.mjs';
 
 const root = path.resolve(import.meta.dirname, '../../..');
 const env = {
   SELECTEL_OS_AUTH_URL: 'https://identity.example/v3',
   SELECTEL_OS_REGION_NAME: 'ru-1',
-  SELECTEL_OS_PROJECT_ID: 'project-1',
   SELECTEL_OS_APPLICATION_CREDENTIAL_ID: 'credential-id',
   SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: 'credential-secret',
 };
+const policy = structuredClone(readSelectelPolicy(root));
+policy.controllerEnvironment.expectedProjectSha256 =
+  'a33e35d302125bbd8e647043a4025b29f659aad51c4a80d6244a45fabcdcd235';
 
 function json(value: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(value), {
@@ -88,7 +91,7 @@ function createFetch({
 }
 
 it('produces a sanitized read-only connectivity proof for exact canonical resources', async () => {
-  const proof = await collectSelectelPreflight({ root, env, fetchImpl: createFetch() });
+  const proof = await collectSelectelPreflight({ root, env, policy, fetchImpl: createFetch() });
   expect(proof).toMatchObject({
     artifactKind: 'sniptale-selectel-connectivity-proof',
     region: 'ru-1',
@@ -99,13 +102,15 @@ it('produces a sanitized read-only connectivity proof for exact canonical resour
   });
   expect(JSON.stringify(proof)).not.toContain('credential-secret');
   expect(JSON.stringify(proof)).not.toContain('ephemeral-token');
-  expect(proof.projectFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+  expect(proof.project).toMatch(/^sha256:[a-f0-9]{12}$/u);
+  expect(JSON.stringify(proof)).not.toContain('project-1');
 });
 
 it('accepts the Cinder detailed quota shape without defaulting usage', async () => {
   const proof = await collectSelectelPreflight({
     root,
     env,
+    policy,
     fetchImpl: createFetch({ nestedVolumeQuota: true }),
   });
   expect(proof.quotas.freeVolumeGiB).toBe(260);
@@ -113,7 +118,7 @@ it('accepts the Cinder detailed quota shape without defaulting usage', async () 
 
 it('fails closed when the project cannot fit one canonical runner', async () => {
   await expect(
-    collectSelectelPreflight({ root, env, fetchImpl: createFetch({ cores: 23 }) })
+    collectSelectelPreflight({ root, env, policy, fetchImpl: createFetch({ cores: 23 }) })
   ).rejects.toThrow('insufficient free canonical runner quota');
 });
 
@@ -124,8 +129,8 @@ it('fails closed when quota usage is missing', async () => {
     }
     return createFetch()(input);
   };
-  await expect(collectSelectelPreflight({ root, env, fetchImpl })).rejects.toThrow(
-    'quota response is missing required limits'
+  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
+    'compute core quota is missing or invalid'
   );
 });
 
@@ -147,7 +152,7 @@ it.each([undefined, 'aarch64'])('rejects image architecture %s', async (architec
     }
     return createFetch()(input);
   };
-  await expect(collectSelectelPreflight({ root, env, fetchImpl })).rejects.toThrow(
+  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
     'No active Ubuntu 24.04 LTS amd64 image'
   );
 });
@@ -156,6 +161,30 @@ it('keeps connectivity secrets on the trusted main dispatch only', () => {
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/quality-gate.yml'), 'utf8');
   expect(workflow).toContain("github.ref == 'refs/heads/main'");
   expect(workflow).toContain("with: { ref: '${{ github.sha }}', persist-credentials: false }");
+  expect(workflow).not.toContain('SELECTEL_OS_PROJECT_ID');
+});
+
+it('fails closed when the signed token belongs to a different project', async () => {
+  const fetchImpl = async (input: string | URL | Request) => {
+    if (String(input).endsWith('/auth/tokens')) {
+      return json(
+        {
+          token: {
+            project: { id: 'different-project' },
+            catalog: ['compute', 'image', 'network', 'volumev3'].map((type) => ({
+              type,
+              endpoints: [{ interface: 'public', region: 'ru-1', url: `https://${type}.example` }],
+            })),
+          },
+        },
+        { headers: { 'x-subject-token': 'ephemeral-token' } }
+      );
+    }
+    return createFetch()(input);
+  };
+  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
+    'token project does not match policy'
+  );
 });
 
 it('does not include a rejected credential or response body in errors', async () => {
@@ -163,7 +192,7 @@ it('does not include a rejected credential or response body in errors', async ()
   await expect(collectSelectelPreflight({ root, env, fetchImpl })).rejects.toThrow(
     'authentication failed with HTTP 401'
   );
-  await expect(collectSelectelPreflight({ root, env, fetchImpl })).rejects.not.toThrow(
+  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.not.toThrow(
     'credential-secret'
   );
 });

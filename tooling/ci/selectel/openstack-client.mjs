@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 function requireString(value, label) {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error(`Missing Selectel controller value: ${label}.`);
@@ -38,7 +40,11 @@ async function parseJsonResponse(response, operation) {
   }
 }
 
-export async function authenticateOpenStack({ env = process.env, fetchImpl = fetch } = {}) {
+export async function authenticateOpenStack({
+  env = process.env,
+  expectedProjectSha256,
+  fetchImpl = fetch,
+} = {}) {
   const authUrl = requireString(env.SELECTEL_OS_AUTH_URL, 'SELECTEL_OS_AUTH_URL').replace(
     /\/$/u,
     ''
@@ -52,7 +58,7 @@ export async function authenticateOpenStack({ env = process.env, fetchImpl = fet
     'SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET'
   );
   const region = requireString(env.SELECTEL_OS_REGION_NAME, 'SELECTEL_OS_REGION_NAME');
-  const projectId = requireString(env.SELECTEL_OS_PROJECT_ID, 'SELECTEL_OS_PROJECT_ID');
+  requireString(expectedProjectSha256, 'expected project SHA-256');
   const response = await fetchImpl(`${authUrl}/auth/tokens`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -69,13 +75,16 @@ export async function authenticateOpenStack({ env = process.env, fetchImpl = fet
   const token = response.headers.get('x-subject-token');
   requireString(token, 'Keystone subject token');
   const tokenProjectId = payload.token?.project?.id;
-  if (tokenProjectId !== projectId)
+  requireString(tokenProjectId, 'Keystone token project');
+  const projectSha256 = crypto.createHash('sha256').update(tokenProjectId).digest('hex');
+  if (projectSha256 !== expectedProjectSha256)
     throw new Error('OpenStack token project does not match policy.');
   if (!Array.isArray(payload.token?.catalog)) {
     throw new Error('Malformed OpenStack response: service catalog.');
   }
   return {
-    projectId,
+    projectId: tokenProjectId,
+    projectFingerprint: `sha256:${projectSha256.slice(0, 12)}`,
     region,
     token,
     endpoints: {
