@@ -41,8 +41,8 @@
   "semgrep": { "version": "1.173.0" },
   "codeql": {
     "version": "2.26.3",
-    "url": "https://github.com/github/codeql-cli-binaries/releases/download/v2.26.3/codeql-linux64.zip",
-    "sha256": "cc0fed57d8441892b8fcf41b378f7ed925fb6e2783fa8f2d453717686e6c723e",
+    "url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.26.3/codeql-bundle-linux64.tar.gz",
+    "sha256": "77e5be1b550d66662e600e795b6cf2ea1729e853e3dc79e02594f767039d2a29",
     "querySuite": "codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls"
   },
   "osvScanner": {

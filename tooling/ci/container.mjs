@@ -6,6 +6,9 @@ import path from 'node:path';
 import { collectLaneArtifacts, finalizeCandidateReleaseArchive } from './artifacts.mjs';
 import {
   materializeCandidateWorkspace,
+  restoreCandidateCommit,
+  restoreCandidateDiff,
+  verifyCandidateCloseout,
   verifyCandidateFinalState,
 } from './candidate-workspace.mjs';
 import {
@@ -106,7 +109,7 @@ for (const name of [
 ]) {
   if (process.env[name]) environment.push(`${name}=${process.env[name]}`);
 }
-const args = [
+const baseContainerArgs = [
   'run',
   '--rm',
   '--platform',
@@ -122,24 +125,109 @@ const args = [
   `${executionRoot}:/workspace`,
 ];
 if (trustedCiRoot) {
-  args.push('--volume', `${controlRoot}:/opt/sniptale-trusted:ro`);
+  baseContainerArgs.push('--volume', `${controlRoot}:/opt/sniptale-trusted:ro`);
 }
-for (const value of environment) args.push('--env', value);
-args.push(
-  image,
-  'bash',
-  '-c',
-  trustedCiRoot
-    ? 'mkdir -p "$HOME" && exec node /opt/sniptale-trusted/tooling/ci/run-lane.mjs "$1"'
-    : 'mkdir -p "$HOME" && exec node tooling/ci/run-lane.mjs "$1"',
-  'sniptale-ci',
-  lane
-);
+for (const value of environment) baseContainerArgs.push('--env', value);
+
+function runContainer(containerLane) {
+  return spawnSync(
+    'docker',
+    [
+      ...baseContainerArgs,
+      image,
+      'bash',
+      '-c',
+      trustedCiRoot
+        ? 'mkdir -p "$HOME" && exec node /opt/sniptale-trusted/tooling/ci/run-lane.mjs "$1"'
+        : 'mkdir -p "$HOME" && exec node tooling/ci/run-lane.mjs "$1"',
+      'sniptale-ci',
+      containerLane,
+    ],
+    { stdio: 'inherit' }
+  );
+}
+
+const candidatePhaseDefinitions = [
+  { id: 'install', command: 'npm ci --ignore-scripts' },
+  { id: 'provision-ast-grep', command: 'node node_modules/@ast-grep/cli/postinstall.js' },
+  { id: 'verify-ast-grep', command: 'node_modules/.bin/ast-grep --version' },
+  { id: 'release-harness', command: 'qa:release-harness', authority: 'diff' },
+  { id: 'checkpoint', command: 'qa:checkpoint', authority: 'diff' },
+  { id: 'closeout', command: 'qa:closeout', authority: 'diff' },
+  {
+    id: 'candidate-tree',
+    command: 'verify closeout tree and restore trusted candidate Git authority',
+    authority: 'closeout',
+  },
+  { id: 'release', command: 'qa:release', authority: 'commit' },
+  { id: 'security', command: 'qa:audit --profile security', authority: 'commit' },
+  { id: 'licenses', command: 'license audit', authority: 'commit' },
+  { id: 'coverage', command: 'qa:audit --profile coverage', authority: 'commit' },
+];
+
+function restoreCandidateAuthority(mode) {
+  const input = { ...candidateWorkspace, cwd: candidateWorkspace.workspace };
+  if (mode === 'diff') return restoreCandidateDiff(input);
+  if (mode === 'commit') return restoreCandidateCommit(input);
+  if (mode === 'closeout') {
+    verifyCandidateCloseout(input);
+    return restoreCandidateCommit(input);
+  }
+  return null;
+}
+
+function runCandidatePhases() {
+  const phases = [];
+  let failed = false;
+  for (const phase of candidatePhaseDefinitions) {
+    if (failed) {
+      phases.push({
+        id: phase.id,
+        command: null,
+        startedAt: null,
+        finishedAt: null,
+        status: 'blocked',
+        reason: 'earlier canonical candidate phase failed',
+      });
+      continue;
+    }
+    const startedAt = new Date().toISOString();
+    try {
+      if (phase.authority) restoreCandidateAuthority(phase.authority);
+      const result =
+        phase.id === 'candidate-tree' ? { status: 0 } : runContainer(`candidate-${phase.id}`);
+      const status = result.status ?? 1;
+      phases.push({
+        id: phase.id,
+        command: phase.command,
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        status: status === 0 ? 'passed' : 'failed',
+        exitCode: status,
+      });
+      failed = status !== 0;
+    } catch (error) {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      phases.push({
+        id: phase.id,
+        command: phase.command,
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        status: 'failed',
+        exitCode: 1,
+      });
+      failed = true;
+    }
+  }
+  return { phases, status: failed ? 1 : 0 };
+}
+
 const candidateStartedAtMs = Date.now();
-const result = spawnSync('docker', args, { stdio: 'inherit' });
+const candidateResult = candidateWorkspace ? runCandidatePhases() : null;
+const standardResult = candidateWorkspace ? null : runContainer(lane);
 try {
   if (candidateWorkspace) {
-    const passed = result.status === 0;
+    const passed = candidateResult.status === 0;
     if (passed) {
       verifyCandidateFinalState({ ...candidateWorkspace, cwd: candidateWorkspace.workspace });
       await finalizeCandidateReleaseArchive({
@@ -147,27 +235,12 @@ try {
         startedAtMs: candidateStartedAtMs,
       });
     }
-    const phaseIds = [
-      'install',
-      'provision-ast-grep',
-      'verify-ast-grep',
-      'release-harness',
-      'checkpoint',
-      'closeout',
-      'candidate-tree',
-      'release',
-      'security',
-      'licenses',
-      'coverage',
-    ];
     collectLaneArtifacts({
       lane: 'candidate',
       startedAtMs: candidateStartedAtMs,
       status: passed ? 'passed' : 'failed',
       command: ['qa:release-harness', 'qa:checkpoint', 'qa:closeout', 'qa:release', 'qa:audit'],
-      phases: passed
-        ? phaseIds.map((id) => ({ id, status: 'passed', exitCode: 0 }))
-        : [{ id: 'candidate-lane', status: 'failed', exitCode: result.status ?? 1 }],
+      phases: candidateResult.phases,
       containerDigest: digest,
       candidateTree: candidateWorkspace.candidateTree,
       trustedControlSha,
@@ -199,4 +272,6 @@ try {
     fs.rmSync(candidateWorkspace.temporaryRoot, { recursive: true, force: true });
   }
 }
-if (result.status !== 0) process.exit(result.status ?? 1);
+if ((candidateResult?.status ?? standardResult?.status ?? 1) !== 0) {
+  process.exit(candidateResult?.status ?? standardResult?.status ?? 1);
+}

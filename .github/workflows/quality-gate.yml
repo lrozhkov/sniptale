@@ -22,6 +22,7 @@ env:
   BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
   TRUSTED_CONTROL_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
   QA_IMAGE: sniptale-qa:${{ github.event.pull_request.head.sha || github.sha }}
+  SNIPTALE_QA_VITEST_MAX_WORKERS: '2'
 
 jobs:
   canonical-qa:

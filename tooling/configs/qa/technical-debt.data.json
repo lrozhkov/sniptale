@@ -16021,15 +16021,15 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "e95c067136fd7bff0d8ca2f8143777f4b4a1fc61104b15d5c05c8f00bff7527a"
+        "contentHash": "548e0b965481ff3bf5aba0f6f69b0c9b1f858c4b78072fac19d4fc01198cc957"
       },
       "consumers": [
         "tooling/ci/container.mjs"
       ],
       "surfaces": [
-        "binding:args",
+        "binding:baseContainerArgs",
+        "binding:candidatePhaseDefinitions",
         "binding:environment",
-        "binding:phaseIds",
         "property:command",
         "property:resourceProfiles"
       ]
@@ -17755,7 +17755,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/install-toolchain.mjs",
-        "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee"
+        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454"
       },
       "consumers": [
         "tooling/ci/install-toolchain.mjs"
@@ -19623,12 +19623,13 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "850ddcdd467c1dbf0696c83fd6c99a48fa5903038f7109438f652186d64fd2ee"
+        "contentHash": "6a146df5edf2938084c24da730df4ce1549f4032585654e665f06eb699e82726"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
+        "binding:candidatePhaseCommands",
         "binding:installCommands",
         "binding:laneCommands",
         "binding:licenseCommand",
