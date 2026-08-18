@@ -111,6 +111,25 @@ describe('collectBrowserAdapterViolations baseline allowances', () => {
       expect.objectContaining({ rule: 'browser-tabs-direct' }),
     ]);
   });
+
+  it('allows only the exact security E2E retention observer', () => {
+    const root = createTempRoot();
+    const allowed = writeFile(
+      root,
+      'tooling/test/e2e/support/security-helpers.ts',
+      'export const read = () => chrome.storage.local.get(null);\n'
+    );
+    const spoofed = writeFile(
+      root,
+      'spoof/tooling/test/e2e/support/security-helpers.ts',
+      'export const read = () => chrome.storage.local.get(null);\n'
+    );
+
+    expect(collectBrowserAdapterViolations([allowed], { root })).toEqual([]);
+    expect(collectBrowserAdapterViolations([spoofed], { root })).toEqual([
+      expect.objectContaining({ rule: 'browser-storage-direct' }),
+    ]);
+  });
 });
 
 describe('retired browser protocol guard', () => {

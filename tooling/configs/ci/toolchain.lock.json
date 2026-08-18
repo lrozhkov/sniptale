@@ -43,7 +43,7 @@
     "version": "2.26.3",
     "url": "https://github.com/github/codeql-cli-binaries/releases/download/v2.26.3/codeql-linux64.zip",
     "sha256": "cc0fed57d8441892b8fcf41b378f7ed925fb6e2783fa8f2d453717686e6c723e",
-    "querySuite": "javascript-security-and-quality.qls"
+    "querySuite": "codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls"
   },
   "osvScanner": {
     "version": "2.5.1",

@@ -149,6 +149,8 @@ try {
     }
     const phaseIds = [
       'install',
+      'provision-ast-grep',
+      'verify-ast-grep',
       'release-harness',
       'checkpoint',
       'closeout',

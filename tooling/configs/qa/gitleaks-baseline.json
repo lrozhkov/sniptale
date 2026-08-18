@@ -1,1 +1,101 @@
-[]
+[
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 47,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:47",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.47",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 60,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:60",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.60",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 135,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:135",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.135",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 143,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:143",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.143",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 162,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:162",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.162",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 174,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:174",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.174",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 181,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:181",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.181",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+    "StartLine": 203,
+    "Commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+    "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:203",
+    "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.203",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "docs/security/data-handling.md",
+    "StartLine": 56,
+    "Commit": "159c3084de72d16480c267fbd94883c2cc7cc9f7",
+    "Fingerprint": "159c3084de72d16480c267fbd94883c2cc7cc9f7:docs/security/data-handling.md:generic-api-key:56",
+    "SniptaleDebtId": "noise.gitleaks.data-handling-provider-metadata.56",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "docs/architecture/release-source-architecture.md",
+    "StartLine": 217,
+    "Commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
+    "Fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
+    "SniptaleDebtId": "noise.gitleaks.release-source-redaction-example.217",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "src/shared/security/secret-redaction.test.ts",
+    "StartLine": 11,
+    "Commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
+    "Fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
+    "SniptaleDebtId": "noise.gitleaks.secret-redaction-fixture.11",
+    "SniptaleScope": "history"
+  }
+]

@@ -118,6 +118,7 @@ it('keeps OSV and Gitleaks as required audit tools', () => {
 it('keeps full product coverage in qa:audit only', () => {
   const source = fs.readFileSync('tooling/qa/wrappers/audit.steps.mjs', 'utf8');
   const coverageSource = fs.readFileSync('tooling/qa/core/audit-coverage-step.mjs', 'utf8');
+  expect(coverageSource).toContain('resolveQaResourceProfile().vitestMaxWorkers');
   const releaseSource = fs.readFileSync('tooling/qa/core/verify-all.execution.mjs', 'utf8');
   const buildSource = fs.readFileSync('tooling/qa/core/verify-build.execution.mjs', 'utf8');
 

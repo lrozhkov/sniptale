@@ -3,6 +3,279 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "noise.gitleaks.viewport-capability-token.47",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:47"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:47",
+        "line": 47,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.60",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:60"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:60",
+        "line": 60,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.135",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:135"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:135",
+        "line": 135,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.143",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:143"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:143",
+        "line": 143,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.162",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:162"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:162",
+        "line": 162,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.174",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:174"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:174",
+        "line": 174,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.181",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:181"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:181",
+        "line": 181,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.203",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:203"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:203",
+        "line": 203,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.data-handling-provider-metadata.56",
+      "classification": "tool-noise",
+      "owner": "security-documentation",
+      "risk": "Security terminology in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding describes excluded provider metadata and contains no credential value.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "159c3084de72d16480c267fbd94883c2cc7cc9f7:docs/security/data-handling.md:generic-api-key:56"
+      },
+      "scope": {
+        "commit": "159c3084de72d16480c267fbd94883c2cc7cc9f7",
+        "file": "docs/security/data-handling.md",
+        "fingerprint": "159c3084de72d16480c267fbd94883c2cc7cc9f7:docs/security/data-handling.md:generic-api-key:56",
+        "line": 56,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.release-source-redaction-example.217",
+      "classification": "tool-noise",
+      "owner": "release-documentation",
+      "risk": "A redaction example in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is documentation for redacted release-source output and contains no usable credential.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217"
+      },
+      "scope": {
+        "commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
+        "file": "docs/architecture/release-source-architecture.md",
+        "fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
+        "line": 217,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.secret-redaction-fixture.11",
+      "classification": "tool-noise",
+      "owner": "shared-security-tests",
+      "risk": "A synthetic redaction fixture in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test input used to prove credential redaction.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11"
+      },
+      "scope": {
+        "commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
+        "file": "src/shared/security/secret-redaction.test.ts",
+        "fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
+        "line": 11,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "accepted.codeql.locked-toolchain-download-write",
+      "classification": "accepted-architecture",
+      "owner": "qa-platform",
+      "risk": "Downloaded tool bytes are written into the QA image and would be executable if their locked digest were incorrectly reviewed.",
+      "reason": "The installer writes only to fixed image-owned destinations after verifying every response byte against the exact SHA-256 in the trusted toolchain lock.",
+      "removalCondition": "Remove this entry if CodeQL models the preceding digest check or the installer no longer writes downloaded tools.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "codeql",
+        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+      },
+      "scope": {
+        "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee",
+        "file": "tooling/ci/install-toolchain.mjs",
+        "line": 42,
+        "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
+        "rule": "js/http-to-file-access"
+      },
+      "targetAction": "Retain fixed destinations and exact pre-write SHA-256 verification; any content or line drift requires renewed review."
+    },
+    {
+      "id": "accepted.codeql.locked-toolchain-download-url",
+      "classification": "accepted-architecture",
+      "owner": "qa-platform",
+      "risk": "A tool URL selected from mutable or candidate-controlled data could turn the QA image build into an unintended outbound request.",
+      "reason": "GitHub CI materializes the Dockerfile and machine lock from the trusted control commit, and every fetched object is additionally bound to an exact reviewed SHA-256.",
+      "removalCondition": "Remove this entry if download endpoints become compile-time constants or CodeQL can model trusted-control provenance.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "codeql",
+        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
+      },
+      "scope": {
+        "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee",
+        "file": "tooling/ci/install-toolchain.mjs",
+        "line": 37,
+        "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
+        "rule": "js/file-access-to-http"
+      },
+      "targetAction": "Keep CI build inputs trusted-control-bound and all downloads exact-digest-verified; any source drift requires renewed review."
+    },
+    {
       "id": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
       "classification": "accepted-architecture",
       "owner": "ai-secret-unlock-tests",
@@ -13341,7 +13614,7 @@
       "remediation": "Keep prefixes limited to canonical adapters and test infrastructure; review every added prefix.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-paths.mjs",
-        "contentHash": "0df4610dab6a310b90c8ccdfb236c153f1f1e6a97cef076109f80d2e3e9aae8b"
+        "contentHash": "bed57a61419e0adfa1ae823a828e7231801637a0699bebccba738c83f8db4ca6"
       },
       "consumers": [
         "tooling/qa/policy/browser-adapters-paths.mjs",
@@ -13692,7 +13965,7 @@
       "remediation": "Keep exceptions file-exact and prefer FakeRuntimeMessagingTransport.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging.mjs",
-        "contentHash": "3cf48013d935c148a8b56cacd18a863011505f3fe9a99c0d46c5f058090114a5"
+        "contentHash": "503758bd8dd50805fdc35ec2bc8a23f65f6c512109ae4235d5f72a1d9d1adffd"
       },
       "surfaces": [
         "binding:ALLOWED_CHROME_STUB_FILES",
@@ -15642,7 +15915,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/codeql.mjs",
-        "contentHash": "c53695db762537bc3f1f365b99c5fe334125a98c70d758115b12759f21c1efcb"
+        "contentHash": "a6fbe750703e5763415eb92b2107e93a3746675813962883e0cf32e43fd8d5e7"
       },
       "consumers": [
         "tooling/qa/audits/codeql.mjs",
@@ -15748,7 +16021,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "274afb87a417adf2d31862c37aa4c5fa2503e8d45835ecf31e7dca6133408981"
+        "contentHash": "e95c067136fd7bff0d8ca2f8143777f4b4a1fc61104b15d5c05c8f00bff7527a"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -19350,12 +19623,13 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "1c96f1b7ba4cbac492c12abcd0908fb692e8e95fd0ca6dd189efcd9480c2c4c4"
+        "contentHash": "850ddcdd467c1dbf0696c83fd6c99a48fa5903038f7109438f652186d64fd2ee"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
+        "binding:installCommands",
         "binding:laneCommands",
         "binding:licenseCommand",
         "binding:phases",
@@ -19726,7 +20000,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/security-control.ts",
-        "contentHash": "b0167980849e29ae1bb4706664eedad22d9105d4c9ae38f7a38cad9528ac67a0"
+        "contentHash": "277de64b564b5e3cb85f761aaf4d8836c69b29b6f7b6e8790ad8e8e839aa72b2"
       },
       "consumers": [
         "tooling/test/harness/security-control.ts"

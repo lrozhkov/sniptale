@@ -18,7 +18,8 @@ import {
   requireAuditCommandStatus,
 } from './result-contract.mjs';
 
-export const CODEQL_STANDARD_SUITE = 'javascript-security-and-quality.qls';
+export const CODEQL_STANDARD_SUITE =
+  'codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls';
 export const CODEQL_CUSTOM_SUITE_PATH = 'tooling/qa/codeql/sniptale-custom.qls';
 export const CODEQL_FILTERED_SARIF_PATH = '.tmp/codeql/results.filtered.sarif';
 
