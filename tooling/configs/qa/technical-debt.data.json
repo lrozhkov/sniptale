@@ -18551,7 +18551,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/selectel/openstack-client.mjs",
-        "contentHash": "55c0060a756812b991736b8c620f69a185992efcdc30f0690b6ff77a94a62da3"
+        "contentHash": "17bc7bbc3646bb0ef32857efc3be84cf312e3ed5c89b8cf593fe448ffdc57f1e"
       },
       "consumers": [
         "tooling/ci/selectel/openstack-client.mjs",
@@ -19102,7 +19102,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/selectel/preflight.mjs",
-        "contentHash": "7aa0dbbf4c49ad53fe0095e7f229e98704ced56c9ab1ac98397e75b11a257cf1"
+        "contentHash": "46fdef31c80cb3781c8d42cf3d5a8f9dfa6aaa8a6020b17c5b83eb40329d1b7e"
       },
       "consumers": [
         "tooling/ci/selectel/preflight.mjs",
@@ -19112,7 +19112,8 @@
         "property:collectSelectelPreflight/externalNetwork",
         "property:collectSelectelPreflight/flavor",
         "property:collectSelectelPreflight/image",
-        "property:collectSelectelPreflight/requested"
+        "property:collectSelectelPreflight/requested",
+        "property:selectRunnerCapacity/quotas"
       ]
     },
     {

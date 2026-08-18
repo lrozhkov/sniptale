@@ -73,34 +73,62 @@ function selectImage(images, policy) {
   return matches[0];
 }
 
-function selectAvailabilityZone(zones) {
-  const matches = zones.filter(
-    (zone) => zone?.zoneState?.available === true && typeof zone?.zoneName === 'string'
-  );
-  if (matches.length === 0) throw new Error('No available Selectel compute availability zone.');
-  return matches.sort((left, right) => left.zoneName.localeCompare(right.zoneName))[0].zoneName;
+function availableZones(zones) {
+  return zones
+    .filter((zone) => zone?.zoneState?.available === true && typeof zone?.zoneName === 'string')
+    .map((zone) => zone.zoneName)
+    .sort((left, right) => left.localeCompare(right));
 }
 
-function assertQuotas({ compute, volume }, policy) {
-  const computeQuota = compute?.quota_set;
+function zoneQuotaPair(payload, resource, zone) {
+  const entries = payload?.quotas?.[resource];
+  if (!Array.isArray(entries)) return { limit: null, used: null };
+  const matches = entries.filter((entry) => entry?.zone === zone);
+  if (matches.length !== 1) return { limit: null, used: null };
+  return {
+    limit: numberField(matches[0], ['value']),
+    used: numberField(matches[0], ['used']),
+  };
+}
+
+function selectRunnerCapacity({ quotaManager, volume, zones }, policy) {
+  if (quotaManager?.error != null) {
+    throw new Error('Selectel quota manager reported a partial failure.');
+  }
   const volumes = volume?.quota_set ?? volume;
-  const { limit: maxCores, used: usedCores } = detailedQuotaPair(computeQuota, 'cores');
-  const { limit: maxRam, used: usedRam } = detailedQuotaPair(computeQuota, 'ram');
   const { limit: maxGigabytes, used: usedGigabytes } = volumeQuotaPair(volumes);
-  assertQuotaPair(maxCores, usedCores, 'compute core');
-  assertQuotaPair(maxRam, usedRam, 'compute RAM');
   assertQuotaPair(maxGigabytes, usedGigabytes, 'volume capacity');
-  if (
-    available(maxCores, usedCores) < policy.compute.vcpus ||
-    available(maxRam, usedRam) < policy.compute.ramMiB ||
-    available(maxGigabytes, usedGigabytes) < policy.compute.bootVolumeGiB
-  ) {
+  if (available(maxGigabytes, usedGigabytes) < policy.compute.bootVolumeGiB) {
     throw new Error('Selectel project has insufficient free canonical runner quota.');
   }
+  const candidates = availableZones(zones).flatMap((zone) => {
+    const { limit: maxCores, used: usedCores } = zoneQuotaPair(quotaManager, 'compute_cores', zone);
+    const { limit: maxRam, used: usedRam } = zoneQuotaPair(quotaManager, 'compute_ram', zone);
+    try {
+      assertQuotaPair(maxCores, usedCores, 'compute core');
+      assertQuotaPair(maxRam, usedRam, 'compute RAM');
+    } catch {
+      return [];
+    }
+    if (
+      available(maxCores, usedCores) < policy.compute.vcpus ||
+      available(maxRam, usedRam) < policy.compute.ramMiB
+    ) {
+      return [];
+    }
+    return [{ zone, maxCores, usedCores, maxRam, usedRam }];
+  });
+  if (candidates.length === 0) {
+    throw new Error('No available Selectel zone has complete canonical runner quota.');
+  }
+  const selected = candidates[0];
   return {
-    freeVcpus: available(maxCores, usedCores),
-    freeRamMiB: available(maxRam, usedRam),
-    freeVolumeGiB: available(maxGigabytes, usedGigabytes),
+    availabilityZone: selected.zone,
+    quotas: {
+      freeVcpus: available(selected.maxCores, selected.usedCores),
+      freeRamMiB: available(selected.maxRam, selected.usedRam),
+      freeVolumeGiB: available(maxGigabytes, usedGigabytes),
+    },
   };
 }
 
@@ -113,23 +141,31 @@ export async function collectSelectelPreflight({
   const session = await authenticateOpenStack({
     env,
     expectedProjectSha256: policy.controllerEnvironment.expectedProjectSha256,
+    expectedRegion: policy.controllerEnvironment.expectedRegion,
+    quotaManagerUrl: policy.controllerEnvironment.quotaManagerUrl,
     fetchImpl,
   });
   const request = (service, requestPath, operation) =>
     openStackJson(session, service, requestPath, { fetchImpl, operation });
-  const [computeQuota, volumeQuota, flavorPayload, zonePayload, imagePayload, networkPayload] =
+  const [quotaManager, volumeQuota, flavorPayload, zonePayload, imagePayload, networkPayload] =
     await Promise.all([
-      request('compute', `/os-quota-sets/${session.projectId}/detail`, 'quota'),
+      request(
+        'quotaManager',
+        `/v1/projects/${session.projectId}/quotas?resource=compute_cores&resource=compute_ram`,
+        'quota'
+      ),
       request('volume', `/os-quota-sets/${session.projectId}?usage=true`, 'quota'),
       request('compute', '/flavors/detail', 'flavors'),
       request('compute', '/os-availability-zone', 'availability zones'),
       request('image', '/v2/images?status=active&limit=200', 'images'),
       request('network', '/v2.0/networks?router%3Aexternal=true', 'external networks'),
     ]);
-  const quotas = assertQuotas({ compute: computeQuota, volume: volumeQuota }, policy);
+  const capacity = selectRunnerCapacity(
+    { quotaManager, volume: volumeQuota, zones: zonePayload.availabilityZoneInfo ?? [] },
+    policy
+  );
   const flavor = selectFlavor(flavorPayload.flavors ?? [], policy);
   const image = selectImage(imagePayload.images ?? [], policy);
-  const availabilityZone = selectAvailabilityZone(zonePayload.availabilityZoneInfo ?? []);
   const externalNetworks = networkPayload.networks ?? [];
   if (
     externalNetworks.length !== 1 ||
@@ -143,11 +179,11 @@ export async function collectSelectelPreflight({
     artifactKind: 'sniptale-selectel-connectivity-proof',
     project: session.projectFingerprint,
     region: session.region,
-    availabilityZone,
+    availabilityZone: capacity.availabilityZone,
     image: { id: image.id, name: image.name },
     flavor: { id: flavor.id, name: flavor.name, vcpus: flavor.vcpus, ramMiB: flavor.ram },
     externalNetwork: { id: externalNetworks[0].id, name: externalNetworks[0].name },
-    quotas,
+    quotas: capacity.quotas,
     requested: {
       vcpus: policy.compute.vcpus,
       ramMiB: policy.compute.ramMiB,
