@@ -7,6 +7,8 @@ import { expect, it } from 'vitest';
 import { createTempRoot, writeFile } from '../qa/core/test-helpers';
 import {
   materializeCandidateWorkspace,
+  restoreCandidateCommit,
+  restoreCandidateDiff,
   verifyCandidateCloseout,
   verifyCandidateFinalState,
 } from './candidate-workspace.mjs';
@@ -89,11 +91,18 @@ it('accepts only a clean closeout commit with the candidate tree and base parent
   }
 });
 
-it('rejects tracked drift after later candidate phases while allowing generated outputs', () => {
+it('restores the exact candidate commit before history-sensitive phases', () => {
   const source = createCandidateRepository();
   const candidate = materializeCandidateWorkspace(source);
   try {
     git(candidate.workspace, ['commit', '--quiet', '-m', 'candidate closeout']);
+    expect(git(candidate.workspace, ['rev-parse', 'HEAD'])).not.toBe(candidate.candidateSha);
+    writeFile(candidate.workspace, '.git/info/grafts', `${candidate.candidateSha}\n`);
+    writeFile(candidate.workspace, '.git/refs/replace/forged', candidate.baseSha);
+    restoreCandidateCommit({ ...candidate, cwd: candidate.workspace });
+    expect(git(candidate.workspace, ['rev-parse', 'HEAD'])).toBe(candidate.candidateSha);
+    expect(fs.existsSync(path.join(candidate.workspace, '.git/info/grafts'))).toBe(false);
+    expect(fs.existsSync(path.join(candidate.workspace, '.git/refs/replace/forged'))).toBe(false);
     writeFile(candidate.workspace, 'build/generated.txt', 'generated\n');
     expect(() =>
       verifyCandidateFinalState({ ...candidate, cwd: candidate.workspace })
@@ -102,6 +111,50 @@ it('rejects tracked drift after later candidate phases while allowing generated 
     expect(() => verifyCandidateFinalState({ ...candidate, cwd: candidate.workspace })).toThrow(
       'tracked state drifted'
     );
+  } finally {
+    fs.rmSync(candidate.temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+it('reconstructs the staged candidate diff from authority outside the candidate workspace', () => {
+  const source = createCandidateRepository();
+  const candidate = materializeCandidateWorkspace(source);
+  try {
+    writeFile(candidate.workspace, '.git/shallow', `${candidate.baseSha}\n`);
+    restoreCandidateDiff({ ...candidate, cwd: candidate.workspace });
+    expect(git(candidate.workspace, ['rev-parse', 'HEAD'])).toBe(candidate.baseSha);
+    expect(git(candidate.workspace, ['write-tree'])).toBe(candidate.candidateTree);
+    expect(fs.existsSync(path.join(candidate.workspace, '.git/shallow'))).toBe(false);
+  } finally {
+    fs.rmSync(candidate.temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+it('fails closed when a candidate phase changes the tracked worktree', () => {
+  const source = createCandidateRepository();
+  const candidate = materializeCandidateWorkspace(source);
+  try {
+    fs.appendFileSync(path.join(candidate.workspace, 'moved.txt'), 'hostile drift\n');
+    expect(() => restoreCandidateDiff({ ...candidate, cwd: candidate.workspace })).toThrow(
+      'does not match expected tree'
+    );
+  } finally {
+    fs.rmSync(candidate.temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+it('rejects candidate identity restoration when the expected tree is forged', () => {
+  const source = createCandidateRepository();
+  const candidate = materializeCandidateWorkspace(source);
+  try {
+    git(candidate.workspace, ['commit', '--quiet', '-m', 'candidate closeout']);
+    expect(() =>
+      restoreCandidateCommit({
+        ...candidate,
+        candidateTree: source.baseSha,
+        cwd: candidate.workspace,
+      })
+    ).toThrow('Candidate commit tree changed');
   } finally {
     fs.rmSync(candidate.temporaryRoot, { recursive: true, force: true });
   }

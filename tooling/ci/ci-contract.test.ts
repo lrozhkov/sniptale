@@ -111,8 +111,10 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(lane).toContain("wrapper('release')");
   expect(lane).toContain("wrapper('audit', '--profile', 'security')");
   expect(lane).toContain("wrapper('audit', '--profile', 'coverage')");
-  expect(lane).toContain("if (lane !== 'candidate')");
+  expect(lane).toContain('if (!candidatePhaseCommand)');
   expect(container).toContain('await finalizeCandidateReleaseArchive');
+  expect(container).toContain('runContainer(`candidate-${phase.id}`)');
+  expect(container).toContain('restoreCandidateAuthority(phase.authority)');
   expect(container.indexOf("spawnSync('docker'")).toBeLessThan(
     container.indexOf('await finalizeCandidateReleaseArchive')
   );
@@ -145,6 +147,7 @@ it('distinguishes disabled settings from rollback snapshot failures', () => {
 it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
   const dockerfile = fs.readFileSync('tooling/ci/Dockerfile', 'utf8');
+  const installer = fs.readFileSync('tooling/ci/install-toolchain.mjs', 'utf8');
   const semgrepLock = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock', 'utf8');
   expect(dockerfile.startsWith(`FROM ${lock.node.image}\n`)).toBe(true);
   expect(semgrepLock).toContain(`semgrep==${lock.semgrep.version}`);
@@ -164,6 +167,13 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
     dockerfile.lastIndexOf('apt-get update')
   );
   expect(dockerfile).not.toContain('deb.debian.org');
+  expect(lock.codeql.url).toMatch(
+    /^https:\/\/github\.com\/github\/codeql-action\/releases\/download\/codeql-bundle-v/u
+  );
+  expect(lock.codeql.url).toContain(`codeql-bundle-v${lock.codeql.version}`);
+  expect(lock.codeql.sha256).toMatch(/^[a-f0-9]{64}$/u);
+  expect(installer).toContain("codeql.tar.gz', '-C', '/opt'");
+  expect(installer).not.toContain('codeql.zip');
   const dockerignore = fs.readFileSync('.dockerignore', 'utf8');
   for (const excluded of ['.git', '.env', '.tmp', 'build', 'node_modules']) {
     expect(dockerignore.split('\n')).toContain(excluded);
@@ -179,6 +189,16 @@ it('binds the CodeQL audit suite to the locked CI query suite', () => {
   const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
   const source = fs.readFileSync('tooling/qa/audits/codeql.mjs', 'utf8');
   expect(source).toContain(lock.codeql.querySuite);
+});
+
+it('pins the measured GitHub runner profile in both canonical workflows', () => {
+  for (const workflowPath of [
+    '.github/workflows/quality-gate.yml',
+    '.github/workflows/release.yml',
+  ]) {
+    const workflow = fs.readFileSync(workflowPath, 'utf8');
+    expect(workflow).toContain("SNIPTALE_QA_VITEST_MAX_WORKERS: '2'");
+  }
 });
 
 it('fails release publication closed around live immutability and asset digests', () => {
@@ -753,4 +773,11 @@ it('rejects PR and local authority that changes while proof lanes run', () => {
   expect(laneSource).toContain("['ci', '--ignore-scripts']");
   expect(laneSource).toContain("['node_modules/@ast-grep/cli/postinstall.js']");
   expect(laneSource).toContain("['node_modules/.bin/ast-grep', ['--version']]");
+  expect(laneSource).toContain('candidatePhaseCommands');
+  expect(laneSource).not.toContain('ci-candidate-phases.json');
+  const containerSource = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
+  expect(containerSource).toContain('runCandidatePhases');
+  expect(containerSource).toContain('restoreCandidateDiff');
+  expect(containerSource).toContain('restoreCandidateCommit');
+  expect(containerSource).toContain('candidateResult.phases');
 });

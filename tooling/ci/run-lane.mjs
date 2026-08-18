@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 
 import { collectLaneArtifacts } from './artifacts.mjs';
-import { verifyCandidateCloseout } from './candidate-workspace.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
@@ -44,8 +43,18 @@ const installCommands = [
   ['provision-ast-grep', ['node', ['node_modules/@ast-grep/cli/postinstall.js']]],
   ['verify-ast-grep', ['node_modules/.bin/ast-grep', ['--version']]],
 ];
-if (![...Object.keys(laneCommands), 'candidate'].includes(lane)) {
-  throw new Error('Usage: run-lane.mjs <candidate|release|release-audit|security|coverage>');
+const candidatePhaseCommands = new Map([
+  ...installCommands.map(([id, command]) => [`candidate-${id}`, command]),
+  ['candidate-release-harness', wrapper('release-harness')],
+  ['candidate-checkpoint', wrapper('checkpoint')],
+  ['candidate-closeout', wrapper('closeout', '-m', 'ci: verify exact candidate tree')],
+  ['candidate-release', wrapper('release')],
+  ['candidate-security', wrapper('audit', '--profile', 'security')],
+  ['candidate-licenses', licenseCommand],
+  ['candidate-coverage', wrapper('audit', '--profile', 'coverage')],
+]);
+if (![...Object.keys(laneCommands), ...candidatePhaseCommands.keys()].includes(lane)) {
+  throw new Error('Usage: run-lane.mjs <release|release-audit|security|coverage|candidate-PHASE>');
 }
 if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
   throw new Error('Canonical lanes may only run inside the locked QA container.');
@@ -53,6 +62,7 @@ if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
 
 const startedAtMs = Date.now();
 const phases = [];
+
 function runPhase(id, command) {
   const startedAt = new Date().toISOString();
   const result = spawnSync(command[0], command[1], { stdio: 'inherit', env: process.env });
@@ -70,66 +80,6 @@ function runPhase(id, command) {
 
 function blockPhase(id, reason) {
   phases.push({ id, command: null, startedAt: null, finishedAt: null, status: 'blocked', reason });
-}
-
-function runCandidateLane() {
-  const prerequisiteCommands = [
-    ...installCommands,
-    ['release-harness', wrapper('release-harness')],
-    ['checkpoint', wrapper('checkpoint')],
-    ['closeout', wrapper('closeout', '-m', 'ci: verify exact candidate tree')],
-  ];
-  let prerequisiteFailure = false;
-  for (const [id, command] of prerequisiteCommands) {
-    if (prerequisiteFailure) {
-      blockPhase(id, 'earlier canonical prerequisite failed');
-      continue;
-    }
-    prerequisiteFailure = runPhase(id, command) !== 0;
-  }
-  if (prerequisiteFailure) {
-    for (const id of ['candidate-tree', 'release', 'security', 'licenses', 'coverage']) {
-      blockPhase(id, 'canonical closeout did not complete');
-    }
-    return 1;
-  }
-
-  try {
-    verifyCandidateCloseout({
-      baseSha: process.env.SNIPTALE_BASE_SHA,
-      candidateSha: process.env.GITHUB_SHA,
-      candidateTree: process.env.SNIPTALE_CANDIDATE_TREE,
-    });
-    phases.push({
-      id: 'candidate-tree',
-      command: 'verify exact candidate tree',
-      startedAt: null,
-      finishedAt: new Date().toISOString(),
-      status: 'passed',
-      exitCode: 0,
-    });
-  } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    phases.push({
-      id: 'candidate-tree',
-      command: 'verify exact candidate tree',
-      startedAt: null,
-      finishedAt: new Date().toISOString(),
-      status: 'failed',
-      exitCode: 1,
-    });
-    for (const id of ['release', 'security', 'licenses', 'coverage']) {
-      blockPhase(id, 'candidate tree identity failed');
-    }
-    return 1;
-  }
-
-  const releaseStatus = runPhase('release', wrapper('release'));
-  const securityStatus = runPhase('security', wrapper('audit', '--profile', 'security'));
-  const licenseStatus = securityStatus === 0 ? runPhase('licenses', licenseCommand) : 1;
-  if (securityStatus !== 0) blockPhase('licenses', 'security audit failed');
-  const coverageStatus = runPhase('coverage', wrapper('audit', '--profile', 'coverage'));
-  return releaseStatus || securityStatus || licenseStatus || coverageStatus;
 }
 
 function runStandardLane() {
@@ -150,9 +100,12 @@ function runStandardLane() {
   }
   return standardStatus;
 }
-let status = lane === 'candidate' ? runCandidateLane() : runStandardLane();
+const candidatePhaseCommand = candidatePhaseCommands.get(lane);
+let status = candidatePhaseCommand
+  ? runPhase(lane.slice('candidate-'.length), candidatePhaseCommand)
+  : runStandardLane();
 
-if (lane !== 'candidate') {
+if (!candidatePhaseCommand) {
   try {
     const artifactPath = collectLaneArtifacts({
       lane,
