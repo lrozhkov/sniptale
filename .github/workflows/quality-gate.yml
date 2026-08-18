@@ -47,22 +47,33 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 22.12.0
+          node-version: 22.16.0
           cache: npm
           cache-dependency-path: candidate/package-lock.json
       - name: Install trusted control dependencies
         working-directory: trusted-control
         run: npm ci --ignore-scripts
+      - name: Reuse immutable trusted QA image
+        if: github.event_name == 'pull_request_target'
+        env:
+          TRUSTED_QA_IMAGE: ghcr.io/lrozhkov/sniptale-qa:sha-${{ env.TRUSTED_CONTROL_SHA }}
+        run: |
+          if docker pull "$TRUSTED_QA_IMAGE"; then
+            echo "SNIPTALE_CI_IMAGE=$TRUSTED_QA_IMAGE" >> "$GITHUB_ENV"
+            echo 'SNIPTALE_CI_SKIP_BUILD=1' >> "$GITHUB_ENV"
+          else
+            echo 'Immutable base image unavailable; canonical lane will rebuild it.' >&2
+          fi
       - name: Run canonical local QA workflow
         working-directory: candidate
         env:
           SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
           SNIPTALE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
-          SNIPTALE_CI_IMAGE: ${{ env.QA_IMAGE }}
           SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control
           SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
         run: node ../trusted-control/tooling/ci/container.mjs candidate
       - name: Upload canonical proof
+        id: canonical-proof
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -71,6 +82,25 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
+      - name: Publish canonical proof location
+        if: always()
+        env:
+          ARTIFACT_NAME: canonical-qa-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          ARTIFACT_URL: ${{ steps.canonical-proof.outputs.artifact-url }}
+        run: |
+          {
+            echo '### Canonical QA proof'
+            echo
+            if [ -n "$ARTIFACT_URL" ]; then
+              echo "Artifact: [$ARTIFACT_NAME]($ARTIFACT_URL)"
+            else
+              echo "Artifact upload did not produce a URL: $ARTIFACT_NAME"
+            fi
+            echo
+            echo '```sh'
+            echo "gh run download $GITHUB_RUN_ID -n $ARTIFACT_NAME"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   candidate-control-smoke:
     if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false

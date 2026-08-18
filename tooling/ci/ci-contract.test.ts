@@ -104,6 +104,9 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs candidate');
   expect(workflow).toContain('working-directory: trusted-control');
   expect(workflow).toContain('run: npm ci --ignore-scripts');
+  expect(workflow).toContain('echo "SNIPTALE_CI_IMAGE=$TRUSTED_QA_IMAGE" >> "$GITHUB_ENV"');
+  expect(workflow).toContain('echo \'SNIPTALE_CI_SKIP_BUILD=1\' >> "$GITHUB_ENV"');
+  expect(workflow.match(/SNIPTALE_CI_IMAGE: \$\{\{ env\.QA_IMAGE \}\}/gu)).toHaveLength(1);
   expect(lane.indexOf("wrapper('release-harness')")).toBeLessThan(
     lane.indexOf("wrapper('checkpoint')")
   );

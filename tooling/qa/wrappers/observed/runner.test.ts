@@ -168,6 +168,48 @@ describe('observed wrapper secret handling', () => {
 });
 
 describe('observed wrapper console output', () => {
+  it('prints a sanitized command-safe tail for a failed step without verbose mode', async () => {
+    const root = createTempRoot('observed-wrapper-failure-tail-');
+    initGitRepo(root);
+    const writes: string[] = [];
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    await withCwd(root, async () => {
+      await runObservedWrapper({
+        wrapperId: 'qa:checkpoint',
+        label: 'QA checkpoint',
+        argv: [],
+        contractValidator: ignoreStepContract,
+        environment: createPrivateEnvironment(root),
+        execute: async () => ({
+          steps: [
+            {
+              label: 'Unit tests',
+              status: 'failed',
+              stdout: [
+                'old output\n'.repeat(5000),
+                'safe\r::add-mask::private-fixture',
+                '\r::error private-fixture\nAssertionError: expected true',
+              ].join(''),
+            },
+          ],
+        }),
+      });
+    });
+    const stdout = writes.join('');
+    expect(stdout).toContain('[Unit tests: failure output tail]');
+    expect(stdout).toContain('| AssertionError: expected true');
+    expect(stdout).toContain('| ::error <redacted>');
+    expect(stdout).toContain('| ::add-mask::<redacted>');
+    expect(stdout).not.toMatch(/^::error/gmu);
+    expect(stdout).not.toMatch(/^::add-mask/gmu);
+    expect(stdout).not.toContain('\r::');
+    expect(stdout).not.toContain(PRIVATE_VALUES.secret);
+    output.mockRestore();
+  });
+
   it('prints one sanitized bounded report block before the summary and records it in the log', async () => {
     const root = createTempRoot('observed-wrapper-console-');
     initGitRepo(root);

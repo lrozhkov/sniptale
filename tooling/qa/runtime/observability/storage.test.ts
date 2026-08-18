@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createTempRoot } from '../../core/test-helpers';
-import { sanitizeLogText } from './sanitize.mjs';
+import { sanitizeBoundedConsoleTail, sanitizeLogText } from './sanitize.mjs';
 import { appendBoundedLog, writeJsonAtomic } from './storage.mjs';
 
 describe('observability log sanitization', () => {
@@ -34,6 +34,20 @@ describe('observability log sanitization', () => {
     expect(sanitized).not.toMatch(/private|password|Alice|alice|json-bearer/u);
     expect(sanitized).not.toContain('\u001b');
     expect(sanitized).not.toContain('\u0000');
+  });
+
+  it('keeps the sanitized end of bounded failure output', () => {
+    const tail = sanitizeBoundedConsoleTail(
+      `private-prefix\n${'x'.repeat(200)}\nAssertionError: expected true`,
+      { sensitiveValues: ['private-prefix'] },
+      96
+    );
+
+    expect(Buffer.byteLength(tail)).toBeLessThanOrEqual(96);
+    expect(tail).toContain('earlier failure output omitted');
+    expect(tail).toContain('AssertionError: expected true');
+    expect(tail).not.toContain('private-prefix');
+    expect(tail).not.toContain('\ufffd');
   });
 });
 
