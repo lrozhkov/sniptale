@@ -224,7 +224,7 @@ it('binds a reusable main proof to its exact commit, tree, files, and trusted co
 });
 
 it('binds the published QA image digest to the exact successful main workflow', () => {
-  const root = path.join(createTempRoot('image-proof-'), 'proof');
+  const root = path.join(createTempRoot('image-proof-'), 'build', 'proof');
   const identity = {
     commit: 'a'.repeat(40),
     digest: `sha256:${'b'.repeat(64)}`,
