@@ -14754,6 +14754,7 @@
         "contentHash": "b5ff7b3ea5766f80d8f3646a9ede0cc1edab08b8247d5c4a0aca3f93d3dd5c71"
       },
       "consumers": [
+        "tooling/ci/artifacts.mjs",
         "tooling/release/artifact-security-dynamic-sandbox-worker.test.ts",
         "tooling/release/artifact-security-dynamic.test.ts",
         "tooling/release/artifact-security.mjs",
@@ -14817,7 +14818,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "f0939f21a84dda45d980cadf55df24f0caf768e7debe87589f60accb62dbb74c"
+        "contentHash": "f98c39bebf88c2c388a46d1dca356f9501f61ba5834888e000d5b4a8706c0d97"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
@@ -15982,7 +15983,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "57686163abda96ee9298fdd4282d7c3614a70256364f5ddb39873e8682024b2c"
+        "contentHash": "ec7b29a92ae01834de002b96a10c4d1417c6fa2c30e8e4f9bc35a68500210f80"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -18694,7 +18695,6 @@
         "contentHash": "9494c36cfcf9ccb9c5e0ddfe76783e7353568ef72f2c875eb6410a4761b44e50"
       },
       "consumers": [
-        "tooling/ci/artifacts.mjs",
         "tooling/release/package-dist.mjs",
         "tooling/release/package-dist.test.ts"
       ],
@@ -19636,7 +19636,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "d3121570f79bae9e0c43f990968983c69fe6b465d4df987d1acbc513d2deb2c6"
+        "contentHash": "0b69fa1820917c5f3282d74d9c1472ffbe50ab7f868a15cb361f068676061217"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"

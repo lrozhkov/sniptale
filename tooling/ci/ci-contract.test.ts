@@ -17,7 +17,7 @@ import {
 import { assertReleaseTagRuleset } from './release-tag-policy.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
 import { verifyImageProof, writeImageProof } from './image-proof.mjs';
-import { finalizeCandidateReleaseArchive } from './artifacts.mjs';
+import { candidateReleaseArchiveIdentity, finalizeCandidateReleaseArchive } from './artifacts.mjs';
 
 function createEmptyRunRecord({
   runId,
@@ -537,6 +537,10 @@ it('rejects a release ZIP replaced by a detached candidate child before trusted 
     expect(spawnSync('git', args, { cwd: root }).status).toBe(0);
   }
   const archivePath = path.join(root, 'build/sniptale_0.3.1.zip');
+  const expectedSha256 = candidateReleaseArchiveIdentity({
+    candidateRoot: root,
+    startedAtMs: 0,
+  }).sha256;
   const replacer = spawn(
     process.execPath,
     [
@@ -552,15 +556,8 @@ it('rejects a release ZIP replaced by a detached candidate child before trusted 
     finalizeCandidateReleaseArchive({
       candidateRoot: root,
       startedAtMs: 0,
-      archiveBuilder: async ({ repoRoot }) => {
-        const rebuilt = path.join(repoRoot, 'build/rebuilt.zip');
-        writeFile(
-          repoRoot,
-          'build/rebuilt.zip',
-          fs.readFileSync(path.join(repoRoot, 'dist/payload.js'))
-        );
-        return rebuilt;
-      },
+      expectedSha256,
+      archiveVerifier: async () => {},
     })
   ).rejects.toThrow('changed after canonical release validation');
 });

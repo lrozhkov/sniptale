@@ -100,10 +100,11 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(lane).toContain('if (!candidatePhaseCommand && lane !== candidateFinalizeLane)');
   expect(lane).toContain('await finalizeCandidateReleaseArchive');
   expect(lane).toContain("const candidateFinalizeLane = 'candidate-release-artifact'");
-  expect(lane).toContain("temporaryParent: '/tmp'");
+  expect(lane).toContain('SNIPTALE_EXPECTED_RELEASE_ARCHIVE_SHA256');
+  expect(container).toContain('candidateReleaseArchiveIdentity');
   expect(container).toContain("id: 'release-artifact'");
   expect(container).toContain("id: 'receipts'");
-  expect(container).toContain('runContainer(`candidate-${phase.id}`)');
+  expect(container).toContain('`candidate-${phase.id}`');
   expect(container).toContain('restoreCandidateAuthority(phase.authority)');
   expect(container).toContain(
     'prepareTrustedControlDependencyMount({ controlRoot, executionRoot, trustedCiRoot })'
@@ -113,7 +114,7 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(artifacts).not.toContain(
     "import { createReleaseArchive } from '../release/package-dist.mjs'"
   );
-  expect(artifacts).toContain("await import('../release/package-dist.mjs')");
+  expect(artifacts).toContain("await import('../release/artifact-security.mjs')");
   expect(workflow).toContain(
     "retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}"
   );
