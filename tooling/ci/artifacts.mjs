@@ -196,10 +196,11 @@ export async function finalizeCandidateReleaseArchive({
   candidateRoot = root,
   startedAtMs,
   archiveBuilder,
+  temporaryParent = path.dirname(candidateRoot),
 }) {
   const candidateArchive = newestReleaseArchive(startedAtMs, candidateRoot);
   const candidateArchivePath = path.join(candidateRoot, candidateArchive);
-  const temporaryRoot = fs.mkdtempSync(path.join(path.dirname(candidateRoot), '.ci-finalize-'));
+  const temporaryRoot = fs.mkdtempSync(path.join(temporaryParent, '.ci-finalize-'));
   const snapshotRoot = path.join(temporaryRoot, 'snapshot');
   try {
     fs.mkdirSync(snapshotRoot);

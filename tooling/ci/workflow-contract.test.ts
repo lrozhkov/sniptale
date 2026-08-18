@@ -103,16 +103,21 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(lane).toContain("wrapper('release')");
   expect(lane).toContain("wrapper('audit', '--profile', 'security')");
   expect(lane).toContain("wrapper('audit', '--profile', 'coverage')");
-  expect(lane).toContain('if (!candidatePhaseCommand)');
-  expect(container).toContain('await finalizeCandidateReleaseArchive');
+  expect(lane).toContain('if (!candidatePhaseCommand && lane !== candidateFinalizeLane)');
+  expect(lane).toContain('await finalizeCandidateReleaseArchive');
+  expect(lane).toContain("const candidateFinalizeLane = 'candidate-release-artifact'");
+  expect(lane).toContain("temporaryParent: '/tmp'");
+  expect(container).toContain("id: 'release-artifact'");
+  expect(container.indexOf("id: 'coverage'")).toBeLessThan(
+    container.indexOf("id: 'release-artifact'")
+  );
   expect(container).toContain('runContainer(`candidate-${phase.id}`)');
   expect(container).toContain('restoreCandidateAuthority(phase.authority)');
   expect(container).toContain(
     'prepareTrustedControlDependencyMount({ controlRoot, executionRoot, trustedCiRoot })'
   );
-  expect(container.indexOf("spawnSync('docker'")).toBeLessThan(
-    container.indexOf('await finalizeCandidateReleaseArchive')
-  );
+  expect(container).toContain('SNIPTALE_CANDIDATE_STARTED_AT_MS');
+  expect(container).not.toContain('await finalizeCandidateReleaseArchive');
   expect(artifacts).not.toContain(
     "import { createReleaseArchive } from '../release/package-dist.mjs'"
   );
