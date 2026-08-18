@@ -113,6 +113,11 @@ for (const name of [
   'SNIPTALE_QA_CPU_TOKENS',
   'SNIPTALE_QA_MEMORY_MIB',
   'SNIPTALE_QA_VITEST_MAX_WORKERS',
+  'SNIPTALE_QA_PLAYWRIGHT_WORKERS',
+  'SNIPTALE_QA_SECURITY_WORKERS',
+  'SNIPTALE_SELECTEL_ATTEMPT',
+  'SNIPTALE_SELECTEL_SERVER_ID',
+  'SNIPTALE_SELECTEL_AVAILABILITY_ZONE',
 ]) {
   if (process.env[name]) environment.push(`${name}=${process.env[name]}`);
 }
@@ -250,6 +255,22 @@ try {
         startedAtMs: candidateStartedAtMs,
       });
     }
+    const selectelInfrastructure = process.env.SNIPTALE_SELECTEL_ATTEMPT
+      ? {
+          provider: 'selectel',
+          attempt: Number(process.env.SNIPTALE_SELECTEL_ATTEMPT),
+          serverId: process.env.SNIPTALE_SELECTEL_SERVER_ID,
+          availabilityZone: process.env.SNIPTALE_SELECTEL_AVAILABILITY_ZONE,
+          imageReference: process.env.SNIPTALE_CI_IMAGE,
+          resourceProfile: {
+            cpuTokens: Number(process.env.SNIPTALE_QA_CPU_TOKENS),
+            memoryMiB: Number(process.env.SNIPTALE_QA_MEMORY_MIB),
+            vitestWorkers: Number(process.env.SNIPTALE_QA_VITEST_MAX_WORKERS),
+            playwrightWorkers: Number(process.env.SNIPTALE_QA_PLAYWRIGHT_WORKERS),
+            securityWorkers: Number(process.env.SNIPTALE_QA_SECURITY_WORKERS),
+          },
+        }
+      : null;
     collectLaneArtifacts({
       lane: 'candidate',
       startedAtMs: candidateStartedAtMs,
@@ -263,6 +284,7 @@ try {
         bounded: resolveQaResourceProfile(),
         release: resolveQaReleaseResourceProfile(),
       },
+      infrastructure: selectelInfrastructure,
       repositoryRoot: candidateWorkspace.workspace,
     });
     const artifactRoot = path.join(candidateWorkspace.workspace, 'build/ci-artifacts');

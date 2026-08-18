@@ -11,8 +11,9 @@ export function readSelectelPolicy(root = process.cwd()) {
     policy.environment !== 'selectel-runner-controller' ||
     policy.compute?.vcpus !== 24 ||
     policy.compute?.ramMiB !== 49152 ||
-    policy.compute?.bootVolumeGiB !== 180 ||
-    policy.compute?.bootVolumeType !== 'fast' ||
+    policy.compute?.bootVolumeGiB !== 80 ||
+    policy.compute?.availabilityZone !== 'ru-3a' ||
+    policy.compute?.bootVolumeType !== 'fast.ru-3a' ||
     policy.compute?.preemptible !== true ||
     policy.compute?.publicIp !== false ||
     policy.compute?.ingress !== false ||
@@ -26,8 +27,6 @@ export function readSelectelPolicy(root = process.cwd()) {
     policy.runner?.maxJobs !== 1 ||
     !/^[a-f0-9]{64}$/u.test(policy.controllerEnvironment?.expectedProjectSha256 ?? '') ||
     policy.controllerEnvironment?.expectedRegion !== 'ru-3' ||
-    policy.controllerEnvironment?.quotaManagerUrl !==
-      'https://ru-3.cloud.api.selcloud.ru/quota-manager' ||
     !/^[a-f0-9]{64}$/u.test(policy.runner?.sha256 ?? '')
   ) {
     throw new Error('Malformed Selectel runner policy.');

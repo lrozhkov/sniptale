@@ -8,19 +8,27 @@ permissions:
   contents: read
 
 env:
-  SNIPTALE_QA_VITEST_MAX_WORKERS: '2'
+  SNIPTALE_QA_CPU_TOKENS: '24'
+  SNIPTALE_QA_MEMORY_MIB: '36864'
+  SNIPTALE_QA_VITEST_MAX_WORKERS: '16'
+  SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'
+  SNIPTALE_QA_SECURITY_WORKERS: '8'
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  admission:
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 30
+    outputs:
+      main-run-id: ${{ steps.main-proof.outputs.run-id }}
+      qa-image: ${{ steps.main-proof.outputs.qa-image }}
+      controller-image: ${{ steps.controller-image.outputs.reference }}
     permissions:
       actions: read
-      contents: write
+      contents: read
       packages: read
     steps:
       - name: Check out signed tag
@@ -33,6 +41,7 @@ jobs:
         env: { GH_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}' }
         run: node tooling/ci/release-policy.mjs
       - name: Download exact successful main proof
+        id: main-proof
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
           runs=$(gh run list --workflow quality-gate.yml --branch main --commit "$GITHUB_SHA" --event push --status success --limit 20 --json databaseId,headSha)
@@ -43,38 +52,195 @@ jobs:
           gh run download "$main_run_id" --name "$image_proof_name" --dir build/image-proof
           node tooling/ci/verify-main-proof.mjs build/main-proof "$GITHUB_SHA"
           image_ref=$(node tooling/ci/image-proof.mjs verify build/image-proof "$GITHUB_SHA" "$main_run_id")
-          echo "SNIPTALE_CI_IMAGE=$image_ref" >> "$GITHUB_ENV"
-          echo "MAIN_PROOF_RUN_ID=$main_run_id" >> "$GITHUB_ENV"
+          echo "run-id=$main_run_id" >> "$GITHUB_OUTPUT"
+          echo "qa-image=$image_ref" >> "$GITHUB_OUTPUT"
       - name: Sign in to GHCR
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
-          {
-            registry: ghcr.io,
-            username: '${{ github.actor }}',
-            password: '${{ secrets.GITHUB_TOKEN }}',
-          }
-      - name: Pull exact main QA image
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve exact controller image
+        id: controller-image
+        env: { CONTROLLER_TAG: 'ghcr.io/lrozhkov/sniptale-controller:sha-${{ github.sha }}' }
         run: |
-          docker pull "$SNIPTALE_CI_IMAGE"
-          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$SNIPTALE_CI_IMAGE")
-          if [ "$revision" != "$GITHUB_SHA" ]; then
-            echo "QA image revision does not match release commit" >&2
+          digest=$(docker buildx imagetools inspect "$CONTROLLER_TAG" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
+          if ! printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
+            echo 'Unable to resolve immutable release controller image' >&2
             exit 1
           fi
+          echo "reference=ghcr.io/lrozhkov/sniptale-controller@$digest" >> "$GITHUB_OUTPUT"
+      - name: Preserve admitted main proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-input-${{ github.sha }}-${{ github.run_id }}
+          path: build/main-proof
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+  provision:
+    needs: admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: selectel-runner-controller
+    outputs:
+      has-record: ${{ steps.record.outputs.exists }}
+      label: ${{ steps.record.outputs.label }}
+      server-id: ${{ steps.record.outputs.server_id }}
+      availability-zone: ${{ steps.record.outputs.availability_zone }}
+    permissions: { contents: read, packages: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - name: Provision disposable preemptible release runner
+        env:
+          CONTROLLER_IMAGE: ${{ needs.admission.outputs.controller-image }}
+          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
+          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
+          RUNNER_IMAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUNNER_IMAGE_USER: ${{ github.actor }}
+          SNIPTALE_ATTEMPT: '1'
+          SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
+          SNIPTALE_QA_IMAGE: ${{ needs.admission.outputs.qa-image }}
+        run: |
+          printf '%s' "$RUNNER_IMAGE_TOKEN" | docker login ghcr.io --username "$RUNNER_IMAGE_USER" --password-stdin >/dev/null
+          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
+            --env SNIPTALE_ATTEMPT --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_QA_IMAGE \
+            --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
+            "$CONTROLLER_IMAGE" provision
+      - name: Export sanitized runner identity
+        id: record
+        if: always()
+        run: |
+          record=build/selectel-controller/attempt-1.json
+          if [ ! -f "$record" ]; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'exists=true' >> "$GITHUB_OUTPUT"
+          echo "label=$(jq -er .runnerLabel "$record")" >> "$GITHUB_OUTPUT"
+          echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
+          echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
+      - name: Preserve sanitized controller record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-selectel-${{ github.sha }}-${{ github.run_id }}
+          path: build/selectel-controller/attempt-1.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  release-audit:
+    needs: [admission, provision]
+    if: needs.provision.result == 'success'
+    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision.outputs.label)) }}
+    timeout-minutes: 120
+    permissions: { actions: read, contents: read }
+    steps:
+      - name: Check out exact release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false }
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0, cache: npm }
       - name: Run release-only canonical audit
         env:
           SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
+          SNIPTALE_CI_IMAGE: ${{ needs.admission.outputs.qa-image }}
           SNIPTALE_CI_SKIP_BUILD: '1'
+          SNIPTALE_SELECTEL_ATTEMPT: '1'
+          SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision.outputs.server-id }}
+          SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision.outputs.availability-zone }}
         run: node tooling/ci/container.mjs release-audit
+      - name: Preserve release audit proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-audit-${{ github.sha }}-${{ github.run_id }}
+          path: build/ci-artifacts/release-audit-${{ github.sha }}-${{ github.run_id }}
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
+
+  cleanup:
+    needs: [admission, provision, release-audit]
+    if: always() && needs.provision.outputs.has-record == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: selectel-runner-controller
+    permissions: { actions: read, contents: read, packages: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: { name: 'release-selectel-${{ github.sha }}-${{ github.run_id }}', path: attempt }
+      - name: Delete release VM, volume, port, and JIT registration
+        env:
+          CONTROLLER_IMAGE: ${{ needs.admission.outputs.controller-image }}
+          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
+          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
+          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/attempt/attempt-1.json
+      - name: Preserve cleanup proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-cleanup-${{ github.sha }}-${{ github.run_id }}
+          path: attempt/attempt-1.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [admission, release-audit, cleanup]
+    if: needs.release-audit.result == 'success' && needs.cleanup.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out signed tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0, cache: npm }
+      - name: Download admitted main proof and release audit
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          {
+            pattern: 'release-*-${{ github.sha }}-${{ github.run_id }}',
+            path: build/release-inputs,
+          }
+      - name: Restore canonical artifact roots
+        run: |
+          mv build/release-inputs/release-input-${GITHUB_SHA}-${GITHUB_RUN_ID} build/main-proof
+          mv build/release-inputs/release-audit-${GITHUB_SHA}-${GITHUB_RUN_ID} build/release-audit
       - name: Prepare immutable release assets
-        run: node tooling/ci/prepare-release-assets.mjs build/main-proof "build/ci-artifacts/release-audit-${GITHUB_SHA}-${GITHUB_RUN_ID}" "$GITHUB_SHA"
+        run: node tooling/ci/prepare-release-assets.mjs build/main-proof build/release-audit "$GITHUB_SHA"
       - name: Preserve release proof
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-${{ github.sha }}-${{ github.run_id }}
           path: |
             build/main-proof
-            build/ci-artifacts/release-audit-${{ github.sha }}-${{ github.run_id }}
+            build/release-audit
           include-hidden-files: true
           retention-days: 30
       - name: Create draft, attach verified assets, and publish
@@ -94,9 +260,7 @@ jobs:
           fi
           created_release_id=''
           cleanup_owned_release() {
-            if [ -z "$created_release_id" ]; then
-              return
-            fi
+            if [ -z "$created_release_id" ]; then return; fi
             release_state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}" --jq '[.tag_name, .draft, .immutable] | @tsv' 2>/dev/null || true)
             if [ "$release_state" = "${GITHUB_REF_NAME}"$'\ttrue\tfalse' ] || [ "$release_state" = "${GITHUB_REF_NAME}"$'\tfalse\tfalse' ]; then
               gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}"
@@ -110,4 +274,3 @@ jobs:
           node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
           node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
-          trap - ERR

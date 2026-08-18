@@ -6,10 +6,10 @@ const DEFAULT_CPU_TOKEN_CAP = 8;
 const DEFAULT_MEMORY_CAP_MIB = 12 * 1024;
 const RESERVED_SYSTEM_MEMORY_MIB = 3 * 1024;
 const MIN_QA_MEMORY_MIB = 6144;
-const MAX_CONCURRENT_VITEST_WORKERS = 4;
-const MAX_VITEST_WORKERS = 6;
-const MAX_RELEASE_CPU_TOKENS = 12;
-const MAX_RELEASE_VITEST_WORKERS = 12;
+const DEFAULT_CONCURRENT_VITEST_WORKERS = 4;
+const MAX_VITEST_WORKERS = 20;
+const MAX_RELEASE_CPU_TOKENS = 24;
+const MAX_RELEASE_VITEST_WORKERS = 20;
 
 function readCpuInfo() {
   try {
@@ -89,8 +89,8 @@ function resolveVitestWorkers({ cpuTokens, env }) {
     env.SNIPTALE_QA_VITEST_MAX_WORKERS,
     'SNIPTALE_QA_VITEST_MAX_WORKERS'
   );
-  const concurrentCap = Math.max(1, Math.min(MAX_CONCURRENT_VITEST_WORKERS, cpuTokens - 3));
-  return Math.min(requested ?? concurrentCap, MAX_VITEST_WORKERS, cpuTokens);
+  const defaultWorkers = Math.max(1, Math.min(DEFAULT_CONCURRENT_VITEST_WORKERS, cpuTokens - 3));
+  return Math.min(requested ?? defaultWorkers, MAX_VITEST_WORKERS, cpuTokens);
 }
 
 export function resolveQaResourceProfile({

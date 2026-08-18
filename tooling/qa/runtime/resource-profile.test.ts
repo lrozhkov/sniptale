@@ -72,7 +72,7 @@ it('clamps explicit overrides to WSL-visible resources', () => {
   ).toMatchObject({
     cpuTokens: 12,
     memoryMiB: 15 * 1024,
-    vitestMaxWorkers: 6,
+    vitestMaxWorkers: 9,
   });
 });
 

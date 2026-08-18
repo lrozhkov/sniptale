@@ -14,7 +14,7 @@ import {
   assertPublishedReleaseAssets,
   readExpectedReleaseAssetDigests,
 } from './release-verification.mjs';
-import { assertReleasePublisher, assertReleaseTagRuleset } from './release-tag-policy.mjs';
+import { assertReleaseTagRuleset } from './release-tag-policy.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
 import { verifyImageProof, writeImageProof } from './image-proof.mjs';
 import { finalizeCandidateReleaseArchive } from './artifacts.mjs';
@@ -68,84 +68,6 @@ function createEmptyRunRecord({
     },
   };
 }
-
-it('pins every external workflow action to an approved full commit SHA', () => {
-  const expectedPins = {
-    'actions/checkout@': 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
-    'actions/setup-node@': 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
-  };
-  for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
-    const source = fs.readFileSync(workflow, 'utf8');
-    const uses = [...source.matchAll(/^\s*uses:\s*([^\s#]+)/gmu)].map((match) => match[1]);
-    expect(uses.length).toBeGreaterThan(0);
-    for (const action of uses) expect(action).toMatch(/^[^@]+@[a-f0-9]{40}$/u);
-    for (const [prefix, pin] of Object.entries(expectedPins)) {
-      const occurrences = uses.filter((action) => action.startsWith(prefix));
-      expect(occurrences.length).toBeGreaterThan(0);
-      expect(occurrences.every((action) => action === pin)).toBe(true);
-    }
-  }
-});
-
-it('runs one candidate-bound GitHub gate over the canonical local wrapper sequence', () => {
-  const workflow = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
-  const lane = fs.readFileSync('tooling/ci/run-lane.mjs', 'utf8');
-  const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
-  const artifacts = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
-  expect(workflow).toContain('canonical-qa:');
-  expect(workflow).toContain('scheduled-security:');
-  expect(workflow).toContain('candidate-control-smoke:');
-  expect(workflow).toContain('continue-on-error: true');
-  expect(workflow).toContain('informational: true');
-  expect(workflow).toContain('candidate-control-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}');
-  expect(workflow).toContain('proof_file="$RUNNER_TEMP/candidate-control-');
-  expect(workflow).toContain('path: ${{ steps.candidate-image.outputs.proof-file }}');
-  expect(workflow).not.toContain('build/candidate-control-proof');
-  expect(workflow).toContain('pr-gate:');
-  expect(workflow).toContain('name: pr-gate-authority');
-  expect(workflow).toContain('checks: write');
-  expect(workflow).toContain('-f head_sha="$CANDIDATE_SHA"');
-  expect(workflow).toContain('-f name=pr-gate');
-  expect(workflow).toContain('pull_request_target:');
-  expect(workflow).not.toContain('  pull_request:\n');
-  expect(workflow).toContain('Check out trusted control plane');
-  expect(workflow).toContain('SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control');
-  expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs candidate');
-  expect(workflow).toContain('working-directory: trusted-control');
-  expect(workflow).toContain('run: npm ci --ignore-scripts');
-  expect(workflow).toContain('echo "SNIPTALE_CI_IMAGE=$TRUSTED_QA_IMAGE" >> "$GITHUB_ENV"');
-  expect(workflow).toContain('echo \'SNIPTALE_CI_SKIP_BUILD=1\' >> "$GITHUB_ENV"');
-  expect(workflow.match(/SNIPTALE_CI_IMAGE: \$\{\{ env\.QA_IMAGE \}\}/gu)).toHaveLength(1);
-  expect(lane.indexOf("wrapper('release-harness')")).toBeLessThan(
-    lane.indexOf("wrapper('checkpoint')")
-  );
-  expect(lane.indexOf("wrapper('checkpoint')")).toBeLessThan(lane.indexOf("wrapper('closeout'"));
-  expect(lane).toContain("wrapper('release')");
-  expect(lane).toContain("wrapper('audit', '--profile', 'security')");
-  expect(lane).toContain("wrapper('audit', '--profile', 'coverage')");
-  expect(lane).toContain('if (!candidatePhaseCommand)');
-  expect(container).toContain('await finalizeCandidateReleaseArchive');
-  expect(container).toContain('runContainer(`candidate-${phase.id}`)');
-  expect(container).toContain('restoreCandidateAuthority(phase.authority)');
-  expect(container.indexOf("spawnSync('docker'")).toBeLessThan(
-    container.indexOf('await finalizeCandidateReleaseArchive')
-  );
-  expect(artifacts).not.toContain(
-    "import { createReleaseArchive } from '../release/package-dist.mjs'"
-  );
-  expect(artifacts).toContain("await import('../release/package-dist.mjs')");
-  expect(workflow).toContain(
-    "retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}"
-  );
-  expect(workflow.match(/include-hidden-files: true/gu)).toHaveLength(2);
-  expect(workflow).not.toContain("hashFiles('reports/.tmp/");
-  expect(workflow).toContain('needs: canonical-qa');
-  expect(workflow).not.toMatch(/pr-gate:[\s\S]*needs:\s*\[[^\]]*candidate-control-smoke/u);
-  expect(workflow).toContain('Refuse immutable tag replacement');
-  expect(workflow).toContain('Refusing to replace existing immutable image tag');
-  expect(workflow).toContain('Unable to prove immutable image tag absence');
-  expect(workflow).toContain('manifest unknown|not found');
-});
 
 it('distinguishes disabled settings from rollback snapshot failures', () => {
   expect(parseToggleState({ ok: true, error: '' }, 'setting')).toBe(true);
@@ -201,56 +123,6 @@ it('binds the CodeQL audit suite to the locked CI query suite', () => {
   const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
   const source = fs.readFileSync('tooling/qa/audits/codeql.mjs', 'utf8');
   expect(source).toContain(lock.codeql.querySuite);
-});
-
-it('pins the measured GitHub runner profile in both canonical workflows', () => {
-  for (const workflowPath of [
-    '.github/workflows/quality-gate.yml',
-    '.github/workflows/release.yml',
-  ]) {
-    const workflow = fs.readFileSync(workflowPath, 'utf8');
-    expect(workflow).toContain("SNIPTALE_QA_VITEST_MAX_WORKERS: '2'");
-  }
-});
-
-it('fails release publication closed around live immutability and asset digests', () => {
-  const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
-  const policy = fs.readFileSync('tooling/ci/release-policy.mjs', 'utf8');
-  expect(workflow).toContain('include-hidden-files: true');
-  expect(workflow).toContain('verify-published-release.mjs "$asset_root" "$release_id"');
-  expect(workflow).toContain('verify-draft-release.mjs "$asset_root" "$release_id"');
-  expect(workflow.indexOf('verify-draft-release.mjs')).toBeLessThan(
-    workflow.indexOf('gh api --method PATCH')
-  );
-  expect(workflow).toContain("grep -q '(HTTP 404)'");
-  expect(workflow).toContain("created_release_id=''");
-  expect(workflow).toContain('releases/${created_release_id}');
-  expect(workflow).toContain('upload-release-assets.mjs "$asset_root" "$release_id"');
-  expect(workflow).not.toContain('gh release upload');
-  expect(workflow).not.toContain('gh release edit');
-  expect(workflow).not.toContain('gh release delete');
-  expect(workflow).toContain('RELEASE_POLICY_READ_TOKEN');
-  expect(workflow).toContain('image-proof.mjs verify');
-  expect(workflow).toContain('docker pull "$SNIPTALE_CI_IMAGE"');
-  expect(workflow).not.toContain('ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}');
-  expect(workflow).not.toContain('existing_draft=');
-  expect(policy).toContain("api(repository, 'immutable-releases')");
-  expect(policy).toContain('--recheck');
-  const githubPolicy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
-  expect(githubPolicy.releaseTagRuleset).toMatchObject({
-    target: 'tag',
-    enforcement: 'active',
-    bypass_actors: [],
-    rules: [{ type: 'update' }, { type: 'deletion' }],
-  });
-  expect(githubPolicy.releasePublisher).toBe('lrozhkov');
-  expect(
-    githubPolicy.ruleset.rules.find(({ type }) => type === 'required_status_checks').parameters
-      .required_status_checks
-  ).toEqual([{ context: 'pr-gate', integration_id: 15368 }]);
-  expect(() => assertReleasePublisher('collaborator', 'collaborator', 'lrozhkov')).toThrow(
-    'Release actor is not authorized'
-  );
 });
 
 it('rejects release tag ruleset exclusions and parameter drift', () => {

@@ -852,6 +852,12 @@
   ],
   "executables": [
     {
+      "path": "tooling/ci/selectel/adjudication.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
       "path": "tooling/ci/image-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -862,12 +868,6 @@
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
-    },
-    {
-      "path": "tooling/ci/selectel/preflight.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "Executable behavior is owned by its canonical control identity."
     },
     {
       "path": "tooling/ci/verify-main-proof.mjs",
