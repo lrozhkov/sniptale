@@ -15,6 +15,7 @@ import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
 } from '../qa/runtime/resource-profile.mjs';
+import { prepareTrustedControlDependencyMount } from './trusted-control-dependencies.mjs';
 import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
 
 const lane = process.argv[2];
@@ -137,7 +138,11 @@ const baseContainerArgs = [
   `${executionRoot}:/workspace`,
 ];
 if (trustedCiRoot) {
-  baseContainerArgs.push('--volume', `${controlRoot}:/opt/sniptale-trusted:ro`);
+  baseContainerArgs.push(
+    '--volume',
+    `${controlRoot}:/opt/sniptale-trusted:ro`,
+    ...prepareTrustedControlDependencyMount({ executionRoot, trustedCiRoot })
+  );
 }
 if (unitProofHostPath) {
   baseContainerArgs.push('--volume', `${unitProofHostPath}:/opt/sniptale-unit-proof.json:ro`);
