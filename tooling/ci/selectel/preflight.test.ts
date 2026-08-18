@@ -22,7 +22,10 @@ function json(value: unknown, init: ResponseInit = {}) {
   });
 }
 
-function createFetch({ cores = 32 }: { cores?: number } = {}) {
+function createFetch({
+  cores = 32,
+  nestedVolumeQuota = false,
+}: { cores?: number; nestedVolumeQuota?: boolean } = {}) {
   return async (input: string | URL | Request) => {
     const url = String(input);
     if (url.endsWith('/auth/tokens')) {
@@ -51,8 +54,13 @@ function createFetch({ cores = 32 }: { cores?: number } = {}) {
         },
       });
     }
-    if (url.includes('/os-quota-sets/'))
-      return json({ quota_set: { gigabytes: 260, gigabytes_used: 0 } });
+    if (url.includes('/os-quota-sets/')) {
+      return json({
+        quota_set: nestedVolumeQuota
+          ? { gigabytes: { limit: 260, in_use: 0, reserved: 0 } }
+          : { gigabytes: 260, gigabytes_used: 0 },
+      });
+    }
     if (url.endsWith('/flavors/detail'))
       return json({ flavors: [{ id: 'flavor-1', name: 'canonical', vcpus: 24, ram: 49152 }] });
     if (url.endsWith('/os-availability-zone'))
@@ -92,6 +100,15 @@ it('produces a sanitized read-only connectivity proof for exact canonical resour
   expect(JSON.stringify(proof)).not.toContain('credential-secret');
   expect(JSON.stringify(proof)).not.toContain('ephemeral-token');
   expect(proof.projectFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+});
+
+it('accepts the Cinder detailed quota shape without defaulting usage', async () => {
+  const proof = await collectSelectelPreflight({
+    root,
+    env,
+    fetchImpl: createFetch({ nestedVolumeQuota: true }),
+  });
+  expect(proof.quotas.freeVolumeGiB).toBe(260);
 });
 
 it('fails closed when the project cannot fit one canonical runner', async () => {
