@@ -852,19 +852,25 @@
   ],
   "executables": [
     {
-      "path": "tooling/ci/selectel/adjudication.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "Executable behavior is owned by its canonical control identity."
-    },
-    {
       "path": "tooling/ci/image-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
+      "path": "tooling/ci/select-codeql-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
       "path": "tooling/ci/select-unit-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/selectel/adjudication.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
@@ -940,6 +946,12 @@
       "disposition": "adapt",
       "owner": "qa-platform",
       "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/codeql/config.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
       "path": "tooling/qa/codeql/generate-ownership.mjs",
@@ -1621,6 +1633,8 @@
     {
       "path": "tooling/configs/qa/codeql-baseline.json",
       "consumers": [
+        "tooling/configs/qa/codeql-proof-reuse.data.json",
+        "tooling/qa/codeql/config.mjs",
         "tooling/qa/core/technical-debt-enforced-sources.mjs",
         "tooling/qa/policy/external-tools.mjs"
       ],
@@ -1631,7 +1645,18 @@
     {
       "path": "tooling/configs/qa/codeql-config.yml",
       "consumers": [
+        "tooling/configs/qa/codeql-proof-reuse.data.json",
+        "tooling/qa/codeql/config.mjs",
         "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/codeql-proof-reuse.data.json",
+      "consumers": [
+        "tooling/qa/codeql/config.mjs"
       ],
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2748,6 +2773,12 @@
     },
     {
       "tool": "verify-logging.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-main-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."

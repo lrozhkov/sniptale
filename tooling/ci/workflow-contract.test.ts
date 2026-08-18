@@ -5,10 +5,25 @@ import { expect, it } from 'vitest';
 import { assertReleasePublisher } from './release-tag-policy.mjs';
 
 it('pins every external workflow action to an approved full commit SHA', () => {
-  const expectedPins = {
+  const expectedEveryWorkflowPins = {
     'actions/checkout@': 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
     'actions/setup-node@': 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
   };
+  const expectedRepositoryPins = {
+    ...expectedEveryWorkflowPins,
+    'actions/upload-artifact@': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+    'actions/download-artifact@':
+      'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
+    'docker/setup-buildx-action@':
+      'docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c',
+    'docker/login-action@': 'docker/login-action@dbcb813823bdd20940b903addbd779551569679f',
+    'docker/build-push-action@':
+      'docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a',
+    'github/codeql-action/upload-sarif@':
+      'github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd',
+    'codecov/codecov-action@': 'codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f',
+  };
+  const repositoryUses = [];
   for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
     const source = fs.readFileSync(workflow, 'utf8');
     const uses = source
@@ -19,11 +34,17 @@ it('pins every external workflow action to an approved full commit SHA', () => {
       .map((line) => line.slice('uses:'.length).trim().split(' ')[0]);
     expect(uses.length).toBeGreaterThan(0);
     for (const action of uses) expect(action).toMatch(/^[^@]+@[a-f0-9]{40}$/u);
-    for (const [prefix, pin] of Object.entries(expectedPins)) {
+    for (const [prefix, pin] of Object.entries(expectedEveryWorkflowPins)) {
       const occurrences = uses.filter((action) => action.startsWith(prefix));
       expect(occurrences.length).toBeGreaterThan(0);
       expect(occurrences.every((action) => action === pin)).toBe(true);
     }
+    repositoryUses.push(...uses);
+  }
+  for (const [prefix, pin] of Object.entries(expectedRepositoryPins)) {
+    const occurrences = repositoryUses.filter((action) => action.startsWith(prefix));
+    expect(occurrences.length).toBeGreaterThan(0);
+    expect(occurrences.every((action) => action === pin)).toBe(true);
   }
 });
 
@@ -125,7 +146,7 @@ it('pins the measured GitHub runner profile in both canonical workflows', () => 
   }
   const quality = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
   expect(quality).toMatch(
-    /canonical-qa-3:[\s\S]*SNIPTALE_QA_CPU_TOKENS: '16'[\s\S]*SNIPTALE_QA_MEMORY_MIB: '24576'[\s\S]*SNIPTALE_QA_VITEST_MAX_WORKERS: '12'/u
+    /canonical-qa-3:[\s\S]*SNIPTALE_QA_CPU_TOKENS: '12'[\s\S]*SNIPTALE_QA_MEMORY_MIB: '18432'[\s\S]*SNIPTALE_QA_VITEST_MAX_WORKERS: '8'/u
   );
 });
 
@@ -151,6 +172,15 @@ it('fails release publication closed around live immutability and asset digests'
   expect(workflow).toContain('release-audit:');
   expect(workflow).toContain('cleanup:');
   expect(workflow).toContain('publish:');
+  expect(workflow).toContain('for attempt in 1 2 3; do');
+  expect(workflow).toContain('build/selectel-controller/selected-attempt.txt');
+  expect(workflow).toContain('SNIPTALE_SELECTEL_ATTEMPT: ${{ needs.provision.outputs.attempt }}');
+  expect(workflow).toContain('SNIPTALE_QA_CPU_TOKENS: ${{ needs.provision.outputs.cpu-tokens }}');
+  expect(workflow).toContain('--arg name "Sniptale ${version} alpha"');
+  expect(workflow).toContain('--rawfile body "$release_notes"');
+  expect(workflow).toContain('Added verified unit and CodeQL proof reuse');
+  expect(workflow).toContain('This is still an alpha preview (**v${version}-alpha**)');
+  expect(workflow).toContain('prerelease: false, generate_release_notes: false');
   expect(workflow).toContain('SNIPTALE_CI_IMAGE: ${{ needs.admission.outputs.qa-image }}');
   expect(workflow).toContain('runs-on: ${{ fromJSON(format');
   expect(workflow).toContain('permissions: { actions: read, contents: read }');

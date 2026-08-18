@@ -13,6 +13,13 @@ import { applyCodeqlBaseline, formatCodeqlBaselineSummary } from './codeql-basel
 import { violationsToSarif, writeCanonicalSarifFile } from './canonical-sarif.mjs';
 import { AUDIT_ADAPTER_SKIP_REASONS } from './profiles/index.mjs';
 import {
+  materializeReusableCodeqlSarif,
+  recordSuccessfulCodeqlProof,
+  removeLocalCodeqlProof,
+  resolveReusableCodeqlProof,
+} from '../core/codeql-proof.mjs';
+import { assertCodeqlConfigIsFresh } from '../codeql/config.mjs';
+import {
   isAuditObject,
   parseRequiredAuditJson,
   requireAuditCommandStatus,
@@ -104,7 +111,13 @@ function runCodeqlCommand(executable, args, runCommandImpl) {
   return result;
 }
 
-function createCodeqlDatabase({ executable, databasePath, configPath, runCommandImpl }) {
+function createCodeqlDatabase({
+  executable,
+  databasePath,
+  configPath,
+  sourceRoot,
+  runCommandImpl,
+}) {
   return runCodeqlCommand(
     executable,
     [
@@ -113,7 +126,7 @@ function createCodeqlDatabase({ executable, databasePath, configPath, runCommand
       databasePath,
       '--language=javascript-typescript',
       '--source-root',
-      repoRoot,
+      sourceRoot,
       '--overwrite',
       '--codescanning-config',
       configPath,
@@ -146,13 +159,101 @@ function analyzeCodeqlDatabase({
   );
 }
 
+function resolveCodeqlControlPaths({ controlRoot, configPath, baselinePath, customSuitePath }) {
+  return {
+    configPath: configPath ?? path.join(controlRoot, CODEQL_CONFIG_PATH),
+    baselinePath:
+      baselinePath === undefined ? path.join(controlRoot, CODEQL_BASELINE_PATH) : baselinePath,
+    customSuitePath: customSuitePath ?? path.join(controlRoot, CODEQL_CUSTOM_SUITE_PATH),
+  };
+}
+
+function collectReusableCodeqlResult({ controlRoot, enabled, sourceRoot }) {
+  if (!enabled) return null;
+  const reusable = resolveReusableCodeqlProof({ cwd: sourceRoot, controlRoot });
+  if (!reusable.matched) {
+    removeLocalCodeqlProof({ cwd: sourceRoot });
+    return null;
+  }
+  const filteredSarifPath = materializeReusableCodeqlSarif(reusable, { cwd: sourceRoot });
+  recordSuccessfulCodeqlProof({
+    cwd: sourceRoot,
+    sarifPath: filteredSarifPath,
+    source: 'qa:audit:reuse',
+    reusedFrom: reusable.proof.proofDigest,
+  });
+  return {
+    skipped: false,
+    reused: true,
+    sarifPath: filteredSarifPath,
+    filteredSarifPath,
+    summaryText: `CodeQL proof reused: ${reusable.source}; input=${reusable.proof.inputDigest}`,
+    violations: [],
+  };
+}
+
+function collectFreshCodeqlResult({
+  controlRoot,
+  executable,
+  outputRoot,
+  paths,
+  proofReuseEnabled,
+  runCommandImpl,
+  sourceRoot,
+}) {
+  if (path.resolve(paths.configPath) === path.join(controlRoot, CODEQL_CONFIG_PATH)) {
+    assertCodeqlConfigIsFresh(controlRoot);
+  }
+  const { root, databasePath, sarifPath } = resolveCodeqlPaths(outputRoot);
+  prepareOutputRoot(root);
+  createCodeqlDatabase({
+    executable,
+    databasePath,
+    configPath: paths.configPath,
+    sourceRoot,
+    runCommandImpl,
+  });
+  const analyzeResult = analyzeCodeqlDatabase({
+    executable,
+    databasePath,
+    sarifPath,
+    customSuitePath: paths.customSuitePath,
+    runCommandImpl,
+  });
+  const filtered = applyCodeqlBaseline({
+    baselinePath: paths.baselinePath,
+    sourceRoot,
+    violations: toSarifViolations(readCodeqlSarif(sarifPath, analyzeResult)),
+  });
+  const filteredSarifPath = writeCanonicalSarifFile(
+    path.join(root, 'results.filtered.sarif'),
+    violationsToSarif({
+      toolName: 'CodeQL',
+      informationUri: 'https://codeql.github.com/',
+      violations: filtered.violations,
+      root: sourceRoot,
+    })
+  );
+  if (proofReuseEnabled && filtered.violations.length === 0) {
+    recordSuccessfulCodeqlProof({ cwd: sourceRoot, sarifPath: filteredSarifPath });
+  }
+  return {
+    skipped: false,
+    sarifPath,
+    filteredSarifPath,
+    summaryText: formatCodeqlBaselineSummary(filtered),
+    violations: filtered.violations,
+  };
+}
+
 export function runCodeqlCheck({
   executable = resolveCodeqlExecutable(),
-  configPath = CODEQL_CONFIG_PATH,
-  baselinePath = CODEQL_BASELINE_PATH,
-  customSuitePath = fromRelativePath(CODEQL_CUSTOM_SUITE_PATH),
+  configPath,
+  baselinePath,
+  customSuitePath,
   outputRoot = '.tmp/codeql',
   sourceRoot = repoRoot,
+  proofReuse,
   runCommandImpl,
 } = {}) {
   if (!executable) {
@@ -165,39 +266,32 @@ export function runCodeqlCheck({
     };
   }
 
-  const { root, databasePath, sarifPath } = resolveCodeqlPaths(outputRoot);
-  prepareOutputRoot(root);
-  createCodeqlDatabase({ executable, databasePath, configPath, runCommandImpl });
-  const analyzeResult = analyzeCodeqlDatabase({
-    executable,
-    databasePath,
-    sarifPath,
-    customSuitePath,
-    runCommandImpl,
-  });
-
-  const rawViolations = toSarifViolations(readCodeqlSarif(sarifPath, analyzeResult));
-  const filtered = applyCodeqlBaseline({
+  const controlRoot = process.env.SNIPTALE_TRUSTED_CI_ROOT ?? repoRoot;
+  const paths = resolveCodeqlControlPaths({
+    controlRoot,
+    configPath,
     baselinePath,
-    sourceRoot,
-    violations: rawViolations,
+    customSuitePath,
   });
-  const filteredSarifPath = writeCanonicalSarifFile(
-    path.join(root, 'results.filtered.sarif'),
-    violationsToSarif({
-      toolName: 'CodeQL',
-      informationUri: 'https://codeql.github.com/',
-      violations: filtered.violations,
-      root: sourceRoot,
+  const proofReuseEnabled =
+    proofReuse ?? (runCommandImpl === undefined && path.resolve(sourceRoot) === repoRoot);
+  const reusable = collectReusableCodeqlResult({
+    controlRoot,
+    enabled: proofReuseEnabled,
+    sourceRoot,
+  });
+  return (
+    reusable ??
+    collectFreshCodeqlResult({
+      controlRoot,
+      executable,
+      outputRoot,
+      paths,
+      proofReuseEnabled,
+      runCommandImpl,
+      sourceRoot,
     })
   );
-  return {
-    skipped: false,
-    sarifPath,
-    filteredSarifPath,
-    summaryText: formatCodeqlBaselineSummary(filtered),
-    violations: filtered.violations,
-  };
 }
 
 if (isExecutedAsScript(import.meta.url)) {

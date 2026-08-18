@@ -17,6 +17,7 @@ import {
 } from '../qa/runtime/resource-profile.mjs';
 import { prepareTrustedControlDependencyMount } from './trusted-control-dependencies.mjs';
 import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
+import { resolveReusableCodeqlProofHostPaths } from './codeql-proof-host.mjs';
 
 const lane = process.argv[2];
 if (!['candidate', 'release', 'release-audit', 'security', 'coverage'].includes(lane)) {
@@ -81,6 +82,16 @@ const unitProofHostPath = resolveReusableUnitProofHostPath(process.env.SNIPTALE_
 if (process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
   process.stderr.write('Reusable unit proof is unavailable; running the complete unit suite.\n');
 }
+const codeqlProofHostPaths = resolveReusableCodeqlProofHostPaths({
+  proofPath: process.env.SNIPTALE_CODEQL_PROOF_PATH,
+  sarifPath: process.env.SNIPTALE_CODEQL_SARIF_PATH,
+});
+if (
+  (process.env.SNIPTALE_CODEQL_PROOF_PATH || process.env.SNIPTALE_CODEQL_SARIF_PATH) &&
+  !codeqlProofHostPaths
+) {
+  process.stderr.write('Reusable CodeQL proof is unavailable; running complete CodeQL.\n');
+}
 const executionRoot = candidateWorkspace?.workspace ?? root;
 const trustedControlSha =
   process.env.SNIPTALE_TRUSTED_CONTROL_SHA ??
@@ -102,10 +113,17 @@ if (candidateWorkspace) {
     `SNIPTALE_BASE_SHA=${candidateWorkspace.baseSha}`,
     `SNIPTALE_CANDIDATE_TREE=${candidateWorkspace.candidateTree}`,
     `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`,
-    'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only'
+    'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only',
+    'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only'
   );
 }
 if (unitProofHostPath) environment.push('SNIPTALE_UNIT_PROOF_PATH=/opt/sniptale-unit-proof.json');
+if (codeqlProofHostPaths) {
+  environment.push(
+    'SNIPTALE_CODEQL_PROOF_PATH=/opt/sniptale-codeql-proof.json',
+    'SNIPTALE_CODEQL_SARIF_PATH=/opt/sniptale-codeql-results.sarif'
+  );
+}
 if (trustedCiRoot) environment.push('SNIPTALE_TRUSTED_CI_ROOT=/opt/sniptale-trusted');
 for (const name of [
   'GITHUB_RUN_ID',
@@ -146,6 +164,14 @@ if (trustedCiRoot) {
 }
 if (unitProofHostPath) {
   baseContainerArgs.push('--volume', `${unitProofHostPath}:/opt/sniptale-unit-proof.json:ro`);
+}
+if (codeqlProofHostPaths) {
+  baseContainerArgs.push(
+    '--volume',
+    `${codeqlProofHostPaths.proof}:/opt/sniptale-codeql-proof.json:ro`,
+    '--volume',
+    `${codeqlProofHostPaths.sarif}:/opt/sniptale-codeql-results.sarif:ro`
+  );
 }
 for (const value of environment) baseContainerArgs.push('--env', value);
 
