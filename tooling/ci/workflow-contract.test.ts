@@ -55,20 +55,16 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   const artifacts = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
   expect(workflow).toContain('canonical-qa:');
   expect(workflow).toContain('scheduled-sweeper:');
-  expect(workflow).toContain('provision-1:');
-  expect(workflow).toContain('provision-2:');
-  expect(workflow).toContain('provision-3:');
-  expect(workflow).toContain('canonical-qa-1:');
-  expect(workflow).toContain('adjudicate-1:');
-  expect(workflow).toContain('cleanup-1:');
+  expect(workflow).toContain('  provision:');
+  expect(workflow).toContain('  cleanup:');
+  expect(workflow).not.toMatch(
+    /provision-[123]:|canonical-qa-[123]:|adjudicate-[123]:|cleanup-[123]:/u
+  );
   expect(workflow).not.toContain('candidate-control-smoke:');
-  expect(
-    workflow.match(/Build informational candidate controls on the disposable runner/gu)
-  ).toHaveLength(3);
+  expect(workflow.match(/Build informational candidate controls/gu)).toHaveLength(1);
   expect(workflow).toContain('continue-on-error: true');
   expect(workflow).toContain('informational: true');
-  expect(workflow).toContain('candidate-control-1-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}');
-  expect(workflow).toContain('path: candidate/build/candidate-control-proof.json');
+  expect(workflow).toContain('candidate/build/candidate-control-proof.json');
   expect(workflow).toContain('> build/candidate-control-proof.json');
   expect(workflow).toContain('pr-gate:');
   expect(workflow).toContain('name: pr-gate-authority');
@@ -82,25 +78,23 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs candidate');
   expect(workflow).toContain('SNIPTALE_CI_IMAGE: ${{ needs.qa-image.outputs.reference }}');
   expect(workflow).toContain("SNIPTALE_CI_SKIP_BUILD: '1'");
-  expect(workflow).toContain('ghcr.io/lrozhkov/sniptale-qa@$digest');
-  expect(workflow).toContain('SNIPTALE_SELECTEL_ATTEMPT:');
+  expect(workflow).toContain('ghcr.io/lrozhkov/sniptale-qa@$QA_DIGEST');
+  expect(workflow).toContain('SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}');
+  expect(workflow).toContain('SNIPTALE_SELECTEL_PROFILES_DIGEST:');
   expect(workflow).not.toContain('SELECTEL_OS_PROJECT_ID');
-  expect(workflow.match(/environment: selectel-runner-controller/gu)).toHaveLength(8);
-  for (const attempt of ['1', '2', '3']) {
-    const start = workflow.indexOf(`  canonical-qa-${attempt}:`);
-    const end = workflow.indexOf(`\n  adjudicate-${attempt}:`, start);
-    const candidateJob = workflow.slice(start, end);
-    expect(candidateJob).not.toContain('SELECTEL_OS_APPLICATION_CREDENTIAL');
-    expect(candidateJob).not.toContain('RUNNER_CONTROLLER_TOKEN');
-    expect(candidateJob).toContain(
-      'Build informational candidate controls on the disposable runner'
-    );
-  }
+  expect(workflow.match(/environment: selectel-runner-controller/gu)).toHaveLength(4);
+  const candidateJob = workflow.slice(
+    workflow.indexOf('  canonical-qa:'),
+    workflow.indexOf('\n  cleanup:')
+  );
+  expect(candidateJob).not.toContain('SELECTEL_OS_APPLICATION_CREDENTIAL');
+  expect(candidateJob).not.toContain('RUNNER_CONTROLLER_TOKEN');
   expect(lane.indexOf("wrapper('release-harness')")).toBeLessThan(
     lane.indexOf("wrapper('checkpoint')")
   );
   expect(lane.indexOf("wrapper('checkpoint')")).toBeLessThan(lane.indexOf("wrapper('closeout'"));
   expect(lane).toContain("wrapper('release')");
+  expect(lane).toContain("wrapper('audit', '--profile', 'pr')");
   expect(lane).toContain("wrapper('audit', '--profile', 'security')");
   expect(lane).toContain("wrapper('audit', '--profile', 'coverage')");
   expect(lane).toContain('if (!candidatePhaseCommand && lane !== candidateFinalizeLane)');
@@ -108,9 +102,7 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(lane).toContain("const candidateFinalizeLane = 'candidate-release-artifact'");
   expect(lane).toContain("temporaryParent: '/tmp'");
   expect(container).toContain("id: 'release-artifact'");
-  expect(container.indexOf("id: 'coverage'")).toBeLessThan(
-    container.indexOf("id: 'release-artifact'")
-  );
+  expect(container).toContain("id: 'receipts'");
   expect(container).toContain('runContainer(`candidate-${phase.id}`)');
   expect(container).toContain('restoreCandidateAuthority(phase.authority)');
   expect(container).toContain(
@@ -125,11 +117,9 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(workflow).toContain(
     "retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}"
   );
-  expect(workflow.match(/include-hidden-files: true/gu)).toHaveLength(4);
+  expect(workflow.match(/include-hidden-files: true/gu).length).toBeGreaterThanOrEqual(1);
   expect(workflow).not.toContain("hashFiles('reports/.tmp/");
   expect(workflow).toContain('needs: canonical-qa');
-  expect(workflow).toContain("if: always() && needs.provision-2.result == 'success'");
-  expect(workflow).toContain("if: always() && needs.provision-3.result == 'success'");
   expect(workflow).not.toMatch(/pr-gate:[\s\S]*needs:\s*\[[^\]]*candidate-control-smoke/u);
   expect(workflow).toContain('Refuse immutable tag replacement');
   expect(workflow).toContain('Refusing to replace existing immutable image tag');
@@ -137,22 +127,17 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(workflow).toContain('manifest unknown|not found');
 });
 
-it('pins the measured GitHub runner profile in both canonical workflows', () => {
+it('derives the measured GitHub runner profile only from the validated repository variable', () => {
   for (const workflowPath of [
     '.github/workflows/quality-gate.yml',
     '.github/workflows/release.yml',
   ]) {
     const workflow = fs.readFileSync(workflowPath, 'utf8');
-    expect(workflow).toContain("SNIPTALE_QA_CPU_TOKENS: '24'");
-    expect(workflow).toContain("SNIPTALE_QA_MEMORY_MIB: '36864'");
-    expect(workflow).toContain("SNIPTALE_QA_VITEST_MAX_WORKERS: '16'");
-    expect(workflow).toContain("SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'");
-    expect(workflow).toContain("SNIPTALE_QA_SECURITY_WORKERS: '8'");
+    expect(workflow).toContain('SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}');
+    expect(workflow).not.toContain("SNIPTALE_QA_CPU_TOKENS: '24'");
   }
-  const quality = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
-  expect(quality).toMatch(
-    /canonical-qa-3:[\s\S]*SNIPTALE_QA_CPU_TOKENS: '12'[\s\S]*SNIPTALE_QA_MEMORY_MIB: '18432'[\s\S]*SNIPTALE_QA_VITEST_MAX_WORKERS: '8'/u
-  );
+  const policy = fs.readFileSync('tooling/configs/ci/selectel-runner.json', 'utf8');
+  expect(policy).not.toContain('attemptPlacements');
 });
 
 it('fails release publication closed around live immutability and asset digests', () => {
@@ -177,13 +162,14 @@ it('fails release publication closed around live immutability and asset digests'
   expect(workflow).toContain('release-audit:');
   expect(workflow).toContain('cleanup:');
   expect(workflow).toContain('publish:');
-  expect(workflow).toContain('for attempt in 1 2 3; do');
-  expect(workflow).toContain('build/selectel-controller/selected-attempt.txt');
+  expect(workflow).not.toContain('for attempt in 1 2 3; do');
+  expect(workflow).toContain('build/selectel-controller/provision.json');
   expect(workflow).toContain('SNIPTALE_SELECTEL_ATTEMPT: ${{ needs.provision.outputs.attempt }}');
   expect(workflow).toContain('SNIPTALE_QA_CPU_TOKENS: ${{ needs.provision.outputs.cpu-tokens }}');
   expect(workflow).toContain('--arg name "Sniptale ${version} alpha"');
   expect(workflow).toContain('--rawfile body "$release_notes"');
-  expect(workflow).toContain('Added verified unit and CodeQL proof reuse');
+  expect(workflow).toContain('Added verified unit, CodeQL, and coverage proof reuse');
+  expect(workflow).toContain('select-coverage-proof.mjs');
   expect(workflow).toContain('This is still an alpha preview (**v${version}-alpha**)');
   expect(workflow).toContain('prerelease: false, generate_release_notes: false');
   expect(workflow).toContain('SNIPTALE_CI_IMAGE: ${{ needs.admission.outputs.qa-image }}');

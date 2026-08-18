@@ -256,6 +256,7 @@ it('fails canonical artifact collection on missing reports and refuses overwrite
     writeFile(root, `.tmp/coverage/canonical/${file}`, '{}\n');
   }
   writeFile(root, '.tmp/coverage/canonical/html/index.html', '<html></html>\n');
+  writeFile(root, '.tmp/qa/coverage-proof.json', '{}\n');
   const runId = '018f68b2-6e52-7cb0-bdb7-7f0a901c94de';
   const logPath = `.tmp/qa-logs/2026-08-17/${runId}.log`;
   writeFile(root, logPath, '');

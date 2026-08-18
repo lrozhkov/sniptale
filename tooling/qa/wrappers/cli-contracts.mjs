@@ -130,14 +130,14 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
     entrypoint: 'tooling/qa/wrappers/audit.mjs',
     lifecycleLabel: 'QA audit',
     scripts: ['qa:audit'],
-    usage: 'npm run qa:audit -- [--profile <repository|security|release>]',
+    usage: 'npm run qa:audit -- [--profile <repository|pr|security|coverage|release>]',
     description: 'Run the configured repository audit profile.',
     options: [
       {
         name: '--profile',
         kind: 'value',
         key: 'profile',
-        description: 'Audit profile: repository, security, or release.',
+        description: 'Audit profile: repository, pr, security, coverage, or release.',
       },
     ],
   },

@@ -60,6 +60,18 @@ const candidatePhaseCommands = new Map([
   ['candidate-checkpoint', wrapper('checkpoint')],
   ['candidate-closeout', wrapper('closeout', '-m', 'ci: verify exact candidate tree')],
   ['candidate-release', wrapper('release')],
+  ['candidate-pr-audit', wrapper('audit', '--profile', 'pr')],
+  [
+    'candidate-receipts',
+    [
+      'node',
+      [
+        trustedRoot
+          ? '/opt/sniptale-trusted/tooling/ci/validate-coverage-proof.mjs'
+          : 'tooling/ci/validate-coverage-proof.mjs',
+      ],
+    ],
+  ],
   ['candidate-security', wrapper('audit', '--profile', 'security')],
   ['candidate-licenses', licenseCommand],
   ['candidate-coverage', wrapper('audit', '--profile', 'coverage')],
@@ -78,6 +90,25 @@ if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
 
 const startedAtMs = Date.now();
 const phases = [];
+
+function selectelInfrastructure() {
+  if (process.env.SNIPTALE_SELECTEL_ATTEMPT === undefined) return null;
+  return {
+    provider: 'selectel',
+    selectedProfileIndex: Number(process.env.SNIPTALE_SELECTEL_ATTEMPT),
+    profilesDigest: process.env.SNIPTALE_SELECTEL_PROFILES_DIGEST,
+    serverId: process.env.SNIPTALE_SELECTEL_SERVER_ID,
+    availabilityZone: process.env.SNIPTALE_SELECTEL_AVAILABILITY_ZONE,
+    imageReference: process.env.SNIPTALE_CI_IMAGE,
+    resourceProfile: {
+      cpuTokens: Number(process.env.SNIPTALE_QA_CPU_TOKENS),
+      memoryMiB: Number(process.env.SNIPTALE_QA_MEMORY_MIB),
+      vitestWorkers: Number(process.env.SNIPTALE_QA_VITEST_MAX_WORKERS),
+      playwrightWorkers: Number(process.env.SNIPTALE_QA_PLAYWRIGHT_WORKERS),
+      securityWorkers: Number(process.env.SNIPTALE_QA_SECURITY_WORKERS),
+    },
+  };
+}
 
 function runPhase(id, command) {
   const startedAt = new Date().toISOString();
@@ -157,6 +188,7 @@ if (!candidatePhaseCommand && lane !== candidateFinalizeLane) {
         bounded: resolveQaResourceProfile(),
         release: resolveQaReleaseResourceProfile(),
       },
+      infrastructure: selectelInfrastructure(),
     });
     process.stdout.write(`SNIPTALE_ARTIFACT_PATH=${artifactPath}\n`);
   } catch (error) {

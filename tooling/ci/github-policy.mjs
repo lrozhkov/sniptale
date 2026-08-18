@@ -3,10 +3,12 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { parseToggleState, requireSelectedActionsSnapshot } from './github-policy-response.mjs';
+import { validateSelectelQaProfiles } from './selectel/policy.mjs';
 
 const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
 const mode = process.argv[2] ?? 'plan';
 const repository = policy.repository;
+const selectelEnvironment = 'selectel-runner-controller';
 const apiVersion = '2026-03-10';
 
 function api(endpoint, { method = 'GET', body, allowFailure = false } = {}) {
@@ -56,6 +58,10 @@ function snapshot() {
           api(`repos/${repository}/actions/permissions/selected-actions`).value
         )
       : null;
+  const qaProfiles = api(
+    `repos/${repository}/environments/${selectelEnvironment}/variables/SELECTEL_QA_PROFILES`
+  ).value;
+  const qaProfilesValidation = validateSelectelQaProfiles(qaProfiles?.value);
   return {
     schemaVersion: 1,
     repository,
@@ -71,6 +77,12 @@ function snapshot() {
       const current = findRuleset(policy.releaseTagRuleset.name);
       return current ? { id: current.id, ...rulesetPayload(current) } : null;
     })(),
+    selectelQaProfiles: {
+      name: qaProfiles?.name,
+      environment: selectelEnvironment,
+      digest: qaProfilesValidation.digest,
+      profiles: qaProfilesValidation.profiles.length,
+    },
   };
 }
 

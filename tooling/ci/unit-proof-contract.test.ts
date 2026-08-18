@@ -21,7 +21,7 @@ it('keeps verified unit proof transport subordinate to the canonical QA owner', 
     },
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
-  expect(workflow.match(/Restore verified main QA proofs/gu)).toHaveLength(3);
+  expect(workflow.match(/Restore verified main receipts when available/gu)).toHaveLength(1);
   expect(workflow).toContain('select-unit-proof.mjs');
   expect(workflow).toContain('select-unit-proof.mjs restore');
   expect(workflow).toContain('SNIPTALE_UNIT_PROOF_PATH=$unit_proof');

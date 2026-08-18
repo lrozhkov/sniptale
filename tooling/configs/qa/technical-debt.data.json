@@ -14817,7 +14817,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "9dcb235038118fe6119caea84e16aa2fd63c7ff7eb1a95496b07cbb787319be5"
+        "contentHash": "f0939f21a84dda45d980cadf55df24f0caf768e7debe87589f60accb62dbb74c"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
@@ -14830,6 +14830,7 @@
         "binding:LANE_WRAPPERS",
         "property:candidate",
         "property:candidate[1]",
+        "property:collectLaneArtifacts/proofReuse",
         "property:coverage",
         "property:coverage[1]",
         "property:release",
@@ -15750,7 +15751,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/cli-contracts.mjs",
-        "contentHash": "2020b3bac95875387397221b832036545f1c08420ccda38c4ba863ad01415051"
+        "contentHash": "4a0f26763fb85af7aefbb757c6f37bdbbfc59d220fe21ac7799948d041789df9"
       },
       "consumers": [
         "tooling/qa/wrappers/build.mjs",
@@ -15882,6 +15883,7 @@
         "contentHash": "a7eca87a77b57dff46cf6380445e9e124bc6e05f9f2d4d0ca084df0d8f90acb0"
       },
       "consumers": [
+        "tooling/ci/validate-coverage-proof.mjs",
         "tooling/qa/audits/codeql.mjs",
         "tooling/qa/core/codeql-proof.mjs",
         "tooling/qa/core/codeql-proof.test.ts"
@@ -15980,7 +15982,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "9d10f2a7f8fc0abd2779de255003a79488a5c90c36f0834df45d540bc2c820c0"
+        "contentHash": "57686163abda96ee9298fdd4282d7c3614a70256364f5ddb39873e8682024b2c"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -16143,10 +16145,32 @@
         "tooling/qa/core/audit-coverage-step.mjs",
         "tooling/qa/core/coverage-audit-report.mjs",
         "tooling/qa/core/coverage-audit-report.test.ts",
+        "tooling/qa/core/coverage-proof.mjs",
         "tooling/qa/core/technical-debt-coverage.mjs"
       ],
       "surfaces": [
         "property:writeCanonicalCoverageArtifacts/files"
+      ]
+    },
+    {
+      "id": "policy.source.coverage-proof-mjs.e07556f2fc",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/coverage-proof.mjs",
+        "contentHash": "432dd7f6db88822f787b27b3132e44d90053755ae3de0a329df6749722967a94"
+      },
+      "consumers": [
+        "tooling/ci/validate-coverage-proof.mjs",
+        "tooling/qa/core/audit-coverage-step.mjs",
+        "tooling/qa/core/coverage-proof.mjs",
+        "tooling/qa/core/coverage-proof.test.ts"
+      ],
+      "surfaces": [
+        "property:recordSuccessfulCoverageProof/producer"
       ]
     },
     {
@@ -17418,7 +17442,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/github-policy.mjs",
-        "contentHash": "1ef4077c2070a30c210152cf7fb009424ac0b7ec7c2c73fe32da0eede51f167a"
+        "contentHash": "5e78334280338b0fb08a8b6a7e53218efee1c33050dbf2af55a3336694f660dc"
       },
       "consumers": [
         "tooling/ci/github-policy.mjs"
@@ -17428,7 +17452,8 @@
         "property:apply/body",
         "property:desired/bypass_actors",
         "property:desired/ruleset",
-        "property:security"
+        "property:security",
+        "property:snapshot/selectelQaProfiles"
       ]
     },
     {
@@ -18851,6 +18876,31 @@
       ]
     },
     {
+      "id": "policy.source.policy-mjs.de76dca223",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/selectel/policy.mjs",
+        "contentHash": "df08cc16c0d3305948d2019625b7b58c10af8d87286b40a9df57709860d7d0dd"
+      },
+      "consumers": [
+        "tooling/ci/github-policy.mjs",
+        "tooling/ci/selectel/policy.mjs",
+        "tooling/ci/selectel/sdk-controller.test.ts"
+      ],
+      "surfaces": [
+        "property:readSelectelPolicy/ru-3a",
+        "property:readSelectelPolicy/ru-3b",
+        "property:readSelectelPolicy/SL1.12-24576",
+        "property:readSelectelPolicy/SL1.12-24576[1]",
+        "property:readSelectelPolicy/SL1.24-49152",
+        "property:readSelectelPolicy/SL1.24-49152[1]"
+      ]
+    },
+    {
       "id": "policy.source.policy-populations-mjs.855365a4b2",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -19067,13 +19117,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/prepare-release-assets.mjs",
-        "contentHash": "39f370682f75dc37d3fdd679c35b2f82422e7817df0620062c9152694c6305db"
+        "contentHash": "80ad4c0b8caf9fc8e2225fc31de44583732c8110943b5ef0e7f2dc19356f6747"
       },
       "consumers": [
         "tooling/ci/prepare-release-assets.mjs"
       ],
       "surfaces": [
         "binding:names",
+        "binding:provenance",
         "binding:sources"
       ]
     },
@@ -19585,7 +19636,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "6e4af01a1985bb2d4d3532c12f7b89e63ab2069acbd45c0189816c1aac35c836"
+        "contentHash": "d3121570f79bae9e0c43f990968983c69fe6b465d4df987d1acbc513d2deb2c6"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
@@ -19600,7 +19651,8 @@
         "property:release",
         "property:release-audit",
         "property:resourceProfiles",
-        "property:security"
+        "property:security",
+        "property:selectelInfrastructure/resourceProfile"
       ]
     },
     {
@@ -19918,7 +19970,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/profiles/schema.mjs",
-        "contentHash": "12374c50cb876c0e2c2ebb8cfe5456d8304e8c32d44d92a55294668d6a5a533f"
+        "contentHash": "37287d51b29a402dceba7463db178e1f73988753b4492cd45905caf161f6c7df"
       },
       "consumers": [
         "tooling/qa/audits/profiles/index.mjs",
@@ -20508,6 +20560,7 @@
         "tooling/qa/core/architecture-inventory.test.ts",
         "tooling/qa/core/codeql-proof.test.ts",
         "tooling/qa/core/coverage-audit-report.test.ts",
+        "tooling/qa/core/coverage-proof.test.ts",
         "tooling/qa/core/dependency-graph-cache.test.ts",
         "tooling/qa/core/dependency-graph-runner.test.ts",
         "tooling/qa/core/design-system-verifier.registry-paths.test.ts",

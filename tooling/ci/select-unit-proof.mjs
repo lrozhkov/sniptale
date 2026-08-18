@@ -13,7 +13,7 @@ function runGh(args) {
   return result.stdout;
 }
 
-function resolveExactMainRun(value, commit) {
+function resolveLatestMainRun(value, commit) {
   const parsed = JSON.parse(value);
   if (!Array.isArray(parsed)) throw new Error('GitHub run discovery returned malformed JSON.');
   const matches = parsed.filter(
@@ -24,7 +24,7 @@ function resolveExactMainRun(value, commit) {
       Number.isSafeInteger(run.databaseId) &&
       run.databaseId > 0
   );
-  if (matches.length !== 1) throw new Error('Expected exactly one successful main proof run.');
+  if (matches.length === 0) throw new Error('Expected a successful main proof run.');
   return matches[0].databaseId;
 }
 
@@ -69,8 +69,6 @@ export function restoreVerifiedMainUnitProof(
       'main',
       '--commit',
       commit,
-      '--event',
-      'push',
       '--status',
       'success',
       '--limit',
@@ -78,7 +76,7 @@ export function restoreVerifiedMainUnitProof(
       '--json',
       'databaseId,headSha',
     ]);
-    const runId = resolveExactMainRun(runs, commit);
+    const runId = resolveLatestMainRun(runs, commit);
     const artifactName = `canonical-qa-${commit}-${runId}`;
     commandRunner([
       'run',

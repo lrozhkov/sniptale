@@ -37,67 +37,107 @@ def required(value: Any, label: str) -> str:
 
 def read_policy() -> dict[str, Any]:
     policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+    compute = policy.get("compute", {})
     if (
         policy.get("artifactKind") != "sniptale-selectel-runner-policy"
-        or policy.get("compute", {}).get("attemptPlacements")
-        != [
-            {
-                "attempt": 1,
-                "availabilityZone": "ru-3a",
-                "bootVolumeType": "universal.ru-3a",
-                "flavorName": "SL1.24-49152",
-                "vcpus": 24,
-                "ramMiB": 49152,
-                "resourceProfile": {
-                    "id": "selectel-24vcpu-48g-v1",
-                    "cpuTokens": 24,
-                    "memoryMiB": 36864,
-                    "vitestWorkers": 16,
-                    "playwrightWorkers": 4,
-                    "securityWorkers": 8,
-                    "memoryReserveMiB": 12288,
-                },
+        or compute.get("allowedZones") != ["ru-3a", "ru-3b"]
+        or compute.get("allowedBootVolumeGiB") != [80]
+        or compute.get("allowedFlavors")
+        != {
+            "SL1.24-49152": {"vcpus": 24, "ramMiB": 49152},
+            "SL1.12-24576": {"vcpus": 12, "ramMiB": 24576},
+        }
+        or compute.get("allowedVolumeTypesByZone")
+        != {"ru-3a": ["universal.ru-3a"], "ru-3b": ["basicssd.ru-3b"]}
+        or compute.get("allowedResourceProfilesByFlavor")
+        != {
+            "SL1.24-49152": {
+                "cpuTokens": 24,
+                "memoryMiB": 36864,
+                "vitestWorkers": 16,
+                "playwrightWorkers": 4,
+                "securityWorkers": 8,
             },
-            {
-                "attempt": 2,
-                "availabilityZone": "ru-3b",
-                "bootVolumeType": "basicssd.ru-3b",
-                "flavorName": "SL1.24-49152",
-                "vcpus": 24,
-                "ramMiB": 49152,
-                "resourceProfile": {
-                    "id": "selectel-24vcpu-48g-v1",
-                    "cpuTokens": 24,
-                    "memoryMiB": 36864,
-                    "vitestWorkers": 16,
-                    "playwrightWorkers": 4,
-                    "securityWorkers": 8,
-                    "memoryReserveMiB": 12288,
-                },
+            "SL1.12-24576": {
+                "cpuTokens": 12,
+                "memoryMiB": 18432,
+                "vitestWorkers": 8,
+                "playwrightWorkers": 4,
+                "securityWorkers": 6,
             },
-            {
-                "attempt": 3,
-                "availabilityZone": "ru-3a",
-                "bootVolumeType": "universal.ru-3a",
-                "flavorName": "SL1.12-24576",
-                "vcpus": 12,
-                "ramMiB": 24576,
-                "resourceProfile": {
-                    "id": "selectel-12vcpu-24g-v1",
-                    "cpuTokens": 12,
-                    "memoryMiB": 18432,
-                    "vitestWorkers": 8,
-                    "playwrightWorkers": 4,
-                    "securityWorkers": 6,
-                    "memoryReserveMiB": 6144,
-                },
-            },
-        ]
-        or policy.get("compute", {}).get("preemptible") is not True
+        }
+        or compute.get("preemptible") is not True
+        or policy.get("lifecycle", {}).get("maxProfiles") != 10
         or policy.get("runner", {}).get("maxJobs") != 1
     ):
         raise RuntimeError("Malformed Selectel runner policy.")
     return policy
+
+
+def read_profiles(policy: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+    raw = required(os.environ.get("SELECTEL_QA_PROFILES"), "SELECTEL_QA_PROFILES")
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as failure:
+        raise RuntimeError("SELECTEL_QA_PROFILES is malformed JSON.") from failure
+    if not isinstance(document, dict) or set(document) != {"profiles"}:
+        raise RuntimeError("SELECTEL_QA_PROFILES must contain only profiles.")
+    profiles = document["profiles"]
+    if not isinstance(profiles, list) or not profiles:
+        raise RuntimeError("SELECTEL_QA_PROFILES profiles must be a non-empty array.")
+    if len(profiles) > policy["lifecycle"]["maxProfiles"]:
+        raise RuntimeError("SELECTEL_QA_PROFILES exceeds the bounded profile count.")
+    compute = policy["compute"]
+    normalized_profiles = []
+    seen = set()
+    for index, profile in enumerate(profiles):
+        if not isinstance(profile, dict) or set(profile) != {
+            "zone", "flavor", "volumeType", "volumeGiB", "qa"
+        }:
+            raise RuntimeError(f"Selectel profile {index} has unknown or missing fields.")
+        qa = profile["qa"]
+        qa_fields = {
+            "cpuTokens", "memoryMiB", "vitestWorkers", "playwrightWorkers", "securityWorkers"
+        }
+        if not isinstance(qa, dict) or set(qa) != qa_fields:
+            raise RuntimeError(f"Selectel profile {index} QA resources are malformed.")
+        if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in qa.values()):
+            raise RuntimeError(f"Selectel profile {index} QA resources must be positive integers.")
+        zone = profile["zone"]
+        flavor_name = profile["flavor"]
+        volume_type = profile["volumeType"]
+        volume_gib = profile["volumeGiB"]
+        flavor = compute["allowedFlavors"].get(flavor_name)
+        if zone not in compute["allowedZones"] or flavor is None:
+            raise RuntimeError(f"Selectel profile {index} uses an unknown zone or flavor.")
+        if volume_type not in compute["allowedVolumeTypesByZone"].get(zone, []):
+            raise RuntimeError(f"Selectel profile {index} uses an unknown volume type for its zone.")
+        if isinstance(volume_gib, bool) or volume_gib not in compute["allowedBootVolumeGiB"]:
+            raise RuntimeError(f"Selectel profile {index} uses an unsupported volume size.")
+        if qa != compute["allowedResourceProfilesByFlavor"].get(flavor_name):
+            raise RuntimeError(f"Selectel profile {index} uses an unknown flavor/resource combination.")
+        if qa["cpuTokens"] > flavor["vcpus"] or qa["memoryMiB"] >= flavor["ramMiB"]:
+            raise RuntimeError(f"Selectel profile {index} oversubscribes CPU or memory.")
+        if flavor["ramMiB"] - qa["memoryMiB"] < 6144:
+            raise RuntimeError(f"Selectel profile {index} does not reserve enough system memory.")
+        if any(qa[name] > qa["cpuTokens"] for name in ("vitestWorkers", "playwrightWorkers", "securityWorkers")):
+            raise RuntimeError(f"Selectel profile {index} workers exceed CPU tokens.")
+        normalized = {
+            "zone": zone,
+            "flavor": flavor_name,
+            "volumeType": volume_type,
+            "volumeGiB": volume_gib,
+            "qa": qa,
+        }
+        key = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+        if key in seen:
+            raise RuntimeError(f"Selectel profile {index} duplicates an earlier profile.")
+        seen.add(key)
+        normalized_profiles.append(normalized)
+    normalized_document = json.dumps(
+        {"profiles": normalized_profiles}, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return normalized_profiles, f"sha256:{hashlib.sha256(normalized_document.encode()).hexdigest()}"
 
 
 def connect(policy: dict[str, Any]):
@@ -137,7 +177,7 @@ def exact(resources, name: str, kind: str):
 def select_resources(connection, policy: dict[str, Any], placement: dict[str, Any]) -> dict[str, Any]:
     compute = policy["compute"]
     selector = policy["imageSelector"]
-    zone = placement["availabilityZone"]
+    zone = placement["zone"]
     zones = [
         item.name
         for item in connection.compute.availability_zones(details=False)
@@ -148,14 +188,14 @@ def select_resources(connection, policy: dict[str, Any], placement: dict[str, An
     flavors = [
         item
         for item in connection.compute.flavors(details=True)
-        if item.name == placement["flavorName"]
+        if item.name == placement["flavor"]
     ]
     if len(flavors) != 1:
         raise RuntimeError("Configured Selectel flavor is unavailable or ambiguous.")
     flavor = flavors[0]
     if (
-        flavor.vcpus != placement["vcpus"]
-        or flavor.ram != placement["ramMiB"]
+        flavor.vcpus != compute["allowedFlavors"][placement["flavor"]]["vcpus"]
+        or flavor.ram != compute["allowedFlavors"][placement["flavor"]]["ramMiB"]
         or flavor.disk != 0
     ):
         raise RuntimeError("Configured Selectel flavor drifted from the canonical resource profile.")
@@ -167,7 +207,7 @@ def select_resources(connection, policy: dict[str, Any], placement: dict[str, An
     if not images:
         raise RuntimeError(f"No active {compute['operatingSystem']} amd64 image is available.")
     image = images[0]
-    if int(image.min_disk or 0) > compute["bootVolumeGiB"]:
+    if int(image.min_disk or 0) > placement["volumeGiB"]:
         raise RuntimeError("Configured Selectel image no longer fits the canonical boot volume.")
     external = [item for item in connection.network.networks(is_router_external=True)]
     if len(external) != 1:
@@ -175,7 +215,7 @@ def select_resources(connection, policy: dict[str, Any], placement: dict[str, An
     volume_types = [
         item
         for item in connection.block_storage.types()
-        if item.name == placement["bootVolumeType"]
+        if item.name == placement["volumeType"]
     ]
     if len(volume_types) != 1:
         raise RuntimeError("Configured Selectel boot volume type is unavailable.")
@@ -365,8 +405,8 @@ runcmd:
     return base64.b64encode(source.encode()).decode(), f"sha256:{hashlib.sha256(source.encode()).hexdigest()}"
 
 
-def record_path(attempt: str) -> Path:
-    return ROOT / f"build/selectel-controller/attempt-{attempt}.json"
+def record_path() -> Path:
+    return ROOT / "build/selectel-controller/provision.json"
 
 
 def write_record(destination: Path, record: dict[str, Any]):
@@ -390,6 +430,24 @@ def server_failure(connection, server_id: str | None, failure: Exception):
     if isinstance(message, str) and message.strip():
         result["message"] = " ".join(message.split())[:500]
     return result
+
+
+def is_profile_fallback_failure(failure: Exception) -> bool:
+    if isinstance(failure, exceptions.SDKException):
+        return True
+    message = str(failure)
+    return any(
+        marker in message
+        for marker in (
+            "availability zone is unavailable",
+            "flavor is unavailable or ambiguous",
+            "volume type is unavailable or ambiguous",
+            "wait_for_status",
+            "wait_for_server",
+            "did not become online",
+            "server is not confirmed preemptible",
+        )
+    )
 
 
 def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, Any]):
@@ -434,14 +492,15 @@ def cleanup_with_retries(
 
 
 def preflight(policy: dict[str, Any]):
+    profiles, profiles_digest = read_profiles(policy)
     connection, _, project = connect(policy)
     placements = []
-    for placement in policy["compute"]["attemptPlacements"]:
+    for index, placement in enumerate(profiles):
         selected = select_resources(connection, policy, placement)
         placements.append(
             {
                 "availabilityZone": selected["zone"],
-                "attempt": placement["attempt"],
+                "profileIndex": index,
                 "image": {"id": selected["image"].id, "name": selected["image"].name},
                 "flavor": {
                     "id": selected["flavor"].id,
@@ -450,6 +509,8 @@ def preflight(policy: dict[str, Any]):
                     "ramMiB": selected["flavor"].ram,
                 },
                 "volumeType": selected["volume_type"].name,
+                "volumeGiB": placement["volumeGiB"],
+                "resourceProfile": placement["qa"],
             }
         )
     proof = {
@@ -457,6 +518,7 @@ def preflight(policy: dict[str, Any]):
         "artifactKind": "sniptale-selectel-connectivity-proof",
         "project": project,
         "region": policy["controllerEnvironment"]["expectedRegion"],
+        "profilesDigest": profiles_digest,
         "placements": placements,
         "externalNetwork": {
             "id": selected["external_network"].id,
@@ -471,30 +533,38 @@ def preflight(policy: dict[str, Any]):
 
 
 def provision(policy: dict[str, Any]):
-    attempt = required(os.environ.get("SNIPTALE_ATTEMPT"), "SNIPTALE_ATTEMPT")
-    if attempt not in {"1", "2", "3"}:
-        raise RuntimeError("Invalid Selectel infrastructure attempt.")
+    profiles, profiles_digest = read_profiles(policy)
     run_id = required(os.environ.get("GITHUB_RUN_ID"), "GITHUB_RUN_ID")
     candidate_sha = required(os.environ.get("SNIPTALE_CANDIDATE_SHA"), "SNIPTALE_CANDIDATE_SHA")
+    base_sha = required(os.environ.get("SNIPTALE_BASE_SHA"), "SNIPTALE_BASE_SHA")
+    trusted_control_sha = required(
+        os.environ.get("SNIPTALE_TRUSTED_CONTROL_SHA"), "SNIPTALE_TRUSTED_CONTROL_SHA"
+    )
     image_reference = required(os.environ.get("SNIPTALE_QA_IMAGE"), "SNIPTALE_QA_IMAGE")
     image_user = required(os.environ.get("RUNNER_IMAGE_USER"), "RUNNER_IMAGE_USER")
     image_token = required(os.environ.get("RUNNER_IMAGE_TOKEN"), "RUNNER_IMAGE_TOKEN")
     token = required(os.environ.get("RUNNER_CONTROLLER_TOKEN"), "RUNNER_CONTROLLER_TOKEN")
     connection, _, project = connect(policy)
-    placement = policy["compute"]["attemptPlacements"][int(attempt) - 1]
-    if placement["attempt"] != int(attempt):
-        raise RuntimeError("Selectel attempt placement order drifted from policy.")
-    selected = select_resources(connection, policy, placement)
-    network, subnet, security_group = ensure_static_network(connection, selected, policy)
-    name = f"sniptale-{run_id}-{attempt}"
-    label = f"{policy['runner']['labelPrefix']}{run_id}-{attempt}"
-    if any(server.name == name for server in connection.compute.servers(name=name)):
-        raise RuntimeError("Selectel runner server name collision.")
-    runner_id, jit_config = create_jit_runner(policy, token, name, label)
-    user_data, user_data_digest = cloud_init(
-        policy, jit_config, image_reference, image_user, image_token
-    )
-    metadata = {
+    destination = record_path()
+    if destination.exists():
+        raise RuntimeError("Refusing Selectel controller record collision.")
+    controller_record = {
+        "schemaVersion": 3,
+        "artifactKind": "sniptale-selectel-provision-record",
+        "runId": run_id,
+        "candidateSha": candidate_sha,
+        "baseSha": base_sha,
+        "trustedControlSha": trusted_control_sha,
+        "qaImage": image_reference,
+        "profilesDigest": profiles_digest,
+        "project": project,
+        "region": policy["controllerEnvironment"]["expectedRegion"],
+        "selectedProfileIndex": None,
+        "attempts": [],
+        "status": "provisioning",
+    }
+    write_record(destination, controller_record)
+    common_metadata = {
         "managed-by": policy["lifecycle"]["managedBy"],
         "repository": policy["repository"],
         "workflow": required(os.environ.get("GITHUB_WORKFLOW"), "GITHUB_WORKFLOW"),
@@ -506,127 +576,140 @@ def provision(policy: dict[str, Any]):
             time.gmtime(time.time() + policy["lifecycle"]["ttlSeconds"]),
         ),
     }
-    destination = record_path(attempt)
-    if destination.exists():
-        raise RuntimeError("Refusing Selectel controller record collision.")
-    record = {
-        "schemaVersion": 2,
-        "artifactKind": "sniptale-selectel-attempt-record",
-        "attempt": int(attempt),
-        "runId": run_id,
-        "candidateSha": candidate_sha,
-        "project": project,
-        "region": policy["controllerEnvironment"]["expectedRegion"],
-        "availabilityZone": selected["zone"],
-        "bootVolumeType": selected["volume_type"].name,
-        "imageId": selected["image"].id,
-        "flavorId": selected["flavor"].id,
-        "qaImage": image_reference,
-        "cloudInitDigest": user_data_digest,
-        "resourceProfile": placement["resourceProfile"],
-        "resources": {
-            "vcpus": placement["vcpus"],
-            "ramMiB": placement["ramMiB"],
-            "bootVolumeGiB": policy["compute"]["bootVolumeGiB"],
-        },
-        "preemptible": False,
-        "publicIp": False,
-        "runnerId": runner_id,
-        "runnerName": name,
-        "runnerLabel": label,
-        "serverId": None,
-        "portIds": [],
-        "volumeIds": [],
-        "status": "provisioning",
-        "failure": None,
-        "cleanupAttempts": 0,
-        "cleanup": None,
-    }
-    write_record(destination, record)
-    try:
-        volume_name = f"{name}-boot"
-        if list(connection.block_storage.volumes(name=volume_name)):
-            raise RuntimeError("Selectel runner boot volume name collision.")
-        volume = connection.block_storage.create_volume(
-            name=volume_name,
-            size=policy["compute"]["bootVolumeGiB"],
-            image_id=selected["image"].id,
-            volume_type=selected["volume_type"].name,
-            availability_zone=selected["zone"],
-            metadata=metadata,
-        )
-        record["volumeIds"] = [volume.id]
-        write_record(destination, record)
-        volume = connection.block_storage.wait_for_status(
-            volume, status="available", failures=["error"], interval=5, wait=600
-        )
-        port_name = f"{name}-port"
-        if list(connection.network.ports(name=port_name)):
-            raise RuntimeError("Selectel runner port name collision.")
-        port = connection.network.create_port(
-            name=port_name,
-            network_id=network.id,
-            fixed_ips=[{"subnet_id": subnet.id}],
-            security_group_ids=[security_group.id],
-            admin_state_up=True,
-            description=f"{policy['lifecycle']['managedBy']}:{run_id}:{attempt}",
-        )
-        record["portIds"] = [port.id]
-        write_record(destination, record)
-        server = connection.compute.create_server(
-            name=name,
-            flavor_id=selected["flavor"].id,
-            availability_zone=selected["zone"],
-            networks=[{"port": port.id}],
-            metadata=metadata,
-            tags=["preemptible"],
-            user_data=user_data,
-            block_device_mapping_v2=[
-                {
-                    "boot_index": 0,
-                    "uuid": volume.id,
-                    "source_type": "volume",
-                    "destination_type": "volume",
-                    "delete_on_termination": True,
-                }
-            ],
-        )
-        record["serverId"] = server.id
-        write_record(destination, record)
-        server = connection.compute.wait_for_server(
-            server, status="ACTIVE", failures=["ERROR"], interval=5, wait=600
-        )
-        if "preemptible" not in (server.tags or []):
-            raise RuntimeError("Selectel runner server is not confirmed preemptible.")
-        addresses = [address for values in (server.addresses or {}).values() for address in values]
-        if any(address.get("OS-EXT-IPS:type") == "floating" for address in addresses):
-            raise RuntimeError("Selectel runner server unexpectedly has a public floating IP.")
-        record["preemptible"] = True
-        wait_runner_online(policy, token, runner_id)
-        record["status"] = "online"
-        write_record(destination, record)
-        print(json.dumps({"record": str(destination.relative_to(ROOT)), "label": label}))
-    except Exception as failure:
-        record["failure"] = server_failure(connection, record["serverId"], failure)
-        record["status"] = "provision-failed"
-        write_record(destination, record)
-        record["cleanup"], record["cleanupAttempts"] = cleanup_with_retries(
-            policy, token, record, connection
-        )
-        write_record(destination, record)
-        if record["failure"].get("message"):
-            code = record["failure"].get("code", "unknown")
-            raise RuntimeError(
-                f"Selectel server build failed ({code}): {record['failure']['message']}"
-            ) from None
-        raise
+    last_failure = None
+    for profile_index, placement in enumerate(profiles):
+        attempt = str(profile_index + 1)
+        name = f"sniptale-{run_id}-{attempt}"
+        label = f"{policy['runner']['labelPrefix']}{run_id}-{attempt}"
+        if any(server.name == name for server in connection.compute.servers(name=name)):
+            raise RuntimeError("Selectel runner server name collision.")
+        record = {
+            "profileIndex": profile_index,
+            "availabilityZone": placement["zone"],
+            "bootVolumeType": placement["volumeType"],
+            "bootVolumeGiB": placement["volumeGiB"],
+            "imageId": None,
+            "flavorId": None,
+            "flavorName": placement["flavor"],
+            "resourceProfile": placement["qa"],
+            "preemptible": False,
+            "publicIp": False,
+            "runnerId": None,
+            "runnerName": name,
+            "runnerLabel": label,
+            "serverId": None,
+            "portIds": [],
+            "volumeIds": [],
+            "status": "provisioning",
+            "failure": None,
+            "cleanupAttempts": 0,
+            "cleanup": None,
+        }
+        controller_record["attempts"].append(record)
+        write_record(destination, controller_record)
+        try:
+            selected = select_resources(connection, policy, placement)
+            network, subnet, security_group = ensure_static_network(connection, selected, policy)
+            record["imageId"] = selected["image"].id
+            record["flavorId"] = selected["flavor"].id
+            runner_id, jit_config = create_jit_runner(policy, token, name, label)
+            record["runnerId"] = runner_id
+            user_data, user_data_digest = cloud_init(
+                policy, jit_config, image_reference, image_user, image_token
+            )
+            record["cloudInitDigest"] = user_data_digest
+            metadata = {**common_metadata, "profile-index": str(profile_index)}
+            write_record(destination, controller_record)
+            volume_name = f"{name}-boot"
+            if list(connection.block_storage.volumes(name=volume_name)):
+                raise RuntimeError("Selectel runner boot volume name collision.")
+            volume = connection.block_storage.create_volume(
+                name=volume_name,
+                size=placement["volumeGiB"],
+                image_id=selected["image"].id,
+                volume_type=selected["volume_type"].name,
+                availability_zone=selected["zone"],
+                metadata=metadata,
+            )
+            record["volumeIds"] = [volume.id]
+            write_record(destination, controller_record)
+            volume = connection.block_storage.wait_for_status(
+                volume, status="available", failures=["error"], interval=5, wait=600
+            )
+            port_name = f"{name}-port"
+            if list(connection.network.ports(name=port_name)):
+                raise RuntimeError("Selectel runner port name collision.")
+            port = connection.network.create_port(
+                name=port_name,
+                network_id=network.id,
+                fixed_ips=[{"subnet_id": subnet.id}],
+                security_group_ids=[security_group.id],
+                admin_state_up=True,
+                description=f"{policy['lifecycle']['managedBy']}:{run_id}:{attempt}",
+            )
+            record["portIds"] = [port.id]
+            write_record(destination, controller_record)
+            server = connection.compute.create_server(
+                name=name,
+                flavor_id=selected["flavor"].id,
+                availability_zone=selected["zone"],
+                networks=[{"port": port.id}],
+                metadata=metadata,
+                tags=["preemptible"],
+                user_data=user_data,
+                block_device_mapping_v2=[
+                    {
+                        "boot_index": 0,
+                        "uuid": volume.id,
+                        "source_type": "volume",
+                        "destination_type": "volume",
+                        "delete_on_termination": True,
+                    }
+                ],
+            )
+            record["serverId"] = server.id
+            write_record(destination, controller_record)
+            server = connection.compute.wait_for_server(
+                server, status="ACTIVE", failures=["ERROR"], interval=5, wait=600
+            )
+            if "preemptible" not in (server.tags or []):
+                raise RuntimeError("Selectel runner server is not confirmed preemptible.")
+            addresses = [address for values in (server.addresses or {}).values() for address in values]
+            if any(address.get("OS-EXT-IPS:type") == "floating" for address in addresses):
+                raise RuntimeError("Selectel runner server unexpectedly has a public floating IP.")
+            record["preemptible"] = True
+            wait_runner_online(policy, token, runner_id)
+            record["status"] = "online"
+            controller_record.update(record)
+            controller_record["selectedProfileIndex"] = profile_index
+            controller_record["status"] = "online"
+            write_record(destination, controller_record)
+            print(json.dumps({"record": str(destination.relative_to(ROOT)), "label": label}))
+            return
+        except Exception as failure:
+            last_failure = failure
+            record["failure"] = server_failure(connection, record["serverId"], failure)
+            record["status"] = "provision-failed"
+            write_record(destination, controller_record)
+            record["cleanup"], record["cleanupAttempts"] = cleanup_with_retries(
+                policy, token, record, connection
+            )
+            record["status"] = "cleaned-after-provision-failure"
+            write_record(destination, controller_record)
+            if not is_profile_fallback_failure(failure):
+                controller_record["status"] = "admission-failed"
+                write_record(destination, controller_record)
+                raise
+    controller_record["status"] = "profiles-exhausted"
+    write_record(destination, controller_record)
+    raise RuntimeError(f"All Selectel QA profiles were exhausted: {type(last_failure).__name__}")
 
 
 def cleanup_command(policy: dict[str, Any], record_file: str):
     destination = Path(record_file).resolve()
     record = json.loads(destination.read_text(encoding="utf-8"))
-    if record.get("artifactKind") != "sniptale-selectel-attempt-record":
-        raise RuntimeError("Malformed Selectel attempt record.")
+    if record.get("artifactKind") != "sniptale-selectel-provision-record" or record.get("status") != "online":
+        raise RuntimeError("Malformed Selectel provision record.")
     token = required(os.environ.get("RUNNER_CONTROLLER_TOKEN"), "RUNNER_CONTROLLER_TOKEN")
     record["cleanup"], record["cleanupAttempts"] = cleanup_with_retries(
         policy, token, record
