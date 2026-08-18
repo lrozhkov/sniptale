@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { createTempRoot, writeFile } from './test-helpers';
 import {
@@ -10,10 +10,26 @@ import {
   resolveReusableCoverageProof,
 } from './coverage-proof.mjs';
 
-const previousEnvironment = { ...process.env };
+const proofEnvironmentKeys = [
+  'SNIPTALE_CI_CONTAINER_DIGEST',
+  'SNIPTALE_COVERAGE_PROOF_PATH',
+  'SNIPTALE_COVERAGE_REPORTS_PATH',
+  'SNIPTALE_COVERAGE_PROOF_AUTHORITY',
+] as const;
+const originalProofEnvironment = new Map(
+  proofEnvironmentKeys.map((key) => [key, process.env[key]])
+);
+
+beforeEach(() => {
+  for (const key of proofEnvironmentKeys) delete process.env[key];
+});
 
 afterEach(() => {
-  process.env = { ...previousEnvironment };
+  for (const key of proofEnvironmentKeys) {
+    const original = originalProofEnvironment.get(key);
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  }
 });
 
 function fixture() {
