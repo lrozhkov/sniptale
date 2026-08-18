@@ -118,6 +118,10 @@ it('pins the measured GitHub runner profile in both canonical workflows', () => 
     expect(workflow).toContain("SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'");
     expect(workflow).toContain("SNIPTALE_QA_SECURITY_WORKERS: '8'");
   }
+  const quality = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
+  expect(quality).toMatch(
+    /canonical-qa-3:[\s\S]*SNIPTALE_QA_CPU_TOKENS: '16'[\s\S]*SNIPTALE_QA_MEMORY_MIB: '24576'[\s\S]*SNIPTALE_QA_VITEST_MAX_WORKERS: '12'/u
+  );
 });
 
 it('fails release publication closed around live immutability and asset digests', () => {
