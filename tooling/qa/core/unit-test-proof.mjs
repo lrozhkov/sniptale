@@ -28,6 +28,17 @@ function stableStringify(value) {
   return JSON.stringify(stableValue(value));
 }
 
+function readRegularFile(filePath, encoding = null) {
+  const descriptor = fs.openSync(filePath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+  try {
+    const stat = fs.fstatSync(descriptor);
+    if (!stat.isFile()) throw new Error(`Unsafe regular-file input: ${filePath}`);
+    return fs.readFileSync(descriptor, encoding === null ? undefined : encoding);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 function assertPathList(values, label) {
   if (
     !Array.isArray(values) ||
@@ -136,11 +147,7 @@ function collectInputFiles(cwd, policy) {
 function fingerprintFiles(cwd, files) {
   return files.map((file) => {
     const absolute = path.join(cwd, file);
-    const stat = fs.lstatSync(absolute);
-    if (!stat.isFile() || stat.isSymbolicLink()) {
-      throw new Error(`Unsafe unit proof input: ${file}`);
-    }
-    return { file, sha256: sha256Bytes(fs.readFileSync(absolute)) };
+    return { file, sha256: sha256Bytes(readRegularFile(absolute)) };
   });
 }
 
@@ -214,9 +221,7 @@ function parseProof(value) {
 
 function readProof(proofPath) {
   try {
-    const stat = fs.lstatSync(proofPath);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('unsafe proof file');
-    return parseProof(JSON.parse(fs.readFileSync(proofPath, 'utf8')));
+    return parseProof(JSON.parse(readRegularFile(proofPath, 'utf8')));
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
@@ -232,7 +237,7 @@ function resolveProofPath(cwd, policy) {
 export function resolveReusableFullUnitProof(options = {}) {
   const current = createFullUnitProofInputs(options);
   const source = resolveProofPath(options.cwd ?? process.cwd(), current.policy);
-  if (!source || !fs.existsSync(source.path)) {
+  if (!source) {
     return { matched: false, reason: 'no admissible full unit proof' };
   }
   const proof = readProof(source.path);
