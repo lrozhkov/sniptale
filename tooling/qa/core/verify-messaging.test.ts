@@ -83,6 +83,25 @@ function verifiesSpoofedTypedTransportPathViolation() {
   ]);
 }
 
+function verifiesSecurityE2eDriverAllowanceIsExact() {
+  const root = createTempRoot();
+  const allowed = writeFile(
+    root,
+    'tooling/test/e2e/security/support.ts',
+    'export const send = () => chrome.runtime.sendMessage({ type: "PING" });\n'
+  );
+  const spoofed = writeFile(
+    root,
+    'spoof/tooling/test/e2e/security/support.ts',
+    'export const send = () => chrome.runtime.sendMessage({ type: "PING" });\n'
+  );
+
+  expect(collectMessagingViolations([allowed], { root })).toEqual([]);
+  expect(collectMessagingViolations([spoofed], { root })).toEqual([
+    expect.objectContaining({ rule: 'messaging-direct-send' }),
+  ]);
+}
+
 function verifiesChromeStubViolation() {
   const root = createTempRoot();
   const file = writeFile(
@@ -232,6 +251,10 @@ describe('collectMessagingViolations', () => {
     verifiesTypedTransportAllowlist
   );
   it('rejects a suffix-spoofed typed transport path', verifiesSpoofedTypedTransportPathViolation);
+  it(
+    'allows only the exact security E2E runtime driver',
+    verifiesSecurityE2eDriverAllowanceIsExact
+  );
   it('flags new chrome global stubs outside the allowlist', verifiesChromeStubViolation);
   it(
     'flags new default runtime messaging imports outside the baseline',

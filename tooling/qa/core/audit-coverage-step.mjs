@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { resolveQaResourceProfile } from '../runtime/resource-profile.mjs';
 import { createFailureStep, createOkStep } from './focused-qa-results.mjs';
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { fromRelativePath } from './shared.mjs';
@@ -13,7 +14,6 @@ import {
 } from './coverage-audit-report.mjs';
 
 const FULL_COVERAGE_DIRECTORY = '.tmp/coverage/unit';
-const FULL_COVERAGE_MAX_WORKERS = 6;
 
 function withDuration(step, durationMs) {
   return {
@@ -33,13 +33,15 @@ function prepareFullCoverageDirectory() {
   fs.mkdirSync(path.join(coverageDirectory, '.tmp'), { recursive: true });
 }
 
-export async function collectFullCoverageAuditStep() {
+export async function collectFullCoverageAuditStep({
+  maxWorkers = resolveQaResourceProfile().vitestMaxWorkers,
+} = {}) {
   prepareFullCoverageDirectory();
   const { durationMs, value: unitResult } = await measureAsyncStep(() =>
     runUnitTests({
       coverage: true,
       coverageMode: 'manual',
-      maxWorkers: FULL_COVERAGE_MAX_WORKERS,
+      maxWorkers,
       suite: PRODUCT_QA_SUITE,
     })
   );

@@ -10,6 +10,8 @@ export const BROWSER_ADAPTER_ALLOWED_PREFIXES = [
 const BROWSER_ADAPTER_ALLOWED_FILES = new Set([
   // Playwright must seed and observe the real extension storage mirrors before application code runs.
   'tooling/test/e2e/extension-smoke.popup-startup.ts',
+  // Security E2E retention proof must observe every real browser storage area directly.
+  'tooling/test/e2e/support/security-helpers.ts',
 ]);
 
 export function normalizeBrowserAdapterPath(relativePath) {

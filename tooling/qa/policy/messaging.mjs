@@ -9,6 +9,9 @@ export const ALLOWED_DIRECT_MESSAGE_FILES = new Set([
   'packages/platform/src/ports/runtime-messaging/content-runtime-shim.ts',
   'apps/extension/src/platform/runtime-messaging/index.ts',
   'tooling/test/harness/browser-mocks.chrome.ts',
+  // Security E2E drivers intentionally exercise the public runtime boundary from a real page.
+  'tooling/test/e2e/security/support.ts',
+  'tooling/test/e2e/support/security-helpers.ts',
 ]);
 
 const ALLOWED_CHROME_STUB_FILES = new Set([

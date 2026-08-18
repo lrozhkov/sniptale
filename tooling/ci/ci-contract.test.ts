@@ -175,6 +175,12 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   }
 });
 
+it('binds the CodeQL audit suite to the locked CI query suite', () => {
+  const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
+  const source = fs.readFileSync('tooling/qa/audits/codeql.mjs', 'utf8');
+  expect(source).toContain(lock.codeql.querySuite);
+});
+
 it('fails release publication closed around live immutability and asset digests', () => {
   const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   const policy = fs.readFileSync('tooling/ci/release-policy.mjs', 'utf8');
@@ -745,4 +751,6 @@ it('rejects PR and local authority that changes while proof lanes run', () => {
   expect(proofSource).toContain("['checkout', '--quiet', '--detach', pr.headRefOid]");
   expect(proofSource).toContain('Fetched PR commit does not match GitHub PR authority');
   expect(laneSource).toContain("['ci', '--ignore-scripts']");
+  expect(laneSource).toContain("['node_modules/@ast-grep/cli/postinstall.js']");
+  expect(laneSource).toContain("['node_modules/.bin/ast-grep', ['--version']]");
 });

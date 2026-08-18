@@ -39,6 +39,11 @@ const laneCommands = {
   security: [wrapper('audit', '--profile', 'security'), licenseCommand],
   coverage: [wrapper('audit', '--profile', 'coverage')],
 };
+const installCommands = [
+  ['install', ['npm', ['ci', '--ignore-scripts']]],
+  ['provision-ast-grep', ['node', ['node_modules/@ast-grep/cli/postinstall.js']]],
+  ['verify-ast-grep', ['node_modules/.bin/ast-grep', ['--version']]],
+];
 if (![...Object.keys(laneCommands), 'candidate'].includes(lane)) {
   throw new Error('Usage: run-lane.mjs <candidate|release|release-audit|security|coverage>');
 }
@@ -69,7 +74,7 @@ function blockPhase(id, reason) {
 
 function runCandidateLane() {
   const prerequisiteCommands = [
-    ['install', ['npm', ['ci', '--ignore-scripts']]],
+    ...installCommands,
     ['release-harness', wrapper('release-harness')],
     ['checkpoint', wrapper('checkpoint')],
     ['closeout', wrapper('closeout', '-m', 'ci: verify exact candidate tree')],
@@ -128,7 +133,14 @@ function runCandidateLane() {
 }
 
 function runStandardLane() {
-  let standardStatus = runPhase('install', ['npm', ['ci', '--ignore-scripts']]);
+  let standardStatus = 0;
+  for (const [id, command] of installCommands) {
+    if (standardStatus !== 0) {
+      blockPhase(id, 'earlier install phase failed');
+      continue;
+    }
+    standardStatus = runPhase(id, command);
+  }
   for (const [index, command] of laneCommands[lane].entries()) {
     if (standardStatus !== 0) {
       blockPhase(`${lane}-${index + 1}`, 'earlier lane command failed');
