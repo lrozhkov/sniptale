@@ -16,6 +16,8 @@ const env = {
 const policy = structuredClone(readSelectelPolicy(root));
 policy.controllerEnvironment.expectedProjectSha256 =
   'a33e35d302125bbd8e647043a4025b29f659aad51c4a80d6244a45fabcdcd235';
+policy.controllerEnvironment.expectedRegion = 'ru-1';
+policy.controllerEnvironment.quotaManagerUrl = 'https://ru-1.cloud.api.selcloud.ru/quota-manager';
 
 function json(value: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(value), {
@@ -45,11 +47,11 @@ function createFetch({
         { headers: { 'x-subject-token': 'ephemeral-token' } }
       );
     }
-    if (url.startsWith('https://compute.example/os-quota-sets/') && url.endsWith('/detail')) {
+    if (url.startsWith('https://ru-1.cloud.api.selcloud.ru/quota-manager/v1/projects/')) {
       return json({
-        quota_set: {
-          cores: { limit: cores, in_use: 0, reserved: 0 },
-          ram: { limit: 65536, in_use: 0, reserved: 0 },
+        quotas: {
+          compute_cores: [{ zone: 'ru-1a', value: cores, used: 0 }],
+          compute_ram: [{ zone: 'ru-1a', value: 65536, used: 0 }],
         },
       });
     }
@@ -115,45 +117,35 @@ it('accepts the Cinder detailed quota shape without defaulting usage', async () 
 it('fails closed when the project cannot fit one canonical runner', async () => {
   await expect(
     collectSelectelPreflight({ root, env, policy, fetchImpl: createFetch({ cores: 23 }) })
-  ).rejects.toThrow('insufficient free canonical runner quota');
+  ).rejects.toThrow('No available Selectel zone has complete canonical runner quota');
 });
 
 it('fails closed when quota usage is missing', async () => {
   const fetchImpl = async (input: string | URL | Request) => {
-    if (
-      String(input).startsWith('https://compute.example/os-quota-sets/') &&
-      String(input).endsWith('/detail')
-    ) {
-      return json({ quota_set: { cores: { limit: 32 }, ram: { limit: 65536, in_use: 0 } } });
-    }
-    return createFetch()(input);
-  };
-  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
-    'compute core quota is missing or invalid'
-  );
-});
-
-it('rejects the legacy flat compute limits shape', async () => {
-  const fetchImpl = async (input: string | URL | Request) => {
-    if (
-      String(input).startsWith('https://compute.example/os-quota-sets/') &&
-      String(input).endsWith('/detail')
-    ) {
+    if (String(input).startsWith(policy.controllerEnvironment.quotaManagerUrl)) {
       return json({
-        limits: {
-          absolute: {
-            maxTotalCores: 32,
-            totalCoresUsed: 0,
-            maxTotalRAMSize: 65536,
-            totalRAMUsed: 0,
-          },
+        quotas: {
+          compute_cores: [{ zone: 'ru-1a', value: 32 }],
+          compute_ram: [{ zone: 'ru-1a', value: 65536, used: 0 }],
         },
       });
     }
     return createFetch()(input);
   };
   await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
-    'compute core quota is missing or invalid'
+    'No available Selectel zone has complete canonical runner quota'
+  );
+});
+
+it('rejects a quota-manager response without explicit per-zone quota entries', async () => {
+  const fetchImpl = async (input: string | URL | Request) => {
+    if (String(input).startsWith(policy.controllerEnvironment.quotaManagerUrl)) {
+      return json({ quotas: { compute_cores: 32, compute_ram: 65536 } });
+    }
+    return createFetch()(input);
+  };
+  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
+    'No available Selectel zone has complete canonical runner quota'
   );
 });
 
@@ -210,9 +202,20 @@ it('fails closed when the signed token belongs to a different project', async ()
   );
 });
 
+it('rejects a controller region outside the machine-owned quota endpoint', async () => {
+  await expect(
+    collectSelectelPreflight({
+      root,
+      env: { ...env, SELECTEL_OS_REGION_NAME: 'ru-2' },
+      policy,
+      fetchImpl: createFetch(),
+    })
+  ).rejects.toThrow('region does not match policy');
+});
+
 it('does not include a rejected credential or response body in errors', async () => {
   const fetchImpl = async () => new Response('credential-secret provider detail', { status: 401 });
-  await expect(collectSelectelPreflight({ root, env, fetchImpl })).rejects.toThrow(
+  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
     'authentication failed with HTTP 401'
   );
   await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.not.toThrow(

@@ -43,6 +43,8 @@ async function parseJsonResponse(response, operation) {
 export async function authenticateOpenStack({
   env = process.env,
   expectedProjectSha256,
+  expectedRegion,
+  quotaManagerUrl,
   fetchImpl = fetch,
 } = {}) {
   const authUrl = requireString(env.SELECTEL_OS_AUTH_URL, 'SELECTEL_OS_AUTH_URL').replace(
@@ -59,6 +61,9 @@ export async function authenticateOpenStack({
   );
   const region = requireString(env.SELECTEL_OS_REGION_NAME, 'SELECTEL_OS_REGION_NAME');
   requireString(expectedProjectSha256, 'expected project SHA-256');
+  requireString(expectedRegion, 'expected region');
+  requireString(quotaManagerUrl, 'quota manager URL');
+  if (region !== expectedRegion) throw new Error('OpenStack region does not match policy.');
   const response = await fetchImpl(`${authUrl}/auth/tokens`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -91,6 +96,7 @@ export async function authenticateOpenStack({
       compute: endpointUrl(payload.token.catalog, 'compute', region),
       image: endpointUrl(payload.token.catalog, 'image', region),
       network: endpointUrl(payload.token.catalog, 'network', region),
+      quotaManager: quotaManagerUrl.replace(/\/$/u, ''),
       volume: endpointUrl(payload.token.catalog, 'volumev3', region),
     },
   };

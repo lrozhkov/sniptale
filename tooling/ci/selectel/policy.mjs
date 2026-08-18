@@ -24,6 +24,9 @@ export function readSelectelPolicy(root = process.cwd()) {
     policy.lifecycle?.ttlSeconds !== 10800 ||
     policy.runner?.maxJobs !== 1 ||
     !/^[a-f0-9]{64}$/u.test(policy.controllerEnvironment?.expectedProjectSha256 ?? '') ||
+    policy.controllerEnvironment?.expectedRegion !== 'ru-3' ||
+    policy.controllerEnvironment?.quotaManagerUrl !==
+      'https://ru-3.cloud.api.selcloud.ru/quota-manager' ||
     !/^[a-f0-9]{64}$/u.test(policy.runner?.sha256 ?? '')
   ) {
     throw new Error('Malformed Selectel runner policy.');
