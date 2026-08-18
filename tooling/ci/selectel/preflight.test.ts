@@ -27,10 +27,7 @@ function json(value: unknown, init: ResponseInit = {}) {
   });
 }
 
-function createFetch({
-  cores = 32,
-  nestedVolumeQuota = false,
-}: { cores?: number; nestedVolumeQuota?: boolean } = {}) {
+function createFetch({ cores = 32, volumeGiB = 260 }: { cores?: number; volumeGiB?: number } = {}) {
   return async (input: string | URL | Request) => {
     const url = String(input);
     if (url.endsWith('/auth/tokens')) {
@@ -52,14 +49,8 @@ function createFetch({
         quotas: {
           compute_cores: [{ zone: 'ru-1a', value: cores, used: 0 }],
           compute_ram: [{ zone: 'ru-1a', value: 65536, used: 0 }],
+          volume_gigabytes_fast: [{ zone: 'ru-1a', value: volumeGiB, used: 0 }],
         },
-      });
-    }
-    if (url.startsWith('https://volumev3.example/os-quota-sets/')) {
-      return json({
-        quota_set: nestedVolumeQuota
-          ? { gigabytes: { limit: 260, in_use: 0, reserved: 0 } }
-          : { gigabytes: 260, gigabytes_used: 0 },
       });
     }
     if (url.endsWith('/flavors/detail'))
@@ -104,12 +95,12 @@ it('produces a sanitized read-only connectivity proof for exact canonical resour
   expect(JSON.stringify(proof)).not.toContain('project-1');
 });
 
-it('accepts the Cinder detailed quota shape without defaulting usage', async () => {
+it('uses the selected zone volume-type quota without defaulting usage', async () => {
   const proof = await collectSelectelPreflight({
     root,
     env,
     policy,
-    fetchImpl: createFetch({ nestedVolumeQuota: true }),
+    fetchImpl: createFetch(),
   });
   expect(proof.quotas.freeVolumeGiB).toBe(260);
 });
@@ -120,6 +111,12 @@ it('fails closed when the project cannot fit one canonical runner', async () => 
   ).rejects.toThrow('No available Selectel zone has complete canonical runner quota');
 });
 
+it('fails closed when the selected volume type cannot fit the boot disk', async () => {
+  await expect(
+    collectSelectelPreflight({ root, env, policy, fetchImpl: createFetch({ volumeGiB: 179 }) })
+  ).rejects.toThrow('No available Selectel zone has complete canonical runner quota');
+});
+
 it('fails closed when quota usage is missing', async () => {
   const fetchImpl = async (input: string | URL | Request) => {
     if (String(input).startsWith(policy.controllerEnvironment.quotaManagerUrl)) {
@@ -127,6 +124,7 @@ it('fails closed when quota usage is missing', async () => {
         quotas: {
           compute_cores: [{ zone: 'ru-1a', value: 32 }],
           compute_ram: [{ zone: 'ru-1a', value: 65536, used: 0 }],
+          volume_gigabytes_fast: [{ zone: 'ru-1a', value: 260, used: 0 }],
         },
       });
     }

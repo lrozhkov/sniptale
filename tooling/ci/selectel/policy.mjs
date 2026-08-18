@@ -12,6 +12,7 @@ export function readSelectelPolicy(root = process.cwd()) {
     policy.compute?.vcpus !== 24 ||
     policy.compute?.ramMiB !== 49152 ||
     policy.compute?.bootVolumeGiB !== 180 ||
+    policy.compute?.bootVolumeType !== 'fast' ||
     policy.compute?.preemptible !== true ||
     policy.compute?.publicIp !== false ||
     policy.compute?.ingress !== false ||
