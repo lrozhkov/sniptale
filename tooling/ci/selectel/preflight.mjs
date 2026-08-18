@@ -17,13 +17,19 @@ function available(limit, used) {
   return limit < 0 ? Number.POSITIVE_INFINITY : limit - used;
 }
 
-function volumeQuotaPair(value) {
-  if (typeof value?.gigabytes === 'object' && value.gigabytes !== null) {
+function detailedQuotaPair(value, field) {
+  if (typeof value?.[field] === 'object' && value[field] !== null) {
     return {
-      limit: numberField(value.gigabytes, ['limit']),
-      used: numberField(value.gigabytes, ['in_use']),
+      limit: numberField(value[field], ['limit']),
+      used: numberField(value[field], ['in_use']),
     };
   }
+  return { limit: null, used: null };
+}
+
+function volumeQuotaPair(value) {
+  const detailed = detailedQuotaPair(value, 'gigabytes');
+  if (detailed.limit !== null || detailed.used !== null) return detailed;
   return {
     limit: numberField(value, ['gigabytes']),
     used: numberField(value, ['gigabytes_used', 'gigabytes_in_use']),
@@ -76,12 +82,10 @@ function selectAvailabilityZone(zones) {
 }
 
 function assertQuotas({ compute, volume }, policy) {
-  const cores = compute?.limits?.absolute ?? compute?.quota_set ?? compute;
+  const computeQuota = compute?.quota_set;
   const volumes = volume?.quota_set ?? volume;
-  const maxCores = numberField(cores, ['maxTotalCores', 'cores']);
-  const usedCores = numberField(cores, ['totalCoresUsed', 'cores_used']);
-  const maxRam = numberField(cores, ['maxTotalRAMSize', 'ram']);
-  const usedRam = numberField(cores, ['totalRAMUsed', 'ram_used']);
+  const { limit: maxCores, used: usedCores } = detailedQuotaPair(computeQuota, 'cores');
+  const { limit: maxRam, used: usedRam } = detailedQuotaPair(computeQuota, 'ram');
   const { limit: maxGigabytes, used: usedGigabytes } = volumeQuotaPair(volumes);
   assertQuotaPair(maxCores, usedCores, 'compute core');
   assertQuotaPair(maxRam, usedRam, 'compute RAM');
@@ -115,7 +119,7 @@ export async function collectSelectelPreflight({
     openStackJson(session, service, requestPath, { fetchImpl, operation });
   const [computeQuota, volumeQuota, flavorPayload, zonePayload, imagePayload, networkPayload] =
     await Promise.all([
-      request('compute', '/limits', 'quota'),
+      request('compute', `/os-quota-sets/${session.projectId}/detail`, 'quota'),
       request('volume', `/os-quota-sets/${session.projectId}?usage=true`, 'quota'),
       request('compute', '/flavors/detail', 'flavors'),
       request('compute', '/os-availability-zone', 'availability zones'),

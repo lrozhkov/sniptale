@@ -45,19 +45,15 @@ function createFetch({
         { headers: { 'x-subject-token': 'ephemeral-token' } }
       );
     }
-    if (url.endsWith('/limits')) {
+    if (url.startsWith('https://compute.example/os-quota-sets/') && url.endsWith('/detail')) {
       return json({
-        limits: {
-          absolute: {
-            maxTotalCores: cores,
-            totalCoresUsed: 0,
-            maxTotalRAMSize: 65536,
-            totalRAMUsed: 0,
-          },
+        quota_set: {
+          cores: { limit: cores, in_use: 0, reserved: 0 },
+          ram: { limit: 65536, in_use: 0, reserved: 0 },
         },
       });
     }
-    if (url.includes('/os-quota-sets/')) {
+    if (url.startsWith('https://volumev3.example/os-quota-sets/')) {
       return json({
         quota_set: nestedVolumeQuota
           ? { gigabytes: { limit: 260, in_use: 0, reserved: 0 } }
@@ -124,8 +120,35 @@ it('fails closed when the project cannot fit one canonical runner', async () => 
 
 it('fails closed when quota usage is missing', async () => {
   const fetchImpl = async (input: string | URL | Request) => {
-    if (String(input).endsWith('/limits')) {
-      return json({ limits: { absolute: { maxTotalCores: 32, maxTotalRAMSize: 65536 } } });
+    if (
+      String(input).startsWith('https://compute.example/os-quota-sets/') &&
+      String(input).endsWith('/detail')
+    ) {
+      return json({ quota_set: { cores: { limit: 32 }, ram: { limit: 65536, in_use: 0 } } });
+    }
+    return createFetch()(input);
+  };
+  await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
+    'compute core quota is missing or invalid'
+  );
+});
+
+it('rejects the legacy flat compute limits shape', async () => {
+  const fetchImpl = async (input: string | URL | Request) => {
+    if (
+      String(input).startsWith('https://compute.example/os-quota-sets/') &&
+      String(input).endsWith('/detail')
+    ) {
+      return json({
+        limits: {
+          absolute: {
+            maxTotalCores: 32,
+            totalCoresUsed: 0,
+            maxTotalRAMSize: 65536,
+            totalRAMUsed: 0,
+          },
+        },
+      });
     }
     return createFetch()(input);
   };
