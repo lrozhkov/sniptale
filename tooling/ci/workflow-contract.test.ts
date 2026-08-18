@@ -99,6 +99,8 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(workflow.match(/include-hidden-files: true/gu)).toHaveLength(4);
   expect(workflow).not.toContain("hashFiles('reports/.tmp/");
   expect(workflow).toContain('needs: canonical-qa');
+  expect(workflow).toContain("if: always() && needs.provision-2.result == 'success'");
+  expect(workflow).toContain("if: always() && needs.provision-3.result == 'success'");
   expect(workflow).not.toMatch(/pr-gate:[\s\S]*needs:\s*\[[^\]]*candidate-control-smoke/u);
   expect(workflow).toContain('Refuse immutable tag replacement');
   expect(workflow).toContain('Refusing to replace existing immutable image tag');

@@ -453,7 +453,7 @@ jobs:
 
   canonical-qa-2:
     needs: [qa-image, provision-2]
-    if: needs.provision-2.result == 'success'
+    if: always() && needs.provision-2.result == 'success'
     runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision-2.outputs.label)) }}
     timeout-minutes: 180
     permissions: { actions: read, contents: read }
@@ -654,7 +654,7 @@ jobs:
 
   canonical-qa-3:
     needs: [qa-image, provision-3]
-    if: needs.provision-3.result == 'success'
+    if: always() && needs.provision-3.result == 'success'
     runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision-3.outputs.label)) }}
     timeout-minutes: 180
     permissions: { actions: read, contents: read }
