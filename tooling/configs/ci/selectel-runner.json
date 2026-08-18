@@ -1,0 +1,133 @@
+{
+  "$comment": "Canonical bounded manifest for disposable Selectel GitHub Actions runners. Secret values are never serialized.",
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-selectel-runner-policy",
+  "environment": "selectel-runner-controller",
+  "repository": "lrozhkov/sniptale",
+  "owners": {
+    "controller": "tooling/ci/selectel/controller.mjs",
+    "cloudInit": "tooling/ci/selectel/cloud-init.mjs",
+    "attemptAdjudication": "tooling/ci/selectel/adjudication.mjs",
+    "canonicalSemantics": "tooling/ci/container.mjs",
+    "qualityWorkflow": ".github/workflows/quality-gate.yml",
+    "releaseWorkflow": ".github/workflows/release.yml"
+  },
+  "controllerEnvironment": {
+    "secrets": [
+      "SELECTEL_OS_APPLICATION_CREDENTIAL_ID",
+      "SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET",
+      "RUNNER_CONTROLLER_TOKEN"
+    ],
+    "variables": [
+      "SELECTEL_OS_AUTH_URL",
+      "SELECTEL_OS_REGION_NAME",
+      "SELECTEL_OS_PROJECT_ID"
+    ]
+  },
+  "runner": {
+    "version": "2.336.0",
+    "archive": "actions-runner-linux-x64-2.336.0.tar.gz",
+    "url": "https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz",
+    "sha256": "04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d",
+    "labelPrefix": "sniptale-qa-",
+    "workFolder": "_work",
+    "maxJobs": 1,
+    "onlineTimeoutSeconds": 600
+  },
+  "compute": {
+    "operatingSystem": "Ubuntu 24.04 LTS",
+    "architecture": "x86_64",
+    "vcpus": 24,
+    "ramMiB": 49152,
+    "bootVolumeGiB": 180,
+    "publicIp": false,
+    "ingress": false,
+    "preemptible": true,
+    "computeApiVersion": "2.72"
+  },
+  "imageSelector": {
+    "name": "Ubuntu 24.04 LTS",
+    "osDistro": "ubuntu",
+    "osVersion": "24.04",
+    "architectures": ["x86_64", "amd64"]
+  },
+  "quotaCeiling": {
+    "vcpus": 32,
+    "ramMiB": 65536,
+    "volumeGiB": 260
+  },
+  "network": {
+    "name": "sniptale-github-actions",
+    "subnetName": "sniptale-github-actions-v4",
+    "subnetCidr": "10.77.0.0/24",
+    "routerName": "sniptale-github-actions",
+    "securityGroupName": "sniptale-github-actions-no-ingress"
+  },
+  "resourceProfile": {
+    "id": "selectel-24vcpu-48g-v1",
+    "vitestWorkers": 16,
+    "playwrightWorkers": 4,
+    "securityWorkers": 8,
+    "memoryReserveMiB": 12288,
+    "profilingCandidates": {
+      "vitestWorkers": [12, 16, 20],
+      "playwrightWorkers": [4, 6]
+    }
+  },
+  "lifecycle": {
+    "attempts": 3,
+    "ttlSeconds": 10800,
+    "nameTemplate": "sniptale-<run-id>-<attempt>",
+    "requiredMetadata": [
+      "managed-by",
+      "repository",
+      "workflow",
+      "run-id",
+      "run-attempt",
+      "candidate-sha",
+      "expires-at"
+    ],
+    "managedBy": "sniptale-github-actions"
+  },
+  "trust": {
+    "candidateReceivesControllerSecrets": false,
+    "candidateControlsAreBlocking": false,
+    "jitConfigRetained": false,
+    "releaseSigningKeyOnRunner": false,
+    "persistentGhcrCredentialOnRunner": false,
+    "sshKeyOnRunner": false
+  },
+  "artifacts": {
+    "prRetentionDays": 14,
+    "mainRetentionDays": 30,
+    "forbidden": [
+      "encoded-jit-config",
+      "openstack-credentials",
+      "controller-token",
+      "raw-cloud-init",
+      "codeql-database",
+      "engine-cache",
+      "raw-engine-temporary-files"
+    ]
+  },
+  "rollback": "Disable Selectel jobs in the two existing workflows, run cleanup --all-managed, delete offline managed JIT registrations, and restore the preceding workflow commit.",
+  "collisionCheck": "Names are unique per run-id and attempt; any existing server, volume, port, or runner with that identity is rejected unless cleanup proves it belongs to the same expired controller record.",
+  "negativeProof": [
+    "invalid-credential",
+    "wrong-project-or-region",
+    "insufficient-quota",
+    "name-collision",
+    "missing-preemptible-tag",
+    "jit-timeout",
+    "cloud-init-failure",
+    "runner-loss",
+    "infrastructure-interruption-retry",
+    "genuine-qa-failure-no-retry",
+    "cross-attempt-receipt-rejection",
+    "cleanup-failure",
+    "expired-resource-sweep",
+    "foreign-resource-preservation",
+    "controller-secret-non-propagation",
+    "jit-config-non-retention"
+  ]
+}

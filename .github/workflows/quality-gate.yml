@@ -9,6 +9,12 @@ on:
   schedule:
     - cron: '23 4 * * 1'
   workflow_dispatch:
+    inputs:
+      selectel_connectivity_only:
+        description: Validate Selectel auth, catalog, quota, image, flavor, and network APIs without writes
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -25,8 +31,44 @@ env:
   SNIPTALE_QA_VITEST_MAX_WORKERS: '2'
 
 jobs:
+  selectel-controller-preflight:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.selectel_connectivity_only == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: selectel-runner-controller
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted controller
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 22.16.0 }
+      - name: Validate Selectel connectivity without writes
+        env:
+          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
+          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_OS_PROJECT_ID: ${{ vars.SELECTEL_OS_PROJECT_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+        run: node tooling/ci/selectel/preflight.mjs
+      - name: Upload sanitized connectivity proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: selectel-connectivity-${{ github.sha }}-${{ github.run_id }}
+          path: build/selectel-controller/preflight.json
+          if-no-files-found: error
+          retention-days: 30
+
   canonical-qa:
-    if: github.event_name != 'schedule' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
+    if: >-
+      github.event_name != 'schedule' &&
+      (github.event_name != 'workflow_dispatch' || inputs.selectel_connectivity_only != true) &&
+      (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     permissions:
@@ -295,7 +337,10 @@ jobs:
   pr-gate:
     name: pr-gate-authority
     needs: canonical-qa
-    if: always() && github.event_name != 'schedule'
+    if: >-
+      always() &&
+      github.event_name != 'schedule' &&
+      (github.event_name != 'workflow_dispatch' || inputs.selectel_connectivity_only != true)
     runs-on: ubuntu-24.04
     permissions:
       checks: write
