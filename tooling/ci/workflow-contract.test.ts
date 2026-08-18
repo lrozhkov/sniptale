@@ -86,6 +86,9 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
   expect(container).toContain('await finalizeCandidateReleaseArchive');
   expect(container).toContain('runContainer(`candidate-${phase.id}`)');
   expect(container).toContain('restoreCandidateAuthority(phase.authority)');
+  expect(container).toContain(
+    'prepareTrustedControlDependencyMount({ executionRoot, trustedCiRoot })'
+  );
   expect(container.indexOf("spawnSync('docker'")).toBeLessThan(
     container.indexOf('await finalizeCandidateReleaseArchive')
   );
