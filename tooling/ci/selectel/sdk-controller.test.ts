@@ -23,13 +23,24 @@ it('keeps cloud protocols in the pinned official OpenStack SDK', () => {
 
 it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () => {
   const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/selectel-runner.json', 'utf8'));
-  expect(policy.compute.flavorName).toBe('SL1.24-49152');
+  expect(policy.compute.attemptPlacements).toMatchObject([
+    { attempt: 1, availabilityZone: 'ru-3a', flavorName: 'SL1.24-49152' },
+    { attempt: 2, availabilityZone: 'ru-3b', flavorName: 'SL1.24-49152' },
+    {
+      attempt: 3,
+      availabilityZone: 'ru-3a',
+      flavorName: 'SL1.16-32768',
+      resourceProfile: { cpuTokens: 16, memoryMiB: 24576, vitestWorkers: 12 },
+    },
+  ]);
   expect(policy.imageSelector).toEqual({ name: 'Ubuntu 24.04 LTS 64-bit' });
-  expect(source).toContain('item.name == compute["flavorName"]');
+  expect(source).toContain('item.name == placement["flavorName"]');
   expect(source).toContain('flavor.disk != 0');
   expect(source).toContain('int(image.min_disk or 0) > compute["bootVolumeGiB"]');
   expect(source).toContain('result["message"] = " ".join(message.split())[:500]');
   expect(source).toContain('record["failure"] = server_failure(');
+  expect(source).toContain('cleanup_with_retries(');
+  expect(source).toContain('policy["compute"]["attemptPlacements"][int(attempt) - 1]');
   expect(source).not.toContain('fault.get("details")');
   expect(source).toContain('tags=["preemptible"]');
   expect(source).toContain('delete_on_termination": True');

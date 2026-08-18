@@ -36,14 +36,62 @@
     "onlineTimeoutSeconds": 600
   },
   "compute": {
-    "availabilityZone": "ru-3a",
+    "attemptPlacements": [
+      {
+        "attempt": 1,
+        "availabilityZone": "ru-3a",
+        "bootVolumeType": "fast.ru-3a",
+        "flavorName": "SL1.24-49152",
+        "vcpus": 24,
+        "ramMiB": 49152,
+        "resourceProfile": {
+          "id": "selectel-24vcpu-48g-v1",
+          "cpuTokens": 24,
+          "memoryMiB": 36864,
+          "vitestWorkers": 16,
+          "playwrightWorkers": 4,
+          "securityWorkers": 8,
+          "memoryReserveMiB": 12288
+        }
+      },
+      {
+        "attempt": 2,
+        "availabilityZone": "ru-3b",
+        "bootVolumeType": "fast.ru-3b",
+        "flavorName": "SL1.24-49152",
+        "vcpus": 24,
+        "ramMiB": 49152,
+        "resourceProfile": {
+          "id": "selectel-24vcpu-48g-v1",
+          "cpuTokens": 24,
+          "memoryMiB": 36864,
+          "vitestWorkers": 16,
+          "playwrightWorkers": 4,
+          "securityWorkers": 8,
+          "memoryReserveMiB": 12288
+        }
+      },
+      {
+        "attempt": 3,
+        "availabilityZone": "ru-3a",
+        "bootVolumeType": "fast.ru-3a",
+        "flavorName": "SL1.16-32768",
+        "vcpus": 16,
+        "ramMiB": 32768,
+        "resourceProfile": {
+          "id": "selectel-16vcpu-32g-v1",
+          "cpuTokens": 16,
+          "memoryMiB": 24576,
+          "vitestWorkers": 12,
+          "playwrightWorkers": 4,
+          "securityWorkers": 8,
+          "memoryReserveMiB": 8192
+        }
+      }
+    ],
     "operatingSystem": "Ubuntu 24.04 LTS",
     "architecture": "x86_64",
-    "flavorName": "SL1.24-49152",
-    "vcpus": 24,
-    "ramMiB": 49152,
     "bootVolumeGiB": 80,
-    "bootVolumeType": "fast.ru-3a",
     "publicIp": false,
     "ingress": false,
     "preemptible": true,
@@ -63,17 +111,6 @@
     "subnetCidr": "10.77.0.0/24",
     "routerName": "sniptale-github-actions",
     "securityGroupName": "sniptale-github-actions-no-ingress"
-  },
-  "resourceProfile": {
-    "id": "selectel-24vcpu-48g-v1",
-    "vitestWorkers": 16,
-    "playwrightWorkers": 4,
-    "securityWorkers": 8,
-    "memoryReserveMiB": 12288,
-    "profilingCandidates": {
-      "vitestWorkers": [12, 16, 20],
-      "playwrightWorkers": [4, 6]
-    }
   },
   "lifecycle": {
     "attempts": 3,

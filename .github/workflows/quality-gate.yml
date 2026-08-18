@@ -658,6 +658,12 @@ jobs:
     runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision-3.outputs.label)) }}
     timeout-minutes: 180
     permissions: { actions: read, contents: read }
+    env:
+      SNIPTALE_QA_CPU_TOKENS: '16'
+      SNIPTALE_QA_MEMORY_MIB: '24576'
+      SNIPTALE_QA_VITEST_MAX_WORKERS: '12'
+      SNIPTALE_QA_PLAYWRIGHT_WORKERS: '4'
+      SNIPTALE_QA_SECURITY_WORKERS: '8'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
