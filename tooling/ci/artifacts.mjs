@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -158,72 +157,30 @@ function newestReleaseArchive(startedAtMs, repositoryRoot = root) {
   return candidates[0];
 }
 
-function runSnapshotCommand(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8' });
-  if (result.status !== 0) {
-    throw new Error(
-      `${command} ${args.join(' ')} failed: ${(result.stderr ?? '').trim() || 'unknown error'}`
-    );
-  }
-}
-
-function copySnapshotTree(source, destination) {
-  const details = fs.lstatSync(source);
-  if (details.isSymbolicLink()) throw new Error(`Unsafe candidate snapshot symlink: ${source}`);
-  if (details.isFile()) {
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.copyFileSync(source, destination, fs.constants.COPYFILE_EXCL);
-    return;
-  }
-  if (!details.isDirectory()) throw new Error(`Unsafe candidate snapshot entry: ${source}`);
-  fs.mkdirSync(destination, { recursive: true });
-  for (const entry of fs.readdirSync(source)) {
-    copySnapshotTree(path.join(source, entry), path.join(destination, entry));
-  }
-}
-
-function assertSnapshotTreeSafe(directory) {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const child = path.join(directory, entry.name);
-    const details = fs.lstatSync(child);
-    if (details.isSymbolicLink()) throw new Error(`Unsafe tracked candidate symlink: ${child}`);
-    if (details.isDirectory()) assertSnapshotTreeSafe(child);
-    else if (!details.isFile()) throw new Error(`Unsafe tracked candidate entry: ${child}`);
-  }
+export function candidateReleaseArchiveIdentity({ candidateRoot = root, startedAtMs }) {
+  const archive = newestReleaseArchive(startedAtMs, candidateRoot);
+  const archivePath = path.join(candidateRoot, archive);
+  return { archive, sha256: sha256(archivePath) };
 }
 
 export async function finalizeCandidateReleaseArchive({
   candidateRoot = root,
   startedAtMs,
-  archiveBuilder,
-  temporaryParent = path.dirname(candidateRoot),
+  expectedSha256,
+  archiveVerifier,
 }) {
+  if (!/^[a-f0-9]{64}$/u.test(expectedSha256 ?? '')) {
+    throw new Error('Candidate release ZIP requires its trusted post-release digest.');
+  }
   const candidateArchive = newestReleaseArchive(startedAtMs, candidateRoot);
   const candidateArchivePath = path.join(candidateRoot, candidateArchive);
-  const temporaryRoot = fs.mkdtempSync(path.join(temporaryParent, '.ci-finalize-'));
-  const snapshotRoot = path.join(temporaryRoot, 'snapshot');
-  try {
-    fs.mkdirSync(snapshotRoot);
-    const archivePath = path.join(temporaryRoot, 'candidate.tar');
-    runSnapshotCommand(
-      'git',
-      ['archive', '--format=tar', '--output', archivePath, 'HEAD'],
-      candidateRoot
-    );
-    runSnapshotCommand('tar', ['-xf', archivePath, '-C', snapshotRoot], candidateRoot);
-    assertSnapshotTreeSafe(snapshotRoot);
-    copySnapshotTree(path.join(candidateRoot, 'dist'), path.join(snapshotRoot, 'dist'));
-    const trustedArchiveBuilder =
-      archiveBuilder ?? (await import('../release/package-dist.mjs')).createReleaseArchive;
-    const rebuiltArchivePath = await trustedArchiveBuilder({ repoRoot: snapshotRoot });
-    if (sha256(candidateArchivePath) !== sha256(rebuiltArchivePath)) {
-      throw new Error('Candidate release ZIP changed after canonical release validation.');
-    }
-    fs.copyFileSync(rebuiltArchivePath, candidateArchivePath);
-    return candidateArchive;
-  } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  if (sha256(candidateArchivePath) !== expectedSha256) {
+    throw new Error('Candidate release ZIP changed after canonical release validation.');
   }
+  const verify =
+    archiveVerifier ?? (await import('../release/artifact-security.mjs')).verifyReleaseArchivePath;
+  await verify(candidateArchivePath, { repoRoot: candidateRoot });
+  return candidateArchive;
 }
 
 const LANE_FILES = {

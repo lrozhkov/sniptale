@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { collectLaneArtifacts } from './artifacts.mjs';
+import { candidateReleaseArchiveIdentity, collectLaneArtifacts } from './artifacts.mjs';
 import {
   materializeCandidateWorkspace,
   restoreCandidateCommit,
@@ -199,11 +199,12 @@ if (coverageProofHostPaths) {
 }
 for (const value of environment) baseContainerArgs.push('--env', value);
 
-function runContainer(containerLane) {
+function runContainer(containerLane, additionalEnvironment = []) {
   return spawnSync(
     'docker',
     [
       ...baseContainerArgs,
+      ...additionalEnvironment.flatMap((value) => ['--env', value]),
       image,
       'bash',
       '-c',
@@ -262,6 +263,7 @@ function restoreCandidateAuthority(mode) {
 function runCandidatePhases() {
   const phases = [];
   let failed = false;
+  let releaseArchiveSha256 = null;
   for (const phase of candidatePhaseDefinitions) {
     if (failed) {
       phases.push({
@@ -279,8 +281,21 @@ function runCandidatePhases() {
     try {
       if (phase.authority) restoreCandidateAuthority(phase.authority);
       const result =
-        phase.id === 'candidate-tree' ? { status: 0 } : runContainer(`candidate-${phase.id}`);
+        phase.id === 'candidate-tree'
+          ? { status: 0 }
+          : runContainer(
+              `candidate-${phase.id}`,
+              phase.id === 'release-artifact'
+                ? [`SNIPTALE_EXPECTED_RELEASE_ARCHIVE_SHA256=${releaseArchiveSha256}`]
+                : []
+            );
       const status = result.status ?? 1;
+      if (phase.id === 'release' && status === 0) {
+        releaseArchiveSha256 = candidateReleaseArchiveIdentity({
+          candidateRoot: candidateWorkspace.workspace,
+          startedAtMs: candidateStartedAtMs,
+        }).sha256;
+      }
       phases.push({
         id: phase.id,
         command: phase.command,

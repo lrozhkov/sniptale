@@ -158,7 +158,7 @@ if (lane === candidateFinalizeLane) {
     await finalizeCandidateReleaseArchive({
       candidateRoot: process.cwd(),
       startedAtMs,
-      temporaryParent: '/tmp',
+      expectedSha256: process.env.SNIPTALE_EXPECTED_RELEASE_ARCHIVE_SHA256,
     });
     status = 0;
   } catch (error) {
