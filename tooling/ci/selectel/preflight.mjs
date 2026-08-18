@@ -76,12 +76,22 @@ function selectRunnerCapacity({ quotaManager, zones }, policy) {
   if (quotaManager?.error != null) {
     throw new Error('Selectel quota manager reported a partial failure.');
   }
+  const volumeResource = `volume_gigabytes_${policy.compute.bootVolumeType}`;
+  if (!Array.isArray(quotaManager?.quotas?.[volumeResource])) {
+    const discovered = Object.keys(quotaManager?.quotas ?? {})
+      .filter((resource) => /^volume_gigabytes_[a-z0-9_]{1,40}$/u.test(resource))
+      .sort()
+      .join(', ');
+    throw new Error(
+      `Configured Selectel volume quota resource is unavailable; discovered: ${discovered || 'none'}.`
+    );
+  }
   const candidates = availableZones(zones).flatMap((zone) => {
     const { limit: maxCores, used: usedCores } = zoneQuotaPair(quotaManager, 'compute_cores', zone);
     const { limit: maxRam, used: usedRam } = zoneQuotaPair(quotaManager, 'compute_ram', zone);
     const { limit: maxGigabytes, used: usedGigabytes } = zoneQuotaPair(
       quotaManager,
-      `volume_gigabytes_${policy.compute.bootVolumeType}`,
+      volumeResource,
       zone
     );
     try {

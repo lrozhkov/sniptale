@@ -138,12 +138,18 @@ it('fails closed when quota usage is missing', async () => {
 it('rejects a quota-manager response without explicit per-zone quota entries', async () => {
   const fetchImpl = async (input: string | URL | Request) => {
     if (String(input).startsWith(policy.controllerEnvironment.quotaManagerUrl)) {
-      return json({ quotas: { compute_cores: 32, compute_ram: 65536 } });
+      return json({
+        quotas: {
+          compute_cores: 32,
+          compute_ram: 65536,
+          volume_gigabytes_archive: [{ zone: 'ru-1a', value: 260, used: 0 }],
+        },
+      });
     }
     return createFetch()(input);
   };
   await expect(collectSelectelPreflight({ root, env, policy, fetchImpl })).rejects.toThrow(
-    'No available Selectel zone has complete canonical runner quota'
+    'volume quota resource is unavailable; discovered: volume_gigabytes_archive'
   );
 });
 
