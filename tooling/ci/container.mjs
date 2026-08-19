@@ -3,7 +3,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { candidateReleaseArchiveIdentity, collectLaneArtifacts } from './artifacts.mjs';
+import {
+  candidateReleaseArchiveIdentity,
+  collectLaneArtifacts,
+  selectelInfrastructureFromEnvironment,
+} from './artifacts.mjs';
 import {
   materializeCandidateWorkspace,
   restoreCandidateCommit,
@@ -331,23 +335,7 @@ try {
     if (passed) {
       verifyCandidateFinalState({ ...candidateWorkspace, cwd: candidateWorkspace.workspace });
     }
-    const selectelInfrastructure = process.env.SNIPTALE_SELECTEL_ATTEMPT
-      ? {
-          provider: 'selectel',
-          selectedProfileIndex: Number(process.env.SNIPTALE_SELECTEL_ATTEMPT),
-          profilesDigest: process.env.SNIPTALE_SELECTEL_PROFILES_DIGEST,
-          serverId: process.env.SNIPTALE_SELECTEL_SERVER_ID,
-          availabilityZone: process.env.SNIPTALE_SELECTEL_AVAILABILITY_ZONE,
-          imageReference: process.env.SNIPTALE_CI_IMAGE,
-          resourceProfile: {
-            cpuTokens: Number(process.env.SNIPTALE_QA_CPU_TOKENS),
-            memoryMiB: Number(process.env.SNIPTALE_QA_MEMORY_MIB),
-            vitestWorkers: Number(process.env.SNIPTALE_QA_VITEST_MAX_WORKERS),
-            playwrightWorkers: Number(process.env.SNIPTALE_QA_PLAYWRIGHT_WORKERS),
-            securityWorkers: Number(process.env.SNIPTALE_QA_SECURITY_WORKERS),
-          },
-        }
-      : null;
+    const selectelInfrastructure = selectelInfrastructureFromEnvironment();
     collectLaneArtifacts({
       lane: 'candidate',
       startedAtMs: candidateStartedAtMs,

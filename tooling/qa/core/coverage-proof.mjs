@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { collectProductionCoverageFiles } from './coverage-audit-report.mjs';
+import { stableStringify } from './proof-input.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/coverage-proof-reuse.data.json';
 const EXTERNAL_PROOF_ENV = 'SNIPTALE_COVERAGE_PROOF_PATH';
@@ -11,12 +12,6 @@ const CANDIDATE_AUTHORITY_ENV = 'SNIPTALE_COVERAGE_PROOF_AUTHORITY';
 const TEST_PATTERN = /(?:\.test|\.spec)\.(?:[cm]?[jt]sx?)$/u;
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
-const stable = (value) =>
-  JSON.stringify(value, (_key, nested) =>
-    nested && typeof nested === 'object' && !Array.isArray(nested)
-      ? Object.fromEntries(Object.entries(nested).sort(([a], [b]) => a.localeCompare(b)))
-      : nested
-  );
 
 function regularBytes(file) {
   const stat = fs.lstatSync(file);
@@ -67,7 +62,7 @@ function fingerprint(cwd, files) {
   const entries = [...files]
     .sort()
     .map((file) => ({ file, sha256: sha256(regularBytes(path.join(cwd, file))) }));
-  return { count: entries.length, digest: sha256(stable(entries)) };
+  return { count: entries.length, digest: sha256(stableStringify(entries)) };
 }
 
 export function createCoverageProofInputs({ cwd = process.cwd() } = {}) {
@@ -89,7 +84,7 @@ export function createCoverageProofInputs({ cwd = process.cwd() } = {}) {
     dependency: fingerprint(cwd, new Set(['package.json', 'package-lock.json'])),
     image: containerDigest,
   };
-  return { ...inputs, inputDigest: sha256(stable(inputs)), policy };
+  return { ...inputs, inputDigest: sha256(stableStringify(inputs)), policy };
 }
 
 function reportDigests(root, policy) {
@@ -105,7 +100,7 @@ function reportDigests(root, policy) {
 function proofDigest(proof) {
   const unsigned = { ...proof };
   delete unsigned.proofDigest;
-  return sha256(stable(unsigned));
+  return sha256(stableStringify(unsigned));
 }
 
 function parseProof(file) {
@@ -136,7 +131,9 @@ export function resolveReusableCoverageProof({ cwd = process.cwd() } = {}) {
     const proof = parseProof(proofPath);
     if (proof.inputDigest !== current.inputDigest)
       return { matched: false, reason: 'coverage proof inputs changed' };
-    if (stable(reportDigests(reportsRoot, current.policy)) !== stable(proof.reports))
+    if (
+      stableStringify(reportDigests(reportsRoot, current.policy)) !== stableStringify(proof.reports)
+    )
       return { matched: false, reason: 'coverage proof reports changed' };
     return {
       matched: true,

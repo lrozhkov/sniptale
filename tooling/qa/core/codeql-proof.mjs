@@ -1,44 +1,17 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 import { readCodeqlProofPolicy } from '../codeql/config.mjs';
+import {
+  readProofInput as readRegularFile,
+  resolveProofCommit as resolveCommit,
+  sha256ProofInput as sha256,
+  stableStringify,
+} from './proof-input.mjs';
 
 const EXTERNAL_PROOF_ENV = 'SNIPTALE_CODEQL_PROOF_PATH';
 const EXTERNAL_SARIF_ENV = 'SNIPTALE_CODEQL_SARIF_PATH';
 const CANDIDATE_AUTHORITY_ENV = 'SNIPTALE_CODEQL_PROOF_AUTHORITY';
-
-function sha256(value) {
-  return crypto.createHash('sha256').update(value).digest('hex');
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)])
-    );
-  }
-  return value;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(stableValue(value));
-}
-
-function readRegularFile(filePath, encoding = null) {
-  const descriptor = fs.openSync(filePath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
-  try {
-    const stat = fs.fstatSync(descriptor);
-    if (!stat.isFile()) throw new Error(`Unsafe CodeQL proof input: ${filePath}`);
-    return fs.readFileSync(descriptor, encoding === null ? undefined : encoding);
-  } finally {
-    fs.closeSync(descriptor);
-  }
-}
 
 export function isCodeqlProductionSourcePath(relativePath, policy) {
   const normalized = relativePath.replaceAll(path.sep, '/');
@@ -113,15 +86,6 @@ function resolveContainerDigest() {
     throw new Error('Malformed CodeQL proof container digest.');
   }
   return digest;
-}
-
-function resolveCommit(cwd) {
-  const configured = process.env.SNIPTALE_PROOF_SHA;
-  if (/^[a-f0-9]{40}$/u.test(configured ?? '')) return configured;
-  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' });
-  return result.status === 0 && /^[a-f0-9]{40}$/u.test(result.stdout.trim())
-    ? result.stdout.trim()
-    : null;
 }
 
 export function createCodeqlProofInputs({ cwd = process.cwd(), controlRoot } = {}) {

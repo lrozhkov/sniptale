@@ -497,26 +497,6 @@
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
     {
-      "id": "noise.jscpd.core.c471b9017a2b",
-      "classification": "tool-noise",
-      "owner": "qa-core",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "tooling/qa/core"
-      },
-      "scope": {
-        "family": "tooling/qa/core",
-        "count": 1,
-        "lines": 21,
-        "sampleFingerprint": "c471b9017a2b3ebfb00fd8baf018768cd6e956fe7848b2325e7f31743415e99c"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
       "id": "noise.jscpd.background-capture-quick-actions.95db4768f15f",
       "classification": "tool-noise",
       "owner": "background-capture-quick-actions",
@@ -14818,7 +14798,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "f98c39bebf88c2c388a46d1dca356f9501f61ba5834888e000d5b4a8706c0d97"
+        "contentHash": "e47e184ef6c67cb5285d71d3ed301f0994c74914c8d6392932282a3408c13433"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
@@ -14838,7 +14818,8 @@
         "property:release-audit",
         "property:release-audit[1]",
         "property:security",
-        "property:security[1]"
+        "property:security[1]",
+        "property:selectelInfrastructureFromEnvironment/resourceProfile"
       ]
     },
     {
@@ -15881,7 +15862,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/codeql-proof.mjs",
-        "contentHash": "a7eca87a77b57dff46cf6380445e9e124bc6e05f9f2d4d0ca084df0d8f90acb0"
+        "contentHash": "03ba623444f060da0a3a7bf2ee8f5a5237d69cc62660baf41ab1fdff78cb7b8d"
       },
       "consumers": [
         "tooling/ci/validate-coverage-proof.mjs",
@@ -15983,7 +15964,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "ec7b29a92ae01834de002b96a10c4d1417c6fa2c30e8e4f9bc35a68500210f80"
+        "contentHash": "73cc1efca13925605bfd19ee1d525727e7c02f12b77e359bf8d2cd5f69d0ec49"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -15993,7 +15974,6 @@
         "binding:candidatePhaseDefinitions",
         "binding:environment",
         "property:command",
-        "property:resourceProfile",
         "property:resourceProfiles"
       ]
     },
@@ -16162,7 +16142,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/coverage-proof.mjs",
-        "contentHash": "432dd7f6db88822f787b27b3132e44d90053755ae3de0a329df6749722967a94"
+        "contentHash": "c6b8ced62312cdd35164359294637dbc8902794468d27b74e6fd00dcef2cd1e7"
       },
       "consumers": [
         "tooling/ci/validate-coverage-proof.mjs",
@@ -18884,7 +18864,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/selectel/policy.mjs",
-        "contentHash": "df08cc16c0d3305948d2019625b7b58c10af8d87286b40a9df57709860d7d0dd"
+        "contentHash": "ba2083a7ceb2d8d9585d99c444ec0e71f25e4c781c6000780c5999e690f74e38"
       },
       "consumers": [
         "tooling/ci/github-policy.mjs",
@@ -19636,7 +19616,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "0b69fa1820917c5f3282d74d9c1472ffbe50ab7f868a15cb361f068676061217"
+        "contentHash": "0a3f0caa84d0f34b2c706346e1a8324d3d6492b102116f4dcc9e1bdc99713146"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
@@ -19651,8 +19631,7 @@
         "property:release",
         "property:release-audit",
         "property:resourceProfiles",
-        "property:security",
-        "property:selectelInfrastructure/resourceProfile"
+        "property:security"
       ]
     },
     {
@@ -20982,7 +20961,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/unit-test-proof.mjs",
-        "contentHash": "2b0ecc31da3b838db8631befc233230b1174f509b91ddb252b56f0dec80d7d5c"
+        "contentHash": "67fb9076f61b3b8fc0340478bb618805b38a8de9ad0b0eeba4bcc731459ef765"
       },
       "consumers": [
         "tooling/qa/core/unit-test-proof.mjs",
@@ -22967,7 +22946,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-sonarjs.mjs",
-        "contentHash": "efecac21f5f4a710cd716a5a857d8adbc851cc0b002aaafa914ccbea17d825a1"
+        "contentHash": "4bedabddc5ca3917332a24296759e0adf3612c5e8dfb2e2172941e1e80742dbc"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
@@ -22980,18 +22959,12 @@
         "binding:SONARJS_ESLINT_IGNORES",
         "binding:SONARJS_RULE_ID_SET",
         "binding:SONARJS_RULE_IDS",
-        "property:createEslint/ecmaFeatures",
-        "property:createEslint/files",
-        "property:createEslint/globals",
-        "property:createEslint/languageOptions",
         "property:createEslint/overrideConfig",
-        "property:createEslint/parserOptions",
-        "property:createEslint/plugins",
-        "property:createSonarjsEslintOverrideConfig/ecmaFeatures",
-        "property:createSonarjsEslintOverrideConfig/globals",
-        "property:createSonarjsEslintOverrideConfig/languageOptions",
-        "property:createSonarjsEslintOverrideConfig/parserOptions",
-        "property:createSonarjsEslintOverrideConfig/plugins",
+        "property:createSonarjsConfig/ecmaFeatures",
+        "property:createSonarjsConfig/globals",
+        "property:createSonarjsConfig/languageOptions",
+        "property:createSonarjsConfig/parserOptions",
+        "property:createSonarjsConfig/plugins",
         "property:runCli/labels",
         "property:runSonarjsCheck/files",
         "property:runSonarjsCheck/violations"

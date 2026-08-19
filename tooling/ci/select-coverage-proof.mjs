@@ -1,26 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-
 import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import {
+  downloadSuccessfulMainProof,
+  removeSafeRestoreOutput,
+  runGitHubCli,
+} from './main-proof-transport.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
 
 const PROOF_FILE = '.tmp/qa/coverage-proof.json';
 const REPORT_DIRECTORY = '.tmp/coverage/canonical';
-
-function runGh(args) {
-  const result = spawnSync('gh', args, { encoding: 'utf8' });
-  if (result.status !== 0) throw new Error((result.stderr ?? '').trim() || 'gh command failed');
-  return result.stdout;
-}
-
-function selectRun(value, commit) {
-  const runs = JSON.parse(value).filter(
-    (run) => run.headSha === commit && Number.isSafeInteger(run.databaseId)
-  );
-  if (runs.length === 0) throw new Error('Expected a successful main proof run.');
-  return runs[0].databaseId;
-}
 
 export function selectVerifiedCoverageProof(
   artifactRoot,
@@ -66,45 +55,15 @@ export function restoreVerifiedMainCoverageProof(
   artifactRoot,
   proofDestination,
   reportsDestination,
-  { commandRunner = runGh } = {}
+  { commandRunner = runGitHubCli } = {}
 ) {
   try {
-    const runId = selectRun(
-      commandRunner([
-        'run',
-        'list',
-        '--workflow',
-        'quality-gate.yml',
-        '--branch',
-        'main',
-        '--commit',
-        commit,
-        '--status',
-        'success',
-        '--limit',
-        '20',
-        '--json',
-        'databaseId,headSha',
-      ]),
-      commit
-    );
-    commandRunner([
-      'run',
-      'download',
-      String(runId),
-      '--name',
-      `canonical-qa-${commit}-${runId}`,
-      '--dir',
-      artifactRoot,
-    ]);
+    downloadSuccessfulMainProof({ artifactRoot, commandRunner, commit });
     return selectVerifiedCoverageProof(artifactRoot, commit, proofDestination, reportsDestination);
   } catch {
-    for (const target of [artifactRoot, proofDestination, reportsDestination]) {
-      const base = path.basename(path.resolve(target));
-      if (!/^(main-coverage-proof-|coverage-proof-|coverage-reports-)/u.test(base))
-        throw new Error(`Refusing unsafe coverage proof cleanup target: ${target}`);
-      fs.rmSync(target, { recursive: target !== proofDestination, force: true });
-    }
+    removeSafeRestoreOutput(artifactRoot, ['main-coverage-proof-'], { recursive: true });
+    removeSafeRestoreOutput(proofDestination, ['coverage-proof-'], { recursive: false });
+    removeSafeRestoreOutput(reportsDestination, ['coverage-reports-'], { recursive: true });
     return null;
   }
 }

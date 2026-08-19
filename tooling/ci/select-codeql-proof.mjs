@@ -1,33 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-
 import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import {
+  downloadSuccessfulMainProof,
+  removeSafeRestoreOutput,
+  runGitHubCli,
+} from './main-proof-transport.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
 
 const CODEQL_PROOF_FILE = '.tmp/qa/codeql-proof.json';
 const CODEQL_SARIF_FILE = '.tmp/codeql/results.filtered.sarif';
-
-function runGh(args) {
-  const result = spawnSync('gh', args, { encoding: 'utf8' });
-  if (result.status !== 0) throw new Error((result.stderr ?? '').trim() || 'gh command failed');
-  return result.stdout;
-}
-
-function resolveLatestMainRun(value, commit) {
-  const parsed = JSON.parse(value);
-  if (!Array.isArray(parsed)) throw new Error('GitHub run discovery returned malformed JSON.');
-  const matches = parsed.filter(
-    (run) =>
-      run &&
-      typeof run === 'object' &&
-      run.headSha === commit &&
-      Number.isSafeInteger(run.databaseId) &&
-      run.databaseId > 0
-  );
-  if (matches.length === 0) throw new Error('Expected a successful main proof run.');
-  return matches[0].databaseId;
-}
 
 function copyVerifiedFile(root, manifest, relativePath, destination) {
   if (!manifest.files.some(({ file }) => file === relativePath)) {
@@ -60,53 +42,20 @@ export function selectVerifiedCodeqlProof(
   return { proofPath: path.resolve(proofDestination), sarifPath: path.resolve(sarifDestination) };
 }
 
-function removeRestoreOutput(value, prefix, { recursive }) {
-  const resolved = path.resolve(value);
-  if (!path.basename(resolved).startsWith(prefix)) {
-    throw new Error(`Refusing unsafe CodeQL proof cleanup target: ${resolved}`);
-  }
-  fs.rmSync(resolved, { recursive, force: true });
-}
-
 export function restoreVerifiedMainCodeqlProof(
   commit,
   artifactRoot,
   proofDestination,
   sarifDestination,
-  { commandRunner = runGh, selector = selectVerifiedCodeqlProof } = {}
+  { commandRunner = runGitHubCli, selector = selectVerifiedCodeqlProof } = {}
 ) {
   try {
-    const runs = commandRunner([
-      'run',
-      'list',
-      '--workflow',
-      'quality-gate.yml',
-      '--branch',
-      'main',
-      '--commit',
-      commit,
-      '--status',
-      'success',
-      '--limit',
-      '20',
-      '--json',
-      'databaseId,headSha',
-    ]);
-    const runId = resolveLatestMainRun(runs, commit);
-    commandRunner([
-      'run',
-      'download',
-      String(runId),
-      '--name',
-      `canonical-qa-${commit}-${runId}`,
-      '--dir',
-      artifactRoot,
-    ]);
+    downloadSuccessfulMainProof({ artifactRoot, commandRunner, commit });
     return selector(artifactRoot, commit, proofDestination, sarifDestination);
   } catch {
-    removeRestoreOutput(artifactRoot, 'main-codeql-proof-', { recursive: true });
-    removeRestoreOutput(proofDestination, 'codeql-proof-', { recursive: false });
-    removeRestoreOutput(sarifDestination, 'codeql-sarif-', { recursive: false });
+    removeSafeRestoreOutput(artifactRoot, ['main-codeql-proof-'], { recursive: true });
+    removeSafeRestoreOutput(proofDestination, ['codeql-proof-'], { recursive: false });
+    removeSafeRestoreOutput(sarifDestination, ['codeql-sarif-'], { recursive: false });
     return null;
   }
 }

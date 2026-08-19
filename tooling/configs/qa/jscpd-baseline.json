@@ -144,13 +144,6 @@
       "debtId": "accepted.jscpd.design-system-previews-product-glass-controls.8383ea741d5f"
     },
     {
-      "family": "tooling/qa/core",
-      "count": 1,
-      "lines": 21,
-      "sampleFingerprint": "c471b9017a2b3ebfb00fd8baf018768cd6e956fe7848b2325e7f31743415e99c",
-      "debtId": "noise.jscpd.core.c471b9017a2b"
-    },
-    {
       "family": "apps/extension/src/background/capture/quick-actions",
       "count": 1,
       "lines": 19,

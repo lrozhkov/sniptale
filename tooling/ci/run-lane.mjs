@@ -1,6 +1,10 @@
 import { spawnSync } from 'node:child_process';
 
-import { collectLaneArtifacts, finalizeCandidateReleaseArchive } from './artifacts.mjs';
+import {
+  collectLaneArtifacts,
+  finalizeCandidateReleaseArchive,
+  selectelInfrastructureFromEnvironment,
+} from './artifacts.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
@@ -91,25 +95,6 @@ if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
 const startedAtMs = Date.now();
 const phases = [];
 
-function selectelInfrastructure() {
-  if (process.env.SNIPTALE_SELECTEL_ATTEMPT === undefined) return null;
-  return {
-    provider: 'selectel',
-    selectedProfileIndex: Number(process.env.SNIPTALE_SELECTEL_ATTEMPT),
-    profilesDigest: process.env.SNIPTALE_SELECTEL_PROFILES_DIGEST,
-    serverId: process.env.SNIPTALE_SELECTEL_SERVER_ID,
-    availabilityZone: process.env.SNIPTALE_SELECTEL_AVAILABILITY_ZONE,
-    imageReference: process.env.SNIPTALE_CI_IMAGE,
-    resourceProfile: {
-      cpuTokens: Number(process.env.SNIPTALE_QA_CPU_TOKENS),
-      memoryMiB: Number(process.env.SNIPTALE_QA_MEMORY_MIB),
-      vitestWorkers: Number(process.env.SNIPTALE_QA_VITEST_MAX_WORKERS),
-      playwrightWorkers: Number(process.env.SNIPTALE_QA_PLAYWRIGHT_WORKERS),
-      securityWorkers: Number(process.env.SNIPTALE_QA_SECURITY_WORKERS),
-    },
-  };
-}
-
 function runPhase(id, command) {
   const startedAt = new Date().toISOString();
   const result = spawnSync(command[0], command[1], { stdio: 'inherit', env: process.env });
@@ -188,7 +173,7 @@ if (!candidatePhaseCommand && lane !== candidateFinalizeLane) {
         bounded: resolveQaResourceProfile(),
         release: resolveQaReleaseResourceProfile(),
       },
-      infrastructure: selectelInfrastructure(),
+      infrastructure: selectelInfrastructureFromEnvironment(),
     });
     process.stdout.write(`SNIPTALE_ARTIFACT_PATH=${artifactPath}\n`);
   } catch (error) {
