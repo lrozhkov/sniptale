@@ -77,6 +77,37 @@ it('is valid Python without importing controller dependencies on the host', () =
   expect(result.status, result.stderr).toBe(0);
 });
 
+it('continues cloud cleanup when GitHub runner deletion fails and preserves partial proof', () => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', 'runner-api-failure'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({
+    ports: 'deleted',
+    runner: 'failed',
+    server: 'deleted',
+    volumes: 'deleted',
+  });
+});
+
+it('writes a replayable cleanup-failed receipt when all retries are exhausted', () => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', 'receipt-failure'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout).status).toBe('cleanup-failed');
+});
+
 const validProfiles = {
   profiles: [
     {

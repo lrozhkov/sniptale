@@ -432,6 +432,14 @@ def server_failure(connection, server_id: str | None, failure: Exception):
     return result
 
 
+def cleanup_failure(failure: Exception):
+    result = {"kind": type(failure).__name__}
+    message = str(failure)
+    if message.strip():
+        result["message"] = " ".join(message.split())[:500]
+    return result
+
+
 def is_profile_fallback_failure(failure: Exception) -> bool:
     if isinstance(failure, exceptions.SDKException):
         return True
@@ -452,26 +460,51 @@ def is_profile_fallback_failure(failure: Exception) -> bool:
 
 def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, Any]):
     result = {"runner": "absent", "server": "absent", "ports": "absent", "volumes": "absent"}
-    if record.get("runnerId"):
-        delete_runner(policy, token, record["runnerId"])
-        result["runner"] = "deleted"
+    record["cleanup"] = result
+    failures = []
+
     if record.get("serverId"):
-        server = connection.compute.find_server(record["serverId"], ignore_missing=True)
-        if server is not None:
-            connection.compute.delete_server(server, ignore_missing=True)
-            connection.compute.wait_for_delete(server, interval=2, wait=120)
-            result["server"] = "deleted"
+        try:
+            server = connection.compute.find_server(record["serverId"], ignore_missing=True)
+            if server is not None:
+                connection.compute.delete_server(server, ignore_missing=True)
+                connection.compute.wait_for_delete(server, interval=2, wait=120)
+                result["server"] = "deleted"
+        except Exception as failure:
+            result["server"] = "failed"
+            failures.append(("server", failure))
     for port_id in record.get("portIds", []):
-        connection.network.delete_port(port_id, ignore_missing=True)
-        if connection.network.find_port(port_id, ignore_missing=True) is not None:
-            raise RuntimeError("Selectel runner port survived cleanup.")
-        result["ports"] = "deleted"
+        try:
+            connection.network.delete_port(port_id, ignore_missing=True)
+            if connection.network.find_port(port_id, ignore_missing=True) is not None:
+                raise RuntimeError("Selectel runner port survived cleanup.")
+            result["ports"] = "deleted"
+        except Exception as failure:
+            result["ports"] = "failed"
+            failures.append(("ports", failure))
     for volume_id in record.get("volumeIds", []):
-        volume = connection.block_storage.find_volume(volume_id, ignore_missing=True)
-        if volume is not None:
-            connection.block_storage.delete_volume(volume, ignore_missing=True)
-            connection.block_storage.wait_for_delete(volume, interval=2, wait=120)
-            result["volumes"] = "deleted"
+        try:
+            volume = connection.block_storage.find_volume(volume_id, ignore_missing=True)
+            if volume is not None:
+                connection.block_storage.delete_volume(volume, ignore_missing=True)
+                connection.block_storage.wait_for_delete(volume, interval=2, wait=120)
+                result["volumes"] = "deleted"
+        except Exception as failure:
+            result["volumes"] = "failed"
+            failures.append(("volumes", failure))
+    if record.get("runnerId"):
+        try:
+            delete_runner(policy, token, record["runnerId"])
+            result["runner"] = "deleted"
+        except Exception as failure:
+            result["runner"] = "failed"
+            failures.append(("runner", failure))
+    if failures:
+        details = "; ".join(
+            f"{owner}: {type(failure).__name__}: {' '.join(str(failure).split())[:500]}"
+            for owner, failure in failures
+        )
+        raise RuntimeError(f"Selectel cleanup incomplete: {details}")
     return result
 
 
@@ -485,6 +518,8 @@ def cleanup_with_retries(
             return cleanup(active_connection, policy, token, record), attempt
         except Exception as current_failure:
             failure = current_failure
+            record["cleanupAttempts"] = attempt
+            record["cleanupFailure"] = cleanup_failure(current_failure)
             connection = None
             if attempt < 3:
                 time.sleep(5)
@@ -708,13 +743,21 @@ def provision(policy: dict[str, Any]):
 def cleanup_command(policy: dict[str, Any], record_file: str):
     destination = Path(record_file).resolve()
     record = json.loads(destination.read_text(encoding="utf-8"))
-    if record.get("artifactKind") != "sniptale-selectel-provision-record" or record.get("status") != "online":
+    if record.get("artifactKind") != "sniptale-selectel-provision-record" or record.get(
+        "status"
+    ) not in {"online", "cleanup-failed"}:
         raise RuntimeError("Malformed Selectel provision record.")
     token = required(os.environ.get("RUNNER_CONTROLLER_TOKEN"), "RUNNER_CONTROLLER_TOKEN")
-    record["cleanup"], record["cleanupAttempts"] = cleanup_with_retries(
-        policy, token, record
-    )
+    try:
+        record["cleanup"], record["cleanupAttempts"] = cleanup_with_retries(
+            policy, token, record
+        )
+    except Exception:
+        record["status"] = "cleanup-failed"
+        write_record(destination, record)
+        raise
     record["status"] = "cleaned"
+    record["cleanupFailure"] = None
     write_record(destination, record)
     print(json.dumps(record["cleanup"]))
 
