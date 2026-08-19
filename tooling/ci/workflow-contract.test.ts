@@ -162,7 +162,7 @@ it('fails release publication closed around live immutability and asset digests'
     'cp .tmp/ci-release-admission.json build/release-admission/ci-release-admission.json'
   );
   expect(workflow).toContain(
-    'release-admission-${GITHUB_SHA}-${GITHUB_RUN_ID}/ci-release-admission.json '
+    'release-admission-${SOURCE_SHA}-${SOURCE_RUN_ID}/ci-release-admission.json '
   );
   expect(workflow.indexOf('Preserve release admission receipt')).toBeLessThan(
     workflow.indexOf('  publish:')
@@ -172,6 +172,14 @@ it('fails release publication closed around live immutability and asset digests'
   expect(workflow).toContain('workflow_dispatch:');
   expect(workflow).toContain('coverage_source_run_id:');
   expect(workflow).toContain('coverage_source_sha:');
+  expect(workflow).toContain('publish_source_tag:');
+  expect(workflow).toContain('Install exact publication dependencies');
+  expect(workflow).toContain('run: npm ci --ignore-scripts');
+  expect(workflow).toContain(
+    "github.event_name == 'workflow_dispatch' && inputs.publish_source_tag != ''"
+  );
+  expect(workflow).toContain('--arg tag "$RELEASE_TAG"');
+  expect(workflow).toContain('release_id=$(jq -er --arg tag "$RELEASE_TAG"');
   expect(workflow).toContain('release-${{ inputs.coverage_source_sha || github.sha }}-');
   expect(workflow).toContain('latest immutable release');
   expect(workflow).toContain('sniptale_*.zip');
