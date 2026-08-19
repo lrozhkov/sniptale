@@ -180,6 +180,8 @@ it('fails release publication closed around live immutability and asset digests'
   expect(workflow).toContain(
     "github.event_name == 'workflow_dispatch' && inputs.publish_source_tag != ''"
   );
+  expect(workflow).toContain('ref: ${{ github.sha }}');
+  expect(workflow).not.toContain('ref: ${{ inputs.coverage_source_sha || github.sha }}');
   expect(workflow).toContain('--arg tag "$RELEASE_TAG"');
   expect(workflow).toContain('release_id=$(jq -er --arg tag "$RELEASE_TAG"');
   expect(draftVerifier).toContain('process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME');
