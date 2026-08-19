@@ -17423,7 +17423,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/github-policy.mjs",
-        "contentHash": "5e78334280338b0fb08a8b6a7e53218efee1c33050dbf2af55a3336694f660dc"
+        "contentHash": "a6571ed84336458c91c9506442dc580ff670a7b2de9f8da4f2ac5a92939e0eff"
       },
       "consumers": [
         "tooling/ci/github-policy.mjs"
@@ -17434,7 +17434,7 @@
         "property:desired/bypass_actors",
         "property:desired/ruleset",
         "property:security",
-        "property:snapshot/selectelQaProfiles"
+        "property:snapshot/selectelProfiles"
       ]
     },
     {
@@ -19097,15 +19097,18 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/prepare-release-assets.mjs",
-        "contentHash": "80ad4c0b8caf9fc8e2225fc31de44583732c8110943b5ef0e7f2dc19356f6747"
+        "contentHash": "fbff69a6eff1e1d0c65b1f391f8fac8909a257759c54c10f81a098783f7482fe"
       },
       "consumers": [
         "tooling/ci/prepare-release-assets.mjs"
       ],
       "surfaces": [
-        "binding:names",
+        "binding:evidenceSources",
         "binding:provenance",
-        "binding:sources"
+        "binding:releaseAuditChecksums",
+        "binding:releaseAuditDigests",
+        "property:qaEvidence",
+        "property:writeEvidenceArchive/compressionOptions"
       ]
     },
     {
@@ -20527,6 +20530,7 @@
         "tooling/ci/ci-contract.test.ts",
         "tooling/ci/codeql-proof-host.test.ts",
         "tooling/ci/select-codeql-proof.test.ts",
+        "tooling/ci/select-release-coverage.test.ts",
         "tooling/ci/select-unit-proof.test.ts",
         "tooling/ci/unit-proof-host.test.ts",
         "tooling/qa/audits/canonical-sarif.test.ts",

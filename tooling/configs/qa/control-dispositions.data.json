@@ -870,6 +870,13 @@
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
+      "path": "tooling/ci/select-release-coverage.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is the release-bound informational coverage publication adapter.",
+      "proofReason": "Exact release identity and digest rejection are covered by the owner-local selector test."
+    },
+    {
       "path": "tooling/ci/select-unit-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",

@@ -3,6 +3,16 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      coverage_source_run_id:
+        description: Existing successful release workflow run ID used only to republish coverage
+        required: true
+        type: string
+      coverage_source_sha:
+        description: Exact published release commit SHA
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -13,6 +23,7 @@ concurrency:
 
 jobs:
   admission:
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
@@ -71,6 +82,16 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
+      - name: Preserve release admission receipt
+        run: |
+          mkdir -p build/release-admission
+          cp .tmp/ci-release-admission.json build/release-admission/ci-release-admission.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-admission-${{ github.sha }}-${{ github.run_id }}
+          path: build/release-admission
+          if-no-files-found: error
+          retention-days: 30
 
   provision:
     needs: admission
@@ -98,7 +119,7 @@ jobs:
           CONTROLLER_IMAGE: ${{ needs.admission.outputs.controller-image }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
-          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}
+          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
           RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
@@ -274,6 +295,8 @@ jobs:
         run: |
           mv build/release-inputs/release-input-${GITHUB_SHA}-${GITHUB_RUN_ID} build/main-proof
           mv build/release-inputs/release-audit-${GITHUB_SHA}-${GITHUB_RUN_ID} build/release-audit
+          mkdir -p .tmp
+          mv build/release-inputs/release-admission-${GITHUB_SHA}-${GITHUB_RUN_ID}/ci-release-admission.json .tmp/ci-release-admission.json
       - name: Prepare immutable release assets
         run: node tooling/ci/prepare-release-assets.mjs build/main-proof build/release-audit "$GITHUB_SHA"
       - name: Preserve release proof
@@ -310,7 +333,7 @@ jobs:
           }
           trap cleanup_owned_release ERR
           version=$(jq -er .version package.json)
-          zip_assets=("$asset_root"/*.zip)
+          zip_assets=("$asset_root"/sniptale_*.zip)
           if [ "${#zip_assets[@]}" -ne 1 ] || [ ! -f "${zip_assets[0]}" ]; then
             echo "Expected exactly one verified extension ZIP" >&2
             exit 1
@@ -320,7 +343,7 @@ jobs:
           cat > "$release_notes" <<EOF
           Snip the web. Tell the story.
 
-          Fourth public alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
+          Fifth public alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
 
           ## Highlights
 
@@ -329,6 +352,8 @@ jobs:
           - Added verified unit, CodeQL, and coverage proof reuse, candidate-bound receipts, immutable QA images, SBOM and provenance, SARIF publication, coverage artifacts, and informational Codecov reporting.
           - Improved CI failure diagnostics with retained wrapper run records, complete sanitized logs, report hashes, artifact download guidance, and deterministic proof manifests.
           - Hardened release admission around signed tags, successful main proof, immutable release assets, checksums, CycloneDX SBOM, and exact artifact verification.
+          - Compact release evidence into one deterministic QA archive and publish the README coverage badge only from the latest immutable release.
+          - Added a private vulnerability reporting policy and documented the confidential disclosure channel.
 
           ## Install
 
@@ -350,3 +375,52 @@ jobs:
           node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
           node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+
+  coverage-results:
+    needs: [publish]
+    if: >-
+      always() &&
+      ((github.event_name == 'push' && needs.publish.result == 'success') ||
+       github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out trusted coverage publisher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0, cache: npm }
+      - name: Download exact published release proof
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-${{ inputs.coverage_source_sha || github.sha }}-${{ inputs.coverage_source_run_id || github.run_id }}
+          path: build/release-proof
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.coverage_source_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Admit coverage only from the latest immutable release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
+        run: |
+          release=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest")
+          test "$(jq -er .immutable <<<"$release")" = true
+          tag=$(jq -er .tag_name <<<"$release")
+          git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
+          test "$(git rev-list -n 1 "$tag")" = "$SOURCE_SHA"
+          node tooling/ci/select-release-coverage.mjs \
+            build/release-proof/release-audit "$SOURCE_SHA" build/codecov/lcov.info
+      - name: Publish release coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          files: build/codecov/lcov.info
+          use_oidc: true
+          override_branch: main
+          override_commit: ${{ inputs.coverage_source_sha || github.sha }}
+          fail_ci_if_error: false
