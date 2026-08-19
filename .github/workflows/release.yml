@@ -6,12 +6,17 @@ on:
   workflow_dispatch:
     inputs:
       coverage_source_run_id:
-        description: Existing successful release workflow run ID used only to republish coverage
+        description: Existing release workflow run ID containing admitted audit proof
         required: true
         type: string
       coverage_source_sha:
         description: Exact published release commit SHA
         required: true
+        type: string
+      publish_source_tag:
+        description: Failed release tag to replay publication from the admitted source run; empty replays coverage only
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -271,7 +276,10 @@ jobs:
 
   publish:
     needs: [admission, release-audit, cleanup]
-    if: needs.release-audit.result == 'success' && needs.cleanup.result == 'success'
+    if: >-
+      always() &&
+      ((github.event_name == 'push' && needs.release-audit.result == 'success' && needs.cleanup.result == 'success') ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish_source_tag != ''))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -280,29 +288,42 @@ jobs:
     steps:
       - name: Check out signed tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { fetch-depth: 0, persist-credentials: false }
+        with:
+          ref: ${{ inputs.coverage_source_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: 22.12.0, cache: npm }
+      - name: Install exact publication dependencies
+        run: npm ci --ignore-scripts
       - name: Download admitted main proof and release audit
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
-            pattern: 'release-*-${{ github.sha }}-${{ github.run_id }}',
+            pattern: 'release-*-${{ inputs.coverage_source_sha || github.sha }}-${{ inputs.coverage_source_run_id || github.run_id }}',
             path: build/release-inputs,
+            repository: '${{ github.repository }}',
+            run-id: '${{ inputs.coverage_source_run_id || github.run_id }}',
+            github-token: '${{ secrets.GITHUB_TOKEN }}',
           }
       - name: Restore canonical artifact roots
+        env:
+          SOURCE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
+          SOURCE_RUN_ID: ${{ inputs.coverage_source_run_id || github.run_id }}
         run: |
-          mv build/release-inputs/release-input-${GITHUB_SHA}-${GITHUB_RUN_ID} build/main-proof
-          mv build/release-inputs/release-audit-${GITHUB_SHA}-${GITHUB_RUN_ID} build/release-audit
+          mv build/release-inputs/release-input-${SOURCE_SHA}-${SOURCE_RUN_ID} build/main-proof
+          mv build/release-inputs/release-audit-${SOURCE_SHA}-${SOURCE_RUN_ID} build/release-audit
           mkdir -p .tmp
-          mv build/release-inputs/release-admission-${GITHUB_SHA}-${GITHUB_RUN_ID}/ci-release-admission.json .tmp/ci-release-admission.json
+          mv build/release-inputs/release-admission-${SOURCE_SHA}-${SOURCE_RUN_ID}/ci-release-admission.json .tmp/ci-release-admission.json
       - name: Prepare immutable release assets
-        run: node tooling/ci/prepare-release-assets.mjs build/main-proof build/release-audit "$GITHUB_SHA"
+        env:
+          SOURCE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
+        run: node tooling/ci/prepare-release-assets.mjs build/main-proof build/release-audit "$SOURCE_SHA"
       - name: Preserve release proof
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-${{ github.sha }}-${{ github.run_id }}
+          name: release-${{ inputs.coverage_source_sha || github.sha }}-${{ github.run_id }}
           path: |
             build/main-proof
             build/release-audit
@@ -312,11 +333,13 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_POLICY_READ_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}'
+          RELEASE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
+          RELEASE_TAG: ${{ inputs.publish_source_tag || github.ref_name }}
         run: |
           asset_root="build/main-proof/release-assets"
-          GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" node tooling/ci/release-policy.mjs --recheck
+          GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs --recheck
           lookup_error=$(mktemp)
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" >/dev/null 2>"$lookup_error"; then
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>"$lookup_error"; then
             echo "Refusing to replace an existing release" >&2
             exit 1
           elif ! grep -q '(HTTP 404)' "$lookup_error"; then
@@ -327,7 +350,7 @@ jobs:
           cleanup_owned_release() {
             if [ -z "$created_release_id" ]; then return; fi
             release_state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}" --jq '[.tag_name, .draft, .immutable] | @tsv' 2>/dev/null || true)
-            if [ "$release_state" = "${GITHUB_REF_NAME}"$'\ttrue\tfalse' ] || [ "$release_state" = "${GITHUB_REF_NAME}"$'\tfalse\tfalse' ]; then
+            if [ "$release_state" = "${RELEASE_TAG}"$'\ttrue\tfalse' ] || [ "$release_state" = "${RELEASE_TAG}"$'\tfalse\tfalse' ]; then
               gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}"
             fi
           }
@@ -363,13 +386,13 @@ jobs:
           EOF
           release_request=$(mktemp)
           jq -n \
-            --arg tag "$GITHUB_REF_NAME" \
+            --arg tag "$RELEASE_TAG" \
             --arg name "Sniptale ${version} alpha" \
             --rawfile body "$release_notes" \
             '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false, generate_release_notes: false}' \
             > "$release_request"
           release_json=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$release_request")
-          release_id=$(jq -er --arg tag "$GITHUB_REF_NAME" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release_json")
+          release_id=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release_json")
           created_release_id="$release_id"
           node tooling/ci/upload-release-assets.mjs "$asset_root" "$release_id"
           node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
@@ -399,10 +422,10 @@ jobs:
       - name: Download exact published release proof
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: release-${{ inputs.coverage_source_sha || github.sha }}-${{ inputs.coverage_source_run_id || github.run_id }}
+          name: release-${{ inputs.coverage_source_sha || github.sha }}-${{ (needs.publish.result == 'success' && github.run_id) || inputs.coverage_source_run_id || github.run_id }}
           path: build/release-proof
           repository: ${{ github.repository }}
-          run-id: ${{ inputs.coverage_source_run_id || github.run_id }}
+          run-id: ${{ (needs.publish.result == 'success' && github.run_id) || inputs.coverage_source_run_id || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Admit coverage only from the latest immutable release
         env:
