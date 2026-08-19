@@ -147,6 +147,8 @@ it('fails release publication closed around live immutability and asset digests'
   const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   const policy = fs.readFileSync('tooling/ci/release-policy.mjs', 'utf8');
   const uploader = fs.readFileSync('tooling/ci/upload-release-assets.mjs', 'utf8');
+  const draftVerifier = fs.readFileSync('tooling/ci/verify-draft-release.mjs', 'utf8');
+  const publishedVerifier = fs.readFileSync('tooling/ci/verify-published-release.mjs', 'utf8');
   expect(workflow).toContain('include-hidden-files: true');
   expect(workflow).toContain('verify-published-release.mjs "$asset_root" "$release_id"');
   expect(workflow).toContain('verify-draft-release.mjs "$asset_root" "$release_id"');
@@ -180,6 +182,8 @@ it('fails release publication closed around live immutability and asset digests'
   );
   expect(workflow).toContain('--arg tag "$RELEASE_TAG"');
   expect(workflow).toContain('release_id=$(jq -er --arg tag "$RELEASE_TAG"');
+  expect(draftVerifier).toContain('process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME');
+  expect(publishedVerifier).toContain('process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME');
   expect(workflow).toContain('release-${{ inputs.coverage_source_sha || github.sha }}-');
   expect(workflow).toContain('latest immutable release');
   expect(workflow).toContain('sniptale_*.zip');

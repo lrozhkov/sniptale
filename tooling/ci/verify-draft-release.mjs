@@ -4,7 +4,7 @@ import { assertDraftRelease, readExpectedReleaseAssetDigests } from './release-v
 
 const [assetRoot, releaseId] = process.argv.slice(2);
 const repository = process.env.GITHUB_REPOSITORY ?? 'lrozhkov/sniptale';
-const tag = process.env.GITHUB_REF_NAME;
+const tag = process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME;
 if (!assetRoot || !releaseId || !tag) {
   throw new Error('Draft release verification requires assets, release ID, and tag.');
 }
