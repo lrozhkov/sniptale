@@ -1,22 +1,20 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import JSZip from 'jszip';
 
+import { parseSha256Sums } from './release-checksums.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
+import { readProofInput, sha256ProofInput as sha256Bytes } from '../qa/core/proof-input.mjs';
 
 const ARCHIVE_FILE_DATE = new Date('1980-01-01T00:00:00.000Z');
 
-function sha256Bytes(value) {
-  return crypto.createHash('sha256').update(value).digest('hex');
-}
-
 function requireRegularFile(file, label) {
-  if (!fs.existsSync(file)) throw new Error(`Missing ${label}: ${file}`);
-  const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Unsafe ${label}: ${file}`);
-  return fs.readFileSync(file);
+  try {
+    return readProofInput(file);
+  } catch (cause) {
+    throw new Error(`Missing or unsafe ${label}: ${file}`, { cause });
+  }
 }
 
 function collectTree(root, archiveRoot) {
@@ -102,8 +100,9 @@ for (const [source, name] of [
   [extensionZip, extensionZipName],
   [sbom, 'sbom.cdx.json'],
 ]) {
-  requireRegularFile(source, 'release asset');
-  fs.copyFileSync(source, path.join(output, name), fs.constants.COPYFILE_EXCL);
+  fs.writeFileSync(path.join(output, name), requireRegularFile(source, 'release asset'), {
+    flag: 'wx',
+  });
 }
 
 const evidenceSources = [
@@ -139,20 +138,13 @@ if (
 const releaseAuditDigests = new Map(
   releaseAuditManifest.files.map(({ file, sha256 }) => [file, sha256])
 );
-const releaseAuditChecksums = new Map(
-  requireRegularFile(path.join(releaseAuditRoot, 'SHA256SUMS'), 'release audit checksums')
-    .toString('utf8')
-    .trim()
-    .split('\n')
-    .map((line) => {
-      const match = /^([a-f0-9]{64}) {2}(.+)$/u.exec(line);
-      if (!match) throw new Error(`Malformed release audit checksum: ${line}`);
-      return [match[2], match[1]];
-    })
+const releaseAuditChecksums = parseSha256Sums(
+  requireRegularFile(path.join(releaseAuditRoot, 'SHA256SUMS'), 'release audit checksums'),
+  'release audit'
 );
 if (
   releaseAuditChecksums.get('proof-manifest.json') !==
-  sha256Bytes(fs.readFileSync(releaseAuditProof))
+  sha256Bytes(requireRegularFile(releaseAuditProof, 'release audit proof'))
 ) {
   throw new Error('Release audit proof checksum drifted.');
 }
@@ -181,8 +173,10 @@ const provenance = {
   schemaVersion: 1,
   artifactKind: 'sniptale-release-provenance',
   commit: releaseCommit,
-  mainProofSha256: sha256Bytes(fs.readFileSync(mainProof)),
-  releaseAuditProofSha256: sha256Bytes(fs.readFileSync(releaseAuditProof)),
+  mainProofSha256: sha256Bytes(requireRegularFile(mainProof, 'main proof')),
+  releaseAuditProofSha256: sha256Bytes(
+    requireRegularFile(releaseAuditProof, 'release audit proof')
+  ),
   qaEvidence: { file: evidenceName, sha256: evidenceSha256 },
 };
 fs.writeFileSync(path.join(output, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`, {

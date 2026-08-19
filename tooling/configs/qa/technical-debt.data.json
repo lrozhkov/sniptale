@@ -19097,7 +19097,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/prepare-release-assets.mjs",
-        "contentHash": "fbff69a6eff1e1d0c65b1f391f8fac8909a257759c54c10f81a098783f7482fe"
+        "contentHash": "1d4f6db3714eaf68dbf47d2c926c630de737c6312897360f1e82197085486864"
       },
       "consumers": [
         "tooling/ci/prepare-release-assets.mjs"
@@ -19105,7 +19105,6 @@
       "surfaces": [
         "binding:evidenceSources",
         "binding:provenance",
-        "binding:releaseAuditChecksums",
         "binding:releaseAuditDigests",
         "property:qaEvidence",
         "property:writeEvidenceArchive/compressionOptions"
