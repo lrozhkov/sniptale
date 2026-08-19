@@ -266,7 +266,7 @@ jobs:
           SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
           SNIPTALE_CI_IMAGE: ${{ needs.qa-image.outputs.reference }}
           SNIPTALE_CI_SKIP_BUILD: '1'
-          SNIPTALE_CI_HEAVY_AUDIT: '1'
+          SNIPTALE_CI_HEAVY_AUDIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
           SNIPTALE_SELECTEL_ATTEMPT: ${{ needs.provision.outputs.profile-index }}
           SNIPTALE_SELECTEL_PROFILES_DIGEST: ${{ needs.provision.outputs.profiles-digest }}
           SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision.outputs.server-id }}
@@ -427,7 +427,9 @@ jobs:
 
   coverage-results:
     needs: canonical-qa
-    if: needs.canonical-qa.result == 'success'
+    if: >-
+      needs.canonical-qa.result == 'success' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     continue-on-error: true
     runs-on: ubuntu-24.04
     permissions: { id-token: write }
