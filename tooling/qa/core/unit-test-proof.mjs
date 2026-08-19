@@ -1,43 +1,17 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+
+import {
+  readProofInput as readRegularFile,
+  resolveProofCommit as resolveCommit,
+  sha256ProofInput as sha256Bytes,
+  stableStringify,
+} from './proof-input.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/unit-proof-reuse.data.json';
 const EXTERNAL_PROOF_ENV = 'SNIPTALE_UNIT_PROOF_PATH';
 const CANDIDATE_AUTHORITY_ENV = 'SNIPTALE_UNIT_PROOF_AUTHORITY';
 const TEST_FILE_PATTERN = /(?:\.test|\.spec)\.(?:ts|tsx)$/u;
-
-function sha256Bytes(value) {
-  return crypto.createHash('sha256').update(value).digest('hex');
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)])
-    );
-  }
-  return value;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(stableValue(value));
-}
-
-function readRegularFile(filePath, encoding = null) {
-  const descriptor = fs.openSync(filePath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
-  try {
-    const stat = fs.fstatSync(descriptor);
-    if (!stat.isFile()) throw new Error(`Unsafe regular-file input: ${filePath}`);
-    return fs.readFileSync(descriptor, encoding === null ? undefined : encoding);
-  } finally {
-    fs.closeSync(descriptor);
-  }
-}
 
 function assertPathList(values, label) {
   if (
@@ -149,15 +123,6 @@ function fingerprintFiles(cwd, files) {
     const absolute = path.join(cwd, file);
     return { file, sha256: sha256Bytes(readRegularFile(absolute)) };
   });
-}
-
-function resolveCommit(cwd) {
-  const configured = process.env.SNIPTALE_PROOF_SHA;
-  if (/^[a-f0-9]{40}$/u.test(configured ?? '')) return configured;
-  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' });
-  return result.status === 0 && /^[a-f0-9]{40}$/u.test(result.stdout.trim())
-    ? result.stdout.trim()
-    : null;
 }
 
 function createExecutionIdentity({ maxWorkers, pool, suite }) {

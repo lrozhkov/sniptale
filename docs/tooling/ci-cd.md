@@ -1,6 +1,6 @@
 # Canonical CI/CD
 
-Updated: 2026-08-18
+Updated: 2026-08-19
 
 This document owns the external execution topology, admission rules, proof transport, artifact retention, and release publication contract. Wrapper behavior remains owned by [wrapper-summary.md](wrapper-summary.md), operator commands by [operator-handbook.md](operator-handbook.md), and quality controls by [code-quality.md](code-quality.md).
 
@@ -28,7 +28,7 @@ The selected profile maps to `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`,
 
 ## Pull Request Gate
 
-A ready pull request runs the fast candidate-bound sequence:
+A ready pull request runs the complete candidate-bound sequence:
 
 ```text
 qa:release-harness
@@ -37,25 +37,26 @@ qa:release-harness
 → candidate tree equality
 → qa:release
 → qa:audit --profile pr
-→ heavyweight receipt validation
+→ qa:audit --profile security
+→ qa:audit --profile coverage
 → release artifact validation
 ```
 
-The `pr` audit profile requires Gitleaks worktree scanning, npm audit, npm signature verification, OSV Scanner, and Semgrep. It excludes full CodeQL and full product coverage. CodeQL and coverage receipts are validated and transported when available, but their absence or content-addressed mismatch does not trigger heavyweight recomputation and does not block an ordinary PR. The final required `pr-gate` succeeds only when canonical QA and external cleanup both succeed.
+The `pr` audit profile requires Gitleaks worktree scanning, npm audit, npm signature verification, OSV Scanner, and Semgrep. The following security and coverage phases add full CodeQL and full product coverage as blocking controls. A matching receipt is reused by the same QA owner; a missing, stale, malformed, or differently bound receipt triggers full recomputation. The final required `pr-gate` succeeds only when every canonical control and external cleanup succeed.
 
 The canonical artifact is uploaded before cleanup even when QA fails. Its job summary identifies the selected profile, profile digest, resolved resources, failed phase, artifact link, and exact `gh run download` command. PR artifacts are retained for 14 days.
 
-## Main And Heavy Audit
+## Main And Scheduled Audit
 
-A push to `main` runs the same fast canonical lane for the exact squash commit. A green proof publishes the already built QA and controller images under immutable `sha-<commit>` tags and moving `main` tags with OCI SBOM and provenance. Main artifacts are retained for 30 days.
+A push to `main` runs the same complete canonical lane for the exact squash commit, including blocking security and coverage. A green proof publishes the already built QA and controller images under immutable `sha-<commit>` tags and moving `main` tags with OCI SBOM and provenance. Main artifacts are retained for 30 days and are the preferred proof-reuse source for the next PR and release of the same inputs.
 
-The weekly schedule and a normal `workflow_dispatch` enable the heavyweight extension of the same candidate lane: full security audit including CodeQL, followed by full canonical coverage. SARIF upload and Codecov remain result presentation, not independent authorities. A Codecov outage is non-blocking. Scheduled/manual results are early warning and reusable evidence; they do not replace release admission.
+The weekly schedule and a normal `workflow_dispatch` execute the same complete lane to detect advisory or environment drift even when no candidate changed. SARIF upload and Codecov remain result presentation, not independent authorities. A Codecov outage is non-blocking. Scheduled/manual results are early warning and reusable evidence; they do not replace release admission.
 
 ## Verified Proof Reuse
 
 Proof reuse is a fail-closed QA-owner decision, not a cache hit decided by YAML. The full-unit receipt binds product sources, tests, support, runner inputs, dependencies, Node/container identity, suite, pool, worker count, and resource profile. The CodeQL receipt binds production source scope, query packs, configuration, baseline, toolchain/image identity, and the filtered SARIF digest. The coverage receipt binds production sources, tests, coverage scope/configuration, dependency lock, image identity, and every canonical coverage report digest.
 
-README, release notes, and unrelated documentation do not invalidate CodeQL or coverage receipts. A changed input, missing report, malformed receipt, changed image digest, or artifact hash mismatch rejects reuse. A blocking lane then performs the full control. Fast PR/main lanes merely report the heavyweight receipt as unavailable and continue with their own required controls.
+README, release notes, and unrelated documentation do not invalidate CodeQL or coverage receipts. A changed input, missing report, malformed receipt, changed image digest, or artifact hash mismatch rejects reuse. Every blocking PR, main, scheduled, manual, or release lane then performs the full control.
 
 ## Release Admission And Assets
 

@@ -329,6 +329,25 @@ function proofReuseStatus(destinationRoot, relativePath) {
   return proof.reusedFrom ? 'reused' : 'fresh';
 }
 
+export function selectelInfrastructureFromEnvironment(env = process.env) {
+  if (env.SNIPTALE_SELECTEL_ATTEMPT === undefined) return null;
+  return {
+    provider: 'selectel',
+    selectedProfileIndex: Number(env.SNIPTALE_SELECTEL_ATTEMPT),
+    profilesDigest: env.SNIPTALE_SELECTEL_PROFILES_DIGEST,
+    serverId: env.SNIPTALE_SELECTEL_SERVER_ID,
+    availabilityZone: env.SNIPTALE_SELECTEL_AVAILABILITY_ZONE,
+    imageReference: env.SNIPTALE_CI_IMAGE,
+    resourceProfile: {
+      cpuTokens: Number(env.SNIPTALE_QA_CPU_TOKENS),
+      memoryMiB: Number(env.SNIPTALE_QA_MEMORY_MIB),
+      vitestWorkers: Number(env.SNIPTALE_QA_VITEST_MAX_WORKERS),
+      playwrightWorkers: Number(env.SNIPTALE_QA_PLAYWRIGHT_WORKERS),
+      securityWorkers: Number(env.SNIPTALE_QA_SECURITY_WORKERS),
+    },
+  };
+}
+
 export function collectLaneArtifacts({
   lane,
   startedAtMs,

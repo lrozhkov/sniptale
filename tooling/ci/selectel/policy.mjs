@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
+import { stableStringify } from '../../qa/core/proof-input.mjs';
+
 export const SELECTEL_POLICY_PATH = 'tooling/configs/ci/selectel-runner.json';
 
 export function readSelectelPolicy(root = process.cwd()) {
@@ -117,13 +119,7 @@ export function validateSelectelQaProfiles(raw, root = process.cwd()) {
   const keys = normalizedProfiles.map((profile) => JSON.stringify(profile));
   if (new Set(keys).size !== keys.length)
     throw new Error('SELECTEL_QA_PROFILES contains duplicate profiles.');
-  const stable = (value) =>
-    JSON.stringify(value, (_key, nested) =>
-      nested && typeof nested === 'object' && !Array.isArray(nested)
-        ? Object.fromEntries(Object.entries(nested).sort(([a], [b]) => a.localeCompare(b)))
-        : nested
-    );
-  const normalized = stable({ profiles: normalizedProfiles });
+  const normalized = stableStringify({ profiles: normalizedProfiles });
   return {
     digest: `sha256:${crypto.createHash('sha256').update(normalized).digest('hex')}`,
     profiles: normalizedProfiles,

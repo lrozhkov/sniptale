@@ -141,6 +141,17 @@ it('derives the measured GitHub runner profile only from the validated repositor
   expect(policy).not.toContain('attemptPlacements');
 });
 
+it('keeps security and coverage blocking on every canonical PR and main candidate', () => {
+  const workflow = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
+  expect(workflow).toContain("SNIPTALE_CI_HEAVY_AUDIT: '1'");
+  expect(workflow).toContain(
+    "coverage-results:\n    needs: canonical-qa\n    if: needs.canonical-qa.result == 'success'"
+  );
+  expect(workflow).not.toContain(
+    "SNIPTALE_CI_HEAVY_AUDIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')"
+  );
+});
+
 it('fails release publication closed around live immutability and asset digests', () => {
   const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   const policy = fs.readFileSync('tooling/ci/release-policy.mjs', 'utf8');
