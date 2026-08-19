@@ -24,7 +24,7 @@ The core application works locally in the browser. It does not require a Sniptal
 
 Download the extension ZIP from the [latest immutable GitHub Release](https://github.com/lrozhkov/sniptale/releases/latest), verify it against the published `SHA256SUMS`, unpack it, then open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the unpacked directory. The release also provides a CycloneDX SBOM, provenance, and one QA evidence ZIP containing the canonical security, coverage, and proof reports.
 
-This remains an alpha distribution rather than a Chrome Web Store release. See [SECURITY.md](SECURITY.md) to report vulnerabilities privately; do not disclose suspected security issues in a public issue.
+This remains an alpha distribution rather than a Chrome Web Store release. See [SECURITY.md](.github/SECURITY.md) to report vulnerabilities privately; do not disclose suspected security issues in a public issue.
 
 ## Build from source
 

@@ -44,12 +44,8 @@ export function validateDocuments(root, policy) {
       }
     }
   }
-  const security = readFileSync(path.resolve(root, 'SECURITY.md'), 'utf8');
-  if (
-    !security.includes('Report a vulnerability') ||
-    !security.includes('do not open a public issue')
-  ) {
-    errors.push('security policy is missing the private vulnerability reporting contract');
+  if (existsSync(path.resolve(root, 'SECURITY.md'))) {
+    errors.push('SECURITY.md is excluded from this local release surface');
   }
   const release = readFileSync(path.resolve(root, 'docs/oss/release.md'), 'utf8');
   errors.push(...contributionDocumentErrors(root));

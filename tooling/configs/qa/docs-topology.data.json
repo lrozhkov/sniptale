@@ -31,10 +31,10 @@
   ],
   "rootDocuments": [
     ".github/pull_request_template.md",
+    ".github/SECURITY.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
-    "README.md",
-    "SECURITY.md"
+    "README.md"
   ],
   "skillDocuments": [
     "docs/agent-tooling/README.md",

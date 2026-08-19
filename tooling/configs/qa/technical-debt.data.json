@@ -18572,7 +18572,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/oss-release-validation.docs.mjs",
-        "contentHash": "da3632ae47f76acf81b48bd8277cb2100e5090ad9ccc1d5b646bba1e5965e27c"
+        "contentHash": "4f6541081b246c89a798e68bbc2c2822e172461bc1ac30924f9566c640c02220"
       },
       "consumers": [
         "tooling/qa/core/oss-release-consumer-discovery.test.ts",

@@ -85,8 +85,8 @@ function createPolicy(font: Buffer, legal: Map<string, string>) {
     ],
     legalFiles,
     bundledAssets: [manropeAsset(font)],
-    contributorFiles: ['README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'],
-    releaseDocs: ['README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'docs/oss/release.md'],
+    contributorFiles: ['README.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'],
+    releaseDocs: ['README.md', 'CONTRIBUTING.md', 'docs/oss/release.md'],
     releaseConsumerManifest: 'tooling/configs/qa/oss-release-consumers.data.json',
     dependencyLegal: {
       manifestPath: 'THIRD_PARTY_DEPENDENCIES.json',
@@ -96,7 +96,7 @@ function createPolicy(font: Buffer, legal: Map<string, string>) {
       reviewedSelections: [],
     },
     forbiddenReleaseDocFragments: ['src/shared', '/home/private/repo'],
-    securityReporting: 'github-private-vulnerability-reporting',
+    securityReporting: 'excluded',
     nativeCompanion: 'separate-repository',
     publication: 'github-immutable-release',
   };
@@ -145,11 +145,6 @@ function seedLegalAndContributorFiles(root: string, font: Buffer) {
   for (const [relativePath, contents] of legal) write(root, relativePath, contents);
   seedManropeInstalledSources(root, font, legal.get('LICENSES/OFL-1.1.txt')!);
   write(root, 'README.md', 'Sniptale AGPL-3.0-or-later\n');
-  write(
-    root,
-    'SECURITY.md',
-    'Use Report a vulnerability for confidential disclosure; do not open a public issue.\n'
-  );
   write(
     root,
     'CONTRIBUTING.md',
@@ -236,7 +231,7 @@ it('accepts a complete release surface and rejects mutable publication policy', 
   const policy = { ...JSON.parse(readFileSync(policyPath, 'utf8')), publication: 'github-release' };
   writeFileSync(policyPath, `${JSON.stringify(policy, null, 2)}\n`);
   expect(collectOssReleaseSurfaceErrors(root)).toContain(
-    'OSS release policy must use immutable GitHub Releases and private vulnerability reporting'
+    'OSS release policy must use immutable GitHub Releases without a security-reporting channel'
   );
 });
 
@@ -274,7 +269,7 @@ it('rejects added or changed bundled font content', async () => {
   expect(parityErrors).toContain('Manrope installed license differs from canonical OFL text');
 });
 
-it('rejects retired layout instructions and an incomplete security-reporting surface', async () => {
+it('rejects retired layout instructions and an added security-reporting surface', async () => {
   const root = await createFixture();
   write(root, 'docs/oss/release.md', 'qa:release src/shared\n');
   write(root, 'SECURITY.md', '# Reporting\n');
@@ -282,7 +277,7 @@ it('rejects retired layout instructions and an incomplete security-reporting sur
   expect(collectOssReleaseSurfaceErrors(root)).toEqual(
     expect.arrayContaining([
       'retired release documentation fragment in docs/oss/release.md: src/shared',
-      'security policy is missing the private vulnerability reporting contract',
+      'SECURITY.md is excluded from this local release surface',
     ])
   );
 });
