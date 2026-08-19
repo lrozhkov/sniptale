@@ -129,21 +129,24 @@ it('runs one candidate-bound GitHub gate over the canonical local wrapper sequen
 });
 
 it('derives the measured GitHub runner profile only from the validated repository variable', () => {
-  for (const workflowPath of [
-    '.github/workflows/quality-gate.yml',
-    '.github/workflows/release.yml',
-  ]) {
-    const workflow = fs.readFileSync(workflowPath, 'utf8');
-    expect(workflow).toContain('SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}');
+  const quality = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
+  const release = fs.readFileSync('.github/workflows/release.yml', 'utf8');
+  expect(quality).toContain('SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}');
+  expect(quality).not.toContain('SELECTEL_RELEASE_PROFILES');
+  expect(release).toContain('SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}');
+  for (const workflow of [quality, release]) {
     expect(workflow).not.toContain("SNIPTALE_QA_CPU_TOKENS: '24'");
   }
   const policy = fs.readFileSync('tooling/configs/ci/selectel-runner.json', 'utf8');
+  expect(policy).toContain('SELECTEL_QA_PROFILES');
+  expect(policy).toContain('SELECTEL_RELEASE_PROFILES');
   expect(policy).not.toContain('attemptPlacements');
 });
 
 it('fails release publication closed around live immutability and asset digests', () => {
   const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   const policy = fs.readFileSync('tooling/ci/release-policy.mjs', 'utf8');
+  const uploader = fs.readFileSync('tooling/ci/upload-release-assets.mjs', 'utf8');
   expect(workflow).toContain('include-hidden-files: true');
   expect(workflow).toContain('verify-published-release.mjs "$asset_root" "$release_id"');
   expect(workflow).toContain('verify-draft-release.mjs "$asset_root" "$release_id"');
@@ -154,6 +157,24 @@ it('fails release publication closed around live immutability and asset digests'
   expect(workflow).toContain("created_release_id=''");
   expect(workflow).toContain('releases/${created_release_id}');
   expect(workflow).toContain('upload-release-assets.mjs "$asset_root" "$release_id"');
+  expect(workflow).toContain('release-admission-${{ github.sha }}-${{ github.run_id }}');
+  expect(workflow).toContain(
+    'cp .tmp/ci-release-admission.json build/release-admission/ci-release-admission.json'
+  );
+  expect(workflow).toContain(
+    'release-admission-${GITHUB_SHA}-${GITHUB_RUN_ID}/ci-release-admission.json '
+  );
+  expect(workflow.indexOf('Preserve release admission receipt')).toBeLessThan(
+    workflow.indexOf('  publish:')
+  );
+  expect(uploader).toContain('https://uploads.github.com/repos/${repository}/releases/');
+  expect(uploader).not.toContain("'--hostname'");
+  expect(workflow).toContain('workflow_dispatch:');
+  expect(workflow).toContain('coverage_source_run_id:');
+  expect(workflow).toContain('coverage_source_sha:');
+  expect(workflow).toContain('release-${{ inputs.coverage_source_sha || github.sha }}-');
+  expect(workflow).toContain('latest immutable release');
+  expect(workflow).toContain('sniptale_*.zip');
   expect(workflow).not.toContain('gh release upload');
   expect(workflow).not.toContain('gh release edit');
   expect(workflow).not.toContain('gh release delete');
@@ -197,6 +218,7 @@ it('fails release publication closed around live immutability and asset digests'
     rules: [{ type: 'update' }, { type: 'deletion' }],
   });
   expect(githubPolicy.releasePublisher).toBe('lrozhkov');
+  expect(githubPolicy.security.privateVulnerabilityReporting).toBe(true);
   expect(
     githubPolicy.ruleset.rules.find(({ type }) => type === 'required_status_checks').parameters
       .required_status_checks

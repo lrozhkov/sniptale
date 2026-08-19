@@ -20,7 +20,8 @@
     "variables": [
       "SELECTEL_OS_AUTH_URL",
       "SELECTEL_OS_REGION_NAME",
-      "SELECTEL_QA_PROFILES"
+      "SELECTEL_QA_PROFILES",
+      "SELECTEL_RELEASE_PROFILES"
     ],
     "expectedProjectSha256": "1047ca5188dc076a7604ee16e568fdc75ae30f389199d1ba662407de70a187a0",
     "expectedRegion": "ru-3"

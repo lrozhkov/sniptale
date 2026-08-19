@@ -269,12 +269,14 @@
   ],
   "contributorFiles": [
     "README.md",
+    "SECURITY.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
     "docs/README.md"
   ],
   "releaseDocs": [
     "README.md",
+    "SECURITY.md",
     "CONTRIBUTING.md",
     "docs/README.md",
     "docs/oss/provenance.md",
@@ -326,7 +328,7 @@
     "packages/legacy-shared",
     "Status: blocked for public OSS release"
   ],
-  "securityReporting": "excluded",
+  "securityReporting": "github-private-vulnerability-reporting",
   "nativeCompanion": "separate-repository",
   "publication": "github-immutable-release"
 }

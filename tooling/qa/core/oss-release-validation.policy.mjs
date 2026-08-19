@@ -56,11 +56,11 @@ function validateCorePolicyShape(policy) {
     errors.push('OSS release dependency legal policy is incomplete');
   }
   if (
-    policy?.securityReporting !== 'excluded' ||
+    policy?.securityReporting !== 'github-private-vulnerability-reporting' ||
     policy?.publication !== 'github-immutable-release'
   ) {
     errors.push(
-      'OSS release policy must use immutable GitHub Releases without a security-reporting channel'
+      'OSS release policy must use immutable GitHub Releases and private vulnerability reporting'
     );
   }
   return errors;

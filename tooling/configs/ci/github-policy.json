@@ -25,6 +25,7 @@
   "security": {
     "vulnerabilityAlerts": true,
     "automatedSecurityFixes": true,
+    "privateVulnerabilityReporting": true,
     "immutableReleases": true
   },
   "ruleset": {

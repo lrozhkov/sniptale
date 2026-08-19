@@ -15,13 +15,11 @@ for (const name of readExpectedReleaseAssetDigests(assetRoot).keys()) {
   if (!stat.isFile() || stat.isSymbolicLink()) {
     throw new Error(`Release asset is not a regular owned file: ${name}`);
   }
-  const endpoint = `repos/${repository}/releases/${releaseId}/assets?name=${encodeURIComponent(name)}`;
+  const endpoint = `https://uploads.github.com/repos/${repository}/releases/${releaseId}/assets?name=${encodeURIComponent(name)}`;
   const result = spawnSync(
     'gh',
     [
       'api',
-      '--hostname',
-      'uploads.github.com',
       '--method',
       'POST',
       '-H',
