@@ -117,9 +117,9 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
     sources.map((source) => {
       const artifact = source.artifact!;
       return {
-        blob: artifact.file,
         filename: artifact.filename,
         id: source.recordingId,
+        preparedAsset: artifact.asset,
         storageClass,
       };
     }),

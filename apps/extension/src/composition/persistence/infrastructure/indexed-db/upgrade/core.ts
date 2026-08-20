@@ -17,15 +17,21 @@ import {
   VIDEO_PROJECTS_STORE,
   WEB_SNAPSHOTS_STORE,
 } from '../core.stores.ts';
+import { applyRecordingAssetsV26Upgrade } from './core.recording-assets.ts';
 import { applyStateManagerStoreUpgrade } from './core.state-manager.ts';
 import { applyEditorCustomShapesStoreUpgrade } from './core.editor-custom-shapes.ts';
 import { applyVideoEffectBundlesStoreUpgrade } from './core.video-effect-bundles.ts';
 import { applyNativeTransferStoresUpgrade } from './core.native-transfer.ts';
 import { applyProjectExportInputsStoreUpgrade } from './core.project-export-inputs.ts';
 import { applyFrameAnnotationRasterJobsStoreUpgrade } from './core.frame-annotation-raster-jobs.ts';
-import type { UpgradeDatabase } from './types';
+import type { UpgradeDatabase, UpgradeTransaction } from './types';
 
-export function handleDatabaseUpgrade(db: UpgradeDatabase, oldVersion: number) {
+export function handleDatabaseUpgrade(
+  db: UpgradeDatabase,
+  oldVersion: number,
+  _newVersion: number | null = null,
+  transaction?: UpgradeTransaction
+) {
   applyVersion1Changes(db, oldVersion);
   applyVersion4Changes(db, oldVersion);
   applyVersion5Changes(db, oldVersion);
@@ -44,6 +50,13 @@ export function handleDatabaseUpgrade(db: UpgradeDatabase, oldVersion: number) {
   applyFrameAnnotationRasterJobsStoreUpgrade(db, oldVersion);
   applyVersion24Changes(db, oldVersion);
   applyVersion25Changes(db, oldVersion);
+  if (oldVersion > 0 && oldVersion < 26 && !transaction) {
+    throw new Error('Recording asset upgrade transaction is unavailable.');
+  }
+  const recordingAssetUpgrade = applyRecordingAssetsV26Upgrade(db, oldVersion, transaction);
+  if (transaction) {
+    void recordingAssetUpgrade.catch(() => transaction.abort());
+  }
   removeLegacyAnnotationPacksStore(db, oldVersion);
   removeRetiredPageStyleAssetsStore(db, oldVersion);
 }

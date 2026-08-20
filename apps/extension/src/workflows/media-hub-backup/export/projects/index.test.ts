@@ -15,32 +15,35 @@ import {
 } from './oversized.test-support.ts';
 import { exportBackupArchive, readArchiveJson } from './archive.test-support.ts';
 import type { MediaHubBackupManifest, MediaHubBackupMetadata } from '../../contracts/types';
+import { createSizedBackupTestBlob } from '../blob/budget.test-support';
 
-const { FakeJSZip, generateAsyncMock, initDBMock, listMediaLibraryMock } = vi.hoisted(() => {
-  class FakeJSZip {
-    private files = new Map<string, Blob | string>();
+const { FakeJSZip, generateAsyncMock, initDBMock, listMediaLibraryMock, readAssetFileMock } =
+  vi.hoisted(() => {
+    class FakeJSZip {
+      private files = new Map<string, Blob | string>();
 
-    file(path: string, value?: Blob | string): FakeJSZip | null {
-      if (value === undefined) {
-        return this.files.has(path) ? this : null;
+      file(path: string, value?: Blob | string): FakeJSZip | null {
+        if (value === undefined) {
+          return this.files.has(path) ? this : null;
+        }
+        this.files.set(path, value);
+        return this;
       }
-      this.files.set(path, value);
-      return this;
+
+      async generateAsync() {
+        generateAsyncMock();
+        return { __fakeZipFiles: new Map(this.files) };
+      }
     }
 
-    async generateAsync() {
-      generateAsyncMock();
-      return { __fakeZipFiles: new Map(this.files) };
-    }
-  }
-
-  return {
-    FakeJSZip,
-    generateAsyncMock: vi.fn(),
-    initDBMock: vi.fn(),
-    listMediaLibraryMock: vi.fn(),
-  };
-});
+    return {
+      FakeJSZip,
+      generateAsyncMock: vi.fn(),
+      initDBMock: vi.fn(),
+      listMediaLibraryMock: vi.fn(),
+      readAssetFileMock: vi.fn(),
+    };
+  });
 
 vi.mock('jszip', () => ({ default: FakeJSZip }));
 
@@ -51,6 +54,7 @@ vi.mock(
       typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
     >()),
     PROJECT_ASSETS_STORE: 'project_assets',
+    ASSET_REFS_STORE: 'asset_refs',
     PROJECT_EXPORTS_STORE: 'project_exports',
     RECORDING_TELEMETRY_STORE: 'recording_telemetry',
     SCENARIO_ASSETS_STORE: 'scenario_assets',
@@ -63,6 +67,10 @@ vi.mock(
     initDB: initDBMock,
   })
 );
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  readAssetFile: readAssetFileMock,
+}));
 
 vi.mock('../../../../composition/persistence/media-library/index', async (importOriginal) => ({
   ...(await importOriginal<
@@ -81,6 +89,9 @@ beforeEach(() => {
   initDBMock.mockReset();
   listMediaLibraryMock.mockReset();
   listMediaLibraryMock.mockResolvedValue([]);
+  readAssetFileMock.mockImplementation(async (ref: { size: number }) =>
+    createSizedBackupTestBlob(ref.size)
+  );
 });
 
 it('exports video and scenario project bundles in v3 metadata', async () => {

@@ -30,6 +30,7 @@ import {
 import { assertSupportedScenarioBackupProjectEntry } from '../../metadata/scenario-project-version';
 import { prepareEffectBundles, type PreparedEffectBundle } from './prepare-effect-bundles';
 import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
+import type { PreparedRestoreRecordingAsset } from '../prepare';
 
 export interface PreparedVideoProject {
   descriptor: VideoBackupProjectDescriptor;
@@ -41,6 +42,8 @@ export interface PreparedVideoProject {
   restoredEffectSnapshots?: VideoProjectEffectSnapshot[];
   replace?: boolean;
   restoredPresentation?: AggregatePresentationEntry;
+  restoredRecordingAssets?: ReadonlyMap<string, PreparedRestoreRecordingAsset>;
+  obsoleteRecordingAssetIds?: string[];
 }
 
 export interface PreparedScenarioProject {

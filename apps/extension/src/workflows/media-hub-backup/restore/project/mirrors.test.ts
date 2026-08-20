@@ -1,7 +1,7 @@
 import type JSZip from 'jszip';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../../composition/persistence/media-library/contracts';
-import type { RecordingEntry } from '../../../../composition/persistence/recordings/contracts';
+import type { StoredRecordingEntry } from '../../../../composition/persistence/recordings/contracts';
 import {
   createProjectExportEntry,
   createVideoProjectEntry,
@@ -64,7 +64,7 @@ vi.mock('../projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../projects')>()),
   isEmptyProjectDomainPlan: (prepared: { scenarioProjects: unknown[]; videoProjects: unknown[] }) =>
     prepared.videoProjects.length === 0 && prepared.scenarioProjects.length === 0,
-  restorePreparedProjectDomainsInTransaction: restorePreparedProjectDomainsInTransactionMock,
+  commitPreparedProjectDomains: restorePreparedProjectDomainsInTransactionMock,
 }));
 
 vi.mock('../write', async (importOriginal) => ({
@@ -108,8 +108,9 @@ function createProjectMirrorBackupMetadata() {
     createdAt: 1,
     filename: 'recording.webm',
     id: 'recording-1',
+    mimeType: 'video/webm',
     size: 10,
-  } satisfies Omit<RecordingEntry, 'blob'>;
+  } satisfies Omit<StoredRecordingEntry, 'assetId'>;
 
   return {
     assets: [

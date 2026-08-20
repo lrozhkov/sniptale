@@ -64,6 +64,9 @@ function createWriteHarness(): {
   const stores = new Map(
     [
       'media_library',
+      'asset_refs',
+      'asset_owners',
+      'asset_operations',
       'recordings',
       'recording_telemetry',
       'project_assets',
@@ -129,6 +132,9 @@ it('returns the complete store list needed for import transactions', async () =>
 
   expect(getImportTransactionStoreNames()).toEqual([
     'recordings',
+    'asset_refs',
+    'asset_owners',
+    'asset_operations',
     'recording_telemetry',
     'project_assets',
     'project_exports',
@@ -237,7 +243,7 @@ it('restores recording records through the recordings store and media library', 
 
   createRecordingStoreEntryMock.mockReturnValue({ id: 'recording-record' });
 
-  await writeMainAssetRecord(tx, entry, blob, telemetry);
+  await writeMainAssetRecord(tx, entry, blob, telemetry, null, createPreparedRecordingAsset());
 
   expect(stores.get('recordings')?.put).toHaveBeenCalledWith({ id: 'recording-record' });
   expect(stores.get('recording_telemetry')?.put).toHaveBeenCalledWith(telemetry);
@@ -261,12 +267,28 @@ it('restores project-export records through recording and export builders', asyn
   createRecordingStoreEntryMock.mockReturnValue({ id: 'recording-record' });
   createProjectExportStoreEntryMock.mockReturnValue({ id: 'export-record' });
 
-  await writeMainAssetRecord(tx, entry, blob, null);
+  await writeMainAssetRecord(tx, entry, blob, null, null, createPreparedRecordingAsset());
 
   expect(stores.get('recordings')?.put).toHaveBeenCalledWith({ id: 'recording-record' });
   expect(stores.get('project_exports')?.put).toHaveBeenCalledWith({ id: 'export-record' });
   expect(stores.get('media_library')?.put).toHaveBeenCalledWith(entry);
 });
+
+function createPreparedRecordingAsset() {
+  return {
+    asset: {
+      ref: {
+        assetId: 'asset-recording',
+        createdAt: 1,
+        location: { kind: 'opfs' as const, objectKey: 'objects/asset-recording' },
+        mimeType: 'video/webm',
+        sha256: null,
+        size: 5,
+      },
+    },
+    journalId: 'journal-recording',
+  };
+}
 
 it('restores project-asset records through the project assets store', async () => {
   const { writeMainAssetRecord } = await import('.');

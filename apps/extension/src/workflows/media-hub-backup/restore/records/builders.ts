@@ -6,20 +6,23 @@ import type {
   ProjectAssetEntry,
   ProjectExportEntry,
 } from '../../../../composition/persistence/projects/contracts';
-import type { RecordingEntry } from '../../../../composition/persistence/recordings/contracts';
+import type { StoredRecordingEntry } from '../../../../composition/persistence/recordings/contracts';
+import type { PreparedAssetObject } from '../../../../composition/persistence/assets';
 import { VideoExportFormat } from '../../../../features/video/project/types';
 
 export function createRecordingStoreEntry(
   recordingId: string,
   entry: Omit<MediaLibraryEntry, 'blob'>,
-  blob: Blob
-): RecordingEntry {
+  prepared: PreparedAssetObject
+): StoredRecordingEntry {
   return {
-    blob,
+    assetId: prepared.ref.assetId,
     createdAt: entry.createdAt,
     filename: entry.filename,
     id: recordingId,
-    size: blob.size,
+    mimeType: entry.mimeType,
+    size: prepared.ref.size,
+    ...(entry.lifecycle ? { lifecycle: entry.lifecycle } : {}),
   };
 }
 

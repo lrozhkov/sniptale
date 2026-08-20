@@ -3,6 +3,7 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 import type { RecordingArtifactSession } from '../encoding/artifact-session';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 const {
   buildVideoMediaRecorderOptionsMock,
@@ -108,7 +109,7 @@ function createControllableArtifactSession(options: { abortError?: Error } = {})
   const file = new File(['terminal'], 'recording.webm', { type: 'video/webm' });
   const artifact = {
     artifactId: 'recording-lifecycle',
-    file,
+    asset: createPreparedRecordingAssetForTest(file, 'recording-lifecycle'),
     filename: file.name,
     mimeType: file.type,
     size: file.size,

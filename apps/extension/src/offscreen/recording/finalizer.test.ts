@@ -3,6 +3,7 @@ import type {
   FinalizedRecordingStagingArtifact,
   RecordingStagingCoordinator,
 } from '../../composition/persistence/recordings/staging';
+import { createPreparedRecordingAssetForTest } from '../../composition/persistence/recordings/staging/test-support';
 
 const { loadSettingsMock, persistStaticFrameSignalsMock, saveBatchMock, sendRuntimeMessageMock } =
   vi.hoisted(() => ({
@@ -45,7 +46,7 @@ function createArtifact(id: string, contents = id): FinalizedRecordingStagingArt
   const file = new File([contents], `${id}.webm`, { type: 'video/webm' });
   return {
     artifactId: id,
-    file,
+    asset: createPreparedRecordingAssetForTest(file, id),
     filename: file.name,
     mimeType: file.type,
     size: file.size,
@@ -89,13 +90,13 @@ describe('recording finalizer', () => {
     expect(saveBatchMock).toHaveBeenCalledWith(
       [
         {
-          blob: primary.file,
+          preparedAsset: primary.asset,
           filename: primary.filename,
           id: primary.artifactId,
           storageClass: 'temporary',
         },
         {
-          blob: webcam.file,
+          preparedAsset: webcam.asset,
           filename: webcam.filename,
           id: webcam.artifactId,
           storageClass: 'temporary',

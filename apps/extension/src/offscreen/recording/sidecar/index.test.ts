@@ -5,6 +5,7 @@ import type { RecordingSidecarRecorder } from './types';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 import { createTrackedStream } from '../multi-source/media-stream.test-support';
 import { TestMediaRecorder } from '../multi-source/media-recorder.test-support';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 const { createWebcamSidecarRecorderMock, loggerDebugMock } = vi.hoisted(() => ({
   createWebcamSidecarRecorderMock: vi.fn(),
@@ -45,7 +46,7 @@ function createSidecar(): RecordingSidecarRecorder {
       start: vi.fn(),
       stop: vi.fn().mockResolvedValue({
         artifactId: 'rec-webcam',
-        file,
+        asset: createPreparedRecordingAssetForTest(file, 'rec-webcam'),
         filename: file.name,
         mimeType: file.type,
         size: file.size,

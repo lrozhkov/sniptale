@@ -99,7 +99,7 @@ function useRecordingPreview(recordingId: string | null): RecordingPreviewState 
           setState({ status: 'unavailable', url: null });
           return;
         }
-        objectUrl = URL.createObjectURL(recording.blob);
+        objectUrl = URL.createObjectURL(recording.file);
         setState({ status: 'ready', url: objectUrl });
       })
       .catch(() => {

@@ -157,7 +157,7 @@ function createStaticFrameEnvironment(duration = 2): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getRecordingMock.mockResolvedValue({ blob: new Blob(['video'], { type: 'video/webm' }) });
+  getRecordingMock.mockResolvedValue({ file: new Blob(['video'], { type: 'video/webm' }) });
 });
 
 afterEach(() => {

@@ -14,11 +14,16 @@ const {
   prepareBackupImportAssetMock,
   publishMediaHubLibraryChangedMock,
   assertPreparedProjectBlobsAvailableMock,
+  stagePreparedProjectRecordingAssetsMock,
   restorePreparedProjectDomainsInTransactionMock,
   restoreAssetRecordMock,
   restoreAssetRecordSnapshotMock,
   snapshotExistingAssetRecordMock,
   withMediaHubWriteGuardMock,
+  runWithPersistenceMutationTransitionMock,
+  createBackupRestoreOperationMock,
+  transitionAssetOperationMock,
+  recoverAssetPublicationsMock,
 } = vi.hoisted(() => ({
   assertBackupImportAssetEntriesAvailableMock: vi.fn(),
   deleteExistingAssetRecordMock: vi.fn(),
@@ -30,12 +35,40 @@ const {
   prepareBackupImportAssetMock: vi.fn(),
   publishMediaHubLibraryChangedMock: vi.fn(),
   assertPreparedProjectBlobsAvailableMock: vi.fn(),
+  stagePreparedProjectRecordingAssetsMock: vi.fn(),
   restorePreparedProjectDomainsInTransactionMock: vi.fn(),
   restoreAssetRecordMock: vi.fn(),
   restoreAssetRecordSnapshotMock: vi.fn(),
   snapshotExistingAssetRecordMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
+  runWithPersistenceMutationTransitionMock: vi.fn(),
+  createBackupRestoreOperationMock: vi.fn(),
+  transitionAssetOperationMock: vi.fn(),
+  recoverAssetPublicationsMock: vi.fn(),
 }));
+
+vi.mock('../../../composition/persistence/assets/operations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/assets/operations')>()),
+  createBackupRestoreOperation: createBackupRestoreOperationMock,
+  transitionAssetOperation: transitionAssetOperationMock,
+}));
+
+vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/asset-publication-recovery')
+  >()),
+  recoverAssetPublications: recoverAssetPublicationsMock,
+}));
+
+vi.mock(
+  '../../../composition/persistence/infrastructure/mutation-barrier',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/infrastructure/mutation-barrier')
+    >()),
+    runWithPersistenceMutationTransition: runWithPersistenceMutationTransitionMock,
+  })
+);
 
 vi.mock(
   '../../../composition/persistence/infrastructure/indexed-db/core',
@@ -76,13 +109,14 @@ vi.mock('./project/prepare', async (importOriginal) => ({
 
 vi.mock('./project/preflight', () => ({
   assertPreparedProjectBlobsAvailable: assertPreparedProjectBlobsAvailableMock,
+  stagePreparedProjectRecordingAssets: stagePreparedProjectRecordingAssetsMock,
 }));
 
 vi.mock('./projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./projects')>()),
   isEmptyProjectDomainPlan: (prepared: { scenarioProjects: unknown[]; videoProjects: unknown[] }) =>
     prepared.videoProjects.length === 0 && prepared.scenarioProjects.length === 0,
-  restorePreparedProjectDomainsInTransaction: restorePreparedProjectDomainsInTransactionMock,
+  commitPreparedProjectDomains: restorePreparedProjectDomainsInTransactionMock,
 }));
 
 vi.mock('./write', async (importOriginal) => ({
@@ -142,6 +176,20 @@ beforeEach(() => {
   withMediaHubWriteGuardMock.mockImplementation(async (_label, callback: () => Promise<void>) =>
     callback()
   );
+  runWithPersistenceMutationTransitionMock.mockImplementation(
+    async (callback: () => Promise<void>) => callback()
+  );
+  createBackupRestoreOperationMock.mockResolvedValue({
+    compensations: [],
+    createdAt: 1,
+    kind: 'backup-restore',
+    obsoleteAssetIds: [],
+    operationId: 'restore-1',
+    status: 'pending',
+    updatedAt: 1,
+  });
+  transitionAssetOperationMock.mockResolvedValue(undefined);
+  recoverAssetPublicationsMock.mockResolvedValue(0);
   prepareProjectDomainsMock.mockResolvedValue({
     changedIds: [],
     conflictsResolved: 0,
@@ -193,8 +241,19 @@ describe('media hub backup restore skip orchestration', () => {
 
 describe('media hub backup restore project-domain orchestration', () => {
   it('adds prepared v2 project bundle counters to the import result and change event', async () => {
+    let transitionActive = false;
+    runWithPersistenceMutationTransitionMock.mockImplementation(
+      async (callback: () => Promise<void>) => {
+        transitionActive = true;
+        try {
+          return await callback();
+        } finally {
+          transitionActive = false;
+        }
+      }
+    );
     const { importMediaHubBackupAssets } = await import('.');
-    const { tx } = createTransactionHarness();
+    createTransactionHarness();
     const preparedProjectDomains = {
       changedIds: ['video-project:project-copy'],
       conflictsResolved: 1,
@@ -213,7 +272,10 @@ describe('media hub backup restore project-domain orchestration', () => {
     };
     prepareBackupImportAssetMock.mockResolvedValue({ prepared: null, resolvedConflict: false });
     prepareProjectDomainsMock.mockResolvedValue(preparedProjectDomains);
-    restorePreparedProjectDomainsInTransactionMock.mockResolvedValue(1);
+    restorePreparedProjectDomainsInTransactionMock.mockImplementation(async () => {
+      expect(transitionActive).toBe(true);
+      return 1;
+    });
 
     await expect(
       importMediaHubBackupAssets({
@@ -228,13 +290,61 @@ describe('media hub backup restore project-domain orchestration', () => {
       skipped: 1,
     });
 
-    expect(restorePreparedProjectDomainsInTransactionMock).toHaveBeenCalledWith(
-      preparedProjectDomains,
-      tx
-    );
+    expect(restorePreparedProjectDomainsInTransactionMock).toHaveBeenCalledWith({
+      prepared: preparedProjectDomains,
+    });
+    expect(runWithPersistenceMutationTransitionMock).toHaveBeenCalledOnce();
     expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('import', [
       'video-project:project-copy',
     ]);
+  });
+
+  it('aborts before recovery when project-export staging fails', async () => {
+    prepareProjectDomainsMock.mockResolvedValue({
+      changedIds: [],
+      conflictsResolved: 0,
+      effectBundles: [],
+      scenarioProjects: [],
+      skipped: 0,
+      videoProjects: [
+        {
+          descriptor: { projectAssets: [], projectExports: [{}] },
+          idChanged: false,
+          projectAssetIdMap: new Map<string, string>(),
+          projectExportIdMap: new Map<string, string>(),
+          projectId: 'project-1',
+          recordingIdMap: new Map<string, string>(),
+        },
+      ],
+    });
+    stagePreparedProjectRecordingAssetsMock.mockRejectedValueOnce(
+      new Error('second project export staging failed')
+    );
+    recoverAssetPublicationsMock
+      .mockResolvedValueOnce(0)
+      .mockRejectedValueOnce(new Error('operation recovery failed'));
+
+    const { importMediaHubBackupAssets } = await import('.');
+    await expect(
+      importMediaHubBackupAssets({
+        metadata: { assets: [], effectBundles: [] },
+        remapEntryForDuplicate: vi.fn(),
+        strategy: 'replace',
+        zip: {} as JSZip,
+      })
+    ).rejects.toMatchObject({
+      errors: [
+        expect.objectContaining({ message: 'second project export staging failed' }),
+        expect.objectContaining({ message: 'operation recovery failed' }),
+      ],
+    });
+
+    expect(transitionAssetOperationMock).toHaveBeenCalledWith('restore-1', 'pending', 'aborted');
+    expect(recoverAssetPublicationsMock).toHaveBeenCalledTimes(2);
+    expect(transitionAssetOperationMock.mock.invocationCallOrder[0]).toBeLessThan(
+      recoverAssetPublicationsMock.mock.invocationCallOrder[1] ?? 0
+    );
+    expect(restorePreparedProjectDomainsInTransactionMock).not.toHaveBeenCalled();
   });
 });
 
@@ -279,7 +389,8 @@ describe('media hub backup restore replace orchestration', () => {
       null,
       null,
       null,
-      null
+      null,
+      undefined
     );
     expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('import', [entry.id]);
   });

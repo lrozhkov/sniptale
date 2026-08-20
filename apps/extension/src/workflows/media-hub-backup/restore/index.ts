@@ -11,6 +11,7 @@ import { withMediaHubWriteGuard } from '../../../features/media-hub/storage-erro
 import { type BackupImportAssetPlan, prepareBackupImportAsset } from './prepare';
 import { prepareProjectDomains } from './project/prepare';
 import { restorePreparedImportPlan } from './batches';
+import { runWithPersistenceMutationTransition } from '../../../composition/persistence/infrastructure/mutation-barrier';
 
 type RestoreCounters = {
   changedIds: string[];
@@ -115,23 +116,25 @@ export async function importMediaHubBackupAssets(args: {
   };
   let imported = 0;
 
-  await withMediaHubWriteGuard(translate('shared.mediaHub.importBackupAction'), async () => {
-    const prepared = await prepareImportAssets(args);
-    counters.changedIds = prepared.changedIds;
-    counters.conflictsResolved = prepared.conflictsResolved;
-    counters.assetPlans = prepared.assetPlans;
-    counters.skipped = prepared.skipped;
-    const preparedProjectDomains = await prepareProjectDomains(args);
-    counters.changedIds.push(...preparedProjectDomains.changedIds);
-    counters.conflictsResolved += preparedProjectDomains.conflictsResolved;
-    counters.skipped += preparedProjectDomains.skipped;
-    imported = await restorePreparedImportPlan({
-      assetPlans: prepared.assetPlans,
-      preparedProjectDomains,
-      strategy: args.strategy,
-      zip: args.zip,
-    });
-  });
+  await withMediaHubWriteGuard(translate('shared.mediaHub.importBackupAction'), () =>
+    runWithPersistenceMutationTransition(async () => {
+      const prepared = await prepareImportAssets(args);
+      counters.changedIds = prepared.changedIds;
+      counters.conflictsResolved = prepared.conflictsResolved;
+      counters.assetPlans = prepared.assetPlans;
+      counters.skipped = prepared.skipped;
+      const preparedProjectDomains = await prepareProjectDomains(args);
+      counters.changedIds.push(...preparedProjectDomains.changedIds);
+      counters.conflictsResolved += preparedProjectDomains.conflictsResolved;
+      counters.skipped += preparedProjectDomains.skipped;
+      imported = await restorePreparedImportPlan({
+        assetPlans: prepared.assetPlans,
+        preparedProjectDomains,
+        strategy: args.strategy,
+        zip: args.zip,
+      });
+    })
+  );
 
   if (counters.changedIds.length > 0) {
     publishMediaHubLibraryChanged('import', counters.changedIds);

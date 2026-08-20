@@ -15,6 +15,14 @@ import type { PreparedProjectDomains } from './prepare';
 import { loadRequiredArchiveBlob } from '../prepare';
 import { readRestoredBlob } from './helpers';
 import { materializeAggregatePresentation } from '../presentation';
+import {
+  assertAssetWriteAdmission,
+  createAssetPublicationJournal,
+  discardPreparedAsset,
+  writeBlobToAsset,
+} from '../../../../composition/persistence/assets';
+import { RECORDING_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/recordings/asset-publication';
+import type { PreparedRestoreRecordingAsset } from '../prepare';
 
 function collectProjectBlobDescriptors(
   prepared: PreparedProjectDomains
@@ -57,6 +65,46 @@ export async function assertPreparedProjectBlobsAvailable(
   await prepareEffectBundles(prepared, restoredBlobs);
   await prepareAggregatePresentations(prepared, zip);
   prepared.restoredBlobs = restoredBlobs;
+}
+
+export async function stagePreparedProjectRecordingAssets(
+  prepared: PreparedProjectDomains,
+  operationId?: string
+): Promise<void> {
+  if (!prepared.restoredBlobs) throw new Error('Backup project blob preflight is incomplete.');
+  for (const project of prepared.videoProjects) {
+    const projectAssets = new Map<string, PreparedRestoreRecordingAsset>();
+    for (const descriptor of project.descriptor.projectExports) {
+      if (!operationId) throw new Error('Restore operation ID is missing for project exports.');
+      const blob = readRestoredBlob(prepared.restoredBlobs, descriptor.recording.blobPath);
+      const entry = descriptor.recording.entry as Record<string, unknown>;
+      const mimeType = typeof entry['mimeType'] === 'string' ? entry['mimeType'] : blob.type;
+      await assertAssetWriteAdmission(blob.size);
+      const asset = await writeBlobToAsset(blob, { mimeType: mimeType || 'video/webm' });
+      const journal = await createAssetPublicationJournal({
+        assetRefs: [asset.ref],
+        domain: RECORDING_ASSET_PUBLICATION_DOMAIN,
+        operationId,
+        payload: { recordingId: descriptor.entry.recordingId, restore: true },
+      }).catch(async (error: unknown) => {
+        try {
+          await discardPreparedAsset(asset.ref.assetId);
+        } catch (cleanupError) {
+          throw new AggregateError(
+            [error, cleanupError],
+            'Project export staging failed before its ready journal became durable.',
+            { cause: error }
+          );
+        }
+        throw error;
+      });
+      projectAssets.set(descriptor.recording.blobPath, {
+        asset,
+        journalId: journal.journalId,
+      });
+    }
+    project.restoredRecordingAssets = projectAssets;
+  }
 }
 
 async function prepareAggregatePresentations(

@@ -130,7 +130,7 @@ beforeEach(() => {
   browserDownloadsDownloadMock.mockResolvedValue(17);
   executeDownloadBlobMock.mockResolvedValue(17);
   ensureOffscreenDocumentMock.mockResolvedValue(false);
-  getRecordingMock.mockResolvedValue({ blob: new Blob(['recording']) });
+  getRecordingMock.mockResolvedValue({ file: new Blob(['recording']) });
   loadSettingsMock.mockResolvedValue({ defaultVideoPresetId: 'preset-1' });
   loadProjectExportInputMock.mockResolvedValue(createProject());
   sendRuntimeMessageMock.mockResolvedValue({ result: 'accepted', success: true });

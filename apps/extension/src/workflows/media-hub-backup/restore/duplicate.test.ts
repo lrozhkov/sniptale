@@ -76,13 +76,14 @@ vi.mock('./project/prepare', async (importOriginal) => ({
 
 vi.mock('./project/preflight', () => ({
   assertPreparedProjectBlobsAvailable: assertPreparedProjectBlobsAvailableMock,
+  stagePreparedProjectRecordingAssets: vi.fn(),
 }));
 
 vi.mock('./projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./projects')>()),
   isEmptyProjectDomainPlan: (prepared: { scenarioProjects: unknown[]; videoProjects: unknown[] }) =>
     prepared.videoProjects.length === 0 && prepared.scenarioProjects.length === 0,
-  restorePreparedProjectDomainsInTransaction: restorePreparedProjectDomainsInTransactionMock,
+  commitPreparedProjectDomains: restorePreparedProjectDomainsInTransactionMock,
 }));
 
 vi.mock('./write', async (importOriginal) => ({
@@ -220,7 +221,8 @@ it('duplicates conflicting assets without deleting the existing record', async (
     null,
     null,
     null,
-    null
+    null,
+    undefined
   );
   expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('import', [nextEntry.id]);
 });

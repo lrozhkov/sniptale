@@ -9,7 +9,7 @@ import type {
   ScenarioBackupProjectDescriptor,
 } from '../../contracts/types';
 
-const { FakeJSZip, initDBMock, listMediaLibraryMock } = vi.hoisted(() => {
+const { FakeJSZip, initDBMock, listMediaLibraryMock, readAssetFileMock } = vi.hoisted(() => {
   class FakeJSZip {
     private files = new Map<string, Blob | string>();
 
@@ -30,6 +30,7 @@ const { FakeJSZip, initDBMock, listMediaLibraryMock } = vi.hoisted(() => {
     FakeJSZip,
     initDBMock: vi.fn(),
     listMediaLibraryMock: vi.fn(),
+    readAssetFileMock: vi.fn(),
   };
 });
 
@@ -60,6 +61,11 @@ vi.mock('../../../../composition/persistence/media-library/index', async (import
   listMediaLibrary: listMediaLibraryMock,
 }));
 
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  readAssetFile: readAssetFileMock,
+}));
+
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -69,6 +75,8 @@ beforeEach(() => {
   initDBMock.mockReset();
   listMediaLibraryMock.mockReset();
   listMediaLibraryMock.mockResolvedValue([]);
+  readAssetFileMock.mockReset();
+  readAssetFileMock.mockResolvedValue(new Blob(['recording']));
 });
 
 function expectScenarioSourceMetadataRemoved(args: {

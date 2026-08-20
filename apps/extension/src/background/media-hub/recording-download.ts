@@ -33,7 +33,7 @@ export async function downloadStoredRecording(
   }
 
   const downloadId = await executeDownloadBlob(
-    recordingEntry.blob,
+    recordingEntry.file,
     filename,
     await resolveDefaultVideoPresetId()
   );

@@ -1,16 +1,13 @@
 import type { MediaAssetKind, MediaLibraryEntry } from './contracts';
 import type { ProjectAssetEntry, ProjectExportEntry } from '../projects/contracts';
-import type { RecordingEntry } from '../recordings/contracts';
+import type { StoredRecordingEntry } from '../recordings/contracts';
 import {
   createProjectAssetMediaId,
   createRecordingMediaId,
 } from '../../../features/media-hub/media-id';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
-type RecordingMediaEntryInput = Omit<RecordingEntry, 'blob'> & {
-  blob?: Blob;
-  mimeType?: string;
-};
+type RecordingMediaEntryInput = StoredRecordingEntry;
 
 function createProjectExportMediaId(exportId: string): string {
   return `export:${exportId}`;
@@ -59,7 +56,7 @@ export function mergeMediaEntry(
 }
 
 export function buildRecordingMediaEntry(entry: RecordingMediaEntryInput): MediaLibraryEntry {
-  const mimeType = entry.blob?.type || entry.mimeType || 'video/webm';
+  const mimeType = entry.mimeType;
   return {
     id: createRecordingMediaId(entry.id),
     kind: resolveRecordingAssetKind(mimeType),

@@ -7,42 +7,47 @@ interface FakeZipArchive {
   __fakeZipFiles: Map<string, Blob | string>;
 }
 
-const { FakeJSZip, initDBMock, listMediaLibraryMock, syncLegacyMediaLibraryMock } = vi.hoisted(
-  () => {
-    class FakeZipFile {
-      constructor(private readonly value: Blob | string) {}
+const {
+  FakeJSZip,
+  initDBMock,
+  listMediaLibraryMock,
+  readAssetFileMock,
+  syncLegacyMediaLibraryMock,
+} = vi.hoisted(() => {
+  class FakeZipFile {
+    constructor(private readonly value: Blob | string) {}
 
-      async async(): Promise<Blob | string> {
-        return this.value;
-      }
+    async async(): Promise<Blob | string> {
+      return this.value;
     }
-
-    class FakeJSZip {
-      private files = new Map<string, Blob | string>();
-
-      file(path: string, value?: Blob | string): FakeZipFile | FakeJSZip | null {
-        if (value === undefined) {
-          const existing = this.files.get(path);
-          return existing === undefined ? null : new FakeZipFile(existing);
-        }
-
-        this.files.set(path, value);
-        return this;
-      }
-
-      async generateAsync(): Promise<FakeZipArchive> {
-        return { __fakeZipFiles: new Map(this.files) };
-      }
-    }
-
-    return {
-      FakeJSZip,
-      initDBMock: vi.fn(),
-      listMediaLibraryMock: vi.fn(),
-      syncLegacyMediaLibraryMock: vi.fn(),
-    };
   }
-);
+
+  class FakeJSZip {
+    private files = new Map<string, Blob | string>();
+
+    file(path: string, value?: Blob | string): FakeZipFile | FakeJSZip | null {
+      if (value === undefined) {
+        const existing = this.files.get(path);
+        return existing === undefined ? null : new FakeZipFile(existing);
+      }
+
+      this.files.set(path, value);
+      return this;
+    }
+
+    async generateAsync(): Promise<FakeZipArchive> {
+      return { __fakeZipFiles: new Map(this.files) };
+    }
+  }
+
+  return {
+    FakeJSZip,
+    initDBMock: vi.fn(),
+    listMediaLibraryMock: vi.fn(),
+    readAssetFileMock: vi.fn(),
+    syncLegacyMediaLibraryMock: vi.fn(),
+  };
+});
 
 vi.mock('jszip', () => ({ default: FakeJSZip }));
 vi.mock(
@@ -50,6 +55,7 @@ vi.mock(
   async (importOriginal) => ({
     ...(await importOriginal<typeof import('jszip')>()),
     PROJECT_ASSETS_STORE: 'project_assets',
+    ASSET_REFS_STORE: 'asset_refs',
     PROJECT_EXPORTS_STORE: 'project_exports',
     RECORDING_TELEMETRY_STORE: 'recording_telemetry',
     SCENARIO_ASSETS_STORE: 'scenario_assets',
@@ -62,6 +68,10 @@ vi.mock(
     initDB: initDBMock,
   })
 );
+vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/assets')>()),
+  readAssetFile: readAssetFileMock,
+}));
 
 vi.mock('../../../composition/persistence/media-library/index', async (importOriginal) => ({
   ...(await importOriginal<
@@ -120,7 +130,31 @@ beforeEach(() => {
   listMediaLibraryMock.mockReset();
   syncLegacyMediaLibraryMock.mockReset();
   syncLegacyMediaLibraryMock.mockResolvedValue(undefined);
+  readAssetFileMock.mockReset();
+  readAssetFileMock.mockResolvedValue(new Blob(['recording']));
 });
+
+function createStoredRecording() {
+  return {
+    assetId: 'asset-recording-1',
+    createdAt: 1,
+    filename: 'capture.webm',
+    id: 'recording-1',
+    mimeType: 'video/webm',
+    size: 9,
+  };
+}
+
+function createAssetRef() {
+  return {
+    assetId: 'asset-recording-1',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/asset-recording-1' },
+    mimeType: 'video/webm',
+    sha256: null,
+    size: 9,
+  };
+}
 
 it('exports recording telemetry sidecars with recording assets', async () => {
   const recordingEntry = createRecordingEntry();
@@ -132,7 +166,10 @@ it('exports recording telemetry sidecars with recording assets', async () => {
       }
 
       if (storeName === 'recordings' && key === 'recording-1') {
-        return { blob: new Blob(['recording']) };
+        return createStoredRecording();
+      }
+      if (storeName === 'asset_refs' && key === 'asset-recording-1') {
+        return createAssetRef();
       }
 
       if (storeName === 'recording_telemetry' && key === 'recording-1') {
@@ -173,7 +210,10 @@ it('omits recording telemetry sidecars when telemetry export is disabled', async
       }
 
       if (storeName === 'recordings' && key === 'recording-1') {
-        return { blob: new Blob(['recording']) };
+        return createStoredRecording();
+      }
+      if (storeName === 'asset_refs' && key === 'asset-recording-1') {
+        return createAssetRef();
       }
 
       if (storeName === 'recording_telemetry' && key === 'recording-1') {

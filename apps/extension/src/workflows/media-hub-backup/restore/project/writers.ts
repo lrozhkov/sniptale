@@ -1,5 +1,7 @@
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
@@ -17,6 +19,10 @@ import {
   deleteExistingVideoProjectBundle,
 } from './replace';
 import { getStore } from '../../storage';
+import {
+  RECORDING_ASSET_OWNER_KIND,
+  RECORDING_ASSET_ROLE,
+} from '../../../../composition/persistence/recordings/asset-publication';
 
 export { restorePreparedScenarioProjectsInTransaction } from './scenario-writer';
 
@@ -44,7 +50,10 @@ async function restorePreparedVideoProject(
 ) {
   if (prepared.replace) {
     assertBackupProjectReplacePreflightComplete(prepared.projectId);
-    await deleteExistingVideoProjectBundle(tx, prepared.projectId);
+    prepared.obsoleteRecordingAssetIds = await deleteExistingVideoProjectBundle(
+      tx,
+      prepared.projectId
+    );
   }
 
   await getStore(tx, VIDEO_PROJECTS_STORE).put(remapVideoProjectEntry(prepared));
@@ -80,12 +89,22 @@ async function restoreVideoProjectExports(
   for (const descriptor of prepared.descriptor.projectExports) {
     const exportId = remapId(prepared.projectExportIdMap, descriptor.entry.id);
     const recordingId = remapId(prepared.recordingIdMap, descriptor.entry.recordingId);
-    await restoreBlobDescriptor({
-      blob: readRestoredBlob(restoredBlobs, descriptor.recording.blobPath),
-      descriptor: descriptor.recording,
-      entryPatch: { id: recordingId },
-      storeName: STORE_NAME,
-      tx,
+    const restored = prepared.restoredRecordingAssets?.get(descriptor.recording.blobPath);
+    if (!restored) throw new Error('Prepared project export recording asset is missing.');
+    const rawEntry = descriptor.recording.entry as Record<string, unknown>;
+    await getStore(tx, STORE_NAME).put({
+      ...rawEntry,
+      assetId: restored.asset.ref.assetId,
+      id: recordingId,
+      mimeType: restored.asset.ref.mimeType,
+      size: restored.asset.ref.size,
+    });
+    await getStore(tx, ASSET_REFS_STORE).put(restored.asset.ref);
+    await getStore(tx, ASSET_OWNERS_STORE).put({
+      assetId: restored.asset.ref.assetId,
+      ownerId: recordingId,
+      ownerKind: RECORDING_ASSET_OWNER_KIND,
+      role: RECORDING_ASSET_ROLE,
     });
     await getStore(tx, PROJECT_EXPORTS_STORE).put({
       ...descriptor.entry,

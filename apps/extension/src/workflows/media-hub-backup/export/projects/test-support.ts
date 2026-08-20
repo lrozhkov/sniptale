@@ -129,10 +129,21 @@ export async function readProjectBundleRecord(storeName: string, key: string) {
   }
   if (storeName === 'recordings' && key === 'recording-1') {
     return {
+      assetId: 'asset-recording-1',
       id: 'recording-1',
-      blob: new Blob(['recording']),
+      mimeType: 'video/webm',
       filename: 'export.webm',
       createdAt: 2,
+      size: 9,
+    };
+  }
+  if (storeName === 'asset_refs' && key === 'asset-recording-1') {
+    return {
+      assetId: 'asset-recording-1',
+      createdAt: 2,
+      location: { kind: 'opfs', objectKey: 'objects/asset-recording-1' },
+      mimeType: 'video/webm',
+      sha256: null,
       size: 9,
     };
   }

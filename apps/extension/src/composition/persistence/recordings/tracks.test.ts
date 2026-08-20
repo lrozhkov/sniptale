@@ -38,7 +38,7 @@ beforeEach(() => {
   ]);
   getRecordingMock.mockImplementation((id: string) =>
     Promise.resolve({
-      blob: new Blob([id], { type: 'video/webm' }),
+      file: new File([id], `${id}.mp4`, { type: 'video/webm' }),
       createdAt: 1,
       filename: `${id}.mp4`,
       id,
@@ -54,10 +54,46 @@ it('loads saved recording track blobs in base-track order', async () => {
   ]);
 });
 
+it('orders sibling tracks and falls back to catalog filenames', async () => {
+  listRecordingsMock.mockResolvedValue([
+    createRecording('rec-1-b'),
+    createRecording('rec-1'),
+    createRecording('rec-1-a'),
+  ]);
+  getRecordingMock.mockImplementation((id: string) =>
+    Promise.resolve({
+      file: new File([id], `${id}.webm`, { type: 'video/webm' }),
+      filename: id === 'rec-1-a' ? '' : `${id}.mp4`,
+      id,
+    })
+  );
+
+  const tracks = await loadSavedRecordingTrackBlobs('rec-1');
+
+  expect(tracks.map((track) => track.id)).toEqual(['rec-1', 'rec-1-a', 'rec-1-b']);
+  expect(tracks[1]?.filename).toBe('rec-1-a.webm');
+});
+
 it('deletes only tracks that belong to the completed recording id', async () => {
   await deleteSavedRecordingTracks('rec-1');
 
   expect(deleteRecordingMock).toHaveBeenCalledWith('rec-1');
   expect(deleteRecordingMock).toHaveBeenCalledWith('rec-1-webcam');
   expect(deleteRecordingMock).not.toHaveBeenCalledWith('other');
+});
+
+it('omits a track whose durable recording cannot be hydrated', async () => {
+  getRecordingMock.mockResolvedValue(undefined);
+
+  await expect(loadSavedRecordingTrackBlobs('rec-1')).rejects.toThrow(
+    'Recording rec-1 is not available'
+  );
+});
+
+it('handles a recording with no related saved tracks', async () => {
+  await expect(loadSavedRecordingTrackBlobs('missing')).resolves.toEqual([]);
+  await deleteSavedRecordingTracks('missing');
+
+  expect(getRecordingMock).not.toHaveBeenCalled();
+  expect(deleteRecordingMock).not.toHaveBeenCalled();
 });

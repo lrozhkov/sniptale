@@ -3,9 +3,12 @@
 import {
   RECORDING_STAGING_PENDING_BYTES_LIMIT,
   type RecordingStagingCoordinator,
-  type RecordingStagingStorageAdapter,
 } from './contracts';
-import { createOpfsRecordingStagingStorage } from './opfs-adapter';
+import {
+  assertAssetWriteAdmission,
+  createAssetObjectWriter,
+  type AssetObjectWriter,
+} from '../../assets';
 import {
   createRecordingStagingArtifactOwner,
   type RecordingStagingArtifactOwner,
@@ -14,8 +17,9 @@ import {
 type CoordinatorPhase = 'active' | 'aborting' | 'aborted' | 'deleting' | 'deleted';
 
 export interface CreateRecordingStagingCoordinatorOptions {
+  admitBytes?: (size: number) => Promise<void>;
+  createWriter?: (input: { assetId?: string; mimeType: string }) => Promise<AssetObjectWriter>;
   pendingBytesLimit?: number;
-  storage?: RecordingStagingStorageAdapter;
 }
 
 let stagingGeneration = 0;
@@ -48,17 +52,13 @@ export async function createRecordingStagingCoordinator(
   options: CreateRecordingStagingCoordinatorOptions = {}
 ): Promise<RecordingStagingCoordinator> {
   const generation = stagingGeneration;
-  const storage = options.storage ?? createOpfsRecordingStagingStorage();
+  const createWriter = options.createWriter ?? createAssetObjectWriter;
+  const admitBytes = options.admitBytes ?? assertAssetWriteAdmission;
   const pendingBytesLimit = options.pendingBytesLimit ?? RECORDING_STAGING_PENDING_BYTES_LIMIT;
   if (!Number.isSafeInteger(pendingBytesLimit) || pendingBytesLimit <= 0) {
     throw new Error('Recording staging pending-byte limit must be a positive safe integer.');
   }
 
-  const session = await storage.createSession();
-  if (generation !== stagingGeneration) {
-    await session.remove();
-    throw new Error('Recording staging was invalidated during session creation.');
-  }
   const artifacts = new Map<string, RecordingStagingArtifactOwner>();
   let pendingBytes = 0;
   let failure: unknown = null;
@@ -104,7 +104,8 @@ export async function createRecordingStagingCoordinator(
       }
 
       try {
-        const artifactStorage = await session.createArtifact();
+        await admitBytes(0);
+        const artifactStorage = await createWriter({ mimeType: input.mimeType });
         try {
           requireHealthy();
         } catch (error) {
@@ -120,6 +121,7 @@ export async function createRecordingStagingCoordinator(
           throw error;
         }
         const owner = createRecordingStagingArtifactOwner({
+          admitBytes,
           assertCoordinatorHealthy: requireHealthy,
           input,
           recordFailure,
@@ -148,11 +150,6 @@ export async function createRecordingStagingCoordinator(
             cleanupErrors.push(reason);
           }
         });
-        try {
-          await session.remove();
-        } catch (error) {
-          cleanupErrors.push(error);
-        }
         phase = 'aborted';
         activeCoordinators.delete(coordinator);
         if (cleanupErrors.length > 0) {
@@ -171,7 +168,7 @@ export async function createRecordingStagingCoordinator(
           throw new Error('Cannot delete recording staging before all artifacts are finalized.');
         }
         phase = 'deleting';
-        await session.remove();
+        artifacts.forEach((artifact) => artifact.release());
         phase = 'deleted';
         activeCoordinators.delete(coordinator);
       })();

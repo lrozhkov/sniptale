@@ -47,6 +47,9 @@ function createPreparedAsset(
 it('returns the complete store list needed for import transactions', () => {
   expect(getImportTransactionStoreNames()).toEqual([
     'recordings',
+    'asset_refs',
+    'asset_owners',
+    'asset_operations',
     'recording_telemetry',
     'project_assets',
     'project_exports',

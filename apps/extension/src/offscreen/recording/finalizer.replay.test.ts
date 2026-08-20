@@ -3,6 +3,7 @@ import type {
   FinalizedRecordingStagingArtifact,
   RecordingStagingCoordinator,
 } from '../../composition/persistence/recordings/staging';
+import { createPreparedRecordingAssetForTest } from '../../composition/persistence/recordings/staging/test-support';
 
 const { saveBatchMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
   saveBatchMock: vi.fn(),
@@ -32,7 +33,7 @@ function createArtifact(id: string): FinalizedRecordingStagingArtifact {
   const file = new File(['video'], `${id}.webm`, { type: 'video/webm' });
   return {
     artifactId: id,
-    file,
+    asset: createPreparedRecordingAssetForTest(file, id),
     filename: file.name,
     mimeType: file.type,
     size: file.size,

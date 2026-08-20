@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import type { ProjectExportEntry } from '../../composition/persistence/projects/contracts';
-import type { RecordingEntry } from '../../composition/persistence/recordings/contracts';
+import type { StoredRecordingEntry } from '../../composition/persistence/recordings/contracts';
 import { createVideoProject } from '../../composition/persistence/projects/index.test-support.ts';
 import {
   VideoProjectAssetType,
@@ -41,13 +41,13 @@ function createMediaItem(overrides: Partial<MediaLibraryItem> = {}): MediaLibrar
   };
 }
 
-function createRecording(
-  overrides: Partial<Omit<RecordingEntry, 'blob'>> = {}
-): Omit<RecordingEntry, 'blob'> {
+function createRecording(overrides: Partial<StoredRecordingEntry> = {}): StoredRecordingEntry {
   return {
+    assetId: overrides.assetId ?? 'asset-recording-1',
     createdAt: overrides.createdAt ?? 0,
     filename: overrides.filename ?? 'recording.webm',
     id: overrides.id ?? 'recording-1',
+    mimeType: overrides.mimeType ?? 'video/webm',
     size: overrides.size ?? 1000,
   };
 }

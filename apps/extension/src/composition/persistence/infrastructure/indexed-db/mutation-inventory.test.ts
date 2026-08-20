@@ -13,6 +13,7 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/editor-bootstrap/retention-cleanup.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-lease.ts',
+  'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/projects/mutation-stores.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',

@@ -1,14 +1,14 @@
 import type { ErasureParticipant } from './participant-types';
 
-export interface RecordingStagingErasureAdapter {
-  countSessions(): Promise<number>;
+export interface AssetStorageErasureAdapter {
+  countRoots(): Promise<number>;
   erase(): Promise<number>;
 }
 
-export function createRecordingStagingErasureParticipant(
-  adapter: RecordingStagingErasureAdapter
+export function createAssetStorageErasureParticipant(
+  adapter: AssetStorageErasureAdapter
 ): ErasureParticipant {
-  const id = 'opfs:recording-staging';
+  const id = 'opfs:durable-assets';
   return {
     id,
     severity: 'required',
@@ -17,7 +17,7 @@ export function createRecordingStagingErasureParticipant(
       return { id, removedCount, severity: 'required', status: 'erased' };
     },
     async verifyEmpty() {
-      const remainingCount = await adapter.countSessions();
+      const remainingCount = await adapter.countRoots();
       return {
         id,
         remainingCount,

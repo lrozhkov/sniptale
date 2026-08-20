@@ -307,6 +307,16 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/assets",
+      "ownerId": "persistence.assets",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/asset-publication-recovery",
+      "ownerId": "persistence.asset-publication-recovery",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/ai-settings",
       "ownerId": "persistence.ai-settings",
       "ownerClass": "persistence"
@@ -493,6 +503,11 @@
     }
   ],
   "authorityOwners": [
+    {
+      "id": "durable-opfs-assets",
+      "path": "apps/extension/src/composition/persistence/assets",
+      "stateKind": "authoritative-durable"
+    },
     {
       "id": "frame-annotation-raster-jobs",
       "path": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",

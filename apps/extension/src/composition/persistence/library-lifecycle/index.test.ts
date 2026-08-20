@@ -406,15 +406,16 @@ describe('library lifecycle promotion', () => {
     const recordingPut = vi.fn();
     const mediaPut = vi.fn();
     const recording = {
-      blob: new Blob(['video'], { type: 'video/webm' }),
+      assetId: 'asset-recording-1',
       createdAt: 10,
       filename: 'recording.webm',
       id: 'recording-1',
       lifecycle: createLibraryLifecycle('library', 20),
+      mimeType: 'video/webm',
       size: 5,
     };
     const media = {
-      blob: recording.blob,
+      blob: new Blob(['video'], { type: 'video/webm' }),
       createdAt: 10,
       duration: 1,
       filename: recording.filename,
@@ -518,11 +519,12 @@ describe('library lifecycle media promotion', () => {
       width: null,
     };
     const recording = {
-      blob: new Blob(['media'], { type: 'video/webm' }),
+      assetId: 'asset-recording-1',
       createdAt: 10,
       filename: 'recording.webm',
       id: 'recording-1',
       lifecycle: createLibraryLifecycle('library', 20),
+      mimeType: 'video/webm',
       size: 5,
     };
     const puts: unknown[] = [];

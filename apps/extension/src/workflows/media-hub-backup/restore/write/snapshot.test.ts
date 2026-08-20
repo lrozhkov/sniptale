@@ -46,6 +46,11 @@ function createWriteHarness(records: Record<string, Record<string, unknown>>) {
       },
     ])
   );
+  for (const name of ['asset_refs', 'asset_owners']) {
+    if (!stores.has(name)) {
+      stores.set(name, { delete: vi.fn(), get: vi.fn(), put: vi.fn() });
+    }
+  }
 
   getStoreMock.mockImplementation((_tx, storeName: string) => {
     const store = stores.get(storeName);

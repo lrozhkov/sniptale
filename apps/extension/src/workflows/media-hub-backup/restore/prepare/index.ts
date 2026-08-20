@@ -13,6 +13,19 @@ import type { ImageWorkspaceEntry } from '../../../../composition/persistence/im
 import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { materializeAggregatePresentation } from '../presentation';
 import type { BackupArchiveReader } from '../archive-reader';
+import {
+  assertAssetWriteAdmission,
+  createAssetPublicationJournal,
+  discardPreparedAsset,
+  writeBlobToAsset,
+  type PreparedAssetObject,
+} from '../../../../composition/persistence/assets';
+import { RECORDING_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/recordings/asset-publication';
+
+export interface PreparedRestoreRecordingAsset {
+  asset: PreparedAssetObject;
+  journalId: string;
+}
 
 export interface PreparedBackupImportAsset {
   assetPath: string | null;
@@ -25,6 +38,7 @@ export interface PreparedBackupImportAsset {
   webSnapshotRecord: WebSnapshotRecord | null;
   workspace?: ImageWorkspaceEntry | null;
   presentation?: AggregatePresentationEntry | null;
+  preparedRecordingAsset?: PreparedRestoreRecordingAsset;
 }
 
 export interface BackupImportAssetPlan {
@@ -186,6 +200,7 @@ async function createWebSnapshotRecordFromPlan(
 }
 
 export async function loadBackupImportAssetBatch(args: {
+  operationId?: string;
   preparedAssets: BackupImportAssetPlan[];
   zip: BackupArchiveReader;
 }): Promise<PreparedBackupImportAsset[]> {
@@ -210,6 +225,34 @@ export async function loadBackupImportAssetBatch(args: {
         ? { ...prepared.nextEntry, size: webSnapshotRecord.size }
         : prepared.nextEntry;
 
+      let preparedRecordingAsset: PreparedRestoreRecordingAsset | undefined;
+      if (
+        prepared.nextEntry.source.kind === 'recording' ||
+        prepared.nextEntry.source.kind === 'project-export'
+      ) {
+        if (!args.operationId) throw new Error('Restore operation ID is missing.');
+        await assertAssetWriteAdmission(assetBlob.size);
+        const asset = await writeBlobToAsset(assetBlob, { mimeType: prepared.nextEntry.mimeType });
+        const journal = await createAssetPublicationJournal({
+          assetRefs: [asset.ref],
+          domain: RECORDING_ASSET_PUBLICATION_DOMAIN,
+          operationId: args.operationId,
+          payload: { recordingId: prepared.nextEntry.source.recordingId, restore: true },
+        }).catch(async (error: unknown) => {
+          try {
+            await discardPreparedAsset(asset.ref.assetId);
+          } catch (cleanupError) {
+            throw new AggregateError(
+              [error, cleanupError],
+              'Recording restore staging failed before its ready journal became durable.',
+              { cause: error }
+            );
+          }
+          throw error;
+        });
+        preparedRecordingAsset = { asset, journalId: journal.journalId };
+      }
+
       return {
         ...prepared,
         assetBlob,
@@ -217,6 +260,7 @@ export async function loadBackupImportAssetBatch(args: {
         thumbnailBlob,
         webSnapshotRecord,
         presentation,
+        ...(preparedRecordingAsset ? { preparedRecordingAsset } : {}),
       };
     })
   );

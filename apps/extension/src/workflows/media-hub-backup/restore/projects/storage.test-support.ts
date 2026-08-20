@@ -2,9 +2,12 @@ import type JSZip from 'jszip';
 import { vi } from 'vitest';
 
 export function createStores() {
-  return new Map(
+  const stores = new Map(
     [
       'project_assets',
+      'asset_refs',
+      'asset_owners',
+      'asset_operations',
       'project_exports',
       'recording_telemetry',
       'recordings',
@@ -25,6 +28,16 @@ export function createStores() {
       },
     ])
   );
+  stores.get('asset_operations')?.get.mockResolvedValue({
+    compensations: [],
+    createdAt: 1,
+    kind: 'backup-restore',
+    obsoleteAssetIds: [],
+    operationId: 'restore-1',
+    status: 'pending',
+    updatedAt: 1,
+  });
+  return stores;
 }
 
 export function createZip(): JSZip {

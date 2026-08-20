@@ -4,10 +4,9 @@ import type {
   MediaThumbnailEntry,
 } from '../../../composition/persistence/media-library/contracts';
 import type { ProjectAssetEntry } from '../../../composition/persistence/projects/contracts';
-import type {
-  RecordingTelemetryEntry,
-  RecordingEntry,
-} from '../../../composition/persistence/recordings/contracts';
+import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
+import { parseRecordingEntry } from '../../../composition/persistence/recordings/index.guards';
+import { parseAssetRef, readAssetFile } from '../../../composition/persistence/assets';
 import type { WebSnapshotRecord } from '../../../composition/persistence/web-snapshots/contracts';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
 import { parseImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/parser';
@@ -16,6 +15,7 @@ import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-ur
 import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
 import {
   PROJECT_ASSETS_STORE,
+  ASSET_REFS_STORE,
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
@@ -188,10 +188,10 @@ export async function resolveBackupMediaBlob(
   }
 
   if (entry.source.kind === 'recording' || entry.source.kind === 'project-export') {
-    const recording = (await db.get(STORE_NAME, entry.source.recordingId)) as
-      | RecordingEntry
-      | undefined;
-    return recording?.blob ?? null;
+    const recording = parseRecordingEntry(await db.get(STORE_NAME, entry.source.recordingId));
+    if (!recording) return null;
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, recording.assetId));
+    return ref ? readAssetFile(ref, recording.filename) : null;
   }
 
   if (entry.source.kind === 'web-snapshot') {

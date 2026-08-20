@@ -4,9 +4,15 @@ import { createScenarioProjectV3 } from '../../../../features/scenario/project/v
 import { createVideoProjectFixture } from '../../export/projects/video-fixture.test-support.ts';
 import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
 
-const { initDBMock, listMediaLibraryMock } = vi.hoisted(() => ({
+const { initDBMock, listMediaLibraryMock, readAssetFileMock } = vi.hoisted(() => ({
   initDBMock: vi.fn(),
   listMediaLibraryMock: vi.fn(),
+  readAssetFileMock: vi.fn(),
+}));
+
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  readAssetFile: readAssetFileMock,
 }));
 
 vi.mock(
@@ -16,6 +22,7 @@ vi.mock(
       typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
     >()),
     PROJECT_ASSETS_STORE: 'project_assets',
+    ASSET_REFS_STORE: 'asset_refs',
     PROJECT_EXPORTS_STORE: 'project_exports',
     RECORDING_TELEMETRY_STORE: 'recording_telemetry',
     SCENARIO_ASSETS_STORE: 'scenario_assets',
@@ -65,6 +72,8 @@ function createMediaEntry(
 beforeEach(() => {
   initDBMock.mockReset();
   listMediaLibraryMock.mockReset();
+  readAssetFileMock.mockReset();
+  readAssetFileMock.mockResolvedValue(new File(['recording'], 'recording.webm'));
 });
 
 function createInspectionEntries(): [MediaLibraryEntry, MediaLibraryEntry] {
@@ -82,14 +91,26 @@ function createInspectionEntries(): [MediaLibraryEntry, MediaLibraryEntry] {
 
 function setupInspectionDb(screenshot: MediaLibraryEntry, webSnapshot: MediaLibraryEntry) {
   listMediaLibraryMock.mockResolvedValue([screenshot, webSnapshot]);
-  initDBMock.mockResolvedValue({
+  const db = {
     get: vi.fn(readInspectionRecord),
     getAll: vi.fn((storeName: string) => readInspectionStore(storeName, screenshot)),
     getAllFromIndex: vi.fn(readInspectionIndex),
-  });
+  };
+  initDBMock.mockResolvedValue(db);
+  return db;
 }
 
 async function readInspectionRecord(storeName: string, key: string) {
+  if (storeName === 'asset_refs' && key === 'asset-recording-1') {
+    return {
+      assetId: key,
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: `objects/${key}` },
+      mimeType: 'video/webm',
+      sha256: null,
+      size: 700,
+    };
+  }
   if (storeName === 'thumbnails' && key === 'scenario:scenario-1') {
     return { assetId: key, blob: new Blob(['scenario-thumb']) };
   }
@@ -103,7 +124,14 @@ async function readInspectionRecord(storeName: string, key: string) {
     return { id: key, blob: new Blob(['asset']), size: 500 };
   }
   return storeName === 'recordings' && key === 'recording-1'
-    ? { id: key, blob: new Blob(['recording']), size: 700 }
+    ? {
+        assetId: 'asset-recording-1',
+        createdAt: 1,
+        filename: 'recording.webm',
+        id: key,
+        mimeType: 'video/webm',
+        size: 700,
+      }
     : undefined;
 }
 
@@ -218,5 +246,30 @@ describe('inspect local media hub backup', () => {
     expect(summary.dataClasses).toEqual(
       expect.objectContaining({ sourceMetadata: true, webSnapshots: false })
     );
+    expect(readAssetFileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ assetId: 'asset-recording-1' }),
+      'recording.webm'
+    );
+  });
+
+  it('rejects a project-export recording whose OPFS reference is missing', async () => {
+    const [screenshot, webSnapshot] = createInspectionEntries();
+    const db = setupInspectionDb(screenshot, webSnapshot);
+    db.get.mockImplementation(async (storeName: string, key: string) =>
+      storeName === 'asset_refs' ? undefined : readInspectionRecord(storeName, key)
+    );
+
+    const { inspectLocalMediaHubBackup } = await import('.');
+    await expect(
+      inspectLocalMediaHubBackup({
+        scope: 'selected',
+        selected: {
+          mediaAssetIds: [],
+          scenarioProjectIds: [],
+          videoProjectIds: ['video-project-1'],
+        },
+        includeWebSnapshots: false,
+      })
+    ).rejects.toThrow('asset reference is missing');
   });
 });

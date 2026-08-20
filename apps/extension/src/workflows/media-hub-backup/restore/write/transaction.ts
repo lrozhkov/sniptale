@@ -1,5 +1,8 @@
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OPERATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -26,6 +29,9 @@ type BackupTransaction = Parameters<typeof getStore>[0] & {
 export function getImportTransactionStoreNames(): string[] {
   return [
     STORE_NAME,
+    ASSET_REFS_STORE,
+    ASSET_OWNERS_STORE,
+    ASSET_OPERATIONS_STORE,
     RECORDING_TELEMETRY_STORE,
     PROJECT_ASSETS_STORE,
     PROJECT_EXPORTS_STORE,

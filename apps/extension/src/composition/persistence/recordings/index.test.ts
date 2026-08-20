@@ -1,246 +1,182 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  dbDeleteMock,
-  dbGetAllMock,
-  dbGetMock,
-  dbPutMock,
-  initDBMock,
-  mediaDeleteMock,
-  mediaPutMock,
-  openCursorMock,
-  transactionMock,
-} = vi.hoisted(() => ({
-  dbDeleteMock: vi.fn(),
-  dbGetAllMock: vi.fn(),
-  dbGetMock: vi.fn(),
-  dbPutMock: vi.fn(),
-  initDBMock: vi.fn(),
-  mediaDeleteMock: vi.fn(),
-  mediaPutMock: vi.fn(),
-  openCursorMock: vi.fn(),
-  transactionMock: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  buildDelete: vi.fn(),
+  completeDelete: vi.fn(),
+  dbGet: vi.fn(),
+  dbGetAll: vi.fn(),
+  initDB: vi.fn(),
+  readFile: vi.fn(),
+  runMutation: vi.fn(),
+  saveBatch: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
+  ASSET_OPERATIONS_STORE: 'asset_operations',
+  ASSET_OWNERS_STORE: 'asset_owners',
+  ASSET_REFS_STORE: 'asset_refs',
   MEDIA_LIBRARY_STORE: 'media_library',
-  PROJECT_EXPORTS_STORE: 'project_exports',
   RECORDING_TELEMETRY_STORE: 'recording_telemetry',
   STORE_NAME: 'recordings',
-  VIDEO_PROJECTS_STORE: 'video_projects',
-  initDB: initDBMock,
+  initDB: mocks.initDB,
 }));
 
-function createRecordingEntry(id = 'recording-1') {
+vi.mock('../infrastructure/indexed-db/mutation', () => ({
+  runWithIndexedDbMutation: mocks.runMutation,
+}));
+
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  buildPhysicalDeleteOperation: mocks.buildDelete,
+  completePhysicalDeleteOperation: mocks.completeDelete,
+  readAssetFile: mocks.readFile,
+}));
+
+vi.mock('./batch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./batch')>()),
+  saveRecordingsBatch: mocks.saveBatch,
+}));
+
+import { deleteRecording, getRecording, listRecordings, saveRecording } from './index';
+
+const stored = {
+  assetId: 'asset-1',
+  createdAt: 1_000,
+  filename: 'recording.webm',
+  id: 'recording-1',
+  lifecycle: { savedAt: 1_000, storageClass: 'library' as const, updatedAt: 1_000 },
+  mimeType: 'video/webm',
+  size: 5,
+};
+const ref = {
+  assetId: 'asset-1',
+  createdAt: 900,
+  location: { kind: 'opfs' as const, objectKey: 'objects/asset-1' },
+  mimeType: 'video/webm',
+  sha256: null,
+  size: 5,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.initDB.mockResolvedValue({ get: mocks.dbGet, getAll: mocks.dbGetAll });
+  mocks.buildDelete.mockReturnValue({
+    assetIds: [],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'delete-1',
+    status: 'pending',
+    updatedAt: 1,
+  });
+  mocks.completeDelete.mockResolvedValue(undefined);
+});
+
+describe('recordings catalog', () => {
+  it('hydrates bytes from OPFS only for the single-recording read path', async () => {
+    const file = new File(['video'], stored.filename, { type: stored.mimeType });
+    mocks.dbGet.mockResolvedValueOnce(stored).mockResolvedValueOnce(ref);
+    mocks.readFile.mockResolvedValue(file);
+
+    await expect(getRecording(stored.id)).resolves.toEqual({ ...stored, file });
+    expect(mocks.readFile).toHaveBeenCalledWith(ref, stored.filename);
+  });
+
+  it('returns undefined for invalid metadata, missing refs, and unavailable objects', async () => {
+    mocks.dbGet.mockResolvedValueOnce({ invalid: true });
+    await expect(getRecording('invalid')).resolves.toBeUndefined();
+
+    mocks.dbGet.mockResolvedValueOnce(stored).mockResolvedValueOnce(undefined);
+    await expect(getRecording(stored.id)).resolves.toBeUndefined();
+
+    mocks.dbGet.mockResolvedValueOnce(stored).mockResolvedValueOnce(ref);
+    mocks.readFile.mockRejectedValueOnce(new Error('missing object'));
+    await expect(getRecording(stored.id)).resolves.toBeUndefined();
+  });
+
+  it('lists metadata without reading OPFS objects', async () => {
+    mocks.dbGetAll.mockResolvedValue([stored]);
+
+    await expect(listRecordings()).resolves.toEqual([
+      expect.objectContaining({
+        assetId: 'asset-1',
+        id: 'recording-1',
+        mimeType: 'video/webm',
+        thumbnailId: 'recording:recording-1',
+      }),
+    ]);
+    expect(mocks.readFile).not.toHaveBeenCalled();
+  });
+
+  it('commits a physical-delete intent with the graph unlink and completes it afterward', async () => {
+    const deletes: Array<[string, unknown]> = [];
+    const puts: Array<[string, unknown]> = [];
+    const stores = new Map<string, ReturnType<typeof createStore>>();
+    const tx = {
+      done: Promise.resolve(),
+      objectStore(name: string) {
+        let store = stores.get(name);
+        if (!store) {
+          store = createStore(name, deletes, puts);
+          stores.set(name, store);
+        }
+        return store;
+      },
+    };
+    const db = { transaction: vi.fn().mockReturnValue(tx) };
+    mocks.runMutation.mockImplementation(async (operation) => operation(db));
+
+    await deleteRecording(stored.id);
+
+    expect(puts).toContainEqual([
+      'asset_operations',
+      expect.objectContaining({ assetIds: ['asset-1'], kind: 'physical-delete' }),
+    ]);
+    expect(mocks.completeDelete).toHaveBeenCalledWith(
+      expect.objectContaining({ assetIds: ['asset-1'] })
+    );
+  });
+
+  it('keeps a shared asset and skips physical deletion', async () => {
+    const stores = new Map<string, ReturnType<typeof createStore>>();
+    const tx = {
+      done: Promise.resolve(),
+      objectStore(name: string) {
+        let store = stores.get(name);
+        if (!store) {
+          store = createStore(name, [], []);
+          if (name === 'asset_owners')
+            store.index = vi.fn(() => ({ count: vi.fn().mockResolvedValue(1) }));
+          stores.set(name, store);
+        }
+        return store;
+      },
+    };
+    mocks.runMutation.mockImplementation(async (operation) => operation({ transaction: () => tx }));
+
+    await deleteRecording(stored.id);
+
+    expect(mocks.completeDelete).not.toHaveBeenCalled();
+  });
+
+  it('streams the compatibility Blob input through the batch owner', async () => {
+    const blob = new Blob(['video'], { type: 'video/webm' });
+    await saveRecording('recording-1', blob, 'recording.webm');
+
+    expect(mocks.saveBatch).toHaveBeenCalledWith([
+      { blob, filename: 'recording.webm', id: 'recording-1' },
+    ]);
+  });
+});
+
+function createStore(
+  name: string,
+  deletes: Array<[string, unknown]>,
+  puts: Array<[string, unknown]>
+) {
   return {
-    id,
-    blob: new Blob(['video'], { type: 'video/webm' }),
-    filename: `${id}.webm`,
-    createdAt: 1000,
-    size: 5,
+    delete: vi.fn(async (key: unknown) => deletes.push([name, key])),
+    get: vi.fn().mockResolvedValue(name === 'recordings' ? stored : undefined),
+    index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
+    put: vi.fn(async (value: unknown) => puts.push([name, value])),
   };
 }
-
-function resetRecordingsDbMocks() {
-  vi.clearAllMocks();
-  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  transactionMock.mockReturnValue({
-    done: Promise.resolve(),
-    objectStore: vi.fn((storeName: string) => ({
-      delete: storeName === 'media_library' ? mediaDeleteMock : dbDeleteMock,
-      index: vi.fn().mockReturnValue({
-        openCursor: openCursorMock,
-      }),
-      put: storeName === 'media_library' ? mediaPutMock : dbPutMock,
-    })),
-  });
-  initDBMock.mockResolvedValue({
-    delete: dbDeleteMock,
-    get: dbGetMock,
-    getAll: dbGetAllMock,
-    put: dbPutMock,
-    transaction: transactionMock,
-  });
-  dbGetAllMock.mockResolvedValue([]);
-}
-
-async function verifySaveRecordingFlow() {
-  const { saveRecording } = await import('./index');
-  const blob = new Blob(['video'], { type: 'video/webm' });
-  vi.spyOn(Date, 'now').mockReturnValue(1700);
-
-  await saveRecording('recording-1', blob, 'capture.webm');
-
-  expect(dbPutMock).toHaveBeenCalledWith({
-    id: 'recording-1',
-    blob,
-    filename: 'capture.webm',
-    createdAt: 1700,
-    lifecycle: {
-      storageClass: 'library',
-      updatedAt: 1700,
-      savedAt: 1700,
-    },
-    size: blob.size,
-  });
-  expect(mediaPutMock).toHaveBeenCalledWith({
-    id: 'recording:recording-1',
-    kind: 'recording',
-    source: {
-      kind: 'recording',
-      recordingId: 'recording-1',
-    },
-    filename: 'capture.webm',
-    originalFilename: 'capture.webm',
-    createdAt: 1700,
-    updatedAt: 1700,
-    size: blob.size,
-    mimeType: 'video/webm',
-    width: null,
-    height: null,
-    duration: null,
-    sourceUrl: null,
-    sourceTitle: null,
-    sourceFavicon: null,
-    tags: [],
-    lifecycle: {
-      storageClass: 'library',
-      updatedAt: 1700,
-      savedAt: 1700,
-    },
-  });
-}
-
-async function verifyAudioRecordingMediaEntryFlow() {
-  const { saveRecording } = await import('./index');
-  const blob = new Blob(['audio'], { type: 'audio/webm' });
-  vi.spyOn(Date, 'now').mockReturnValue(1800);
-
-  await saveRecording('recording-audio', blob, 'microphone.webm');
-
-  expect(mediaPutMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      id: 'recording:recording-audio',
-      kind: 'audio',
-      mimeType: 'audio/webm',
-      source: {
-        kind: 'recording',
-        recordingId: 'recording-audio',
-      },
-    })
-  );
-}
-
-async function verifyInvalidReadValuesAreDropped() {
-  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  dbGetMock.mockResolvedValueOnce({ id: 'broken' });
-  dbGetAllMock.mockResolvedValueOnce([createRecordingEntry('recording-1'), { id: 'broken' }]);
-
-  const { getRecording, listRecordings } = await import('./index');
-
-  await expect(getRecording('recording-1')).resolves.toBeUndefined();
-  await expect(listRecordings()).resolves.toEqual([
-    {
-      id: 'recording-1',
-      filename: 'recording-1.webm',
-      createdAt: 1000,
-      size: 5,
-      mimeType: 'video/webm',
-      duration: null,
-      height: null,
-      thumbnailId: 'recording:recording-1',
-      width: null,
-    },
-  ]);
-
-  expect(warnSpy).toHaveBeenNthCalledWith(
-    1,
-    '[SharedRecordingsDb]',
-    'Ignoring invalid recording entry from IndexedDB',
-    { recordingId: 'recording-1' }
-  );
-  expect(warnSpy).toHaveBeenNthCalledWith(
-    2,
-    '[SharedRecordingsDb]',
-    'Dropped invalid recording entries from IndexedDB list',
-    { invalidEntryCount: 1 }
-  );
-}
-
-async function verifyValidRecordingReadsAndDeleteFlow() {
-  const entry = createRecordingEntry('recording-2');
-  dbGetMock.mockResolvedValueOnce(entry);
-
-  const { deleteRecording, getRecording } = await import('./index');
-
-  await expect(getRecording('recording-2')).resolves.toEqual({
-    ...entry,
-    lifecycle: {
-      storageClass: 'library',
-      updatedAt: 1000,
-      savedAt: 1000,
-    },
-  });
-
-  await deleteRecording('recording-2');
-
-  expect(transactionMock).toHaveBeenCalledWith(
-    ['recordings', 'media_library', 'recording_telemetry'],
-    'readwrite'
-  );
-  expect(dbDeleteMock).toHaveBeenCalledTimes(2);
-  expect(dbDeleteMock).toHaveBeenCalledWith('recording-2');
-  expect(mediaDeleteMock).toHaveBeenCalledWith('recording:recording-2');
-}
-
-async function verifyInvalidListRootWarning() {
-  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  dbGetAllMock.mockResolvedValueOnce({ broken: true });
-
-  const { listRecordings } = await import('./index');
-
-  await expect(listRecordings()).resolves.toEqual([]);
-
-  expect(warnSpy).toHaveBeenCalledWith(
-    '[SharedRecordingsDb]',
-    'Ignoring invalid recordings list root from IndexedDB'
-  );
-}
-
-async function verifyListRecordingMimeTypeFallback() {
-  dbGetAllMock.mockResolvedValueOnce([
-    {
-      ...createRecordingEntry('recording-without-mime'),
-      blob: new Blob(['video']),
-    },
-  ]);
-
-  const { listRecordings } = await import('./index');
-
-  await expect(listRecordings()).resolves.toEqual([
-    expect.objectContaining({
-      id: 'recording-without-mime',
-      mimeType: 'video/webm',
-    }),
-  ]);
-}
-
-describe('recordings-db', () => {
-  beforeEach(resetRecordingsDbMocks);
-
-  it('persists recordings and mirrors them into the media library', verifySaveRecordingFlow);
-  it('classifies audio-only recordings as audio media entries', verifyAudioRecordingMediaEntryFlow);
-  it('drops invalid IndexedDB payloads when reading recordings', verifyInvalidReadValuesAreDropped);
-  it(
-    'returns valid recordings and deletes them from IndexedDB',
-    verifyValidRecordingReadsAndDeleteFlow
-  );
-  it(
-    'warns and returns an empty list for an invalid recordings root payload',
-    verifyInvalidListRootWarning
-  );
-  it(
-    'uses the recording MIME fallback when the stored blob has no type',
-    verifyListRecordingMimeTypeFallback
-  );
-});

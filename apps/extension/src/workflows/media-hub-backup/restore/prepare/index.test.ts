@@ -3,8 +3,22 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../../composition/persistence/media-library/contracts';
 import type { BackupArchiveReader } from './index';
 
-const { getMediaLibraryEntryMock } = vi.hoisted(() => ({
+const { getMediaLibraryEntryMock, assetMocks } = vi.hoisted(() => ({
   getMediaLibraryEntryMock: vi.fn(),
+  assetMocks: {
+    admit: vi.fn(),
+    createJournal: vi.fn(),
+    discard: vi.fn(),
+    writeBlob: vi.fn(),
+  },
+}));
+
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  assertAssetWriteAdmission: assetMocks.admit,
+  createAssetPublicationJournal: assetMocks.createJournal,
+  discardPreparedAsset: assetMocks.discard,
+  writeBlobToAsset: assetMocks.writeBlob,
 }));
 
 vi.mock('../../../../composition/persistence/media-library/index', async (importOriginal) => ({
@@ -101,7 +115,8 @@ function createBackupAsset(entry: Omit<MediaLibraryEntry, 'blob'>) {
 }
 
 beforeEach(() => {
-  getMediaLibraryEntryMock.mockReset();
+  vi.clearAllMocks();
+  assetMocks.admit.mockResolvedValue(undefined);
 });
 
 it('skips conflicting assets when the import strategy is skip', async () => {
@@ -195,3 +210,69 @@ it('rejects oversized archive blobs when loading a write batch', async () => {
     })
   ).rejects.toThrow('shared.mediaHub.backupReadFailedPrefix asset.png.');
 });
+
+it('discards a standalone recording object when its ready journal cannot be created', async () => {
+  const { loadBackupImportAssetBatch } = await import('.');
+  assetMocks.writeBlob.mockResolvedValueOnce(createPreparedAsset('asset-recording'));
+  assetMocks.createJournal.mockRejectedValueOnce(new Error('journal failed'));
+  assetMocks.discard.mockResolvedValueOnce(undefined);
+
+  await expect(
+    loadBackupImportAssetBatch({
+      operationId: 'restore-1',
+      preparedAssets: [createRecordingPlan()],
+      zip: createZip(),
+    })
+  ).rejects.toThrow('journal failed');
+
+  expect(assetMocks.discard).toHaveBeenCalledWith('asset-recording');
+});
+
+it('aggregates journal and unpublished-object cleanup failures', async () => {
+  const { loadBackupImportAssetBatch } = await import('.');
+  assetMocks.writeBlob.mockResolvedValueOnce(createPreparedAsset('asset-recording'));
+  assetMocks.createJournal.mockRejectedValueOnce(new Error('journal failed'));
+  assetMocks.discard.mockRejectedValueOnce(new Error('discard failed'));
+
+  await expect(
+    loadBackupImportAssetBatch({
+      operationId: 'restore-1',
+      preparedAssets: [createRecordingPlan()],
+      zip: createZip(),
+    })
+  ).rejects.toMatchObject({
+    errors: [
+      expect.objectContaining({ message: 'journal failed' }),
+      expect.objectContaining({ message: 'discard failed' }),
+    ],
+  });
+});
+
+function createRecordingPlan() {
+  return {
+    assetPath: 'assets/asset-1',
+    existingEntry: undefined,
+    nextEntry: createMediaEntry(
+      { kind: 'recording', recordingId: 'recording-1' },
+      { filename: 'recording.webm', kind: 'video', mimeType: 'video/webm' }
+    ),
+    presentationDescriptor: undefined,
+    recordingTelemetry: null,
+    thumbnailPath: null,
+    webSnapshotPackage: null,
+    workspace: null,
+  };
+}
+
+function createPreparedAsset(assetId: string) {
+  return {
+    ref: {
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      mimeType: 'video/webm',
+      sha256: null,
+      size: 5,
+    },
+  };
+}

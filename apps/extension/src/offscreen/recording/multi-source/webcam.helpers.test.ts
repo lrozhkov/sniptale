@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import type { RecordingSidecarRecorder } from '../sidecar/types';
 import { createWebcamProjectInput, stopWebcamRecorderStream } from './webcam';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 function createWebcamRecorder(
   overrides: Partial<RecordingSidecarRecorder> = {}
@@ -9,7 +10,7 @@ function createWebcamRecorder(
   return {
     artifact: {
       artifactId: 'rec-webcam',
-      file,
+      asset: createPreparedRecordingAssetForTest(file, 'rec-webcam'),
       filename: file.name,
       mimeType: file.type,
       size: file.size,

@@ -226,7 +226,7 @@ export async function persistStaticFrameSignals(recordingId: string): Promise<vo
       });
       return;
     }
-    const staticSignals = await detectStaticFrameSignals(recording.blob);
+    const staticSignals = await detectStaticFrameSignals(recording.file);
     const baseSignals = entry.signals.filter(
       (signal) => signal.kind !== RecordingTelemetrySignalKind.STATIC_FRAME
     );

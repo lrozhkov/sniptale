@@ -1,5 +1,8 @@
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OPERATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -31,6 +34,12 @@ import { resolveVideoProjectRetentionKind } from '../../../features/media-hub/vi
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import { getDraftRetentionMs } from './policy';
 import { collectVideoProjectReferences } from './references';
+import {
+  buildPhysicalDeleteOperation,
+  completePhysicalDeleteOperation,
+  type PhysicalDeleteAssetOperation,
+} from '../assets';
+import { RECORDING_ASSET_OWNER_KIND, RECORDING_ASSET_ROLE } from '../recordings/asset-publication';
 
 export interface DraftCleanupResult {
   deletedCount: number;
@@ -182,6 +191,26 @@ type ParsedMediaEntry = NonNullable<ReturnType<typeof parseMediaLibraryEntry>>;
 type CleanupReadStore = { get(key: string): Promise<unknown>; getAll(): Promise<unknown[]> };
 type CleanupDeleteStore = { delete(key: IDBValidKey): Promise<unknown> };
 type CleanupMutableStore = CleanupReadStore & CleanupDeleteStore;
+type CleanupOwnerStore = CleanupDeleteStore & {
+  index(name: 'assetId'): { count(assetId: string): Promise<number> };
+};
+
+async function unlinkRecordingAsset(args: {
+  operation: PhysicalDeleteAssetOperation;
+  ownerStore: CleanupOwnerStore;
+  recording: NonNullable<ReturnType<typeof parseRecordingEntry>>;
+  refStore: CleanupDeleteStore;
+}): Promise<void> {
+  await args.ownerStore.delete([
+    RECORDING_ASSET_OWNER_KIND,
+    args.recording.id,
+    RECORDING_ASSET_ROLE,
+  ]);
+  if ((await args.ownerStore.index('assetId').count(args.recording.assetId)) === 0) {
+    await args.refStore.delete(args.recording.assetId);
+    args.operation.assetIds.push(args.recording.assetId);
+  }
+}
 
 function isMediaReferencedByVideoProject(
   media: ParsedMediaEntry,
@@ -276,6 +305,9 @@ async function cleanupVideoProjectRecordings(args: {
   protectedRecordingIds: ReadonlySet<string>;
   recordingIds: ReadonlySet<string>;
   recordingStore: CleanupMutableStore;
+  operation: PhysicalDeleteAssetOperation;
+  ownerStore: CleanupOwnerStore;
+  refStore: CleanupDeleteStore;
   telemetryStore: CleanupDeleteStore;
   videoRetention: number | null;
 }): Promise<void> {
@@ -289,6 +321,12 @@ async function cleanupVideoProjectRecordings(args: {
     ) {
       await args.recordingStore.delete(recordingId);
       await args.telemetryStore.delete(recordingId);
+      await unlinkRecordingAsset({
+        operation: args.operation,
+        ownerStore: args.ownerStore,
+        recording,
+        refStore: args.refStore,
+      });
     }
   }
 }
@@ -299,7 +337,8 @@ async function deleteExpiredMedia(
   retention: number | null,
   includeUnexpired: boolean
 ): Promise<boolean> {
-  return runWithIndexedDbMutation(async (db) => {
+  const operation = buildPhysicalDeleteOperation([]);
+  const deleted = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
@@ -310,6 +349,9 @@ async function deleteExpiredMedia(
         VIDEO_PROJECTS_STORE,
         PROJECT_ASSETS_STORE,
         RECORDING_TELEMETRY_STORE,
+        ASSET_OWNERS_STORE,
+        ASSET_REFS_STORE,
+        ASSET_OPERATIONS_STORE,
       ],
       'readwrite'
     );
@@ -353,13 +395,24 @@ async function deleteExpiredMedia(
     if (current.source.kind === 'recording' && recording?.lifecycle?.storageClass === 'temporary') {
       await recordingStore.delete(current.source.recordingId);
       await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(current.source.recordingId);
+      await unlinkRecordingAsset({
+        operation,
+        ownerStore: tx.objectStore(ASSET_OWNERS_STORE),
+        recording,
+        refStore: tx.objectStore(ASSET_REFS_STORE),
+      });
     }
     if (current.source.kind === 'project-asset') {
       await tx.objectStore(PROJECT_ASSETS_STORE).delete(current.source.projectAssetId);
     }
+    if (operation.assetIds.length > 0) {
+      await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
+    }
     await tx.done;
     return true;
   });
+  if (operation.assetIds.length > 0) await completePhysicalDeleteOperation(operation);
+  return deleted;
 }
 
 async function deleteExpiredVideoProjectGraph(args: {
@@ -370,7 +423,8 @@ async function deleteExpiredVideoProjectGraph(args: {
   parentRetention: number | null;
   videoRetention: number | null;
 }): Promise<boolean> {
-  return runWithIndexedDbMutation(async (db) => {
+  const operation = buildPhysicalDeleteOperation([]);
+  const deleted = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
         VIDEO_PROJECTS_STORE,
@@ -381,6 +435,9 @@ async function deleteExpiredVideoProjectGraph(args: {
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
         RECORDING_TELEMETRY_STORE,
+        ASSET_OWNERS_STORE,
+        ASSET_REFS_STORE,
+        ASSET_OPERATIONS_STORE,
       ],
       'readwrite'
     );
@@ -415,6 +472,9 @@ async function deleteExpiredVideoProjectGraph(args: {
       protectedRecordingIds,
       recordingIds: refs.recordingIds,
       recordingStore: tx.objectStore(STORE_NAME),
+      operation,
+      ownerStore: tx.objectStore(ASSET_OWNERS_STORE),
+      refStore: tx.objectStore(ASSET_REFS_STORE),
       telemetryStore: tx.objectStore(RECORDING_TELEMETRY_STORE),
       videoRetention: args.videoRetention,
     });
@@ -428,9 +488,14 @@ async function deleteExpiredVideoProjectGraph(args: {
     );
     await tx.objectStore(THUMBNAILS_STORE).delete(`video-project:${args.id}`);
     await projectStore.delete(args.id);
+    if (operation.assetIds.length > 0) {
+      await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
+    }
     await tx.done;
     return true;
   });
+  if (operation.assetIds.length > 0) await completePhysicalDeleteOperation(operation);
+  return deleted;
 }
 
 function classifyVideoProjectMediaCleanup(

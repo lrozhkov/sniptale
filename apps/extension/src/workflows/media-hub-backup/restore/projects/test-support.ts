@@ -73,6 +73,7 @@ function createMinimalVideoProject(): PreparedProjectDomains['videoProjects'][nu
     projectId: 'video-1',
     idChanged: false,
     recordingIdMap: new Map(),
+    restoredRecordingAssets: createRestoredRecordingAssets(),
   };
 }
 
@@ -172,7 +173,29 @@ function createPreparedVideoProject(): PreparedProjectDomains['videoProjects'][n
     projectId: 'video-copy',
     idChanged: true,
     recordingIdMap: new Map([['recording-1', 'recording-copy']]),
+    restoredRecordingAssets: createRestoredRecordingAssets(),
   };
+}
+
+function createRestoredRecordingAssets() {
+  return new Map([
+    [
+      'recording',
+      {
+        asset: {
+          ref: {
+            assetId: 'asset-restored-recording',
+            createdAt: 1,
+            location: { kind: 'opfs' as const, objectKey: 'objects/asset-restored-recording' },
+            mimeType: 'video/webm',
+            sha256: null,
+            size: 9,
+          },
+        },
+        journalId: 'journal-restored-recording',
+      },
+    ],
+  ]);
 }
 
 function createScenarioProjectEntry(includeBundleRefs = false) {

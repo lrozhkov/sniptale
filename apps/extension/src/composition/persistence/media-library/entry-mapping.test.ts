@@ -7,15 +7,16 @@ import {
 } from './entry-mapping';
 import type { MediaLibraryEntry } from './contracts';
 import type { ProjectAssetEntry } from '../projects/contracts';
-import type { RecordingEntry } from '../recordings/contracts';
+import type { StoredRecordingEntry } from '../recordings/contracts';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
-function createRecording(type: string): RecordingEntry {
+function createRecording(type: string): StoredRecordingEntry {
   return {
-    blob: new Blob(['data'], { type }),
+    assetId: 'asset-1',
     createdAt: 10,
     filename: type.startsWith('audio/') ? 'microphone.webm' : 'recording.webm',
     id: type.startsWith('audio/') ? 'mic-1' : 'video-1',
+    mimeType: type,
     size: 4,
   };
 }

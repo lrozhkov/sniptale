@@ -35,7 +35,7 @@ async function buildRecordingProject(
   sourceRecordingId: string,
   sidecarVideos: RecordingSidecarVideoProjectInput[]
 ): Promise<VideoProject> {
-  const metadata = await loadVideoMetadata(entry.blob);
+  const metadata = await loadVideoMetadata(entry.file);
   const telemetry = await getRecordingTelemetry(sourceRecordingId);
   const normalizedTelemetryParams = {
     captureMode: telemetry?.captureMode ?? null,

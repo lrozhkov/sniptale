@@ -127,7 +127,7 @@ function resetExportFlowMocks() {
   blobToDataUrlMock.mockResolvedValue('data:video/webm;base64,generated-download');
   executeDownloadBlobMock.mockResolvedValue(17);
   ensureOffscreenDocumentMock.mockResolvedValue(false);
-  getRecordingMock.mockResolvedValue({ blob: new Blob(['recording']) });
+  getRecordingMock.mockResolvedValue({ file: new Blob(['recording']) });
   hasOffscreenDocumentMock.mockReturnValue(true);
   loadSettingsMock.mockResolvedValue({ defaultVideoPresetId: 'preset-1' });
   loadProjectExportInputMock.mockResolvedValue(createProject());

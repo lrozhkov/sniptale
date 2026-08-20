@@ -12,9 +12,9 @@ const {
   verifySniptaleDatabaseAbsentAfterPrivacyErasureMock,
   eraseVideoPreviewCacheForPrivacyErasureMock,
   verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock,
-  countRecordingStagingSessionsMock,
+  countAssetStorageRootsMock,
   invalidateAndAbortActiveRecordingStagingMock,
-  removeAllRecordingStagingSessionsMock,
+  eraseAssetStorageMock,
 } = vi.hoisted(() => ({
   browserStorageAreaMock: {
     get: vi.fn(),
@@ -32,9 +32,9 @@ const {
   verifySniptaleDatabaseAbsentAfterPrivacyErasureMock: vi.fn(),
   eraseVideoPreviewCacheForPrivacyErasureMock: vi.fn(),
   verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock: vi.fn(),
-  countRecordingStagingSessionsMock: vi.fn(),
+  countAssetStorageRootsMock: vi.fn(),
   invalidateAndAbortActiveRecordingStagingMock: vi.fn(),
-  removeAllRecordingStagingSessionsMock: vi.fn(),
+  eraseAssetStorageMock: vi.fn(),
 }));
 
 vi.mock('../infrastructure/browser-storage/privacy-erasure', async (importOriginal) => ({
@@ -67,11 +67,12 @@ vi.mock('../video-preview-cache/privacy-erasure', () => ({
 }));
 vi.mock('../recordings/staging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../recordings/staging')>()),
-  createOpfsRecordingStagingStorage: () => ({
-    countSessions: countRecordingStagingSessionsMock,
-    removeAllSessions: removeAllRecordingStagingSessionsMock,
-  }),
   invalidateAndAbortActiveRecordingStaging: invalidateAndAbortActiveRecordingStagingMock,
+}));
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  countAssetStorageRoots: countAssetStorageRootsMock,
+  eraseAssetStorage: eraseAssetStorageMock,
 }));
 
 import { erasePersistentLocalExtensionData } from './cleanup';
@@ -87,9 +88,9 @@ beforeEach(() => {
   verifySniptaleDatabaseAbsentAfterPrivacyErasureMock.mockResolvedValue(true);
   eraseVideoPreviewCacheForPrivacyErasureMock.mockResolvedValue(undefined);
   verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock.mockResolvedValue(true);
-  countRecordingStagingSessionsMock.mockResolvedValue(0);
+  countAssetStorageRootsMock.mockResolvedValue(0);
   invalidateAndAbortActiveRecordingStagingMock.mockResolvedValue(undefined);
-  removeAllRecordingStagingSessionsMock.mockResolvedValue(2);
+  eraseAssetStorageMock.mockResolvedValue(2);
 });
 
 it('clears IndexedDB through the default database adapter', async () => {
@@ -105,8 +106,8 @@ it('clears IndexedDB through the default database adapter', async () => {
   expect(eraseVideoPreviewCacheForPrivacyErasureMock).toHaveBeenCalledOnce();
   expect(verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock).toHaveBeenCalledTimes(2);
   expect(invalidateAndAbortActiveRecordingStagingMock).toHaveBeenCalledOnce();
-  expect(removeAllRecordingStagingSessionsMock).toHaveBeenCalledOnce();
-  expect(countRecordingStagingSessionsMock).toHaveBeenCalledTimes(2);
+  expect(eraseAssetStorageMock).toHaveBeenCalledOnce();
+  expect(countAssetStorageRootsMock).toHaveBeenCalledTimes(2);
   expect(browserStorageAreaMock.remove).toHaveBeenCalled();
 });
 

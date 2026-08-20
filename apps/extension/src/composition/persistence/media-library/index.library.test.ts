@@ -52,10 +52,12 @@ vi.mock('../web-snapshots', async (importOriginal) => ({
 }));
 function createRecording(id: string): RecordingEntry {
   return {
+    assetId: `asset-${id}`,
     id,
-    blob: new Blob([id], { type: 'video/webm' }),
+    file: new File([id], `${id}.webm`, { type: 'video/webm' }),
     filename: `${id}.webm`,
     createdAt: id === 'rec-1' ? 100 : 200,
+    mimeType: 'video/webm',
     size: 10,
   };
 }
@@ -297,8 +299,8 @@ async function verifyGetMediaAssetBlobFlow() {
     )
     .mockResolvedValueOnce(undefined);
   dbMocks.getRecordingMock
-    .mockResolvedValueOnce({ blob: recordingBlob })
-    .mockResolvedValueOnce({ blob: recordingBlob });
+    .mockResolvedValueOnce({ file: recordingBlob })
+    .mockResolvedValueOnce({ file: recordingBlob });
   dbMocks.getProjectAssetMock.mockResolvedValueOnce({ blob: projectAssetBlob });
 
   await expect(getMediaAssetBlob('screenshot')).resolves.toBe(screenshotBlob);

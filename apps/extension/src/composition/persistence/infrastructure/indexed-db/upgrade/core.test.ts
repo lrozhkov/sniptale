@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { handleDatabaseUpgrade } from './core.ts';
+import type { UpgradeObjectStore, UpgradeTransaction } from './types';
 
 const COMPLETE_STORES = [
   'recordings',
@@ -26,12 +27,16 @@ const COMPLETE_STORES = [
   'native_transfer_sessions',
   'native_transfer_chunks',
   'frame_annotation_raster_jobs',
+  'asset_refs',
+  'asset_owners',
+  'asset_operations',
 ];
+const LEGACY_STORES = COMPLETE_STORES.filter((store) => !store.startsWith('asset_'));
 
-it('creates stores for the expected schema versions', () => {
+it('creates stores for the expected schema versions', async () => {
   const upgradeDb = createMockDb();
 
-  handleDatabaseUpgrade(upgradeDb, 0);
+  await handleDatabaseUpgrade(upgradeDb, 0);
 
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('recordings', { keyPath: 'id' });
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('recording_telemetry', {
@@ -68,13 +73,13 @@ it('creates stores for the expected schema versions', () => {
   });
 });
 
-it('replaces the engine1 template pack store without migrating executable data in v20', () => {
+it('replaces the engine1 template pack store without migrating executable data in v20', async () => {
   const legacyDb = createMockDb([
-    ...COMPLETE_STORES.filter((store) => store !== 'video_effect_bundles'),
+    ...LEGACY_STORES.filter((store) => store !== 'video_effect_bundles'),
     'video_template_packs',
   ]);
 
-  handleDatabaseUpgrade(legacyDb, 19);
+  await handleDatabaseUpgrade(legacyDb, 19, null, createEmptyUpgradeTransaction());
 
   expect(legacyDb.deleteObjectStore).toHaveBeenCalledWith('video_template_packs');
   expect(legacyDb.createObjectStore).toHaveBeenCalledWith('video_effect_bundles', {
@@ -84,10 +89,10 @@ it('replaces the engine1 template pack store without migrating executable data i
   expect(legacyDb.objectStoreNames).toContain('video_effect_bundles');
 });
 
-it('creates native transfer indexes during the v19 upgrade', () => {
-  const upgradeDb = createMockDb(COMPLETE_STORES.filter((store) => !store.startsWith('native_')));
+it('creates native transfer indexes during the v19 upgrade', async () => {
+  const upgradeDb = createMockDb(LEGACY_STORES.filter((store) => !store.startsWith('native_')));
 
-  handleDatabaseUpgrade(upgradeDb, 18);
+  await handleDatabaseUpgrade(upgradeDb, 18, null, createEmptyUpgradeTransaction());
 
   expect(upgradeDb.storeIndexes.get('native_transfer_sessions')?.createIndex).toHaveBeenCalledWith(
     'createdAt',
@@ -103,12 +108,12 @@ it('creates native transfer indexes during the v19 upgrade', () => {
   );
 });
 
-it('creates the job-scoped project export input handoff during the v21 upgrade', () => {
+it('creates the job-scoped project export input handoff during the v21 upgrade', async () => {
   const upgradeDb = createMockDb(
-    COMPLETE_STORES.filter((store) => store !== 'project_export_inputs')
+    LEGACY_STORES.filter((store) => store !== 'project_export_inputs')
   );
 
-  handleDatabaseUpgrade(upgradeDb, 20);
+  await handleDatabaseUpgrade(upgradeDb, 20, null, createEmptyUpgradeTransaction());
 
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('project_export_inputs', {
     keyPath: 'jobId',
@@ -119,18 +124,18 @@ it('creates the job-scoped project export input handoff during the v21 upgrade',
   );
 });
 
-it('skips store creation when existing stores already cover the upgrade', () => {
+it('skips store creation when existing stores already cover the upgrade', async () => {
   const existingDb = createMockDb(COMPLETE_STORES);
 
-  handleDatabaseUpgrade(existingDb, 25);
+  await handleDatabaseUpgrade(existingDb, 26);
 
   expect(existingDb.createObjectStore).not.toHaveBeenCalled();
 });
 
-it('recreates only interaction diagnostics stores during the v25 upgrade', () => {
-  const existingDb = createMockDb(COMPLETE_STORES);
+it('recreates interaction diagnostics and adds asset stores during the v25 upgrade', async () => {
+  const existingDb = createMockDb(LEGACY_STORES);
 
-  handleDatabaseUpgrade(existingDb, 24);
+  await handleDatabaseUpgrade(existingDb, 24, null, createEmptyUpgradeTransaction());
 
   expect(existingDb.deleteObjectStore.mock.calls).toEqual([
     ['diagnostics_events'],
@@ -139,19 +144,22 @@ it('recreates only interaction diagnostics stores during the v25 upgrade', () =>
   expect(existingDb.createObjectStore.mock.calls).toEqual([
     ['diagnostics_meta', { keyPath: 'recordingId' }],
     ['diagnostics_events', { keyPath: ['recordingId', 'chunkIndex'] }],
+    ['asset_refs', { keyPath: 'assetId' }],
+    ['asset_owners', { keyPath: ['ownerKind', 'ownerId', 'role'] }],
+    ['asset_operations', { keyPath: 'operationId' }],
   ]);
   expect(existingDb.objectStoreNames).toEqual(expect.arrayContaining(COMPLETE_STORES));
 });
 
-it('replaces editor sessions with aggregate-owned image stores during the v24 upgrade', () => {
+it('replaces editor sessions with aggregate-owned image stores during the v24 upgrade', async () => {
   const legacyDb = createMockDb([
-    ...COMPLETE_STORES.filter(
+    ...LEGACY_STORES.filter(
       (store) => store !== 'image_workspaces' && store !== 'aggregate_presentations'
     ),
     'editor_sessions',
   ]);
 
-  handleDatabaseUpgrade(legacyDb, 23);
+  await handleDatabaseUpgrade(legacyDb, 23, null, createEmptyUpgradeTransaction());
 
   expect(legacyDb.deleteObjectStore).toHaveBeenCalledWith('editor_sessions');
   expect(legacyDb.objectStoreNames).not.toContain('editor_sessions');
@@ -167,19 +175,19 @@ it('replaces editor sessions with aggregate-owned image stores during the v24 up
   );
 });
 
-it('removes the legacy annotation pack store during the v16 upgrade', () => {
-  const legacyDb = createMockDb([...COMPLETE_STORES, 'annotation_packs']);
+it('removes the legacy annotation pack store during the v16 upgrade', async () => {
+  const legacyDb = createMockDb([...LEGACY_STORES, 'annotation_packs']);
 
-  handleDatabaseUpgrade(legacyDb, 15);
+  await handleDatabaseUpgrade(legacyDb, 15, null, createEmptyUpgradeTransaction());
 
   expect(legacyDb.deleteObjectStore).toHaveBeenCalledWith('annotation_packs');
   expect(legacyDb.objectStoreNames).not.toContain('annotation_packs');
 });
 
-it('destructively removes the retired page style asset store during the v22 upgrade', () => {
-  const legacyDb = createMockDb([...COMPLETE_STORES, 'page_style_assets']);
+it('destructively removes the retired page style asset store during the v22 upgrade', async () => {
+  const legacyDb = createMockDb([...LEGACY_STORES, 'page_style_assets']);
 
-  handleDatabaseUpgrade(legacyDb, 21);
+  await handleDatabaseUpgrade(legacyDb, 21, null, createEmptyUpgradeTransaction());
 
   expect(legacyDb.deleteObjectStore).toHaveBeenCalledWith('page_style_assets');
   expect(legacyDb.objectStoreNames).not.toContain('page_style_assets');
@@ -214,4 +222,23 @@ function createStoreNames(initialStores: readonly string[]) {
   const storeNames = [...initialStores] as string[] & { contains(name: string): boolean };
   storeNames.contains = (name: string) => storeNames.includes(name);
   return storeNames;
+}
+
+function createEmptyUpgradeTransaction(): UpgradeTransaction {
+  const stores = new Map<string, UpgradeObjectStore>();
+  return {
+    abort: vi.fn(),
+    objectStore(name: string) {
+      let store = stores.get(name);
+      if (!store) {
+        store = {
+          clear: vi.fn(async () => undefined),
+          delete: vi.fn(async () => undefined),
+          getAll: vi.fn(async () => []),
+        };
+        stores.set(name, store);
+      }
+      return store;
+    },
+  };
 }

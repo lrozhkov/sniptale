@@ -9,7 +9,7 @@ async function loadVideoEditorAssetUrl(
 ): Promise<readonly [string, string] | null> {
   if (asset.source.kind === 'recording') {
     const entry = await getRecording(asset.source.recordingId);
-    return entry ? [asset.id, URL.createObjectURL(entry.blob)] : null;
+    return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
   }
 
   if (asset.source.kind === 'scenario-asset') {

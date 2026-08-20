@@ -1,8 +1,35 @@
 import JSZip from 'jszip';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
-import { assertPreparedProjectBlobsAvailable } from './preflight';
+const assetMocks = vi.hoisted(() => ({
+  admit: vi.fn(),
+  createJournal: vi.fn(),
+  deleteObject: vi.fn(),
+  deleteJournal: vi.fn(),
+  discard: vi.fn(),
+  writeBlob: vi.fn(),
+}));
+
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  assertAssetWriteAdmission: assetMocks.admit,
+  createAssetPublicationJournal: assetMocks.createJournal,
+  deleteAssetObject: assetMocks.deleteObject,
+  deleteReadyJournal: assetMocks.deleteJournal,
+  discardPreparedAsset: assetMocks.discard,
+  writeBlobToAsset: assetMocks.writeBlob,
+}));
+
+import {
+  assertPreparedProjectBlobsAvailable,
+  stagePreparedProjectRecordingAssets,
+} from './preflight';
 import { createMissingProjectBlobZip, createPreparedDomains } from '../projects/test-support';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  assetMocks.admit.mockResolvedValue(undefined);
+});
 
 it('materializes every project blob exactly once before the write transaction', async () => {
   const zip = new JSZip();
@@ -46,3 +73,64 @@ it('fails when a prepared project blob entry is missing', async () => {
     assertPreparedProjectBlobsAvailable(createPreparedDomains(), createMissingProjectBlobZip())
   ).rejects.toThrow('project-asset');
 });
+
+it('leaves earlier operation journals to recovery when later project-export staging fails', async () => {
+  const prepared = createPreparedDomains();
+  const project = prepared.videoProjects[0]!;
+  const first = project.descriptor.projectExports[0]!;
+  project.descriptor.projectExports.push({
+    ...first,
+    entry: { ...first.entry, id: 'export-2', recordingId: 'recording-2' },
+    recording: {
+      ...first.recording,
+      blobPath: 'recording-2',
+      entry: { ...first.recording.entry, id: 'recording-2' },
+    },
+  });
+  prepared.restoredBlobs = new Map([
+    [first.recording.blobPath, new Blob(['first'], { type: 'video/webm' })],
+    ['recording-2', new Blob(['second'], { type: 'video/webm' })],
+  ]);
+  assetMocks.writeBlob
+    .mockResolvedValueOnce(createPreparedAsset('asset-1'))
+    .mockRejectedValueOnce(new Error('second staging failed'));
+  assetMocks.createJournal.mockResolvedValueOnce({ journalId: 'journal-1' });
+
+  await expect(stagePreparedProjectRecordingAssets(prepared, 'restore-1')).rejects.toThrow(
+    'second staging failed'
+  );
+
+  expect(assetMocks.deleteObject).not.toHaveBeenCalled();
+  expect(assetMocks.deleteJournal).not.toHaveBeenCalled();
+  expect(assetMocks.discard).not.toHaveBeenCalled();
+});
+
+it('discards only the current unpublished object when journal creation fails', async () => {
+  const prepared = createPreparedDomains();
+  const recording = prepared.videoProjects[0]!.descriptor.projectExports[0]!.recording;
+  prepared.restoredBlobs = new Map([
+    [recording.blobPath, new Blob(['recording'], { type: 'video/webm' })],
+  ]);
+  assetMocks.writeBlob.mockResolvedValueOnce(createPreparedAsset('asset-current'));
+  assetMocks.createJournal.mockRejectedValueOnce(new Error('journal failed'));
+  assetMocks.discard.mockResolvedValueOnce(undefined);
+
+  await expect(stagePreparedProjectRecordingAssets(prepared, 'restore-1')).rejects.toThrow(
+    'journal failed'
+  );
+
+  expect(assetMocks.discard).toHaveBeenCalledWith('asset-current');
+});
+
+function createPreparedAsset(assetId: string) {
+  return {
+    ref: {
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      mimeType: 'video/webm',
+      sha256: null,
+      size: 5,
+    },
+  };
+}

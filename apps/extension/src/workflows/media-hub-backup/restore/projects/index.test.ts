@@ -6,6 +6,8 @@ import {
   createStores,
   createZip,
 } from './test-support';
+import { assertPreparedProjectBlobsAvailable } from '../project/preflight';
+import { commitPreparedProjectDomains } from '.';
 
 const { initDBMock } = vi.hoisted(() => ({
   initDBMock: vi.fn(),
@@ -29,11 +31,9 @@ describe('backup project restore writer', () => {
   it('restores prepared video and scenario bundles with remapped internal ids', async () => {
     const stores = createStores();
     initDBMock.mockResolvedValue(createTransactionDb(stores));
-    const { restorePreparedProjectDomains } = await import('.');
-
-    await expect(restorePreparedProjectDomains(createPreparedDomains(), createZip())).resolves.toBe(
-      2
-    );
+    await expect(
+      preflightAndCommitPreparedProjectDomains(createPreparedDomains(), createZip())
+    ).resolves.toBe(2);
 
     expect(stores.get('project_assets')?.put).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'project-asset-copy', blob: expect.any(Blob) })
@@ -51,6 +51,38 @@ describe('backup project restore writer', () => {
       expect.objectContaining({ assetId: 'scenario-export:scenario-export-copy' })
     );
   });
+
+  it('commits the durable asset operation in the same final project transaction', async () => {
+    const stores = createStores();
+    stores.get('asset_operations')?.get.mockResolvedValue({
+      compensations: [],
+      createdAt: 1,
+      kind: 'backup-restore',
+      obsoleteAssetIds: [],
+      operationId: 'restore-1',
+      status: 'pending',
+      updatedAt: 1,
+    });
+    initDBMock.mockResolvedValue(createTransactionDb(stores));
+    const prepared = createPreparedDomains();
+    await assertPreparedProjectBlobsAvailable(prepared, createZip());
+
+    await commitPreparedProjectDomains({ operationId: 'restore-1', prepared });
+
+    expect(stores.get('asset_operations')?.put).toHaveBeenCalledWith(
+      expect.objectContaining({ operationId: 'restore-1', status: 'committed' })
+    );
+  });
+
+  it('rejects an export-bearing project commit without durable operation authority', async () => {
+    const prepared = createPreparedDomains();
+    await assertPreparedProjectBlobsAvailable(prepared, createZip());
+
+    await expect(commitPreparedProjectDomains({ prepared })).rejects.toThrow(
+      'requires a durable asset operation'
+    );
+    expect(initDBMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('backup project restore writer empty domains', () => {
@@ -59,19 +91,17 @@ describe('backup project restore writer empty domains', () => {
   });
 
   it('skips project transactions when no v2 project domains are present', async () => {
-    const { restorePreparedProjectDomains } = await import('.');
-
-    await expect(restorePreparedProjectDomains(createEmptyDomains(), createZip())).resolves.toBe(0);
+    await expect(
+      preflightAndCommitPreparedProjectDomains(createEmptyDomains(), createZip())
+    ).resolves.toBe(0);
     expect(initDBMock).not.toHaveBeenCalled();
   });
 
   it('restores minimal bundles without optional thumbnails or telemetry', async () => {
     const stores = createStores();
     initDBMock.mockResolvedValue(createTransactionDb(stores));
-    const { restorePreparedProjectDomains } = await import('.');
-
     await expect(
-      restorePreparedProjectDomains(createMinimalPreparedDomains(), createZip())
+      preflightAndCommitPreparedProjectDomains(createMinimalPreparedDomains(), createZip())
     ).resolves.toBe(2);
 
     expect(stores.get('project_exports')?.put).toHaveBeenCalledWith(
@@ -83,10 +113,8 @@ describe('backup project restore writer empty domains', () => {
   it('restores scenario export thumbnails when export ids are not remapped', async () => {
     const stores = createStores();
     initDBMock.mockResolvedValue(createTransactionDb(stores));
-    const { restorePreparedProjectDomains } = await import('.');
-
     await expect(
-      restorePreparedProjectDomains(createScenarioThumbnailNoRemapDomains(), createZip())
+      preflightAndCommitPreparedProjectDomains(createScenarioThumbnailNoRemapDomains(), createZip())
     ).resolves.toBe(1);
 
     expect(stores.get('thumbnails')?.put).toHaveBeenCalledWith(
@@ -102,6 +130,19 @@ function createTransactionDb(stores: ReturnType<typeof createStores>) {
       objectStore: (name: string) => stores.get(name),
     })),
   };
+}
+
+async function preflightAndCommitPreparedProjectDomains(
+  prepared: Parameters<typeof commitPreparedProjectDomains>[0]['prepared'],
+  zip: Parameters<typeof assertPreparedProjectBlobsAvailable>[1]
+): Promise<number> {
+  await assertPreparedProjectBlobsAvailable(prepared, zip);
+  const operationId = prepared.videoProjects.some(
+    (project) => project.descriptor.projectExports.length > 0
+  )
+    ? 'restore-1'
+    : undefined;
+  return commitPreparedProjectDomains({ ...(operationId ? { operationId } : {}), prepared });
 }
 
 function createEmptyDomains() {

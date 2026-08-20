@@ -35,7 +35,7 @@ it('loads blobs for recording, scenario, and project asset sources', async () =>
   const scenarioBlob = new Blob(['scenario']);
   const projectBlob = new Blob(['asset']);
 
-  getRecordingMock.mockResolvedValue({ blob: recordingBlob });
+  getRecordingMock.mockResolvedValue({ file: recordingBlob });
   getScenarioAssetMock.mockResolvedValue({ blob: scenarioBlob });
   getProjectAssetMock.mockResolvedValue({ blob: projectBlob });
 

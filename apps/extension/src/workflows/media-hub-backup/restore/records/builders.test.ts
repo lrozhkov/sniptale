@@ -35,16 +35,27 @@ function createEntry(
 
 function assertRecordingStoreEntry(): void {
   const blob = new Blob(['recording-data']);
+  const prepared = {
+    ref: {
+      assetId: 'asset-recording-1',
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: 'objects/asset-recording-1' },
+      mimeType: 'video/webm',
+      sha256: null,
+      size: blob.size,
+    },
+  };
   const entry = createEntry({
     kind: 'recording',
     recordingId: 'recording-1',
   });
 
-  expect(createRecordingStoreEntry('recording-1', entry, blob)).toEqual({
-    blob,
+  expect(createRecordingStoreEntry('recording-1', entry, prepared)).toEqual({
+    assetId: 'asset-recording-1',
     createdAt: 10,
     filename: 'asset.webm',
     id: 'recording-1',
+    mimeType: 'video/webm',
     size: blob.size,
   });
 }

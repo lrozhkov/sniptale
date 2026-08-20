@@ -1,20 +1,20 @@
 import {
+  ASSET_REFS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
+import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
 import type {
   ProjectAssetEntry,
   ProjectExportEntry,
   VideoProjectEntry,
 } from '../../../../composition/persistence/projects/contracts';
-import type {
-  RecordingEntry,
-  RecordingTelemetryEntry,
-} from '../../../../composition/persistence/recordings/contracts';
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { MediaHubBackupExportOptions } from '../../contracts/types';
 
@@ -39,17 +39,6 @@ function isMediaThumbnailEntry(value: unknown): value is MediaThumbnailEntry {
 }
 
 function isProjectAssetEntry(value: unknown): value is ProjectAssetEntry {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'blob' in value &&
-    value.blob instanceof Blob &&
-    'size' in value &&
-    typeof value.size === 'number'
-  );
-}
-
-function isRecordingEntry(value: unknown): value is RecordingEntry {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -134,9 +123,17 @@ async function inspectVideoProjectExport(
   inventory: VideoProjectBackupInspection
 ): Promise<void> {
   const recording: unknown = await db.get(STORE_NAME, projectExport.recordingId);
-  if (isRecordingEntry(recording)) {
+  const storedRecording = parseRecordingEntry(recording);
+  if (storedRecording) {
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, storedRecording.assetId));
+    if (!ref) {
+      throw new Error(
+        `Project export recording asset reference is missing: ${storedRecording.id}.`
+      );
+    }
+    await readAssetFile(ref, storedRecording.filename);
     inventory.recordingCount += 1;
-    inventory.sizeBytes += recording.size;
+    inventory.sizeBytes += ref.size;
   }
 
   const exportThumbnail = await getThumbnail(db, `export:${projectExport.id}`);

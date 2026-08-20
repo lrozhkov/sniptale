@@ -141,11 +141,12 @@ describe('aggregate lifecycle promotion replay', () => {
     const recordingLifecycle = createLibraryLifecycle('library', 700);
     const assetLifecycle = createLibraryLifecycle('library', 800);
     const recording = {
-      blob: new Blob(['recording']),
+      assetId: 'asset-recording-1',
       createdAt: 10,
       filename: 'recording.webm',
       id: 'recording-1',
       lifecycle: recordingLifecycle,
+      mimeType: 'video/webm',
       size: 9,
     };
     const mediaRows = [

@@ -1,12 +1,23 @@
 import JSZip from 'jszip';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import { appendBackupAssetDescriptor, resolveBackupMediaBlob } from './index';
 import { createBackupExportBudget } from '../export/blob/budget';
-import { PROJECT_ASSETS_STORE, RECORDING_TELEMETRY_STORE, STORE_NAME } from '../storage/constants';
+import {
+  ASSET_REFS_STORE,
+  PROJECT_ASSETS_STORE,
+  RECORDING_TELEMETRY_STORE,
+  STORE_NAME,
+} from '../storage/constants';
 import type { MediaHubBackupAssetDescriptor } from '../contracts/types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+
+const readAssetFileMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/assets')>()),
+  readAssetFile: readAssetFileMock,
+}));
 
 function createEntry(
   source: MediaLibraryEntry['source'],
@@ -77,7 +88,25 @@ async function assertResolvesStoreBackedBlobs(): Promise<void> {
       calls.push({ key, storeName });
 
       if (storeName === STORE_NAME) {
-        return { blob: key === 'rec-1' ? recordingBlob : projectExportBlob };
+        return {
+          assetId: key === 'rec-1' ? 'asset-recording' : 'asset-export',
+          createdAt: 1,
+          filename: `${key}.webm`,
+          id: key,
+          mimeType: 'video/webm',
+          size: key === 'rec-1' ? recordingBlob.size : projectExportBlob.size,
+        };
+      }
+
+      if (storeName === ASSET_REFS_STORE) {
+        return {
+          assetId: key,
+          createdAt: 1,
+          location: { kind: 'opfs', objectKey: `objects/${key}` },
+          mimeType: 'video/webm',
+          sha256: null,
+          size: key === 'asset-recording' ? recordingBlob.size : projectExportBlob.size,
+        };
       }
 
       if (storeName === PROJECT_ASSETS_STORE) {
@@ -87,13 +116,17 @@ async function assertResolvesStoreBackedBlobs(): Promise<void> {
       return undefined;
     },
   };
+  readAssetFileMock.mockReset();
+  readAssetFileMock.mockResolvedValueOnce(recordingBlob).mockResolvedValueOnce(projectExportBlob);
 
   await expect(resolveBackupMediaBlob(db, recordingEntry)).resolves.toBe(recordingBlob);
   await expect(resolveBackupMediaBlob(db, projectExportEntry)).resolves.toBe(projectExportBlob);
   await expect(resolveBackupMediaBlob(db, projectAssetEntry)).resolves.toBe(projectAssetBlob);
   expect(calls).toEqual([
     { key: 'rec-1', storeName: STORE_NAME },
+    { key: 'asset-recording', storeName: ASSET_REFS_STORE },
     { key: 'export-recording-1', storeName: STORE_NAME },
+    { key: 'asset-export', storeName: ASSET_REFS_STORE },
     { key: 'project-asset-1', storeName: PROJECT_ASSETS_STORE },
   ]);
 }
@@ -168,6 +201,8 @@ async function assertAppendsArchiveDescriptor(): Promise<void> {
   const assets: MediaHubBackupAssetDescriptor[] = [];
   const fileBlob = new Blob(['video-export']);
   const thumbnailBlob = new Blob(['thumbnail']);
+  readAssetFileMock.mockReset();
+  readAssetFileMock.mockResolvedValueOnce(fileBlob);
 
   const nextThumbnailCount = await appendBackupAssetDescriptor({
     assets,
@@ -175,7 +210,11 @@ async function assertAppendsArchiveDescriptor(): Promise<void> {
     db: {
       get: async (storeName: string, key: string) => {
         if (storeName === STORE_NAME && key === 'recording-1') {
-          return { blob: fileBlob };
+          return createStoredRecording('recording-1', 'asset-export', fileBlob.size);
+        }
+
+        if (storeName === ASSET_REFS_STORE && key === 'asset-export') {
+          return createAssetRef('asset-export', fileBlob.size);
         }
 
         if (storeName === 'thumbnails' && key === entry.id) {
@@ -204,6 +243,8 @@ async function assertAppendsRecordingTelemetryDescriptor(): Promise<void> {
   const zip = createZipRecorder();
   const assets: MediaHubBackupAssetDescriptor[] = [];
   const telemetry = createRecordingTelemetry();
+  readAssetFileMock.mockReset();
+  readAssetFileMock.mockResolvedValueOnce(new Blob(['recording']));
 
   await appendBackupAssetDescriptor({
     assets,
@@ -211,7 +252,11 @@ async function assertAppendsRecordingTelemetryDescriptor(): Promise<void> {
     db: {
       get: async (storeName: string, key: string) => {
         if (storeName === STORE_NAME && key === 'recording-1') {
-          return { blob: new Blob(['recording']) };
+          return createStoredRecording('recording-1', 'asset-recording', 9);
+        }
+
+        if (storeName === ASSET_REFS_STORE && key === 'asset-recording') {
+          return createAssetRef('asset-recording', 9);
         }
 
         if (storeName === RECORDING_TELEMETRY_STORE && key === 'recording-1') {
@@ -234,6 +279,28 @@ async function assertAppendsRecordingTelemetryDescriptor(): Promise<void> {
       thumbnailPath: null,
     })
   );
+}
+
+function createStoredRecording(id: string, assetId: string, size: number) {
+  return {
+    assetId,
+    createdAt: 1,
+    filename: `${id}.webm`,
+    id,
+    mimeType: 'video/webm',
+    size,
+  };
+}
+
+function createAssetRef(assetId: string, size: number) {
+  return {
+    assetId,
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+    mimeType: 'video/webm',
+    sha256: null,
+    size,
+  };
 }
 
 async function assertThrowsWhenBlobIsMissing(): Promise<void> {

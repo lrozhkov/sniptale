@@ -1,4 +1,7 @@
 export const STORE_NAME = 'recordings';
+export const ASSET_REFS_STORE = 'asset_refs';
+export const ASSET_OWNERS_STORE = 'asset_owners';
+export const ASSET_OPERATIONS_STORE = 'asset_operations';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
 export const PROJECT_ASSETS_STORE = 'project_assets';
 export const PROJECT_EXPORTS_STORE = 'project_exports';

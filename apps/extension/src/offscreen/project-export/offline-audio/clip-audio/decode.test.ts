@@ -96,7 +96,7 @@ it('loads recording blobs when decoding recording-backed clips', async () => {
     metadata: { hasAudio: true },
     source: { kind: 'recording', recordingId: 'recording-1' },
   });
-  getRecordingMock.mockResolvedValue({ blob: new Blob(['recording']) });
+  getRecordingMock.mockResolvedValue({ file: new Blob(['recording']) });
 
   await decodeClipAudioBuffer(project, clip, decodedBuffers, decodeContext);
 

@@ -31,6 +31,8 @@ function createTransaction(stores: Map<string, ReturnType<typeof createStore>>):
 function createStores() {
   return new Map([
     ['aggregate_presentations', createStore()],
+    ['asset_owners', createStore()],
+    ['asset_refs', createStore()],
     ['media_library', createStore()],
     ['project_assets', createStore()],
     ['project_exports', createStore([createStaleProjectExport()])],

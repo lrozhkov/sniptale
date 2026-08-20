@@ -4,6 +4,7 @@ import type {
   RecordingStagingArtifactWriter,
   RecordingStagingCoordinator,
 } from '../../../composition/persistence/recordings/staging';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 export function createRecordingStagingCoordinatorTestDouble(): RecordingStagingCoordinator {
   const writers = new Map<string, RecordingStagingArtifactWriter>();
@@ -22,7 +23,7 @@ export function createRecordingStagingCoordinatorTestDouble(): RecordingStagingC
           const file = new File(writtenParts, input.filename, { type: input.mimeType });
           return {
             artifactId: input.artifactId,
-            file,
+            asset: createPreparedRecordingAssetForTest(file, input.artifactId),
             filename: input.filename,
             mimeType: input.mimeType,
             size: file.size,

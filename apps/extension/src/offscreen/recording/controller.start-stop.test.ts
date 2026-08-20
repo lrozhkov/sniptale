@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { TestMediaStream } from './multi-source/media-stream.test-support';
+import type { FinalizedRecordingStagingArtifact } from '../../composition/persistence/recordings/staging';
+import { createPreparedRecordingAssetForTest } from '../../composition/persistence/recordings/staging/test-support';
 
 const {
   cancelPendingMultiSourceRecordingStartMock,
@@ -125,18 +127,12 @@ function createActiveRecorderFixture() {
 
 function bindArtifactSession(
   recorder: ActiveMediaRecorderFixture,
-  stopImplementation: () => Promise<{
-    artifactId: string;
-    file: File;
-    filename: string;
-    mimeType: string;
-    size: number;
-  }> = async () => {
+  stopImplementation: () => Promise<FinalizedRecordingStagingArtifact> = async () => {
     recorder.stop();
     const file = new File(['saved'], 'recording.webm', { type: 'video/webm' });
     return {
       artifactId: 'recording-delayed',
-      file,
+      asset: createPreparedRecordingAssetForTest(file, 'recording-delayed'),
       filename: file.name,
       mimeType: file.type,
       size: file.size,
@@ -225,7 +221,10 @@ it('delegates normal STOP to the artifact session as the only raw recorder stop 
   const { recorder, stop: rawRecorderStop } = createActiveRecorderFixture();
   const artifact = {
     artifactId: 'recording-delayed',
-    file: new File(['saved'], 'recording.webm', { type: 'video/webm' }),
+    asset: createPreparedRecordingAssetForTest(
+      new File(['saved'], 'recording.webm', { type: 'video/webm' }),
+      'recording-delayed'
+    ),
     filename: 'recording.webm',
     mimeType: 'video/webm',
     size: 5,
@@ -256,7 +255,7 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
   const firstFile = new File(['first'], 'first.webm', { type: 'video/webm' });
   const firstArtifact = {
     artifactId: sourceBinding.recordingId,
-    file: firstFile,
+    asset: createPreparedRecordingAssetForTest(firstFile, sourceBinding.recordingId),
     filename: firstFile.name,
     mimeType: firstFile.type,
     size: firstFile.size,
@@ -301,7 +300,7 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
     recordingContext.stopRecordingResolve?.({ result: 'stopped' });
     return {
       artifactId: nextBinding.recordingId,
-      file: nextFile,
+      asset: createPreparedRecordingAssetForTest(nextFile, nextBinding.recordingId),
       filename: nextFile.name,
       mimeType: nextFile.type,
       size: nextFile.size,

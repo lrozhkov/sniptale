@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createPreparedRecordingAssetForTest } from '../../composition/persistence/recordings/staging/test-support';
 
 const {
   cleanupResourcesMock,
@@ -113,7 +114,7 @@ function bindActiveArtifactSession(binding: {
     recordingContext.stopRecordingResolve?.({ result: 'stopped' });
     return {
       artifactId: binding.recordingId,
-      file,
+      asset: createPreparedRecordingAssetForTest(file, binding.recordingId),
       filename: file.name,
       mimeType: file.type,
       size: file.size,

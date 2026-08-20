@@ -86,7 +86,7 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
 
   if (entry.source.kind === 'recording' || entry.source.kind === 'project-export') {
     const recording = await getRecording(entry.source.recordingId);
-    return recording?.blob;
+    return recording?.file;
   }
 
   if (entry.source.kind === 'web-snapshot') {

@@ -17,10 +17,21 @@ export function createOversizedVideoProjectAssetBundleDb() {
 }
 
 export function createOversizedVideoProjectExportBundleDb() {
+  const blob = createOversizedBackupBlob();
   return createVideoProjectBundleDb({
     getRecord: async (storeName, key) => {
       if (storeName === 'recordings' && key === 'recording-1') {
-        return createRecordingRecord(createOversizedBackupBlob());
+        return createRecordingRecord(blob);
+      }
+      if (storeName === 'asset_refs' && key === 'asset-recording-1') {
+        return {
+          assetId: 'asset-recording-1',
+          createdAt: 2,
+          location: { kind: 'opfs', objectKey: 'objects/asset-recording-1' },
+          mimeType: 'video/webm',
+          sha256: null,
+          size: blob.size,
+        };
       }
       return undefined;
     },
@@ -93,8 +104,9 @@ function createProjectAssetRecord(blob: Blob) {
 
 function createRecordingRecord(blob: Blob) {
   return {
+    assetId: 'asset-recording-1',
     id: 'recording-1',
-    blob,
+    mimeType: 'video/webm',
     filename: 'export.webm',
     createdAt: 2,
     size: blob.size,

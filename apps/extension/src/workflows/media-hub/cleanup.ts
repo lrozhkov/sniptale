@@ -7,7 +7,7 @@ import type {
   ProjectAssetEntry,
   ProjectExportEntry,
 } from '../../composition/persistence/projects/contracts';
-import type { RecordingEntry } from '../../composition/persistence/recordings/contracts';
+import type { StoredRecordingEntry } from '../../composition/persistence/recordings/contracts';
 import type { VideoProject } from '../../features/video/project/types/model';
 
 import {
@@ -37,7 +37,7 @@ export function sumBytes(items: Array<{ size: number }>): number {
 export function buildCleanupCandidates(params: {
   mediaItems: MediaLibraryItem[];
   projectAssets?: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>;
-  recordings: Array<Omit<RecordingEntry, 'blob'>>;
+  recordings: StoredRecordingEntry[];
   projectExports: ProjectExportEntry[];
   projectDetails: Array<VideoProject | null>;
   rawInventory?: StorageCleanupInventory;
@@ -95,7 +95,7 @@ function collectCleanupReferences(args: {
 }
 
 function getOrphanedRawRecordings(
-  recordings: Array<Omit<RecordingEntry, 'blob'>>,
+  recordings: StoredRecordingEntry[],
   referencedRecordingIds: Set<string>
 ): StorageCleanupCandidate[] {
   return recordings
@@ -124,7 +124,7 @@ function getBrokenMediaMirrors(args: {
   mediaItems: MediaLibraryItem[];
   projectAssets: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>;
   projectExports: ProjectExportEntry[];
-  recordings: Array<Omit<RecordingEntry, 'blob'>>;
+  recordings: StoredRecordingEntry[];
   webSnapshotIds?: Set<string>;
 }): StorageCleanupCandidate[] {
   const recordingIds = new Set(args.recordings.map((entry) => entry.id));
@@ -174,9 +174,7 @@ function getOrphanedProjectAssets(
     }));
 }
 
-function createRecordingCandidate(
-  recording: Omit<RecordingEntry, 'blob'>
-): StorageCleanupCandidate {
+function createRecordingCandidate(recording: StoredRecordingEntry): StorageCleanupCandidate {
   return {
     id: recording.id,
     filename: recording.filename,

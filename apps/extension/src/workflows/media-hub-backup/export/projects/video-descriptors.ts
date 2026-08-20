@@ -1,6 +1,7 @@
 import type JSZip from 'jszip';
 import {
   PROJECT_ASSETS_STORE,
+  ASSET_REFS_STORE,
   PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
@@ -17,6 +18,8 @@ import type {
   RecordingEntry,
   RecordingTelemetryEntry,
 } from '../../../../composition/persistence/recordings/contracts';
+import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
+import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { parseVideoProjectEntryResult } from '../../../../composition/persistence/projects/read-guards';
 import type { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
@@ -166,11 +169,17 @@ async function buildVideoProjectExportDescriptors(
 
   for (const entry of exports) {
     assertBackupExportNotCancelled(signal);
-    const recording = (await db.get(STORE_NAME, entry.recordingId)) as RecordingEntry | undefined;
+    const storedRecording = parseRecordingEntry(await db.get(STORE_NAME, entry.recordingId));
     assertBackupExportNotCancelled(signal);
-    if (!recording) {
+    if (!storedRecording) {
       continue;
     }
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, storedRecording.assetId));
+    if (!ref) continue;
+    const recording: RecordingEntry = {
+      ...storedRecording,
+      file: await readAssetFile(ref, storedRecording.filename),
+    };
 
     descriptors.push(
       await buildVideoProjectExportDescriptor(
@@ -219,7 +228,15 @@ async function buildVideoProjectExportDescriptor(
       zip,
       budget,
       `video-projects/${projectSegment}/exports/${exportSegment}`,
-      recording,
+      {
+        blob: recording.file,
+        createdAt: recording.createdAt,
+        filename: recording.filename,
+        id: recording.id,
+        mimeType: recording.mimeType,
+        size: recording.size,
+        ...(recording.lifecycle ? { lifecycle: recording.lifecycle } : {}),
+      },
       signal
     ),
     ...(recordingTelemetry ? { recordingTelemetry } : {}),

@@ -7,6 +7,8 @@ import {
   createStores,
   createZip,
 } from './test-support';
+import { assertPreparedProjectBlobsAvailable } from '../project/preflight';
+import { commitPreparedProjectDomains } from '.';
 
 const { initDBMock } = vi.hoisted(() => ({
   initDBMock: vi.fn(),
@@ -28,34 +30,33 @@ beforeEach(() => {
 
 describe('backup project restore atomic preflight', () => {
   it('rejects missing project blobs before opening a restore transaction', async () => {
-    const { restorePreparedProjectDomains } = await import('.');
-
     await expect(
-      restorePreparedProjectDomains(createMinimalPreparedDomains(), createMissingProjectBlobZip())
+      preflightAndCommitPreparedProjectDomains(
+        createMinimalPreparedDomains(),
+        createMissingProjectBlobZip()
+      )
     ).rejects.toThrow('recording.');
 
     expect(initDBMock).not.toHaveBeenCalled();
   });
 
   it('rejects unsafe project asset blobs before opening a restore transaction', async () => {
-    const { restorePreparedProjectDomains } = await import('.');
     const prepared = createPreparedDomains();
     prepared.videoProjects[0]!.descriptor.projectAssets[0]!.entry.mimeType = 'image/svg+xml';
 
     await expect(
-      restorePreparedProjectDomains(prepared, createUnsafeProjectAssetZip())
+      preflightAndCommitPreparedProjectDomains(prepared, createUnsafeProjectAssetZip())
     ).rejects.toThrow('Unsupported project asset MIME type');
 
     expect(initDBMock).not.toHaveBeenCalled();
   });
 
   it('rejects malformed scenario asset entries before opening a restore transaction', async () => {
-    const { restorePreparedProjectDomains } = await import('.');
     const prepared = createPreparedDomains();
     Reflect.set(prepared.scenarioProjects[0]!.descriptor.assets[0]!.entry, 'width', 'wide');
 
     await expect(
-      restorePreparedProjectDomains(prepared, createUnsafeProjectAssetZip())
+      preflightAndCommitPreparedProjectDomains(prepared, createUnsafeProjectAssetZip())
     ).rejects.toThrow('Invalid scenario asset backup entry');
 
     expect(initDBMock).not.toHaveBeenCalled();
@@ -64,7 +65,6 @@ describe('backup project restore atomic preflight', () => {
 
 describe('backup project restore transaction lifecycle', () => {
   it('materializes every archive blob before opening the restore transaction', async () => {
-    const { restorePreparedProjectDomains } = await import('.');
     const stores = createStores();
     let releaseArchiveRead!: () => void;
     let transactionOpened = false;
@@ -84,7 +84,7 @@ describe('backup project restore transaction lifecycle', () => {
     });
     initDBMock.mockResolvedValue({ transaction });
 
-    const restore = restorePreparedProjectDomains(createPreparedDomains(), zip);
+    const restore = preflightAndCommitPreparedProjectDomains(createPreparedDomains(), zip);
     await vi.waitFor(() => expect(firstRead).toHaveBeenCalled());
     expect(initDBMock).not.toHaveBeenCalled();
     releaseArchiveRead();
@@ -96,7 +96,6 @@ describe('backup project restore transaction lifecycle', () => {
 
 describe('backup project restore rollback', () => {
   it('aborts the transaction when a prepared write rejects', async () => {
-    const { restorePreparedProjectDomains } = await import('.');
     const stores = createStores();
     stores.get('video_projects')?.put.mockRejectedValue(new Error('write failed'));
     const abort = vi.fn();
@@ -109,11 +108,24 @@ describe('backup project restore rollback', () => {
     });
 
     await expect(
-      restorePreparedProjectDomains(createPreparedDomains(), createZip())
+      preflightAndCommitPreparedProjectDomains(createPreparedDomains(), createZip())
     ).rejects.toThrow('write failed');
     expect(abort).toHaveBeenCalledOnce();
   });
 });
+
+async function preflightAndCommitPreparedProjectDomains(
+  prepared: Parameters<typeof commitPreparedProjectDomains>[0]['prepared'],
+  zip: Parameters<typeof assertPreparedProjectBlobsAvailable>[1]
+): Promise<number> {
+  await assertPreparedProjectBlobsAvailable(prepared, zip);
+  const operationId = prepared.videoProjects.some(
+    (project) => project.descriptor.projectExports.length > 0
+  )
+    ? 'restore-1'
+    : undefined;
+  return commitPreparedProjectDomains({ ...(operationId ? { operationId } : {}), prepared });
+}
 
 function createDelayedProjectBlobZip(
   gate: Promise<void>,

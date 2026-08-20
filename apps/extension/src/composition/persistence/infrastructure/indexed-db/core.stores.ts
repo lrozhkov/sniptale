@@ -1,6 +1,6 @@
 // Keep the IndexedDB name stable so existing user media/projects remain readable across rebrands.
 export const DB_NAME = 'sniptale-video-db';
-export const DB_VERSION = 25;
+export const DB_VERSION = 26;
 
 export const STORE_NAME = 'recordings';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
@@ -26,6 +26,9 @@ export const EDITOR_CUSTOM_SHAPES_STORE = 'editor_custom_shapes';
 export const STATE_MANAGER_STORE = 'state_manager';
 export const NATIVE_TRANSFER_SESSIONS_STORE = 'native_transfer_sessions';
 export const NATIVE_TRANSFER_CHUNKS_STORE = 'native_transfer_chunks';
+export const ASSET_REFS_STORE = 'asset_refs';
+export const ASSET_OWNERS_STORE = 'asset_owners';
+export const ASSET_OPERATIONS_STORE = 'asset_operations';
 
 export const EXPECTED_STORES = [
   STORE_NAME,
@@ -52,6 +55,9 @@ export const EXPECTED_STORES = [
   STATE_MANAGER_STORE,
   NATIVE_TRANSFER_SESSIONS_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_OPERATIONS_STORE,
 ] as const;
 
 export const EXPECTED_INDEXES = {
@@ -77,4 +83,7 @@ export const EXPECTED_INDEXES = {
   [STATE_MANAGER_STORE]: ['domain', 'updatedAtEpochMs'],
   [NATIVE_TRANSFER_SESSIONS_STORE]: ['createdAt', 'updatedAt'],
   [NATIVE_TRANSFER_CHUNKS_STORE]: ['sessionId'],
+  [ASSET_REFS_STORE]: ['createdAt'],
+  [ASSET_OWNERS_STORE]: ['assetId'],
+  [ASSET_OPERATIONS_STORE]: ['status', 'updatedAt'],
 } as const satisfies Partial<Record<(typeof EXPECTED_STORES)[number], readonly string[]>>;

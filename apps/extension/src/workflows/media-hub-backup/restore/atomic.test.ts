@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
-import type { RecordingEntry } from '../../../composition/persistence/recordings/contracts';
+import type { StoredRecordingEntry } from '../../../composition/persistence/recordings/contracts';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import type { MediaHubBackupMetadata } from '../contracts/types';
 
@@ -184,11 +184,12 @@ function createProjectMissingRecordingMetadata(): MediaHubBackupMetadata {
   };
 }
 
-function createRecordingDescriptorEntry(): Omit<RecordingEntry, 'blob'> {
+function createRecordingDescriptorEntry(): Omit<StoredRecordingEntry, 'assetId'> {
   return {
     createdAt: 1,
     filename: 'recording.webm',
     id: 'recording-1',
+    mimeType: 'video/webm',
     size: 10,
   };
 }

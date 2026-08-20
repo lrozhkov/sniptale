@@ -6,7 +6,7 @@ interface FakeZipArchive {
   __fakeZipFiles: Map<string, Blob | string>;
 }
 
-const { FakeJSZip, initDBMock, listMediaLibraryMock } = vi.hoisted(() => {
+const { FakeJSZip, initDBMock, listMediaLibraryMock, readAssetFileMock } = vi.hoisted(() => {
   class FakeZipFile {
     constructor(private readonly value: Blob | string) {}
 
@@ -54,6 +54,7 @@ const { FakeJSZip, initDBMock, listMediaLibraryMock } = vi.hoisted(() => {
     FakeJSZip,
     initDBMock: vi.fn(),
     listMediaLibraryMock: vi.fn(),
+    readAssetFileMock: vi.fn(),
   };
 });
 
@@ -66,6 +67,7 @@ vi.mock(
   async (importOriginal) => ({
     ...(await importOriginal<typeof import('jszip')>()),
     PROJECT_ASSETS_STORE: 'project_assets',
+    ASSET_REFS_STORE: 'asset_refs',
     PROJECT_EXPORTS_STORE: 'project_exports',
     RECORDING_TELEMETRY_STORE: 'recording_telemetry',
     SCENARIO_ASSETS_STORE: 'scenario_assets',
@@ -78,6 +80,11 @@ vi.mock(
     initDB: initDBMock,
   })
 );
+
+vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/assets')>()),
+  readAssetFile: readAssetFileMock,
+}));
 
 vi.mock('../../../composition/persistence/media-library/index', async (importOriginal) => ({
   ...(await importOriginal<
@@ -148,8 +155,17 @@ function setupExportDatabase(firstEntry: MediaLibraryEntry, secondEntry: MediaLi
 
       if (storeName === 'recordings' && key === 'recording-1') {
         return {
-          blob: new Blob(['recording-1']),
+          assetId: 'recording-asset-1',
+          createdAt: 1,
+          filename: 'recording.webm',
+          id: 'recording-1',
+          mimeType: 'video/webm',
+          size: 11,
         };
+      }
+
+      if (storeName === 'asset_refs' && key === 'recording-asset-1') {
+        return createRecordingAssetRef();
       }
 
       return undefined;
@@ -157,6 +173,18 @@ function setupExportDatabase(firstEntry: MediaLibraryEntry, secondEntry: MediaLi
     getAll: vi.fn().mockResolvedValue([]),
     getAllFromIndex: vi.fn().mockResolvedValue([]),
   });
+  readAssetFileMock.mockResolvedValue(new Blob(['recording-1']));
+}
+
+function createRecordingAssetRef() {
+  return {
+    assetId: 'recording-asset-1',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/recording-asset-1' },
+    mimeType: 'video/webm',
+    sha256: null,
+    size: 11,
+  };
 }
 
 function expectExportedManifest(manifest: MediaHubBackupManifest): void {
@@ -248,8 +276,16 @@ async function verifySkipsMissingMediaLibraryRows(): Promise<void> {
 
       if (storeName === 'recordings' && key === 'recording-1') {
         return {
-          blob: new Blob(['recording-1']),
+          assetId: 'recording-asset-1',
+          createdAt: 1,
+          filename: 'recording.webm',
+          id: 'recording-1',
+          mimeType: 'video/webm',
+          size: 11,
         };
+      }
+      if (storeName === 'asset_refs' && key === 'recording-asset-1') {
+        return createRecordingAssetRef();
       }
 
       return undefined;
@@ -257,6 +293,7 @@ async function verifySkipsMissingMediaLibraryRows(): Promise<void> {
     getAll: vi.fn().mockResolvedValue([]),
     getAllFromIndex: vi.fn().mockResolvedValue([]),
   });
+  readAssetFileMock.mockResolvedValue(new Blob(['recording-1']));
 
   const { exportMediaHubBackup } = await importMediaHubBackupModule();
   const archive = await exportMediaHubBackup();
@@ -277,6 +314,7 @@ async function verifySkipsMissingMediaLibraryRows(): Promise<void> {
 beforeEach(() => {
   initDBMock.mockReset();
   listMediaLibraryMock.mockReset();
+  readAssetFileMock.mockReset();
   vi.restoreAllMocks();
 });
 

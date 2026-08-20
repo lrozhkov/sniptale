@@ -11,7 +11,7 @@ export async function loadBlobForSource(source: BlobAssetSource): Promise<Blob> 
     if (!entry) {
       throw new Error(`Recording ${source.recordingId} not found.`);
     }
-    return entry.blob;
+    return entry.file;
   }
 
   if (source.kind === 'scenario-asset') {

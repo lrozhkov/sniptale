@@ -4,6 +4,8 @@ import type {
 } from '../../../../composition/persistence/projects/contracts';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -16,6 +18,11 @@ import {
   VIDEO_PROJECTS_STORE,
 } from '../../storage/constants';
 import { getStore } from '../../storage';
+import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
+import {
+  RECORDING_ASSET_OWNER_KIND,
+  RECORDING_ASSET_ROLE,
+} from '../../../../composition/persistence/recordings/asset-publication';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
 
@@ -28,7 +35,8 @@ export function assertBackupProjectReplacePreflightComplete(projectId: string): 
 export async function deleteExistingVideoProjectBundle(
   tx: BackupTransaction,
   projectId: string
-): Promise<void> {
+): Promise<string[]> {
+  const obsoleteRecordingAssetIds: string[] = [];
   const existing = (await getStore(tx, VIDEO_PROJECTS_STORE).get(projectId)) as
     | VideoProjectEntry
     | undefined;
@@ -44,10 +52,12 @@ export async function deleteExistingVideoProjectBundle(
     await deleteProjectAssetMirror(tx, assetId);
   }
   for (const entry of projectExports) {
-    await deleteProjectExportMirror(tx, entry);
+    const assetId = await deleteProjectExportMirror(tx, entry);
+    if (assetId) obsoleteRecordingAssetIds.push(assetId);
   }
   await getStore(tx, THUMBNAILS_STORE).delete(`video-project:${projectId}`);
   await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).delete(['video-project', projectId]);
+  return obsoleteRecordingAssetIds;
 }
 
 async function deleteProjectAssetMirror(tx: BackupTransaction, assetId: string): Promise<void> {
@@ -59,12 +69,20 @@ async function deleteProjectAssetMirror(tx: BackupTransaction, assetId: string):
 async function deleteProjectExportMirror(
   tx: BackupTransaction,
   entry: ProjectExportEntry
-): Promise<void> {
+): Promise<string | null> {
+  const recording = parseRecordingEntry(await getStore(tx, STORE_NAME).get(entry.recordingId));
   await getStore(tx, PROJECT_EXPORTS_STORE).delete(entry.id);
   await getStore(tx, STORE_NAME).delete(entry.recordingId);
   await getStore(tx, RECORDING_TELEMETRY_STORE).delete(entry.recordingId);
   await getStore(tx, MEDIA_LIBRARY_STORE).delete(`export:${entry.id}`);
   await getStore(tx, THUMBNAILS_STORE).delete(`export:${entry.id}`);
+  await getStore(tx, ASSET_OWNERS_STORE).delete([
+    RECORDING_ASSET_OWNER_KIND,
+    entry.recordingId,
+    RECORDING_ASSET_ROLE,
+  ]);
+  if (recording) await getStore(tx, ASSET_REFS_STORE).delete(recording.assetId);
+  return recording?.assetId ?? null;
 }
 
 export async function deleteExistingScenarioProjectBundle(

@@ -10,7 +10,7 @@ import type {
   VideoProjectEntry,
 } from '../../../composition/persistence/projects/contracts';
 import type {
-  RecordingEntry,
+  StoredRecordingEntry,
   RecordingTelemetryEntry,
 } from '../../../composition/persistence/recordings/contracts';
 import type {
@@ -103,10 +103,9 @@ export interface EffectBundleBackupDescriptor {
 
 export interface BackupBlobDescriptor {
   blobPath: string;
-  entry: Omit<
-    ProjectAssetEntry | RecordingEntry | ScenarioAssetEntry | MediaThumbnailEntry,
-    'blob'
-  >;
+  entry:
+    | Omit<ProjectAssetEntry | ScenarioAssetEntry | MediaThumbnailEntry, 'blob'>
+    | Omit<StoredRecordingEntry, 'assetId'>;
 }
 
 export interface ProjectAssetBackupBlobDescriptor {

@@ -1,6 +1,4 @@
-import type JSZip from 'jszip';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
-import { assertPreparedProjectBlobsAvailable } from '../project/preflight';
 import type { PreparedProjectDomains } from '../project/prepare';
 import { restorePreparedEffectBundlesInTransaction } from '../project/effect-bundle-writer';
 import {
@@ -8,24 +6,51 @@ import {
   restorePreparedVideoProjectsInTransaction,
 } from '../project/writers';
 import { commitBackupTransaction, getImportTransactionStoreNames } from '../write';
-import type { getStore } from '../../storage';
+import { getStore } from '../../storage';
+import { ASSET_OPERATIONS_STORE } from '../../storage/constants';
+import { parseBackupAssetOperation } from '../../../../composition/persistence/assets';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
 
-export async function restorePreparedProjectDomains(
-  prepared: PreparedProjectDomains,
-  zip: JSZip
-): Promise<number> {
-  if (isEmptyProjectDomainPlan(prepared)) {
+export async function commitPreparedProjectDomains(args: {
+  operationId?: string;
+  prepared: PreparedProjectDomains;
+}): Promise<number> {
+  if (isEmptyProjectDomainPlan(args.prepared)) {
     return 0;
   }
+  const hasProjectExportRecordings = args.prepared.videoProjects.some(
+    (project) => project.descriptor.projectExports.length > 0
+  );
+  if (hasProjectExportRecordings && !args.operationId) {
+    throw new Error('Project export restore requires a durable asset operation.');
+  }
 
-  await assertPreparedProjectBlobsAvailable(prepared, zip);
   return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(getImportTransactionStoreNames(), 'readwrite');
-    return commitBackupTransaction(tx, () =>
-      restorePreparedProjectDomainsInTransaction(prepared, tx)
-    );
+    return commitBackupTransaction(tx, async () => {
+      const imported = await restorePreparedProjectDomainsInTransaction(args.prepared, tx);
+      if (args.operationId) {
+        const operation = parseBackupAssetOperation(
+          await getStore(tx, ASSET_OPERATIONS_STORE).get(args.operationId)
+        );
+        if (!operation || operation.status !== 'pending') {
+          throw new Error('Restore operation is not pending at project commit.');
+        }
+        await getStore(tx, ASSET_OPERATIONS_STORE).put({
+          ...operation,
+          obsoleteAssetIds: [
+            ...operation.obsoleteAssetIds,
+            ...args.prepared.videoProjects.flatMap(
+              (project) => project.obsoleteRecordingAssetIds ?? []
+            ),
+          ],
+          status: 'committed',
+          updatedAt: Date.now(),
+        });
+      }
+      return imported;
+    });
   });
 }
 
