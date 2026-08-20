@@ -19,6 +19,7 @@ async function hydrateWorkspace(entry: StoredImageWorkspaceEntry): Promise<Image
   return {
     ...entry,
     document: hydrated.document,
+    documentAssetsByRuntimeUrl: hydrated.assetsByRuntimeUrl,
     releaseDocumentAssets: hydrated.release,
   };
 }

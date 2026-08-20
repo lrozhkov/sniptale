@@ -54,7 +54,10 @@ import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/valida
 const IMAGE_WORKSPACE_PUBLICATION_DOMAIN = 'image-workspace';
 const IMAGE_WORKSPACE_OWNER_KIND = 'image-workspace';
 
-interface PreparedImageWorkspaceInput extends Omit<CommitImageWorkspaceInput, 'document'> {
+interface PreparedImageWorkspaceInput extends Omit<
+  CommitImageWorkspaceInput,
+  'document' | 'reusableAssetsByRuntimeUrl'
+> {
   document: PersistedEditorDocumentV3;
   refs: AssetRef[];
 }
@@ -72,6 +75,13 @@ export interface CommitImageWorkspaceInput {
     workspaceRevision: number;
   };
   requireMissingRoot?: boolean;
+  reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
+}
+
+export interface CommitImageWorkspaceResult {
+  documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
+  revision: number;
+  updatedAt: number;
 }
 
 type ImageMutationDatabase = Parameters<Parameters<typeof runWithIndexedDbMutation>[0]>[0];
@@ -277,18 +287,23 @@ async function commitImageWorkspaceMutation(
 
 export async function commitImageWorkspace(
   input: CommitImageWorkspaceInput
-): Promise<{ revision: number; updatedAt: number }> {
-  const preparedDocument = await preparePersistedEditorDocument(input.document);
+): Promise<CommitImageWorkspaceResult> {
+  const preparedDocument = await preparePersistedEditorDocument(input.document, {
+    ...(input.reusableAssetsByRuntimeUrl
+      ? { reusableAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl }
+      : {}),
+  });
+  const { reusableAssetsByRuntimeUrl: _reusableAssetsByRuntimeUrl, ...serializableInput } = input;
   const preparedInput: PreparedImageWorkspaceInput = {
-    ...input,
+    ...serializableInput,
     document: preparedDocument.document,
-    refs: preparedDocument.objects.map(({ ref }) => ref),
+    refs: preparedDocument.refs,
   };
   let journalCreated = false;
   try {
     await recoverImageWorkspacePublications();
     const journal = await createAssetPublicationJournal({
-      assetRefs: preparedInput.refs,
+      assetRefs: preparedDocument.objects.map(({ ref }) => ref),
       domain: IMAGE_WORKSPACE_PUBLICATION_DOMAIN,
       payload: preparedInput,
     });
@@ -299,13 +314,16 @@ export async function commitImageWorkspace(
       if (!published) throw new Error('Image workspace publication was superseded.');
       result = published;
     });
-    await releaseAssetReadyProtection(preparedInput.refs.map((ref) => ref.assetId));
+    await releaseAssetReadyProtection(preparedDocument.objects.map(({ ref }) => ref.assetId));
     if (!result) throw new Error('Image workspace publication produced no result.');
-    return result;
+    return {
+      ...result,
+      documentAssetsByRuntimeUrl: preparedDocument.runtimeAssetsByUrl,
+    };
   } catch (error) {
     if (!journalCreated) {
       const cleanup = await Promise.allSettled(
-        preparedInput.refs.map((ref) => discardPreparedAsset(ref.assetId))
+        preparedDocument.objects.map(({ ref }) => discardPreparedAsset(ref.assetId))
       );
       const failures = cleanup.flatMap((result) =>
         result.status === 'rejected' ? [result.reason as unknown] : []
@@ -392,7 +410,15 @@ async function publishImageWorkspaceJournal(
     throw new Error('Invalid image workspace publication journal.');
   }
   const input = parseImageWorkspacePublicationPayload(journal.payload);
-  if (!input || input.refs.length !== journal.assetRefs.length) {
+  if (
+    !input ||
+    journal.assetRefs.some(
+      (journalRef) => !input.refs.some((inputRef) => inputRef.assetId === journalRef.assetId)
+    ) ||
+    input.document.assets.some(
+      (asset) => !input.refs.some((inputRef) => inputRef.assetId === asset.assetId)
+    )
+  ) {
     throw new Error('Invalid image workspace publication payload.');
   }
   const db = await initDB();
@@ -412,18 +438,23 @@ async function publishImageWorkspaceJournal(
     ? existingMedia !== null
     : (existingMedia?.workspaceRevision ?? 0) !== input.expectedRevision;
   if (allowSuperseded && permanentlySuperseded) {
-    for (const asset of input.document.assets) {
-      const ref: unknown = await db.get(ASSET_REFS_STORE, asset.assetId);
-      const owner: unknown = await db.get(ASSET_OWNERS_STORE, [
-        IMAGE_WORKSPACE_OWNER_KIND,
-        input.aggregateId,
-        asset.role,
-      ]);
-      if (ref !== undefined || owner !== undefined) {
+    for (const stagedRef of journal.assetRefs) {
+      const ref: unknown = await db.get(ASSET_REFS_STORE, stagedRef.assetId);
+      const roles = input.document.assets
+        .filter((asset) => asset.assetId === stagedRef.assetId)
+        .map((asset) => asset.role);
+      const owners = await Promise.all(
+        roles.map((role) =>
+          db.get(ASSET_OWNERS_STORE, [IMAGE_WORKSPACE_OWNER_KIND, input.aggregateId, role])
+        )
+      );
+      const hasOwner = owners.some((owner) => owner !== undefined);
+      if ((ref !== undefined) !== hasOwner) {
         throw new StaleImageWorkspaceError(input.aggregateId);
       }
+      if (hasOwner) continue;
+      await deleteAssetObject(stagedRef.assetId);
     }
-    await Promise.all(input.document.assets.map((asset) => deleteAssetObject(asset.assetId)));
     return null;
   }
   const sourceRef = input.refs.find((ref) => ref.assetId === input.document.sourceImage.assetId);
@@ -591,7 +622,7 @@ export async function restoreImageAggregateOriginal(
     previewBlob: source.blob,
     thumbnailBlob,
   });
-  return result;
+  return { revision: result.revision, updatedAt: result.updatedAt };
 }
 
 export async function copyImageAggregate(input: {

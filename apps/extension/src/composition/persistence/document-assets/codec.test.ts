@@ -95,6 +95,90 @@ it('hydrates files through temporary object URLs and revokes every URL exactly o
   expect(revokeObjectUrl).toHaveBeenCalledTimes(1);
 });
 
+it('reuses hydrated immutable assets without reading their OPFS-backed object URLs again', async () => {
+  const prepared = await preparePersistedEditorDocument(createEditorDocumentFixture());
+  mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:hydrated-source');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  const hydrated = await hydratePersistedEditorDocument({
+    document: prepared.document,
+    refs: prepared.refs,
+  });
+  mocks.writeBlobToAsset.mockClear();
+
+  const next = await preparePersistedEditorDocument(hydrated.document, {
+    reusableAssetsByRuntimeUrl: hydrated.assetsByRuntimeUrl,
+  });
+
+  expect(mocks.writeBlobToAsset).not.toHaveBeenCalled();
+  expect(next.objects).toEqual([]);
+  expect(next.refs).toEqual(prepared.refs);
+  expect(next.document.sourceImage).toEqual(prepared.document.sourceImage);
+  hydrated.release();
+});
+
+it('hydrates a shared immutable asset once and clears every runtime capability on release', async () => {
+  const prepared = await preparePersistedEditorDocument(createEditorDocumentFixture());
+  const sourceRef = prepared.refs[0]!;
+  const sharedDocument = {
+    ...prepared.document,
+    assets: [
+      { assetId: sourceRef.assetId, role: 'source-image' },
+      { assetId: sourceRef.assetId, role: 'canvas:$.objects[0].src' },
+    ],
+    canvasJson: JSON.stringify({
+      objects: [{ src: `sniptale-asset:${sourceRef.assetId}`, type: 'image' }],
+    }),
+  };
+  mocks.readAssetFile.mockResolvedValue(new File(['shared'], 'shared', { type: 'image/png' }));
+  const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:shared');
+  const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+  const hydrated = await hydratePersistedEditorDocument({
+    document: sharedDocument,
+    refs: [sourceRef],
+  });
+
+  expect(createObjectUrl).toHaveBeenCalledOnce();
+  expect(hydrated.document.sourceImageData).toBe('blob:shared');
+  expect(hydrated.document.canvasJson).toContain('blob:shared');
+  expect(hydrated.assetsByRuntimeUrl.size).toBe(1);
+  hydrated.release();
+  hydrated.release();
+  expect(revokeObjectUrl).toHaveBeenCalledOnce();
+  expect(hydrated.assetsByRuntimeUrl.size).toBe(0);
+});
+
+it('reuses unchanged slots while staging changed runtime binaries', async () => {
+  const prepared = await preparePersistedEditorDocument(createEditorDocumentFixture());
+  mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:hydrated-source');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  const hydrated = await hydratePersistedEditorDocument({
+    document: prepared.document,
+    refs: prepared.refs,
+  });
+  const changed = {
+    ...hydrated.document,
+    frame: {
+      ...hydrated.document.frame,
+      backgroundImageData: 'data:image/png;base64,Y2hhbmdlZA==',
+    },
+  };
+  mocks.writeBlobToAsset.mockClear();
+
+  const next = await preparePersistedEditorDocument(changed, {
+    reusableAssetsByRuntimeUrl: hydrated.assetsByRuntimeUrl,
+  });
+
+  expect(mocks.writeBlobToAsset).toHaveBeenCalledOnce();
+  expect(next.objects).toHaveLength(1);
+  expect(next.refs).toHaveLength(2);
+  expect(next.document.sourceImage).toEqual(prepared.document.sourceImage);
+  expect(next.document.frame.backgroundImage).toEqual({ assetId: 'asset-2' });
+  hydrated.release();
+});
+
 it('rejects embedded, remote, undeclared, and duplicate-role persisted asset metadata', async () => {
   const prepared = await preparePersistedEditorDocument(createEditorDocumentFixture());
   expect(

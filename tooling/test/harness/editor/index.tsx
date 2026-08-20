@@ -20,6 +20,7 @@ import { createExactBrowserFrameHarnessPayload } from './scenarios/browser-frame
 declare global {
   interface Window {
     __sniptaleEditorHarness?: {
+      applyBrowserFrameMutation: () => Promise<void>;
       clearSelection: () => void;
       getCanvasObjects: () => Array<Record<string, unknown>>;
       setZoomLevel: (value: number) => void;
@@ -114,9 +115,20 @@ function HarnessEditorBootstrapDispatch({ payload }: { payload: EditorBootstrapP
 
 function HarnessEditorDebugBridge() {
   const controller = useEditorController();
+  const mutationSequenceRef = useRef(0);
 
   useEffect(() => {
     window.__sniptaleEditorHarness = {
+      applyBrowserFrameMutation: async () => {
+        mutationSequenceRef.current += 1;
+        const current = useEditorStore.getState().browserFrame;
+        await controller.applyBrowserFrame(
+          normalizeBrowserFrameState({
+            ...current,
+            title: `${current.title} · change-${mutationSequenceRef.current}`,
+          })
+        );
+      },
       clearSelection: () => {
         controller.clearSelection();
       },
@@ -143,6 +155,8 @@ void harnessReady.then(() => {
     createExactBrowserFrameHarnessPayload();
   const autoApplyBrowserFrame =
     window.__sniptaleHarnessBootstrap?.editorAutoApplyBrowserFrame === true;
+  const dispatchBootstrapPayload =
+    window.__sniptaleHarnessBootstrap?.editorDispatchBootstrapPayload !== false;
   const harnessBrowserFrame = autoApplyBrowserFrame
     ? resolveHarnessBrowserFrame(bootstrapPayload)
     : null;
@@ -151,7 +165,9 @@ void harnessReady.then(() => {
     <EditorPage
       afterLayout={
         <>
-          <HarnessEditorBootstrapDispatch payload={bootstrapPayload} />
+          {dispatchBootstrapPayload ? (
+            <HarnessEditorBootstrapDispatch payload={bootstrapPayload} />
+          ) : null}
           <HarnessEditorDebugBridge />
           {autoApplyBrowserFrame ? (
             <HarnessBrowserFrameAutoApply browserFrame={harnessBrowserFrame} />

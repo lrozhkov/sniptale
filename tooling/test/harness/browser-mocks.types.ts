@@ -75,6 +75,8 @@ export type SniptaleHarnessBootstrap = {
   apiBehavior?: SniptaleHarnessApiBehaviorOverrides;
   editorBootstrapPayload?: EditorBootstrapPayload;
   editorAutoApplyBrowserFrame?: boolean;
+  editorDispatchBootstrapPayload?: boolean;
+  preserveMediaLibrary?: boolean;
 };
 
 export const DEFAULT_ACTIVE_TAB: HarnessActiveTab = {

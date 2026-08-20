@@ -1,4 +1,5 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
+import type { AssetRef } from '../../../composition/persistence/assets';
 
 export interface ActiveEditorSessionContext {
   aggregateId: string;
@@ -14,6 +15,7 @@ export type EditorSessionAutosaveState = {
   pendingDocument: EditorDocument | null;
   pendingTimer: number;
   lastWriteError: unknown | null;
+  documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   releaseHydratedDocument: (() => void) | null;
   writeChain: Promise<void>;
 };
@@ -25,6 +27,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     pendingDocument: null,
     pendingTimer: 0,
     lastWriteError: null,
+    documentAssetsByRuntimeUrl: new Map(),
     releaseHydratedDocument: null,
     writeChain: Promise.resolve(),
   };

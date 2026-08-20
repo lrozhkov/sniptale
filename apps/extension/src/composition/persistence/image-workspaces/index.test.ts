@@ -53,6 +53,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.initDB.mockResolvedValue({ get: mocks.get, getAll: mocks.getAll });
   mocks.hydrate.mockImplementation(async () => ({
+    assetsByRuntimeUrl: new Map([['blob:source', { assetId: 'image-1-source' }]]),
     document: createEditorDocumentFixture(),
     release: vi.fn(),
   }));
@@ -67,7 +68,11 @@ it('returns a valid workspace and treats a missing row as absent without warning
     .mockResolvedValueOnce(undefined);
 
   await expect(recoverAndGetImageWorkspace('image-1')).resolves.toEqual(
-    expect.objectContaining({ ...entry, document: createEditorDocumentFixture() })
+    expect.objectContaining({
+      ...entry,
+      document: createEditorDocumentFixture(),
+      documentAssetsByRuntimeUrl: expect.any(Map),
+    })
   );
   await expect(recoverAndGetImageWorkspace('missing')).resolves.toBeUndefined();
   expect(mocks.warn).not.toHaveBeenCalled();

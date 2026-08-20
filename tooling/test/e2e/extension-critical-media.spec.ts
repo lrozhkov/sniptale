@@ -343,19 +343,19 @@ test('editor save and copy actions emit observable side effects', async ({ page,
   expect(clipboardWrite?.types).toContain('image/png');
 });
 
-test('editor reopens a persisted workspace and autosaves without revoking its file URLs', async ({
+test('editor promotes, closes, reopens from Gallery, and autosaves hydrated files', async ({
   page,
   hostOrigin,
+  context,
 }) => {
-  const persistErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error' && message.text().includes('Failed to persist draft')) {
-      persistErrors.push(message.text());
-    }
-  });
+  const consoleErrors: string[] = [];
+  const capturePersistError = (message: { type(): string; text(): string }) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  };
+  page.on('console', capturePersistError);
   await applyHarnessBootstrap(page, {
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
-    editorAutoApplyBrowserFrame: true,
+    editorAutoApplyBrowserFrame: false,
     editorBootstrapPayload: createExactBrowserFrameHarnessPayload(),
   });
   await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
@@ -364,18 +364,76 @@ test('editor reopens a persisted workspace and autosaves without revoking its fi
   await expect.poll(() => new URL(page.url()).searchParams.has('assetId')).toBe(true);
   const aggregateId = new URL(page.url()).searchParams.get('assetId');
   expect(aggregateId).not.toBeNull();
-  await expect
-    .poll(async () => (await readImageWorkspaceRevision(page, aggregateId!)) ?? 0)
-    .toBeGreaterThan(0);
-  const firstRevision = await readImageWorkspaceRevision(page, aggregateId!);
-  expect(firstRevision).not.toBeNull();
+  const promoteButton = page.locator('[data-ui="editor.floating.document-bar.promote-button"]');
+  await expect(promoteButton).toBeVisible();
+  await promoteButton.click();
+  await expect(promoteButton).toBeHidden();
+  const promotedRevision = await readImageWorkspaceRevision(page, aggregateId!);
+  expect(promotedRevision).not.toBeNull();
+  await page.close();
 
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.locator('[data-ui="editor.page.root"]').waitFor({ state: 'visible' });
+  const galleryPage = await context.newPage();
+  await applyHarnessBootstrap(galleryPage, { preserveMediaLibrary: true });
+  await galleryPage.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await galleryPage.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
+  const [stored] = await galleryPage.evaluate(
+    async () => (await window.__sniptaleHarness?.getMediaLibraryState()) ?? []
+  );
+  expect(stored?.id).toBe(aggregateId);
+  await galleryPage.locator('button', { hasText: stored!.filename }).first().click();
+  const openInEditorButton = galleryPage.getByRole('button', {
+    name: GALLERY_OPEN_IN_EDITOR_LABEL,
+    exact: true,
+  });
+  await expect(openInEditorButton).toBeVisible();
+  await openInEditorButton.evaluate((button) => (button as HTMLButtonElement).click());
+  const [createdTab] = await galleryPage.evaluate(
+    () => window.__sniptaleHarness?.getCreatedTabs() ?? []
+  );
+  const restoredAssetId = new URL(createdTab!.url).searchParams.get('assetId');
+  expect(restoredAssetId).toBe(aggregateId);
+  await galleryPage.close();
+
+  const editorPage = await context.newPage();
+  editorPage.on('console', capturePersistError);
+  await applyHarnessBootstrap(editorPage, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    editorAutoApplyBrowserFrame: false,
+    editorDispatchBootstrapPayload: false,
+    preserveMediaLibrary: true,
+  });
+  await editorPage.goto(
+    `${hostOrigin}${EDITOR_HARNESS_PATH}?assetId=${encodeURIComponent(restoredAssetId!)}`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  await editorPage.locator('[data-ui="editor.page.root"]').waitFor({ state: 'visible' });
   await expect
-    .poll(async () => (await readImageWorkspaceRevision(page, aggregateId!)) ?? 0)
-    .toBeGreaterThan(firstRevision!);
-  expect(persistErrors).toEqual([]);
+    .poll(
+      async () =>
+        await editorPage.evaluate(
+          () => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0
+        )
+    )
+    .toBeGreaterThan(0);
+  await editorPage.evaluate(() => window.__sniptaleEditorHarness?.applyBrowserFrameMutation());
+  await expect
+    .poll(async () => (await readImageWorkspaceRevision(editorPage, aggregateId!)) ?? 0)
+    .toBeGreaterThan(promotedRevision!);
+  const firstRestoredRevision = await readImageWorkspaceRevision(editorPage, aggregateId!);
+  expect(firstRestoredRevision).not.toBeNull();
+  await editorPage.evaluate(() => window.__sniptaleEditorHarness?.applyBrowserFrameMutation());
+  await expect
+    .poll(async () => (await readImageWorkspaceRevision(editorPage, aggregateId!)) ?? 0)
+    .toBeGreaterThan(firstRestoredRevision!);
+  expect(
+    consoleErrors.filter(
+      (message) =>
+        message.includes('Failed to persist draft') || message.includes('Failed to fetch')
+    )
+  ).toEqual([]);
+  await editorPage.close();
 });
 
 test('editor exact browser-frame harness stays visually stable', async ({ page, hostOrigin }) => {

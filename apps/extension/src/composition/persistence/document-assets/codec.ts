@@ -54,8 +54,18 @@ async function stageDataUrl(
   binaryUrl: string,
   role: string,
   assets: PersistedEditorDocumentAsset[],
-  objects: PreparedEditorDocument['objects']
+  objects: PreparedEditorDocument['objects'],
+  refsById: Map<string, AssetRef>,
+  runtimeAssetsByUrl: Map<string, AssetRef>,
+  reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>
 ): Promise<PersistedEditorAssetPointer> {
+  const reusable = reusableAssetsByRuntimeUrl?.get(binaryUrl);
+  if (reusable) {
+    refsById.set(reusable.assetId, reusable);
+    runtimeAssetsByUrl.set(binaryUrl, reusable);
+    assets.push({ assetId: reusable.assetId, role });
+    return pointer(reusable.assetId);
+  }
   const blob = binaryUrl.startsWith('blob:')
     ? await fetch(binaryUrl).then((response) => {
         if (!response.ok) throw new Error('Editor object URL is unavailable.');
@@ -64,6 +74,8 @@ async function stageDataUrl(
     : await dataUrlToBlob(binaryUrl);
   const prepared = await writeBlobToAsset(blob);
   objects.push(prepared);
+  refsById.set(prepared.ref.assetId, prepared.ref);
+  runtimeAssetsByUrl.set(binaryUrl, prepared.ref);
   assets.push({ assetId: prepared.ref.assetId, role });
   return pointer(prepared.ref.assetId);
 }
@@ -72,6 +84,9 @@ async function extractCanvasValue(args: {
   assets: PersistedEditorDocumentAsset[];
   objects: PreparedEditorDocument['objects'];
   path: string;
+  refsById: Map<string, AssetRef>;
+  reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
+  runtimeAssetsByUrl: Map<string, AssetRef>;
   value: unknown;
 }): Promise<unknown> {
   if (Array.isArray(args.value)) {
@@ -92,7 +107,15 @@ async function extractCanvasValue(args: {
       typeof child === 'string' &&
       (child.startsWith('data:') || child.startsWith('blob:'))
     ) {
-      const staged = await stageDataUrl(child, `canvas:${path}`, args.assets, args.objects);
+      const staged = await stageDataUrl(
+        child,
+        `canvas:${path}`,
+        args.assets,
+        args.objects,
+        args.refsById,
+        args.runtimeAssetsByUrl,
+        args.reusableAssetsByRuntimeUrl
+      );
       output[key] = assetUrl(staged.assetId);
     } else {
       output[key] = await extractCanvasValue({ ...args, path, value: child });
@@ -102,25 +125,57 @@ async function extractCanvasValue(args: {
 }
 
 export async function preparePersistedEditorDocument(
-  document: EditorDocument
+  document: EditorDocument,
+  options: { reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef> } = {}
 ): Promise<PreparedEditorDocument> {
   const assets: PersistedEditorDocumentAsset[] = [];
   const objects: PreparedEditorDocument['objects'] = [];
+  const refsById = new Map<string, AssetRef>();
+  const runtimeAssetsByUrl = new Map<string, AssetRef>();
   try {
     const sourceImage = await stageDataUrl(
       document.sourceImageData,
       'source-image',
       assets,
-      objects
+      objects,
+      refsById,
+      runtimeAssetsByUrl,
+      options.reusableAssetsByRuntimeUrl
     );
     const backgroundImage = document.frame.backgroundImageData
-      ? await stageDataUrl(document.frame.backgroundImageData, 'frame-background', assets, objects)
+      ? await stageDataUrl(
+          document.frame.backgroundImageData,
+          'frame-background',
+          assets,
+          objects,
+          refsById,
+          runtimeAssetsByUrl,
+          options.reusableAssetsByRuntimeUrl
+        )
       : null;
     const favicon = document.browserFrame?.faviconDataUrl
-      ? await stageDataUrl(document.browserFrame.faviconDataUrl, 'browser-favicon', assets, objects)
+      ? await stageDataUrl(
+          document.browserFrame.faviconDataUrl,
+          'browser-favicon',
+          assets,
+          objects,
+          refsById,
+          runtimeAssetsByUrl,
+          options.reusableAssetsByRuntimeUrl
+        )
       : null;
     const parsedCanvas: unknown = JSON.parse(document.canvasJson);
-    const canvas = await extractCanvasValue({ assets, objects, path: '$', value: parsedCanvas });
+    const canvas = await extractCanvasValue({
+      assets,
+      objects,
+      path: '$',
+      refsById,
+      ...(options.reusableAssetsByRuntimeUrl
+        ? { reusableAssetsByRuntimeUrl: options.reusableAssetsByRuntimeUrl }
+        : {}),
+      runtimeAssetsByUrl,
+      value: parsedCanvas,
+    });
     assertMetadataHasNoEmbeddedBinary(canvas);
     assertMetadataHasNoEmbeddedBinary(document.richShapes);
     const { backgroundImageData: _backgroundImageData, ...frame } = document.frame;
@@ -150,6 +205,8 @@ export async function preparePersistedEditorDocument(
         assets,
       },
       objects,
+      refs: [...refsById.values()],
+      runtimeAssetsByUrl,
     };
   } catch (error) {
     const cleanup = await Promise.allSettled(
@@ -202,12 +259,16 @@ export async function hydratePersistedEditorDocument(args: {
     if (ref) refsById.set(ref.assetId, ref);
   }
   const urls = new Map<string, string>();
+  const assetsByRuntimeUrl = new Map<string, AssetRef>();
   try {
     for (const asset of args.document.assets) {
+      if (urls.has(asset.assetId)) continue;
       const ref = refsById.get(asset.assetId);
       if (!ref) throw new Error(`Editor document asset ref is missing: ${asset.assetId}.`);
       const file = await readAssetFile(ref, asset.role);
-      urls.set(asset.assetId, URL.createObjectURL(file));
+      const runtimeUrl = URL.createObjectURL(file);
+      urls.set(asset.assetId, runtimeUrl);
+      assetsByRuntimeUrl.set(runtimeUrl, ref);
     }
     const sourceImageData = urls.get(args.document.sourceImage.assetId);
     if (!sourceImageData) throw new Error('Editor document source image is missing.');
@@ -227,6 +288,7 @@ export async function hydratePersistedEditorDocument(args: {
         })()
       : undefined;
     return {
+      assetsByRuntimeUrl,
       document: {
         version: 2,
         sourceImageData,
@@ -247,6 +309,7 @@ export async function hydratePersistedEditorDocument(args: {
       release() {
         for (const url of urls.values()) URL.revokeObjectURL(url);
         urls.clear();
+        assetsByRuntimeUrl.clear();
       },
     };
   } catch (error) {

@@ -1,5 +1,6 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { PersistedEditorDocumentV3 } from '../document-assets';
+import type { AssetRef } from '../assets';
 
 /** Authoritative editable document for an image aggregate. */
 export interface ImageWorkspaceEntry {
@@ -10,6 +11,7 @@ export interface ImageWorkspaceEntry {
   sourceTitle: string | null;
   sourceUrl: string | null;
   updatedAt: number;
+  documentAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
   releaseDocumentAssets?(): void;
 }
 

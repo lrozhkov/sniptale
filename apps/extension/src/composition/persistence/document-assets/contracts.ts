@@ -1,5 +1,5 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
-import type { PreparedAssetObject } from '../assets';
+import type { AssetRef, PreparedAssetObject } from '../assets';
 
 export interface PersistedEditorAssetPointer {
   assetId: string;
@@ -29,9 +29,12 @@ export interface PersistedEditorDocumentAsset extends PersistedEditorAssetPointe
 export interface PreparedEditorDocument {
   document: PersistedEditorDocumentV3;
   objects: PreparedAssetObject[];
+  refs: AssetRef[];
+  runtimeAssetsByUrl: ReadonlyMap<string, AssetRef>;
 }
 
 export interface HydratedEditorDocument {
+  assetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   document: EditorDocument;
   release(): void;
 }

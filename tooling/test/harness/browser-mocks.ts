@@ -51,7 +51,7 @@ const runtimeResponseOverrides = new Map<string, RuntimeResponseOverride>();
 let activeTab: HarnessActiveTab = { ...DEFAULT_ACTIVE_TAB };
 let apiBehavior: SniptaleHarnessApiBehavior = createHarnessApiBehavior();
 
-async function resetHarnessState() {
+async function resetHarnessState(options: { preserveMediaLibrary?: boolean } = {}) {
   runtimeMessages.length = 0;
   createdTabs.length = 0;
   clipboardWrites.length = 0;
@@ -59,7 +59,9 @@ async function resetHarnessState() {
   activeTab = { ...DEFAULT_ACTIVE_TAB };
   apiBehavior = createHarnessApiBehavior();
   clearStoredItems();
-  await clearHarnessMediaLibrary();
+  if (!options.preserveMediaLibrary) {
+    await clearHarnessMediaLibrary();
+  }
 }
 
 async function applyHarnessBootstrap(bootstrap?: SniptaleHarnessBootstrap) {
@@ -261,12 +263,14 @@ ensureWindowClose();
 ensureChromeMock();
 
 export const harnessReady = (async () => {
-  await resetHarnessState();
+  await resetHarnessState({
+    preserveMediaLibrary: window.__sniptaleHarnessBootstrap?.preserveMediaLibrary === true,
+  });
   await applyHarnessBootstrap(window.__sniptaleHarnessBootstrap);
 })();
 
 window.__sniptaleHarness = {
-  reset: resetHarnessState,
+  reset: () => resetHarnessState(),
   seedStorage: (items) => {
     setStoredItems(items);
   },

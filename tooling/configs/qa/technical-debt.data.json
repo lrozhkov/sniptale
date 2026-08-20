@@ -2687,16 +2687,16 @@
         "apps/extension/src/composition/persistence/document-assets/contracts.ts",
         "apps/extension/src/composition/persistence/document-assets/index.ts",
         "apps/extension/src/composition/persistence/document-assets/ownership.ts",
-        "apps/extension/src/composition/persistence/document-assets/parser.ts"
-        ,"apps/extension/src/composition/persistence/document-assets/test-support.ts"
+        "apps/extension/src/composition/persistence/document-assets/parser.ts",
+        "apps/extension/src/composition/persistence/document-assets/test-support.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/document-assets/codec.ts",
         "apps/extension/src/composition/persistence/document-assets/contracts.ts",
         "apps/extension/src/composition/persistence/document-assets/index.ts",
         "apps/extension/src/composition/persistence/document-assets/ownership.ts",
-        "apps/extension/src/composition/persistence/document-assets/parser.ts"
-        ,"apps/extension/src/composition/persistence/document-assets/test-support.ts"
+        "apps/extension/src/composition/persistence/document-assets/parser.ts",
+        "apps/extension/src/composition/persistence/document-assets/test-support.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -15505,7 +15505,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.ts",
-        "contentHash": "cd4e227226f1aed155312428637ddbe95ecffa33bb53500c7a3e7e55e32ea8d5"
+        "contentHash": "bba8e7b67dd6731cbf18c83dcd7505b3187a96c6b06826651206be54ed41f061"
       },
       "consumers": [
         "tooling/test/harness/browser-mocks.test.ts",
@@ -15537,7 +15537,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.types.ts",
-        "contentHash": "ba2b1c3d48c8b02de7518bafea99849327f381f691e0d4866ae260ba75c81e40"
+        "contentHash": "67c961d86cd1137dbe336dbe5ba708e3b8a941e3b79b7332c242380f9c81cb85"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical.helpers.ts",

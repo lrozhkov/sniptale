@@ -19,6 +19,7 @@ export function activateAutosaveContext(
   if (!options.preserveHydratedDocument) {
     state.releaseHydratedDocument?.();
     state.releaseHydratedDocument = null;
+    state.documentAssetsByRuntimeUrl = new Map();
   }
   state.pendingDocument = null;
   state.lastWriteError = null;
@@ -70,6 +71,7 @@ export async function restoreAutosaveDraft(
     sourceTitle: entry.sourceTitle,
   });
   state.releaseHydratedDocument = entry.releaseDocumentAssets ?? null;
+  state.documentAssetsByRuntimeUrl = entry.documentAssetsByRuntimeUrl ?? new Map();
   setEditorSaveState('saved');
   return entry;
 }
@@ -81,6 +83,7 @@ export async function discardAutosaveDraft(
   clearPendingAutosaveTimer(state);
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
+  state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.lastWriteError = null;
   state.activeContext = null;
@@ -92,6 +95,7 @@ export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   clearPendingAutosaveTimer(state);
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
+  state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.activeContext = null;
 }

@@ -59,10 +59,12 @@ async function persistEditorSessionDocument(args: {
       expectedRevision: args.context.durableRevision,
       sourceUrl: args.context.sourceUrl,
       sourceTitle: args.context.sourceTitle,
+      reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
     });
 
     if (args.state.activeContext?.aggregateId === args.context.aggregateId) {
       args.state.activeContext.durableRevision = result.revision;
+      args.state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
     }
     args.state.lastWriteError = null;
     void updateImagePresentation(args.context, result.revision);
