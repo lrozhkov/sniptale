@@ -10,7 +10,9 @@ import {
   discardPreparedAsset,
   eraseAssetStorage,
   isAssetReadyProtected,
+  listAssetObjectIds,
   listReadyJournals,
+  listWritingAssetIds,
   readAssetFile,
   releaseAssetReadyProtection,
   writeBlobToAsset,
@@ -24,11 +26,12 @@ function notFound(): Error {
 class MemoryFileHandle {
   readonly kind = 'file' as const;
   private bytes = new Blob();
+  abortEffect: () => Promise<void> = async () => undefined;
 
   async createWritable(): Promise<FileSystemWritableFileStream> {
     const chunks: BlobPart[] = [];
     return {
-      abort: async () => undefined,
+      abort: async () => this.abortEffect(),
       close: async () => {
         this.bytes = new Blob(chunks);
       },
@@ -114,6 +117,8 @@ it('keeps a closed immutable object and changes writing protection to a ready jo
   expect(assetRoot).toBeInstanceOf(MemoryDirectoryHandle);
   const writing = (assetRoot as MemoryDirectoryHandle).entriesByName.get('writing');
   expect((writing as MemoryDirectoryHandle).entriesByName.has('asset-1')).toBe(true);
+  await expect(listWritingAssetIds(harness.options)).resolves.toEqual(['asset-1']);
+  await expect(listAssetObjectIds(harness.options)).resolves.toEqual(['asset-1']);
 
   await writer.append(new Blob(['first']));
   await writer.append(new Blob(['second']));
@@ -128,6 +133,7 @@ it('keeps a closed immutable object and changes writing protection to a ready jo
   await writeReadyJournal(journal, harness.options);
 
   expect((writing as MemoryDirectoryHandle).entriesByName.has('asset-1')).toBe(false);
+  await expect(listWritingAssetIds(harness.options)).resolves.toEqual([]);
   expect(isAssetReadyProtected('asset-1')).toBe(true);
   await expect(listReadyJournals(harness.options)).resolves.toEqual([journal]);
   const file = await readAssetFile(prepared.ref, 'recording.webm', harness.options);
@@ -136,6 +142,8 @@ it('keeps a closed immutable object and changes writing protection to a ready jo
   await expect(file.text()).resolves.toBe('firstsecond');
   await deleteReadyJournal(journal.journalId, harness.options);
   await expect(listReadyJournals(harness.options)).resolves.toEqual([]);
+  await expect(listAssetObjectIds(harness.options)).resolves.toEqual(['asset-1']);
+  await expect(listWritingAssetIds(harness.options)).resolves.toEqual([]);
   releaseAssetReadyProtection(['asset-1']);
   expect(isAssetReadyProtected('asset-1')).toBe(false);
 });
@@ -159,6 +167,32 @@ it('aborts an active writer and removes both its marker and partial object', asy
   );
 });
 
+it('settles an active writable abort before removing its object and marker', async () => {
+  const harness = createHarness();
+  const writer = await createAssetObjectWriter({ mimeType: 'video/webm' }, harness.options);
+  const assetRoot = harness.root.entriesByName.get(
+    ASSET_ROOT_DIRECTORY_NAME
+  ) as MemoryDirectoryHandle;
+  const objects = assetRoot.entriesByName.get('objects') as MemoryDirectoryHandle;
+  const writing = assetRoot.entriesByName.get('writing') as MemoryDirectoryHandle;
+  const object = objects.entriesByName.get('asset-1') as MemoryFileHandle;
+  let releaseAbort: (() => void) | undefined;
+  object.abortEffect = () =>
+    new Promise<void>((resolve) => {
+      releaseAbort = resolve;
+    });
+
+  const aborting = writer.abort();
+  await Promise.resolve();
+
+  expect(objects.entriesByName.has('asset-1')).toBe(true);
+  expect(writing.entriesByName.has('asset-1')).toBe(true);
+  releaseAbort?.();
+  await aborting;
+  expect(objects.entriesByName.has('asset-1')).toBe(false);
+  expect(writing.entriesByName.has('asset-1')).toBe(false);
+});
+
 it('erases the durable asset root together with legacy recording staging', async () => {
   const harness = createHarness();
   await harness.root.getDirectoryHandle(ASSET_ROOT_DIRECTORY_NAME, { create: true });
@@ -174,6 +208,8 @@ it('reports absent storage as empty and fails closed when an object is missing',
   const harness = createHarness();
 
   await expect(listReadyJournals(harness.options)).resolves.toEqual([]);
+  await expect(listAssetObjectIds(harness.options)).resolves.toEqual([]);
+  await expect(listWritingAssetIds(harness.options)).resolves.toEqual([]);
   await expect(collectQuiescentWritingObjects(harness.options)).resolves.toBe(0);
   await expect(countAssetStorageRoots(harness.options)).resolves.toBe(0);
   await expect(deleteAssetObject('missing', harness.options)).resolves.toBeUndefined();
@@ -194,6 +230,21 @@ it('reports absent storage as empty and fails closed when an object is missing',
   ).rejects.toThrow('missing');
 });
 
+it('fails closed when OPFS directory enumeration is unavailable', async () => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  const objects = new MemoryDirectoryHandle();
+  const writing = new MemoryDirectoryHandle();
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  assetRoot.entriesByName.set('objects', objects);
+  assetRoot.entriesByName.set('writing', writing);
+  Reflect.set(objects, 'entries', undefined);
+  Reflect.set(writing, 'entries', undefined);
+
+  await expect(listAssetObjectIds(harness.options)).rejects.toThrow('enumeration');
+  await expect(listWritingAssetIds(harness.options)).rejects.toThrow('enumeration');
+});
+
 it('streams a Blob into an object and can discard the finalized unpublished object', async () => {
   const harness = createHarness();
   const prepared = await writeBlobToAsset(
@@ -208,6 +259,55 @@ it('streams a Blob into an object and can discard the finalized unpublished obje
   await expect(readAssetFile(prepared.ref, 'video.webm', harness.options)).rejects.toThrow(
     'missing'
   );
+});
+
+it('removes writer protection even when prepared object deletion fails', async () => {
+  const harness = createHarness();
+  const prepared = await writeBlobToAsset(new Blob(['video']), harness.options);
+  const assetRoot = harness.root.entriesByName.get(
+    ASSET_ROOT_DIRECTORY_NAME
+  ) as MemoryDirectoryHandle;
+  const objects = assetRoot.entriesByName.get('objects') as MemoryDirectoryHandle;
+  const writing = assetRoot.entriesByName.get('writing') as MemoryDirectoryHandle;
+  const removeObject = objects.removeEntry.bind(objects);
+  objects.removeEntry = async () => {
+    throw new Error('transient object delete failure');
+  };
+
+  await expect(discardPreparedAsset(prepared.ref.assetId, harness.options)).rejects.toThrow(
+    'Unable to discard prepared asset'
+  );
+
+  expect(writing.entriesByName.has(prepared.ref.assetId)).toBe(false);
+  expect(objects.entriesByName.has(prepared.ref.assetId)).toBe(true);
+  objects.removeEntry = removeObject;
+  await expect(
+    discardPreparedAsset(prepared.ref.assetId, harness.options)
+  ).resolves.toBeUndefined();
+});
+
+it('removes an available writing marker when the objects directory lookup fails', async () => {
+  const harness = createHarness();
+  const prepared = await writeBlobToAsset(new Blob(['video']), harness.options);
+  const assetRoot = harness.root.entriesByName.get(
+    ASSET_ROOT_DIRECTORY_NAME
+  ) as MemoryDirectoryHandle;
+  const writing = assetRoot.entriesByName.get('writing') as MemoryDirectoryHandle;
+  const getDirectory = assetRoot.getDirectoryHandle.bind(assetRoot);
+  assetRoot.getDirectoryHandle = async (name, options) => {
+    if (name === 'objects') throw new Error('transient objects lookup failure');
+    return getDirectory(name, options);
+  };
+
+  await expect(discardPreparedAsset(prepared.ref.assetId, harness.options)).rejects.toThrow(
+    'Unable to discard prepared asset'
+  );
+
+  expect(writing.entriesByName.has(prepared.ref.assetId)).toBe(false);
+  assetRoot.getDirectoryHandle = getDirectory;
+  await expect(
+    discardPreparedAsset(prepared.ref.assetId, harness.options)
+  ).resolves.toBeUndefined();
 });
 
 it('uses an explicit asset id and the binary MIME fallback', async () => {

@@ -58,13 +58,17 @@ function getProjectAssetMaxBytes(mimeType: string): number | null {
 }
 
 export function assertSafeProjectAssetStorageInput(blob: Blob, mimeType: string): void {
+  assertSafeProjectAssetStorageMetadata(blob.size, mimeType);
+}
+
+export function assertSafeProjectAssetStorageMetadata(size: number, mimeType: string): void {
   const maxBytes = getProjectAssetMaxBytes(mimeType);
 
   if (maxBytes === null) {
     throw new Error('Unsupported project asset MIME type.');
   }
 
-  if (blob.size <= 0 || blob.size > maxBytes) {
+  if (!Number.isSafeInteger(size) || size <= 0 || size > maxBytes) {
     throw new Error('Project asset exceeds storage size limit.');
   }
 }

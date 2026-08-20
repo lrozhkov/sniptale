@@ -23,6 +23,11 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
+  runWithDurableAssetLifecycleLock,
+  runWithDurableAssetOperationRecovery,
+  type DurableAssetOperationPermit,
+} from '../infrastructure/mutation-barrier';
+import {
   RECORDING_ASSET_OWNER_KIND,
   RECORDING_ASSET_ROLE,
   recordingAssetPublicationAdapter,
@@ -32,6 +37,8 @@ import {
   projectExportPublicationAdapter,
 } from '../projects/asset-publication';
 import { scenarioAssetPublicationAdapter } from '../scenario/aggregate-mutations';
+export { auditDurableAssets, collectOrphanAssetObjects } from './audit';
+import { collectOrphanAssetObjects } from './audit';
 
 async function restorePreviousRecord(
   store: { put(value: unknown): Promise<unknown> },
@@ -187,13 +194,19 @@ async function recoverBackupRestoreOperations(): Promise<void> {
   }
 }
 
-export async function recoverAssetPublications(): Promise<number> {
-  await collectQuiescentWritingObjects();
-  await recoverBackupRestoreOperations();
-  return recoverStandaloneAssetPublications([
-    recordingAssetPublicationAdapter,
-    projectAssetPublicationAdapter,
-    projectExportPublicationAdapter,
-    scenarioAssetPublicationAdapter,
-  ]);
+export async function recoverAssetPublications(
+  permit?: DurableAssetOperationPermit
+): Promise<number> {
+  return runWithDurableAssetOperationRecovery(permit, async () => {
+    await collectQuiescentWritingObjects();
+    await runWithDurableAssetLifecycleLock(recoverBackupRestoreOperations);
+    const recovered = await recoverStandaloneAssetPublications([
+      recordingAssetPublicationAdapter,
+      projectAssetPublicationAdapter,
+      projectExportPublicationAdapter,
+      scenarioAssetPublicationAdapter,
+    ]);
+    await collectOrphanAssetObjects();
+    return recovered;
+  });
 }

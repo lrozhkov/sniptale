@@ -4,6 +4,7 @@ import {
   importMediaHubBackup,
   inspectLocalMediaHubBackup,
   inspectMediaHubBackup,
+  releaseMediaHubBackupExport,
   type MediaHubBackupExportOptions,
   type MediaHubImportConflictStrategy,
 } from '../../../workflows/media-hub-backup/index';
@@ -83,7 +84,8 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         }
         downloadBlob(
           result,
-          `media-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`
+          `media-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`,
+          () => releaseMediaHubBackupExport(result)
         );
         controller.actions.surface.setPendingExport(null);
         await controller.actions.storage.refresh();

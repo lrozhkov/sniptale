@@ -265,7 +265,27 @@ describe('library lifecycle cleanup and usage', () => {
       },
     ]);
     persistenceMocks.listScenarioProjectEntries.mockResolvedValue([scenario]);
-    persistenceMocks.listScenarioAssets.mockResolvedValue([{ size: 7 }]);
+    persistenceMocks.listScenarioAssets.mockResolvedValue([
+      { assetId: 'scenario-asset-ref', size: 700 },
+    ]);
+    persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (effect) =>
+      effect({
+        getAll: vi.fn(async (storeName: string) =>
+          storeName === 'asset_refs'
+            ? [
+                {
+                  assetId: 'scenario-asset-ref',
+                  createdAt: 1,
+                  location: { kind: 'opfs', objectKey: 'objects/scenario-asset-ref' },
+                  mimeType: 'image/png',
+                  sha256: null,
+                  size: 7,
+                },
+              ]
+            : []
+        ),
+      })
+    );
     persistenceMocks.listScenarioExports.mockResolvedValue([{ size: 3 }]);
     const stepDocument = {
       createdAt: 1,

@@ -1,5 +1,6 @@
 import type { AssetReadyJournal, AssetRef } from './contracts';
 import { deleteReadyJournal, writeReadyJournal } from './opfs-store';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 
 const IMMEDIATE_PUBLICATION_ATTEMPTS = 3;
 
@@ -23,11 +24,18 @@ export async function createAssetPublicationJournal<TPayload>(args: {
     ...(args.operationId ? { operationId: args.operationId } : {}),
     payload: args.payload,
   };
-  await writeReadyJournal(journal);
+  await runWithDurableAssetLifecycleLock(() => writeReadyJournal(journal));
   return journal;
 }
 
 export async function publishReadyJournalWithRetry(
+  journal: AssetReadyJournal,
+  publish: (journal: AssetReadyJournal) => Promise<void>
+): Promise<void> {
+  return runWithDurableAssetLifecycleLock(() => publishReadyJournal(journal, publish));
+}
+
+async function publishReadyJournal(
   journal: AssetReadyJournal,
   publish: (journal: AssetReadyJournal) => Promise<void>
 ): Promise<void> {

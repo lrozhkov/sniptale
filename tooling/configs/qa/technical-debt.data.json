@@ -2689,9 +2689,11 @@
       "disposition": "rollout",
       "reason": "The cross-domain asset publication recovery wiring has deterministic crash and compensation coverage.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/asset-publication-recovery/audit.ts",
         "apps/extension/src/composition/persistence/asset-publication-recovery/index.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/asset-publication-recovery/audit.ts",
         "apps/extension/src/composition/persistence/asset-publication-recovery/index.ts"
       ],
       "unownedFocusedFiles": []
@@ -3043,7 +3045,9 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.scenario-assets.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
@@ -3080,7 +3084,9 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.scenario-assets.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
@@ -3233,6 +3239,7 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/projects/asset-publication.ts",
         "apps/extension/src/composition/persistence/projects/asset-references.ts",
         "apps/extension/src/composition/persistence/projects/contracts.ts",
         "apps/extension/src/composition/persistence/projects/index-mutations.ts",
@@ -3244,6 +3251,7 @@
         "apps/extension/src/composition/persistence/projects/read-guards.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/projects/asset-publication.ts",
         "apps/extension/src/composition/persistence/projects/asset-references.ts",
         "apps/extension/src/composition/persistence/projects/contracts.ts",
         "apps/extension/src/composition/persistence/projects/index-mutations.ts",
@@ -3342,6 +3350,7 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
+        "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -3407,6 +3416,7 @@
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
+        "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -12466,6 +12476,7 @@
         "apps/extension/src/workflows/media-hub-backup/contracts/types.ts",
         "apps/extension/src/workflows/media-hub-backup/export/blob/budget.ts",
         "apps/extension/src/workflows/media-hub-backup/export/blob/descriptor.ts",
+        "apps/extension/src/workflows/media-hub-backup/export/blob/stream.ts",
         "apps/extension/src/workflows/media-hub-backup/export/effect-bundles.ts",
         "apps/extension/src/workflows/media-hub-backup/export/filters.ts",
         "apps/extension/src/workflows/media-hub-backup/export/index.ts",
@@ -12503,6 +12514,7 @@
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-project-version.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-projects.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/archive-reader.ts",
+        "apps/extension/src/workflows/media-hub-backup/restore/asset-stream.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/batches.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/index.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/prepare/index.ts",
@@ -15185,7 +15197,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.media-library.ts",
-        "contentHash": "568fa57662b08e4f501834c441cad1dd08a499ca62babba11d5e0e66496df68b"
+        "contentHash": "05f84d79875ce6492514a591a0d6ead3b0518de5e01d7496dbf718f698e7f3a9"
       },
       "consumers": [
         "tooling/test/harness/browser-mocks.media-library.ts",
@@ -15260,7 +15272,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.types.ts",
-        "contentHash": "dd3864697616d49b2d956f5d5f1ea581bc87667c6a4ad89df6dff6e5cc0130c7"
+        "contentHash": "ba2b1c3d48c8b02de7518bafea99849327f381f691e0d4866ae260ba75c81e40"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical.helpers.ts",
@@ -18288,7 +18300,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "2cc02038917cae66f206b02256ba233d26a6b706a1d53980a9eb97190798d84b"
+        "contentHash": "e8fdca9a791153177d7b39c8ca63b10efb4830953721e6bbfef3f801bf4a7125"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"

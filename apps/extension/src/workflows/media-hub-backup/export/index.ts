@@ -18,6 +18,8 @@ import { assertMediaHubBackupZipLimits } from './package-profile';
 import { buildBackupManifest, type BackupProjectDescriptorSet } from './manifest';
 import { buildEffectBundleDescriptors } from './effect-bundles';
 import { MAX_BACKUP_JSON_BYTES } from '../manifest';
+import { generateBackupZipFileToOpfs, releaseBackupZipFile } from './blob/stream';
+export { releaseBackupZipFile as releaseMediaHubBackupExport } from './blob/stream';
 import type {
   MediaHubBackupAssetDescriptor,
   MediaHubBackupExportOptions,
@@ -191,7 +193,12 @@ export async function exportMediaHubBackup(
   assertMediaHubBackupZipLimits(zip, manifest);
   return generateBackupZipBlob({
     budget,
+    generate: () =>
+      generateBackupZipFileToOpfs({
+        signal: runtimeOptions.signal,
+        zip,
+      }),
+    release: releaseBackupZipFile,
     signal: runtimeOptions.signal,
-    zip,
   });
 }

@@ -1,5 +1,9 @@
 import type JSZip from 'jszip';
 import { runWithIndexedDbMutation } from '../../../composition/persistence/infrastructure/indexed-db/mutation';
+import {
+  runWithDurableAssetLifecycleLock,
+  type DurableAssetOperationPermit,
+} from '../../../composition/persistence/infrastructure/mutation-barrier';
 import type { MediaHubImportConflictStrategy } from '../contracts/types';
 import {
   assertBackupImportAssetEntriesAvailable,
@@ -243,6 +247,7 @@ async function cleanupProjectMediaAssets(
 }
 
 export async function restorePreparedImportPlan(args: {
+  assetOperationPermit: DurableAssetOperationPermit;
   assetPlans: BackupImportAssetPlan[];
   preparedProjectDomains: PreparedProjectDomains;
   strategy: MediaHubImportConflictStrategy;
@@ -268,11 +273,11 @@ export async function restorePreparedImportPlan(args: {
     args.preparedProjectDomains.scenarioProjects.some(
       (project) => project.descriptor.assets.length > 0
     );
-  if (needsAssetOperation) await recoverAssetPublications();
+  if (needsAssetOperation) await recoverAssetPublications(args.assetOperationPermit);
   const operation = needsAssetOperation ? await createBackupRestoreOperation() : null;
   const importedAssetCompensations: ImportedAssetCompensation[] = [];
   try {
-    await stagePreparedProjectAssets(args.preparedProjectDomains, operation?.operationId);
+    await stagePreparedProjectAssets(args.preparedProjectDomains, args.zip, operation?.operationId);
     const importedAssets = await restorePreparedAssetsInBatches({
       assetPlans: args.assetPlans,
       importedAssetCompensations,
@@ -287,14 +292,16 @@ export async function restorePreparedImportPlan(args: {
     if (operation && isEmptyProjectDomainPlan(args.preparedProjectDomains)) {
       await transitionAssetOperation(operation.operationId, 'pending', 'committed');
     }
-    for (const compensation of importedAssetCompensations) {
-      const prepared = compensation.preparedAssetPublication;
-      if (!prepared) continue;
-      await deleteReadyJournal(prepared.journalId).catch(() => undefined);
-      releaseAssetReadyProtection([prepared.asset.ref.assetId]);
-    }
-    await cleanupProjectMediaAssets(args.preparedProjectDomains, false).catch(() => undefined);
-    await recoverAssetPublications().catch(() => undefined);
+    await runWithDurableAssetLifecycleLock(async () => {
+      for (const compensation of importedAssetCompensations) {
+        const prepared = compensation.preparedAssetPublication;
+        if (!prepared) continue;
+        await deleteReadyJournal(prepared.journalId).catch(() => undefined);
+        releaseAssetReadyProtection([prepared.asset.ref.assetId]);
+      }
+      await cleanupProjectMediaAssets(args.preparedProjectDomains, false).catch(() => undefined);
+    });
+    await recoverAssetPublications(args.assetOperationPermit).catch(() => undefined);
     return importedAssets + importedProjects;
   } catch (error) {
     if (operation) {
@@ -309,7 +316,7 @@ export async function restorePreparedImportPlan(args: {
       }
     }
     const cleanupResults = await Promise.allSettled([
-      ...(operation ? [recoverAssetPublications()] : []),
+      ...(operation ? [recoverAssetPublications(args.assetOperationPermit)] : []),
       cleanupImportedNonOperationAssets(importedAssetCompensations),
       ...(operation ? [] : [cleanupProjectMediaAssets(args.preparedProjectDomains, true)]),
     ]);

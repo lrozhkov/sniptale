@@ -8,18 +8,16 @@ import { isExportReadyVideoProject } from '../../../../features/video/project/va
 
 import { parseScenarioAssetEntry } from '../../../../composition/persistence/scenario/read-guards';
 import { translate } from '../../../../platform/i18n';
-import { assertSafeProjectAssetStorageInput } from '../../../../features/media-hub/project-assets';
-import { assertSafeScenarioAssetStorageInput } from '../../../../composition/persistence/scenario/projects/guards';
+import { assertSafeProjectAssetStorageMetadata } from '../../../../features/media-hub/project-assets';
+import { assertSafeScenarioAssetStorageMetadata } from '../../../../composition/persistence/scenario/projects/guards';
 import type { BackupBlobDescriptor, ProjectAssetBackupBlobDescriptor } from '../../contracts/types';
 import type { PreparedProjectDomains } from './prepare';
 import { loadRequiredArchiveBlob } from '../prepare';
 import { readRestoredBlob } from './helpers';
 import { materializeAggregatePresentation } from '../presentation';
 import {
-  assertAssetWriteAdmission,
   createAssetPublicationJournal,
   discardPreparedAsset,
-  writeBlobToAsset,
 } from '../../../../composition/persistence/assets';
 import {
   PROJECT_ASSET_PUBLICATION_DOMAIN,
@@ -27,6 +25,7 @@ import {
 } from '../../../../composition/persistence/projects/asset-publication';
 import type { PreparedRestoreRecordingAsset } from '../prepare';
 import { SCENARIO_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/scenario/aggregate-mutations';
+import { writeBackupArchiveEntryToAsset } from '../asset-stream';
 
 function collectProjectBlobDescriptors(
   prepared: PreparedProjectDomains
@@ -50,6 +49,25 @@ function collectProjectBlobDescriptors(
   ];
 }
 
+function collectMaterializedProjectBlobDescriptors(
+  prepared: PreparedProjectDomains
+): Array<{ blobPath: string }> {
+  return [
+    ...prepared.effectBundles.flatMap(({ descriptor }) => descriptor.assets),
+    ...prepared.videoProjects.flatMap((project) => [
+      ...(project.descriptor.effectProject?.snapshots.flatMap(({ assets }) => assets) ?? []),
+      ...project.descriptor.projectExports.flatMap((projectExport) =>
+        projectExport.thumbnail ? [projectExport.thumbnail] : []
+      ),
+      ...(project.descriptor.thumbnail ? [project.descriptor.thumbnail] : []),
+    ]),
+    ...prepared.scenarioProjects.flatMap((project) => [
+      ...(project.descriptor.thumbnail ? [project.descriptor.thumbnail] : []),
+      ...(project.descriptor.exportThumbnails ?? []),
+    ]),
+  ];
+}
+
 export async function assertPreparedProjectBlobsAvailable(
   prepared: PreparedProjectDomains,
   zip: JSZip
@@ -63,8 +81,11 @@ export async function assertPreparedProjectBlobsAvailable(
     }
   }
 
-  const restoredBlobs = await materializeProjectBlobs(descriptors, zip);
-  await assertPreparedProjectAssetBlobsSafe(prepared, restoredBlobs);
+  const restoredBlobs = await materializeProjectBlobs(
+    collectMaterializedProjectBlobDescriptors(prepared),
+    zip
+  );
+  assertPreparedProjectAssetsMetadataSafe(prepared);
   await prepareEffectProjectSnapshots(prepared, restoredBlobs);
   await prepareEffectBundles(prepared, restoredBlobs);
   await prepareAggregatePresentations(prepared, zip);
@@ -73,6 +94,7 @@ export async function assertPreparedProjectBlobsAvailable(
 
 export async function stagePreparedProjectAssets(
   prepared: PreparedProjectDomains,
+  zip: JSZip,
   operationId?: string
 ): Promise<void> {
   if (!prepared.restoredBlobs) throw new Error('Backup project blob preflight is incomplete.');
@@ -85,9 +107,12 @@ export async function stagePreparedProjectAssets(
     }
     const projectAssets = new Map<string, PreparedRestoreRecordingAsset>();
     for (const descriptor of project.descriptor.projectAssets) {
-      const blob = readRestoredBlob(prepared.restoredBlobs, descriptor.blobPath);
-      await assertAssetWriteAdmission(blob.size);
-      const asset = await writeBlobToAsset(blob, { mimeType: descriptor.entry.mimeType });
+      const asset = await writeBackupArchiveEntryToAsset({
+        expectedSize: descriptor.entry.size,
+        mimeType: descriptor.entry.mimeType,
+        path: descriptor.blobPath,
+        zip,
+      });
       const journal = await createAssetPublicationJournal({
         assetRefs: [asset.ref],
         domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
@@ -98,11 +123,14 @@ export async function stagePreparedProjectAssets(
     }
     const projectExportAssets = new Map<string, PreparedRestoreRecordingAsset>();
     for (const descriptor of project.descriptor.projectExports) {
-      const blob = readRestoredBlob(prepared.restoredBlobs, descriptor.recording.blobPath);
-      const entry = descriptor.recording.entry as Record<string, unknown>;
-      const mimeType = typeof entry['mimeType'] === 'string' ? entry['mimeType'] : blob.type;
-      await assertAssetWriteAdmission(blob.size);
-      const asset = await writeBlobToAsset(blob, { mimeType: mimeType || 'video/webm' });
+      const mimeType = descriptor.entry.mimeType || 'video/webm';
+      const size = descriptor.entry.size;
+      const asset = await writeBackupArchiveEntryToAsset({
+        expectedSize: size,
+        mimeType,
+        path: descriptor.recording.blobPath,
+        zip,
+      });
       const journal = await createAssetPublicationJournal({
         assetRefs: [asset.ref],
         domain: PROJECT_EXPORT_PUBLICATION_DOMAIN,
@@ -123,11 +151,18 @@ export async function stagePreparedProjectAssets(
     }
     const scenarioAssets = new Map<string, PreparedRestoreRecordingAsset>();
     for (const descriptor of project.descriptor.assets) {
-      const blob = readRestoredBlob(prepared.restoredBlobs, descriptor.blobPath);
       const entry = descriptor.entry as Record<string, unknown>;
-      const mimeType = typeof entry['mimeType'] === 'string' ? entry['mimeType'] : blob.type;
-      await assertAssetWriteAdmission(blob.size);
-      const asset = await writeBlobToAsset(blob, { mimeType });
+      const mimeType = entry['mimeType'];
+      const size = entry['size'];
+      if (typeof mimeType !== 'string' || typeof size !== 'number') {
+        throw new Error('Scenario asset backup metadata is incomplete.');
+      }
+      const asset = await writeBackupArchiveEntryToAsset({
+        expectedSize: size,
+        mimeType,
+        path: descriptor.blobPath,
+        zip,
+      });
       const journal = await createAssetPublicationJournal({
         assetRefs: [asset.ref],
         domain: SCENARIO_ASSET_PUBLICATION_DOMAIN,
@@ -231,47 +266,38 @@ async function prepareEffectBundles(
   }
 }
 
-async function assertPreparedProjectAssetBlobsSafe(
-  prepared: PreparedProjectDomains,
-  restoredBlobs: ReadonlyMap<string, Blob>
-): Promise<void> {
+function assertPreparedProjectAssetsMetadataSafe(prepared: PreparedProjectDomains): void {
   for (const project of prepared.videoProjects) {
     for (const descriptor of project.descriptor.projectAssets) {
-      assertPreparedProjectAssetBlobSafe(descriptor, restoredBlobs);
+      assertPreparedProjectAssetMetadataSafe(descriptor);
     }
   }
 
   for (const project of prepared.scenarioProjects) {
     for (const descriptor of project.descriptor.assets) {
-      assertPreparedScenarioAssetBlobSafe(descriptor, restoredBlobs);
+      assertPreparedScenarioAssetMetadataSafe(descriptor);
     }
   }
 }
 
-function assertPreparedProjectAssetBlobSafe(
-  descriptor: ProjectAssetBackupBlobDescriptor,
-  restoredBlobs: ReadonlyMap<string, Blob>
+function assertPreparedProjectAssetMetadataSafe(
+  descriptor: ProjectAssetBackupBlobDescriptor
 ): void {
-  const blob = readRestoredBlob(restoredBlobs, descriptor.blobPath);
-  assertSafeProjectAssetStorageInput(blob, descriptor.entry.mimeType);
+  assertSafeProjectAssetStorageMetadata(descriptor.entry.size, descriptor.entry.mimeType);
 }
 
-export function assertPreparedScenarioAssetBlobSafe(
-  descriptor: BackupBlobDescriptor,
-  restoredBlobs: ReadonlyMap<string, Blob>
-): void {
-  const blob = readRestoredBlob(restoredBlobs, descriptor.blobPath);
+export function assertPreparedScenarioAssetMetadataSafe(descriptor: BackupBlobDescriptor): void {
   const entry = descriptor.entry as Record<string, unknown>;
   const mimeType = entry['mimeType'];
   const size = entry['size'];
   if (typeof mimeType !== 'string') {
     throw new Error('Scenario asset backup entry MIME type is missing.');
   }
-  if (typeof size !== 'number' || size !== blob.size) {
-    throw new Error('Scenario asset backup entry size does not match blob.');
+  if (typeof size !== 'number') {
+    throw new Error('Scenario asset backup entry size is missing.');
   }
 
-  assertSafeScenarioAssetStorageInput(blob, mimeType);
+  assertSafeScenarioAssetStorageMetadata(size, mimeType);
   if (!parseScenarioAssetEntry({ ...entry, assetId: 'preflight-asset' })) {
     throw new Error('Invalid scenario asset backup entry.');
   }

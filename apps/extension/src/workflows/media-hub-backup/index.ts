@@ -10,7 +10,7 @@ export {
   SUPPORT_MEDIA_HUB_BACKUP_EXPORT_OPTIONS,
   createMediaHubBackupExportOptions,
 } from './export/options';
-export { exportMediaHubBackup } from './export';
+export { exportMediaHubBackup, releaseMediaHubBackupExport } from './export';
 export { importMediaHubBackup } from './import';
 export { inspectMediaHubBackup } from './inspect';
 export { inspectLocalMediaHubBackup } from './inspect/local';

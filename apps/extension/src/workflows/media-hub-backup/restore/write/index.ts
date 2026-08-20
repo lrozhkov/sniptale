@@ -23,7 +23,7 @@ import {
   createThumbnailStoreEntry,
 } from '../records/builders';
 import { getStore } from '../../storage';
-import { assertSafeProjectAssetStorageInput } from '../../../../features/media-hub/project-assets';
+import { assertSafeProjectAssetStorageMetadata } from '../../../../features/media-hub/project-assets';
 import type { PreparedRestoreRecordingAsset } from '../prepare';
 import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import {
@@ -220,12 +220,13 @@ export async function restoreAssetRecordSnapshot(
 export async function writeMainAssetRecord(
   tx: BackupTransaction,
   entry: Omit<MediaLibraryEntry, 'blob'>,
-  blob: Blob,
+  blob: Blob | null,
   recordingTelemetry: RecordingTelemetryEntry | null,
   webSnapshotRecord: WebSnapshotRecord | null = null,
   preparedAssetPublication?: PreparedRestoreRecordingAsset
 ): Promise<void> {
   if (entry.source.kind === 'screenshot') {
+    if (!blob) throw new Error('Screenshot backup blob is missing.');
     await getStore(tx, MEDIA_LIBRARY_STORE).put({ ...entry, blob } satisfies MediaLibraryEntry);
     return;
   }
@@ -275,8 +276,11 @@ export async function writeMainAssetRecord(
     return;
   }
 
-  assertSafeProjectAssetStorageInput(blob, entry.mimeType);
+  assertSafeProjectAssetStorageMetadata(entry.size, entry.mimeType);
   if (!preparedAssetPublication) throw new Error('Prepared project asset is missing.');
+  if (preparedAssetPublication.asset.ref.size !== entry.size) {
+    throw new Error('Prepared project asset size does not match media metadata.');
+  }
   await getStore(tx, ASSET_REFS_STORE).put(preparedAssetPublication.asset.ref);
   await getStore(tx, ASSET_OWNERS_STORE).put({
     assetId: preparedAssetPublication.asset.ref.assetId,
@@ -305,7 +309,7 @@ export async function writeThumbnailRecord(
 export async function restoreAssetRecord(
   tx: BackupTransaction,
   entry: Omit<MediaLibraryEntry, 'blob'>,
-  blob: Blob,
+  blob: Blob | null,
   thumbnail: Blob | null,
   recordingTelemetry: RecordingTelemetryEntry | null = null,
   webSnapshotRecord: WebSnapshotRecord | null = null,

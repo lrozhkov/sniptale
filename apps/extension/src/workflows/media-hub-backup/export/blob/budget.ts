@@ -20,10 +20,6 @@ interface BackupTextZipWriter {
   file: (path: string, text: string) => unknown;
 }
 
-interface BackupZipGenerator {
-  generateAsync: (options: { type: 'blob' }, onUpdate?: () => void) => Promise<Blob>;
-}
-
 export function createBackupExportBudget(): BackupExportBudget {
   return { totalBytes: 0 };
 }
@@ -65,17 +61,31 @@ export function appendBackupTextEntry(args: {
 export async function generateBackupZipBlob(args: {
   budget: BackupExportBudget;
   signal?: AbortSignal | undefined;
-  zip: BackupZipGenerator;
+  generate: () => Promise<File>;
+  release?: (blob: Blob) => Promise<void>;
 }): Promise<Blob> {
   assertBackupExportGenerationAllowed(args.budget, args.signal);
-  const blob = await args.zip.generateAsync({ type: 'blob' }, () => {
+  const blob = await args.generate();
+  try {
     assertBackupExportGenerationAllowed(args.budget, args.signal);
-  });
-  assertBackupExportGenerationAllowed(args.budget, args.signal);
-  if (typeof blob.size === 'number' && blob.size > MAX_BACKUP_ARCHIVE_BYTES) {
-    throw new Error('Media hub backup package exceeds archive byte budget.');
+    if (typeof blob.size === 'number' && blob.size > MAX_BACKUP_ARCHIVE_BYTES) {
+      throw new Error('Media hub backup package exceeds archive byte budget.');
+    }
+    return blob;
+  } catch (error) {
+    if (args.release) {
+      try {
+        await args.release(blob);
+      } catch (releaseError) {
+        throw new AggregateError(
+          [error, releaseError],
+          'Media hub backup generation failed and temporary output cleanup was incomplete.',
+          { cause: error }
+        );
+      }
+    }
+    throw error;
   }
-  return blob;
 }
 
 function assertBackupExportBudget(budget: BackupExportBudget): void {

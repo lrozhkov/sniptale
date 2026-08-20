@@ -22,6 +22,7 @@ const {
   snapshotExistingAssetRecordMock,
   withMediaHubWriteGuardMock,
   runWithPersistenceMutationTransitionMock,
+  runWithDurableAssetOperationMock,
   createBackupRestoreOperationMock,
   transitionAssetOperationMock,
   recoverAssetPublicationsMock,
@@ -47,6 +48,7 @@ const {
   snapshotExistingAssetRecordMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
   runWithPersistenceMutationTransitionMock: vi.fn(),
+  runWithDurableAssetOperationMock: vi.fn(),
   createBackupRestoreOperationMock: vi.fn(),
   transitionAssetOperationMock: vi.fn(),
   recoverAssetPublicationsMock: vi.fn(),
@@ -87,6 +89,7 @@ vi.mock(
       typeof import('../../../composition/persistence/infrastructure/mutation-barrier')
     >()),
     runWithPersistenceMutationTransition: runWithPersistenceMutationTransitionMock,
+    runWithDurableAssetOperation: runWithDurableAssetOperationMock,
   })
 );
 
@@ -129,7 +132,7 @@ vi.mock('./project/prepare', async (importOriginal) => ({
 
 vi.mock('./project/preflight', () => ({
   assertPreparedProjectBlobsAvailable: assertPreparedProjectBlobsAvailableMock,
-  assertPreparedScenarioAssetBlobSafe: vi.fn(),
+  assertPreparedScenarioAssetMetadataSafe: vi.fn(),
   stagePreparedProjectAssets: stagePreparedProjectAssetsMock,
 }));
 
@@ -199,6 +202,9 @@ beforeEach(() => {
   );
   runWithPersistenceMutationTransitionMock.mockImplementation(
     async (callback: () => Promise<void>) => callback()
+  );
+  runWithDurableAssetOperationMock.mockImplementation(
+    async (callback: (permit: object) => Promise<void>) => callback({})
   );
   createBackupRestoreOperationMock.mockResolvedValue({
     compensations: [],

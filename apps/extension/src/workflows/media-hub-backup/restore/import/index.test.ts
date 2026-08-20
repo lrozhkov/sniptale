@@ -43,6 +43,9 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
   createAssetPublicationJournal: createAssetPublicationJournalMock,
   writeBlobToAsset: writeBlobToAssetMock,
 }));
+vi.mock('../asset-stream', () => ({
+  writeBackupArchiveEntryToAsset: writeBlobToAssetMock,
+}));
 
 vi.mock('../../../../composition/persistence/assets/operations', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -227,16 +230,19 @@ beforeEach(() => {
   transitionAssetOperationMock.mockResolvedValue(undefined);
   assertAssetWriteAdmissionMock.mockResolvedValue(undefined);
   createAssetPublicationJournalMock.mockResolvedValue({ journalId: 'journal-1' });
-  writeBlobToAssetMock.mockResolvedValue({
-    ref: {
-      assetId: 'asset-restored-1',
-      createdAt: 1,
-      location: { kind: 'opfs', objectKey: 'objects/asset-restored-1' },
-      mimeType: 'image/png',
-      sha256: null,
-      size: 5,
-    },
-  });
+  writeBlobToAssetMock.mockImplementation(
+    ({ expectedSize = 5, mimeType = 'image/png' }: { expectedSize?: number; mimeType?: string }) =>
+      Promise.resolve({
+        ref: {
+          assetId: 'asset-restored-1',
+          createdAt: 1,
+          location: { kind: 'opfs', objectKey: 'objects/asset-restored-1' },
+          mimeType,
+          sha256: null,
+          size: expectedSize,
+        },
+      })
+  );
   withMediaHubWriteGuardMock.mockImplementation(async (_operation, callback: () => Promise<void>) =>
     callback()
   );

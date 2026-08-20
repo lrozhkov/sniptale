@@ -68,6 +68,7 @@ export type SniptaleHarnessBridge = {
 export type SniptaleHarnessBootstrap = {
   storage?: Record<string, unknown>;
   mediaLibrary?: HarnessMediaLibraryAsset[];
+  recordings?: Array<{ bytes: string; filename: string; id: string; mimeType: string }>;
   videoProjects?: VideoProject[];
   runtimeResponses?: Record<string, RuntimeResponseOverride>;
   activeTab?: Partial<HarnessActiveTab>;

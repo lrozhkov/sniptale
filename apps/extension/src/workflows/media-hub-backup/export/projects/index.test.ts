@@ -46,6 +46,11 @@ const { FakeJSZip, generateAsyncMock, initDBMock, listMediaLibraryMock, readAsse
   });
 
 vi.mock('jszip', () => ({ default: FakeJSZip }));
+vi.mock('../blob/stream', () => ({
+  generateBackupZipFileToOpfs: ({ zip }: { zip: { generateAsync(): Promise<unknown> } }) =>
+    zip.generateAsync(),
+  releaseBackupZipFile: vi.fn(),
+}));
 
 vi.mock(
   '../../../../composition/persistence/infrastructure/indexed-db/core',

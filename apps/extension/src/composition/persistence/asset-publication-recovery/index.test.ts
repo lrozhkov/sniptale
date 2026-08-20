@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
   deleteJournal: vi.fn(),
   journals: vi.fn(),
+  objects: vi.fn(),
+  writing: vi.fn(),
   recoverStandalone: vi.fn(),
   runMutation: vi.fn(),
 }));
@@ -17,6 +19,8 @@ vi.mock('../assets', async (importOriginal) => ({
   deleteAssetObject: mocks.deleteObject,
   deleteReadyJournal: mocks.deleteJournal,
   listReadyJournals: mocks.journals,
+  listAssetObjectIds: mocks.objects,
+  listWritingAssetIds: mocks.writing,
   recoverStandaloneAssetPublications: mocks.recoverStandalone,
 }));
 
@@ -41,6 +45,8 @@ beforeEach(() => {
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.deleteJournal.mockResolvedValue(undefined);
   mocks.journals.mockResolvedValue([]);
+  mocks.objects.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
   mocks.recoverStandalone.mockResolvedValue(0);
 });
 

@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import {
   isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
+  runWithDurableAssetOperation,
+  runWithDurableAssetOperationRecovery,
   runWithPersistenceMutationPermit,
   runWithPersistenceMutationTransition,
   runWithExclusivePersistenceMutationPermit,
@@ -143,6 +145,57 @@ it('keeps a cross-context transition ahead of erasure across worker-local state 
   await transition;
   await erasure;
   expect(erasureOperation).toHaveBeenCalledOnce();
+});
+
+it('queues startup recovery until a live durable restore operation completes', async () => {
+  let releaseRestore!: () => void;
+  const restoreGate = new Promise<void>((resolve) => {
+    releaseRestore = resolve;
+  });
+  const liveRestore = vi.fn(async () => restoreGate);
+  const startupRecovery = vi.fn(async () => undefined);
+
+  const restore = runWithDurableAssetOperation(liveRestore);
+  await vi.waitFor(() => expect(liveRestore).toHaveBeenCalledOnce());
+  const recovery = runWithDurableAssetOperationRecovery(undefined, startupRecovery);
+  await Promise.resolve();
+  expect(startupRecovery).not.toHaveBeenCalled();
+
+  releaseRestore();
+  await restore;
+  await recovery;
+  expect(startupRecovery).toHaveBeenCalledOnce();
+});
+
+it('serializes live durable restores so one restore cannot recover another', async () => {
+  let releaseFirstRestore!: () => void;
+  const firstRestoreGate = new Promise<void>((resolve) => {
+    releaseFirstRestore = resolve;
+  });
+  const firstRestore = vi.fn(async () => firstRestoreGate);
+  const secondRestore = vi.fn(async () => undefined);
+
+  const first = runWithDurableAssetOperation(firstRestore);
+  await vi.waitFor(() => expect(firstRestore).toHaveBeenCalledOnce());
+  const second = runWithDurableAssetOperation(secondRestore);
+  await Promise.resolve();
+  expect(secondRestore).not.toHaveBeenCalled();
+
+  releaseFirstRestore();
+  await first;
+  await second;
+  expect(secondRestore).toHaveBeenCalledOnce();
+});
+
+it('lets an admitted restore invoke its own recovery without reacquiring the operation lock', async () => {
+  const nestedRecovery = vi.fn(async () => 'recovered');
+
+  await expect(
+    runWithDurableAssetOperation((permit) =>
+      runWithDurableAssetOperationRecovery(permit, nestedRecovery)
+    )
+  ).resolves.toBe('recovered');
+  expect(nestedRecovery).toHaveBeenCalledOnce();
 });
 
 it('issues an unforgeable permit only for the lifetime of its admitted operation', async () => {

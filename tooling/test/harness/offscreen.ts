@@ -5,11 +5,11 @@ import type { ProjectExportInputReference } from '../../../apps/extension/src/co
 import type { VideoProject } from '../../../apps/extension/src/features/video/project/types';
 import { createCanvasVideoOutput } from '../../../apps/extension/src/offscreen/recording/stream/canvas-video-output';
 import { createRecordingArtifactSession } from '../../../apps/extension/src/offscreen/recording/encoding/artifact-session';
+import { createRecordingStagingCoordinator } from '../../../apps/extension/src/composition/persistence/recordings/staging';
 import {
-  createOpfsRecordingStagingStorage,
-  createRecordingStagingCoordinator,
-  type RecordingStagingStorageAdapter,
-} from '../../../apps/extension/src/composition/persistence/recordings/staging';
+  createAssetObjectWriter,
+  type AssetObjectWriter,
+} from '../../../apps/extension/src/composition/persistence/assets';
 
 type HarnessMediaRecorderState = 'inactive' | 'recording' | 'paused';
 
@@ -87,32 +87,18 @@ function resolveStaticCanvasRecordingMimeType(): string {
   return mimeType;
 }
 
-function createObservedOpfsStorage(
+function createObservedAssetWriter(
   onAppend: (chunk: Blob) => void
-): RecordingStagingStorageAdapter {
-  const storage = createOpfsRecordingStagingStorage();
-  return {
-    countSessions: () => storage.countSessions(),
-    removeAllSessions: () => storage.removeAllSessions(),
-    async createSession() {
-      const session = await storage.createSession();
-      return {
-        remove: () => session.remove(),
-        async createArtifact() {
-          const artifact = await session.createArtifact();
-          return {
-            abort: () => artifact.abort(),
-            async append(chunk) {
-              onAppend(chunk);
-              await artifact.append(chunk);
-            },
-            close: () => artifact.close(),
-            getFile: () => artifact.getFile(),
-            remove: () => artifact.remove(),
-          };
-        },
-      };
-    },
+): (input: { assetId?: string; mimeType: string }) => Promise<AssetObjectWriter> {
+  return async (input) => {
+    const writer = await createAssetObjectWriter(input);
+    return {
+      ...writer,
+      async append(chunk) {
+        onAppend(chunk);
+        await writer.append(chunk);
+      },
+    };
   };
 }
 
@@ -128,7 +114,7 @@ async function recordColdHighResolutionArtifact(
   let startedAt = 0;
   let stopRequestedAt = Number.POSITIVE_INFINITY;
   const coordinator = await createRecordingStagingCoordinator({
-    storage: createObservedOpfsStorage(() => {
+    createWriter: createObservedAssetWriter(() => {
       appendTimes.push(performance.now() - startedAt);
     }),
   });

@@ -20,6 +20,9 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
   discardPreparedAsset: assetMocks.discard,
   writeBlobToAsset: assetMocks.writeBlob,
 }));
+vi.mock('../asset-stream', () => ({
+  writeBackupArchiveEntryToAsset: assetMocks.writeBlob,
+}));
 
 vi.mock('../../../../composition/persistence/media-library/index', async (importOriginal) => ({
   ...(await importOriginal<

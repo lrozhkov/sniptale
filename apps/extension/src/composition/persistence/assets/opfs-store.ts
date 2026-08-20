@@ -186,16 +186,24 @@ export async function createAssetObjectWriter(
     assetId,
     async abort() {
       if (phase === 'aborted') return;
-      if (phase === 'open') await writable.abort().catch(() => undefined);
+      const wasOpen = phase === 'open';
       phase = 'aborted';
+      const failures: unknown[] = [];
+      if (wasOpen) {
+        try {
+          await writable.abort();
+        } catch (error) {
+          failures.push(error);
+        }
+      }
       const cleanup = await Promise.allSettled([
         removeIfPresent(objects, assetId),
         removeIfPresent(writing, assetId),
+        releaseWriterLock(assetId),
       ]);
-      await releaseWriterLock(assetId).catch(() => undefined);
-      const failures = cleanup.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason as unknown] : []
-      );
+      for (const result of cleanup) {
+        if (result.status === 'rejected') failures.push(result.reason as unknown);
+      }
       if (failures.length > 0) {
         throw new AggregateError(failures, `Failed to discard asset object: ${assetId}.`);
       }
@@ -324,6 +332,45 @@ export async function deleteAssetObject(
   readyProtectedAssetIds.delete(assetId);
 }
 
+export async function runWithAssetObjectLockIfAvailable<T>(
+  assetId: string,
+  operation: () => Promise<T>,
+  options: AssetOpfsOptions = {}
+): Promise<T | undefined> {
+  let result: T | undefined;
+  const requestLock = options.requestExclusiveLock ?? defaultRequestExclusiveLock;
+  await requestLock(assetLockName(assetId), { ifAvailable: true }, async (locked) => {
+    if (locked) result = await operation();
+  });
+  return result;
+}
+
+export async function listAssetObjectIds(options: AssetOpfsOptions = {}): Promise<string[]> {
+  const objects = await getAssetDirectory(options, OBJECTS_DIRECTORY_NAME, false);
+  if (!objects) return [];
+  if (typeof Reflect.get(objects, 'entries') !== 'function') {
+    throw new Error('Asset object enumeration is unavailable.');
+  }
+  const assetIds: string[] = [];
+  for await (const [assetId, handle] of (objects as EnumerableDirectoryHandle).entries()) {
+    if (handle.kind === 'file') assetIds.push(assetId);
+  }
+  return assetIds.sort();
+}
+
+export async function listWritingAssetIds(options: AssetOpfsOptions = {}): Promise<string[]> {
+  const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
+  if (!writing) return [];
+  if (typeof Reflect.get(writing, 'entries') !== 'function') {
+    throw new Error('Asset writing-marker enumeration is unavailable.');
+  }
+  const assetIds: string[] = [];
+  for await (const [assetId, handle] of (writing as EnumerableDirectoryHandle).entries()) {
+    if (handle.kind === 'file') assetIds.push(assetId);
+  }
+  return assetIds.sort();
+}
+
 export function isAssetReadyProtected(assetId: string): boolean {
   return readyProtectedAssetIds.has(assetId);
 }
@@ -336,13 +383,28 @@ export async function discardPreparedAsset(
   assetId: string,
   options: AssetOpfsOptions = {}
 ): Promise<void> {
-  const [objects, writing] = await Promise.all([
+  const failures: unknown[] = [];
+  let objects: FileSystemDirectoryHandle | null = null;
+  let writing: FileSystemDirectoryHandle | null = null;
+  const [objectsResult, writingResult] = await Promise.allSettled([
     getAssetDirectory(options, OBJECTS_DIRECTORY_NAME, false),
     getAssetDirectory(options, WRITING_DIRECTORY_NAME, false),
   ]);
-  if (objects) await removeIfPresent(objects, assetId);
-  if (writing) await removeIfPresent(writing, assetId);
-  await releaseWriterLock(assetId);
+  if (objectsResult.status === 'fulfilled') objects = objectsResult.value;
+  else failures.push(objectsResult.reason as unknown);
+  if (writingResult.status === 'fulfilled') writing = writingResult.value;
+  else failures.push(writingResult.reason as unknown);
+  const cleanupResults = await Promise.allSettled([
+    ...(objects ? [removeIfPresent(objects, assetId)] : []),
+    ...(writing ? [removeIfPresent(writing, assetId)] : []),
+    releaseWriterLock(assetId),
+  ]);
+  for (const result of cleanupResults) {
+    if (result.status === 'rejected') failures.push(result.reason as unknown);
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(failures, `Unable to discard prepared asset: ${assetId}.`);
+  }
 }
 
 export async function collectQuiescentWritingObjects(
@@ -354,20 +416,20 @@ export async function collectQuiescentWritingObjects(
     throw new Error('Asset writing-marker enumeration is unavailable.');
   }
   const requestLock = options.requestExclusiveLock ?? defaultRequestExclusiveLock;
-  const readyAssetIds = new Set(
-    (await listReadyJournals(options)).flatMap((journal) =>
-      journal.assetRefs.map((ref) => ref.assetId)
-    )
-  );
   let removed = 0;
   for await (const [assetId, handle] of (writing as EnumerableDirectoryHandle).entries()) {
     if (handle.kind !== 'file') continue;
-    if (readyAssetIds.has(assetId)) {
-      await removeIfPresent(writing, assetId);
-      continue;
-    }
     await requestLock(assetLockName(assetId), { ifAvailable: true }, async (locked) => {
       if (!locked) return;
+      const readyAssetIds = new Set(
+        (await listReadyJournals(options)).flatMap((journal) =>
+          journal.assetRefs.map((ref) => ref.assetId)
+        )
+      );
+      if (readyAssetIds.has(assetId)) {
+        await removeIfPresent(writing, assetId);
+        return;
+      }
       await deleteAssetObject(assetId, options);
       await removeIfPresent(writing, assetId);
       removed += 1;

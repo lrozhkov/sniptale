@@ -14,10 +14,8 @@ import type { AggregatePresentationEntry } from '../../../../composition/persist
 import { materializeAggregatePresentation } from '../presentation';
 import type { BackupArchiveReader } from '../archive-reader';
 import {
-  assertAssetWriteAdmission,
   createAssetPublicationJournal,
   discardPreparedAsset,
-  writeBlobToAsset,
   type PreparedAssetObject,
 } from '../../../../composition/persistence/assets';
 import { RECORDING_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/recordings/asset-publication';
@@ -25,6 +23,7 @@ import {
   PROJECT_ASSET_PUBLICATION_DOMAIN,
   PROJECT_EXPORT_PUBLICATION_DOMAIN,
 } from '../../../../composition/persistence/projects/asset-publication';
+import { writeBackupArchiveEntryToAsset } from '../asset-stream';
 
 export interface PreparedRestoreRecordingAsset {
   asset: PreparedAssetObject;
@@ -33,7 +32,7 @@ export interface PreparedRestoreRecordingAsset {
 
 export interface PreparedBackupImportAsset {
   assetPath: string | null;
-  assetBlob: Blob;
+  assetBlob: Blob | null;
   existingEntry: MediaLibraryEntry | undefined;
   nextEntry: Omit<MediaLibraryEntry, 'blob'>;
   recordingTelemetry: RecordingTelemetryEntry | null;
@@ -208,78 +207,93 @@ export async function loadBackupImportAssetBatch(args: {
   preparedAssets: BackupImportAssetPlan[];
   zip: BackupArchiveReader;
 }): Promise<PreparedBackupImportAsset[]> {
-  return Promise.all(
-    args.preparedAssets.map(async (prepared) => {
-      const assetBlob = await loadRequiredArchiveBlob({
+  return Promise.all(args.preparedAssets.map((prepared) => loadBackupImportAsset(prepared, args)));
+}
+
+async function loadBackupImportAsset(
+  prepared: BackupImportAssetPlan,
+  args: { operationId?: string; zip: BackupArchiveReader }
+): Promise<PreparedBackupImportAsset> {
+  const preparedAssetPublication = await stageDurableBackupAsset(prepared, args);
+  const assetBlob = preparedAssetPublication
+    ? null
+    : await loadRequiredArchiveBlob({
         assetPath: prepared.assetPath,
         filename: prepared.nextEntry.filename,
         zip: args.zip,
       });
-      const thumbnailBlob = await loadThumbnailBlob({
-        path: prepared.thumbnailPath,
-        zip: args.zip,
-      });
-      const webSnapshotRecord = await createWebSnapshotRecordFromPlan(prepared, assetBlob);
-      const presentation = await materializeAggregatePresentation({
-        descriptor: prepared.presentationDescriptor,
-        ref: { id: prepared.nextEntry.id, kind: 'image' },
-        zip: args.zip,
-      });
-      const nextEntry = webSnapshotRecord
-        ? { ...prepared.nextEntry, size: webSnapshotRecord.size }
-        : prepared.nextEntry;
+  const thumbnailBlob = await loadThumbnailBlob({ path: prepared.thumbnailPath, zip: args.zip });
+  const webSnapshotRecord = assetBlob
+    ? await createWebSnapshotRecordFromPlan(prepared, assetBlob)
+    : null;
+  const presentation = await materializeAggregatePresentation({
+    descriptor: prepared.presentationDescriptor,
+    ref: { id: prepared.nextEntry.id, kind: 'image' },
+    zip: args.zip,
+  });
+  return {
+    ...prepared,
+    assetBlob,
+    nextEntry: webSnapshotRecord
+      ? { ...prepared.nextEntry, size: webSnapshotRecord.size }
+      : prepared.nextEntry,
+    thumbnailBlob,
+    webSnapshotRecord,
+    presentation,
+    ...(preparedAssetPublication ? { preparedAssetPublication } : {}),
+  };
+}
 
-      let preparedAssetPublication: PreparedRestoreRecordingAsset | undefined;
-      if (
-        prepared.nextEntry.source.kind === 'recording' ||
-        prepared.nextEntry.source.kind === 'project-export' ||
-        prepared.nextEntry.source.kind === 'project-asset'
-      ) {
-        if (!args.operationId) throw new Error('Restore operation ID is missing.');
-        await assertAssetWriteAdmission(assetBlob.size);
-        const asset = await writeBlobToAsset(assetBlob, { mimeType: prepared.nextEntry.mimeType });
-        const source = prepared.nextEntry.source;
-        const domain =
-          source.kind === 'recording'
-            ? RECORDING_ASSET_PUBLICATION_DOMAIN
-            : source.kind === 'project-export'
-              ? PROJECT_EXPORT_PUBLICATION_DOMAIN
-              : PROJECT_ASSET_PUBLICATION_DOMAIN;
-        const payload =
-          source.kind === 'recording'
-            ? { recordingId: source.recordingId, restore: true }
-            : source.kind === 'project-export'
-              ? { projectExportId: source.exportId, restore: true }
-              : { projectAssetId: source.projectAssetId, restore: true };
-        const journal = await createAssetPublicationJournal({
-          assetRefs: [asset.ref],
-          domain,
-          operationId: args.operationId,
-          payload,
-        }).catch(async (error: unknown) => {
-          try {
-            await discardPreparedAsset(asset.ref.assetId);
-          } catch (cleanupError) {
-            throw new AggregateError(
-              [error, cleanupError],
-              'Recording restore staging failed before its ready journal became durable.',
-              { cause: error }
-            );
-          }
-          throw error;
-        });
-        preparedAssetPublication = { asset, journalId: journal.journalId };
-      }
+async function stageDurableBackupAsset(
+  prepared: BackupImportAssetPlan,
+  args: { operationId?: string; zip: BackupArchiveReader }
+): Promise<PreparedRestoreRecordingAsset | undefined> {
+  const source = prepared.nextEntry.source;
+  if (
+    source.kind !== 'recording' &&
+    source.kind !== 'project-export' &&
+    source.kind !== 'project-asset'
+  ) {
+    return undefined;
+  }
+  if (!args.operationId) throw new Error('Restore operation ID is missing.');
+  if (!prepared.assetPath) throw new Error('Durable restore asset path is missing.');
+  const asset = await writeBackupArchiveEntryToAsset({
+    expectedSize: prepared.nextEntry.size,
+    mimeType: prepared.nextEntry.mimeType,
+    path: prepared.assetPath,
+    zip: args.zip,
+  });
+  const domain =
+    source.kind === 'recording'
+      ? RECORDING_ASSET_PUBLICATION_DOMAIN
+      : source.kind === 'project-export'
+        ? PROJECT_EXPORT_PUBLICATION_DOMAIN
+        : PROJECT_ASSET_PUBLICATION_DOMAIN;
+  const payload =
+    source.kind === 'recording'
+      ? { recordingId: source.recordingId, restore: true }
+      : source.kind === 'project-export'
+        ? { projectExportId: source.exportId, restore: true }
+        : { projectAssetId: source.projectAssetId, restore: true };
+  const journal = await createAssetPublicationJournal({
+    assetRefs: [asset.ref],
+    domain,
+    operationId: args.operationId,
+    payload,
+  }).catch((error: unknown) => discardStagedBackupAsset(asset.ref.assetId, error));
+  return { asset, journalId: journal.journalId };
+}
 
-      return {
-        ...prepared,
-        assetBlob,
-        nextEntry,
-        thumbnailBlob,
-        webSnapshotRecord,
-        presentation,
-        ...(preparedAssetPublication ? { preparedAssetPublication } : {}),
-      };
-    })
-  );
+async function discardStagedBackupAsset(assetId: string, error: unknown): Promise<never> {
+  try {
+    await discardPreparedAsset(assetId);
+  } catch (cleanupError) {
+    throw new AggregateError(
+      [error, cleanupError],
+      'Recording restore staging failed before its ready journal became durable.',
+      { cause: error }
+    );
+  }
+  throw error;
 }

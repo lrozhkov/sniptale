@@ -67,23 +67,16 @@ describe('backup restore bundle project asset MIME boundary', () => {
 });
 
 async function validateScenarioAssetDescriptor(args: {
-  blob: Blob;
   descriptor: import('../../contracts/types').BackupBlobDescriptor;
 }): Promise<void> {
-  const { assertPreparedScenarioAssetBlobSafe } = await import('./preflight');
-  assertPreparedScenarioAssetBlobSafe(
-    args.descriptor,
-    new Map([[args.descriptor.blobPath, args.blob]])
-  );
+  const { assertPreparedScenarioAssetMetadataSafe } = await import('./preflight');
+  assertPreparedScenarioAssetMetadataSafe(args.descriptor);
 }
 
 it('rejects scenario bundle SVG assets before scenario asset staging', async () => {
   const harness = createStoreHarness();
-  const blob = new Blob(['<svg></svg>'], { type: 'image/svg+xml' });
-
   await expect(
     validateScenarioAssetDescriptor({
-      blob,
       descriptor: {
         blobPath: 'scenario-projects/project-1/assets/asset-1',
         entry: createScenarioAssetBackupEntry({ mimeType: 'image/svg+xml', size: 11 }),
@@ -101,13 +94,11 @@ it.each([
   ['malformed galleryAssetId', { galleryAssetId: 42 }],
 ])('rejects scenario bundle assets with %s before store writes', async (_label, overrides) => {
   const harness = createStoreHarness();
-  const blob = new Blob(['png-bytes'], { type: 'image/png' });
   await expect(
     validateScenarioAssetDescriptor({
-      blob,
       descriptor: {
         blobPath: 'scenario-projects/project-1/assets/asset-1',
-        entry: createScenarioAssetBackupEntry({ size: blob.size, ...overrides }),
+        entry: createScenarioAssetBackupEntry({ size: 9, ...overrides }),
       },
     })
   ).rejects.toThrow('Invalid scenario asset backup entry.');
@@ -115,19 +106,17 @@ it.each([
   expect(harness.scenarioAssetsStore.put).not.toHaveBeenCalled();
 });
 
-it('rejects scenario bundle assets whose metadata size does not match the blob', async () => {
+it('rejects scenario bundle assets with an invalid declared size', async () => {
   const harness = createStoreHarness();
-  const blob = new Blob(['png-bytes'], { type: 'image/png' });
 
   await expect(
     validateScenarioAssetDescriptor({
-      blob,
       descriptor: {
         blobPath: 'scenario-projects/project-1/assets/asset-1',
-        entry: createScenarioAssetBackupEntry({ size: 999 }),
+        entry: createScenarioAssetBackupEntry({ size: 0 }),
       },
     })
-  ).rejects.toThrow('Scenario asset backup entry size does not match blob.');
+  ).rejects.toThrow('Scenario asset exceeds storage size limit.');
 
   expect(harness.scenarioAssetsStore.put).not.toHaveBeenCalled();
 });

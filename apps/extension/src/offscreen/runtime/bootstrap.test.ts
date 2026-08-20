@@ -44,7 +44,10 @@ vi.mock('../project-export', () => ({
   reconcileProjectExportJobs: offscreenMocks.reconcileProjectExportJobs,
   startProjectExport: vi.fn(),
 }));
-vi.mock('../../composition/persistence/asset-publication-recovery', () => ({
+vi.mock('../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/asset-publication-recovery')
+  >()),
   recoverAssetPublications: offscreenMocks.recoverAssetPublications,
 }));
 vi.mock('../../composition/persistence/frame-annotation-raster-jobs', async (importOriginal) => ({

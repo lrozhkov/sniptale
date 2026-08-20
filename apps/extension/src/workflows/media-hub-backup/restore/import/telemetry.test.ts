@@ -49,9 +49,18 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
   releaseAssetReadyProtection: vi.fn(),
   writeBlobToAsset: writeBlobToAssetMock,
 }));
-vi.mock('../../../../composition/persistence/asset-publication-recovery', () => ({
-  recoverAssetPublications: recoverAssetPublicationsMock,
+vi.mock('../asset-stream', () => ({
+  writeBackupArchiveEntryToAsset: writeBlobToAssetMock,
 }));
+vi.mock(
+  '../../../../composition/persistence/asset-publication-recovery',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/asset-publication-recovery')
+    >()),
+    recoverAssetPublications: recoverAssetPublicationsMock,
+  })
+);
 
 vi.mock(
   '../../../../composition/persistence/infrastructure/indexed-db/core',

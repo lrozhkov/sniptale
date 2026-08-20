@@ -1,5 +1,8 @@
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OPERATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   IMAGE_WORKSPACES_STORE,
@@ -11,6 +14,8 @@ import {
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core';
+import { eraseAssetStorage } from '../../../apps/extension/src/composition/persistence/assets';
+import { saveRecording } from '../../../apps/extension/src/composition/persistence/recordings';
 import type {
   MediaLibraryEntry,
   MediaThumbnailEntry,
@@ -33,6 +38,9 @@ const HARNESS_MEDIA_LIBRARY_STORES = [
   THUMBNAILS_STORE,
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OPERATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
 ] as const;
 
 export async function clearHarnessMediaLibrary(): Promise<void> {
@@ -43,6 +51,7 @@ export async function clearHarnessMediaLibrary(): Promise<void> {
     HARNESS_MEDIA_LIBRARY_STORES.map((storeName) => transaction.objectStore(storeName).clear())
   );
   await transaction.done;
+  await eraseAssetStorage();
 }
 
 export async function seedHarnessMediaLibrary(assets: HarnessMediaLibraryAsset[]): Promise<void> {
@@ -90,9 +99,19 @@ export async function seedHarnessVideoProjects(projects: VideoProject[]): Promis
 
 export async function seedHarnessMediaState(state: {
   mediaLibrary?: HarnessMediaLibraryAsset[];
+  recordings?: Array<{ bytes: string; filename: string; id: string; mimeType: string }>;
   videoProjects?: VideoProject[];
 }): Promise<void> {
   if (state.mediaLibrary) await seedHarnessMediaLibrary(state.mediaLibrary);
+  if (state.recordings) {
+    for (const recording of state.recordings) {
+      await saveRecording(
+        recording.id,
+        new Blob([recording.bytes], { type: recording.mimeType }),
+        recording.filename
+      );
+    }
+  }
   if (state.videoProjects) await seedHarnessVideoProjects(state.videoProjects);
 }
 

@@ -64,7 +64,7 @@ describe('backup project restore atomic preflight', () => {
 });
 
 describe('backup project restore transaction lifecycle', () => {
-  it('materializes every archive blob before opening the restore transaction', async () => {
+  it('materializes every bounded archive blob before opening the restore transaction', async () => {
     const stores = createStores();
     let releaseArchiveRead!: () => void;
     let transactionOpened = false;
@@ -141,7 +141,7 @@ function createDelayedProjectBlobZip(
       })
     );
   }
-  const firstEntry = zip.file('project-asset');
+  const firstEntry = zip.file('export-thumb');
   if (!firstEntry) throw new Error('delayed project blob fixture is incomplete');
   return { firstRead: vi.spyOn(firstEntry, 'async'), zip };
 }

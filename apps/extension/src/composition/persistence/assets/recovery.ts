@@ -1,7 +1,14 @@
 import type { AssetPublicationAdapter, AssetReadyJournal } from './contracts';
 import { deleteReadyJournal, listReadyJournals } from './opfs-store';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 
 export async function recoverStandaloneAssetPublications(
+  adapters: readonly AssetPublicationAdapter[]
+): Promise<number> {
+  return runWithDurableAssetLifecycleLock(() => recoverStandaloneJournals(adapters));
+}
+
+async function recoverStandaloneJournals(
   adapters: readonly AssetPublicationAdapter[]
 ): Promise<number> {
   const byDomain = new Map(adapters.map((adapter) => [adapter.domain, adapter]));

@@ -185,6 +185,104 @@ test('gallery backup export imports media as duplicate through the modal flow', 
   await expect.poll(() => countMediaLibraryEntries(page)).toBe(2);
 });
 
+test('recording backup round-trip keeps durable bytes in OPFS without recording Blob rows', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  await applyHarnessBootstrap(page, {
+    recordings: [
+      {
+        bytes: 'durable-recording-e2e-payload',
+        filename: 'durable-recording.webm',
+        id: 'durable-recording-e2e',
+        mimeType: 'video/webm',
+      },
+    ],
+  });
+  await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
+  await expect
+    .poll(() => readDurableRecordingState(page))
+    .toEqual({
+      blobRows: 0,
+      objectCount: 1,
+      payloads: ['durable-recording-e2e-payload'],
+      recordingCount: 1,
+      refCount: 1,
+    });
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
+  await page
+    .getByRole('button', { name: GALLERY_CONFIRM_EXPORT_BACKUP_LABEL, exact: true })
+    .click();
+  const backupPath = testInfo.outputPath('durable-recording-backup.zip');
+  await (await downloadPromise).saveAs(backupPath);
+
+  await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
+  await page.locator('input[type="file"]').setInputFiles(backupPath);
+  await page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL }).click();
+
+  await expect
+    .poll(() => readDurableRecordingState(page))
+    .toEqual({
+      blobRows: 0,
+      objectCount: 2,
+      payloads: ['durable-recording-e2e-payload', 'durable-recording-e2e-payload'],
+      recordingCount: 2,
+      refCount: 2,
+    });
+});
+
+async function readDurableRecordingState(page: Page): Promise<{
+  blobRows: number;
+  objectCount: number;
+  payloads: string[];
+  recordingCount: number;
+  refCount: number;
+}> {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-video-db');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const readAll = (storeName: string) =>
+      new Promise<unknown[]>((resolve, reject) => {
+        const request = database.transaction(storeName, 'readonly').objectStore(storeName).getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+    const [recordings, refs] = await Promise.all([readAll('recordings'), readAll('asset_refs')]);
+    database.close();
+    const origin = await navigator.storage.getDirectory();
+    const assetRoot = await origin.getDirectoryHandle('sniptale-assets');
+    const objects = await assetRoot.getDirectoryHandle('objects');
+    let objectCount = 0;
+    for await (const [, handle] of objects.entries()) {
+      if (handle.kind === 'file') objectCount += 1;
+    }
+    const assetIds = recordings.flatMap((entry) => {
+      if (typeof entry !== 'object' || entry === null || !('assetId' in entry)) return [];
+      return typeof entry.assetId === 'string' ? [entry.assetId] : [];
+    });
+    const payloads = await Promise.all(
+      assetIds.map(async (assetId) =>
+        (await (await objects.getFileHandle(assetId)).getFile()).text()
+      )
+    );
+    return {
+      blobRows: recordings.filter(
+        (entry) => typeof entry === 'object' && entry !== null && 'blob' in entry
+      ).length,
+      objectCount,
+      payloads: payloads.sort(),
+      recordingCount: recordings.length,
+      refCount: refs.length,
+    };
+  });
+}
+
 test('editor save and copy actions emit observable side effects', async ({ page, hostOrigin }) => {
   await openEditorHarness(page, hostOrigin);
 

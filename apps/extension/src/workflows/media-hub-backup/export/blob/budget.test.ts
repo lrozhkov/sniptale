@@ -68,7 +68,7 @@ describe('media hub backup export package contract', () => {
     await expect(
       generateBackupZipBlob({
         budget: createBackupExportBudget(),
-        zip,
+        generate: () => zip.generate(),
       })
     ).rejects.toThrow('Media hub backup package exceeds archive byte budget.');
     expect(zip.generated).toBe(true);
@@ -100,8 +100,8 @@ describe('media hub backup export cancellation budget', () => {
     await expect(
       generateBackupZipBlob({
         budget: createBackupExportBudget(),
+        generate: () => zip.generate(),
         signal: abortController.signal,
-        zip,
       })
     ).rejects.toThrow('Media hub backup export was cancelled.');
     expect(zip.generated).toBe(false);
@@ -115,8 +115,8 @@ describe('media hub backup export cancellation budget', () => {
     await expect(
       generateBackupZipBlob({
         budget: createBackupExportBudget(),
+        generate: () => zip.generate(),
         signal: zip.abortController.signal,
-        zip,
       })
     ).rejects.toThrow('Media hub backup export was cancelled.');
     expect(zip.generated).toBe(true);
@@ -124,15 +124,20 @@ describe('media hub backup export cancellation budget', () => {
 
   it('checks cancellation after archive generation resolves', async () => {
     const zip = new RecordingZipGenerator(undefined, 3, 'abort-before-return');
+    const released: Blob[] = [];
 
     await expect(
       generateBackupZipBlob({
         budget: createBackupExportBudget(),
+        generate: () => zip.generate(),
+        release: async (blob) => {
+          released.push(blob);
+        },
         signal: zip.abortController.signal,
-        zip,
       })
     ).rejects.toThrow('Media hub backup export was cancelled.');
     expect(zip.generated).toBe(true);
+    expect(released).toHaveLength(1);
   });
 });
 
@@ -168,13 +173,12 @@ class RecordingZipGenerator {
     private readonly mode: 'normal' | 'abort-before-return' = 'normal'
   ) {}
 
-  async generateAsync(_options: { type: 'blob' }, onUpdate?: () => void): Promise<Blob> {
+  async generate(): Promise<File> {
     this.generated = true;
     this.onUpdate?.();
-    onUpdate?.();
     if (this.mode === 'abort-before-return') {
       this.abortController.abort();
     }
-    return createSizedBackupTestBlob(this.generatedSize);
+    return createSizedBackupTestBlob(this.generatedSize) as File;
   }
 }

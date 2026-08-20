@@ -295,7 +295,7 @@ it('restores project-asset records through the project assets store', async () =
   const { stores, tx } = createWriteHarness();
   const entry = createMediaEntry(
     { kind: 'project-asset', projectAssetId: 'project-asset-1' },
-    { id: 'project-asset:project-asset-1', kind: 'image' }
+    { id: 'project-asset:project-asset-1', kind: 'image', size: 5 }
   );
   const blob = new Blob(['asset']);
 

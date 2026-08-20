@@ -25,9 +25,12 @@ export {
   deleteReadyJournal,
   eraseAssetStorage,
   isAssetReadyProtected,
+  listAssetObjectIds,
+  listWritingAssetIds,
   listReadyJournals,
   readAssetFile,
   releaseAssetReadyProtection,
+  runWithAssetObjectLockIfAvailable,
   writeBlobToAsset,
   writeReadyJournal,
 } from './opfs-store';
