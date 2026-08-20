@@ -3,10 +3,12 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { parseToggleState, requireSelectedActionsSnapshot } from './github-policy-response.mjs';
+import { validateSelectelQaProfiles } from './selectel/policy.mjs';
 
 const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
 const mode = process.argv[2] ?? 'plan';
 const repository = policy.repository;
+const selectelEnvironment = 'selectel-runner-controller';
 const apiVersion = '2026-03-10';
 
 function api(endpoint, { method = 'GET', body, allowFailure = false } = {}) {
@@ -31,6 +33,14 @@ function toggleState(endpoint) {
   return parseToggleState(api(endpoint, { allowFailure: true }), endpoint);
 }
 
+function booleanState(endpoint) {
+  const response = api(endpoint);
+  if (typeof response.value?.enabled !== 'boolean') {
+    throw new Error(`Unable to snapshot ${endpoint}: malformed GitHub API response`);
+  }
+  return response.value.enabled;
+}
+
 function rulesetPayload(value) {
   return {
     name: value.name,
@@ -46,6 +56,19 @@ function findRuleset(name) {
   const summaries = api(`repos/${repository}/rulesets`).value;
   const summary = summaries.find((candidate) => candidate.name === name);
   return summary ? api(`repos/${repository}/rulesets/${summary.id}`).value : null;
+}
+
+function selectelProfilesSnapshot(name) {
+  const variable = api(
+    `repos/${repository}/environments/${selectelEnvironment}/variables/${name}`
+  ).value;
+  const validation = validateSelectelQaProfiles(variable?.value);
+  return {
+    name: variable?.name,
+    environment: selectelEnvironment,
+    digest: validation.digest,
+    profiles: validation.profiles.length,
+  };
 }
 
 function snapshot() {
@@ -65,12 +88,19 @@ function snapshot() {
     workflow: api(`repos/${repository}/actions/permissions/workflow`).value,
     vulnerabilityAlerts: toggleState(`repos/${repository}/vulnerability-alerts`),
     automatedSecurityFixes: toggleState(`repos/${repository}/automated-security-fixes`),
+    privateVulnerabilityReporting: booleanState(
+      `repos/${repository}/private-vulnerability-reporting`
+    ),
     immutableReleases: toggleState(`repos/${repository}/immutable-releases`),
     ruleset: rulesetPayload(api(`repos/${repository}/rulesets/${policy.rulesetId}`).value),
     releaseTagRuleset: (() => {
       const current = findRuleset(policy.releaseTagRuleset.name);
       return current ? { id: current.id, ...rulesetPayload(current) } : null;
     })(),
+    selectelProfiles: {
+      qa: selectelProfilesSnapshot('SELECTEL_QA_PROFILES'),
+      release: selectelProfilesSnapshot('SELECTEL_RELEASE_PROFILES'),
+    },
   };
 }
 
@@ -122,6 +152,10 @@ function apply(value, { releaseTag = true } = {}) {
   });
   setToggle(`repos/${repository}/vulnerability-alerts`, value.security.vulnerabilityAlerts);
   setToggle(`repos/${repository}/automated-security-fixes`, value.security.automatedSecurityFixes);
+  setToggle(
+    `repos/${repository}/private-vulnerability-reporting`,
+    value.security.privateVulnerabilityReporting
+  );
   setToggle(`repos/${repository}/immutable-releases`, value.security.immutableReleases);
   api(`repos/${repository}/rulesets/${policy.rulesetId}`, {
     method: 'PUT',
@@ -191,6 +225,7 @@ if (mode === 'plan') {
       security: {
         vulnerabilityAlerts: previous.vulnerabilityAlerts,
         automatedSecurityFixes: previous.automatedSecurityFixes,
+        privateVulnerabilityReporting: previous.privateVulnerabilityReporting,
         immutableReleases: previous.immutableReleases,
       },
       ruleset: previous.ruleset,

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-03-23T08:09:10.011Z'));
+  vi.setSystemTime(new Date(2026, 2, 23, 11, 9, 10, 11));
 });
 
 afterEach(() => {

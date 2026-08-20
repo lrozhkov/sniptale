@@ -36,6 +36,17 @@ function attachResultContext(session, result, observationMode) {
   });
 }
 
+function emitFailureTail(session, step) {
+  const output = [step.stdout, step.stderr].filter(Boolean).join('\n');
+  if (!output) return;
+  const tail = session.sanitizeConsoleTail(output);
+  const quoted = tail
+    .split(/\r\n?|\n/u)
+    .map((line) => `| ${line}`)
+    .join('\n');
+  process.stdout.write(`[${step.label}: failure output tail]\n${quoted}\n`);
+}
+
 export function recordObservedResult(session, result, verbose, contract) {
   const steps = collectQaResultSteps(result);
   const executionMode =
@@ -57,6 +68,7 @@ export function recordObservedResult(session, result, verbose, contract) {
     const normalized = normalizeObservedStep(step);
     session.addStep(normalized.observation);
     if (verbose) process.stdout.write(normalized.observation.log);
+    else if (step.status === 'failed') emitFailureTail(session, step);
   }
   const hasFailedStep = steps.some((step) => step.status === 'failed');
   return session.finalize(result.skipped && !hasFailedStep ? { status: 'skipped' } : undefined);

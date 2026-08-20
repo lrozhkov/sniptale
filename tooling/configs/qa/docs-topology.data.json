@@ -18,6 +18,7 @@
     "docs/security/data-handling.md",
     "docs/security/manifest-permissions.md",
     "docs/security/threat-model.md",
+    "docs/tooling/ci-cd.md",
     "docs/tooling/code-quality.md",
     "docs/tooling/operator-handbook.md",
     "docs/tooling/repo-root-inventory.md",
@@ -30,6 +31,7 @@
   ],
   "rootDocuments": [
     ".github/pull_request_template.md",
+    ".github/SECURITY.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "README.md"

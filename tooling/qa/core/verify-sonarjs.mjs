@@ -58,33 +58,33 @@ const SONARJS_ESLINT_IGNORES = [
   'apps/extension/src/*/**/__generated__/**',
 ];
 
-export function createSonarjsEslintOverrideConfig() {
-  return [
-    {
-      files: SONARJS_ESLINT_FILES,
-      ignores: SONARJS_ESLINT_IGNORES,
-      languageOptions: {
-        ecmaVersion: 'latest',
-        globals: {
-          ...globals.browser,
-          ...globals.node,
-          ...globals.serviceworker,
-          chrome: 'readonly',
-        },
-        parser: tseslint.parser,
-        parserOptions: {
-          ecmaFeatures: {
-            jsx: true,
-          },
-          projectService: true,
-          tsconfigRootDir: repoRoot,
-        },
-        sourceType: 'module',
+function createSonarjsConfig(files, ignores = []) {
+  return {
+    files,
+    ignores,
+    languageOptions: {
+      ecmaVersion: 'latest',
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        ...globals.serviceworker,
+        chrome: 'readonly',
       },
-      plugins: { sonarjs },
-      rules: SONARJS_RULE_CONFIG,
+      parser: tseslint.parser,
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+        projectService: true,
+        tsconfigRootDir: repoRoot,
+      },
+      sourceType: 'module',
     },
-  ];
+    plugins: { sonarjs },
+    rules: SONARJS_RULE_CONFIG,
+  };
+}
+
+export function createSonarjsEslintOverrideConfig() {
+  return [createSonarjsConfig(SONARJS_ESLINT_FILES, SONARJS_ESLINT_IGNORES)];
 }
 
 export function isSonarjsProductionFile(relativePath) {
@@ -109,33 +109,7 @@ function createEslint() {
     cwd: repoRoot,
     errorOnUnmatchedPattern: false,
     overrideConfigFile: true,
-    overrideConfig: [
-      {
-        files: ['**/*.{ts,tsx,js,mjs,cjs}'],
-        languageOptions: {
-          ecmaVersion: 'latest',
-          globals: {
-            ...globals.browser,
-            ...globals.node,
-            ...globals.serviceworker,
-            chrome: 'readonly',
-          },
-          parser: tseslint.parser,
-          parserOptions: {
-            ecmaFeatures: {
-              jsx: true,
-            },
-            projectService: true,
-            tsconfigRootDir: repoRoot,
-          },
-          sourceType: 'module',
-        },
-        plugins: {
-          sonarjs,
-        },
-        rules: SONARJS_RULE_CONFIG,
-      },
-    ],
+    overrideConfig: [createSonarjsConfig(['**/*.{ts,tsx,js,mjs,cjs}'])],
   });
 }
 

@@ -3,6 +3,216 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "noise.gitleaks.viewport-capability-token.47",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:47"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:47",
+        "line": 47,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.60",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:60"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:60",
+        "line": 60,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.135",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:135"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:135",
+        "line": 135,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.143",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:143"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:143",
+        "line": 143,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.162",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:162"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:162",
+        "line": 162,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.174",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:174"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:174",
+        "line": 174,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.181",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:181"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:181",
+        "line": 181,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.viewport-capability-token.203",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar-tests",
+      "risk": "A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove viewport capability propagation.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:203"
+      },
+      "scope": {
+        "commit": "30260b2b8fef68d60456a15da43d3184592ccc21",
+        "file": "apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts",
+        "fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:203",
+        "line": 203,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "accepted.codeql.locked-toolchain-download-write",
+      "classification": "accepted-architecture",
+      "owner": "qa-platform",
+      "risk": "Downloaded tool bytes are written into the QA image and would be executable if their locked digest were incorrectly reviewed.",
+      "reason": "The installer writes only to fixed image-owned destinations after verifying every response byte against the exact SHA-256 in the trusted toolchain lock.",
+      "removalCondition": "Remove this entry if CodeQL models the preceding digest check or the installer no longer writes downloaded tools.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "codeql",
+        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+      },
+      "scope": {
+        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
+        "file": "tooling/ci/install-toolchain.mjs",
+        "line": 42,
+        "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
+        "rule": "js/http-to-file-access"
+      },
+      "targetAction": "Retain fixed destinations and exact pre-write SHA-256 verification; any content or line drift requires renewed review."
+    },
+    {
+      "id": "accepted.codeql.locked-toolchain-download-url",
+      "classification": "accepted-architecture",
+      "owner": "qa-platform",
+      "risk": "A tool URL selected from mutable or candidate-controlled data could turn the QA image build into an unintended outbound request.",
+      "reason": "GitHub CI materializes the Dockerfile and machine lock from the trusted control commit, and every fetched object is additionally bound to an exact reviewed SHA-256.",
+      "removalCondition": "Remove this entry if download endpoints become compile-time constants or CodeQL can model trusted-control provenance.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "codeql",
+        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
+      },
+      "scope": {
+        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
+        "file": "tooling/ci/install-toolchain.mjs",
+        "line": 37,
+        "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
+        "rule": "js/file-access-to-http"
+      },
+      "targetAction": "Keep CI build inputs trusted-control-bound and all downloads exact-digest-verified; any source drift requires renewed review."
+    },
+    {
       "id": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
       "classification": "accepted-architecture",
       "owner": "ai-secret-unlock-tests",
@@ -283,26 +493,6 @@
         "count": 1,
         "lines": 22,
         "sampleFingerprint": "79af704f37cc515dc3c80d356e52b02b0816643e3d52f13d439234cfa280aa7f"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.core.c471b9017a2b",
-      "classification": "tool-noise",
-      "owner": "qa-core",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "tooling/qa/core"
-      },
-      "scope": {
-        "family": "tooling/qa/core",
-        "count": 1,
-        "lines": 21,
-        "sampleFingerprint": "c471b9017a2b3ebfb00fd8baf018768cd6e956fe7848b2325e7f31743415e99c"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
@@ -2685,46 +2875,6 @@
       "unownedFocusedFiles": []
     },
     {
-      "owner": "apps/extension/src/composition/persistence/asset-publication-recovery",
-      "disposition": "rollout",
-      "reason": "The cross-domain asset publication recovery wiring has deterministic crash and compensation coverage.",
-      "productionFiles": [
-        "apps/extension/src/composition/persistence/asset-publication-recovery/audit.ts",
-        "apps/extension/src/composition/persistence/asset-publication-recovery/index.ts"
-      ],
-      "rolloutFiles": [
-        "apps/extension/src/composition/persistence/asset-publication-recovery/audit.ts",
-        "apps/extension/src/composition/persistence/asset-publication-recovery/index.ts"
-      ],
-      "unownedFocusedFiles": []
-    },
-    {
-      "owner": "apps/extension/src/composition/persistence/assets",
-      "disposition": "rollout",
-      "reason": "The durable OPFS asset owner has deterministic lifecycle, quota, publication, and recovery coverage.",
-      "productionFiles": [
-        "apps/extension/src/composition/persistence/assets/contracts.ts",
-        "apps/extension/src/composition/persistence/assets/guards.ts",
-        "apps/extension/src/composition/persistence/assets/index.ts",
-        "apps/extension/src/composition/persistence/assets/operations.ts",
-        "apps/extension/src/composition/persistence/assets/opfs-store.ts",
-        "apps/extension/src/composition/persistence/assets/publication.ts",
-        "apps/extension/src/composition/persistence/assets/quota.ts",
-        "apps/extension/src/composition/persistence/assets/recovery.ts"
-      ],
-      "rolloutFiles": [
-        "apps/extension/src/composition/persistence/assets/contracts.ts",
-        "apps/extension/src/composition/persistence/assets/guards.ts",
-        "apps/extension/src/composition/persistence/assets/index.ts",
-        "apps/extension/src/composition/persistence/assets/operations.ts",
-        "apps/extension/src/composition/persistence/assets/opfs-store.ts",
-        "apps/extension/src/composition/persistence/assets/publication.ts",
-        "apps/extension/src/composition/persistence/assets/quota.ts",
-        "apps/extension/src/composition/persistence/assets/recovery.ts"
-      ],
-      "unownedFocusedFiles": []
-    },
-    {
       "owner": "apps/extension/src/composition/persistence/callout-presets",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -3045,9 +3195,6 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.scenario-assets.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
@@ -3084,9 +3231,6 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.scenario-assets.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
@@ -3191,7 +3335,6 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
-        "apps/extension/src/composition/persistence/privacy-erasure/asset-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/browser-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/cleanup.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/index.ts",
@@ -3201,10 +3344,10 @@
         "apps/extension/src/composition/persistence/privacy-erasure/participant-result.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participant-types.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participants.ts",
+        "apps/extension/src/composition/persistence/privacy-erasure/recording-staging-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/video-preview-participant.ts"
       ],
       "rolloutFiles": [
-        "apps/extension/src/composition/persistence/privacy-erasure/asset-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/browser-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/cleanup.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/index.ts",
@@ -3214,6 +3357,7 @@
         "apps/extension/src/composition/persistence/privacy-erasure/participant-result.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participant-types.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participants.ts",
+        "apps/extension/src/composition/persistence/privacy-erasure/recording-staging-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/video-preview-participant.ts"
       ],
       "unownedFocusedFiles": []
@@ -3239,7 +3383,6 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
-        "apps/extension/src/composition/persistence/projects/asset-publication.ts",
         "apps/extension/src/composition/persistence/projects/asset-references.ts",
         "apps/extension/src/composition/persistence/projects/contracts.ts",
         "apps/extension/src/composition/persistence/projects/index-mutations.ts",
@@ -3251,7 +3394,6 @@
         "apps/extension/src/composition/persistence/projects/read-guards.ts"
       ],
       "rolloutFiles": [
-        "apps/extension/src/composition/persistence/projects/asset-publication.ts",
         "apps/extension/src/composition/persistence/projects/asset-references.ts",
         "apps/extension/src/composition/persistence/projects/contracts.ts",
         "apps/extension/src/composition/persistence/projects/index-mutations.ts",
@@ -3311,33 +3453,33 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
-        "apps/extension/src/composition/persistence/recordings/asset-publication.ts",
         "apps/extension/src/composition/persistence/recordings/batch.ts",
         "apps/extension/src/composition/persistence/recordings/completion-outbox.ts",
         "apps/extension/src/composition/persistence/recordings/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/index.guards.ts",
         "apps/extension/src/composition/persistence/recordings/index.ts",
         "apps/extension/src/composition/persistence/recordings/staging/artifact-writer.ts",
+        "apps/extension/src/composition/persistence/recordings/staging/cleanup.ts",
         "apps/extension/src/composition/persistence/recordings/staging/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/staging/coordinator.ts",
         "apps/extension/src/composition/persistence/recordings/staging/index.ts",
-        "apps/extension/src/composition/persistence/recordings/staging/test-support.ts",
+        "apps/extension/src/composition/persistence/recordings/staging/opfs-adapter.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.guards.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.ts",
         "apps/extension/src/composition/persistence/recordings/tracks.ts"
       ],
       "rolloutFiles": [
-        "apps/extension/src/composition/persistence/recordings/asset-publication.ts",
         "apps/extension/src/composition/persistence/recordings/batch.ts",
         "apps/extension/src/composition/persistence/recordings/completion-outbox.ts",
         "apps/extension/src/composition/persistence/recordings/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/index.guards.ts",
         "apps/extension/src/composition/persistence/recordings/index.ts",
         "apps/extension/src/composition/persistence/recordings/staging/artifact-writer.ts",
+        "apps/extension/src/composition/persistence/recordings/staging/cleanup.ts",
         "apps/extension/src/composition/persistence/recordings/staging/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/staging/coordinator.ts",
         "apps/extension/src/composition/persistence/recordings/staging/index.ts",
-        "apps/extension/src/composition/persistence/recordings/staging/test-support.ts",
+        "apps/extension/src/composition/persistence/recordings/staging/opfs-adapter.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.guards.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.ts",
         "apps/extension/src/composition/persistence/recordings/tracks.ts"
@@ -3350,7 +3492,6 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
-        "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -3416,7 +3557,6 @@
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
-        "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -12476,7 +12616,6 @@
         "apps/extension/src/workflows/media-hub-backup/contracts/types.ts",
         "apps/extension/src/workflows/media-hub-backup/export/blob/budget.ts",
         "apps/extension/src/workflows/media-hub-backup/export/blob/descriptor.ts",
-        "apps/extension/src/workflows/media-hub-backup/export/blob/stream.ts",
         "apps/extension/src/workflows/media-hub-backup/export/effect-bundles.ts",
         "apps/extension/src/workflows/media-hub-backup/export/filters.ts",
         "apps/extension/src/workflows/media-hub-backup/export/index.ts",
@@ -12514,7 +12653,6 @@
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-project-version.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-projects.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/archive-reader.ts",
-        "apps/extension/src/workflows/media-hub-backup/restore/asset-stream.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/batches.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/index.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/prepare/index.ts",
@@ -13350,7 +13488,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "62ba264e7969172cac17c493b18d5183e12f15a9f12b2efd0dad86c88e92ae09"
+        "contentHash": "075fd9535ec4c6576438bcea6e497ff4c3f6b4f8871bfd57abf2776e886f26eb"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -13393,7 +13531,7 @@
       "remediation": "Keep prefixes limited to canonical adapters and test infrastructure; review every added prefix.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-paths.mjs",
-        "contentHash": "0df4610dab6a310b90c8ccdfb236c153f1f1e6a97cef076109f80d2e3e9aae8b"
+        "contentHash": "bed57a61419e0adfa1ae823a828e7231801637a0699bebccba738c83f8db4ca6"
       },
       "consumers": [
         "tooling/qa/policy/browser-adapters-paths.mjs",
@@ -13744,7 +13882,7 @@
       "remediation": "Keep exceptions file-exact and prefer FakeRuntimeMessagingTransport.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging.mjs",
-        "contentHash": "3cf48013d935c148a8b56cacd18a863011505f3fe9a99c0d46c5f058090114a5"
+        "contentHash": "503758bd8dd50805fdc35ec2bc8a23f65f6c512109ae4235d5f72a1d9d1adffd"
       },
       "surfaces": [
         "binding:ALLOWED_CHROME_STUB_FILES",
@@ -14596,6 +14734,7 @@
         "contentHash": "b5ff7b3ea5766f80d8f3646a9ede0cc1edab08b8247d5c4a0aca3f93d3dd5c71"
       },
       "consumers": [
+        "tooling/ci/artifacts.mjs",
         "tooling/release/artifact-security-dynamic-sandbox-worker.test.ts",
         "tooling/release/artifact-security-dynamic.test.ts",
         "tooling/release/artifact-security.mjs",
@@ -14659,20 +14798,28 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "b76a595fd5d65465c10721ca394295c4753b5e4d5860ddf820576a56a045598f"
+        "contentHash": "e47e184ef6c67cb5285d71d3ed301f0994c74914c8d6392932282a3408c13433"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/container.mjs",
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
         "binding:LANE_FILES",
         "binding:LANE_WRAPPERS",
+        "property:candidate",
+        "property:candidate[1]",
+        "property:collectLaneArtifacts/proofReuse",
         "property:coverage",
         "property:coverage[1]",
         "property:release",
+        "property:release-audit",
+        "property:release-audit[1]",
         "property:security",
-        "property:security[1]"
+        "property:security[1]",
+        "property:selectelInfrastructureFromEnvironment/resourceProfile"
       ]
     },
     {
@@ -15197,7 +15344,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.media-library.ts",
-        "contentHash": "05f84d79875ce6492514a591a0d6ead3b0518de5e01d7496dbf718f698e7f3a9"
+        "contentHash": "568fa57662b08e4f501834c441cad1dd08a499ca62babba11d5e0e66496df68b"
       },
       "consumers": [
         "tooling/test/harness/browser-mocks.media-library.ts",
@@ -15272,7 +15419,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.types.ts",
-        "contentHash": "ba2b1c3d48c8b02de7518bafea99849327f381f691e0d4866ae260ba75c81e40"
+        "contentHash": "dd3864697616d49b2d956f5d5f1ea581bc87667c6a4ad89df6dff6e5cc0130c7"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical.helpers.ts",
@@ -15586,7 +15733,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/cli-contracts.mjs",
-        "contentHash": "2020b3bac95875387397221b832036545f1c08420ccda38c4ba863ad01415051"
+        "contentHash": "4a0f26763fb85af7aefbb757c6f37bdbbfc59d220fe21ac7799948d041789df9"
       },
       "consumers": [
         "tooling/qa/wrappers/build.mjs",
@@ -15688,11 +15835,12 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/codeql.mjs",
-        "contentHash": "c53695db762537bc3f1f365b99c5fe334125a98c70d758115b12759f21c1efcb"
+        "contentHash": "2fd414fc4fd7ddbc81038537430682433d6702720f76d7b2ed4881a089359ec7"
       },
       "consumers": [
         "tooling/qa/audits/codeql.mjs",
         "tooling/qa/audits/execution-evidence.test.ts",
+        "tooling/qa/core/codeql-proof.test.ts",
         "tooling/qa/core/verify-codeql-baseline.test.ts",
         "tooling/qa/core/verify-external-audit-results.test.ts",
         "tooling/qa/core/verify-external-audit-semantics.test-support.ts",
@@ -15700,8 +15848,30 @@
         "tooling/qa/wrappers/audit.steps.mjs"
       ],
       "surfaces": [
+        "property:collectReusableCodeqlResult/violations",
         "property:runCodeqlCheck/violations",
         "property:runCodeqlCommand/statuses"
+      ]
+    },
+    {
+      "id": "policy.source.codeql-proof-mjs.bdeec5c555",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/codeql-proof.mjs",
+        "contentHash": "03ba623444f060da0a3a7bf2ee8f5a5237d69cc62660baf41ab1fdff78cb7b8d"
+      },
+      "consumers": [
+        "tooling/ci/validate-coverage-proof.mjs",
+        "tooling/qa/audits/codeql.mjs",
+        "tooling/qa/core/codeql-proof.mjs",
+        "tooling/qa/core/codeql-proof.test.ts"
+      ],
+      "surfaces": [
+        "property:recordSuccessfulCodeqlProof/producer"
       ]
     },
     {
@@ -15762,7 +15932,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/constants.mjs",
-        "contentHash": "0fcf34cb99df9ba228f58e11647211248d98ac183285d009277407670d13ce32"
+        "contentHash": "522fd54675c59c10fbe9d253f718ce467bb470008823da4340f1d6b0b329b5a6"
       },
       "consumers": [
         "tooling/qa/runtime/observability/constants.mjs",
@@ -15794,14 +15964,17 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "9df2e2cd1aa73b320c0d4af38b4b197af05385960c49633b33afb75d14757724"
+        "contentHash": "73cc1efca13925605bfd19ee1d525727e7c02f12b77e359bf8d2cd5f69d0ec49"
       },
       "consumers": [
         "tooling/ci/container.mjs"
       ],
       "surfaces": [
-        "binding:args",
-        "binding:environment"
+        "binding:baseContainerArgs",
+        "binding:candidatePhaseDefinitions",
+        "binding:environment",
+        "property:command",
+        "property:resourceProfiles"
       ]
     },
     {
@@ -15953,10 +16126,32 @@
         "tooling/qa/core/audit-coverage-step.mjs",
         "tooling/qa/core/coverage-audit-report.mjs",
         "tooling/qa/core/coverage-audit-report.test.ts",
+        "tooling/qa/core/coverage-proof.mjs",
         "tooling/qa/core/technical-debt-coverage.mjs"
       ],
       "surfaces": [
         "property:writeCanonicalCoverageArtifacts/files"
+      ]
+    },
+    {
+      "id": "policy.source.coverage-proof-mjs.e07556f2fc",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/coverage-proof.mjs",
+        "contentHash": "c6b8ced62312cdd35164359294637dbc8902794468d27b74e6fd00dcef2cd1e7"
+      },
+      "consumers": [
+        "tooling/ci/validate-coverage-proof.mjs",
+        "tooling/qa/core/audit-coverage-step.mjs",
+        "tooling/qa/core/coverage-proof.mjs",
+        "tooling/qa/core/coverage-proof.test.ts"
+      ],
+      "surfaces": [
+        "property:recordSuccessfulCoverageProof/producer"
       ]
     },
     {
@@ -17228,7 +17423,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/github-policy.mjs",
-        "contentHash": "1ef4077c2070a30c210152cf7fb009424ac0b7ec7c2c73fe32da0eede51f167a"
+        "contentHash": "a6571ed84336458c91c9506442dc580ff670a7b2de9f8da4f2ac5a92939e0eff"
       },
       "consumers": [
         "tooling/ci/github-policy.mjs"
@@ -17238,7 +17433,8 @@
         "property:apply/body",
         "property:desired/bypass_actors",
         "property:desired/ruleset",
-        "property:security"
+        "property:security",
+        "property:snapshot/selectelProfiles"
       ]
     },
     {
@@ -17525,7 +17721,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/install-toolchain.mjs",
-        "contentHash": "ee6f7d082a3390cb6a23c298deb84057b1dd62067ddab1934903d09438ee9eee"
+        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454"
       },
       "consumers": [
         "tooling/ci/install-toolchain.mjs"
@@ -18300,7 +18496,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "e8fdca9a791153177d7b39c8ca63b10efb4830953721e6bbfef3f801bf4a7125"
+        "contentHash": "2cc02038917cae66f206b02256ba233d26a6b706a1d53980a9eb97190798d84b"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"
@@ -18585,7 +18781,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "playwright.config.ts",
-        "contentHash": "daba32ccd4c2753dca7711eb32189b84c16964e145b89fe88c674a454f2f2404"
+        "contentHash": "6bfcadfae0fc962b6524c3d7feaffd14f3c6112aa6cd59cde8b3c4d7a198e00a"
       },
       "consumers": [
         "playwright.config.ts"
@@ -18657,6 +18853,31 @@
         "binding:POLICY_FIELDS",
         "binding:POLICY_MODES",
         "binding:REVIEWED_EXCEPTION_FIELDS"
+      ]
+    },
+    {
+      "id": "policy.source.policy-mjs.de76dca223",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/selectel/policy.mjs",
+        "contentHash": "ba2083a7ceb2d8d9585d99c444ec0e71f25e4c781c6000780c5999e690f74e38"
+      },
+      "consumers": [
+        "tooling/ci/github-policy.mjs",
+        "tooling/ci/selectel/policy.mjs",
+        "tooling/ci/selectel/sdk-controller.test.ts"
+      ],
+      "surfaces": [
+        "property:readSelectelPolicy/ru-3a",
+        "property:readSelectelPolicy/ru-3b",
+        "property:readSelectelPolicy/SL1.12-24576",
+        "property:readSelectelPolicy/SL1.12-24576[1]",
+        "property:readSelectelPolicy/SL1.24-49152",
+        "property:readSelectelPolicy/SL1.24-49152[1]"
       ]
     },
     {
@@ -18876,14 +19097,17 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/prepare-release-assets.mjs",
-        "contentHash": "40b8d2897d077825830e6ce69cb8fa67374e634bb56466cb34273ee0fffbf344"
+        "contentHash": "1d4f6db3714eaf68dbf47d2c926c630de737c6312897360f1e82197085486864"
       },
       "consumers": [
         "tooling/ci/prepare-release-assets.mjs"
       ],
       "surfaces": [
-        "binding:names",
-        "binding:sources"
+        "binding:evidenceSources",
+        "binding:provenance",
+        "binding:releaseAuditDigests",
+        "property:qaEvidence",
+        "property:writeEvidenceArchive/compressionOptions"
       ]
     },
     {
@@ -19026,7 +19250,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/proof.mjs",
-        "contentHash": "7eb6b58195b298c5840b6e32e953750444a0c391e25406e3ea29f01e842615e9"
+        "contentHash": "89ca7d00363cb925943d06444a057f02c51cb2863e61df3e2dd5226d574af6d7"
       },
       "consumers": [
         "tooling/ci/proof.mjs"
@@ -19034,7 +19258,9 @@
       "surfaces": [
         "binding:currentAuthority",
         "binding:env",
-        "binding:proof"
+        "binding:proof",
+        "binding:resourceEnvironment",
+        "binding:resourceOptions"
       ]
     },
     {
@@ -19211,7 +19437,8 @@
       "consumers": [
         "tooling/ci/ci-contract.test.ts",
         "tooling/ci/release-policy.mjs",
-        "tooling/ci/release-tag-policy.mjs"
+        "tooling/ci/release-tag-policy.mjs",
+        "tooling/ci/workflow-contract.test.ts"
       ],
       "surfaces": [
         "property:normalizeRules/anonymous-5/parameters"
@@ -19314,7 +19541,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/run-controller.mjs",
-        "contentHash": "0ff1afce65b057db1c3405c86797a27726bbe9857edece74afeae533fd962944"
+        "contentHash": "681ba451e80e0c884dc1efb839701e50141bd9fc42bdf88aab98da013ef7f2bd"
       },
       "consumers": [
         "tooling/qa/runtime/observability/run-controller.mjs",
@@ -19331,6 +19558,7 @@
         "property:interrupt/locations",
         "property:interrupt/problemIds",
         "property:sanitizeConsoleOutput/sensitiveValues",
+        "property:sanitizeConsoleTail/sensitiveValues",
         "property:writeLog/sensitiveValues"
       ]
     },
@@ -19390,16 +19618,21 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "2fd3df347a35cef17a8e5d9a80631a91c0159e886e1d61787298fcb849301b10"
+        "contentHash": "0a3f0caa84d0f34b2c706346e1a8324d3d6492b102116f4dcc9e1bdc99713146"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
-        "binding:commands",
-        "binding:executed",
+        "binding:candidatePhaseCommands",
+        "binding:installCommands",
+        "binding:laneCommands",
+        "binding:licenseCommand",
+        "binding:phases",
         "property:coverage",
         "property:release",
+        "property:release-audit",
+        "property:resourceProfiles",
         "property:security"
       ]
     },
@@ -19503,7 +19736,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/sanitize.mjs",
-        "contentHash": "80c5d8b5f30024e05086439d530bf82ae74f1ce57bd7340400159d57d45797d5"
+        "contentHash": "e1d71f2c5d37f3bb741f6105ebde56c2f9bc2ab0069e61ba1a2aa3cc22c2b75f"
       },
       "consumers": [
         "tooling/qa/audits/canonical-sarif.mjs",
@@ -19718,7 +19951,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/profiles/schema.mjs",
-        "contentHash": "12374c50cb876c0e2c2ebb8cfe5456d8304e8c32d44d92a55294668d6a5a533f"
+        "contentHash": "37287d51b29a402dceba7463db178e1f73988753b4492cd45905caf161f6c7df"
       },
       "consumers": [
         "tooling/qa/audits/profiles/index.mjs",
@@ -19763,7 +19996,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/security-control.ts",
-        "contentHash": "b0167980849e29ae1bb4706664eedad22d9105d4c9ae38f7a38cad9528ac67a0"
+        "contentHash": "277de64b564b5e3cb85f761aaf4d8836c69b29b6f7b6e8790ad8e8e839aa72b2"
       },
       "consumers": [
         "tooling/test/harness/security-control.ts"
@@ -20292,7 +20525,13 @@
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.test.ts",
+        "tooling/ci/candidate-workspace.test.ts",
         "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/codeql-proof-host.test.ts",
+        "tooling/ci/select-codeql-proof.test.ts",
+        "tooling/ci/select-release-coverage.test.ts",
+        "tooling/ci/select-unit-proof.test.ts",
+        "tooling/ci/unit-proof-host.test.ts",
         "tooling/qa/audits/canonical-sarif.test.ts",
         "tooling/qa/audits/execution-error.test.ts",
         "tooling/qa/audits/execution-evidence.test.ts",
@@ -20301,7 +20540,9 @@
         "tooling/qa/audits/security-result-contracts.test.ts",
         "tooling/qa/core/architecture-guardrails.policy-state.test.ts",
         "tooling/qa/core/architecture-inventory.test.ts",
+        "tooling/qa/core/codeql-proof.test.ts",
         "tooling/qa/core/coverage-audit-report.test.ts",
+        "tooling/qa/core/coverage-proof.test.ts",
         "tooling/qa/core/dependency-graph-cache.test.ts",
         "tooling/qa/core/dependency-graph-runner.test.ts",
         "tooling/qa/core/design-system-verifier.registry-paths.test.ts",
@@ -20324,6 +20565,7 @@
         "tooling/qa/core/shared-baseline.test.ts",
         "tooling/qa/core/test-helpers.ts",
         "tooling/qa/core/unit-test-cache.test.ts",
+        "tooling/qa/core/unit-test-proof.test.ts",
         "tooling/qa/core/verify-advisory.test-support.ts",
         "tooling/qa/core/verify-advisory.test.ts",
         "tooling/qa/core/verify-all.scope.test.ts",
@@ -20711,6 +20953,28 @@
       "surfaces": [
         "binding:TEST_SUFFIXES",
         "property:createUnitTestPlan/relatedFiles"
+      ]
+    },
+    {
+      "id": "policy.source.unit-test-proof-mjs.e3df726ad8",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/unit-test-proof.mjs",
+        "contentHash": "67fb9076f61b3b8fc0340478bb618805b38a8de9ad0b0eeba4bcc731459ef765"
+      },
+      "consumers": [
+        "tooling/qa/core/unit-test-proof.mjs",
+        "tooling/qa/core/unit-test-proof.test.ts",
+        "tooling/qa/core/verify-all.unit-test-steps.mjs",
+        "tooling/qa/core/verify-all.unit-test-steps.test.ts"
+      ],
+      "surfaces": [
+        "property:recordSuccessfulFullUnitProof/producer",
+        "property:resolveReusableFullUnitProof/plan"
       ]
     },
     {
@@ -22685,7 +22949,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-sonarjs.mjs",
-        "contentHash": "efecac21f5f4a710cd716a5a857d8adbc851cc0b002aaafa914ccbea17d825a1"
+        "contentHash": "4bedabddc5ca3917332a24296759e0adf3612c5e8dfb2e2172941e1e80742dbc"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
@@ -22698,18 +22962,12 @@
         "binding:SONARJS_ESLINT_IGNORES",
         "binding:SONARJS_RULE_ID_SET",
         "binding:SONARJS_RULE_IDS",
-        "property:createEslint/ecmaFeatures",
-        "property:createEslint/files",
-        "property:createEslint/globals",
-        "property:createEslint/languageOptions",
         "property:createEslint/overrideConfig",
-        "property:createEslint/parserOptions",
-        "property:createEslint/plugins",
-        "property:createSonarjsEslintOverrideConfig/ecmaFeatures",
-        "property:createSonarjsEslintOverrideConfig/globals",
-        "property:createSonarjsEslintOverrideConfig/languageOptions",
-        "property:createSonarjsEslintOverrideConfig/parserOptions",
-        "property:createSonarjsEslintOverrideConfig/plugins",
+        "property:createSonarjsConfig/ecmaFeatures",
+        "property:createSonarjsConfig/globals",
+        "property:createSonarjsConfig/languageOptions",
+        "property:createSonarjsConfig/parserOptions",
+        "property:createSonarjsConfig/plugins",
         "property:runCli/labels",
         "property:runSonarjsCheck/files",
         "property:runSonarjsCheck/violations"

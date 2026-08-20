@@ -11,15 +11,39 @@ type SecurityControlResponse = {
   reached?: SecurityCheckpoint[];
 };
 
+function isSecurityCheckpoint(value: unknown): value is SecurityCheckpoint {
+  return value === 'persistence-before-commit' || value === 'popup-export-after-admission';
+}
+
+function parseSecurityControlResponse(value: unknown): SecurityControlResponse | null {
+  if (!value || typeof value !== 'object') return null;
+  const ok = Reflect.get(value, 'ok');
+  const paused = Reflect.get(value, 'paused');
+  const reached = Reflect.get(value, 'reached');
+  const requestId = Reflect.get(value, 'requestId');
+  if (typeof ok !== 'boolean' || typeof requestId !== 'string') return null;
+  if (paused !== undefined && (!Array.isArray(paused) || !paused.every(isSecurityCheckpoint))) {
+    return null;
+  }
+  if (reached !== undefined && (!Array.isArray(reached) || !reached.every(isSecurityCheckpoint))) {
+    return null;
+  }
+  return {
+    ok,
+    requestId,
+    ...(paused === undefined ? {} : { paused }),
+    ...(reached === undefined ? {} : { reached }),
+  };
+}
+
 const port = chrome.runtime.connect({ name: 'sniptale:security-e2e-control:v1' });
 const pending = new Map<string, (response: SecurityControlResponse) => void>();
 let disconnected = false;
 
 port.onMessage.addListener((message: unknown) => {
-  if (!message || typeof message !== 'object') return;
-  const response = message as Partial<SecurityControlResponse>;
-  if (typeof response.requestId !== 'string') return;
-  pending.get(response.requestId)?.(response as SecurityControlResponse);
+  const response = parseSecurityControlResponse(message);
+  if (!response) return;
+  pending.get(response.requestId)?.(response);
   pending.delete(response.requestId);
 });
 port.onDisconnect.addListener(() => {

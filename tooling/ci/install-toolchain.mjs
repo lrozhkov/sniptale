@@ -43,8 +43,8 @@ async function download(tool, destination) {
 }
 
 fs.mkdirSync('/opt/sniptale-downloads', { recursive: true });
-await download(lock.codeql, '/opt/sniptale-downloads/codeql.zip');
-run('unzip', ['-q', '/opt/sniptale-downloads/codeql.zip', '-d', '/opt']);
+await download(lock.codeql, '/opt/sniptale-downloads/codeql.tar.gz');
+run('tar', ['-xzf', '/opt/sniptale-downloads/codeql.tar.gz', '-C', '/opt']);
 await download(lock.osvScanner, '/usr/local/bin/osv-scanner');
 await download(lock.gitleaks, '/opt/sniptale-downloads/gitleaks.tar.gz');
 await download(lock.actionlint, '/opt/sniptale-downloads/actionlint.tar.gz');

@@ -19,6 +19,7 @@ describe('audit profile schema', () => {
     expect(registry.defaultProfile).toBe('repository');
     expect(registry.profiles.map(({ id }) => id).sort()).toEqual([
       'coverage',
+      'pr',
       'release',
       'repository',
       'security',

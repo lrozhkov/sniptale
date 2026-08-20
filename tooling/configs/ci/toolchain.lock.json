@@ -2,13 +2,19 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "22.12.0",
-    "image": "node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213"
+    "version": "22.16.0",
+    "image": "node:22.16.0-bookworm-slim@sha256:048ed02c5fd52e86fda6fbd2f6a76cf0d4492fd6c6fee9e2c463ed5108da0e34"
+  },
+  "openstackController": {
+    "pythonVersion": "3.12.11",
+    "image": "python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
+    "openstacksdkVersion": "4.17.0",
+    "requirementsSha256": "22eb51c3ee8b0ef5f2c10c10989e07ea10bb7d90c10e77c7eaacdfeb0c6fd8c5"
   },
   "debian": {
-    "snapshot": "20250115T000000Z",
-    "archiveUrl": "https://snapshot.debian.org/archive/debian/20250115T000000Z",
-    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20250115T000000Z",
+    "snapshot": "20250521T000000Z",
+    "archiveUrl": "https://snapshot.debian.org/archive/debian/20250521T000000Z",
+    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20250521T000000Z",
     "suites": ["bookworm", "bookworm-updates", "bookworm-security"]
   },
   "playwright": {
@@ -41,9 +47,9 @@
   "semgrep": { "version": "1.173.0" },
   "codeql": {
     "version": "2.26.3",
-    "url": "https://github.com/github/codeql-cli-binaries/releases/download/v2.26.3/codeql-linux64.zip",
-    "sha256": "cc0fed57d8441892b8fcf41b378f7ed925fb6e2783fa8f2d453717686e6c723e",
-    "querySuite": "javascript-security-and-quality.qls"
+    "url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.26.3/codeql-bundle-linux64.tar.gz",
+    "sha256": "77e5be1b550d66662e600e795b6cf2ea1729e853e3dc79e02594f767039d2a29",
+    "querySuite": "codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls"
   },
   "osvScanner": {
     "version": "2.5.1",

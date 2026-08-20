@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { resolveQaResourceProfile } from '../runtime/resource-profile.mjs';
 import { createFailureStep, createOkStep } from './focused-qa-results.mjs';
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { fromRelativePath } from './shared.mjs';
@@ -11,9 +12,13 @@ import {
   formatCoverageAuditReport,
   writeCanonicalCoverageArtifacts,
 } from './coverage-audit-report.mjs';
+import {
+  materializeReusableCoverageProof,
+  recordSuccessfulCoverageProof,
+  resolveReusableCoverageProof,
+} from './coverage-proof.mjs';
 
 const FULL_COVERAGE_DIRECTORY = '.tmp/coverage/unit';
-const FULL_COVERAGE_MAX_WORKERS = 6;
 
 function withDuration(step, durationMs) {
   return {
@@ -33,13 +38,24 @@ function prepareFullCoverageDirectory() {
   fs.mkdirSync(path.join(coverageDirectory, '.tmp'), { recursive: true });
 }
 
-export async function collectFullCoverageAuditStep() {
+export async function collectFullCoverageAuditStep({
+  maxWorkers = resolveQaResourceProfile().vitestMaxWorkers,
+} = {}) {
+  const reusable = resolveReusableCoverageProof();
+  if (reusable.matched) {
+    materializeReusableCoverageProof(reusable);
+    recordSuccessfulCoverageProof({ reusedFrom: reusable.proof.producer ?? null });
+    return withDuration(
+      createOkStep('Full product coverage', `reused verified ${reusable.source}`),
+      0
+    );
+  }
   prepareFullCoverageDirectory();
   const { durationMs, value: unitResult } = await measureAsyncStep(() =>
     runUnitTests({
       coverage: true,
       coverageMode: 'manual',
-      maxWorkers: FULL_COVERAGE_MAX_WORKERS,
+      maxWorkers,
       suite: PRODUCT_QA_SUITE,
     })
   );
@@ -65,6 +81,7 @@ export async function collectFullCoverageAuditStep() {
 
   try {
     writeCanonicalCoverageArtifacts({ report: coverageReport });
+    recordSuccessfulCoverageProof();
   } catch (error) {
     return withDuration(
       createFailureStep('Full product coverage', 'coverage publication failed', {

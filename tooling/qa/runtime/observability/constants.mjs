@@ -9,7 +9,7 @@ export const DEFAULT_PATHS = Object.freeze({
 export const OBSERVABILITY_ROOT_ENV = 'SNIPTALE_QA_OBSERVABILITY_ROOT';
 
 export const DEFAULT_LIMITS = Object.freeze({
-  logBytes: 256 * 1024,
+  logBytes: 2 * 1024 * 1024,
   retainedRuns: 500,
   retainedInvalidRecords: 25,
   retainedOrphanLogs: 25,

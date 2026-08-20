@@ -4,17 +4,17 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "c79cc62c3af55120635f5ea51fe335520c87db8f87de9924ee0313ab7140a32e"
+      "sha256": "57ad4c24fcf29ae37d22cae4111fb25e128184a0d0bc3383d515cd0992503179"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "c79cc62c3af55120635f5ea51fe335520c87db8f87de9924ee0313ab7140a32e"
+      "sha256": "57ad4c24fcf29ae37d22cae4111fb25e128184a0d0bc3383d515cd0992503179"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/manifest.json",
-      "sha256": "c0606ef47faa80b52ad9239ec89512fe5a581bd12550ba9de86bacf2a15190f6"
+      "sha256": "5b5445a9eab931c0e499f407855fdab74c9d73e24e401a9ed110c0c17c96f46d"
     },
     {
       "category": "bundled-font",
@@ -34,12 +34,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "273037a122914a67d61f842fd8939af06ca519ceec00ba48e6205010b1fb23bb"
+      "sha256": "9c9cbb0f15c5395c4255b8a4026d213c051594aa7c541b267ac033b0839987ce"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "273037a122914a67d61f842fd8939af06ca519ceec00ba48e6205010b1fb23bb"
+      "sha256": "9c9cbb0f15c5395c4255b8a4026d213c051594aa7c541b267ac033b0839987ce"
     },
     {
       "category": "bundled-font",
@@ -54,12 +54,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "64e93941764a0dd6c470d4aef1ef4987c74bf4fadfb3fb9270790f73a24d9c4c"
+      "sha256": "f4d423d1ad17409004571dbd1e7710b7d3f92ef0489eabc6dd35d8b726498b05"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "64e93941764a0dd6c470d4aef1ef4987c74bf4fadfb3fb9270790f73a24d9c4c"
+      "sha256": "f4d423d1ad17409004571dbd1e7710b7d3f92ef0489eabc6dd35d8b726498b05"
     },
     {
       "category": "validator-integration",

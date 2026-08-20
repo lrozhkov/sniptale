@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-unit-proof-reuse-policy",
+  "proofPath": ".tmp/qa/unit-proof.json",
+  "owners": {
+    "decision": "tooling/qa/core/unit-test-proof.mjs",
+    "execution": "tooling/qa/core/verify-all.unit-test-steps.mjs",
+    "ciTransport": "tooling/ci/select-unit-proof.mjs",
+    "ciMount": "tooling/ci/unit-proof-host.mjs"
+  },
+  "inputRoots": ["apps/extension", "packages"],
+  "testSupportRoots": ["tooling/test/harness", "tooling/test/support"],
+  "runnerRoots": ["tooling/qa/core"],
+  "configFiles": [
+    "package.json",
+    "package-lock.json",
+    "vitest.config.ts",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    "tooling/test/harness/vitest.setup.ts",
+    "tooling/configs/qa/unit-proof-reuse.data.json"
+  ],
+  "excludedDirectoryNames": [".git", ".tmp", "build", "dist", "node_modules"],
+  "consumers": [
+    "tooling/qa/core/verify-all.unit-test-steps.mjs",
+    "tooling/qa/wrappers/build.mjs",
+    "tooling/qa/wrappers/release.mjs",
+    "tooling/ci/container.mjs",
+    "tooling/ci/artifacts.mjs",
+    "tooling/ci/select-unit-proof.mjs",
+    "tooling/ci/unit-proof-host.mjs",
+    ".github/workflows/quality-gate.yml"
+  ],
+  "modes": {
+    "local": "validated local receipt or full-suite fallback",
+    "candidate": "validated read-only successful-main receipt or full-suite fallback"
+  },
+  "digests": [
+    "complete sorted input file inventory and contents",
+    "complete sorted product test inventory",
+    "complete product-suite harness and support inputs",
+    "Node platform, version, locale, and timezone",
+    "container digest when containerized",
+    "suite, pool, workers, and requested CPU/RAM profile"
+  ],
+  "proof": "Only a successful complete product full-suite run may write the receipt; every consumer recomputes all inputs.",
+  "rollback": "Delete the disposable receipt or omit its read-only CI mount to force the complete unit suite.",
+  "collisionCheck": "Atomic replacement is limited to the canonical disposable proof path; immutable CI artifacts retain its SHA-256."
+}

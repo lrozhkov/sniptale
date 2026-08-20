@@ -165,3 +165,14 @@ export function sanitizeBoundedConsoleOutput(value, options = {}, maximumBytes =
   const contentBytes = Math.max(0, maximumBytes - Buffer.byteLength(marker));
   return truncateUtf8(sanitized, contentBytes).text + marker;
 }
+
+export function sanitizeBoundedConsoleTail(value, options = {}, maximumBytes = 32 * 1024) {
+  const marker = '[qa-observability: earlier failure output omitted]\n';
+  const sanitized = sanitizeLogText(value, options);
+  const bytes = Buffer.from(sanitized, 'utf8');
+  if (bytes.length <= maximumBytes) return sanitized;
+  const contentBytes = Math.max(0, maximumBytes - Buffer.byteLength(marker));
+  let start = bytes.length - contentBytes;
+  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start += 1;
+  return marker + bytes.subarray(start).toString('utf8');
+}

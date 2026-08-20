@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
   createDirectUnitTestStep,
@@ -6,6 +6,7 @@ import {
 } from './verify-all.unit-test-results.mjs';
 import { collectUnitTestAndCoverageStepResults } from './verify-all.unit-test-steps.mjs';
 import { resolveReusableUnitTestPlan } from './unit-test-cache.mjs';
+import { recordSuccessfulFullUnitProof, resolveReusableFullUnitProof } from './unit-test-proof.mjs';
 import { runUnitTests } from './verify-unit-tests.mjs';
 
 vi.mock('./unit-test-cache.mjs', async (importOriginal) => {
@@ -20,8 +21,34 @@ vi.mock('./verify-unit-tests.mjs', () => ({
   runUnitTests: vi.fn(() => ({ status: 0, stderr: '', stdout: '' })),
 }));
 
+vi.mock('./unit-test-proof.mjs', () => ({
+  recordSuccessfulFullUnitProof: vi.fn(),
+  resolveReusableFullUnitProof: vi.fn(() => ({
+    matched: false,
+    reason: 'no admissible full unit proof',
+  })),
+}));
+
 const mockedResolveReusableUnitTestPlan = vi.mocked(resolveReusableUnitTestPlan);
+const mockedRecordSuccessfulFullUnitProof = vi.mocked(recordSuccessfulFullUnitProof);
+const mockedResolveReusableFullUnitProof = vi.mocked(resolveReusableFullUnitProof);
 const mockedRunUnitTests = vi.mocked(runUnitTests);
+
+beforeEach(() => {
+  mockedResolveReusableUnitTestPlan.mockReset();
+  mockedResolveReusableUnitTestPlan.mockReturnValue({
+    matched: false,
+    reason: 'no cached execution state',
+  });
+  mockedResolveReusableFullUnitProof.mockReset();
+  mockedResolveReusableFullUnitProof.mockReturnValue({
+    matched: false,
+    reason: 'no admissible full unit proof',
+  });
+  mockedRecordSuccessfulFullUnitProof.mockClear();
+  mockedRunUnitTests.mockClear();
+  mockedRunUnitTests.mockReturnValue({ status: 0, stderr: '', stdout: '' });
+});
 
 it('preserves the selected build profile in a successful direct unit-test step', () => {
   expect(
@@ -145,13 +172,15 @@ it('requires at least one related test for graph-closed deletion successor proof
   );
 });
 
-it('always executes the release full suite instead of reusing an earlier plan', async () => {
+it('reuses an exact sealed release full-suite proof and records the current proof chain', async () => {
   mockedResolveReusableUnitTestPlan.mockClear();
-  mockedResolveReusableUnitTestPlan.mockReturnValueOnce({
+  mockedResolveReusableFullUnitProof.mockReturnValueOnce({
     matched: true,
-    plan: { mode: 'full-suite' },
-    source: 'prior-release',
+    plan: { mode: 'full' },
+    proof: { proofDigest: 'a'.repeat(64) },
+    source: 'external proof',
   });
+  mockedRecordSuccessfulFullUnitProof.mockClear();
   mockedRunUnitTests.mockClear();
 
   const steps = await collectUnitTestAndCoverageStepResults({
@@ -162,14 +191,37 @@ it('always executes the release full suite instead of reusing an earlier plan', 
   });
 
   expect(mockedResolveReusableUnitTestPlan).not.toHaveBeenCalled();
-  expect(mockedRunUnitTests).toHaveBeenCalledWith(
-    expect.objectContaining({
-      relatedFiles: [],
-      suite: 'product',
-    })
+  expect(mockedRunUnitTests).not.toHaveBeenCalled();
+  expect(mockedRecordSuccessfulFullUnitProof).toHaveBeenCalledWith(
+    expect.objectContaining({ reusedFrom: 'a'.repeat(64), suite: 'product' })
   );
   expect(steps[0]).toMatchObject({
+    detail: expect.stringContaining('reused external proof full test plan'),
     label: 'Unit tests',
     status: 'ok',
   });
+});
+
+it('runs and seals the complete release suite when no proof is admissible', async () => {
+  mockedResolveReusableFullUnitProof.mockReturnValueOnce({
+    matched: false,
+    reason: 'full unit proof inputs changed',
+  });
+  mockedRecordSuccessfulFullUnitProof.mockClear();
+  mockedRunUnitTests.mockClear();
+
+  await collectUnitTestAndCoverageStepResults({
+    codeFiles: [],
+    coverageEnabled: false,
+    maxWorkers: 2,
+    releaseMode: true,
+    targetFiles: [],
+  });
+
+  expect(mockedRunUnitTests).toHaveBeenCalledWith(
+    expect.objectContaining({ maxWorkers: 2, relatedFiles: [], suite: 'product' })
+  );
+  expect(mockedRecordSuccessfulFullUnitProof).toHaveBeenCalledWith(
+    expect.objectContaining({ maxWorkers: 2, source: 'full-verify', suite: 'product' })
+  );
 });

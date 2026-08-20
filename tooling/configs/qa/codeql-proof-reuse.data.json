@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-codeql-proof-reuse-policy",
+  "proofPath": ".tmp/qa/codeql-proof.json",
+  "sarifPath": ".tmp/codeql/results.filtered.sarif",
+  "configPath": "tooling/configs/qa/codeql-config.yml",
+  "baselinePath": "tooling/configs/qa/codeql-baseline.json",
+  "sourceRoots": [
+    "src",
+    "apps",
+    "packages",
+    "tooling/ci",
+    "tooling/qa/audits",
+    "tooling/qa/codeql",
+    "tooling/qa/guards/security",
+    "tooling/release"
+  ],
+  "sourceExtensions": [".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"],
+  "excludedDirectoryNames": [
+    ".tmp",
+    "__generated__",
+    "build",
+    "dist",
+    "fixture",
+    "fixtures",
+    "generated",
+    "node_modules",
+    "test",
+    "tests"
+  ],
+  "excludedFileMarkers": [".data.", ".generated.", ".spec.", ".test."],
+  "queryRoots": ["tooling/qa/codeql/lib", "tooling/qa/codeql/queries"],
+  "controlFiles": [
+    "tooling/configs/ci/toolchain.lock.json",
+    "tooling/configs/qa/codeql-baseline.json",
+    "tooling/configs/qa/codeql-config.yml",
+    "tooling/configs/qa/codeql-proof-reuse.data.json",
+    "tooling/qa/audits/canonical-sarif.mjs",
+    "tooling/qa/audits/codeql-baseline.mjs",
+    "tooling/qa/audits/codeql.mjs",
+    "tooling/qa/audits/result-contract.mjs",
+    "tooling/qa/codeql/codeql-pack.lock.yml",
+    "tooling/qa/codeql/config.mjs",
+    "tooling/qa/codeql/qlpack.yml",
+    "tooling/qa/codeql/sniptale-custom.qls",
+    "tooling/qa/core/codeql-proof.mjs",
+    "tooling/qa/policy/external-tools.mjs",
+    "tooling/qa/tools/tool-cli.mjs"
+  ],
+  "owners": {
+    "scope": "tooling/qa/codeql/config.mjs",
+    "decision": "tooling/qa/core/codeql-proof.mjs",
+    "execution": "tooling/qa/audits/codeql.mjs",
+    "ciTransport": "tooling/ci/select-codeql-proof.mjs",
+    "ciMount": "tooling/ci/codeql-proof-host.mjs"
+  },
+  "consumers": [
+    "tooling/qa/codeql/config.mjs",
+    "tooling/qa/core/codeql-proof.mjs",
+    "tooling/qa/audits/codeql.mjs",
+    "tooling/ci/codeql-proof-host.mjs",
+    "tooling/ci/select-codeql-proof.mjs",
+    "tooling/ci/container.mjs",
+    "tooling/ci/artifacts.mjs",
+    ".github/workflows/quality-gate.yml",
+    ".github/workflows/release.yml"
+  ],
+  "modes": {
+    "local": "validated local receipt and SARIF or complete CodeQL fallback",
+    "candidate": "validated read-only successful-main receipt and SARIF or complete CodeQL fallback"
+  },
+  "proof": "Only a successful complete CodeQL run may write the receipt; every consumer recomputes the production-source, query-pack, configuration, baseline, toolchain, and image digest.",
+  "rollback": "Delete the disposable receipt or omit its read-only CI mounts to force a complete CodeQL run.",
+  "collisionCheck": "Atomic replacement is limited to the canonical disposable proof path; immutable CI artifacts retain receipt and SARIF SHA-256 values."
+}

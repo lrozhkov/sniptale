@@ -852,6 +852,43 @@
   ],
   "executables": [
     {
+      "path": "tooling/ci/image-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/select-codeql-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/select-coverage-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/select-release-coverage.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is the release-bound informational coverage publication adapter.",
+      "proofReason": "Exact release identity and digest rejection are covered by the owner-local selector test."
+    },
+    {
+      "path": "tooling/ci/select-unit-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/verify-main-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
       "path": "tooling/qa/audits/ast-grep.mjs",
       "disposition": "adapt",
       "owner": "qa-platform",
@@ -916,6 +953,12 @@
       "disposition": "adapt",
       "owner": "qa-platform",
       "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/codeql/config.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
       "path": "tooling/qa/codeql/generate-ownership.mjs",
@@ -1597,6 +1640,8 @@
     {
       "path": "tooling/configs/qa/codeql-baseline.json",
       "consumers": [
+        "tooling/configs/qa/codeql-proof-reuse.data.json",
+        "tooling/qa/codeql/config.mjs",
         "tooling/qa/core/technical-debt-enforced-sources.mjs",
         "tooling/qa/policy/external-tools.mjs"
       ],
@@ -1607,7 +1652,18 @@
     {
       "path": "tooling/configs/qa/codeql-config.yml",
       "consumers": [
+        "tooling/configs/qa/codeql-proof-reuse.data.json",
+        "tooling/qa/codeql/config.mjs",
         "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/codeql-proof-reuse.data.json",
+      "consumers": [
+        "tooling/qa/codeql/config.mjs"
       ],
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1620,6 +1676,15 @@
         "tooling/qa/core/qa-controls/discovery.mjs",
         "tooling/qa/core/qa-controls/policy.mjs",
         "tooling/qa/core/retired-controls/validation.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/coverage-proof-reuse.data.json",
+      "consumers": [
+        "tooling/qa/core/coverage-proof.mjs"
       ],
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1872,6 +1937,15 @@
       "disposition": "adapt",
       "owner": "qa-platform",
       "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/unit-proof-reuse.data.json",
+      "consumers": [
+        "tooling/qa/core/unit-test-proof.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
     },
     {
       "path": "tooling/configs/qa/validation-manifest.json",
@@ -2715,6 +2789,12 @@
     },
     {
       "tool": "verify-logging.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-main-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."

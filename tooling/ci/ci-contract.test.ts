@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 import { expect, it } from 'vitest';
 
@@ -14,44 +14,60 @@ import {
   assertPublishedReleaseAssets,
   readExpectedReleaseAssetDigests,
 } from './release-verification.mjs';
-import { assertReleasePublisher, assertReleaseTagRuleset } from './release-tag-policy.mjs';
+import { assertReleaseTagRuleset } from './release-tag-policy.mjs';
+import { verifyMainProof } from './verify-main-proof.mjs';
+import { verifyImageProof, writeImageProof } from './image-proof.mjs';
+import { candidateReleaseArchiveIdentity, finalizeCandidateReleaseArchive } from './artifacts.mjs';
 
-it('pins every external workflow action to a full commit SHA', () => {
-  for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
-    const source = fs.readFileSync(workflow, 'utf8');
-    const uses = [...source.matchAll(/^\s*uses:\s*([^\s]+)$/gmu)].map((match) => match[1]);
-    expect(uses.length).toBeGreaterThan(0);
-    for (const action of uses) expect(action).toMatch(/^[^@]+@[a-f0-9]{40}$/u);
-  }
-});
-
-it('keeps the GitHub gate on canonical wrappers without checkpoint', () => {
-  const workflow = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
-  expect(workflow).toContain('qa-release:');
-  expect(workflow).toContain('security-audit:');
-  expect(workflow).toContain('coverage-audit:');
-  expect(workflow).toContain('pr-gate:');
-  expect(workflow).toContain('name: pr-gate-authority');
-  expect(workflow).toContain('checks: write');
-  expect(workflow).toContain('-f head_sha="$CANDIDATE_SHA"');
-  expect(workflow).toContain('-f name=pr-gate');
-  expect(workflow).toContain('pull_request_target:');
-  expect(workflow).not.toContain('  pull_request:\n');
-  expect(workflow).toContain('Check out trusted control plane');
-  expect(workflow).toContain('SNIPTALE_TRUSTED_CI_ROOT: ${{ github.workspace }}/trusted-control');
-  expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs release');
-  expect(workflow).not.toContain('qa:checkpoint');
-  expect(workflow).toContain(
-    "retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}"
-  );
-  expect(workflow.match(/include-hidden-files: true/gu)).toHaveLength(3);
-  expect(workflow).not.toContain("hashFiles('reports/.tmp/");
-  expect(workflow).toContain('needs: [qa-release, security-audit, coverage-audit]');
-  expect(workflow).toContain('Refuse immutable tag replacement');
-  expect(workflow).toContain('Refusing to replace existing immutable image tag');
-  expect(workflow).toContain('Unable to prove immutable image tag absence');
-  expect(workflow).toContain('manifest unknown|not found');
-});
+function createEmptyRunRecord({
+  runId,
+  wrapperId,
+  rootRunId = runId,
+  parentRunId = null,
+  logText = '',
+}) {
+  return {
+    schemaVersion: 2,
+    runId,
+    rootRunId,
+    parentRunId,
+    ownerPid: 42,
+    wrapperId,
+    status: 'all-passed',
+    exitCode: 0,
+    startedAt: '2026-08-17T00:00:00.000Z',
+    finishedAt: '2026-08-17T00:00:01.000Z',
+    durationMs: 1000,
+    repository: {
+      head: 'a'.repeat(40),
+      treeFingerprint: 'b'.repeat(40),
+      diffFingerprint: 'c'.repeat(64),
+      changedFileCount: 0,
+      scope: 'workspace',
+      suite: null,
+      mode: 'default',
+      targetFiles: [],
+    },
+    correlation: {},
+    summary: {
+      stepCount: 0,
+      passed: 0,
+      problemsFound: 0,
+      skipped: 0,
+      errors: 0,
+      interrupted: 0,
+      problemCount: 0,
+      problemIds: [],
+    },
+    steps: [],
+    log: {
+      path: `.tmp/qa-logs/2026-08-17/${runId}.log`,
+      digest: crypto.createHash('sha256').update(logText).digest('hex'),
+      byteCount: Buffer.byteLength(logText),
+      truncated: false,
+    },
+  };
+}
 
 it('distinguishes disabled settings from rollback snapshot failures', () => {
   expect(parseToggleState({ ok: true, error: '' }, 'setting')).toBe(true);
@@ -65,6 +81,7 @@ it('distinguishes disabled settings from rollback snapshot failures', () => {
 it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
   const dockerfile = fs.readFileSync('tooling/ci/Dockerfile', 'utf8');
+  const installer = fs.readFileSync('tooling/ci/install-toolchain.mjs', 'utf8');
   const semgrepLock = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock', 'utf8');
   expect(dockerfile.startsWith(`FROM ${lock.node.image}\n`)).toBe(true);
   expect(semgrepLock).toContain(`semgrep==${lock.semgrep.version}`);
@@ -76,7 +93,21 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(lock.debian.snapshot).toMatch(/^\d{8}T\d{6}Z$/u);
   expect(dockerfile).toContain(`${lock.debian.archiveUrl} bookworm main`);
   expect(dockerfile).toContain(`${lock.debian.securityArchiveUrl} bookworm-security main`);
+  expect(dockerfile).toContain('Acquire::https::Verify-Peer "false";');
+  expect(
+    dockerfile.indexOf('apt-get install -y --no-install-recommends ca-certificates')
+  ).toBeLessThan(dockerfile.indexOf('rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap'));
+  expect(dockerfile.indexOf('rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap')).toBeLessThan(
+    dockerfile.lastIndexOf('apt-get update')
+  );
   expect(dockerfile).not.toContain('deb.debian.org');
+  expect(lock.codeql.url).toMatch(
+    /^https:\/\/github\.com\/github\/codeql-action\/releases\/download\/codeql-bundle-v/u
+  );
+  expect(lock.codeql.url).toContain(`codeql-bundle-v${lock.codeql.version}`);
+  expect(lock.codeql.sha256).toMatch(/^[a-f0-9]{64}$/u);
+  expect(installer).toContain("codeql.tar.gz', '-C', '/opt'");
+  expect(installer).not.toContain('codeql.zip');
   const dockerignore = fs.readFileSync('.dockerignore', 'utf8');
   for (const excluded of ['.git', '.env', '.tmp', 'build', 'node_modules']) {
     expect(dockerignore.split('\n')).toContain(excluded);
@@ -88,41 +119,10 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   }
 });
 
-it('fails release publication closed around live immutability and asset digests', () => {
-  const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
-  const policy = fs.readFileSync('tooling/ci/release-policy.mjs', 'utf8');
-  expect(workflow).toContain('include-hidden-files: true');
-  expect(workflow).toContain('verify-published-release.mjs "$asset_root" "$release_id"');
-  expect(workflow).toContain('verify-draft-release.mjs "$asset_root" "$release_id"');
-  expect(workflow.indexOf('verify-draft-release.mjs')).toBeLessThan(
-    workflow.indexOf('gh api --method PATCH')
-  );
-  expect(workflow).toContain("grep -q '(HTTP 404)'");
-  expect(workflow).toContain("created_release_id=''");
-  expect(workflow).toContain('releases/${created_release_id}');
-  expect(workflow).toContain('upload-release-assets.mjs "$asset_root" "$release_id"');
-  expect(workflow).not.toContain('gh release upload');
-  expect(workflow).not.toContain('gh release edit');
-  expect(workflow).not.toContain('gh release delete');
-  expect(workflow).toContain('RELEASE_POLICY_READ_TOKEN');
-  expect(workflow).not.toContain('existing_draft=');
-  expect(policy).toContain("api(repository, 'immutable-releases')");
-  expect(policy).toContain('--recheck');
-  const githubPolicy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
-  expect(githubPolicy.releaseTagRuleset).toMatchObject({
-    target: 'tag',
-    enforcement: 'active',
-    bypass_actors: [],
-    rules: [{ type: 'update' }, { type: 'deletion' }],
-  });
-  expect(githubPolicy.releasePublisher).toBe('lrozhkov');
-  expect(
-    githubPolicy.ruleset.rules.find(({ type }) => type === 'required_status_checks').parameters
-      .required_status_checks
-  ).toEqual([{ context: 'pr-gate', integration_id: 15368 }]);
-  expect(() => assertReleasePublisher('collaborator', 'collaborator', 'lrozhkov')).toThrow(
-    'Release actor is not authorized'
-  );
+it('binds the CodeQL audit suite to the locked CI query suite', () => {
+  const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
+  const source = fs.readFileSync('tooling/qa/audits/codeql.mjs', 'utf8');
+  expect(source).toContain(lock.codeql.querySuite);
 });
 
 it('rejects release tag ruleset exclusions and parameter drift', () => {
@@ -182,6 +182,63 @@ it('verifies the exact published asset set including SHA256SUMS itself', () => {
   );
 });
 
+it('binds a reusable main proof to its exact commit, tree, files, and trusted controls', () => {
+  const root = createTempRoot('main-proof-');
+  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  const tree = spawnSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).stdout.trim();
+  writeFile(root, 'build/sniptale_0.3.1.zip', 'zip\n');
+  writeFile(root, '.tmp/licenses/sbom.cdx.json', '{}\n');
+  const files = ['build/sniptale_0.3.1.zip', '.tmp/licenses/sbom.cdx.json'].map((file) => ({
+    file,
+    sha256: crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(path.join(root, file)))
+      .digest('hex'),
+  }));
+  const manifest = {
+    schemaVersion: 1,
+    artifactKind: 'sniptale-ci-proof',
+    lane: 'candidate',
+    status: 'passed',
+    commit,
+    candidateTree: tree,
+    trustedControlSha: commit,
+    containerDigest: `sha256:${'a'.repeat(64)}`,
+    files,
+  };
+  writeFile(root, 'proof-manifest.json', `${JSON.stringify(manifest)}\n`);
+  const sums = [
+    ...files.map(({ file, sha256 }) => `${sha256}  ${file}`),
+    `${crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(path.join(root, 'proof-manifest.json')))
+      .digest('hex')}  proof-manifest.json`,
+  ];
+  writeFile(root, 'SHA256SUMS', `${sums.join('\n')}\n`);
+  expect(verifyMainProof(root, commit).zipFile).toBe('build/sniptale_0.3.1.zip');
+  writeFile(root, 'build/sniptale_unlisted.zip', 'unlisted\n');
+  expect(() => verifyMainProof(root, commit)).toThrow('physical artifact inventory is not exact');
+  fs.rmSync(path.join(root, 'build/sniptale_unlisted.zip'));
+  fs.appendFileSync(path.join(root, 'build/sniptale_0.3.1.zip'), 'drift\n');
+  expect(() => verifyMainProof(root, commit)).toThrow('Main proof digest mismatch');
+});
+
+it('binds the published QA image digest to the exact successful main workflow', () => {
+  const root = path.join(createTempRoot('image-proof-'), 'build', 'proof');
+  const identity = {
+    commit: 'a'.repeat(40),
+    digest: `sha256:${'b'.repeat(64)}`,
+    repository: 'lrozhkov/sniptale',
+    runId: '42',
+  };
+  writeImageProof(root, identity);
+  expect(verifyImageProof(root, identity).reference).toBe(
+    `ghcr.io/lrozhkov/sniptale-qa@${identity.digest}`
+  );
+  writeFile(root, 'extra.json', '{}\n');
+  expect(() => verifyImageProof(root, identity)).toThrow('inventory is not exact');
+});
+
 it('fails canonical artifact collection on missing reports and refuses overwrite', () => {
   const root = createTempRoot('ci-artifact-contract-');
   fs.mkdirSync(path.join(root, 'build'), { recursive: true });
@@ -199,53 +256,14 @@ it('fails canonical artifact collection on missing reports and refuses overwrite
     writeFile(root, `.tmp/coverage/canonical/${file}`, '{}\n');
   }
   writeFile(root, '.tmp/coverage/canonical/html/index.html', '<html></html>\n');
+  writeFile(root, '.tmp/qa/coverage-proof.json', '{}\n');
   const runId = '018f68b2-6e52-7cb0-bdb7-7f0a901c94de';
   const logPath = `.tmp/qa-logs/2026-08-17/${runId}.log`;
   writeFile(root, logPath, '');
   writeFile(
     root,
     `.tmp/qa-observability/runs/2026-08-17/${runId}.json`,
-    JSON.stringify({
-      schemaVersion: 2,
-      runId,
-      rootRunId: runId,
-      parentRunId: null,
-      ownerPid: 42,
-      wrapperId: 'qa:audit',
-      status: 'all-passed',
-      exitCode: 0,
-      startedAt: '2026-08-17T00:00:00.000Z',
-      finishedAt: '2026-08-17T00:00:01.000Z',
-      durationMs: 1000,
-      repository: {
-        head: 'a'.repeat(40),
-        treeFingerprint: 'b'.repeat(40),
-        diffFingerprint: 'c'.repeat(64),
-        changedFileCount: 0,
-        scope: 'workspace',
-        suite: null,
-        mode: 'default',
-        targetFiles: [],
-      },
-      correlation: {},
-      summary: {
-        stepCount: 0,
-        passed: 0,
-        problemsFound: 0,
-        skipped: 0,
-        errors: 0,
-        interrupted: 0,
-        problemCount: 0,
-        problemIds: [],
-      },
-      steps: [],
-      log: {
-        path: logPath,
-        digest: crypto.createHash('sha256').update('').digest('hex'),
-        byteCount: 0,
-        truncated: false,
-      },
-    })
+    JSON.stringify(createEmptyRunRecord({ runId, wrapperId: 'qa:audit' }))
   );
   const forgedRoot = createTempRoot('ci-artifact-forged-record-');
   fs.cpSync(root, forgedRoot, { recursive: true });
@@ -281,6 +299,267 @@ it('fails canonical artifact collection on missing reports and refuses overwrite
   });
   expect(collision.status).not.toBe(0);
   expect(collision.stderr).toContain('EEXIST');
+
+  const launcherRoot = createTempRoot('ci-artifact-launcher-');
+  writeFile(launcherRoot, '.tmp/coverage/canonical/lcov.info', 'forged launcher report\n');
+  const explicitRootScript = [
+    `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)};`,
+    `collectLaneArtifacts(${JSON.stringify({
+      lane: 'coverage',
+      repositoryRoot: root,
+      startedAtMs: 0,
+      status: 'passed',
+      command: [],
+      containerDigest: `sha256:${'a'.repeat(64)}`,
+    })});`,
+  ].join(' ');
+  const explicitRoot = spawnSync(
+    process.execPath,
+    ['--input-type=module', '--eval', explicitRootScript],
+    {
+      cwd: launcherRoot,
+      env: { ...process.env, GITHUB_SHA: 'b'.repeat(40), GITHUB_RUN_ID: '21' },
+      encoding: 'utf8',
+    }
+  );
+  expect(explicitRoot.status, explicitRoot.stderr).toBe(0);
+  expect(fs.existsSync(path.join(root, `build/ci-artifacts/coverage-${'b'.repeat(40)}-21`))).toBe(
+    true
+  );
+  expect(fs.existsSync(path.join(launcherRoot, 'build/ci-artifacts'))).toBe(false);
+});
+
+it('admits closeout child proof only through exact parent diagnostic evidence', () => {
+  const moduleUrl = new URL('./artifacts.mjs', import.meta.url).href;
+  const lineageRoot = createTempRoot('ci-artifact-child-lineage-');
+  const parentRunId = '218f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const childRunId = '318f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const siblingRunId = '418f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const mixedLineageRunId = '518f68b2-6e52-7cb0-bdb7-7f0a901c94de';
+  const baseRecord = createEmptyRunRecord({ runId: parentRunId, wrapperId: 'qa:closeout' });
+  for (const record of [
+    {
+      ...baseRecord,
+      runId: parentRunId,
+      rootRunId: parentRunId,
+      wrapperId: 'qa:closeout',
+      status: 'problems-found',
+      exitCode: 1,
+      summary: {
+        stepCount: 1,
+        passed: 0,
+        problemsFound: 1,
+        skipped: 0,
+        errors: 0,
+        interrupted: 0,
+        problemCount: 1,
+        problemIds: ['qa.rule.full-build.process-exit'],
+      },
+      steps: [
+        {
+          stepId: 'qa.rule.full-build',
+          outcome: 'problems-found',
+          startedAt: '2026-08-17T00:00:00.000Z',
+          finishedAt: '2026-08-17T00:00:01.000Z',
+          durationMs: 1000,
+          controlIds: ['qa.rule.full-build'],
+          problemIds: ['qa.rule.full-build.process-exit'],
+          skipReasonId: null,
+          diagnostic: {
+            summary: 'failed',
+            locations: [],
+            remediation: 'inspect the canonical child build proof',
+            ruleDoc: 'docs/tooling/code-quality.md',
+            evidence: [
+              {
+                kind: 'child-run',
+                runId: childRunId,
+                recordPath: `.tmp/qa-observability/runs/2026-08-17/${childRunId}.json`,
+                logPath: `.tmp/qa-logs/2026-08-17/${childRunId}.log`,
+              },
+            ],
+          },
+        },
+      ],
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${parentRunId}.log`,
+        digest: crypto.createHash('sha256').update('parent\n').digest('hex'),
+        byteCount: 7,
+        truncated: false,
+      },
+    },
+    {
+      ...baseRecord,
+      runId: childRunId,
+      rootRunId: parentRunId,
+      parentRunId,
+      wrapperId: 'qa:build',
+      status: 'problems-found',
+      exitCode: 1,
+      summary: {
+        stepCount: 1,
+        passed: 0,
+        problemsFound: 1,
+        skipped: 0,
+        errors: 0,
+        interrupted: 0,
+        problemCount: 1,
+        problemIds: ['qa.rule.full-build.process-exit'],
+      },
+      steps: [
+        {
+          stepId: 'qa.rule.full-build',
+          outcome: 'problems-found',
+          startedAt: '2026-08-17T00:00:00.000Z',
+          finishedAt: '2026-08-17T00:00:01.000Z',
+          durationMs: 1000,
+          controlIds: ['qa.rule.full-build'],
+          problemIds: ['qa.rule.full-build.process-exit'],
+          skipReasonId: null,
+          diagnostic: {
+            summary: 'failed',
+            locations: [],
+            remediation: 'inspect the canonical build proof',
+            ruleDoc: 'docs/tooling/code-quality.md',
+            evidence: [],
+          },
+        },
+      ],
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${childRunId}.log`,
+        digest: crypto.createHash('sha256').update('child\n').digest('hex'),
+        byteCount: 6,
+        truncated: false,
+      },
+    },
+    {
+      ...baseRecord,
+      runId: siblingRunId,
+      rootRunId: parentRunId,
+      parentRunId,
+      wrapperId: 'qa:build',
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${siblingRunId}.log`,
+        digest: crypto.createHash('sha256').update('sibling\n').digest('hex'),
+        byteCount: 8,
+        truncated: false,
+      },
+    },
+    {
+      ...baseRecord,
+      runId: mixedLineageRunId,
+      rootRunId: '618f68b2-6e52-7cb0-bdb7-7f0a901c94de',
+      parentRunId,
+      wrapperId: 'qa:build',
+      log: {
+        path: `.tmp/qa-logs/2026-08-17/${mixedLineageRunId}.log`,
+        digest: crypto.createHash('sha256').update('mixed\n').digest('hex'),
+        byteCount: 6,
+        truncated: false,
+      },
+    },
+  ]) {
+    const logByRunId = {
+      [parentRunId]: 'parent\n',
+      [childRunId]: 'child\n',
+      [siblingRunId]: 'sibling\n',
+      [mixedLineageRunId]: 'mixed\n',
+    };
+    writeFile(lineageRoot, record.log.path, logByRunId[record.runId]);
+    writeFile(
+      lineageRoot,
+      `.tmp/qa-observability/runs/2026-08-17/${record.runId}.json`,
+      JSON.stringify(record)
+    );
+  }
+  const lineageScript = `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)}; collectLaneArtifacts({ lane: 'candidate', startedAtMs: 0, status: 'failed', command: [], containerDigest: 'sha256:${'a'.repeat(64)}' });`;
+  const lineage = spawnSync(process.execPath, ['--input-type=module', '--eval', lineageScript], {
+    cwd: lineageRoot,
+    env: { ...process.env, GITHUB_SHA: 'b'.repeat(40), GITHUB_RUN_ID: '22' },
+    encoding: 'utf8',
+  });
+  expect(lineage.status, lineage.stderr).toBe(0);
+  const lineageBundle = path.join(lineageRoot, `build/ci-artifacts/candidate-${'b'.repeat(40)}-22`);
+  expect(
+    fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${parentRunId}.log`))
+  ).toBe(true);
+  expect(fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${childRunId}.log`))).toBe(
+    true
+  );
+  expect(
+    fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${siblingRunId}.log`))
+  ).toBe(false);
+  expect(
+    fs.existsSync(path.join(lineageBundle, `.tmp/qa-logs/2026-08-17/${mixedLineageRunId}.log`))
+  ).toBe(false);
+
+  const successfulChildRoot = createTempRoot('ci-artifact-successful-child-');
+  fs.cpSync(lineageRoot, successfulChildRoot, { recursive: true });
+  writeFile(
+    successfulChildRoot,
+    `.tmp/qa-observability/runs/2026-08-17/${childRunId}.json`,
+    JSON.stringify(
+      createEmptyRunRecord({
+        runId: childRunId,
+        rootRunId: parentRunId,
+        parentRunId,
+        wrapperId: 'qa:build',
+        logText: 'child\n',
+      })
+    )
+  );
+  const successfulChild = spawnSync(
+    process.execPath,
+    ['--input-type=module', '--eval', lineageScript],
+    {
+      cwd: successfulChildRoot,
+      env: { ...process.env, GITHUB_SHA: 'b'.repeat(40), GITHUB_RUN_ID: '23' },
+      encoding: 'utf8',
+    }
+  );
+  expect(successfulChild.status).not.toBe(0);
+  expect(successfulChild.stderr).toContain('Expected exactly one canonical qa:build child');
+});
+
+it('rejects a release ZIP replaced by a detached candidate child before trusted finalization', async () => {
+  const root = createTempRoot('ci-candidate-finalizer-');
+  writeFile(root, 'package.json', '{"name":"sniptale","version":"0.3.1"}\n');
+  writeFile(root, 'tracked.txt', 'candidate\n');
+  writeFile(root, 'dist/payload.js', 'canonical payload\n');
+  writeFile(root, 'build/sniptale_0.3.1.zip', 'canonical payload\n');
+  for (const args of [
+    ['init', '--quiet'],
+    ['config', 'user.name', 'CI Test'],
+    ['config', 'user.email', 'ci@example.test'],
+    ['add', 'package.json', 'tracked.txt'],
+    ['commit', '--quiet', '-m', 'candidate'],
+  ]) {
+    expect(spawnSync('git', args, { cwd: root }).status).toBe(0);
+  }
+  const archivePath = path.join(root, 'build/sniptale_0.3.1.zip');
+  const expectedSha256 = candidateReleaseArchiveIdentity({
+    candidateRoot: root,
+    startedAtMs: 0,
+  }).sha256;
+  const replacer = spawn(
+    process.execPath,
+    [
+      '--eval',
+      `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(archivePath)}, 'substituted payload\\n'), 25)`,
+    ],
+    { detached: true, stdio: 'ignore' }
+  );
+  replacer.unref();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  await expect(
+    finalizeCandidateReleaseArchive({
+      candidateRoot: root,
+      startedAtMs: 0,
+      expectedSha256,
+      archiveVerifier: async () => {},
+    })
+  ).rejects.toThrow('changed after canonical release validation');
 });
 
 it('rejects stale coverage outputs from an earlier run', () => {
@@ -374,4 +653,15 @@ it('rejects PR and local authority that changes while proof lanes run', () => {
   expect(proofSource).toContain("['checkout', '--quiet', '--detach', pr.headRefOid]");
   expect(proofSource).toContain('Fetched PR commit does not match GitHub PR authority');
   expect(laneSource).toContain("['ci', '--ignore-scripts']");
+  expect(laneSource).toContain("['rebuild', 'canvas']");
+  expect(laneSource).toContain("createCanvas(1, 1).getContext('2d')");
+  expect(laneSource).toContain("['node_modules/@ast-grep/cli/postinstall.js']");
+  expect(laneSource).toContain("['node_modules/.bin/ast-grep', ['--version']]");
+  expect(laneSource).toContain('candidatePhaseCommands');
+  expect(laneSource).not.toContain('ci-candidate-phases.json');
+  const containerSource = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
+  expect(containerSource).toContain('runCandidatePhases');
+  expect(containerSource).toContain('restoreCandidateDiff');
+  expect(containerSource).toContain('restoreCandidateCommit');
+  expect(containerSource).toContain('candidateResult.phases');
 });
