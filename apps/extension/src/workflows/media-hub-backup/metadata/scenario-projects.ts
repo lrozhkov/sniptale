@@ -47,6 +47,20 @@ function normalizeScenarioAssetBlobDescriptor(
   return descriptor;
 }
 
+function assertUniqueScenarioAssets(assets: readonly BackupBlobDescriptor[]): void {
+  const ids = new Set<string>();
+  const paths = new Set<string>();
+  for (const asset of assets) {
+    const id = readBackupBlobDescriptorId(asset.entry);
+    if (ids.has(id)) throw new Error('Duplicate scenario asset ID in backup metadata.');
+    if (paths.has(asset.blobPath)) {
+      throw new Error('Duplicate scenario asset path in backup metadata.');
+    }
+    ids.add(id);
+    paths.add(asset.blobPath);
+  }
+}
+
 function normalizeScenarioProjectEntry(value: unknown): ScenarioProjectEntry {
   const parsed = parseScenarioProjectEntry(readProjectEntryFields(value));
   if (!parsed) {
@@ -110,6 +124,7 @@ export function normalizeScenarioProject(value: JsonRecord): ScenarioBackupProje
         }),
     ...(presentation ? { presentation } : {}),
   };
+  assertUniqueScenarioAssets(descriptor.assets);
   assertScenarioExportThumbnailOwnership(descriptor);
   assertScenarioProjectDescriptorReferences(descriptor);
   return descriptor;

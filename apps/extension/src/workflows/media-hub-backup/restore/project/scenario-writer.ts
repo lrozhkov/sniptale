@@ -5,9 +5,11 @@ import {
   SCENARIO_PROJECTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   THUMBNAILS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
 } from '../../storage/constants';
 import { getStore } from '../../storage';
-import { restoreBlobDescriptor, restoreScenarioAssetBlobDescriptor } from './blobs';
+import { restoreBlobDescriptor } from './blobs';
 import { remapId } from './ids';
 import { readRestoredBlob, remapDescriptorId } from './helpers';
 import type { PreparedScenarioProject } from './prepare';
@@ -16,6 +18,10 @@ import {
   assertBackupProjectReplacePreflightComplete,
   deleteExistingScenarioProjectBundle,
 } from './replace';
+import {
+  SCENARIO_ASSET_OWNER_KIND,
+  SCENARIO_ASSET_ROLE,
+} from '../../../../composition/persistence/scenario/aggregate-mutations';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
 
@@ -39,10 +45,13 @@ async function restorePreparedScenarioProject(
 ) {
   if (prepared.replace) {
     assertBackupProjectReplacePreflightComplete(prepared.projectId);
-    await deleteExistingScenarioProjectBundle(tx, prepared.projectId);
+    prepared.obsoleteScenarioAssetIds = await deleteExistingScenarioProjectBundle(
+      tx,
+      prepared.projectId
+    );
   }
   await getStore(tx, SCENARIO_PROJECTS_STORE).put(remapScenarioProjectEntry(prepared));
-  await restoreScenarioAssets(tx, restoredBlobs, prepared);
+  await restoreScenarioAssets(tx, prepared);
   await restoreScenarioExports(tx, prepared);
   await restoreScenarioStepDocuments(tx, prepared);
   await restoreScenarioThumbnails(tx, restoredBlobs, prepared);
@@ -51,21 +60,25 @@ async function restorePreparedScenarioProject(
   }
 }
 
-async function restoreScenarioAssets(
-  tx: BackupTransaction,
-  restoredBlobs: ReadonlyMap<string, Blob>,
-  prepared: PreparedScenarioProject
-) {
+async function restoreScenarioAssets(tx: BackupTransaction, prepared: PreparedScenarioProject) {
   for (const descriptor of prepared.descriptor.assets) {
-    await restoreScenarioAssetBlobDescriptor({
-      blob: readRestoredBlob(restoredBlobs, descriptor.blobPath),
-      descriptor,
-      entryPatch: {
-        id: remapDescriptorId(descriptor.entry, prepared.scenarioAssetIdMap),
-        projectId: prepared.projectId,
-      },
-      storeName: SCENARIO_ASSETS_STORE,
-      tx,
+    const restored = prepared.restoredScenarioAssets?.get(descriptor.blobPath);
+    if (!restored) throw new Error('Prepared scenario asset is missing.');
+    const id = remapDescriptorId(descriptor.entry, prepared.scenarioAssetIdMap);
+    await getStore(tx, ASSET_REFS_STORE).put(restored.asset.ref);
+    await getStore(tx, ASSET_OWNERS_STORE).put({
+      assetId: restored.asset.ref.assetId,
+      ownerId: id,
+      ownerKind: SCENARIO_ASSET_OWNER_KIND,
+      role: SCENARIO_ASSET_ROLE,
+    });
+    await getStore(tx, SCENARIO_ASSETS_STORE).put({
+      ...descriptor.entry,
+      assetId: restored.asset.ref.assetId,
+      id,
+      mimeType: restored.asset.ref.mimeType,
+      projectId: prepared.projectId,
+      size: restored.asset.ref.size,
     });
   }
 }

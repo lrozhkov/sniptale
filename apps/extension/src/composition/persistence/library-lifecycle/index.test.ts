@@ -27,6 +27,10 @@ vi.mock('../recordings/asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverRecordingAssetPublications: vi.fn().mockResolvedValue(0),
 }));
+vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
+  recoverScenarioAssetPublications: vi.fn().mockResolvedValue(0),
+}));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,

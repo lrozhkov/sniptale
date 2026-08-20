@@ -1,10 +1,10 @@
 import type { EditorDocument } from '../../../../../features/editor/document/types';
 import type { ScenarioProject } from '../../../../../features/scenario/contracts/types/project';
-import type { ScenarioAssetEntry as DbScenarioAssetEntry } from '../../contracts';
+import type { PreparedScenarioAssetEntry } from '../../contracts';
 import { commitScenarioAggregateMutation } from '../../aggregate-mutations';
 
 export async function persistScenarioCaptureArtifacts(args: {
-  assetEntry: DbScenarioAssetEntry;
+  assetEntry: PreparedScenarioAssetEntry;
   baseUpdatedAt: number;
   project: ScenarioProject;
   projectId: string;

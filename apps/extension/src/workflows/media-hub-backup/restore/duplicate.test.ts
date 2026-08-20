@@ -93,6 +93,7 @@ vi.mock('./project/prepare', async (importOriginal) => ({
 
 vi.mock('./project/preflight', () => ({
   assertPreparedProjectBlobsAvailable: assertPreparedProjectBlobsAvailableMock,
+  assertPreparedScenarioAssetBlobSafe: vi.fn(),
   stagePreparedProjectAssets: vi.fn(),
 }));
 

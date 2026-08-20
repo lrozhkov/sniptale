@@ -24,6 +24,11 @@ import {
   parseProjectExportEntry,
 } from '../../../../composition/persistence/projects/read-guards';
 import { parseStoredVideoProjectAssetReferences } from '../../../../composition/persistence/projects/asset-references';
+import { parseScenarioAssetEntry } from '../../../../composition/persistence/scenario/read-guards';
+import {
+  SCENARIO_ASSET_OWNER_KIND,
+  SCENARIO_ASSET_ROLE,
+} from '../../../../composition/persistence/scenario/aggregate-mutations';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
 
@@ -111,7 +116,8 @@ async function deleteProjectExportMirror(
 export async function deleteExistingScenarioProjectBundle(
   tx: BackupTransaction,
   projectId: string
-): Promise<void> {
+): Promise<string[]> {
+  const obsoleteAssetIds: string[] = [];
   const [assets, exports, stepDocuments] = await Promise.all([
     getStore(tx, SCENARIO_ASSETS_STORE).index('projectId').getAll(projectId),
     getStore(tx, SCENARIO_EXPORTS_STORE).index('projectId').getAll(projectId),
@@ -119,9 +125,19 @@ export async function deleteExistingScenarioProjectBundle(
   ]);
 
   for (const asset of assets) {
-    const assetId = readStringField(asset, 'id');
-    if (assetId) {
-      await getStore(tx, SCENARIO_ASSETS_STORE).delete(assetId);
+    const entry = parseScenarioAssetEntry(asset);
+    const scenarioAssetId = readStringField(asset, 'id');
+    if (scenarioAssetId) {
+      await getStore(tx, SCENARIO_ASSETS_STORE).delete(scenarioAssetId);
+      await getStore(tx, ASSET_OWNERS_STORE).delete([
+        SCENARIO_ASSET_OWNER_KIND,
+        scenarioAssetId,
+        SCENARIO_ASSET_ROLE,
+      ]);
+      if (entry) {
+        await getStore(tx, ASSET_REFS_STORE).delete(entry.assetId);
+        obsoleteAssetIds.push(entry.assetId);
+      }
     }
   }
   for (const entry of exports) {
@@ -139,6 +155,7 @@ export async function deleteExistingScenarioProjectBundle(
   }
   await getStore(tx, THUMBNAILS_STORE).delete(`scenario:${projectId}`);
   await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).delete(['scenario', projectId]);
+  return obsoleteAssetIds;
 }
 
 function readStringField(value: unknown, field: string): string | null {

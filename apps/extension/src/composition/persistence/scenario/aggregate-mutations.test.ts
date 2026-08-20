@@ -37,13 +37,33 @@ const db = {
           delete: async (id: unknown) => void getStore(name).delete(normalizeKey(id)),
           get: async (id: unknown) => getStore(name).get(normalizeKey(id)),
           index: () => ({
+            count: async (assetId: string) =>
+              [...getStore(name).values()].filter(
+                (value) => (value as { assetId?: string }).assetId === assetId
+              ).length,
             getAll: async (projectId: string) =>
               [...getStore(name).values()].filter(
                 (value) => (value as { projectId?: string }).projectId === projectId
               ),
           }),
-          put: async (value: { id?: string; stepId?: string }) => {
-            getStore(name).set(value.id ?? value.stepId ?? '', value);
+          put: async (value: {
+            assetId?: string;
+            id?: string;
+            operationId?: string;
+            ownerId?: string;
+            ownerKind?: string;
+            role?: string;
+            stepId?: string;
+          }) => {
+            const key =
+              value.id ??
+              value.stepId ??
+              value.operationId ??
+              (value.ownerKind
+                ? JSON.stringify([value.ownerKind, value.ownerId, value.role])
+                : value.assetId) ??
+              '';
+            getStore(name).set(key, value);
           },
         };
       },
@@ -53,11 +73,37 @@ const db = {
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
   AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
+  ASSET_OPERATIONS_STORE: 'asset_operations',
+  ASSET_OWNERS_STORE: 'asset_owners',
+  ASSET_REFS_STORE: 'asset_refs',
   SCENARIO_ASSETS_STORE: 'scenario_assets',
   SCENARIO_EXPORTS_STORE: 'scenario_exports',
   SCENARIO_PROJECTS_STORE: 'scenario_projects',
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE: 'scenario_step_editor_documents',
   initDB: vi.fn(async () => db),
+}));
+
+vi.mock('../assets', () => ({
+  buildPhysicalDeleteOperation: () => ({
+    assetIds: [],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'delete-1',
+    status: 'pending',
+    updatedAt: 1,
+  }),
+  completePhysicalDeleteOperation: vi.fn(async () => undefined),
+  createAssetPublicationJournal: vi.fn(async (args) => ({
+    ...args,
+    createdAt: 1,
+    journalId: 'journal-1',
+  })),
+  deleteAssetObject: vi.fn(async () => undefined),
+  discardPreparedAsset: vi.fn(async () => undefined),
+  parseAssetRef: (value: unknown) => value,
+  publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
+  recoverStandaloneAssetPublications: vi.fn(async () => 0),
+  releaseAssetReadyProtection: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
@@ -69,12 +115,22 @@ import {
   commitScenarioAggregateSnapshotMutation,
   deleteOrphanedScenarioAggregateChild,
   deleteScenarioAggregate,
+  scenarioAssetPublicationAdapter,
 } from './aggregate-mutations';
 
 function createAsset(projectId: string, id = 'asset-1') {
   const blob = new Blob(['asset'], { type: 'image/png' });
+  const assetId = `opfs-${id}`;
   return {
-    blob,
+    assetId,
+    assetRef: {
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      mimeType: 'image/png',
+      sha256: null,
+      size: blob.size,
+    },
     createdAt: 1,
     galleryAssetId: null,
     height: 10,
@@ -171,15 +227,39 @@ it('rejects stale roots, foreign puts, collisions, and foreign child deletes', a
   ).rejects.toThrow('does not belong');
 });
 
+it('surfaces failed OPFS cleanup when a pre-journal mutation is rejected', async () => {
+  const project = createScenarioProject('Aggregate');
+  await commitScenarioAggregateMutation(project);
+  const assetMocks = await import('../assets');
+  vi.mocked(assetMocks.discardPreparedAsset).mockRejectedValueOnce(
+    new Error('OPFS removal failed')
+  );
+
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [createAsset(project.id, 'stale-cleanup')] },
+      expectedRevision: 0,
+    })
+  ).rejects.toMatchObject({
+    errors: expect.arrayContaining([
+      expect.objectContaining({ name: 'StaleScenarioAggregateRevisionError' }),
+      expect.objectContaining({ message: 'Failed to discard uncommitted scenario assets.' }),
+    ]),
+  });
+});
+
 it('guards snapshot commits and orphan cleanup against concurrent owners', async () => {
   const project = createScenarioProject('Aggregate');
   const saved = await commitScenarioAggregateMutation(project);
   await expect(
     commitScenarioAggregateSnapshotMutation({
       baseProject: { ...saved.project, name: 'Wrong base' },
+      children: { assetPuts: [createAsset(project.id, 'stale')] },
       nextProject: saved.project,
     })
   ).rejects.toMatchObject({ name: 'StaleScenarioAggregateRevisionError' });
+  const assetMocks = await import('../assets');
+  expect(assetMocks.discardPreparedAsset).toHaveBeenCalledWith('opfs-stale');
   await expect(
     commitScenarioAggregateSnapshotMutation({
       baseProject: saved.project,
@@ -197,6 +277,57 @@ it('guards snapshot commits and orphan cleanup against concurrent owners', async
   await expect(
     deleteOrphanedScenarioAggregateChild({ id: owned.stepId, kind: 'editor-document' })
   ).rejects.toThrow('still belongs');
+});
+
+it('retires a superseded ready journal so later scenario mutations can proceed', async () => {
+  const project = createScenarioProject('Aggregate');
+  const initial = await commitScenarioAggregateMutation(project);
+  const assetMocks = await import('../assets');
+  vi.mocked(assetMocks.publishReadyJournalWithRetry).mockImplementationOnce(
+    async (journal, publish) => {
+      const current = getStore('scenario_projects').get(project.id) as {
+        project: typeof project;
+        workspaceRevision: number;
+      };
+      getStore('scenario_projects').set(project.id, {
+        ...current,
+        project: { ...current.project, name: 'Competing save' },
+        workspaceRevision: 2,
+      });
+      await publish(journal);
+    }
+  );
+
+  await expect(
+    commitScenarioAggregateMutation(
+      { ...initial.project, name: 'Asset save' },
+      {
+        children: { assetPuts: [createAsset(project.id, 'loser')] },
+        expectedRevision: 1,
+      }
+    )
+  ).rejects.toMatchObject({ name: 'StaleScenarioAggregateRevisionError' });
+
+  const journal = await vi.mocked(assetMocks.createAssetPublicationJournal).mock.results.at(-1)
+    ?.value;
+  expect(journal).toBeDefined();
+  getStore('asset_refs').set('opfs-loser', createAsset(project.id, 'loser').assetRef);
+  await expect(scenarioAssetPublicationAdapter.publish(journal!)).rejects.toMatchObject({
+    name: 'StaleScenarioAggregateRevisionError',
+  });
+  expect(assetMocks.deleteAssetObject).not.toHaveBeenCalledWith('opfs-loser');
+  getStore('asset_refs').delete('opfs-loser');
+  await expect(scenarioAssetPublicationAdapter.publish(journal!)).resolves.toBeUndefined();
+  expect(assetMocks.deleteAssetObject).toHaveBeenCalledWith('opfs-loser');
+  await expect(
+    commitScenarioAggregateMutation(
+      {
+        ...(getStore('scenario_projects').get(project.id) as { project: typeof project }).project,
+        name: 'Later save',
+      },
+      { expectedRevision: 2 }
+    )
+  ).resolves.toEqual(expect.objectContaining({ workspaceRevision: 3 }));
 });
 
 it('deletes the complete scenario aggregate graph', async () => {
@@ -248,6 +379,7 @@ it('keeps graph discovery and failed deletion inside one rollback-capable transa
       delete: stagedDeletes,
       get: async (id: unknown) => getStore(name).get(normalizeKey(id)),
       index: () => ({
+        count: async () => 0,
         getAll: async (projectId: string) =>
           [...getStore(name).values()].filter(
             (value) => (value as { projectId?: string }).projectId === projectId

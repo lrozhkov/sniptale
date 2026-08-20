@@ -103,15 +103,16 @@ function setupInspectionDb(screenshot: MediaLibraryEntry, webSnapshot: MediaLibr
 async function readInspectionRecord(storeName: string, key: string) {
   if (
     storeName === 'asset_refs' &&
-    ['asset-recording-1', 'asset-project-1', 'asset-export-1'].includes(key)
+    ['asset-recording-1', 'asset-project-1', 'asset-export-1', 'asset-scenario-1'].includes(key)
   ) {
     return {
       assetId: key,
       createdAt: 1,
       location: { kind: 'opfs', objectKey: `objects/${key}` },
-      mimeType: key === 'asset-project-1' ? 'image/png' : 'video/webm',
+      mimeType:
+        key === 'asset-project-1' || key === 'asset-scenario-1' ? 'image/png' : 'video/webm',
       sha256: null,
-      size: key === 'asset-project-1' ? 500 : 700,
+      size: key === 'asset-project-1' ? 500 : key === 'asset-scenario-1' ? 300 : 700,
     };
   }
   if (storeName === 'thumbnails' && key === 'scenario:scenario-1') {
@@ -214,7 +215,19 @@ function readStepDocuments(storeName: string) {
 
 async function readInspectionIndex(storeName: string) {
   if (storeName === 'scenario_assets') {
-    return [{ id: 'scenario-asset-1', projectId: 'scenario-1', size: 300 }];
+    return [
+      {
+        assetId: 'asset-scenario-1',
+        createdAt: 1,
+        galleryAssetId: null,
+        height: 10,
+        id: 'scenario-asset-1',
+        mimeType: 'image/png',
+        projectId: 'scenario-1',
+        size: 300,
+        width: 10,
+      },
+    ];
   }
   if (storeName === 'scenario_exports') {
     return [{ id: 'scenario-export-1', projectId: 'scenario-1', size: 400 }];

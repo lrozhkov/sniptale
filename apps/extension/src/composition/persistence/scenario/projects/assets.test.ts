@@ -20,6 +20,14 @@ vi.mock('../../infrastructure/indexed-db/core', async () => {
   };
 });
 
+vi.mock('../../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../assets')>()),
+  parseAssetRef: (value: unknown) => value,
+  readAssetFile: vi.fn(
+    async (_ref, filename: string) => new File(['asset'], filename, { type: 'image/png' })
+  ),
+}));
+
 import {
   deletePendingScenarioAsset,
   getPendingScenarioAsset,
@@ -42,10 +50,10 @@ beforeEach(() => {
 function createScenarioAssetRow(overrides: Record<string, unknown> = {}) {
   const blob = new Blob(['asset'], { type: 'image/png' });
   return {
+    assetId: 'opfs-asset-1',
     id: 'asset-1',
     projectId: 'project-1',
     galleryAssetId: null,
-    blob,
     mimeType: 'image/png',
     width: 100,
     height: 50,
@@ -71,23 +79,32 @@ function createPendingScenarioAssetRow(overrides: Record<string, unknown> = {}) 
 
 it('loads scenario assets through the read-only child-store seam', async () => {
   const assetBlob = new Blob(['asset'], { type: 'image/png' });
-  dbGetMock.mockResolvedValueOnce({
-    id: 'asset-1',
-    projectId: 'project-1',
-    galleryAssetId: null,
-    blob: assetBlob,
-    mimeType: 'image/png',
-    width: 100,
-    height: 50,
-    createdAt: 10,
-    size: assetBlob.size,
-  });
-  dbGetAllFromIndexMock.mockResolvedValueOnce([
-    {
+  dbGetMock
+    .mockResolvedValueOnce({
+      assetId: 'opfs-asset-1',
       id: 'asset-1',
       projectId: 'project-1',
       galleryAssetId: null,
-      blob: assetBlob,
+      mimeType: 'image/png',
+      width: 100,
+      height: 50,
+      createdAt: 10,
+      size: assetBlob.size,
+    })
+    .mockResolvedValueOnce({
+      assetId: 'opfs-asset-1',
+      createdAt: 10,
+      location: { kind: 'opfs', objectKey: 'objects/opfs-asset-1' },
+      mimeType: 'image/png',
+      sha256: null,
+      size: assetBlob.size,
+    });
+  dbGetAllFromIndexMock.mockResolvedValueOnce([
+    {
+      assetId: 'opfs-asset-1',
+      id: 'asset-1',
+      projectId: 'project-1',
+      galleryAssetId: null,
       mimeType: 'image/png',
       width: 100,
       height: 50,
@@ -105,19 +122,16 @@ it('loads scenario assets through the read-only child-store seam', async () => {
 });
 
 it('filters malformed scenario asset rows at the DB boundary', async () => {
-  const assetBlob = new Blob(['asset'], { type: 'image/png' });
-  dbGetMock.mockResolvedValueOnce(createScenarioAssetRow({ blob: { not: 'blob' } }));
+  dbGetMock.mockResolvedValueOnce(createScenarioAssetRow({ assetId: null }));
   dbGetAllFromIndexMock.mockResolvedValueOnce([
     createScenarioAssetRow(),
     createScenarioAssetRow({
       id: 'asset-svg',
-      blob: new Blob(['<svg></svg>'], { type: 'image/svg+xml' }),
       mimeType: 'image/svg+xml',
       size: 11,
     }),
     createScenarioAssetRow({
       id: 'asset-2',
-      blob: assetBlob,
       width: Number.POSITIVE_INFINITY,
     }),
   ]);

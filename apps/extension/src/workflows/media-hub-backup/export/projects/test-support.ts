@@ -127,14 +127,17 @@ export async function readProjectBundleRecord(storeName: string, key: string) {
       size: 5,
     };
   }
-  if (storeName === 'asset_refs' && (key === 'asset-project-1' || key === 'asset-export-1')) {
+  if (
+    storeName === 'asset_refs' &&
+    (key === 'asset-project-1' || key === 'asset-export-1' || key === 'opfs-scenario-asset-1')
+  ) {
     return {
       assetId: key,
       createdAt: 2,
       location: { kind: 'opfs', objectKey: `objects/${key}` },
-      mimeType: key === 'asset-project-1' ? 'image/png' : 'video/webm',
+      mimeType: key === 'asset-export-1' ? 'video/webm' : 'image/png',
       sha256: null,
-      size: key === 'asset-project-1' ? 5 : 9,
+      size: key === 'asset-export-1' ? 9 : key === 'opfs-scenario-asset-1' ? 14 : 5,
     };
   }
   return undefined;
@@ -199,10 +202,10 @@ export function createScenarioAssetRecord(
   const mimeType = args.mimeType ?? 'image/png';
   const blob = new Blob(['scenario-asset'], { type: mimeType });
   return {
+    assetId: 'opfs-scenario-asset-1',
     id: args.id ?? 'scenario-asset-1',
     projectId: args.projectId ?? 'scenario-1',
     galleryAssetId: null,
-    blob,
     mimeType,
     width: 10,
     height: 10,

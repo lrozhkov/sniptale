@@ -26,6 +26,7 @@ import {
   PROJECT_EXPORT_PUBLICATION_DOMAIN,
 } from '../../../../composition/persistence/projects/asset-publication';
 import type { PreparedRestoreRecordingAsset } from '../prepare';
+import { SCENARIO_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/scenario/aggregate-mutations';
 
 function collectProjectBlobDescriptors(
   prepared: PreparedProjectDomains
@@ -115,6 +116,27 @@ export async function stagePreparedProjectAssets(
     }
     project.restoredProjectAssets = projectAssets;
     project.restoredProjectExportAssets = projectExportAssets;
+  }
+  for (const project of prepared.scenarioProjects) {
+    if (!operationId && project.descriptor.assets.length > 0) {
+      throw new Error('Restore operation ID is missing for scenario assets.');
+    }
+    const scenarioAssets = new Map<string, PreparedRestoreRecordingAsset>();
+    for (const descriptor of project.descriptor.assets) {
+      const blob = readRestoredBlob(prepared.restoredBlobs, descriptor.blobPath);
+      const entry = descriptor.entry as Record<string, unknown>;
+      const mimeType = typeof entry['mimeType'] === 'string' ? entry['mimeType'] : blob.type;
+      await assertAssetWriteAdmission(blob.size);
+      const asset = await writeBlobToAsset(blob, { mimeType });
+      const journal = await createAssetPublicationJournal({
+        assetRefs: [asset.ref],
+        domain: SCENARIO_ASSET_PUBLICATION_DOMAIN,
+        operationId: operationId!,
+        payload: { restore: true, scenarioAssetId: entry['id'] },
+      }).catch((error: unknown) => discardCurrentStagedAsset(asset.ref.assetId, error));
+      scenarioAssets.set(descriptor.blobPath, { asset, journalId: journal.journalId });
+    }
+    project.restoredScenarioAssets = scenarioAssets;
   }
 }
 
@@ -234,7 +256,7 @@ function assertPreparedProjectAssetBlobSafe(
   assertSafeProjectAssetStorageInput(blob, descriptor.entry.mimeType);
 }
 
-function assertPreparedScenarioAssetBlobSafe(
+export function assertPreparedScenarioAssetBlobSafe(
   descriptor: BackupBlobDescriptor,
   restoredBlobs: ReadonlyMap<string, Blob>
 ): void {
@@ -250,7 +272,7 @@ function assertPreparedScenarioAssetBlobSafe(
   }
 
   assertSafeScenarioAssetStorageInput(blob, mimeType);
-  if (!parseScenarioAssetEntry({ ...entry, blob })) {
+  if (!parseScenarioAssetEntry({ ...entry, assetId: 'preflight-asset' })) {
     throw new Error('Invalid scenario asset backup entry.');
   }
 }

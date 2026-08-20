@@ -20,7 +20,11 @@ import {
   readString,
   readStringArray,
 } from './readers';
-import type { MediaHubBackupAssetDescriptor, MediaHubBackupMetadata } from '../contracts/types';
+import type {
+  MediaHubBackupAssetDescriptor,
+  MediaHubBackupMetadata,
+  ScenarioBackupProjectDescriptor,
+} from '../contracts/types';
 import { normalizeEffectBundleDescriptor } from './effect-bundles';
 import { tryNormalizeAggregatePresentation } from './presentation';
 import { parseImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/parser';
@@ -160,16 +164,15 @@ export function parseBackupMetadata(value: unknown): MediaHubBackupMetadata {
   if (new Set(effectBundles.map(({ entry }) => entry.packId)).size !== effectBundles.length) {
     failMetadata();
   }
+  const scenarioProjects =
+    field(metadata, 'scenarioProjects') === undefined
+      ? undefined
+      : readRecordArray(field(metadata, 'scenarioProjects')).map(normalizeScenarioProject);
+  if (scenarioProjects) assertUniqueScenarioProjectGraph(scenarioProjects);
   return {
     assets: readRecordArray(field(metadata, 'assets')).map(normalizeAssetDescriptor),
     effectBundles,
-    ...(field(metadata, 'scenarioProjects') === undefined
-      ? {}
-      : {
-          scenarioProjects: readRecordArray(field(metadata, 'scenarioProjects')).map(
-            normalizeScenarioProject
-          ),
-        }),
+    ...(scenarioProjects ? { scenarioProjects } : {}),
     ...(field(metadata, 'videoProjects') === undefined
       ? {}
       : {
@@ -178,4 +181,33 @@ export function parseBackupMetadata(value: unknown): MediaHubBackupMetadata {
           ),
         }),
   };
+}
+
+function assertUniqueScenarioProjectGraph(
+  projects: readonly ScenarioBackupProjectDescriptor[]
+): void {
+  const projectIds = new Set<string>();
+  const assetIds = new Set<string>();
+  const exportIds = new Set<string>();
+  const stepIds = new Set<string>();
+  const blobPaths = new Set<string>();
+  const addUnique = (values: Set<string>, value: string) => {
+    if (values.has(value)) failMetadata();
+    values.add(value);
+  };
+
+  for (const project of projects) {
+    addUnique(projectIds, project.entry.id);
+    for (const asset of project.assets) {
+      if (!('id' in asset.entry) || typeof asset.entry.id !== 'string') failMetadata();
+      addUnique(assetIds, asset.entry.id);
+      addUnique(blobPaths, asset.blobPath);
+    }
+    for (const scenarioExport of project.exports) addUnique(exportIds, scenarioExport.id);
+    for (const document of project.stepDocuments) addUnique(stepIds, document.stepId);
+    if (project.thumbnail) addUnique(blobPaths, project.thumbnail.blobPath);
+    for (const thumbnail of project.exportThumbnails ?? []) {
+      addUnique(blobPaths, thumbnail.blobPath);
+    }
+  }
 }

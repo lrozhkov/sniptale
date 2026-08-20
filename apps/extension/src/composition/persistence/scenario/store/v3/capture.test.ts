@@ -5,11 +5,19 @@ const {
   dataUrlToBlobMock,
   getScenarioProjectRecordV3Mock,
   measureImageBlobMock,
+  writeBlobToAssetMock,
 } = vi.hoisted(() => ({
   commitScenarioAggregateMutationMock: vi.fn(),
   dataUrlToBlobMock: vi.fn(),
   getScenarioProjectRecordV3Mock: vi.fn(),
   measureImageBlobMock: vi.fn(),
+  writeBlobToAssetMock: vi.fn(),
+}));
+
+vi.mock('../../../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../assets')>()),
+  assertAssetWriteAdmission: vi.fn(async () => undefined),
+  writeBlobToAsset: writeBlobToAssetMock,
 }));
 
 vi.mock('../../../../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -43,6 +51,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   dataUrlToBlobMock.mockResolvedValue(new Blob(['pixel'], { type: 'image/png' }));
   measureImageBlobMock.mockResolvedValue({ height: 900, width: 1440 });
+  writeBlobToAssetMock.mockResolvedValue({
+    ref: {
+      assetId: 'opfs-capture-1',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/opfs-capture-1' },
+      mimeType: 'image/png',
+      sha256: null,
+      size: 5,
+    },
+  });
   commitScenarioAggregateMutationMock.mockImplementation(async (project) => ({
     project,
     workspaceRevision: 1,

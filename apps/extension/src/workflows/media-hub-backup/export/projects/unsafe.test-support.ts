@@ -11,7 +11,18 @@ export function createUnsafeScenarioProjectBundleDb(args: {
 }) {
   const projectId = args.projectId ?? 'scenario-1';
   return {
-    get: vi.fn(async () => undefined),
+    get: vi.fn(async (storeName: string) =>
+      storeName === 'asset_refs'
+        ? {
+            assetId: 'opfs-scenario-asset-1',
+            createdAt: 1,
+            location: { kind: 'opfs', objectKey: 'objects/opfs-scenario-asset-1' },
+            mimeType: args.assetMimeType ?? 'image/png',
+            sha256: null,
+            size: 14,
+          }
+        : undefined
+    ),
     getAll: vi.fn(async (storeName: string) =>
       storeName === 'scenario_projects' ? [createScenarioProjectEntry(projectId)] : []
     ),
@@ -42,10 +53,10 @@ function createScenarioAssetRecord(
   const mimeType = args.assetMimeType ?? 'image/png';
   const blob = new Blob(['scenario-asset'], { type: mimeType });
   return {
+    assetId: 'opfs-scenario-asset-1',
     id: args.assetId ?? 'scenario-asset-1',
     projectId,
     galleryAssetId: null,
-    blob,
     mimeType,
     width: 10,
     height: 10,

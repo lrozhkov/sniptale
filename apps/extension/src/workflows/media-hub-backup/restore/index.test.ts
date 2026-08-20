@@ -7,6 +7,7 @@ const {
   assertBackupImportAssetEntriesAvailableMock,
   deleteExistingAssetRecordMock,
   getImportTransactionStoreNamesMock,
+  getBackupStoreMock,
   initDBMock,
   assertBackupImportWritePreflightCompleteMock,
   loadBackupImportAssetBatchMock,
@@ -24,10 +25,14 @@ const {
   createBackupRestoreOperationMock,
   transitionAssetOperationMock,
   recoverAssetPublicationsMock,
+  deleteAssetObjectMock,
+  deleteReadyJournalMock,
+  releaseAssetReadyProtectionMock,
 } = vi.hoisted(() => ({
   assertBackupImportAssetEntriesAvailableMock: vi.fn(),
   deleteExistingAssetRecordMock: vi.fn(),
   getImportTransactionStoreNamesMock: vi.fn(),
+  getBackupStoreMock: vi.fn(),
   initDBMock: vi.fn(),
   assertBackupImportWritePreflightCompleteMock: vi.fn(),
   loadBackupImportAssetBatchMock: vi.fn(),
@@ -45,12 +50,27 @@ const {
   createBackupRestoreOperationMock: vi.fn(),
   transitionAssetOperationMock: vi.fn(),
   recoverAssetPublicationsMock: vi.fn(),
+  deleteAssetObjectMock: vi.fn(),
+  deleteReadyJournalMock: vi.fn(),
+  releaseAssetReadyProtectionMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/assets')>()),
+  deleteAssetObject: deleteAssetObjectMock,
+  deleteReadyJournal: deleteReadyJournalMock,
+  releaseAssetReadyProtection: releaseAssetReadyProtectionMock,
 }));
 
 vi.mock('../../../composition/persistence/assets/operations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/assets/operations')>()),
   createBackupRestoreOperation: createBackupRestoreOperationMock,
   transitionAssetOperation: transitionAssetOperationMock,
+}));
+
+vi.mock('../storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../storage')>()),
+  getStore: getBackupStoreMock,
 }));
 
 vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
@@ -109,6 +129,7 @@ vi.mock('./project/prepare', async (importOriginal) => ({
 
 vi.mock('./project/preflight', () => ({
   assertPreparedProjectBlobsAvailable: assertPreparedProjectBlobsAvailableMock,
+  assertPreparedScenarioAssetBlobSafe: vi.fn(),
   stagePreparedProjectAssets: stagePreparedProjectAssetsMock,
 }));
 
@@ -190,6 +211,8 @@ beforeEach(() => {
   });
   transitionAssetOperationMock.mockResolvedValue(undefined);
   recoverAssetPublicationsMock.mockResolvedValue(0);
+  deleteAssetObjectMock.mockResolvedValue(undefined);
+  deleteReadyJournalMock.mockResolvedValue(undefined);
   prepareProjectDomainsMock.mockResolvedValue({
     changedIds: [],
     conflictsResolved: 0,
@@ -209,6 +232,18 @@ beforeEach(() => {
   );
   restorePreparedProjectDomainsInTransactionMock.mockResolvedValue(0);
   snapshotExistingAssetRecordMock.mockResolvedValue({ mediaLibraryEntry: { id: 'existing' } });
+  getBackupStoreMock.mockReturnValue({
+    get: vi.fn().mockResolvedValue({
+      compensations: [],
+      createdAt: 1,
+      kind: 'backup-restore',
+      obsoleteAssetIds: [],
+      operationId: 'restore-1',
+      status: 'pending',
+      updatedAt: 1,
+    }),
+    put: vi.fn(),
+  });
 });
 
 describe('media hub backup restore skip orchestration', () => {
@@ -240,6 +275,53 @@ describe('media hub backup restore skip orchestration', () => {
 });
 
 describe('media hub backup restore project-domain orchestration', () => {
+  it('commits a standalone durable recording under its restore operation', async () => {
+    const { importMediaHubBackupAssets } = await import('.');
+    createTransactionHarness();
+    const entry = createMediaEntry(
+      { kind: 'recording', recordingId: 'recording-1' },
+      { id: 'recording-1', kind: 'recording', mimeType: 'video/webm' }
+    );
+    prepareBackupImportAssetMock.mockResolvedValue({
+      prepared: {
+        assetPath: 'recordings/recording-1',
+        existingEntry: null,
+        nextEntry: entry,
+        preparedAssetPublication: {
+          asset: {
+            ref: {
+              assetId: 'opfs-recording-1',
+              createdAt: 1,
+              location: { kind: 'opfs', objectKey: 'objects/opfs-recording-1' },
+              mimeType: 'video/webm',
+              sha256: null,
+              size: 5,
+            },
+          },
+          journalId: 'recording-journal',
+        },
+        recordingTelemetry: null,
+        thumbnailPath: null,
+        webSnapshotPackage: null,
+      },
+      resolvedConflict: false,
+    });
+
+    await expect(
+      importMediaHubBackupAssets({
+        metadata: createMetadata(entry),
+        remapEntryForDuplicate: vi.fn(),
+        strategy: 'replace',
+        zip: {} as JSZip,
+      })
+    ).resolves.toEqual({ conflictsResolved: 0, imported: 1, skipped: 0 });
+
+    expect(createBackupRestoreOperationMock).toHaveBeenCalledOnce();
+    expect(transitionAssetOperationMock).toHaveBeenCalledWith('restore-1', 'pending', 'committed');
+    expect(deleteReadyJournalMock).toHaveBeenCalledWith('recording-journal');
+    expect(releaseAssetReadyProtectionMock).toHaveBeenCalledWith(['opfs-recording-1']);
+  });
+
   it('adds prepared v2 project bundle counters to the import result and change event', async () => {
     let transitionActive = false;
     runWithPersistenceMutationTransitionMock.mockImplementation(
@@ -257,7 +339,32 @@ describe('media hub backup restore project-domain orchestration', () => {
     const preparedProjectDomains = {
       changedIds: ['video-project:project-copy'],
       conflictsResolved: 1,
-      scenarioProjects: [],
+      scenarioProjects: [
+        {
+          descriptor: { assets: [{}] },
+          restoredScenarioAssets: new Map([
+            [
+              'scenario-asset',
+              {
+                asset: {
+                  ref: {
+                    assetId: 'opfs-scenario-asset',
+                    createdAt: 1,
+                    location: { kind: 'opfs', objectKey: 'objects/opfs-scenario-asset' },
+                    mimeType: 'image/png',
+                    sha256: null,
+                    size: 5,
+                  },
+                },
+                journalId: 'scenario-journal',
+              },
+            ],
+          ]),
+        },
+        {
+          descriptor: { assets: [] },
+        },
+      ],
       skipped: 0,
       videoProjects: [
         {
@@ -291,12 +398,17 @@ describe('media hub backup restore project-domain orchestration', () => {
     });
 
     expect(restorePreparedProjectDomainsInTransactionMock).toHaveBeenCalledWith({
+      operationId: 'restore-1',
       prepared: preparedProjectDomains,
     });
+    expect(createBackupRestoreOperationMock).toHaveBeenCalledOnce();
     expect(runWithPersistenceMutationTransitionMock).toHaveBeenCalledOnce();
     expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('import', [
       'video-project:project-copy',
     ]);
+    expect(deleteReadyJournalMock).toHaveBeenCalledWith('scenario-journal');
+    expect(releaseAssetReadyProtectionMock).toHaveBeenCalledWith(['opfs-scenario-asset']);
+    expect(deleteAssetObjectMock).not.toHaveBeenCalledWith('opfs-scenario-asset');
   });
 
   it('aborts before recovery when project-export staging fails', async () => {

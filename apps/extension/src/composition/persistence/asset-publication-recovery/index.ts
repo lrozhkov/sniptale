@@ -31,6 +31,7 @@ import {
   projectAssetPublicationAdapter,
   projectExportPublicationAdapter,
 } from '../projects/asset-publication';
+import { scenarioAssetPublicationAdapter } from '../scenario/aggregate-mutations';
 
 async function restorePreviousRecord(
   store: { put(value: unknown): Promise<unknown> },
@@ -193,5 +194,6 @@ export async function recoverAssetPublications(): Promise<number> {
     recordingAssetPublicationAdapter,
     projectAssetPublicationAdapter,
     projectExportPublicationAdapter,
+    scenarioAssetPublicationAdapter,
   ]);
 }

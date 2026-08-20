@@ -30,6 +30,7 @@ vi.mock(
   '../../../../composition/persistence/infrastructure/indexed-db/core',
   async (importOriginal) => ({
     ...(await importOriginal<typeof import('jszip')>()),
+    ASSET_REFS_STORE: 'asset_refs',
     PROJECT_ASSETS_STORE: 'project_assets',
     PROJECT_EXPORTS_STORE: 'project_exports',
     RECORDING_TELEMETRY_STORE: 'recording_telemetry',
@@ -43,6 +44,14 @@ vi.mock(
     initDB: initDBMock,
   })
 );
+
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  readAssetFile: vi.fn(
+    async (ref: { mimeType: string; size: number }) =>
+      new File([new Uint8Array(ref.size)], 'scenario-asset', { type: ref.mimeType })
+  ),
+}));
 
 vi.mock('../../../../composition/persistence/media-library/index', async (importOriginal) => ({
   ...(await importOriginal<

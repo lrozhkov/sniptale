@@ -184,8 +184,8 @@ function createEditorDocument(): EditorDocument {
 }
 
 function createScenarioAssetEntry(
-  overrides: Partial<Omit<ScenarioAssetEntry, 'blob'>> = {}
-): Omit<ScenarioAssetEntry, 'blob'> {
+  overrides: Partial<Omit<ScenarioAssetEntry, 'assetId'>> = {}
+): Omit<ScenarioAssetEntry, 'assetId'> {
   return {
     createdAt: 1,
     galleryAssetId: null,

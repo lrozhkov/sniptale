@@ -39,7 +39,7 @@ function createPendingAssets(now: number) {
 
 function createScenarioAsset() {
   return {
-    blob: new Blob(['asset']),
+    assetId: 'opfs-scenario-asset-1',
     createdAt: 2,
     galleryAssetId: null,
     height: 1,

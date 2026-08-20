@@ -1,5 +1,5 @@
 import { getScenarioAsset } from '../../../composition/persistence/scenario/projects';
-import type { ScenarioAssetEntry } from '../../../composition/persistence/scenario/contracts';
+import type { HydratedScenarioAssetEntry } from '../../../composition/persistence/scenario/contracts';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { getScenarioProjectRecordV3 } from '../../../composition/persistence/scenario/store/v3';
 import type {
@@ -27,12 +27,11 @@ function getSlideTitle(slide: ScenarioSlide): string {
   return slide.title || slide.notes || slide.id;
 }
 
-function resolveScenarioAssetPreviewBlob(asset: ScenarioAssetEntry): Blob {
-  if (asset.blob.type || !asset.mimeType) {
-    return asset.blob;
+function resolveScenarioAssetPreviewBlob(asset: HydratedScenarioAssetEntry): Blob {
+  if (asset.file.type || !asset.mimeType) {
+    return asset.file;
   }
-
-  return new Blob([asset.blob], { type: asset.mimeType });
+  return new Blob([asset.file], { type: asset.mimeType });
 }
 
 async function buildRecentScenarioStepFromSlide(args: {

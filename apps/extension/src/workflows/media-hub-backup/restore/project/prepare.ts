@@ -55,6 +55,8 @@ export interface PreparedScenarioProject {
   scenarioExportIdMap: ReadonlyMap<string, string>;
   stepIdMap: ReadonlyMap<string, string>;
   restoredPresentation?: AggregatePresentationEntry;
+  restoredScenarioAssets?: ReadonlyMap<string, PreparedRestoreRecordingAsset>;
+  obsoleteScenarioAssetIds?: string[];
 }
 
 interface PreparedProjectSet<T> {

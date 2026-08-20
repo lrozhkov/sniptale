@@ -1,6 +1,4 @@
-import { parseScenarioAssetEntry } from '../../../../composition/persistence/scenario/read-guards';
 import { assertSafeProjectAssetStorageInput } from '../../../../features/media-hub/project-assets';
-import { assertSafeScenarioAssetStorageInput } from '../../../../composition/persistence/scenario/projects/guards';
 import { getStore } from '../../storage';
 import type { BackupBlobDescriptor, ProjectAssetBackupBlobDescriptor } from '../../contracts/types';
 
@@ -46,21 +44,4 @@ export async function restoreProjectAssetBlobDescriptor(
 
   assertSafeProjectAssetStorageInput(args.blob, mimeType);
   await getStore(args.tx, args.storeName).put(entry);
-}
-
-export async function restoreScenarioAssetBlobDescriptor(args: BlobRestoreArgs): Promise<void> {
-  const entry = prepareBlobEntry(args);
-  const mimeType = readRequiredMimeType(entry, 'Scenario asset backup entry MIME type is missing.');
-  const size = entry['size'];
-  if (typeof size !== 'number' || size !== args.blob.size) {
-    throw new Error('Scenario asset backup entry size does not match blob.');
-  }
-
-  assertSafeScenarioAssetStorageInput(args.blob, mimeType);
-  const parsedEntry = parseScenarioAssetEntry(entry);
-  if (!parsedEntry) {
-    throw new Error('Invalid scenario asset backup entry.');
-  }
-
-  await getStore(args.tx, args.storeName).put(parsedEntry);
 }

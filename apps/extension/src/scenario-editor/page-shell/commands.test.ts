@@ -8,7 +8,8 @@ import { insertImageFileIntoSelectedSlide } from './image-import';
 import type { ScenarioV3EditorSession } from './types';
 
 const imageImportMocks = vi.hoisted(() => ({
-  prepareScenarioV3ImageAsset: vi.fn(),
+  stageScenarioV3ImageAsset: vi.fn(),
+  discardPreparedScenarioAsset: vi.fn(),
   createScenarioAssetEntryFromBlob: vi.fn(),
   deleteScenarioAsset: vi.fn(),
   readScenarioEditorFileAsDataUrl: vi.fn(),
@@ -21,7 +22,8 @@ vi.mock('./file-reader', () => ({
 
 vi.mock('../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/scenario/store/v3')>()),
-  prepareScenarioV3ImageAsset: imageImportMocks.prepareScenarioV3ImageAsset,
+  stageScenarioV3ImageAsset: imageImportMocks.stageScenarioV3ImageAsset,
+  discardPreparedScenarioAsset: imageImportMocks.discardPreparedScenarioAsset,
 }));
 
 vi.mock(
@@ -43,7 +45,7 @@ vi.mock('../../composition/persistence/scenario/projects', async (importOriginal
 beforeEach(() => {
   vi.clearAllMocks();
   imageImportMocks.readScenarioEditorFileAsDataUrl.mockResolvedValue('data:image/png;base64,aW1n');
-  imageImportMocks.prepareScenarioV3ImageAsset.mockResolvedValue({
+  imageImportMocks.stageScenarioV3ImageAsset.mockResolvedValue({
     asset: {
       createdAt: 10,
       galleryAssetId: null,
@@ -161,7 +163,7 @@ it('imports image files as persisted image layers on the selected slide', async 
 
   const inserted = harness.getSession().project.slides[1]?.elements.at(-1);
   expect(imageImportMocks.readScenarioEditorFileAsDataUrl).toHaveBeenCalledWith(file);
-  expect(imageImportMocks.prepareScenarioV3ImageAsset).toHaveBeenCalledWith({
+  expect(imageImportMocks.stageScenarioV3ImageAsset).toHaveBeenCalledWith({
     dataUrl: 'data:image/png;base64,aW1n',
     projectId: 'project-1',
   });
@@ -197,18 +199,49 @@ it('rolls back imported image assets when the project changes before insertion',
   );
   const file = new File(['image'], 'Stale.png', { type: 'image/png' });
 
-  imageImportMocks.prepareScenarioV3ImageAsset.mockImplementationOnce(async () => {
+  imageImportMocks.stageScenarioV3ImageAsset.mockImplementationOnce(async () => {
     harness.setSession((session) => ({
       ...session,
       project: { ...session.project, id: 'project-2' },
     }));
-    return { asset: { id: 'asset-imported' }, entry: { id: 'asset-imported' } };
+    return {
+      asset: { id: 'asset-imported' },
+      entry: { assetId: 'opfs-asset-imported', id: 'asset-imported' },
+    };
   });
   await elements.insertImageFile(file);
 
   expect(commit).not.toHaveBeenCalled();
+  expect(imageImportMocks.discardPreparedScenarioAsset).toHaveBeenCalledWith(
+    expect.objectContaining({ assetId: 'opfs-asset-imported' })
+  );
   expect(harness.getSession().project.slides[1]?.elements).toHaveLength(1);
   expect(harness.getSession().selectedElementId).toBeNull();
+});
+
+it('discards a staged image when the aggregate mutation owner is unavailable', async () => {
+  const project = createCommandsTwoSlideProject();
+  const preparedEntry = { assetId: 'opfs-asset-imported', id: 'asset-imported' };
+  imageImportMocks.stageScenarioV3ImageAsset.mockResolvedValueOnce({
+    asset: { height: 10, id: 'asset-imported', width: 10 },
+    entry: preparedEntry,
+  });
+
+  await expect(
+    insertImageFileIntoSelectedSlide({
+      file: new File(['image'], 'Missing owner.png', { type: 'image/png' }),
+      getSession: () => ({
+        history: { future: [], past: [] },
+        project,
+        selectedElementId: null,
+        selectedSlideId: 'slide-2',
+      }),
+      projectId: project.id,
+      setSession: vi.fn(),
+      commitAggregateMutation: null,
+    })
+  ).rejects.toThrow('mutation owner is unavailable');
+  expect(imageImportMocks.discardPreparedScenarioAsset).toHaveBeenCalledWith(preparedEntry);
 });
 
 it('rolls back imported image assets when project mutation throws', async () => {

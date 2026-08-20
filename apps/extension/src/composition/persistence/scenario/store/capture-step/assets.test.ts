@@ -29,10 +29,18 @@ beforeEach(() => {
   vi.clearAllMocks();
   createScenarioAssetEntryMock.mockResolvedValue({
     assetEntry: {
+      assetId: 'opfs-asset-1',
+      assetRef: {
+        assetId: 'opfs-asset-1',
+        createdAt: 123,
+        location: { kind: 'opfs', objectKey: 'objects/opfs-asset-1' },
+        mimeType: 'image/png',
+        sha256: null,
+        size: 5,
+      },
       id: 'asset-1',
       projectId: 'project-1',
       galleryAssetId: null,
-      blob: new Blob(['pixel'], { type: 'image/png' }),
       mimeType: 'image/png',
       width: 1440,
       height: 900,
@@ -43,10 +51,18 @@ beforeEach(() => {
   });
   createScenarioAssetEntryFromBlobMock.mockResolvedValue({
     assetEntry: {
+      assetId: 'opfs-asset-blob-1',
+      assetRef: {
+        assetId: 'opfs-asset-blob-1',
+        createdAt: 456,
+        location: { kind: 'opfs', objectKey: 'objects/opfs-asset-blob-1' },
+        mimeType: 'image/webp',
+        sha256: null,
+        size: 5,
+      },
       id: 'asset-blob-1',
       projectId: 'project-1',
       galleryAssetId: 'gallery-1',
-      blob: new Blob(['pixel'], { type: 'image/webp' }),
       mimeType: 'image/webp',
       width: 1280,
       height: 720,
@@ -78,10 +94,18 @@ async function verifyAssetEntryDelegation() {
 async function verifyPersistenceDelegation() {
   const args: Parameters<typeof persistScenarioCaptureArtifacts>[0] = {
     assetEntry: {
+      assetId: 'opfs-asset-1',
+      assetRef: {
+        assetId: 'opfs-asset-1',
+        createdAt: 123,
+        location: { kind: 'opfs', objectKey: 'objects/opfs-asset-1' },
+        mimeType: 'image/png',
+        sha256: null,
+        size: 5,
+      },
       id: 'asset-1',
       projectId: 'project-1',
       galleryAssetId: null,
-      blob: new Blob(['pixel'], { type: 'image/png' }),
       mimeType: 'image/png',
       width: 1440,
       height: 900,

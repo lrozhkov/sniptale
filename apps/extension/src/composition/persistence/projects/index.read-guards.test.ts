@@ -300,7 +300,7 @@ it('parses scenario project and asset rows directly', async () => {
   } = await import('../scenario/read-guards');
   const blob = new Blob(['scenario'], { type: 'image/png' });
   const asset = {
-    blob,
+    assetId: 'opfs-scenario-asset-1',
     createdAt: 1,
     galleryAssetId: null,
     height: 20,
@@ -320,9 +320,19 @@ it('parses scenario project and asset rows directly', async () => {
   });
   expect(parseScenarioProjectEntry({ ...entry, project: { id: project.id } })).toBeNull();
   expect(parseScenarioAssetEntry(asset)).toEqual(asset);
-  expect(parseScenarioAssetEntry({ ...asset, blob: {} })).toBeNull();
-  expect(parsePendingScenarioAssetEntry({ ...asset, height: undefined, tabId: 7 })).toBeTruthy();
-  expect(parsePendingScenarioAssetEntry({ ...asset, tabId: -1 })).toBeNull();
+  expect(parseScenarioAssetEntry({ ...asset, assetId: null })).toBeNull();
+  expect(
+    parsePendingScenarioAssetEntry({
+      ...asset,
+      assetId: undefined,
+      blob,
+      height: undefined,
+      tabId: 7,
+    })
+  ).toBeTruthy();
+  expect(
+    parsePendingScenarioAssetEntry({ ...asset, assetId: undefined, blob, tabId: -1 })
+  ).toBeNull();
   expect(
     parseScenarioExportEntry({
       createdAt: 1,

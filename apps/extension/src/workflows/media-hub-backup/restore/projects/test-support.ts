@@ -142,6 +142,11 @@ function createPreparedScenarioProject(): PreparedProjectDomains['scenarioProjec
     projectId: 'scenario-copy',
     idChanged: true,
     scenarioAssetIdMap: new Map([['scenario-asset-1', 'scenario-asset-copy']]),
+    restoredScenarioAssets: createRestoredAsset(
+      'scenario-asset',
+      'asset-restored-scenario',
+      'image/png'
+    ),
     scenarioExportIdMap: new Map([['scenario-export-1', 'scenario-export-copy']]),
     stepIdMap: new Map([['step-1', 'step-copy']]),
   };
@@ -177,7 +182,7 @@ function createPreparedVideoProject(): PreparedProjectDomains['videoProjects'][n
   };
 }
 
-function createRestoredAsset(path: string, assetId: string) {
+function createRestoredAsset(path: string, assetId: string, mimeType = 'video/webm') {
   return new Map([
     [
       path,
@@ -187,7 +192,7 @@ function createRestoredAsset(path: string, assetId: string) {
             assetId,
             createdAt: 1,
             location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
-            mimeType: 'video/webm',
+            mimeType,
             sha256: null,
             size: 9,
           },

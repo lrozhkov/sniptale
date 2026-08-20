@@ -19,7 +19,7 @@ export async function loadBlobForSource(source: BlobAssetSource): Promise<Blob> 
     if (!scenarioAsset) {
       throw new Error(`Scenario asset ${source.scenarioAssetId} not found.`);
     }
-    return scenarioAsset.blob;
+    return scenarioAsset.file;
   }
 
   const projectAsset = await getProjectAsset(source.projectAssetId);

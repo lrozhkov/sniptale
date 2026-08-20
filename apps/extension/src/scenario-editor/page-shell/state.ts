@@ -21,7 +21,10 @@ import {
 } from './project-echo';
 import type { ScenarioV3EditorShellProps } from './types';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import { commitScenarioAggregateSnapshotMutation } from '../../composition/persistence/scenario/aggregate-mutations';
+import {
+  commitScenarioAggregateSnapshotMutation,
+  discardScenarioAggregateAssetPuts,
+} from '../../composition/persistence/scenario/aggregate-mutations';
 import type { CommitScenarioV3AggregateMutation } from './types';
 
 export function useScenarioV3EditorState(props: ScenarioV3EditorShellProps) {
@@ -43,7 +46,10 @@ export function useScenarioV3EditorState(props: ScenarioV3EditorShellProps) {
   ) => {
     const baseSession = sessionRef.current;
     const nextSession = mutateSession(baseSession);
-    if (Object.is(nextSession, baseSession)) return;
+    if (Object.is(nextSession, baseSession)) {
+      await discardScenarioAggregateAssetPuts(children);
+      return;
+    }
     const result = await commitScenarioAggregateSnapshotMutation({
       baseProject: baseSession.project,
       children,

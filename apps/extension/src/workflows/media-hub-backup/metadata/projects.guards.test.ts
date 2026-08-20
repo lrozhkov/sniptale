@@ -54,7 +54,51 @@ describe('media hub backup scenario asset metadata guards', () => {
       })
     ).toThrow('shared.mediaHub.backupMetadataCorrupted');
   });
+
+  it.each([
+    [
+      'ID',
+      [
+        createScenarioAssetDescriptor('asset-1', 'asset-1'),
+        createScenarioAssetDescriptor('asset-1', 'asset-2'),
+      ],
+    ],
+    [
+      'path',
+      [
+        createScenarioAssetDescriptor('asset-1', 'shared'),
+        createScenarioAssetDescriptor('asset-2', 'shared'),
+      ],
+    ],
+  ])('rejects duplicate scenario asset %s values before restore staging', async (kind, assets) => {
+    const { normalizeScenarioProject } = await import('./projects');
+
+    expect(() =>
+      normalizeScenarioProject({
+        assets,
+        entry: createScenarioProjectEntry('scenario-1'),
+        exports: [],
+        stepDocuments: [],
+      })
+    ).toThrow(`Duplicate scenario asset ${kind} in backup metadata.`);
+  });
 });
+
+function createScenarioAssetDescriptor(id: string, pathSuffix: string) {
+  return {
+    blobPath: `scenario-projects/scenario-1/assets/${pathSuffix}`,
+    entry: {
+      createdAt: 1,
+      galleryAssetId: null,
+      height: 10,
+      id,
+      mimeType: 'image/png',
+      projectId: 'scenario-1',
+      size: 20,
+      width: 10,
+    },
+  };
+}
 
 describe('media hub backup scenario project metadata malformed input guards', () => {
   it('rejects malformed nested scenario project entries through canonical parsers', async () => {

@@ -5,6 +5,7 @@ import {
   SCENARIO_PROJECTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   THUMBNAILS_STORE,
+  ASSET_REFS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
 import type {
@@ -32,6 +33,7 @@ import type {
   ScenarioBackupProjectDescriptor,
 } from '../../contracts/types';
 import { appendAggregatePresentation } from '../presentation';
+import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 
 type ExportDatabase = Awaited<ReturnType<typeof initDB>>;
 
@@ -82,15 +84,16 @@ async function buildScenarioProjectDescriptor(
   assertBackupExportNotCancelled(signal);
 
   return normalizeScenarioProject({
-    assets: assets.map((asset) =>
-      createBackupBlobDescriptor(
+    assets: assets.map((asset) => {
+      const { assetId: _localAssetId, ...portableAsset } = asset;
+      return createBackupBlobDescriptor(
         zip,
         budget,
         `scenario-projects/${projectSegment}/assets/${safeBackupPathSegment(asset.id, 'scenario asset id')}`,
-        asset,
+        portableAsset,
         signal
-      )
-    ),
+      );
+    }),
     entry: applyScenarioProjectPrivacyOptions(entry, options),
     exports,
     stepDocuments: buildScenarioStepDocuments(stepDocuments, options),
@@ -115,9 +118,15 @@ async function loadScenarioProjectBundle(
 ) {
   assertBackupExportNotCancelled(signal);
   const rawAssets = await db.getAllFromIndex(SCENARIO_ASSETS_STORE, 'projectId', projectId);
-  const assets = parseDbEntries(rawAssets, parseScenarioAssetEntry);
-  if (assets.length !== rawAssets.length) {
+  const storedAssets = parseDbEntries(rawAssets, parseScenarioAssetEntry);
+  if (storedAssets.length !== rawAssets.length) {
     throw new Error('Invalid scenario asset backup metadata.');
+  }
+  const assets = [];
+  for (const asset of storedAssets) {
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, asset.assetId));
+    if (!ref) throw new Error('Scenario asset backup object reference is missing.');
+    assets.push({ ...asset, blob: await readAssetFile(ref, asset.id) });
   }
   assertBackupExportNotCancelled(signal);
   const exports = (await db.getAllFromIndex(

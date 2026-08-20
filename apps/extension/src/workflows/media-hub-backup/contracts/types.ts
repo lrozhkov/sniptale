@@ -102,7 +102,8 @@ export interface BackupBlobDescriptor {
   blobPath: string;
   entry:
     | ProjectAssetBackupEntry
-    | Omit<ScenarioAssetEntry | MediaThumbnailEntry, 'blob'>
+    | Omit<ScenarioAssetEntry, 'assetId'>
+    | Omit<MediaThumbnailEntry, 'blob'>
     | Omit<StoredRecordingEntry, 'assetId'>;
 }
 

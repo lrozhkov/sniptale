@@ -1,11 +1,11 @@
 import {
   SCENARIO_ASSETS_STORE,
+  ASSET_REFS_STORE,
   SCENARIO_EXPORTS_STORE,
   THUMBNAILS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
 import type {
-  ScenarioAssetEntry,
   ScenarioExportEntry,
   ScenarioProjectEntry,
   ScenarioStepEditorDocumentEntry,
@@ -15,6 +15,8 @@ import {
   countScenarioProjectEntrySourceMetadata,
   hasEditorDocumentSourceMetadata,
 } from '../../export/privacy';
+import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
+import { parseScenarioAssetEntry } from '../../../../composition/persistence/scenario/read-guards';
 
 type LocalBackupDb = Awaited<ReturnType<typeof initDB>>;
 
@@ -76,12 +78,15 @@ async function inspectScenarioProjectEntry(
 ): Promise<void> {
   inventory.sizeBytes += getJsonSizeBytes(project);
 
-  const assets = (await db.getAllFromIndex(
-    SCENARIO_ASSETS_STORE,
-    'projectId',
-    project.id
-  )) as ScenarioAssetEntry[];
-  inventory.sizeBytes += assets.reduce((total, asset) => total + asset.size, 0);
+  const rawAssets = await db.getAllFromIndex(SCENARIO_ASSETS_STORE, 'projectId', project.id);
+  for (const raw of rawAssets) {
+    const asset = parseScenarioAssetEntry(raw);
+    if (!asset) throw new Error(`Invalid scenario asset metadata: ${project.id}.`);
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, asset.assetId));
+    if (!ref) throw new Error(`Scenario asset reference is missing: ${asset.id}.`);
+    await readAssetFile(ref, asset.id);
+    inventory.sizeBytes += ref.size;
+  }
 
   const exports = (await db.getAllFromIndex(
     SCENARIO_EXPORTS_STORE,

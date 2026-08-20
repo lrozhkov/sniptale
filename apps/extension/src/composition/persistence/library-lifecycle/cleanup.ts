@@ -49,6 +49,11 @@ import {
   PROJECT_MEDIA_ASSET_ROLE,
   recoverProjectMediaPublications,
 } from '../projects/asset-publication';
+import {
+  recoverScenarioAssetPublications,
+  SCENARIO_ASSET_OWNER_KIND,
+  SCENARIO_ASSET_ROLE,
+} from '../scenario/aggregate-mutations';
 
 export interface DraftCleanupResult {
   deletedCount: number;
@@ -144,7 +149,9 @@ async function deleteExpiredScenarioProject(
   retention: number | null,
   includeUnexpired: boolean
 ): Promise<boolean> {
-  return runWithIndexedDbMutation(async (db) => {
+  await recoverScenarioAssetPublications();
+  const operation = buildPhysicalDeleteOperation([]);
+  const deleted = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
         SCENARIO_PROJECTS_STORE,
@@ -153,6 +160,9 @@ async function deleteExpiredScenarioProject(
         SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
         THUMBNAILS_STORE,
+        ASSET_OWNERS_STORE,
+        ASSET_REFS_STORE,
+        ASSET_OPERATIONS_STORE,
       ],
       'readwrite'
     );
@@ -171,7 +181,17 @@ async function deleteExpiredScenarioProject(
     for (const raw of await assetStore.getAll()) {
       const asset = parseScenarioAssetEntry(raw);
       const assetId = asset?.projectId === id ? asset.id : readOwnedChildKey(raw, id, 'id');
-      if (assetId) await assetStore.delete(assetId);
+      if (assetId) {
+        await assetStore.delete(assetId);
+        if (asset) {
+          const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+          await ownerStore.delete([SCENARIO_ASSET_OWNER_KIND, assetId, SCENARIO_ASSET_ROLE]);
+          if ((await ownerStore.index('assetId').count(asset.assetId)) === 0) {
+            await tx.objectStore(ASSET_REFS_STORE).delete(asset.assetId);
+            operation.assetIds.push(asset.assetId);
+          }
+        }
+      }
     }
     const exportStore = tx.objectStore(SCENARIO_EXPORTS_STORE);
     for (const raw of await exportStore.getAll()) {
@@ -193,9 +213,16 @@ async function deleteExpiredScenarioProject(
       .delete(createAggregatePresentationKey({ id, kind: 'scenario' }));
     await tx.objectStore(THUMBNAILS_STORE).delete(`scenario:${id}`);
     await projectStore.delete(id);
+    if (operation.assetIds.length > 0) {
+      await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
+    }
     await tx.done;
     return true;
   });
+  if (operation.assetIds.length > 0) {
+    await completePhysicalDeleteOperation(operation).catch(() => undefined);
+  }
+  return deleted;
 }
 
 type ParsedMediaEntry = NonNullable<ReturnType<typeof parseMediaLibraryEntry>>;

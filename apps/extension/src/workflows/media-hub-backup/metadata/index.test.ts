@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { createScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import { createLegacyScenarioProjectMetadata } from '../restore/project/prepare.test-support.ts';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 
@@ -84,6 +85,34 @@ function createVideoProjectMetadata(recordingPath: string) {
         ],
       },
     ],
+  };
+}
+
+function createScenarioProjectMetadata(projectId: string, assetId: string) {
+  return {
+    assets: [
+      {
+        blobPath: `scenario-projects/${projectId}/assets/${assetId}`,
+        entry: {
+          createdAt: 1,
+          galleryAssetId: null,
+          height: 10,
+          id: assetId,
+          mimeType: 'image/png',
+          projectId,
+          size: 20,
+          width: 10,
+        },
+      },
+    ],
+    entry: {
+      createdAt: 1,
+      id: projectId,
+      project: { ...createScenarioProjectV3('Scenario backup'), id: projectId },
+      updatedAt: 2,
+    },
+    exports: [],
+    stepDocuments: [],
   };
 }
 
@@ -212,6 +241,32 @@ describe('media hub backup metadata rejection boundaries', () => {
       'shared.mediaHub.backupUnsupportedVersionPrefix scenario project 2.'
     );
   });
+
+  it.each([
+    [
+      'project IDs',
+      [
+        createScenarioProjectMetadata('scenario-1', 'asset-1'),
+        createScenarioProjectMetadata('scenario-1', 'asset-2'),
+      ],
+    ],
+    [
+      'globally keyed asset IDs',
+      [
+        createScenarioProjectMetadata('scenario-1', 'shared-asset'),
+        createScenarioProjectMetadata('scenario-2', 'shared-asset'),
+      ],
+    ],
+  ])(
+    'rejects duplicate scenario %s across project descriptors',
+    async (_kind, scenarioProjects) => {
+      const { parseBackupMetadata } = await import('.');
+
+      expect(() =>
+        parseBackupMetadata({ assets: [], effectBundles: [], scenarioProjects })
+      ).toThrow('shared.mediaHub.backupMetadataCorrupted');
+    }
+  );
 });
 
 describe('media hub backup metadata filename boundaries', () => {

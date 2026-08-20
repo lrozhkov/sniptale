@@ -14,7 +14,7 @@ async function loadVideoEditorAssetUrl(
 
   if (asset.source.kind === 'scenario-asset') {
     const entry = await getScenarioAsset(asset.source.scenarioAssetId);
-    return entry ? [asset.id, URL.createObjectURL(entry.blob)] : null;
+    return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
   }
 
   const entry = await getProjectAsset(asset.source.projectAssetId);
