@@ -20,18 +20,18 @@ function resolveFullTab(resolution: VideoResolutionPreset = VideoResolutionPrese
 const ALL_VIDEO_RESOLUTIONS = Object.values(VideoResolutionPreset);
 
 describe('tab recording geometry', () => {
-  it('uses the logical viewport for SOURCE and the physical track only for sampling', () => {
+  it('preserves the mapped physical pixel grid for full-tab SOURCE output', () => {
     const geometry = resolveFullTab();
     expect(geometry).toMatchObject({
       fillsOutput: true,
       fit: 'contain',
-      outputBasis: { width: 1904, height: 985 },
-      outputSize: { width: 1904, height: 984 },
+      outputBasis: { width: 2560, height: 1324 },
+      outputSize: { width: 2560, height: 1324 },
       sourceRect: {
-        x: 2,
-        y: expect.closeTo(59.52100840336129),
-        width: 2556,
-        height: expect.closeTo(1320.957983193277),
+        x: 0,
+        y: 58,
+        width: 2560,
+        height: 1324,
       },
       sourceSize: { width: 2560, height: 1440 },
     });
@@ -43,7 +43,7 @@ describe('tab recording geometry', () => {
     expect(1382 - (geometry.sourceRect.y + geometry.sourceRect.height)).toBeLessThanOrEqual(1.6);
   });
 
-  it('removes the physical I420 sampling edge after density-scaled odd-edge normalization', () => {
+  it('does not crop or resample an exact density-scaled SOURCE frame', () => {
     const geometry = resolveTabOutputGeometry(
       { x: 0, y: 0, width: 1904, height: 985 },
       { width: 3808, height: 1970 },
@@ -55,13 +55,13 @@ describe('tab recording geometry', () => {
       }
     );
 
-    expect(geometry.outputSize).toEqual({ width: 1904, height: 984 });
+    expect(geometry.outputSize).toEqual({ width: 3808, height: 1970 });
     expect(geometry.fillsOutput).toBe(true);
     expect(geometry.sourceRect).toEqual({
-      x: 2,
-      y: expect.closeTo(2.033613445378251),
-      width: 3804,
-      height: expect.closeTo(1965.9327731092435),
+      x: 0,
+      y: 0,
+      width: 3808,
+      height: 1970,
     });
   });
 
@@ -81,7 +81,7 @@ describe('tab recording geometry', () => {
     }
   );
 
-  it('uses the logical TAB_CROP selection as output basis', () => {
+  it('uses the mapped physical TAB_CROP selection as SOURCE output basis', () => {
     const geometry = resolveTabOutputGeometry(
       { x: 100, y: 80, width: 300, height: 301 },
       { width: 2560, height: 1440 },
@@ -91,9 +91,9 @@ describe('tab recording geometry', () => {
 
     expect(geometry).toMatchObject({
       fillsOutput: true,
-      outputBasis: { width: 300, height: 301 },
-      outputSize: { width: 300, height: 300 },
-      sourceRect: { x: 200, y: 161, width: 600, height: 600 },
+      outputBasis: { width: 600, height: 602 },
+      outputSize: { width: 600, height: 602 },
+      sourceRect: { x: 200, y: 160, width: 600, height: 602 },
     });
   });
 
@@ -130,8 +130,8 @@ describe('tab recording geometry', () => {
     expect(resized).toMatchObject({
       fillsOutput: false,
       fit: 'contain',
-      outputBasis: { width: 1904, height: 985 },
-      outputSize: { width: 1904, height: 984 },
+      outputBasis: { width: 2560, height: 1324 },
+      outputSize: { width: 2560, height: 1324 },
       requestedCrop: { x: 0, y: 0, width: 1600, height: 900 },
       sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
     });
@@ -196,8 +196,8 @@ describe('tab recording geometry', () => {
       kind: 'recoverable-contain',
       geometry: {
         fit: 'contain',
-        outputBasis: { width: 300, height: 300 },
-        outputSize: { width: 300, height: 300 },
+        outputBasis: { width: 600, height: 600 },
+        outputSize: { width: 600, height: 600 },
         requestedCrop: { x: 700, y: 300, width: 300, height: 300 },
         sourceRect: { x: 240, y: 0, width: 1440, height: 1080 },
       },

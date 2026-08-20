@@ -1,6 +1,7 @@
 import { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import {
   CaptureMode,
+  resolveVideoOutputProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -107,7 +108,10 @@ function resolvePhysicalTabCaptureSize(
 
 function createTabSourceConstraints(
   streamId: string,
-  physicalSize: { height: number; width: number } | null = null
+  options: {
+    frameRate?: number;
+    physicalSize?: { height: number; width: number } | null;
+  } = {}
 ): MediaTrackConstraints {
   return {
     mandatory: {
@@ -115,7 +119,10 @@ function createTabSourceConstraints(
       chromeMediaSourceId: streamId,
       // Chromium seeds its WebContents capture scaler from the requested maximum frame size.
       // Keep that request on the tab's existing physical pixel grid; output scaling happens later.
-      ...(physicalSize ? { maxHeight: physicalSize.height, maxWidth: physicalSize.width } : {}),
+      ...(options.frameRate ? { maxFrameRate: options.frameRate } : {}),
+      ...(options.physicalSize
+        ? { maxHeight: options.physicalSize.height, maxWidth: options.physicalSize.width }
+        : {}),
     },
   } as MediaTrackConstraints;
 }
@@ -138,7 +145,10 @@ async function acquireTabStream({
 
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: audioConstraints,
-    video: createTabSourceConstraints(streamId, requestedPhysicalSize),
+    video: createTabSourceConstraints(streamId, {
+      frameRate: resolveVideoOutputProfile(settings).frameRate,
+      physicalSize: requestedPhysicalSize,
+    }),
   });
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {

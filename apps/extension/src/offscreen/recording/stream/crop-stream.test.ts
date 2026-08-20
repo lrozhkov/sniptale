@@ -25,6 +25,7 @@ import { resolveTabOutputGeometry } from '../geometry/tab-source';
 
 function installCanvasOutput(width: number, height: number) {
   const output = createStream(width, height);
+  Object.assign(output.getVideoTracks()[0]!, { requestFrame: vi.fn() });
   const context = {
     drawImage: vi.fn(),
     fillRect: vi.fn(),
@@ -43,26 +44,22 @@ function installCanvasOutput(width: number, height: number) {
   return { context, output };
 }
 
-function installSolidPixelCanvasOutput(width: number, height: number, sourceWidth: number) {
+function installSolidPixelCanvasOutput(width: number, height: number) {
   const output = createStream(width, height);
+  Object.assign(output.getVideoTracks()[0]!, { requestFrame: vi.fn() });
   const pixels = new Uint8ClampedArray(width * height * 4);
-  // Chromium's I420 capture region is aligned on two-pixel chroma boundaries.
   const writePixel = (x: number, y: number, color: readonly [number, number, number, number]) => {
     const offset = (y * width + x) * 4;
     pixels.set(color, offset);
   };
   const context = {
     drawImage: vi.fn((...args: unknown[]) => {
-      const [
-        sourceX,
-        ,
-        sampledWidth,
-        ,
-        destinationX,
-        destinationY,
-        destinationWidth,
-        destinationHeight,
-      ] = args.slice(1) as [number, number, number, number, number, number, number, number];
+      const [destinationX, destinationY, destinationWidth, destinationHeight] = args.slice(-4) as [
+        number,
+        number,
+        number,
+        number,
+      ];
       const destination = [destinationX, destinationY, destinationWidth, destinationHeight] as [
         number,
         number,
@@ -79,12 +76,7 @@ function installSolidPixelCanvasOutput(width: number, height: number, sourceWidt
             centerY >= destination[1] &&
             centerY < destination[1] + destination[3]
           ) {
-            const sampledX = sourceX + ((centerX - destination[0]) / destination[2]) * sampledWidth;
-            const color =
-              sampledX >= 2 && sampledX < sourceWidth - 2
-                ? ([17, 113, 201, 255] as const)
-                : ([0, 0, 0, 255] as const);
-            writePixel(x, y, color);
+            writePixel(x, y, [17, 113, 201, 255]);
           }
         }
       }
@@ -164,8 +156,7 @@ describe('crop stream', () => {
       );
       const { context, output, pixels } = installSolidPixelCanvasOutput(
         geometry.outputSize.width,
-        geometry.outputSize.height,
-        raw.width
+        geometry.outputSize.height
       );
 
       await createCropStream(createStream(raw.width, raw.height), geometry);
@@ -213,8 +204,7 @@ describe('crop stream', () => {
     );
     const { context, output, pixels } = installSolidPixelCanvasOutput(
       geometry.outputSize.width,
-      geometry.outputSize.height,
-      raw.width
+      geometry.outputSize.height
     );
     const video = { videoHeight: raw.height, videoWidth: raw.width };
     mocks.createSourceVideo.mockReturnValue(video);
@@ -245,6 +235,39 @@ describe('crop stream', () => {
     output.getVideoTracks()[0]?.stop();
   });
 
+  it('keeps an exact physical SOURCE mapping on a one-to-one pixel grid', async () => {
+    const raw = { width: 3808, height: 1970 };
+    const geometry = resolveTabOutputGeometry(
+      { x: 0, y: 0, width: 1904, height: 985 },
+      raw,
+      { width: 1904, height: 985, devicePixelRatio: 2 },
+      {
+        frameRateCap: 30,
+        resolution: VideoResolutionPreset.SOURCE,
+        tracksFullViewport: true,
+      }
+    );
+    const { context, output } = installCanvasOutput(raw.width, raw.height);
+    const video = { videoHeight: raw.height, videoWidth: raw.width };
+    mocks.createSourceVideo.mockReturnValue(video);
+
+    await createCropStream(createStream(raw.width, raw.height), geometry);
+
+    expect(context.drawImage).toHaveBeenCalledWith(
+      video,
+      0,
+      0,
+      raw.width,
+      raw.height,
+      0,
+      0,
+      raw.width,
+      raw.height
+    );
+    expect(context.imageSmoothingEnabled).toBe(false);
+    output.getVideoTracks()[0]?.stop();
+  });
+
   it('caps the crop cadence once at the source track rate reported on start', async () => {
     const { output } = installCanvasOutput(1280, 720);
     const video = { videoHeight: 720, videoWidth: 1280 };
@@ -261,7 +284,7 @@ describe('crop stream', () => {
       { frameRate: 60 }
     );
 
-    expect(HTMLCanvasElement.prototype.captureStream).toHaveBeenCalledWith(24);
+    expect(HTMLCanvasElement.prototype.captureStream).toHaveBeenCalledWith(0);
     output.getVideoTracks()[0]?.stop();
   });
 

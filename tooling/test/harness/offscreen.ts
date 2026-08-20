@@ -35,6 +35,10 @@ type ColdHighResolutionRecordingResult = {
 };
 
 type OffscreenHarnessBridge = {
+  recordCanvasCadence: (
+    frameRate: number,
+    recordingDurationMs: number
+  ) => Promise<StaticCanvasRecordingResult>;
   reset: () => Promise<void>;
   stageProjectExportInput: (
     jobId: string,
@@ -248,11 +252,12 @@ async function readBlobVideoMetrics(blob: Blob): Promise<{
   }
 }
 
-async function recordStaticCanvasArtifact(): Promise<StaticCanvasRecordingResult> {
+async function recordCanvasCadence(
+  frameRate: number,
+  recordingDurationMs: number
+): Promise<StaticCanvasRecordingResult> {
   const width = 854;
   const height = 480;
-  const frameRate = 30;
-  const recordingDurationMs = 1_200;
   const source = document.createElement('canvas');
   source.width = width;
   source.height = height;
@@ -311,6 +316,10 @@ async function recordStaticCanvasArtifact(): Promise<StaticCanvasRecordingResult
   };
 }
 
+function recordStaticCanvasArtifact(): Promise<StaticCanvasRecordingResult> {
+  return recordCanvasCadence(30, 1_200);
+}
+
 function getRoot() {
   return document.getElementById('root');
 }
@@ -359,6 +368,7 @@ window.__sniptaleOffscreenHarness = {
     return harnessMediaRecorder?.state ?? 'inactive';
   },
   recordColdHighResolutionSequence,
+  recordCanvasCadence,
   recordStaticCanvasArtifact,
   stageProjectExportInput,
 };

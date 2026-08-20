@@ -26,6 +26,7 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 }));
 import {
   CaptureMode,
+  VideoFrameRate,
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -85,6 +86,7 @@ it('requests the measured physical viewport as the maximum TAB source size', asy
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-controlled',
+        maxFrameRate: 30,
         maxHeight: 1184,
         maxWidth: 2399,
       },
@@ -125,6 +127,7 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
         mandatory: {
           chromeMediaSource: 'tab',
           chromeMediaSourceId: 'tab-stream-source',
+          maxFrameRate: 30,
           maxHeight: 1440,
           maxWidth: 2560,
         },
@@ -136,6 +139,44 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
     );
   }
 );
+
+it('negotiates the selected 60 FPS cap with the TAB source', async () => {
+  const getUserMedia = vi.fn().mockResolvedValue({
+    getTracks: () => [{ stop: vi.fn() }],
+    getVideoTracks: () => [
+      { getSettings: () => ({ frameRate: VideoFrameRate.FPS60 }), readyState: 'live' },
+    ],
+    id: 'tab-stream',
+  });
+  installMediaDevicesMocks({ getUserMedia });
+
+  await acquireRecordingSourceStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...createControlledTabSettings(),
+      controlledCursorCaptureEnabled: false,
+      outputProfile: {
+        ...createControlledTabSettings().outputProfile,
+        frameRate: VideoFrameRate.FPS60,
+      },
+    },
+    streamId: 'tab-stream-60fps',
+    viewport: { devicePixelRatio: 2, height: 720, width: 1280 },
+  });
+
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: 'tab-stream-60fps',
+        maxFrameRate: 60,
+        maxHeight: 1440,
+        maxWidth: 2560,
+      },
+    },
+  });
+});
 
 it('uses the same isolated source binding for system audio and video', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
@@ -166,6 +207,7 @@ it('uses the same isolated source binding for system audio and video', async () 
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-with-audio',
+        maxFrameRate: 30,
       },
     },
   });
@@ -201,6 +243,7 @@ it('does not copy video size constraints onto TAB system audio', async () => {
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-physical-audio',
+        maxFrameRate: 30,
         maxHeight: 1350,
         maxWidth: 2160,
       },

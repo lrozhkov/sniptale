@@ -10,6 +10,8 @@ afterEach(() => {
 });
 
 function installCanvas(stream: MediaStream) {
+  const [track] = stream.getVideoTracks();
+  if (track && !('requestFrame' in track)) Object.assign(track, { requestFrame: vi.fn() });
   const context = { drawImage: vi.fn() };
   const canvas = Object.assign(document.createElement('canvas'), {
     captureStream: vi.fn(() => stream),
@@ -35,7 +37,7 @@ it('keeps drawing a static source through one constant-rate canvas stream', () =
 
   expect(stream).toBe(output);
   expect(canvas.captureStream).toHaveBeenCalledOnce();
-  expect(canvas.captureStream).toHaveBeenCalledWith(30);
+  expect(canvas.captureStream).toHaveBeenCalledWith(0);
   expect(drawLiveFrame).toHaveBeenCalledOnce();
   vi.advanceTimersByTime(1000);
   expect(drawLiveFrame).toHaveBeenCalledTimes(31);
@@ -47,8 +49,10 @@ it('keeps drawing a static source through one constant-rate canvas stream', () =
   expect(release).toHaveBeenCalledOnce();
 });
 
-it('uses the selected cadence without requiring a source callback contract', () => {
+it('requests frames explicitly so canvas capture does not impose a second cadence clock', () => {
   const output = createTrackedStream({ frameRate: 24, height: 480, width: 854 });
+  const requestFrame = vi.fn();
+  Object.assign(output.track, { requestFrame });
   const { canvas } = installCanvas(output);
 
   createCanvasVideoOutput({
@@ -59,6 +63,7 @@ it('uses the selected cadence without requiring a source callback contract', () 
   });
 
   expect(canvas.captureStream).toHaveBeenCalledOnce();
-  expect(canvas.captureStream).toHaveBeenCalledWith(24);
+  expect(canvas.captureStream).toHaveBeenCalledWith(0);
+  expect(requestFrame).toHaveBeenCalledOnce();
   output.track.stop();
 });

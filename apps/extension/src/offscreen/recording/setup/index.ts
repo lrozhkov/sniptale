@@ -23,6 +23,9 @@ import {
   resolveVideoRecordingFrameRate,
 } from '../../../platform/media-utils/video-recording';
 import type { VideoOutputDimensions } from '@sniptale/runtime-contracts/video/types/types';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
 
 type RecordingSetupParams = {
   streamId: string;
@@ -147,7 +150,12 @@ function assertEncoderInputSettings(
     );
   }
   const appliedFrameRate = applied.frameRate;
-  const frameRate = appliedFrameRate ?? expectedFrameRate;
+  // Manual CanvasCaptureMediaStreamTrack cadence is reported as 0 by Chromium even though
+  // requestFrame() is driven at the resolved scheduler rate.
+  const frameRate =
+    typeof appliedFrameRate === 'number' && appliedFrameRate > 0
+      ? appliedFrameRate
+      : expectedFrameRate;
   if (
     typeof frameRate !== 'number' ||
     !Number.isFinite(frameRate) ||
@@ -208,6 +216,15 @@ export async function prepareRecordingStream(
     output.outputSize,
     output.frameRate
   );
+  logger.debug('Resolved recording video pipeline', {
+    captureMode: params.captureMode ?? null,
+    outputFrameRate: outputTrackSettings.frameRate ?? output.frameRate,
+    outputSize: output.outputSize,
+    pipeline: output.stream === sourceStream ? 'source-pass-through' : 'single-canvas-transform',
+    rawFrameRate: raw.trackSettings.frameRate ?? null,
+    rawSize: { height: raw.height, width: raw.width },
+    requestedFrameRate: resolveVideoRecordingFrameRate(params.settings),
+  });
   recordingContext.videoStream = output.stream;
   if (params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP) {
     await prepareStableTabRecordingAudio(params.settings);

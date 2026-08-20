@@ -119,6 +119,7 @@ export async function createFixedVideoOutputStream(
         }),
       }),
       release,
+      sourceVideo: video,
     });
 
     return { dimensions: geometry.outputSize, frameRate, stream: normalizedStream };

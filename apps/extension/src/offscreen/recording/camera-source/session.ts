@@ -152,6 +152,7 @@ function createNormalizedCameraOutput(
       },
     }),
     release: () => undefined,
+    sourceVideo: target.video,
   });
 }
 

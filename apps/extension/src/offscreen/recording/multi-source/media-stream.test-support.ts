@@ -54,6 +54,7 @@ class TestAudioTrack extends TestMediaStreamTrackBase implements MediaStreamAudi
 
 class TestVideoTrack extends TestMediaStreamTrackBase implements MediaStreamVideoTrack {
   readonly kind = 'video';
+  readonly requestFrame = vi.fn();
 
   constructor(settings: MediaTrackSettings = {}) {
     super('video', settings);

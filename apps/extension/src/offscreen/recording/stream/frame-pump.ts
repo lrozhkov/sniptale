@@ -2,6 +2,8 @@ type VideoFramePumpOptions = {
   drawHeldFrame?: () => boolean;
   drawLiveFrame: () => boolean;
   frameRate: number;
+  onFrameDrawn?: () => void;
+  sourceVideo?: HTMLVideoElement;
 };
 
 export function resolveFixedVideoFrameRate(
@@ -40,7 +42,39 @@ function startCompensatedTimer(frameRate: number, callback: () => void): () => v
 }
 
 export function startVideoFramePump(options: VideoFramePumpOptions): () => void {
+  const source = options.sourceVideo;
+  if (source && typeof source.requestVideoFrameCallback === 'function') {
+    const periodMs = 1000 / options.frameRate;
+    const timingToleranceMs = periodMs * 0.1;
+    let callbackId: number | null = null;
+    let nextDrawTime = Number.NEGATIVE_INFINITY;
+    let stopped = false;
+    const schedule = () => {
+      callbackId = source.requestVideoFrameCallback((now) => {
+        if (stopped) return;
+        if (now + timingToleranceMs >= nextDrawTime) {
+          if (options.drawLiveFrame()) {
+            options.onFrameDrawn?.();
+            if (!Number.isFinite(nextDrawTime)) nextDrawTime = now;
+            do {
+              nextDrawTime += periodMs;
+            } while (nextDrawTime <= now);
+          }
+        }
+        schedule();
+      });
+    };
+    schedule();
+    return () => {
+      stopped = true;
+      if (callbackId !== null && typeof source.cancelVideoFrameCallback === 'function') {
+        source.cancelVideoFrameCallback(callbackId);
+      }
+    };
+  }
+
   return startCompensatedTimer(options.frameRate, () => {
-    if (!options.drawLiveFrame()) options.drawHeldFrame?.();
+    const drawn = options.drawLiveFrame() || options.drawHeldFrame?.() === true;
+    if (drawn) options.onFrameDrawn?.();
   });
 }

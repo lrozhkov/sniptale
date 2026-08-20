@@ -111,6 +111,7 @@ export async function createCropOutputStream(
         },
       }),
       release: () => releaseSourceVideo(video),
+      sourceVideo: video,
     });
     ownershipTransferred = true;
     return { frameRate, stream: cropped };

@@ -157,7 +157,7 @@ it('caps an adapter cadence at the selected profile frame rate', async () => {
   });
 
   expect(result.frameRate).toBe(30);
-  expect(canvas.captureStream).toHaveBeenCalledWith(30);
+  expect(canvas.captureStream).toHaveBeenCalledWith(0);
   canvasStream.track.stop();
 });
 
@@ -175,7 +175,7 @@ it('caps the fixed cadence once at the source track rate reported on start', asy
   const result = await createFixedVideoOutputStream(sourceStream, createSettings());
 
   expect(result.frameRate).toBe(24);
-  expect(canvas.captureStream).toHaveBeenCalledWith(24);
+  expect(canvas.captureStream).toHaveBeenCalledWith(0);
   canvasStream.track.stop();
 });
 

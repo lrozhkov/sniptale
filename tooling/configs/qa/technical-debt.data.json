@@ -18561,16 +18561,16 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "e8fdca9a791153177d7b39c8ca63b10efb4830953721e6bbfef3f801bf4a7125"
+        "contentHash": "c45af96c4118dc6b89eb5d8788fe637848b5980ad6e294fb272e98eaba1c6b97"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"
       ],
       "surfaces": [
         "property:readBlobVideoMetrics/centerPixel",
+        "property:recordCanvasCadence/dimensions",
         "property:recordColdHighResolutionArtifact/dimensions",
-        "property:recordColdHighResolutionArtifact/recorderOptions",
-        "property:recordStaticCanvasArtifact/dimensions"
+        "property:recordColdHighResolutionArtifact/recorderOptions"
       ]
     },
     {
