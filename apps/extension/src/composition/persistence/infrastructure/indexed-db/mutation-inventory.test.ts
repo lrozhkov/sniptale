@@ -13,9 +13,9 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/editor-bootstrap/retention-cleanup.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-lease.ts',
+  'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
-  'apps/extension/src/composition/persistence/projects/mutation-stores.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
 ]);
 const indexedDbMutationPattern =
@@ -57,12 +57,16 @@ it('keeps every IndexedDB mutation leaf behind the persistent mutation barrier',
 
 it('commits project assets and their media rows inside one admitted transaction', () => {
   const source = readFileSync(
-    join(repoRoot, 'apps/extension/src/composition/persistence/projects/index.ts'),
+    join(repoRoot, 'apps/extension/src/composition/persistence/projects/asset-publication.ts'),
     'utf8'
   );
 
   expect(source).not.toContain('upsertMediaEntry');
-  expect(source).toContain('[PROJECT_ASSETS_STORE, MEDIA_LIBRARY_STORE]');
+  expect(source).toContain(
+    'args.storeName,\n        MEDIA_LIBRARY_STORE,\n        ASSET_REFS_STORE'
+  );
+  expect(source).toContain('await domainStore.put(args.entry)');
+  expect(source).toContain('await tx.objectStore(MEDIA_LIBRARY_STORE).put(mediaEntry)');
 });
 
 it('keeps the complete extension-page localStorage writer inventory behind the same barrier', () => {

@@ -2,19 +2,18 @@ import {
   ASSET_REFS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
-  RECORDING_TELEMETRY_STORE,
-  STORE_NAME,
   THUMBNAILS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
 import type {
-  ProjectAssetEntry,
-  ProjectExportEntry,
+  StoredProjectExportEntry,
   VideoProjectEntry,
 } from '../../../../composition/persistence/projects/contracts';
-import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+} from '../../../../composition/persistence/projects/read-guards';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { MediaHubBackupExportOptions } from '../../contracts/types';
 
@@ -35,17 +34,6 @@ function isMediaThumbnailEntry(value: unknown): value is MediaThumbnailEntry {
     typeof value.assetId === 'string' &&
     'blob' in value &&
     value.blob instanceof Blob
-  );
-}
-
-function isProjectAssetEntry(value: unknown): value is ProjectAssetEntry {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'blob' in value &&
-    value.blob instanceof Blob &&
-    'size' in value &&
-    typeof value.size === 'number'
   );
 }
 
@@ -92,10 +80,12 @@ async function inspectVideoProjectAssets(
   for (const assetId of project.project.assets.flatMap((asset) =>
     asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
   )) {
-    const asset: unknown = await db.get(PROJECT_ASSETS_STORE, assetId);
-    if (isProjectAssetEntry(asset)) {
-      inventory.sizeBytes += asset.size;
-    }
+    const asset = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, assetId));
+    if (!asset) continue;
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, asset.assetId));
+    if (!ref) throw new Error(`Project asset reference is missing: ${asset.id}.`);
+    await readAssetFile(ref, asset.id);
+    inventory.sizeBytes += ref.size;
   }
 }
 
@@ -105,11 +95,9 @@ async function inspectVideoProjectExports(
   options: MediaHubBackupExportOptions,
   inventory: VideoProjectBackupInspection
 ): Promise<void> {
-  const projectExports = (await db.getAllFromIndex(
-    PROJECT_EXPORTS_STORE,
-    'projectId',
-    project.id
-  )) as ProjectExportEntry[];
+  const projectExports = (await db.getAllFromIndex(PROJECT_EXPORTS_STORE, 'projectId', project.id))
+    .map(parseProjectExportEntry)
+    .filter((entry): entry is StoredProjectExportEntry => entry !== null);
 
   for (const projectExport of projectExports) {
     await inspectVideoProjectExport(db, projectExport, options, inventory);
@@ -118,45 +106,22 @@ async function inspectVideoProjectExports(
 
 async function inspectVideoProjectExport(
   db: LocalBackupDb,
-  projectExport: ProjectExportEntry,
+  projectExport: StoredProjectExportEntry,
   options: MediaHubBackupExportOptions,
   inventory: VideoProjectBackupInspection
 ): Promise<void> {
-  const recording: unknown = await db.get(STORE_NAME, projectExport.recordingId);
-  const storedRecording = parseRecordingEntry(recording);
-  if (storedRecording) {
-    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, storedRecording.assetId));
-    if (!ref) {
-      throw new Error(
-        `Project export recording asset reference is missing: ${storedRecording.id}.`
-      );
-    }
-    await readAssetFile(ref, storedRecording.filename);
-    inventory.recordingCount += 1;
-    inventory.sizeBytes += ref.size;
-  }
+  const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, projectExport.assetId));
+  if (!ref) throw new Error(`Project export asset reference is missing: ${projectExport.id}.`);
+  await readAssetFile(ref, projectExport.filename);
+  inventory.recordingCount += 1;
+  inventory.sizeBytes += ref.size;
 
   const exportThumbnail = await getThumbnail(db, `export:${projectExport.id}`);
   if (exportThumbnail) {
     inventory.thumbnails.push(exportThumbnail);
   }
 
-  if (options.includeTelemetry) {
-    await inspectVideoProjectExportTelemetry(db, projectExport, inventory);
-  }
-}
-
-async function inspectVideoProjectExportTelemetry(
-  db: LocalBackupDb,
-  projectExport: ProjectExportEntry,
-  inventory: VideoProjectBackupInspection
-): Promise<void> {
-  const value: unknown = await db.get(RECORDING_TELEMETRY_STORE, projectExport.recordingId);
-  const telemetry = value as RecordingTelemetryEntry | undefined;
-  if (telemetry) {
-    inventory.telemetryCount += 1;
-    inventory.sizeBytes += getJsonSizeBytes(telemetry);
-  }
+  void options;
 }
 
 async function getThumbnail(db: LocalBackupDb, key: string): Promise<MediaThumbnailEntry | null> {

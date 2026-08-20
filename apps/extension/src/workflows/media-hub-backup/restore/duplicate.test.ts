@@ -19,6 +19,9 @@ const {
   restoreAssetRecordSnapshotMock,
   snapshotExistingAssetRecordMock,
   withMediaHubWriteGuardMock,
+  recoverAssetPublicationsMock,
+  createBackupRestoreOperationMock,
+  transitionAssetOperationMock,
 } = vi.hoisted(() => ({
   assertBackupImportAssetEntriesAvailableMock: vi.fn(),
   deleteExistingAssetRecordMock: vi.fn(),
@@ -35,6 +38,20 @@ const {
   restoreAssetRecordSnapshotMock: vi.fn(),
   snapshotExistingAssetRecordMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
+  recoverAssetPublicationsMock: vi.fn(),
+  createBackupRestoreOperationMock: vi.fn(),
+  transitionAssetOperationMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/assets/operations', async (importOriginal) => ({
+  ...(await importOriginal()),
+  createBackupRestoreOperation: createBackupRestoreOperationMock,
+  transitionAssetOperation: transitionAssetOperationMock,
+}));
+
+vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverAssetPublications: recoverAssetPublicationsMock,
 }));
 
 vi.mock(
@@ -76,7 +93,7 @@ vi.mock('./project/prepare', async (importOriginal) => ({
 
 vi.mock('./project/preflight', () => ({
   assertPreparedProjectBlobsAvailable: assertPreparedProjectBlobsAvailableMock,
-  stagePreparedProjectRecordingAssets: vi.fn(),
+  stagePreparedProjectAssets: vi.fn(),
 }));
 
 vi.mock('./projects', async (importOriginal) => ({
@@ -166,6 +183,12 @@ function createDuplicateLoadedAsset(args: {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  recoverAssetPublicationsMock.mockResolvedValue(undefined);
+  createBackupRestoreOperationMock.mockResolvedValue({
+    operationId: 'restore-1',
+    status: 'pending',
+  });
+  transitionAssetOperationMock.mockResolvedValue(undefined);
   withMediaHubWriteGuardMock.mockImplementation(async (_label, callback: () => Promise<void>) =>
     callback()
   );

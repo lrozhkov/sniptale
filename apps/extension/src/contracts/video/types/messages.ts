@@ -82,6 +82,11 @@ export type VideoRuntimeMessage =
       url?: never;
     }
   | {
+      type: typeof VideoMessageType.DOWNLOAD_PROJECT_EXPORT;
+      exportId: string;
+      filename: string;
+    }
+  | {
       type: typeof VideoMessageType.DOWNLOAD_RECORDING_SIDECAR;
       content: string;
       filename: string;

@@ -9,33 +9,27 @@ import {
 import { finalizeExport } from './index';
 
 const {
-  deleteOrphanedRawRecordingsSafelyMock,
   deleteProjectExportSafelyMock,
-  downloadExportRecordingMock,
+  downloadProjectExportMock,
   downloadExportSidecarMock,
   notifyProjectExportCompletedMock,
   saveProjectExportSafelyMock,
-  saveRecordingSafelyMock,
 } = vi.hoisted(() => ({
-  deleteOrphanedRawRecordingsSafelyMock: vi.fn(),
   deleteProjectExportSafelyMock: vi.fn(),
-  downloadExportRecordingMock: vi.fn(),
+  downloadProjectExportMock: vi.fn(),
   downloadExportSidecarMock: vi.fn(),
   notifyProjectExportCompletedMock: vi.fn(),
   saveProjectExportSafelyMock: vi.fn(),
-  saveRecordingSafelyMock: vi.fn(),
 }));
 
 vi.mock('../../../../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../workflows/media-hub/store')>()),
-  deleteOrphanedRawRecordingsSafely: deleteOrphanedRawRecordingsSafelyMock,
   deleteProjectExportSafely: deleteProjectExportSafelyMock,
   saveProjectExportSafely: saveProjectExportSafelyMock,
-  saveRecordingSafely: saveRecordingSafelyMock,
 }));
 
 vi.mock('./runtime/index', () => ({
-  downloadExportRecording: downloadExportRecordingMock,
+  downloadProjectExport: downloadProjectExportMock,
   downloadExportSidecar: downloadExportSidecarMock,
   notifyProjectExportCompleted: notifyProjectExportCompletedMock,
 }));
@@ -85,22 +79,18 @@ function mockRandomUuids(): void {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRandomUuids();
-  deleteOrphanedRawRecordingsSafelyMock.mockResolvedValue(undefined);
   deleteProjectExportSafelyMock.mockResolvedValue(undefined);
   notifyProjectExportCompletedMock.mockResolvedValue(true);
   saveProjectExportSafelyMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('does not write an export entry when cancellation arrives after raw recording save', async () => {
+it('does not write an export entry when already cancelled', async () => {
   const abortController = new AbortController();
-  saveRecordingSafelyMock.mockImplementation(async () => {
-    abortController.abort();
-  });
+  abortController.abort();
 
   await expect(
     finalizeExport(
@@ -114,10 +104,7 @@ it('does not write an export entry when cancellation arrives after raw recording
 
   expect(saveProjectExportSafelyMock).not.toHaveBeenCalled();
   expect(deleteProjectExportSafelyMock).not.toHaveBeenCalled();
-  expect(deleteOrphanedRawRecordingsSafelyMock).toHaveBeenCalledWith([
-    expect.stringMatching(/^export-/),
-  ]);
-  expect(downloadExportRecordingMock).not.toHaveBeenCalled();
+  expect(downloadProjectExportMock).not.toHaveBeenCalled();
   expect(downloadExportSidecarMock).not.toHaveBeenCalled();
   expect(notifyProjectExportCompletedMock).not.toHaveBeenCalled();
 });
@@ -138,13 +125,9 @@ it('rolls back the export entry when cancellation arrives after export entry sav
     )
   ).rejects.toThrow('PROJECT_EXPORT_CANCELLED');
 
-  expect(saveRecordingSafelyMock).toHaveBeenCalledOnce();
   expect(saveProjectExportSafelyMock).toHaveBeenCalledOnce();
   expect(deleteProjectExportSafelyMock).toHaveBeenCalledWith(expect.any(String));
-  expect(deleteOrphanedRawRecordingsSafelyMock).toHaveBeenCalledWith([
-    expect.stringMatching(/^export-/),
-  ]);
-  expect(downloadExportRecordingMock).not.toHaveBeenCalled();
+  expect(downloadProjectExportMock).not.toHaveBeenCalled();
   expect(downloadExportSidecarMock).not.toHaveBeenCalled();
   expect(notifyProjectExportCompletedMock).not.toHaveBeenCalled();
 });

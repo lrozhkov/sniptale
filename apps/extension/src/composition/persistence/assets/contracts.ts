@@ -21,7 +21,10 @@ export interface AssetOperationCompensation {
   journalId: string;
   nextMediaId: string;
   nextOwnerId: string;
+  nextProjectAssetId?: string;
   nextProjectExportId?: string;
+  ownerKind?: string;
+  ownerRole?: string;
   previousRecords: Record<string, unknown>;
 }
 

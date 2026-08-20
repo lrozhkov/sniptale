@@ -182,14 +182,13 @@ it('deletes existing project-export records from all owning stores', async () =>
         kind: 'project-export',
         exportId: 'export-1',
         projectId: 'project-1',
-        recordingId: 'recording-1',
       },
       { id: 'asset-1', kind: 'export' }
     )
   );
 
-  expect(stores.get('recordings')?.delete).toHaveBeenCalledWith('recording-1');
-  expect(stores.get('recording_telemetry')?.delete).toHaveBeenCalledWith('recording-1');
+  expect(stores.get('recordings')?.delete).not.toHaveBeenCalled();
+  expect(stores.get('recording_telemetry')?.delete).not.toHaveBeenCalled();
   expect(stores.get('project_exports')?.delete).toHaveBeenCalledWith('export-1');
   expect(stores.get('media_library')?.delete).toHaveBeenCalledWith('asset-1');
   expect(stores.get('thumbnails')?.delete).toHaveBeenCalledWith('asset-1');
@@ -250,7 +249,7 @@ it('restores recording records through the recordings store and media library', 
   expect(stores.get('media_library')?.put).toHaveBeenCalledWith(entry);
 });
 
-it('restores project-export records through recording and export builders', async () => {
+it('restores project-export records with direct asset ownership', async () => {
   const { writeMainAssetRecord } = await import('.');
   const { stores, tx } = createWriteHarness();
   const entry = createMediaEntry(
@@ -258,19 +257,20 @@ it('restores project-export records through recording and export builders', asyn
       kind: 'project-export',
       exportId: 'export-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     },
     { id: 'asset-2', kind: 'export' }
   );
   const blob = new Blob(['asset']);
 
-  createRecordingStoreEntryMock.mockReturnValue({ id: 'recording-record' });
   createProjectExportStoreEntryMock.mockReturnValue({ id: 'export-record' });
 
   await writeMainAssetRecord(tx, entry, blob, null, null, createPreparedRecordingAsset());
 
-  expect(stores.get('recordings')?.put).toHaveBeenCalledWith({ id: 'recording-record' });
+  expect(stores.get('recordings')?.put).not.toHaveBeenCalled();
   expect(stores.get('project_exports')?.put).toHaveBeenCalledWith({ id: 'export-record' });
+  expect(stores.get('asset_refs')?.put).toHaveBeenCalledWith(
+    expect.objectContaining({ assetId: 'asset-recording' })
+  );
   expect(stores.get('media_library')?.put).toHaveBeenCalledWith(entry);
 });
 
@@ -301,7 +301,7 @@ it('restores project-asset records through the project assets store', async () =
 
   createProjectAssetStoreEntryMock.mockReturnValue({ id: 'asset-record' });
 
-  await writeMainAssetRecord(tx, entry, blob, null);
+  await writeMainAssetRecord(tx, entry, blob, null, null, createPreparedRecordingAsset());
 
   expect(stores.get('project_assets')?.put).toHaveBeenCalledWith({ id: 'asset-record' });
   expect(stores.get('media_library')?.put).toHaveBeenCalledWith(entry);

@@ -41,6 +41,7 @@ vi.mock(
   async (importOriginal) => ({
     ...(await importOriginal<typeof import('jszip')>()),
     PROJECT_ASSETS_STORE: 'project_assets',
+    ASSET_REFS_STORE: 'asset_refs',
     PROJECT_EXPORTS_STORE: 'project_exports',
     RECORDING_TELEMETRY_STORE: 'recording_telemetry',
     SCENARIO_ASSETS_STORE: 'scenario_assets',

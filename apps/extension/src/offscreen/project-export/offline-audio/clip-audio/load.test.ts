@@ -40,7 +40,7 @@ it('loads blobs from project assets', async () => {
   getAssetByIdMock.mockReturnValue({
     source: { kind: 'project-asset', projectAssetId: 'asset-1' },
   });
-  getProjectAssetMock.mockResolvedValue({ blob });
+  getProjectAssetMock.mockResolvedValue({ file: blob });
 
   await expect(loadBlobForAsset(PROJECT, 'asset-1')).resolves.toBe(blob);
   expect(getRecordingMock).not.toHaveBeenCalled();

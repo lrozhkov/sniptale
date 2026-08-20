@@ -4,15 +4,14 @@ import {
   ASSET_REFS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
-  RECORDING_TELEMETRY_STORE,
-  STORE_NAME,
+  MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../../storage/constants';
-import { restoreBlobDescriptor, restoreProjectAssetBlobDescriptor } from './blobs';
+import { restoreBlobDescriptor } from './blobs';
 import type { PreparedVideoProject } from './prepare';
 import { remapId } from './ids';
-import { readRestoredBlob, remapDescriptorId } from './helpers';
+import { readRestoredBlob } from './helpers';
 import { remapVideoProjectEntry } from './remap';
 import {
   assertBackupProjectReplacePreflightComplete,
@@ -20,9 +19,14 @@ import {
 } from './replace';
 import { getStore } from '../../storage';
 import {
-  RECORDING_ASSET_OWNER_KIND,
-  RECORDING_ASSET_ROLE,
-} from '../../../../composition/persistence/recordings/asset-publication';
+  PROJECT_ASSET_OWNER_KIND,
+  PROJECT_EXPORT_OWNER_KIND,
+  PROJECT_MEDIA_ASSET_ROLE,
+} from '../../../../composition/persistence/projects/asset-publication';
+import {
+  buildProjectAssetMediaEntry,
+  buildProjectExportMediaEntry,
+} from '../../../../composition/persistence/media-library/entry-mapping';
 
 export { restorePreparedScenarioProjectsInTransaction } from './scenario-writer';
 
@@ -50,14 +54,14 @@ async function restorePreparedVideoProject(
 ) {
   if (prepared.replace) {
     assertBackupProjectReplacePreflightComplete(prepared.projectId);
-    prepared.obsoleteRecordingAssetIds = await deleteExistingVideoProjectBundle(
+    prepared.obsoleteProjectMediaAssetIds = await deleteExistingVideoProjectBundle(
       tx,
       prepared.projectId
     );
   }
 
   await getStore(tx, VIDEO_PROJECTS_STORE).put(remapVideoProjectEntry(prepared));
-  await restoreVideoProjectAssets(tx, restoredBlobs, prepared);
+  await restoreVideoProjectAssets(tx, prepared);
   await restoreVideoProjectExports(tx, restoredBlobs, prepared);
   await restoreVideoProjectThumbnail(tx, restoredBlobs, prepared);
   if (prepared.restoredPresentation) {
@@ -65,19 +69,27 @@ async function restorePreparedVideoProject(
   }
 }
 
-async function restoreVideoProjectAssets(
-  tx: BackupTransaction,
-  restoredBlobs: ReadonlyMap<string, Blob>,
-  prepared: PreparedVideoProject
-) {
+async function restoreVideoProjectAssets(tx: BackupTransaction, prepared: PreparedVideoProject) {
   for (const descriptor of prepared.descriptor.projectAssets) {
-    await restoreProjectAssetBlobDescriptor({
-      blob: readRestoredBlob(restoredBlobs, descriptor.blobPath),
-      descriptor,
-      entryPatch: { id: remapDescriptorId(descriptor.entry, prepared.projectAssetIdMap) },
-      storeName: PROJECT_ASSETS_STORE,
-      tx,
+    const id = remapId(prepared.projectAssetIdMap, descriptor.entry.id);
+    const restored = prepared.restoredProjectAssets?.get(descriptor.blobPath);
+    if (!restored) throw new Error('Prepared project asset is missing.');
+    const entry = {
+      ...descriptor.entry,
+      assetId: restored.asset.ref.assetId,
+      id,
+      mimeType: restored.asset.ref.mimeType,
+      size: restored.asset.ref.size,
+    };
+    await getStore(tx, PROJECT_ASSETS_STORE).put(entry);
+    await getStore(tx, ASSET_REFS_STORE).put(restored.asset.ref);
+    await getStore(tx, ASSET_OWNERS_STORE).put({
+      assetId: restored.asset.ref.assetId,
+      ownerId: id,
+      ownerKind: PROJECT_ASSET_OWNER_KIND,
+      role: PROJECT_MEDIA_ASSET_ROLE,
     });
+    await getStore(tx, MEDIA_LIBRARY_STORE).put(buildProjectAssetMediaEntry(entry));
   }
 }
 
@@ -88,36 +100,31 @@ async function restoreVideoProjectExports(
 ) {
   for (const descriptor of prepared.descriptor.projectExports) {
     const exportId = remapId(prepared.projectExportIdMap, descriptor.entry.id);
-    const recordingId = remapId(prepared.recordingIdMap, descriptor.entry.recordingId);
-    const restored = prepared.restoredRecordingAssets?.get(descriptor.recording.blobPath);
-    if (!restored) throw new Error('Prepared project export recording asset is missing.');
-    const rawEntry = descriptor.recording.entry as Record<string, unknown>;
-    await getStore(tx, STORE_NAME).put({
-      ...rawEntry,
+    const restored = prepared.restoredProjectExportAssets?.get(descriptor.recording.blobPath);
+    if (!restored) throw new Error('Prepared project export asset is missing.');
+    const entry = {
       assetId: restored.asset.ref.assetId,
-      id: recordingId,
+      createdAt: descriptor.entry.createdAt,
+      duration: descriptor.entry.duration,
+      filename: descriptor.entry.filename,
+      fps: descriptor.entry.fps,
+      height: descriptor.entry.height,
+      id: exportId,
       mimeType: restored.asset.ref.mimeType,
+      projectId: prepared.projectId,
       size: restored.asset.ref.size,
-    });
+      width: descriptor.entry.width,
+      ...(descriptor.entry.format ? { format: descriptor.entry.format } : {}),
+    };
     await getStore(tx, ASSET_REFS_STORE).put(restored.asset.ref);
     await getStore(tx, ASSET_OWNERS_STORE).put({
       assetId: restored.asset.ref.assetId,
-      ownerId: recordingId,
-      ownerKind: RECORDING_ASSET_OWNER_KIND,
-      role: RECORDING_ASSET_ROLE,
+      ownerId: exportId,
+      ownerKind: PROJECT_EXPORT_OWNER_KIND,
+      role: PROJECT_MEDIA_ASSET_ROLE,
     });
-    await getStore(tx, PROJECT_EXPORTS_STORE).put({
-      ...descriptor.entry,
-      id: exportId,
-      projectId: prepared.projectId,
-      recordingId,
-    });
-    if (descriptor.recordingTelemetry) {
-      await getStore(tx, RECORDING_TELEMETRY_STORE).put({
-        ...descriptor.recordingTelemetry,
-        recordingId,
-      });
-    }
+    await getStore(tx, PROJECT_EXPORTS_STORE).put(entry);
+    await getStore(tx, MEDIA_LIBRARY_STORE).put(buildProjectExportMediaEntry(entry));
     if (descriptor.thumbnail) {
       await restoreBlobDescriptor({
         blob: readRestoredBlob(restoredBlobs, descriptor.thumbnail.blobPath),

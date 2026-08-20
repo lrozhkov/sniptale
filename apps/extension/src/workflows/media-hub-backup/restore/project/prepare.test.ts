@@ -8,14 +8,21 @@ import {
   createRestoreProjectMetadata,
 } from './prepare.test-support.ts';
 
-const { dbGetMock, getScenarioProjectEntryMock, getVideoProjectMock, initDBMock, randomUuidMock } =
-  vi.hoisted(() => ({
-    dbGetMock: vi.fn(),
-    getScenarioProjectEntryMock: vi.fn(),
-    getVideoProjectMock: vi.fn(),
-    initDBMock: vi.fn(),
-    randomUuidMock: vi.fn(),
-  }));
+const {
+  dbGetAllMock,
+  dbGetMock,
+  getScenarioProjectEntryMock,
+  getVideoProjectMock,
+  initDBMock,
+  randomUuidMock,
+} = vi.hoisted(() => ({
+  dbGetAllMock: vi.fn(),
+  dbGetMock: vi.fn(),
+  getScenarioProjectEntryMock: vi.fn(),
+  getVideoProjectMock: vi.fn(),
+  initDBMock: vi.fn(),
+  randomUuidMock: vi.fn(),
+}));
 
 vi.mock(
   '../../../../composition/persistence/infrastructure/indexed-db/core',
@@ -53,7 +60,8 @@ beforeEach(() => {
   getScenarioProjectEntryMock.mockResolvedValue({ id: 'scenario-1' });
   getVideoProjectMock.mockResolvedValue({ project: { id: 'video-1' }, status: 'ready' });
   dbGetMock.mockResolvedValue(undefined);
-  initDBMock.mockResolvedValue({ get: dbGetMock });
+  dbGetAllMock.mockResolvedValue([]);
+  initDBMock.mockResolvedValue({ get: dbGetMock, getAll: dbGetAllMock });
   randomUuidMock.mockReset();
   vi.stubGlobal('crypto', { randomUUID: randomUuidMock });
 });
@@ -65,7 +73,6 @@ describe('backup project restore preparation', () => {
       .mockReturnValueOnce('new-video')
       .mockReturnValueOnce('new-project-asset')
       .mockReturnValueOnce('new-export')
-      .mockReturnValueOnce('new-recording')
       .mockReturnValueOnce('new-scenario')
       .mockReturnValueOnce('new-scenario-asset');
 
@@ -184,6 +191,29 @@ describe('backup project restore preparation replace ownership', () => {
         strategy: 'replace',
       })
     ).resolves.toMatchObject({ skipped: 0, videoProjects: [expect.any(Object)] });
+  });
+
+  it('rejects replace before staging when a project asset is shared with another project', async () => {
+    const target = createVideoProjectEntryWithMediaClip({ id: 'video-1' });
+    const foreign = createVideoProjectEntryWithMediaClip({ id: 'video-2' });
+    getScenarioProjectEntryMock.mockResolvedValue(undefined);
+    getVideoProjectMock.mockResolvedValue({ project: target.project, status: 'ready' });
+    dbGetMock.mockImplementation(async (storeName: string, id: string) =>
+      storeName === 'project_assets' && id === 'project-asset-1' ? { id } : undefined
+    );
+    dbGetAllMock.mockResolvedValue([target, foreign]);
+
+    await expect(
+      prepareProjectDomains({
+        metadata: {
+          assets: [],
+          effectBundles: [],
+          scenarioProjects: [],
+          videoProjects: onlyVideoProjects(),
+        },
+        strategy: 'replace',
+      })
+    ).rejects.toThrow('Backup project asset is shared with another existing project.');
   });
 });
 

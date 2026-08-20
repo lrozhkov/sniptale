@@ -41,6 +41,7 @@ export function createProjectExportEntry(
   overrides: Partial<ProjectExportEntry> = {}
 ): ProjectExportEntry {
   return {
+    assetId: 'asset-project-export-1',
     createdAt: 100,
     duration: 42,
     filename: 'project-export.webm',
@@ -48,7 +49,6 @@ export function createProjectExportEntry(
     height: 1080,
     id: 'export-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     size: 512,
     width: 1920,
     ...overrides,

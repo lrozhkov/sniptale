@@ -5,7 +5,7 @@ export function createProjectAssetEntry(
   overrides: Partial<ProjectAssetEntry> = {}
 ): ProjectAssetEntry {
   return {
-    blob: new Blob(['asset'], { type: 'image/png' }),
+    assetId: 'asset-object-1',
     createdAt: 200,
     id: 'asset-1',
     mimeType: 'image/png',
@@ -24,8 +24,9 @@ export function createProjectExportEntry(
     fps: 30,
     height: 1080,
     id: 'export-1',
+    mimeType: 'video/webm',
     projectId: 'project-1',
-    recordingId: 'recording-1',
+    assetId: 'export-object-1',
     size: 55,
     width: 1920,
     ...overrides,

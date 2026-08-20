@@ -6,7 +6,12 @@ import {
   THUMBNAILS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { deleteProjectAsset, deleteProjectExport, getProjectAsset } from '../projects/index';
+import {
+  deleteProjectAsset,
+  deleteProjectExport,
+  getProjectAsset,
+  getProjectExport,
+} from '../projects/index';
 import { deleteRecording, getRecording } from '../recordings/index';
 import { deleteWebSnapshotMediaAsset, getWebSnapshotRecord } from '../web-snapshots';
 import type { MediaLibraryEntry, MediaLibraryItem, MediaThumbnailEntry } from './contracts';
@@ -84,9 +89,14 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
     return entry.blob;
   }
 
-  if (entry.source.kind === 'recording' || entry.source.kind === 'project-export') {
+  if (entry.source.kind === 'recording') {
     const recording = await getRecording(entry.source.recordingId);
     return recording?.file;
+  }
+
+  if (entry.source.kind === 'project-export') {
+    const projectExport = await getProjectExport(entry.source.exportId);
+    return projectExport?.file;
   }
 
   if (entry.source.kind === 'web-snapshot') {
@@ -103,7 +113,7 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
   }
 
   const projectAsset = await getProjectAsset(entry.source.projectAssetId);
-  return projectAsset?.blob;
+  return projectAsset?.file;
 }
 
 export async function updateMediaLibraryEntry(
@@ -191,7 +201,6 @@ async function deleteLinkedMediaSource(entry: MediaLibraryEntry): Promise<void> 
     await deleteRecording(entry.source.recordingId);
   } else if (entry.source.kind === 'project-export') {
     await deleteProjectExport(entry.source.exportId);
-    await deleteRecording(entry.source.recordingId);
   } else if (entry.source.kind === 'project-asset') {
     await deleteProjectAsset(entry.source.projectAssetId);
   }

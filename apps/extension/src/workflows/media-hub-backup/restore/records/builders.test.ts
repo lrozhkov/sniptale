@@ -8,6 +8,19 @@ import {
 } from './builders';
 import { VideoExportFormat } from '../../../../features/video/project/types';
 
+function createPrepared(assetId: string, blob: Blob) {
+  return {
+    ref: {
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      mimeType: blob.type || 'video/webm',
+      sha256: null,
+      size: blob.size,
+    },
+  };
+}
+
 function createEntry(
   source: MediaLibraryEntry['source'],
   overrides: Partial<Omit<MediaLibraryEntry, 'source'>> = {}
@@ -67,7 +80,6 @@ function assertProjectExportStoreEntry(): void {
       kind: 'project-export',
       exportId: 'export-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     },
     {
       duration: null,
@@ -77,7 +89,8 @@ function assertProjectExportStoreEntry(): void {
     }
   );
 
-  expect(createProjectExportStoreEntry(entry, blob)).toEqual({
+  expect(createProjectExportStoreEntry(entry, createPrepared('asset-export-1', blob))).toEqual({
+    assetId: 'asset-export-1',
     createdAt: 10,
     duration: 0,
     filename: 'asset.webm',
@@ -87,7 +100,6 @@ function assertProjectExportStoreEntry(): void {
     id: 'export-1',
     mimeType: 'video/mp4',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     size: blob.size,
     width: 0,
   });
@@ -99,16 +111,17 @@ function assertProjectExportWebmStoreEntry(): void {
     kind: 'project-export',
     exportId: 'export-2',
     projectId: 'project-2',
-    recordingId: 'recording-2',
   });
 
-  expect(createProjectExportStoreEntry(entry, blob)).toMatchObject({
+  expect(
+    createProjectExportStoreEntry(entry, createPrepared('asset-export-2', blob))
+  ).toMatchObject({
+    assetId: 'asset-export-2',
     duration: 42,
     format: VideoExportFormat.WEBM,
     height: 1080,
     id: 'export-2',
     projectId: 'project-2',
-    recordingId: 'recording-2',
     width: 1920,
   });
 }
@@ -121,13 +134,15 @@ function assertProjectAssetAndThumbnailEntries(): void {
     projectAssetId: 'project-asset-1',
   });
 
-  expect(createProjectAssetStoreEntry(entry, assetBlob)).toEqual({
-    blob: assetBlob,
-    createdAt: 10,
-    id: 'project-asset-1',
-    mimeType: 'video/webm',
-    size: assetBlob.size,
-  });
+  expect(createProjectAssetStoreEntry(entry, createPrepared('asset-project-1', assetBlob))).toEqual(
+    {
+      assetId: 'asset-project-1',
+      createdAt: 10,
+      id: 'project-asset-1',
+      mimeType: 'video/webm',
+      size: assetBlob.size,
+    }
+  );
   expect(createThumbnailStoreEntry(entry, thumbnailBlob)).toEqual({
     assetId: 'asset-1',
     blob: thumbnailBlob,
@@ -145,7 +160,7 @@ function assertProjectExportSourceGuard(): void {
         kind: 'recording',
         recordingId: 'recording-1',
       }),
-      new Blob(['asset'])
+      createPrepared('asset-invalid-export', new Blob(['asset']))
     )
   ).toThrowError('Project export record builder requires a project-export media entry.');
 }
@@ -157,7 +172,7 @@ function assertProjectAssetSourceGuard(): void {
         kind: 'recording',
         recordingId: 'recording-1',
       }),
-      new Blob(['asset'])
+      createPrepared('asset-invalid-project', new Blob(['asset']))
     )
   ).toThrowError('Project asset record builder requires a project-asset media entry.');
 }

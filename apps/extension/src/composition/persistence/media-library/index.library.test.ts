@@ -13,6 +13,7 @@ const dbMocks = vi.hoisted(() => ({
   getAllMock: vi.fn(),
   getMock: vi.fn(),
   getProjectAssetMock: vi.fn(),
+  getProjectExportMock: vi.fn(),
   getRecordingMock: vi.fn(),
   initDBMock: vi.fn(),
   listAllProjectExportsMock: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock('../projects/index', async (importOriginal) => ({
   deleteProjectAsset: dbMocks.deleteProjectAssetMock,
   deleteProjectExport: dbMocks.deleteProjectExportMock,
   getProjectAsset: dbMocks.getProjectAssetMock,
+  getProjectExport: dbMocks.getProjectExportMock,
   listAllProjectExports: dbMocks.listAllProjectExportsMock,
   listProjectAssets: dbMocks.listProjectAssetsMock,
   listVideoProjectReadResults: dbMocks.listVideoProjectReadResultsMock,
@@ -61,11 +63,11 @@ function createRecording(id: string): RecordingEntry {
     size: 10,
   };
 }
-function createProjectExport(id: string, recordingId: string): ProjectExportEntry {
+function createProjectExport(id: string, assetId: string): ProjectExportEntry {
   return {
+    assetId,
     id,
     projectId: 'project-1',
-    recordingId,
     filename: `${id}.webm`,
     createdAt: 300,
     size: 12,
@@ -80,8 +82,8 @@ function createProjectAsset(
   filename = `${id}.png`
 ): ProjectAssetEntry & { filename: string } {
   return {
+    assetId: `object-${id}`,
     id,
-    blob: new Blob([id], { type: 'image/png' }),
     mimeType: 'image/png',
     createdAt: 400,
     size: 8,
@@ -175,7 +177,6 @@ function installLegacyMediaLibrarySourceMocks() {
         kind: 'project-export',
         exportId: 'stale-export',
         projectId: 'project-1',
-        recordingId: 'stale-recording',
       },
     }),
     createMediaEntry({
@@ -192,7 +193,7 @@ function installLegacyMediaLibrarySourceMocks() {
 }
 
 function expectLegacyMediaLibrarySyncWrites() {
-  expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('recording:rec-2');
+  expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('export:stale-export');
   expect(dbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'recording:rec-1', filename: 'renamed.webm' })
   );
@@ -203,7 +204,6 @@ function expectLegacyMediaLibrarySyncWrites() {
         kind: 'project-export',
         exportId: 'exp-1',
         projectId: 'project-1',
-        recordingId: 'rec-2',
       },
     })
   );
@@ -239,9 +239,7 @@ async function verifySyncLegacyMediaLibraryFlow() {
   await syncLegacyMediaLibrary();
 
   expectLegacyMediaLibrarySyncWrites();
-  expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('recording:rec-2');
   expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('export:stale-export');
-  expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith('recording:rec-2');
   expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith('export:stale-export');
   expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-1');
   expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-2');
@@ -290,7 +288,6 @@ async function verifyGetMediaAssetBlobFlow() {
           kind: 'project-export',
           exportId: 'exp-1',
           projectId: 'project-1',
-          recordingId: 'rec-2',
         },
       })
     )
@@ -298,10 +295,9 @@ async function verifyGetMediaAssetBlobFlow() {
       createMediaEntry({ source: { kind: 'project-asset', projectAssetId: 'asset-1' } })
     )
     .mockResolvedValueOnce(undefined);
-  dbMocks.getRecordingMock
-    .mockResolvedValueOnce({ file: recordingBlob })
-    .mockResolvedValueOnce({ file: recordingBlob });
-  dbMocks.getProjectAssetMock.mockResolvedValueOnce({ blob: projectAssetBlob });
+  dbMocks.getRecordingMock.mockResolvedValueOnce({ file: recordingBlob });
+  dbMocks.getProjectExportMock.mockResolvedValueOnce({ file: recordingBlob });
+  dbMocks.getProjectAssetMock.mockResolvedValueOnce({ file: projectAssetBlob });
 
   await expect(getMediaAssetBlob('screenshot')).resolves.toBe(screenshotBlob);
   await expect(getMediaAssetBlob('recording')).resolves.toBe(recordingBlob);

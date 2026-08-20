@@ -26,7 +26,7 @@ export async function loadBlobForSource(source: BlobAssetSource): Promise<Blob> 
   if (!projectAsset) {
     throw new Error(`Project asset ${source.projectAssetId} not found.`);
   }
-  return projectAsset.blob;
+  return projectAsset.file;
 }
 
 export async function loadBlobForAsset(

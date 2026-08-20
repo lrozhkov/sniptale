@@ -9,7 +9,7 @@ import {
 } from './prepare';
 import {
   assertPreparedProjectBlobsAvailable,
-  stagePreparedProjectRecordingAssets,
+  stagePreparedProjectAssets,
 } from './project/preflight';
 import type { prepareProjectDomains } from './project/prepare';
 import { commitPreparedProjectDomains, isEmptyProjectDomainPlan } from './projects';
@@ -39,6 +39,11 @@ import {
   type AssetOperationCompensation,
 } from '../../../composition/persistence/assets';
 import { recoverAssetPublications } from '../../../composition/persistence/asset-publication-recovery';
+import {
+  PROJECT_ASSET_OWNER_KIND,
+  PROJECT_EXPORT_OWNER_KIND,
+  PROJECT_MEDIA_ASSET_ROLE,
+} from '../../../composition/persistence/projects/asset-publication';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
 type PreparedProjectDomains = Awaited<ReturnType<typeof prepareProjectDomains>>;
@@ -66,8 +71,8 @@ async function restorePreparedAssetsInTransaction(
     }
     importedAssetCompensations.push({
       nextEntry: prepared.nextEntry,
-      ...(prepared.preparedRecordingAsset
-        ? { preparedRecordingAsset: prepared.preparedRecordingAsset }
+      ...(prepared.preparedAssetPublication
+        ? { preparedAssetPublication: prepared.preparedAssetPublication }
         : {}),
       replacedSnapshot,
     });
@@ -84,34 +89,56 @@ async function restorePreparedAssetsInTransaction(
       prepared.webSnapshotRecord,
       prepared.workspace ?? null,
       prepared.presentation ?? null,
-      prepared.preparedRecordingAsset
+      prepared.preparedAssetPublication
     );
-    if (prepared.preparedRecordingAsset) {
+    if (prepared.preparedAssetPublication) {
       if (!operationId) throw new Error('Restore operation ID is missing during publication.');
       const source = prepared.nextEntry.source;
-      if (source.kind !== 'recording' && source.kind !== 'project-export') {
-        throw new Error('Prepared recording asset has an invalid media source.');
+      if (
+        source.kind !== 'recording' &&
+        source.kind !== 'project-export' &&
+        source.kind !== 'project-asset'
+      ) {
+        throw new Error('Prepared durable asset has an invalid media source.');
       }
       const operation = parseBackupAssetOperation(
         await getBackupStore(tx, ASSET_OPERATIONS_STORE).get(operationId)
       );
       if (!operation || operation.status !== 'pending') {
-        throw new Error('Restore operation is not pending during recording publication.');
+        throw new Error('Restore operation is not pending during asset publication.');
       }
+      const nextOwnerId =
+        source.kind === 'recording'
+          ? source.recordingId
+          : source.kind === 'project-export'
+            ? source.exportId
+            : source.projectAssetId;
       const durableCompensation: AssetOperationCompensation = {
-        assetId: prepared.preparedRecordingAsset.asset.ref.assetId,
-        journalId: prepared.preparedRecordingAsset.journalId,
+        assetId: prepared.preparedAssetPublication.asset.ref.assetId,
+        journalId: prepared.preparedAssetPublication.journalId,
         nextMediaId: prepared.nextEntry.id,
-        nextOwnerId: source.recordingId,
+        nextOwnerId,
+        ...(source.kind === 'project-asset'
+          ? {
+              nextProjectAssetId: source.projectAssetId,
+              ownerKind: PROJECT_ASSET_OWNER_KIND,
+              ownerRole: PROJECT_MEDIA_ASSET_ROLE,
+            }
+          : {}),
         ...(source.kind === 'project-export' ? { nextProjectExportId: source.exportId } : {}),
+        ...(source.kind === 'project-export'
+          ? { ownerKind: PROJECT_EXPORT_OWNER_KIND, ownerRole: PROJECT_MEDIA_ASSET_ROLE }
+          : {}),
         previousRecords: replacedSnapshot
           ? {
               assetOwnerEntry: replacedSnapshot.assetOwnerEntry,
               assetRefEntry: replacedSnapshot.assetRefEntry,
               mediaLibraryEntry: replacedSnapshot.mediaLibraryEntry,
+              projectAssetEntry: replacedSnapshot.projectAssetEntry,
               projectExportEntry: replacedSnapshot.projectExportEntry,
               recordingEntry: replacedSnapshot.recordingEntry,
               recordingTelemetryEntry: replacedSnapshot.recordingTelemetryEntry,
+              thumbnailEntry: replacedSnapshot.thumbnailEntry,
             }
           : {},
       };
@@ -133,7 +160,7 @@ async function restorePreparedAssetsInTransaction(
 
 interface ImportedAssetCompensation {
   nextEntry: BackupImportAssetPlan['nextEntry'];
-  preparedRecordingAsset?: PreparedBackupImportAsset['preparedRecordingAsset'];
+  preparedAssetPublication?: PreparedBackupImportAsset['preparedAssetPublication'];
   replacedSnapshot: BackupImportAssetRecordSnapshot | null;
 }
 
@@ -141,7 +168,7 @@ async function cleanupImportedNonOperationAssets(
   importedAssetCompensations: ImportedAssetCompensation[]
 ): Promise<void> {
   const localCompensations = importedAssetCompensations.filter(
-    (compensation) => !compensation.preparedRecordingAsset
+    (compensation) => !compensation.preparedAssetPublication
   );
   if (localCompensations.length === 0) {
     return;
@@ -194,15 +221,17 @@ async function restorePreparedAssetsInBatches(args: {
   return imported;
 }
 
-async function cleanupProjectRecordingAssets(
+async function cleanupProjectMediaAssets(
   prepared: PreparedProjectDomains,
   deleteObjects: boolean
 ): Promise<void> {
   for (const project of prepared.videoProjects) {
-    for (const restored of project.restoredRecordingAssets?.values() ?? []) {
-      if (deleteObjects) await deleteAssetObject(restored.asset.ref.assetId);
-      await deleteReadyJournal(restored.journalId);
-      releaseAssetReadyProtection([restored.asset.ref.assetId]);
+    for (const assets of [project.restoredProjectAssets, project.restoredProjectExportAssets]) {
+      for (const restored of assets?.values() ?? []) {
+        if (deleteObjects) await deleteAssetObject(restored.asset.ref.assetId);
+        await deleteReadyJournal(restored.journalId);
+        releaseAssetReadyProtection([restored.asset.ref.assetId]);
+      }
     }
   }
 }
@@ -223,16 +252,18 @@ export async function restorePreparedImportPlan(args: {
     args.assetPlans.some(
       (plan) =>
         plan.nextEntry.source.kind === 'recording' ||
-        plan.nextEntry.source.kind === 'project-export'
+        plan.nextEntry.source.kind === 'project-export' ||
+        plan.nextEntry.source.kind === 'project-asset'
     ) ||
     args.preparedProjectDomains.videoProjects.some(
-      (project) => project.descriptor.projectExports.length > 0
+      (project) =>
+        project.descriptor.projectAssets.length > 0 || project.descriptor.projectExports.length > 0
     );
   if (needsAssetOperation) await recoverAssetPublications();
   const operation = needsAssetOperation ? await createBackupRestoreOperation() : null;
   const importedAssetCompensations: ImportedAssetCompensation[] = [];
   try {
-    await stagePreparedProjectRecordingAssets(args.preparedProjectDomains, operation?.operationId);
+    await stagePreparedProjectAssets(args.preparedProjectDomains, operation?.operationId);
     const importedAssets = await restorePreparedAssetsInBatches({
       assetPlans: args.assetPlans,
       importedAssetCompensations,
@@ -248,12 +279,12 @@ export async function restorePreparedImportPlan(args: {
       await transitionAssetOperation(operation.operationId, 'pending', 'committed');
     }
     for (const compensation of importedAssetCompensations) {
-      const prepared = compensation.preparedRecordingAsset;
+      const prepared = compensation.preparedAssetPublication;
       if (!prepared) continue;
       await deleteReadyJournal(prepared.journalId).catch(() => undefined);
       releaseAssetReadyProtection([prepared.asset.ref.assetId]);
     }
-    await cleanupProjectRecordingAssets(args.preparedProjectDomains, false).catch(() => undefined);
+    await cleanupProjectMediaAssets(args.preparedProjectDomains, false).catch(() => undefined);
     await recoverAssetPublications().catch(() => undefined);
     return importedAssets + importedProjects;
   } catch (error) {
@@ -271,7 +302,7 @@ export async function restorePreparedImportPlan(args: {
     const cleanupResults = await Promise.allSettled([
       ...(operation ? [recoverAssetPublications()] : []),
       cleanupImportedNonOperationAssets(importedAssetCompensations),
-      ...(operation ? [] : [cleanupProjectRecordingAssets(args.preparedProjectDomains, true)]),
+      ...(operation ? [] : [cleanupProjectMediaAssets(args.preparedProjectDomains, true)]),
     ]);
     const cleanupErrors = cleanupResults.flatMap((result) =>
       result.status === 'rejected' ? [result.reason as unknown] : []

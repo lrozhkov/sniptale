@@ -49,7 +49,6 @@ export const runtimeVideoExportLifecycleContracts = {
         required: {
           jobId: isString,
           projectId: isString,
-          recordingId: isString,
           exportId: isString,
           filename: isString,
           format: isString,

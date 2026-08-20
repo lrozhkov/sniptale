@@ -118,7 +118,7 @@ async function verifyLoadBlobForAsset() {
   const projectAssetBlob = new Blob(['asset']);
 
   getRecordingMock.mockResolvedValue({ file: recordingBlob });
-  getProjectAssetMock.mockResolvedValue({ blob: projectAssetBlob });
+  getProjectAssetMock.mockResolvedValue({ file: projectAssetBlob });
 
   await expect(
     loadBlobForAsset(createAsset({ kind: 'recording', recordingId: 'rec-1' }))
@@ -169,7 +169,7 @@ function configureClipPreloadEnvironment() {
     }
     return null;
   });
-  getProjectAssetMock.mockResolvedValue({ blob: new Blob(['video']) });
+  getProjectAssetMock.mockResolvedValue({ file: new Blob(['video']) });
   getRecordingMock.mockResolvedValue({ file: new Blob(['audio']) });
 
   return { container, job, project };
@@ -197,7 +197,7 @@ async function verifyLoadImagesForProject() {
     }
     return null;
   });
-  getProjectAssetMock.mockResolvedValue({ blob: new Blob(['image']) });
+  getProjectAssetMock.mockResolvedValue({ file: new Blob(['image']) });
 
   const images = await loadImagesForProject(project as never, job as never);
 

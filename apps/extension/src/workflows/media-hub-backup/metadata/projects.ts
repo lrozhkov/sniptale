@@ -1,7 +1,4 @@
-import type {
-  ProjectExportEntry,
-  VideoProjectEntry,
-} from '../../../composition/persistence/projects/contracts';
+import type { VideoProjectEntry } from '../../../composition/persistence/projects/contracts';
 import { parseVideoProjectEntry } from '../../../composition/persistence/projects/read-guards';
 import { isEffectProjectMetadataBranches } from '../../../features/video/project/validation/effect-instances';
 import { readSafeBackupPathSegment, readSafeExportFilename } from './archive-fields';
@@ -21,6 +18,7 @@ import {
 } from './readers';
 import type {
   ProjectAssetBackupBlobDescriptor,
+  ProjectExportBackupEntry,
   EffectProjectBackupDescriptor,
   EffectSnapshotBackupBlobDescriptor,
   EffectSnapshotBackupDescriptor,
@@ -57,7 +55,7 @@ function normalizeProjectAssetBlobDescriptor(
   };
 }
 
-function normalizeProjectExportEntry(value: unknown): ProjectExportEntry {
+function normalizeProjectExportEntry(value: unknown): ProjectExportBackupEntry {
   const entry = readRecord(value);
   return {
     createdAt: readNumber(field(entry, 'createdAt')),
@@ -74,7 +72,7 @@ function normalizeProjectExportEntry(value: unknown): ProjectExportEntry {
     ...(field(entry, 'mimeType') === undefined
       ? {}
       : { mimeType: readString(field(entry, 'mimeType')) }),
-  } as ProjectExportEntry;
+  } as ProjectExportBackupEntry;
 }
 
 export function normalizeVideoProject(value: JsonRecord): VideoBackupProjectDescriptor {

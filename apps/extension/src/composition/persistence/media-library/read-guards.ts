@@ -79,14 +79,11 @@ function parseMediaAssetSource(value: unknown): MediaAssetSource | null {
         ? { kind: 'recording', recordingId: value['recordingId'] }
         : null;
     case 'project-export':
-      return isString(value['exportId']) &&
-        isString(value['projectId']) &&
-        isString(value['recordingId'])
+      return isString(value['exportId']) && isString(value['projectId'])
         ? {
             exportId: value['exportId'],
             kind: 'project-export',
             projectId: value['projectId'],
-            recordingId: value['recordingId'],
           }
         : null;
     case 'project-asset':

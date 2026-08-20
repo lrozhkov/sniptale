@@ -25,7 +25,6 @@ vi.mock(
     SCENARIO_ASSETS_STORE: 'scenario_assets',
     SCENARIO_EXPORTS_STORE: 'scenario_exports',
     SCENARIO_STEP_EDITOR_DOCUMENTS_STORE: 'scenario_step_editor_documents',
-    STORE_NAME: 'recordings',
   })
 );
 
@@ -35,18 +34,17 @@ beforeEach(() => {
 });
 
 describe('backup project video child conflicts', () => {
-  it('accepts replace when a colliding recording is owned by an existing project export', async () => {
+  it('accepts replace when a colliding project export belongs to the project', async () => {
     dbGetMock.mockImplementation(async (storeName: string, id: string) => {
       if (storeName === 'project_exports' && id === 'export-1') {
-        return { id, projectId: 'video-1', recordingId: 'recording-1' };
+        return { id, projectId: 'video-1' };
       }
-      return storeName === 'recordings' && id === 'recording-1' ? { id } : undefined;
+      return undefined;
     });
 
     const conflicts = await createVideoChildConflicts({
       projectAssetIds: [],
       projectExportIds: ['export-1'],
-      recordingIds: ['recording-1'],
     });
 
     expect(hasVideoChildConflict(conflicts)).toBe(true);
@@ -55,13 +53,12 @@ describe('backup project video child conflicts', () => {
     ).not.toThrow();
   });
 
-  it('rejects replace when a colliding recording is not owned by project exports', async () => {
-    dbGetMock.mockResolvedValue({ id: 'recording-1' });
+  it('rejects replace when a colliding project export belongs to another project', async () => {
+    dbGetMock.mockResolvedValue({ id: 'export-1', projectId: 'other-project' });
 
     const conflicts = await createVideoChildConflicts({
       projectAssetIds: [],
-      projectExportIds: [],
-      recordingIds: ['recording-1'],
+      projectExportIds: ['export-1'],
     });
 
     expect(() =>

@@ -98,7 +98,10 @@ function parseCompensation(value: unknown): AssetOperationCompensation | null {
     !isString(value['journalId']) ||
     !isString(value['nextMediaId']) ||
     !isString(value['nextOwnerId']) ||
+    !(value['nextProjectAssetId'] === undefined || isString(value['nextProjectAssetId'])) ||
     !(value['nextProjectExportId'] === undefined || isString(value['nextProjectExportId'])) ||
+    !(value['ownerKind'] === undefined || isString(value['ownerKind'])) ||
+    !(value['ownerRole'] === undefined || isString(value['ownerRole'])) ||
     !isRecord(value['previousRecords'])
   ) {
     return null;
@@ -108,9 +111,14 @@ function parseCompensation(value: unknown): AssetOperationCompensation | null {
     journalId: value['journalId'],
     nextMediaId: value['nextMediaId'],
     nextOwnerId: value['nextOwnerId'],
+    ...(value['nextProjectAssetId'] === undefined
+      ? {}
+      : { nextProjectAssetId: value['nextProjectAssetId'] }),
     ...(value['nextProjectExportId'] === undefined
       ? {}
       : { nextProjectExportId: value['nextProjectExportId'] }),
+    ...(value['ownerKind'] === undefined ? {} : { ownerKind: value['ownerKind'] }),
+    ...(value['ownerRole'] === undefined ? {} : { ownerRole: value['ownerRole'] }),
     previousRecords: value['previousRecords'],
   };
 }

@@ -14,7 +14,7 @@ const {
   prepareBackupImportAssetMock,
   publishMediaHubLibraryChangedMock,
   assertPreparedProjectBlobsAvailableMock,
-  stagePreparedProjectRecordingAssetsMock,
+  stagePreparedProjectAssetsMock,
   restorePreparedProjectDomainsInTransactionMock,
   restoreAssetRecordMock,
   restoreAssetRecordSnapshotMock,
@@ -35,7 +35,7 @@ const {
   prepareBackupImportAssetMock: vi.fn(),
   publishMediaHubLibraryChangedMock: vi.fn(),
   assertPreparedProjectBlobsAvailableMock: vi.fn(),
-  stagePreparedProjectRecordingAssetsMock: vi.fn(),
+  stagePreparedProjectAssetsMock: vi.fn(),
   restorePreparedProjectDomainsInTransactionMock: vi.fn(),
   restoreAssetRecordMock: vi.fn(),
   restoreAssetRecordSnapshotMock: vi.fn(),
@@ -109,7 +109,7 @@ vi.mock('./project/prepare', async (importOriginal) => ({
 
 vi.mock('./project/preflight', () => ({
   assertPreparedProjectBlobsAvailable: assertPreparedProjectBlobsAvailableMock,
-  stagePreparedProjectRecordingAssets: stagePreparedProjectRecordingAssetsMock,
+  stagePreparedProjectAssets: stagePreparedProjectAssetsMock,
 }));
 
 vi.mock('./projects', async (importOriginal) => ({
@@ -317,7 +317,7 @@ describe('media hub backup restore project-domain orchestration', () => {
         },
       ],
     });
-    stagePreparedProjectRecordingAssetsMock.mockRejectedValueOnce(
+    stagePreparedProjectAssetsMock.mockRejectedValueOnce(
       new Error('second project export staging failed')
     );
     recoverAssetPublicationsMock

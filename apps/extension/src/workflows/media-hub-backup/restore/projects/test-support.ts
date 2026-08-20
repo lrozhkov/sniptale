@@ -72,8 +72,8 @@ function createMinimalVideoProject(): PreparedProjectDomains['videoProjects'][nu
     projectExportIdMap: new Map(),
     projectId: 'video-1',
     idChanged: false,
-    recordingIdMap: new Map(),
-    restoredRecordingAssets: createRestoredRecordingAssets(),
+    restoredProjectAssets: new Map(),
+    restoredProjectExportAssets: createRestoredAsset('recording', 'asset-restored-export'),
   };
 }
 
@@ -172,27 +172,27 @@ function createPreparedVideoProject(): PreparedProjectDomains['videoProjects'][n
     projectExportIdMap: new Map([['export-1', 'export-copy']]),
     projectId: 'video-copy',
     idChanged: true,
-    recordingIdMap: new Map([['recording-1', 'recording-copy']]),
-    restoredRecordingAssets: createRestoredRecordingAssets(),
+    restoredProjectAssets: createRestoredAsset('project-asset', 'asset-restored-project'),
+    restoredProjectExportAssets: createRestoredAsset('recording', 'asset-restored-export'),
   };
 }
 
-function createRestoredRecordingAssets() {
+function createRestoredAsset(path: string, assetId: string) {
   return new Map([
     [
-      'recording',
+      path,
       {
         asset: {
           ref: {
-            assetId: 'asset-restored-recording',
+            assetId,
             createdAt: 1,
-            location: { kind: 'opfs' as const, objectKey: 'objects/asset-restored-recording' },
+            location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
             mimeType: 'video/webm',
             sha256: null,
             size: 9,
           },
         },
-        journalId: 'journal-restored-recording',
+        journalId: `journal-${assetId}`,
       },
     ],
   ]);

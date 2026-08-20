@@ -13,6 +13,12 @@ const {
   initDBMock,
   publishMediaHubLibraryChangedMock,
   withMediaHubWriteGuardMock,
+  recoverAssetPublicationsMock,
+  createBackupRestoreOperationMock,
+  transitionAssetOperationMock,
+  assertAssetWriteAdmissionMock,
+  createAssetPublicationJournalMock,
+  writeBlobToAssetMock,
 } = vi.hoisted(() => ({
   createProjectAssetStoreEntryMock: vi.fn(),
   createProjectExportStoreEntryMock: vi.fn(),
@@ -23,7 +29,34 @@ const {
   initDBMock: vi.fn(),
   publishMediaHubLibraryChangedMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
+  recoverAssetPublicationsMock: vi.fn(),
+  createBackupRestoreOperationMock: vi.fn(),
+  transitionAssetOperationMock: vi.fn(),
+  assertAssetWriteAdmissionMock: vi.fn(),
+  createAssetPublicationJournalMock: vi.fn(),
+  writeBlobToAssetMock: vi.fn(),
 }));
+
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal()),
+  assertAssetWriteAdmission: assertAssetWriteAdmissionMock,
+  createAssetPublicationJournal: createAssetPublicationJournalMock,
+  writeBlobToAsset: writeBlobToAssetMock,
+}));
+
+vi.mock('../../../../composition/persistence/assets/operations', async (importOriginal) => ({
+  ...(await importOriginal()),
+  createBackupRestoreOperation: createBackupRestoreOperationMock,
+  transitionAssetOperation: transitionAssetOperationMock,
+}));
+
+vi.mock(
+  '../../../../composition/persistence/asset-publication-recovery',
+  async (importOriginal) => ({
+    ...(await importOriginal()),
+    recoverAssetPublications: recoverAssetPublicationsMock,
+  })
+);
 
 vi.mock(
   '../../../../composition/persistence/infrastructure/indexed-db/core',
@@ -97,6 +130,9 @@ function createMediaEntry(
 function createWriteHarness() {
   const stores = new Map(
     [
+      'asset_refs',
+      'asset_owners',
+      'asset_operations',
       'media_library',
       'recordings',
       'recording_telemetry',
@@ -110,6 +146,15 @@ function createWriteHarness() {
   const tx = {
     done: Promise.resolve(),
   };
+  stores.get('asset_operations')?.get.mockResolvedValue({
+    compensations: [],
+    createdAt: 1,
+    kind: 'backup-restore',
+    obsoleteAssetIds: [],
+    operationId: 'restore-1',
+    status: 'pending',
+    updatedAt: 1,
+  });
 
   initDBMock.mockResolvedValue({
     transaction: vi.fn().mockReturnValue(tx),
@@ -171,6 +216,27 @@ beforeEach(() => {
   initDBMock.mockReset();
   publishMediaHubLibraryChangedMock.mockReset();
   withMediaHubWriteGuardMock.mockReset();
+  recoverAssetPublicationsMock.mockReset();
+  createBackupRestoreOperationMock.mockReset();
+  transitionAssetOperationMock.mockReset();
+  recoverAssetPublicationsMock.mockResolvedValue(undefined);
+  createBackupRestoreOperationMock.mockResolvedValue({
+    operationId: 'restore-1',
+    status: 'pending',
+  });
+  transitionAssetOperationMock.mockResolvedValue(undefined);
+  assertAssetWriteAdmissionMock.mockResolvedValue(undefined);
+  createAssetPublicationJournalMock.mockResolvedValue({ journalId: 'journal-1' });
+  writeBlobToAssetMock.mockResolvedValue({
+    ref: {
+      assetId: 'asset-restored-1',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/asset-restored-1' },
+      mimeType: 'image/png',
+      sha256: null,
+      size: 5,
+    },
+  });
   withMediaHubWriteGuardMock.mockImplementation(async (_operation, callback: () => Promise<void>) =>
     callback()
   );
@@ -223,6 +289,70 @@ describe('import media hub backup assets skip and replace flows', () => {
       imported: 1,
       skipped: 0,
     });
+  });
+
+  it('persists the complete project-asset rollback snapshot before a later batch can fail', async () => {
+    const { importMediaHubBackupAssets } = await importRestoreModule();
+    const { stores } = createWriteHarness();
+    const existingEntry = createMediaEntry(
+      { kind: 'project-asset', projectAssetId: 'project-asset-1' },
+      { id: 'project-asset:project-asset-1', kind: 'image' }
+    );
+    const previousProjectAsset = {
+      assetId: 'asset-old',
+      createdAt: 1,
+      id: 'project-asset-1',
+      mimeType: 'image/png',
+      size: 5,
+    };
+    const previousThumbnail = { blob: new Blob(['old-thumb']), id: existingEntry.id };
+    const previousRef = {
+      assetId: 'asset-old',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/asset-old' },
+      mimeType: 'image/png',
+      sha256: null,
+      size: 5,
+    };
+    const previousOwner = {
+      assetId: 'asset-old',
+      ownerId: 'project-asset-1',
+      ownerKind: 'project-asset',
+      role: 'body',
+    };
+    getMediaLibraryEntryMock.mockResolvedValue(existingEntry);
+    stores.get('media_library')?.get.mockResolvedValue(existingEntry);
+    stores.get('project_assets')?.get.mockResolvedValue(previousProjectAsset);
+    stores.get('thumbnails')?.get.mockResolvedValue(previousThumbnail);
+    stores.get('asset_refs')?.get.mockResolvedValue(previousRef);
+    stores.get('asset_owners')?.get.mockResolvedValue(previousOwner);
+    createProjectAssetStoreEntryMock.mockReturnValue({
+      ...previousProjectAsset,
+      assetId: 'asset-restored-1',
+    });
+
+    await importMediaHubBackupAssets({
+      metadata: createBackupMetadata(existingEntry, 'thumbnails/asset-1'),
+      remapEntryForDuplicate: vi.fn((entry) => entry),
+      strategy: 'replace',
+      zip: createZip(),
+    });
+
+    expect(stores.get('asset_operations')?.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        compensations: [
+          expect.objectContaining({
+            previousRecords: expect.objectContaining({
+              assetOwnerEntry: previousOwner,
+              assetRefEntry: previousRef,
+              mediaLibraryEntry: existingEntry,
+              projectAssetEntry: previousProjectAsset,
+              thumbnailEntry: previousThumbnail,
+            }),
+          }),
+        ],
+      })
+    );
   });
 });
 

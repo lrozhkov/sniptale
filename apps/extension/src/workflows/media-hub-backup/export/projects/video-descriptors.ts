@@ -3,25 +3,19 @@ import {
   PROJECT_ASSETS_STORE,
   ASSET_REFS_STORE,
   PROJECT_EXPORTS_STORE,
-  RECORDING_TELEMETRY_STORE,
-  STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
-import type {
-  ProjectAssetEntry,
-  ProjectExportEntry,
-} from '../../../../composition/persistence/projects/contracts';
+import type { StoredProjectExportEntry } from '../../../../composition/persistence/projects/contracts';
 import { UnsupportedEngine1VideoProjectError } from '../../../../composition/persistence/projects/contracts';
-import type {
-  RecordingEntry,
-  RecordingTelemetryEntry,
-} from '../../../../composition/persistence/recordings/contracts';
-import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
-import { parseVideoProjectEntryResult } from '../../../../composition/persistence/projects/read-guards';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+  parseVideoProjectEntryResult,
+} from '../../../../composition/persistence/projects/read-guards';
 import type { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
 import { assertBackupExportNotCancelled, type BackupExportBudget } from '../blob/budget';
 import { createBackupBlobDescriptor } from '../blob/descriptor';
@@ -130,18 +124,27 @@ async function buildVideoProjectAssetDescriptors(
   const projectAssets: VideoBackupProjectDescriptor['projectAssets'] = [];
   for (const assetId of projectAssetIds) {
     assertBackupExportNotCancelled(signal);
-    const asset = (await db.get(PROJECT_ASSETS_STORE, assetId)) as ProjectAssetEntry | undefined;
+    const asset = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, assetId));
     assertBackupExportNotCancelled(signal);
     if (!asset) {
       continue;
     }
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, asset.assetId));
+    if (!ref) continue;
+    const file = await readAssetFile(ref, asset.id);
 
     projectAssets.push(
       createBackupBlobDescriptor(
         zip,
         budget,
         `video-projects/${entry.id}/assets/${safeBackupPathSegment(assetId, 'video project asset id')}`,
-        asset,
+        {
+          blob: file,
+          createdAt: asset.createdAt,
+          id: asset.id,
+          mimeType: asset.mimeType,
+          size: asset.size,
+        },
         signal
       )
     );
@@ -159,27 +162,17 @@ async function buildVideoProjectExportDescriptors(
   signal: AbortSignal | undefined
 ): Promise<VideoBackupProjectDescriptor['projectExports']> {
   assertBackupExportNotCancelled(signal);
-  const exports = (await db.getAllFromIndex(
-    PROJECT_EXPORTS_STORE,
-    'projectId',
-    projectId
-  )) as ProjectExportEntry[];
+  const exports = (await db.getAllFromIndex(PROJECT_EXPORTS_STORE, 'projectId', projectId))
+    .map(parseProjectExportEntry)
+    .filter((entry): entry is StoredProjectExportEntry => entry !== null);
   assertBackupExportNotCancelled(signal);
   const descriptors: VideoBackupProjectDescriptor['projectExports'] = [];
 
   for (const entry of exports) {
     assertBackupExportNotCancelled(signal);
-    const storedRecording = parseRecordingEntry(await db.get(STORE_NAME, entry.recordingId));
-    assertBackupExportNotCancelled(signal);
-    if (!storedRecording) {
-      continue;
-    }
-    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, storedRecording.assetId));
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, entry.assetId));
     if (!ref) continue;
-    const recording: RecordingEntry = {
-      ...storedRecording,
-      file: await readAssetFile(ref, storedRecording.filename),
-    };
+    const file = await readAssetFile(ref, entry.filename);
 
     descriptors.push(
       await buildVideoProjectExportDescriptor(
@@ -188,7 +181,7 @@ async function buildVideoProjectExportDescriptors(
         budget,
         projectId,
         entry,
-        recording,
+        file,
         options,
         signal
       )
@@ -203,8 +196,8 @@ async function buildVideoProjectExportDescriptor(
   zip: JSZip,
   budget: BackupExportBudget,
   projectId: string,
-  entry: ProjectExportEntry,
-  recording: RecordingEntry,
+  entry: StoredProjectExportEntry,
+  file: File,
   options: MediaHubBackupExportOptions,
   signal: AbortSignal | undefined
 ): Promise<VideoBackupProjectDescriptor['projectExports'][number]> {
@@ -215,31 +208,37 @@ async function buildVideoProjectExportDescriptor(
     | MediaThumbnailEntry
     | undefined;
   assertBackupExportNotCancelled(signal);
-  const recordingTelemetry = options.includeTelemetry
-    ? ((await db.get(RECORDING_TELEMETRY_STORE, entry.recordingId)) as
-        | RecordingTelemetryEntry
-        | undefined)
-    : undefined;
-  assertBackupExportNotCancelled(signal);
+  void options;
 
   return {
-    entry,
+    entry: {
+      createdAt: entry.createdAt,
+      duration: entry.duration,
+      filename: entry.filename,
+      fps: entry.fps,
+      height: entry.height,
+      id: entry.id,
+      projectId: entry.projectId,
+      recordingId: entry.id,
+      size: entry.size,
+      width: entry.width,
+      ...(entry.format ? { format: entry.format } : {}),
+      ...(entry.mimeType ? { mimeType: entry.mimeType } : {}),
+    },
     recording: createBackupBlobDescriptor(
       zip,
       budget,
       `video-projects/${projectSegment}/exports/${exportSegment}`,
       {
-        blob: recording.file,
-        createdAt: recording.createdAt,
-        filename: recording.filename,
-        id: recording.id,
-        mimeType: recording.mimeType,
-        size: recording.size,
-        ...(recording.lifecycle ? { lifecycle: recording.lifecycle } : {}),
+        blob: file,
+        createdAt: entry.createdAt,
+        filename: entry.filename,
+        id: entry.id,
+        mimeType: entry.mimeType ?? 'video/webm',
+        size: entry.size,
       },
       signal
     ),
-    ...(recordingTelemetry ? { recordingTelemetry } : {}),
     ...(thumbnail
       ? {
           thumbnail: createBackupBlobDescriptor(

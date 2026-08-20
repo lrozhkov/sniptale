@@ -19,7 +19,7 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 import { listMediaLibrary } from '../media-library';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { listVideoProjectEntries } from '../projects';
-import { parseVideoProjectEntry } from '../projects/read-guards';
+import { parseProjectAssetEntry, parseVideoProjectEntry } from '../projects/read-guards';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { listScenarioProjectEntries } from '../scenario/projects';
 import {
@@ -39,7 +39,16 @@ import {
   completePhysicalDeleteOperation,
   type PhysicalDeleteAssetOperation,
 } from '../assets';
-import { RECORDING_ASSET_OWNER_KIND, RECORDING_ASSET_ROLE } from '../recordings/asset-publication';
+import {
+  RECORDING_ASSET_OWNER_KIND,
+  RECORDING_ASSET_ROLE,
+  recoverRecordingAssetPublications,
+} from '../recordings/asset-publication';
+import {
+  PROJECT_ASSET_OWNER_KIND,
+  PROJECT_MEDIA_ASSET_ROLE,
+  recoverProjectMediaPublications,
+} from '../projects/asset-publication';
 
 export interface DraftCleanupResult {
   deletedCount: number;
@@ -61,6 +70,8 @@ export async function cleanupDrafts(args: {
   includeUnexpired?: boolean;
   now?: number;
 }): Promise<DraftCleanupResult> {
+  await recoverRecordingAssetPublications();
+  await recoverProjectMediaPublications();
   const now = args.now ?? Date.now();
   const ordinaryRetention = getDraftRetentionMs(args.policy, 'ordinary');
   const videoRetention = getDraftRetentionMs(args.policy, 'video');
@@ -209,6 +220,23 @@ async function unlinkRecordingAsset(args: {
   if ((await args.ownerStore.index('assetId').count(args.recording.assetId)) === 0) {
     await args.refStore.delete(args.recording.assetId);
     args.operation.assetIds.push(args.recording.assetId);
+  }
+}
+
+async function unlinkProjectAsset(args: {
+  operation: PhysicalDeleteAssetOperation;
+  ownerStore: CleanupOwnerStore;
+  projectAsset: NonNullable<ReturnType<typeof parseProjectAssetEntry>>;
+  refStore: CleanupDeleteStore;
+}): Promise<void> {
+  await args.ownerStore.delete([
+    PROJECT_ASSET_OWNER_KIND,
+    args.projectAsset.id,
+    PROJECT_MEDIA_ASSET_ROLE,
+  ]);
+  if ((await args.ownerStore.index('assetId').count(args.projectAsset.assetId)) === 0) {
+    await args.refStore.delete(args.projectAsset.assetId);
+    args.operation.assetIds.push(args.projectAsset.assetId);
   }
 }
 
@@ -403,7 +431,18 @@ async function deleteExpiredMedia(
       });
     }
     if (current.source.kind === 'project-asset') {
+      const projectAsset = parseProjectAssetEntry(
+        await tx.objectStore(PROJECT_ASSETS_STORE).get(current.source.projectAssetId)
+      );
       await tx.objectStore(PROJECT_ASSETS_STORE).delete(current.source.projectAssetId);
+      if (projectAsset) {
+        await unlinkProjectAsset({
+          operation,
+          ownerStore: tx.objectStore(ASSET_OWNERS_STORE),
+          projectAsset,
+          refStore: tx.objectStore(ASSET_REFS_STORE),
+        });
+      }
     }
     if (operation.assetIds.length > 0) {
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
@@ -480,7 +519,18 @@ async function deleteExpiredVideoProjectGraph(args: {
     });
     for (const projectAssetId of refs.projectAssetIds) {
       if (!protectedProjectAssetIds.has(projectAssetId)) {
+        const projectAsset = parseProjectAssetEntry(
+          await tx.objectStore(PROJECT_ASSETS_STORE).get(projectAssetId)
+        );
         await tx.objectStore(PROJECT_ASSETS_STORE).delete(projectAssetId);
+        if (projectAsset) {
+          await unlinkProjectAsset({
+            operation,
+            ownerStore: tx.objectStore(ASSET_OWNERS_STORE),
+            projectAsset,
+            refStore: tx.objectStore(ASSET_REFS_STORE),
+          });
+        }
       }
     }
     await presentationStore.delete(

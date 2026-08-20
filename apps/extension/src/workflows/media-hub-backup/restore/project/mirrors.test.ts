@@ -92,7 +92,6 @@ function createProjectExportMirror(): Omit<MediaLibraryEntry, 'blob'> {
       exportId: 'export-1',
       kind: 'project-export',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     },
     sourceFavicon: null,
     sourceTitle: null,
@@ -127,7 +126,7 @@ function createProjectMirrorBackupMetadata() {
         projectAssets: [],
         projectExports: [
           {
-            entry: createProjectExportEntry(),
+            entry: { ...createProjectExportEntry(), recordingId: 'recording-1' },
             recording: { blobPath: 'recording', entry: recordingEntry },
           },
         ],

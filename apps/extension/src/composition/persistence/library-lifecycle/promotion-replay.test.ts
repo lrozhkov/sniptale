@@ -174,7 +174,7 @@ describe('aggregate lifecycle promotion replay', () => {
       media_library: { getAll: vi.fn(async () => mediaRows), put: mediaPut },
       project_assets: {
         get: vi.fn(async () => ({
-          blob: new Blob(['asset']),
+          assetId: 'asset-project-1',
           createdAt: 10,
           id: 'project-asset-1',
           mimeType: 'image/png',

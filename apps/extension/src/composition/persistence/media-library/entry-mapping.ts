@@ -1,17 +1,14 @@
 import type { MediaAssetKind, MediaLibraryEntry } from './contracts';
-import type { ProjectAssetEntry, ProjectExportEntry } from '../projects/contracts';
+import type { StoredProjectAssetEntry, StoredProjectExportEntry } from '../projects/contracts';
 import type { StoredRecordingEntry } from '../recordings/contracts';
 import {
   createProjectAssetMediaId,
+  createProjectExportMediaId,
   createRecordingMediaId,
 } from '../../../features/media-hub/media-id';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
 type RecordingMediaEntryInput = StoredRecordingEntry;
-
-function createProjectExportMediaId(exportId: string): string {
-  return `export:${exportId}`;
-}
 
 function resolveProjectAssetKind(mimeType: string): MediaAssetKind {
   if (mimeType.startsWith('audio/')) {
@@ -81,14 +78,13 @@ export function buildRecordingMediaEntry(entry: RecordingMediaEntryInput): Media
   };
 }
 
-export function buildProjectExportMediaEntry(entry: ProjectExportEntry): MediaLibraryEntry {
+export function buildProjectExportMediaEntry(entry: StoredProjectExportEntry): MediaLibraryEntry {
   return {
     id: createProjectExportMediaId(entry.id),
     kind: 'export',
     source: {
       kind: 'project-export',
       exportId: entry.id,
-      recordingId: entry.recordingId,
       projectId: entry.projectId,
     },
     filename: entry.filename,
@@ -108,9 +104,7 @@ export function buildProjectExportMediaEntry(entry: ProjectExportEntry): MediaLi
   };
 }
 
-export function buildProjectAssetMediaEntry(
-  entry: Omit<ProjectAssetEntry, 'blob'>
-): MediaLibraryEntry {
+export function buildProjectAssetMediaEntry(entry: StoredProjectAssetEntry): MediaLibraryEntry {
   return {
     id: createProjectAssetMediaId(entry.id),
     kind: resolveProjectAssetKind(entry.mimeType),

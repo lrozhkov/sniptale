@@ -20,10 +20,7 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
   writeBlobToAsset: assetMocks.writeBlob,
 }));
 
-import {
-  assertPreparedProjectBlobsAvailable,
-  stagePreparedProjectRecordingAssets,
-} from './preflight';
+import { assertPreparedProjectBlobsAvailable, stagePreparedProjectAssets } from './preflight';
 import { createMissingProjectBlobZip, createPreparedDomains } from '../projects/test-support';
 
 beforeEach(() => {
@@ -77,6 +74,7 @@ it('fails when a prepared project blob entry is missing', async () => {
 it('leaves earlier operation journals to recovery when later project-export staging fails', async () => {
   const prepared = createPreparedDomains();
   const project = prepared.videoProjects[0]!;
+  project.descriptor.projectAssets = [];
   const first = project.descriptor.projectExports[0]!;
   project.descriptor.projectExports.push({
     ...first,
@@ -96,7 +94,7 @@ it('leaves earlier operation journals to recovery when later project-export stag
     .mockRejectedValueOnce(new Error('second staging failed'));
   assetMocks.createJournal.mockResolvedValueOnce({ journalId: 'journal-1' });
 
-  await expect(stagePreparedProjectRecordingAssets(prepared, 'restore-1')).rejects.toThrow(
+  await expect(stagePreparedProjectAssets(prepared, 'restore-1')).rejects.toThrow(
     'second staging failed'
   );
 
@@ -107,6 +105,7 @@ it('leaves earlier operation journals to recovery when later project-export stag
 
 it('discards only the current unpublished object when journal creation fails', async () => {
   const prepared = createPreparedDomains();
+  prepared.videoProjects[0]!.descriptor.projectAssets = [];
   const recording = prepared.videoProjects[0]!.descriptor.projectExports[0]!.recording;
   prepared.restoredBlobs = new Map([
     [recording.blobPath, new Blob(['recording'], { type: 'video/webm' })],
@@ -115,9 +114,7 @@ it('discards only the current unpublished object when journal creation fails', a
   assetMocks.createJournal.mockRejectedValueOnce(new Error('journal failed'));
   assetMocks.discard.mockResolvedValueOnce(undefined);
 
-  await expect(stagePreparedProjectRecordingAssets(prepared, 'restore-1')).rejects.toThrow(
-    'journal failed'
-  );
+  await expect(stagePreparedProjectAssets(prepared, 'restore-1')).rejects.toThrow('journal failed');
 
   expect(assetMocks.discard).toHaveBeenCalledWith('asset-current');
 });

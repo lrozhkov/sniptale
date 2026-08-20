@@ -129,6 +129,8 @@ declare module './index' {
     type PROJECT_EXPORT_FAILED = typeof import('./index').VideoMessageType.PROJECT_EXPORT_FAILED;
     type PROJECT_EXPORT_CANCELLED =
       typeof import('./index').VideoMessageType.PROJECT_EXPORT_CANCELLED;
+    type DOWNLOAD_PROJECT_EXPORT =
+      typeof import('./index').VideoMessageType.DOWNLOAD_PROJECT_EXPORT;
     type DOWNLOAD_RECORDING = typeof import('./index').VideoMessageType.DOWNLOAD_RECORDING;
     type DOWNLOAD_RECORDING_SIDECAR =
       typeof import('./index').VideoMessageType.DOWNLOAD_RECORDING_SIDECAR;

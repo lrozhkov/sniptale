@@ -19,11 +19,12 @@ export async function commitPreparedProjectDomains(args: {
   if (isEmptyProjectDomainPlan(args.prepared)) {
     return 0;
   }
-  const hasProjectExportRecordings = args.prepared.videoProjects.some(
-    (project) => project.descriptor.projectExports.length > 0
+  const hasProjectMediaAssets = args.prepared.videoProjects.some(
+    (project) =>
+      project.descriptor.projectAssets.length > 0 || project.descriptor.projectExports.length > 0
   );
-  if (hasProjectExportRecordings && !args.operationId) {
-    throw new Error('Project export restore requires a durable asset operation.');
+  if (hasProjectMediaAssets && !args.operationId) {
+    throw new Error('Project media restore requires a durable asset operation.');
   }
 
   return runWithIndexedDbMutation(async (db) => {
@@ -42,7 +43,7 @@ export async function commitPreparedProjectDomains(args: {
           obsoleteAssetIds: [
             ...operation.obsoleteAssetIds,
             ...args.prepared.videoProjects.flatMap(
-              (project) => project.obsoleteRecordingAssetIds ?? []
+              (project) => project.obsoleteProjectMediaAssetIds ?? []
             ),
           ],
           status: 'committed',

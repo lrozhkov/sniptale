@@ -35,7 +35,7 @@ export function createProjectAssetEntry(
   overrides: Partial<ProjectAssetEntry> = {}
 ): ProjectAssetEntry {
   return {
-    blob: new Blob(['asset'], { type: 'image/png' }),
+    assetId: 'asset-project-asset-1',
     createdAt: 200,
     id: 'asset-1',
     mimeType: 'image/png',

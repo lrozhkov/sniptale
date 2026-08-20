@@ -165,7 +165,6 @@ function verifyStartExportState() {
 function verifyCompleteExportState() {
   const nextState = completeExportState(startExportState(createInitialExportState(), 'job-1'), {
     filename: 'demo.webm',
-    recordingId: 'rec-1',
     exportId: 'exp-1',
   });
 
@@ -173,7 +172,6 @@ function verifyCompleteExportState() {
   expect(nextState.jobId).toBeNull();
   expect(nextState.lastResult).toEqual({
     filename: 'demo.webm',
-    recordingId: 'rec-1',
     exportId: 'exp-1',
   });
   expect(nextState.status).toEqual({
@@ -208,7 +206,6 @@ function runExportStateActions(actions: ReturnType<typeof createExportStateActio
   actions.failExport('failed');
   actions.completeExport({
     filename: 'done.webm',
-    recordingId: 'rec-1',
     exportId: 'exp-1',
   });
   actions.cancelExport();

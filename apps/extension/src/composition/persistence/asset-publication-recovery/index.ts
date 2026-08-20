@@ -15,9 +15,11 @@ import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
+  THUMBNAILS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
@@ -25,6 +27,10 @@ import {
   RECORDING_ASSET_ROLE,
   recordingAssetPublicationAdapter,
 } from '../recordings/asset-publication';
+import {
+  projectAssetPublicationAdapter,
+  projectExportPublicationAdapter,
+} from '../projects/asset-publication';
 
 async function restorePreviousRecord(
   store: { put(value: unknown): Promise<unknown> },
@@ -42,9 +48,11 @@ async function compensateRestoreOperation(operation: AssetOperation): Promise<vo
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
         MEDIA_LIBRARY_STORE,
+        PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
         RECORDING_TELEMETRY_STORE,
         STORE_NAME,
+        THUMBNAILS_STORE,
       ],
       'readwrite'
     );
@@ -55,15 +63,25 @@ async function compensateRestoreOperation(operation: AssetOperation): Promise<vo
       return;
     }
     for (const compensation of [...current.compensations].reverse()) {
-      await tx.objectStore(STORE_NAME).delete(compensation.nextOwnerId);
-      await tx.objectStore(MEDIA_LIBRARY_STORE).delete(compensation.nextMediaId);
-      await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(compensation.nextOwnerId);
-      if (compensation.nextProjectExportId) {
+      if (compensation.nextProjectAssetId) {
+        await tx.objectStore(PROJECT_ASSETS_STORE).delete(compensation.nextProjectAssetId);
+      } else if (compensation.nextProjectExportId) {
         await tx.objectStore(PROJECT_EXPORTS_STORE).delete(compensation.nextProjectExportId);
+      } else {
+        await tx.objectStore(STORE_NAME).delete(compensation.nextOwnerId);
+      }
+      await tx.objectStore(MEDIA_LIBRARY_STORE).delete(compensation.nextMediaId);
+      await tx.objectStore(THUMBNAILS_STORE).delete(compensation.nextMediaId);
+      if (!compensation.nextProjectAssetId && !compensation.nextProjectExportId) {
+        await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(compensation.nextOwnerId);
       }
       await tx
         .objectStore(ASSET_OWNERS_STORE)
-        .delete([RECORDING_ASSET_OWNER_KIND, compensation.nextOwnerId, RECORDING_ASSET_ROLE]);
+        .delete([
+          compensation.ownerKind ?? RECORDING_ASSET_OWNER_KIND,
+          compensation.nextOwnerId,
+          compensation.ownerRole ?? RECORDING_ASSET_ROLE,
+        ]);
       await tx.objectStore(ASSET_REFS_STORE).delete(compensation.assetId);
       const previous = compensation.previousRecords;
       await restorePreviousRecord(tx.objectStore(STORE_NAME), previous['recordingEntry']);
@@ -76,9 +94,14 @@ async function compensateRestoreOperation(operation: AssetOperation): Promise<vo
         previous['projectExportEntry']
       );
       await restorePreviousRecord(
+        tx.objectStore(PROJECT_ASSETS_STORE),
+        previous['projectAssetEntry']
+      );
+      await restorePreviousRecord(
         tx.objectStore(MEDIA_LIBRARY_STORE),
         previous['mediaLibraryEntry']
       );
+      await restorePreviousRecord(tx.objectStore(THUMBNAILS_STORE), previous['thumbnailEntry']);
       await restorePreviousRecord(tx.objectStore(ASSET_REFS_STORE), previous['assetRefEntry']);
       await restorePreviousRecord(tx.objectStore(ASSET_OWNERS_STORE), previous['assetOwnerEntry']);
       compensated.push(compensation);
@@ -166,5 +189,9 @@ async function recoverBackupRestoreOperations(): Promise<void> {
 export async function recoverAssetPublications(): Promise<number> {
   await collectQuiescentWritingObjects();
   await recoverBackupRestoreOperations();
-  return recoverStandaloneAssetPublications([recordingAssetPublicationAdapter]);
+  return recoverStandaloneAssetPublications([
+    recordingAssetPublicationAdapter,
+    projectAssetPublicationAdapter,
+    projectExportPublicationAdapter,
+  ]);
 }

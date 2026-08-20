@@ -30,6 +30,15 @@ import {
   RECORDING_ASSET_OWNER_KIND,
   RECORDING_ASSET_ROLE,
 } from '../../../../composition/persistence/recordings/asset-publication';
+import {
+  PROJECT_ASSET_OWNER_KIND,
+  PROJECT_EXPORT_OWNER_KIND,
+  PROJECT_MEDIA_ASSET_ROLE,
+} from '../../../../composition/persistence/projects/asset-publication';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+} from '../../../../composition/persistence/projects/read-guards';
 export {
   assertBackupImportWritePreflightComplete,
   commitBackupTransaction,
@@ -69,20 +78,27 @@ export async function deleteExistingAssetRecord(
     if (stored) await getStore(tx, ASSET_REFS_STORE).delete(stored.assetId);
     await getStore(tx, RECORDING_TELEMETRY_STORE).delete(entry.source.recordingId);
   } else if (entry.source.kind === 'project-export') {
-    const stored = parseRecordingEntry(
-      await getStore(tx, STORE_NAME).get(entry.source.recordingId)
+    const stored = parseProjectExportEntry(
+      await getStore(tx, PROJECT_EXPORTS_STORE).get(entry.source.exportId)
     );
-    await getStore(tx, STORE_NAME).delete(entry.source.recordingId);
     await getStore(tx, ASSET_OWNERS_STORE).delete([
-      RECORDING_ASSET_OWNER_KIND,
-      entry.source.recordingId,
-      RECORDING_ASSET_ROLE,
+      PROJECT_EXPORT_OWNER_KIND,
+      entry.source.exportId,
+      PROJECT_MEDIA_ASSET_ROLE,
     ]);
     if (stored) await getStore(tx, ASSET_REFS_STORE).delete(stored.assetId);
     await getStore(tx, PROJECT_EXPORTS_STORE).delete(entry.source.exportId);
-    await getStore(tx, RECORDING_TELEMETRY_STORE).delete(entry.source.recordingId);
   } else if (entry.source.kind === 'project-asset') {
+    const stored = parseProjectAssetEntry(
+      await getStore(tx, PROJECT_ASSETS_STORE).get(entry.source.projectAssetId)
+    );
     await getStore(tx, PROJECT_ASSETS_STORE).delete(entry.source.projectAssetId);
+    await getStore(tx, ASSET_OWNERS_STORE).delete([
+      PROJECT_ASSET_OWNER_KIND,
+      entry.source.projectAssetId,
+      PROJECT_MEDIA_ASSET_ROLE,
+    ]);
+    if (stored) await getStore(tx, ASSET_REFS_STORE).delete(stored.assetId);
   } else if (entry.source.kind === 'web-snapshot') {
     await getStore(tx, WEB_SNAPSHOTS_STORE).delete(entry.source.snapshotId);
   }
@@ -134,26 +150,31 @@ export async function snapshotExistingAssetRecord(
       entry.source.recordingId
     );
   } else if (entry.source.kind === 'project-export') {
-    snapshot.recordingEntry = await getStore(tx, STORE_NAME).get(entry.source.recordingId);
-    const stored = parseRecordingEntry(snapshot.recordingEntry);
-    if (stored) {
-      snapshot.assetRefEntry = await getStore(tx, ASSET_REFS_STORE).get(stored.assetId);
-      snapshot.assetOwnerEntry = await getStore(tx, ASSET_OWNERS_STORE).get([
-        RECORDING_ASSET_OWNER_KIND,
-        entry.source.recordingId,
-        RECORDING_ASSET_ROLE,
-      ]);
-    }
     snapshot.projectExportEntry = await getStore(tx, PROJECT_EXPORTS_STORE).get(
       entry.source.exportId
     );
-    snapshot.recordingTelemetryEntry = await getStore(tx, RECORDING_TELEMETRY_STORE).get(
-      entry.source.recordingId
-    );
+    const stored = parseProjectExportEntry(snapshot.projectExportEntry);
+    if (stored) {
+      snapshot.assetRefEntry = await getStore(tx, ASSET_REFS_STORE).get(stored.assetId);
+      snapshot.assetOwnerEntry = await getStore(tx, ASSET_OWNERS_STORE).get([
+        PROJECT_EXPORT_OWNER_KIND,
+        entry.source.exportId,
+        PROJECT_MEDIA_ASSET_ROLE,
+      ]);
+    }
   } else if (entry.source.kind === 'project-asset') {
     snapshot.projectAssetEntry = await getStore(tx, PROJECT_ASSETS_STORE).get(
       entry.source.projectAssetId
     );
+    const stored = parseProjectAssetEntry(snapshot.projectAssetEntry);
+    if (stored) {
+      snapshot.assetRefEntry = await getStore(tx, ASSET_REFS_STORE).get(stored.assetId);
+      snapshot.assetOwnerEntry = await getStore(tx, ASSET_OWNERS_STORE).get([
+        PROJECT_ASSET_OWNER_KIND,
+        entry.source.projectAssetId,
+        PROJECT_MEDIA_ASSET_ROLE,
+      ]);
+    }
   } else if (entry.source.kind === 'web-snapshot') {
     snapshot.webSnapshotEntry = await getStore(tx, WEB_SNAPSHOTS_STORE).get(
       entry.source.snapshotId
@@ -202,7 +223,7 @@ export async function writeMainAssetRecord(
   blob: Blob,
   recordingTelemetry: RecordingTelemetryEntry | null,
   webSnapshotRecord: WebSnapshotRecord | null = null,
-  preparedRecordingAsset?: PreparedRestoreRecordingAsset
+  preparedAssetPublication?: PreparedRestoreRecordingAsset
 ): Promise<void> {
   if (entry.source.kind === 'screenshot') {
     await getStore(tx, MEDIA_LIBRARY_STORE).put({ ...entry, blob } satisfies MediaLibraryEntry);
@@ -210,13 +231,13 @@ export async function writeMainAssetRecord(
   }
 
   if (entry.source.kind === 'recording') {
-    if (!preparedRecordingAsset) throw new Error('Prepared recording asset is missing.');
+    if (!preparedAssetPublication) throw new Error('Prepared recording asset is missing.');
     await getStore(tx, STORE_NAME).put(
-      createRecordingStoreEntry(entry.source.recordingId, entry, preparedRecordingAsset.asset)
+      createRecordingStoreEntry(entry.source.recordingId, entry, preparedAssetPublication.asset)
     );
-    await getStore(tx, ASSET_REFS_STORE).put(preparedRecordingAsset.asset.ref);
+    await getStore(tx, ASSET_REFS_STORE).put(preparedAssetPublication.asset.ref);
     await getStore(tx, ASSET_OWNERS_STORE).put({
-      assetId: preparedRecordingAsset.asset.ref.assetId,
+      assetId: preparedAssetPublication.asset.ref.assetId,
       ownerId: entry.source.recordingId,
       ownerKind: RECORDING_ASSET_OWNER_KIND,
       role: RECORDING_ASSET_ROLE,
@@ -229,18 +250,17 @@ export async function writeMainAssetRecord(
   }
 
   if (entry.source.kind === 'project-export') {
-    if (!preparedRecordingAsset) throw new Error('Prepared export recording asset is missing.');
-    await getStore(tx, STORE_NAME).put(
-      createRecordingStoreEntry(entry.source.recordingId, entry, preparedRecordingAsset.asset)
-    );
-    await getStore(tx, ASSET_REFS_STORE).put(preparedRecordingAsset.asset.ref);
+    if (!preparedAssetPublication) throw new Error('Prepared project export asset is missing.');
+    await getStore(tx, ASSET_REFS_STORE).put(preparedAssetPublication.asset.ref);
     await getStore(tx, ASSET_OWNERS_STORE).put({
-      assetId: preparedRecordingAsset.asset.ref.assetId,
-      ownerId: entry.source.recordingId,
-      ownerKind: RECORDING_ASSET_OWNER_KIND,
-      role: RECORDING_ASSET_ROLE,
+      assetId: preparedAssetPublication.asset.ref.assetId,
+      ownerId: entry.source.exportId,
+      ownerKind: PROJECT_EXPORT_OWNER_KIND,
+      role: PROJECT_MEDIA_ASSET_ROLE,
     });
-    await getStore(tx, PROJECT_EXPORTS_STORE).put(createProjectExportStoreEntry(entry, blob));
+    await getStore(tx, PROJECT_EXPORTS_STORE).put(
+      createProjectExportStoreEntry(entry, preparedAssetPublication.asset)
+    );
     await getStore(tx, MEDIA_LIBRARY_STORE).put(entry);
     return;
   }
@@ -256,7 +276,17 @@ export async function writeMainAssetRecord(
   }
 
   assertSafeProjectAssetStorageInput(blob, entry.mimeType);
-  await getStore(tx, PROJECT_ASSETS_STORE).put(createProjectAssetStoreEntry(entry, blob));
+  if (!preparedAssetPublication) throw new Error('Prepared project asset is missing.');
+  await getStore(tx, ASSET_REFS_STORE).put(preparedAssetPublication.asset.ref);
+  await getStore(tx, ASSET_OWNERS_STORE).put({
+    assetId: preparedAssetPublication.asset.ref.assetId,
+    ownerId: entry.source.projectAssetId,
+    ownerKind: PROJECT_ASSET_OWNER_KIND,
+    role: PROJECT_MEDIA_ASSET_ROLE,
+  });
+  await getStore(tx, PROJECT_ASSETS_STORE).put(
+    createProjectAssetStoreEntry(entry, preparedAssetPublication.asset)
+  );
   await getStore(tx, MEDIA_LIBRARY_STORE).put(entry);
 }
 
@@ -281,7 +311,7 @@ export async function restoreAssetRecord(
   webSnapshotRecord: WebSnapshotRecord | null = null,
   workspace: ImageWorkspaceEntry | null = null,
   presentation: AggregatePresentationEntry | null = null,
-  preparedRecordingAsset?: PreparedRestoreRecordingAsset
+  preparedAssetPublication?: PreparedRestoreRecordingAsset
 ): Promise<void> {
   await writeMainAssetRecord(
     tx,
@@ -289,7 +319,7 @@ export async function restoreAssetRecord(
     blob,
     recordingTelemetry,
     webSnapshotRecord,
-    preparedRecordingAsset
+    preparedAssetPublication
   );
   await writeThumbnailRecord(tx, entry, thumbnail);
   if (workspace) await getStore(tx, IMAGE_WORKSPACES_STORE).put(workspace);

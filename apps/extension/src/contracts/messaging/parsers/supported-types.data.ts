@@ -126,6 +126,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   VideoMessageType.DIAGNOSTIC_EVENT_FROM_CS,
   VideoMessageType.DOWNLOAD_RECORDING_SIDECAR,
   VideoMessageType.DOWNLOAD_RECORDING,
+  VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
   VideoMessageType.VIDEO_SAVED_TO_IDB,
   'KEEP_ALIVE',
   'AREA_SELECTED',

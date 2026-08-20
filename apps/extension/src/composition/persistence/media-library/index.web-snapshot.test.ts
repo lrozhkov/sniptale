@@ -169,7 +169,6 @@ it('deletes regular media assets after cleaning their source records', async () 
           exportId: 'export-1',
           kind: 'project-export',
           projectId: 'project-1',
-          recordingId: 'recording-2',
         },
       })
     )
@@ -190,7 +189,7 @@ it('deletes regular media assets after cleaning their source records', async () 
 
   expect(deleteRecording).toHaveBeenCalledWith('recording-1');
   expect(deleteProjectExport).toHaveBeenCalledWith('export-1');
-  expect(deleteRecording).toHaveBeenCalledWith('recording-2');
+  expect(deleteRecording).toHaveBeenCalledOnce();
   expect(deleteProjectAsset).toHaveBeenCalledWith('project-asset-1');
   expect(mocks.txDelete).toHaveBeenCalledWith('asset-recording');
   expect(mocks.txDelete).toHaveBeenCalledWith('asset-export');

@@ -91,7 +91,6 @@ function mockDeleteMediaLibraryAssetEntries() {
           kind: 'project-export',
           exportId: 'exp-1',
           projectId: 'project-1',
-          recordingId: 'rec-2',
         },
       })
     )
@@ -113,7 +112,7 @@ function mockDeleteMediaLibraryAssetEntries() {
 function expectDeleteMediaLibraryAssetCleanup() {
   expect(dbMocks.deleteRecordingMock).toHaveBeenCalledWith('rec-1');
   expect(dbMocks.deleteProjectExportMock).toHaveBeenCalledWith('exp-1');
-  expect(dbMocks.deleteRecordingMock).toHaveBeenCalledWith('rec-2');
+  expect(dbMocks.deleteRecordingMock).toHaveBeenCalledOnce();
   expect(dbMocks.deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
   ['recording', 'export', 'asset', 'screenshot'].forEach((assetId) =>
     expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith(assetId)

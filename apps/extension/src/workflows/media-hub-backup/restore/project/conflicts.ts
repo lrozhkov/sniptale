@@ -5,10 +5,11 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
-  STORE_NAME,
+  VIDEO_PROJECTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { MediaHubImportConflictStrategy } from '../../contracts/types';
 import type { VideoProject } from '../../../../features/video/project/types/model';
+import { parseStoredVideoProjectAssetReferences } from '../../../../composition/persistence/projects/asset-references';
 
 interface ChildConflictState {
   hasConflict: boolean;
@@ -19,7 +20,6 @@ interface ChildConflictState {
 export interface VideoChildConflicts {
   projectAssetIds: ChildConflictState;
   projectExportIds: ChildConflictState;
-  recordingIds: ChildConflictState;
 }
 
 export interface ScenarioChildConflicts {
@@ -31,12 +31,10 @@ export interface ScenarioChildConflicts {
 export async function createVideoChildConflicts(args: {
   projectAssetIds: string[];
   projectExportIds: string[];
-  recordingIds: string[];
 }): Promise<VideoChildConflicts> {
   return {
     projectAssetIds: await createChildConflictState(PROJECT_ASSETS_STORE, args.projectAssetIds),
     projectExportIds: await createChildConflictState(PROJECT_EXPORTS_STORE, args.projectExportIds),
-    recordingIds: await createChildConflictState(STORE_NAME, args.recordingIds),
   };
 }
 
@@ -56,11 +54,7 @@ export async function createScenarioChildConflicts(args: {
 }
 
 export function hasVideoChildConflict(conflicts: VideoChildConflicts): boolean {
-  return (
-    conflicts.projectAssetIds.hasConflict ||
-    conflicts.projectExportIds.hasConflict ||
-    conflicts.recordingIds.hasConflict
-  );
+  return conflicts.projectAssetIds.hasConflict || conflicts.projectExportIds.hasConflict;
 }
 
 export function hasScenarioChildConflict(conflicts: ScenarioChildConflicts): boolean {
@@ -89,8 +83,22 @@ export function assertReplaceCanOwnVideoChildConflicts(
   for (const record of conflicts.projectExportIds.records.values()) {
     assertRecordProjectOwner(record, projectId);
   }
-  for (const record of conflicts.recordingIds.records.values()) {
-    assertRecordingOwnedByProjectExport(record, projectId, conflicts.projectExportIds.records);
+}
+
+export async function assertReplaceHasExclusiveProjectAssets(
+  strategy: MediaHubImportConflictStrategy,
+  projectId: string,
+  projectAssetIds: ReadonlySet<string>
+): Promise<void> {
+  if (strategy !== 'replace' || projectAssetIds.size === 0) return;
+  const db = await initDB();
+  const projects: unknown[] = await db.getAll(VIDEO_PROJECTS_STORE);
+  for (const raw of projects) {
+    const storedReferences = parseStoredVideoProjectAssetReferences(raw);
+    if (!storedReferences || storedReferences.projectId === projectId) continue;
+    if ([...projectAssetIds].some((assetId) => storedReferences.assetIds.has(assetId))) {
+      throw new Error('Backup project asset is shared with another existing project.');
+    }
   }
 }
 
@@ -143,26 +151,6 @@ function assertRecordProjectOwner(record: unknown, projectId: string): void {
   if (!isRecord(record) || record['projectId'] !== projectId) {
     throw new Error('Backup project child record conflicts with an existing record.');
   }
-}
-
-function assertRecordingOwnedByProjectExport(
-  record: unknown,
-  projectId: string,
-  projectExportRecords: ReadonlyMap<string, unknown>
-): void {
-  const isOwned = [...projectExportRecords.values()].some(
-    (exportRecord) =>
-      isRecord(exportRecord) &&
-      exportRecord['projectId'] === projectId &&
-      exportRecord['recordingId'] === readRecordId(record)
-  );
-  if (!isOwned) {
-    throw new Error('Backup project child record conflicts with an existing record.');
-  }
-}
-
-function readRecordId(record: unknown): string | undefined {
-  return isRecord(record) && typeof record['id'] === 'string' ? record['id'] : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

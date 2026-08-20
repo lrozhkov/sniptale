@@ -29,15 +29,6 @@ export function collectVideoProjectAssetIds(descriptor: VideoBackupProjectDescri
   ];
 }
 
-export function collectVideoProjectRecordingIds(
-  descriptor: VideoBackupProjectDescriptor
-): string[] {
-  return descriptor.projectExports.flatMap((entry) => [
-    entry.entry.recordingId,
-    ...collectEntryId(entry.recording.entry),
-  ]);
-}
-
 export function collectScenarioAssetIds(descriptor: ScenarioBackupProjectDescriptor): string[] {
   assertSupportedScenarioBackupProjectEntry(descriptor.entry);
   return descriptor.assets.flatMap((asset) => collectEntryId(asset.entry));

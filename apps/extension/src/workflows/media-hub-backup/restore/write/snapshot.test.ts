@@ -78,19 +78,45 @@ it('snapshots and restores all backing records for replaced project exports', as
     exportId: 'export-1',
     kind: 'project-export',
     projectId: 'project-1',
-    recordingId: 'recording-1',
   });
   const mediaRecord = { id: entry.id, kind: 'media-library' };
-  const recordingRecord = { id: 'recording-1', kind: 'recording' };
-  const telemetryRecord = { recordingId: 'recording-1', kind: 'telemetry' };
-  const exportRecord = { id: 'export-1', kind: 'project-export' };
+  const assetRefRecord = {
+    assetId: 'asset-export-1',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/asset-export-1' },
+    mimeType: 'video/webm',
+    sha256: null,
+    size: 10,
+  };
+  const assetOwnerRecord = {
+    assetId: 'asset-export-1',
+    ownerId: 'export-1',
+    ownerKind: 'project-export',
+    role: 'body',
+  };
+  const exportRecord = {
+    assetId: 'asset-export-1',
+    createdAt: 1,
+    duration: 1,
+    filename: 'export.webm',
+    fps: 30,
+    height: 100,
+    id: 'export-1',
+    kind: 'project-export',
+    mimeType: 'video/webm',
+    projectId: 'project-1',
+    size: 10,
+    width: 100,
+  };
   const thumbnailRecord = { assetId: entry.id, kind: 'thumbnail' };
   const { stores, tx } = createWriteHarness({
+    asset_owners: { 'project-export,export-1,body': assetOwnerRecord },
+    asset_refs: { 'asset-export-1': assetRefRecord },
     media_library: { [entry.id]: mediaRecord },
     project_assets: {},
     project_exports: { 'export-1': exportRecord },
-    recording_telemetry: { 'recording-1': telemetryRecord },
-    recordings: { 'recording-1': recordingRecord },
+    recording_telemetry: {},
+    recordings: {},
     thumbnails: { [entry.id]: thumbnailRecord },
     web_snapshots: {},
   });
@@ -99,12 +125,14 @@ it('snapshots and restores all backing records for replaced project exports', as
   await restoreAssetRecordSnapshot(tx, snapshot);
 
   expect(stores.get('media_library')?.get).toHaveBeenCalledWith(entry.id);
-  expect(stores.get('recordings')?.get).toHaveBeenCalledWith('recording-1');
-  expect(stores.get('recording_telemetry')?.get).toHaveBeenCalledWith('recording-1');
+  expect(stores.get('recordings')?.get).not.toHaveBeenCalled();
+  expect(stores.get('recording_telemetry')?.get).not.toHaveBeenCalled();
   expect(stores.get('project_exports')?.get).toHaveBeenCalledWith('export-1');
   expect(stores.get('thumbnails')?.get).toHaveBeenCalledWith(entry.id);
-  expect(stores.get('recordings')?.put).toHaveBeenCalledWith(recordingRecord);
-  expect(stores.get('recording_telemetry')?.put).toHaveBeenCalledWith(telemetryRecord);
+  expect(stores.get('recordings')?.put).not.toHaveBeenCalled();
+  expect(stores.get('recording_telemetry')?.put).not.toHaveBeenCalled();
+  expect(stores.get('asset_refs')?.put).toHaveBeenCalledWith(assetRefRecord);
+  expect(stores.get('asset_owners')?.put).toHaveBeenCalledWith(assetOwnerRecord);
   expect(stores.get('project_exports')?.put).toHaveBeenCalledWith(exportRecord);
   expect(stores.get('media_library')?.put).toHaveBeenCalledWith(mediaRecord);
   expect(stores.get('thumbnails')?.put).toHaveBeenCalledWith(thumbnailRecord);

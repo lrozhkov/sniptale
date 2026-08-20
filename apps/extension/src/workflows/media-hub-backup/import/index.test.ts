@@ -206,19 +206,17 @@ function verifyProjectExportRemap(
           kind: 'project-export',
           exportId: 'export-1',
           projectId: 'project-1',
-          recordingId: 'recording-1',
         },
         { id: 'export:export-1', kind: 'export' }
       )
     )
   ).toEqual(
     expect.objectContaining({
-      id: `export:${createUuid(4)}`,
+      id: `export:${createUuid(3)}`,
       source: {
-        exportId: createUuid(4),
+        exportId: createUuid(3),
         kind: 'project-export',
         projectId: 'project-1',
-        recordingId: `import-${createUuid(3)}`,
       },
     })
   );
@@ -238,10 +236,10 @@ function verifyProjectAssetRemap(
     )
   ).toEqual(
     expect.objectContaining({
-      id: `project-asset:import-${createUuid(5)}`,
+      id: `project-asset:import-${createUuid(4)}`,
       source: {
         kind: 'project-asset',
-        projectAssetId: `import-${createUuid(5)}`,
+        projectAssetId: `import-${createUuid(4)}`,
       },
     })
   );

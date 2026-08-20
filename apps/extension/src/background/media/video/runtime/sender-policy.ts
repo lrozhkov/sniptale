@@ -29,6 +29,7 @@ const offscreenOnlyRuntimeTypes = new Set<VideoRuntimeMessage['type']>([
   VideoMessageType.DESKTOP_MEDIA_FAILED,
   VideoMessageType.DOWNLOAD_RECORDING_SIDECAR,
   VideoMessageType.DOWNLOAD_RECORDING,
+  VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
   VideoMessageType.VIDEO_SAVED_TO_IDB,
 ]);
 

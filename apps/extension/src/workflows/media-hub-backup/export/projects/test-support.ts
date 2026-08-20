@@ -18,8 +18,8 @@ export function createProjectBundleDb() {
     getAllFromIndex: vi.fn(async (storeName: string) => {
       if (storeName === 'project_exports') {
         return [
-          createProjectExportRecord('export-1', 'recording-1'),
-          createProjectExportRecord('export-missing', 'missing-recording'),
+          createProjectExportRecord('export-1', 'asset-export-1'),
+          createProjectExportRecord('export-missing', 'missing-asset'),
         ];
       }
       if (storeName === 'scenario_assets') {
@@ -120,31 +120,21 @@ export async function readProjectBundleRecord(storeName: string, key: string) {
   }
   if (storeName === 'project_assets' && key === 'asset-1') {
     return {
+      assetId: 'asset-project-1',
       id: 'asset-1',
-      blob: new Blob(['asset']),
       createdAt: 1,
       mimeType: 'image/png',
       size: 5,
     };
   }
-  if (storeName === 'recordings' && key === 'recording-1') {
+  if (storeName === 'asset_refs' && (key === 'asset-project-1' || key === 'asset-export-1')) {
     return {
-      assetId: 'asset-recording-1',
-      id: 'recording-1',
-      mimeType: 'video/webm',
-      filename: 'export.webm',
+      assetId: key,
       createdAt: 2,
-      size: 9,
-    };
-  }
-  if (storeName === 'asset_refs' && key === 'asset-recording-1') {
-    return {
-      assetId: 'asset-recording-1',
-      createdAt: 2,
-      location: { kind: 'opfs', objectKey: 'objects/asset-recording-1' },
-      mimeType: 'video/webm',
+      location: { kind: 'opfs', objectKey: `objects/${key}` },
+      mimeType: key === 'asset-project-1' ? 'image/png' : 'video/webm',
       sha256: null,
-      size: 9,
+      size: key === 'asset-project-1' ? 5 : 9,
     };
   }
   return undefined;
@@ -242,16 +232,17 @@ function createScenarioStepDocumentRecord(args: { projectId?: string; stepId?: s
   };
 }
 
-function createProjectExportRecord(id: string, recordingId: string) {
+function createProjectExportRecord(id: string, assetId: string) {
   return {
+    assetId,
     createdAt: 4,
     duration: 1,
     filename: `${id}.webm`,
     fps: 30,
     height: 100,
     id,
+    mimeType: 'video/webm',
     projectId: 'video-project-1',
-    recordingId,
     size: 8,
     width: 100,
   };

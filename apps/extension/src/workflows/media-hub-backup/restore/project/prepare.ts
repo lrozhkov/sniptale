@@ -13,12 +13,12 @@ import {
   collectScenarioAssetIds,
   collectScenarioStepIds,
   collectVideoProjectAssetIds,
-  collectVideoProjectRecordingIds,
   createIdMap,
 } from './ids';
 import {
   assertReplaceCanOwnScenarioChildConflicts,
   assertReplaceCanOwnVideoChildConflicts,
+  assertReplaceHasExclusiveProjectAssets,
   collectExistingVideoProjectAssetIds,
   createScenarioChildConflicts,
   createVideoChildConflicts,
@@ -38,12 +38,12 @@ export interface PreparedVideoProject {
   projectExportIdMap: ReadonlyMap<string, string>;
   projectId: string;
   idChanged: boolean;
-  recordingIdMap: ReadonlyMap<string, string>;
   restoredEffectSnapshots?: VideoProjectEffectSnapshot[];
+  restoredProjectAssets?: ReadonlyMap<string, PreparedRestoreRecordingAsset>;
+  restoredProjectExportAssets?: ReadonlyMap<string, PreparedRestoreRecordingAsset>;
   replace?: boolean;
   restoredPresentation?: AggregatePresentationEntry;
-  restoredRecordingAssets?: ReadonlyMap<string, PreparedRestoreRecordingAsset>;
-  obsoleteRecordingAssetIds?: string[];
+  obsoleteProjectMediaAssetIds?: string[];
 }
 
 export interface PreparedScenarioProject {
@@ -126,6 +126,14 @@ async function prepareVideoProjects(
       childConflicts,
       collectExistingVideoProjectAssetIds(existing)
     );
+    await assertReplaceHasExclusiveProjectAssets(
+      args.strategy,
+      descriptor.entry.id,
+      new Set([
+        ...collectExistingVideoProjectAssetIds(existing),
+        ...collectVideoProjectAssetIds(descriptor),
+      ])
+    );
 
     const nextProject = createPreparedVideoProject(
       descriptor,
@@ -166,11 +174,6 @@ function createPreparedVideoProject(
     ),
     projectId,
     idChanged,
-    recordingIdMap: createIdMap(
-      collectVideoProjectRecordingIds(descriptor),
-      idChanged,
-      childConflicts.recordingIds.ids
-    ),
     replace: !!existing && strategy === 'replace',
   };
 }
@@ -248,7 +251,6 @@ async function loadVideoProjectChildConflicts(
   return createVideoChildConflicts({
     projectAssetIds: collectVideoProjectAssetIds(descriptor),
     projectExportIds: descriptor.projectExports.map((entry) => entry.entry.id),
-    recordingIds: collectVideoProjectRecordingIds(descriptor),
   });
 }
 

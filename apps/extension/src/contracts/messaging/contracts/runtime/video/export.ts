@@ -100,6 +100,19 @@ export const runtimeVideoExportMessageContracts = {
       createRuntimeResponseGuard({ optional: { downloadId: isNumber } })
     ),
   },
+  [V.DOWNLOAD_PROJECT_EXPORT]: {
+    parseRequest: createGuardParser(
+      'runtime DOWNLOAD_PROJECT_EXPORT message',
+      createMessageGuard({
+        type: V.DOWNLOAD_PROJECT_EXPORT,
+        required: { exportId: isString, filename: isString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime DOWNLOAD_PROJECT_EXPORT response',
+      createRuntimeResponseGuard({ optional: { downloadId: isNumber } })
+    ),
+  },
   [V.DOWNLOAD_RECORDING_SIDECAR]: {
     parseRequest: createGuardParser(
       'runtime DOWNLOAD_RECORDING_SIDECAR message',

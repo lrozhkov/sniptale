@@ -35,7 +35,6 @@ function remapProjectExport(
     return entry;
   }
 
-  const recordingId = `import-${crypto.randomUUID()}`;
   const exportId = crypto.randomUUID();
   return {
     ...entry,
@@ -44,7 +43,6 @@ function remapProjectExport(
       exportId,
       kind: 'project-export',
       projectId: entry.source.projectId,
-      recordingId,
     },
   };
 }

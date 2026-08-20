@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   verifyIntegrity: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal()),
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
   VIDEO_PROJECTS_STORE: 'video_projects',

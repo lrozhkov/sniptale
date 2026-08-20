@@ -101,14 +101,17 @@ function setupInspectionDb(screenshot: MediaLibraryEntry, webSnapshot: MediaLibr
 }
 
 async function readInspectionRecord(storeName: string, key: string) {
-  if (storeName === 'asset_refs' && key === 'asset-recording-1') {
+  if (
+    storeName === 'asset_refs' &&
+    ['asset-recording-1', 'asset-project-1', 'asset-export-1'].includes(key)
+  ) {
     return {
       assetId: key,
       createdAt: 1,
       location: { kind: 'opfs', objectKey: `objects/${key}` },
-      mimeType: 'video/webm',
+      mimeType: key === 'asset-project-1' ? 'image/png' : 'video/webm',
       sha256: null,
-      size: 700,
+      size: key === 'asset-project-1' ? 500 : 700,
     };
   }
   if (storeName === 'thumbnails' && key === 'scenario:scenario-1') {
@@ -121,7 +124,13 @@ async function readInspectionRecord(storeName: string, key: string) {
     return { assetId: key, blob: new Blob(['scenario-export-thumb']) };
   }
   if (storeName === 'project_assets' && key === 'project-asset-1') {
-    return { id: key, blob: new Blob(['asset']), size: 500 };
+    return {
+      assetId: 'asset-project-1',
+      createdAt: 1,
+      id: key,
+      mimeType: 'image/png',
+      size: 500,
+    };
   }
   return storeName === 'recordings' && key === 'recording-1'
     ? {
@@ -211,7 +220,21 @@ async function readInspectionIndex(storeName: string) {
     return [{ id: 'scenario-export-1', projectId: 'scenario-1', size: 400 }];
   }
   return storeName === 'project_exports'
-    ? [{ id: 'export-1', projectId: 'video-project-1', recordingId: 'recording-1' }]
+    ? [
+        {
+          assetId: 'asset-export-1',
+          createdAt: 1,
+          duration: 1,
+          filename: 'export.webm',
+          fps: 30,
+          height: 100,
+          id: 'export-1',
+          mimeType: 'video/webm',
+          projectId: 'video-project-1',
+          size: 700,
+          width: 100,
+        },
+      ]
     : [];
 }
 
@@ -247,12 +270,12 @@ describe('inspect local media hub backup', () => {
       expect.objectContaining({ sourceMetadata: true, webSnapshots: false })
     );
     expect(readAssetFileMock).toHaveBeenCalledWith(
-      expect.objectContaining({ assetId: 'asset-recording-1' }),
-      'recording.webm'
+      expect.objectContaining({ assetId: 'asset-export-1' }),
+      'export.webm'
     );
   });
 
-  it('rejects a project-export recording whose OPFS reference is missing', async () => {
+  it('rejects a project export whose OPFS reference is missing', async () => {
     const [screenshot, webSnapshot] = createInspectionEntries();
     const db = setupInspectionDb(screenshot, webSnapshot);
     db.get.mockImplementation(async (storeName: string, key: string) =>

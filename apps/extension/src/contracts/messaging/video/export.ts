@@ -7,6 +7,7 @@ import type {
   RuntimeGetProjectExportCapabilitiesMessage,
   RuntimeAreaSelectedMessage,
   RuntimeDiagnosticEventMessage,
+  RuntimeDownloadProjectExportMessage,
   RuntimeDownloadRecordingMessage,
   RuntimeDownloadRecordingSidecarMessage,
   RuntimeOffscreenGetProjectExportCapabilitiesMessage,
@@ -68,6 +69,7 @@ export type RuntimeVideoExportRequestByType = {
   [VideoMessageType.DIAGNOSTIC_EVENT_FROM_CS]: RuntimeDiagnosticEventMessage;
   [VideoMessageType.DOWNLOAD_RECORDING_SIDECAR]: RuntimeDownloadRecordingSidecarMessage;
   [VideoMessageType.DOWNLOAD_RECORDING]: RuntimeDownloadRecordingMessage;
+  [VideoMessageType.DOWNLOAD_PROJECT_EXPORT]: RuntimeDownloadProjectExportMessage;
   [VideoMessageType.VIDEO_SAVED_TO_IDB]: RuntimeVideoSavedToIdbMessage;
   KEEP_ALIVE: { type: 'KEEP_ALIVE'; tabId?: number };
   AREA_SELECTED: RuntimeAreaSelectedMessage;
@@ -87,6 +89,7 @@ export type RuntimeVideoExportResponseByType = {
   [VideoMessageType.DIAGNOSTIC_EVENT_FROM_CS]: RuntimeAckResponse;
   [VideoMessageType.DOWNLOAD_RECORDING_SIDECAR]: DownloadRecordingResponse;
   [VideoMessageType.DOWNLOAD_RECORDING]: DownloadRecordingResponse;
+  [VideoMessageType.DOWNLOAD_PROJECT_EXPORT]: DownloadRecordingResponse;
   [VideoMessageType.VIDEO_SAVED_TO_IDB]: RuntimeVideoSavedToIdbResponse;
   KEEP_ALIVE: RuntimeAckResponse;
   AREA_SELECTED: RuntimeAckResponse;

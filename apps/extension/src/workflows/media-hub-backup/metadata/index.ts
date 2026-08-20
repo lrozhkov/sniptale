@@ -51,7 +51,6 @@ function normalizeMediaSource(value: unknown): MediaAssetSource {
       exportId: readString(field(source, 'exportId')),
       kind,
       projectId: readString(field(source, 'projectId')),
-      recordingId: readString(field(source, 'recordingId')),
     };
   }
   if (kind === 'project-asset') {

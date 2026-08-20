@@ -21,7 +21,10 @@ import {
   discardPreparedAsset,
   writeBlobToAsset,
 } from '../../../../composition/persistence/assets';
-import { RECORDING_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/recordings/asset-publication';
+import {
+  PROJECT_ASSET_PUBLICATION_DOMAIN,
+  PROJECT_EXPORT_PUBLICATION_DOMAIN,
+} from '../../../../composition/persistence/projects/asset-publication';
 import type { PreparedRestoreRecordingAsset } from '../prepare';
 
 function collectProjectBlobDescriptors(
@@ -67,15 +70,33 @@ export async function assertPreparedProjectBlobsAvailable(
   prepared.restoredBlobs = restoredBlobs;
 }
 
-export async function stagePreparedProjectRecordingAssets(
+export async function stagePreparedProjectAssets(
   prepared: PreparedProjectDomains,
   operationId?: string
 ): Promise<void> {
   if (!prepared.restoredBlobs) throw new Error('Backup project blob preflight is incomplete.');
   for (const project of prepared.videoProjects) {
+    if (
+      !operationId &&
+      (project.descriptor.projectAssets.length > 0 || project.descriptor.projectExports.length > 0)
+    ) {
+      throw new Error('Restore operation ID is missing for project assets.');
+    }
     const projectAssets = new Map<string, PreparedRestoreRecordingAsset>();
+    for (const descriptor of project.descriptor.projectAssets) {
+      const blob = readRestoredBlob(prepared.restoredBlobs, descriptor.blobPath);
+      await assertAssetWriteAdmission(blob.size);
+      const asset = await writeBlobToAsset(blob, { mimeType: descriptor.entry.mimeType });
+      const journal = await createAssetPublicationJournal({
+        assetRefs: [asset.ref],
+        domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
+        operationId: operationId!,
+        payload: { projectAssetId: descriptor.entry.id, restore: true },
+      }).catch((error: unknown) => discardCurrentStagedAsset(asset.ref.assetId, error));
+      projectAssets.set(descriptor.blobPath, { asset, journalId: journal.journalId });
+    }
+    const projectExportAssets = new Map<string, PreparedRestoreRecordingAsset>();
     for (const descriptor of project.descriptor.projectExports) {
-      if (!operationId) throw new Error('Restore operation ID is missing for project exports.');
       const blob = readRestoredBlob(prepared.restoredBlobs, descriptor.recording.blobPath);
       const entry = descriptor.recording.entry as Record<string, unknown>;
       const mimeType = typeof entry['mimeType'] === 'string' ? entry['mimeType'] : blob.type;
@@ -83,28 +104,31 @@ export async function stagePreparedProjectRecordingAssets(
       const asset = await writeBlobToAsset(blob, { mimeType: mimeType || 'video/webm' });
       const journal = await createAssetPublicationJournal({
         assetRefs: [asset.ref],
-        domain: RECORDING_ASSET_PUBLICATION_DOMAIN,
-        operationId,
-        payload: { recordingId: descriptor.entry.recordingId, restore: true },
-      }).catch(async (error: unknown) => {
-        try {
-          await discardPreparedAsset(asset.ref.assetId);
-        } catch (cleanupError) {
-          throw new AggregateError(
-            [error, cleanupError],
-            'Project export staging failed before its ready journal became durable.',
-            { cause: error }
-          );
-        }
-        throw error;
-      });
-      projectAssets.set(descriptor.recording.blobPath, {
+        domain: PROJECT_EXPORT_PUBLICATION_DOMAIN,
+        operationId: operationId!,
+        payload: { projectExportId: descriptor.entry.id, restore: true },
+      }).catch((error: unknown) => discardCurrentStagedAsset(asset.ref.assetId, error));
+      projectExportAssets.set(descriptor.recording.blobPath, {
         asset,
         journalId: journal.journalId,
       });
     }
-    project.restoredRecordingAssets = projectAssets;
+    project.restoredProjectAssets = projectAssets;
+    project.restoredProjectExportAssets = projectExportAssets;
   }
+}
+
+async function discardCurrentStagedAsset(assetId: string, error: unknown): Promise<never> {
+  try {
+    await discardPreparedAsset(assetId);
+  } catch (cleanupError) {
+    throw new AggregateError(
+      [error, cleanupError],
+      'Project media staging failed before its ready journal became durable.',
+      { cause: error }
+    );
+  }
+  throw error;
 }
 
 async function prepareAggregatePresentations(

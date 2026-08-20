@@ -4,11 +4,8 @@ import type {
 } from '../../../composition/persistence/media-library/contracts';
 import type { AggregatePresentationEntry } from '../../../composition/persistence/aggregate-presentations/contracts';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
-import type {
-  ProjectAssetEntry,
-  ProjectExportEntry,
-  VideoProjectEntry,
-} from '../../../composition/persistence/projects/contracts';
+import type { VideoProjectEntry } from '../../../composition/persistence/projects/contracts';
+import type { VideoExportFormat } from '../../../features/video/project/types';
 import type {
   StoredRecordingEntry,
   RecordingTelemetryEntry,
@@ -104,13 +101,36 @@ export interface EffectBundleBackupDescriptor {
 export interface BackupBlobDescriptor {
   blobPath: string;
   entry:
-    | Omit<ProjectAssetEntry | ScenarioAssetEntry | MediaThumbnailEntry, 'blob'>
+    | ProjectAssetBackupEntry
+    | Omit<ScenarioAssetEntry | MediaThumbnailEntry, 'blob'>
     | Omit<StoredRecordingEntry, 'assetId'>;
+}
+
+interface ProjectAssetBackupEntry {
+  createdAt: number;
+  id: string;
+  mimeType: string;
+  size: number;
 }
 
 export interface ProjectAssetBackupBlobDescriptor {
   blobPath: string;
-  entry: Omit<ProjectAssetEntry, 'blob'>;
+  entry: ProjectAssetBackupEntry;
+}
+
+export interface ProjectExportBackupEntry {
+  createdAt: number;
+  duration: number;
+  filename: string;
+  format?: VideoExportFormat;
+  fps: number;
+  height: number;
+  id: string;
+  mimeType?: string;
+  projectId: string;
+  recordingId: string;
+  size: number;
+  width: number;
 }
 
 export interface EffectSnapshotBackupBlobDescriptor {
@@ -132,7 +152,7 @@ export interface VideoBackupProjectDescriptor {
   effectProject?: EffectProjectBackupDescriptor;
   projectAssets: ProjectAssetBackupBlobDescriptor[];
   projectExports: Array<{
-    entry: ProjectExportEntry;
+    entry: ProjectExportBackupEntry;
     recording: BackupBlobDescriptor;
     recordingTelemetry?: RecordingTelemetryEntry;
     thumbnail?: BackupBlobDescriptor;

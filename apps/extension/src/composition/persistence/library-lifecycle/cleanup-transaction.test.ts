@@ -8,6 +8,17 @@ const persistenceMocks = vi.hoisted(() => ({
   listScenarioProjectEntries: vi.fn(),
   listVideoProjectEntries: vi.fn(),
   runWithIndexedDbMutation: vi.fn(),
+  recoverProjectMediaPublications: vi.fn(),
+  recoverRecordingAssetPublications: vi.fn(),
+}));
+
+vi.mock('../projects/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: persistenceMocks.recoverProjectMediaPublications,
+}));
+vi.mock('../recordings/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverRecordingAssetPublications: persistenceMocks.recoverRecordingAssetPublications,
 }));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
@@ -45,6 +56,21 @@ beforeEach(() => {
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
+  persistenceMocks.recoverProjectMediaPublications.mockResolvedValue(0);
+  persistenceMocks.recoverRecordingAssetPublications.mockResolvedValue(0);
+});
+
+it('does not begin lifecycle cleanup while retained project journals cannot drain', async () => {
+  persistenceMocks.recoverProjectMediaPublications.mockRejectedValueOnce(
+    new Error('ready journal replay failed')
+  );
+
+  await expect(
+    cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
+  ).rejects.toThrow('ready journal replay failed');
+
+  expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
 });
 
 it('removes standalone media dependency graphs and aggregate sidecars atomically', async () => {

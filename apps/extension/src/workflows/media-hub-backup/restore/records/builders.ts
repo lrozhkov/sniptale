@@ -3,8 +3,8 @@ import type {
   MediaThumbnailEntry,
 } from '../../../../composition/persistence/media-library/contracts';
 import type {
-  ProjectAssetEntry,
-  ProjectExportEntry,
+  StoredProjectAssetEntry,
+  StoredProjectExportEntry,
 } from '../../../../composition/persistence/projects/contracts';
 import type { StoredRecordingEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { PreparedAssetObject } from '../../../../composition/persistence/assets';
@@ -28,13 +28,14 @@ export function createRecordingStoreEntry(
 
 export function createProjectExportStoreEntry(
   entry: Omit<MediaLibraryEntry, 'blob'>,
-  blob: Blob
-): ProjectExportEntry {
+  prepared: PreparedAssetObject
+): StoredProjectExportEntry {
   if (entry.source.kind !== 'project-export') {
     throw new Error('Project export record builder requires a project-export media entry.');
   }
 
   return {
+    assetId: prepared.ref.assetId,
     createdAt: entry.createdAt,
     duration: entry.duration ?? 0,
     filename: entry.filename,
@@ -44,26 +45,25 @@ export function createProjectExportStoreEntry(
     id: entry.source.exportId,
     mimeType: entry.mimeType,
     projectId: entry.source.projectId,
-    recordingId: entry.source.recordingId,
-    size: blob.size,
+    size: prepared.ref.size,
     width: entry.width ?? 0,
   };
 }
 
 export function createProjectAssetStoreEntry(
   entry: Omit<MediaLibraryEntry, 'blob'>,
-  blob: Blob
-): ProjectAssetEntry {
+  prepared: PreparedAssetObject
+): StoredProjectAssetEntry {
   if (entry.source.kind !== 'project-asset') {
     throw new Error('Project asset record builder requires a project-asset media entry.');
   }
 
   return {
-    blob,
+    assetId: prepared.ref.assetId,
     createdAt: entry.createdAt,
     id: entry.source.projectAssetId,
     mimeType: entry.mimeType,
-    size: blob.size,
+    size: prepared.ref.size,
   };
 }
 

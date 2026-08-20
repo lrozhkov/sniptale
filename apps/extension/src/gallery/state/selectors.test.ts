@@ -56,7 +56,6 @@ function createCountAndTagItems(): MediaLibraryItem[] {
       source: {
         kind: 'project-export',
         exportId: 'exp-1',
-        recordingId: 'rec-2',
         projectId: 'p-1',
       },
       tags: ['delta'],
@@ -67,7 +66,6 @@ function createCountAndTagItems(): MediaLibraryItem[] {
       source: {
         kind: 'project-export',
         exportId: 'exp-2',
-        recordingId: 'rec-3',
         projectId: 'p-1',
       },
       tags: ['alpha'],

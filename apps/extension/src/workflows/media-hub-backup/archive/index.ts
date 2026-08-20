@@ -3,7 +3,10 @@ import type {
   MediaLibraryEntry,
   MediaThumbnailEntry,
 } from '../../../composition/persistence/media-library/contracts';
-import type { ProjectAssetEntry } from '../../../composition/persistence/projects/contracts';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+} from '../../../composition/persistence/projects/read-guards';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import { parseRecordingEntry } from '../../../composition/persistence/recordings/index.guards';
 import { parseAssetRef, readAssetFile } from '../../../composition/persistence/assets';
@@ -15,6 +18,7 @@ import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-ur
 import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
 import {
   PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
   ASSET_REFS_STORE,
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
@@ -187,11 +191,20 @@ export async function resolveBackupMediaBlob(
     return entry.blob ?? null;
   }
 
-  if (entry.source.kind === 'recording' || entry.source.kind === 'project-export') {
+  if (entry.source.kind === 'recording') {
     const recording = parseRecordingEntry(await db.get(STORE_NAME, entry.source.recordingId));
     if (!recording) return null;
     const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, recording.assetId));
     return ref ? readAssetFile(ref, recording.filename) : null;
+  }
+
+  if (entry.source.kind === 'project-export') {
+    const projectExport = parseProjectExportEntry(
+      await db.get(PROJECT_EXPORTS_STORE, entry.source.exportId)
+    );
+    if (!projectExport) return null;
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, projectExport.assetId));
+    return ref ? readAssetFile(ref, projectExport.filename) : null;
   }
 
   if (entry.source.kind === 'web-snapshot') {
@@ -201,10 +214,12 @@ export async function resolveBackupMediaBlob(
     return snapshot ? createSanitizedWebSnapshotPackageBlob(snapshot, options) : null;
   }
 
-  const projectAsset = (await db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId)) as
-    | ProjectAssetEntry
-    | undefined;
-  return projectAsset?.blob ?? null;
+  const projectAsset = parseProjectAssetEntry(
+    await db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId)
+  );
+  if (!projectAsset) return null;
+  const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, projectAsset.assetId));
+  return ref ? readAssetFile(ref, projectAsset.id) : null;
 }
 
 async function createSanitizedWebSnapshotPackageBlob(

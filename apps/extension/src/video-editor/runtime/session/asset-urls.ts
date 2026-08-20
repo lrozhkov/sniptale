@@ -18,7 +18,7 @@ async function loadVideoEditorAssetUrl(
   }
 
   const entry = await getProjectAsset(asset.source.projectAssetId);
-  return entry ? [asset.id, URL.createObjectURL(entry.blob)] : null;
+  return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
 }
 
 function revokeVideoEditorAssetUrl(url: string): void {

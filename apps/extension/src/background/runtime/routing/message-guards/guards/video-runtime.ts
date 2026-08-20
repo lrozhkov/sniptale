@@ -30,6 +30,7 @@ export const videoRuntimeMessageTypes = [
   VideoMessageType.DESKTOP_MEDIA_FAILED,
   VideoMessageType.VIDEO_SAVED_TO_IDB,
   VideoMessageType.DOWNLOAD_RECORDING,
+  VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
 ] as const satisfies ReadonlyArray<VideoRuntimeMessage['type']>;
 
 export function isVideoRuntimeMessage(

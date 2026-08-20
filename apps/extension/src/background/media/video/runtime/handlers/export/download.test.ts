@@ -1,12 +1,18 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { downloadRecordingSidecarMock, downloadStoredRecordingMock } = vi.hoisted(() => ({
+const {
+  downloadRecordingSidecarMock,
+  downloadStoredProjectExportMock,
+  downloadStoredRecordingMock,
+} = vi.hoisted(() => ({
   downloadRecordingSidecarMock: vi.fn(),
+  downloadStoredProjectExportMock: vi.fn(),
   downloadStoredRecordingMock: vi.fn(),
 }));
 
 vi.mock('../../../../../media-hub/recording-download', () => ({
   downloadRecordingSidecar: downloadRecordingSidecarMock,
+  downloadStoredProjectExport: downloadStoredProjectExportMock,
   downloadStoredRecording: downloadStoredRecordingMock,
 }));
 

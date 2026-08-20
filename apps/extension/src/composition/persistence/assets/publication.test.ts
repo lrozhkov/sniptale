@@ -85,6 +85,25 @@ it('keeps ready durable after bounded immediate retries are exhausted', async ()
   expect(deleteReadyJournalMock).not.toHaveBeenCalled();
 });
 
+it('keeps a successful publication successful when ready cleanup must be replayed', async () => {
+  const journal = createJournal();
+  const publish = vi.fn().mockResolvedValue(undefined);
+  deleteReadyJournalMock.mockRejectedValue(new Error('OPFS cleanup failed'));
+
+  await expect(publishReadyJournalWithRetry(journal, publish)).resolves.toBeUndefined();
+
+  expect(publish).toHaveBeenCalledOnce();
+  expect(deleteReadyJournalMock).toHaveBeenCalledWith(journal.journalId);
+
+  deleteReadyJournalMock.mockResolvedValue(undefined);
+  listReadyJournalsMock.mockResolvedValue([journal]);
+  await expect(
+    recoverStandaloneAssetPublications([{ domain: journal.domain, publish }])
+  ).resolves.toBe(1);
+  expect(publish).toHaveBeenCalledTimes(2);
+  expect(deleteReadyJournalMock).toHaveBeenCalledTimes(2);
+});
+
 it('replays only standalone journals with a registered domain adapter', async () => {
   const standalone = createJournal();
   const workflow = createJournal({ journalId: 'workflow', operationId: 'restore-1' });

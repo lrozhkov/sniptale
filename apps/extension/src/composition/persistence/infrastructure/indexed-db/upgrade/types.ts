@@ -6,6 +6,7 @@ export type UpgradeObjectStore = {
   clear(): Promise<unknown>;
   delete(key: IDBValidKey): Promise<unknown>;
   getAll(): Promise<unknown[]>;
+  put?(value: unknown): Promise<unknown>;
 };
 
 export type UpgradeTransaction = {

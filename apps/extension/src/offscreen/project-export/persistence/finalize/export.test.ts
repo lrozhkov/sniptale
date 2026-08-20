@@ -13,35 +13,21 @@ import {
   type VideoProjectExportSettings,
 } from '../../../../features/video/project/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import {
-  deleteOrphanedRawRecordingsSafely,
-  saveProjectExportSafely,
-  saveRecordingSafely,
-} from '../../../../workflows/media-hub/store';
+import { saveProjectExportSafely } from '../../../../workflows/media-hub/store';
 import { sendRuntimeMessage } from '../../../../platform/runtime-messaging/index';
 import { finalizeExport } from './export/index';
 
-const {
-  deleteOrphanedRawRecordingsSafelyMock,
-  loggerDebugMock,
-  markTerminalMock,
-  saveProjectExportSafelyMock,
-  saveRecordingSafelyMock,
-  sendRuntimeMessageMock,
-} = vi.hoisted(() => ({
-  deleteOrphanedRawRecordingsSafelyMock: vi.fn(),
-  loggerDebugMock: vi.fn(),
-  markTerminalMock: vi.fn(),
-  saveProjectExportSafelyMock: vi.fn(),
-  saveRecordingSafelyMock: vi.fn(),
-  sendRuntimeMessageMock: vi.fn(),
-}));
+const { loggerDebugMock, markTerminalMock, saveProjectExportSafelyMock, sendRuntimeMessageMock } =
+  vi.hoisted(() => ({
+    loggerDebugMock: vi.fn(),
+    markTerminalMock: vi.fn(),
+    saveProjectExportSafelyMock: vi.fn(),
+    sendRuntimeMessageMock: vi.fn(),
+  }));
 
 vi.mock('../../../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../workflows/media-hub/store')>()),
-  deleteOrphanedRawRecordingsSafely: deleteOrphanedRawRecordingsSafelyMock,
   saveProjectExportSafely: saveProjectExportSafelyMock,
-  saveRecordingSafely: saveRecordingSafelyMock,
 }));
 
 vi.mock('../../../../platform/runtime-messaging/index', async (importOriginal) => ({
@@ -185,8 +171,6 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-03-22T10:11:12.345Z'));
   installFileReaderStub();
   sendRuntimeMessageMock.mockResolvedValue({ success: true });
-  deleteOrphanedRawRecordingsSafelyMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
   saveProjectExportSafelyMock.mockResolvedValue(undefined);
   markTerminalMock.mockResolvedValue(null);
 });
@@ -200,21 +184,16 @@ it('finalizes exports by downloading, persisting, and notifying completion', asy
   const project = createProject();
   const settings = createExportSettings();
   const blob = new Blob(['video'], { type: 'video/mp4' });
-  const randomUUID = mockRandomUuids('recording-uuid', 'export-uuid');
+  const randomUUID = mockRandomUuids('export-uuid');
 
   await finalizeExport('job-1', project, settings, blob);
 
-  expect(randomUUID).toHaveBeenCalledTimes(2);
-  expect(saveRecordingSafely).toHaveBeenCalledWith(
-    'export-recording-uuid',
-    blob,
-    'Demo_Project-2026-03-22T10-11-12.mp4'
-  );
+  expect(randomUUID).toHaveBeenCalledOnce();
   expect(saveProjectExportSafely).toHaveBeenCalledWith(
     expect.objectContaining({
       id: 'export-uuid',
       projectId: 'project-1',
-      recordingId: 'export-recording-uuid',
+      blob,
       filename: 'Demo_Project-2026-03-22T10-11-12.mp4',
       format: VideoExportFormat.MP4,
     })
@@ -225,13 +204,12 @@ it('finalizes exports by downloading, persisting, and notifying completion', asy
       type: 'PROJECT_EXPORT_COMPLETED',
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'export-recording-uuid',
       exportId: 'export-uuid',
     })
   );
   expect(sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
-    type: VideoMessageType.DOWNLOAD_RECORDING,
-    recordingId: 'export-recording-uuid',
+    type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
+    exportId: 'export-uuid',
     filename: 'Demo_Project-2026-03-22T10-11-12.mp4',
   });
   expect(markTerminalMock).toHaveBeenCalledWith('job-1', 'completed');
@@ -242,15 +220,10 @@ it('falls back to the default export base name when the project is unnamed', asy
   const settings = createExportSettings();
   const blob = new Blob(['video'], { type: 'video/mp4' });
 
-  mockRandomUuids('recording-uuid', 'export-uuid');
+  mockRandomUuids('export-uuid');
 
   await finalizeExport('job-2', project, settings, blob);
 
-  expect(saveRecordingSafely).toHaveBeenCalledWith(
-    'export-recording-uuid',
-    blob,
-    'project-export-2026-03-22T10-11-12.mp4'
-  );
   expect(saveProjectExportSafely).toHaveBeenCalledWith(
     expect.objectContaining({
       filename: 'project-export-2026-03-22T10-11-12.mp4',
@@ -259,20 +232,19 @@ it('falls back to the default export base name when the project is unnamed', asy
   );
 });
 
-it('deletes the orphaned recording and suppresses runtime side effects when export save fails', async () => {
+it('suppresses runtime side effects when export publication fails', async () => {
   const project = createProject();
   const settings = createExportSettings();
   const blob = new Blob(['video'], { type: 'video/mp4' });
   const exportError = new Error('export save failed');
 
-  mockRandomUuids('recording-uuid', 'export-uuid');
+  mockRandomUuids('export-uuid');
   saveProjectExportSafelyMock.mockRejectedValueOnce(exportError);
 
   await expect(finalizeExport('job-4', project, settings, blob)).rejects.toThrow(
     'export save failed'
   );
 
-  expect(deleteOrphanedRawRecordingsSafely).toHaveBeenCalledWith(['export-recording-uuid']);
   expect(sendRuntimeMessage).not.toHaveBeenCalled();
   expect(markTerminalMock).not.toHaveBeenCalled();
 });
@@ -283,7 +255,7 @@ it('downloads subtitle sidecars after persisting the completed export entry', as
     subtitleSidecarFormats: [VideoSubtitleSidecarFormat.SRT],
   });
   const blob = new Blob(['video'], { type: 'video/mp4' });
-  mockRandomUuids('recording-uuid', 'export-uuid');
+  mockRandomUuids('export-uuid');
 
   await finalizeExport('job-5', project, settings, blob);
   await flushSidecarDownloadRequest();

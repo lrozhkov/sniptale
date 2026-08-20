@@ -5,6 +5,7 @@ const {
   handleCancelProjectExportMock,
   handleAcknowledgePostRecordResultMock,
   handleDownloadRecordingMock,
+  handleDownloadProjectExportMock,
   handleDownloadRecordingSidecarMock,
   handleGetProjectExportCapabilitiesMock,
   handleInternalVideoSignalMock,
@@ -25,6 +26,7 @@ const {
   handleCancelProjectExportMock: vi.fn(),
   handleAcknowledgePostRecordResultMock: vi.fn(),
   handleDownloadRecordingMock: vi.fn(),
+  handleDownloadProjectExportMock: vi.fn(),
   handleDownloadRecordingSidecarMock: vi.fn(),
   handleGetProjectExportCapabilitiesMock: vi.fn(),
   handleInternalVideoSignalMock: vi.fn(),
@@ -43,6 +45,7 @@ const {
 }));
 
 vi.mock('./handlers/export/download', () => ({
+  handleDownloadProjectExport: handleDownloadProjectExportMock,
   handleDownloadRecording: handleDownloadRecordingMock,
   handleDownloadRecordingSidecar: handleDownloadRecordingSidecarMock,
 }));
@@ -180,7 +183,6 @@ function createProjectExportLifecycleMessages(): RoutedVideoRuntimeMessage[] {
       type: VideoMessageType.PROJECT_EXPORT_COMPLETED,
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
       exportId: 'export-1',
       filename: 'project.mp4',
       format: VideoExportFormat.MP4,

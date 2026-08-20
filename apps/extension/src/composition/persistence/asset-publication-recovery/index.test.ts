@@ -136,6 +136,85 @@ it('aborts and compensates a crashed restore before removing its uncommitted obj
   expect(mocks.deleteJournal).toHaveBeenCalledWith('journal-1');
 });
 
+it('restores a replaced project asset and thumbnail after a later restore batch crashes', async () => {
+  const previousProjectAsset = {
+    assetId: 'asset-old',
+    createdAt: 1,
+    id: 'project-asset-1',
+    mimeType: 'image/png',
+    size: 3,
+  };
+  const previousMedia = { id: 'project-asset:project-asset-1', filename: 'old.png' };
+  const previousThumbnail = { id: 'project-asset:project-asset-1', blob: new Blob(['old']) };
+  const previousRef = {
+    assetId: 'asset-old',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/asset-old' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: 3,
+  };
+  const previousOwner = {
+    assetId: 'asset-old',
+    ownerId: 'project-asset-1',
+    ownerKind: 'project-asset',
+    role: 'body',
+  };
+  const operation: AssetOperation = {
+    compensations: [
+      {
+        assetId: 'asset-new',
+        journalId: 'journal-project-asset',
+        nextMediaId: 'project-asset:project-asset-1',
+        nextOwnerId: 'project-asset-1',
+        nextProjectAssetId: 'project-asset-1',
+        ownerKind: 'project-asset',
+        ownerRole: 'body',
+        previousRecords: {
+          assetOwnerEntry: previousOwner,
+          assetRefEntry: previousRef,
+          mediaLibraryEntry: previousMedia,
+          projectAssetEntry: previousProjectAsset,
+          thumbnailEntry: previousThumbnail,
+        },
+      },
+    ],
+    createdAt: 1,
+    kind: 'backup-restore',
+    obsoleteAssetIds: ['asset-old'],
+    operationId: 'restore-project-asset',
+    status: 'pending',
+    updatedAt: 1,
+  };
+  const harness = createDbHarness([operation]);
+  harness.put('project_assets', 'project-asset-1', {
+    ...previousProjectAsset,
+    assetId: 'asset-new',
+  });
+  harness.put('media_library', previousMedia.id, { ...previousMedia, filename: 'new.png' });
+  harness.put('thumbnails', previousThumbnail.id, {
+    id: previousThumbnail.id,
+    blob: new Blob(['new']),
+  });
+  harness.put('asset_refs', 'asset-new', { assetId: 'asset-new' });
+  harness.put('asset_owners', ['project-asset', 'project-asset-1', 'body'], {
+    ...previousOwner,
+    assetId: 'asset-new',
+  });
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+
+  await recoverAssetPublications();
+
+  expect(harness.get('project_assets', 'project-asset-1')).toEqual(previousProjectAsset);
+  expect(harness.get('media_library', previousMedia.id)).toEqual(previousMedia);
+  expect(harness.get('thumbnails', previousThumbnail.id)).toEqual(previousThumbnail);
+  expect(harness.get('asset_refs', 'asset-old')).toEqual(previousRef);
+  expect(harness.get('asset_refs', 'asset-new')).toBeUndefined();
+  expect(mocks.deleteObject).toHaveBeenCalledWith('asset-new');
+  expect(mocks.deleteObject).not.toHaveBeenCalledWith('asset-old');
+  expect(mocks.deleteJournal).toHaveBeenCalledWith('journal-project-asset');
+});
+
 it('finishes journals and obsolete objects for a committed restore', async () => {
   const operation: AssetOperation = {
     compensations: [],

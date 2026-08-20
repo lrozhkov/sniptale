@@ -4,8 +4,8 @@ import {
 } from '../../features/media-hub/references';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import type {
-  ProjectAssetEntry,
-  ProjectExportEntry,
+  StoredProjectAssetEntry,
+  StoredProjectExportEntry,
 } from '../../composition/persistence/projects/contracts';
 import type { StoredRecordingEntry } from '../../composition/persistence/recordings/contracts';
 import type { VideoProject } from '../../features/video/project/types/model';
@@ -36,9 +36,9 @@ export function sumBytes(items: Array<{ size: number }>): number {
 
 export function buildCleanupCandidates(params: {
   mediaItems: MediaLibraryItem[];
-  projectAssets?: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>;
+  projectAssets?: Array<StoredProjectAssetEntry & { filename: string }>;
   recordings: StoredRecordingEntry[];
-  projectExports: ProjectExportEntry[];
+  projectExports: StoredProjectExportEntry[];
   projectDetails: Array<VideoProject | null>;
   rawInventory?: StorageCleanupInventory;
   topN?: number;
@@ -79,7 +79,7 @@ export function buildCleanupCandidates(params: {
 function collectCleanupReferences(args: {
   mediaItems: MediaLibraryItem[];
   projectDetails: Array<VideoProject | null>;
-  projectExports: ProjectExportEntry[];
+  projectExports: StoredProjectExportEntry[];
 }): {
   projectAssetIds: Set<string>;
   recordingIds: Set<string>;
@@ -122,8 +122,8 @@ function getOldScreenshots(mediaItems: MediaLibraryItem[]): StorageCleanupCandid
 
 function getBrokenMediaMirrors(args: {
   mediaItems: MediaLibraryItem[];
-  projectAssets: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>;
-  projectExports: ProjectExportEntry[];
+  projectAssets: Array<StoredProjectAssetEntry & { filename: string }>;
+  projectExports: StoredProjectExportEntry[];
   recordings: StoredRecordingEntry[];
   webSnapshotIds?: Set<string>;
 }): StorageCleanupCandidate[] {
@@ -141,9 +141,7 @@ function getBrokenMediaMirrors(args: {
         return !recordingIds.has(item.source.recordingId);
       }
       if (item.source.kind === 'project-export') {
-        return (
-          !recordingIds.has(item.source.recordingId) || !projectExportIds.has(item.source.exportId)
-        );
+        return !projectExportIds.has(item.source.exportId);
       }
       if (item.source.kind === 'web-snapshot') {
         return !webSnapshotIds.has(item.source.snapshotId);
@@ -154,7 +152,7 @@ function getBrokenMediaMirrors(args: {
 }
 
 function getOrphanedProjectAssets(
-  projectAssets: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>,
+  projectAssets: Array<StoredProjectAssetEntry & { filename: string }>,
   referencedProjectAssetIds: Set<string>
 ): StorageCleanupCandidate[] {
   return projectAssets

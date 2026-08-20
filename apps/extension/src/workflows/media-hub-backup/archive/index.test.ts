@@ -7,6 +7,7 @@ import { createBackupExportBudget } from '../export/blob/budget';
 import {
   ASSET_REFS_STORE,
   PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
 } from '../storage/constants';
@@ -69,7 +70,6 @@ async function assertResolvesStoreBackedBlobs(): Promise<void> {
     exportId: 'export-1',
     kind: 'project-export',
     projectId: 'project-1',
-    recordingId: 'export-recording-1',
   });
   const projectAssetEntry = createEntry(
     {
@@ -89,12 +89,28 @@ async function assertResolvesStoreBackedBlobs(): Promise<void> {
 
       if (storeName === STORE_NAME) {
         return {
-          assetId: key === 'rec-1' ? 'asset-recording' : 'asset-export',
+          assetId: 'asset-recording',
           createdAt: 1,
           filename: `${key}.webm`,
           id: key,
           mimeType: 'video/webm',
-          size: key === 'rec-1' ? recordingBlob.size : projectExportBlob.size,
+          size: recordingBlob.size,
+        };
+      }
+
+      if (storeName === PROJECT_EXPORTS_STORE) {
+        return {
+          assetId: 'asset-export',
+          createdAt: 1,
+          duration: 1,
+          filename: `${key}.webm`,
+          fps: 30,
+          height: 100,
+          id: key,
+          mimeType: 'video/webm',
+          projectId: 'project-1',
+          size: projectExportBlob.size,
+          width: 100,
         };
       }
 
@@ -110,14 +126,23 @@ async function assertResolvesStoreBackedBlobs(): Promise<void> {
       }
 
       if (storeName === PROJECT_ASSETS_STORE) {
-        return { blob: projectAssetBlob };
+        return {
+          assetId: 'asset-project',
+          createdAt: 1,
+          id: key,
+          mimeType: 'video/webm',
+          size: projectAssetBlob.size,
+        };
       }
 
       return undefined;
     },
   };
   readAssetFileMock.mockReset();
-  readAssetFileMock.mockResolvedValueOnce(recordingBlob).mockResolvedValueOnce(projectExportBlob);
+  readAssetFileMock
+    .mockResolvedValueOnce(recordingBlob)
+    .mockResolvedValueOnce(projectExportBlob)
+    .mockResolvedValueOnce(projectAssetBlob);
 
   await expect(resolveBackupMediaBlob(db, recordingEntry)).resolves.toBe(recordingBlob);
   await expect(resolveBackupMediaBlob(db, projectExportEntry)).resolves.toBe(projectExportBlob);
@@ -125,9 +150,10 @@ async function assertResolvesStoreBackedBlobs(): Promise<void> {
   expect(calls).toEqual([
     { key: 'rec-1', storeName: STORE_NAME },
     { key: 'asset-recording', storeName: ASSET_REFS_STORE },
-    { key: 'export-recording-1', storeName: STORE_NAME },
+    { key: 'export-1', storeName: PROJECT_EXPORTS_STORE },
     { key: 'asset-export', storeName: ASSET_REFS_STORE },
     { key: 'project-asset-1', storeName: PROJECT_ASSETS_STORE },
+    { key: 'asset-project', storeName: ASSET_REFS_STORE },
   ]);
 }
 
@@ -195,7 +221,6 @@ async function assertAppendsArchiveDescriptor(): Promise<void> {
     kind: 'project-export',
     exportId: 'export-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
   });
   const zip = createZipRecorder();
   const assets: MediaHubBackupAssetDescriptor[] = [];
@@ -209,8 +234,20 @@ async function assertAppendsArchiveDescriptor(): Promise<void> {
     budget: createBackupExportBudget(),
     db: {
       get: async (storeName: string, key: string) => {
-        if (storeName === STORE_NAME && key === 'recording-1') {
-          return createStoredRecording('recording-1', 'asset-export', fileBlob.size);
+        if (storeName === PROJECT_EXPORTS_STORE && key === 'export-1') {
+          return {
+            assetId: 'asset-export',
+            createdAt: 1,
+            duration: 1,
+            filename: 'asset.webm',
+            fps: 30,
+            height: 1080,
+            id: 'export-1',
+            mimeType: 'video/webm',
+            projectId: 'project-1',
+            size: fileBlob.size,
+            width: 1920,
+          };
         }
 
         if (storeName === ASSET_REFS_STORE && key === 'asset-export') {

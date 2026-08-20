@@ -77,7 +77,6 @@ async function createPreparedEffectProject(): Promise<{
     projectAssetIdMap: new Map(),
     projectExportIdMap: new Map(),
     projectId: project.id,
-    recordingIdMap: new Map(),
   };
   const zip = new JSZip();
   zip.file(

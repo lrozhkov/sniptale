@@ -35,11 +35,17 @@ export async function publishReadyJournalWithRetry(
   for (let attempt = 0; attempt < IMMEDIATE_PUBLICATION_ATTEMPTS; attempt += 1) {
     try {
       await publish(journal);
-      await deleteReadyJournal(journal.journalId);
-      return;
     } catch (error) {
       lastError = error;
+      continue;
     }
+    try {
+      await deleteReadyJournal(journal.journalId);
+    } catch {
+      // Publication is authoritative after its transaction commits. The durable
+      // journal remains available for idempotent startup recovery.
+    }
+    return;
   }
   throw lastError;
 }

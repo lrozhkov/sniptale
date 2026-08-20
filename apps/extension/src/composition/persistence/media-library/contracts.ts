@@ -10,7 +10,6 @@ export type MediaAssetSource =
   | {
       kind: 'project-export';
       exportId: string;
-      recordingId: string;
       projectId: string;
     }
   | { kind: 'project-asset'; projectAssetId: string }

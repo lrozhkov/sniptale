@@ -80,6 +80,7 @@ function createLibrariesState(store: VideoEditorState) {
   return {
     projectExports: [
       {
+        assetId: 'asset-export-1',
         createdAt: 3,
         duration: store.project!.duration,
         filename: 'builder-test.mp4',
@@ -89,7 +90,6 @@ function createLibrariesState(store: VideoEditorState) {
         id: 'export-1',
         mimeType: 'video/mp4',
         projectId: store.project!.id,
-        recordingId: 'recording-1',
         size: 1024,
         width: 1920,
       },

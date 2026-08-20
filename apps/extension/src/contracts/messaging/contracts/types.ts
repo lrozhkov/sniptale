@@ -112,6 +112,12 @@ export type RuntimeDownloadRecordingMessage = {
   url?: never;
 };
 
+export type RuntimeDownloadProjectExportMessage = {
+  type: typeof VideoMessageType.DOWNLOAD_PROJECT_EXPORT;
+  exportId: string;
+  filename: string;
+};
+
 export type RuntimeDownloadRecordingSidecarMessage = {
   type: VideoMessageType.DOWNLOAD_RECORDING_SIDECAR;
   content: string;
@@ -184,7 +190,6 @@ export type RuntimeProjectExportCompletedMessage = {
   type: VideoMessageType.PROJECT_EXPORT_COMPLETED;
   jobId: string;
   projectId: string;
-  recordingId: string;
   exportId: string;
   filename: string;
   format: string;

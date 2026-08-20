@@ -5,7 +5,6 @@ import {
   listProjectExports,
   listVideoProjects,
 } from '../../composition/persistence/projects/index';
-import { deleteRecording } from '../../composition/persistence/recordings/index';
 import { deleteVideoPreviewCacheProjectRecords } from '../../composition/persistence/video-preview-cache';
 import type { VideoProjectListItem } from '../../features/media-hub/video-project-list-items';
 import { translate } from '../../platform/i18n';
@@ -18,7 +17,6 @@ async function deleteProjectExportArtifacts(projectId: string): Promise<string[]
   await Promise.all(
     exports.map(async (entry) => {
       await deleteProjectExport(entry.id);
-      await deleteRecording(entry.recordingId);
       await deleteMediaThumbnail(`export:${entry.id}`);
     })
   );

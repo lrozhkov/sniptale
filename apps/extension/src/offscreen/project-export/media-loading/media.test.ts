@@ -77,7 +77,7 @@ function installClipMediaMocks() {
     }
     return null;
   });
-  getProjectAssetMock.mockResolvedValue({ blob: new Blob(['video']) });
+  getProjectAssetMock.mockResolvedValue({ file: new Blob(['video']) });
   getRecordingMock.mockResolvedValue({ file: new Blob(['audio']) });
 }
 

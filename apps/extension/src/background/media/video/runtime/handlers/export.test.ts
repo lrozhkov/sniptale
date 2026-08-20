@@ -4,6 +4,7 @@ const {
   browserDownloadsDownloadMock,
   ensureOffscreenDocumentMock,
   executeDownloadBlobMock,
+  getProjectExportMock,
   getRecordingMock,
   loadProjectExportInputMock,
   loadSettingsMock,
@@ -13,6 +14,7 @@ const {
   browserDownloadsDownloadMock: vi.fn(),
   ensureOffscreenDocumentMock: vi.fn(),
   executeDownloadBlobMock: vi.fn(),
+  getProjectExportMock: vi.fn(),
   getRecordingMock: vi.fn(),
   loadProjectExportInputMock: vi.fn(),
   loadSettingsMock: vi.fn(),
@@ -29,6 +31,10 @@ vi.mock('../../../../../composition/persistence/recordings/index', async (import
     typeof import('../../../../../composition/persistence/recordings/index')
   >()),
   getRecording: getRecordingMock,
+}));
+vi.mock('../../../../../composition/persistence/projects', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../composition/persistence/projects')>()),
+  getProjectExport: getProjectExportMock,
 }));
 vi.mock('../../../../../composition/persistence/project-export-inputs', async (importOriginal) => ({
   ...(await importOriginal<
@@ -61,7 +67,7 @@ vi.mock('../../../../offscreen-document/service', async (importOriginal) => ({
 }));
 
 import { installBackgroundRuntimeMessagingMock } from '../../../../routing-contracts/runtime-messaging/mock';
-import { handleDownloadRecording } from './export/download';
+import { handleDownloadProjectExport, handleDownloadRecording } from './export/download';
 import { handleStartProjectExport } from './export/project-export';
 import {
   VideoExportFormat,
@@ -131,6 +137,7 @@ beforeEach(() => {
   executeDownloadBlobMock.mockResolvedValue(17);
   ensureOffscreenDocumentMock.mockResolvedValue(false);
   getRecordingMock.mockResolvedValue({ file: new Blob(['recording']) });
+  getProjectExportMock.mockResolvedValue({ file: new Blob(['project-export']) });
   loadSettingsMock.mockResolvedValue({ defaultVideoPresetId: 'preset-1' });
   loadProjectExportInputMock.mockResolvedValue(createProject());
   sendRuntimeMessageMock.mockResolvedValue({ result: 'accepted', success: true });
@@ -140,6 +147,7 @@ beforeEach(() => {
 
 it('keeps only explicit download commands under the recording-download owner', () => {
   expect(recordingDownloadRouteDescriptor.messageTypes).toEqual([
+    VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
     VideoMessageType.DOWNLOAD_RECORDING_SIDECAR,
     VideoMessageType.DOWNLOAD_RECORDING,
   ]);
@@ -157,6 +165,16 @@ it('downloads recordings and starts project export through the export owner', as
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   expect(executeDownloadBlobMock).toHaveBeenCalledWith(expect.any(Blob), 'clip.webm', 'preset-1');
+
+  expect(
+    handleDownloadProjectExport({ exportId: 'export-1', filename: 'project.mp4' }, sendResponse)
+  ).toEqual({ handled: true, keepChannelOpen: true });
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(getProjectExportMock).toHaveBeenCalledWith('export-1');
+  expect(executeDownloadBlobMock).toHaveBeenCalledWith(expect.any(Blob), 'project.mp4', 'preset-1');
 
   const settings = createExportSettings();
   expect(

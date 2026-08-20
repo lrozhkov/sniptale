@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { getStore } from '../../storage';
+import { createVideoProjectEntryWithMediaClip } from '../../../../composition/persistence/projects/index.test-support';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
 
@@ -7,6 +8,7 @@ function createStore(entries: unknown[] = []) {
   return {
     delete: vi.fn(),
     get: vi.fn(),
+    getAll: vi.fn(async () => entries),
     index: vi.fn(() => ({
       getAll: vi.fn(async () => entries),
     })),
@@ -57,8 +59,17 @@ function createStores() {
 
 function createStaleProjectExport() {
   return {
+    assetId: 'asset-stale-export',
+    createdAt: 1,
+    duration: 1,
+    filename: 'stale.webm',
+    fps: 30,
+    height: 100,
     id: 'stale-export',
-    recordingId: 'stale-recording',
+    mimeType: 'video/webm',
+    projectId: 'video-1',
+    size: 10,
+    width: 100,
   };
 }
 
@@ -88,7 +99,7 @@ describe('backup project replace cleanup', () => {
 
     expect(stores.get('project_assets')?.delete).toHaveBeenCalledWith('stale-project-asset');
     expect(stores.get('project_exports')?.delete).toHaveBeenCalledWith('stale-export');
-    expect(stores.get('recordings')?.delete).toHaveBeenCalledWith('stale-recording');
+    expect(stores.get('recordings')?.delete).not.toHaveBeenCalled();
     expect(stores.get('media_library')?.delete).toHaveBeenCalledWith('export:stale-export');
     expect(stores.get('thumbnails')?.delete).toHaveBeenCalledWith('video-project:video-1');
     expect(stores.get('aggregate_presentations')?.delete).toHaveBeenCalledWith([
@@ -106,6 +117,25 @@ describe('backup project replace cleanup', () => {
     expect(stores.get('project_assets')?.delete).not.toHaveBeenCalled();
     expect(stores.get('project_exports')?.delete).toHaveBeenCalledWith('stale-export');
     expect(stores.get('thumbnails')?.delete).toHaveBeenCalledWith('video-project:video-missing');
+  });
+
+  it('rejects transactional cleanup when another project still references the asset', async () => {
+    const stores = createStores();
+    const target = createVideoProjectEntryWithMediaClip({ id: 'video-1', name: 'Target' });
+    const foreign = createVideoProjectEntryWithMediaClip({ id: 'video-2', name: 'Foreign' });
+    const projectStore = createStore([target, foreign]);
+    projectStore.get.mockResolvedValue(target);
+    stores.set('video_projects', projectStore);
+    const { deleteExistingVideoProjectBundle } = await import('./replace');
+
+    await expect(
+      deleteExistingVideoProjectBundle(createTransaction(stores), 'video-1')
+    ).rejects.toThrow('Backup project asset is shared with another existing project.');
+
+    expect(stores.get('project_assets')?.delete).not.toHaveBeenCalled();
+    expect(stores.get('asset_refs')?.delete).not.toHaveBeenCalled();
+    expect(stores.get('asset_owners')?.delete).not.toHaveBeenCalled();
+    expect(stores.get('media_library')?.delete).not.toHaveBeenCalled();
   });
 });
 

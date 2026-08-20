@@ -21,6 +21,10 @@ import {
   type PreparedAssetObject,
 } from '../../../../composition/persistence/assets';
 import { RECORDING_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/recordings/asset-publication';
+import {
+  PROJECT_ASSET_PUBLICATION_DOMAIN,
+  PROJECT_EXPORT_PUBLICATION_DOMAIN,
+} from '../../../../composition/persistence/projects/asset-publication';
 
 export interface PreparedRestoreRecordingAsset {
   asset: PreparedAssetObject;
@@ -38,7 +42,7 @@ export interface PreparedBackupImportAsset {
   webSnapshotRecord: WebSnapshotRecord | null;
   workspace?: ImageWorkspaceEntry | null;
   presentation?: AggregatePresentationEntry | null;
-  preparedRecordingAsset?: PreparedRestoreRecordingAsset;
+  preparedAssetPublication?: PreparedRestoreRecordingAsset;
 }
 
 export interface BackupImportAssetPlan {
@@ -225,19 +229,33 @@ export async function loadBackupImportAssetBatch(args: {
         ? { ...prepared.nextEntry, size: webSnapshotRecord.size }
         : prepared.nextEntry;
 
-      let preparedRecordingAsset: PreparedRestoreRecordingAsset | undefined;
+      let preparedAssetPublication: PreparedRestoreRecordingAsset | undefined;
       if (
         prepared.nextEntry.source.kind === 'recording' ||
-        prepared.nextEntry.source.kind === 'project-export'
+        prepared.nextEntry.source.kind === 'project-export' ||
+        prepared.nextEntry.source.kind === 'project-asset'
       ) {
         if (!args.operationId) throw new Error('Restore operation ID is missing.');
         await assertAssetWriteAdmission(assetBlob.size);
         const asset = await writeBlobToAsset(assetBlob, { mimeType: prepared.nextEntry.mimeType });
+        const source = prepared.nextEntry.source;
+        const domain =
+          source.kind === 'recording'
+            ? RECORDING_ASSET_PUBLICATION_DOMAIN
+            : source.kind === 'project-export'
+              ? PROJECT_EXPORT_PUBLICATION_DOMAIN
+              : PROJECT_ASSET_PUBLICATION_DOMAIN;
+        const payload =
+          source.kind === 'recording'
+            ? { recordingId: source.recordingId, restore: true }
+            : source.kind === 'project-export'
+              ? { projectExportId: source.exportId, restore: true }
+              : { projectAssetId: source.projectAssetId, restore: true };
         const journal = await createAssetPublicationJournal({
           assetRefs: [asset.ref],
-          domain: RECORDING_ASSET_PUBLICATION_DOMAIN,
+          domain,
           operationId: args.operationId,
-          payload: { recordingId: prepared.nextEntry.source.recordingId, restore: true },
+          payload,
         }).catch(async (error: unknown) => {
           try {
             await discardPreparedAsset(asset.ref.assetId);
@@ -250,7 +268,7 @@ export async function loadBackupImportAssetBatch(args: {
           }
           throw error;
         });
-        preparedRecordingAsset = { asset, journalId: journal.journalId };
+        preparedAssetPublication = { asset, journalId: journal.journalId };
       }
 
       return {
@@ -260,7 +278,7 @@ export async function loadBackupImportAssetBatch(args: {
         thumbnailBlob,
         webSnapshotRecord,
         presentation,
-        ...(preparedRecordingAsset ? { preparedRecordingAsset } : {}),
+        ...(preparedAssetPublication ? { preparedAssetPublication } : {}),
       };
     })
   );

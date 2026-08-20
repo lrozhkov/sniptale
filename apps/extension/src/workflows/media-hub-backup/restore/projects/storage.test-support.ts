@@ -8,6 +8,7 @@ export function createStores() {
       'asset_refs',
       'asset_owners',
       'asset_operations',
+      'media_library',
       'project_exports',
       'recording_telemetry',
       'recordings',

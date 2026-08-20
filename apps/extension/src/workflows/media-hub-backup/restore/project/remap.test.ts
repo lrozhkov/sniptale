@@ -40,7 +40,6 @@ function createPreparedVideoProject(entry: PreparedVideoProject['descriptor']['e
     projectAssetIdMap: new Map(),
     projectExportIdMap: new Map(),
     projectId: entry.id,
-    recordingIdMap: new Map(),
   } satisfies PreparedVideoProject;
 }
 

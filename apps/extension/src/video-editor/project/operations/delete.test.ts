@@ -54,10 +54,7 @@ describe('deletePersistedProject', () => {
 
   it('deletes export artifacts and project thumbnails before removing the project record', async () => {
     deleteVideoProject.mockResolvedValue(['asset-1']);
-    listProjectExports.mockResolvedValue([
-      { id: 'export-1', recordingId: 'recording-1' },
-      { id: 'export-2', recordingId: 'recording-2' },
-    ]);
+    listProjectExports.mockResolvedValue([{ id: 'export-1' }, { id: 'export-2' }]);
     listVideoProjects.mockResolvedValue([{ id: 'remaining-project' }]);
 
     await expect(deletePersistedProject('project-1')).resolves.toEqual([
@@ -66,8 +63,7 @@ describe('deletePersistedProject', () => {
 
     expect(deleteProjectExport).toHaveBeenCalledWith('export-1');
     expect(deleteProjectExport).toHaveBeenCalledWith('export-2');
-    expect(deleteRecording).toHaveBeenCalledWith('recording-1');
-    expect(deleteRecording).toHaveBeenCalledWith('recording-2');
+    expect(deleteRecording).not.toHaveBeenCalled();
     expect(deleteMediaThumbnail).toHaveBeenCalledWith('project-asset:asset-1');
     expect(deleteMediaThumbnail).toHaveBeenCalledWith('export:export-1');
     expect(deleteMediaThumbnail).toHaveBeenCalledWith('export:export-2');

@@ -4,6 +4,7 @@ const {
   createUnhandledRouteResultMock,
   handleCancelProjectExportMock,
   handleDownloadRecordingMock,
+  handleDownloadProjectExportMock,
   handleDownloadRecordingSidecarMock,
   handleGetProjectExportCapabilitiesMock,
   handleInternalVideoSignalMock,
@@ -23,6 +24,7 @@ const {
   createUnhandledRouteResultMock: vi.fn(),
   handleCancelProjectExportMock: vi.fn(),
   handleDownloadRecordingMock: vi.fn(),
+  handleDownloadProjectExportMock: vi.fn(),
   handleDownloadRecordingSidecarMock: vi.fn(),
   handleGetProjectExportCapabilitiesMock: vi.fn(),
   handleInternalVideoSignalMock: vi.fn(),
@@ -41,6 +43,7 @@ const {
 }));
 
 vi.mock('./handlers/export/download', () => ({
+  handleDownloadProjectExport: handleDownloadProjectExportMock,
   handleDownloadRecording: handleDownloadRecordingMock,
   handleDownloadRecordingSidecar: handleDownloadRecordingSidecarMock,
 }));

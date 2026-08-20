@@ -21,8 +21,9 @@ function createRecording(type: string): StoredRecordingEntry {
   };
 }
 
-function createProjectAsset(type: string): Omit<ProjectAssetEntry, 'blob'> {
+function createProjectAsset(type: string): ProjectAssetEntry {
   return {
+    assetId: `asset-${type}`,
     createdAt: 20,
     id: type,
     mimeType: type,

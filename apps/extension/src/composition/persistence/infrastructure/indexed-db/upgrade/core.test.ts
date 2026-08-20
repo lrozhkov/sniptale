@@ -127,7 +127,7 @@ it('creates the job-scoped project export input handoff during the v21 upgrade',
 it('skips store creation when existing stores already cover the upgrade', async () => {
   const existingDb = createMockDb(COMPLETE_STORES);
 
-  await handleDatabaseUpgrade(existingDb, 26);
+  await handleDatabaseUpgrade(existingDb, 26, null, createEmptyUpgradeTransaction());
 
   expect(existingDb.createObjectStore).not.toHaveBeenCalled();
 });

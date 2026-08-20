@@ -168,6 +168,14 @@ function setupExportDatabase(firstEntry: MediaLibraryEntry, secondEntry: MediaLi
         return createRecordingAssetRef();
       }
 
+      if (storeName === 'project_exports' && key === 'export-1') {
+        return createProjectExportRow();
+      }
+
+      if (storeName === 'asset_refs' && key === 'project-export-asset-1') {
+        return createProjectExportAssetRef();
+      }
+
       return undefined;
     }),
     getAll: vi.fn().mockResolvedValue([]),
@@ -182,6 +190,33 @@ function createRecordingAssetRef() {
     createdAt: 1,
     location: { kind: 'opfs', objectKey: 'objects/recording-asset-1' },
     mimeType: 'video/webm',
+    sha256: null,
+    size: 11,
+  };
+}
+
+function createProjectExportRow() {
+  return {
+    assetId: 'project-export-asset-1',
+    createdAt: 1,
+    duration: 1,
+    filename: 'asset.png',
+    fps: 30,
+    height: 1080,
+    id: 'export-1',
+    mimeType: 'video/mp4',
+    projectId: 'project-1',
+    size: 11,
+    width: 1920,
+  };
+}
+
+function createProjectExportAssetRef() {
+  return {
+    assetId: 'project-export-asset-1',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/project-export-asset-1' },
+    mimeType: 'video/mp4',
     sha256: null,
     size: 11,
   };
@@ -228,7 +263,6 @@ async function verifyExportMediaHubBackup(): Promise<void> {
       kind: 'project-export',
       exportId: 'export-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     },
     {
       id: 'asset-2',
@@ -259,7 +293,6 @@ async function verifySkipsMissingMediaLibraryRows(): Promise<void> {
       kind: 'project-export',
       exportId: 'export-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     },
     {
       id: 'asset-2',
@@ -286,6 +319,13 @@ async function verifySkipsMissingMediaLibraryRows(): Promise<void> {
       }
       if (storeName === 'asset_refs' && key === 'recording-asset-1') {
         return createRecordingAssetRef();
+      }
+
+      if (storeName === 'project_exports' && key === 'export-1') {
+        return createProjectExportRow();
+      }
+      if (storeName === 'asset_refs' && key === 'project-export-asset-1') {
+        return createProjectExportAssetRef();
       }
 
       return undefined;

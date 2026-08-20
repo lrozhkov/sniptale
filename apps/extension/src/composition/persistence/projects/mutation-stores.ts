@@ -1,6 +1,9 @@
 import type { initDB } from '../infrastructure/indexed-db/core';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OPERATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   VIDEO_PROJECTS_STORE,
@@ -10,10 +13,20 @@ type ProjectMutationDatabase = Awaited<ReturnType<typeof initDB>>;
 
 export function createProjectMutationStores(db: ProjectMutationDatabase) {
   const tx = db.transaction(
-    [VIDEO_PROJECTS_STORE, PROJECT_ASSETS_STORE, MEDIA_LIBRARY_STORE],
+    [
+      VIDEO_PROJECTS_STORE,
+      PROJECT_ASSETS_STORE,
+      MEDIA_LIBRARY_STORE,
+      ASSET_OWNERS_STORE,
+      ASSET_REFS_STORE,
+      ASSET_OPERATIONS_STORE,
+    ],
     'readwrite'
   );
   return {
+    assetOperationStore: tx.objectStore(ASSET_OPERATIONS_STORE),
+    assetOwnerStore: tx.objectStore(ASSET_OWNERS_STORE),
+    assetRefStore: tx.objectStore(ASSET_REFS_STORE),
     mediaLibraryStore: tx.objectStore(MEDIA_LIBRARY_STORE),
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
@@ -28,11 +41,17 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       AGGREGATE_PRESENTATIONS_STORE,
+      ASSET_OWNERS_STORE,
+      ASSET_REFS_STORE,
+      ASSET_OPERATIONS_STORE,
     ],
     'readwrite'
   );
   return {
     aggregatePresentationStore: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
+    assetOperationStore: tx.objectStore(ASSET_OPERATIONS_STORE),
+    assetOwnerStore: tx.objectStore(ASSET_OWNERS_STORE),
+    assetRefStore: tx.objectStore(ASSET_REFS_STORE),
     mediaLibraryStore: tx.objectStore(MEDIA_LIBRARY_STORE),
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),

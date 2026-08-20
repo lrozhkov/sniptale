@@ -36,10 +36,13 @@ describe('backup project restore writer', () => {
     ).resolves.toBe(2);
 
     expect(stores.get('project_assets')?.put).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'project-asset-copy', blob: expect.any(Blob) })
+      expect.objectContaining({
+        assetId: 'asset-restored-project',
+        id: 'project-asset-copy',
+      })
     );
     expect(stores.get('project_exports')?.put).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'export-copy', recordingId: 'recording-copy' })
+      expect.objectContaining({ assetId: 'asset-restored-export', id: 'export-copy' })
     );
     expect(stores.get('scenario_assets')?.put).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'scenario-asset-copy', projectId: 'scenario-copy' })
@@ -105,7 +108,7 @@ describe('backup project restore writer empty domains', () => {
     ).resolves.toBe(2);
 
     expect(stores.get('project_exports')?.put).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'export-1', recordingId: 'recording-1' })
+      expect.objectContaining({ assetId: 'asset-restored-export', id: 'export-1' })
     );
     expect(stores.get('recording_telemetry')?.put).not.toHaveBeenCalled();
   });
