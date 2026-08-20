@@ -1,8 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { deleteReadyJournalMock, listReadyJournalsMock, writeReadyJournalMock } = vi.hoisted(() => ({
+const {
+  deleteReadyJournalMock,
+  listReadyJournalsMock,
+  releaseTransitionsMock,
+  writeReadyJournalMock,
+} = vi.hoisted(() => ({
   deleteReadyJournalMock: vi.fn(),
   listReadyJournalsMock: vi.fn(),
+  releaseTransitionsMock: vi.fn(),
   writeReadyJournalMock: vi.fn(),
 }));
 
@@ -10,6 +16,7 @@ vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteReadyJournal: deleteReadyJournalMock,
   listReadyJournals: listReadyJournalsMock,
+  releaseAssetPublicationTransitions: releaseTransitionsMock,
   writeReadyJournal: writeReadyJournalMock,
 }));
 
@@ -40,6 +47,7 @@ function createJournal(overrides: Partial<AssetReadyJournal> = {}): AssetReadyJo
 beforeEach(() => {
   vi.clearAllMocks();
   deleteReadyJournalMock.mockResolvedValue(undefined);
+  releaseTransitionsMock.mockResolvedValue(undefined);
   writeReadyJournalMock.mockResolvedValue(undefined);
 });
 
@@ -59,6 +67,7 @@ it('persists ready before publication and removes it only after a successful ret
   expect(writeReadyJournalMock).toHaveBeenCalledWith(journal);
   expect(publish).toHaveBeenCalledTimes(2);
   expect(deleteReadyJournalMock).toHaveBeenCalledWith(journal.journalId);
+  expect(releaseTransitionsMock).toHaveBeenCalledWith(['asset-1']);
 });
 
 it('binds workflow publications to their durable operation', async () => {
@@ -83,6 +92,20 @@ it('keeps ready durable after bounded immediate retries are exhausted', async ()
 
   expect(publish).toHaveBeenCalledTimes(3);
   expect(deleteReadyJournalMock).not.toHaveBeenCalled();
+  expect(releaseTransitionsMock).toHaveBeenCalledWith(['asset-1']);
+});
+
+it('surfaces both publication and transition-release failures', async () => {
+  const journal = createJournal();
+  const publicationError = new Error('transaction failed');
+  const releaseError = new Error('transition release failed');
+  const publish = vi.fn().mockRejectedValue(publicationError);
+  releaseTransitionsMock.mockRejectedValueOnce(releaseError);
+
+  await expect(publishReadyJournalWithRetry(journal, publish)).rejects.toMatchObject({
+    cause: publicationError,
+    errors: [publicationError, releaseError],
+  });
 });
 
 it('keeps a successful publication successful when ready cleanup must be replayed', async () => {

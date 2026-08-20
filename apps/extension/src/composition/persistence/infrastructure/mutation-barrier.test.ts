@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 import {
+  acquirePersistenceMutationTransition,
   isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
   runWithDurableAssetOperation,
@@ -145,6 +146,20 @@ it('keeps a cross-context transition ahead of erasure across worker-local state 
   await transition;
   await erasure;
   expect(erasureOperation).toHaveBeenCalledOnce();
+});
+
+it('keeps an explicitly acquired publication transition ahead of erasure until release', async () => {
+  const lease = await acquirePersistenceMutationTransition();
+  const erasureOperation = vi.fn(async () => undefined);
+
+  const erasure = runWithPersistentDataErasureBarrier(erasureOperation);
+  await Promise.resolve();
+  expect(erasureOperation).not.toHaveBeenCalled();
+
+  await lease.release();
+  await erasure;
+  expect(erasureOperation).toHaveBeenCalledOnce();
+  await expect(lease.release()).resolves.toBeUndefined();
 });
 
 it('queues startup recovery until a live durable restore operation completes', async () => {

@@ -58,11 +58,12 @@ export function handleDatabaseUpgrade(
   const durableAssetUpgrade = applyRecordingAssetsV26Upgrade(db, oldVersion, transaction)
     .then(() => applyProjectMediaV27Upgrade(oldVersion, transaction))
     .then(() => applyScenarioAssetsV28Upgrade(oldVersion, transaction));
-  if (transaction) {
-    void durableAssetUpgrade.catch(() => transaction.abort());
-  }
+  const upgradeCompletion = transaction
+    ? durableAssetUpgrade.catch(() => transaction.abort())
+    : durableAssetUpgrade;
   removeLegacyAnnotationPacksStore(db, oldVersion);
   removeRetiredPageStyleAssetsStore(db, oldVersion);
+  return upgradeCompletion;
 }
 
 function applyVersion25Changes(db: UpgradeDatabase, oldVersion: number) {

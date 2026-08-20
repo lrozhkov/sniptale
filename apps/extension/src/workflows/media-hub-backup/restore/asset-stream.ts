@@ -25,7 +25,10 @@ export async function writeBackupArchiveEntryToAsset(args: {
     throw new Error(`Durable backup asset cannot be streamed: ${args.path}.`);
   }
   await assertAssetWriteAdmission(args.expectedSize);
-  const writer = await createAssetObjectWriter({ mimeType: args.mimeType });
+  const writer = await createAssetObjectWriter(
+    { mimeType: args.mimeType },
+    { persistenceTransition: 'already-admitted' }
+  );
   let written = 0;
   try {
     await pipeArchiveStream(entry.internalStream('uint8array'), async (chunk) => {

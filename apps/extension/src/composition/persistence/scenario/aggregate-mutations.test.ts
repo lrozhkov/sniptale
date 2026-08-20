@@ -248,6 +248,37 @@ it('surfaces failed OPFS cleanup when a pre-journal mutation is rejected', async
   });
 });
 
+it('surfaces persistence-admission release failure after scenario publication', async () => {
+  const project = createScenarioProject('Aggregate');
+  const assetMocks = await import('../assets');
+  vi.mocked(assetMocks.releaseAssetReadyProtection).mockRejectedValueOnce(
+    new Error('transition release failed')
+  );
+
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [createAsset(project.id)] },
+      expectedRevision: null,
+    })
+  ).rejects.toThrow('transition release failed');
+  expect(getStore('scenario_projects').has(project.id)).toBe(true);
+  expect(getStore('asset_refs').has('opfs-asset-1')).toBe(true);
+});
+
+it('fails closed when publication completes without a scenario aggregate result', async () => {
+  const project = createScenarioProject('Aggregate');
+  const assetMocks = await import('../assets');
+  vi.mocked(assetMocks.publishReadyJournalWithRetry).mockResolvedValueOnce(undefined);
+
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [createAsset(project.id)] },
+      expectedRevision: null,
+    })
+  ).rejects.toThrow('produced no result');
+  expect(assetMocks.releaseAssetReadyProtection).toHaveBeenCalledWith(['opfs-asset-1']);
+});
+
 it('guards snapshot commits and orphan cleanup against concurrent owners', async () => {
   const project = createScenarioProject('Aggregate');
   const saved = await commitScenarioAggregateMutation(project);
@@ -277,6 +308,39 @@ it('guards snapshot commits and orphan cleanup against concurrent owners', async
   await expect(
     deleteOrphanedScenarioAggregateChild({ id: owned.stepId, kind: 'editor-document' })
   ).rejects.toThrow('still belongs');
+});
+
+it('discards staged snapshot assets when the pre-handoff project read fails', async () => {
+  const project = createScenarioProject('Aggregate');
+  db.get.mockRejectedValueOnce(new Error('scenario project read failed'));
+
+  await expect(
+    commitScenarioAggregateSnapshotMutation({
+      baseProject: project,
+      children: { assetPuts: [createAsset(project.id, 'read-failure')] },
+      nextProject: project,
+    })
+  ).rejects.toThrow('scenario project read failed');
+
+  const assetMocks = await import('../assets');
+  expect(assetMocks.discardPreparedAsset).toHaveBeenCalledWith('opfs-read-failure');
+});
+
+it('discards staged snapshot assets when database initialization fails', async () => {
+  const project = createScenarioProject('Aggregate');
+  const coreMocks = await import('../infrastructure/indexed-db/core');
+  vi.mocked(coreMocks.initDB).mockRejectedValueOnce(new Error('database initialization failed'));
+
+  await expect(
+    commitScenarioAggregateSnapshotMutation({
+      baseProject: project,
+      children: { assetPuts: [createAsset(project.id, 'init-failure')] },
+      nextProject: project,
+    })
+  ).rejects.toThrow('database initialization failed');
+
+  const assetMocks = await import('../assets');
+  expect(assetMocks.discardPreparedAsset).toHaveBeenCalledWith('opfs-init-failure');
 });
 
 it('retires a superseded ready journal so later scenario mutations can proceed', async () => {

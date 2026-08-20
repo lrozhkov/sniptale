@@ -12,6 +12,7 @@ import type { GalleryBackupExportController, GalleryImportController } from './c
 import type { GalleryItem } from '../items';
 import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
 import { downloadBlob, type GalleryBusyAction } from './shared';
+import { translate } from '../../../platform/i18n';
 
 const activeBackupExportAbortControllers = new WeakMap<
   GalleryBackupExportController,
@@ -80,12 +81,21 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         controller.actions.surface.setPendingExport({ options, summary });
         const result = await exportMediaHubBackup(options, { signal: abortController.signal });
         if (abortController.signal.aborted) {
+          await releaseMediaHubBackupExport(result).catch(() => {
+            controller.actions.surface.setBanner(
+              translate('gallery.backupExportModal.cleanupFailed')
+            );
+          });
           return;
         }
         downloadBlob(
           result,
           `media-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`,
-          () => releaseMediaHubBackupExport(result)
+          () => releaseMediaHubBackupExport(result),
+          () =>
+            controller.actions.surface.setBanner(
+              translate('gallery.backupExportModal.cleanupFailed')
+            )
         );
         controller.actions.surface.setPendingExport(null);
         await controller.actions.storage.refresh();

@@ -234,14 +234,14 @@ async function cleanupProjectMediaAssets(
       for (const restored of assets?.values() ?? []) {
         if (deleteObjects) await deleteAssetObject(restored.asset.ref.assetId);
         await deleteReadyJournal(restored.journalId);
-        releaseAssetReadyProtection([restored.asset.ref.assetId]);
+        await releaseAssetReadyProtection([restored.asset.ref.assetId]);
       }
     }
   }
   for (const project of prepared.scenarioProjects) {
     for (const restored of project.restoredScenarioAssets?.values() ?? []) {
       await deleteReadyJournal(restored.journalId);
-      releaseAssetReadyProtection([restored.asset.ref.assetId]);
+      await releaseAssetReadyProtection([restored.asset.ref.assetId]);
     }
   }
 }
@@ -297,7 +297,7 @@ export async function restorePreparedImportPlan(args: {
         const prepared = compensation.preparedAssetPublication;
         if (!prepared) continue;
         await deleteReadyJournal(prepared.journalId).catch(() => undefined);
-        releaseAssetReadyProtection([prepared.asset.ref.assetId]);
+        await releaseAssetReadyProtection([prepared.asset.ref.assetId]);
       }
       await cleanupProjectMediaAssets(args.preparedProjectDomains, false).catch(() => undefined);
     });

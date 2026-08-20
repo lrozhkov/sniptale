@@ -261,7 +261,7 @@ export async function commitScenarioAggregateMutation<TProject extends StoredSce
         ready
       )) as ScenarioAggregateMutationResult<TProject>;
     });
-    releaseAssetReadyProtection(assetPuts.map((asset) => asset.assetId));
+    await releaseAssetReadyProtection(assetPuts.map((asset) => asset.assetId));
     if (!result) throw new Error('Scenario asset publication produced no result.');
     return result;
   } catch (error) {
@@ -458,10 +458,15 @@ export async function commitScenarioAggregateSnapshotMutation<
       new Error('Scenario aggregate mutation cannot change the project ID.')
     );
   }
-  const db = await initDB();
-  const existing = parseScenarioProjectEntry(
-    await db.get(SCENARIO_PROJECTS_STORE, args.baseProject.id)
-  );
+  let existing: ScenarioProjectEntry | null;
+  try {
+    const db = await initDB();
+    existing = parseScenarioProjectEntry(
+      await db.get(SCENARIO_PROJECTS_STORE, args.baseProject.id)
+    );
+  } catch (error) {
+    return rejectScenarioMutationBeforeHandoff(args.children, error);
+  }
   if (!existing || !areScenarioProjectsEqual(existing.project, args.baseProject)) {
     return rejectScenarioMutationBeforeHandoff(
       args.children,

@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import {
   ASSET_ROOT_DIRECTORY_NAME,
   LEGACY_RECORDING_STAGING_DIRECTORY_NAME,
@@ -18,6 +18,7 @@ import {
   writeBlobToAsset,
   writeReadyJournal,
 } from './opfs-store';
+import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
 
 function notFound(): Error {
   return Object.assign(new Error('missing'), { name: 'NotFoundError' });
@@ -27,15 +28,21 @@ class MemoryFileHandle {
   readonly kind = 'file' as const;
   private bytes = new Blob();
   abortEffect: () => Promise<void> = async () => undefined;
+  closeEffect: () => Promise<void> = async () => undefined;
+  createWritableEffect: () => Promise<void> = async () => undefined;
+  writeEffect: () => Promise<void> = async () => undefined;
 
   async createWritable(): Promise<FileSystemWritableFileStream> {
+    await this.createWritableEffect();
     const chunks: BlobPart[] = [];
     return {
       abort: async () => this.abortEffect(),
       close: async () => {
+        await this.closeEffect();
         this.bytes = new Blob(chunks);
       },
       write: async (value: FileSystemWriteChunkType) => {
+        await this.writeEffect();
         if (
           typeof value === 'object' &&
           value !== null &&
@@ -57,6 +64,8 @@ class MemoryFileHandle {
 class MemoryDirectoryHandle {
   readonly kind = 'directory' as const;
   readonly entriesByName = new Map<string, MemoryDirectoryHandle | MemoryFileHandle>();
+  initializeCreatedFile: (file: MemoryFileHandle) => void = () => undefined;
+  removeEffect: () => Promise<void> = async () => undefined;
 
   async getDirectoryHandle(name: string, options?: FileSystemGetDirectoryOptions) {
     const current = this.entriesByName.get(name);
@@ -76,12 +85,14 @@ class MemoryDirectoryHandle {
     if (current instanceof MemoryFileHandle) return current as unknown as FileSystemFileHandle;
     if (current || !options?.create) throw notFound();
     const file = new MemoryFileHandle();
+    this.initializeCreatedFile(file);
     // Browser boundary test double: only the OPFS methods exercised below are implemented.
     this.entriesByName.set(name, file);
     return file as unknown as FileSystemFileHandle;
   }
 
   async removeEntry(name: string): Promise<void> {
+    await this.removeEffect();
     if (!this.entriesByName.delete(name)) throw notFound();
   }
 
@@ -144,7 +155,7 @@ it('keeps a closed immutable object and changes writing protection to a ready jo
   await expect(listReadyJournals(harness.options)).resolves.toEqual([]);
   await expect(listAssetObjectIds(harness.options)).resolves.toEqual(['asset-1']);
   await expect(listWritingAssetIds(harness.options)).resolves.toEqual([]);
-  releaseAssetReadyProtection(['asset-1']);
+  await releaseAssetReadyProtection(['asset-1']);
   expect(isAssetReadyProtected('asset-1')).toBe(false);
 });
 
@@ -165,6 +176,265 @@ it('aborts an active writer and removes both its marker and partial object', asy
   expect((assetRoot.entriesByName.get('objects') as MemoryDirectoryHandle).entriesByName.size).toBe(
     0
   );
+});
+
+it('supports a writer whose enclosing workflow already owns persistence admission', async () => {
+  const harness = createHarness();
+  const writer = await createAssetObjectWriter(
+    { mimeType: 'video/webm' },
+    { ...harness.options, persistenceTransition: 'already-admitted' }
+  );
+
+  await writer.abort();
+
+  await expect(listWritingAssetIds(harness.options)).resolves.toEqual([]);
+  await expect(listAssetObjectIds(harness.options)).resolves.toEqual([]);
+});
+
+it('releases persistence admission when the object writer lock cannot be acquired', async () => {
+  const harness = createHarness();
+  await expect(
+    createAssetObjectWriter(
+      { mimeType: 'video/webm' },
+      {
+        ...harness.options,
+        requestExclusiveLock: async () => {
+          throw new Error('writer lock failed');
+        },
+      }
+    )
+  ).rejects.toThrow('writer lock failed');
+
+  await expect(runWithPersistentDataErasureBarrier(async () => undefined)).resolves.toBeUndefined();
+});
+
+it('releases writer and persistence admission when OPFS directory creation fails', async () => {
+  const harness = createHarness();
+  await expect(
+    createAssetObjectWriter(
+      { mimeType: 'video/webm' },
+      {
+        ...harness.options,
+        getOriginRoot: async () => {
+          throw new Error('OPFS root failed');
+        },
+      }
+    )
+  ).rejects.toMatchObject({
+    errors: expect.arrayContaining([expect.objectContaining({ message: 'OPFS root failed' })]),
+  });
+
+  await expect(runWithPersistentDataErasureBarrier(async () => undefined)).resolves.toBeUndefined();
+});
+
+it('keeps persistence admission until concurrent directory creation attempts settle', async () => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  const getDirectoryHandle = assetRoot.getDirectoryHandle.bind(assetRoot);
+  let releaseWritingDirectory: (() => void) | undefined;
+  let writingDirectoryStartedResolve: (() => void) | undefined;
+  const writingDirectoryStarted = new Promise<void>((resolve) => {
+    writingDirectoryStartedResolve = resolve;
+  });
+  vi.spyOn(assetRoot, 'getDirectoryHandle').mockImplementation(async (name, options) => {
+    if (name === 'objects') throw new Error('objects directory failed');
+    if (name === 'writing') {
+      writingDirectoryStartedResolve?.();
+      await new Promise<void>((resolve) => {
+        releaseWritingDirectory = resolve;
+      });
+    }
+    return getDirectoryHandle(name, options);
+  });
+
+  const writerCreation = createAssetObjectWriter({ mimeType: 'video/webm' }, harness.options);
+  let writerCreationSettled = false;
+  void writerCreation.then(
+    () => {
+      writerCreationSettled = true;
+    },
+    () => {
+      writerCreationSettled = true;
+    }
+  );
+  await writingDirectoryStarted;
+  const rootRemoval = vi.spyOn(harness.root, 'removeEntry');
+  let erasureCompleted = false;
+  const erasure = runWithPersistentDataErasureBarrier(async () => {
+    await eraseAssetStorage(harness.options);
+    erasureCompleted = true;
+  });
+  await Promise.resolve();
+  expect(writerCreationSettled).toBe(false);
+  expect(erasureCompleted).toBe(false);
+  expect(rootRemoval).not.toHaveBeenCalled();
+
+  releaseWritingDirectory?.();
+  await expect(writerCreation).rejects.toThrow('Failed to create asset directories.');
+  await erasure;
+
+  expect(erasureCompleted).toBe(true);
+  expect(rootRemoval).toHaveBeenCalledWith(ASSET_ROOT_DIRECTORY_NAME, { recursive: true });
+  expect(harness.root.entriesByName.has(ASSET_ROOT_DIRECTORY_NAME)).toBe(false);
+});
+
+it('removes the marker and releases persistence admission when object creation fails', async () => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  const objects = new MemoryDirectoryHandle();
+  const writing = new MemoryDirectoryHandle();
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  assetRoot.entriesByName.set('objects', objects);
+  assetRoot.entriesByName.set('writing', writing);
+  vi.spyOn(objects, 'getFileHandle').mockRejectedValueOnce(new Error('object creation failed'));
+
+  await expect(
+    createAssetObjectWriter({ mimeType: 'video/webm' }, harness.options)
+  ).rejects.toThrow('object creation failed');
+
+  expect(writing.entriesByName.has('asset-1')).toBe(false);
+  expect(objects.entriesByName.has('asset-1')).toBe(false);
+  await expect(runWithPersistentDataErasureBarrier(async () => undefined)).resolves.toBeUndefined();
+});
+
+it('removes a created marker when its writable cannot be opened', async () => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  const objects = new MemoryDirectoryHandle();
+  const writing = new MemoryDirectoryHandle();
+  writing.initializeCreatedFile = (marker) => {
+    marker.createWritableEffect = async () => {
+      throw new Error('marker writable failed');
+    };
+  };
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  assetRoot.entriesByName.set('objects', objects);
+  assetRoot.entriesByName.set('writing', writing);
+
+  await expect(
+    createAssetObjectWriter({ mimeType: 'video/webm' }, harness.options)
+  ).rejects.toThrow('marker writable failed');
+
+  expect(writing.entriesByName.has('asset-1')).toBe(false);
+  await expect(runWithPersistentDataErasureBarrier(async () => undefined)).resolves.toBeUndefined();
+});
+
+it('releases persistence admission when marker file creation fails', async () => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  const objects = new MemoryDirectoryHandle();
+  const writing = new MemoryDirectoryHandle();
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  assetRoot.entriesByName.set('objects', objects);
+  assetRoot.entriesByName.set('writing', writing);
+  vi.spyOn(writing, 'getFileHandle').mockRejectedValueOnce(new Error('marker creation failed'));
+  const markerRemoval = vi.spyOn(writing, 'removeEntry');
+
+  await expect(
+    createAssetObjectWriter({ mimeType: 'video/webm' }, harness.options)
+  ).rejects.toThrow('marker creation failed');
+  expect(markerRemoval).toHaveBeenCalledWith('asset-1', { recursive: false });
+  await expect(runWithPersistentDataErasureBarrier(async () => undefined)).resolves.toBeUndefined();
+});
+
+it.each([
+  {
+    configure(marker: MemoryFileHandle) {
+      marker.writeEffect = async () => {
+        throw new Error('marker write failed');
+      };
+    },
+    failure: 'marker write failed',
+  },
+  {
+    configure(marker: MemoryFileHandle) {
+      marker.closeEffect = async () => {
+        throw new Error('marker close failed');
+      };
+    },
+    failure: 'marker close failed',
+  },
+])('removes a created marker when $failure', async ({ configure, failure }) => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  const objects = new MemoryDirectoryHandle();
+  const writing = new MemoryDirectoryHandle();
+  writing.initializeCreatedFile = configure;
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  assetRoot.entriesByName.set('objects', objects);
+  assetRoot.entriesByName.set('writing', writing);
+
+  await expect(
+    createAssetObjectWriter({ mimeType: 'video/webm' }, harness.options)
+  ).rejects.toThrow(failure);
+
+  expect(writing.entriesByName.has('asset-1')).toBe(false);
+  await expect(runWithPersistentDataErasureBarrier(async () => undefined)).resolves.toBeUndefined();
+});
+
+it('surfaces marker cleanup failure without retaining persistence admission', async () => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  const objects = new MemoryDirectoryHandle();
+  const writing = new MemoryDirectoryHandle();
+  writing.initializeCreatedFile = (marker) => {
+    marker.writeEffect = async () => {
+      throw new Error('marker write failed');
+    };
+    marker.abortEffect = async () => {
+      throw new Error('marker abort failed');
+    };
+  };
+  writing.removeEffect = async () => {
+    throw new Error('marker removal failed');
+  };
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  assetRoot.entriesByName.set('objects', objects);
+  assetRoot.entriesByName.set('writing', writing);
+
+  await expect(
+    createAssetObjectWriter({ mimeType: 'video/webm' }, harness.options)
+  ).rejects.toMatchObject({
+    errors: expect.arrayContaining([
+      expect.objectContaining({
+        errors: expect.arrayContaining([
+          expect.objectContaining({ message: 'marker write failed' }),
+          expect.objectContaining({ message: 'marker abort failed' }),
+          expect.objectContaining({ message: 'marker removal failed' }),
+        ]),
+        message: 'Failed to write and clean up OPFS marker: asset-1.',
+      }),
+      expect.objectContaining({ message: 'marker removal failed' }),
+    ]),
+  });
+  await expect(runWithPersistentDataErasureBarrier(async () => undefined)).resolves.toBeUndefined();
+});
+
+it('surfaces Blob write and abort-cleanup failures together', async () => {
+  const harness = createHarness();
+  const assetRoot = new MemoryDirectoryHandle();
+  const objects = new MemoryDirectoryHandle();
+  const writing = new MemoryDirectoryHandle();
+  const object = new MemoryFileHandle();
+  object.writeEffect = async () => {
+    throw new Error('object write failed');
+  };
+  object.abortEffect = async () => {
+    throw new Error('writable abort failed');
+  };
+  harness.root.entriesByName.set(ASSET_ROOT_DIRECTORY_NAME, assetRoot);
+  assetRoot.entriesByName.set('objects', objects);
+  assetRoot.entriesByName.set('writing', writing);
+  objects.entriesByName.set('asset-1', object);
+
+  await expect(writeBlobToAsset(new Blob(['bytes']), harness.options)).rejects.toMatchObject({
+    cause: expect.objectContaining({ message: 'object write failed' }),
+    errors: expect.arrayContaining([
+      expect.objectContaining({ message: 'object write failed' }),
+      expect.objectContaining({ message: 'Failed to discard asset object: asset-1.' }),
+    ]),
+  });
 });
 
 it('settles an active writable abort before removing its object and marker', async () => {
@@ -259,6 +529,20 @@ it('streams a Blob into an object and can discard the finalized unpublished obje
   await expect(readAssetFile(prepared.ref, 'video.webm', harness.options)).rejects.toThrow(
     'missing'
   );
+});
+
+it('keeps erasure behind an unpublished OPFS object until the object is discarded', async () => {
+  const harness = createHarness();
+  const prepared = await writeBlobToAsset(new Blob(['video']), harness.options);
+  const erase = vi.fn(async () => undefined);
+
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  expect(erase).not.toHaveBeenCalled();
+
+  await discardPreparedAsset(prepared.ref.assetId, harness.options);
+  await erasure;
+  expect(erase).toHaveBeenCalledOnce();
 });
 
 it('removes writer protection even when prepared object deletion fails', async () => {

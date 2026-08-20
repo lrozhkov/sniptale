@@ -83,6 +83,7 @@ it('reports cross-domain authority drift while protecting ready and active-writi
 it.each([
   ['recordings', createRecording('recording-owner-missing', 'asset-domain')],
   ['project_assets', createProjectAsset('project-owner-missing', 'asset-domain')],
+  ['project_exports', createProjectExport('export-owner-missing', 'asset-domain')],
   ['scenario_assets', createScenarioAsset('scenario-owner-missing', 'asset-domain')],
 ])('reports a required %s owner missing from an otherwise referenced asset', async (store, row) => {
   mocks.objects.mockResolvedValue(['asset-domain']);
@@ -250,6 +251,22 @@ function createProjectAsset(id: string, assetId: string) {
     id,
     mimeType: 'video/webm',
     size: 3,
+  };
+}
+
+function createProjectExport(id: string, assetId: string) {
+  return {
+    assetId,
+    createdAt: 1,
+    duration: 1,
+    filename: `${id}.webm`,
+    fps: 30,
+    height: 100,
+    id,
+    mimeType: 'video/webm',
+    projectId: 'project-1',
+    size: 3,
+    width: 100,
   };
 }
 

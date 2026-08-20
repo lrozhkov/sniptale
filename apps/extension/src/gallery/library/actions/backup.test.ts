@@ -20,18 +20,41 @@ import {
   createImportAction,
   createImportSelectedFileAction,
 } from './backup';
+import { translate } from '../../../platform/i18n';
 
 const {
+  downloadBlobRuntime,
   exportMediaHubBackupMock,
   importMediaHubBackupMock,
   inspectLocalMediaHubBackupMock,
   inspectMediaHubBackupMock,
+  releaseMediaHubBackupExportMock,
 } = vi.hoisted(() => ({
+  downloadBlobRuntime: {
+    onReleaseError: undefined as ((error: unknown) => void) | undefined,
+  },
   exportMediaHubBackupMock: vi.fn(),
   importMediaHubBackupMock: vi.fn(),
   inspectLocalMediaHubBackupMock: vi.fn(),
   inspectMediaHubBackupMock: vi.fn(),
+  releaseMediaHubBackupExportMock: vi.fn(),
 }));
+
+vi.mock('./shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./shared')>();
+  return {
+    ...actual,
+    downloadBlob: (
+      blob: Blob,
+      filename: string,
+      release?: () => Promise<void> | void,
+      onReleaseError?: (error: unknown) => void
+    ) => {
+      downloadBlobRuntime.onReleaseError = onReleaseError;
+      return actual.downloadBlob(blob, filename, release, onReleaseError);
+    },
+  };
+});
 
 vi.mock('../../../workflows/media-hub-backup/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../workflows/media-hub-backup/index')>()),
@@ -39,6 +62,7 @@ vi.mock('../../../workflows/media-hub-backup/index', async (importOriginal) => (
   importMediaHubBackup: importMediaHubBackupMock,
   inspectLocalMediaHubBackup: inspectLocalMediaHubBackupMock,
   inspectMediaHubBackup: inspectMediaHubBackupMock,
+  releaseMediaHubBackupExport: releaseMediaHubBackupExportMock,
 }));
 
 let anchorClickSpy = vi.fn();
@@ -115,6 +139,9 @@ beforeEach(() => {
   importMediaHubBackupMock.mockReset();
   inspectLocalMediaHubBackupMock.mockReset();
   inspectMediaHubBackupMock.mockReset();
+  releaseMediaHubBackupExportMock.mockReset();
+  releaseMediaHubBackupExportMock.mockResolvedValue(undefined);
+  downloadBlobRuntime.onReleaseError = undefined;
   anchorClickSpy = vi.fn();
   stubAnchorDownloads();
 });
@@ -179,6 +206,19 @@ async function verifyConfirmExportRequiresFreshDisclosureInspection() {
   });
 }
 
+async function verifyTerminalCleanupFailureShowsTranslatedBanner() {
+  const { controller } = createController();
+  const setBanner = vi.fn();
+  controller.actions.surface.setBanner = setBanner;
+  inspectLocalMediaHubBackupMock.mockResolvedValue(createLocalBackupSummary());
+  exportMediaHubBackupMock.mockResolvedValue(new Blob(['backup'], { type: 'application/zip' }));
+
+  await createConfirmExportBackupAction(controller)(createAllBackupOptions(), runBusyAction);
+  downloadBlobRuntime.onReleaseError?.(new Error('persistent OPFS cleanup failure'));
+
+  expect(setBanner).toHaveBeenCalledWith(translate('gallery.backupExportModal.cleanupFailed'));
+}
+
 async function verifyCancelledExportAbortsAndSkipsDownload() {
   const { controller, getState } = createController();
   const pendingOptions = createAllBackupOptions();
@@ -205,6 +245,37 @@ async function verifyCancelledExportAbortsAndSkipsDownload() {
   expect(anchorClickSpy).not.toHaveBeenCalled();
   expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
   expect(getState().storage.pendingExport).toBeNull();
+}
+
+async function verifyResolvedCancelledExportReleasesTemporaryFile() {
+  const { controller, getState } = createController();
+  const setBanner = vi.fn();
+  controller.actions.surface.setBanner = setBanner;
+  const pendingOptions = createAllBackupOptions();
+  const backupFile = new File(['backup'], 'backup.zip', { type: 'application/zip' });
+  let resolveExport: (result: Blob) => void = () => undefined;
+
+  inspectLocalMediaHubBackupMock.mockResolvedValue(createLocalBackupSummary());
+  exportMediaHubBackupMock.mockImplementation(
+    () =>
+      new Promise<Blob>((resolve) => {
+        resolveExport = resolve;
+      })
+  );
+  releaseMediaHubBackupExportMock.mockRejectedValueOnce(new Error('persistent cleanup failure'));
+
+  const exportPromise = createConfirmExportBackupAction(controller)(pendingOptions, runBusyAction);
+  await Promise.resolve();
+  await Promise.resolve();
+  createClosePendingExportAction(controller)();
+  resolveExport(backupFile);
+  await exportPromise;
+
+  expect(releaseMediaHubBackupExportMock).toHaveBeenCalledWith(backupFile);
+  expect(anchorClickSpy).not.toHaveBeenCalled();
+  expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
+  expect(getState().storage.pendingExport).toBeNull();
+  expect(setBanner).toHaveBeenCalledWith(translate('gallery.backupExportModal.cleanupFailed'));
 }
 
 async function verifySelectedExportScope() {
@@ -270,8 +341,16 @@ describe('gallery backup actions', () => {
     verifyConfirmExportRequiresFreshDisclosureInspection
   );
   it(
+    'shows a translated banner when terminal backup cleanup fails',
+    verifyTerminalCleanupFailureShowsTranslatedBanner
+  );
+  it(
     'aborts in-progress backup export when the pending export modal closes',
     verifyCancelledExportAbortsAndSkipsDownload
+  );
+  it(
+    'releases a completed temporary backup when cancellation wins before download handoff',
+    verifyResolvedCancelledExportReleasesTemporaryFile
   );
   it('opens backup disclosure with the selected item scope', verifySelectedExportScope);
   it('imports selected backup files through the existing conflict flow', verifyBackupImportFlow);

@@ -171,6 +171,92 @@ describe('media hub backup metadata parser', () => {
 });
 
 describe('media hub backup metadata rejection boundaries', () => {
+  it('rejects duplicate standalone media and durable owner identities', async () => {
+    const { parseBackupMetadata } = await import('.');
+    const duplicateMedia = createBackupAssetMetadata();
+    duplicateMedia.assets.push({
+      ...structuredClone(duplicateMedia.assets[0]!),
+      assetPath: 'assets/asset-2',
+    });
+    expect(() => parseBackupMetadata(duplicateMedia)).toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+
+    const duplicateRecording = createBackupAssetMetadata();
+    duplicateRecording.assets = [
+      {
+        ...duplicateRecording.assets[0]!,
+        entry: {
+          ...duplicateRecording.assets[0]!.entry,
+          id: 'recording:one',
+          kind: 'recording',
+          source: { kind: 'recording', recordingId: 'recording-owner' },
+        },
+      },
+      {
+        ...structuredClone(duplicateRecording.assets[0]!),
+        assetPath: 'assets/recording-2',
+        entry: {
+          ...duplicateRecording.assets[0]!.entry,
+          id: 'recording:two',
+          source: { kind: 'recording', recordingId: 'recording-owner' },
+        },
+      },
+    ];
+    expect(() => parseBackupMetadata(duplicateRecording)).toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+  });
+
+  it('rejects duplicate video project and cross-project durable child identities', async () => {
+    const { parseBackupMetadata } = await import('.');
+    const duplicateProject = createVideoProjectMetadata(
+      'video-projects/video-1/exports/export-1.webm'
+    );
+    duplicateProject.videoProjects.push(structuredClone(duplicateProject.videoProjects[0]!));
+    expect(() => parseBackupMetadata(duplicateProject)).toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+
+    const duplicateChild = createVideoProjectMetadata(
+      'video-projects/video-1/exports/export-1.webm'
+    );
+    const second = structuredClone(duplicateChild.videoProjects[0]!);
+    second.entry.id = 'video-2';
+    second.entry.project.id = 'video-2';
+    second.projectExports[0]!.entry.projectId = 'video-2';
+    second.projectExports[0]!.recording.blobPath = 'video-projects/video-2/exports/export-1.webm';
+    duplicateChild.videoProjects.push(second);
+    expect(() => parseBackupMetadata(duplicateChild)).toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+  });
+
+  it('rejects a standalone durable owner colliding with a project child', async () => {
+    const { parseBackupMetadata } = await import('.');
+    const projectMetadata = createVideoProjectMetadata(
+      'video-projects/video-1/exports/export-1.webm'
+    );
+    const standalone = createBackupAssetMetadata().assets[0]!;
+    const metadata = {
+      ...projectMetadata,
+      assets: [
+        {
+          ...standalone,
+          entry: {
+            ...standalone.entry,
+            id: 'standalone-export',
+            kind: 'export',
+            mimeType: 'video/webm',
+            source: { exportId: 'export-1', kind: 'project-export', projectId: 'video-1' },
+          },
+        },
+      ],
+    };
+
+    expect(() => parseBackupMetadata(metadata)).toThrow('shared.mediaHub.backupMetadataCorrupted');
+  });
+
   it('rejects image workspace authority that is incompatible with its root', async () => {
     const { parseBackupMetadata } = await import('.');
     const createWorkspace = (revision: number) => ({

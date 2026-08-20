@@ -168,9 +168,17 @@ export async function createRecordingStagingCoordinator(
           throw new Error('Cannot delete recording staging before all artifacts are finalized.');
         }
         phase = 'deleting';
-        artifacts.forEach((artifact) => artifact.release());
+        const releases = await Promise.allSettled(
+          [...artifacts.values()].map((artifact) => artifact.release())
+        );
         phase = 'deleted';
         activeCoordinators.delete(coordinator);
+        const failures = releases.flatMap((result) =>
+          result.status === 'rejected' ? [result.reason as unknown] : []
+        );
+        if (failures.length > 0) {
+          throw new AggregateError(failures, 'Failed to release recording staging.');
+        }
       })();
       return deletePromise;
     },

@@ -106,6 +106,7 @@ interface GalleryBackupExportControllerActions {
     refresh: () => Promise<void>;
   };
   surface: {
+    setBanner: Dispatch<SetStateAction<string | null>>;
     setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   };
 }

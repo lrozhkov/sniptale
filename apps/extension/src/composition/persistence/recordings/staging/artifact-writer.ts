@@ -15,7 +15,7 @@ export interface RecordingStagingArtifactOwner {
   readonly phase: ArtifactPhase;
   readonly writer: RecordingStagingArtifactWriter;
   abort(): Promise<void>;
-  release(): void;
+  release(): Promise<void>;
 }
 
 interface CreateRecordingStagingArtifactOwnerInput {
@@ -107,8 +107,6 @@ export function createRecordingStagingArtifactOwner(
     },
     writer,
     abort,
-    release() {
-      releaseAssetReadyProtection([input.storage.assetId]);
-    },
+    release: () => releaseAssetReadyProtection([input.storage.assetId]),
   };
 }

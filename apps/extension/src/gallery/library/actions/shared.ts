@@ -49,17 +49,22 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
 export function downloadBlob(
   blob: Blob,
   filename: string,
-  release?: () => void | Promise<void>
+  release?: () => void | Promise<void>,
+  onReleaseError?: (error: unknown) => void
 ): void {
   const url = URL.createObjectURL(blob);
-  trackBlobDownloadCleanup(url, release);
+  trackBlobDownloadCleanup(url, release, onReleaseError);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
   link.click();
 }
 
-function trackBlobDownloadCleanup(url: string, release?: () => void | Promise<void>): void {
+function trackBlobDownloadCleanup(
+  url: string,
+  release?: () => void | Promise<void>,
+  onReleaseError?: (error: unknown) => void
+): void {
   const tracksTerminalState = browserDownloads.isAvailable();
   let settled = false;
   let timeoutId: number | null = null;
@@ -75,7 +80,7 @@ function trackBlobDownloadCleanup(url: string, release?: () => void | Promise<vo
     if (release)
       void Promise.resolve()
         .then(release)
-        .catch(() => undefined);
+        .catch((error: unknown) => onReleaseError?.(error));
   };
   if (!tracksTerminalState) {
     timeoutId = window.setTimeout(cleanup, 1000);

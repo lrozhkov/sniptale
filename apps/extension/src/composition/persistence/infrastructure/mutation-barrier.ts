@@ -18,6 +18,10 @@ export interface DurableAssetOperationPermit {
   readonly [durableAssetOperationPermitBrand]: true;
 }
 
+export interface PersistenceMutationTransitionLease {
+  release(): Promise<void>;
+}
+
 export interface PersistenceLockManager {
   request<T>(
     name: string,
@@ -122,6 +126,38 @@ export function runWithPersistenceMutationTransition<T>(
     { mode: 'shared' },
     operation
   );
+}
+
+export async function acquirePersistenceMutationTransition(): Promise<PersistenceMutationTransitionLease> {
+  let releaseTransition!: () => void;
+  let resolveAcquired!: () => void;
+  let rejectAcquired!: (error: unknown) => void;
+  const released = new Promise<void>((resolve) => {
+    releaseTransition = resolve;
+  });
+  const acquired = new Promise<void>((resolve, reject) => {
+    resolveAcquired = resolve;
+    rejectAcquired = reject;
+  });
+  const lifetime = getPersistenceLockManager().request(
+    PERSISTENCE_TRANSITION_LOCK_NAME,
+    { mode: 'shared' },
+    async () => {
+      resolveAcquired();
+      await released;
+    }
+  );
+  void lifetime.catch(rejectAcquired);
+  await acquired;
+  let active = true;
+  return {
+    async release() {
+      if (!active) return;
+      active = false;
+      releaseTransition();
+      await lifetime;
+    },
+  };
 }
 
 export function runWithDurableAssetLifecycleLock<T>(operation: () => T | Promise<T>): Promise<T> {

@@ -81,7 +81,7 @@ export async function commitProjectExport(input: SaveProjectExportInput): Promis
     });
     journalCreated = true;
     await publishReadyJournalWithRetry(journal, publishProjectExportJournal);
-    if (input.blob) releaseAssetReadyProtection([prepared.ref.assetId]);
+    if (input.blob) await releaseAssetReadyProtection([prepared.ref.assetId]);
   } catch (error) {
     if (!journalCreated) await discardPreparedAsset(prepared.ref.assetId);
     throw error;

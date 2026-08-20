@@ -108,7 +108,7 @@ async function saveRecordingEntries(
     });
     journalCreated = true;
     await publishReadyJournalWithRetry(journal, publishRecordingAssetJournal);
-    releaseAssetReadyProtection(
+    await releaseAssetReadyProtection(
       preparedInputs
         .filter(({ input }) => input.blob !== undefined)
         .map(({ prepared }) => prepared.ref.assetId)

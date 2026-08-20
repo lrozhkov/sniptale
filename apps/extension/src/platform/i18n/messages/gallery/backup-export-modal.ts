@@ -93,4 +93,8 @@ export const galleryBackupExportModalMessages = defineMessageSource({
     ru: 'Создать ZIP',
     en: 'Create ZIP',
   },
+  cleanupFailed: {
+    ru: 'Не удалось удалить временный backup-файл. Перезапустите расширение или удалите локальные данные, чтобы повторить очистку.',
+    en: 'The temporary backup file could not be removed. Restart the extension or erase local data to retry cleanup.',
+  },
 });

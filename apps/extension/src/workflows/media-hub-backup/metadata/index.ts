@@ -24,12 +24,17 @@ import type {
   MediaHubBackupAssetDescriptor,
   MediaHubBackupMetadata,
   ScenarioBackupProjectDescriptor,
+  VideoBackupProjectDescriptor,
 } from '../contracts/types';
 import { normalizeEffectBundleDescriptor } from './effect-bundles';
 import { tryNormalizeAggregatePresentation } from './presentation';
 import { parseImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/parser';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
 import { parseLibraryLifecycle } from '../../../composition/persistence/library-lifecycle/parser';
+import {
+  createProjectAssetMediaId,
+  createProjectExportMediaId,
+} from '../../../features/media-hub/media-id';
 
 const BACKUP_MEDIA_KINDS = new Set<MediaAssetKind>([
   'audio',
@@ -169,18 +174,57 @@ export function parseBackupMetadata(value: unknown): MediaHubBackupMetadata {
       ? undefined
       : readRecordArray(field(metadata, 'scenarioProjects')).map(normalizeScenarioProject);
   if (scenarioProjects) assertUniqueScenarioProjectGraph(scenarioProjects);
+  const assets = readRecordArray(field(metadata, 'assets')).map(normalizeAssetDescriptor);
+  const videoProjects =
+    field(metadata, 'videoProjects') === undefined
+      ? undefined
+      : readRecordArray(field(metadata, 'videoProjects')).map(normalizeVideoProject);
+  assertUniqueDurableMediaGraph(assets, videoProjects ?? []);
   return {
-    assets: readRecordArray(field(metadata, 'assets')).map(normalizeAssetDescriptor),
+    assets,
     effectBundles,
     ...(scenarioProjects ? { scenarioProjects } : {}),
-    ...(field(metadata, 'videoProjects') === undefined
-      ? {}
-      : {
-          videoProjects: readRecordArray(field(metadata, 'videoProjects')).map(
-            normalizeVideoProject
-          ),
-        }),
+    ...(videoProjects ? { videoProjects } : {}),
   };
+}
+
+function assertUniqueDurableMediaGraph(
+  assets: readonly MediaHubBackupAssetDescriptor[],
+  videoProjects: readonly VideoBackupProjectDescriptor[]
+): void {
+  const mediaIds = new Set<string>();
+  const recordingIds = new Set<string>();
+  const projectAssetIds = new Set<string>();
+  const projectExportIds = new Set<string>();
+  const projectIds = new Set<string>();
+  const durablePaths = new Set<string>();
+  const addUnique = (values: Set<string>, value: string) => {
+    if (values.has(value)) failMetadata();
+    values.add(value);
+  };
+  for (const descriptor of assets) {
+    addUnique(mediaIds, descriptor.entry.id);
+    if (descriptor.assetPath) addUnique(durablePaths, descriptor.assetPath);
+    const source = descriptor.entry.source;
+    if (source.kind === 'recording') addUnique(recordingIds, source.recordingId);
+    if (source.kind === 'project-asset') {
+      addUnique(projectAssetIds, source.projectAssetId);
+    }
+    if (source.kind === 'project-export') addUnique(projectExportIds, source.exportId);
+  }
+  for (const project of videoProjects) {
+    addUnique(projectIds, project.entry.id);
+    for (const descriptor of project.projectAssets) {
+      addUnique(projectAssetIds, descriptor.entry.id);
+      addUnique(mediaIds, createProjectAssetMediaId(descriptor.entry.id));
+      addUnique(durablePaths, descriptor.blobPath);
+    }
+    for (const descriptor of project.projectExports) {
+      addUnique(projectExportIds, descriptor.entry.id);
+      addUnique(mediaIds, createProjectExportMediaId(descriptor.entry.id));
+      addUnique(durablePaths, descriptor.recording.blobPath);
+    }
+  }
 }
 
 function assertUniqueScenarioProjectGraph(

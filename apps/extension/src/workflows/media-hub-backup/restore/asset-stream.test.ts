@@ -77,6 +77,65 @@ it('aborts the OPFS writer when streamed bytes exceed declared metadata', async 
   expect(mocks.finalize).not.toHaveBeenCalled();
 });
 
+it('aborts the OPFS writer when the archive stream ends before the declared size', async () => {
+  await expect(
+    writeBackupArchiveEntryToAsset({
+      expectedSize: 3,
+      mimeType: 'video/webm',
+      path: 'assets/recording.webm',
+      zip: {
+        file: () => ({
+          async: vi.fn(),
+          internalStream: () => new ControlledStream([new Uint8Array([1, 2])]),
+        }),
+      },
+    })
+  ).rejects.toThrow('does not match metadata');
+
+  expect(mocks.abort).toHaveBeenCalledOnce();
+  expect(mocks.finalize).not.toHaveBeenCalled();
+});
+
+it('aborts the OPFS writer when a streamed chunk write fails', async () => {
+  mocks.append.mockRejectedValueOnce(new Error('OPFS chunk write failed'));
+
+  await expect(
+    writeBackupArchiveEntryToAsset({
+      expectedSize: 2,
+      mimeType: 'video/webm',
+      path: 'assets/recording.webm',
+      zip: {
+        file: () => ({
+          async: vi.fn(),
+          internalStream: () => new ControlledStream([new Uint8Array([1, 2])]),
+        }),
+      },
+    })
+  ).rejects.toThrow('OPFS chunk write failed');
+
+  expect(mocks.abort).toHaveBeenCalledOnce();
+});
+
+it('aborts the OPFS writer when finalization fails', async () => {
+  mocks.finalize.mockRejectedValueOnce(new Error('OPFS finalize failed'));
+
+  await expect(
+    writeBackupArchiveEntryToAsset({
+      expectedSize: 2,
+      mimeType: 'video/webm',
+      path: 'assets/recording.webm',
+      zip: {
+        file: () => ({
+          async: vi.fn(),
+          internalStream: () => new ControlledStream([new Uint8Array([1, 2])]),
+        }),
+      },
+    })
+  ).rejects.toThrow('OPFS finalize failed');
+
+  expect(mocks.abort).toHaveBeenCalledOnce();
+});
+
 it('surfaces incomplete OPFS cleanup together with the invalid archive error', async () => {
   mocks.abort.mockRejectedValueOnce(new Error('partial restore cleanup failed'));
 
@@ -107,6 +166,31 @@ it('refuses a durable entry when the archive cannot expose an internal stream', 
     })
   ).rejects.toThrow('cannot be streamed');
 
+  expect(mocks.createWriter).not.toHaveBeenCalled();
+});
+
+it('rejects missing entries and quota admission before creating an OPFS writer', async () => {
+  await expect(
+    writeBackupArchiveEntryToAsset({
+      expectedSize: 1,
+      mimeType: 'video/webm',
+      path: 'assets/missing.webm',
+      zip: { file: () => null },
+    })
+  ).rejects.toThrow('is missing');
+  expect(mocks.createWriter).not.toHaveBeenCalled();
+
+  mocks.admit.mockRejectedValueOnce(new Error('quota admission failed'));
+  await expect(
+    writeBackupArchiveEntryToAsset({
+      expectedSize: 1,
+      mimeType: 'video/webm',
+      path: 'assets/recording.webm',
+      zip: {
+        file: () => ({ async: vi.fn(), internalStream: () => new ControlledStream([]) }),
+      },
+    })
+  ).rejects.toThrow('quota admission failed');
   expect(mocks.createWriter).not.toHaveBeenCalled();
 });
 

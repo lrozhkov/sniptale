@@ -84,6 +84,33 @@ it('aborts and removes partial output when export cancellation is observed betwe
   expect(mocks.finalize).not.toHaveBeenCalled();
 });
 
+it('does not create an OPFS writer when export is already cancelled', async () => {
+  const controller = new AbortController();
+  controller.abort();
+
+  await expect(
+    generateBackupZipFileToOpfs({
+      signal: controller.signal,
+      zip: { generateInternalStream: () => new ZipStream([]) },
+    })
+  ).rejects.toThrow('cancelled');
+
+  expect(mocks.createWriter).not.toHaveBeenCalled();
+});
+
+it('aborts and removes partial output when the OPFS sink cannot finalize', async () => {
+  mocks.finalize.mockRejectedValueOnce(new Error('OPFS close failed'));
+
+  await expect(
+    generateBackupZipFileToOpfs({
+      zip: { generateInternalStream: () => new ZipStream([new Uint8Array([1])]) },
+    })
+  ).rejects.toThrow('OPFS close failed');
+
+  expect(mocks.abort).toHaveBeenCalledOnce();
+  expect(mocks.readFile).not.toHaveBeenCalled();
+});
+
 it('retains release authority and retries a transient OPFS cleanup failure', async () => {
   const file = await generateBackupZipFileToOpfs({
     zip: { generateInternalStream: () => new ZipStream([new Uint8Array([1])]) },

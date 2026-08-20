@@ -110,17 +110,11 @@ function createMediaEntry(
   };
 }
 
-async function createBackupArchive(): Promise<FakeZipArchive> {
+async function createBackupArchive(
+  metadataOverride?: MediaHubBackupMetadata
+): Promise<FakeZipArchive> {
   const zip = new FakeJSZip();
-  const manifest: MediaHubBackupManifest = {
-    assetCount: 1,
-    exportedAt: '2026-03-22T12:00:00.000Z',
-    format: 'sniptale-media-hub-backup',
-    thumbnailCount: 0,
-    effectBundleCount: 0,
-    version: 4,
-  };
-  const metadata: MediaHubBackupMetadata = {
+  const metadata: MediaHubBackupMetadata = metadataOverride ?? {
     assets: [
       {
         assetPath: 'assets/asset-1',
@@ -130,7 +124,14 @@ async function createBackupArchive(): Promise<FakeZipArchive> {
     ],
     effectBundles: [],
   };
-
+  const manifest: MediaHubBackupManifest = {
+    assetCount: metadata.assets.length,
+    exportedAt: '2026-03-22T12:00:00.000Z',
+    format: 'sniptale-media-hub-backup',
+    thumbnailCount: 0,
+    effectBundleCount: 0,
+    version: 4,
+  };
   zip.file('manifest.json', JSON.stringify(manifest));
   zip.file('metadata.json', JSON.stringify(metadata));
 
@@ -286,4 +287,32 @@ beforeEach(() => {
 
 describe('media hub backup import', () => {
   it('passes duplicate remapping callback through import flow', verifyImportMediaHubBackup);
+
+  it('rejects duplicate durable identities before restore writes begin', async () => {
+    const first = {
+      assetPath: 'assets/recording-1',
+      entry: createMediaEntry(
+        { kind: 'recording', recordingId: 'recording-owner' },
+        { id: 'recording:first', kind: 'recording', mimeType: 'video/webm' }
+      ),
+      thumbnailPath: null,
+    } satisfies MediaHubBackupAssetDescriptor;
+    const archive = await createBackupArchive({
+      assets: [
+        first,
+        {
+          ...first,
+          assetPath: 'assets/recording-2',
+          entry: { ...first.entry, id: 'recording:second' },
+        },
+      ],
+      effectBundles: [],
+    });
+
+    const { importMediaHubBackup } = await importMediaHubBackupModule();
+    await expect(importMediaHubBackup(archive, 'replace')).rejects.toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+    expect(importMediaHubBackupAssetsMock).not.toHaveBeenCalled();
+  });
 });

@@ -1,5 +1,9 @@
 import type { AssetReadyJournal, AssetRef } from './contracts';
-import { deleteReadyJournal, writeReadyJournal } from './opfs-store';
+import {
+  deleteReadyJournal,
+  releaseAssetPublicationTransitions,
+  writeReadyJournal,
+} from './opfs-store';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 
 const IMMEDIATE_PUBLICATION_ATTEMPTS = 3;
@@ -32,7 +36,25 @@ export async function publishReadyJournalWithRetry(
   journal: AssetReadyJournal,
   publish: (journal: AssetReadyJournal) => Promise<void>
 ): Promise<void> {
-  return runWithDurableAssetLifecycleLock(() => publishReadyJournal(journal, publish));
+  let publicationError: unknown;
+  try {
+    await runWithDurableAssetLifecycleLock(() => publishReadyJournal(journal, publish));
+  } catch (error) {
+    publicationError = error;
+  }
+  try {
+    await releaseAssetPublicationTransitions(journal.assetRefs.map((ref) => ref.assetId));
+  } catch (releaseError) {
+    if (publicationError !== undefined) {
+      throw new AggregateError(
+        [publicationError, releaseError],
+        'Asset publication failed and persistence admission could not be released.',
+        { cause: publicationError }
+      );
+    }
+    throw releaseError;
+  }
+  if (publicationError !== undefined) throw publicationError;
 }
 
 async function publishReadyJournal(

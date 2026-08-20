@@ -7,6 +7,10 @@ import type {
   PreparedAssetObject,
 } from './contracts';
 import { parseAssetReadyJournal } from './guards';
+import {
+  acquirePersistenceMutationTransition,
+  type PersistenceMutationTransitionLease,
+} from '../infrastructure/mutation-barrier';
 
 export const ASSET_ROOT_DIRECTORY_NAME = 'sniptale-assets';
 export const LEGACY_RECORDING_STAGING_DIRECTORY_NAME = 'sniptale-recording-staging';
@@ -22,6 +26,7 @@ interface AssetOpfsOptions {
   createId?: () => string;
   getOriginRoot?: () => Promise<FileSystemDirectoryHandle>;
   requestExclusiveLock?: RequestExclusiveAssetLock;
+  persistenceTransition?: 'acquire' | 'already-admitted';
 }
 
 type RequestExclusiveAssetLock = (
@@ -31,6 +36,7 @@ type RequestExclusiveAssetLock = (
 ) => Promise<void>;
 
 const activeWriterLockReleases = new Map<string, () => Promise<void>>();
+const activePublicationTransitionLeases = new Map<string, PersistenceMutationTransitionLease>();
 const readyProtectedAssetIds = new Set<string>();
 
 function defaultCreateId(): string {
@@ -94,6 +100,18 @@ async function releaseWriterLock(assetId: string): Promise<void> {
   await activeWriterLockReleases.get(assetId)?.();
 }
 
+async function releasePublicationTransition(assetId: string): Promise<void> {
+  const lease = activePublicationTransitionLeases.get(assetId);
+  if (!lease || !activePublicationTransitionLeases.delete(assetId)) return;
+  await lease.release();
+}
+
+export async function releaseAssetPublicationTransitions(
+  assetIds: readonly string[]
+): Promise<void> {
+  await Promise.all(assetIds.map(releasePublicationTransition));
+}
+
 function readErrorName(error: unknown): string | null {
   if (typeof error !== 'object' || error === null) return null;
   const name: unknown = Reflect.get(error, 'name');
@@ -138,15 +156,132 @@ async function writeTextFile(
   name: string,
   text: string
 ): Promise<void> {
-  const handle = await directory.getFileHandle(name, { create: true });
-  const writable = await handle.createWritable({ keepExistingData: false });
+  let writable: FileSystemWritableFileStream | null = null;
   try {
+    const handle = await directory.getFileHandle(name, { create: true });
+    writable = await handle.createWritable({ keepExistingData: false });
     await writable.write(text);
     await writable.close();
   } catch (error) {
-    await writable.abort().catch(() => undefined);
-    await removeIfPresent(directory, name).catch(() => undefined);
+    const cleanup = await Promise.allSettled([
+      ...(writable ? [writable.abort()] : []),
+      removeIfPresent(directory, name),
+    ]);
+    const cleanupFailures = cleanup.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+    if (cleanupFailures.length > 0) {
+      throw new AggregateError(
+        [error, ...cleanupFailures],
+        `Failed to write and clean up OPFS marker: ${name}.`,
+        { cause: error }
+      );
+    }
     throw error;
+  }
+}
+
+interface InitializedAssetWriter {
+  objectHandle: FileSystemFileHandle;
+  objects: FileSystemDirectoryHandle;
+  writable: FileSystemWritableFileStream;
+  writing: FileSystemDirectoryHandle;
+}
+
+async function acquireAssetWriterAdmission(
+  assetId: string,
+  options: AssetOpfsOptions
+): Promise<void> {
+  const transitionLease =
+    options.persistenceTransition === 'already-admitted'
+      ? null
+      : await acquirePersistenceMutationTransition();
+  try {
+    await acquireWriterLock(assetId, options);
+    if (!transitionLease) return;
+    if (activePublicationTransitionLeases.has(assetId)) {
+      await releaseWriterLock(assetId);
+      throw new Error(`Asset publication is already active: ${assetId}.`);
+    }
+    activePublicationTransitionLeases.set(assetId, transitionLease);
+  } catch (error) {
+    await transitionLease?.release().catch(() => undefined);
+    throw error;
+  }
+}
+
+async function cleanupFailedAssetWriterSetup(
+  assetId: string,
+  directories: {
+    objects?: FileSystemDirectoryHandle;
+    writing?: FileSystemDirectoryHandle;
+  } = {}
+): Promise<unknown[]> {
+  const cleanup = await Promise.allSettled([
+    ...(directories.objects ? [removeIfPresent(directories.objects, assetId)] : []),
+    ...(directories.writing ? [removeIfPresent(directories.writing, assetId)] : []),
+    releaseWriterLock(assetId),
+    releasePublicationTransition(assetId),
+  ]);
+  return cleanup.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+}
+
+function throwAssetWriterSetupFailure(
+  assetId: string,
+  error: unknown,
+  cleanupFailures: readonly unknown[]
+): never {
+  if (cleanupFailures.length === 0) throw error;
+  throw new AggregateError(
+    [error, ...cleanupFailures],
+    `Failed to initialize and clean up asset object: ${assetId}.`
+  );
+}
+
+async function initializeAssetWriter(
+  assetId: string,
+  options: AssetOpfsOptions
+): Promise<InitializedAssetWriter> {
+  await acquireAssetWriterAdmission(assetId, options);
+  let objects: FileSystemDirectoryHandle | null = null;
+  let writing: FileSystemDirectoryHandle | null = null;
+  try {
+    const directoryResults = await Promise.allSettled([
+      getAssetDirectory(options, OBJECTS_DIRECTORY_NAME, true),
+      getAssetDirectory(options, WRITING_DIRECTORY_NAME, true),
+    ]);
+    objects = directoryResults[0].status === 'fulfilled' ? directoryResults[0].value : null;
+    writing = directoryResults[1].status === 'fulfilled' ? directoryResults[1].value : null;
+    const directoryFailures = directoryResults.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+    if (directoryFailures.length > 0) {
+      throw new AggregateError(directoryFailures, 'Failed to create asset directories.');
+    }
+    if (!objects || !writing) throw new Error('Unable to create asset directories.');
+    await writeTextFile(writing, assetId, JSON.stringify({ assetId, createdAt: Date.now() }));
+  } catch (error) {
+    throwAssetWriterSetupFailure(
+      assetId,
+      error,
+      await cleanupFailedAssetWriterSetup(assetId, {
+        ...(objects ? { objects } : {}),
+        ...(writing ? { writing } : {}),
+      })
+    );
+  }
+  try {
+    const objectHandle = await objects.getFileHandle(assetId, { create: true });
+    const writable = await objectHandle.createWritable({ keepExistingData: false });
+    return { objectHandle, objects, writable, writing };
+  } catch (error) {
+    throwAssetWriterSetupFailure(
+      assetId,
+      error,
+      await cleanupFailedAssetWriterSetup(assetId, { objects, writing })
+    );
   }
 }
 
@@ -156,30 +291,10 @@ export async function createAssetObjectWriter(
 ): Promise<AssetObjectWriter> {
   if (input.mimeType.trim().length === 0) throw new Error('Asset MIME type must not be empty.');
   const assetId = input.assetId ?? (options.createId ?? defaultCreateId)();
-  await acquireWriterLock(assetId, options);
-  let objects: FileSystemDirectoryHandle | null;
-  let writing: FileSystemDirectoryHandle | null;
-  try {
-    [objects, writing] = await Promise.all([
-      getAssetDirectory(options, OBJECTS_DIRECTORY_NAME, true),
-      getAssetDirectory(options, WRITING_DIRECTORY_NAME, true),
-    ]);
-    if (!objects || !writing) throw new Error('Unable to create asset directories.');
-    await writeTextFile(writing, assetId, JSON.stringify({ assetId, createdAt: Date.now() }));
-  } catch (error) {
-    await releaseWriterLock(assetId).catch(() => undefined);
-    throw error;
-  }
-  const objectHandle = await objects.getFileHandle(assetId, { create: true });
-  let writable: FileSystemWritableFileStream;
-  try {
-    writable = await objectHandle.createWritable({ keepExistingData: false });
-  } catch (error) {
-    await removeIfPresent(objects, assetId).catch(() => undefined);
-    await removeIfPresent(writing, assetId).catch(() => undefined);
-    await releaseWriterLock(assetId).catch(() => undefined);
-    throw error;
-  }
+  const { objectHandle, objects, writable, writing } = await initializeAssetWriter(
+    assetId,
+    options
+  );
   let phase: 'aborted' | 'finalized' | 'open' = 'open';
   let writtenBytes = 0;
   return {
@@ -200,6 +315,7 @@ export async function createAssetObjectWriter(
         removeIfPresent(objects, assetId),
         removeIfPresent(writing, assetId),
         releaseWriterLock(assetId),
+        releasePublicationTransition(assetId),
       ]);
       for (const result of cleanup) {
         if (result.status === 'rejected') failures.push(result.reason as unknown);
@@ -218,11 +334,25 @@ export async function createAssetObjectWriter(
       await writable.close();
       const file = await objectHandle.getFile();
       if (file.size !== writtenBytes) {
-        await removeIfPresent(objects, assetId);
-        await removeIfPresent(writing, assetId);
-        await releaseWriterLock(assetId);
         phase = 'aborted';
-        throw new Error('Finalized asset size does not match streamed bytes.');
+        const mismatch = new Error('Finalized asset size does not match streamed bytes.');
+        const cleanup = await Promise.allSettled([
+          removeIfPresent(objects, assetId),
+          removeIfPresent(writing, assetId),
+          releaseWriterLock(assetId),
+          releasePublicationTransition(assetId),
+        ]);
+        const failures = cleanup.flatMap((result) =>
+          result.status === 'rejected' ? [result.reason as unknown] : []
+        );
+        if (failures.length > 0) {
+          throw new AggregateError(
+            [mismatch, ...failures],
+            'Finalized asset validation and cleanup failed.',
+            { cause: mismatch }
+          );
+        }
+        throw mismatch;
       }
       phase = 'finalized';
       return {
@@ -259,7 +389,15 @@ export async function writeBlobToAsset(
     }
     return await writer.finalize();
   } catch (error) {
-    await writer.abort().catch(() => undefined);
+    try {
+      await writer.abort();
+    } catch (abortError) {
+      throw new AggregateError(
+        [error, abortError],
+        'Asset Blob write failed and partial OPFS cleanup was incomplete.',
+        { cause: error }
+      );
+    }
     throw error;
   }
 }
@@ -375,8 +513,20 @@ export function isAssetReadyProtected(assetId: string): boolean {
   return readyProtectedAssetIds.has(assetId);
 }
 
-export function releaseAssetReadyProtection(assetIds: readonly string[]): void {
+export async function releaseAssetReadyProtection(assetIds: readonly string[]): Promise<void> {
   assetIds.forEach((assetId) => readyProtectedAssetIds.delete(assetId));
+  const results = await Promise.allSettled(
+    assetIds.flatMap((assetId) => [
+      releaseWriterLock(assetId),
+      releasePublicationTransition(assetId),
+    ])
+  );
+  const failures = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+  if (failures.length > 0) {
+    throw new AggregateError(failures, 'Failed to release asset ready protection.');
+  }
 }
 
 export async function discardPreparedAsset(
@@ -398,6 +548,7 @@ export async function discardPreparedAsset(
     ...(objects ? [removeIfPresent(objects, assetId)] : []),
     ...(writing ? [removeIfPresent(writing, assetId)] : []),
     releaseWriterLock(assetId),
+    releasePublicationTransition(assetId),
   ]);
   for (const result of cleanupResults) {
     if (result.status === 'rejected') failures.push(result.reason as unknown);

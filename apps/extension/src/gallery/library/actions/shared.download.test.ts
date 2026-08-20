@@ -61,3 +61,19 @@ it('keeps the Blob URL and backing OPFS file until Chrome reports terminal downl
   expect(revoke).toHaveBeenCalledWith('blob:backup');
   expect(release).toHaveBeenCalledOnce();
 });
+
+it('surfaces persistent backing-file cleanup failure after terminal download state', async () => {
+  const releaseError = new Error('persistent OPFS cleanup failure');
+  const release = vi.fn().mockRejectedValue(releaseError);
+  const onReleaseError = vi.fn();
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup-failure');
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+  downloadBlob(new Blob(['zip']), 'backup.zip', release, onReleaseError);
+  downloads.created?.({ id: 8, state: 'in_progress', url: 'blob:backup-failure' });
+  downloads.changed?.({ id: 8, state: { current: 'interrupted' } });
+
+  await vi.waitFor(() => expect(onReleaseError).toHaveBeenCalledWith(releaseError));
+  expect(release).toHaveBeenCalledOnce();
+});

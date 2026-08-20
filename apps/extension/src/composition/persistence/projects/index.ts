@@ -252,7 +252,7 @@ export async function saveProjectAsset(
     });
     journalCreated = true;
     await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
-    releaseAssetReadyProtection([prepared.ref.assetId]);
+    await releaseAssetReadyProtection([prepared.ref.assetId]);
   } catch (error) {
     if (!journalCreated) await discardPreparedAsset(prepared.ref.assetId);
     throw error;
