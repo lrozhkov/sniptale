@@ -120,6 +120,7 @@ function createOpenOverlayProps(onConfirm = vi.fn()) {
     pendingImport: {
       file: new File(['backup'], 'backup.zip', { type: 'application/zip' }),
       summary: {
+        archiveFingerprint: 'a'.repeat(64),
         assetCount: 2,
         conflicts: ['asset-1'],
         manifest: {

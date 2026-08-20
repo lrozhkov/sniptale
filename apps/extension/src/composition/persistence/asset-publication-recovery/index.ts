@@ -3,12 +3,15 @@ import {
   deleteReadyJournal,
   listReadyJournals,
   parseBackupAssetOperation,
+  parseArchiveRestoreSession,
   parsePhysicalDeleteAssetOperation,
   completePhysicalDeleteOperation,
   collectQuiescentWritingObjects,
   recoverStandaloneAssetPublications,
   type AssetOperation,
   type AssetOperationCompensation,
+  type ArchiveRestoreSession,
+  clearArchiveRestoreCurrentRoot,
 } from '../assets';
 import {
   ASSET_OPERATIONS_STORE,
@@ -162,10 +165,17 @@ async function recoverBackupRestoreOperations(): Promise<void> {
     db.getAll(ASSET_OPERATIONS_STORE)
   );
   const byId = new Map<string, AssetOperation>();
+  const archiveSessions = new Map<string, ArchiveRestoreSession>();
+  const archiveSessionsWithAmbiguousJournals = new Set<string>();
   for (const raw of operations) {
     const physicalDelete = parsePhysicalDeleteAssetOperation(raw);
     if (physicalDelete) {
       await completePhysicalDeleteOperation(physicalDelete);
+      continue;
+    }
+    const archiveSession = parseArchiveRestoreSession(raw);
+    if (archiveSession) {
+      archiveSessions.set(archiveSession.operationId, archiveSession);
       continue;
     }
     const parsedOperation = parseBackupAssetOperation(raw);
@@ -195,12 +205,46 @@ async function recoverBackupRestoreOperations(): Promise<void> {
       await deleteReadyJournal(journal.journalId);
       continue;
     }
+    const archiveSession = archiveSessions.get(journal.operationId);
+    if (archiveSession) {
+      const referenced = await runWithIndexedDbMutation(async (db) =>
+        Promise.all(
+          journal.assetRefs.map(async (ref) => Boolean(await db.get(ASSET_REFS_STORE, ref.assetId)))
+        )
+      );
+      const rootKey =
+        typeof journal.payload === 'object' &&
+        journal.payload !== null &&
+        'rootKey' in journal.payload &&
+        typeof journal.payload.rootKey === 'string'
+          ? journal.payload.rootKey
+          : null;
+      const committed = rootKey !== null && archiveSession.committedRoots.includes(rootKey);
+      if (!committed && referenced.some(Boolean)) {
+        archiveSessionsWithAmbiguousJournals.add(archiveSession.operationId);
+        continue;
+      }
+      for (const [index, ref] of journal.assetRefs.entries()) {
+        if (!referenced[index]) await deleteAssetObject(ref.assetId);
+      }
+      await deleteReadyJournal(journal.journalId);
+      continue;
+    }
     const referenced = await runWithIndexedDbMutation<unknown>(async (db) =>
       Promise.resolve(db.get(ASSET_REFS_STORE, journal.assetRefs[0]?.assetId ?? '') as unknown)
     );
     if (referenced === undefined) {
       for (const ref of journal.assetRefs) await deleteAssetObject(ref.assetId);
       await deleteReadyJournal(journal.journalId);
+    }
+  }
+  for (const session of archiveSessions.values()) {
+    if (
+      session.status === 'pending' &&
+      session.currentRoot !== null &&
+      !archiveSessionsWithAmbiguousJournals.has(session.operationId)
+    ) {
+      await clearArchiveRestoreCurrentRoot(session.operationId);
     }
   }
   for (const operation of byId.values()) {

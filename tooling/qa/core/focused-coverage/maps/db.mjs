@@ -74,7 +74,6 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
         'maintenance/provenance.test.ts',
       ].join('/'),
       'apps/extension/src/composition/persistence/web-snapshots/records.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/restore/web-snapshot.test.ts',
     ],
   },
   {
@@ -196,11 +195,5 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/composition/persistence/projects/asset-references.ts',
     reason: 'Project asset reference ownership is covered by focused project DB delete tests.',
     testFiles: ['apps/extension/src/composition/persistence/projects/index.delete.test.ts'],
-  },
-  {
-    owner: 'shared-media-hub-backup-project-test-support',
-    productionFile: 'apps/extension/src/workflows/media-hub-backup/export/projects/test-support.ts',
-    reason: 'Media hub backup project fixtures are owned by the project bundle export suite.',
-    testFiles: ['apps/extension/src/workflows/media-hub-backup/export/projects/index.test.ts'],
   },
 ];

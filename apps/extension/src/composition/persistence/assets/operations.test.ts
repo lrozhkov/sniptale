@@ -25,6 +25,13 @@ import {
   createBackupRestoreOperation,
   readAssetOperation,
   transitionAssetOperation,
+  abortArchiveRestoreSession,
+  appendCommittedArchiveRootInTransaction,
+  beginArchiveRestoreRoot,
+  completeArchiveRestoreSession,
+  createArchiveRestoreSession,
+  listArchiveRestoreSessions,
+  readArchiveRestoreSession,
 } from './operations';
 
 const operation = {
@@ -106,5 +113,93 @@ describe('durable asset operations', () => {
     await expect(
       transitionAssetOperation(operation.operationId, 'pending', 'committed')
     ).rejects.toThrow('not pending');
+  });
+
+  it('persists immutable archive identity and checkpoints a root in the caller transaction', async () => {
+    const harness = installMutationHarness();
+    const created = await createArchiveRestoreSession({
+      archiveFingerprint: 'a'.repeat(64),
+      strategy: 'duplicate',
+    });
+    expect(harness.db.add).toHaveBeenCalledWith('asset_operations', created);
+    expect(created).toMatchObject({ currentRoot: null, status: 'pending', strategy: 'duplicate' });
+
+    const session = { ...created, currentRoot: 'media:library-item:one' };
+    const store = {
+      get: vi.fn().mockResolvedValue(session),
+      put: vi.fn().mockResolvedValue(undefined),
+    };
+    await appendCommittedArchiveRootInTransaction(
+      store,
+      session.operationId,
+      'media:library-item:one',
+      'media-copy'
+    );
+    expect(store.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        committedRoots: ['media:library-item:one'],
+        conflictedRoots: [],
+        currentRoot: null,
+        rootIdMap: { 'media:library-item:one': 'media-copy' },
+        skippedRoots: [],
+        strategy: 'duplicate',
+      })
+    );
+
+    store.get = vi.fn().mockResolvedValue(session);
+    await appendCommittedArchiveRootInTransaction(
+      store,
+      session.operationId,
+      'media:library-item:one',
+      'media-existing',
+      false,
+      true
+    );
+    expect(store.put).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        conflictedRoots: ['media:library-item:one'],
+        skippedRoots: ['media:library-item:one'],
+      })
+    );
+  });
+
+  it('enforces archive root and terminal session transitions', async () => {
+    const session = {
+      archiveFingerprint: 'b'.repeat(64),
+      committedRoots: [],
+      conflictedRoots: [],
+      createdAt: 1,
+      currentRoot: null,
+      kind: 'archive-restore-session' as const,
+      operationId: 'restore-v6',
+      rootIdMap: {},
+      skippedRoots: [],
+      status: 'pending' as const,
+      strategy: 'replace' as const,
+      updatedAt: 1,
+    };
+    const harness = installMutationHarness(session);
+    await expect(
+      beginArchiveRestoreRoot(session.operationId, 'video-project:one')
+    ).resolves.toMatchObject({
+      currentRoot: 'video-project:one',
+    });
+    expect(harness.put).toHaveBeenCalled();
+
+    installMutationHarness(session);
+    await expect(completeArchiveRestoreSession(session.operationId)).resolves.toMatchObject({
+      status: 'completed',
+    });
+    installMutationHarness(session);
+    await expect(abortArchiveRestoreSession(session.operationId)).resolves.toMatchObject({
+      status: 'aborted',
+    });
+
+    mocks.initDB.mockResolvedValue({
+      get: vi.fn().mockResolvedValue(session),
+      getAll: vi.fn().mockResolvedValue([session, operation, { malformed: true }]),
+    });
+    await expect(readArchiveRestoreSession(session.operationId)).resolves.toEqual(session);
+    await expect(listArchiveRestoreSessions()).resolves.toEqual([session]);
   });
 });

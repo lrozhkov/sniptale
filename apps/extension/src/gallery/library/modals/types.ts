@@ -13,6 +13,7 @@ export interface StorageManagerModalProps {
 }
 
 export interface ImportConflictModalProps {
+  fixedStrategy?: MediaHubImportConflictStrategy;
   summary: MediaHubBackupSummary;
   onClose: () => void;
   onImport: (strategy: MediaHubImportConflictStrategy) => Promise<void>;

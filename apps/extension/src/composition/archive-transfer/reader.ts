@@ -38,8 +38,12 @@ export function createBoundedArchiveBlobReader(file: Blob): Reader<Blob> {
 
 function createEntrySource(entry: Entry): ArchiveEntrySource {
   const size = entry.uncompressedSize;
+  if (entry.crc32 === undefined) {
+    throw new Error(`Archive entry has no CRC-32 identity: ${entry.filename}.`);
+  }
   return {
     compressedSize: entry.compressedSize,
+    crc32: entry.crc32,
     directory: entry.directory,
     path: entry.filename,
     size,
@@ -76,13 +80,19 @@ export async function openArchiveReader(file: Blob): Promise<ArchiveReader> {
   try {
     const budget = createArchiveBudget();
     const entries = new Map<string, ArchiveEntrySource>();
+    const canonicalPaths = new Set<string>();
     for await (const rawEntry of zip.getEntriesGenerator({ checkAmbiguity: true })) {
       if (rawEntry.directory) throw new Error('Media archive directory entries are not supported.');
+      if (rawEntry.encrypted || rawEntry.symlink) {
+        throw new Error('Encrypted and symbolic-link media archive entries are not supported.');
+      }
       assertSafeArchivePath(rawEntry.filename);
-      if (entries.has(rawEntry.filename)) {
+      const canonicalPath = rawEntry.filename.toLocaleLowerCase('en-US');
+      if (entries.has(rawEntry.filename) || canonicalPaths.has(canonicalPath)) {
         throw new Error(`Duplicate media archive path: ${rawEntry.filename}.`);
       }
       admitArchiveEntry(budget, rawEntry.uncompressedSize);
+      canonicalPaths.add(canonicalPath);
       entries.set(rawEntry.filename, createEntrySource(rawEntry));
     }
     return {

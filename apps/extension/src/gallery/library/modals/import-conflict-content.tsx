@@ -94,6 +94,7 @@ function ImportStrategyCard({
   titleClassName,
   className,
   descriptionClassName,
+  disabled,
   onImport,
 }: {
   strategy: MediaHubImportConflictStrategy;
@@ -102,21 +103,31 @@ function ImportStrategyCard({
   titleClassName: string;
   className: string;
   descriptionClassName: string;
+  disabled: boolean;
   onImport: ImportConflictModalProps['onImport'];
 }) {
   return (
-    <button type="button" onClick={() => void onImport(strategy)} className={className}>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => void onImport(strategy)}
+      className={`${className} disabled:cursor-not-allowed disabled:opacity-45`}
+    >
       <div className={`font-semibold ${titleClassName}`}>{title}</div>
       <div className={`mt-1 ${descriptionClassName}`}>{description}</div>
     </button>
   );
 }
 
-function ImportStrategyGrid({ onImport }: Pick<ImportConflictModalProps, 'onImport'>) {
+function ImportStrategyGrid({
+  fixedStrategy,
+  onImport,
+}: Pick<ImportConflictModalProps, 'fixedStrategy' | 'onImport'>) {
   return (
     <div className="mt-5 grid gap-3 md:grid-cols-3">
       <ImportStrategyCard
         strategy="replace"
+        disabled={fixedStrategy !== undefined && fixedStrategy !== 'replace'}
         title={translate('gallery.importModal.replaceTitle')}
         description={translate('gallery.importModal.replaceDescription')}
         titleClassName="text-[var(--sniptale-color-danger)]"
@@ -126,6 +137,7 @@ function ImportStrategyGrid({ onImport }: Pick<ImportConflictModalProps, 'onImpo
       />
       <ImportStrategyCard
         strategy="skip"
+        disabled={fixedStrategy !== undefined && fixedStrategy !== 'skip'}
         title={translate('gallery.importModal.skipTitle')}
         description={translate('gallery.importModal.skipDescription')}
         titleClassName="text-[var(--sniptale-color-text-primary)]"
@@ -135,6 +147,7 @@ function ImportStrategyGrid({ onImport }: Pick<ImportConflictModalProps, 'onImpo
       />
       <ImportStrategyCard
         strategy="duplicate"
+        disabled={fixedStrategy !== undefined && fixedStrategy !== 'duplicate'}
         title={translate('gallery.importModal.duplicateTitle')}
         description={translate('gallery.importModal.duplicateDescription')}
         titleClassName="text-[var(--sniptale-color-info)]"
@@ -147,6 +160,7 @@ function ImportStrategyGrid({ onImport }: Pick<ImportConflictModalProps, 'onImpo
 }
 
 export function ImportConflictModalContent({
+  fixedStrategy,
   summary,
   onClose,
   onImport,
@@ -165,7 +179,7 @@ export function ImportConflictModalContent({
     >
       <ImportSummaryStats summary={summary} />
       <ImportManifestBanner summary={summary} />
-      <ImportStrategyGrid onImport={onImport} />
+      <ImportStrategyGrid {...(fixedStrategy ? { fixedStrategy } : {})} onImport={onImport} />
     </GalleryModalFrame>
   );
 }

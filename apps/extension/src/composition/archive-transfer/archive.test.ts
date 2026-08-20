@@ -17,6 +17,7 @@ describe('archive transfer', () => {
       'manifest.json',
       'objects/object-1/video.webm',
     ]);
+    expect(reader.entry('manifest.json')?.crc32).toEqual(expect.any(Number));
     await expect(reader.entry('manifest.json')?.text()).resolves.toBe('{"version":6}');
     const chunks: Uint8Array[] = [];
     await reader.entry('objects/object-1/video.webm')?.pipeTo(
@@ -38,6 +39,14 @@ describe('archive transfer', () => {
     await expect(writer.addText('manifest.json', '{}')).rejects.toThrow('Duplicate');
     await writer.abort();
     expect(output.aborted).toBe(true);
+  });
+
+  it('rejects case-ambiguous writer paths', async () => {
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    await writer.addText('Catalog/media.ndjson', '{}');
+    await expect(writer.addText('catalog/MEDIA.ndjson', '{}')).rejects.toThrow('Duplicate');
+    await writer.abort();
   });
 
   it('keeps the in-memory fallback bounded', async () => {

@@ -15,6 +15,7 @@ export interface AssetOwner {
 }
 
 export type AssetOperationStatus = 'aborted' | 'committed' | 'pending';
+export type ArchiveRestoreStrategy = 'replace' | 'skip' | 'duplicate';
 
 export interface AssetOperationCompensation {
   assetId: string;
@@ -46,6 +47,23 @@ export interface PhysicalDeleteAssetOperation {
   createdAt: number;
   updatedAt: number;
   assetIds: string[];
+}
+
+export interface ArchiveRestoreSession {
+  operationId: string;
+  kind: 'archive-restore-session';
+  status: 'pending' | 'completed' | 'aborted';
+  createdAt: number;
+  updatedAt: number;
+  archiveFingerprint: string;
+  strategy: ArchiveRestoreStrategy;
+  committedRoots: string[];
+  /** Durable portable-root to local-root identity mapping for cross-root references. */
+  rootIdMap: Record<string, string>;
+  /** Roots whose portable identity collided with an existing local graph. */
+  conflictedRoots: string[];
+  skippedRoots: string[];
+  currentRoot: string | null;
 }
 
 export interface PreparedAssetObject {

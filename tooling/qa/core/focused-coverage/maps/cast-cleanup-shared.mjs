@@ -73,13 +73,10 @@ export const CAST_CLEANUP_SHARED_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/features/media-hub/events/index.test.ts'],
   },
   {
-    owner: 'media-hub-backup-manifest-boundary',
-    productionPrefix: 'apps/extension/src/workflows/media-hub-backup/manifest/index',
-    reason: 'Backup manifest parsing and privacy options are covered by manifest tests.',
-    testFiles: [
-      'apps/extension/src/workflows/media-hub-backup/manifest/index.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/manifest/privacy-options.test.ts',
-    ],
+    owner: 'media-hub-backup-v6-codec-boundary',
+    productionFile: 'apps/extension/src/workflows/media-hub-backup/v6/codec.ts',
+    reason: 'Backup v6 manifest and descriptor parsing are covered by strict codec tests.',
+    testFiles: ['apps/extension/src/workflows/media-hub-backup/v6/codec.test.ts'],
   },
   {
     owner: 'shared-css-sanitizer-boundary',

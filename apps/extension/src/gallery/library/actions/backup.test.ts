@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   MediaHubBackupSummary,
   MediaHubImportConflictStrategy,
@@ -15,46 +15,28 @@ import {
 } from './test-support/index';
 import {
   createClosePendingExportAction,
+  createClosePendingImportAction,
   createConfirmExportBackupAction,
   createExportBackupAction,
   createImportAction,
   createImportSelectedFileAction,
 } from './backup';
-import { translate } from '../../../platform/i18n';
 
 const {
-  downloadBlobRuntime,
   exportMediaHubBackupMock,
   importMediaHubBackupMock,
   inspectLocalMediaHubBackupMock,
   inspectMediaHubBackupMock,
-  releaseMediaHubBackupExportMock,
+  listResumableMediaHubRestoresMock,
+  resumeMediaHubBackupImportMock,
 } = vi.hoisted(() => ({
-  downloadBlobRuntime: {
-    onReleaseError: undefined as ((error: unknown) => void) | undefined,
-  },
   exportMediaHubBackupMock: vi.fn(),
   importMediaHubBackupMock: vi.fn(),
   inspectLocalMediaHubBackupMock: vi.fn(),
   inspectMediaHubBackupMock: vi.fn(),
-  releaseMediaHubBackupExportMock: vi.fn(),
+  listResumableMediaHubRestoresMock: vi.fn(),
+  resumeMediaHubBackupImportMock: vi.fn(),
 }));
-
-vi.mock('./shared', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./shared')>();
-  return {
-    ...actual,
-    downloadBlob: (
-      blob: Blob,
-      filename: string,
-      release?: () => Promise<void> | void,
-      onReleaseError?: (error: unknown) => void
-    ) => {
-      downloadBlobRuntime.onReleaseError = onReleaseError;
-      return actual.downloadBlob(blob, filename, release, onReleaseError);
-    },
-  };
-});
 
 vi.mock('../../../workflows/media-hub-backup/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../workflows/media-hub-backup/index')>()),
@@ -62,14 +44,13 @@ vi.mock('../../../workflows/media-hub-backup/index', async (importOriginal) => (
   importMediaHubBackup: importMediaHubBackupMock,
   inspectLocalMediaHubBackup: inspectLocalMediaHubBackupMock,
   inspectMediaHubBackup: inspectMediaHubBackupMock,
-  releaseMediaHubBackupExport: releaseMediaHubBackupExportMock,
+  listResumableMediaHubRestores: listResumableMediaHubRestoresMock,
+  resumeMediaHubBackupImport: resumeMediaHubBackupImportMock,
 }));
-
-let anchorClickSpy = vi.fn();
-let originalCreateElement: typeof document.createElement;
 
 function createBackupSummary(): MediaHubBackupSummary {
   return {
+    archiveFingerprint: 'a'.repeat(64),
     assetCount: 2,
     conflicts: ['asset-1'],
     manifest: {
@@ -117,46 +98,22 @@ function createAllBackupOptions() {
   };
 }
 
-function stubAnchorDownloads() {
-  originalCreateElement = document.createElement.bind(document);
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-  vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-    if (tagName !== 'a') {
-      return originalCreateElement(tagName);
-    }
-
-    const anchor = originalCreateElement('a');
-    anchor.click = () => {
-      anchorClickSpy();
-    };
-    return anchor;
-  });
-}
-
 beforeEach(() => {
   exportMediaHubBackupMock.mockReset();
   importMediaHubBackupMock.mockReset();
   inspectLocalMediaHubBackupMock.mockReset();
   inspectMediaHubBackupMock.mockReset();
-  releaseMediaHubBackupExportMock.mockReset();
-  releaseMediaHubBackupExportMock.mockResolvedValue(undefined);
-  downloadBlobRuntime.onReleaseError = undefined;
-  anchorClickSpy = vi.fn();
-  stubAnchorDownloads();
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
+  listResumableMediaHubRestoresMock.mockReset();
+  listResumableMediaHubRestoresMock.mockResolvedValue([]);
+  resumeMediaHubBackupImportMock.mockReset();
 });
 
 async function verifyExportRequiresDisclosure() {
   const localSummary = createLocalBackupSummary();
-  const backupBlob = new Blob(['backup'], { type: 'application/zip' });
   const { controller, getState } = createController();
 
   inspectLocalMediaHubBackupMock.mockResolvedValue(localSummary);
-  exportMediaHubBackupMock.mockResolvedValue(backupBlob);
+  exportMediaHubBackupMock.mockResolvedValue(undefined);
 
   await createExportBackupAction(controller, runBusyAction)();
 
@@ -179,7 +136,6 @@ async function verifyExportRequiresDisclosure() {
     expect.objectContaining({ scope: 'all' }),
     expect.objectContaining({ signal: expect.any(AbortSignal) })
   );
-  expect(anchorClickSpy).toHaveBeenCalledTimes(1);
   expect(getState().storage.pendingExport).toBeNull();
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 }
@@ -199,24 +155,21 @@ async function verifyConfirmExportRequiresFreshDisclosureInspection() {
   ).rejects.toThrow('inspection failed');
 
   expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
-  expect(anchorClickSpy).not.toHaveBeenCalled();
   expect(getState().storage.pendingExport).toEqual({
     options: pendingOptions,
     summary: createLocalBackupSummary(),
   });
 }
 
-async function verifyTerminalCleanupFailureShowsTranslatedBanner() {
+async function verifyDirectSinkFailureIsAuthoritative() {
   const { controller } = createController();
-  const setBanner = vi.fn();
-  controller.actions.surface.setBanner = setBanner;
   inspectLocalMediaHubBackupMock.mockResolvedValue(createLocalBackupSummary());
-  exportMediaHubBackupMock.mockResolvedValue(new Blob(['backup'], { type: 'application/zip' }));
+  exportMediaHubBackupMock.mockRejectedValue(new Error('external disk write failed'));
 
-  await createConfirmExportBackupAction(controller)(createAllBackupOptions(), runBusyAction);
-  downloadBlobRuntime.onReleaseError?.(new Error('persistent OPFS cleanup failure'));
-
-  expect(setBanner).toHaveBeenCalledWith(translate('gallery.backupExportModal.cleanupFailed'));
+  await expect(
+    createConfirmExportBackupAction(controller)(createAllBackupOptions(), runBusyAction)
+  ).rejects.toThrow('external disk write failed');
+  expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
 }
 
 async function verifyCancelledExportAbortsAndSkipsDownload() {
@@ -228,7 +181,7 @@ async function verifyCancelledExportAbortsAndSkipsDownload() {
   inspectLocalMediaHubBackupMock.mockResolvedValue(createLocalBackupSummary());
   exportMediaHubBackupMock.mockImplementation((_options, runtimeOptions) => {
     exportSignal = runtimeOptions?.signal ?? exportSignal;
-    return new Promise<Blob>((_resolve, reject) => {
+    return new Promise<void>((_resolve, reject) => {
       rejectExport = reject;
     });
   });
@@ -242,40 +195,32 @@ async function verifyCancelledExportAbortsAndSkipsDownload() {
   await expect(exportPromise).rejects.toThrow('cancelled');
 
   expect(exportSignal.aborted).toBe(true);
-  expect(anchorClickSpy).not.toHaveBeenCalled();
   expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
   expect(getState().storage.pendingExport).toBeNull();
 }
 
-async function verifyResolvedCancelledExportReleasesTemporaryFile() {
+async function verifyResolvedCancelledExportSkipsRefresh() {
   const { controller, getState } = createController();
-  const setBanner = vi.fn();
-  controller.actions.surface.setBanner = setBanner;
   const pendingOptions = createAllBackupOptions();
-  const backupFile = new File(['backup'], 'backup.zip', { type: 'application/zip' });
-  let resolveExport: (result: Blob) => void = () => undefined;
+  let resolveExport: () => void = () => undefined;
 
   inspectLocalMediaHubBackupMock.mockResolvedValue(createLocalBackupSummary());
   exportMediaHubBackupMock.mockImplementation(
     () =>
-      new Promise<Blob>((resolve) => {
+      new Promise<void>((resolve) => {
         resolveExport = resolve;
       })
   );
-  releaseMediaHubBackupExportMock.mockRejectedValueOnce(new Error('persistent cleanup failure'));
 
   const exportPromise = createConfirmExportBackupAction(controller)(pendingOptions, runBusyAction);
   await Promise.resolve();
   await Promise.resolve();
   createClosePendingExportAction(controller)();
-  resolveExport(backupFile);
+  resolveExport();
   await exportPromise;
 
-  expect(releaseMediaHubBackupExportMock).toHaveBeenCalledWith(backupFile);
-  expect(anchorClickSpy).not.toHaveBeenCalled();
   expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
   expect(getState().storage.pendingExport).toBeNull();
-  expect(setBanner).toHaveBeenCalledWith(translate('gallery.backupExportModal.cleanupFailed'));
 }
 
 async function verifySelectedExportScope() {
@@ -326,9 +271,82 @@ async function verifyBackupImportFlow() {
     runBusyAction
   );
 
-  expect(importMediaHubBackupMock).toHaveBeenCalledWith(importFile, 'replace');
+  expect(importMediaHubBackupMock).toHaveBeenCalledWith(
+    importFile,
+    'replace',
+    expect.objectContaining({ signal: expect.any(AbortSignal) })
+  );
   expect(getState().storage.pendingImport).toBeNull();
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
+}
+
+async function verifyResumableBackupImportFlow() {
+  const summary = createBackupSummary();
+  const { controller, getState } = createController();
+  const importFile = new File(['zip'], 'backup.zip', { type: 'application/zip' });
+
+  inspectMediaHubBackupMock.mockResolvedValue(summary);
+  listResumableMediaHubRestoresMock.mockResolvedValue([
+    {
+      archiveFingerprint: summary.archiveFingerprint,
+      operationId: 'restore-1',
+      strategy: 'duplicate',
+    },
+  ]);
+  resumeMediaHubBackupImportMock.mockResolvedValue({
+    importedAssets: 1,
+    skippedConflicts: [],
+  });
+
+  await createImportSelectedFileAction(controller)(importFile, runBusyAction);
+
+  expect(getState().storage.pendingImport).toMatchObject({
+    resumeOperationId: 'restore-1',
+    resumeStrategy: 'duplicate',
+  });
+
+  await createImportAction(controller)('replace', runBusyAction);
+
+  expect(resumeMediaHubBackupImportMock).toHaveBeenCalledWith({
+    file: importFile,
+    operationId: 'restore-1',
+    signal: expect.any(AbortSignal),
+  });
+  expect(importMediaHubBackupMock).not.toHaveBeenCalled();
+  expect(getState().storage.pendingImport).toBeNull();
+  expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
+}
+
+async function verifyCancelledBackupImportFlow() {
+  const summary = createBackupSummary();
+  const { controller, getState } = createController();
+  const importFile = new File(['zip'], 'backup.zip', { type: 'application/zip' });
+  let importSignal = new AbortController().signal;
+  let resolveImport: (result: {
+    importedAssets: number;
+    skippedConflicts: string[];
+  }) => void = () => undefined;
+
+  inspectMediaHubBackupMock.mockResolvedValue(summary);
+  importMediaHubBackupMock.mockImplementation((_file, _strategy, options) => {
+    importSignal = options?.signal ?? importSignal;
+    return new Promise((resolve) => {
+      resolveImport = resolve;
+    });
+  });
+
+  await createImportSelectedFileAction(controller)(importFile, runBusyAction);
+  const importPromise = createImportAction(controller)('replace', runBusyAction);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  createClosePendingImportAction(controller)();
+  resolveImport({ importedAssets: 1, skippedConflicts: [] });
+  await importPromise;
+
+  expect(importSignal.aborted).toBe(true);
+  expect(getState().storage.pendingImport).toBeNull();
+  expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
 }
 
 describe('gallery backup actions', () => {
@@ -341,17 +359,19 @@ describe('gallery backup actions', () => {
     verifyConfirmExportRequiresFreshDisclosureInspection
   );
   it(
-    'shows a translated banner when terminal backup cleanup fails',
-    verifyTerminalCleanupFailureShowsTranslatedBanner
+    'surfaces direct sink failures as authoritative export failures',
+    verifyDirectSinkFailureIsAuthoritative
   );
   it(
     'aborts in-progress backup export when the pending export modal closes',
     verifyCancelledExportAbortsAndSkipsDownload
   );
   it(
-    'releases a completed temporary backup when cancellation wins before download handoff',
-    verifyResolvedCancelledExportReleasesTemporaryFile
+    'skips refresh when cancellation wins after direct export completion',
+    verifyResolvedCancelledExportSkipsRefresh
   );
   it('opens backup disclosure with the selected item scope', verifySelectedExportScope);
   it('imports selected backup files through the existing conflict flow', verifyBackupImportFlow);
+  it('resumes a matching durable restore with its fixed strategy', verifyResumableBackupImportFlow);
+  it('aborts an in-progress restore when the import modal closes', verifyCancelledBackupImportFlow);
 });

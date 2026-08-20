@@ -16,6 +16,7 @@ import {
   type HarnessActiveTab,
   type HarnessClipboardWrite,
   type HarnessCreatedTab,
+  type HarnessSavedFile,
   isRuntimeResponseOverrideHandler,
   type RuntimeResponseOverride,
   type SniptaleHarnessApiBehavior,
@@ -47,6 +48,7 @@ declare global {
 const runtimeMessages: unknown[] = [];
 const createdTabs: HarnessCreatedTab[] = [];
 const clipboardWrites: HarnessClipboardWrite[] = [];
+const savedFiles: HarnessSavedFile[] = [];
 const runtimeResponseOverrides = new Map<string, RuntimeResponseOverride>();
 let activeTab: HarnessActiveTab = { ...DEFAULT_ACTIVE_TAB };
 let apiBehavior: SniptaleHarnessApiBehavior = createHarnessApiBehavior();
@@ -55,6 +57,7 @@ async function resetHarnessState(options: { preserveMediaLibrary?: boolean } = {
   runtimeMessages.length = 0;
   createdTabs.length = 0;
   clipboardWrites.length = 0;
+  savedFiles.length = 0;
   runtimeResponseOverrides.clear();
   activeTab = { ...DEFAULT_ACTIVE_TAB };
   apiBehavior = createHarnessApiBehavior();
@@ -262,6 +265,44 @@ ensureMediaDevices(() => apiBehavior);
 ensureWindowClose();
 ensureChromeMock();
 
+Object.defineProperty(window, 'showSaveFilePicker', {
+  configurable: true,
+  value: async (options?: { suggestedName?: string }) => {
+    const chunks: Uint8Array[] = [];
+    let settled = false;
+    return {
+      async createWritable() {
+        return new WritableStream<Uint8Array>({
+          write(chunk) {
+            const copy = new Uint8Array(chunk.byteLength);
+            copy.set(chunk);
+            chunks.push(copy);
+          },
+          close() {
+            if (settled) return;
+            settled = true;
+            const size = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+            const bytes = new Uint8Array(size);
+            let offset = 0;
+            for (const chunk of chunks) {
+              bytes.set(chunk, offset);
+              offset += chunk.byteLength;
+            }
+            savedFiles.push({
+              bytes: Array.from(bytes),
+              filename: options?.suggestedName ?? 'download.bin',
+            });
+          },
+          abort() {
+            settled = true;
+            chunks.length = 0;
+          },
+        });
+      },
+    };
+  },
+});
+
 export const harnessReady = (async () => {
   await resetHarnessState({
     preserveMediaLibrary: window.__sniptaleHarnessBootstrap?.preserveMediaLibrary === true,
@@ -284,6 +325,7 @@ window.__sniptaleHarness = {
   emitTrustedOffscreenRuntimeMessage: (message) => emitOffscreenMessage(runtimeOnMessage, message),
   getCreatedTabs: () => [...createdTabs],
   getClipboardWrites: () => [...clipboardWrites],
+  getSavedFiles: () => savedFiles.map((file) => ({ ...file, bytes: [...file.bytes] })),
   setRuntimeResponse: (messageType, response) => {
     runtimeResponseOverrides.set(messageType, response);
   },

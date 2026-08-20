@@ -62,7 +62,7 @@ async function writeSnapshotObjects(
       throw new AggregateError(
         [...errors, cleanupError],
         'Web snapshot object write and cleanup failed.',
-        { cause: errors[0] }
+        { cause: cleanupError }
       );
     }
     throw errors.length === 1
@@ -117,7 +117,7 @@ export async function saveWebSnapshotMediaAsset(
         await discardPrepared([packageObject, screenshotObject]);
       } catch (cleanupError) {
         throw new AggregateError([error, cleanupError], 'Web snapshot save cleanup failed.', {
-          cause: error,
+          cause: cleanupError,
         });
       }
     }

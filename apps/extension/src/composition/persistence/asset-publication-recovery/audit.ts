@@ -7,10 +7,12 @@ import {
   parsePhysicalDeleteAssetOperation,
   parseAssetOwner,
   parseAssetRef,
+  parseArchiveRestoreSession,
   runWithAssetObjectLockIfAvailable,
   type AssetOperation,
   type AssetOwner,
   type AssetRef,
+  type ArchiveRestoreSession,
 } from '../assets';
 import {
   ASSET_OWNERS_STORE,
@@ -35,11 +37,14 @@ import { parseStoredWebSnapshotRecord } from '../web-snapshots';
 
 interface DurableAssetAuditReport {
   authorityValid: boolean;
+  embeddedBinaryMetadata: string[];
   objectsWithoutAuthority: string[];
+  orphanedJournals: string[];
   ownersWithoutRefs: AssetOwner[];
   ownerMetadataMismatches: AssetOwner[];
   refsWithoutObjects: AssetRef[];
   refsWithoutOwners: AssetRef[];
+  unfinishedRestoreSessions: ArchiveRestoreSession[];
 }
 
 export async function auditDurableAssets(): Promise<DurableAssetAuditReport> {
@@ -76,13 +81,23 @@ export async function auditDurableAssets(): Promise<DurableAssetAuditReport> {
   ]);
   return {
     authorityValid: snapshot.authorityValid,
+    embeddedBinaryMetadata: snapshot.embeddedBinaryMetadata,
     objectsWithoutAuthority: objectIds.filter(
       (assetId) => snapshot.authorityValid && !refsById.has(assetId) && !protectedIds.has(assetId)
     ),
     ownersWithoutRefs: snapshot.owners.filter((owner) => !refsById.has(owner.assetId)),
     ownerMetadataMismatches: [...ownerMetadataMismatches.values()],
+    orphanedJournals: readyJournals
+      .filter(
+        (journal) =>
+          journal.operationId !== undefined && !snapshot.operationIds.has(journal.operationId)
+      )
+      .map((journal) => journal.journalId),
     refsWithoutObjects: snapshot.refs.filter((ref) => !objectIdSet.has(ref.assetId)),
     refsWithoutOwners: snapshot.refs.filter((ref) => !ownedAssetIds.has(ref.assetId)),
+    unfinishedRestoreSessions: snapshot.archiveSessions.filter(
+      (session) => session.status === 'pending'
+    ),
   };
 }
 
@@ -121,9 +136,12 @@ async function isStillOrphanAssetObject(assetId: string): Promise<boolean> {
 
 async function collectDurableAssetSnapshot(): Promise<{
   authorityValid: boolean;
+  archiveSessions: ArchiveRestoreSession[];
+  embeddedBinaryMetadata: string[];
   expectedOwnerAssets: Map<string, string>;
   expectedOwners: AssetOwner[];
   owners: AssetOwner[];
+  operationIds: Set<string>;
   protectedRollbackAssetIds: Set<string>;
   refs: AssetRef[];
 }> {
@@ -231,9 +249,18 @@ async function collectDurableAssetSnapshot(): Promise<{
       scenarioDocumentsResult,
       webSnapshotsResult,
     ].every((result) => result.valid),
+    archiveSessions: operationsResult.archiveSessions,
+    embeddedBinaryMetadata: [
+      ...findEmbeddedBinaryRows(rawImageWorkspaces, 'image-workspace'),
+      ...findEmbeddedBinaryRows(rawScenarioDocuments, 'scenario-editor-document'),
+    ],
     expectedOwnerAssets,
     expectedOwners,
     owners,
+    operationIds: new Set([
+      ...operationsResult.archiveSessions.map((operation) => operation.operationId),
+      ...operationsResult.backupOperations.map((operation) => operation.operationId),
+    ]),
     protectedRollbackAssetIds: new Set(
       operationsResult.backupOperations
         .filter((operation) => operation.status !== 'committed')
@@ -243,18 +270,54 @@ async function collectDurableAssetSnapshot(): Promise<{
   };
 }
 
+function findEmbeddedBinaryRows(raw: unknown, owner: string): string[] {
+  if (!Array.isArray(raw)) return [];
+  const findings: string[] = [];
+  const visit = (value: unknown, path: string, depth: number): void => {
+    if (depth > 64) return;
+    if (
+      typeof value === 'string' &&
+      (/^data:[^,]*;base64,/i.test(value) || value.startsWith('blob:'))
+    ) {
+      findings.push(path);
+      return;
+    }
+    if (value instanceof Blob) {
+      findings.push(path);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => visit(item, `${path}[${index}]`, depth + 1));
+      return;
+    }
+    if (typeof value === 'object' && value !== null) {
+      for (const [key, child] of Object.entries(value)) {
+        visit(child, `${path}.${key}`, depth + 1);
+      }
+    }
+  };
+  raw.forEach((row, index) => visit(row, `${owner}[${index}]`, 0));
+  return findings;
+}
+
 function parseAssetOperations(raw: unknown): {
   backupOperations: AssetOperation[];
+  archiveSessions: ArchiveRestoreSession[];
   valid: boolean;
 } {
-  if (!Array.isArray(raw)) return { backupOperations: [], valid: false };
+  if (!Array.isArray(raw)) return { archiveSessions: [], backupOperations: [], valid: false };
   const parsed = raw.map((value) => ({
+    archive: parseArchiveRestoreSession(value),
     backup: parseBackupAssetOperation(value),
     physicalDelete: parsePhysicalDeleteAssetOperation(value),
   }));
   return {
+    archiveSessions: parsed.flatMap(({ archive }) => (archive ? [archive] : [])),
     backupOperations: parsed.flatMap(({ backup }) => (backup ? [backup] : [])),
-    valid: parsed.every(({ backup, physicalDelete }) => backup !== null || physicalDelete !== null),
+    valid: parsed.every(
+      ({ archive, backup, physicalDelete }) =>
+        archive !== null || backup !== null || physicalDelete !== null
+    ),
   };
 }
 

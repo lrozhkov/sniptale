@@ -30,6 +30,9 @@ function GalleryImportOverlay(
 
   return (
     <ImportConflictModalContent
+      {...(props.state.storage.pendingImport.resumeStrategy
+        ? { fixedStrategy: props.state.storage.pendingImport.resumeStrategy }
+        : {})}
       summary={props.state.storage.pendingImport.summary}
       onClose={props.onPendingImportClose}
       onImport={async (strategy) => props.onImport(strategy)}

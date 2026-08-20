@@ -2,7 +2,8 @@ import { MAX_MEDIA_ARCHIVE_BYTES } from './contracts';
 
 export function createArchiveOutputBoundary(
   destination: WritableStream<Uint8Array>,
-  maxBytes = MAX_MEDIA_ARCHIVE_BYTES
+  maxBytes = MAX_MEDIA_ARCHIVE_BYTES,
+  onBytesWritten?: (bytesWritten: number) => void
 ): { release(): void; writable: WritableStream<Uint8Array> } {
   const writer = destination.getWriter();
   let bytesWritten = 0;
@@ -22,6 +23,7 @@ export function createArchiveOutputBoundary(
         }
         await writer.write(chunk);
         bytesWritten = nextBytesWritten;
+        onBytesWritten?.(bytesWritten);
       },
     }),
   };

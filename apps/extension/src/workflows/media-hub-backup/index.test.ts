@@ -1,9 +1,11 @@
 import { expect, it } from 'vitest';
 
-import { exportMediaHubBackup as exportMediaHubBackupImpl } from './export';
-import { inspectLocalMediaHubBackup as inspectLocalMediaHubBackupImpl } from './inspect/local';
-import { importMediaHubBackup as importMediaHubBackupImpl } from './import';
-import { inspectMediaHubBackup as inspectMediaHubBackupImpl } from './inspect';
+import {
+  exportMediaHubBackup as exportMediaHubBackupImpl,
+  importMediaHubBackup as importMediaHubBackupImpl,
+  inspectLocalMediaHubBackup as inspectLocalMediaHubBackupImpl,
+  inspectMediaHubBackup as inspectMediaHubBackupImpl,
+} from './v6/public';
 import {
   exportMediaHubBackup,
   importMediaHubBackup,

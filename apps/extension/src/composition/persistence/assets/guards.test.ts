@@ -3,6 +3,7 @@ import {
   parseAssetOwner,
   parseAssetReadyJournal,
   parseAssetRef,
+  parseArchiveRestoreSession,
   parseBackupAssetOperation,
   parsePhysicalDeleteAssetOperation,
 } from './guards';
@@ -88,6 +89,39 @@ describe('asset persistence guards', () => {
     expect(parsePhysicalDeleteAssetOperation({ ...physicalDelete, assetIds: [''] })).toBeNull();
     expect(
       parsePhysicalDeleteAssetOperation({ ...physicalDelete, status: 'committed' })
+    ).toBeNull();
+  });
+
+  it('narrows resumable archive restore sessions and rejects mutable identity drift', () => {
+    const session = {
+      archiveFingerprint: 'a'.repeat(64),
+      committedRoots: ['media:library-item:one'],
+      conflictedRoots: [],
+      createdAt: 1,
+      currentRoot: null,
+      kind: 'archive-restore-session',
+      operationId: 'restore-v6',
+      rootIdMap: { 'media:library-item:one': 'media-copy' },
+      skippedRoots: [],
+      status: 'pending',
+      strategy: 'duplicate',
+      updatedAt: 2,
+    };
+    expect(parseArchiveRestoreSession(session)).toEqual(session);
+    expect(
+      parseArchiveRestoreSession({ ...session, archiveFingerprint: 'filename.zip' })
+    ).toBeNull();
+    expect(parseArchiveRestoreSession({ ...session, strategy: 'merge' })).toBeNull();
+    expect(parseArchiveRestoreSession({ ...session, currentRoot: '' })).toBeNull();
+    expect(parseArchiveRestoreSession({ ...session, rootIdMap: {} })).toBeNull();
+    expect(
+      parseArchiveRestoreSession({ ...session, conflictedRoots: ['unknown-root'] })
+    ).toBeNull();
+    expect(
+      parseArchiveRestoreSession({
+        ...session,
+        committedRoots: [...session.committedRoots, ...session.committedRoots],
+      })
     ).toBeNull();
   });
 });

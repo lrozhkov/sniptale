@@ -1,5 +1,7 @@
 export type {
   AssetObjectWriter,
+  ArchiveRestoreSession,
+  ArchiveRestoreStrategy,
   AssetOperation,
   AssetOperationCompensation,
   AssetOwner,
@@ -13,6 +15,7 @@ export {
   parseAssetOwner,
   parseAssetReadyJournal,
   parseAssetRef,
+  parseArchiveRestoreSession,
   parseBackupAssetOperation,
   parsePhysicalDeleteAssetOperation,
 } from './guards';
@@ -38,10 +41,22 @@ export { assertAssetWriteAdmission, createAggregateAssetReservation } from './qu
 export { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
 export { recoverStandaloneAssetPublications } from './recovery';
 export {
+  runWithDurableAssetOperation,
+  type DurableAssetOperationPermit,
+} from '../infrastructure/mutation-barrier';
+export {
   appendAssetOperationCompensation,
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
   createBackupRestoreOperation,
   readAssetOperation,
   transitionAssetOperation,
+  abortArchiveRestoreSession,
+  appendCommittedArchiveRootInTransaction,
+  beginArchiveRestoreRoot,
+  clearArchiveRestoreCurrentRoot,
+  completeArchiveRestoreSession,
+  createArchiveRestoreSession,
+  listArchiveRestoreSessions,
+  readArchiveRestoreSession,
 } from './operations';

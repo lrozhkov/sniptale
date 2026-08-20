@@ -4,20 +4,21 @@ import {
   importMediaHubBackup,
   inspectLocalMediaHubBackup,
   inspectMediaHubBackup,
-  releaseMediaHubBackupExport,
+  listResumableMediaHubRestores,
+  resumeMediaHubBackupImport,
   type MediaHubBackupExportOptions,
   type MediaHubImportConflictStrategy,
 } from '../../../workflows/media-hub-backup/index';
 import type { GalleryBackupExportController, GalleryImportController } from './controller-types';
 import type { GalleryItem } from '../items';
 import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
-import { downloadBlob, type GalleryBusyAction } from './shared';
-import { translate } from '../../../platform/i18n';
+import { type GalleryBusyAction } from './shared';
 
 const activeBackupExportAbortControllers = new WeakMap<
   GalleryBackupExportController,
   AbortController
 >();
+const activeBackupImportAbortControllers = new WeakMap<GalleryImportController, AbortController>();
 
 function buildSelectedBackupScope(
   items: GalleryItem[]
@@ -79,24 +80,10 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
           return;
         }
         controller.actions.surface.setPendingExport({ options, summary });
-        const result = await exportMediaHubBackup(options, { signal: abortController.signal });
+        await exportMediaHubBackup(options, { signal: abortController.signal });
         if (abortController.signal.aborted) {
-          await releaseMediaHubBackupExport(result).catch(() => {
-            controller.actions.surface.setBanner(
-              translate('gallery.backupExportModal.cleanupFailed')
-            );
-          });
           return;
         }
-        downloadBlob(
-          result,
-          `media-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`,
-          () => releaseMediaHubBackupExport(result),
-          () =>
-            controller.actions.surface.setBanner(
-              translate('gallery.backupExportModal.cleanupFailed')
-            )
-        );
         controller.actions.surface.setPendingExport(null);
         await controller.actions.storage.refresh();
       } finally {
@@ -128,7 +115,19 @@ export function createImportSelectedFileAction(controller: GalleryImportControll
 
     await withBusy(async () => {
       const summary = await inspectMediaHubBackup(file);
-      controller.actions.surface.setPendingImport({ file, summary });
+      const resumable = (await listResumableMediaHubRestores()).find(
+        (session) => session.archiveFingerprint === summary.archiveFingerprint
+      );
+      controller.actions.surface.setPendingImport({
+        file,
+        ...(resumable
+          ? {
+              resumeOperationId: resumable.operationId,
+              resumeStrategy: resumable.strategy,
+            }
+          : {}),
+        summary,
+      });
     });
 
     if (controller.refs.importInputRef.current) {
@@ -145,9 +144,37 @@ export function createImportAction(controller: GalleryImportController) {
     }
 
     await withBusy(async () => {
-      await importMediaHubBackup(pendingImport.file, strategy);
-      controller.actions.surface.setPendingImport(null);
-      await controller.actions.storage.refresh();
+      activeBackupImportAbortControllers.get(controller)?.abort();
+      const abortController = new AbortController();
+      activeBackupImportAbortControllers.set(controller, abortController);
+      try {
+        if (pendingImport.resumeOperationId) {
+          await resumeMediaHubBackupImport({
+            file: pendingImport.file,
+            operationId: pendingImport.resumeOperationId,
+            signal: abortController.signal,
+          });
+        } else {
+          await importMediaHubBackup(pendingImport.file, strategy, {
+            signal: abortController.signal,
+          });
+        }
+        if (abortController.signal.aborted) return;
+        controller.actions.surface.setPendingImport(null);
+        await controller.actions.storage.refresh();
+      } finally {
+        if (activeBackupImportAbortControllers.get(controller) === abortController) {
+          activeBackupImportAbortControllers.delete(controller);
+        }
+      }
     });
+  };
+}
+
+export function createClosePendingImportAction(controller: GalleryImportController) {
+  return () => {
+    activeBackupImportAbortControllers.get(controller)?.abort();
+    activeBackupImportAbortControllers.delete(controller);
+    controller.actions.surface.setPendingImport(null);
   };
 }

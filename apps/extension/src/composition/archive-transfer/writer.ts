@@ -9,8 +9,11 @@ function assertNotAborted(signal: AbortSignal | undefined): void {
     throw new DOMException('Media archive operation was cancelled.', 'AbortError');
 }
 
-export function createArchiveWriter(sink: ExportSink): ArchiveWriter {
-  const output = createArchiveOutputBoundary(sink.writable);
+export function createArchiveWriter(
+  sink: ExportSink,
+  options: { onBytesWritten?: (bytesWritten: number) => void } = {}
+): ArchiveWriter {
+  const output = createArchiveOutputBoundary(sink.writable, undefined, options.onBytesWritten);
   const zip = new ZipWriter(output.writable, {
     bufferedWrite: false,
     preventClose: true,
@@ -19,14 +22,19 @@ export function createArchiveWriter(sink: ExportSink): ArchiveWriter {
   });
   const budget = createArchiveBudget();
   const paths = new Set<string>();
+  const canonicalPaths = new Set<string>();
   let settled = false;
 
   const admit = (path: string, size: number) => {
     if (settled) throw new Error('Media archive writer is already settled.');
     assertSafeArchivePath(path);
-    if (paths.has(path)) throw new Error(`Duplicate media archive path: ${path}.`);
+    const canonicalPath = path.toLocaleLowerCase('en-US');
+    if (paths.has(path) || canonicalPaths.has(canonicalPath)) {
+      throw new Error(`Duplicate media archive path: ${path}.`);
+    }
     admitArchiveEntry(budget, size);
     paths.add(path);
+    canonicalPaths.add(canonicalPath);
   };
 
   return {

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   buildScenarioHtmlExportMock,
   buildScenarioMarkdownExportMock,
+  createDirectFileSinkMock,
   createScenarioProjectRecordMock,
   deleteScenarioProjectRecordMock,
   downloadScenarioEditorBlobMock,
@@ -15,12 +16,18 @@ const {
 } = vi.hoisted(() => ({
   buildScenarioHtmlExportMock: vi.fn(),
   buildScenarioMarkdownExportMock: vi.fn(),
+  createDirectFileSinkMock: vi.fn(),
   createScenarioProjectRecordMock: vi.fn(),
   deleteScenarioProjectRecordMock: vi.fn(),
   downloadScenarioEditorBlobMock: vi.fn(),
   renameScenarioProjectRecordMock: vi.fn(),
   saveScenarioExportRecordMock: vi.fn(),
   translateMock: vi.fn(() => 'New scenario'),
+}));
+
+vi.mock('../../../../../composition/archive-transfer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../composition/archive-transfer')>()),
+  createDirectFileSink: createDirectFileSinkMock,
 }));
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -136,6 +143,12 @@ function registerProjectCrudFixtures() {
       blob: new Blob(['# Scenario'], { type: 'text/markdown' }),
       filename: 'scenario.md',
       format: 'markdown',
+      size: 64,
+    });
+    createDirectFileSinkMock.mockResolvedValue({
+      abort: vi.fn(),
+      close: vi.fn(),
+      writable: new WritableStream(),
     });
     saveScenarioExportRecordMock.mockResolvedValue(undefined);
     vi.stubGlobal('navigator', {
@@ -210,7 +223,7 @@ function verifiesGuardPaths() {
 }
 
 function verifiesExportFlow() {
-  it('exports html to clipboard and markdown through the download driver seam', async () => {
+  it('exports html to clipboard and streams markdown through a direct file sink', async () => {
     const args = createCrudArgs();
     const crud = createScenarioEditorProjectCrud(args);
     const clipboard = vi.mocked(navigator.clipboard.writeText);
@@ -227,10 +240,11 @@ function verifiesExportFlow() {
     expect(buildScenarioMarkdownExportMock).toHaveBeenCalledWith(
       args.project,
       expect.any(Function),
-      'svg'
+      'svg',
+      expect.objectContaining({ writable: expect.any(WritableStream) })
     );
     expect(clipboard).toHaveBeenCalledWith('<html />');
-    expect(downloadScenarioEditorBlobMock).toHaveBeenCalledWith(expect.any(Blob), 'scenario.md');
+    expect(downloadScenarioEditorBlobMock).not.toHaveBeenCalled();
     expect(saveScenarioExportRecordMock).toHaveBeenCalledTimes(2);
   });
 }

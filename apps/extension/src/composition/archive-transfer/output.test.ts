@@ -2,6 +2,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { createArchiveOutputBoundary } from './output';
 
 describe('archive output boundary', () => {
+  it('reports compressed output progress after the destination accepts each chunk', async () => {
+    const progress: number[] = [];
+    const output = createArchiveOutputBoundary(
+      new WritableStream({ write: () => undefined }),
+      10,
+      (bytes) => progress.push(bytes)
+    );
+    const writer = output.writable.getWriter();
+    await writer.write(new Uint8Array(2));
+    await writer.write(new Uint8Array(3));
+    expect(progress).toEqual([2, 5]);
+    writer.releaseLock();
+    output.release();
+  });
   it('forwards chunks up to the compressed byte ceiling', async () => {
     const chunks: number[] = [];
     const destination = new WritableStream<Uint8Array>({

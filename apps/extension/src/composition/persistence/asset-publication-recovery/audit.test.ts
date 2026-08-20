@@ -260,6 +260,57 @@ it('fails closed when persisted asset authority cannot be parsed', async () => {
   expect(mocks.deleteObject).not.toHaveBeenCalled();
 });
 
+it('reports embedded binary metadata across nested editor document values', async () => {
+  const deeplyNested: Record<string, unknown> = {};
+  let cursor = deeplyNested;
+  for (let depth = 0; depth < 66; depth += 1) {
+    const child: Record<string, unknown> = {};
+    cursor['child'] = child;
+    cursor = child;
+  }
+  mocks.objects.mockResolvedValue([]);
+  mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: async (store: string) => {
+        if (store === 'image_workspaces') {
+          return [
+            { document: { source: 'data:image/png;base64,AAAA' } },
+            { document: ['blob:https://example.com/object', new Blob(['binary'])] },
+            deeplyNested,
+          ];
+        }
+        return [];
+      },
+    })
+  );
+
+  const report = await auditDurableAssets();
+
+  expect(report.embeddedBinaryMetadata).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('.document.source'),
+      expect.stringContaining('.document[0]'),
+      expect.stringContaining('.document[1]'),
+    ])
+  );
+});
+
+it('fails closed when operation and editor-document stores are not arrays', async () => {
+  mocks.objects.mockResolvedValue([]);
+  mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: async (store: string) =>
+        store === 'asset_operations' || store === 'image_workspaces' ? { invalid: true } : [],
+    })
+  );
+
+  await expect(auditDurableAssets()).resolves.toMatchObject({ authorityValid: false });
+});
+
 function createRef(assetId: string) {
   return {
     assetId,

@@ -4,6 +4,7 @@ import type {
   MediaHubBackupSummary,
   MediaHubLocalBackupSummary,
 } from '../../workflows/media-hub-backup/index';
+import type { MediaHubImportConflictStrategy } from '../../workflows/media-hub-backup/index';
 import type { StorageCleanupReport } from '../../features/media-hub/types';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
 import type { GalleryItem } from '../library/items';
@@ -28,6 +29,8 @@ export type {
 
 export interface PendingImportState {
   file: File;
+  resumeOperationId?: string;
+  resumeStrategy?: MediaHubImportConflictStrategy;
   summary: MediaHubBackupSummary;
 }
 

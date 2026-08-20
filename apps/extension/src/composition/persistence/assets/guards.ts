@@ -6,7 +6,76 @@ import type {
   AssetReadyJournal,
   AssetRef,
   PhysicalDeleteAssetOperation,
+  ArchiveRestoreSession,
 } from './contracts';
+
+export function parseArchiveRestoreSession(value: unknown): ArchiveRestoreSession | null {
+  if (
+    !isRecord(value) ||
+    value['kind'] !== 'archive-restore-session' ||
+    !isString(value['operationId']) ||
+    !['pending', 'completed', 'aborted'].includes(String(value['status'])) ||
+    !isNumber(value['createdAt']) ||
+    !isNumber(value['updatedAt']) ||
+    !isString(value['archiveFingerprint']) ||
+    !/^[a-f0-9]{64}$/.test(value['archiveFingerprint']) ||
+    !['replace', 'skip', 'duplicate'].includes(String(value['strategy'])) ||
+    !Array.isArray(value['committedRoots']) ||
+    !value['committedRoots'].every((root) => isString(root) && root.length > 0) ||
+    !Array.isArray(value['conflictedRoots']) ||
+    !value['conflictedRoots'].every((root) => isString(root) && root.length > 0) ||
+    !isRecord(value['rootIdMap']) ||
+    !Object.entries(value['rootIdMap']).every(
+      ([root, target]) => root.length > 0 && isString(target) && target.length > 0
+    ) ||
+    !Array.isArray(value['skippedRoots']) ||
+    !value['skippedRoots'].every((root) => isString(root) && root.length > 0) ||
+    !(
+      value['currentRoot'] === null ||
+      (isString(value['currentRoot']) && value['currentRoot'].length > 0)
+    )
+  ) {
+    return null;
+  }
+  const status = value['status'];
+  const strategy = value['strategy'];
+  if (
+    (status !== 'pending' && status !== 'completed' && status !== 'aborted') ||
+    (strategy !== 'replace' && strategy !== 'skip' && strategy !== 'duplicate')
+  ) {
+    return null;
+  }
+  const committedRoots = value['committedRoots'].filter(isString);
+  if (new Set(committedRoots).size !== committedRoots.length) return null;
+  const rootIdMap = value['rootIdMap'] as Record<string, string>;
+  const conflictedRoots = value['conflictedRoots'].filter(isString);
+  const skippedRoots = value['skippedRoots'].filter(isString);
+  if (
+    Object.keys(rootIdMap).length !== committedRoots.length ||
+    committedRoots.some((root) => !(root in rootIdMap)) ||
+    (status !== 'pending' && value['currentRoot'] !== null) ||
+    new Set(conflictedRoots).size !== conflictedRoots.length ||
+    conflictedRoots.some((root) => !committedRoots.includes(root)) ||
+    new Set(skippedRoots).size !== skippedRoots.length ||
+    skippedRoots.some((root) => !committedRoots.includes(root))
+  ) {
+    return null;
+  }
+  return {
+    archiveFingerprint: value['archiveFingerprint'],
+    committedRoots,
+    conflictedRoots,
+    createdAt: value['createdAt'],
+    currentRoot: value['currentRoot'],
+    kind: 'archive-restore-session',
+    operationId: value['operationId'],
+    rootIdMap,
+    skippedRoots,
+    status,
+    strategy,
+    updatedAt: value['updatedAt'],
+  };
+}
 
 function isNullableString(value: unknown): value is string | null {
   return value === null || isString(value);

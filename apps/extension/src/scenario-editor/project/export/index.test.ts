@@ -2,31 +2,12 @@ const {
   blobToDataUrlMock,
   buildScenarioCaptureImageBlobMock,
   buildScenarioCaptureImageDataUrlMock,
-  generatedArchives,
   measureImageBlobMock,
 } = vi.hoisted(() => ({
   blobToDataUrlMock: vi.fn(),
   buildScenarioCaptureImageBlobMock: vi.fn(),
   buildScenarioCaptureImageDataUrlMock: vi.fn(),
-  generatedArchives: [] as Array<Record<string, unknown>>,
   measureImageBlobMock: vi.fn(),
-}));
-
-vi.mock('jszip', () => ({
-  default: class FakeScenarioZip {
-    private readonly files = new Map<string, unknown>();
-
-    file(path: string, data: unknown) {
-      this.files.set(path, data);
-      return this;
-    }
-
-    async generateAsync(): Promise<Blob> {
-      const archive = Object.fromEntries(this.files.entries());
-      generatedArchives.push(archive);
-      return new Blob([JSON.stringify(archive)], { type: 'application/json' });
-    }
-  },
 }));
 
 vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -64,6 +45,8 @@ import {
   createScenarioSectionStep,
 } from '../../../features/scenario/project/public';
 import { type ScenarioProject } from '../../../features/scenario/contracts/types/project';
+import { openArchiveReader } from '../../../composition/archive-transfer';
+import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
 
 function createProject(): ScenarioProject {
   return {
@@ -120,7 +103,6 @@ async function resolveAsset(assetId: string): Promise<Blob | undefined> {
 }
 
 function installScenarioExportImageMocks() {
-  generatedArchives.length = 0;
   blobToDataUrlMock.mockImplementation(async (blob: Blob) =>
     blob.type.startsWith('image/svg+xml')
       ? 'data:image/svg+xml;utf8,%3Csvg%3E'
@@ -137,6 +119,37 @@ function installScenarioExportImageMocks() {
         type: imageFormat === 'png' ? 'image/png' : 'image/svg+xml;charset=utf-8',
       })
   );
+}
+
+async function buildMarkdownArchive(
+  project: ScenarioProject,
+  resolver: typeof resolveAsset,
+  imageFormat: 'png' | 'svg' = 'png'
+) {
+  const output = createArchiveMemorySink();
+  const result = await buildScenarioMarkdownExport(project, resolver, imageFormat, output.sink);
+  const reader = await openArchiveReader(output.blob());
+  const archive: Record<string, Blob | string> = {};
+  for (const entry of reader.entries()) {
+    const source = reader.entry(entry.path)!;
+    if (entry.path === 'scenario.md') {
+      archive[entry.path] = await source.text();
+      continue;
+    }
+    const chunks: ArrayBuffer[] = [];
+    await source.pipeTo(
+      new WritableStream<Uint8Array>({
+        write(chunk) {
+          const copy = new Uint8Array(chunk.byteLength);
+          copy.set(chunk);
+          chunks.push(copy.buffer as ArrayBuffer);
+        },
+      })
+    );
+    archive[entry.path] = new Blob(chunks);
+  }
+  await reader.close();
+  return { archive, result };
 }
 
 beforeEach(() => {
@@ -164,14 +177,17 @@ it('builds a single-file html export with embedded image data', async () => {
 
 it('supports png exports and keeps capture steps print-safe inside a single page block', async () => {
   const htmlResult = await buildScenarioHtmlExport(createProject(), resolveAsset, 'png');
-  const markdownResult = await buildScenarioMarkdownExport(createProject(), resolveAsset, 'png');
+  const { archive, result: markdownResult } = await buildMarkdownArchive(
+    createProject(),
+    resolveAsset,
+    'png'
+  );
   const html = await htmlResult.blob.text();
-  const archive = generatedArchives[0] as Record<string, Blob | string> | undefined;
 
   expect(html).toContain('data:image/png;base64');
   expect(html).toContain('break-inside:avoid;page-break-inside:avoid;');
-  expect(archive?.['scenario.md']).toContain('![Open export menu](assets/step-1.png)');
-  expect(archive?.['assets/step-1.png']).toBeInstanceOf(Blob);
+  expect(archive['scenario.md']).toContain('![Open export menu](assets/step-1.png)');
+  expect(archive['assets/step-1.png']).toBeInstanceOf(Blob);
   expect(markdownResult.filename).toBe('how-to-export-markdown.zip');
 });
 
@@ -196,36 +212,34 @@ it('ignores full-image links for svg exports', async () => {
 });
 
 it('builds markdown zip exports with scenario.md and capture assets', async () => {
-  const result = await buildScenarioMarkdownExport(createProject(), resolveAsset);
-  const archive = generatedArchives[0] as Record<string, Blob | string> | undefined;
+  const { archive, result } = await buildMarkdownArchive(createProject(), resolveAsset);
 
   expect(result.format).toBe('markdown');
   expect(result.filename).toBe('how-to-export-markdown.zip');
-  expect(archive?.['scenario.md']).toContain('# How to Export');
-  expect(archive?.['scenario.md']).toContain('## Open export menu');
-  expect(archive?.['scenario.md']).toContain('![Open export menu](assets/step-1.png)');
-  expect(archive?.['scenario.md']).toContain('### Check the preview');
-  expect(archive?.['assets/step-1.png']).toBeInstanceOf(Blob);
+  expect(archive['scenario.md']).toContain('# How to Export');
+  expect(archive['scenario.md']).toContain('## Open export menu');
+  expect(archive['scenario.md']).toContain('![Open export menu](assets/step-1.png)');
+  expect(archive['scenario.md']).toContain('### Check the preview');
+  expect(archive['assets/step-1.png']).toBeInstanceOf(Blob);
 });
 
 it('renders missing capture assets and non-capture steps without crashing', async () => {
   const htmlExport = await buildScenarioHtmlExport(createProjectWithMissingAsset(), resolveAsset);
-  const markdownExport = await buildScenarioMarkdownExport(
+  const { archive, result: markdownExport } = await buildMarkdownArchive(
     createProjectWithMissingAsset(),
     resolveAsset
   );
   const html = await htmlExport.blob.text();
-  const archive = generatedArchives[0] as Record<string, Blob | string> | undefined;
 
   expect(html).toContain('scenario.editor.exportMissingAsset');
   expect(html).toContain('Section title');
   expect(html).toContain('class="section-step"');
   expect(html).toContain('Section caption');
-  expect(archive?.['scenario.md']).toContain('## Step 1');
-  expect(archive?.['scenario.md']).toContain('## Section title');
-  expect(archive?.['scenario.md']).not.toContain('Section caption');
-  expect(archive?.['scenario.md']).toContain('\n---\n');
-  expect(archive?.['assets/step-1.png']).toBeUndefined();
+  expect(archive['scenario.md']).toContain('## Step 1');
+  expect(archive['scenario.md']).toContain('## Section title');
+  expect(archive['scenario.md']).not.toContain('Section caption');
+  expect(archive['scenario.md']).toContain('\n---\n');
+  expect(archive['assets/step-1.png']).toBeUndefined();
   expect(markdownExport.filename).toBe('fallback-markdown.zip');
 });
 

@@ -24,6 +24,7 @@ function createActions(): UseGalleryAppActionsResult {
       inspectExport: vi.fn(),
     },
     importing: {
+      closePendingImport: vi.fn(),
       importBackup: vi.fn(),
       importSelectedFile: vi.fn(),
     },

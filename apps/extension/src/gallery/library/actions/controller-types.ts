@@ -2,6 +2,7 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type {
   MediaHubBackupExportOptions,
   MediaHubBackupSummary,
+  MediaHubImportConflictStrategy,
   MediaHubLocalBackupSummary,
 } from '../../../workflows/media-hub-backup/index';
 import type { GalleryItem } from '../items';
@@ -9,6 +10,8 @@ import type { GalleryPreviewSessionState } from '../types';
 
 interface PendingImportState {
   file: File;
+  resumeOperationId?: string;
+  resumeStrategy?: MediaHubImportConflictStrategy;
   summary: MediaHubBackupSummary;
 }
 

@@ -8,57 +8,31 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
   },
   {
     exclusive: true,
-    owner: 'effect-v1-backup-export-bundles',
-    productionFile: 'apps/extension/src/workflows/media-hub-backup/export/effect-bundles.ts',
-    reason: 'EffectV1 bundle export closure has direct descriptor and asset-integrity proof.',
-    testFiles: ['apps/extension/src/workflows/media-hub-backup/export/effect-bundles.test.ts'],
-  },
-  {
-    exclusive: true,
-    owner: 'effect-v1-backup-export-descriptor',
-    productionFile:
-      'apps/extension/src/workflows/media-hub-backup/export/projects/video-effect-descriptor.ts',
-    reason: 'Project EffectV1 descriptor assembly is exercised by the direct bundle export proof.',
-    testFiles: ['apps/extension/src/workflows/media-hub-backup/export/effect-bundles.test.ts'],
-  },
-  {
-    exclusive: true,
-    owner: 'effect-v1-backup-metadata',
-    productionFile: 'apps/extension/src/workflows/media-hub-backup/metadata/effect-bundles.ts',
-    reason: 'EffectV1 backup metadata parsing has direct manifest and snapshot restore proof.',
+    owner: 'effect-v1-backup-v6-inventory',
+    productionFile: 'apps/extension/src/workflows/media-hub-backup/v6/inventory/effect-bundles.ts',
+    reason: 'EffectV1 bundle archive inventory has direct metadata and object-file proof.',
     testFiles: [
-      'apps/extension/src/workflows/media-hub-backup/manifest/index.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/restore/project/effect-snapshots.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/inventory/effect-bundles.test.ts',
     ],
   },
   {
     exclusive: true,
-    owner: 'effect-v1-backup-restore-writer',
-    productionFile:
-      'apps/extension/src/workflows/media-hub-backup/restore/project/effect-bundle-writer.ts',
-    reason: 'EffectV1 bundle writes are covered by direct integrity and atomic restore proof.',
+    owner: 'effect-v1-backup-v6-codec',
+    productionFile: 'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/effect-bundle.ts',
+    reason: 'EffectV1 portable metadata parsing has direct strict codec proof.',
     testFiles: [
-      'apps/extension/src/workflows/media-hub-backup/restore/project/effect-bundles.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/restore/projects/index.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/effect-bundle.test.ts',
     ],
   },
   {
     exclusive: true,
-    owner: 'effect-v1-backup-restore-preparation',
+    owner: 'effect-v1-backup-v6-publication',
     productionFile:
-      'apps/extension/src/workflows/media-hub-backup/restore/project/prepare-effect-bundles.ts',
-    reason: 'EffectV1 snapshot preparation has direct snapshot and project-prepare proof.',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/effect-bundle.ts',
+    reason: 'EffectV1 restore publication and session checkpoint share one transaction.',
     testFiles: [
-      'apps/extension/src/workflows/media-hub-backup/restore/project/effect-snapshots.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/restore/project/prepare.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/effect-bundle.test.ts',
     ],
-  },
-  {
-    exclusive: true,
-    owner: 'effect-v1-backup-project-restore',
-    productionFile: 'apps/extension/src/workflows/media-hub-backup/restore/projects/index.ts',
-    reason: 'EffectV1 project restore assembly has direct multi-project restore proof.',
-    testFiles: ['apps/extension/src/workflows/media-hub-backup/restore/projects/index.test.ts'],
   },
   {
     exclusive: true,

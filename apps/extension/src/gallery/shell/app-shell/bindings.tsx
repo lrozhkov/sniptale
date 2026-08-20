@@ -132,7 +132,7 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onConfirmDialogClose: () => controller.actions.surface.setConfirmDialog(null),
     onStorageCleanup: (group: Parameters<UseGalleryAppActionsResult['storage']['cleanup']>[0]) =>
       void actions.storage.cleanup(group),
-    onPendingImportClose: () => controller.actions.surface.setPendingImport(null),
+    onPendingImportClose: actions.importing.closePendingImport,
     onPendingExportClose: actions.backup.closePendingExport,
     onBackupExportConfirm: (
       options: Parameters<UseGalleryAppActionsResult['backup']['confirmExport']>[0]

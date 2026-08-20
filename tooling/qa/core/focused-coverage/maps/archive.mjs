@@ -27,11 +27,7 @@ export const ARCHIVE_PACKAGE_OWNER_MAPPINGS = [
     owner: 'scenario-project-entry-raw-reader',
     productionFile: 'apps/extension/src/composition/persistence/scenario/projects/project.ts',
     reason: 'Raw scenario project entry reads are covered by backup restore preparation tests.',
-    testFiles: [
-      'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/restore/project/prepare.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/restore/project/prepare-v3.test.ts',
-    ],
+    testFiles: ['apps/extension/src/composition/persistence/scenario/projects/project.test.ts'],
   },
   {
     owner: 'media-hub-store-filename-boundary',

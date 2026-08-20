@@ -1,7 +1,7 @@
 import type { VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectEntry } from './contracts';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
-import { isRecord, parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
+import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseVideoProjectEntry } from './read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { PhysicalDeleteAssetOperation } from '../assets';
@@ -42,25 +42,6 @@ export function collectProjectOwnedAssetIds(project: VideoProject | undefined): 
   return project.assets.flatMap((asset) =>
     asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
   );
-}
-
-export function parseStoredVideoProjectAssetReferences(
-  value: unknown
-): { assetIds: ReadonlySet<string>; projectId: string } | null {
-  if (!isRecord(value) || typeof value['id'] !== 'string' || !isRecord(value['project'])) {
-    return null;
-  }
-  const assets = value['project']['assets'];
-  if (!Array.isArray(assets)) return null;
-  const assetIds = new Set<string>();
-  for (const asset of assets) {
-    if (!isRecord(asset) || !isRecord(asset['source'])) continue;
-    const source = asset['source'];
-    if (source['kind'] === 'project-asset' && typeof source['projectAssetId'] === 'string') {
-      assetIds.add(source['projectAssetId']);
-    }
-  }
-  return { assetIds, projectId: value['id'] };
 }
 
 function collectAssetIdsReferencedByOtherProjects(

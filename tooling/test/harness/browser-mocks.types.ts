@@ -24,6 +24,11 @@ export type HarnessClipboardWrite = {
   types: string[];
 };
 
+export type HarnessSavedFile = {
+  bytes: number[];
+  filename: string;
+};
+
 type HarnessRuntimeFallbackMode = 'known-only' | 'typed-success';
 type HarnessTabSendMessageMode = 'error' | 'success';
 type HarnessMediaGetUserMediaMode = 'denied' | 'success';
@@ -58,6 +63,7 @@ export type SniptaleHarnessBridge = {
   emitTrustedOffscreenRuntimeMessage: (message: { type: string } & Record<string, unknown>) => void;
   getCreatedTabs: () => HarnessCreatedTab[];
   getClipboardWrites: () => HarnessClipboardWrite[];
+  getSavedFiles: () => HarnessSavedFile[];
   setRuntimeResponse: (messageType: string, response: RuntimeResponseOverride) => void;
   clearRuntimeResponses: () => void;
   setApiBehavior: (behavior: SniptaleHarnessApiBehaviorOverrides) => void;

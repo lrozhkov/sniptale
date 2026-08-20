@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../apps/extension/src/platform/i18n';
 import { test } from './support/extension-fixture';
 import {
@@ -190,16 +191,15 @@ test('gallery backup export imports media as duplicate through the modal flow', 
   await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
   await expect.poll(() => countMediaLibraryEntries(page)).toBe(1);
 
-  const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
   await page
     .getByRole('button', { name: GALLERY_CONFIRM_EXPORT_BACKUP_LABEL, exact: true })
     .click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^media-hub-backup-.*\.zip$/);
-
   const backupPath = testInfo.outputPath('gallery-backup.zip');
-  await download.saveAs(backupPath);
+  await expect.poll(() => readLastSavedFile(page)).not.toBeNull();
+  const savedBackup = await readLastSavedFile(page);
+  expect(savedBackup?.filename).toMatch(/^media-hub-backup-.*\.zip$/);
+  await writeFile(backupPath, Uint8Array.from(savedBackup?.bytes ?? []));
 
   await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
   await page.locator('input[type="file"]').setInputFiles(backupPath);
@@ -234,13 +234,14 @@ test('recording backup round-trip keeps durable bytes in OPFS without recording 
       refCount: 1,
     });
 
-  const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
   await page
     .getByRole('button', { name: GALLERY_CONFIRM_EXPORT_BACKUP_LABEL, exact: true })
     .click();
   const backupPath = testInfo.outputPath('durable-recording-backup.zip');
-  await (await downloadPromise).saveAs(backupPath);
+  await expect.poll(() => readLastSavedFile(page)).not.toBeNull();
+  const savedBackup = await readLastSavedFile(page);
+  await writeFile(backupPath, Uint8Array.from(savedBackup?.bytes ?? []));
 
   await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
   await page.locator('input[type="file"]').setInputFiles(backupPath);
@@ -256,6 +257,10 @@ test('recording backup round-trip keeps durable bytes in OPFS without recording 
       refCount: 2,
     });
 });
+
+async function readLastSavedFile(page: Page) {
+  return page.evaluate(() => window.__sniptaleHarness?.getSavedFiles().at(-1) ?? null);
+}
 
 async function readDurableRecordingState(page: Page): Promise<{
   blobRows: number;

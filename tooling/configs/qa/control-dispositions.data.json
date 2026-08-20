@@ -1964,6 +1964,18 @@
   ],
   "scripts": [
     {
+      "id": "qa:archive-certify",
+      "disposition": "keep",
+      "owner": "media-transfer",
+      "rationale": "The package script is the release-scale ZIP64 archive certification entrypoint."
+    },
+    {
+      "id": "qa:archive-stress",
+      "disposition": "keep",
+      "owner": "media-transfer",
+      "rationale": "The package script is the bounded-memory pull-request archive stress entrypoint."
+    },
+    {
       "id": "qa:advisory",
       "disposition": "keep",
       "owner": "qa-platform",

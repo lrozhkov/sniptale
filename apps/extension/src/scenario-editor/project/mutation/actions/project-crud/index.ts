@@ -3,7 +3,10 @@ import { commitVideoProjectMutation } from '../../../../../composition/persisten
 import { deleteVideoProject } from '../../../../../composition/persistence/projects/index';
 import { openVideoEditorPage } from '../../../../../platform/navigation/extension-pages';
 import { buildScenarioHtmlExport } from '../../../export/html';
-import { buildScenarioMarkdownExport } from '../../../export/markdown';
+import {
+  buildScenarioMarkdownExport,
+  createScenarioMarkdownArchiveFilename,
+} from '../../../export/markdown';
 import { buildVideoProjectDraftFromScenarioProject } from '../../../../../workflows/scenario-video/draft';
 import {
   createScenarioProjectRecord,
@@ -19,6 +22,7 @@ import type {
   ScenarioProject,
   ScenarioProjectSummary,
 } from '../../../../../features/scenario/contracts/types/project';
+import { createDirectFileSink } from '../../../../../composition/archive-transfer';
 import type { ScenarioVideoBridgeAsset } from '../../../../../workflows/scenario-video/types';
 import type { ScenarioEditorBrowserDriverPort } from '../../../../application/ports/browser-driver';
 import type { ScenarioEditorLeftPanelMode } from '../../../state/ui';
@@ -180,10 +184,20 @@ function exportScenarioAction(args: Parameters<typeof createScenarioEditorProjec
             imageFormat,
             includeFullImages
           )
-        : await buildScenarioMarkdownExport(args.project, getScenarioAssetBlob, imageFormat);
+        : await buildScenarioMarkdownExport(
+            args.project,
+            getScenarioAssetBlob,
+            imageFormat,
+            await createDirectFileSink({
+              description: translate('scenario.editor.exportArchiveDescription'),
+              extension: '.zip',
+              filename: createScenarioMarkdownArchiveFilename(args.project.name),
+              mimeType: 'application/zip',
+            })
+          );
     if (mode === 'copy' && format === 'html') {
       await navigator.clipboard.writeText(await exportResult.blob.text());
-    } else {
+    } else if (format === 'html') {
       args.browserDriver.downloadBlob(exportResult.blob, exportResult.filename);
     }
 
@@ -191,7 +205,10 @@ function exportScenarioAction(args: Parameters<typeof createScenarioEditorProjec
       projectId: args.project.id,
       format: exportResult.format,
       filename: exportResult.filename,
-      size: exportResult.blob.size,
+      size:
+        'size' in exportResult && typeof exportResult.size === 'number'
+          ? exportResult.size
+          : exportResult.blob.size,
     });
   };
 }

@@ -1,6 +1,3 @@
-import { createArchiveEntryLeafFilenameAllocator } from '@sniptale/platform/data/zip-profile/entry-filenames';
-import { createArchiveWriter, createDirectFileSink } from '../../../composition/archive-transfer';
-import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import {
   addMediaLibraryEntryTagsSafely,
   deleteMediaLibraryAssetsBatchSafely,
@@ -22,7 +19,8 @@ import {
   type GalleryItem,
 } from '../items';
 import { deletePersistedVideoProject } from '../../../workflows/media-hub/video-projects';
-import { createMissingBlobError, type GalleryBusyAction, openGalleryConfirmDialog } from './shared';
+import { type GalleryBusyAction, openGalleryConfirmDialog } from './shared';
+import { exportMediaHubBackup } from '../../../workflows/media-hub-backup';
 
 function splitSelectableTargets(targets: GalleryItem[]) {
   return {
@@ -97,28 +95,20 @@ export function createSelectionZipAction(controller: GallerySelectionController)
       return;
     }
     await withBusy(async () => {
-      const filename = `media-hub-selection-${Date.now()}.zip`;
-      const sink = await createDirectFileSink({
-        description: translate('gallery.app.mediaArchiveDescription'),
-        extension: '.zip',
-        filename,
-        mimeType: 'application/zip',
-      });
-      const archive = createArchiveWriter(sink);
-      const allocateArchiveFilename = createArchiveEntryLeafFilenameAllocator();
-      try {
-        for (const item of mediaItems) {
-          const blob = await getMediaAssetBlob(item.entityId ?? item.id);
-          if (!blob) {
-            throw createMissingBlobError(item.filename);
-          }
-          await archive.addBlob(allocateArchiveFilename(item.filename), blob);
-        }
-        await archive.close();
-      } catch (error) {
-        await archive.abort(error);
-        throw error;
-      }
+      await exportMediaHubBackup(
+        {
+          includeSourceMetadata: true,
+          includeTelemetry: true,
+          includeWebSnapshots: true,
+          scope: 'selected',
+          selected: {
+            mediaAssetIds: mediaItems.map((item) => item.entityId ?? item.id),
+            scenarioProjectIds: [],
+            videoProjectIds: [],
+          },
+        },
+        { filename: `media-hub-selection-${Date.now()}.zip` }
+      );
     });
   };
 }

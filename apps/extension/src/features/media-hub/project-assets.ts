@@ -61,7 +61,7 @@ export function assertSafeProjectAssetStorageInput(blob: Blob, mimeType: string)
   assertSafeProjectAssetStorageMetadata(blob.size, mimeType);
 }
 
-export function assertSafeProjectAssetStorageMetadata(size: number, mimeType: string): void {
+function assertSafeProjectAssetStorageMetadata(size: number, mimeType: string): void {
   const maxBytes = getProjectAssetMaxBytes(mimeType);
 
   if (maxBytes === null) {

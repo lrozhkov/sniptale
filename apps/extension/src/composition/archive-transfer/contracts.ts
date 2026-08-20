@@ -12,13 +12,21 @@ export interface ArchiveObjectRef {
   size: number;
 }
 
-export interface ArchiveRootDescriptor {
-  rootKind: 'media' | 'video-project' | 'scenario-project';
+interface ArchiveRootDescriptorBase {
   rootId: string;
   metadataPath: string;
   objectCount: number;
   totalBytes: number;
 }
+
+export type ArchiveRootDescriptor =
+  | (ArchiveRootDescriptorBase & {
+      rootKind: 'media';
+      mediaSubtype: 'library-item' | 'effect-bundle';
+    })
+  | (ArchiveRootDescriptorBase & {
+      rootKind: 'video-project' | 'scenario-project';
+    });
 
 export interface ArchiveTransferProgress {
   bytesRead: number;
@@ -35,6 +43,7 @@ export interface ExportSink {
 
 export interface ArchiveEntryInfo {
   compressedSize: number;
+  crc32: number;
   directory: boolean;
   path: string;
   size: number;

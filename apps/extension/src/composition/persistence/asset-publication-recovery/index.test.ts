@@ -36,7 +36,11 @@ vi.mock('../recordings/asset-publication', async (importOriginal) => ({
 }));
 
 import { recoverAssetPublications } from './index';
-import type { AssetOperation, PhysicalDeleteAssetOperation } from '../assets';
+import type {
+  ArchiveRestoreSession,
+  AssetOperation,
+  PhysicalDeleteAssetOperation,
+} from '../assets';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -328,7 +332,84 @@ it('finishes journals and obsolete objects for a committed restore', async () =>
   expect(harness.get('asset_operations', 'restore-committed')).toBeUndefined();
 });
 
-function createDbHarness(operations: Array<AssetOperation | PhysicalDeleteAssetOperation>) {
+it('keeps a crashed archive session resumable while removing only its uncommitted root', async () => {
+  const session: ArchiveRestoreSession = {
+    archiveFingerprint: 'a'.repeat(64),
+    committedRoots: [],
+    conflictedRoots: [],
+    createdAt: 1,
+    currentRoot: 'media:library-item:one',
+    kind: 'archive-restore-session',
+    operationId: 'archive-restore',
+    rootIdMap: {},
+    skippedRoots: [],
+    status: 'pending',
+    strategy: 'duplicate',
+    updatedAt: 2,
+  };
+  const harness = createDbHarness([session]);
+  mocks.journals.mockResolvedValue([
+    {
+      assetRefs: [createRef('uncommitted-object')],
+      createdAt: 1,
+      domain: 'archive-restore-root',
+      journalId: 'archive-journal',
+      operationId: session.operationId,
+      payload: { rootKey: session.currentRoot },
+    },
+  ]);
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+
+  await recoverAssetPublications();
+
+  expect(mocks.deleteObject).toHaveBeenCalledWith('uncommitted-object');
+  expect(mocks.deleteJournal).toHaveBeenCalledWith('archive-journal');
+  expect(harness.get('asset_operations', session.operationId)).toMatchObject({
+    currentRoot: null,
+    status: 'pending',
+  });
+});
+
+it('never deletes a referenced object while cleaning a committed multi-object archive journal', async () => {
+  const rootKey = 'media:library-item:one';
+  const session: ArchiveRestoreSession = {
+    archiveFingerprint: 'b'.repeat(64),
+    committedRoots: [rootKey],
+    conflictedRoots: [],
+    createdAt: 1,
+    currentRoot: null,
+    kind: 'archive-restore-session',
+    operationId: 'archive-committed-root',
+    rootIdMap: { [rootKey]: 'one' },
+    skippedRoots: [],
+    status: 'pending',
+    strategy: 'replace',
+    updatedAt: 2,
+  };
+  const harness = createDbHarness([session]);
+  harness.put('asset_refs', 'retained-object', createRef('retained-object'));
+  mocks.journals.mockResolvedValue([
+    {
+      assetRefs: [createRef('temporary-object'), createRef('retained-object')],
+      createdAt: 1,
+      domain: 'archive-restore-root',
+      journalId: 'committed-journal',
+      operationId: session.operationId,
+      payload: { rootKey },
+    },
+  ]);
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+
+  await recoverAssetPublications();
+
+  expect(mocks.deleteObject).toHaveBeenCalledWith('temporary-object');
+  expect(mocks.deleteObject).not.toHaveBeenCalledWith('retained-object');
+  expect(mocks.deleteJournal).toHaveBeenCalledWith('committed-journal');
+});
+
+function createDbHarness(
+  operations: Array<AssetOperation | ArchiveRestoreSession | PhysicalDeleteAssetOperation>
+) {
   const stores = new Map<string, Map<string, unknown>>();
   const key = (value: unknown) => JSON.stringify(value);
   const put = (storeName: string, entryKey: unknown, value: unknown) => {

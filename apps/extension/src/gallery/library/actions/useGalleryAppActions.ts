@@ -12,6 +12,7 @@ import type {
 } from './controller-types';
 import type { GalleryItem } from '../items';
 import {
+  createClosePendingImportAction,
   createClosePendingExportAction,
   createConfirmExportBackupAction,
   createExportBackupAction,
@@ -77,6 +78,7 @@ function buildGalleryAppActionsResult(args: {
   return {
     backup: args.backupActions,
     importing: {
+      closePendingImport: createClosePendingImportAction(controller),
       importBackup: args.handleImport,
       importSelectedFile: args.handleImportSelectedFile,
     },

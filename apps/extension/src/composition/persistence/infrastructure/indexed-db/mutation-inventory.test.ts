@@ -7,10 +7,13 @@ const inventoryRoots = [
   'apps/extension/src/background/capture/native-app/persistence',
   'apps/extension/src/composition/persistence',
   'apps/extension/src/editor/objects/custom-shapes',
-  'apps/extension/src/workflows/media-hub-backup/restore',
+  'apps/extension/src/workflows/media-hub-backup/v6/root-publication',
 ] as const;
 const delegatedMutationHelpers = new Set([
+  'apps/extension/src/composition/persistence/aggregate-presentations/backup-restore.ts',
   'apps/extension/src/composition/persistence/editor-bootstrap/retention-cleanup.ts',
+  'apps/extension/src/composition/persistence/effect-bundles/backup-restore.ts',
+  'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-lease.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts',
@@ -18,8 +21,9 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.web-snapshots.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
+  'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
-  'apps/extension/src/workflows/media-hub-backup/restore/write/index.ts',
+  'apps/extension/src/composition/persistence/web-snapshots/backup-restore.ts',
 ]);
 const indexedDbMutationPattern =
   /(?:\b(?:db|tx|store|cursor)|\b\w+Store)\.(?:put|delete|clear)\s*\(|\.transaction\([\s\S]{0,180}?["']readwrite["']/m;
