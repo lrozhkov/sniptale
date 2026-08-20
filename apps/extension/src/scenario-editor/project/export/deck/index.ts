@@ -4,6 +4,7 @@ import type { ScenarioDeckExportInput, ScenarioDeckExportResult } from './types'
 
 export { buildScenarioDeckHtmlExport } from './html';
 export { buildScenarioDeckMarkdownExport } from './markdown';
+export { createScenarioDeckArchiveFilename } from './package-result';
 export type {
   ScenarioDeckAssetMode,
   ScenarioDeckExportAsset,

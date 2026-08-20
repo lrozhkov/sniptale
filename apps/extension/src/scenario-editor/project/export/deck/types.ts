@@ -3,6 +3,7 @@ import type {
   ScenarioSlide,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { ScenarioSlideRenderAssetMap } from '../../stage-render/slide';
+import type { ExportSink } from '../../../../composition/archive-transfer';
 
 export type ScenarioDeckExportFormat = 'html' | 'markdown';
 export type ScenarioDeckAssetMode = 'embed' | 'files';
@@ -29,13 +30,14 @@ export interface ScenarioDeckExportAssets {
 }
 
 export interface ScenarioDeckExportResult {
-  blob: Blob;
+  blob: Blob | null;
   filename: string;
   format: ScenarioDeckExportFormat;
   missingAssetIds: string[];
 }
 
 export interface ScenarioDeckExportInput {
+  archiveSink?: ExportSink;
   getAssetBlob: (assetId: string) => Promise<Blob | undefined>;
   options: ScenarioDeckExportOptions;
   project: ScenarioProjectV3;

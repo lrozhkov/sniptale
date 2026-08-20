@@ -2794,12 +2794,6 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
-      "tool": "verify-main-proof.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "The validation row proves a deterministic repository tool or canonical control."
-    },
-    {
       "tool": "verify-manifest-integrity.mjs",
       "disposition": "keep",
       "owner": "qa-platform",

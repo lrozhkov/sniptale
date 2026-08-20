@@ -145,6 +145,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Объём:',
     en: 'Size:',
   },
+  mediaArchiveDescription: {
+    ru: 'Медиаархив Sniptale',
+    en: 'Sniptale media archive',
+  },
   selectionTagPlaceholder: {
     ru: 'Тег для batch update',
     en: 'Tag for batch update',

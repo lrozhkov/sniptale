@@ -52,6 +52,11 @@
       "source": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt",
+      "sha256": "1b7ebc8d7889ed25491484ab2b102370742ca6c0b26650a0c62cc2269b579b84",
+      "source": "LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt",
       "sha256": "c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2",
       "source": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt"
@@ -213,12 +218,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "c54b332e3c025afa693e602443750d406db979daf86f27d3073581b3cf333734",
+      "sha256": "9396535f2508ab411570e609258b6ed77bbf293ab4c4bcb15fcb4f05f3b71585",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "708cbfe7ef4ea43f934a6bea2be7a26c01dd2f5ae1c9fd37d4f058b3804b8414",
+      "sha256": "4b589f050e6bc8aab0ace10d6fdd8b186f858d26082a9273cbfeacfeb405bbe4",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

@@ -42,9 +42,13 @@ export async function publishReadyJournalWithRetry(
   } catch (error) {
     publicationError = error;
   }
+  let releaseError: unknown;
   try {
     await releaseAssetPublicationTransitions(journal.assetRefs.map((ref) => ref.assetId));
-  } catch (releaseError) {
+  } catch (error) {
+    releaseError = error;
+  }
+  if (releaseError !== undefined) {
     if (publicationError !== undefined) {
       throw new AggregateError(
         [publicationError, releaseError],

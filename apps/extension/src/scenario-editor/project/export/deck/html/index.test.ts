@@ -10,6 +10,7 @@ import type {
   ScenarioProjectV3,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { buildScenarioDeckHtmlExport } from './';
+import { createArchiveMemorySink } from '../../../../../composition/archive-transfer/test-support';
 
 describe('buildScenarioDeckHtmlExport', () => {
   it('builds a standalone escaped HTML deck with embedded assets and notes', async () => {
@@ -18,6 +19,7 @@ describe('buildScenarioDeckHtmlExport', () => {
       options: createHtmlOptions({ assetMode: 'embed' }),
       project: createDeckProject(),
     });
+    if (!result.blob) throw new Error('Expected embedded HTML blob.');
     const html = await result.blob.text();
 
     expect(result.filename).toBe('demo-deck.html');
@@ -32,12 +34,14 @@ describe('buildScenarioDeckHtmlExport', () => {
   });
 
   it('packages HTML with asset files and source JSON when requested', async () => {
+    const output = createArchiveMemorySink();
     const result = await buildScenarioDeckHtmlExport({
+      archiveSink: output.sink,
       getAssetBlob: createAssetResolver(),
       options: createHtmlOptions({ assetMode: 'files', includeSourceJson: true }),
       project: createDeckProject(),
     });
-    const archive = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const archive = await JSZip.loadAsync(output.bytes());
     const html = await archive.file('index.html')?.async('string');
     const source = await archive.file('scenario.json')?.async('string');
 
@@ -54,6 +58,7 @@ describe('buildScenarioDeckHtmlExport', () => {
       options: createHtmlOptions({ assetMode: 'embed' }),
       project: createDeckProject(),
     });
+    if (!result.blob) throw new Error('Expected embedded HTML blob.');
     const html = await result.blob.text();
 
     expect(result.missingAssetIds).toEqual(['asset-image']);

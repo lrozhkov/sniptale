@@ -176,9 +176,13 @@ export async function stagePreparedProjectAssets(
 }
 
 async function discardCurrentStagedAsset(assetId: string, error: unknown): Promise<never> {
+  let cleanupError: unknown;
   try {
     await discardPreparedAsset(assetId);
-  } catch (cleanupError) {
+  } catch (caughtError) {
+    cleanupError = caughtError;
+  }
+  if (cleanupError !== undefined) {
     throw new AggregateError(
       [error, cleanupError],
       'Project media staging failed before its ready journal became durable.',

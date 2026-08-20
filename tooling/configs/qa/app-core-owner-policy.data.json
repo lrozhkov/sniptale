@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "finalOwnerRules": [
     {
+      "sourcePrefix": "apps/extension/src/composition/archive-transfer",
+      "ownerId": "app-core.archive-transfer",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/frame-annotation-controls",
       "ownerId": "app-core.frame-annotation-controls",
       "ownerClass": "app-core"

@@ -2651,6 +2651,34 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/archive-transfer",
+      "disposition": "rollout",
+      "reason": "The streaming ZIP64 archive owner has deterministic path, budget, integrity, sink failure, and archive round-trip proof.",
+      "productionFiles": [
+        "apps/extension/src/composition/archive-transfer/contracts.ts",
+        "apps/extension/src/composition/archive-transfer/file-sink.ts",
+        "apps/extension/src/composition/archive-transfer/index.ts",
+        "apps/extension/src/composition/archive-transfer/output.ts",
+        "apps/extension/src/composition/archive-transfer/path.ts",
+        "apps/extension/src/composition/archive-transfer/profile.ts",
+        "apps/extension/src/composition/archive-transfer/reader.ts",
+        "apps/extension/src/composition/archive-transfer/test-support.ts",
+        "apps/extension/src/composition/archive-transfer/writer.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/archive-transfer/contracts.ts",
+        "apps/extension/src/composition/archive-transfer/file-sink.ts",
+        "apps/extension/src/composition/archive-transfer/index.ts",
+        "apps/extension/src/composition/archive-transfer/output.ts",
+        "apps/extension/src/composition/archive-transfer/path.ts",
+        "apps/extension/src/composition/archive-transfer/profile.ts",
+        "apps/extension/src/composition/archive-transfer/reader.ts",
+        "apps/extension/src/composition/archive-transfer/test-support.ts",
+        "apps/extension/src/composition/archive-transfer/writer.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/frame-annotation-controls",
       "disposition": "rollout",
       "reason": "The shared frame annotation controls are fully covered by deterministic content and editor owner proof.",
@@ -2871,6 +2899,46 @@
         "apps/extension/src/composition/persistence/annotation-template-tags/storage.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/system-tags.ts",
         "apps/extension/src/composition/persistence/annotation-template-tags/tag-ids.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/composition/persistence/asset-publication-recovery",
+      "disposition": "rollout",
+      "reason": "The cross-domain OPFS publication recovery and audit owner has deterministic recovery and integrity proof.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/asset-publication-recovery/audit.ts",
+        "apps/extension/src/composition/persistence/asset-publication-recovery/index.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/asset-publication-recovery/audit.ts",
+        "apps/extension/src/composition/persistence/asset-publication-recovery/index.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/composition/persistence/assets",
+      "disposition": "rollout",
+      "reason": "The generic durable OPFS asset owner has deterministic publication, quota, operation, recovery, and object-store proof.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/assets/contracts.ts",
+        "apps/extension/src/composition/persistence/assets/guards.ts",
+        "apps/extension/src/composition/persistence/assets/index.ts",
+        "apps/extension/src/composition/persistence/assets/operations.ts",
+        "apps/extension/src/composition/persistence/assets/opfs-store.ts",
+        "apps/extension/src/composition/persistence/assets/publication.ts",
+        "apps/extension/src/composition/persistence/assets/quota.ts",
+        "apps/extension/src/composition/persistence/assets/recovery.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/assets/contracts.ts",
+        "apps/extension/src/composition/persistence/assets/guards.ts",
+        "apps/extension/src/composition/persistence/assets/index.ts",
+        "apps/extension/src/composition/persistence/assets/operations.ts",
+        "apps/extension/src/composition/persistence/assets/opfs-store.ts",
+        "apps/extension/src/composition/persistence/assets/publication.ts",
+        "apps/extension/src/composition/persistence/assets/quota.ts",
+        "apps/extension/src/composition/persistence/assets/recovery.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -3195,6 +3263,9 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.scenario-assets.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
@@ -3231,6 +3302,9 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.scenario-assets.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
@@ -3335,6 +3409,7 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/privacy-erasure/asset-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/browser-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/cleanup.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/index.ts",
@@ -3344,10 +3419,10 @@
         "apps/extension/src/composition/persistence/privacy-erasure/participant-result.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participant-types.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participants.ts",
-        "apps/extension/src/composition/persistence/privacy-erasure/recording-staging-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/video-preview-participant.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/privacy-erasure/asset-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/browser-storage-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/cleanup.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/index.ts",
@@ -3357,7 +3432,6 @@
         "apps/extension/src/composition/persistence/privacy-erasure/participant-result.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participant-types.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/participants.ts",
-        "apps/extension/src/composition/persistence/privacy-erasure/recording-staging-participant.ts",
         "apps/extension/src/composition/persistence/privacy-erasure/video-preview-participant.ts"
       ],
       "unownedFocusedFiles": []
@@ -3383,6 +3457,7 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/projects/asset-publication.ts",
         "apps/extension/src/composition/persistence/projects/asset-references.ts",
         "apps/extension/src/composition/persistence/projects/contracts.ts",
         "apps/extension/src/composition/persistence/projects/index-mutations.ts",
@@ -3394,6 +3469,7 @@
         "apps/extension/src/composition/persistence/projects/read-guards.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/projects/asset-publication.ts",
         "apps/extension/src/composition/persistence/projects/asset-references.ts",
         "apps/extension/src/composition/persistence/projects/contracts.ts",
         "apps/extension/src/composition/persistence/projects/index-mutations.ts",
@@ -3453,33 +3529,33 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/recordings/asset-publication.ts",
         "apps/extension/src/composition/persistence/recordings/batch.ts",
         "apps/extension/src/composition/persistence/recordings/completion-outbox.ts",
         "apps/extension/src/composition/persistence/recordings/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/index.guards.ts",
         "apps/extension/src/composition/persistence/recordings/index.ts",
         "apps/extension/src/composition/persistence/recordings/staging/artifact-writer.ts",
-        "apps/extension/src/composition/persistence/recordings/staging/cleanup.ts",
         "apps/extension/src/composition/persistence/recordings/staging/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/staging/coordinator.ts",
         "apps/extension/src/composition/persistence/recordings/staging/index.ts",
-        "apps/extension/src/composition/persistence/recordings/staging/opfs-adapter.ts",
+        "apps/extension/src/composition/persistence/recordings/staging/test-support.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.guards.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.ts",
         "apps/extension/src/composition/persistence/recordings/tracks.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/recordings/asset-publication.ts",
         "apps/extension/src/composition/persistence/recordings/batch.ts",
         "apps/extension/src/composition/persistence/recordings/completion-outbox.ts",
         "apps/extension/src/composition/persistence/recordings/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/index.guards.ts",
         "apps/extension/src/composition/persistence/recordings/index.ts",
         "apps/extension/src/composition/persistence/recordings/staging/artifact-writer.ts",
-        "apps/extension/src/composition/persistence/recordings/staging/cleanup.ts",
         "apps/extension/src/composition/persistence/recordings/staging/contracts.ts",
         "apps/extension/src/composition/persistence/recordings/staging/coordinator.ts",
         "apps/extension/src/composition/persistence/recordings/staging/index.ts",
-        "apps/extension/src/composition/persistence/recordings/staging/opfs-adapter.ts",
+        "apps/extension/src/composition/persistence/recordings/staging/test-support.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.guards.ts",
         "apps/extension/src/composition/persistence/recordings/telemetry.ts",
         "apps/extension/src/composition/persistence/recordings/tracks.ts"
@@ -3492,6 +3568,7 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
+        "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -3557,6 +3634,7 @@
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
+        "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -12616,6 +12694,7 @@
         "apps/extension/src/workflows/media-hub-backup/contracts/types.ts",
         "apps/extension/src/workflows/media-hub-backup/export/blob/budget.ts",
         "apps/extension/src/workflows/media-hub-backup/export/blob/descriptor.ts",
+        "apps/extension/src/workflows/media-hub-backup/export/blob/stream.ts",
         "apps/extension/src/workflows/media-hub-backup/export/effect-bundles.ts",
         "apps/extension/src/workflows/media-hub-backup/export/filters.ts",
         "apps/extension/src/workflows/media-hub-backup/export/index.ts",
@@ -12653,6 +12732,7 @@
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-project-version.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-projects.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/archive-reader.ts",
+        "apps/extension/src/workflows/media-hub-backup/restore/asset-stream.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/batches.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/index.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/prepare/index.ts",
@@ -13488,7 +13568,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "075fd9535ec4c6576438bcea6e497ff4c3f6b4f8871bfd57abf2776e886f26eb"
+        "contentHash": "1c4ea46c0d1174fc04818efd7e0ba96c3714641de89072038131e5fee4057bdb"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -15344,7 +15424,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.media-library.ts",
-        "contentHash": "568fa57662b08e4f501834c441cad1dd08a499ca62babba11d5e0e66496df68b"
+        "contentHash": "05f84d79875ce6492514a591a0d6ead3b0518de5e01d7496dbf718f698e7f3a9"
       },
       "consumers": [
         "tooling/test/harness/browser-mocks.media-library.ts",
@@ -15419,7 +15499,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.types.ts",
-        "contentHash": "dd3864697616d49b2d956f5d5f1ea581bc87667c6a4ad89df6dff6e5cc0130c7"
+        "contentHash": "ba2b1c3d48c8b02de7518bafea99849327f381f691e0d4866ae260ba75c81e40"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical.helpers.ts",
@@ -18496,7 +18576,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "2cc02038917cae66f206b02256ba233d26a6b706a1d53980a9eb97190798d84b"
+        "contentHash": "e8fdca9a791153177d7b39c8ca63b10efb4830953721e6bbfef3f801bf4a7125"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"

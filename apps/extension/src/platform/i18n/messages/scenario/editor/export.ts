@@ -1,4 +1,8 @@
 export const scenarioEditorExportMessages = {
+  exportArchiveDescription: {
+    ru: 'Архив презентации сценария Sniptale',
+    en: 'Sniptale scenario deck archive',
+  },
   exportOpenFullImage: {
     ru: 'Открыть полное изображение',
     en: 'Open full image',

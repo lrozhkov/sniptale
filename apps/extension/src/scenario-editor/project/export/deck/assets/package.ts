@@ -1,11 +1,11 @@
-import type JSZip from 'jszip';
+import type { ArchiveWriter } from '../../../../../composition/archive-transfer';
 import type { ScenarioDeckExportAssets } from '../types';
 
 export async function addScenarioDeckAssetFiles(
-  zip: JSZip,
+  archive: ArchiveWriter,
   assets: ScenarioDeckExportAssets
 ): Promise<void> {
   for (const asset of assets.assetsById.values()) {
-    zip.file(asset.filename, await asset.blob.arrayBuffer());
+    await archive.addBlob(asset.filename, asset.blob);
   }
 }

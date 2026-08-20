@@ -1,4 +1,4 @@
-import type JSZip from 'jszip';
+import type { ArchiveWriter } from '../../../../composition/archive-transfer';
 import type { ScenarioDeckExportInput, ScenarioDeckExportResult } from './types';
 import { addScenarioDeckAssetFiles } from './assets/package';
 import type { resolveScenarioDeckExportAssets } from './assets/resolve';
@@ -6,20 +6,28 @@ import { slugifyDeckExportName } from './helpers';
 
 type ScenarioDeckExportAssets = Awaited<ReturnType<typeof resolveScenarioDeckExportAssets>>;
 
+export function createScenarioDeckArchiveFilename(
+  projectName: string,
+  format: 'html' | 'markdown'
+): string {
+  return `${slugifyDeckExportName(projectName)}-${format}.zip`;
+}
+
 export async function buildScenarioDeckPackageResult(args: {
   assets: ScenarioDeckExportAssets;
+  archive: ArchiveWriter;
   format: 'html' | 'markdown';
   input: ScenarioDeckExportInput;
-  zip: JSZip;
 }): Promise<ScenarioDeckExportResult> {
-  await addScenarioDeckAssetFiles(args.zip, args.assets);
+  await addScenarioDeckAssetFiles(args.archive, args.assets);
   if (args.input.options.includeSourceJson) {
-    args.zip.file('scenario.json', JSON.stringify(args.input.project, null, 2));
+    await args.archive.addText('scenario.json', JSON.stringify(args.input.project, null, 2));
   }
+  await args.archive.close();
 
   return {
-    blob: await args.zip.generateAsync({ type: 'blob' }),
-    filename: `${slugifyDeckExportName(args.input.project.name)}-${args.format}.zip`,
+    blob: null,
+    filename: createScenarioDeckArchiveFilename(args.input.project.name, args.format),
     format: args.format,
     missingAssetIds: args.assets.missingAssetIds,
   };

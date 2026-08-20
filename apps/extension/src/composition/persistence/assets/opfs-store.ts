@@ -389,9 +389,13 @@ export async function writeBlobToAsset(
     }
     return await writer.finalize();
   } catch (error) {
+    let abortError: unknown;
     try {
       await writer.abort();
-    } catch (abortError) {
+    } catch (cleanupError) {
+      abortError = cleanupError;
+    }
+    if (abortError !== undefined) {
       throw new AggregateError(
         [error, abortError],
         'Asset Blob write failed and partial OPFS cleanup was incomplete.',

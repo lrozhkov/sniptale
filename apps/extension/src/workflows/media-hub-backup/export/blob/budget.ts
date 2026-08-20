@@ -74,9 +74,13 @@ export async function generateBackupZipBlob(args: {
     return blob;
   } catch (error) {
     if (args.release) {
+      let releaseError: unknown;
       try {
         await args.release(blob);
-      } catch (releaseError) {
+      } catch (caughtError) {
+        releaseError = caughtError;
+      }
+      if (releaseError !== undefined) {
         throw new AggregateError(
           [error, releaseError],
           'Media hub backup generation failed and temporary output cleanup was incomplete.',

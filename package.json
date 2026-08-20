@@ -90,6 +90,7 @@
     "@iconify-icons/tabler": "^1.2.95",
     "@iconify/react": "^6.0.2",
     "@webav/mp4box.js": "^0.5.7",
+    "@zip.js/zip.js": "^2.8.53",
     "@zumer/snapdom": "2.23.2",
     "dompurify": "^3.4.12",
     "fabric": "^7.4.0",

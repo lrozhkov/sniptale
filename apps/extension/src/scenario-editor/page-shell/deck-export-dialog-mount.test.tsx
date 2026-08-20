@@ -7,15 +7,21 @@ import { createScenarioProjectV3 } from '../../features/scenario/project/v3';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { ScenarioV3DeckExportDialogMount } from './deck-export-dialog-mount';
 import type { useScenarioV3EditorState } from './state';
+import { translate } from '../../platform/i18n';
 
 type ScenarioV3EditorState = ReturnType<typeof useScenarioV3EditorState>;
 
-const { buildScenarioDeckExportMock, downloadScenarioEditorBlobMock, exportDialogPropsMock } =
-  vi.hoisted(() => ({
-    buildScenarioDeckExportMock: vi.fn(),
-    downloadScenarioEditorBlobMock: vi.fn(),
-    exportDialogPropsMock: vi.fn(),
-  }));
+const {
+  buildScenarioDeckExportMock,
+  createDirectFileSinkMock,
+  downloadScenarioEditorBlobMock,
+  exportDialogPropsMock,
+} = vi.hoisted(() => ({
+  buildScenarioDeckExportMock: vi.fn(),
+  createDirectFileSinkMock: vi.fn(),
+  downloadScenarioEditorBlobMock: vi.fn(),
+  exportDialogPropsMock: vi.fn(),
+}));
 
 vi.mock('../project/export/deck', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../project/export/deck')>()),
@@ -28,6 +34,10 @@ vi.mock('../../composition/persistence/scenario/store/public', async (importOrig
 vi.mock('../platform/browser-driver', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/browser-driver')>()),
   downloadScenarioEditorBlob: downloadScenarioEditorBlobMock,
+}));
+vi.mock('../../composition/archive-transfer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/archive-transfer')>()),
+  createDirectFileSink: createDirectFileSinkMock,
 }));
 vi.mock('../export-dialog/deck', () => ({
   ScenarioDeckExportDialog: (props: { onExport: (options: object) => Promise<unknown> }) => {
@@ -46,6 +56,11 @@ beforeEach(() => {
     filename: 'deck.zip',
     format: 'html',
     missingAssetIds: [],
+  });
+  createDirectFileSinkMock.mockResolvedValue({
+    abort: vi.fn(),
+    close: vi.fn(),
+    writable: new WritableStream<Uint8Array>(),
   });
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -86,6 +101,44 @@ it('does not mount the export dialog while closed', () => {
 
   expect(container?.querySelector('[data-testid="deck-export-dialog"]')).toBeNull();
   expect(exportDialogPropsMock).not.toHaveBeenCalled();
+});
+
+it('opens a localized direct sink for file-backed deck packages', async () => {
+  const project = createScenarioProjectV3('Deck');
+  renderDialogMount(project);
+  const dialogProps = getLastMockArg<{
+    onExport: (options: {
+      assetMode: 'files';
+      format: 'markdown';
+      includeMissingPlaceholders: boolean;
+      includeNotes: boolean;
+      includeSourceJson: boolean;
+    }) => Promise<unknown>;
+  }>(exportDialogPropsMock);
+  const options = {
+    assetMode: 'files' as const,
+    format: 'markdown' as const,
+    includeMissingPlaceholders: true,
+    includeNotes: true,
+    includeSourceJson: true,
+  };
+
+  await act(async () => {
+    await dialogProps.onExport(options);
+  });
+
+  expect(createDirectFileSinkMock).toHaveBeenCalledWith({
+    description: translate('scenario.editor.exportArchiveDescription'),
+    extension: '.zip',
+    filename: 'deck-markdown.zip',
+    mimeType: 'application/zip',
+  });
+  expect(buildScenarioDeckExportMock).toHaveBeenCalledWith({
+    archiveSink: expect.any(Object),
+    getAssetBlob: expect.any(Function),
+    options,
+    project,
+  });
 });
 
 function renderDialogMount(project: ScenarioProjectV3, open = true) {

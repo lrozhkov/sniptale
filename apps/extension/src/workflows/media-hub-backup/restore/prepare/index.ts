@@ -286,9 +286,13 @@ async function stageDurableBackupAsset(
 }
 
 async function discardStagedBackupAsset(assetId: string, error: unknown): Promise<never> {
+  let cleanupError: unknown;
   try {
     await discardPreparedAsset(assetId);
-  } catch (cleanupError) {
+  } catch (caughtError) {
+    cleanupError = caughtError;
+  }
+  if (cleanupError !== undefined) {
     throw new AggregateError(
       [error, cleanupError],
       'Recording restore staging failed before its ready journal became durable.',

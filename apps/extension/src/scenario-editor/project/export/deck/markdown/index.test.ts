@@ -10,15 +10,18 @@ import type {
   ScenarioProjectV3,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { buildScenarioDeckMarkdownExport } from './';
+import { createArchiveMemorySink } from '../../../../../composition/archive-transfer/test-support';
 
 describe('buildScenarioDeckMarkdownExport', () => {
   it('packages markdown, slide previews, assets, notes, code, and source JSON', async () => {
+    const output = createArchiveMemorySink();
     const result = await buildScenarioDeckMarkdownExport({
+      archiveSink: output.sink,
       getAssetBlob: vi.fn(async () => new Blob(['asset-bytes'], { type: 'image/png' })),
       options: createMarkdownOptions(),
       project: createMarkdownProject(),
     });
-    const archive = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const archive = await JSZip.loadAsync(output.bytes());
     const markdown = await archive.file('scenario.md')?.async('string');
     const slidePreview = await archive.file('slides/slide-1.svg')?.async('string');
 
@@ -33,17 +36,58 @@ describe('buildScenarioDeckMarkdownExport', () => {
   });
 
   it('records missing image assets in markdown without blocking export', async () => {
+    const output = createArchiveMemorySink();
     const result = await buildScenarioDeckMarkdownExport({
+      archiveSink: output.sink,
       getAssetBlob: vi.fn(async () => undefined),
       options: createMarkdownOptions({ includeSourceJson: false }),
       project: createMarkdownProject(),
     });
-    const archive = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const archive = await JSZip.loadAsync(output.bytes());
     const markdown = await archive.file('scenario.md')?.async('string');
 
     expect(result.missingAssetIds).toEqual(['asset-image']);
     expect(markdown).toContain('Missing assets: `asset-image`');
     expect(archive.file('scenario.json')).toBeNull();
+  });
+
+  it('requires a streaming archive sink', async () => {
+    await expect(
+      buildScenarioDeckMarkdownExport({
+        getAssetBlob: vi.fn(async () => undefined),
+        options: createMarkdownOptions(),
+        project: createMarkdownProject(),
+      })
+    ).rejects.toThrow('Scenario deck archive sink is required');
+  });
+
+  it('aborts the archive when asset resolution fails before the first write', async () => {
+    const output = createArchiveMemorySink();
+    const assetError = new Error('asset read failed');
+
+    await expect(
+      buildScenarioDeckMarkdownExport({
+        archiveSink: output.sink,
+        getAssetBlob: vi.fn(async () => Promise.reject(assetError)),
+        options: createMarkdownOptions(),
+        project: createMarkdownProject(),
+      })
+    ).rejects.toBe(assetError);
+    expect(output.aborted).toBe(true);
+  });
+
+  it('aborts the archive when the initial package write fails', async () => {
+    const output = createArchiveMemorySink(1);
+
+    await expect(
+      buildScenarioDeckMarkdownExport({
+        archiveSink: output.sink,
+        getAssetBlob: vi.fn(async () => new Blob(['asset'])),
+        options: createMarkdownOptions(),
+        project: createMarkdownProject(),
+      })
+    ).rejects.toThrow('memory sink');
+    expect(output.aborted).toBe(true);
   });
 });
 

@@ -48,9 +48,13 @@ export function generateBackupZipFileToOpfs(args: {
       temporaryBackupObjects.set(file, prepared.ref.assetId);
       return file;
     } catch (error) {
+      let abortError: unknown;
       try {
         await writer.abort();
-      } catch (abortError) {
+      } catch (caughtError) {
+        abortError = caughtError;
+      }
+      if (abortError !== undefined) {
         throw new AggregateError(
           [error, abortError],
           'Media hub backup export failed and partial OPFS cleanup was incomplete.',

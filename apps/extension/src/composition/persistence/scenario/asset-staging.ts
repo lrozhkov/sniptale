@@ -38,9 +38,13 @@ export async function rejectScenarioMutationBeforeHandoff(
   children: ScenarioAggregateChildMutation | undefined,
   error: unknown
 ): Promise<never> {
+  let cleanupError: unknown;
   try {
     await discardScenarioAggregateAssetPuts(children);
-  } catch (cleanupError) {
+  } catch (caughtError) {
+    cleanupError = caughtError;
+  }
+  if (cleanupError !== undefined) {
     throw new AggregateError(
       [error, cleanupError],
       'Scenario mutation was rejected before publication and asset cleanup was incomplete.',

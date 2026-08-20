@@ -45,9 +45,13 @@ export async function writeBackupArchiveEntryToAsset(args: {
     }
     return await writer.finalize();
   } catch (error) {
+    let abortError: unknown;
     try {
       await writer.abort();
-    } catch (abortError) {
+    } catch (caughtError) {
+      abortError = caughtError;
+    }
+    if (abortError !== undefined) {
       throw new AggregateError(
         [error, abortError],
         'Durable backup restore failed and partial OPFS cleanup was incomplete.',
