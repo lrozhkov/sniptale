@@ -25,11 +25,11 @@ export function generateBackupZipFileToOpfs(args: {
   signal?: AbortSignal | undefined;
   zip: StreamingBackupZip;
 }): Promise<File> {
-  return runWithPersistenceMutationTransition(async () => {
+  return runWithPersistenceMutationTransition(async (transitionPermit) => {
     assertBackupExportNotCancelled(args.signal);
     const writer = await createAssetObjectWriter(
       { mimeType: 'application/zip' },
-      { persistenceTransition: 'already-admitted' }
+      { persistenceTransitionPermit: transitionPermit }
     );
     try {
       const stream = args.zip.generateInternalStream({

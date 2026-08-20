@@ -120,7 +120,7 @@ export async function importMediaHubBackupAssets(args: {
   let imported = 0;
 
   await withMediaHubWriteGuard(translate('shared.mediaHub.importBackupAction'), () =>
-    runWithPersistenceMutationTransition(() =>
+    runWithPersistenceMutationTransition((transitionPermit) =>
       runWithDurableAssetOperation(async (assetOperationPermit) => {
         const prepared = await prepareImportAssets(args);
         counters.changedIds = prepared.changedIds;
@@ -133,6 +133,7 @@ export async function importMediaHubBackupAssets(args: {
         counters.skipped += preparedProjectDomains.skipped;
         imported = await restorePreparedImportPlan({
           assetOperationPermit,
+          transitionPermit,
           assetPlans: prepared.assetPlans,
           preparedProjectDomains,
           strategy: args.strategy,

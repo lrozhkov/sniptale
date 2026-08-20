@@ -16,12 +16,11 @@ import {
   getProjectExport,
 } from '../projects/index';
 import { deleteRecording, getRecording } from '../recordings/index';
-import { deleteWebSnapshotMediaAsset, getWebSnapshotRecord } from '../web-snapshots';
+import { deleteWebSnapshotMediaAsset, getWebSnapshotPackageFile } from '../web-snapshots';
 import type { MediaLibraryEntry, MediaLibraryItem, MediaThumbnailEntry } from './contracts';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
 import { createAggregatePresentationKey } from '../aggregate-presentations';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { removeEditorDocumentOwnership } from '../document-assets';
@@ -110,16 +109,7 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
   }
 
   if (entry.source.kind === 'web-snapshot') {
-    const snapshot = await getWebSnapshotRecord(entry.source.snapshotId);
-    if (!snapshot) {
-      return undefined;
-    }
-
-    const sanitizedPackage = await sanitizeWebSnapshotPackageProvenance(
-      snapshot.packageBlob,
-      snapshot.manifest
-    );
-    return sanitizedPackage.packageBlob;
+    return getWebSnapshotPackageFile(entry.source.snapshotId);
   }
 
   const projectAsset = await getProjectAsset(entry.source.projectAssetId);

@@ -18,7 +18,10 @@ import {
   writeBlobToAsset,
   writeReadyJournal,
 } from './opfs-store';
-import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
+import {
+  runWithPersistenceMutationTransition,
+  runWithPersistentDataErasureBarrier,
+} from '../infrastructure/mutation-barrier';
 
 function notFound(): Error {
   return Object.assign(new Error('missing'), { name: 'NotFoundError' });
@@ -180,12 +183,34 @@ it('aborts an active writer and removes both its marker and partial object', asy
 
 it('supports a writer whose enclosing workflow already owns persistence admission', async () => {
   const harness = createHarness();
-  const writer = await createAssetObjectWriter(
-    { mimeType: 'video/webm' },
-    { ...harness.options, persistenceTransition: 'already-admitted' }
-  );
+  let continueWorkflow!: () => void;
+  let signalWorkflowAdmitted!: () => void;
+  const workflowAdmitted = new Promise<void>((resolve) => {
+    signalWorkflowAdmitted = resolve;
+  });
+  const workflowContinued = new Promise<void>((resolve) => {
+    continueWorkflow = resolve;
+  });
+  const workflow = runWithPersistenceMutationTransition(async (transitionPermit) => {
+    signalWorkflowAdmitted();
+    await workflowContinued;
+    const writer = await createAssetObjectWriter(
+      { mimeType: 'video/webm' },
+      { ...harness.options, persistenceTransitionPermit: transitionPermit }
+    );
+    await writer.abort();
+  });
+  await workflowAdmitted;
+  const erase = vi.fn();
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  expect(erase).not.toHaveBeenCalled();
 
-  await writer.abort();
+  continueWorkflow();
+  await workflow;
+  await erasure;
+
+  expect(erase).toHaveBeenCalledOnce();
 
   await expect(listWritingAssetIds(harness.options)).resolves.toEqual([]);
   await expect(listAssetObjectIds(harness.options)).resolves.toEqual([]);

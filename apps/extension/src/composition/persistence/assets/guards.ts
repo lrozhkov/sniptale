@@ -100,6 +100,7 @@ function parseCompensation(value: unknown): AssetOperationCompensation | null {
     !isString(value['nextOwnerId']) ||
     !(value['nextProjectAssetId'] === undefined || isString(value['nextProjectAssetId'])) ||
     !(value['nextProjectExportId'] === undefined || isString(value['nextProjectExportId'])) ||
+    !(value['nextWebSnapshotId'] === undefined || isString(value['nextWebSnapshotId'])) ||
     !(value['ownerKind'] === undefined || isString(value['ownerKind'])) ||
     !(value['ownerRole'] === undefined || isString(value['ownerRole'])) ||
     !isRecord(value['previousRecords'])
@@ -117,6 +118,9 @@ function parseCompensation(value: unknown): AssetOperationCompensation | null {
     ...(value['nextProjectExportId'] === undefined
       ? {}
       : { nextProjectExportId: value['nextProjectExportId'] }),
+    ...(value['nextWebSnapshotId'] === undefined
+      ? {}
+      : { nextWebSnapshotId: value['nextWebSnapshotId'] }),
     ...(value['ownerKind'] === undefined ? {} : { ownerKind: value['ownerKind'] }),
     ...(value['ownerRole'] === undefined ? {} : { ownerRole: value['ownerRole'] }),
     previousRecords: value['previousRecords'],

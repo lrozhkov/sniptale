@@ -327,7 +327,84 @@ describe('media hub backup restore project-domain orchestration', () => {
     expect(deleteReadyJournalMock).toHaveBeenCalledWith('recording-journal');
     expect(releaseAssetReadyProtectionMock).toHaveBeenCalledWith(['opfs-recording-1']);
   });
+});
 
+describe('media hub backup restore shared-owner replacement', () => {
+  it('does not obsolete shared web snapshot objects during replace', async () => {
+    const { importMediaHubBackupAssets } = await import('.');
+    createTransactionHarness();
+    const entry = createMediaEntry(
+      { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
+      { id: 'snapshot-1', kind: 'web-archive', mimeType: 'application/zip' }
+    );
+    const existingEntry = { ...entry, filename: 'existing.zip' };
+    const createRef = (assetId: string) => ({
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      mimeType: 'application/octet-stream',
+      sha256: null,
+      size: 5,
+    });
+    prepareBackupImportAssetMock.mockResolvedValue({
+      prepared: {
+        assetPath: 'assets/snapshot-1',
+        existingEntry,
+        nextEntry: entry,
+        preparedAssetPublication: {
+          additionalAssets: [{ ref: createRef('screenshot-new') }],
+          asset: { ref: createRef('package-new') },
+          journalId: 'snapshot-journal',
+        },
+        recordingTelemetry: null,
+        thumbnailPath: null,
+        webSnapshotPackage: null,
+      },
+      resolvedConflict: true,
+    });
+    snapshotExistingAssetRecordMock.mockResolvedValue({
+      assetOwnerEntries: [],
+      assetOwnerEntry: undefined,
+      assetRefEntries: [createRef('package-shared'), createRef('screenshot-shared')],
+      assetRefEntry: undefined,
+      mediaLibraryEntry: existingEntry,
+      projectAssetEntry: undefined,
+      projectExportEntry: undefined,
+      recordingEntry: undefined,
+      recordingTelemetryEntry: undefined,
+      thumbnailEntry: undefined,
+      webSnapshotEntry: { id: 'snapshot-1' },
+    });
+    const operationPut = vi.fn();
+    getBackupStoreMock.mockImplementation((_tx, storeName: string) =>
+      storeName === 'asset_owners'
+        ? { index: vi.fn(() => ({ getAll: vi.fn(async () => [{ shared: true }]) })) }
+        : {
+            get: vi.fn().mockResolvedValue({
+              compensations: [],
+              createdAt: 1,
+              kind: 'backup-restore',
+              obsoleteAssetIds: [],
+              operationId: 'restore-1',
+              status: 'pending',
+              updatedAt: 1,
+            }),
+            put: operationPut,
+          }
+    );
+
+    await importMediaHubBackupAssets({
+      metadata: createMetadata(entry),
+      remapEntryForDuplicate: vi.fn(),
+      strategy: 'replace',
+      zip: {} as JSZip,
+    });
+
+    expect(operationPut).toHaveBeenCalledWith(expect.objectContaining({ obsoleteAssetIds: [] }));
+  });
+});
+
+describe('media hub backup restore project-domain continuation', () => {
   it('adds prepared v2 project bundle counters to the import result and change event', async () => {
     let transitionActive = false;
     runWithPersistenceMutationTransitionMock.mockImplementation(

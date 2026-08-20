@@ -5,11 +5,13 @@ import {
 } from '../../../composition/persistence/assets';
 import { MAX_BACKUP_ENTRY_BYTES } from '../manifest';
 import type { BackupArchiveReader, BackupArchiveStream } from './archive-reader';
+import type { PersistenceMutationTransitionPermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 
 export async function writeBackupArchiveEntryToAsset(args: {
   expectedSize: number;
   mimeType: string;
   path: string;
+  transitionPermit?: PersistenceMutationTransitionPermit;
   zip: BackupArchiveReader;
 }): Promise<PreparedAssetObject> {
   if (
@@ -27,7 +29,7 @@ export async function writeBackupArchiveEntryToAsset(args: {
   await assertAssetWriteAdmission(args.expectedSize);
   const writer = await createAssetObjectWriter(
     { mimeType: args.mimeType },
-    { persistenceTransition: 'already-admitted' }
+    args.transitionPermit ? { persistenceTransitionPermit: args.transitionPermit } : {}
   );
   let written = 0;
   try {

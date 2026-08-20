@@ -120,7 +120,7 @@ async function loadAssetUsageAuthority(): Promise<AssetUsageAuthority> {
   const owners = Array.isArray(rawOwners) ? rawOwners.map(parseAssetOwner).filter(isPresent) : [];
   return {
     ownersByDomainKey: new Map(
-      owners.map((owner) => [ownerDomainKey(owner.ownerKind, owner.ownerId), owner])
+      owners.map((owner) => [ownerDomainKey(owner.ownerKind, owner.ownerId, owner.role), owner])
     ),
     refsById: new Map(refs.map((ref) => [ref.assetId, ref])),
   };
@@ -131,14 +131,31 @@ function resolveMediaBytes(
   authority: AssetUsageAuthority
 ): number {
   if (!entry.source) return entry.size;
+  if (entry.source.kind === 'web-snapshot') {
+    return [
+      authority.ownersByDomainKey.get(
+        ownerDomainKey('web-snapshot', entry.source.snapshotId, 'package')
+      ),
+      authority.ownersByDomainKey.get(
+        ownerDomainKey('web-snapshot', entry.source.snapshotId, 'screenshot')
+      ),
+    ].reduce(
+      (total, owner) => total + (owner ? (authority.refsById.get(owner.assetId)?.size ?? 0) : 0),
+      0
+    );
+  }
   const owner =
     entry.source.kind === 'recording'
-      ? authority.ownersByDomainKey.get(ownerDomainKey('recording', entry.source.recordingId))
+      ? authority.ownersByDomainKey.get(
+          ownerDomainKey('recording', entry.source.recordingId, 'body')
+        )
       : entry.source.kind === 'project-export'
-        ? authority.ownersByDomainKey.get(ownerDomainKey('project-export', entry.source.exportId))
+        ? authority.ownersByDomainKey.get(
+            ownerDomainKey('project-export', entry.source.exportId, 'body')
+          )
         : entry.source.kind === 'project-asset'
           ? authority.ownersByDomainKey.get(
-              ownerDomainKey('project-asset', entry.source.projectAssetId)
+              ownerDomainKey('project-asset', entry.source.projectAssetId, 'body')
             )
           : undefined;
   if (owner) return authority.refsById.get(owner.assetId)?.size ?? 0;
@@ -146,11 +163,16 @@ function resolveMediaBytes(
 }
 
 function isDurableMediaSource(kind: string): boolean {
-  return kind === 'recording' || kind === 'project-export' || kind === 'project-asset';
+  return (
+    kind === 'recording' ||
+    kind === 'project-export' ||
+    kind === 'project-asset' ||
+    kind === 'web-snapshot'
+  );
 }
 
-function ownerDomainKey(ownerKind: string, ownerId: string): string {
-  return `${ownerKind}\u0000${ownerId}`;
+function ownerDomainKey(ownerKind: string, ownerId: string, role: string): string {
+  return `${ownerKind}\u0000${ownerId}\u0000${role}`;
 }
 
 function isPresent<T>(value: T | null): value is T {

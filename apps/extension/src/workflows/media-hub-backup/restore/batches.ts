@@ -3,6 +3,7 @@ import { runWithIndexedDbMutation } from '../../../composition/persistence/infra
 import {
   runWithDurableAssetLifecycleLock,
   type DurableAssetOperationPermit,
+  type PersistenceMutationTransitionPermit,
 } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import type { MediaHubImportConflictStrategy } from '../contracts/types';
 import {
@@ -29,7 +30,7 @@ import {
 } from './write';
 import type { getStore } from '../storage';
 import { getStore as getBackupStore } from '../storage';
-import { ASSET_OPERATIONS_STORE } from '../storage/constants';
+import { ASSET_OPERATIONS_STORE, ASSET_OWNERS_STORE } from '../storage/constants';
 import {
   createBackupRestoreOperation,
   transitionAssetOperation,
@@ -41,6 +42,7 @@ import {
   parseAssetRef,
   releaseAssetReadyProtection,
   type AssetOperationCompensation,
+  type AssetRef,
 } from '../../../composition/persistence/assets';
 import { recoverAssetPublications } from '../../../composition/persistence/asset-publication-recovery';
 import {
@@ -48,11 +50,36 @@ import {
   PROJECT_EXPORT_OWNER_KIND,
   PROJECT_MEDIA_ASSET_ROLE,
 } from '../../../composition/persistence/projects/asset-publication';
+import {
+  WEB_SNAPSHOT_OWNER_KIND,
+  WEB_SNAPSHOT_PACKAGE_ROLE,
+  WEB_SNAPSHOT_SCREENSHOT_ROLE,
+} from '../../../composition/persistence/web-snapshots/publication';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
 type PreparedProjectDomains = Awaited<ReturnType<typeof prepareProjectDomains>>;
 
 const STANDALONE_RESTORE_BATCH_SIZE = 1;
+
+async function collectUnownedReplacedRefs(
+  tx: BackupTransaction,
+  snapshot: BackupImportAssetRecordSnapshot | null
+): Promise<AssetRef[]> {
+  if (!snapshot) return [];
+  const candidates = [
+    parseAssetRef(snapshot.assetRefEntry),
+    ...(snapshot.assetRefEntries ?? []).map(parseAssetRef),
+  ].filter((ref): ref is AssetRef => ref !== null);
+  if (candidates.length === 0) return [];
+  const ownerIndex = getBackupStore(tx, ASSET_OWNERS_STORE).index('assetId');
+  const ownership = await Promise.all(
+    candidates.map(async (ref) => ({
+      ref,
+      owners: (await ownerIndex.getAll(ref.assetId)).length,
+    }))
+  );
+  return ownership.flatMap(({ ref, owners }) => (owners === 0 ? [ref] : []));
+}
 
 async function restorePreparedAssetsInTransaction(
   tx: BackupTransaction,
@@ -70,6 +97,7 @@ async function restorePreparedAssetsInTransaction(
 
   for (const prepared of preparedAssets) {
     let replacedSnapshot: BackupImportAssetRecordSnapshot | null = null;
+    let obsoleteRefs: AssetRef[] = [];
     if (prepared.existingEntry && strategy === 'replace') {
       replacedSnapshot = await snapshotExistingAssetRecord(tx, prepared.existingEntry);
     }
@@ -82,6 +110,7 @@ async function restorePreparedAssetsInTransaction(
     });
     if (prepared.existingEntry && strategy === 'replace') {
       await deleteExistingAssetRecord(tx, prepared.existingEntry);
+      obsoleteRefs = await collectUnownedReplacedRefs(tx, replacedSnapshot);
     }
 
     await restoreAssetRecord(
@@ -101,7 +130,8 @@ async function restorePreparedAssetsInTransaction(
       if (
         source.kind !== 'recording' &&
         source.kind !== 'project-export' &&
-        source.kind !== 'project-asset'
+        source.kind !== 'project-asset' &&
+        source.kind !== 'web-snapshot'
       ) {
         throw new Error('Prepared durable asset has an invalid media source.');
       }
@@ -116,43 +146,65 @@ async function restorePreparedAssetsInTransaction(
           ? source.recordingId
           : source.kind === 'project-export'
             ? source.exportId
-            : source.projectAssetId;
-      const durableCompensation: AssetOperationCompensation = {
-        assetId: prepared.preparedAssetPublication.asset.ref.assetId,
-        journalId: prepared.preparedAssetPublication.journalId,
-        nextMediaId: prepared.nextEntry.id,
-        nextOwnerId,
-        ...(source.kind === 'project-asset'
-          ? {
-              nextProjectAssetId: source.projectAssetId,
-              ownerKind: PROJECT_ASSET_OWNER_KIND,
-              ownerRole: PROJECT_MEDIA_ASSET_ROLE,
-            }
-          : {}),
-        ...(source.kind === 'project-export' ? { nextProjectExportId: source.exportId } : {}),
-        ...(source.kind === 'project-export'
-          ? { ownerKind: PROJECT_EXPORT_OWNER_KIND, ownerRole: PROJECT_MEDIA_ASSET_ROLE }
-          : {}),
-        previousRecords: replacedSnapshot
-          ? {
-              assetOwnerEntry: replacedSnapshot.assetOwnerEntry,
-              assetRefEntry: replacedSnapshot.assetRefEntry,
-              mediaLibraryEntry: replacedSnapshot.mediaLibraryEntry,
-              projectAssetEntry: replacedSnapshot.projectAssetEntry,
-              projectExportEntry: replacedSnapshot.projectExportEntry,
-              recordingEntry: replacedSnapshot.recordingEntry,
-              recordingTelemetryEntry: replacedSnapshot.recordingTelemetryEntry,
-              thumbnailEntry: replacedSnapshot.thumbnailEntry,
-            }
-          : {},
-      };
-      const obsoleteRef = parseAssetRef(replacedSnapshot?.assetRefEntry);
+            : source.kind === 'project-asset'
+              ? source.projectAssetId
+              : source.snapshotId;
+      const preparedObjects = [
+        prepared.preparedAssetPublication.asset,
+        ...(prepared.preparedAssetPublication.additionalAssets ?? []),
+      ];
+      const previousRecords = replacedSnapshot
+        ? {
+            assetOwnerEntries: replacedSnapshot.assetOwnerEntries,
+            assetOwnerEntry: replacedSnapshot.assetOwnerEntry,
+            assetRefEntries: replacedSnapshot.assetRefEntries,
+            assetRefEntry: replacedSnapshot.assetRefEntry,
+            mediaLibraryEntry: replacedSnapshot.mediaLibraryEntry,
+            projectAssetEntry: replacedSnapshot.projectAssetEntry,
+            projectExportEntry: replacedSnapshot.projectExportEntry,
+            recordingEntry: replacedSnapshot.recordingEntry,
+            recordingTelemetryEntry: replacedSnapshot.recordingTelemetryEntry,
+            thumbnailEntry: replacedSnapshot.thumbnailEntry,
+            webSnapshotEntry: replacedSnapshot.webSnapshotEntry,
+          }
+        : {};
+      const durableCompensations: AssetOperationCompensation[] = preparedObjects.map(
+        (preparedObject, index) => ({
+          assetId: preparedObject.ref.assetId,
+          journalId: prepared.preparedAssetPublication!.journalId,
+          nextMediaId: prepared.nextEntry.id,
+          nextOwnerId,
+          ...(source.kind === 'project-asset'
+            ? {
+                nextProjectAssetId: source.projectAssetId,
+                ownerKind: PROJECT_ASSET_OWNER_KIND,
+                ownerRole: PROJECT_MEDIA_ASSET_ROLE,
+              }
+            : {}),
+          ...(source.kind === 'project-export'
+            ? {
+                nextProjectExportId: source.exportId,
+                ownerKind: PROJECT_EXPORT_OWNER_KIND,
+                ownerRole: PROJECT_MEDIA_ASSET_ROLE,
+              }
+            : {}),
+          ...(source.kind === 'web-snapshot'
+            ? {
+                nextWebSnapshotId: source.snapshotId,
+                ownerKind: WEB_SNAPSHOT_OWNER_KIND,
+                ownerRole: index === 0 ? WEB_SNAPSHOT_PACKAGE_ROLE : WEB_SNAPSHOT_SCREENSHOT_ROLE,
+              }
+            : {}),
+          previousRecords,
+        })
+      );
       await getBackupStore(tx, ASSET_OPERATIONS_STORE).put({
         ...operation,
-        compensations: [...operation.compensations, durableCompensation],
-        obsoleteAssetIds: obsoleteRef
-          ? [...operation.obsoleteAssetIds, obsoleteRef.assetId]
-          : operation.obsoleteAssetIds,
+        compensations: [...operation.compensations, ...durableCompensations],
+        obsoleteAssetIds: [
+          ...operation.obsoleteAssetIds,
+          ...obsoleteRefs.map((ref) => ref.assetId),
+        ],
         updatedAt: Date.now(),
       });
     }
@@ -196,6 +248,7 @@ async function restorePreparedAssetsInBatches(args: {
   importedAssetCompensations: ImportedAssetCompensation[];
   operationId?: string;
   strategy: MediaHubImportConflictStrategy;
+  transitionPermit: PersistenceMutationTransitionPermit;
   zip: JSZip;
 }): Promise<number> {
   let imported = 0;
@@ -205,6 +258,7 @@ async function restorePreparedAssetsInBatches(args: {
     const preparedAssets = await loadBackupImportAssetBatch({
       ...(args.operationId ? { operationId: args.operationId } : {}),
       preparedAssets: batchPlans,
+      transitionPermit: args.transitionPermit,
       zip: args.zip,
     });
     const restored = await runWithIndexedDbMutation(async (db) => {
@@ -248,6 +302,7 @@ async function cleanupProjectMediaAssets(
 
 export async function restorePreparedImportPlan(args: {
   assetOperationPermit: DurableAssetOperationPermit;
+  transitionPermit: PersistenceMutationTransitionPermit;
   assetPlans: BackupImportAssetPlan[];
   preparedProjectDomains: PreparedProjectDomains;
   strategy: MediaHubImportConflictStrategy;
@@ -264,7 +319,8 @@ export async function restorePreparedImportPlan(args: {
       (plan) =>
         plan.nextEntry.source.kind === 'recording' ||
         plan.nextEntry.source.kind === 'project-export' ||
-        plan.nextEntry.source.kind === 'project-asset'
+        plan.nextEntry.source.kind === 'project-asset' ||
+        plan.nextEntry.source.kind === 'web-snapshot'
     ) ||
     args.preparedProjectDomains.videoProjects.some(
       (project) =>
@@ -273,16 +329,24 @@ export async function restorePreparedImportPlan(args: {
     args.preparedProjectDomains.scenarioProjects.some(
       (project) => project.descriptor.assets.length > 0
     );
-  if (needsAssetOperation) await recoverAssetPublications(args.assetOperationPermit);
+  if (needsAssetOperation) {
+    await recoverAssetPublications(args.assetOperationPermit, args.transitionPermit);
+  }
   const operation = needsAssetOperation ? await createBackupRestoreOperation() : null;
   const importedAssetCompensations: ImportedAssetCompensation[] = [];
   try {
-    await stagePreparedProjectAssets(args.preparedProjectDomains, args.zip, operation?.operationId);
+    await stagePreparedProjectAssets(
+      args.preparedProjectDomains,
+      args.zip,
+      operation?.operationId,
+      args.transitionPermit
+    );
     const importedAssets = await restorePreparedAssetsInBatches({
       assetPlans: args.assetPlans,
       importedAssetCompensations,
       ...(operation ? { operationId: operation.operationId } : {}),
       strategy: args.strategy,
+      transitionPermit: args.transitionPermit,
       zip: args.zip,
     });
     const importedProjects = await commitPreparedProjectDomains({
@@ -297,11 +361,16 @@ export async function restorePreparedImportPlan(args: {
         const prepared = compensation.preparedAssetPublication;
         if (!prepared) continue;
         await deleteReadyJournal(prepared.journalId).catch(() => undefined);
-        await releaseAssetReadyProtection([prepared.asset.ref.assetId]);
+        await releaseAssetReadyProtection([
+          prepared.asset.ref.assetId,
+          ...(prepared.additionalAssets ?? []).map(({ ref }) => ref.assetId),
+        ]);
       }
       await cleanupProjectMediaAssets(args.preparedProjectDomains, false).catch(() => undefined);
     });
-    await recoverAssetPublications(args.assetOperationPermit).catch(() => undefined);
+    await recoverAssetPublications(args.assetOperationPermit, args.transitionPermit).catch(
+      () => undefined
+    );
     return importedAssets + importedProjects;
   } catch (error) {
     if (operation) {
@@ -316,7 +385,9 @@ export async function restorePreparedImportPlan(args: {
       }
     }
     const cleanupResults = await Promise.allSettled([
-      ...(operation ? [recoverAssetPublications(args.assetOperationPermit)] : []),
+      ...(operation
+        ? [recoverAssetPublications(args.assetOperationPermit, args.transitionPermit)]
+        : []),
       cleanupImportedNonOperationAssets(importedAssetCompensations),
       ...(operation ? [] : [cleanupProjectMediaAssets(args.preparedProjectDomains, true)]),
     ]);

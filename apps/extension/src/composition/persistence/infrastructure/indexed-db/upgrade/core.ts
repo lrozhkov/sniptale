@@ -21,6 +21,7 @@ import { applyRecordingAssetsV26Upgrade } from './core.recording-assets.ts';
 import { applyProjectMediaV27Upgrade } from './core.project-media.ts';
 import { applyScenarioAssetsV28Upgrade } from './core.scenario-assets.ts';
 import { applyEditorDocumentsV29Upgrade } from './core.editor-documents.ts';
+import { applyWebSnapshotsV30Upgrade } from './core.web-snapshots.ts';
 import { applyStateManagerStoreUpgrade } from './core.state-manager.ts';
 import { applyEditorCustomShapesStoreUpgrade } from './core.editor-custom-shapes.ts';
 import { applyVideoEffectBundlesStoreUpgrade } from './core.video-effect-bundles.ts';
@@ -53,13 +54,14 @@ export function handleDatabaseUpgrade(
   applyFrameAnnotationRasterJobsStoreUpgrade(db, oldVersion);
   applyVersion24Changes(db, oldVersion);
   applyVersion25Changes(db, oldVersion);
-  if (oldVersion > 0 && oldVersion < 29 && !transaction) {
+  if (oldVersion > 0 && oldVersion < 30 && !transaction) {
     throw new Error('Durable asset upgrade transaction is unavailable.');
   }
   const durableAssetUpgrade = applyRecordingAssetsV26Upgrade(db, oldVersion, transaction)
     .then(() => applyProjectMediaV27Upgrade(oldVersion, transaction))
     .then(() => applyScenarioAssetsV28Upgrade(oldVersion, transaction))
-    .then(() => applyEditorDocumentsV29Upgrade(oldVersion, transaction));
+    .then(() => applyEditorDocumentsV29Upgrade(oldVersion, transaction))
+    .then(() => applyWebSnapshotsV30Upgrade(oldVersion, transaction));
   const upgradeCompletion = transaction
     ? durableAssetUpgrade.catch(() => transaction.abort())
     : durableAssetUpgrade;

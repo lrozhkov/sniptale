@@ -221,6 +221,83 @@ it('restores a replaced project asset and thumbnail after a later restore batch 
   expect(mocks.deleteJournal).toHaveBeenCalledWith('journal-project-asset');
 });
 
+it('restores both previous web snapshot assets after a crashed restore root', async () => {
+  const previousWebSnapshot = {
+    createdAt: 1,
+    id: 'snapshot-1',
+    manifest: {},
+    packageAssetId: 'package-old',
+    screenshotAssetId: 'screenshot-old',
+    screenshotMimeType: 'image/png',
+    screenshotSize: 4,
+    size: 5,
+    updatedAt: 1,
+  };
+  const previousMedia = { id: 'snapshot-1', filename: 'old.zip' };
+  const previousThumbnail = { assetId: 'snapshot-1', blob: new Blob(['old']) };
+  const previousRefs = [createRef('package-old'), createRef('screenshot-old')];
+  const previousOwners = [
+    {
+      assetId: 'package-old',
+      ownerId: 'snapshot-1',
+      ownerKind: 'web-snapshot',
+      role: 'package',
+    },
+    {
+      assetId: 'screenshot-old',
+      ownerId: 'snapshot-1',
+      ownerKind: 'web-snapshot',
+      role: 'screenshot',
+    },
+  ];
+  const previousRecords = {
+    assetOwnerEntries: previousOwners,
+    assetRefEntries: previousRefs,
+    mediaLibraryEntry: previousMedia,
+    thumbnailEntry: previousThumbnail,
+    webSnapshotEntry: previousWebSnapshot,
+  };
+  const operation: AssetOperation = {
+    compensations: [
+      createWebSnapshotCompensation('package-new', 'package', previousRecords),
+      createWebSnapshotCompensation('screenshot-new', 'screenshot', previousRecords),
+    ],
+    createdAt: 1,
+    kind: 'backup-restore',
+    obsoleteAssetIds: ['package-old', 'screenshot-old'],
+    operationId: 'restore-web-snapshot',
+    status: 'pending',
+    updatedAt: 1,
+  };
+  const harness = createDbHarness([operation]);
+  harness.put('web_snapshots', 'snapshot-1', {
+    ...previousWebSnapshot,
+    packageAssetId: 'package-new',
+    screenshotAssetId: 'screenshot-new',
+  });
+  harness.put('asset_refs', 'package-new', createRef('package-new'));
+  harness.put('asset_refs', 'screenshot-new', createRef('screenshot-new'));
+  harness.put('asset_owners', ['web-snapshot', 'snapshot-1', 'package'], {
+    ...previousOwners[0],
+    assetId: 'package-new',
+  });
+  harness.put('asset_owners', ['web-snapshot', 'snapshot-1', 'screenshot'], {
+    ...previousOwners[1],
+    assetId: 'screenshot-new',
+  });
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+
+  await recoverAssetPublications();
+
+  expect(harness.get('web_snapshots', 'snapshot-1')).toEqual(previousWebSnapshot);
+  expect(harness.get('asset_refs', 'package-old')).toEqual(previousRefs[0]);
+  expect(harness.get('asset_refs', 'screenshot-old')).toEqual(previousRefs[1]);
+  expect(harness.get('asset_refs', 'package-new')).toBeUndefined();
+  expect(harness.get('asset_refs', 'screenshot-new')).toBeUndefined();
+  expect(mocks.deleteObject).toHaveBeenCalledWith('package-new');
+  expect(mocks.deleteObject).toHaveBeenCalledWith('screenshot-new');
+});
+
 it('finishes journals and obsolete objects for a committed restore', async () => {
   const operation: AssetOperation = {
     compensations: [],
@@ -289,5 +366,33 @@ function createDbHarness(operations: Array<AssetOperation | PhysicalDeleteAssetO
     db,
     get: (storeName: string, entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
     put,
+  };
+}
+
+function createRef(assetId: string) {
+  return {
+    assetId,
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+    mimeType: 'application/octet-stream',
+    sha256: null,
+    size: 3,
+  };
+}
+
+function createWebSnapshotCompensation(
+  assetId: string,
+  ownerRole: string,
+  previousRecords: Record<string, unknown>
+): AssetOperation['compensations'][number] {
+  return {
+    assetId,
+    journalId: 'journal-web-snapshot',
+    nextMediaId: 'snapshot-1',
+    nextOwnerId: 'snapshot-1',
+    nextWebSnapshotId: 'snapshot-1',
+    ownerKind: 'web-snapshot',
+    ownerRole,
+    previousRecords,
   };
 }

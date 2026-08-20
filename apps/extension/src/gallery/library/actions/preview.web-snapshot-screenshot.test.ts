@@ -6,13 +6,11 @@ import { createController, createMediaItem, runBusyAction } from './test-support
 
 const {
   browserTabsCreateMock,
-  getMediaAssetBlobMock,
-  loadWebSnapshotScreenshotBlobMock,
+  getWebSnapshotScreenshotFileMock,
   persistPendingEditorBootstrapPayloadMock,
 } = vi.hoisted(() => ({
   browserTabsCreateMock: vi.fn(),
-  getMediaAssetBlobMock: vi.fn(),
-  loadWebSnapshotScreenshotBlobMock: vi.fn(),
+  getWebSnapshotScreenshotFileMock: vi.fn(),
   persistPendingEditorBootstrapPayloadMock: vi.fn(),
 }));
 
@@ -20,11 +18,9 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { create: browserTabsCreateMock },
 }));
 
-vi.mock('../../../composition/persistence/media-library/index.library.ts', async () => ({
-  ...(await vi.importActual<
-    typeof import('../../../composition/persistence/media-library/index.library.ts')
-  >('../../../composition/persistence/media-library/index.library.ts')),
-  getMediaAssetBlob: getMediaAssetBlobMock,
+vi.mock('../../../composition/persistence/web-snapshots', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/web-snapshots')>()),
+  getWebSnapshotScreenshotFile: getWebSnapshotScreenshotFileMock,
 }));
 
 vi.mock('../../../workflows/editor/bootstrap/index', async (importOriginal) => ({
@@ -43,10 +39,6 @@ vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
   ),
 }));
 
-vi.mock('../../web-snapshot/package', () => ({
-  loadWebSnapshotScreenshotBlob: loadWebSnapshotScreenshotBlobMock,
-}));
-
 beforeEach(() => {
   vi.clearAllMocks();
   persistPendingEditorBootstrapPayloadMock.mockResolvedValue('bootstrap-1');
@@ -57,8 +49,7 @@ afterEach(() => {
 });
 
 it('opens web snapshot screenshots in the image editor', async () => {
-  const packageBlob = new Blob(['zip'], { type: 'application/zip' });
-  const screenshotBlob = new Blob(['png'], { type: 'image/png' });
+  const screenshotBlob = new File(['png'], 'screenshot.png', { type: 'image/png' });
   const previewItem = createMediaItem({
     entityId: 'snapshot-1',
     filename: 'snapshot.zip',
@@ -69,12 +60,11 @@ it('opens web snapshot screenshots in the image editor', async () => {
   });
   const { controller } = createController({ previewItem });
 
-  getMediaAssetBlobMock.mockResolvedValue(packageBlob);
-  loadWebSnapshotScreenshotBlobMock.mockResolvedValue(screenshotBlob);
+  getWebSnapshotScreenshotFileMock.mockResolvedValue(screenshotBlob);
 
   await openSnapshotScreenshotInEditor(controller, runBusyAction);
 
-  expect(loadWebSnapshotScreenshotBlobMock).toHaveBeenCalledWith(packageBlob);
+  expect(getWebSnapshotScreenshotFileMock).toHaveBeenCalledWith('snapshot-1');
   expect(persistPendingEditorBootstrapPayloadMock).toHaveBeenCalledWith(
     expect.objectContaining({
       sourceFaviconUrl: null,
@@ -92,7 +82,7 @@ it('ignores non-web-snapshot preview items and reports missing packages', async 
   const { controller: imageController } = createController({ previewItem: image });
 
   await openSnapshotScreenshotInEditor(imageController, runBusyAction);
-  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+  expect(getWebSnapshotScreenshotFileMock).not.toHaveBeenCalled();
 
   const snapshot = createMediaItem({
     id: 'asset-web',
@@ -103,14 +93,13 @@ it('ignores non-web-snapshot preview items and reports missing packages', async 
   const runBusy = vi.fn(async (task: () => Promise<void>) => {
     await expect(task()).rejects.toThrow(snapshot.filename);
   });
-  getMediaAssetBlobMock.mockResolvedValue(null);
+  getWebSnapshotScreenshotFileMock.mockResolvedValue(null);
 
   await openSnapshotScreenshotInEditor(snapshotController, runBusy);
 });
 
 it('uses snapshot fallback metadata when opening the screenshot editor', async () => {
-  const packageBlob = new Blob(['zip'], { type: 'application/zip' });
-  const screenshotBlob = new Blob(['png'], { type: 'image/png' });
+  const screenshotBlob = new File(['png'], 'screenshot.png', { type: 'image/png' });
   const previewItem = createMediaItem({
     filename: 'fallback.zip',
     id: 'snapshot-asset-1',
@@ -121,12 +110,11 @@ it('uses snapshot fallback metadata when opening the screenshot editor', async (
   });
   const { controller } = createController({ previewItem });
 
-  getMediaAssetBlobMock.mockResolvedValue(packageBlob);
-  loadWebSnapshotScreenshotBlobMock.mockResolvedValue(screenshotBlob);
+  getWebSnapshotScreenshotFileMock.mockResolvedValue(screenshotBlob);
 
   await openSnapshotScreenshotInEditor(controller, runBusyAction);
 
-  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('snapshot-asset-1');
+  expect(getWebSnapshotScreenshotFileMock).toHaveBeenCalledWith('snapshot-asset-1');
   expect(persistPendingEditorBootstrapPayloadMock).toHaveBeenCalledWith(
     expect.objectContaining({ title: 'fallback.zip', url: '' })
   );
@@ -153,8 +141,7 @@ it('surfaces screenshot read errors through the busy action', async () => {
   });
 
   vi.stubGlobal('FileReader', ErroringFileReader);
-  getMediaAssetBlobMock.mockResolvedValue(new Blob(['zip']));
-  loadWebSnapshotScreenshotBlobMock.mockResolvedValue(new Blob(['png']));
+  getWebSnapshotScreenshotFileMock.mockResolvedValue(new File(['png'], 'screenshot.png'));
 
   await openSnapshotScreenshotInEditor(controller, runBusy);
 });

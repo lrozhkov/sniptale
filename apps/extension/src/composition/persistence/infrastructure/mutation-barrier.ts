@@ -8,6 +8,7 @@ const DURABLE_ASSET_OPERATION_LOCK_NAME = `${PERSISTENCE_LOCK_NAME}:durable-asse
 type PersistenceLockMode = 'exclusive' | 'shared';
 
 const persistenceMutationPermitBrand = Symbol('persistenceMutationPermit');
+const persistenceMutationTransitionPermitBrand = Symbol('persistenceMutationTransitionPermit');
 const durableAssetOperationPermitBrand = Symbol('durableAssetOperationPermit');
 
 export interface PersistenceMutationPermit {
@@ -16,6 +17,20 @@ export interface PersistenceMutationPermit {
 
 export interface DurableAssetOperationPermit {
   readonly [durableAssetOperationPermitBrand]: true;
+}
+
+export interface PersistenceMutationTransitionPermit {
+  readonly [persistenceMutationTransitionPermitBrand]: true;
+}
+
+export function isActivePersistenceMutationTransitionPermit(
+  value: unknown
+): value is PersistenceMutationTransitionPermit {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    activePersistenceMutationTransitionPermits.has(value)
+  );
 }
 
 export interface PersistenceMutationTransitionLease {
@@ -33,6 +48,7 @@ export interface PersistenceLockManager {
 let lockManagerForTests: PersistenceLockManager | null = null;
 const fallbackQueues = new Map<string, Promise<void>>();
 const activePersistenceMutationPermits = new WeakSet<object>();
+const activePersistenceMutationTransitionPermits = new WeakSet<object>();
 const activeDurableAssetOperationPermits = new WeakSet<object>();
 
 const fallbackLockManager: PersistenceLockManager = {
@@ -119,13 +135,33 @@ export function runWithExclusivePersistenceMutationPermit<T>(
  * continuation cannot survive an MV3 worker restart and publish data after verified erasure.
  */
 export function runWithPersistenceMutationTransition<T>(
-  operation: () => T | Promise<T>
+  operation: (permit: PersistenceMutationTransitionPermit) => T | Promise<T>
 ): Promise<T> {
   return getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
-    operation
+    async () => {
+      const permit: PersistenceMutationTransitionPermit = {
+        [persistenceMutationTransitionPermitBrand]: true,
+      };
+      activePersistenceMutationTransitionPermits.add(permit);
+      try {
+        return await operation(permit);
+      } finally {
+        activePersistenceMutationTransitionPermits.delete(permit);
+      }
+    }
   );
+}
+
+export function runWithPersistenceMutationTransitionRecovery<T>(
+  permit: PersistenceMutationTransitionPermit | undefined,
+  operation: () => T | Promise<T>
+): Promise<T> {
+  if (permit && activePersistenceMutationTransitionPermits.has(permit)) {
+    return Promise.resolve().then(operation);
+  }
+  return runWithPersistenceMutationTransition(operation);
 }
 
 export async function acquirePersistenceMutationTransition(): Promise<PersistenceMutationTransitionLease> {

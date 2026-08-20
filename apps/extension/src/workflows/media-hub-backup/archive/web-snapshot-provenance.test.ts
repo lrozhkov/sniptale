@@ -2,8 +2,15 @@ import JSZip from 'jszip';
 import { expect, it, vi } from 'vitest';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
-import type { WebSnapshotRecord } from '../../../composition/persistence/web-snapshots/contracts';
+import type { StoredWebSnapshotRecord } from '../../../composition/persistence/web-snapshots/contracts';
 import { createWebSnapshotManifest } from '../../../features/web-snapshot/manifest';
+
+const mocks = vi.hoisted(() => ({ readAssetFile: vi.fn() }));
+
+vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/assets')>()),
+  readAssetFile: mocks.readAssetFile,
+}));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -123,17 +130,23 @@ it('aligns web snapshot backup metadata size with the archived rewritten package
   expect(assets[0]?.entry.size).toBe(archivedBlob?.size);
 });
 
-async function createSnapshot(manifest: WebSnapshotManifest): Promise<WebSnapshotRecord> {
+async function createSnapshot(manifest: WebSnapshotManifest): Promise<StoredWebSnapshotRecord> {
   const zip = new JSZip();
   zip.file('manifest.json', JSON.stringify(manifest));
   zip.file('snapshot.html', '<main></main>');
   const packageBlob = await zip.generateAsync({ type: 'blob' });
 
+  mocks.readAssetFile.mockResolvedValue(
+    new File([packageBlob], 'snapshot.zip', { type: packageBlob.type })
+  );
   return {
     createdAt: 10,
     id: 'snapshot-1',
     manifest,
-    packageBlob,
+    packageAssetId: 'snapshot-package-asset',
+    screenshotAssetId: 'snapshot-screenshot-asset',
+    screenshotMimeType: 'image/png',
+    screenshotSize: 3,
     size: packageBlob.size,
     updatedAt: 20,
   };
@@ -172,10 +185,21 @@ function createWebSnapshotEntry(manifest: WebSnapshotManifest): MediaLibraryEntr
   };
 }
 
-function createDb(snapshot: WebSnapshotRecord) {
+function createDb(snapshot: StoredWebSnapshotRecord) {
   return {
-    get: vi.fn(async (storeName: string, key: string) =>
-      storeName === 'web_snapshots' && key === 'snapshot-1' ? snapshot : undefined
-    ),
+    get: vi.fn(async (storeName: string, key: string) => {
+      if (storeName === 'web_snapshots' && key === 'snapshot-1') return snapshot;
+      if (storeName === 'asset_refs' && key === snapshot.packageAssetId) {
+        return {
+          assetId: snapshot.packageAssetId,
+          createdAt: snapshot.createdAt,
+          location: { kind: 'opfs', objectKey: `objects/${snapshot.packageAssetId}` },
+          mimeType: 'application/x-sniptale-web-snapshot+zip',
+          sha256: null,
+          size: snapshot.size,
+        };
+      }
+      return undefined;
+    }),
   };
 }

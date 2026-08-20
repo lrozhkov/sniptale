@@ -1,13 +1,16 @@
 import { getMediaLibraryEntry } from '../../../../composition/persistence/media-library/index';
 import type { MediaLibraryEntry } from '../../../../composition/persistence/media-library/contracts';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import type { WebSnapshotRecord } from '../../../../composition/persistence/web-snapshots/contracts';
 import { translate } from '../../../../platform/i18n';
 import {
   type MediaHubBackupMetadata,
   type MediaHubImportConflictStrategy,
 } from '../../contracts/types';
-import { createBackupWebSnapshotRecord } from '../web-snapshot';
+import {
+  createBackupWebSnapshotRecord,
+  readBackupWebSnapshotScreenshot,
+  type PreparedBackupWebSnapshotRecord,
+} from '../web-snapshot';
 import { MAX_BACKUP_ENTRY_BYTES } from '../../manifest';
 import type { ImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
@@ -16,6 +19,7 @@ import type { BackupArchiveReader } from '../archive-reader';
 import {
   createAssetPublicationJournal,
   discardPreparedAsset,
+  writeBlobToAsset,
   type PreparedAssetObject,
 } from '../../../../composition/persistence/assets';
 import { RECORDING_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/recordings/asset-publication';
@@ -24,9 +28,12 @@ import {
   PROJECT_EXPORT_PUBLICATION_DOMAIN,
 } from '../../../../composition/persistence/projects/asset-publication';
 import { writeBackupArchiveEntryToAsset } from '../asset-stream';
+import { WEB_SNAPSHOT_PUBLICATION_DOMAIN } from '../../../../composition/persistence/web-snapshots/publication';
+import type { PersistenceMutationTransitionPermit } from '../../../../composition/persistence/infrastructure/mutation-barrier';
 
 export interface PreparedRestoreRecordingAsset {
   asset: PreparedAssetObject;
+  additionalAssets?: PreparedAssetObject[];
   journalId: string;
 }
 
@@ -38,7 +45,7 @@ export interface PreparedBackupImportAsset {
   recordingTelemetry: RecordingTelemetryEntry | null;
   thumbnailPath: string | null;
   thumbnailBlob: Blob | null;
-  webSnapshotRecord: WebSnapshotRecord | null;
+  webSnapshotRecord: PreparedBackupWebSnapshotRecord | null;
   workspace?: ImageWorkspaceEntry | null;
   presentation?: AggregatePresentationEntry | null;
   preparedAssetPublication?: PreparedRestoreRecordingAsset;
@@ -190,7 +197,7 @@ async function loadThumbnailBlob(args: {
 async function createWebSnapshotRecordFromPlan(
   prepared: BackupImportAssetPlan,
   assetBlob: Blob
-): Promise<WebSnapshotRecord | null> {
+): Promise<PreparedBackupWebSnapshotRecord | null> {
   if (!prepared.webSnapshotPackage) {
     return null;
   }
@@ -204,6 +211,7 @@ async function createWebSnapshotRecordFromPlan(
 export async function loadBackupImportAssetBatch(args: {
   operationId?: string;
   preparedAssets: BackupImportAssetPlan[];
+  transitionPermit?: PersistenceMutationTransitionPermit;
   zip: BackupArchiveReader;
 }): Promise<PreparedBackupImportAsset[]> {
   return Promise.all(args.preparedAssets.map((prepared) => loadBackupImportAsset(prepared, args)));
@@ -211,10 +219,14 @@ export async function loadBackupImportAssetBatch(args: {
 
 async function loadBackupImportAsset(
   prepared: BackupImportAssetPlan,
-  args: { operationId?: string; zip: BackupArchiveReader }
+  args: {
+    operationId?: string;
+    transitionPermit?: PersistenceMutationTransitionPermit;
+    zip: BackupArchiveReader;
+  }
 ): Promise<PreparedBackupImportAsset> {
-  const preparedAssetPublication = await stageDurableBackupAsset(prepared, args);
-  const assetBlob = preparedAssetPublication
+  let preparedAssetPublication = await stageDurableBackupAsset(prepared, args);
+  let assetBlob = preparedAssetPublication
     ? null
     : await loadRequiredArchiveBlob({
         assetPath: prepared.assetPath,
@@ -225,6 +237,15 @@ async function loadBackupImportAsset(
   const webSnapshotRecord = assetBlob
     ? await createWebSnapshotRecordFromPlan(prepared, assetBlob)
     : null;
+  if (webSnapshotRecord) {
+    if (!args.operationId) throw new Error('Web snapshot restore operation ID is missing.');
+    preparedAssetPublication = await stageBackupWebSnapshotAssets(
+      webSnapshotRecord,
+      args.operationId,
+      args.transitionPermit
+    );
+    assetBlob = null;
+  }
   const presentation = await materializeAggregatePresentation({
     descriptor: prepared.presentationDescriptor,
     ref: { id: prepared.nextEntry.id, kind: 'image' },
@@ -243,9 +264,67 @@ async function loadBackupImportAsset(
   };
 }
 
+async function stageBackupWebSnapshotAssets(
+  record: PreparedBackupWebSnapshotRecord,
+  operationId: string,
+  transitionPermit?: PersistenceMutationTransitionPermit
+): Promise<PreparedRestoreRecordingAsset> {
+  const screenshot = await readBackupWebSnapshotScreenshot(record);
+  const results = await Promise.allSettled([
+    writeBlobToAsset(
+      record.packageBlob,
+      transitionPermit ? { persistenceTransitionPermit: transitionPermit } : {}
+    ),
+    writeBlobToAsset(
+      screenshot,
+      transitionPermit ? { persistenceTransitionPermit: transitionPermit } : {}
+    ),
+  ]);
+  const assets = results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+  const failures = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+  if (failures.length > 0) {
+    const cleanup = await Promise.allSettled(
+      assets.map(({ ref }) => discardPreparedAsset(ref.assetId))
+    );
+    const cleanupFailures = cleanup.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+    throw new AggregateError(
+      [...failures, ...cleanupFailures],
+      'Web snapshot restore staging failed.'
+    );
+  }
+  const [packageAsset, screenshotAsset] = assets as [PreparedAssetObject, PreparedAssetObject];
+  const journal = await createAssetPublicationJournal({
+    assetRefs: [packageAsset.ref, screenshotAsset.ref],
+    domain: WEB_SNAPSHOT_PUBLICATION_DOMAIN,
+    operationId,
+    payload: { restore: true, snapshotId: record.id },
+  }).catch(async (error: unknown) => {
+    const cleanup = await Promise.allSettled(
+      assets.map(({ ref }) => discardPreparedAsset(ref.assetId))
+    );
+    const cleanupFailures = cleanup.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+    throw cleanupFailures.length > 0
+      ? new AggregateError([error, ...cleanupFailures], 'Web snapshot journal cleanup failed.', {
+          cause: error,
+        })
+      : error;
+  });
+  return { additionalAssets: [screenshotAsset], asset: packageAsset, journalId: journal.journalId };
+}
+
 async function stageDurableBackupAsset(
   prepared: BackupImportAssetPlan,
-  args: { operationId?: string; zip: BackupArchiveReader }
+  args: {
+    operationId?: string;
+    transitionPermit?: PersistenceMutationTransitionPermit;
+    zip: BackupArchiveReader;
+  }
 ): Promise<PreparedRestoreRecordingAsset | undefined> {
   const source = prepared.nextEntry.source;
   if (
@@ -261,6 +340,7 @@ async function stageDurableBackupAsset(
     expectedSize: prepared.nextEntry.size,
     mimeType: prepared.nextEntry.mimeType,
     path: prepared.assetPath,
+    ...(args.transitionPermit ? { transitionPermit: args.transitionPermit } : {}),
     zip: args.zip,
   });
   const domain =

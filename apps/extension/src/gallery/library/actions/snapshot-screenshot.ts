@@ -1,10 +1,9 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
+import { getWebSnapshotScreenshotFile } from '../../../composition/persistence/web-snapshots';
 import { persistPendingEditorBootstrapPayload } from '../../../workflows/editor/bootstrap/index';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import type { GalleryPreviewController } from './controller-types';
 import { isGalleryMediaItem } from '../items';
-import { loadWebSnapshotScreenshotBlob } from '../../web-snapshot/package';
 import { createMissingBlobError, type GalleryBusyAction } from './shared';
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -26,12 +25,12 @@ export async function openSnapshotScreenshotInEditor(
   }
 
   await withBusy(async () => {
-    const packageBlob = await getMediaAssetBlob(previewItem.entityId ?? previewItem.id);
-    if (!packageBlob) {
+    const screenshotBlob = await getWebSnapshotScreenshotFile(
+      previewItem.entityId ?? previewItem.id
+    );
+    if (!screenshotBlob) {
       throw createMissingBlobError(previewItem.filename);
     }
-
-    const screenshotBlob = await loadWebSnapshotScreenshotBlob(packageBlob);
     const bootstrapId = await persistPendingEditorBootstrapPayload({
       dataUrl: await blobToDataUrl(screenshotBlob),
       sourceFaviconUrl: previewItem.sourceFavicon,

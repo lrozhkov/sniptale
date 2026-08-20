@@ -6,7 +6,7 @@ import type {
   MediaThumbnailEntry,
   SaveWebSnapshotMediaAssetInput,
 } from '../media-library/contracts';
-import type { WebSnapshotRecord } from './contracts';
+import type { StoredWebSnapshotRecord } from './contracts';
 
 export async function createWebSnapshotThumbnailEntry(args: {
   assetId: string;
@@ -30,7 +30,7 @@ export async function createWebSnapshotMediaEntry(args: {
   assetId: string;
   input: SaveWebSnapshotMediaAssetInput;
   now: number;
-  snapshot: WebSnapshotRecord;
+  snapshot: StoredWebSnapshotRecord;
 }): Promise<MediaLibraryEntry> {
   const dimensions = await measureImageBlob(args.input.screenshotBlob);
 

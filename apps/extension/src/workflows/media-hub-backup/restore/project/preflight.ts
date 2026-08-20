@@ -26,6 +26,7 @@ import {
 import type { PreparedRestoreRecordingAsset } from '../prepare';
 import { SCENARIO_ASSET_PUBLICATION_DOMAIN } from '../../../../composition/persistence/scenario/aggregate-mutations';
 import { writeBackupArchiveEntryToAsset } from '../asset-stream';
+import type { PersistenceMutationTransitionPermit } from '../../../../composition/persistence/infrastructure/mutation-barrier';
 
 function collectProjectBlobDescriptors(
   prepared: PreparedProjectDomains
@@ -95,7 +96,8 @@ export async function assertPreparedProjectBlobsAvailable(
 export async function stagePreparedProjectAssets(
   prepared: PreparedProjectDomains,
   zip: JSZip,
-  operationId?: string
+  operationId?: string,
+  transitionPermit?: PersistenceMutationTransitionPermit
 ): Promise<void> {
   if (!prepared.restoredBlobs) throw new Error('Backup project blob preflight is incomplete.');
   for (const project of prepared.videoProjects) {
@@ -111,6 +113,7 @@ export async function stagePreparedProjectAssets(
         expectedSize: descriptor.entry.size,
         mimeType: descriptor.entry.mimeType,
         path: descriptor.blobPath,
+        ...(transitionPermit ? { transitionPermit } : {}),
         zip,
       });
       const journal = await createAssetPublicationJournal({
@@ -129,6 +132,7 @@ export async function stagePreparedProjectAssets(
         expectedSize: size,
         mimeType,
         path: descriptor.recording.blobPath,
+        ...(transitionPermit ? { transitionPermit } : {}),
         zip,
       });
       const journal = await createAssetPublicationJournal({
@@ -161,6 +165,7 @@ export async function stagePreparedProjectAssets(
         expectedSize: size,
         mimeType,
         path: descriptor.blobPath,
+        ...(transitionPermit ? { transitionPermit } : {}),
         zip,
       });
       const journal = await createAssetPublicationJournal({

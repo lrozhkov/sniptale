@@ -3294,6 +3294,7 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.web-snapshots.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/types.ts",
         "apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts",
         "apps/extension/src/composition/persistence/infrastructure/preference-service/browser-io.ts",
@@ -3334,6 +3335,7 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.state-manager.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.video-effect-bundles.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.web-snapshots.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/types.ts",
         "apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts",
         "apps/extension/src/composition/persistence/infrastructure/preference-service/browser-io.ts",
@@ -3860,6 +3862,8 @@
         "apps/extension/src/composition/persistence/web-snapshots/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/web-snapshots/media-entry.ts",
         "apps/extension/src/composition/persistence/web-snapshots/provenance-state.ts",
+        "apps/extension/src/composition/persistence/web-snapshots/publication.ts",
+        "apps/extension/src/composition/persistence/web-snapshots/read.ts",
         "apps/extension/src/composition/persistence/web-snapshots/records.ts"
       ],
       "rolloutFiles": [
@@ -3870,6 +3874,8 @@
         "apps/extension/src/composition/persistence/web-snapshots/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/web-snapshots/media-entry.ts",
         "apps/extension/src/composition/persistence/web-snapshots/provenance-state.ts",
+        "apps/extension/src/composition/persistence/web-snapshots/publication.ts",
+        "apps/extension/src/composition/persistence/web-snapshots/read.ts",
         "apps/extension/src/composition/persistence/web-snapshots/records.ts"
       ],
       "unownedFocusedFiles": []

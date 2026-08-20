@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../../composition/persistence/media-library/contracts';
-import type { WebSnapshotRecord } from '../../../../composition/persistence/web-snapshots/contracts';
 import { createWebSnapshotManifest } from '../../../../features/web-snapshot/manifest';
+import type { PreparedBackupWebSnapshotRecord } from '../web-snapshot';
 import type { getStore } from '../../storage';
 
 type BackupTransaction = Parameters<typeof getStore>[0];
@@ -31,15 +31,43 @@ it('deletes existing web snapshot records from the snapshot store and shared ind
   expect(harness.stores.get('thumbnails')?.delete).toHaveBeenCalledWith('web-snapshot:snapshot-1');
 });
 
+it('retains shared refs when replacing one web snapshot owner', async () => {
+  const { deleteExistingAssetRecord } = await import('.');
+  const harness = createWriteHarness({
+    ownerCount: 1,
+    webSnapshot: createStoredWebSnapshotRecord(),
+  });
+
+  await deleteExistingAssetRecord(harness.tx, createWebSnapshotMediaEntry());
+
+  expect(harness.stores.get('asset_owners')?.delete).toHaveBeenCalledTimes(2);
+  expect(harness.stores.get('asset_refs')?.delete).not.toHaveBeenCalled();
+});
+
 it('restores web snapshot records only with the required snapshot record', async () => {
   const { writeMainAssetRecord } = await import('.');
   const harness = createWriteHarness();
   const entry = createWebSnapshotMediaEntry();
   const snapshotRecord = createWebSnapshotRecord();
 
-  await writeMainAssetRecord(harness.tx, entry, new Blob(['asset']), null, snapshotRecord);
+  await writeMainAssetRecord(
+    harness.tx,
+    entry,
+    null,
+    null,
+    snapshotRecord,
+    createPreparedPublication()
+  );
 
-  expect(harness.stores.get('web_snapshots')?.put).toHaveBeenCalledWith(snapshotRecord);
+  expect(harness.stores.get('web_snapshots')?.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: 'snapshot-1',
+      packageAssetId: 'package-asset',
+      screenshotAssetId: 'screenshot-asset',
+    })
+  );
+  expect(harness.stores.get('asset_refs')?.put).toHaveBeenCalledTimes(2);
+  expect(harness.stores.get('asset_owners')?.put).toHaveBeenCalledTimes(2);
   expect(harness.stores.get('media_library')?.put).toHaveBeenCalledWith(entry);
 });
 
@@ -56,9 +84,15 @@ it('rejects web snapshot restore without the required snapshot record', async ()
   expect(harness.stores.get('media_library')?.put).not.toHaveBeenCalledWith(entry);
 });
 
-function createWriteHarness() {
+function createWriteHarness(options: { ownerCount?: number; webSnapshot?: unknown } = {}) {
   const stores = new Map(
-    ['media_library', 'thumbnails', 'web_snapshots'].map((name) => [name, createStore()])
+    ['asset_owners', 'asset_refs', 'media_library', 'thumbnails', 'web_snapshots'].map((name) => [
+      name,
+      createStore({
+        getValue: name === 'web_snapshots' ? options.webSnapshot : undefined,
+        ownerCount: options.ownerCount ?? 0,
+      }),
+    ])
   );
   const tx: BackupTransaction = {
     objectStore: (storeName) => {
@@ -79,11 +113,13 @@ function createWriteHarness() {
   return { stores, tx };
 }
 
-function createStore(): BackupObjectStore {
+function createStore(options: { getValue?: unknown; ownerCount?: number } = {}): BackupObjectStore {
   return {
     delete: vi.fn(),
-    get: vi.fn(),
-    index: vi.fn(() => ({ getAll: vi.fn(async () => []) })),
+    get: vi.fn(async () => options.getValue),
+    index: vi.fn(() => ({
+      getAll: vi.fn(async () => Array.from({ length: options.ownerCount ?? 0 }, () => ({}))),
+    })),
     put: vi.fn(),
   };
 }
@@ -109,7 +145,7 @@ function createWebSnapshotMediaEntry(): Omit<MediaLibraryEntry, 'blob'> {
   };
 }
 
-function createWebSnapshotRecord(): WebSnapshotRecord {
+function createWebSnapshotRecord(): PreparedBackupWebSnapshotRecord {
   const packageBlob = new Blob(['zip'], { type: 'application/zip' });
 
   return {
@@ -122,5 +158,47 @@ function createWebSnapshotRecord(): WebSnapshotRecord {
     packageBlob,
     size: packageBlob.size,
     updatedAt: 2,
+  };
+}
+
+function createStoredWebSnapshotRecord() {
+  return {
+    createdAt: 1,
+    id: 'snapshot-1',
+    manifest: createWebSnapshotManifest({
+      id: 'snapshot-1',
+      source: { faviconUrl: null, title: 'Page', url: 'https://example.com' },
+    }),
+    packageAssetId: 'package-old',
+    screenshotAssetId: 'screenshot-old',
+    screenshotMimeType: 'image/png',
+    screenshotSize: 3,
+    size: 3,
+    updatedAt: 2,
+  };
+}
+
+function createPreparedPublication() {
+  const createAsset = (assetId: string, mimeType: string, size: number) => ({
+    ref: {
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      mimeType,
+      sha256: null,
+      size,
+    },
+    writingMarker: {
+      assetId,
+      createdAt: 1,
+      domain: 'backup-restore',
+      markerId: `marker-${assetId}`,
+      objectKey: `objects/${assetId}`,
+    },
+  });
+  return {
+    asset: createAsset('package-asset', 'application/zip', 3),
+    additionalAssets: [createAsset('screenshot-asset', 'image/png', 3)],
+    journalId: 'journal-1',
   };
 }

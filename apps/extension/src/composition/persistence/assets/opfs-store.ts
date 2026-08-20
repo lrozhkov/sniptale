@@ -9,7 +9,9 @@ import type {
 import { parseAssetReadyJournal } from './guards';
 import {
   acquirePersistenceMutationTransition,
+  isActivePersistenceMutationTransitionPermit,
   type PersistenceMutationTransitionLease,
+  type PersistenceMutationTransitionPermit,
 } from '../infrastructure/mutation-barrier';
 
 export const ASSET_ROOT_DIRECTORY_NAME = 'sniptale-assets';
@@ -26,7 +28,7 @@ interface AssetOpfsOptions {
   createId?: () => string;
   getOriginRoot?: () => Promise<FileSystemDirectoryHandle>;
   requestExclusiveLock?: RequestExclusiveAssetLock;
-  persistenceTransition?: 'acquire' | 'already-admitted';
+  persistenceTransitionPermit?: PersistenceMutationTransitionPermit;
 }
 
 type RequestExclusiveAssetLock = (
@@ -192,10 +194,15 @@ async function acquireAssetWriterAdmission(
   assetId: string,
   options: AssetOpfsOptions
 ): Promise<void> {
-  const transitionLease =
-    options.persistenceTransition === 'already-admitted'
-      ? null
-      : await acquirePersistenceMutationTransition();
+  if (
+    options.persistenceTransitionPermit &&
+    !isActivePersistenceMutationTransitionPermit(options.persistenceTransitionPermit)
+  ) {
+    throw new Error('Persistence transition permit is not active.');
+  }
+  const transitionLease = options.persistenceTransitionPermit
+    ? null
+    : await acquirePersistenceMutationTransition();
   try {
     await acquireWriterLock(assetId, options);
     if (!transitionLease) return;

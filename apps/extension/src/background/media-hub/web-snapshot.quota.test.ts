@@ -29,7 +29,8 @@ vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => (
   ensureMediaHubStorageHeadroom: mocks.ensureHeadroom,
 }));
 
-vi.mock('../../features/web-snapshot/provenance', () => ({
+vi.mock('../../features/web-snapshot/provenance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/web-snapshot/provenance')>()),
   sanitizeWebSnapshotManifestProvenance: (manifest: unknown) => manifest,
   sanitizeWebSnapshotPackageProvenance: (packageBlob: Blob, manifest: unknown) => ({
     manifest,

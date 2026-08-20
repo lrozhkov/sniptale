@@ -1,11 +1,18 @@
 import type { AssetPublicationAdapter, AssetReadyJournal } from './contracts';
 import { deleteReadyJournal, listReadyJournals } from './opfs-store';
-import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import {
+  runWithDurableAssetLifecycleLock,
+  runWithPersistenceMutationTransitionRecovery,
+  type PersistenceMutationTransitionPermit,
+} from '../infrastructure/mutation-barrier';
 
 export async function recoverStandaloneAssetPublications(
-  adapters: readonly AssetPublicationAdapter[]
+  adapters: readonly AssetPublicationAdapter[],
+  transitionPermit?: PersistenceMutationTransitionPermit
 ): Promise<number> {
-  return runWithDurableAssetLifecycleLock(() => recoverStandaloneJournals(adapters));
+  return runWithPersistenceMutationTransitionRecovery(transitionPermit, () =>
+    runWithDurableAssetLifecycleLock(() => recoverStandaloneJournals(adapters))
+  );
 }
 
 async function recoverStandaloneJournals(

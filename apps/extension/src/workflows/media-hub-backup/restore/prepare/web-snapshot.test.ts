@@ -8,9 +8,21 @@ import {
 import type { MediaLibraryEntry } from '../../../../composition/persistence/media-library/contracts';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../../features/web-snapshot/manifest';
 import type { BackupArchiveReader } from './index';
+import {
+  runWithPersistenceMutationTransition,
+  runWithPersistentDataErasureBarrier,
+} from '../../../../composition/persistence/infrastructure/mutation-barrier';
 
-const { getMediaLibraryEntryMock } = vi.hoisted(() => ({
+const { createJournalMock, getMediaLibraryEntryMock, writeBlobToAssetMock } = vi.hoisted(() => ({
+  createJournalMock: vi.fn(),
   getMediaLibraryEntryMock: vi.fn(),
+  writeBlobToAssetMock: vi.fn(),
+}));
+
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  createAssetPublicationJournal: createJournalMock,
+  writeBlobToAsset: writeBlobToAssetMock,
 }));
 
 vi.mock('../../../../composition/persistence/media-library/index', async (importOriginal) => ({
@@ -69,6 +81,7 @@ async function createPackageBlob(manifest: unknown, includeManifest = true): Pro
     zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(manifest));
   }
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, '<main></main>');
+  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, 'png');
   return zip.generateAsync({ type: 'blob' });
 }
 
@@ -83,6 +96,12 @@ function createArchiveZip(packageBlob: Blob): BackupArchiveReader {
 beforeEach(() => {
   getMediaLibraryEntryMock.mockReset();
   getMediaLibraryEntryMock.mockResolvedValue(undefined);
+  createJournalMock.mockReset();
+  createJournalMock.mockResolvedValue({ journalId: 'journal-1' });
+  writeBlobToAssetMock.mockReset();
+  writeBlobToAssetMock
+    .mockResolvedValueOnce(createPreparedAsset('package-asset', 'application/zip'))
+    .mockResolvedValueOnce(createPreparedAsset('screenshot-asset', 'image/png'));
 });
 
 it('prepares web snapshot imports with a package record parsed from the nested package manifest', async () => {
@@ -98,6 +117,7 @@ it('prepares web snapshot imports with a package record parsed from the nested p
     zip: createArchiveZip(packageBlob),
   });
   const [loaded] = await loadBackupImportAssetBatch({
+    operationId: 'restore-1',
     preparedAssets: prepared ? [prepared] : [],
     zip: createArchiveZip(packageBlob),
   });
@@ -105,7 +125,7 @@ it('prepares web snapshot imports with a package record parsed from the nested p
   expect(resolvedConflict).toBe(false);
   expect(loaded).toEqual(
     expect.objectContaining({
-      assetBlob: packageBlob,
+      assetBlob: null,
       nextEntry: expect.objectContaining({ id: entry.id }),
       webSnapshotRecord: expect.objectContaining({
         createdAt: 10,
@@ -133,6 +153,7 @@ it('aligns restored web snapshot media size with the rewritten package record', 
     zip: createArchiveZip(packageBlob),
   });
   const [loaded] = await loadBackupImportAssetBatch({
+    operationId: 'restore-1',
     preparedAssets: prepared ? [prepared] : [],
     zip: createArchiveZip(packageBlob),
   });
@@ -142,8 +163,78 @@ it('aligns restored web snapshot media size with the rewritten package record', 
   }
 
   expect(loaded.nextEntry.size).toBe(loaded.webSnapshotRecord.size);
-  expect(loaded.webSnapshotRecord.size).toBe(loaded.webSnapshotRecord.packageBlob.size);
+  expect(loaded.preparedAssetPublication?.asset.ref.size).toBeGreaterThan(0);
 });
+
+it('passes the outer restore admission through web snapshot OPFS staging', async () => {
+  const { loadBackupImportAssetBatch, prepareBackupImportAsset } = await import('.');
+  const packageBlob = await createPackageBlob(createManifest());
+  const { prepared } = await prepareBackupImportAsset({
+    asset: {
+      assetPath: 'assets/snapshot-1',
+      entry: createWebSnapshotEntry(),
+      thumbnailPath: null,
+    },
+    remapEntryForDuplicate: vi.fn(),
+    strategy: 'replace',
+    zip: createArchiveZip(packageBlob),
+  });
+  let continueRestore!: () => void;
+  let signalRestoreAdmitted!: () => void;
+  const restoreAdmitted = new Promise<void>((resolve) => {
+    signalRestoreAdmitted = resolve;
+  });
+  const restoreContinued = new Promise<void>((resolve) => {
+    continueRestore = resolve;
+  });
+  const restore = runWithPersistenceMutationTransition(async (transitionPermit) => {
+    signalRestoreAdmitted();
+    await restoreContinued;
+    await loadBackupImportAssetBatch({
+      operationId: 'restore-1',
+      preparedAssets: prepared ? [prepared] : [],
+      transitionPermit,
+      zip: createArchiveZip(packageBlob),
+    });
+    expect(writeBlobToAssetMock).toHaveBeenNthCalledWith(1, expect.any(Blob), {
+      persistenceTransitionPermit: transitionPermit,
+    });
+    expect(writeBlobToAssetMock).toHaveBeenNthCalledWith(2, expect.any(Blob), {
+      persistenceTransitionPermit: transitionPermit,
+    });
+  });
+  await restoreAdmitted;
+  const erase = vi.fn();
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  expect(erase).not.toHaveBeenCalled();
+
+  continueRestore();
+  await restore;
+  await erasure;
+
+  expect(erase).toHaveBeenCalledOnce();
+});
+
+function createPreparedAsset(assetId: string, mimeType: string) {
+  return {
+    ref: {
+      assetId,
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      mimeType,
+      sha256: null,
+      size: 3,
+    },
+    writingMarker: {
+      assetId,
+      createdAt: 1,
+      domain: 'web-snapshot-assets',
+      markerId: `marker-${assetId}`,
+      objectKey: `objects/${assetId}`,
+    },
+  };
+}
 
 it('rejects web snapshot imports when the nested package manifest is malformed', async () => {
   const { loadBackupImportAssetBatch, prepareBackupImportAsset } = await import('.');

@@ -144,7 +144,15 @@ function createWriteHarness() {
       'thumbnails',
       'image_workspaces',
       'aggregate_presentations',
-    ].map((name) => [name, { delete: vi.fn(), get: vi.fn(), put: vi.fn() }])
+    ].map((name) => [
+      name,
+      {
+        delete: vi.fn(),
+        get: vi.fn(),
+        index: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]) })),
+        put: vi.fn(),
+      },
+    ])
   );
   const tx = {
     done: Promise.resolve(),

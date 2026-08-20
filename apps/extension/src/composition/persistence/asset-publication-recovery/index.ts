@@ -20,12 +20,14 @@ import {
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
+  WEB_SNAPSHOTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   runWithDurableAssetLifecycleLock,
   runWithDurableAssetOperationRecovery,
   type DurableAssetOperationPermit,
+  type PersistenceMutationTransitionPermit,
 } from '../infrastructure/mutation-barrier';
 import {
   RECORDING_ASSET_OWNER_KIND,
@@ -38,6 +40,7 @@ import {
 } from '../projects/asset-publication';
 import { scenarioAssetPublicationAdapter } from '../scenario/aggregate-mutations';
 import { imageWorkspacePublicationAdapter } from '../image-aggregates/mutations';
+import { webSnapshotPublicationAdapter } from '../web-snapshots/publication';
 export { auditDurableAssets, collectOrphanAssetObjects } from './audit';
 import { collectOrphanAssetObjects } from './audit';
 
@@ -62,6 +65,7 @@ async function compensateRestoreOperation(operation: AssetOperation): Promise<vo
         RECORDING_TELEMETRY_STORE,
         STORE_NAME,
         THUMBNAILS_STORE,
+        WEB_SNAPSHOTS_STORE,
       ],
       'readwrite'
     );
@@ -72,7 +76,9 @@ async function compensateRestoreOperation(operation: AssetOperation): Promise<vo
       return;
     }
     for (const compensation of [...current.compensations].reverse()) {
-      if (compensation.nextProjectAssetId) {
+      if (compensation.nextWebSnapshotId) {
+        await tx.objectStore(WEB_SNAPSHOTS_STORE).delete(compensation.nextWebSnapshotId);
+      } else if (compensation.nextProjectAssetId) {
         await tx.objectStore(PROJECT_ASSETS_STORE).delete(compensation.nextProjectAssetId);
       } else if (compensation.nextProjectExportId) {
         await tx.objectStore(PROJECT_EXPORTS_STORE).delete(compensation.nextProjectExportId);
@@ -81,7 +87,11 @@ async function compensateRestoreOperation(operation: AssetOperation): Promise<vo
       }
       await tx.objectStore(MEDIA_LIBRARY_STORE).delete(compensation.nextMediaId);
       await tx.objectStore(THUMBNAILS_STORE).delete(compensation.nextMediaId);
-      if (!compensation.nextProjectAssetId && !compensation.nextProjectExportId) {
+      if (
+        !compensation.nextProjectAssetId &&
+        !compensation.nextProjectExportId &&
+        !compensation.nextWebSnapshotId
+      ) {
         await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(compensation.nextOwnerId);
       }
       await tx
@@ -107,12 +117,26 @@ async function compensateRestoreOperation(operation: AssetOperation): Promise<vo
         previous['projectAssetEntry']
       );
       await restorePreviousRecord(
+        tx.objectStore(WEB_SNAPSHOTS_STORE),
+        previous['webSnapshotEntry']
+      );
+      await restorePreviousRecord(
         tx.objectStore(MEDIA_LIBRARY_STORE),
         previous['mediaLibraryEntry']
       );
       await restorePreviousRecord(tx.objectStore(THUMBNAILS_STORE), previous['thumbnailEntry']);
       await restorePreviousRecord(tx.objectStore(ASSET_REFS_STORE), previous['assetRefEntry']);
       await restorePreviousRecord(tx.objectStore(ASSET_OWNERS_STORE), previous['assetOwnerEntry']);
+      for (const ref of Array.isArray(previous['assetRefEntries'])
+        ? previous['assetRefEntries']
+        : []) {
+        await restorePreviousRecord(tx.objectStore(ASSET_REFS_STORE), ref);
+      }
+      for (const owner of Array.isArray(previous['assetOwnerEntries'])
+        ? previous['assetOwnerEntries']
+        : []) {
+        await restorePreviousRecord(tx.objectStore(ASSET_OWNERS_STORE), owner);
+      }
       compensated.push(compensation);
     }
     await operationStore.put({
@@ -196,18 +220,23 @@ async function recoverBackupRestoreOperations(): Promise<void> {
 }
 
 export async function recoverAssetPublications(
-  permit?: DurableAssetOperationPermit
+  permit?: DurableAssetOperationPermit,
+  transitionPermit?: PersistenceMutationTransitionPermit
 ): Promise<number> {
   return runWithDurableAssetOperationRecovery(permit, async () => {
     await collectQuiescentWritingObjects();
     await runWithDurableAssetLifecycleLock(recoverBackupRestoreOperations);
-    const recovered = await recoverStandaloneAssetPublications([
-      recordingAssetPublicationAdapter,
-      projectAssetPublicationAdapter,
-      projectExportPublicationAdapter,
-      scenarioAssetPublicationAdapter,
-      imageWorkspacePublicationAdapter,
-    ]);
+    const recovered = await recoverStandaloneAssetPublications(
+      [
+        recordingAssetPublicationAdapter,
+        projectAssetPublicationAdapter,
+        projectExportPublicationAdapter,
+        scenarioAssetPublicationAdapter,
+        imageWorkspacePublicationAdapter,
+        webSnapshotPublicationAdapter,
+      ],
+      transitionPermit
+    );
     await collectOrphanAssetObjects();
     return recovered;
   });

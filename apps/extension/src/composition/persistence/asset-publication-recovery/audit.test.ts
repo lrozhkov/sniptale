@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createWebSnapshotManifest } from '../../../features/web-snapshot/manifest';
 
 const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
@@ -103,6 +104,43 @@ it.each([
 
   expect(report.ownerMetadataMismatches).toEqual([
     expect.objectContaining({ assetId: 'asset-domain', role: 'body' }),
+  ]);
+});
+
+it('audits package and screenshot ownership for a web snapshot independently', async () => {
+  mocks.objects.mockResolvedValue(['package-asset', 'screenshot-asset']);
+  mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: async (store: string) => {
+        if (store === 'asset_refs') {
+          return [createRef('package-asset'), createRef('screenshot-asset')];
+        }
+        if (store === 'asset_owners') {
+          return [
+            {
+              assetId: 'package-asset',
+              ownerId: 'snapshot-1',
+              ownerKind: 'web-snapshot',
+              role: 'package',
+            },
+          ];
+        }
+        if (store === 'web_snapshots') return [createWebSnapshot()];
+        return [];
+      },
+    })
+  );
+
+  const report = await auditDurableAssets();
+
+  expect(report.ownerMetadataMismatches).toEqual([
+    expect.objectContaining({
+      assetId: 'screenshot-asset',
+      ownerKind: 'web-snapshot',
+      role: 'screenshot',
+    }),
   ]);
 });
 
@@ -241,6 +279,23 @@ function createRecording(id: string, assetId: string) {
     id,
     mimeType: 'video/webm',
     size: 3,
+  };
+}
+
+function createWebSnapshot() {
+  return {
+    createdAt: 1,
+    id: 'snapshot-1',
+    manifest: createWebSnapshotManifest({
+      id: 'snapshot-1',
+      source: { faviconUrl: null, title: 'Page', url: 'https://example.com/' },
+    }),
+    packageAssetId: 'package-asset',
+    screenshotAssetId: 'screenshot-asset',
+    screenshotMimeType: 'image/png',
+    screenshotSize: 3,
+    size: 3,
+    updatedAt: 2,
   };
 }
 

@@ -22,7 +22,11 @@ vi.mock('../../composition/persistence/web-snapshots', async (importOriginal) =>
 
 import { loadWebSnapshotPackage } from './assets';
 
-class OversizedWebSnapshotPackageBlob extends Blob {
+class OversizedWebSnapshotPackageFile extends File {
+  constructor(parts: BlobPart[]) {
+    super(parts, 'snapshot.zip');
+  }
+
   override get size(): number {
     return 101 * 1024 * 1024;
   }
@@ -99,7 +103,7 @@ async function stubWebSnapshotRecord(args: {
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageBlob: await createPackageBlob(packageArgs),
+    packageFile: new File([await createPackageBlob(packageArgs)], 'snapshot.zip'),
     size: 1,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -110,7 +114,7 @@ function stubOversizedWebSnapshotRecord(): void {
     createdAt: 1,
     id: 'snapshot-1',
     manifest: createManifest(),
-    packageBlob: new OversizedWebSnapshotPackageBlob(['zip']),
+    packageFile: new OversizedWebSnapshotPackageFile(['zip']),
     size: 101 * 1024 * 1024,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -239,7 +243,7 @@ it('rejects oversized entry metadata before inflating viewer package entries', a
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageBlob: new Blob(['zip']),
+    packageFile: new File(['zip'], 'snapshot.zip'),
     size: 1,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);

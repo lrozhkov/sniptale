@@ -22,6 +22,7 @@ import {
   IMAGE_WORKSPACES_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STORE_NAME,
+  WEB_SNAPSHOTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
@@ -30,6 +31,7 @@ import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents';
+import { parseStoredWebSnapshotRecord } from '../web-snapshots';
 
 interface DurableAssetAuditReport {
   authorityValid: boolean;
@@ -135,6 +137,7 @@ async function collectDurableAssetSnapshot(): Promise<{
     rawScenarioAssets,
     rawImageWorkspaces,
     rawScenarioDocuments,
+    rawWebSnapshots,
   ] = await runWithIndexedDbMutation(async (db) =>
     Promise.all([
       db.getAll(ASSET_REFS_STORE),
@@ -146,6 +149,7 @@ async function collectDurableAssetSnapshot(): Promise<{
       db.getAll(SCENARIO_ASSETS_STORE),
       db.getAll(IMAGE_WORKSPACES_STORE),
       db.getAll(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
+      db.getAll(WEB_SNAPSHOTS_STORE),
     ])
   );
   const refsResult = parseRows(rawRefs, parseAssetRef);
@@ -160,6 +164,7 @@ async function collectDurableAssetSnapshot(): Promise<{
     rawScenarioDocuments,
     parseScenarioStepEditorDocumentEntry
   );
+  const webSnapshotsResult = parseRows(rawWebSnapshots, parseStoredWebSnapshotRecord);
   const refs = refsResult.entries;
   const owners = ownersResult.entries;
   const expectedOwnerAssets = new Map<string, string>();
@@ -196,6 +201,20 @@ async function collectDurableAssetSnapshot(): Promise<{
       });
     }
   }
+  for (const entry of webSnapshotsResult.entries) {
+    expectedOwners.push({
+      assetId: entry.packageAssetId,
+      ownerId: entry.id,
+      ownerKind: 'web-snapshot',
+      role: 'package',
+    });
+    expectedOwners.push({
+      assetId: entry.screenshotAssetId,
+      ownerId: entry.id,
+      ownerKind: 'web-snapshot',
+      role: 'screenshot',
+    });
+  }
   for (const owner of expectedOwners) {
     expectedOwnerAssets.set(ownerKey(owner), owner.assetId);
   }
@@ -210,6 +229,7 @@ async function collectDurableAssetSnapshot(): Promise<{
       scenarioAssetsResult,
       imageWorkspacesResult,
       scenarioDocumentsResult,
+      webSnapshotsResult,
     ].every((result) => result.valid),
     expectedOwnerAssets,
     expectedOwners,

@@ -16,8 +16,10 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-media.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.scenario-assets.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.recording-assets.ts',
+  'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.web-snapshots.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
+  'apps/extension/src/workflows/media-hub-backup/restore/write/index.ts',
 ]);
 const indexedDbMutationPattern =
   /(?:\b(?:db|tx|store|cursor)|\b\w+Store)\.(?:put|delete|clear)\s*\(|\.transaction\([\s\S]{0,180}?["']readwrite["']/m;

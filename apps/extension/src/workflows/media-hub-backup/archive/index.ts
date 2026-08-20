@@ -10,7 +10,7 @@ import {
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import { parseRecordingEntry } from '../../../composition/persistence/recordings/index.guards';
 import { parseAssetRef, readAssetFile } from '../../../composition/persistence/assets';
-import type { WebSnapshotRecord } from '../../../composition/persistence/web-snapshots/contracts';
+import { parseStoredWebSnapshotRecord } from '../../../composition/persistence/web-snapshots';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
 import { recoverAndGetStoredImageWorkspace } from '../../../composition/persistence/image-workspaces';
 import { materializePersistedEditorDocumentForLegacyTransfer } from '../../../composition/persistence/document-assets';
@@ -224,10 +224,10 @@ export async function resolveBackupMediaBlob(
   }
 
   if (entry.source.kind === 'web-snapshot') {
-    const snapshot = (await db.get(WEB_SNAPSHOTS_STORE, entry.source.snapshotId)) as
-      | WebSnapshotRecord
-      | undefined;
-    return snapshot ? createSanitizedWebSnapshotPackageBlob(snapshot, options) : null;
+    const snapshot = parseStoredWebSnapshotRecord(
+      await db.get(WEB_SNAPSHOTS_STORE, entry.source.snapshotId)
+    );
+    return snapshot ? createSanitizedWebSnapshotPackageBlob(db, snapshot, options) : null;
   }
 
   const projectAsset = parseProjectAssetEntry(
@@ -239,11 +239,15 @@ export async function resolveBackupMediaBlob(
 }
 
 async function createSanitizedWebSnapshotPackageBlob(
-  snapshot: WebSnapshotRecord,
+  db: BackupDatabase,
+  snapshot: NonNullable<ReturnType<typeof parseStoredWebSnapshotRecord>>,
   options: MediaHubBackupExportOptions
 ): Promise<Blob> {
+  const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, snapshot.packageAssetId));
+  if (!ref) throw new Error(`Web snapshot package ref is missing: ${snapshot.id}.`);
+  const packageFile = await readAssetFile(ref, `${snapshot.id}.sniptale-web-snapshot.zip`);
   const sanitizedPackage = await sanitizeWebSnapshotPackageProvenance(
-    snapshot.packageBlob,
+    packageFile,
     snapshot.manifest,
     { includeSourceMetadata: options.includeSourceMetadata }
   );

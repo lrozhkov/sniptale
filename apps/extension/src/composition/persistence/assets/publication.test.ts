@@ -23,6 +23,10 @@ vi.mock('./opfs-store', async (importOriginal) => ({
 import { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
 import { recoverStandaloneAssetPublications } from './recovery';
 import type { AssetReadyJournal } from './contracts';
+import {
+  runWithPersistenceMutationTransition,
+  runWithPersistentDataErasureBarrier,
+} from '../infrastructure/mutation-barrier';
 
 const ref = {
   assetId: 'asset-1',
@@ -142,4 +146,64 @@ it('replays only standalone journals with a registered domain adapter', async ()
   expect(publish).toHaveBeenCalledWith(standalone);
   expect(deleteReadyJournalMock).toHaveBeenCalledWith('journal-1');
   expect(deleteReadyJournalMock).not.toHaveBeenCalledWith('workflow');
+});
+
+it('keeps privacy erasure ordered after an admitted standalone recovery', async () => {
+  const journal = createJournal();
+  listReadyJournalsMock.mockResolvedValue([journal]);
+  let releasePublication!: () => void;
+  let signalPublicationStarted!: () => void;
+  const publicationStarted = new Promise<void>((resolve) => {
+    signalPublicationStarted = resolve;
+  });
+  const publicationReleased = new Promise<void>((resolve) => {
+    releasePublication = resolve;
+  });
+  const publish = vi.fn(async () => {
+    signalPublicationStarted();
+    await publicationReleased;
+  });
+  const recovery = recoverStandaloneAssetPublications([{ domain: 'recording-assets', publish }]);
+  await publicationStarted;
+  const erase = vi.fn();
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(erase).not.toHaveBeenCalled();
+
+  releasePublication();
+  await recovery;
+  await erasure;
+
+  expect(deleteReadyJournalMock).toHaveBeenCalledWith(journal.journalId);
+  expect(erase).toHaveBeenCalledOnce();
+});
+
+it('reuses an outer transition admission when erasure is already queued', async () => {
+  listReadyJournalsMock.mockResolvedValue([]);
+  let continueRestore!: () => void;
+  let signalRestoreAdmitted!: () => void;
+  const restoreAdmitted = new Promise<void>((resolve) => {
+    signalRestoreAdmitted = resolve;
+  });
+  const restoreContinued = new Promise<void>((resolve) => {
+    continueRestore = resolve;
+  });
+  const restore = runWithPersistenceMutationTransition(async (transitionPermit) => {
+    signalRestoreAdmitted();
+    await restoreContinued;
+    return recoverStandaloneAssetPublications([], transitionPermit);
+  });
+  await restoreAdmitted;
+  const erase = vi.fn();
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  expect(erase).not.toHaveBeenCalled();
+
+  continueRestore();
+  await expect(restore).resolves.toBe(0);
+  await erasure;
+
+  expect(erase).toHaveBeenCalledOnce();
 });

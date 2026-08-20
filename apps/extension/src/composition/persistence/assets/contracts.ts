@@ -23,6 +23,7 @@ export interface AssetOperationCompensation {
   nextOwnerId: string;
   nextProjectAssetId?: string;
   nextProjectExportId?: string;
+  nextWebSnapshotId?: string;
   ownerKind?: string;
   ownerRole?: string;
   previousRecords: Record<string, unknown>;

@@ -59,7 +59,8 @@ export function assertBackupImportWritePreflightComplete(
     const durable =
       prepared.nextEntry.source.kind === 'recording' ||
       prepared.nextEntry.source.kind === 'project-export' ||
-      prepared.nextEntry.source.kind === 'project-asset';
+      prepared.nextEntry.source.kind === 'project-asset' ||
+      prepared.nextEntry.source.kind === 'web-snapshot';
     if (durable ? !prepared.preparedAssetPublication : !prepared.assetBlob) {
       throw new Error('Backup import write preflight is incomplete.');
     }

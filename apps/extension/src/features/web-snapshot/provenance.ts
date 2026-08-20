@@ -29,6 +29,30 @@ interface WebSnapshotPackageProvenanceOptions {
   maxPackageBytes?: number;
 }
 
+function createBinaryBlob(bytes: Uint8Array, mimeType: string): Blob {
+  const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+  copy.set(bytes);
+  return new Blob([copy], { type: mimeType });
+}
+
+export async function readSanitizedWebSnapshotScreenshot(packageBlob: Blob): Promise<Blob> {
+  assertWebSnapshotPackageBlobLimits(packageBlob, MAX_WEB_SNAPSHOT_PACKAGE_BYTES);
+  const zip = await JSZip.loadAsync(await packageBlob.arrayBuffer());
+  assertWebSnapshotInflatedProfile(zip);
+  const screenshot = zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot);
+  if (!screenshot) throw new Error('Web snapshot screenshot is missing from backup package.');
+  assertZipEntryCanInflate(
+    screenshot,
+    MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES,
+    () => new Error('Web snapshot screenshot is too large.')
+  );
+  const bytes = await screenshot.async('uint8array');
+  if (bytes.byteLength > MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES) {
+    throw new Error('Web snapshot screenshot is too large.');
+  }
+  return createBinaryBlob(bytes, 'image/png');
+}
+
 export function sanitizeWebSnapshotManifestProvenance(
   manifest: WebSnapshotManifest,
   options: WebSnapshotPackageProvenanceOptions = {}

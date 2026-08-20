@@ -1,6 +1,6 @@
 import type { MediaLibraryEntry } from '../../../../composition/persistence/media-library/contracts';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import type { WebSnapshotRecord } from '../../../../composition/persistence/web-snapshots/contracts';
+import type { PreparedBackupWebSnapshotRecord } from '../web-snapshot';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -40,6 +40,13 @@ import {
   parseProjectExportEntry,
 } from '../../../../composition/persistence/projects/read-guards';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
+import { parseStoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots';
+import {
+  WEB_SNAPSHOT_OWNER_KIND,
+  WEB_SNAPSHOT_PACKAGE_ROLE,
+  WEB_SNAPSHOT_SCREENSHOT_ROLE,
+} from '../../../../composition/persistence/web-snapshots/publication';
+import { markWebSnapshotProvenanceSanitized } from '../../../../composition/persistence/web-snapshots/provenance-state';
 export {
   assertBackupImportWritePreflightComplete,
   commitBackupTransaction,
@@ -60,6 +67,20 @@ export interface BackupImportAssetRecordSnapshot {
   aggregatePresentationEntry: unknown;
   assetOwnerEntry: unknown;
   assetRefEntry: unknown;
+  assetOwnerEntries: unknown[];
+  assetRefEntries: unknown[];
+}
+
+async function removeAssetOwnerAndUnreferencedRef(
+  tx: BackupTransaction,
+  ownerKey: [string, string, string],
+  assetId: string | null
+): Promise<void> {
+  const ownerStore = getStore(tx, ASSET_OWNERS_STORE);
+  await ownerStore.delete(ownerKey);
+  if (assetId && (await ownerStore.index('assetId').getAll(assetId)).length === 0) {
+    await getStore(tx, ASSET_REFS_STORE).delete(assetId);
+  }
 }
 
 export async function deleteExistingAssetRecord(
@@ -79,36 +100,48 @@ export async function deleteExistingAssetRecord(
       await getStore(tx, STORE_NAME).get(entry.source.recordingId)
     );
     await getStore(tx, STORE_NAME).delete(entry.source.recordingId);
-    await getStore(tx, ASSET_OWNERS_STORE).delete([
-      RECORDING_ASSET_OWNER_KIND,
-      entry.source.recordingId,
-      RECORDING_ASSET_ROLE,
-    ]);
-    if (stored) await getStore(tx, ASSET_REFS_STORE).delete(stored.assetId);
+    await removeAssetOwnerAndUnreferencedRef(
+      tx,
+      [RECORDING_ASSET_OWNER_KIND, entry.source.recordingId, RECORDING_ASSET_ROLE],
+      stored?.assetId ?? null
+    );
     await getStore(tx, RECORDING_TELEMETRY_STORE).delete(entry.source.recordingId);
   } else if (entry.source.kind === 'project-export') {
     const stored = parseProjectExportEntry(
       await getStore(tx, PROJECT_EXPORTS_STORE).get(entry.source.exportId)
     );
-    await getStore(tx, ASSET_OWNERS_STORE).delete([
-      PROJECT_EXPORT_OWNER_KIND,
-      entry.source.exportId,
-      PROJECT_MEDIA_ASSET_ROLE,
-    ]);
-    if (stored) await getStore(tx, ASSET_REFS_STORE).delete(stored.assetId);
+    await removeAssetOwnerAndUnreferencedRef(
+      tx,
+      [PROJECT_EXPORT_OWNER_KIND, entry.source.exportId, PROJECT_MEDIA_ASSET_ROLE],
+      stored?.assetId ?? null
+    );
     await getStore(tx, PROJECT_EXPORTS_STORE).delete(entry.source.exportId);
   } else if (entry.source.kind === 'project-asset') {
     const stored = parseProjectAssetEntry(
       await getStore(tx, PROJECT_ASSETS_STORE).get(entry.source.projectAssetId)
     );
     await getStore(tx, PROJECT_ASSETS_STORE).delete(entry.source.projectAssetId);
-    await getStore(tx, ASSET_OWNERS_STORE).delete([
-      PROJECT_ASSET_OWNER_KIND,
-      entry.source.projectAssetId,
-      PROJECT_MEDIA_ASSET_ROLE,
-    ]);
-    if (stored) await getStore(tx, ASSET_REFS_STORE).delete(stored.assetId);
+    await removeAssetOwnerAndUnreferencedRef(
+      tx,
+      [PROJECT_ASSET_OWNER_KIND, entry.source.projectAssetId, PROJECT_MEDIA_ASSET_ROLE],
+      stored?.assetId ?? null
+    );
   } else if (entry.source.kind === 'web-snapshot') {
+    const stored = parseStoredWebSnapshotRecord(
+      await getStore(tx, WEB_SNAPSHOTS_STORE).get(entry.source.snapshotId)
+    );
+    if (stored) {
+      for (const [assetId, role] of [
+        [stored.packageAssetId, WEB_SNAPSHOT_PACKAGE_ROLE],
+        [stored.screenshotAssetId, WEB_SNAPSHOT_SCREENSHOT_ROLE],
+      ] as const) {
+        await removeAssetOwnerAndUnreferencedRef(
+          tx,
+          [WEB_SNAPSHOT_OWNER_KIND, stored.id, role],
+          assetId
+        );
+      }
+    }
     await getStore(tx, WEB_SNAPSHOTS_STORE).delete(entry.source.snapshotId);
   }
 
@@ -118,6 +151,32 @@ export async function deleteExistingAssetRecord(
     await getStore(tx, IMAGE_WORKSPACES_STORE).delete(entry.id);
     await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).delete(['image', entry.id]);
   }
+}
+
+async function snapshotWebSnapshotOwnership(
+  tx: BackupTransaction,
+  snapshotId: string,
+  snapshot: BackupImportAssetRecordSnapshot
+): Promise<void> {
+  snapshot.webSnapshotEntry = await getStore(tx, WEB_SNAPSHOTS_STORE).get(snapshotId);
+  const stored = parseStoredWebSnapshotRecord(snapshot.webSnapshotEntry);
+  if (!stored) return;
+  snapshot.assetRefEntries = await Promise.all([
+    getStore(tx, ASSET_REFS_STORE).get(stored.packageAssetId),
+    getStore(tx, ASSET_REFS_STORE).get(stored.screenshotAssetId),
+  ]);
+  snapshot.assetOwnerEntries = await Promise.all([
+    getStore(tx, ASSET_OWNERS_STORE).get([
+      WEB_SNAPSHOT_OWNER_KIND,
+      stored.id,
+      WEB_SNAPSHOT_PACKAGE_ROLE,
+    ]),
+    getStore(tx, ASSET_OWNERS_STORE).get([
+      WEB_SNAPSHOT_OWNER_KIND,
+      stored.id,
+      WEB_SNAPSHOT_SCREENSHOT_ROLE,
+    ]),
+  ]);
 }
 
 export async function snapshotExistingAssetRecord(
@@ -142,6 +201,8 @@ export async function snapshotExistingAssetRecord(
         : undefined,
     assetOwnerEntry: undefined,
     assetRefEntry: undefined,
+    assetOwnerEntries: [],
+    assetRefEntries: [],
   };
 
   if (entry.source.kind === 'recording') {
@@ -185,9 +246,7 @@ export async function snapshotExistingAssetRecord(
       ]);
     }
   } else if (entry.source.kind === 'web-snapshot') {
-    snapshot.webSnapshotEntry = await getStore(tx, WEB_SNAPSHOTS_STORE).get(
-      entry.source.snapshotId
-    );
+    await snapshotWebSnapshotOwnership(tx, entry.source.snapshotId, snapshot);
   }
 
   return snapshot;
@@ -212,6 +271,12 @@ export async function restoreAssetRecordSnapshot(
   await restoreSnapshotEntry(tx, STORE_NAME, snapshot.recordingEntry);
   await restoreSnapshotEntry(tx, ASSET_REFS_STORE, snapshot.assetRefEntry);
   await restoreSnapshotEntry(tx, ASSET_OWNERS_STORE, snapshot.assetOwnerEntry);
+  for (const ref of snapshot.assetRefEntries) {
+    await restoreSnapshotEntry(tx, ASSET_REFS_STORE, ref);
+  }
+  for (const owner of snapshot.assetOwnerEntries) {
+    await restoreSnapshotEntry(tx, ASSET_OWNERS_STORE, owner);
+  }
   await restoreSnapshotEntry(tx, RECORDING_TELEMETRY_STORE, snapshot.recordingTelemetryEntry);
   await restoreSnapshotEntry(tx, PROJECT_ASSETS_STORE, snapshot.projectAssetEntry);
   await restoreSnapshotEntry(tx, PROJECT_EXPORTS_STORE, snapshot.projectExportEntry);
@@ -226,12 +291,50 @@ export async function restoreAssetRecordSnapshot(
   );
 }
 
+async function writeWebSnapshotAssetRecord(
+  tx: BackupTransaction,
+  entry: Omit<MediaLibraryEntry, 'blob'>,
+  webSnapshotRecord: PreparedBackupWebSnapshotRecord | null,
+  preparedAssetPublication?: PreparedRestoreRecordingAsset
+): Promise<void> {
+  const screenshotAsset = preparedAssetPublication?.additionalAssets?.[0];
+  if (!webSnapshotRecord || !preparedAssetPublication || !screenshotAsset) {
+    throw new Error('Web snapshot backup record is missing.');
+  }
+  const packageAsset = preparedAssetPublication.asset;
+  const storedRecord = markWebSnapshotProvenanceSanitized({
+    createdAt: webSnapshotRecord.createdAt,
+    id: webSnapshotRecord.id,
+    manifest: webSnapshotRecord.manifest,
+    packageAssetId: packageAsset.ref.assetId,
+    screenshotAssetId: screenshotAsset.ref.assetId,
+    screenshotMimeType: screenshotAsset.ref.mimeType,
+    screenshotSize: screenshotAsset.ref.size,
+    size: packageAsset.ref.size,
+    updatedAt: webSnapshotRecord.updatedAt,
+  });
+  for (const [asset, role] of [
+    [packageAsset, WEB_SNAPSHOT_PACKAGE_ROLE],
+    [screenshotAsset, WEB_SNAPSHOT_SCREENSHOT_ROLE],
+  ] as const) {
+    await getStore(tx, ASSET_REFS_STORE).put(asset.ref);
+    await getStore(tx, ASSET_OWNERS_STORE).put({
+      assetId: asset.ref.assetId,
+      ownerId: storedRecord.id,
+      ownerKind: WEB_SNAPSHOT_OWNER_KIND,
+      role,
+    });
+  }
+  await getStore(tx, WEB_SNAPSHOTS_STORE).put(storedRecord);
+  await getStore(tx, MEDIA_LIBRARY_STORE).put(entry);
+}
+
 export async function writeMainAssetRecord(
   tx: BackupTransaction,
   entry: Omit<MediaLibraryEntry, 'blob'>,
   blob: Blob | null,
   recordingTelemetry: RecordingTelemetryEntry | null,
-  webSnapshotRecord: WebSnapshotRecord | null = null,
+  webSnapshotRecord: PreparedBackupWebSnapshotRecord | null = null,
   preparedAssetPublication?: PreparedRestoreRecordingAsset
 ): Promise<void> {
   if (entry.source.kind === 'screenshot') {
@@ -276,12 +379,7 @@ export async function writeMainAssetRecord(
   }
 
   if (entry.source.kind === 'web-snapshot') {
-    if (!webSnapshotRecord) {
-      throw new Error('Web snapshot backup record is missing.');
-    }
-
-    await getStore(tx, WEB_SNAPSHOTS_STORE).put(webSnapshotRecord);
-    await getStore(tx, MEDIA_LIBRARY_STORE).put(entry);
+    await writeWebSnapshotAssetRecord(tx, entry, webSnapshotRecord, preparedAssetPublication);
     return;
   }
 
@@ -321,7 +419,7 @@ export async function restoreAssetRecord(
   blob: Blob | null,
   thumbnail: Blob | null,
   recordingTelemetry: RecordingTelemetryEntry | null = null,
-  webSnapshotRecord: WebSnapshotRecord | null = null,
+  webSnapshotRecord: PreparedBackupWebSnapshotRecord | null = null,
   workspace: ImageWorkspaceEntry | null = null,
   presentation: AggregatePresentationEntry | null = null,
   preparedAssetPublication?: PreparedRestoreRecordingAsset
