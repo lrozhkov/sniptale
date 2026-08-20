@@ -13,12 +13,12 @@ import { getEmbeddedEditorUrlMocks } from './editor-url.test-support';
 const {
   blobToDataUrlMock,
   getScenarioAssetBlobMock,
-  getScenarioStepEditorDocumentRecordMock,
+  getScenarioStepEditorDocumentTransferRecordMock,
   persistPendingEditorBootstrapPayloadMock,
 } = vi.hoisted(() => ({
   blobToDataUrlMock: vi.fn(),
   getScenarioAssetBlobMock: vi.fn(),
-  getScenarioStepEditorDocumentRecordMock: vi.fn(),
+  getScenarioStepEditorDocumentTransferRecordMock: vi.fn(),
   persistPendingEditorBootstrapPayloadMock: vi.fn(),
 }));
 
@@ -37,7 +37,7 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (importO
     typeof import('../../../composition/persistence/scenario/store/public')
   >()),
   getScenarioAssetBlob: getScenarioAssetBlobMock,
-  getScenarioStepEditorDocumentRecord: getScenarioStepEditorDocumentRecordMock,
+  getScenarioStepEditorDocumentTransferRecord: getScenarioStepEditorDocumentTransferRecordMock,
 }));
 
 vi.mock('../../../workflows/editor/bootstrap', async (importOriginal) => ({
@@ -176,7 +176,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
   getScenarioAssetBlobMock.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
-  getScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
+  getScenarioStepEditorDocumentTransferRecordMock.mockResolvedValue(undefined);
   blobToDataUrlMock.mockResolvedValue('data:image/png;base64,abc');
   persistPendingEditorBootstrapPayloadMock.mockResolvedValue('bootstrap-1');
   getEmbeddedEditorUrlMocks().buildEditorUrlMock.mockReturnValue(
@@ -231,7 +231,7 @@ it('renders a translated runtime error when the scenario asset cannot be loaded'
 
 it('prefers the persisted step document when reopening the embedded editor', async () => {
   const stepDocument = createEditorDocument();
-  getScenarioStepEditorDocumentRecordMock.mockResolvedValue({
+  getScenarioStepEditorDocumentTransferRecordMock.mockResolvedValue({
     createdAt: 1,
     document: stepDocument,
     projectId: 'project-1',
@@ -252,7 +252,7 @@ it('prefers the persisted step document when reopening the embedded editor', asy
 
 it('syncs compat overlays from the current step before reopening the embedded editor', async () => {
   const stepDocument = createCompatOverlayDocument();
-  getScenarioStepEditorDocumentRecordMock.mockResolvedValue({
+  getScenarioStepEditorDocumentTransferRecordMock.mockResolvedValue({
     createdAt: 1,
     document: stepDocument,
     projectId: 'project-1',

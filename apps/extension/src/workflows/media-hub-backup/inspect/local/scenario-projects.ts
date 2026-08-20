@@ -8,7 +8,7 @@ import type { MediaThumbnailEntry } from '../../../../composition/persistence/me
 import type {
   ScenarioExportEntry,
   ScenarioProjectEntry,
-  ScenarioStepEditorDocumentEntry,
+  StoredScenarioStepEditorDocumentEntry,
 } from '../../../../composition/persistence/scenario/contracts';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import {
@@ -44,7 +44,7 @@ function getJsonSizeBytes(value: unknown): number {
 export async function inspectScenarioProjectBackupEntries(
   db: LocalBackupDb,
   scenarioProjects: ScenarioProjectEntry[],
-  stepDocuments: ScenarioStepEditorDocumentEntry[]
+  stepDocuments: StoredScenarioStepEditorDocumentEntry[]
 ): Promise<ScenarioProjectBackupInspection> {
   const inventory: ScenarioProjectBackupInspection = {
     sizeBytes: stepDocuments.reduce((total, entry) => total + getJsonSizeBytes(entry), 0),
@@ -61,7 +61,7 @@ export async function inspectScenarioProjectBackupEntries(
 
 function countScenarioSourceMetadata(
   scenarioProjects: ScenarioProjectEntry[],
-  stepDocuments: ScenarioStepEditorDocumentEntry[]
+  stepDocuments: StoredScenarioStepEditorDocumentEntry[]
 ): number {
   return (
     scenarioProjects.reduce(

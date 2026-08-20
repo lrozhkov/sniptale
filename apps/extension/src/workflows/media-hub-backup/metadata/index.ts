@@ -28,8 +28,8 @@ import type {
 } from '../contracts/types';
 import { normalizeEffectBundleDescriptor } from './effect-bundles';
 import { tryNormalizeAggregatePresentation } from './presentation';
-import { parseImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/parser';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
+import { isEditorDocument } from '../../../features/editor/document/guards';
 import { parseLibraryLifecycle } from '../../../composition/persistence/library-lifecycle/parser';
 import {
   createProjectAssetMediaId,
@@ -124,8 +124,19 @@ function normalizeMediaLibraryEntry(value: unknown): Omit<MediaLibraryEntry, 'bl
 }
 
 function normalizeImageWorkspace(value: unknown): ImageWorkspaceEntry {
-  const parsed = parseImageWorkspaceEntry(value);
-  return parsed ?? failMetadata();
+  const entry = readRecord(value);
+  const document = field(entry, 'document');
+  const revision = readNumber(field(entry, 'revision'));
+  if (!isEditorDocument(document) || !Number.isInteger(revision) || revision < 1) failMetadata();
+  return {
+    aggregateId: readString(field(entry, 'aggregateId')),
+    createdAt: readNumber(field(entry, 'createdAt')),
+    document,
+    revision,
+    sourceTitle: readNullableString(field(entry, 'sourceTitle')),
+    sourceUrl: sanitizeProvenanceUrl(readNullableString(field(entry, 'sourceUrl'))),
+    updatedAt: readNumber(field(entry, 'updatedAt')),
+  };
 }
 
 function normalizeAssetDescriptor(value: JsonRecord): MediaHubBackupAssetDescriptor {

@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   put: vi.fn(),
   rootDelete: vi.fn(),
   txDelete: vi.fn(),
+  txGet: vi.fn(),
+  txPut: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -39,6 +41,10 @@ vi.mock('../web-snapshots', async (importOriginal) => ({
   deleteWebSnapshotMediaAsset: mocks.deleteWebSnapshotMediaAsset,
   getWebSnapshotRecord: mocks.getWebSnapshotRecord,
 }));
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  listReadyJournals: vi.fn(async () => []),
+}));
 
 import { deleteProjectAsset, deleteProjectExport } from '../projects/index';
 import { deleteRecording } from '../recordings/index';
@@ -59,7 +65,7 @@ beforeEach(() => {
     delete: mocks.rootDelete,
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: () => ({ delete: mocks.txDelete }),
+      objectStore: () => ({ delete: mocks.txDelete, get: mocks.txGet, put: mocks.txPut }),
     })),
   });
 });

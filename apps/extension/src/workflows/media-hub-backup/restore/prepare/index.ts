@@ -138,10 +138,9 @@ export async function prepareBackupImportAsset(args: {
       recordingTelemetry: remapRecordingTelemetry(nextEntry, args.asset.recordingTelemetry),
       thumbnailPath: args.asset.thumbnailPath ?? null,
       webSnapshotPackage: createWebSnapshotPackagePlan(nextEntry),
-      workspace:
-        args.asset.workspace?.aggregateId === args.asset.entry.id
-          ? { ...args.asset.workspace, aggregateId: nextEntry.id }
-          : null,
+      // EditorDocumentV2 rows are intentionally retired by the alpha V29 cutover.
+      // V6 restore stages their binary slots as OPFS assets instead of reviving embedded data URLs.
+      workspace: null,
       presentationDescriptor:
         args.asset.presentation?.entry.aggregateId === args.asset.entry.id
           ? {

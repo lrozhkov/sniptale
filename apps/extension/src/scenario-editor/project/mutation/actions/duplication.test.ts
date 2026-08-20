@@ -4,7 +4,23 @@ import type {
   ScenarioNoteStep,
   ScenarioProject,
 } from '../../../../features/scenario/contracts/types/project';
+import type { EditorDocument } from '../../../../features/editor/document/types';
 import { createScenarioEditorProjectActions } from '.';
+import { preparePersistedEditorDocument } from '../../../../composition/persistence/document-assets';
+
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  writeBlobToAsset: vi.fn(async (blob: Blob) => ({
+    ref: {
+      assetId: 'duplicated-editor-source',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/duplicated-editor-source' },
+      mimeType: blob.type,
+      sha256: null,
+      size: blob.size,
+    },
+  })),
+}));
 
 const {
   commitScenarioAggregateSnapshotMutationMock,
@@ -25,6 +41,41 @@ vi.mock(
     commitScenarioAggregateSnapshotMutation: commitScenarioAggregateSnapshotMutationMock,
   })
 );
+
+function createEditorDocumentFixture(): EditorDocument {
+  return {
+    version: 2,
+    sourceImageData: 'data:image/png;base64,c291cmNl',
+    sourceName: 'capture.png',
+    sourceWidth: 100,
+    sourceHeight: 80,
+    canvasWidth: 100,
+    canvasHeight: 80,
+    sourceLeft: 0,
+    sourceTop: 0,
+    sourceDisplayWidth: 100,
+    sourceDisplayHeight: 80,
+    frame: {
+      browserMode: false,
+      paddingTop: 0,
+      paddingRight: 0,
+      paddingBottom: 0,
+      paddingLeft: 0,
+      backgroundMode: 'color',
+      backgroundBlurAmount: 0,
+      backgroundColor: '#ffffff',
+      backgroundGradientFrom: '#ffffff',
+      backgroundGradientTo: '#000000',
+      backgroundGradientAngle: 90,
+      backgroundImageData: null,
+      backgroundImageFit: 'cover',
+      layoutMode: 'fit-image',
+      browserTitle: '',
+      browserUrl: '',
+    },
+    canvasJson: '{"objects":[]}',
+  };
+}
 
 vi.mock(
   '../../../../composition/persistence/scenario/store/step-editor-documents',
@@ -150,9 +201,29 @@ beforeEach(() => {
 
 async function verifiesCaptureStepDuplication() {
   vi.spyOn(Date, 'now').mockReturnValue(500);
+  const sourceUrl = URL.createObjectURL(new Blob(['source'], { type: 'image/png' }));
+  const releaseDocumentAssets = vi.fn(() => URL.revokeObjectURL(sourceUrl));
+  const sourceDocument = createEditorDocumentFixture();
+  sourceDocument.sourceImageData = sourceUrl;
   getScenarioStepEditorDocumentRecordMock.mockResolvedValue({
-    document: { version: 1 },
+    document: sourceDocument,
+    releaseDocumentAssets,
   });
+  commitScenarioAggregateSnapshotMutationMock.mockImplementationOnce(
+    async ({ children, nextProject }) => {
+      expect(releaseDocumentAssets).not.toHaveBeenCalled();
+      const document = children?.editorDocumentPuts?.[0]?.document;
+      if (!document) throw new Error('Expected duplicated editor document');
+      const prepared = await preparePersistedEditorDocument(document);
+      expect(prepared.document).toEqual(
+        expect.objectContaining({
+          sourceImage: { assetId: 'duplicated-editor-source' },
+          version: 3,
+        })
+      );
+      return { project: nextProject, workspaceRevision: 1 };
+    }
+  );
   const harness = createHarness();
 
   await harness.actions.duplicateStep('step-capture');
@@ -181,6 +252,7 @@ async function verifiesCaptureStepDuplication() {
     })
   );
   expect(harness.setError).toHaveBeenCalledWith(null);
+  expect(releaseDocumentAssets).toHaveBeenCalledOnce();
 }
 
 async function verifiesNoteStepDuplication() {

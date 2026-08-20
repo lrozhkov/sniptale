@@ -11,12 +11,12 @@ export function createUnsafeScenarioProjectBundleDb(args: {
 }) {
   const projectId = args.projectId ?? 'scenario-1';
   return {
-    get: vi.fn(async (storeName: string) =>
+    get: vi.fn(async (storeName: string, key: string) =>
       storeName === 'asset_refs'
         ? {
-            assetId: 'opfs-scenario-asset-1',
+            assetId: key,
             createdAt: 1,
-            location: { kind: 'opfs', objectKey: 'objects/opfs-scenario-asset-1' },
+            location: { kind: 'opfs', objectKey: `objects/${key}` },
             mimeType: args.assetMimeType ?? 'image/png',
             sha256: null,
             size: 14,

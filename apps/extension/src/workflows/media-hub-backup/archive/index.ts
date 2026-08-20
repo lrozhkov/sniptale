@@ -12,7 +12,8 @@ import { parseRecordingEntry } from '../../../composition/persistence/recordings
 import { parseAssetRef, readAssetFile } from '../../../composition/persistence/assets';
 import type { WebSnapshotRecord } from '../../../composition/persistence/web-snapshots/contracts';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
-import { parseImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/parser';
+import { recoverAndGetStoredImageWorkspace } from '../../../composition/persistence/image-workspaces';
+import { materializePersistedEditorDocumentForLegacyTransfer } from '../../../composition/persistence/document-assets';
 import { translate } from '../../../platform/i18n';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
@@ -23,7 +24,6 @@ import {
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
-  IMAGE_WORKSPACES_STORE,
   WEB_SNAPSHOTS_STORE,
 } from '../storage/constants';
 import {
@@ -32,7 +32,10 @@ import {
   type BackupZipWriter,
 } from '../export/blob/budget';
 import { createMediaHubBackupExportOptions } from '../export/options';
-import { applyMediaEntryPrivacyOptions } from '../export/privacy';
+import {
+  applyMediaEntryPrivacyOptions,
+  applyScenarioStepDocumentPrivacyOptions,
+} from '../export/privacy';
 import type {
   MediaHubBackupAssetDescriptor,
   MediaHubBackupExportOptions,
@@ -82,9 +85,21 @@ export async function appendBackupAssetDescriptor(args: {
     options.includeTelemetry && args.entry.source.kind === 'recording'
       ? await resolveRecordingTelemetry(args.db, args.entry)
       : undefined;
-  const workspace = isImageAggregate
-    ? (parseImageWorkspaceEntry(await args.db.get(IMAGE_WORKSPACES_STORE, args.entry.id)) ??
-      undefined)
+  const storedWorkspace = isImageAggregate
+    ? await recoverAndGetStoredImageWorkspace(args.entry.id)
+    : undefined;
+  const workspace = storedWorkspace
+    ? {
+        ...storedWorkspace,
+        document: await materializePersistedEditorDocumentForLegacyTransfer({
+          document: storedWorkspace.document,
+          refs: await Promise.all(
+            storedWorkspace.document.assets.map((asset) =>
+              args.db.get(ASSET_REFS_STORE, asset.assetId)
+            )
+          ),
+        }),
+      }
     : undefined;
   const presentation = isImageAggregate
     ? await appendAggregatePresentation({
@@ -113,9 +128,10 @@ function sanitizeWorkspace(
   workspace: ImageWorkspaceEntry,
   options: MediaHubBackupExportOptions
 ): ImageWorkspaceEntry {
-  return options.includeSourceMetadata
+  const sanitizedWorkspace = options.includeSourceMetadata
     ? { ...workspace, sourceUrl: sanitizeProvenanceUrl(workspace.sourceUrl) }
     : { ...workspace, sourceTitle: null, sourceUrl: null };
+  return applyScenarioStepDocumentPrivacyOptions(sanitizedWorkspace, options);
 }
 
 function buildBackupAssetEntry(

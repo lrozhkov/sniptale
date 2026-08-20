@@ -19,6 +19,7 @@ import { buildBackupManifest, type BackupProjectDescriptorSet } from './manifest
 import { buildEffectBundleDescriptors } from './effect-bundles';
 import { MAX_BACKUP_JSON_BYTES } from '../manifest';
 import { generateBackupZipFileToOpfs, releaseBackupZipFile } from './blob/stream';
+import { recoverAssetPublications } from '../../../composition/persistence/asset-publication-recovery';
 export { releaseBackupZipFile as releaseMediaHubBackupExport } from './blob/stream';
 import type {
   MediaHubBackupAssetDescriptor,
@@ -169,6 +170,8 @@ export async function exportMediaHubBackup(
   rawOptions: Partial<MediaHubBackupExportOptions> = {},
   runtimeOptions: { signal?: AbortSignal | undefined } = {}
 ): Promise<Blob> {
+  assertBackupExportNotCancelled(runtimeOptions.signal);
+  await recoverAssetPublications();
   assertBackupExportNotCancelled(runtimeOptions.signal);
   const options = createMediaHubBackupExportOptions(rawOptions);
   const db = await initDB();

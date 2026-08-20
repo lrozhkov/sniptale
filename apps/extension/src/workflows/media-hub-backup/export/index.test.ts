@@ -2,61 +2,75 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import type { MediaHubBackupManifest, MediaHubBackupMetadata } from '../contracts/types';
 
+vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
+  recoverAndGetStoredImageWorkspace: vi.fn(async () => undefined),
+}));
+
 interface FakeZipArchive {
   __fakeZipFiles: Map<string, Blob | string>;
 }
 
-const { FakeJSZip, initDBMock, listMediaLibraryMock, readAssetFileMock } = vi.hoisted(() => {
-  class FakeZipFile {
-    constructor(private readonly value: Blob | string) {}
+const { FakeJSZip, initDBMock, listMediaLibraryMock, readAssetFileMock, recoverAssetsMock } =
+  vi.hoisted(() => {
+    class FakeZipFile {
+      constructor(private readonly value: Blob | string) {}
 
-    async async(): Promise<Blob | string> {
-      return this.value;
+      async async(): Promise<Blob | string> {
+        return this.value;
+      }
     }
-  }
 
-  class FakeJSZip {
-    private files = new Map<string, Blob | string>();
+    class FakeJSZip {
+      private files = new Map<string, Blob | string>();
 
-    static async loadAsync(input: unknown): Promise<FakeJSZip> {
-      const files = (input as { __fakeZipFiles?: Map<string, Blob | string> } | null)
-        ?.__fakeZipFiles;
-      if (!files) {
-        throw new Error(
-          "Can't read the data of 'the loaded zip file'. Is it in a supported JavaScript type " +
-            '(String, Blob, ArrayBuffer, etc) ?'
-        );
+      static async loadAsync(input: unknown): Promise<FakeJSZip> {
+        const files = (input as { __fakeZipFiles?: Map<string, Blob | string> } | null)
+          ?.__fakeZipFiles;
+        if (!files) {
+          throw new Error(
+            "Can't read the data of 'the loaded zip file'. Is it in a supported JavaScript type " +
+              '(String, Blob, ArrayBuffer, etc) ?'
+          );
+        }
+
+        const zip = new FakeJSZip();
+        zip.files = new Map(files);
+        return zip;
       }
 
-      const zip = new FakeJSZip();
-      zip.files = new Map(files);
-      return zip;
-    }
+      file(path: string, value?: Blob | string): FakeZipFile | FakeJSZip | null {
+        if (value === undefined) {
+          const existing = this.files.get(path);
+          return existing === undefined ? null : new FakeZipFile(existing);
+        }
 
-    file(path: string, value?: Blob | string): FakeZipFile | FakeJSZip | null {
-      if (value === undefined) {
-        const existing = this.files.get(path);
-        return existing === undefined ? null : new FakeZipFile(existing);
+        this.files.set(path, value);
+        return this;
       }
 
-      this.files.set(path, value);
-      return this;
+      async generateAsync() {
+        return {
+          __fakeZipFiles: new Map(this.files),
+        };
+      }
     }
 
-    async generateAsync() {
-      return {
-        __fakeZipFiles: new Map(this.files),
-      };
-    }
-  }
+    return {
+      FakeJSZip,
+      initDBMock: vi.fn(),
+      listMediaLibraryMock: vi.fn(),
+      readAssetFileMock: vi.fn(),
+      recoverAssetsMock: vi.fn(),
+    };
+  });
 
-  return {
-    FakeJSZip,
-    initDBMock: vi.fn(),
-    listMediaLibraryMock: vi.fn(),
-    readAssetFileMock: vi.fn(),
-  };
-});
+vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/asset-publication-recovery')
+  >()),
+  recoverAssetPublications: recoverAssetsMock,
+}));
 
 vi.mock('./blob/stream', () => ({
   generateBackupZipFileToOpfs: ({ zip }: { zip: { generateAsync(): Promise<unknown> } }) =>
@@ -290,6 +304,9 @@ async function verifyExportMediaHubBackup(): Promise<void> {
 
   expectExportedManifest(manifest);
   expectExportedAssets(metadata, firstEntry.id, secondEntry.id);
+  expect(recoverAssetsMock.mock.invocationCallOrder[0]).toBeLessThan(
+    listMediaLibraryMock.mock.invocationCallOrder[0] ?? 0
+  );
 }
 
 async function verifySkipsMissingMediaLibraryRows(): Promise<void> {
@@ -361,6 +378,8 @@ beforeEach(() => {
   initDBMock.mockReset();
   listMediaLibraryMock.mockReset();
   readAssetFileMock.mockReset();
+  recoverAssetsMock.mockReset();
+  recoverAssetsMock.mockResolvedValue(0);
   vi.restoreAllMocks();
 });
 

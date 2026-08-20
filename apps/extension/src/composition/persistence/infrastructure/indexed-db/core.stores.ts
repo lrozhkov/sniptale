@@ -1,6 +1,6 @@
 // Keep the IndexedDB name stable so existing user media/projects remain readable across rebrands.
 export const DB_NAME = 'sniptale-video-db';
-export const DB_VERSION = 28;
+export const DB_VERSION = 29;
 
 export const STORE_NAME = 'recordings';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';

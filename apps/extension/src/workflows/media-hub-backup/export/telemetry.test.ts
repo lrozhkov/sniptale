@@ -1,4 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+
+vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/asset-publication-recovery')
+  >()),
+  recoverAssetPublications: vi.fn(async () => 0),
+}));
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';

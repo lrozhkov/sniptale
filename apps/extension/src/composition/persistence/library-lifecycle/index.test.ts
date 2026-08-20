@@ -5,16 +5,17 @@ import {
 } from '../projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createScenarioProject } from '../../../features/scenario/project/factories/project';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 
 const persistenceMocks = vi.hoisted(() => ({
   getMediaThumbnail: vi.fn(),
   listAggregatePresentations: vi.fn(),
-  listImageWorkspaces: vi.fn(),
+  recoverAndListStoredImageWorkspaces: vi.fn(),
   listMediaLibrary: vi.fn(),
   listScenarioAssets: vi.fn(),
   listScenarioExports: vi.fn(),
   listScenarioProjectEntries: vi.fn(),
-  listScenarioStepEditorDocuments: vi.fn(),
+  listStoredScenarioStepEditorDocuments: vi.fn(),
   listVideoProjectEntries: vi.fn(),
   runWithIndexedDbMutation: vi.fn(),
 }));
@@ -26,6 +27,10 @@ vi.mock('../projects/asset-publication', async (importOriginal) => ({
 vi.mock('../recordings/asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverRecordingAssetPublications: vi.fn().mockResolvedValue(0),
+}));
+vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image-aggregates/mutations')>()),
+  recoverImageWorkspacePublications: vi.fn().mockResolvedValue(0),
 }));
 vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
@@ -42,7 +47,7 @@ vi.mock('../aggregate-presentations', async (importOriginal) => ({
 }));
 vi.mock('../image-workspaces', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../image-workspaces')>()),
-  listImageWorkspaces: persistenceMocks.listImageWorkspaces,
+  recoverAndListStoredImageWorkspaces: persistenceMocks.recoverAndListStoredImageWorkspaces,
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -51,7 +56,7 @@ vi.mock('../media-library', async (importOriginal) => ({
 }));
 vi.mock('../scenario/editor-documents', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../scenario/editor-documents')>()),
-  listScenarioStepEditorDocuments: persistenceMocks.listScenarioStepEditorDocuments,
+  listStoredScenarioStepEditorDocuments: persistenceMocks.listStoredScenarioStepEditorDocuments,
 }));
 vi.mock('../projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../projects')>()),
@@ -106,13 +111,13 @@ function createMissingProjectAssetObjectStore(
 beforeEach(() => {
   vi.clearAllMocks();
   persistenceMocks.listAggregatePresentations.mockResolvedValue([]);
-  persistenceMocks.listImageWorkspaces.mockResolvedValue([]);
+  persistenceMocks.recoverAndListStoredImageWorkspaces.mockResolvedValue([]);
   persistenceMocks.getMediaThumbnail.mockResolvedValue(undefined);
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioAssets.mockResolvedValue([]);
   persistenceMocks.listScenarioExports.mockResolvedValue([]);
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
-  persistenceMocks.listScenarioStepEditorDocuments.mockResolvedValue([]);
+  persistenceMocks.listStoredScenarioStepEditorDocuments.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
   persistenceMocks.runWithIndexedDbMutation.mockResolvedValue(true);
 });
@@ -202,7 +207,10 @@ describe('library lifecycle cleanup and usage', () => {
     const imageWorkspace = {
       aggregateId: 'usage-image',
       createdAt: 1,
-      document: createEditorDocumentFixture(),
+      document: createPersistedEditorDocumentFixture(
+        createEditorDocumentFixture(),
+        'usage-image-source'
+      ),
       revision: 1,
       sourceTitle: null,
       sourceUrl: null,
@@ -231,7 +239,7 @@ describe('library lifecycle cleanup and usage', () => {
       { hasThumbnail: true, id: 'missing-thumbnail-media', size: 1 },
     ]);
     persistenceMocks.listVideoProjectEntries.mockResolvedValue([videoProject, legacyVideoProject]);
-    persistenceMocks.listImageWorkspaces.mockResolvedValue([imageWorkspace]);
+    persistenceMocks.recoverAndListStoredImageWorkspaces.mockResolvedValue([imageWorkspace]);
     persistenceMocks.listAggregatePresentations.mockResolvedValue([
       {
         aggregateId: 'usage-image',
@@ -281,6 +289,22 @@ describe('library lifecycle cleanup and usage', () => {
                   sha256: null,
                   size: 7,
                 },
+                {
+                  assetId: 'usage-image-source',
+                  createdAt: 1,
+                  location: { kind: 'opfs', objectKey: 'objects/usage-image-source' },
+                  mimeType: 'image/png',
+                  sha256: null,
+                  size: 11,
+                },
+                {
+                  assetId: 'usage-step-source',
+                  createdAt: 1,
+                  location: { kind: 'opfs', objectKey: 'objects/usage-step-source' },
+                  mimeType: 'image/png',
+                  sha256: null,
+                  size: 13,
+                },
               ]
             : []
         ),
@@ -289,12 +313,15 @@ describe('library lifecycle cleanup and usage', () => {
     persistenceMocks.listScenarioExports.mockResolvedValue([{ size: 3 }]);
     const stepDocument = {
       createdAt: 1,
-      document: createEditorDocumentFixture(),
+      document: createPersistedEditorDocumentFixture(
+        createEditorDocumentFixture(),
+        'usage-step-source'
+      ),
       projectId: scenario.id,
       stepId: 'usage-step',
       updatedAt: 1,
     };
-    persistenceMocks.listScenarioStepEditorDocuments.mockResolvedValue([stepDocument]);
+    persistenceMocks.listStoredScenarioStepEditorDocuments.mockResolvedValue([stepDocument]);
     persistenceMocks.getMediaThumbnail.mockImplementation(async (id: string) =>
       id === 'thumbnail-media'
         ? { blob: new Blob(['x']) }
@@ -315,6 +342,7 @@ describe('library lifecycle cleanup and usage', () => {
       18 +
       jsonBytes(videoProject.project) +
       jsonBytes(imageWorkspace) +
+      11 +
       new Blob(['preview']).size +
       new Blob(['thumb']).size +
       new Blob(['video-preview']).size +
@@ -326,6 +354,7 @@ describe('library lifecycle cleanup and usage', () => {
       7 +
       3 +
       jsonBytes(stepDocument) +
+      13 +
       4 +
       3 +
       new Blob(['scenario-thumb']).size;

@@ -34,6 +34,8 @@ import type {
 } from '../../contracts/types';
 import { appendAggregatePresentation } from '../presentation';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
+import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/editor-documents';
+import { materializePersistedEditorDocumentForLegacyTransfer } from '../../../../composition/persistence/document-assets';
 
 type ExportDatabase = Awaited<ReturnType<typeof initDB>>;
 
@@ -135,11 +137,30 @@ async function loadScenarioProjectBundle(
     projectId
   )) as ScenarioExportEntry[];
   assertBackupExportNotCancelled(signal);
-  const stepDocuments = (await db.getAllFromIndex(
+  const rawStepDocuments = await db.getAllFromIndex(
     SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
     'projectId',
     projectId
-  )) as ScenarioStepEditorDocumentEntry[];
+  );
+  const storedStepDocuments = parseDbEntries(
+    rawStepDocuments,
+    parseScenarioStepEditorDocumentEntry
+  );
+  if (storedStepDocuments.length !== rawStepDocuments.length) {
+    throw new Error('Invalid scenario editor document backup metadata.');
+  }
+  const stepDocuments: ScenarioStepEditorDocumentEntry[] = [];
+  for (const entry of storedStepDocuments) {
+    stepDocuments.push({
+      ...entry,
+      document: await materializePersistedEditorDocumentForLegacyTransfer({
+        document: entry.document,
+        refs: await Promise.all(
+          entry.document.assets.map((asset) => db.get(ASSET_REFS_STORE, asset.assetId))
+        ),
+      }),
+    });
+  }
   assertBackupExportNotCancelled(signal);
   return [assets, exports, stepDocuments] as const;
 }

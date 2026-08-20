@@ -1,6 +1,6 @@
-import { type EditorDocument } from '../../../../features/editor/document/types';
+import type { PersistedEditorDocumentV3 } from '../../../../composition/persistence/document-assets';
 
-export function createEditorDocument(): EditorDocument {
+export function createEditorDocument(): PersistedEditorDocumentV3 {
   return {
     canvasHeight: 1,
     canvasJson: '{"version":"7.2.0","objects":[]}',
@@ -11,7 +11,7 @@ export function createEditorDocument(): EditorDocument {
       backgroundGradientAngle: 90,
       backgroundGradientFrom: '#fff',
       backgroundGradientTo: '#000',
-      backgroundImageData: null,
+      backgroundImage: null,
       backgroundImageFit: 'cover',
       backgroundMode: 'color',
       browserMode: false,
@@ -26,11 +26,12 @@ export function createEditorDocument(): EditorDocument {
     sourceDisplayHeight: 1,
     sourceDisplayWidth: 1,
     sourceHeight: 1,
-    sourceImageData: 'data:image/png;base64,source',
+    sourceImage: { assetId: 'editor-source-1' },
     sourceLeft: 0,
     sourceName: null,
     sourceTop: 0,
     sourceWidth: 1,
-    version: 2,
+    assets: [{ assetId: 'editor-source-1', role: 'source-image' }],
+    version: 3,
   };
 }

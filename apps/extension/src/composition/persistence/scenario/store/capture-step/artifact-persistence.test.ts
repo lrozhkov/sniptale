@@ -15,6 +15,16 @@ vi.mock('../../../assets', async (importOriginal) => ({
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
   recoverStandaloneAssetPublications: vi.fn(async () => 0),
   releaseAssetReadyProtection: vi.fn(),
+  writeBlobToAsset: vi.fn(async (blob: Blob) => ({
+    ref: {
+      assetId: 'editor-source',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/editor-source' },
+      mimeType: blob.type,
+      sha256: null,
+      size: blob.size,
+    },
+  })),
 }));
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -43,7 +53,7 @@ import { createScenarioStoreProjectFixture } from '../test.helpers.ts';
 function createEditorDocument() {
   return {
     version: 2 as const,
-    sourceImageData: 'data:image/png;base64,asset',
+    sourceImageData: 'data:image/png;base64,YXNzZXQ=',
     sourceName: null,
     sourceWidth: 320,
     sourceHeight: 180,
@@ -176,10 +186,19 @@ async function verifyArtifactPersistenceWithDocument() {
   expect(txPutMock).toHaveBeenCalledWith({
     stepId: 'step-1',
     projectId: project.id,
-    document: stepDocument,
+    document: expect.objectContaining({
+      assets: [{ assetId: 'editor-source', role: 'source-image' }],
+      sourceImage: { assetId: 'editor-source' },
+      version: 3,
+    }),
     createdAt: 11,
     updatedAt: 11,
   });
+  expect(txPutMock).not.toHaveBeenCalledWith(
+    expect.objectContaining({
+      document: expect.objectContaining({ sourceImageData: expect.anything() }),
+    })
+  );
 }
 
 async function verifyArtifactPersistenceWithoutDocument() {

@@ -14,6 +14,7 @@ export type EditorSessionAutosaveState = {
   pendingDocument: EditorDocument | null;
   pendingTimer: number;
   lastWriteError: unknown | null;
+  releaseHydratedDocument: (() => void) | null;
   writeChain: Promise<void>;
 };
 
@@ -24,6 +25,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     pendingDocument: null,
     pendingTimer: 0,
     lastWriteError: null,
+    releaseHydratedDocument: null,
     writeChain: Promise.resolve(),
   };
 }

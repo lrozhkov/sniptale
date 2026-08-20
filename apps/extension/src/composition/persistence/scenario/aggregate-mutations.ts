@@ -1,51 +1,54 @@
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { ScenarioProject } from '../../../features/scenario/contracts/types/project';
 import {
-  AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   SCENARIO_ASSETS_STORE,
-  SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   initDB,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import type {
-  PreparedScenarioAssetEntry,
-  ScenarioProjectEntry,
-  ScenarioStepEditorDocumentEntry,
-} from './contracts';
+import type { PreparedScenarioAssetEntry, ScenarioProjectEntry } from './contracts';
 import { createScenarioProjectEntry } from './projects/entry';
 import { parseScenarioProjectEntry } from './read-guards';
-import { parseScenarioAssetEntry, parseScenarioExportEntry } from './read-guards';
+import { parseScenarioAssetEntry } from './read-guards';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.guards';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
 import { parseScenarioProject } from './projects/guards';
-import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
+import { areScenarioProjectsEqual } from './aggregate-comparison';
 import { isScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import { isRecord } from '../infrastructure/indexed-db/read-primitives';
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
   createAssetPublicationJournal,
+  deleteAssetObject,
   parseAssetRef,
   publishReadyJournalWithRetry,
   recoverStandaloneAssetPublications,
   releaseAssetReadyProtection,
   type AssetPublicationAdapter,
   type AssetReadyJournal,
+  type AssetRef,
   type PhysicalDeleteAssetOperation,
 } from '../assets';
 import {
-  discardSupersededScenarioAssetPuts,
   rejectScenarioMutationBeforeHandoff,
   SCENARIO_ASSET_OWNER_KIND,
   SCENARIO_ASSET_PUBLICATION_DOMAIN,
   SCENARIO_ASSET_ROLE,
   type ScenarioAggregateChildMutation,
+  type PreparedScenarioAggregateChildMutation,
+  type PreparedScenarioStepEditorDocumentEntry,
 } from './asset-staging';
+import {
+  applyScenarioDocumentMutations,
+  discardPreparedScenarioEditorDocuments,
+  prepareScenarioEditorDocumentMutations,
+  SCENARIO_EDITOR_DOCUMENT_OWNER_KIND,
+} from './editor-document-staging';
 export {
   discardScenarioAggregateAssetPuts,
   SCENARIO_ASSET_OWNER_KIND,
@@ -72,11 +75,18 @@ interface CommitScenarioAggregateMutationOptions {
   publicationUpdatedAt?: number;
 }
 
+interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
+  CommitScenarioAggregateMutationOptions,
+  'children'
+> {
+  children?: PreparedScenarioAggregateChildMutation;
+}
+
 interface ScenarioAggregatePublicationPayload<
   TProject extends StoredScenarioProject = StoredScenarioProject,
 > {
   baseRevision: number | null;
-  children: ScenarioAggregateChildMutation;
+  children: PreparedScenarioAggregateChildMutation;
   committedAt: number;
   expectedUpdatedAt?: number | null;
   project: TProject;
@@ -91,57 +101,15 @@ interface ScenarioAggregateMutationResult<TProject extends StoredScenarioProject
 
 type ScenarioAggregateTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
 
-function hasScenarioChildMutations(children: ScenarioAggregateChildMutation | undefined): boolean {
+function hasScenarioChildMutations(
+  children: PreparedScenarioAggregateChildMutation | undefined
+): boolean {
   return (
     (children?.assetDeletes?.length ?? 0) > 0 ||
     (children?.assetPuts?.length ?? 0) > 0 ||
     (children?.editorDocumentDeletes?.length ?? 0) > 0 ||
     (children?.editorDocumentPuts?.length ?? 0) > 0
   );
-}
-
-function areScenarioProjectsEqual(
-  left: StoredScenarioProject,
-  right: StoredScenarioProject
-): boolean {
-  const canonicalLeft = left.version === 3 ? left : (parseScenarioProject(left) ?? left);
-  const canonicalRight = right.version === 3 ? right : (parseScenarioProject(right) ?? right);
-  return areJsonValuesEqual(canonicalLeft, canonicalRight);
-}
-
-function areJsonValuesEqual(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right)) return true;
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return (
-      Array.isArray(left) &&
-      Array.isArray(right) &&
-      left.length === right.length &&
-      left.every((value, index) => areJsonValuesEqual(value, right[index]))
-    );
-  }
-  if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
-    return false;
-  }
-  const leftRecord = left as Record<string, unknown>;
-  const rightRecord = right as Record<string, unknown>;
-  const leftKeys = Object.keys(leftRecord);
-  const rightKeys = Object.keys(rightRecord);
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every(
-      (key) =>
-        Object.prototype.hasOwnProperty.call(rightRecord, key) &&
-        areJsonValuesEqual(leftRecord[key], rightRecord[key])
-    )
-  );
-}
-
-function readOwnedScenarioChildId(value: unknown, projectId: string): string | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  return record['projectId'] === projectId && typeof record['id'] === 'string'
-    ? record['id']
-    : null;
 }
 
 function assertExpectedScenarioRevision(args: {
@@ -166,7 +134,7 @@ function assertExpectedScenarioRevision(args: {
 
 function assertChildOwnership(
   projectId: string,
-  children: ScenarioAggregateChildMutation | undefined
+  children: PreparedScenarioAggregateChildMutation | ScenarioAggregateChildMutation | undefined
 ): void {
   for (const asset of children?.assetPuts ?? []) {
     if (asset.projectId !== projectId) {
@@ -180,7 +148,7 @@ function assertChildOwnership(
   }
 }
 
-function getMutationStoreNames(children: ScenarioAggregateChildMutation | undefined) {
+function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation | undefined) {
   const storeNames: Array<
     | typeof SCENARIO_PROJECTS_STORE
     | typeof SCENARIO_ASSETS_STORE
@@ -201,56 +169,74 @@ function getMutationStoreNames(children: ScenarioAggregateChildMutation | undefi
     (children?.editorDocumentPuts?.length ?? 0) > 0 ||
     (children?.editorDocumentDeletes?.length ?? 0) > 0
   ) {
-    storeNames.push(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE);
+    storeNames.push(
+      SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
+      ASSET_REFS_STORE,
+      ASSET_OWNERS_STORE,
+      ASSET_OPERATIONS_STORE
+    );
   }
-  return storeNames;
+  return [...new Set(storeNames)];
 }
 
 export async function commitScenarioAggregateMutation<TProject extends StoredScenarioProject>(
   project: TProject,
   options: CommitScenarioAggregateMutationOptions = {}
 ): Promise<ScenarioAggregateMutationResult<TProject>> {
-  const assetPuts = options.children?.assetPuts ?? [];
-  if (assetPuts.length === 0) {
-    assertChildOwnership(project.id, options.children);
-    if ((options.children?.assetDeletes?.length ?? 0) > 0) {
-      await recoverScenarioAssetPublications();
-    }
+  assertChildOwnership(project.id, options.children);
+  await recoverScenarioAssetPublications();
+  let preparedChildren: PreparedScenarioAggregateChildMutation | undefined;
+  try {
+    preparedChildren = await prepareScenarioEditorDocumentMutations(options.children);
+  } catch (error) {
+    return rejectScenarioMutationBeforeHandoff(options.children, error);
+  }
+  const { children: _children, ...optionMetadata } = options;
+  const preparedOptions: PreparedCommitScenarioAggregateMutationOptions = {
+    ...optionMetadata,
+    ...(preparedChildren ? { children: preparedChildren } : {}),
+  };
+  const assetRefs = [
+    ...(preparedChildren?.assetPuts ?? []).map((asset) => asset.assetRef),
+    ...(preparedChildren?.editorDocumentPuts ?? []).flatMap((entry) => entry.assetRefs),
+  ];
+  if (assetRefs.length === 0) {
     return runWithIndexedDbMutation((db) =>
-      commitScenarioAggregateInTransaction(db, project, options)
+      commitScenarioAggregateInTransaction(db, project, preparedOptions)
     );
   }
   let journalCreated = false;
   try {
-    assertChildOwnership(project.id, options.children);
-    await recoverScenarioAssetPublications();
+    assertChildOwnership(project.id, preparedChildren);
     const db = await initDB();
     const existing = parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, project.id));
     assertExpectedScenarioRevision({
       existing: existing ?? undefined,
-      expectedRevision: options.expectedRevision,
-      expectedUpdatedAt: options.expectedUpdatedAt,
+      expectedRevision: preparedOptions.expectedRevision,
+      expectedUpdatedAt: preparedOptions.expectedUpdatedAt,
       projectId: project.id,
     });
     const committedAt = Date.now();
     const targetEntry = createScenarioAggregateEntry({
       existing: existing ?? undefined,
-      options: { ...options, publicationUpdatedAt: committedAt },
+      options: { ...preparedOptions, publicationUpdatedAt: committedAt },
       project,
     });
     const payload: ScenarioAggregatePublicationPayload<TProject> = {
       baseRevision: existing?.workspaceRevision ?? null,
-      children: options.children!,
+      children: preparedChildren!,
       committedAt,
-      ...(options.expectedUpdatedAt === undefined
+      ...(preparedOptions.expectedUpdatedAt === undefined
         ? {}
-        : { expectedUpdatedAt: options.expectedUpdatedAt }),
+        : { expectedUpdatedAt: preparedOptions.expectedUpdatedAt }),
       project,
       targetEntry,
-      ...(options.storageClass === undefined ? {} : { storageClass: options.storageClass }),
+      ...(preparedOptions.storageClass === undefined
+        ? {}
+        : { storageClass: preparedOptions.storageClass }),
     };
     const journal = await createAssetPublicationJournal({
-      assetRefs: assetPuts.map((asset) => asset.assetRef),
+      assetRefs,
       domain: SCENARIO_ASSET_PUBLICATION_DOMAIN,
       payload,
     });
@@ -261,12 +247,25 @@ export async function commitScenarioAggregateMutation<TProject extends StoredSce
         ready
       )) as ScenarioAggregateMutationResult<TProject>;
     });
-    await releaseAssetReadyProtection(assetPuts.map((asset) => asset.assetId));
+    await releaseAssetReadyProtection(assetRefs.map((ref) => ref.assetId));
     if (!result) throw new Error('Scenario asset publication produced no result.');
     return result;
   } catch (error) {
     if (!journalCreated) {
-      return rejectScenarioMutationBeforeHandoff(options.children, error);
+      let documentCleanupError: unknown;
+      try {
+        await discardPreparedScenarioEditorDocuments(preparedChildren);
+      } catch (cleanupError) {
+        documentCleanupError = cleanupError;
+      }
+      if (documentCleanupError !== undefined) {
+        throw new AggregateError(
+          [error, documentCleanupError],
+          'Scenario mutation and editor document cleanup failed.',
+          { cause: error }
+        );
+      }
+      return rejectScenarioMutationBeforeHandoff(preparedChildren, error);
     }
     throw error;
   }
@@ -275,7 +274,7 @@ export async function commitScenarioAggregateMutation<TProject extends StoredSce
 async function commitScenarioAggregateInTransaction<TProject extends StoredScenarioProject>(
   db: Awaited<ReturnType<typeof initDB>>,
   project: TProject,
-  options: CommitScenarioAggregateMutationOptions
+  options: PreparedCommitScenarioAggregateMutationOptions
 ): Promise<ScenarioAggregateMutationResult<TProject>> {
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const tx = db.transaction(getMutationStoreNames(options.children), 'readwrite');
@@ -301,7 +300,13 @@ async function commitScenarioAggregateInTransaction<TProject extends StoredScena
   const entry = createScenarioAggregateEntry({ existing, options, project });
   await applyScenarioAssetMutations(tx, project.id, options.children, physicalDelete);
   await projectStore.put(entry);
-  await applyScenarioDocumentMutations(tx, project.id, entry.updatedAt, options.children);
+  await applyScenarioDocumentMutations({
+    children: options.children,
+    physicalDelete,
+    projectId: project.id,
+    tx,
+    updatedAt: entry.updatedAt,
+  });
   await tx.done;
   if (physicalDelete.assetIds.length > 0) {
     await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
@@ -311,7 +316,7 @@ async function commitScenarioAggregateInTransaction<TProject extends StoredScena
 
 function createScenarioAggregateEntry<TProject extends StoredScenarioProject>(args: {
   existing: ScenarioProjectEntry | undefined;
-  options: CommitScenarioAggregateMutationOptions;
+  options: PreparedCommitScenarioAggregateMutationOptions;
   project: TProject;
 }): ScenarioProjectEntry & { project: TProject } {
   return (
@@ -342,7 +347,7 @@ function createScenarioAggregateEntry<TProject extends StoredScenarioProject>(ar
 async function applyScenarioAssetMutations(
   tx: ScenarioAggregateTransaction,
   projectId: string,
-  children: ScenarioAggregateChildMutation | undefined,
+  children: PreparedScenarioAggregateChildMutation | undefined,
   physicalDelete: PhysicalDeleteAssetOperation
 ): Promise<void> {
   if ((children?.assetPuts?.length ?? 0) === 0 && (children?.assetDeletes?.length ?? 0) === 0) {
@@ -400,48 +405,6 @@ async function applyScenarioAssetMutations(
   }
   if (physicalDelete.assetIds.length > 0) {
     await tx.objectStore(ASSET_OPERATIONS_STORE).put!(physicalDelete);
-  }
-}
-
-async function applyScenarioDocumentMutations(
-  tx: ScenarioAggregateTransaction,
-  projectId: string,
-  updatedAt: number,
-  children: ScenarioAggregateChildMutation | undefined
-): Promise<void> {
-  if (
-    (children?.editorDocumentPuts?.length ?? 0) === 0 &&
-    (children?.editorDocumentDeletes?.length ?? 0) === 0
-  ) {
-    return;
-  }
-  const documentStore = tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE);
-  for (const document of children?.editorDocumentPuts ?? []) {
-    const rawDocument: unknown = await documentStore.get!(document.stepId);
-    const existingDocument = parseScenarioStepEditorDocumentEntry(rawDocument);
-    if (
-      rawDocument !== undefined &&
-      (!existingDocument || existingDocument.projectId !== projectId)
-    ) {
-      throw new Error(
-        `Scenario editor document ${document.stepId} does not belong to project ${projectId}.`
-      );
-    }
-    await documentStore.put!({
-      ...document,
-      createdAt: existingDocument?.createdAt ?? (document.createdAt || updatedAt),
-      updatedAt,
-    });
-  }
-  for (const stepId of children?.editorDocumentDeletes ?? []) {
-    const rawDocument: unknown = await documentStore.get!(stepId);
-    const document = parseScenarioStepEditorDocumentEntry(rawDocument);
-    if (rawDocument !== undefined && (!document || document.projectId !== projectId)) {
-      throw new Error(
-        `Scenario editor document ${stepId} does not belong to project ${projectId}.`
-      );
-    }
-    await documentStore.delete!(stepId);
   }
 }
 
@@ -519,8 +482,14 @@ function parseScenarioAggregatePublicationPayload(
     if (!entry || !ref || ref.assetId !== entry.assetId) return null;
     assetPuts.push({ ...entry, assetRef: ref });
   }
-  const editorDocumentPuts = rawDocumentPuts.map(parseScenarioStepEditorDocumentEntry);
-  if (editorDocumentPuts.some((entry) => entry === null)) return null;
+  const editorDocumentPuts: PreparedScenarioStepEditorDocumentEntry[] = [];
+  for (const raw of rawDocumentPuts) {
+    const entry = parseScenarioStepEditorDocumentEntry(raw);
+    if (!entry || !isRecord(raw) || !Array.isArray(raw['assetRefs'])) return null;
+    const assetRefs = raw['assetRefs'].map(parseAssetRef);
+    if (assetRefs.some((ref) => ref === null)) return null;
+    editorDocumentPuts.push({ ...entry, assetRefs: assetRefs as AssetRef[] });
+  }
   if (!rawAssetDeletes.every((id) => typeof id === 'string')) return null;
   if (!rawDocumentDeletes.every((id) => typeof id === 'string')) return null;
   const storageClass = value['storageClass'];
@@ -539,7 +508,7 @@ function parseScenarioAggregatePublicationPayload(
     children: {
       assetPuts,
       assetDeletes: rawAssetDeletes as string[],
-      editorDocumentPuts: editorDocumentPuts as ScenarioStepEditorDocumentEntry[],
+      editorDocumentPuts,
       editorDocumentDeletes: rawDocumentDeletes as string[],
     },
     committedAt,
@@ -558,12 +527,25 @@ async function publishScenarioAssetJournal(
     throw new Error('Invalid standalone scenario asset publication journal.');
   }
   const payload = parseScenarioAggregatePublicationPayload(journal.payload);
-  if (!payload || payload.children.assetPuts?.length !== journal.assetRefs.length) {
+  const payloadAssetRefs = payload
+    ? [
+        ...(payload.children.assetPuts ?? []).map((asset) => asset.assetRef),
+        ...(payload.children.editorDocumentPuts ?? []).flatMap((entry) => entry.assetRefs),
+      ]
+    : [];
+  if (!payload || payloadAssetRefs.length !== journal.assetRefs.length) {
     throw new Error('Invalid scenario asset publication payload.');
   }
   const journalAssetIds = new Set(journal.assetRefs.map((ref) => ref.assetId));
-  if (payload.children.assetPuts.some((asset) => !journalAssetIds.has(asset.assetId))) {
+  if ((payload.children.assetPuts ?? []).some((asset) => !journalAssetIds.has(asset.assetId))) {
     throw new Error('Scenario publication assets do not match its journal.');
+  }
+  if (
+    (payload.children.editorDocumentPuts ?? []).some((entry) =>
+      entry.assetRefs.some((ref) => !journalAssetIds.has(ref.assetId))
+    )
+  ) {
+    throw new Error('Scenario editor document assets do not match its journal.');
   }
   const db = await initDB();
   const existing = parseScenarioProjectEntry(
@@ -576,10 +558,7 @@ async function publishScenarioAssetJournal(
     };
   }
   if ((existing?.workspaceRevision ?? null) !== payload.baseRevision) {
-    if (
-      allowSuperseded &&
-      (await discardSupersededScenarioAssetPuts(db, payload.children.assetPuts ?? []))
-    ) {
+    if (allowSuperseded && (await discardSupersededScenarioPublication(db, payload.children))) {
       return null;
     }
     throw new StaleScenarioAggregateRevisionError(payload.project.id);
@@ -595,6 +574,57 @@ async function publishScenarioAssetJournal(
       publicationUpdatedAt: payload.committedAt,
     })
   );
+}
+
+async function discardSupersededScenarioPublication(
+  db: Awaited<ReturnType<typeof initDB>>,
+  children: PreparedScenarioAggregateChildMutation
+): Promise<boolean> {
+  for (const prepared of children.assetPuts ?? []) {
+    const stored = parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, prepared.id));
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, prepared.assetId));
+    const owner: unknown = await db.get(ASSET_OWNERS_STORE, [
+      SCENARIO_ASSET_OWNER_KIND,
+      prepared.id,
+      SCENARIO_ASSET_ROLE,
+    ]);
+    if (
+      stored?.assetId === prepared.assetId ||
+      ref?.assetId === prepared.assetId ||
+      (isRecord(owner) && owner['assetId'] === prepared.assetId)
+    ) {
+      return false;
+    }
+  }
+  for (const prepared of children.editorDocumentPuts ?? []) {
+    const stored = parseScenarioStepEditorDocumentEntry(
+      await db.get(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE, prepared.stepId)
+    );
+    if (stored && JSON.stringify(stored.document) === JSON.stringify(prepared.document)) {
+      return false;
+    }
+    for (const asset of prepared.document.assets) {
+      if (
+        (await db.get(ASSET_REFS_STORE, asset.assetId)) !== undefined ||
+        (await db.get(ASSET_OWNERS_STORE, [
+          SCENARIO_EDITOR_DOCUMENT_OWNER_KIND,
+          prepared.stepId,
+          asset.role,
+        ])) !== undefined
+      ) {
+        return false;
+      }
+    }
+  }
+  await Promise.all(
+    [
+      ...(children.assetPuts ?? []).map((prepared) => prepared.assetId),
+      ...(children.editorDocumentPuts ?? []).flatMap((prepared) =>
+        prepared.document.assets.map((asset) => asset.assetId)
+      ),
+    ].map((assetId) => deleteAssetObject(assetId))
+  );
+  return true;
 }
 
 async function isScenarioPublicationAlreadyCommitted(
@@ -626,6 +656,23 @@ async function isScenarioPublicationAlreadyCommitted(
     )
       return false;
   }
+  for (const prepared of payload.children.editorDocumentPuts ?? []) {
+    const stored = parseScenarioStepEditorDocumentEntry(
+      await db.get(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE, prepared.stepId)
+    );
+    if (!stored || JSON.stringify(stored.document) !== JSON.stringify(prepared.document)) {
+      return false;
+    }
+    for (const asset of prepared.document.assets) {
+      const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, asset.assetId));
+      const owner: unknown = await db.get(ASSET_OWNERS_STORE, [
+        SCENARIO_EDITOR_DOCUMENT_OWNER_KIND,
+        prepared.stepId,
+        asset.role,
+      ]);
+      if (!ref || !isRecord(owner) || owner['assetId'] !== asset.assetId) return false;
+    }
+  }
   return true;
 }
 
@@ -638,136 +685,4 @@ export const scenarioAssetPublicationAdapter: AssetPublicationAdapter = {
 
 export function recoverScenarioAssetPublications(): Promise<number> {
   return recoverStandaloneAssetPublications([scenarioAssetPublicationAdapter]);
-}
-
-export async function deleteOrphanedScenarioAggregateChild(args: {
-  id: string;
-  kind: 'asset' | 'editor-document';
-}): Promise<void> {
-  await recoverScenarioAssetPublications();
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (db) => {
-    const childStoreName =
-      args.kind === 'asset' ? SCENARIO_ASSETS_STORE : SCENARIO_STEP_EDITOR_DOCUMENTS_STORE;
-    const tx = db.transaction(
-      args.kind === 'asset'
-        ? [
-            SCENARIO_PROJECTS_STORE,
-            childStoreName,
-            ASSET_REFS_STORE,
-            ASSET_OWNERS_STORE,
-            ASSET_OPERATIONS_STORE,
-          ]
-        : [SCENARIO_PROJECTS_STORE, childStoreName],
-      'readwrite'
-    );
-    const childStore = tx.objectStore(childStoreName);
-    const rawChild: unknown = await childStore.get(args.id);
-    const child =
-      args.kind === 'asset'
-        ? parseScenarioAssetEntry(rawChild)
-        : parseScenarioStepEditorDocumentEntry(rawChild);
-    if (!child) {
-      if (rawChild !== undefined) {
-        throw new Error(`Invalid scenario ${args.kind} cannot be safely removed.`);
-      }
-      await tx.done;
-      return;
-    }
-    const projectId = child.projectId;
-    if (await tx.objectStore(SCENARIO_PROJECTS_STORE).get(projectId)) {
-      throw new Error(`Scenario ${args.kind} ${args.id} still belongs to aggregate ${projectId}.`);
-    }
-    await childStore.delete(args.id);
-    if (args.kind === 'asset' && 'assetId' in child) {
-      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-      await ownerStore.delete([SCENARIO_ASSET_OWNER_KIND, args.id, SCENARIO_ASSET_ROLE]);
-      if ((await ownerStore.index('assetId').count(child.assetId)) === 0) {
-        await tx.objectStore(ASSET_REFS_STORE).delete(child.assetId);
-        physicalDelete.assetIds.push(child.assetId);
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-      }
-    }
-    await tx.done;
-  });
-  if (physicalDelete.assetIds.length > 0) {
-    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
-  }
-}
-
-export async function deleteScenarioAggregate(projectId: string): Promise<void> {
-  await recoverScenarioAssetPublications();
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        SCENARIO_PROJECTS_STORE,
-        SCENARIO_ASSETS_STORE,
-        SCENARIO_EXPORTS_STORE,
-        SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
-        AGGREGATE_PRESENTATIONS_STORE,
-        ASSET_REFS_STORE,
-        ASSET_OWNERS_STORE,
-        ASSET_OPERATIONS_STORE,
-      ],
-      'readwrite'
-    );
-    const [rawAssets, rawExports, rawDocuments] = await Promise.all([
-      tx.objectStore(SCENARIO_ASSETS_STORE).index!('projectId').getAll(projectId),
-      tx.objectStore(SCENARIO_EXPORTS_STORE).index!('projectId').getAll(projectId),
-      tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).index!('projectId').getAll(projectId),
-    ]);
-    const assetIds = rawAssets.flatMap((value) => {
-      const parsed = parseScenarioAssetEntry(value);
-      const id = parsed?.id ?? readOwnedScenarioChildId(value, projectId);
-      return id ? [id] : [];
-    });
-    const exportIds = rawExports.flatMap((value) => {
-      const parsed = parseScenarioExportEntry(value);
-      const id = parsed?.id ?? readOwnedScenarioChildId(value, projectId);
-      return id ? [id] : [];
-    });
-    const documentIds = rawDocuments.flatMap((value) => {
-      const parsed = parseScenarioStepEditorDocumentEntry(value);
-      const stepId =
-        parsed?.stepId ??
-        (typeof value === 'object' &&
-        value !== null &&
-        !Array.isArray(value) &&
-        (value as Record<string, unknown>)['projectId'] === projectId &&
-        typeof (value as Record<string, unknown>)['stepId'] === 'string'
-          ? ((value as Record<string, unknown>)['stepId'] as string)
-          : null);
-      return stepId ? [stepId] : [];
-    });
-    await tx.objectStore(SCENARIO_PROJECTS_STORE).delete(projectId);
-    const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-    for (const assetId of assetIds) {
-      const asset = parseScenarioAssetEntry(
-        await tx.objectStore(SCENARIO_ASSETS_STORE).get(assetId)
-      );
-      await tx.objectStore(SCENARIO_ASSETS_STORE).delete(assetId);
-      if (asset) {
-        await ownerStore.delete([SCENARIO_ASSET_OWNER_KIND, assetId, SCENARIO_ASSET_ROLE]);
-        if ((await ownerStore.index('assetId').count(asset.assetId)) === 0) {
-          await tx.objectStore(ASSET_REFS_STORE).delete(asset.assetId);
-          physicalDelete.assetIds.push(asset.assetId);
-        }
-      }
-    }
-    for (const exportId of exportIds) await tx.objectStore(SCENARIO_EXPORTS_STORE).delete(exportId);
-    for (const stepId of documentIds) {
-      await tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).delete(stepId);
-    }
-    await tx
-      .objectStore(AGGREGATE_PRESENTATIONS_STORE)
-      .delete(createAggregatePresentationKey({ id: projectId, kind: 'scenario' }));
-    if (physicalDelete.assetIds.length > 0) {
-      await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-    }
-    await tx.done;
-  });
-  if (physicalDelete.assetIds.length > 0) {
-    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
-  }
 }

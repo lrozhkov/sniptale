@@ -4,11 +4,24 @@ import { createScenarioProjectV3 } from '../../../../features/scenario/project/v
 import { createVideoProjectFixture } from '../../export/projects/video-fixture.test-support.ts';
 import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
 
-const { initDBMock, listMediaLibraryMock, readAssetFileMock } = vi.hoisted(() => ({
-  initDBMock: vi.fn(),
-  listMediaLibraryMock: vi.fn(),
-  readAssetFileMock: vi.fn(),
-}));
+const { initDBMock, listMediaLibraryMock, readAssetFileMock, recoverAssetsMock } = vi.hoisted(
+  () => ({
+    initDBMock: vi.fn(),
+    listMediaLibraryMock: vi.fn(),
+    readAssetFileMock: vi.fn(),
+    recoverAssetsMock: vi.fn(),
+  })
+);
+
+vi.mock(
+  '../../../../composition/persistence/asset-publication-recovery',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/asset-publication-recovery')
+    >()),
+    recoverAssetPublications: recoverAssetsMock,
+  })
+);
 
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
@@ -73,6 +86,8 @@ beforeEach(() => {
   initDBMock.mockReset();
   listMediaLibraryMock.mockReset();
   readAssetFileMock.mockReset();
+  recoverAssetsMock.mockReset();
+  recoverAssetsMock.mockResolvedValue(0);
   readAssetFileMock.mockResolvedValue(new File(['recording'], 'recording.webm'));
 });
 
@@ -150,11 +165,31 @@ async function readInspectionStore(storeName: string, screenshot: MediaLibraryEn
     return [{ assetId: screenshot.id, blob: new Blob(['thumb']) }];
   }
   if (storeName === 'image_workspaces') {
+    const runtimeDocument = createEditorDocumentFixture();
     return [
       {
         aggregateId: screenshot.id,
         createdAt: 1,
-        document: createEditorDocumentFixture(),
+        document: {
+          ...runtimeDocument,
+          version: 3,
+          sourceImage: { assetId: 'workspace-source' },
+          assets: [{ assetId: 'workspace-source', role: 'source-image' }],
+          browserFrame: {
+            canvasMode: 'resize',
+            contentMode: 'push-down',
+            favicon: null,
+            title: 'Private document title',
+            url: 'https://private.test/reset?token=secret',
+          },
+          frame: {
+            ...runtimeDocument.frame,
+            backgroundImage: null,
+            browserTitle: 'Private frame title',
+            browserUrl: 'https://private.test/invite?code=secret',
+          },
+          sourceImageData: undefined,
+        },
         revision: 1,
         sourceTitle: null,
         sourceUrl: null,
@@ -273,7 +308,7 @@ describe('inspect local media hub backup', () => {
         recordingCount: 1,
         scenarioProjectCount: 1,
         selectedCount: 3,
-        sourceMetadataCount: 1,
+        sourceMetadataCount: 2,
         thumbnailCount: 5,
         videoProjectCount: 1,
         webSnapshotCount: 0,
@@ -285,6 +320,9 @@ describe('inspect local media hub backup', () => {
     expect(readAssetFileMock).toHaveBeenCalledWith(
       expect.objectContaining({ assetId: 'asset-export-1' }),
       'export.webm'
+    );
+    expect(recoverAssetsMock.mock.invocationCallOrder[0]).toBeLessThan(
+      listMediaLibraryMock.mock.invocationCallOrder[0] ?? 0
     );
   });
 

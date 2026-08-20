@@ -4,7 +4,7 @@ import type {
   ScenarioStepEditorDocumentEntry,
 } from '../../../composition/persistence/scenario/contracts';
 import { parseScenarioProjectEntry } from '../../../composition/persistence/scenario/read-guards';
-import { parseScenarioStepEditorDocumentEntry } from '../../../composition/persistence/scenario/editor-documents';
+import { isEditorDocument } from '../../../features/editor/document/guards';
 import { isSafeScenarioAssetImageMimeType } from '../../../composition/persistence/scenario/projects/guards';
 import { readSafeBackupPathSegment, readSafeExportFilename } from './archive-fields';
 import { readProjectEntryFields } from './project-entry-fields';
@@ -85,17 +85,15 @@ function normalizeScenarioExportEntry(value: unknown): ScenarioExportEntry {
 
 function normalizeStepDocument(value: unknown): ScenarioStepEditorDocumentEntry {
   const entry = readRecord(value);
-  const parsed = parseScenarioStepEditorDocumentEntry({
+  const document = field(entry, 'document');
+  if (!isEditorDocument(document)) failMetadata();
+  return {
     createdAt: readNumber(field(entry, 'createdAt')),
-    document: field(entry, 'document'),
+    document,
     projectId: readSafeBackupPathSegment(field(entry, 'projectId'), 'scenario project id'),
     stepId: readSafeBackupPathSegment(field(entry, 'stepId'), 'scenario step document id'),
     updatedAt: readNumber(field(entry, 'updatedAt')),
-  });
-  if (!parsed) {
-    failMetadata();
-  }
-  return parsed;
+  };
 }
 
 export function normalizeScenarioProject(value: JsonRecord): ScenarioBackupProjectDescriptor {

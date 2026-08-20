@@ -1,13 +1,10 @@
-import {
-  ASSET_OWNERS_STORE,
-  ASSET_REFS_STORE,
-  SCENARIO_ASSETS_STORE,
-} from '../infrastructure/indexed-db/core';
-import type { initDB } from '../infrastructure/indexed-db/core';
-import { deleteAssetObject, discardPreparedAsset, parseAssetRef } from '../assets';
-import { isRecord } from '../infrastructure/indexed-db/read-primitives';
-import type { PreparedScenarioAssetEntry, ScenarioStepEditorDocumentEntry } from './contracts';
-import { parseScenarioAssetEntry } from './read-guards';
+import { discardPreparedAsset } from '../assets';
+import type {
+  PreparedScenarioAssetEntry,
+  ScenarioStepEditorDocumentEntry,
+  StoredScenarioStepEditorDocumentEntry,
+} from './contracts';
+import type { AssetRef } from '../assets';
 
 export const SCENARIO_ASSET_PUBLICATION_DOMAIN = 'scenario-assets';
 export const SCENARIO_ASSET_OWNER_KIND = 'scenario-asset';
@@ -18,6 +15,17 @@ export interface ScenarioAggregateChildMutation {
   assetPuts?: readonly PreparedScenarioAssetEntry[];
   editorDocumentDeletes?: readonly string[];
   editorDocumentPuts?: readonly ScenarioStepEditorDocumentEntry[];
+}
+
+export interface PreparedScenarioStepEditorDocumentEntry extends StoredScenarioStepEditorDocumentEntry {
+  assetRefs: AssetRef[];
+}
+
+export interface PreparedScenarioAggregateChildMutation extends Omit<
+  ScenarioAggregateChildMutation,
+  'editorDocumentPuts'
+> {
+  editorDocumentPuts?: readonly PreparedScenarioStepEditorDocumentEntry[];
 }
 
 export async function discardScenarioAggregateAssetPuts(
@@ -35,7 +43,7 @@ export async function discardScenarioAggregateAssetPuts(
 }
 
 export async function rejectScenarioMutationBeforeHandoff(
-  children: ScenarioAggregateChildMutation | undefined,
+  children: Pick<ScenarioAggregateChildMutation, 'assetPuts'> | undefined,
   error: unknown
 ): Promise<never> {
   let cleanupError: unknown;
@@ -52,28 +60,4 @@ export async function rejectScenarioMutationBeforeHandoff(
     );
   }
   throw error;
-}
-
-export async function discardSupersededScenarioAssetPuts(
-  db: Awaited<ReturnType<typeof initDB>>,
-  assetPuts: readonly PreparedScenarioAssetEntry[]
-): Promise<boolean> {
-  for (const prepared of assetPuts) {
-    const stored = parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, prepared.id));
-    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, prepared.assetId));
-    const owner: unknown = await db.get(ASSET_OWNERS_STORE, [
-      SCENARIO_ASSET_OWNER_KIND,
-      prepared.id,
-      SCENARIO_ASSET_ROLE,
-    ]);
-    if (
-      stored?.assetId === prepared.assetId ||
-      ref?.assetId === prepared.assetId ||
-      (isRecord(owner) && owner['assetId'] === prepared.assetId)
-    ) {
-      return false;
-    }
-  }
-  await Promise.all(assetPuts.map((asset) => deleteAssetObject(asset.assetId)));
-  return true;
 }

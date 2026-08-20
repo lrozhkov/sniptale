@@ -2679,6 +2679,28 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/document-assets",
+      "disposition": "rollout",
+      "reason": "The file-backed editor document codec has deterministic extraction, hydration, cleanup, hostile metadata, large-document, and ownership proof.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/document-assets/codec.ts",
+        "apps/extension/src/composition/persistence/document-assets/contracts.ts",
+        "apps/extension/src/composition/persistence/document-assets/index.ts",
+        "apps/extension/src/composition/persistence/document-assets/ownership.ts",
+        "apps/extension/src/composition/persistence/document-assets/parser.ts"
+        ,"apps/extension/src/composition/persistence/document-assets/test-support.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/document-assets/codec.ts",
+        "apps/extension/src/composition/persistence/document-assets/contracts.ts",
+        "apps/extension/src/composition/persistence/document-assets/index.ts",
+        "apps/extension/src/composition/persistence/document-assets/ownership.ts",
+        "apps/extension/src/composition/persistence/document-assets/parser.ts"
+        ,"apps/extension/src/composition/persistence/document-assets/test-support.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/frame-annotation-controls",
       "disposition": "rollout",
       "reason": "The shared frame annotation controls are fully covered by deterministic content and editor owner proof.",
@@ -3229,12 +3251,14 @@
       "productionFiles": [
         "apps/extension/src/composition/persistence/image-workspaces/contracts.ts",
         "apps/extension/src/composition/persistence/image-workspaces/index.ts",
-        "apps/extension/src/composition/persistence/image-workspaces/parser.ts"
+        "apps/extension/src/composition/persistence/image-workspaces/parser.ts",
+        "apps/extension/src/composition/persistence/image-workspaces/read.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/image-workspaces/contracts.ts",
         "apps/extension/src/composition/persistence/image-workspaces/index.ts",
-        "apps/extension/src/composition/persistence/image-workspaces/parser.ts"
+        "apps/extension/src/composition/persistence/image-workspaces/parser.ts",
+        "apps/extension/src/composition/persistence/image-workspaces/read.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -3260,6 +3284,7 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/read-primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/state-manager-adapter.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.editor-custom-shapes.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.editor-documents.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
@@ -3299,6 +3324,7 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/read-primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/state-manager-adapter.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.editor-custom-shapes.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.editor-documents.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.frame-annotation-raster-jobs.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.native-transfer.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.project-export-inputs.ts",
@@ -3567,9 +3593,12 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
+        "apps/extension/src/composition/persistence/scenario/aggregate-comparison.ts",
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
         "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
+        "apps/extension/src/composition/persistence/scenario/editor-document-staging.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
         "apps/extension/src/composition/persistence/scenario/projects/assets.ts",
@@ -3633,9 +3662,12 @@
         "apps/extension/src/composition/persistence/scenario/store/v3/project-records/store.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
+        "apps/extension/src/composition/persistence/scenario/aggregate-comparison.ts",
         "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
         "apps/extension/src/composition/persistence/scenario/asset-staging.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
+        "apps/extension/src/composition/persistence/scenario/editor-document-staging.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
         "apps/extension/src/composition/persistence/scenario/projects/assets.ts",
@@ -13568,7 +13600,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "1c4ea46c0d1174fc04818efd7e0ba96c3714641de89072038131e5fee4057bdb"
+        "contentHash": "8418739190dbe5d6fe2b31c45013c41f8922f4d4dbb4d91fa653ce1ad94d724f"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",

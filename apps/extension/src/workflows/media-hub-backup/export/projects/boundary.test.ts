@@ -1,4 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock(
+  '../../../../composition/persistence/asset-publication-recovery',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/asset-publication-recovery')
+    >()),
+    recoverAssetPublications: vi.fn(async () => 0),
+  })
+);
+
+vi.mock('../../../../platform/media-utils/data-url', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/media-utils/data-url')>()),
+  blobToDataUrl: vi.fn(async () => 'data:image/png;base64,dGVzdA=='),
+}));
 import { createUnsafeScenarioProjectBundleDb } from './unsafe.test-support.ts';
 import { exportBackupArchive } from './archive.test-support.ts';
 

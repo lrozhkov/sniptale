@@ -37,6 +37,7 @@ import {
   projectExportPublicationAdapter,
 } from '../projects/asset-publication';
 import { scenarioAssetPublicationAdapter } from '../scenario/aggregate-mutations';
+import { imageWorkspacePublicationAdapter } from '../image-aggregates/mutations';
 export { auditDurableAssets, collectOrphanAssetObjects } from './audit';
 import { collectOrphanAssetObjects } from './audit';
 
@@ -205,6 +206,7 @@ export async function recoverAssetPublications(
       projectAssetPublicationAdapter,
       projectExportPublicationAdapter,
       scenarioAssetPublicationAdapter,
+      imageWorkspacePublicationAdapter,
     ]);
     await collectOrphanAssetObjects();
     return recovered;

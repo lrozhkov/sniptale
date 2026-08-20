@@ -10,6 +10,13 @@ import {
 } from '../../../composition/persistence/ai-settings/constants';
 import type { MediaHubBackupManifest } from '../contracts/types';
 
+vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/asset-publication-recovery')
+  >()),
+  recoverAssetPublications: vi.fn(async () => 0),
+}));
+
 interface FakeZipArchive {
   __fakeZipFiles: Map<string, Blob | string>;
 }
@@ -68,6 +75,12 @@ vi.mock('../../../composition/persistence/media-library/index', async (importOri
     typeof import('../../../composition/persistence/media-library/index')
   >()),
   listMediaLibrary: listMediaLibraryMock,
+}));
+vi.mock('../../../composition/persistence/image-aggregates/mutations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/image-aggregates/mutations')
+  >()),
+  recoverImageWorkspacePublications: vi.fn(async () => 0),
 }));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({

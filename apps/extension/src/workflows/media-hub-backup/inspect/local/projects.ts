@@ -1,7 +1,7 @@
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
 import type {
   ScenarioProjectEntry,
-  ScenarioStepEditorDocumentEntry,
+  StoredScenarioStepEditorDocumentEntry,
 } from '../../../../composition/persistence/scenario/contracts';
 import type { VideoProjectEntry } from '../../../../composition/persistence/projects/contracts';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
@@ -23,7 +23,7 @@ export async function inspectProjectOwnedBackupEntries(args: {
   db: LocalBackupDb;
   options: MediaHubBackupExportOptions;
   scenarioProjects: ScenarioProjectEntry[];
-  stepDocuments: ScenarioStepEditorDocumentEntry[];
+  stepDocuments: StoredScenarioStepEditorDocumentEntry[];
   videoProjects: VideoProjectEntry[];
 }): Promise<LocalBackupProjectInspection> {
   const videoInventory = await inspectVideoProjectBackupEntries(

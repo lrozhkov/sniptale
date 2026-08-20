@@ -4,6 +4,7 @@ import type { MediaLibraryEntry } from '../../../composition/persistence/media-l
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import { appendBackupAssetDescriptor, resolveBackupMediaBlob } from './index';
 import { createBackupExportBudget } from '../export/blob/budget';
+import { createMediaHubBackupExportOptions } from '../export/options';
 import {
   ASSET_REFS_STORE,
   PROJECT_ASSETS_STORE,
@@ -14,10 +15,22 @@ import {
 import type { MediaHubBackupAssetDescriptor } from '../contracts/types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
-const readAssetFileMock = vi.hoisted(() => vi.fn());
+const { getStoredImageWorkspaceMock, readAssetFileMock } = vi.hoisted(() => ({
+  getStoredImageWorkspaceMock: vi.fn(),
+  readAssetFileMock: vi.fn(),
+}));
 vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/assets')>()),
   readAssetFile: readAssetFileMock,
+}));
+vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
+  recoverAndGetStoredImageWorkspace: getStoredImageWorkspaceMock,
+}));
+vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
+  blobToDataUrl: async (blob: Blob) =>
+    `data:${blob.type || 'application/octet-stream'};base64,dGVzdA==`,
 }));
 
 function createEntry(
@@ -358,6 +371,89 @@ async function assertThrowsWhenBlobIsMissing(): Promise<void> {
   ).rejects.toThrow('asset.webm');
 }
 
+function createStoredPrivateWorkspace() {
+  return {
+    aggregateId: 'asset-1',
+    createdAt: 1,
+    document: {
+      assets: [
+        { assetId: 'editor-source', role: 'source-image' },
+        { assetId: 'editor-favicon', role: 'browser-favicon' },
+      ],
+      browserFrame: {
+        canvasMode: 'resize' as const,
+        contentMode: 'push-down' as const,
+        favicon: { assetId: 'editor-favicon' },
+        title: 'Private browser title',
+        url: 'https://private.test/reset?token=secret',
+      },
+      canvasHeight: 80,
+      canvasJson: '{"objects":[]}',
+      canvasWidth: 100,
+      frame: {
+        backgroundBlurAmount: 0,
+        backgroundColor: '#fff',
+        backgroundGradientAngle: 90,
+        backgroundGradientFrom: '#fff',
+        backgroundGradientTo: '#000',
+        backgroundImage: null,
+        backgroundImageFit: 'cover' as const,
+        backgroundMode: 'color' as const,
+        browserMode: true,
+        browserTitle: 'Private frame title',
+        browserUrl: 'https://private.test/invite?code=secret',
+        layoutMode: 'fit-image' as const,
+        paddingBottom: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
+        paddingTop: 0,
+      },
+      sourceDisplayHeight: 80,
+      sourceDisplayWidth: 100,
+      sourceHeight: 80,
+      sourceImage: { assetId: 'editor-source' },
+      sourceLeft: 0,
+      sourceName: 'capture.png',
+      sourceTop: 0,
+      sourceWidth: 100,
+      version: 3 as const,
+    },
+    revision: 1,
+    sourceTitle: 'Private workspace title',
+    sourceUrl: 'https://private.test/workspace?token=secret',
+    updatedAt: 2,
+  };
+}
+
+async function appendPrivateWorkspaceDescriptor(includeSourceMetadata: boolean) {
+  const entry = createEntry(
+    { kind: 'screenshot' },
+    { id: 'asset-1', kind: 'screenshot', mimeType: 'image/png' }
+  );
+  const assets: MediaHubBackupAssetDescriptor[] = [];
+  readAssetFileMock.mockReset();
+  readAssetFileMock.mockResolvedValue(new File(['private-file-bytes'], 'asset.png'));
+  getStoredImageWorkspaceMock.mockResolvedValueOnce(createStoredPrivateWorkspace());
+
+  await appendBackupAssetDescriptor({
+    assets,
+    budget: createBackupExportBudget(),
+    db: {
+      get: async (storeName: string, key: string) => {
+        if (storeName === ASSET_REFS_STORE) return createAssetRef(key, 18);
+        return undefined;
+      },
+    },
+    encodePathSegment: encodeURIComponent,
+    entry,
+    options: createMediaHubBackupExportOptions({ includeSourceMetadata }),
+    thumbnailCount: 0,
+    zip: createZipRecorder(),
+  });
+
+  return assets[0]?.workspace;
+}
+
 describe('media-hub backup archive helpers', () => {
   it('resolves screenshot blobs directly from the media entry', assertResolvesScreenshotBlob);
 
@@ -375,4 +471,43 @@ describe('media-hub backup archive helpers', () => {
     assertAppendsRecordingTelemetryDescriptor
   );
   it('fails when the backing asset blob is missing', assertThrowsWhenBlobIsMissing);
+
+  it('strips source metadata from a file-backed image workspace', async () => {
+    const workspace = await appendPrivateWorkspaceDescriptor(false);
+
+    expect(workspace).toEqual(
+      expect.objectContaining({
+        sourceTitle: null,
+        sourceUrl: null,
+        document: expect.objectContaining({
+          browserFrame: expect.objectContaining({
+            faviconDataUrl: null,
+            title: '',
+            url: '',
+          }),
+          frame: expect.objectContaining({ browserTitle: '', browserUrl: '' }),
+        }),
+      })
+    );
+    expect(JSON.stringify(workspace)).not.toContain('private.test');
+    expect(JSON.stringify(workspace)).not.toContain('private-file-bytes');
+  });
+
+  it('retains and sanitizes declared source metadata in a file-backed image workspace', async () => {
+    const workspace = await appendPrivateWorkspaceDescriptor(true);
+
+    expect(workspace?.document.browserFrame).toEqual(
+      expect.objectContaining({
+        title: 'Private browser title',
+        url: 'https://private.test/',
+      })
+    );
+    expect(workspace?.document.frame).toEqual(
+      expect.objectContaining({
+        browserTitle: 'Private frame title',
+        browserUrl: 'https://private.test/',
+      })
+    );
+    expect(workspace?.document.browserFrame?.faviconDataUrl).toMatch(/^data:/);
+  });
 });

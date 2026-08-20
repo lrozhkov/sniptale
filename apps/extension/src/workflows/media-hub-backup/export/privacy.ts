@@ -90,12 +90,26 @@ export function countScenarioProjectEntrySourceMetadata(entry: ScenarioProjectEn
 }
 
 export function hasEditorDocumentSourceMetadata(
-  document: Partial<EditorDocument> | undefined
+  document:
+    | {
+        browserFrame?:
+          | {
+              favicon?: unknown;
+              faviconDataUrl?: unknown;
+              title?: unknown;
+              url?: unknown;
+            }
+          | undefined;
+        frame?: { browserTitle?: unknown; browserUrl?: unknown };
+      }
+    | undefined
 ): boolean {
+  const browserFrame = document?.browserFrame;
   return Boolean(
-    document?.browserFrame?.title ||
-    document?.browserFrame?.url ||
-    document?.browserFrame?.faviconDataUrl ||
+    browserFrame?.title ||
+    browserFrame?.url ||
+    browserFrame?.faviconDataUrl ||
+    browserFrame?.favicon ||
     document?.frame?.browserTitle ||
     document?.frame?.browserUrl
   );

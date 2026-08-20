@@ -10,6 +10,7 @@ import type { PendingScenarioAssetEntry, ScenarioAssetEntry } from '../contracts
 import type { HydratedScenarioAssetEntry } from '../contracts';
 import { ASSET_REFS_STORE } from '../../infrastructure/indexed-db/core';
 import { discardPreparedAsset, parseAssetRef, readAssetFile } from '../../assets';
+import { recoverScenarioAssetPublications } from '../aggregate-mutations';
 
 export async function discardPreparedScenarioAsset(
   entry: Pick<ScenarioAssetEntry, 'assetId'>
@@ -20,6 +21,7 @@ export async function discardPreparedScenarioAsset(
 export async function getScenarioAsset(
   id: string
 ): Promise<HydratedScenarioAssetEntry | undefined> {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   const entry = parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, id));
   if (!entry) return undefined;
@@ -33,6 +35,7 @@ export async function getScenarioAsset(
 }
 
 export async function listScenarioAssets(projectId: string): Promise<ScenarioAssetEntry[]> {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   return parseDbEntries(
     await db.getAllFromIndex(SCENARIO_ASSETS_STORE, 'projectId', projectId),

@@ -357,6 +357,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/document-assets",
+      "ownerId": "persistence.document-assets",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/editor-bootstrap",
       "ownerId": "persistence.editor-bootstrap",
       "ownerClass": "persistence"
@@ -567,6 +572,11 @@
       "id": "diagnostics",
       "path": "apps/extension/src/composition/persistence/diagnostics",
       "stateKind": "recovery-session"
+    },
+    {
+      "id": "document-assets",
+      "path": "apps/extension/src/composition/persistence/document-assets",
+      "stateKind": "authoritative-durable"
     },
     {
       "id": "editor-bootstrap-retention",

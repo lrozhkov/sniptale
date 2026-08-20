@@ -7,6 +7,7 @@ import {
   parseScenarioStepEditorDocumentEntries,
   parseScenarioStepEditorDocumentEntry,
 } from './index.guards.ts';
+import { createPersistedEditorDocumentFixture } from '../../document-assets/test-support';
 
 function createEditorDocument() {
   return {
@@ -30,7 +31,7 @@ function createEditorDocument() {
 function createEntry() {
   return {
     createdAt: 100,
-    document: createEditorDocument(),
+    document: createPersistedEditorDocumentFixture(createEditorDocument()),
     projectId: 'project-1',
     stepId: 'step-1',
     updatedAt: 200,

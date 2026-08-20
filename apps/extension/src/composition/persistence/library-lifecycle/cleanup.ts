@@ -28,6 +28,8 @@ import {
   parseScenarioProjectEntry,
 } from '../scenario/read-guards';
 import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
+import { removeEditorDocumentOwnership } from '../document-assets';
 import type { LocalStoragePolicy } from '../../../contracts/settings';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import { resolveVideoProjectRetentionKind } from '../../../features/media-hub/video-project-list-items';
@@ -49,6 +51,7 @@ import {
   PROJECT_MEDIA_ASSET_ROLE,
   recoverProjectMediaPublications,
 } from '../projects/asset-publication';
+import { recoverImageWorkspacePublications } from '../image-aggregates/mutations';
 import {
   recoverScenarioAssetPublications,
   SCENARIO_ASSET_OWNER_KIND,
@@ -77,6 +80,7 @@ export async function cleanupDrafts(args: {
 }): Promise<DraftCleanupResult> {
   await recoverRecordingAssetPublications();
   await recoverProjectMediaPublications();
+  await recoverImageWorkspacePublications();
   const now = args.now ?? Date.now();
   const ordinaryRetention = getDraftRetentionMs(args.policy, 'ordinary');
   const videoRetention = getDraftRetentionMs(args.policy, 'video');
@@ -206,7 +210,21 @@ async function deleteExpiredScenarioProject(
       const document = parseScenarioStepEditorDocumentEntry(raw);
       const stepId =
         document?.projectId === id ? document.stepId : readOwnedChildKey(raw, id, 'stepId');
-      if (stepId) await documentStore.delete(stepId);
+      if (stepId) {
+        if (document) {
+          await removeEditorDocumentOwnership({
+            document: document.document,
+            ownerId: stepId,
+            ownerKind: 'scenario-editor-document',
+            physicalDelete: operation,
+            stores: {
+              owners: tx.objectStore(ASSET_OWNERS_STORE),
+              refs: tx.objectStore(ASSET_REFS_STORE),
+            },
+          });
+        }
+        await documentStore.delete(stepId);
+      }
     }
     await tx
       .objectStore(AGGREGATE_PRESENTATIONS_STORE)
@@ -301,9 +319,22 @@ function collectProtectedVideoProjectReferences(
 
 async function deleteImageAggregateSidecars(args: {
   aggregateId: string;
+  operation: PhysicalDeleteAssetOperation;
+  ownerStore: CleanupOwnerStore;
   presentationStore: CleanupDeleteStore;
-  workspaceStore: CleanupDeleteStore;
+  refStore: CleanupMutableStore;
+  workspaceStore: CleanupMutableStore;
 }): Promise<void> {
+  const workspace = parseImageWorkspaceEntry(await args.workspaceStore.get(args.aggregateId));
+  if (workspace) {
+    await removeEditorDocumentOwnership({
+      document: workspace.document,
+      ownerId: args.aggregateId,
+      ownerKind: 'image-workspace',
+      physicalDelete: args.operation,
+      stores: { owners: args.ownerStore, refs: args.refStore },
+    });
+  }
   await args.workspaceStore.delete(args.aggregateId);
   await args.presentationStore.delete(
     createAggregatePresentationKey({ id: args.aggregateId, kind: 'image' })
@@ -318,12 +349,15 @@ async function cleanupVideoProjectMedia(args: {
     videoRetention: number | null;
   };
   mediaStore: CleanupMutableStore;
+  operation: PhysicalDeleteAssetOperation;
+  ownerStore: CleanupOwnerStore;
   presentationStore: CleanupDeleteStore;
   protectedProjectAssetIds: Set<string>;
   protectedRecordingIds: Set<string>;
   refs: ReturnType<typeof collectVideoProjectReferences>;
+  refStore: CleanupMutableStore;
   thumbnailStore: CleanupDeleteStore;
-  workspaceStore: CleanupDeleteStore;
+  workspaceStore: CleanupMutableStore;
 }): Promise<void> {
   for (const raw of await args.mediaStore.getAll()) {
     const media = parseMediaLibraryEntry(raw);
@@ -348,7 +382,10 @@ async function cleanupVideoProjectMedia(args: {
     await args.thumbnailStore.delete(media.id);
     await deleteImageAggregateSidecars({
       aggregateId: media.id,
+      operation: args.operation,
+      ownerStore: args.ownerStore,
       presentationStore: args.presentationStore,
+      refStore: args.refStore,
       workspaceStore: args.workspaceStore,
     });
   }
@@ -444,7 +481,10 @@ async function deleteExpiredMedia(
     await tx.objectStore(THUMBNAILS_STORE).delete(id);
     await deleteImageAggregateSidecars({
       aggregateId: id,
+      operation,
+      ownerStore: tx.objectStore(ASSET_OWNERS_STORE),
       presentationStore: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
+      refStore: tx.objectStore(ASSET_REFS_STORE),
       workspaceStore: tx.objectStore(IMAGE_WORKSPACES_STORE),
     });
     if (current.source.kind === 'recording' && recording?.lifecycle?.storageClass === 'temporary') {
@@ -525,10 +565,13 @@ async function deleteExpiredVideoProjectGraph(args: {
     await cleanupVideoProjectMedia({
       context: args,
       mediaStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+      operation,
+      ownerStore: tx.objectStore(ASSET_OWNERS_STORE),
       presentationStore,
       protectedProjectAssetIds,
       protectedRecordingIds,
       refs,
+      refStore: tx.objectStore(ASSET_REFS_STORE),
       thumbnailStore: tx.objectStore(THUMBNAILS_STORE),
       workspaceStore: tx.objectStore(IMAGE_WORKSPACES_STORE),
     });

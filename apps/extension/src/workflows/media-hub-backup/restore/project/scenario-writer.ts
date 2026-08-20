@@ -3,7 +3,6 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
-  SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   THUMBNAILS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
@@ -94,16 +93,11 @@ async function restoreScenarioExports(tx: BackupTransaction, prepared: PreparedS
 }
 
 async function restoreScenarioStepDocuments(
-  tx: BackupTransaction,
-  prepared: PreparedScenarioProject
+  _tx: BackupTransaction,
+  _prepared: PreparedScenarioProject
 ) {
-  for (const entry of prepared.descriptor.stepDocuments) {
-    await getStore(tx, SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).put({
-      ...entry,
-      projectId: prepared.projectId,
-      stepId: remapId(prepared.stepIdMap, entry.stepId),
-    });
-  }
+  // Legacy V4/V5 editor documents embed bytes in JSON and are retired at the V29 alpha cutover.
+  // V6 restore owns file-backed document publication.
 }
 
 async function restoreScenarioThumbnails(

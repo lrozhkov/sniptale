@@ -4,6 +4,7 @@ import {
   activateAutosaveContext,
   discardAutosaveDraft,
   disposeAutosaveState,
+  rebindAutosaveAggregate,
   restoreAutosaveDraft,
   updateAutosaveContext,
 } from './lifecycle';
@@ -16,6 +17,7 @@ import {
 
 export interface EditorSessionAutosaveService {
   activate: (context: ActiveEditorSessionContext) => void;
+  rebindAggregate: (context: ActiveEditorSessionContext) => void;
   updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
   restoreDraft: (aggregateId: string) => Promise<ImageWorkspaceEntry | undefined>;
   scheduleAutosave: (document: EditorDocument) => void;
@@ -34,6 +36,7 @@ function createEditorSessionAutosaveActions(
 ): EditorSessionAutosaveService {
   return {
     activate: (context) => activateAutosaveContext(state, context),
+    rebindAggregate: (context) => rebindAutosaveAggregate(state, context),
     updateContext: (patch) => updateAutosaveContext(state, patch),
     restoreDraft: (aggregateId) => restoreAutosaveDraft(state, aggregateId),
     scheduleAutosave: (document) => queuePendingAutosave(state, document),

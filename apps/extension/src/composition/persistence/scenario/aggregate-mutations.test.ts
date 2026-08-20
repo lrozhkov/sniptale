@@ -4,6 +4,7 @@ import {
   DEFAULT_BROWSER_FRAME_STATE,
   DEFAULT_EDITOR_FRAME_SETTINGS,
 } from '../../../features/editor/document/constants';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 
 const stores = vi.hoisted(() => new Map<string, Map<string, unknown>>());
 
@@ -104,6 +105,20 @@ vi.mock('../assets', () => ({
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
   recoverStandaloneAssetPublications: vi.fn(async () => 0),
   releaseAssetReadyProtection: vi.fn(),
+  writeBlobToAsset: vi.fn(async (blob: Blob) => {
+    const assetId = `editor-${getStore('prepared_editor_assets').size + 1}`;
+    getStore('prepared_editor_assets').set(assetId, blob);
+    return {
+      ref: {
+        assetId,
+        createdAt: 1,
+        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+        mimeType: blob.type || 'application/octet-stream',
+        sha256: null,
+        size: blob.size,
+      },
+    };
+  }),
 }));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
@@ -113,10 +128,9 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
 import {
   commitScenarioAggregateMutation,
   commitScenarioAggregateSnapshotMutation,
-  deleteOrphanedScenarioAggregateChild,
-  deleteScenarioAggregate,
   scenarioAssetPublicationAdapter,
 } from './aggregate-mutations';
+import { deleteOrphanedScenarioAggregateChild, deleteScenarioAggregate } from './aggregate-cleanup';
 
 function createAsset(projectId: string, id = 'asset-1') {
   const blob = new Blob(['asset'], { type: 'image/png' });
@@ -248,6 +262,44 @@ it('surfaces failed OPFS cleanup when a pre-journal mutation is rejected', async
   });
 });
 
+it('surfaces editor cleanup failure together with a pre-journal revision rejection', async () => {
+  const project = createScenarioProject('Aggregate');
+  await commitScenarioAggregateMutation(project);
+  const assetMocks = await import('../assets');
+  vi.mocked(assetMocks.discardPreparedAsset).mockRejectedValueOnce(
+    new Error('editor object cleanup failed')
+  );
+
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { editorDocumentPuts: [createDocument(project.id)] },
+      expectedRevision: 0,
+    })
+  ).rejects.toMatchObject({
+    name: 'AggregateError',
+    errors: expect.arrayContaining([
+      expect.objectContaining({ name: 'StaleScenarioAggregateRevisionError' }),
+      expect.objectContaining({
+        message: 'Failed to discard scenario editor document assets.',
+      }),
+    ]),
+  });
+});
+
+it('rejects a document preparation failure before publication handoff', async () => {
+  const project = createScenarioProject('Aggregate');
+  const assetMocks = await import('../assets');
+  vi.mocked(assetMocks.writeBlobToAsset).mockRejectedValueOnce(new Error('quota exhausted'));
+
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { editorDocumentPuts: [createDocument(project.id)] },
+      expectedRevision: null,
+    })
+  ).rejects.toThrow('quota exhausted');
+  expect(assetMocks.createAssetPublicationJournal).not.toHaveBeenCalled();
+});
+
 it('surfaces persistence-admission release failure after scenario publication', async () => {
   const project = createScenarioProject('Aggregate');
   const assetMocks = await import('../assets');
@@ -279,6 +331,49 @@ it('fails closed when publication completes without a scenario aggregate result'
   expect(assetMocks.releaseAssetReadyProtection).toHaveBeenCalledWith(['opfs-asset-1']);
 });
 
+it('records explicit lifecycle and updated-at constraints in publication payloads', async () => {
+  const project = createScenarioProject('Aggregate');
+  const assetMocks = await import('../assets');
+  await commitScenarioAggregateMutation(project, {
+    children: { assetPuts: [createAsset(project.id)] },
+    expectedRevision: null,
+    expectedUpdatedAt: null,
+    storageClass: 'temporary',
+  });
+
+  expect(assetMocks.createAssetPublicationJournal).toHaveBeenCalledWith(
+    expect.objectContaining({
+      payload: expect.objectContaining({ expectedUpdatedAt: null, storageClass: 'temporary' }),
+    })
+  );
+});
+
+it('replays a cold-runtime journal before a project-only mutation reads the revision', async () => {
+  const project = createScenarioProject('Cold runtime');
+  const initial = await commitScenarioAggregateMutation(project);
+  const assetMocks = await import('../assets');
+  vi.mocked(assetMocks.recoverStandaloneAssetPublications).mockImplementationOnce(async () => {
+    const stored = getStore('scenario_projects').get(project.id) as {
+      project: typeof project;
+      workspaceRevision: number;
+    };
+    getStore('scenario_projects').set(project.id, {
+      ...stored,
+      project: { ...stored.project, name: 'Recovered document publication' },
+      workspaceRevision: stored.workspaceRevision + 1,
+    });
+    return 1;
+  });
+
+  const saved = await commitScenarioAggregateMutation(
+    { ...initial.project, name: 'Metadata-only save' },
+    { expectedRevision: 2 }
+  );
+
+  expect(saved.workspaceRevision).toBe(3);
+  expect(saved.project.name).toBe('Metadata-only save');
+});
+
 it('guards snapshot commits and orphan cleanup against concurrent owners', async () => {
   const project = createScenarioProject('Aggregate');
   const saved = await commitScenarioAggregateMutation(project);
@@ -302,9 +397,19 @@ it('guards snapshot commits and orphan cleanup against concurrent owners', async
   getStore('scenario_assets').set(orphan.id, orphan);
   await deleteOrphanedScenarioAggregateChild({ id: orphan.id, kind: 'asset' });
   expect(getStore('scenario_assets').has(orphan.id)).toBe(false);
+  await expect(
+    deleteOrphanedScenarioAggregateChild({ id: 'missing', kind: 'asset' })
+  ).resolves.toBeUndefined();
+  getStore('scenario_assets').set('invalid', { broken: true });
+  await expect(
+    deleteOrphanedScenarioAggregateChild({ id: 'invalid', kind: 'asset' })
+  ).rejects.toThrow('cannot be safely removed');
 
   const owned = createDocument(project.id, 'owned');
-  getStore('scenario_step_editor_documents').set(owned.stepId, owned);
+  getStore('scenario_step_editor_documents').set(owned.stepId, {
+    ...owned,
+    document: createPersistedEditorDocumentFixture(owned.document, 'owned-source'),
+  });
   await expect(
     deleteOrphanedScenarioAggregateChild({ id: owned.stepId, kind: 'editor-document' })
   ).rejects.toThrow('still belongs');
@@ -392,6 +497,83 @@ it('retires a superseded ready journal so later scenario mutations can proceed',
       { expectedRevision: 2 }
     )
   ).resolves.toEqual(expect.objectContaining({ workspaceRevision: 3 }));
+});
+
+it('rejects malformed child arrays in a ready publication journal', async () => {
+  const project = createScenarioProject('Aggregate');
+  const assetMocks = await import('../assets');
+  await commitScenarioAggregateMutation(project, {
+    children: { assetPuts: [createAsset(project.id)] },
+    expectedRevision: null,
+  });
+  const journal = await vi.mocked(assetMocks.createAssetPublicationJournal).mock.results.at(-1)
+    ?.value;
+  expect(journal).toBeDefined();
+  const payload = journal?.payload as Record<string, unknown>;
+  const children = payload['children'] as Record<string, unknown>;
+
+  for (const field of [
+    'assetPuts',
+    'assetDeletes',
+    'editorDocumentPuts',
+    'editorDocumentDeletes',
+  ]) {
+    await expect(
+      scenarioAssetPublicationAdapter.publish({
+        ...journal!,
+        payload: { ...payload, children: { ...children, [field]: 'invalid' } },
+      })
+    ).rejects.toThrow('Invalid scenario asset publication payload');
+  }
+});
+
+it('rejects malformed and mismatched editor assets in a ready journal', async () => {
+  const project = createScenarioProject('Aggregate');
+  const assetMocks = await import('../assets');
+  await commitScenarioAggregateMutation(project, {
+    children: { editorDocumentPuts: [createDocument(project.id)] },
+    expectedRevision: null,
+  });
+  const journal = await vi.mocked(assetMocks.createAssetPublicationJournal).mock.results.at(-1)
+    ?.value;
+  expect(journal).toBeDefined();
+  const payload = journal?.payload as Record<string, unknown>;
+  const children = payload['children'] as Record<string, unknown>;
+  const documentPuts = children['editorDocumentPuts'] as Array<Record<string, unknown>>;
+
+  await expect(
+    scenarioAssetPublicationAdapter.publish({
+      ...journal!,
+      payload: {
+        ...payload,
+        children: {
+          ...children,
+          editorDocumentPuts: [{ ...documentPuts[0], assetRefs: 'invalid' }],
+        },
+      },
+    })
+  ).rejects.toThrow('Invalid scenario asset publication payload');
+  await expect(
+    scenarioAssetPublicationAdapter.publish({
+      ...journal!,
+      payload: {
+        ...payload,
+        children: {
+          ...children,
+          editorDocumentPuts: [{ ...documentPuts[0], assetRefs: [null] }],
+        },
+      },
+    })
+  ).rejects.toThrow('Invalid scenario asset publication payload');
+  await expect(
+    scenarioAssetPublicationAdapter.publish({
+      ...journal!,
+      assetRefs: journal!.assetRefs.map((assetRef: ReturnType<typeof createAsset>['assetRef']) => ({
+        ...assetRef,
+        assetId: `mismatch-${assetRef.assetId}`,
+      })),
+    })
+  ).rejects.toThrow('Scenario editor document assets do not match its journal');
 });
 
 it('deletes the complete scenario aggregate graph', async () => {

@@ -1,6 +1,7 @@
 import type { EditorDocument } from '../../../../../features/editor/document/types';
 import {
   getScenarioStepEditorDocument,
+  getScenarioStepEditorDocumentForTransfer,
   listScenarioStepEditorDocuments,
 } from '../../editor-documents/index';
 import type { ScenarioStepEditorDocumentEntry } from '../../contracts';
@@ -20,6 +21,10 @@ export function prepareScenarioStepEditorDocumentRecord(args: {
 
 export function getScenarioStepEditorDocumentRecord(stepId: string) {
   return getScenarioStepEditorDocument(stepId);
+}
+
+export function getScenarioStepEditorDocumentTransferRecord(stepId: string) {
+  return getScenarioStepEditorDocumentForTransfer(stepId);
 }
 
 export function listScenarioStepEditorDocumentRecords(projectId: string) {

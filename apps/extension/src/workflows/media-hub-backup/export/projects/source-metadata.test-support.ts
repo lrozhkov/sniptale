@@ -11,8 +11,6 @@ import {
 import type { ScenarioSlideSource } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { createScenarioAssetRecord, readProjectBundleRecord } from './test-support';
 
-const EDITOR_SOURCE_IMAGE_DATA_URL = 'data:image/png;base64,AA==';
-
 export function createSourceMetadataProjectBundleDb() {
   return {
     get: vi.fn(readProjectBundleRecord),
@@ -93,8 +91,8 @@ function createScenarioStepDocumentRecordWithSourceMetadata() {
   return {
     createdAt: 5,
     document: {
-      version: 2,
-      sourceImageData: EDITOR_SOURCE_IMAGE_DATA_URL,
+      version: 3,
+      sourceImage: { assetId: 'editor-source-metadata' },
       sourceName: null,
       sourceWidth: 100,
       sourceHeight: 100,
@@ -106,16 +104,23 @@ function createScenarioStepDocumentRecordWithSourceMetadata() {
       sourceDisplayHeight: 100,
       frame: {
         ...DEFAULT_EDITOR_FRAME_SETTINGS,
+        backgroundImage: null,
         browserTitle: 'Private editor page',
         browserUrl: 'https://editor.example/invite?code=secret',
+        backgroundImageData: undefined,
       },
       browserFrame: {
         ...DEFAULT_BROWSER_FRAME_STATE,
         title: 'Private browser frame',
         url: 'https://editor.example/reset?token=secret',
-        faviconDataUrl: 'data:image/png;base64,favicon',
+        favicon: { assetId: 'editor-favicon-metadata' },
+        faviconDataUrl: undefined,
       },
       canvasJson: '{}',
+      assets: [
+        { assetId: 'editor-source-metadata', role: 'source-image' },
+        { assetId: 'editor-favicon-metadata', role: 'browser-favicon' },
+      ],
     },
     projectId: 'scenario-1',
     stepId: 'step-1',

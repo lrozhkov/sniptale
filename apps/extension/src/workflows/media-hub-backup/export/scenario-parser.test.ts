@@ -1,4 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+
+vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/asset-publication-recovery')
+  >()),
+  recoverAssetPublications: vi.fn(async () => 0),
+}));
 import { createScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import type { MediaHubBackupManifest, MediaHubBackupMetadata } from '../contracts/types';
 

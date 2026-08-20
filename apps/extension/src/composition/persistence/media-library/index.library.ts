@@ -1,5 +1,8 @@
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_OPERATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
   initDB,
   MEDIA_LIBRARY_STORE,
@@ -20,6 +23,13 @@ import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards'
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
 import { createAggregatePresentationKey } from '../aggregate-presentations';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
+import { removeEditorDocumentOwnership } from '../document-assets';
+import {
+  buildPhysicalDeleteOperation,
+  completePhysicalDeleteOperation,
+  listReadyJournals,
+} from '../assets';
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
 
@@ -173,6 +183,21 @@ export async function addMediaLibraryEntryTags(
 }
 
 export async function deleteMediaLibraryAsset(assetId: string): Promise<void> {
+  const pendingWorkspacePublication = (await listReadyJournals()).some(
+    (journal) =>
+      journal.domain === 'image-workspace' &&
+      typeof journal.payload === 'object' &&
+      journal.payload !== null &&
+      !Array.isArray(journal.payload) &&
+      (journal.payload as Record<string, unknown>)['aggregateId'] === assetId
+  );
+  if (pendingWorkspacePublication) {
+    throw new MediaLibraryDeleteError(
+      assetId,
+      'linked-source-cleanup',
+      new Error('Image workspace publication is pending.')
+    );
+  }
   const db = await initDB();
   const entry = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
 
@@ -207,6 +232,7 @@ async function deleteLinkedMediaSource(entry: MediaLibraryEntry): Promise<void> 
 }
 
 async function deleteMediaLibraryRows(assetId: string): Promise<void> {
+  const physicalDelete = buildPhysicalDeleteOperation([]);
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
@@ -214,19 +240,43 @@ async function deleteMediaLibraryRows(assetId: string): Promise<void> {
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
+        ASSET_REFS_STORE,
+        ASSET_OWNERS_STORE,
+        ASSET_OPERATIONS_STORE,
       ],
       'readwrite'
     );
     try {
       await tx.objectStore(MEDIA_LIBRARY_STORE).delete(assetId);
       await tx.objectStore(THUMBNAILS_STORE).delete(assetId);
+      const workspace = parseImageWorkspaceEntry(
+        await tx.objectStore(IMAGE_WORKSPACES_STORE).get(assetId)
+      );
+      if (workspace) {
+        await removeEditorDocumentOwnership({
+          document: workspace.document,
+          ownerId: assetId,
+          ownerKind: 'image-workspace',
+          physicalDelete,
+          stores: {
+            owners: tx.objectStore(ASSET_OWNERS_STORE),
+            refs: tx.objectStore(ASSET_REFS_STORE),
+          },
+        });
+      }
       await tx.objectStore(IMAGE_WORKSPACES_STORE).delete(assetId);
       await tx
         .objectStore(AGGREGATE_PRESENTATIONS_STORE)
         .delete(createAggregatePresentationKey({ id: assetId, kind: 'image' }));
+      if (physicalDelete.assetIds.length > 0) {
+        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
+      }
       await tx.done;
     } catch (error) {
       throw new MediaLibraryDeleteError(assetId, 'media-library-transaction', error);
     }
   });
+  if (physicalDelete.assetIds.length > 0) {
+    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
+  }
 }

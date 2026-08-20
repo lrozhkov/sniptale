@@ -9,6 +9,7 @@ const persistenceMocks = vi.hoisted(() => ({
   listVideoProjectEntries: vi.fn(),
   runWithIndexedDbMutation: vi.fn(),
   recoverProjectMediaPublications: vi.fn(),
+  recoverImageWorkspacePublications: vi.fn(),
   recoverRecordingAssetPublications: vi.fn(),
   recoverScenarioAssetPublications: vi.fn(),
   completePhysicalDeleteOperation: vi.fn(),
@@ -21,6 +22,10 @@ vi.mock('../projects/asset-publication', async (importOriginal) => ({
 vi.mock('../recordings/asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverRecordingAssetPublications: persistenceMocks.recoverRecordingAssetPublications,
+}));
+vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image-aggregates/mutations')>()),
+  recoverImageWorkspacePublications: persistenceMocks.recoverImageWorkspacePublications,
 }));
 vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
@@ -63,6 +68,7 @@ beforeEach(() => {
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
   persistenceMocks.recoverProjectMediaPublications.mockResolvedValue(0);
+  persistenceMocks.recoverImageWorkspacePublications.mockResolvedValue(0);
   persistenceMocks.recoverRecordingAssetPublications.mockResolvedValue(0);
   persistenceMocks.recoverScenarioAssetPublications.mockResolvedValue(0);
   persistenceMocks.completePhysicalDeleteOperation.mockResolvedValue(undefined);
@@ -76,6 +82,19 @@ it('does not begin lifecycle cleanup while retained project journals cannot drai
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).rejects.toThrow('ready journal replay failed');
+
+  expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
+});
+
+it('does not begin lifecycle cleanup while retained image workspace journals cannot drain', async () => {
+  persistenceMocks.recoverImageWorkspacePublications.mockRejectedValueOnce(
+    new Error('image workspace journal replay failed')
+  );
+
+  await expect(
+    cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
+  ).rejects.toThrow('image workspace journal replay failed');
 
   expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();

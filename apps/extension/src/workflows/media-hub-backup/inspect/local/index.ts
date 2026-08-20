@@ -9,12 +9,12 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { listMediaLibrary } from '../../../../composition/persistence/media-library/index';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
-import type { ScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/contracts';
+import type { StoredScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/contracts';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
 import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
 import { serializeAggregateRef } from '../../../../composition/persistence/aggregate-presentations';
 import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations';
-import type { ImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
+import type { StoredImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
 import { parseDbEntries } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 import { parseScenarioProjectEntry } from '../../../../composition/persistence/scenario/read-guards';
 import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
@@ -27,12 +27,13 @@ import {
   shouldExportScenarioProject,
   shouldExportVideoProject,
 } from '../../export/filters';
-import { hasBackupSourceMetadata } from '../../export/privacy';
+import { hasBackupSourceMetadata, hasEditorDocumentSourceMetadata } from '../../export/privacy';
 import { inspectProjectOwnedBackupEntries } from './projects';
 import type {
   MediaHubBackupExportOptions,
   MediaHubLocalBackupSummary,
 } from '../../contracts/types';
+import { recoverAssetPublications } from '../../../../composition/persistence/asset-publication-recovery';
 
 interface LocalBackupInspectionEntries {
   mediaItems: Awaited<ReturnType<typeof listMediaLibrary>>;
@@ -45,6 +46,7 @@ interface LocalBackupInspectionEntries {
   videoProjectCount: number;
   projectSizeBytes: number;
   workspaceSizeBytes: number;
+  workspaceSourceMetadataCount: number;
 }
 
 function isMediaThumbnailEntry(value: unknown): value is MediaThumbnailEntry {
@@ -113,7 +115,7 @@ async function loadLocalBackupInspectionEntries(
   const exportedStepDocuments = stepDocuments.filter(
     (entry) =>
       hasScenarioStepDocumentProjectId(entry) && exportedScenarioProjectIds.has(entry.projectId)
-  ) as ScenarioStepEditorDocumentEntry[];
+  ) as StoredScenarioStepEditorDocumentEntry[];
   const projectInventory = await inspectProjectOwnedBackupEntries({
     db,
     options,
@@ -135,13 +137,16 @@ async function loadLocalBackupInspectionEntries(
           serializeAggregateRef({ id: entry.aggregateId, kind: entry.aggregateKind })
         )
     );
-  const workspaceSizeBytes = imageWorkspaces
+  const exportedImageWorkspaces = imageWorkspaces
     .map(parseImageWorkspaceEntry)
     .filter(
-      (entry): entry is ImageWorkspaceEntry =>
+      (entry): entry is StoredImageWorkspaceEntry =>
         entry !== null && exportedImageAggregateIds.has(entry.aggregateId)
-    )
-    .reduce((total, entry) => total + getJsonSizeBytes(entry), 0);
+    );
+  const workspaceSizeBytes = exportedImageWorkspaces.reduce(
+    (total, entry) => total + getJsonSizeBytes(entry),
+    0
+  );
 
   return {
     mediaItems,
@@ -161,6 +166,9 @@ async function loadLocalBackupInspectionEntries(
     ],
     videoProjectCount: videoProjects.length,
     workspaceSizeBytes,
+    workspaceSourceMetadataCount: exportedImageWorkspaces.filter((entry) =>
+      hasEditorDocumentSourceMetadata(entry.document)
+    ).length,
   };
 }
 
@@ -180,7 +188,9 @@ function buildLocalBackupSummary(
     entries.workspaceSizeBytes +
     entries.presentationPreviewSizeBytes;
   const sourceMetadataCount = options.includeSourceMetadata
-    ? mediaItems.filter(hasBackupSourceMetadata).length + entries.projectSourceMetadataCount
+    ? mediaItems.filter(hasBackupSourceMetadata).length +
+      entries.projectSourceMetadataCount +
+      entries.workspaceSourceMetadataCount
     : 0;
   const recordingCount =
     mediaItems.filter(
@@ -221,6 +231,7 @@ function buildLocalBackupSummary(
 export async function inspectLocalMediaHubBackup(
   rawOptions: Partial<MediaHubBackupExportOptions> = {}
 ): Promise<MediaHubLocalBackupSummary> {
+  await recoverAssetPublications();
   const options = createMediaHubBackupExportOptions(rawOptions);
   return buildLocalBackupSummary(await loadLocalBackupInspectionEntries(options), options);
 }

@@ -2,6 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import { MAX_BACKUP_JSON_BYTES } from '../manifest';
 
+vi.mock('../../../composition/persistence/asset-publication-recovery', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/asset-publication-recovery')
+  >()),
+  recoverAssetPublications: vi.fn(async () => 0),
+}));
+
+vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
+  recoverAndGetStoredImageWorkspace: vi.fn(async () => undefined),
+}));
+
 const { FakeJSZip, generateAsyncMock, initDBMock, listMediaLibraryMock } = vi.hoisted(() => {
   class FakeJSZip {
     private files = new Map<string, Blob | string>();

@@ -11,7 +11,7 @@ import { ScenarioImageElementEditorHost } from './ScenarioImageElementEditorHost
 const bootstrapMock = vi.hoisted(() => ({
   buildEditorUrl: vi.fn(),
   getScenarioAssetBlob: vi.fn(),
-  getScenarioStepEditorDocumentRecord: vi.fn(),
+  getScenarioStepEditorDocumentTransferRecord: vi.fn(),
   persistPendingEditorBootstrapPayload: vi.fn(),
 }));
 
@@ -40,7 +40,8 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (importO
     typeof import('../../../composition/persistence/scenario/store/public')
   >()),
   getScenarioAssetBlob: bootstrapMock.getScenarioAssetBlob,
-  getScenarioStepEditorDocumentRecord: bootstrapMock.getScenarioStepEditorDocumentRecord,
+  getScenarioStepEditorDocumentTransferRecord:
+    bootstrapMock.getScenarioStepEditorDocumentTransferRecord,
 }));
 
 let container: HTMLDivElement | null = null;
@@ -94,7 +95,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   bootstrapMock.buildEditorUrl.mockReturnValue('https://app.test/editor?embed=scenario');
   bootstrapMock.getScenarioAssetBlob.mockResolvedValue(new Blob(['pixel']));
-  bootstrapMock.getScenarioStepEditorDocumentRecord.mockResolvedValue(null);
+  bootstrapMock.getScenarioStepEditorDocumentTransferRecord.mockResolvedValue(null);
   bootstrapMock.persistPendingEditorBootstrapPayload.mockResolvedValue('bootstrap-1');
 });
 

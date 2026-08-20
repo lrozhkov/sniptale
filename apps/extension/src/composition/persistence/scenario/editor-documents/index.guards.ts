@@ -1,5 +1,5 @@
-import { isEditorDocument } from '../../../../features/editor/document/guards';
-import type { ScenarioStepEditorDocumentEntry } from '../contracts';
+import { parsePersistedEditorDocument } from '../../document-assets';
+import type { StoredScenarioStepEditorDocumentEntry } from '../contracts';
 import {
   parseStoredEntries,
   parseStoredEntry,
@@ -8,16 +8,16 @@ import {
 import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/validation/primitives';
 
 type ParsedScenarioStepEditorDocumentEntriesValue =
-  ParsedStoredEntriesValue<ScenarioStepEditorDocumentEntry>;
+  ParsedStoredEntriesValue<StoredScenarioStepEditorDocumentEntry>;
 
 function isScenarioStepEditorDocumentEntry(
   value: unknown
-): value is ScenarioStepEditorDocumentEntry {
+): value is StoredScenarioStepEditorDocumentEntry {
   return (
     isRecord(value) &&
     isString(value['stepId']) &&
     isString(value['projectId']) &&
-    isEditorDocument(value['document']) &&
+    parsePersistedEditorDocument(value['document']) !== null &&
     isNumber(value['createdAt']) &&
     isNumber(value['updatedAt'])
   );
@@ -25,7 +25,7 @@ function isScenarioStepEditorDocumentEntry(
 
 export function parseScenarioStepEditorDocumentEntry(
   value: unknown
-): ScenarioStepEditorDocumentEntry | null {
+): StoredScenarioStepEditorDocumentEntry | null {
   return parseStoredEntry(value, isScenarioStepEditorDocumentEntry);
 }
 

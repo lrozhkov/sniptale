@@ -39,6 +39,7 @@ import {
   parseProjectAssetEntry,
   parseProjectExportEntry,
 } from '../../../../composition/persistence/projects/read-guards';
+import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
 export {
   assertBackupImportWritePreflightComplete,
   commitBackupTransaction,
@@ -65,6 +66,14 @@ export async function deleteExistingAssetRecord(
   tx: BackupTransaction,
   entry: Omit<MediaLibraryEntry, 'blob'>
 ): Promise<void> {
+  if (
+    entry.source.kind === 'screenshot' &&
+    parseImageWorkspaceEntry(await getStore(tx, IMAGE_WORKSPACES_STORE).get(entry.id))
+  ) {
+    throw new Error(
+      'Legacy backup replace cannot overwrite a file-backed image workspace; use skip or duplicate.'
+    );
+  }
   if (entry.source.kind === 'recording') {
     const stored = parseRecordingEntry(
       await getStore(tx, STORE_NAME).get(entry.source.recordingId)
@@ -326,6 +335,8 @@ export async function restoreAssetRecord(
     preparedAssetPublication
   );
   await writeThumbnailRecord(tx, entry, thumbnail);
-  if (workspace) await getStore(tx, IMAGE_WORKSPACES_STORE).put(workspace);
+  // V4/V5 workspaces embed binary data URLs and are intentionally retired by schema V29.
+  // V6 restore publishes file-backed EditorDocumentV3 rows through the asset transaction.
+  void workspace;
   if (presentation) await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).put(presentation);
 }

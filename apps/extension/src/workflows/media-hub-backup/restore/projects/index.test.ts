@@ -47,9 +47,7 @@ describe('backup project restore writer', () => {
     expect(stores.get('scenario_assets')?.put).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'scenario-asset-copy', projectId: 'scenario-copy' })
     );
-    expect(stores.get('scenario_step_editor_documents')?.put).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: 'scenario-copy', stepId: 'step-copy' })
-    );
+    expect(stores.get('scenario_step_editor_documents')?.put).not.toHaveBeenCalled();
     expect(stores.get('thumbnails')?.put).toHaveBeenCalledWith(
       expect.objectContaining({ assetId: 'scenario-export:scenario-export-copy' })
     );

@@ -46,7 +46,7 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
-  getImageWorkspace: getWorkspaceMock,
+  recoverAndGetImageWorkspace: getWorkspaceMock,
 }));
 
 beforeEach(() => {
@@ -241,7 +241,7 @@ describe('image aggregate autosave', () => {
     expect(autosave.getLastWriteError()).toBeInstanceOf(Error);
 
     autosave.scheduleAutosave(createDocument('must-not-overwrite-copy'));
-    autosave.activate({
+    autosave.rebindAggregate({
       aggregateId: 'image-copy',
       durableRevision: 1,
       renderPresentation: null,

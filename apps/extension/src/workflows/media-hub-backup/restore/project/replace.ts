@@ -25,6 +25,7 @@ import {
 } from '../../../../composition/persistence/projects/read-guards';
 import { parseStoredVideoProjectAssetReferences } from '../../../../composition/persistence/projects/asset-references';
 import { parseScenarioAssetEntry } from '../../../../composition/persistence/scenario/read-guards';
+import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/editor-documents';
 import {
   SCENARIO_ASSET_OWNER_KIND,
   SCENARIO_ASSET_ROLE,
@@ -123,6 +124,11 @@ export async function deleteExistingScenarioProjectBundle(
     getStore(tx, SCENARIO_EXPORTS_STORE).index('projectId').getAll(projectId),
     getStore(tx, SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).index('projectId').getAll(projectId),
   ]);
+  if (stepDocuments.some((entry) => parseScenarioStepEditorDocumentEntry(entry) !== null)) {
+    throw new Error(
+      'Legacy backup replace cannot overwrite file-backed scenario documents; use skip or duplicate.'
+    );
+  }
 
   for (const asset of assets) {
     const entry = parseScenarioAssetEntry(asset);
@@ -149,9 +155,7 @@ export async function deleteExistingScenarioProjectBundle(
   }
   for (const entry of stepDocuments) {
     const stepId = readStringField(entry, 'stepId');
-    if (stepId) {
-      await getStore(tx, SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).delete(stepId);
-    }
+    if (stepId) await getStore(tx, SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).delete(stepId);
   }
   await getStore(tx, THUMBNAILS_STORE).delete(`scenario:${projectId}`);
   await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).delete(['scenario', projectId]);

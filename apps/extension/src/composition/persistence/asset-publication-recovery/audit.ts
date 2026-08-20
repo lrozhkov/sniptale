@@ -19,6 +19,8 @@ import {
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   SCENARIO_ASSETS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STORE_NAME,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -26,6 +28,8 @@ import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-bar
 import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
+import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents';
 
 interface DurableAssetAuditReport {
   authorityValid: boolean;
@@ -129,6 +133,8 @@ async function collectDurableAssetSnapshot(): Promise<{
     rawProjectAssets,
     rawProjectExports,
     rawScenarioAssets,
+    rawImageWorkspaces,
+    rawScenarioDocuments,
   ] = await runWithIndexedDbMutation(async (db) =>
     Promise.all([
       db.getAll(ASSET_REFS_STORE),
@@ -138,6 +144,8 @@ async function collectDurableAssetSnapshot(): Promise<{
       db.getAll(PROJECT_ASSETS_STORE),
       db.getAll(PROJECT_EXPORTS_STORE),
       db.getAll(SCENARIO_ASSETS_STORE),
+      db.getAll(IMAGE_WORKSPACES_STORE),
+      db.getAll(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
     ])
   );
   const refsResult = parseRows(rawRefs, parseAssetRef);
@@ -147,6 +155,11 @@ async function collectDurableAssetSnapshot(): Promise<{
   const projectAssetsResult = parseRows(rawProjectAssets, parseProjectAssetEntry);
   const projectExportsResult = parseRows(rawProjectExports, parseProjectExportEntry);
   const scenarioAssetsResult = parseRows(rawScenarioAssets, parseScenarioAssetEntry);
+  const imageWorkspacesResult = parseRows(rawImageWorkspaces, parseImageWorkspaceEntry);
+  const scenarioDocumentsResult = parseRows(
+    rawScenarioDocuments,
+    parseScenarioStepEditorDocumentEntry
+  );
   const refs = refsResult.entries;
   const owners = ownersResult.entries;
   const expectedOwnerAssets = new Map<string, string>();
@@ -163,6 +176,26 @@ async function collectDurableAssetSnapshot(): Promise<{
   for (const entry of scenarioAssetsResult.entries) {
     expectedOwners.push(createExpectedOwner('scenario-asset', entry.id, entry.assetId));
   }
+  for (const entry of imageWorkspacesResult.entries) {
+    for (const asset of entry.document.assets) {
+      expectedOwners.push({
+        assetId: asset.assetId,
+        ownerId: entry.aggregateId,
+        ownerKind: 'image-workspace',
+        role: asset.role,
+      });
+    }
+  }
+  for (const entry of scenarioDocumentsResult.entries) {
+    for (const asset of entry.document.assets) {
+      expectedOwners.push({
+        assetId: asset.assetId,
+        ownerId: entry.stepId,
+        ownerKind: 'scenario-editor-document',
+        role: asset.role,
+      });
+    }
+  }
   for (const owner of expectedOwners) {
     expectedOwnerAssets.set(ownerKey(owner), owner.assetId);
   }
@@ -175,6 +208,8 @@ async function collectDurableAssetSnapshot(): Promise<{
       projectAssetsResult,
       projectExportsResult,
       scenarioAssetsResult,
+      imageWorkspacesResult,
+      scenarioDocumentsResult,
     ].every((result) => result.valid),
     expectedOwnerAssets,
     expectedOwners,

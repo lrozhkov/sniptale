@@ -2,9 +2,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   listAggregatePresentations: vi.fn(),
-  listImageWorkspaces: vi.fn(),
+  recoverAndListStoredImageWorkspaces: vi.fn(),
   listMediaLibrary: vi.fn(),
   listScenarioProjectEntries: vi.fn(),
+  listStoredScenarioStepEditorDocuments: vi.fn(),
   listVideoProjectEntries: vi.fn(),
   runMutation: vi.fn(),
 }));
@@ -15,7 +16,7 @@ vi.mock('../aggregate-presentations', async (importOriginal) => ({
 }));
 vi.mock('../image-workspaces', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../image-workspaces')>()),
-  listImageWorkspaces: mocks.listImageWorkspaces,
+  recoverAndListStoredImageWorkspaces: mocks.recoverAndListStoredImageWorkspaces,
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -34,7 +35,7 @@ vi.mock('../scenario/projects', async (importOriginal) => ({
 }));
 vi.mock('../scenario/editor-documents', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../scenario/editor-documents')>()),
-  listScenarioStepEditorDocuments: vi.fn(),
+  listStoredScenarioStepEditorDocuments: mocks.listStoredScenarioStepEditorDocuments,
 }));
 vi.mock('../infrastructure/indexed-db/mutation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/indexed-db/mutation')>()),
@@ -46,7 +47,8 @@ import { getLibraryStorageUsage } from './usage';
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.listAggregatePresentations.mockResolvedValue([]);
-  mocks.listImageWorkspaces.mockResolvedValue([]);
+  mocks.recoverAndListStoredImageWorkspaces.mockResolvedValue([]);
+  mocks.listStoredScenarioStepEditorDocuments.mockResolvedValue([]);
   mocks.listScenarioProjectEntries.mockResolvedValue([]);
   mocks.listVideoProjectEntries.mockResolvedValue([]);
 });

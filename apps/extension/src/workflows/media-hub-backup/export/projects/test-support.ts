@@ -129,7 +129,12 @@ export async function readProjectBundleRecord(storeName: string, key: string) {
   }
   if (
     storeName === 'asset_refs' &&
-    (key === 'asset-project-1' || key === 'asset-export-1' || key === 'opfs-scenario-asset-1')
+    (key === 'asset-project-1' ||
+      key === 'asset-export-1' ||
+      key === 'opfs-scenario-asset-1' ||
+      key === 'editor-source-1' ||
+      key === 'editor-source-metadata' ||
+      key === 'editor-favicon-metadata')
   ) {
     return {
       assetId: key,

@@ -7,9 +7,16 @@ const dbMocks = vi.hoisted(() => ({
   deleteRecordingMock: vi.fn(),
   getMock: vi.fn(),
   initDBMock: vi.fn(),
+  objectStoreGetMock: vi.fn(),
   objectStoreDeleteMock: vi.fn(),
   putMock: vi.fn(),
+  listReadyJournalsMock: vi.fn(),
   txDoneMock: vi.fn(),
+}));
+
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  listReadyJournals: dbMocks.listReadyJournalsMock,
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -75,10 +82,18 @@ function createDb() {
     put: dbMocks.putMock,
     transaction: vi.fn(() => ({
       done: dbMocks.txDoneMock(),
-      objectStore: vi.fn(() => ({ delete: dbMocks.objectStoreDeleteMock })),
+      objectStore: vi.fn(() => ({
+        delete: dbMocks.objectStoreDeleteMock,
+        get: dbMocks.objectStoreGetMock,
+        put: dbMocks.putMock,
+      })),
     })),
   };
 }
+
+beforeEach(() => {
+  dbMocks.listReadyJournalsMock.mockResolvedValue([]);
+});
 
 function mockDeleteMediaLibraryAssetEntries() {
   dbMocks.getMock
@@ -122,6 +137,7 @@ function expectDeleteMediaLibraryAssetCleanup() {
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.txDoneMock.mockResolvedValue(undefined);
+  dbMocks.objectStoreGetMock.mockResolvedValue(undefined);
   dbMocks.initDBMock.mockResolvedValue(createDb());
 });
 

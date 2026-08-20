@@ -18,7 +18,7 @@ export interface ScenarioEmbeddedEditorApplyPayload {
 }
 
 interface ScenarioEmbeddedEditorRuntimeArgs {
-  createIframeUrl: () => Promise<string>;
+  createIframeUrl: () => Promise<{ release?: () => void; url: string }>;
   onApply: (payload: ScenarioEmbeddedEditorApplyPayload) => Promise<void>;
   onClose: () => void;
 }
@@ -62,17 +62,23 @@ function clearEmbeddedEditorSaving(setState: Dispatch<SetStateAction<EmbeddedEdi
   setState((current) => ({ ...current, saving: false }));
 }
 
-function useScenarioEmbeddedEditorFrame(createIframeUrl: () => Promise<string>) {
+function useScenarioEmbeddedEditorFrame(
+  createIframeUrl: () => Promise<{ release?: () => void; url: string }>
+) {
   const [state, setState] = useState<EmbeddedEditorState>(createInitialState);
 
   useEffect(() => {
     let cancelled = false;
+    let release: (() => void) | undefined;
 
     setState(createInitialState());
     void createIframeUrl()
-      .then((iframeUrl) => {
+      .then((result) => {
         if (!cancelled) {
-          setState((current) => ({ ...current, iframeUrl, loading: false }));
+          release = result.release;
+          setState((current) => ({ ...current, iframeUrl: result.url, loading: false }));
+        } else {
+          result.release?.();
         }
       })
       .catch((error: unknown) => {
@@ -89,6 +95,7 @@ function useScenarioEmbeddedEditorFrame(createIframeUrl: () => Promise<string>) 
 
     return () => {
       cancelled = true;
+      release?.();
     };
   }, [createIframeUrl]);
 

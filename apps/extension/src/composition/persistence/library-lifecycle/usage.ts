@@ -1,5 +1,5 @@
 import { listAggregatePresentations } from '../aggregate-presentations';
-import { listImageWorkspaces } from '../image-workspaces';
+import { recoverAndListStoredImageWorkspaces } from '../image-workspaces';
 import { getMediaThumbnail, listMediaLibrary } from '../media-library';
 import { listVideoProjectEntries } from '../projects';
 import {
@@ -7,7 +7,7 @@ import {
   listScenarioExports,
   listScenarioProjectEntries,
 } from '../scenario/projects';
-import { listScenarioStepEditorDocuments } from '../scenario/editor-documents';
+import { listStoredScenarioStepEditorDocuments } from '../scenario/editor-documents';
 import { parseAssetOwner, parseAssetRef, type AssetOwner, type AssetRef } from '../assets';
 import { ASSET_OWNERS_STORE, ASSET_REFS_STORE } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -26,7 +26,7 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
       listMediaLibrary(),
       listVideoProjectEntries(),
       listScenarioProjectEntries(),
-      listImageWorkspaces(),
+      recoverAndListStoredImageWorkspaces(),
       listAggregatePresentations(),
       loadAssetUsageAuthority(),
     ]);
@@ -54,6 +54,12 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
     const parent = mediaById.get(workspace.aggregateId);
     if (parent) {
       addBytes(jsonBytes(workspace), parent.lifecycle?.storageClass ?? 'library');
+      for (const assetId of new Set(workspace.document.assets.map((asset) => asset.assetId))) {
+        addBytes(
+          assetAuthority.refsById.get(assetId)?.size ?? 0,
+          parent.lifecycle?.storageClass ?? 'library'
+        );
+      }
     }
   }
   for (const entry of videoProjects) {
@@ -69,13 +75,18 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
     const [assets, exports, stepDocuments, legacyThumbnail] = await Promise.all([
       listScenarioAssets(entry.id),
       listScenarioExports(entry.id),
-      listScenarioStepEditorDocuments(entry.id),
+      listStoredScenarioStepEditorDocuments(entry.id),
       getMediaThumbnail(`scenario:${entry.id}`),
     ]);
     for (const asset of assets) {
       addBytes(assetAuthority.refsById.get(asset.assetId)?.size ?? 0, storageClass);
     }
-    for (const stepDocument of stepDocuments) addBytes(jsonBytes(stepDocument), storageClass);
+    for (const stepDocument of stepDocuments) {
+      addBytes(jsonBytes(stepDocument), storageClass);
+      for (const assetId of new Set(stepDocument.document.assets.map((asset) => asset.assetId))) {
+        addBytes(assetAuthority.refsById.get(assetId)?.size ?? 0, storageClass);
+      }
+    }
     if (legacyThumbnail) addBytes(legacyThumbnail.blob.size, storageClass);
     for (const scenarioExport of exports) {
       addBytes(scenarioExport.size, storageClass);

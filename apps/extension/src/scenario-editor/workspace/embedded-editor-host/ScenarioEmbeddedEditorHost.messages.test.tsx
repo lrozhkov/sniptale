@@ -17,13 +17,13 @@ const {
   blobToDataUrlMock,
   buildEditorUrlMock,
   getScenarioAssetBlobMock,
-  getScenarioStepEditorDocumentRecordMock,
+  getScenarioStepEditorDocumentTransferRecordMock,
   persistPendingEditorBootstrapPayloadMock,
 } = vi.hoisted(() => ({
   blobToDataUrlMock: vi.fn(),
   buildEditorUrlMock: vi.fn(),
   getScenarioAssetBlobMock: vi.fn(),
-  getScenarioStepEditorDocumentRecordMock: vi.fn(),
+  getScenarioStepEditorDocumentTransferRecordMock: vi.fn(),
   persistPendingEditorBootstrapPayloadMock: vi.fn(),
 }));
 
@@ -42,7 +42,7 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (importO
     typeof import('../../../composition/persistence/scenario/store/public')
   >()),
   getScenarioAssetBlob: getScenarioAssetBlobMock,
-  getScenarioStepEditorDocumentRecord: getScenarioStepEditorDocumentRecordMock,
+  getScenarioStepEditorDocumentTransferRecord: getScenarioStepEditorDocumentTransferRecordMock,
 }));
 
 vi.mock('../../../workflows/editor/bootstrap', async (importOriginal) => ({
@@ -178,7 +178,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
   getScenarioAssetBlobMock.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
-  getScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
+  getScenarioStepEditorDocumentTransferRecordMock.mockResolvedValue(undefined);
   blobToDataUrlMock.mockResolvedValue('data:image/png;base64,abc');
   persistPendingEditorBootstrapPayloadMock.mockResolvedValue('bootstrap-1');
   buildEditorUrlMock.mockReturnValue('/editor/index.html?bootstrap=bootstrap-1&embed=scenario');

@@ -7,6 +7,10 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
+vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
+  recoverAndGetStoredImageWorkspace: vi.fn(async () => undefined),
+}));
 
 it('sanitizes legacy source provenance before writing backup metadata descriptors', async () => {
   const assets: Parameters<typeof appendBackupAssetDescriptor>[0]['assets'] = [];

@@ -22,6 +22,9 @@ import {
   applyScenarioStepDocumentPrivacyOptions,
   countScenarioProjectEntrySourceMetadata,
 } from './privacy';
+import { buildBackupManifest } from './manifest';
+import { createMediaHubBackupExportOptions } from './options';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 
 function createPage(url: string): ScenarioPageDescriptor {
   return {
@@ -116,6 +119,57 @@ function createLegacyScenarioProject(): ScenarioProject {
     version: 2,
   };
 }
+
+it('declares image workspace document provenance in the backup manifest', () => {
+  const document = createEditorDocumentFixture();
+  document.browserFrame = {
+    canvasMode: 'resize',
+    contentMode: 'push-down',
+    faviconDataUrl: null,
+    title: 'Private document title',
+    url: 'https://private.test/reset?token=secret',
+  };
+  const manifest = buildBackupManifest({
+    assets: [
+      {
+        assetPath: 'assets/image-1',
+        entry: {
+          createdAt: 1,
+          duration: null,
+          filename: 'image.png',
+          height: 80,
+          id: 'image-1',
+          kind: 'image',
+          mimeType: 'image/png',
+          originalFilename: 'image.png',
+          size: 1,
+          source: { kind: 'screenshot' },
+          sourceFavicon: null,
+          sourceTitle: null,
+          sourceUrl: null,
+          tags: [],
+          updatedAt: 2,
+          width: 100,
+        },
+        thumbnailPath: null,
+        workspace: {
+          aggregateId: 'image-1',
+          createdAt: 1,
+          document,
+          revision: 1,
+          sourceTitle: null,
+          sourceUrl: null,
+          updatedAt: 2,
+        },
+      },
+    ],
+    options: createMediaHubBackupExportOptions({ includeSourceMetadata: true }),
+    projects: { effectBundles: [], scenarioProjects: [], videoProjects: [] },
+    thumbnailCount: 0,
+  });
+
+  expect(manifest.dataClasses).toEqual(expect.objectContaining({ sourceMetadata: true }));
+});
 
 it('strips source metadata from scenario v3 slide and image capture contexts', () => {
   const entry = createScenarioProjectEntry();

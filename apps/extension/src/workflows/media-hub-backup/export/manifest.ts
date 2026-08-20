@@ -1,5 +1,9 @@
 import { createMediaHubBackupDataClassFlags } from './options';
-import { countScenarioProjectSourceMetadata, hasBackupSourceMetadata } from './privacy';
+import {
+  countScenarioProjectSourceMetadata,
+  hasBackupSourceMetadata,
+  hasEditorDocumentSourceMetadata,
+} from './privacy';
 import { BACKUP_FORMAT, BACKUP_VERSION } from '../manifest';
 import type {
   MediaHubBackupAssetDescriptor,
@@ -120,6 +124,7 @@ function countBackupSourceMetadata(
 ): number {
   return (
     assets.filter((asset) => hasBackupSourceMetadata(asset.entry)).length +
+    assets.filter((asset) => hasEditorDocumentSourceMetadata(asset.workspace?.document)).length +
     scenarioProjects.reduce(
       (count, project) => count + countScenarioProjectSourceMetadata(project),
       0

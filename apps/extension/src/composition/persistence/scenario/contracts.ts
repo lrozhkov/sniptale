@@ -4,6 +4,7 @@ import type { EditorDocument } from '../../../features/editor/document/types';
 import type { ScenarioProject } from '../../../features/scenario/contracts/types/project';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 import type { AssetRef } from '../assets';
+import type { PersistedEditorDocumentV3 } from '../document-assets';
 
 export interface ScenarioProjectEntry {
   id: string;
@@ -60,4 +61,12 @@ export interface ScenarioStepEditorDocumentEntry {
   document: EditorDocument;
   createdAt: number;
   updatedAt: number;
+  releaseDocumentAssets?(): void;
+}
+
+export interface StoredScenarioStepEditorDocumentEntry extends Omit<
+  ScenarioStepEditorDocumentEntry,
+  'document'
+> {
+  document: PersistedEditorDocumentV3;
 }

@@ -8,7 +8,7 @@ import {
   deletePendingScenarioAsset,
   deleteScenarioExport,
 } from '../../composition/persistence/scenario/projects';
-import { deleteOrphanedScenarioAggregateChild } from '../../composition/persistence/scenario/aggregate-mutations';
+import { deleteOrphanedScenarioAggregateChild } from '../../composition/persistence/scenario/aggregate-cleanup';
 import { deleteProjectAsset } from '../../composition/persistence/projects/index';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { withMediaHubWriteGuard } from '../../features/media-hub/storage-errors';
