@@ -304,3 +304,59 @@ describe('image aggregate autosave', () => {
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
   });
 });
+
+describe('image workspace hydration freshness', () => {
+  it('discards a late hydrated draft without revoking the newer active document', async () => {
+    let resolveOlder!: (value: unknown) => void;
+    let resolveNewer!: (value: unknown) => void;
+    const releaseOlder = vi.fn();
+    const releaseNewer = vi.fn();
+    getWorkspaceMock
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOlder = resolve;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveNewer = resolve;
+        })
+      );
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    let generation = 1;
+    const older = autosave.restoreDraft('image-older', () => generation === 1);
+    generation = 2;
+    const newer = autosave.restoreDraft('image-newer', () => generation === 2);
+
+    resolveNewer({
+      aggregateId: 'image-newer',
+      createdAt: 1,
+      document: createDocument('newer'),
+      releaseDocumentAssets: releaseNewer,
+      revision: 8,
+      sourceTitle: null,
+      sourceUrl: null,
+      updatedAt: 2,
+    });
+    await expect(newer).resolves.toEqual(expect.objectContaining({ aggregateId: 'image-newer' }));
+    resolveOlder({
+      aggregateId: 'image-older',
+      createdAt: 1,
+      document: createDocument('older'),
+      releaseDocumentAssets: releaseOlder,
+      revision: 4,
+      sourceTitle: null,
+      sourceUrl: null,
+      updatedAt: 2,
+    });
+
+    await expect(older).resolves.toBeUndefined();
+    expect(releaseOlder).toHaveBeenCalledOnce();
+    expect(releaseNewer).not.toHaveBeenCalled();
+    expect(autosave.getDurableRevision()).toBe(8);
+
+    autosave.dispose();
+    expect(releaseNewer).toHaveBeenCalledOnce();
+  });
+});

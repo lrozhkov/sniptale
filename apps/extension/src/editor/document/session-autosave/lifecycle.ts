@@ -49,10 +49,15 @@ export function updateAutosaveContext(
 
 export async function restoreAutosaveDraft(
   state: EditorSessionAutosaveState,
-  aggregateId: string
+  aggregateId: string,
+  isCurrent: () => boolean = () => true
 ): Promise<ImageWorkspaceEntry | undefined> {
   const entry = await recoverAndGetImageWorkspace(aggregateId);
   if (!entry) {
+    return undefined;
+  }
+  if (!isCurrent()) {
+    entry.releaseDocumentAssets?.();
     return undefined;
   }
 

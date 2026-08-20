@@ -19,7 +19,10 @@ export interface EditorSessionAutosaveService {
   activate: (context: ActiveEditorSessionContext) => void;
   rebindAggregate: (context: ActiveEditorSessionContext) => void;
   updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
-  restoreDraft: (aggregateId: string) => Promise<ImageWorkspaceEntry | undefined>;
+  restoreDraft: (
+    aggregateId: string,
+    isCurrent?: () => boolean
+  ) => Promise<ImageWorkspaceEntry | undefined>;
   scheduleAutosave: (document: EditorDocument) => void;
   flushAutosave: (getDocument: () => EditorDocument) => Promise<void>;
   persistSnapshot: (getDocument: () => EditorDocument) => Promise<void>;
@@ -38,7 +41,7 @@ function createEditorSessionAutosaveActions(
     activate: (context) => activateAutosaveContext(state, context),
     rebindAggregate: (context) => rebindAutosaveAggregate(state, context),
     updateContext: (patch) => updateAutosaveContext(state, patch),
-    restoreDraft: (aggregateId) => restoreAutosaveDraft(state, aggregateId),
+    restoreDraft: (aggregateId, isCurrent) => restoreAutosaveDraft(state, aggregateId, isCurrent),
     scheduleAutosave: (document) => queuePendingAutosave(state, document),
     flushAutosave: (getDocument) => flushPendingAutosave(state, getDocument),
     persistSnapshot: (getDocument) => persistAutosaveSnapshot(state, getDocument),

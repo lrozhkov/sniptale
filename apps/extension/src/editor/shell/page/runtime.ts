@@ -141,7 +141,8 @@ export async function bootstrapEditorPageSession(
   const restoreSource = await resolveEditorPageRestoreSource(
     locationState,
     aggregateId,
-    services.autosaveService
+    services.autosaveService,
+    () => !isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)
   );
   if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
     return;

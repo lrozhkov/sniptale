@@ -44,6 +44,29 @@ async function openEditorFrameUtility(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function readImageWorkspaceRevision(page: Page, aggregateId: string): Promise<number | null> {
+  return page.evaluate(async (id) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-video-db');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const entry = await new Promise<unknown>((resolve, reject) => {
+      const request = database
+        .transaction('image_workspaces', 'readonly')
+        .objectStore('image_workspaces')
+        .get(id);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    database.close();
+    if (typeof entry !== 'object' || entry === null || !('revision' in entry)) {
+      return null;
+    }
+    return typeof entry.revision === 'number' ? entry.revision : null;
+  }, aggregateId);
+}
+
 async function hasStoredQuickAction(page: Page, actionName: string): Promise<boolean> {
   const storageState = await getHarnessStorageState(page);
   const storedActions = storageState[QUICK_ACTIONS_KEY];
@@ -318,6 +341,41 @@ test('editor save and copy actions emit observable side effects', async ({ page,
     () => window.__sniptaleHarness?.getClipboardWrites() ?? []
   );
   expect(clipboardWrite?.types).toContain('image/png');
+});
+
+test('editor reopens a persisted workspace and autosaves without revoking its file URLs', async ({
+  page,
+  hostOrigin,
+}) => {
+  const persistErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && message.text().includes('Failed to persist draft')) {
+      persistErrors.push(message.text());
+    }
+  });
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    editorAutoApplyBrowserFrame: true,
+    editorBootstrapPayload: createExactBrowserFrameHarnessPayload(),
+  });
+  await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-ui="editor.page.root"]').waitFor({ state: 'visible' });
+
+  await expect.poll(() => new URL(page.url()).searchParams.has('assetId')).toBe(true);
+  const aggregateId = new URL(page.url()).searchParams.get('assetId');
+  expect(aggregateId).not.toBeNull();
+  await expect
+    .poll(async () => (await readImageWorkspaceRevision(page, aggregateId!)) ?? 0)
+    .toBeGreaterThan(0);
+  const firstRevision = await readImageWorkspaceRevision(page, aggregateId!);
+  expect(firstRevision).not.toBeNull();
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('[data-ui="editor.page.root"]').waitFor({ state: 'visible' });
+  await expect
+    .poll(async () => (await readImageWorkspaceRevision(page, aggregateId!)) ?? 0)
+    .toBeGreaterThan(firstRevision!);
+  expect(persistErrors).toEqual([]);
 });
 
 test('editor exact browser-frame harness stays visually stable', async ({ page, hostOrigin }) => {
