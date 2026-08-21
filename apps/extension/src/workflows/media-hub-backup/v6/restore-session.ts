@@ -16,15 +16,19 @@ export interface RestoreSessionSummary {
   strategy: ArchiveRestoreStrategy;
   status: ArchiveRestoreSession['status'];
   committedRootCount: number;
+  conflictedRootCount: number;
   currentRoot: string | null;
+  skippedRootCount: number;
 }
 
 function summarize(session: ArchiveRestoreSession): RestoreSessionSummary {
   return {
     archiveFingerprint: session.archiveFingerprint,
     committedRootCount: session.committedRoots.length,
+    conflictedRootCount: session.conflictedRoots.length,
     currentRoot: session.currentRoot,
     operationId: session.operationId,
+    skippedRootCount: session.skippedRoots.length,
     status: session.status,
     strategy: session.strategy,
   };
@@ -71,6 +75,13 @@ export async function listResumableMediaHubRestores(): Promise<RestoreSessionSum
   return (await listArchiveRestoreSessions())
     .filter((session) => session.status === 'pending')
     .map(summarize);
+}
+
+export async function readMediaHubRestoreSummary(
+  operationId: string
+): Promise<RestoreSessionSummary | null> {
+  const session = await readArchiveRestoreSession(operationId);
+  return session ? summarize(session) : null;
 }
 
 export async function abortMediaHubBackupRestore(operationId: string): Promise<void> {

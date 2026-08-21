@@ -4,7 +4,9 @@ export function createLocalBackupSummary(): MediaHubLocalBackupSummary {
   return {
     approximateSizeBytes: 0,
     assetCount: 0,
+    draftCount: 0,
     dataClasses: {
+      drafts: false,
       mediaAssets: false,
       recordings: false,
       scenarioProjects: false,

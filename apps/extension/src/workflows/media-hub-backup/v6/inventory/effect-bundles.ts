@@ -1,10 +1,11 @@
-import { createArchiveObjectPath } from '../../../../composition/archive-transfer';
+import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { VIDEO_EFFECT_BUNDLES_STORE } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { parseEffectBundleCatalogEntry } from '../../../../composition/persistence/effect-bundles/entry';
 import { assertEffectBundleCatalogIntegrity } from '../../../../composition/persistence/effect-bundles/integrity';
 import { encodeEffectBundleMetadata } from '../root-codecs/effect-bundle';
 import type { MediaHubBackupRootInventoryItem } from '../export';
 import type { JsonValue } from '../contracts';
+import { createInternalObjectSegments, METADATA_ROOT } from '../layout';
 
 interface EffectBundleInventoryDatabase {
   getAll(store: typeof VIDEO_EFFECT_BUNDLES_STORE): Promise<unknown>;
@@ -15,7 +16,8 @@ function portableObjectId(rootIndex: number, assetIndex: number): string {
 }
 
 export async function buildEffectBundleRootInventory(
-  db: EffectBundleInventoryDatabase
+  db: EffectBundleInventoryDatabase,
+  paths: ArchivePathAllocator
 ): Promise<MediaHubBackupRootInventoryItem[]> {
   const values = await db.getAll(VIDEO_EFFECT_BUNDLES_STORE);
   if (!Array.isArray(values)) throw new Error('Effect bundle backup inventory is invalid.');
@@ -41,14 +43,14 @@ export async function buildEffectBundleRootInventory(
               filename,
               mimeType: asset.mimeType,
               objectId,
-              path: createArchiveObjectPath(objectId, filename),
+              path: paths.reserve(createInternalObjectSegments(objectId, filename)),
               size: asset.byteLength,
             },
           };
         });
         const descriptor = {
           mediaSubtype: 'effect-bundle' as const,
-          metadataPath: `metadata/media/effect-bundle-${encodeURIComponent(entry.packId)}.json`,
+          metadataPath: `${METADATA_ROOT}/media/effect-bundle-${encodeURIComponent(entry.packId)}.json`,
           objectCount: objects.length,
           rootId: entry.packId,
           rootKind: 'media' as const,
@@ -61,6 +63,7 @@ export async function buildEffectBundleRootInventory(
             objects,
           }),
           summary: {
+            draftCount: 0,
             recordingCount: 0,
             sourceMetadataCount: 0,
             telemetryCount: 0,

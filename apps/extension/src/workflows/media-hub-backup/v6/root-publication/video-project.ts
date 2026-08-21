@@ -27,6 +27,7 @@ import {
 import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
+import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 
 function newId() {
   if (typeof crypto.randomUUID !== 'function')
@@ -128,7 +129,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       session.rootIdMap
     );
     const entry = parseVideoProjectEntry({
-      ...metadata.entry,
+      ...rebaseTemporaryLifecycle(metadata.entry),
       id: targetProjectId,
       project: transformedProject,
     });

@@ -15,6 +15,7 @@ import {
   type MediaHubBackupPrivacyFlags,
   type MediaHubBackupRootEnvelope,
 } from './contracts';
+import { assertV6CatalogPath, assertV6ObjectPath, MEDIA_HUB_BACKUP_LAYOUT } from './layout';
 
 const PORTABLE_URL_PATTERN = /^(?:data|blob):/i;
 const BINARY_BASE64_SIGNATURE_PATTERN =
@@ -125,10 +126,7 @@ function parseArchiveObjectRef(value: unknown): ArchiveObjectRef {
   const filename = parseNonEmptyString(value['filename'], 'object filename');
   const mimeType = parseNonEmptyString(value['mimeType'], 'object MIME type');
   const size = parseSafeInteger(value['size'], 'object size');
-  assertSafeArchivePath(path);
-  if (!path.startsWith(`objects/${encodeURIComponent(objectId)}/`)) {
-    throw new Error('Media backup object path does not match its portable ID.');
-  }
+  assertV6ObjectPath(path, objectId, filename);
   if (!MIME_TYPE_PATTERN.test(mimeType)) {
     throw new Error('Media backup object MIME type is invalid.');
   }
@@ -202,7 +200,7 @@ function parseCatalogShard(value: unknown): MediaHubBackupCatalogShard {
     media ? ['mediaSubtype'] : []
   );
   const path = parseNonEmptyString(value['path'], 'catalog path');
-  assertSafeArchivePath(path);
+  assertV6CatalogPath(path);
   const rootKind = value['rootKind'];
   if (rootKind !== 'media' && rootKind !== 'video-project' && rootKind !== 'scenario-project') {
     throw new Error('Media backup catalog root kind is invalid.');
@@ -222,18 +220,27 @@ function parseCatalogShard(value: unknown): MediaHubBackupCatalogShard {
 
 export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
   if (!isPlainRecord(value)) throw new Error('Media backup manifest is invalid.');
+  if (
+    value['format'] === MEDIA_HUB_BACKUP_FORMAT &&
+    value['version'] === MEDIA_HUB_BACKUP_VERSION &&
+    value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT
+  ) {
+    throw new Error('Unsupported media backup v6 layout. Create a new backup with this version.');
+  }
   assertExactKeys(value, [
     'archiveId',
     'catalogs',
     'exportedAt',
     'format',
+    'layout',
     'privacy',
     'totals',
     'version',
   ]);
   if (
     value['format'] !== MEDIA_HUB_BACKUP_FORMAT ||
-    value['version'] !== MEDIA_HUB_BACKUP_VERSION
+    value['version'] !== MEDIA_HUB_BACKUP_VERSION ||
+    value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT
   ) {
     throw new Error('Unsupported media backup format.');
   }
@@ -264,6 +271,7 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
     catalogs,
     exportedAt: parseNonEmptyString(value['exportedAt'], 'export date'),
     format: MEDIA_HUB_BACKUP_FORMAT,
+    layout: MEDIA_HUB_BACKUP_LAYOUT,
     privacy: parsePrivacyFlags(value['privacy']),
     totals: {
       bytes: parseSafeInteger(totals['bytes'], 'total bytes'),

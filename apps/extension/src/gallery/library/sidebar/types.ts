@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { FolderFilter, GalleryFolderCounts, GalleryScope } from '../types';
 
 export interface GallerySidebarProps {
@@ -9,6 +9,7 @@ export interface GallerySidebarProps {
   folderFilter: FolderFilter;
   scope?: GalleryScope;
   isBusy: boolean;
+  importTriggerRef: RefObject<HTMLButtonElement | null>;
   onActiveTagsChange: Dispatch<SetStateAction<string[]>>;
   onExportBackup: () => void;
   onFolderFilterChange: Dispatch<SetStateAction<FolderFilter>>;

@@ -1,6 +1,7 @@
 import type { MediaHubBackupExportOptions, MediaHubBackupSelectedScope } from './contracts';
 
 export const FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS: MediaHubBackupExportOptions = {
+  includeDrafts: false,
   includeSourceMetadata: true,
   includeTelemetry: true,
   includeWebSnapshots: true,
@@ -8,6 +9,7 @@ export const FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS: MediaHubBackupExportOptions =
 };
 
 export const SUPPORT_MEDIA_HUB_BACKUP_EXPORT_OPTIONS: MediaHubBackupExportOptions = {
+  includeDrafts: false,
   includeSourceMetadata: false,
   includeTelemetry: false,
   includeWebSnapshots: false,
@@ -28,6 +30,7 @@ export function createMediaHubBackupExportOptions(
   options: Partial<MediaHubBackupExportOptions> = {}
 ): MediaHubBackupExportOptions {
   return {
+    includeDrafts: options.includeDrafts ?? FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS.includeDrafts,
     includeSourceMetadata:
       options.includeSourceMetadata ?? FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS.includeSourceMetadata,
     includeTelemetry:

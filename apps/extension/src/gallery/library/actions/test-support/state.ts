@@ -2,6 +2,7 @@ import type { GalleryAppState, GalleryPreviewSessionState } from '../../../state
 import type { GalleryItem } from '../../items';
 
 export type GalleryStateOverride = Partial<GalleryAppState> & {
+  activeImport?: GalleryAppState['storage']['activeImport'];
   allTags?: GalleryAppState['derived']['allTags'];
   cleanupReport?: GalleryAppState['storage']['cleanupReport'];
   confirmDialog?: GalleryAppState['storage']['confirmDialog'];
@@ -108,6 +109,7 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
       ...overrides.selection,
     },
     storage: {
+      activeImport: overrides.activeImport ?? null,
       banner: null,
       cleanupReport: overrides.cleanupReport ?? null,
       confirmDialog: overrides.confirmDialog ?? null,

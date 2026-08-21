@@ -15,6 +15,7 @@ import {
   type MediaHubBackupPrivacyFlags,
   type MediaHubBackupRootEnvelope,
 } from './contracts';
+import { CATALOG_ROOT, MANIFEST_PATH, MEDIA_HUB_BACKUP_LAYOUT } from './layout';
 
 export interface ArchiveRootObjectSource {
   blob: Blob;
@@ -30,6 +31,7 @@ export interface MediaHubBackupRootInventoryItem {
   descriptor: ArchiveRootDescriptor;
   load(signal?: AbortSignal): Promise<ArchiveRootPayload>;
   summary: {
+    draftCount: number;
     recordingCount: number;
     sourceMetadataCount: number;
     telemetryCount: number;
@@ -74,7 +76,7 @@ function catalogPath(profile: string, index: number): string {
         : profile === 'video-project'
           ? 'video-projects'
           : 'scenario-projects';
-  return `catalog/${label}-${String(index + 1).padStart(6, '0')}.ndjson`;
+  return `${CATALOG_ROOT}/${label}-${String(index + 1).padStart(6, '0')}.ndjson`;
 }
 
 function createArchiveId(): string {
@@ -148,6 +150,7 @@ export function buildMediaHubBackupExportPlanV6(args: {
     catalogs: catalogs.map((catalog) => catalog.descriptor),
     exportedAt: args.exportedAt ?? new Date().toISOString(),
     format: MEDIA_HUB_BACKUP_FORMAT,
+    layout: MEDIA_HUB_BACKUP_LAYOUT,
     privacy: args.privacy,
     totals: {
       bytes: roots.reduce((total, item) => total + item.descriptor.totalBytes, 0),
@@ -181,10 +184,10 @@ export async function exportMediaHubBackupV6(args: {
   });
   try {
     throwIfAborted(args.signal);
-    progress.currentFilename = 'manifest.json';
+    progress.currentFilename = MANIFEST_PATH;
     report();
     await writer.addText(
-      'manifest.json',
+      MANIFEST_PATH,
       JSON.stringify(args.plan.manifest),
       signalOptions(args.signal)
     );

@@ -88,7 +88,7 @@ function BackupExportSummaryGrid(props: {
       : translate('gallery.backupExportModal.scopeAll');
 
   return (
-    <div className="mt-5 grid gap-3 md:grid-cols-4">
+    <div className="mt-5 grid gap-3 md:grid-cols-5">
       <SummaryStat
         label={translate('gallery.backupExportModal.assets')}
         value={props.summary.assetCount}
@@ -102,6 +102,10 @@ function BackupExportSummaryGrid(props: {
         value={formatBytes(props.summary.approximateSizeBytes, 1)}
       />
       <SummaryStat label={translate('gallery.backupExportModal.scope')} value={scopeLabel} />
+      <SummaryStat
+        label={translate('gallery.backupExportModal.drafts')}
+        value={props.summary.draftCount}
+      />
     </div>
   );
 }
@@ -117,6 +121,10 @@ function BackupDataClassesPanel({ summary }: Pick<BackupExportModalProps, 'summa
         <DataClassRow
           count={summary.assetCount}
           label={translate('gallery.backupExportModal.classMedia')}
+        />
+        <DataClassRow
+          count={summary.draftCount}
+          label={translate('gallery.backupExportModal.classDrafts')}
         />
         <DataClassRow
           count={summary.videoProjectCount + summary.scenarioProjectCount}
@@ -145,6 +153,12 @@ function BackupPrivacyOptionsGrid(props: {
 }) {
   return (
     <div className="mt-5 grid gap-3 md:grid-cols-2">
+      <PrivacyToggle
+        checked={props.options.includeDrafts}
+        label={translate('gallery.backupExportModal.includeDrafts')}
+        description={translate('gallery.backupExportModal.includeDraftsDescription')}
+        onChange={(includeDrafts) => props.onChange({ includeDrafts })}
+      />
       <PrivacyToggle
         checked={props.options.includeTelemetry}
         label={translate('gallery.backupExportModal.includeTelemetry')}

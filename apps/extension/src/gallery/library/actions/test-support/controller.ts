@@ -101,6 +101,7 @@ function createControllerActions(
       refresh: vi.fn(async () => undefined),
     },
     surface: {
+      setActiveImport: createNestedSetter({ area: 'storage', key: 'activeImport', stateRef }),
       setBanner: () => undefined,
       setConfirmDialog: createNestedSetter({ area: 'storage', key: 'confirmDialog', stateRef }),
       setIsBusy: () => undefined,
@@ -119,6 +120,7 @@ export function createController(overrides: GalleryStateOverride = {}) {
     refs: {
       gridViewportRef: { current: null },
       importInputRef: { current: document.createElement('input') },
+      importTriggerRef: { current: document.createElement('button') },
     },
     get state() {
       return stateRef.getState();

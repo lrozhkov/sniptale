@@ -1,6 +1,9 @@
 import { expect, type Page } from '@playwright/test';
+import { BlobReader, ZipReader } from '@zip.js/zip.js';
 import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../apps/extension/src/platform/i18n';
+import { createVideoProject } from '../../../apps/extension/src/composition/persistence/projects/index.test-support';
+import { createScenarioProjectV3 } from '../../../apps/extension/src/features/scenario/project/v3';
 import { test } from './support/extension-fixture';
 import {
   createExactBrowserFrameHarnessPayload,
@@ -199,13 +202,99 @@ test('gallery backup export imports media as duplicate through the modal flow', 
   await expect.poll(() => readLastSavedFile(page)).not.toBeNull();
   const savedBackup = await readLastSavedFile(page);
   expect(savedBackup?.filename).toMatch(/^media-hub-backup-.*\.zip$/);
+  await expect(readArchivePaths(savedBackup?.bytes ?? [])).resolves.toEqual(
+    expect.arrayContaining([
+      'Screenshots/gallery-backup.png',
+      '_sniptale/catalog/media-000001.ndjson',
+      '_sniptale/manifest.json',
+    ])
+  );
   await writeFile(backupPath, Uint8Array.from(savedBackup?.bytes ?? []));
 
   await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
   await page.locator('input[type="file"]').setInputFiles(backupPath);
   await page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL }).click();
 
+  await expect(page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL })).toBeHidden();
+  await expect(page.locator('[data-ui="gallery.import-progress"]')).toBeVisible();
+
   await expect.poll(() => countMediaLibraryEntries(page)).toBe(2);
+});
+
+test('gallery backup restores draft media and projects to a fresh Drafts retention interval', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  const createdAt = 1_000;
+  const videoProject = createVideoProject({
+    createdAt,
+    id: 'draft-video-project',
+    name: 'Draft video',
+    updatedAt: createdAt,
+  });
+  const scenarioProject = {
+    ...createScenarioProjectV3('Draft scenario'),
+    createdAt,
+    id: 'draft-scenario-project',
+    updatedAt: createdAt,
+  };
+  await applyGalleryScreenshotBootstrap(page, {
+    blobText: 'draft-image-bytes',
+    createdAt,
+    filename: 'draft image.png',
+    height: 720,
+    id: 'draft-image',
+    size: 17,
+    sourceTitle: 'Draft image',
+    sourceUrl: 'https://example.com/draft',
+    storageClass: 'temporary',
+    tags: [],
+    width: 1280,
+  });
+  await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
+  await seedDraftProjectEntries(page, videoProject, scenarioProject, createdAt);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+
+  await page.getByRole('button', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
+  await page.getByRole('checkbox').first().check();
+  await page
+    .getByRole('button', { name: GALLERY_CONFIRM_EXPORT_BACKUP_LABEL, exact: true })
+    .click();
+  await expect.poll(() => readLastSavedFile(page)).not.toBeNull();
+  const backupPath = testInfo.outputPath('gallery-drafts-backup.zip');
+  const savedBackup = await readLastSavedFile(page);
+  const paths = await readArchivePaths(savedBackup?.bytes ?? []);
+  expect(paths).toEqual(
+    expect.arrayContaining([
+      'Drafts/Screenshots/draft image.png',
+      '_sniptale/metadata/video-projects/draft-video-project.json',
+      '_sniptale/metadata/scenario-projects/draft-scenario-project.json',
+    ])
+  );
+  await writeFile(backupPath, Uint8Array.from(savedBackup?.bytes ?? []));
+  await clearDraftRoots(page);
+
+  await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
+  await page.locator('input[type="file"]').setInputFiles(backupPath);
+  await page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL }).click();
+  await expect
+    .poll(() => readDraftRootLifecycles(page))
+    .toEqual([
+      expect.objectContaining({ id: 'draft-image', savedAt: null, storageClass: 'temporary' }),
+      expect.objectContaining({
+        id: 'draft-scenario-project',
+        savedAt: null,
+        storageClass: 'temporary',
+      }),
+      expect.objectContaining({
+        id: 'draft-video-project',
+        savedAt: null,
+        storageClass: 'temporary',
+      }),
+    ]);
+  const restored = await readDraftRootLifecycles(page);
+  expect(restored.every((entry) => entry.updatedAt > createdAt)).toBe(true);
 });
 
 test('recording backup round-trip keeps durable bytes in OPFS without recording Blob rows', async ({
@@ -260,6 +349,122 @@ test('recording backup round-trip keeps durable bytes in OPFS without recording 
 
 async function readLastSavedFile(page: Page) {
   return page.evaluate(() => window.__sniptaleHarness?.getSavedFiles().at(-1) ?? null);
+}
+
+async function readArchivePaths(bytes: number[]): Promise<string[]> {
+  const reader = new ZipReader(new BlobReader(new Blob([Uint8Array.from(bytes)])));
+  try {
+    return (await reader.getEntries()).map((entry) => entry.filename).sort();
+  } finally {
+    await reader.close();
+  }
+}
+
+async function seedDraftProjectEntries(
+  page: Page,
+  videoProject: ReturnType<typeof createVideoProject>,
+  scenarioProject: ReturnType<typeof createScenarioProjectV3>,
+  updatedAt: number
+) {
+  await page.evaluate(
+    async ({ scenario, video, now }) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-video-db');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+      const transaction = database.transaction(
+        ['video_projects', 'scenario_projects'],
+        'readwrite'
+      );
+      const lifecycle = { savedAt: null, storageClass: 'temporary', updatedAt: now };
+      transaction.objectStore('video_projects').put({
+        createdAt: video.createdAt,
+        id: video.id,
+        lifecycle,
+        project: video,
+        updatedAt: video.updatedAt,
+        workspaceRevision: 0,
+      });
+      transaction.objectStore('scenario_projects').put({
+        createdAt: scenario.createdAt,
+        id: scenario.id,
+        lifecycle,
+        project: scenario,
+        updatedAt: scenario.updatedAt,
+        workspaceRevision: 0,
+      });
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+      database.close();
+    },
+    { now: updatedAt, scenario: scenarioProject, video: videoProject }
+  );
+}
+
+async function clearDraftRoots(page: Page) {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-video-db');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const transaction = database.transaction(
+      ['media_library', 'video_projects', 'scenario_projects'],
+      'readwrite'
+    );
+    transaction.objectStore('media_library').clear();
+    transaction.objectStore('video_projects').clear();
+    transaction.objectStore('scenario_projects').clear();
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+  });
+}
+
+async function readDraftRootLifecycles(page: Page) {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-video-db');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const rows = await Promise.all(
+      ['media_library', 'scenario_projects', 'video_projects'].map(
+        (store) =>
+          new Promise<Record<string, unknown>[]>((resolve, reject) => {
+            const request = database.transaction(store, 'readonly').objectStore(store).getAll();
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result as Record<string, unknown>[]);
+          })
+      )
+    );
+    database.close();
+    return rows
+      .flat()
+      .map((entry) => ({
+        id: entry['id'],
+        savedAt:
+          typeof entry['lifecycle'] === 'object' && entry['lifecycle'] !== null
+            ? (entry['lifecycle'] as Record<string, unknown>)['savedAt']
+            : undefined,
+        storageClass:
+          typeof entry['lifecycle'] === 'object' && entry['lifecycle'] !== null
+            ? (entry['lifecycle'] as Record<string, unknown>)['storageClass']
+            : undefined,
+        updatedAt:
+          typeof entry['lifecycle'] === 'object' && entry['lifecycle'] !== null
+            ? (entry['lifecycle'] as Record<string, unknown>)['updatedAt']
+            : undefined,
+      }))
+      .sort((left, right) => String(left.id).localeCompare(String(right.id)));
+  });
 }
 
 async function readDurableRecordingState(page: Page): Promise<{

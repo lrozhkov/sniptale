@@ -47,7 +47,9 @@ function createActions(): UseGalleryAppActionsResult {
   return {
     backup: createBackupActions(),
     importing: {
+      cancelActiveImport: vi.fn(),
       closePendingImport: vi.fn(),
+      dismissActiveImport: vi.fn(),
       importBackup: vi.fn(async () => undefined),
       importSelectedFile: vi.fn(async () => undefined),
     },
@@ -82,7 +84,9 @@ function createBackupActions(): UseGalleryAppActionsResult['backup'] {
     inspectExport: vi.fn(async () => ({
       approximateSizeBytes: 0,
       assetCount: 0,
+      draftCount: 0,
       dataClasses: {
+        drafts: false,
         mediaAssets: false,
         recordings: false,
         scenarioProjects: false,

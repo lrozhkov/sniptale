@@ -57,4 +57,40 @@ export const galleryImportModalMessages = defineMessageSource({
     ru: 'Импортировать конфликтующие asset как новые записи с новыми ID.',
     en: 'Import conflicting assets as new entries with new IDs.',
   },
+  progressRunning: {
+    ru: 'Импорт выполняется',
+    en: 'Import in progress',
+  },
+  progressCancelling: {
+    ru: 'Отмена импорта',
+    en: 'Cancelling import',
+  },
+  progressCancelled: {
+    ru: 'Импорт отменён',
+    en: 'Import cancelled',
+  },
+  progressCompleted: {
+    ru: 'Импорт завершён',
+    en: 'Import completed',
+  },
+  progressFailed: {
+    ru: 'Не удалось завершить импорт. Выберите архив повторно, чтобы продолжить или начать заново.',
+    en: 'The import could not be completed. Select the archive again to resume or restart.',
+  },
+  progressLabel: {
+    ru: 'Прогресс импорта',
+    en: 'Import progress',
+  },
+  progressRoots: {
+    ru: 'объектов',
+    en: 'items',
+  },
+  progressImported: {
+    ru: 'Импортировано',
+    en: 'Imported',
+  },
+  progressSkipped: {
+    ru: 'Пропущено',
+    en: 'Skipped',
+  },
 });

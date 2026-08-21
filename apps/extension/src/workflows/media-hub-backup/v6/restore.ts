@@ -1,6 +1,7 @@
 import {
   abortArchiveRestoreSession,
   beginArchiveRestoreRoot,
+  clearArchiveRestoreCurrentRoot,
   completeArchiveRestoreSession,
   createAssetPublicationJournal,
   deleteReadyJournal,
@@ -162,7 +163,11 @@ async function restoreArchiveRoot(args: {
         cause: error,
       });
     });
-    await abortArchiveRestoreSession(session.operationId).catch(() => undefined);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      await clearArchiveRestoreCurrentRoot(session.operationId);
+    } else {
+      await abortArchiveRestoreSession(session.operationId).catch(() => undefined);
+    }
     throw error;
   }
 }

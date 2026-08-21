@@ -5,7 +5,7 @@ import { createArchiveFingerprint, encodeCatalogShards, parseCatalog } from './c
 function descriptor(index: number): ArchiveRootDescriptor {
   return {
     mediaSubtype: 'library-item',
-    metadataPath: `metadata/media/media-${index}.json`,
+    metadataPath: `_sniptale/metadata/media/media-${index}.json`,
     objectCount: 1,
     rootId: `media-${index}`,
     rootKind: 'media',
@@ -35,7 +35,7 @@ describe('media backup v6 catalogs', () => {
         {
           compressedSize: 10,
           crc32: 123,
-          path: 'manifest.json',
+          path: '_sniptale/manifest.json',
           size: 20,
         },
       ],

@@ -1,8 +1,10 @@
 import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
+import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  MEDIA_LIBRARY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -14,6 +16,7 @@ import {
   parseScenarioExportEntry,
   parseScenarioProjectEntry,
 } from '../../../../composition/persistence/scenario/read-guards';
+import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import type { ScenarioProjectEntry } from '../../../../composition/persistence/scenario/contracts';
 import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/editor-documents';
 import { encodePortableEditorDocument } from '../root-codecs/editor-document';
@@ -25,7 +28,13 @@ import {
 import { projectScenarioPrivacy, projectStoredEditorDocumentPrivacy } from '../privacy';
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { MediaHubBackupRootInventoryItem } from '../export';
-import { createObjectCollector, readInventoryAssetFile, type InventoryDatabase } from './helpers';
+import {
+  createObjectCollector,
+  createReadableAssetFilename,
+  readInventoryAssetFile,
+  type InventoryDatabase,
+} from './helpers';
+import { METADATA_ROOT, withDraftRoot } from '../layout';
 
 function readSelectedScenarioProjects(
   rows: unknown[],
@@ -36,7 +45,7 @@ function readSelectedScenarioProjects(
     .filter((entry): entry is NonNullable<typeof entry> =>
       Boolean(
         entry &&
-        entry.lifecycle?.storageClass !== 'temporary' &&
+        (entry.lifecycle?.storageClass !== 'temporary' || options.includeDrafts) &&
         (options.scope === 'all' || options.selected?.scenarioProjectIds.includes(entry.id))
       )
     )
@@ -49,14 +58,34 @@ async function buildScenarioAssets(
   collector: ReturnType<typeof createObjectCollector>
 ) {
   const assets = [];
-  for (const raw of await db.getAllFromIndex(SCENARIO_ASSETS_STORE, 'projectId', entry.id)) {
+  const rows = (await db.getAllFromIndex(SCENARIO_ASSETS_STORE, 'projectId', entry.id)).sort(
+    (left, right) => {
+      const leftEntry = parseScenarioAssetEntry(left);
+      const rightEntry = parseScenarioAssetEntry(right);
+      return (leftEntry?.id ?? '').localeCompare(rightEntry?.id ?? '');
+    }
+  );
+  for (const [index, raw] of rows.entries()) {
     const asset = parseScenarioAssetEntry(raw);
     if (!asset) throw new Error('Stored scenario asset is invalid and cannot be exported.');
-    const file = await readInventoryAssetFile(db, asset.assetId, asset.id);
+    const media = asset.galleryAssetId
+      ? parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, asset.galleryAssetId))
+      : null;
+    const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
+    const file = await readInventoryAssetFile(db, asset.assetId, filename);
     const { assetId: _assetId, ...portable } = asset;
     assets.push({
       entry: portable,
-      objectId: collector.addObject(file, file.name || asset.id, asset.mimeType),
+      objectId: collector.addObject(
+        file,
+        filename,
+        asset.mimeType,
+        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+          'Scenarios',
+          entry.project.name,
+          'Assets',
+        ])
+      ),
     });
   }
   return assets;
@@ -74,6 +103,11 @@ async function buildScenarioDocuments(
     'projectId',
     entry.id
   );
+  rows.sort((left, right) => {
+    const leftEntry = parseScenarioStepEditorDocumentEntry(left);
+    const rightEntry = parseScenarioStepEditorDocumentEntry(right);
+    return (leftEntry?.stepId ?? '').localeCompare(rightEntry?.stepId ?? '');
+  });
   for (const raw of rows) {
     const stored = parseScenarioStepEditorDocumentEntry(raw);
     if (!stored)
@@ -131,18 +165,21 @@ async function buildScenarioProjectRoot(args: {
   entry: ScenarioProjectEntry;
   index: number;
   options: MediaHubBackupExportOptions;
+  paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem> {
-  const collector = createObjectCollector(`scenario-${String(args.index + 1).padStart(6, '0')}`);
+  const collector = createObjectCollector(
+    `scenario-${String(args.index + 1).padStart(6, '0')}`,
+    args.paths
+  );
   const assets = await buildScenarioAssets(args.db, args.entry, collector);
   const exports = (
     await args.db.getAllFromIndex(SCENARIO_EXPORTS_STORE, 'projectId', args.entry.id)
   )
     .map(parseScenarioExportEntry)
-    .filter((value): value is NonNullable<typeof value> => value !== null);
-  const [stepDocuments, exportThumbnails] = await Promise.all([
-    buildScenarioDocuments(args.db, args.entry, collector, args.options),
-    buildScenarioExportThumbnails(args.db, exports, collector),
-  ]);
+    .filter((value): value is NonNullable<typeof value> => value !== null)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const stepDocuments = await buildScenarioDocuments(args.db, args.entry, collector, args.options);
+  const exportThumbnails = await buildScenarioExportThumbnails(args.db, exports, collector);
   const projectThumbnail = parseMediaThumbnailEntry(
     await args.db.get(THUMBNAILS_STORE, `scenario:${args.entry.id}`)
   );
@@ -194,7 +231,7 @@ async function buildScenarioProjectRoot(args: {
   };
   return {
     descriptor: {
-      metadataPath: `metadata/scenario-projects/${encodeURIComponent(args.entry.id)}.json`,
+      metadataPath: `${METADATA_ROOT}/scenario-projects/${encodeURIComponent(args.entry.id)}.json`,
       objectCount: collector.objects.length,
       rootId: args.entry.id,
       rootKind: 'scenario-project',
@@ -202,6 +239,7 @@ async function buildScenarioProjectRoot(args: {
     },
     load: async () => ({ metadata: metadata as unknown as JsonValue, objects: collector.objects }),
     summary: {
+      draftCount: args.entry.lifecycle?.storageClass === 'temporary' ? 1 : 0,
       recordingCount: 0,
       sourceMetadataCount: 0,
       telemetryCount: 0,
@@ -217,6 +255,7 @@ async function buildScenarioProjectRoot(args: {
 export async function buildScenarioProjectRootInventory(args: {
   db: InventoryDatabase;
   options: MediaHubBackupExportOptions;
+  paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const projects = readSelectedScenarioProjects(
     await args.db.getAll(SCENARIO_PROJECTS_STORE),

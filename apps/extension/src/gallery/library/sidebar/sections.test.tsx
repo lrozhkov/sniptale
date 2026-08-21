@@ -157,6 +157,7 @@ it('disables backup actions while busy', () => {
 
   render(
     <GalleryBackupActions
+      importTriggerRef={{ current: null }}
       isBusy={false}
       onExportBackup={onExportBackup}
       onImportBackupClick={onImportBackupClick}
@@ -170,6 +171,7 @@ it('disables backup actions while busy', () => {
 
   render(
     <GalleryBackupActions
+      importTriggerRef={{ current: null }}
       isBusy
       onExportBackup={onExportBackup}
       onImportBackupClick={onImportBackupClick}

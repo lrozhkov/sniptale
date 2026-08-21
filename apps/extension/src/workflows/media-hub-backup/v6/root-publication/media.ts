@@ -53,6 +53,7 @@ import { assertPortableJson } from '../codec';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import type { MediaHubBackupRootEnvelope } from '../contracts';
+import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 
 type MutableStore = {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -438,27 +439,36 @@ async function prepareMediaRoot(args: {
     args.metadata,
     args.strategy === 'duplicate' && (await hasMediaSourceConflict(args.metadata))
   );
+  const restoredEntry = rebaseTemporaryLifecycle(targetEntry);
   const screenshotBlob =
-    targetEntry.source.kind === 'screenshot'
-      ? await readAssetFile(original.ref, targetEntry.filename)
+    restoredEntry.source.kind === 'screenshot'
+      ? await readAssetFile(original.ref, restoredEntry.filename)
       : undefined;
   const media = parseMediaLibraryEntry({
-    ...targetEntry,
+    ...restoredEntry,
     ...(screenshotBlob ? { blob: screenshotBlob } : {}),
   });
   if (!media) throw new Error('Restored media metadata is invalid.');
-  const recording = prepareRecording({ metadata: args.metadata, original, targetEntry });
-  const snapshot = prepareSnapshot({ metadata: args.metadata, objects: args.objects, targetEntry });
+  const recording = prepareRecording({
+    metadata: args.metadata,
+    original,
+    targetEntry: restoredEntry,
+  });
+  const snapshot = prepareSnapshot({
+    metadata: args.metadata,
+    objects: args.objects,
+    targetEntry: restoredEntry,
+  });
   const [thumbnail, presentation] = await Promise.all([
-    prepareThumbnail({ mediaId: targetEntry.id, metadata: args.metadata, objects: args.objects }),
+    prepareThumbnail({ mediaId: restoredEntry.id, metadata: args.metadata, objects: args.objects }),
     preparePresentation({
-      mediaId: targetEntry.id,
+      mediaId: restoredEntry.id,
       metadata: args.metadata,
       objects: args.objects,
     }),
   ]);
   const workspace = prepareWorkspace({
-    mediaId: targetEntry.id,
+    mediaId: restoredEntry.id,
     metadata: args.metadata,
     objects: args.objects,
   });

@@ -20,7 +20,7 @@ import { stageArchiveRootObjects } from './staging';
 
 const descriptor = {
   mediaSubtype: 'library-item' as const,
-  metadataPath: 'metadata/media/one.json',
+  metadataPath: '_sniptale/metadata/media/one.json',
   objectCount: 1,
   rootId: 'one',
   rootKind: 'media' as const,
@@ -30,7 +30,7 @@ const object = {
   filename: 'one.bin',
   mimeType: 'application/octet-stream',
   objectId: 'object-one',
-  path: 'objects/object-one/one.bin',
+  path: 'Screenshots/one.bin',
   size: 5,
 };
 
@@ -133,7 +133,7 @@ describe('media backup v6 root staging', () => {
   });
 
   it('discards already finalized root objects when a later object fails', async () => {
-    const second = { ...object, objectId: 'object-two', path: 'objects/object-two/two.bin' };
+    const second = { ...object, objectId: 'object-two', path: 'Screenshots/two.bin' };
     let entryIndex = 0;
     const archiveReader = reader(['media']);
     archiveReader.entry = vi.fn(() => {
@@ -155,7 +155,7 @@ describe('media backup v6 root staging', () => {
   });
 
   it('surfaces finalized-object cleanup failures together with the root error', async () => {
-    const second = { ...object, objectId: 'object-two', path: 'objects/object-two/two.bin' };
+    const second = { ...object, objectId: 'object-two', path: 'Screenshots/two.bin' };
     let entryIndex = 0;
     const archiveReader = reader(['media']);
     archiveReader.entry = vi.fn(() => {

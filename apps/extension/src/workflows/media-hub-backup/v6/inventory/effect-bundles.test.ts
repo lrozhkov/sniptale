@@ -9,6 +9,7 @@ vi.mock('../../../../composition/persistence/effect-bundles/integrity', async (i
 }));
 
 import { buildEffectBundleRootInventory } from './effect-bundles';
+import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
 
 function bundle(packId: string) {
   return {
@@ -46,9 +47,10 @@ function bundle(packId: string) {
 
 describe('effect bundle v6 inventory', () => {
   it('creates sorted effect-bundle roots with file entries', async () => {
-    const roots = await buildEffectBundleRootInventory({
-      getAll: vi.fn().mockResolvedValue([bundle('z-bundle'), bundle('a-bundle')]),
-    });
+    const roots = await buildEffectBundleRootInventory(
+      { getAll: vi.fn().mockResolvedValue([bundle('z-bundle'), bundle('a-bundle')]) },
+      createArchivePathAllocator()
+    );
     expect(roots.map((root) => root.descriptor.rootId)).toEqual(['a-bundle', 'z-bundle']);
     expect(roots[0]?.descriptor).toMatchObject({
       mediaSubtype: 'effect-bundle',
@@ -58,7 +60,11 @@ describe('effect bundle v6 inventory', () => {
     await expect(roots[0]?.load()).resolves.toMatchObject({
       objects: [
         {
-          ref: expect.objectContaining({ mimeType: 'image/png', size: 5 }),
+          ref: expect.objectContaining({
+            mimeType: 'image/png',
+            path: '_sniptale/assets/effect-bundle-000001-object-000001/asset-000001',
+            size: 5,
+          }),
         },
       ],
     });

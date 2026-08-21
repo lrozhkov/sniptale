@@ -12,6 +12,7 @@ import {
   MAX_ROOT_METADATA_BYTES,
   type MediaHubBackupManifestV6,
 } from './contracts';
+import { assertV6MetadataPath, MANIFEST_PATH } from './layout';
 
 export interface InspectedMediaHubBackupV6 {
   descriptors: ArchiveRootDescriptor[];
@@ -50,19 +51,13 @@ function matchesCatalogProfile(
   return catalog.mediaSubtype === undefined;
 }
 
-function expectedMetadataPrefix(descriptor: ArchiveRootDescriptor): string {
-  if (descriptor.rootKind === 'media') return 'metadata/media/';
-  if (descriptor.rootKind === 'video-project') return 'metadata/video-projects/';
-  return 'metadata/scenario-projects/';
-}
-
 function assertMetadataPath(descriptor: ArchiveRootDescriptor): void {
-  if (
-    !descriptor.metadataPath.startsWith(expectedMetadataPrefix(descriptor)) ||
-    !descriptor.metadataPath.endsWith('.json')
-  ) {
-    throw new Error('Media backup root metadata path does not match its profile.');
-  }
+  assertV6MetadataPath(
+    descriptor.metadataPath,
+    descriptor.rootKind,
+    descriptor.rootId,
+    descriptor.rootKind === 'media' ? descriptor.mediaSubtype : undefined
+  );
 }
 
 function sameDescriptor(left: ArchiveRootDescriptor, right: ArchiveRootDescriptor): boolean {
@@ -95,7 +90,7 @@ function createInspectionAccumulator(): InspectionAccumulator {
   return {
     catalogTexts: [],
     canonicalRootKeys: new Set(),
-    declaredPaths: new Set(['manifest.json']),
+    declaredPaths: new Set([MANIFEST_PATH]),
     rootDescriptors: [],
     rootKeys: [],
     rootsByProfile: {
@@ -227,8 +222,15 @@ function assertExactDeclaredEntries(reader: ArchiveReader, state: InspectionAccu
 export async function inspectMediaHubBackupV6(file: Blob): Promise<InspectedMediaHubBackupV6> {
   const reader = await openArchiveReader(file);
   try {
-    const manifestEntry = reader.entry('manifest.json');
-    if (!manifestEntry) throw new Error('Media backup manifest is missing.');
+    const manifestEntry = reader.entry(MANIFEST_PATH);
+    if (!manifestEntry) {
+      if (reader.entry('manifest.json')) {
+        throw new Error(
+          'Unsupported media backup v6 layout. Create a new backup with this version.'
+        );
+      }
+      throw new Error('Media backup manifest is missing.');
+    }
     const manifestText = await manifestEntry.text(MAX_MEDIA_ARCHIVE_TEXT_ENTRY_BYTES);
     const manifest = parseManifestV6(parseBoundedJson(manifestText));
     const state = createInspectionAccumulator();

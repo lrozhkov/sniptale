@@ -1,10 +1,12 @@
 import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
+import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
@@ -13,6 +15,8 @@ import {
   parseProjectExportEntry,
   parseVideoProjectEntryResult,
 } from '../../../../composition/persistence/projects/read-guards';
+import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
+import { createProjectAssetMediaId } from '../../../../features/media-hub/media-id';
 import {
   UnsupportedEngine1VideoProjectError,
   type VideoProjectEntry,
@@ -22,14 +26,20 @@ import { encodePortablePresentation, encodePortableThumbnail } from '../root-cod
 import type { PortableVideoProjectMetadata } from '../root-codecs/projects';
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { MediaHubBackupRootInventoryItem } from '../export';
-import { createObjectCollector, readInventoryAssetFile, type InventoryDatabase } from './helpers';
+import {
+  createObjectCollector,
+  createReadableAssetFilename,
+  readInventoryAssetFile,
+  type InventoryDatabase,
+} from './helpers';
+import { METADATA_ROOT, withDraftRoot } from '../layout';
 
 function selected(
   id: string,
   lifecycle: { storageClass: string } | undefined,
   options: MediaHubBackupExportOptions
 ) {
-  if (lifecycle?.storageClass === 'temporary') return false;
+  if (lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return false;
   return options.scope === 'all' || Boolean(options.selected?.videoProjectIds.includes(id));
 }
 
@@ -66,15 +76,29 @@ async function buildProjectAssets(
       )
     ),
   ];
-  for (const id of ids) {
+  for (const [index, id] of ids.entries()) {
     const asset = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
     if (!asset) throw new Error(`Video project asset is invalid: ${id}.`);
-    const file = await readInventoryAssetFile(db, asset.assetId, asset.id);
+    const media = parseMediaLibraryEntry(
+      await db.get(MEDIA_LIBRARY_STORE, createProjectAssetMediaId(asset.id))
+    );
+    const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
+    const file = await readInventoryAssetFile(db, asset.assetId, filename);
     const { assetId: _assetId, ...portable } = asset;
     output.push({
       entry: portable,
-      filename: file.name || asset.id,
-      objectId: collector.addObject(file, file.name || asset.id, asset.mimeType),
+      filename,
+      objectId: collector.addObject(
+        file,
+        filename,
+        asset.mimeType,
+        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+          'Recordings',
+          'Projects',
+          entry.project.name,
+          'Assets',
+        ])
+      ),
     });
   }
   return output;
@@ -98,7 +122,15 @@ async function buildProjectExports(
     );
     output.push({
       entry: portable,
-      objectId: collector.addObject(file, exportEntry.filename, exportEntry.mimeType),
+      objectId: collector.addObject(
+        file,
+        exportEntry.filename,
+        exportEntry.mimeType,
+        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+          'Exports',
+          entry.project.name,
+        ])
+      ),
       ...(thumbnail
         ? {
             thumbnail: encodePortableThumbnail(
@@ -136,13 +168,15 @@ async function buildVideoProjectRoot(args: {
   db: InventoryDatabase;
   entry: VideoProjectEntry;
   index: number;
+  paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem> {
   await verifyVideoProjectEffectSnapshotIntegrity(args.entry.project);
-  const collector = createObjectCollector(`video-${String(args.index + 1).padStart(6, '0')}`);
-  const [projectAssets, projectExports] = await Promise.all([
-    buildProjectAssets(args.db, args.entry, collector),
-    buildProjectExports(args.db, args.entry, collector),
-  ]);
+  const collector = createObjectCollector(
+    `video-${String(args.index + 1).padStart(6, '0')}`,
+    args.paths
+  );
+  const projectAssets = await buildProjectAssets(args.db, args.entry, collector);
+  const projectExports = await buildProjectExports(args.db, args.entry, collector);
   const projectThumbnail = parseMediaThumbnailEntry(
     await args.db.get(THUMBNAILS_STORE, `video-project:${args.entry.id}`)
   );
@@ -197,7 +231,7 @@ async function buildVideoProjectRoot(args: {
   };
   return {
     descriptor: {
-      metadataPath: `metadata/video-projects/${encodeURIComponent(args.entry.id)}.json`,
+      metadataPath: `${METADATA_ROOT}/video-projects/${encodeURIComponent(args.entry.id)}.json`,
       objectCount: collector.objects.length,
       rootId: args.entry.id,
       rootKind: 'video-project',
@@ -205,6 +239,7 @@ async function buildVideoProjectRoot(args: {
     },
     load: async () => ({ metadata: metadata as unknown as JsonValue, objects: collector.objects }),
     summary: {
+      draftCount: args.entry.lifecycle?.storageClass === 'temporary' ? 1 : 0,
       recordingCount: projectExports.length,
       sourceMetadataCount: 0,
       telemetryCount: 0,
@@ -220,6 +255,7 @@ async function buildVideoProjectRoot(args: {
 export async function buildVideoProjectRootInventory(args: {
   db: InventoryDatabase;
   options: MediaHubBackupExportOptions;
+  paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const entries = readSelectedVideoProjects(
     await args.db.getAll(VIDEO_PROJECTS_STORE),
@@ -227,7 +263,7 @@ export async function buildVideoProjectRootInventory(args: {
   );
   const roots: MediaHubBackupRootInventoryItem[] = [];
   for (const [index, entry] of entries.entries()) {
-    roots.push(await buildVideoProjectRoot({ db: args.db, entry, index }));
+    roots.push(await buildVideoProjectRoot({ ...args, entry, index }));
   }
   return roots;
 }

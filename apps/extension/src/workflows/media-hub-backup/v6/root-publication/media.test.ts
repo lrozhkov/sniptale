@@ -89,7 +89,7 @@ describe('media v6 root publication', () => {
       envelope: {
         descriptor: {
           mediaSubtype: 'library-item',
-          metadataPath: 'metadata/media/media-one.json',
+          metadataPath: '_sniptale/metadata/media/media-one.json',
           objectCount: 1,
           rootId: 'media-one',
           rootKind: 'media',
@@ -209,7 +209,7 @@ describe('media v6 web snapshot root validation', () => {
       envelope: {
         descriptor: {
           mediaSubtype: 'library-item',
-          metadataPath: 'metadata/media/snapshot.json',
+          metadataPath: '_sniptale/metadata/media/snapshot.json',
           objectCount: 2,
           rootId: 'snapshot',
           rootKind: 'media',
@@ -276,7 +276,7 @@ describe('media v6 web snapshot root validation', () => {
         envelope: {
           descriptor: {
             mediaSubtype: 'library-item',
-            metadataPath: 'metadata/media/snapshot.json',
+            metadataPath: '_sniptale/metadata/media/snapshot.json',
             objectCount: 2,
             rootId: 'snapshot',
             rootKind: 'media',

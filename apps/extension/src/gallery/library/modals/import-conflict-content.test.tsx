@@ -50,7 +50,9 @@ function createImportSummary() {
       thumbnailCount: 2,
       version: 1,
     },
+    rootCount: 3,
     thumbnailCount: 2,
+    totalBytes: 1024,
   };
 }
 

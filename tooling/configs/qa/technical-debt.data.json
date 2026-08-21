@@ -9208,6 +9208,8 @@
         "apps/extension/src/gallery/library/actions/test-support/index.ts",
         "apps/extension/src/gallery/library/actions/test-support/state.ts",
         "apps/extension/src/gallery/library/actions/useGalleryAppActions.ts",
+        "apps/extension/src/gallery/library/import-progress-card.tsx",
+        "apps/extension/src/gallery/library/import-types.ts",
         "apps/extension/src/gallery/library/items/adapters.ts",
         "apps/extension/src/gallery/library/items/index.ts",
         "apps/extension/src/gallery/library/items/legacy-thumbnails.ts",
@@ -9279,6 +9281,8 @@
         "apps/extension/src/gallery/library/actions/test-support/index.ts",
         "apps/extension/src/gallery/library/actions/test-support/state.ts",
         "apps/extension/src/gallery/library/actions/useGalleryAppActions.ts",
+        "apps/extension/src/gallery/library/import-progress-card.tsx",
+        "apps/extension/src/gallery/library/import-types.ts",
         "apps/extension/src/gallery/library/items/adapters.ts",
         "apps/extension/src/gallery/library/items/index.ts",
         "apps/extension/src/gallery/library/items/legacy-thumbnails.ts",
@@ -12761,9 +12765,11 @@
         "apps/extension/src/workflows/media-hub-backup/v6/inventory/media.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "apps/extension/src/workflows/media-hub-backup/v6/layout.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/options.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/privacy.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/public.ts",
+        "apps/extension/src/workflows/media-hub-backup/v6/restore-lifecycle.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/restore-session.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/restore.ts",
         "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
@@ -17019,7 +17025,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/extension-critical.helpers.ts",
-        "contentHash": "64bc9401623c7e208cfaa5dddbd3a96c0e28ea13d911b22df09bdd71dd13eeca"
+        "contentHash": "65fa7568a1bf879f94e7ecb8dc086bdd4edf123759cecd44afcc75168f440777"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical-media.spec.ts",
@@ -17034,9 +17040,10 @@
       ],
       "surfaces": [
         "binding:E2E_RUNTIME_SUCCESS_API_BEHAVIOR",
-        "property:applyGalleryScreenshotBootstrap/anonymous-138/entry",
-        "property:applyGalleryScreenshotBootstrap/anonymous-138/mediaLibrary",
-        "property:applyGalleryScreenshotBootstrap/anonymous-138/source",
+        "property:applyGalleryScreenshotBootstrap/anonymous-139/entry",
+        "property:applyGalleryScreenshotBootstrap/anonymous-139/lifecycle",
+        "property:applyGalleryScreenshotBootstrap/anonymous-139/mediaLibrary",
+        "property:applyGalleryScreenshotBootstrap/anonymous-139/source",
         "property:createRecordingRuntimeState/captureSource"
       ]
     },

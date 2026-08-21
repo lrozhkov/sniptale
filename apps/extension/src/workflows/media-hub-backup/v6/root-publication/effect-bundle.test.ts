@@ -107,7 +107,7 @@ describe('effect bundle v6 root publication', () => {
         envelope: {
           descriptor: {
             mediaSubtype: 'effect-bundle',
-            metadataPath: 'metadata/media/bundle-one.json',
+            metadataPath: '_sniptale/metadata/media/bundle-one.json',
             objectCount: 1,
             rootId: 'bundle-one',
             rootKind: 'media',

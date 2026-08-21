@@ -2,6 +2,7 @@ import type {
   ArchiveObjectRef,
   ArchiveRootDescriptor,
 } from '../../../composition/archive-transfer';
+import type { MEDIA_HUB_BACKUP_LAYOUT } from './layout';
 
 export const MEDIA_HUB_BACKUP_FORMAT = 'sniptale-media-hub-backup';
 export const MEDIA_HUB_BACKUP_VERSION = 6;
@@ -19,6 +20,7 @@ export interface MediaHubBackupPrivacyFlags {
 }
 
 export interface MediaHubBackupDataClassFlags {
+  drafts: boolean;
   mediaAssets: boolean;
   recordings: boolean;
   scenarioProjects: boolean;
@@ -32,6 +34,7 @@ export interface MediaHubBackupDataClassFlags {
 export interface MediaHubLocalBackupSummary {
   approximateSizeBytes: number;
   assetCount: number;
+  draftCount: number;
   dataClasses: MediaHubBackupDataClassFlags;
   recordingCount: number;
   scenarioProjectCount: number;
@@ -49,6 +52,7 @@ export interface MediaHubBackupSelectedScope {
 }
 
 export interface MediaHubBackupExportOptions extends MediaHubBackupPrivacyFlags {
+  includeDrafts: boolean;
   scope: 'all' | 'selected';
   selected?: MediaHubBackupSelectedScope;
 }
@@ -67,6 +71,7 @@ export interface MediaHubBackupManifestV6 {
   catalogs: MediaHubBackupCatalogShard[];
   exportedAt: string;
   format: typeof MEDIA_HUB_BACKUP_FORMAT;
+  layout: typeof MEDIA_HUB_BACKUP_LAYOUT;
   privacy: MediaHubBackupPrivacyFlags;
   totals: {
     bytes: number;

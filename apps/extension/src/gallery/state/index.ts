@@ -152,6 +152,7 @@ function buildGalleryAppActions(args: {
       refresh: args.storage.refresh,
     },
     surface: {
+      setActiveImport: args.storage.setActiveImport,
       setBanner: args.storage.setBanner,
       setConfirmDialog: args.storage.setConfirmDialog,
       setIsBusy: args.storage.setIsBusy,
@@ -251,6 +252,7 @@ export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateCo
     refs: {
       gridViewportRef: viewport.gridViewportRef,
       importInputRef: viewport.importInputRef,
+      importTriggerRef: viewport.importTriggerRef,
     },
     state,
   };

@@ -21,6 +21,7 @@ import { createCleanupWebSnapshotRecord } from '../../../media-hub/cleanup.test-
 import { createWebSnapshotManifest } from '../../../../features/web-snapshot/manifest';
 import { buildMediaRootInventory } from './media';
 import { createMediaHubBackupExportOptions } from '../options';
+import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
 
 function mediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibraryEntry {
   return {
@@ -63,6 +64,32 @@ function ref(assetId: string) {
 }
 
 describe('media v6 root inventory', () => {
+  it('excludes drafts by default and places included drafts in readable folders', async () => {
+    const entry = mediaEntry({
+      id: 'draft-image',
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
+    });
+    const db = { get: vi.fn(async () => entry) };
+    await expect(
+      buildMediaRootInventory({
+        db,
+        items: [item(entry)],
+        options: createMediaHubBackupExportOptions(),
+        paths: createArchivePathAllocator(),
+      })
+    ).resolves.toEqual([]);
+    const [root] = await buildMediaRootInventory({
+      db,
+      items: [item(entry)],
+      options: createMediaHubBackupExportOptions({ includeDrafts: true }),
+      paths: createArchivePathAllocator(),
+    });
+    expect(root?.summary.draftCount).toBe(1);
+    await expect(root?.load()).resolves.toMatchObject({
+      objects: [{ ref: { path: 'Drafts/Screenshots/capture.png' } }],
+    });
+  });
+
   it('exports screenshot, presentation and editor dependencies as separate files', async () => {
     const entry = mediaEntry();
     const document = createPersistedEditorDocumentFixture(
@@ -104,11 +131,16 @@ describe('media v6 root inventory', () => {
       db,
       items: [item(entry)],
       options: createMediaHubBackupExportOptions({ includeSourceMetadata: false }),
+      paths: createArchivePathAllocator(),
     });
     expect(roots).toHaveLength(1);
     expect(roots[0]?.descriptor).toMatchObject({ objectCount: 4, totalBytes: 23 });
     const payload = await roots[0]!.load();
     expect(payload.objects).toHaveLength(4);
+    expect(payload.objects.map((object) => object.ref.path)).toContain('Screenshots/capture.png');
+    expect(
+      payload.objects.filter((object) => object.ref.path.startsWith('_sniptale/assets/'))
+    ).toHaveLength(3);
     expect(payload.metadata).toMatchObject({
       entry: { sourceTitle: null, sourceUrl: null },
       presentation: expect.objectContaining({ thumbnailObjectId: expect.any(String) }),
@@ -169,8 +201,10 @@ describe('media v6 root inventory', () => {
       db,
       items: [item(entry)],
       options: createMediaHubBackupExportOptions({ includeTelemetry: true }),
+      paths: createArchivePathAllocator(),
     });
     const payload = await root!.load();
+    expect(payload.objects[0]?.ref.path).toBe('Recordings/recording.webm');
     expect(payload.metadata).toMatchObject({
       recording: {
         entry: { id: 'recording-one' },
@@ -180,9 +214,27 @@ describe('media v6 root inventory', () => {
     expect(JSON.stringify(payload.metadata)).not.toContain('recording-asset');
   });
 
+  it('places durable audio in the readable Audio directory', async () => {
+    const entry = mediaEntry({
+      filename: 'voice note.webm',
+      id: 'audio-media',
+      kind: 'audio',
+      mimeType: 'audio/webm',
+    });
+    const [root] = await buildMediaRootInventory({
+      db: { get: vi.fn(async () => entry) },
+      items: [item(entry)],
+      options: createMediaHubBackupExportOptions(),
+      paths: createArchivePathAllocator(),
+    });
+    await expect(root?.load()).resolves.toMatchObject({
+      objects: [{ ref: { path: 'Audio/voice note.webm' } }],
+    });
+  });
+
   it('uses the sanitized snapshot manifest in outer metadata when provenance is disabled', async () => {
     const entry = mediaEntry({
-      filename: 'snapshot.png',
+      filename: 'Private title.png',
       id: 'snapshot',
       source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
     });
@@ -224,13 +276,22 @@ describe('media v6 root inventory', () => {
         includeSourceMetadata: false,
         includeWebSnapshots: true,
       }),
+      paths: createArchivePathAllocator(),
     });
     const payload = await root!.load();
+
+    expect(payload.objects.map((object) => object.ref.path)).toEqual([
+      'Web snapshots/Snapshot/snapshot.sniptale-web-snapshot.zip',
+      'Web snapshots/Snapshot/screenshot.png',
+    ]);
 
     expect(payload.metadata).toMatchObject({
       webSnapshot: { entry: { manifest: { source: sanitizedManifest.source }, size: 12 } },
     });
     expect(JSON.stringify(payload.metadata)).not.toContain('Private title');
     expect(JSON.stringify(payload.metadata)).not.toContain('token=secret');
+    expect(payload.objects.map((object) => object.ref.path).join('\n')).not.toContain(
+      'Private title'
+    );
   });
 });

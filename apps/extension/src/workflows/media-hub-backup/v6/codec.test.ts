@@ -3,7 +3,7 @@ import { parseArchiveRootDescriptor, parseManifestV6, parseRootEnvelope } from '
 
 const libraryDescriptor = {
   mediaSubtype: 'library-item' as const,
-  metadataPath: 'metadata/media/media-000001.json',
+  metadataPath: '_sniptale/metadata/media/media-000001.json',
   objectCount: 1,
   rootId: 'media-000001',
   rootKind: 'media' as const,
@@ -33,7 +33,7 @@ describe('media backup v6 codec', () => {
           filename: 'image.png',
           mimeType: 'image/png',
           objectId: 'object-000001',
-          path: 'objects/object-000001/image.png',
+          path: 'Screenshots/image.png',
           size: 5,
         },
       ],
@@ -67,7 +67,7 @@ describe('media backup v6 codec', () => {
     );
   });
 
-  it('requires exact object paths, unique IDs and declared totals', () => {
+  it('requires library-layout object paths and declared totals', () => {
     expect(() =>
       parseRootEnvelope({
         descriptor: libraryDescriptor,
@@ -77,12 +77,12 @@ describe('media backup v6 codec', () => {
             filename: 'image.png',
             mimeType: 'image/png',
             objectId: 'object-000001',
-            path: 'objects/another-id/image.png',
+            path: 'objects/object-000001/image.png',
             size: 5,
           },
         ],
       })
-    ).toThrow('does not match');
+    ).toThrow('outside the v6 library layout');
     expect(() =>
       parseRootEnvelope({
         descriptor: libraryDescriptor,
@@ -90,6 +90,36 @@ describe('media backup v6 codec', () => {
         objects: [],
       })
     ).toThrow('totals');
+    expect(() =>
+      parseRootEnvelope({
+        descriptor: libraryDescriptor,
+        metadata: { id: 'portable-media-id' },
+        objects: [
+          {
+            filename: 'image.png',
+            mimeType: 'image/png',
+            objectId: 'object-000001',
+            path: '_sniptale/assets/image.png',
+            size: 5,
+          },
+        ],
+      })
+    ).toThrow('internal object path is invalid');
+    expect(() =>
+      parseRootEnvelope({
+        descriptor: libraryDescriptor,
+        metadata: { id: 'portable-media-id' },
+        objects: [
+          {
+            filename: 'image.png',
+            mimeType: 'image/png',
+            objectId: 'object-000001',
+            path: '_sniptale/assets/different-object/image.png',
+            size: 5,
+          },
+        ],
+      })
+    ).toThrow('internal object path is invalid');
   });
 
   it('rejects unknown manifest fields and unsupported versions', () => {
@@ -98,6 +128,7 @@ describe('media backup v6 codec', () => {
       catalogs: [],
       exportedAt: '2026-08-20T00:00:00.000Z',
       format: 'sniptale-media-hub-backup',
+      layout: 'library-folders-v1',
       privacy: {
         includeSourceMetadata: false,
         includeTelemetry: false,
@@ -117,6 +148,8 @@ describe('media backup v6 codec', () => {
       version: 6,
     };
     expect(parseManifestV6(manifest)).toEqual(manifest);
+    const { layout: _layout, ...legacyLayout } = manifest;
+    expect(() => parseManifestV6(legacyLayout)).toThrow('Unsupported media backup v6 layout');
     expect(() => parseManifestV6({ ...manifest, version: 5 })).toThrow('Unsupported');
     expect(() => parseManifestV6({ ...manifest, metadataPath: 'metadata.json' })).toThrow(
       'unknown fields'

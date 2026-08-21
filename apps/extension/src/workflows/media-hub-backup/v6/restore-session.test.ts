@@ -31,6 +31,7 @@ import {
   abortMediaHubBackupRestore,
   createMediaHubRestoreSession,
   listResumableMediaHubRestores,
+  readMediaHubRestoreSummary,
   verifyMediaHubRestoreResume,
 } from './restore-session';
 
@@ -95,6 +96,15 @@ describe('media backup v6 restore sessions', () => {
     ]);
     await abortMediaHubBackupRestore('restore-1');
     expect(mocks.abort).toHaveBeenCalledWith('restore-1');
+  });
+
+  it('reads terminal session counts for exact partial failure reporting', async () => {
+    mocks.read.mockResolvedValue({ ...session, status: 'aborted' });
+    await expect(readMediaHubRestoreSummary('restore-1')).resolves.toMatchObject({
+      committedRootCount: 1,
+      operationId: 'restore-1',
+      status: 'aborted',
+    });
   });
 
   it('runs canonical crash recovery before exposing an interrupted root for resume', async () => {

@@ -4,6 +4,7 @@ import { ImportConflictModalContent } from '../../library/modals/import-conflict
 import { StorageManagerModalContent } from '../../library/modals/storage-manager-content';
 import { PreviewPanel } from '../../library/preview';
 import type { GalleryAppLayoutProps } from './types';
+import { GalleryImportProgressCard } from '../../library/import-progress-card';
 
 function GalleryStorageOverlay(
   props: Pick<GalleryAppLayoutProps, 'onStorageCleanup' | 'onStorageManagerClose' | 'state'>
@@ -36,6 +37,19 @@ function GalleryImportOverlay(
       summary={props.state.storage.pendingImport.summary}
       onClose={props.onPendingImportClose}
       onImport={async (strategy) => props.onImport(strategy)}
+    />
+  );
+}
+
+function GalleryImportProgressOverlay(
+  props: Pick<GalleryAppLayoutProps, 'onActiveImportCancel' | 'onActiveImportDismiss' | 'state'>
+) {
+  if (!props.state.storage.activeImport) return null;
+  return (
+    <GalleryImportProgressCard
+      state={props.state.storage.activeImport}
+      onCancel={props.onActiveImportCancel}
+      onDismiss={props.onActiveImportDismiss}
     />
   );
 }
@@ -159,6 +173,7 @@ export function GalleryOverlays(props: GalleryAppLayoutProps) {
       <GalleryBackupExportOverlay {...props} />
       <GalleryStorageOverlay {...props} />
       <GalleryImportOverlay {...props} />
+      <GalleryImportProgressOverlay {...props} />
       <GalleryPreviewOverlay {...props} />
     </>
   );

@@ -124,9 +124,12 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
   return {
     gridViewportRef: controller.refs.gridViewportRef,
     importInputRef: controller.refs.importInputRef,
+    importTriggerRef: controller.refs.importTriggerRef,
     state: controller.state,
     viewMode: props.viewMode,
     onImportFileChange: (file: File | null) => void actions.importing.importSelectedFile(file),
+    onActiveImportCancel: actions.importing.cancelActiveImport,
+    onActiveImportDismiss: actions.importing.dismissActiveImport,
     onStorageManagerOpen: () => controller.actions.surface.setShowStorageManager(true),
     onStorageManagerClose: () => controller.actions.surface.setShowStorageManager(false),
     onConfirmDialogClose: () => controller.actions.surface.setConfirmDialog(null),

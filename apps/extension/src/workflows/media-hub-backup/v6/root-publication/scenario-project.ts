@@ -30,6 +30,7 @@ import { decodePortableEditorDocument } from '../root-codecs/editor-document';
 import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
+import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 
 function newId() {
   if (typeof crypto.randomUUID !== 'function')
@@ -171,7 +172,11 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
       projectId: targetProjectId,
       stepIds,
     });
-    const entry = parseScenarioProjectEntry({ ...metadata.entry, id: targetProjectId, project });
+    const entry = parseScenarioProjectEntry({
+      ...rebaseTemporaryLifecycle(metadata.entry),
+      id: targetProjectId,
+      project,
+    });
     if (!entry) throw new Error('Restored scenario project metadata is invalid.');
     const assets = metadata.assets.map((item) => {
       const object = required(objects, item.objectId);

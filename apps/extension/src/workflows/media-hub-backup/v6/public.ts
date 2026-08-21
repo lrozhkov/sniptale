@@ -18,7 +18,11 @@ import { buildMediaHubBackupExportPlanFromLibraryV6 } from './inventory';
 import { exportMediaHubBackupV6 } from './export';
 import { inspectMediaHubBackupV6 } from './inspect';
 import { createMediaHubRestoreSession } from './restore-session';
-export { abortMediaHubBackupRestore, listResumableMediaHubRestores } from './restore-session';
+export {
+  abortMediaHubBackupRestore,
+  listResumableMediaHubRestores,
+  readMediaHubRestoreSummary,
+} from './restore-session';
 import { restoreMediaHubBackupV6 } from './restore';
 import { effectBundleRootPublisher } from './root-publication/effect-bundle';
 import { mediaLibraryRootPublisher } from './root-publication/media';
@@ -37,7 +41,9 @@ export interface MediaHubBackupSummaryV6 {
     format: string;
     version: number;
   };
+  rootCount: number;
   thumbnailCount: number;
+  totalBytes: number;
 }
 
 export interface MediaHubImportResultV6 {
@@ -59,6 +65,7 @@ export async function inspectLocalMediaHubBackup(
   const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options);
   const summary = plan.roots.reduce(
     (total, root) => ({
+      draftCount: total.draftCount + root.summary.draftCount,
       recordingCount: total.recordingCount + root.summary.recordingCount,
       sourceMetadataCount: total.sourceMetadataCount + root.summary.sourceMetadataCount,
       telemetryCount: total.telemetryCount + root.summary.telemetryCount,
@@ -66,6 +73,7 @@ export async function inspectLocalMediaHubBackup(
       webSnapshotCount: total.webSnapshotCount + root.summary.webSnapshotCount,
     }),
     {
+      draftCount: 0,
       recordingCount: 0,
       sourceMetadataCount: 0,
       telemetryCount: 0,
@@ -77,7 +85,9 @@ export async function inspectLocalMediaHubBackup(
   return {
     approximateSizeBytes: plan.manifest.totals.bytes,
     assetCount: rootsByProfile.libraryItems,
+    draftCount: summary.draftCount,
     dataClasses: {
+      drafts: summary.draftCount > 0,
       mediaAssets: rootsByProfile.libraryItems > 0,
       recordings: summary.recordingCount > 0,
       scenarioProjects: rootsByProfile.scenarioProjects > 0,
@@ -140,6 +150,7 @@ export function exportVideoProjectPackage(
   return exportMediaHubBackup(
     {
       includeSourceMetadata: true,
+      includeDrafts: true,
       includeTelemetry: true,
       includeWebSnapshots: true,
       scope: 'selected',
@@ -156,6 +167,7 @@ export function exportScenarioProjectPackage(
   return exportMediaHubBackup(
     {
       includeSourceMetadata: true,
+      includeDrafts: true,
       includeTelemetry: true,
       includeWebSnapshots: true,
       scope: 'selected',
@@ -204,7 +216,9 @@ export async function inspectMediaHubBackup(file: Blob): Promise<MediaHubBackupS
       format: inspection.manifest.format,
       version: inspection.manifest.version,
     },
+    rootCount: inspection.manifest.totals.roots,
     thumbnailCount: inspection.thumbnailCount,
+    totalBytes: inspection.manifest.totals.bytes,
   };
 }
 
@@ -212,11 +226,13 @@ export async function importMediaHubBackup(
   file: Blob,
   strategy: MediaHubImportConflictStrategy,
   runtime: {
+    onSessionCreated?: (operationId: string) => void;
     onProgress?: (progress: ArchiveTransferProgress) => void;
     signal?: AbortSignal;
   } = {}
 ): Promise<MediaHubImportResultV6> {
   const { session } = await createMediaHubRestoreSession({ file, strategy });
+  runtime.onSessionCreated?.(session.operationId);
   const completed = await restoreMediaHubBackupV6({
     file,
     operationId: session.operationId,

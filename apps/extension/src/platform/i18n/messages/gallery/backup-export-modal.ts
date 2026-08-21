@@ -37,6 +37,10 @@ export const galleryBackupExportModalMessages = defineMessageSource({
     ru: 'Только выбранное',
     en: 'Selected only',
   },
+  drafts: {
+    ru: 'Черновики',
+    en: 'Drafts',
+  },
   dataClassesTitle: {
     ru: 'Что может попасть в архив',
     en: 'Data classes in this archive',
@@ -48,6 +52,10 @@ export const galleryBackupExportModalMessages = defineMessageSource({
   classProjects: {
     ru: 'Видео- и scenario-проекты с asset-ами',
     en: 'Video and scenario projects with assets',
+  },
+  classDrafts: {
+    ru: 'Temporary media и проекты, если опция включена',
+    en: 'Temporary media and projects when enabled',
   },
   classSourceMetadata: {
     ru: 'Source URL/title/favicon metadata, если опция включена',
@@ -64,6 +72,14 @@ export const galleryBackupExportModalMessages = defineMessageSource({
   includeTelemetry: {
     ru: 'Включить recording telemetry',
     en: 'Include recording telemetry',
+  },
+  includeDrafts: {
+    ru: 'Включить черновики',
+    en: 'Include drafts',
+  },
+  includeDraftsDescription: {
+    ru: 'Экспортирует temporary media, видео-проекты и scenario-проекты и возвращает их в Черновики при импорте.',
+    en: 'Exports temporary media, video projects, and scenario projects and restores them to Drafts.',
   },
   includeTelemetryDescription: {
     ru: 'Cursor/action/viewport события помогают восстановить записи, но могут раскрывать поведение пользователя.',

@@ -14,7 +14,9 @@ export interface UseGalleryAppActionsResult {
     inspectExport: (options: MediaHubBackupExportOptions) => Promise<MediaHubLocalBackupSummary>;
   };
   importing: {
+    cancelActiveImport: () => void;
     closePendingImport: () => void;
+    dismissActiveImport: () => void;
     importBackup: (strategy: MediaHubImportConflictStrategy) => Promise<void>;
     importSelectedFile: (file: File | null) => Promise<void>;
   };

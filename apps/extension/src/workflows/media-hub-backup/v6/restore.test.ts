@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   abortSession: vi.fn(),
   beginRoot: vi.fn(),
+  clearCurrentRoot: vi.fn(),
   completeSession: vi.fn(),
   createJournal: vi.fn(),
   deleteJournal: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/assets')>()),
   abortArchiveRestoreSession: mocks.abortSession,
   beginArchiveRestoreRoot: mocks.beginRoot,
+  clearArchiveRestoreCurrentRoot: mocks.clearCurrentRoot,
   completeArchiveRestoreSession: mocks.completeSession,
   createAssetPublicationJournal: mocks.createJournal,
   deleteReadyJournal: mocks.deleteJournal,
@@ -40,7 +42,7 @@ import { restoreMediaHubBackupV6 } from './restore';
 
 const descriptor = {
   mediaSubtype: 'library-item' as const,
-  metadataPath: 'metadata/media/one.json',
+  metadataPath: '_sniptale/metadata/media/one.json',
   objectCount: 1,
   rootId: 'one',
   rootKind: 'media' as const,
@@ -50,10 +52,10 @@ const object = {
   filename: 'one.bin',
   mimeType: 'application/octet-stream',
   objectId: 'object-one',
-  path: 'objects/object-one/one.bin',
+  path: 'Screenshots/one.bin',
   size: 5,
 };
-const catalogPath = 'catalog/media-000001.ndjson';
+const catalogPath = '_sniptale/catalog/media-000001.ndjson';
 let currentSession: {
   archiveFingerprint: string;
   committedRoots: string[];
@@ -72,7 +74,7 @@ let currentSession: {
 async function archive(): Promise<Blob> {
   const output = createArchiveMemorySink();
   const writer = createArchiveWriter(output.sink);
-  await writer.addText('manifest.json', '{}');
+  await writer.addText('_sniptale/manifest.json', '{}');
   await writer.addText(catalogPath, `${JSON.stringify(descriptor)}\n`);
   await writer.addText(
     descriptor.metadataPath,
@@ -132,6 +134,10 @@ beforeEach(() => {
   mocks.readSession.mockImplementation(async () => currentSession);
   mocks.completeSession.mockImplementation(async () => {
     currentSession = { ...currentSession, status: 'completed' };
+    return currentSession;
+  });
+  mocks.clearCurrentRoot.mockImplementation(async () => {
+    currentSession = { ...currentSession, currentRoot: null };
     return currentSession;
   });
   mocks.discard.mockResolvedValue(undefined);
@@ -280,6 +286,33 @@ describe('media backup v6 restore orchestration', () => {
     ).rejects.toThrow('transaction failed');
     expect(mocks.discard).toHaveBeenCalledWith('local-asset');
     expect(mocks.abortSession).toHaveBeenCalledWith('restore-1');
+  });
+
+  it('keeps an interrupted session pending and resumable after user cancellation', async () => {
+    currentSession = {
+      ...currentSession,
+      committedRoots: ['media:library-item:previous'],
+      rootIdMap: { 'media:library-item:previous': 'previous' },
+    };
+    mocks.verify.mockResolvedValue({
+      inspection: { manifest: { catalogs: [{ path: catalogPath }] } },
+      session: currentSession,
+    });
+    mocks.stage.mockRejectedValue(new DOMException('cancelled', 'AbortError'));
+    await expect(
+      restoreMediaHubBackupV6({
+        file: await archive(),
+        operationId: 'restore-1',
+        publishers: [{ profile: 'media:library-item', publish: vi.fn() }],
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mocks.clearCurrentRoot).toHaveBeenCalledWith('restore-1');
+    expect(mocks.abortSession).not.toHaveBeenCalled();
+    expect(currentSession).toMatchObject({
+      committedRoots: ['media:library-item:previous'],
+      currentRoot: null,
+      status: 'pending',
+    });
   });
 
   it('checkpoints an existing skipped root without staging its bytes', async () => {

@@ -1,4 +1,4 @@
-import { createArchiveObjectPath } from '../../../../composition/archive-transfer';
+import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
 import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
@@ -32,6 +32,7 @@ import {
 import { projectImageWorkspacePrivacy, projectMediaEntryPrivacy } from '../privacy';
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { ArchiveRootObjectSource, MediaHubBackupRootInventoryItem } from '../export';
+import { METADATA_ROOT, withDraftRoot } from '../layout';
 
 interface MediaInventoryDatabase {
   get(store: string, key: unknown): Promise<unknown>;
@@ -70,21 +71,56 @@ function selected(item: MediaLibraryItem, options: MediaHubBackupExportOptions):
   if (item.source.kind === 'project-asset' || item.source.kind === 'project-export') return false;
   if (item.source.kind === 'web-snapshot' && !options.includeWebSnapshots) return false;
   const explicitlySelected = Boolean(options.selected?.mediaAssetIds.includes(item.id));
-  if (item.lifecycle?.storageClass === 'temporary' && !explicitlySelected) return false;
+  if (item.lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return false;
   return options.scope === 'all' || explicitlySelected;
 }
 
+function withoutExtension(filename: string): string {
+  const index = filename.lastIndexOf('.');
+  return index > 0 ? filename.slice(0, index) : filename;
+}
+
+function imageExtension(mimeType: string): string {
+  if (mimeType === 'image/jpeg') return '.jpg';
+  if (mimeType === 'image/webp') return '.webp';
+  if (mimeType === 'image/gif') return '.gif';
+  return mimeType === 'image/png' ? '.png' : '';
+}
+
+function mediaObjectDirectory(
+  entry: MediaLibraryEntry,
+  options: MediaHubBackupExportOptions
+): string[] {
+  const isDraft = entry.lifecycle?.storageClass === 'temporary';
+  if (entry.source.kind === 'web-snapshot') {
+    return withDraftRoot(isDraft, [
+      'Web snapshots',
+      options.includeSourceMetadata
+        ? entry.sourceTitle || withoutExtension(entry.filename)
+        : 'Snapshot',
+    ]);
+  }
+  if (entry.mimeType.startsWith('audio/')) return withDraftRoot(isDraft, ['Audio']);
+  if (entry.source.kind === 'recording' || entry.mimeType.startsWith('video/')) {
+    return withDraftRoot(isDraft, ['Recordings']);
+  }
+  return withDraftRoot(isDraft, ['Screenshots']);
+}
+
 interface MediaObjectCollector {
-  add(blob: Blob, filename: string, mimeType?: string): string;
+  add(blob: Blob, filename: string, mimeType?: string, directory?: readonly string[]): string;
   objects: ArchiveRootObjectSource[];
   sizeOf(objectId: string): number;
 }
 
-function createMediaObjectCollector(rootIndex: number): MediaObjectCollector {
+function createMediaObjectCollector(
+  rootIndex: number,
+  paths: ArchivePathAllocator
+): MediaObjectCollector {
   const objects: ArchiveRootObjectSource[] = [];
   let sequence = 0;
   return {
-    add(blob, filename, mimeType = blob.type || 'application/octet-stream') {
+    add(blob, filename, mimeType = blob.type || 'application/octet-stream', directory) {
       const rootNumber = String(rootIndex + 1).padStart(6, '0');
       const objectNumber = String(++sequence).padStart(6, '0');
       const objectId = `media-${rootNumber}-object-${objectNumber}`;
@@ -95,7 +131,11 @@ function createMediaObjectCollector(rootIndex: number): MediaObjectCollector {
           filename: safeFilename,
           mimeType,
           objectId,
-          path: createArchiveObjectPath(objectId, safeFilename),
+          path: paths.reserve(
+            directory
+              ? [...directory, safeFilename]
+              : ['_sniptale', 'assets', objectId, safeFilename]
+          ),
           size: blob.size,
         },
       });
@@ -122,7 +162,12 @@ async function buildRecordingSource(args: {
     throw new Error(`Recording backup metadata is missing: ${args.recordingId}.`);
   }
   const file = await readRefFile(args.db, stored.assetId, stored.filename);
-  const originalObjectId = args.collector.add(file, stored.filename, stored.mimeType);
+  const originalObjectId = args.collector.add(
+    file,
+    stored.filename,
+    stored.mimeType,
+    mediaObjectDirectory(args.entry, args.options)
+  );
   const { assetId: _assetId, ...portableRecording } = stored;
   const telemetry = args.options.includeTelemetry
     ? parseRecordingTelemetryEntry(await args.db.get(RECORDING_TELEMETRY_STORE, stored.id))
@@ -159,12 +204,16 @@ async function buildWebSnapshotSource(args: {
   const packageObjectId = args.collector.add(
     sanitized.packageBlob,
     `${stored.id}.sniptale-web-snapshot.zip`,
-    'application/zip'
+    'application/zip',
+    mediaObjectDirectory(args.entry, args.options)
   );
   const screenshotObjectId = args.collector.add(
     screenshotFile,
-    args.entry.filename,
-    stored.screenshotMimeType
+    args.options.includeSourceMetadata
+      ? `${args.entry.sourceTitle || 'screenshot'}${imageExtension(stored.screenshotMimeType)}`
+      : `screenshot${imageExtension(stored.screenshotMimeType)}`,
+    stored.screenshotMimeType,
+    mediaObjectDirectory(args.entry, args.options)
   );
   const { packageAssetId: _package, screenshotAssetId: _screenshot, ...portable } = stored;
   return {
@@ -195,7 +244,12 @@ async function buildMediaSource(args: {
   if (entry.source.kind === 'screenshot') {
     if (!entry.blob) throw new Error(`Screenshot backup bytes are missing: ${entry.id}.`);
     return {
-      originalObjectId: args.collector.add(entry.blob, entry.filename, entry.mimeType),
+      originalObjectId: args.collector.add(
+        entry.blob,
+        entry.filename,
+        entry.mimeType,
+        mediaObjectDirectory(entry, args.options)
+      ),
     };
   }
   if (entry.source.kind === 'recording') {
@@ -290,6 +344,7 @@ function buildRootSummary(args: {
   thumbnail: PortableMediaMetadata['thumbnail'];
 }) {
   return {
+    draftCount: args.entry.lifecycle?.storageClass === 'temporary' ? 1 : 0,
     recordingCount: args.source.recording ? 1 : 0,
     sourceMetadataCount:
       args.options.includeSourceMetadata &&
@@ -308,23 +363,41 @@ async function buildMediaRoot(args: {
   db: MediaInventoryDatabase;
   item: MediaLibraryItem;
   options: MediaHubBackupExportOptions;
+  paths: ArchivePathAllocator;
   rootIndex: number;
 }): Promise<MediaHubBackupRootInventoryItem> {
   const entry = parseMediaLibraryEntry(await args.db.get(MEDIA_LIBRARY_STORE, args.item.id));
   if (!entry) throw new Error(`Media backup row is invalid: ${args.item.id}.`);
-  const collector = createMediaObjectCollector(args.rootIndex);
+  const collector = createMediaObjectCollector(args.rootIndex, args.paths);
   const source = await buildMediaSource({ collector, db: args.db, entry, options: args.options });
   const isImageAggregate =
     entry.source.kind === 'screenshot' && (entry.kind === 'image' || entry.kind === 'screenshot');
-  const [thumbnail, workspace, presentation] = await Promise.all([
-    buildThumbnail({ collector, db: args.db, entry, isImageAggregate }),
-    buildWorkspace({ collector, db: args.db, entry, isImageAggregate, options: args.options }),
-    buildPresentation({ collector, db: args.db, entry, isImageAggregate }),
-  ]);
+  const thumbnail = await buildThumbnail({ collector, db: args.db, entry, isImageAggregate });
+  const workspace = await buildWorkspace({
+    collector,
+    db: args.db,
+    entry,
+    isImageAggregate,
+    options: args.options,
+  });
+  const presentation = await buildPresentation({
+    collector,
+    db: args.db,
+    entry,
+    isImageAggregate,
+  });
   const { blob: _blob, ...entryWithoutBlob } = entry;
+  const portableEntry =
+    entry.source.kind === 'web-snapshot' && !args.options.includeSourceMetadata
+      ? {
+          ...entryWithoutBlob,
+          filename: 'snapshot.sniptale-web-snapshot.zip',
+          originalFilename: 'snapshot.sniptale-web-snapshot.zip',
+        }
+      : entryWithoutBlob;
   const metadata: PortableMediaMetadata = {
     entry: projectMediaEntryPrivacy(
-      { ...entryWithoutBlob, size: collector.sizeOf(source.originalObjectId) },
+      { ...portableEntry, size: collector.sizeOf(source.originalObjectId) },
       args.options
     ),
     originalObjectId: source.originalObjectId,
@@ -337,7 +410,7 @@ async function buildMediaRoot(args: {
   return {
     descriptor: {
       mediaSubtype: 'library-item',
-      metadataPath: `metadata/media/${encodeURIComponent(entry.id)}.json`,
+      metadataPath: `${METADATA_ROOT}/media/${encodeURIComponent(entry.id)}.json`,
       objectCount: collector.objects.length,
       rootId: entry.id,
       rootKind: 'media',
@@ -352,6 +425,7 @@ export async function buildMediaRootInventory(args: {
   db: MediaInventoryDatabase;
   items: MediaLibraryItem[];
   options: MediaHubBackupExportOptions;
+  paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const roots: MediaHubBackupRootInventoryItem[] = [];
   const items = args.items

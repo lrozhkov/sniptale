@@ -80,7 +80,9 @@ it('opens the storage manager from the query flag and updates the remaining surf
           thumbnailCount: 0,
           version: 1,
         },
+        rootCount: 1,
         thumbnailCount: 0,
+        totalBytes: 512,
       },
     });
     value.actions.setConfirmDialog({

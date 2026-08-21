@@ -46,6 +46,7 @@ function createProps(): GallerySidebarProps {
     counts: { all: 2, export: 0, recording: 0, scenario: 1, screenshot: 2 },
     folderFilter: 'all',
     isBusy: false,
+    importTriggerRef: { current: null },
     onActiveTagsChange: vi.fn(),
     onExportBackup: vi.fn(),
     onFolderFilterChange: vi.fn(),

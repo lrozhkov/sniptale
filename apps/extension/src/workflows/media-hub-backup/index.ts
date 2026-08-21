@@ -19,5 +19,6 @@ export {
   inspectLocalMediaHubBackup,
   inspectMediaHubBackup,
   listResumableMediaHubRestores,
+  readMediaHubRestoreSummary,
   resumeMediaHubBackupImport,
 } from './v6/public';

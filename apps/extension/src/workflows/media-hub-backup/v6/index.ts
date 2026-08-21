@@ -20,6 +20,7 @@ export {
   abortMediaHubBackupRestore,
   createMediaHubRestoreSession,
   listResumableMediaHubRestores,
+  readMediaHubRestoreSummary,
   verifyMediaHubRestoreResume,
   type RestoreSessionSummary,
 } from './restore-session';

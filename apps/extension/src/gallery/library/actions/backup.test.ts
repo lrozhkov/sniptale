@@ -14,8 +14,8 @@ import {
   runBusyAction,
 } from './test-support/index';
 import {
+  createCancelActiveImportAction,
   createClosePendingExportAction,
-  createClosePendingImportAction,
   createConfirmExportBackupAction,
   createExportBackupAction,
   createImportAction,
@@ -28,6 +28,7 @@ const {
   inspectLocalMediaHubBackupMock,
   inspectMediaHubBackupMock,
   listResumableMediaHubRestoresMock,
+  readMediaHubRestoreSummaryMock,
   resumeMediaHubBackupImportMock,
 } = vi.hoisted(() => ({
   exportMediaHubBackupMock: vi.fn(),
@@ -35,6 +36,7 @@ const {
   inspectLocalMediaHubBackupMock: vi.fn(),
   inspectMediaHubBackupMock: vi.fn(),
   listResumableMediaHubRestoresMock: vi.fn(),
+  readMediaHubRestoreSummaryMock: vi.fn(),
   resumeMediaHubBackupImportMock: vi.fn(),
 }));
 
@@ -45,6 +47,7 @@ vi.mock('../../../workflows/media-hub-backup/index', async (importOriginal) => (
   inspectLocalMediaHubBackup: inspectLocalMediaHubBackupMock,
   inspectMediaHubBackup: inspectMediaHubBackupMock,
   listResumableMediaHubRestores: listResumableMediaHubRestoresMock,
+  readMediaHubRestoreSummary: readMediaHubRestoreSummaryMock,
   resumeMediaHubBackupImport: resumeMediaHubBackupImportMock,
 }));
 
@@ -61,7 +64,9 @@ function createBackupSummary(): MediaHubBackupSummary {
       thumbnailCount: 0,
       version: 1,
     },
+    rootCount: 2,
     thumbnailCount: 0,
+    totalBytes: 4096,
   };
 }
 
@@ -69,7 +74,9 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
   return {
     approximateSizeBytes: 4096,
     assetCount: 2,
+    draftCount: 0,
     dataClasses: {
+      drafts: false,
       mediaAssets: true,
       recordings: true,
       scenarioProjects: true,
@@ -91,6 +98,7 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
 
 function createAllBackupOptions() {
   return {
+    includeDrafts: false,
     includeSourceMetadata: false,
     includeTelemetry: true,
     includeWebSnapshots: true,
@@ -105,6 +113,8 @@ beforeEach(() => {
   inspectMediaHubBackupMock.mockReset();
   listResumableMediaHubRestoresMock.mockReset();
   listResumableMediaHubRestoresMock.mockResolvedValue([]);
+  readMediaHubRestoreSummaryMock.mockReset();
+  readMediaHubRestoreSummaryMock.mockResolvedValue(null);
   resumeMediaHubBackupImportMock.mockReset();
 });
 
@@ -238,6 +248,7 @@ async function verifySelectedExportScope() {
 
   expect(inspectLocalMediaHubBackupMock).toHaveBeenCalledWith(
     expect.objectContaining({
+      includeDrafts: false,
       scope: 'selected',
       selected: {
         mediaAssetIds: ['asset-1'],
@@ -248,6 +259,93 @@ async function verifySelectedExportScope() {
   );
 }
 
+async function verifySelectedDraftEnablesDraftExport() {
+  const { controller } = createController({
+    selectedItems: [
+      createMediaItem({
+        id: 'draft-1',
+        entityId: 'draft-1',
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+      }),
+    ],
+  });
+  inspectLocalMediaHubBackupMock.mockResolvedValue(createLocalBackupSummary());
+  await createExportBackupAction(controller, runBusyAction)();
+  expect(inspectLocalMediaHubBackupMock).toHaveBeenCalledWith(
+    expect.objectContaining({ includeDrafts: true, scope: 'selected' })
+  );
+}
+
+async function verifyImportModalTransitionsToProgressBeforeCompletion() {
+  const summary = createBackupSummary();
+  const { controller, getState } = createController();
+  const importFile = new File(['zip'], 'backup.zip', { type: 'application/zip' });
+  let report:
+    | ((progress: {
+        bytesRead: number;
+        bytesWritten: number;
+        currentFilename: string | null;
+        rootsComplete: number;
+      }) => void)
+    | undefined;
+  let resolveImport: (result: {
+    conflictsResolved: number;
+    imported: number;
+    operationId: string;
+    skipped: number;
+  }) => void = () => undefined;
+  const focusTrigger = vi.spyOn(controller.refs.importTriggerRef.current!, 'focus');
+  inspectMediaHubBackupMock.mockResolvedValue(summary);
+  importMediaHubBackupMock.mockImplementation((_file, _strategy, options) => {
+    report = options?.onProgress;
+    return new Promise((resolve) => {
+      resolveImport = resolve;
+    });
+  });
+  await createImportSelectedFileAction(controller)(importFile, runBusyAction);
+  const promise = createImportAction(controller)('replace', runBusyAction);
+  await Promise.resolve();
+  expect(getState().storage.pendingImport).toBeNull();
+  expect(getState().storage.activeImport).toMatchObject({ status: 'running', totalRoots: 2 });
+  expect(focusTrigger).toHaveBeenCalledOnce();
+  report?.({
+    bytesRead: 2048,
+    bytesWritten: 2048,
+    currentFilename: 'Screenshots/a.png',
+    rootsComplete: 1,
+  });
+  expect(getState().storage.activeImport?.progress).toMatchObject({
+    bytesRead: 2048,
+    rootsComplete: 1,
+  });
+  resolveImport({ conflictsResolved: 0, imported: 2, operationId: 'operation-1', skipped: 0 });
+  await promise;
+  expect(getState().storage.activeImport).toMatchObject({ status: 'completed' });
+}
+
+async function verifyActiveImportBlocksAnotherTransfer() {
+  const { controller } = createController({
+    activeImport: {
+      file: new File(['zip'], 'active.zip'),
+      id: 'active-import',
+      progress: {
+        bytesRead: 0,
+        bytesWritten: 0,
+        currentFilename: null,
+        rootsComplete: 0,
+      },
+      status: 'running',
+      strategy: 'replace',
+      totalBytes: 1,
+      totalRoots: 1,
+    },
+  });
+  await createImportSelectedFileAction(controller)(new File(['zip'], 'second.zip'), runBusyAction);
+  await createExportBackupAction(controller, runBusyAction)();
+  expect(inspectMediaHubBackupMock).not.toHaveBeenCalled();
+  expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
+}
+
 async function verifyBackupImportFlow() {
   const summary = createBackupSummary();
   const { controller, getState } = createController();
@@ -255,8 +353,10 @@ async function verifyBackupImportFlow() {
 
   inspectMediaHubBackupMock.mockResolvedValue(summary);
   importMediaHubBackupMock.mockResolvedValue({
-    importedAssets: 2,
-    skippedConflicts: ['asset-1'],
+    conflictsResolved: 1,
+    imported: 2,
+    operationId: 'operation-1',
+    skipped: 0,
   });
 
   controller.refs.importInputRef.current!.value = 'backup.zip';
@@ -294,8 +394,10 @@ async function verifyResumableBackupImportFlow() {
     },
   ]);
   resumeMediaHubBackupImportMock.mockResolvedValue({
-    importedAssets: 1,
-    skippedConflicts: [],
+    conflictsResolved: 0,
+    imported: 1,
+    operationId: 'restore-1',
+    skipped: 0,
   });
 
   await createImportSelectedFileAction(controller)(importFile, runBusyAction);
@@ -309,6 +411,7 @@ async function verifyResumableBackupImportFlow() {
 
   expect(resumeMediaHubBackupImportMock).toHaveBeenCalledWith({
     file: importFile,
+    onProgress: expect.any(Function),
     operationId: 'restore-1',
     signal: expect.any(AbortSignal),
   });
@@ -322,16 +425,14 @@ async function verifyCancelledBackupImportFlow() {
   const { controller, getState } = createController();
   const importFile = new File(['zip'], 'backup.zip', { type: 'application/zip' });
   let importSignal = new AbortController().signal;
-  let resolveImport: (result: {
-    importedAssets: number;
-    skippedConflicts: string[];
-  }) => void = () => undefined;
+  let rejectImport: (error: Error) => void = () => undefined;
 
   inspectMediaHubBackupMock.mockResolvedValue(summary);
   importMediaHubBackupMock.mockImplementation((_file, _strategy, options) => {
     importSignal = options?.signal ?? importSignal;
-    return new Promise((resolve) => {
-      resolveImport = resolve;
+    options?.onSessionCreated?.('restore-cancelled');
+    return new Promise((_resolve, reject) => {
+      rejectImport = reject;
     });
   });
 
@@ -340,13 +441,68 @@ async function verifyCancelledBackupImportFlow() {
   await Promise.resolve();
   await Promise.resolve();
 
-  createClosePendingImportAction(controller)();
-  resolveImport({ importedAssets: 1, skippedConflicts: [] });
+  const rerenderedController = { ...controller };
+  createCancelActiveImportAction(rerenderedController)();
+  readMediaHubRestoreSummaryMock.mockResolvedValue({
+    archiveFingerprint: summary.archiveFingerprint,
+    committedRootCount: 1,
+    conflictedRootCount: 1,
+    currentRoot: null,
+    operationId: 'restore-cancelled',
+    skippedRootCount: 0,
+    status: 'pending',
+    strategy: 'replace',
+  });
+  rejectImport(new DOMException('cancelled', 'AbortError'));
   await importPromise;
 
   expect(importSignal.aborted).toBe(true);
   expect(getState().storage.pendingImport).toBeNull();
+  expect(getState().storage.activeImport).toMatchObject({
+    result: {
+      conflictsResolved: 1,
+      imported: 1,
+      operationId: 'restore-cancelled',
+      skipped: 0,
+    },
+    status: 'cancelled',
+  });
   expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
+}
+
+async function verifyFailedBackupImportReportsPartialResult() {
+  const summary = createBackupSummary();
+  const { controller, getState } = createController();
+  const importFile = new File(['zip'], 'backup.zip', { type: 'application/zip' });
+
+  inspectMediaHubBackupMock.mockResolvedValue(summary);
+  importMediaHubBackupMock.mockImplementation((_file, _strategy, options) => {
+    options?.onSessionCreated?.('restore-failed');
+    return Promise.reject(new Error('disk write failed'));
+  });
+  readMediaHubRestoreSummaryMock.mockResolvedValue({
+    archiveFingerprint: summary.archiveFingerprint,
+    committedRootCount: 3,
+    conflictedRootCount: 2,
+    currentRoot: null,
+    operationId: 'restore-failed',
+    skippedRootCount: 1,
+    status: 'aborted',
+    strategy: 'replace',
+  });
+
+  await createImportSelectedFileAction(controller)(importFile, runBusyAction);
+  await createImportAction(controller)('replace', runBusyAction);
+
+  expect(getState().storage.activeImport).toMatchObject({
+    result: {
+      conflictsResolved: 2,
+      imported: 2,
+      operationId: 'restore-failed',
+      skipped: 1,
+    },
+    status: 'failed',
+  });
 }
 
 describe('gallery backup actions', () => {
@@ -371,7 +527,23 @@ describe('gallery backup actions', () => {
     verifyResolvedCancelledExportSkipsRefresh
   );
   it('opens backup disclosure with the selected item scope', verifySelectedExportScope);
+  it(
+    'enables draft export for an explicitly selected draft',
+    verifySelectedDraftEnablesDraftExport
+  );
+  it(
+    'closes strategy state before restore completion and reports progress separately',
+    verifyImportModalTransitionsToProgressBeforeCompletion
+  );
+  it(
+    'blocks another import or export while restore is active',
+    verifyActiveImportBlocksAnotherTransfer
+  );
   it('imports selected backup files through the existing conflict flow', verifyBackupImportFlow);
   it('resumes a matching durable restore with its fixed strategy', verifyResumableBackupImportFlow);
-  it('aborts an in-progress restore when the import modal closes', verifyCancelledBackupImportFlow);
+  it('aborts an in-progress restore through the progress owner', verifyCancelledBackupImportFlow);
+  it(
+    'reports exact committed counts when a later restore root fails',
+    verifyFailedBackupImportReportsPartialResult
+  );
 });
