@@ -120,20 +120,26 @@ export function getActiveSidecarWebcamSettings(): WebcamActualSettings | null {
   return pickNumericWebcamActualSettings(webcam.trackSettings);
 }
 
-export function getActiveSidecarVideoDimensions(): Array<{ height: number; width: number }> {
+export function getActiveSidecarVideoProfiles(): Array<{
+  dimensions: { height: number; width: number };
+  frameRate: number;
+}> {
   return (getActiveSidecarSession()?.recorders ?? []).map((sidecar) => {
-    const { height, width } = sidecar.trackSettings;
+    const { frameRate, height, width } = sidecar.trackSettings;
     if (
       typeof width !== 'number' ||
       typeof height !== 'number' ||
+      typeof frameRate !== 'number' ||
       !Number.isInteger(width) ||
       !Number.isInteger(height) ||
+      !Number.isFinite(frameRate) ||
       width <= 0 ||
-      height <= 0
+      height <= 0 ||
+      frameRate <= 0
     ) {
-      throw new Error(`Webcam recording dimensions are unavailable for ${sidecar.recordingId}.`);
+      throw new Error(`Webcam recording profile is unavailable for ${sidecar.recordingId}.`);
     }
-    return { height, width };
+    return { dimensions: { height, width }, frameRate };
   });
 }
 

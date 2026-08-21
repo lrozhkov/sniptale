@@ -1,7 +1,7 @@
 import type { Dispatch } from 'react';
 import type { VideoRecordingSurfaceSnapshot } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type { VideoRecordingToolbarStateAction } from './state';
-import { translate } from '../../../../platform/i18n';
+import { resolveVideoRecordingFailureMessage } from '../../../../features/video/recording-failure';
 
 export function projectVideoRecordingSurfaceSnapshot(
   snapshot: VideoRecordingSurfaceSnapshot,
@@ -12,6 +12,6 @@ export function projectVideoRecordingSurfaceSnapshot(
     type: 'snapshot',
     snapshot,
     surfaceToken,
-    error: snapshot.errorCode ? translate('content.toolbar.videoRecordingActionFailed') : null,
+    error: resolveVideoRecordingFailureMessage(snapshot.errorCode),
   });
 }

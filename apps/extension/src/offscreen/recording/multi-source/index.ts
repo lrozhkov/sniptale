@@ -36,14 +36,19 @@ export function getActiveMultiSourceRecordingId(): string | null {
   return getActiveMultiSourceSession()?.recordingId ?? null;
 }
 
-function requireVideoDimensions(source: {
-  recordingId: string;
-  trackSettings: MediaTrackSettings;
-}): { height: number; width: number } {
-  return requireRecordingDimensions(
+function requireVideoProfile(source: { recordingId: string; trackSettings: MediaTrackSettings }): {
+  dimensions: { height: number; width: number };
+  frameRate: number;
+} {
+  const dimensions = requireRecordingDimensions(
     source,
     `Recording dimensions are unavailable for ${source.recordingId}.`
   );
+  const frameRate = source.trackSettings.frameRate;
+  if (typeof frameRate !== 'number' || !Number.isFinite(frameRate) || frameRate <= 0) {
+    throw new Error(`Recording frame rate is unavailable for ${source.recordingId}.`);
+  }
+  return { dimensions, frameRate };
 }
 
 function assertMultiSourceResourceBudget(
@@ -51,9 +56,9 @@ function assertMultiSourceResourceBudget(
   settings: VideoRecordingSettings
 ): void {
   assertRecordingResourceBudget({
-    dimensions: [
-      ...prepared.recorders.map(requireVideoDimensions),
-      ...(prepared.webcamRecorder ? [requireVideoDimensions(prepared.webcamRecorder)] : []),
+    artifacts: [
+      ...prepared.recorders.map(requireVideoProfile),
+      ...(prepared.webcamRecorder ? [requireVideoProfile(prepared.webcamRecorder)] : []),
     ],
     frameRate: settings.outputProfile.frameRate,
     resolution: settings.outputProfile.resolution,

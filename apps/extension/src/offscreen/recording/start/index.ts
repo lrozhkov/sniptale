@@ -136,6 +136,7 @@ async function startRecordingInternal(
     resolvedRecordingId: recordingId,
     settings: params.settings,
     cursorCaptureMode: prepared.cursorCaptureMode,
+    encoderFrameCrop: prepared.encoderFrameCrop,
     trackSettings: prepared.trackSettings,
     durationTracker: recordingContext.durationTracker,
     sourceBinding: {
@@ -143,5 +144,6 @@ async function startRecordingInternal(
       recordingId,
       streamInstanceId: params.streamInstanceId,
     },
+    transformFailure: prepared.transformFailure,
   });
 }

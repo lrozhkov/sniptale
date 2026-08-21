@@ -30,7 +30,11 @@ beforeEach(() => {
 describe('tab capture viewport validation', () => {
   it('reads the atomic viewport response through canonical tab messaging', async () => {
     await expect(readTabCaptureViewport(7)).resolves.toEqual(viewport);
-    expect(mocks.sendTabMessage).toHaveBeenCalledWith(7, { type: 'GET_VIEWPORT_COORDS' });
+    expect(mocks.sendTabMessage).toHaveBeenCalledWith(
+      7,
+      { type: 'GET_VIEWPORT_COORDS' },
+      { frameId: 0 }
+    );
   });
 
   it.each([

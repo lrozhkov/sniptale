@@ -3,7 +3,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  CONTENT_RUNTIME_PROTOCOL_VERSION,
+  VideoMessageType,
+} from '@sniptale/runtime-contracts/video/messages';
 import type { ContentRuntimeMessage } from './types';
 import { handleViewportMessage } from './viewport';
 
@@ -64,6 +67,7 @@ function registerViewportCoordsTest() {
 
     expect(sendResponse).toHaveBeenCalledWith({
       success: true,
+      contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
       coords: {
         x: 0,
         y: 0,

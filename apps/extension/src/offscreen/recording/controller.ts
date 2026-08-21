@@ -224,9 +224,9 @@ async function stopActiveRecording(
     return waitForExistingArtifactStop();
   }
 
-  const { artifactSession, mediaRecorder, durationTracker } = recordingContext;
+  const { artifactSession, durationTracker } = recordingContext;
   const hadActiveSession = hasActiveRecordingSession();
-  if (!artifactSession || !mediaRecorder || mediaRecorder.state === 'inactive') {
+  if (!artifactSession || artifactSession.state === 'inactive') {
     return handleStopWithoutActiveRecorder(hadActiveSession);
   }
 
@@ -240,12 +240,7 @@ async function stopActiveRecording(
         clearTimeout(timeoutId);
         timeoutId = null;
       }
-      mediaRecorder.removeEventListener('stop', handleRecorderTerminal);
     };
-    const handleRecorderTerminal = () => {
-      clearRecorderTerminalDeadline();
-    };
-    mediaRecorder.addEventListener('stop', handleRecorderTerminal, { once: true });
 
     timeoutId = setTimeout(() => {
       clearRecorderTerminalDeadline();
@@ -255,6 +250,7 @@ async function stopActiveRecording(
       }
 
       const error = translate('background.runtime.recordingStopTimeout');
+      void artifactSession.abort().catch(() => undefined);
       cleanupResources();
       pendingStopRequest.resolve?.({ error, result: 'terminal-failure' });
     }, STOP_RECORDING_TIMEOUT_MS);
@@ -279,6 +275,7 @@ async function stopActiveRecording(
         });
       },
     });
+    recordingContext.registerArtifactFinalizingHandler(clearRecorderTerminalDeadline);
 
     void artifactSession.stop().catch((error: unknown) => {
       clearRecorderTerminalDeadline();
@@ -435,14 +432,14 @@ export function pauseRecording(binding: RecordingSourceBinding): void {
     return;
   }
 
-  const { mediaRecorder, durationTracker } = recordingContext;
-  if (!mediaRecorder || mediaRecorder.state !== 'recording') {
+  const { artifactSession, durationTracker } = recordingContext;
+  if (!artifactSession || artifactSession.state !== 'recording') {
     logger.debug('Pause requested while recording is not active');
     return;
   }
 
   logger.debug('Pausing recording');
-  mediaRecorder.pause();
+  artifactSession.pause();
   pauseActiveSidecarRecorders();
   durationTracker.freeze();
   durationTracker.stopSegment();
@@ -467,14 +464,14 @@ export function resumeRecording(binding: RecordingSourceBinding): void {
     return;
   }
 
-  const { mediaRecorder, durationTracker } = recordingContext;
-  if (!mediaRecorder || mediaRecorder.state !== 'paused') {
+  const { artifactSession, durationTracker } = recordingContext;
+  if (!artifactSession || artifactSession.state !== 'paused') {
     logger.debug('Resume requested while recording is not paused');
     return;
   }
 
   logger.debug('Resuming recording');
-  mediaRecorder.resume();
+  artifactSession.resume();
   resumeActiveSidecarRecorders();
   durationTracker.startSegment();
 

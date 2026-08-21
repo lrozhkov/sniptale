@@ -2,18 +2,17 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import {
   VideoDisplaySurface,
+  VideoOutputCodec,
+  VideoOutputContainer,
+  resolveVideoTargetBitrate,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  buildVideoMediaRecorderOptions,
-  resolveVideoRecordingArtifact,
-} from '../../../platform/media-utils/video-recording';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
 import { buildRecordingFilename, finalizeRecording } from '../finalizer';
 import {
-  getActiveSidecarVideoDimensions,
+  getActiveSidecarVideoProfiles,
   getActiveSidecarWebcamSettings,
   startActiveSidecarRecorders,
   stopActiveSidecarRecordersWithFlush,
@@ -21,7 +20,10 @@ import {
 import { PostRecordPublicationError } from '../post-record-publication';
 import { cleanupResources } from './cleanup';
 import { handleRecordingStartError } from './session';
-import { createRecordingArtifactSession } from '../encoding/artifact-session';
+import {
+  createLiveRecordingArtifactSession,
+  type LiveRecordingEncodingConfig,
+} from '../encoding/live-artifact-session';
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
 
@@ -56,12 +58,47 @@ function requireRecordingVideoStream(): MediaStream {
   return recordingContext.videoStream;
 }
 
-function buildRecorderConfig(
+function resolveLiveVideoBitrate(
   settings: VideoRecordingSettings,
-  videoStream: MediaStream,
   trackSettings: MediaTrackSettings
-) {
-  const config = buildVideoMediaRecorderOptions(settings, videoStream, trackSettings);
+): number {
+  const profile = settings.outputProfile;
+  const width = trackSettings.width;
+  const height = trackSettings.height;
+  if (!width || !height) throw new Error('Recording output dimensions are unavailable');
+  return resolveVideoTargetBitrate({
+    fps: profile.frameRate,
+    height,
+    quality: profile.quality,
+    resolution: profile.resolution,
+    width,
+  });
+}
+
+function buildLiveEncoderConfig(
+  settings: VideoRecordingSettings,
+  trackSettings: MediaTrackSettings
+): LiveRecordingEncodingConfig {
+  const profile = settings.outputProfile;
+  const width = trackSettings.width;
+  const height = trackSettings.height;
+  if (!width || !height) throw new Error('Recording output dimensions are unavailable');
+  const config: LiveRecordingEncodingConfig = {
+    audioBitrate: 128_000,
+    audioCodec: profile.container === VideoOutputContainer.MP4 ? 'aac' : 'opus',
+    container: profile.container === VideoOutputContainer.MP4 ? 'mp4' : 'webm',
+    frameRate: profile.frameRate,
+    videoBitrate: resolveLiveVideoBitrate(settings, trackSettings),
+    videoCodec:
+      profile.codec === VideoOutputCodec.AVC
+        ? 'avc'
+        : profile.codec === VideoOutputCodec.VP9
+          ? 'vp9'
+          : 'vp8',
+    ...(profile.codec === VideoOutputCodec.AVC
+      ? { videoCodecString: resolveAvcCodecString(width, height, profile.frameRate) }
+      : {}),
+  };
 
   logger.debug('Built recorder config', {
     quality: settings.outputProfile.quality,
@@ -71,13 +108,34 @@ function buildRecorderConfig(
   return config;
 }
 
+function resolveAvcCodecString(width: number, height: number, frameRate: number): string {
+  const macroblocksPerFrame = Math.ceil(width / 16) * Math.ceil(height / 16);
+  const macroblocksPerSecond = macroblocksPerFrame * frameRate;
+  const levels = [
+    { codec: 'avc1.64002a', maxFrame: 8_704, maxRate: 522_240 },
+    { codec: 'avc1.640032', maxFrame: 22_080, maxRate: 589_824 },
+    { codec: 'avc1.640033', maxFrame: 36_864, maxRate: 983_040 },
+    { codec: 'avc1.640034', maxFrame: 36_864, maxRate: 2_073_600 },
+  ];
+  const level = levels.find(
+    (candidate) =>
+      macroblocksPerFrame <= candidate.maxFrame && macroblocksPerSecond <= candidate.maxRate
+  );
+  if (!level) {
+    throw new Error(`AVC profile cannot encode ${width}x${height} at ${frameRate} FPS`);
+  }
+  return level.codec;
+}
+
 export async function finalizeRecordingBootstrap(params: {
   resolvedRecordingId: string;
   settings: VideoRecordingSettings;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
+  encoderFrameCrop?: { x: number; y: number; width: number; height: number } | null;
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
   sourceBinding?: RecordingSourceBinding;
+  transformFailure?: Promise<never> | null;
 }) {
   const videoStream = requireRecordingVideoStream();
   const stagingCoordinator = recordingContext.stagingCoordinator;
@@ -99,21 +157,27 @@ export async function finalizeRecordingBootstrap(params: {
     throw new Error('Recording output dimensions are unavailable');
   }
   assertRecordingResourceBudget({
-    dimensions: [{ height, width }, ...getActiveSidecarVideoDimensions()],
+    artifacts: [
+      {
+        dimensions: { height, width },
+        frameRate: params.settings.outputProfile.frameRate,
+      },
+      ...getActiveSidecarVideoProfiles(),
+    ],
     frameRate: params.settings.outputProfile.frameRate,
     resolution: params.settings.outputProfile.resolution,
   });
-  const recorderConfig = buildRecorderConfig(params.settings, videoStream, params.trackSettings);
-  const artifact = resolveVideoRecordingArtifact(recorderConfig.mimeType ?? '');
-  const artifactSession = await createRecordingArtifactSession({
+  const encoderConfig = buildLiveEncoderConfig(params.settings, params.trackSettings);
+  const mimeType = encoderConfig.container === 'mp4' ? 'video/mp4' : 'video/webm';
+  const artifactSession = await createLiveRecordingArtifactSession({
     artifactId: params.resolvedRecordingId,
     coordinator: stagingCoordinator,
-    filename: buildRecordingFilename(artifact.mimeType),
-    mimeType: artifact.mimeType,
-    recorderOptions: recorderConfig,
+    encoding: encoderConfig,
+    filename: buildRecordingFilename(mimeType),
+    ...(params.encoderFrameCrop ? { frameCrop: params.encoderFrameCrop } : {}),
+    mimeType,
     stream: videoStream,
   });
-  const mediaRecorder = artifactSession.recorder;
   recordingContext.bindStartingArtifactSession(artifactSession);
   const cancelStartingRecorder = attachRecorderLifecycle({
     artifactSession,
@@ -122,10 +186,10 @@ export async function finalizeRecordingBootstrap(params: {
       : { cursorCaptureMode: params.cursorCaptureMode }),
     displaySurface,
     durationTracker: params.durationTracker,
-    mediaRecorder,
     recordingId: params.resolvedRecordingId,
     videoStream,
     webcamSettings,
+    transformFailure: params.transformFailure ?? null,
   });
   if (params.sourceBinding) {
     const pendingSourceFailure = recordingContext.registerSourceFailureHandler(
@@ -135,7 +199,7 @@ export async function finalizeRecordingBootstrap(params: {
     if (pendingSourceFailure) throw pendingSourceFailure;
   }
   recordingContext.registerStartingRecorderCancellation(
-    mediaRecorder,
+    artifactSession,
     cancelStartingRecorder.cancel
   );
   params.durationTracker.reset();
@@ -216,16 +280,16 @@ async function finalizeStoppedRecorder(
 }
 
 function attachRecorderLifecycle(params: {
-  artifactSession: Awaited<ReturnType<typeof createRecordingArtifactSession>>;
+  artifactSession: Awaited<ReturnType<typeof createLiveRecordingArtifactSession>>;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
   displaySurface: (typeof VideoDisplaySurface)[keyof typeof VideoDisplaySurface] | null;
   durationTracker: typeof recordingContext.durationTracker;
-  mediaRecorder: MediaRecorder;
   recordingId: string;
   videoStream: MediaStream;
   webcamSettings: ReturnType<typeof getActiveSidecarWebcamSettings>;
+  transformFailure: Promise<never> | null;
 }): { cancel: () => void; failUnexpectedly: (error: Error) => void } {
-  const { artifactSession, mediaRecorder, recordingId } = params;
+  const { artifactSession, recordingId } = params;
   let phase: 'starting' | 'recording' | 'terminal' = 'starting';
 
   const isTerminal = () => phase === 'terminal';
@@ -275,19 +339,22 @@ function attachRecorderLifecycle(params: {
     cleanupResources();
   };
 
+  void params.transformFailure?.catch(failUnexpectedly);
+
   artifactSession.setLifecycleCallbacks({
     onFailure: failUnexpectedly,
     onStart: () => {
       if (phase !== 'starting') return;
       startActiveSidecarRecorders(failUnexpectedly);
       if (isTerminal()) return;
-      recordingContext.activateRecorder(mediaRecorder);
+      recordingContext.activateRecorder(artifactSession);
       phase = 'recording';
       params.durationTracker.startSegment();
       notifyRecordingStarted(params);
     },
     onStop: async (artifact) => {
-      logger.debug('MediaRecorder stopped');
+      logger.debug('Live recording encoder stopped');
+      recordingContext.reportArtifactFinalizing();
       if (recordingContext.lifecycleState !== 'stopping') {
         failUnexpectedly(
           new Error(

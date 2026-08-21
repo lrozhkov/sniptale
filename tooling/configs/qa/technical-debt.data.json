@@ -8853,6 +8853,7 @@
         "apps/extension/src/features/video/project/validation/recording-telemetry.ts",
         "apps/extension/src/features/video/project/validation/root.ts",
         "apps/extension/src/features/video/project/validation/tracks.ts",
+        "apps/extension/src/features/video/recording-failure.ts",
         "apps/extension/src/features/video/recording/media-stream-video.tsx"
       ],
       "rolloutFiles": [
@@ -9133,6 +9134,7 @@
         "apps/extension/src/features/video/project/validation/recording-telemetry.ts",
         "apps/extension/src/features/video/project/validation/root.ts",
         "apps/extension/src/features/video/project/validation/tracks.ts",
+        "apps/extension/src/features/video/recording-failure.ts",
         "apps/extension/src/features/video/recording/media-stream-video.tsx"
       ],
       "unownedFocusedFiles": []
@@ -9481,6 +9483,8 @@
         "apps/extension/src/offscreen/recording/duration.ts",
         "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
         "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-artifact-session.ts",
         "apps/extension/src/offscreen/recording/encoding/resource-budget.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
         "apps/extension/src/offscreen/recording/finalizer.ts",
@@ -9688,6 +9692,8 @@
         "apps/extension/src/offscreen/recording/duration.ts",
         "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
         "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-artifact-session.ts",
         "apps/extension/src/offscreen/recording/encoding/resource-budget.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
         "apps/extension/src/offscreen/recording/finalizer.ts",
@@ -21772,7 +21778,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-config-policy.mjs",
-        "contentHash": "0121b130e553e58f2d049517e9979bff2b0f5b50d29b0f4670ea2e7578767797"
+        "contentHash": "de93eeed5e245cdcfb211c78c48f979b7672d8e5b77d7ce57c11962dcc104d43"
       },
       "consumers": [
         "tooling/qa/core/verify-config-policy.mjs",

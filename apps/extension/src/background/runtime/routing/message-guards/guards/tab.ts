@@ -26,6 +26,8 @@ import type {
 
 const backgroundInternalSignalTypes = [
   VideoMessageType.COUNTDOWN_COMPLETE,
+  VideoMessageType.REGION_SELECTED,
+  VideoMessageType.REGION_SELECTION_CANCELLED,
   'KEEP_ALIVE',
 ] as const satisfies ReadonlyArray<BackgroundInternalSignalMessage['type']>;
 

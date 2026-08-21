@@ -15,6 +15,17 @@ vi.mock('./video-source', async (importOriginal) => ({
   waitForSourceMetadata: mocks.waitForSourceMetadata,
 }));
 
+vi.mock('./frame-pump', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./frame-pump')>();
+  return {
+    ...original,
+    startVideoFramePump: vi.fn((options: Parameters<typeof original.startVideoFramePump>[0]) => {
+      options.drawLiveFrame();
+      return vi.fn();
+    }),
+  };
+});
+
 import { createStream } from '../multi-source/media-stream.test-support';
 import { createCropStream } from './crop-stream';
 

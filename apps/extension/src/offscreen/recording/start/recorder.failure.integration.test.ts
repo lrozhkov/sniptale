@@ -2,10 +2,19 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 import { createTrackedStream } from '../multi-source/media-stream.test-support';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
+import type { LiveRecordingArtifactSession } from '../encoding/live-artifact-session';
 
-const { finalizeRecordingMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
-  finalizeRecordingMock: vi.fn(),
-  sendRuntimeMessageMock: vi.fn(),
+const { createLiveRecordingArtifactSessionMock, finalizeRecordingMock, sendRuntimeMessageMock } =
+  vi.hoisted(() => ({
+    createLiveRecordingArtifactSessionMock: vi.fn(),
+    finalizeRecordingMock: vi.fn(),
+    sendRuntimeMessageMock: vi.fn(),
+  }));
+
+vi.mock('../encoding/live-artifact-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../encoding/live-artifact-session')>()),
+  createLiveRecordingArtifactSession: createLiveRecordingArtifactSessionMock,
 }));
 
 vi.mock('../finalizer', async (importOriginal) => ({
@@ -51,9 +60,52 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('MediaRecorder', TerminalMediaRecorder);
   recordingContext.resetRecordingSession();
-  recordingContext.mediaRecorder = null;
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
+  createLiveRecordingArtifactSessionMock.mockImplementation(async (input) => {
+    let callbacks: Parameters<LiveRecordingArtifactSession['setLifecycleCallbacks']>[0] = {};
+    let state: RecordingState = 'inactive';
+    const artifact = {
+      artifactId: 'recording-failure',
+      asset: createPreparedRecordingAssetForTest(
+        new File(['x'], 'recording.webm', { type: 'video/webm' }),
+        'recording-failure'
+      ),
+      filename: 'recording.webm',
+      mimeType: 'video/webm',
+      size: 1,
+    };
+    let terminal: Promise<typeof artifact> | null = null;
+    return {
+      abort: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      setLifecycleCallbacks: vi.fn((next) => {
+        callbacks = next;
+      }),
+      start: vi.fn(() => {
+        state = 'recording';
+        callbacks.onStart?.();
+      }),
+      get state() {
+        return state;
+      },
+      stop: vi.fn(() => {
+        terminal ??= (async () => {
+          state = 'inactive';
+          try {
+            await callbacks.onStop?.(artifact);
+            return artifact;
+          } catch (error) {
+            await input.coordinator.abort();
+            callbacks.onFailure?.(error as Error);
+            throw error;
+          }
+        })();
+        return terminal;
+      }),
+    };
+  });
 });
 
 it('keeps the exact source-ended finalization failure after real shared cleanup', async () => {

@@ -5,7 +5,6 @@ import {
   resolveWebcamQualitySettings,
 } from '@sniptale/runtime-contracts/video/types/webcam-quality';
 import { createCanvasVideoOutput } from '../stream/canvas-video-output';
-import { resolveFixedVideoFrameRate } from '../stream/frame-pump';
 import { createSourceVideo, waitForSourceMetadata } from '../stream/video-source';
 
 export type CameraSourceLease = {
@@ -118,6 +117,9 @@ function createNormalizedCameraOutput(
     height: target.video.videoHeight,
     width: target.video.videoWidth,
   });
+  // Drive the stable output independently from a particular HTMLVideoElement. Input switching
+  // replaces target.video; binding requestVideoFrameCallback to the retired element freezes the
+  // peer stream on its blank frame.
   return createCanvasVideoOutput({
     contentHint: 'motion',
     dimensions: target.dimensions,
@@ -152,8 +154,7 @@ function createNormalizedCameraOutput(
       },
     }),
     release: () => undefined,
-    sourceVideo: target.video,
-  });
+  }).stream;
 }
 
 async function initializeCameraSourceSession(args: {
@@ -178,11 +179,19 @@ async function initializeCameraSourceSession(args: {
       selectedFrameRate ?? args.settings.outputProfile.frameRate,
       args.settings.outputProfile.frameRate
     );
-    const frameRate = resolveFixedVideoFrameRate(
+    const sourceFrameRate = sourceTrack.getSettings().frameRate;
+    if (
+      typeof sourceFrameRate !== 'number' ||
+      !Number.isFinite(sourceFrameRate) ||
+      sourceFrameRate <= 0
+    ) {
+      throw new Error('Camera source frame rate is unavailable.');
+    }
+    const frameRate = Math.min(
       args.settings.webcamPresentation?.mode === 'embedded'
         ? Math.min(requestedFrameRate, EMBEDDED_CAMERA_PREVIEW_MAX_FRAME_RATE)
         : requestedFrameRate,
-      sourceTrack.getSettings().frameRate
+      sourceFrameRate
     );
     const target: CameraSourceSession = {
       closed: false,

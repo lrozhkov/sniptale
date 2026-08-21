@@ -73,7 +73,11 @@ function writePassingConfigPolicyFixture(root) {
   writeFile(
     root,
     'apps/extension/manifest.json',
-    JSON.stringify({ minimum_chrome_version: '140' }, null, 2)
+    JSON.stringify(
+      { minimum_chrome_version: '148', message_serialization: 'structured_clone' },
+      null,
+      2
+    )
   );
   writeFile(
     root,
@@ -123,7 +127,11 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'apps/extension/manifest.json',
-        message: 'minimum_chrome_version must be "140"',
+        message: 'minimum_chrome_version must be "148"',
+      }),
+      expect.objectContaining({
+        file: 'apps/extension/manifest.json',
+        message: 'message_serialization must be "structured_clone"',
       }),
       expect.objectContaining({
         file: 'apps/extension/vite.config.ts',

@@ -65,10 +65,66 @@ function createControlledTabSettings(): VideoRecordingSettings {
   };
 }
 
-it('requests the measured physical viewport as the maximum TAB source size', async () => {
+function createNativeTabTrack(settings: Record<string, unknown> = {}) {
+  return {
+    applyConstraints: vi.fn().mockResolvedValue(undefined),
+    cropTo: vi.fn().mockResolvedValue(undefined),
+    getSettings: () => ({ frameRate: 30, resizeMode: 'none', ...settings }),
+    readyState: 'live',
+  };
+}
+
+it('keeps TAB capture off Region Capture and requests the viewport-sized source', async () => {
+  const track = createNativeTabTrack({ frameRate: 60 });
+  const getUserMedia = vi.fn().mockResolvedValue({
+    getTracks: () => [track],
+    getVideoTracks: () => [track],
+    id: 'region-tab-stream',
+  });
+  installMediaDevicesMocks({ getUserMedia });
+
+  await acquireRecordingSourceStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...createControlledTabSettings(),
+      controlledCursorCaptureEnabled: false,
+      outputProfile: {
+        ...createControlledTabSettings().outputProfile,
+        frameRate: VideoFrameRate.FPS60,
+      },
+    },
+    streamId: 'region-tab-stream',
+    viewport: { devicePixelRatio: 1, height: 1309, width: 2560 },
+  });
+
+  expect(track.cropTo).not.toHaveBeenCalled();
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: 'region-tab-stream',
+        maxFrameRate: 60,
+        maxHeight: 1309,
+        maxWidth: 2560,
+        minFrameRate: 60,
+      },
+    },
+  });
+  expect(track.applyConstraints).not.toHaveBeenCalled();
+});
+
+it('requests TAB viewport dimensions from Chromium capture', async () => {
+  const applyConstraints = vi.fn().mockResolvedValue(undefined);
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
-    getVideoTracks: () => [{ getSettings: () => ({ cursor: 'never' }), readyState: 'live' }],
+    getVideoTracks: () => [
+      {
+        applyConstraints,
+        getSettings: () => ({ cursor: 'never', frameRate: 30, resizeMode: 'none' }),
+        readyState: 'live',
+      },
+    ],
     id: 'tab-stream',
   });
   installMediaDevicesMocks({ getUserMedia });
@@ -89,9 +145,11 @@ it('requests the measured physical viewport as the maximum TAB source size', asy
         maxFrameRate: 30,
         maxHeight: 1184,
         maxWidth: 2399,
+        minFrameRate: 30,
       },
     },
   });
+  expect(applyConstraints).not.toHaveBeenCalled();
   expect(loggerDebugMock).toHaveBeenCalledWith(
     'Controlled cursor capture will use embedded cursor telemetry',
     expect.objectContaining({
@@ -103,11 +161,11 @@ it('requests the measured physical viewport as the maximum TAB source size', asy
 });
 
 it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
-  'keeps the physical viewport source request for %s independent from output settings',
+  'requests the %s source at viewport physical size',
   async (captureMode) => {
     const getUserMedia = vi.fn().mockResolvedValue({
       getTracks: () => [{ stop: vi.fn() }],
-      getVideoTracks: () => [{ getSettings: () => ({}), readyState: 'live' }],
+      getVideoTracks: () => [createNativeTabTrack()],
       id: 'tab-stream',
     });
     installMediaDevicesMocks({ getUserMedia });
@@ -130,6 +188,7 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
           maxFrameRate: 30,
           maxHeight: 1440,
           maxWidth: 2560,
+          minFrameRate: 30,
         },
       },
     });
@@ -143,9 +202,7 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
 it('negotiates the selected 60 FPS cap with the TAB source', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
-    getVideoTracks: () => [
-      { getSettings: () => ({ frameRate: VideoFrameRate.FPS60 }), readyState: 'live' },
-    ],
+    getVideoTracks: () => [createNativeTabTrack({ frameRate: VideoFrameRate.FPS60 })],
     id: 'tab-stream',
   });
   installMediaDevicesMocks({ getUserMedia });
@@ -173,15 +230,88 @@ it('negotiates the selected 60 FPS cap with the TAB source', async () => {
         maxFrameRate: 60,
         maxHeight: 1440,
         maxWidth: 2560,
+        minFrameRate: 60,
       },
     },
   });
 });
 
+it('requires the selected output frame rate from a camera-only source', async () => {
+  const getUserMedia = vi.fn().mockResolvedValue({
+    getTracks: () => [],
+    getVideoTracks: () => [],
+    id: 'camera-stream',
+  });
+  installMediaDevicesMocks({ getUserMedia });
+
+  await acquireRecordingSourceStream({
+    captureMode: CaptureMode.CAMERA,
+    settings: {
+      ...createControlledTabSettings(),
+      outputProfile: {
+        ...createControlledTabSettings().outputProfile,
+        frameRate: VideoFrameRate.FPS60,
+      },
+    },
+    streamId: 'camera',
+  });
+
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: false,
+    video: expect.objectContaining({ frameRate: { exact: 60 } }),
+  });
+});
+
+it('normalizes an unsupported camera frame rate at the media boundary', async () => {
+  const error = Object.assign(new DOMException('', 'OverconstrainedError'), {
+    constraint: 'frameRate',
+  });
+  installMediaDevicesMocks({ getUserMedia: vi.fn().mockRejectedValue(error) });
+
+  await expect(
+    acquireRecordingSourceStream({
+      captureMode: CaptureMode.CAMERA,
+      settings: {
+        ...createControlledTabSettings(),
+        outputProfile: {
+          ...createControlledTabSettings().outputProfile,
+          frameRate: VideoFrameRate.FPS60,
+        },
+      },
+      streamId: 'camera',
+    })
+  ).rejects.toThrow('camera-frame-rate-unsupported');
+});
+
+it('does not renegotiate the TAB track after initial source acquisition', async () => {
+  const track = createNativeTabTrack();
+  vi.mocked(track.applyConstraints).mockRejectedValue(
+    new DOMException('Unsupported', 'OverconstrainedError')
+  );
+  installMediaDevicesMocks({
+    getUserMedia: vi.fn().mockResolvedValue({
+      getTracks: () => [track],
+      getVideoTracks: () => [track],
+      id: 'tab-stream',
+    }),
+  });
+
+  await expect(
+    acquireRecordingSourceStream({
+      captureMode: CaptureMode.TAB,
+      settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
+      streamId: 'tab-stream-native-unsupported',
+      viewport: { devicePixelRatio: 1, height: 1305, width: 2560 },
+    })
+  ).resolves.toEqual(expect.objectContaining({ stream: expect.anything() }));
+
+  expect(track.applyConstraints).not.toHaveBeenCalled();
+});
+
 it('uses the same isolated source binding for system audio and video', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
-    getVideoTracks: () => [{ getSettings: () => ({}), readyState: 'live' }],
+    getVideoTracks: () => [createNativeTabTrack()],
     id: 'tab-stream',
   });
   installMediaDevicesMocks({ getUserMedia });
@@ -208,6 +338,7 @@ it('uses the same isolated source binding for system audio and video', async () 
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-with-audio',
         maxFrameRate: 30,
+        minFrameRate: 30,
       },
     },
   });
@@ -216,7 +347,7 @@ it('uses the same isolated source binding for system audio and video', async () 
 it('does not copy video size constraints onto TAB system audio', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
-    getVideoTracks: () => [{ getSettings: () => ({}), readyState: 'live' }],
+    getVideoTracks: () => [createNativeTabTrack()],
     id: 'tab-stream',
   });
   installMediaDevicesMocks({ getUserMedia });
@@ -246,6 +377,7 @@ it('does not copy video size constraints onto TAB system audio', async () => {
         maxFrameRate: 30,
         maxHeight: 1350,
         maxWidth: 2160,
+        minFrameRate: 30,
       },
     },
   });
@@ -299,7 +431,7 @@ it('keeps controlled tab telemetry alive when native cursor exclusion was not re
   installMediaDevicesMocks({
     getUserMedia: vi.fn().mockResolvedValue({
       getTracks: () => [{ stop }],
-      getVideoTracks: () => [{ getSettings: () => ({ cursor: 'always' }), readyState: 'live' }],
+      getVideoTracks: () => [createNativeTabTrack({ cursor: 'always' })],
       id: 'tab-stream',
     }),
   });

@@ -41,9 +41,13 @@ export function captureViewportsEqual(left: ViewportInfo, right: ViewportInfo): 
 }
 
 export async function readTabCaptureViewport(tabId: number): Promise<ViewportInfo> {
-  const response = await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
-    type: VideoMessageType.GET_VIEWPORT_COORDS,
-  });
+  const response = await getBackgroundRuntimeMessaging().sendTabMessage(
+    tabId,
+    {
+      type: VideoMessageType.GET_VIEWPORT_COORDS,
+    },
+    { frameId: 0 }
+  );
   if (response.success !== true || !response.viewport) {
     throw new Error(response.error ?? 'Tab capture viewport is unavailable');
   }

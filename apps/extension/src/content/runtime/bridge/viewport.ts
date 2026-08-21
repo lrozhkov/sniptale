@@ -1,4 +1,7 @@
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  CONTENT_RUNTIME_PROTOCOL_VERSION,
+  VideoMessageType,
+} from '@sniptale/runtime-contracts/video/messages';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
@@ -65,6 +68,7 @@ function handleKnownViewportMessage(
     case VideoMessageType.GET_VIEWPORT_COORDS:
       sendResponse({
         success: true,
+        contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
         coords: {
           x: 0,
           y: 0,

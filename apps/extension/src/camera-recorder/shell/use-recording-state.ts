@@ -12,6 +12,7 @@ import {
 import { getResponseError } from './format';
 import type { CameraRecorderRouteState, ControlCapability } from './types';
 import type { RuntimeVideoSessionResponseByType } from '../../contracts/messaging/video/session-responses';
+import { resolveVideoRecordingFailureMessage } from '../../features/video/recording-failure';
 
 type CameraRegistrationResponse =
   RuntimeVideoSessionResponseByType[typeof VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL];
@@ -214,7 +215,12 @@ function subscribeToRecordingUpdates(
 ): () => void {
   return browserRuntime.subscribeToMessages((message: unknown) => {
     const parsed = parseCameraRecorderRuntimeMessage(message);
-    if (!parsed || parsed.type !== VideoMessageType.RECORDING_STATE_SYNC) {
+    if (!parsed) return;
+    if (parsed.type === VideoMessageType.RECORDING_START_FAILED) {
+      setRegistrationError(
+        resolveVideoRecordingFailureMessage(parsed.error) ??
+          translate('background.runtime.recordingError')
+      );
       return;
     }
     setState(parsed.state);
@@ -228,13 +234,22 @@ function subscribeToRecordingUpdates(
   });
 }
 
-function parseCameraRecorderRuntimeMessage(message: unknown): {
-  type: typeof VideoMessageType.RECORDING_STATE_SYNC;
-  state: VideoRecordingRuntimeState;
-} | null {
+function parseCameraRecorderRuntimeMessage(message: unknown):
+  | {
+      type: typeof VideoMessageType.RECORDING_STATE_SYNC;
+      state: VideoRecordingRuntimeState;
+    }
+  | {
+      error?: string;
+      type: typeof VideoMessageType.RECORDING_START_FAILED;
+    }
+  | null {
   try {
     const parsed = parseRuntimeRequestMessage(message);
-    if (parsed.type === VideoMessageType.RECORDING_STATE_SYNC) {
+    if (
+      parsed.type === VideoMessageType.RECORDING_STATE_SYNC ||
+      parsed.type === VideoMessageType.RECORDING_START_FAILED
+    ) {
       return parsed;
     }
   } catch {

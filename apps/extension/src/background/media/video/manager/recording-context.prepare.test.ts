@@ -81,7 +81,7 @@ function createSettings() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test' });
+  browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test', windowId: 3 });
   getVideoCaptureModeCapabilityMock.mockReturnValue({ reason: null, supported: true });
   prepareVideoCaptureSurfaceMock.mockResolvedValue(null);
   ensureOffscreenDocumentReadyOrAbortMock.mockResolvedValue(true);
@@ -186,6 +186,60 @@ it('applies the final surface before acquiring the tab stream', async () => {
   );
 });
 
+it('reads TAB viewport after source selection for crop-coordinate mapping', async () => {
+  readLiveViewportMock.mockResolvedValueOnce({
+    devicePixelRatio: 1,
+    height: 1309,
+    scrollX: 0,
+    scrollY: 0,
+    viewportOffsetX: 0,
+    viewportOffsetY: 0,
+    visualViewportScale: 1,
+    width: 2560,
+  });
+
+  await expect(
+    initializeRecordingContext({
+      captureMode: CaptureMode.TAB,
+      settings: createSettings(),
+      tabId: 42,
+      viewportPresetId: null,
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      generation: 1,
+      surface: null,
+      viewport: expect.objectContaining({ height: 1309, width: 2560 }),
+    })
+  );
+
+  expect(prepareContentSurfaceOrAbortMock.mock.invocationCallOrder[0]).toBeLessThan(
+    resolveCaptureSourceForModeMock.mock.invocationCallOrder[0]!
+  );
+  expect(resolveCaptureSourceForModeMock.mock.invocationCallOrder[0]).toBeLessThan(
+    readLiveViewportMock.mock.invocationCallOrder[0]!
+  );
+});
+
+it('does not require a content-script viewport after selecting a window source', async () => {
+  resolveCaptureSourceForModeMock.mockResolvedValueOnce({
+    mode: CaptureMode.SCREEN,
+    screenName: 'Selected window',
+    streamId: 'desktop',
+  });
+
+  const context = await initializeRecordingContext({
+    captureMode: CaptureMode.SCREEN,
+    settings: createSettings(),
+    tabId: 42,
+    viewportPresetId: null,
+  });
+
+  expect(context).toEqual(expect.objectContaining({ captureMode: CaptureMode.SCREEN, tabId: 42 }));
+  expect(context).not.toHaveProperty('viewport');
+  expect(readLiveViewportMock).not.toHaveBeenCalled();
+});
+
 it('fails before mutation when the capture mode is unsupported', async () => {
   getVideoCaptureModeCapabilityMock.mockReturnValue({ reason: null, supported: false });
   await expect(
@@ -200,6 +254,16 @@ it('fails before mutation when the capture mode is unsupported', async () => {
 });
 
 it('rejects a TAB_CROP selection when its atomic viewport no longer matches the live tab', async () => {
+  readLiveViewportMock.mockResolvedValueOnce({
+    devicePixelRatio: 2,
+    height: 768,
+    scrollX: 0,
+    scrollY: 0,
+    viewportOffsetX: 0,
+    viewportOffsetY: 0,
+    visualViewportScale: 1,
+    width: 1024,
+  });
   resolveCaptureSourceForModeMock.mockResolvedValueOnce({
     captureViewport: {
       devicePixelRatio: 2,
@@ -213,15 +277,6 @@ it('rejects a TAB_CROP selection when its atomic viewport no longer matches the 
     mode: CaptureMode.TAB_CROP,
     streamId: 'stream-crop',
   });
-  readLiveViewportMock.mockResolvedValueOnce({
-    devicePixelRatio: 2,
-    height: 768,
-    scrollX: 0,
-    scrollY: 0,
-    visualViewportScale: 1,
-    width: 1024,
-  });
-
   await expect(
     initializeRecordingContext({
       captureMode: CaptureMode.TAB_CROP,

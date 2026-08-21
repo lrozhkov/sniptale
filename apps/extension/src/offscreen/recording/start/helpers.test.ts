@@ -60,7 +60,6 @@ beforeEach(() => {
   sendRuntimeMessageMock.mockResolvedValue(undefined);
 
   recordingContext.resetRecordingSession();
-  recordingContext.mediaRecorder = null;
   recordingContext.videoStream = null;
   recordingContext.sourceStream = null;
   recordingContext.audioMixer = null;
@@ -128,15 +127,13 @@ it('delegates recorder shutdown to the artifact owner while cleaning up other re
   recordingContext.videoStream = {
     getTracks: () => [createTrack(videoTrackStop)],
   } as never;
-  recordingContext.mediaRecorder = {
-    state: 'recording',
-    stop: recorderStop,
-  } as never;
   recordingContext.artifactSession = {
     abort: artifactAbort,
-    recorder: recordingContext.mediaRecorder,
+    pause: vi.fn(),
+    resume: vi.fn(),
     setLifecycleCallbacks: vi.fn(),
     start: vi.fn(),
+    state: 'recording',
     stop: vi.fn(),
   };
 
@@ -152,7 +149,6 @@ it('delegates recorder shutdown to the artifact owner while cleaning up other re
   expect(loggerWarnMock).toHaveBeenCalledWith('Audio mixer cleanup failed', cleanupError);
   expect(recordingContext.sourceStream).toBeNull();
   expect(recordingContext.videoStream).toBeNull();
-  expect(recordingContext.mediaRecorder).toBeNull();
 });
 
 it('reports start errors against the active session before cleanup', () => {

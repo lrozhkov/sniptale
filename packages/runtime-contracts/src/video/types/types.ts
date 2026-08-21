@@ -55,6 +55,13 @@ export const VideoRecordingStatus = {
 
 export type VideoRecordingStatus = (typeof VideoRecordingStatus)[keyof typeof VideoRecordingStatus];
 
+export const VideoRecordingFailureCode = {
+  CAMERA_FRAME_RATE_UNSUPPORTED: 'camera-frame-rate-unsupported',
+} as const;
+
+export type VideoRecordingFailureCode =
+  (typeof VideoRecordingFailureCode)[keyof typeof VideoRecordingFailureCode];
+
 export type VideoPostRecordResult = {
   primaryRecordingId: string;
   projectId: string | null;

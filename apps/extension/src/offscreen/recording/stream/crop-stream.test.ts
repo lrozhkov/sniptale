@@ -15,12 +15,23 @@ vi.mock('./video-source', () => ({
   waitForSourceMetadata: mocks.waitForSourceMetadata,
 }));
 
+vi.mock('./frame-pump', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./frame-pump')>();
+  return {
+    ...original,
+    startVideoFramePump: vi.fn((options: Parameters<typeof original.startVideoFramePump>[0]) => {
+      options.drawLiveFrame();
+      return vi.fn();
+    }),
+  };
+});
+
 import {
   createEmptyStream,
   createStream,
   createTrackedStream,
 } from '../multi-source/media-stream.test-support';
-import { createCropStream } from './crop-stream';
+import { createCropOutputStream, createCropStream } from './crop-stream';
 import { resolveTabOutputGeometry } from '../geometry/tab-source';
 
 function installCanvasOutput(width: number, height: number) {
@@ -268,23 +279,25 @@ describe('crop stream', () => {
     output.getVideoTracks()[0]?.stop();
   });
 
-  it('caps the crop cadence once at the source track rate reported on start', async () => {
+  it('rejects a selected crop cadence that the source cannot provide', async () => {
     const { output } = installCanvasOutput(1280, 720);
     const video = { videoHeight: 720, videoWidth: 1280 };
     mocks.createSourceVideo.mockReturnValue(video);
     const source = createTrackedStream({ frameRate: 24, height: 720, width: 1280 });
 
-    await createCropStream(
-      source,
-      {
-        fit: 'contain',
-        sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
-        outputSize: { width: 1280, height: 720 },
-      },
-      { frameRate: 60 }
-    );
+    await expect(
+      createCropOutputStream(
+        source,
+        {
+          fit: 'contain',
+          sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+          outputSize: { width: 1280, height: 720 },
+        },
+        { frameRate: 60 }
+      )
+    ).rejects.toThrow('requested 60 FPS, source provides 24 FPS');
 
-    expect(HTMLCanvasElement.prototype.captureStream).toHaveBeenCalledWith(0);
+    expect(HTMLCanvasElement.prototype.captureStream).not.toHaveBeenCalled();
     output.getVideoTracks()[0]?.stop();
   });
 

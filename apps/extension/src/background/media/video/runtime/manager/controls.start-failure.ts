@@ -9,7 +9,7 @@ import {
   resetVideoRecordingStartSession,
   setVideoRecordingId,
 } from '../../session-state';
-import { resetVideoRecordingRuntimeState } from '../session-state';
+import { resetVideoRecordingRuntimeState, setVideoRecordingRuntimeState } from '../session-state';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
 import { cancelVideoSourceReadyWait, releaseVideoCaptureSurface } from '../../capture-surface';
 
@@ -70,6 +70,7 @@ export async function notifyRecordingStartFailed(
     setVideoRecordingId(null);
     resetVideoRecordingStartSession();
     resetVideoRecordingRuntimeState();
+    setVideoRecordingRuntimeState({ error });
   }
 
   runBestEffort(

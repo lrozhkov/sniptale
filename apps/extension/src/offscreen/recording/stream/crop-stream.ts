@@ -13,6 +13,8 @@ type CropStreamGeometry = {
 };
 
 export type CropOutputStream = {
+  encoderFrameCrop?: CropRect;
+  failure?: Promise<never>;
   frameRate: number;
   stream: MediaStream;
 };
@@ -44,10 +46,12 @@ function requireCropGeometry(geometry: CropStreamGeometry, source: OutputSize): 
   requirePositiveInteger(outputSize.width, 'Crop output width');
   requirePositiveInteger(outputSize.height, 'Crop output height');
   if (geometry.fillsOutput) {
-    const sourceAspect = sourceRect.width / sourceRect.height;
-    const outputAspect = outputSize.width / outputSize.height;
-    const tolerance = Number.EPSILON * Math.max(sourceAspect, outputAspect) * 8;
-    if (Math.abs(sourceAspect - outputAspect) > tolerance) {
+    const scaledWidth = (sourceRect.width * outputSize.height) / sourceRect.height;
+    const scaledHeight = (sourceRect.height * outputSize.width) / sourceRect.width;
+    if (
+      Math.abs(scaledWidth - outputSize.width) > 1 &&
+      Math.abs(scaledHeight - outputSize.height) > 1
+    ) {
       throw new Error('Fill-output crop geometry must preserve the sampled source aspect');
     }
   }
@@ -56,6 +60,7 @@ function requireCropGeometry(geometry: CropStreamGeometry, source: OutputSize): 
 
 function drawContainedSourceFrame(params: {
   context: CanvasRenderingContext2D;
+  frame?: VideoFrame;
   geometry: CropStreamGeometry;
   video: HTMLVideoElement;
 }): void {
@@ -69,7 +74,7 @@ function drawContainedSourceFrame(params: {
   params.context.imageSmoothingEnabled = scaled;
   if (scaled) params.context.imageSmoothingQuality = 'high';
   params.context.drawImage(
-    params.video,
+    params.frame ?? params.video,
     sourceRect.x,
     sourceRect.y,
     sourceRect.width,
@@ -95,6 +100,8 @@ export async function createCropOutputStream(
       height: video.videoHeight,
     });
     const sourceFrameRate = sourceStream.getVideoTracks()[0]?.getSettings().frameRate;
+    const sourceTrack = sourceStream.getVideoTracks()[0];
+    if (!sourceTrack) throw new Error('Crop source stream returned no video track');
     const frameRate = resolveFixedVideoFrameRate(
       options.frameRate ?? sourceFrameRate ?? 30,
       sourceFrameRate
@@ -105,16 +112,21 @@ export async function createCropOutputStream(
       frameRate,
       initializeDrawing: ({ context }) => ({
         drawHeldFrame: () => false,
-        drawLiveFrame: () => {
-          drawContainedSourceFrame({ context, geometry: activeGeometry, video });
+        drawLiveFrame: (frame) => {
+          drawContainedSourceFrame({
+            context,
+            ...(frame ? { frame } : {}),
+            geometry: activeGeometry,
+            video,
+          });
           return true;
         },
       }),
       release: () => releaseSourceVideo(video),
-      sourceVideo: video,
+      sourceTrack,
     });
     ownershipTransferred = true;
-    return { frameRate, stream: cropped };
+    return { failure: cropped.failure, frameRate, stream: cropped.stream };
   } finally {
     if (!ownershipTransferred) releaseSourceVideo(video);
   }

@@ -1,3 +1,5 @@
+export const CONTENT_RUNTIME_PROTOCOL_VERSION = 2 as const;
+
 export const VideoMessageType = {
   OPEN_VIDEO_RECORDER: 'OPEN_VIDEO_RECORDER',
   START_RECORDING: 'START_RECORDING',

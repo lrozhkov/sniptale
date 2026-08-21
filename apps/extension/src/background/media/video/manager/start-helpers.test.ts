@@ -39,6 +39,7 @@ beforeEach(() => {
 it('forwards the exact surface contract without preset-derived constraints', async () => {
   const transport = createTransport();
   const surface = {
+    intent: 'viewport-preset' as const,
     presetId: 'wide',
     target: 'window' as const,
     width: 1920,

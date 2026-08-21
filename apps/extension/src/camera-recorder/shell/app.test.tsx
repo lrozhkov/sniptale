@@ -116,6 +116,12 @@ function installRecordingMessageListener() {
         await Promise.resolve();
       });
     },
+    emitStartFailure: async (error: string) => {
+      await act(async () => {
+        listener?.({ type: VideoMessageType.RECORDING_START_FAILED, error });
+        await Promise.resolve();
+      });
+    },
   };
 }
 
@@ -216,6 +222,16 @@ it('surfaces rejected camera recorder control responses', async () => {
     recordingId: 'rec-1',
   });
   expect(container?.textContent).toContain('Pause rejected');
+});
+
+it('localizes an asynchronous camera frame-rate start failure', async () => {
+  const harness = installRecordingMessageListener();
+  mockRegisteredRecordingState();
+  await renderApp();
+
+  await harness.emitStartFailure('camera-frame-rate-unsupported');
+
+  expect(container?.textContent).toContain('background.runtime.cameraFrameRateUnsupported');
 });
 
 it('starts a local camera preview for the selected camera in the main area', async () => {

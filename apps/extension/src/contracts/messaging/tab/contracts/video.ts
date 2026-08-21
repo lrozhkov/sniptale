@@ -1,4 +1,7 @@
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  CONTENT_RUNTIME_PROTOCOL_VERSION,
+  VideoMessageType,
+} from '@sniptale/runtime-contracts/video/messages';
 import {
   createGuardParser,
   type MessageContractRegistry,
@@ -74,7 +77,11 @@ export const tabVideoMessageContracts = {
     parseResponse: createGuardParser(
       'tab GET_VIEWPORT_COORDS response',
       createRuntimeResponseGuard({
-        optional: { coords: isViewportRegion, viewport: isViewportInfo },
+        optional: {
+          contentRuntimeProtocolVersion: (value) => value === CONTENT_RUNTIME_PROTOCOL_VERSION,
+          coords: isViewportRegion,
+          viewport: isViewportInfo,
+        },
       })
     ),
   },
