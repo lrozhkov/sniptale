@@ -132,6 +132,8 @@ The interface supports Russian and English, plus system, light, and dark appeara
 
 Screenshots, recordings, audio, exports, video projects, scenario projects and exports, and saved web snapshots can be retained in a local IndexedDB-backed media library.
 
+The future beta persistence contract starts from a clean `sniptale-db` version 1 baseline with independently versioned logical domains. Alpha database versions are intentionally not migration sources; once beta begins, every released beta fixture remains supported for forward migration without silent loss of durable data.
+
 The Gallery includes search, sorting, tags, multiple view densities, previews, rename and download actions, image copy, multi-selection, batch tag updates, ZIP download, and links into the relevant editor or viewer. A storage manager can identify old, large, and orphaned items and estimate reclaimable space.
 
 Backup and restore workflows can export the full Gallery or a selection to a ZIP archive. Depending on the chosen options, a backup can include source metadata, recording telemetry, editor drafts, web snapshots, and diagnostic support data. Import validates the archive, reports version and conflicts, and supports replace, skip, or duplicate strategies. Backups may contain sensitive URLs or diagnostic context; the export UI is expected to be treated as a data-disclosure boundary.

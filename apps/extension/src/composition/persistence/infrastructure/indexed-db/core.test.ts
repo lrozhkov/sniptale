@@ -116,7 +116,7 @@ async function verifyTerminationSubscribers() {
 
   expect(listener).toHaveBeenCalledWith(
     expect.objectContaining({
-      dbName: 'sniptale-video-db',
+      dbName: 'sniptale-db',
       dbVersion: expect.any(Number),
     })
   );
@@ -168,6 +168,19 @@ describe('shared db core persistent storage', () => {
 });
 
 describe('shared db core initDB cache', () => {
+  it('never starts preparation from an already-issued mutation permit', async () => {
+    stubPersistentStorage();
+    const module = await importDbModule();
+    const { runWithPersistenceMutationPermit } = await import('../mutation-barrier');
+
+    await expect(
+      runWithPersistenceMutationPermit((permit) => module.initDB(permit))
+    ).rejects.toMatchObject({
+      admission: { reason: 'connection-blocked', status: 'blocked' },
+    });
+    expect(dbMocks.openDB).not.toHaveBeenCalled();
+  });
+
   it('reuses the cached promise when all expected stores already exist', async () => {
     stubPersistentStorage();
     const completeDb = createCompleteDb();
@@ -190,7 +203,7 @@ describe('shared db core initDB schema mismatch', () => {
 
     const module = await importDbModule();
     await expect(module.initDB()).rejects.toThrow(
-      'IndexedDB schema mismatch for sniptale-video-db: missing stores'
+      'IndexedDB schema mismatch for sniptale-db: missing stores'
     );
     expect(incompleteDb.close).toHaveBeenCalledTimes(1);
     expect(dbMocks.openDB).toHaveBeenCalledTimes(1);
@@ -203,7 +216,7 @@ describe('shared db core initDB schema mismatch', () => {
 
     const module = await importDbModule();
     await expect(module.initDB()).rejects.toThrow(
-      'IndexedDB schema mismatch for sniptale-video-db: missing indexes recordings.createdAt'
+      'IndexedDB schema mismatch for sniptale-db: missing indexes recordings.createdAt'
     );
     expect(incompleteIndexDb.close).toHaveBeenCalledTimes(1);
     expect(dbMocks.openDB).toHaveBeenCalledTimes(1);
@@ -223,6 +236,28 @@ describe('shared db core initDB schema mismatch', () => {
 });
 
 describe('shared db core initDB recovery', () => {
+  it('fails concurrent callers with one typed result when another context blocks opening', async () => {
+    stubPersistentStorage();
+    dbMocks.openDB.mockImplementation(
+      (_name: string, _version: number, options: { blocked(): void }) => {
+        options.blocked();
+        return new Promise(() => undefined);
+      }
+    );
+
+    const module = await importDbModule();
+    const first = module.initDB();
+    const second = module.initDB();
+
+    await expect(first).rejects.toMatchObject({
+      admission: { reason: 'connection-blocked', status: 'blocked' },
+    });
+    await expect(second).rejects.toMatchObject({
+      admission: { reason: 'connection-blocked', status: 'blocked' },
+    });
+    expect(dbMocks.openDB).toHaveBeenCalledOnce();
+  });
+
   it('resets the cache after termination and failed initialization', async () => {
     stubPersistentStorage();
     const firstDb = createCompleteDb();
@@ -277,7 +312,7 @@ describe('shared db core privacy erasure', () => {
     const completeDb = createCompleteDb();
     dbMocks.openDB.mockResolvedValueOnce(completeDb);
     const request = {} as IDBOpenDBRequest;
-    const deleteDatabase = vi.fn(() => {
+    const deleteDatabase = vi.fn((_name: string) => {
       queueMicrotask(() => request.onsuccess?.call(request, new Event('success')));
       return request;
     });
@@ -291,7 +326,10 @@ describe('shared db core privacy erasure', () => {
     await module.eraseSniptaleDatabaseForPrivacyErasure();
 
     expect(completeDb.close).toHaveBeenCalled();
-    expect(deleteDatabase).toHaveBeenCalledWith('sniptale-video-db');
+    expect(deleteDatabase.mock.calls.map(([name]) => name)).toEqual([
+      'sniptale-db',
+      'sniptale-video-db',
+    ]);
     await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(true);
   });
 });

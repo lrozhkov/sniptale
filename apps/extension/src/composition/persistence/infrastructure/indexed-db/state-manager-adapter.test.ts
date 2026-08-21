@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
   runWithPersistentDataErasureBarrier,
 } from '../mutation-barrier';
@@ -71,26 +70,23 @@ async function verifyMutationInitializationPermit() {
   });
   const fakeDb = createFakeDatabase();
   let resolveDatabase!: (database: typeof fakeDb) => void;
-  let receivedPermit: unknown;
   const database = new Promise<typeof fakeDb>((resolve) => {
     resolveDatabase = resolve;
   });
-  const adapter = createIndexedDbStateDomainAdapter('domain.a', async (permit) => {
-    receivedPermit = permit;
-    return database;
-  });
+  const getDatabase = vi.fn(async () => database);
+  const adapter = createIndexedDbStateDomainAdapter('domain.a', getDatabase);
 
   const write = adapter.write('key', 'value');
-  await vi.waitFor(() => expect(isActivePersistenceMutationPermit(receivedPermit)).toBe(true));
+  await vi.waitFor(() => expect(getDatabase).toHaveBeenCalledWith());
   const erase = vi.fn(async () => undefined);
   const erasure = runWithPersistentDataErasureBarrier(erase);
+  await erasure;
+  expect(erase).toHaveBeenCalledOnce();
+  expect(fakeDb.put).not.toHaveBeenCalled();
   resolveDatabase(fakeDb);
 
   await write;
-  await erasure;
   expect(fakeDb.put).toHaveBeenCalledOnce();
-  expect(erase).toHaveBeenCalledOnce();
-  expect(isActivePersistenceMutationPermit(receivedPermit)).toBe(false);
 }
 
 describe('createIndexedDbStateDomainAdapter persistence', () => {

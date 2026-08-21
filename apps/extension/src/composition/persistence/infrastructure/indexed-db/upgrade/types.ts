@@ -1,12 +1,13 @@
 type UpgradeStoreSchema = {
   createIndex: (name: string, keyPath: string | string[]) => unknown;
+  put(value: unknown): unknown;
 };
 
-export type UpgradeObjectStore = {
-  clear(): Promise<unknown>;
-  delete(key: IDBValidKey): Promise<unknown>;
-  getAll(): Promise<unknown[]>;
-  put?(value: unknown): Promise<unknown>;
+type UpgradeObjectStore = {
+  clear(): unknown;
+  delete(key: IDBValidKey): unknown;
+  getAll(): unknown;
+  put(value: unknown): unknown;
 };
 
 export type UpgradeTransaction = {

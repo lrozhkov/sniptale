@@ -98,9 +98,8 @@ async function writeDomainRecords(
 function createAdapter(domain: string, getDb: InitDb): StateDomainAdapter {
   return {
     async clear() {
-      await runWithPersistenceMutationPermit(async (permit) =>
-        deleteDomainRecords(await getDb(permit), domain)
-      );
+      const db = await getDb();
+      await runWithPersistenceMutationPermit(() => deleteDomainRecords(db, domain));
     },
     async hydrate() {
       const records = await readDomainRecords(await getDb(), domain);
@@ -116,25 +115,24 @@ function createAdapter(domain: string, getDb: InitDb): StateDomainAdapter {
       return record?.value;
     },
     async remove(key) {
-      await runWithPersistenceMutationPermit(async (permit) =>
-        (await getDb(permit)).delete(STATE_MANAGER_STORE, [domain, key])
-      );
+      const db = await getDb();
+      await runWithPersistenceMutationPermit(() => db.delete(STATE_MANAGER_STORE, [domain, key]));
     },
     async removeMany(keys) {
-      await runWithPersistenceMutationPermit(async (permit) => {
-        const db = await getDb(permit);
+      const db = await getDb();
+      await runWithPersistenceMutationPermit(async () => {
         await Promise.all(keys.map((key) => db.delete(STATE_MANAGER_STORE, [domain, key])));
       });
     },
     async write(key, value) {
-      await runWithPersistenceMutationPermit(async (permit) =>
-        (await getDb(permit)).put(STATE_MANAGER_STORE, createRecord(domain, key, value))
+      const db = await getDb();
+      await runWithPersistenceMutationPermit(() =>
+        db.put(STATE_MANAGER_STORE, createRecord(domain, key, value))
       );
     },
     async writeMany(values) {
-      await runWithPersistenceMutationPermit(async (permit) => {
-        await writeDomainRecords(await getDb(permit), domain, values);
-      });
+      const db = await getDb();
+      await runWithPersistenceMutationPermit(() => writeDomainRecords(db, domain, values));
     },
   };
 }

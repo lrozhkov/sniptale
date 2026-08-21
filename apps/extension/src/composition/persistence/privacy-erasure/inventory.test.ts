@@ -2,6 +2,11 @@ import { expect, it } from 'vitest';
 
 import { EXPECTED_STORES } from '../infrastructure/indexed-db/core.stores.ts';
 import {
+  ALPHA_RESET_JOURNAL_KEY,
+  DATABASE_BACKUP_RECEIPT_KEY,
+  DATABASE_RESET_JOURNAL_KEY,
+} from '../infrastructure/indexed-db/admission';
+import {
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
   AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY,
   AI_PROVIDER_SECRETS_KEY,
@@ -43,6 +48,9 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).toContain('sniptale.gallery.command-palette');
   expect(plan.local).toContain('sniptale.settings.command-palette');
   expect(plan.local).toContain('sniptale.video-editor.command-palette');
+  expect(plan.local).toContain(ALPHA_RESET_JOURNAL_KEY);
+  expect(plan.local).toContain(DATABASE_BACKUP_RECEIPT_KEY);
+  expect(plan.local).toContain(DATABASE_RESET_JOURNAL_KEY);
   expect(plan.localPrefixes).toContain('sniptale_video_editor_track_panel_prefs:');
   expect(plan.session).toContain('diagnostics-active-sessions');
   expect(plan.session).toContain('interaction-diagnostics-active-sessions');

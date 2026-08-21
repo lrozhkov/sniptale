@@ -5,8 +5,13 @@ import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import '@sniptale/ui/styles/overlays';
 import { GalleryApp } from './shell/app-shell';
+import { GalleryPersistenceAdmission } from './shell/app-shell/persistence-admission';
 
 renderPageShell({
-  element: <GalleryApp />,
+  element: (
+    <GalleryPersistenceAdmission>
+      <GalleryApp />
+    </GalleryPersistenceAdmission>
+  ),
   namespace: 'GalleryEntrypoint',
 });

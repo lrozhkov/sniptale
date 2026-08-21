@@ -5,7 +5,6 @@ const { initDBMock } = vi.hoisted(() => ({ initDBMock: vi.fn() }));
 vi.mock('./core', () => ({ initDB: initDBMock }));
 
 import {
-  isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
   runWithPersistentDataErasureBarrier,
 } from '../mutation-barrier';
@@ -32,7 +31,7 @@ beforeEach(() => {
   });
 });
 
-it('does not reacquire a shared lock while database initialization is pending', async () => {
+it('finishes database readiness before admitting the mutation lock', async () => {
   let resolveDatabase!: (database: { id: string }) => void;
   initDBMock.mockReturnValueOnce(
     new Promise((resolve) => {
@@ -43,17 +42,15 @@ it('does not reacquire a shared lock while database initialization is pending', 
   const erase = vi.fn(async () => undefined);
 
   const mutation = runWithIndexedDbMutation(write);
-  await vi.waitFor(() => expect(initDBMock).toHaveBeenCalledWith(expect.any(Object)));
-  const permit = initDBMock.mock.calls[0]?.[0];
-  expect(isActivePersistenceMutationPermit(permit)).toBe(true);
+  await vi.waitFor(() => expect(initDBMock).toHaveBeenCalledWith());
   const erasure = runWithPersistentDataErasureBarrier(erase);
+  await erasure;
+  expect(erase).toHaveBeenCalledOnce();
+  expect(write).not.toHaveBeenCalled();
   resolveDatabase({ id: 'db' });
 
   await mutation;
-  await erasure;
   expect(write).toHaveBeenCalledWith({ id: 'db' });
-  expect(erase).toHaveBeenCalledOnce();
-  expect(isActivePersistenceMutationPermit(permit)).toBe(false);
 });
 
 afterEach(() => {

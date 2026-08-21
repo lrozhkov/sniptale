@@ -1,10 +1,12 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, test as browserTest, type Page } from '@playwright/test';
 import { BlobReader, ZipReader } from '@zip.js/zip.js';
 import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createScenarioProjectV3 } from '../../../apps/extension/src/features/scenario/project/v3';
+import { betaV1Fixture as betaV1PersistenceFixture } from '../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { test } from './support/extension-fixture';
+import { startHostServer } from './support/host-server';
 import {
   createExactBrowserFrameHarnessPayload,
   applyGalleryScreenshotBootstrap,
@@ -32,6 +34,101 @@ import {
 
 const EDITOR_FRAME_LABEL = translate('editor.toolbar.frame', 'ru');
 
+browserTest(
+  'beta-v1 fixture hydrates a real IndexedDB and OPFS graph with stable domain contracts',
+  async ({ page }) => {
+    const host = await startHostServer();
+    try {
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
+      await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
+
+      const snapshot = await page.evaluate(async (fixture) => {
+        const openDatabase = () =>
+          new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(fixture.databaseName);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+          });
+        const complete = (transaction: IDBTransaction) =>
+          new Promise<void>((resolve, reject) => {
+            transaction.onabort = () => reject(transaction.error);
+            transaction.onerror = () => reject(transaction.error);
+            transaction.oncomplete = () => resolve();
+          });
+        const database = await openDatabase();
+        const recordStores = Object.keys(fixture.records);
+        const write = database.transaction(recordStores, 'readwrite');
+        for (const [storeName, entries] of Object.entries(fixture.records)) {
+          const store = write.objectStore(storeName);
+          for (const entry of entries) store.put(entry);
+        }
+        await complete(write);
+        database.close();
+
+        const origin = await navigator.storage.getDirectory();
+        const assets = await origin.getDirectoryHandle('sniptale-assets', { create: true });
+        const objects = await assets.getDirectoryHandle('objects', { create: true });
+        for (const object of fixture.opfsObjects) {
+          const handle = await objects.getFileHandle(object.assetId, { create: true });
+          const writable = await handle.createWritable();
+          await writable.write(object.text);
+          await writable.close();
+        }
+
+        const reopened = await openDatabase();
+        const read = reopened.transaction([...recordStores, 'schema_contracts'], 'readonly');
+        const keys = await Promise.all(
+          recordStores.map(
+            (storeName) =>
+              new Promise<[string, IDBValidKey[]]>((resolve, reject) => {
+                const request = read.objectStore(storeName).getAllKeys();
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve([storeName, request.result]);
+              })
+          )
+        );
+        const contracts = await new Promise<Array<{ domainId: string; schemaVersion: number }>>(
+          (resolve, reject) => {
+            const request = read.objectStore('schema_contracts').getAll();
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+          }
+        );
+        await complete(read);
+        reopened.close();
+        const objectText = await (await objects.getFileHandle(fixture.opfsObjects[0]!.assetId))
+          .getFile()
+          .then((file) => file.text());
+        return {
+          contracts: Object.fromEntries(
+            contracts.map(({ domainId, schemaVersion }) => [domainId, schemaVersion])
+          ),
+          databaseVersion: database.version,
+          objectText,
+          recordKeys: Object.fromEntries(keys),
+          stores: Array.from(database.objectStoreNames),
+        };
+      }, betaV1PersistenceFixture);
+
+      expect(snapshot.databaseVersion).toBe(betaV1PersistenceFixture.databaseVersion);
+      expect(snapshot.stores).toEqual([...betaV1PersistenceFixture.stores].sort());
+      expect(snapshot.contracts).toEqual(betaV1PersistenceFixture.domainVersions);
+      expect(snapshot.objectText).toBe(betaV1PersistenceFixture.opfsObjects[0]?.text);
+      expect(snapshot.recordKeys).toMatchObject({
+        asset_owners: [['recording', 'beta-v1-recording', 'body']],
+        asset_refs: ['beta-v1-recording-asset'],
+        media_library: ['recording:beta-v1-recording'],
+        recordings: ['beta-v1-recording'],
+        state_manager: [['video-recording-completion-outbox', 'pending']],
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+);
+
 async function openEditorHarness(page: Page, hostOrigin: string) {
   await applyHarnessBootstrap(page, {
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
@@ -51,7 +148,7 @@ async function openEditorFrameUtility(page: Page): Promise<void> {
 async function readImageWorkspaceRevision(page: Page, aggregateId: string): Promise<number | null> {
   return page.evaluate(async (id) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-video-db');
+      const request = indexedDB.open('sniptale-db');
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
     });
@@ -369,7 +466,7 @@ async function seedDraftProjectEntries(
   await page.evaluate(
     async ({ scenario, video, now }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('sniptale-video-db');
+        const request = indexedDB.open('sniptale-db');
         request.onerror = () => reject(request.error);
         request.onsuccess = () => resolve(request.result);
       });
@@ -408,7 +505,7 @@ async function seedDraftProjectEntries(
 async function clearDraftRoots(page: Page) {
   await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-video-db');
+      const request = indexedDB.open('sniptale-db');
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
     });
@@ -431,7 +528,7 @@ async function clearDraftRoots(page: Page) {
 async function readDraftRootLifecycles(page: Page) {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-video-db');
+      const request = indexedDB.open('sniptale-db');
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
     });
@@ -476,7 +573,7 @@ async function readDurableRecordingState(page: Page): Promise<{
 }> {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-video-db');
+      const request = indexedDB.open('sniptale-db');
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
     });
