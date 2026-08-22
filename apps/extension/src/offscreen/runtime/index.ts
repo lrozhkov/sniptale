@@ -159,6 +159,23 @@ function buildOffscreenCommandSuccessResponse(result: unknown) {
   if (
     typeof result === 'object' &&
     result !== null &&
+    'challenge' in result &&
+    typeof result.challenge === 'string' &&
+    'offscreenStartupId' in result &&
+    typeof result.offscreenStartupId === 'string' &&
+    'state' in result &&
+    (result.state === 'failed' || result.state === 'ready')
+  ) {
+    return {
+      success: true,
+      challenge: result.challenge,
+      offscreenStartupId: result.offscreenStartupId,
+      state: result.state,
+    };
+  }
+  if (
+    typeof result === 'object' &&
+    result !== null &&
     'mediaDevices' in result &&
     Array.isArray(result.mediaDevices)
   ) {

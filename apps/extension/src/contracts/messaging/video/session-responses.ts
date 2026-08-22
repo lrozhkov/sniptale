@@ -56,6 +56,11 @@ export type RuntimeVideoSessionResponseByType = {
   [VideoMessageType.RECORDING_START_FAILED]: RuntimeAckResponse;
   [VideoMessageType.COUNTDOWN_COMPLETE]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_READY]: RuntimeMessageResponse<Record<string, never>>;
+  [VideoMessageType.OFFSCREEN_READINESS_PROBE]: RuntimeMessageResponse<{
+    challenge: string;
+    offscreenStartupId: string;
+    state: 'failed' | 'ready';
+  }>;
   [VideoMessageType.OFFSCREEN_START_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeMessageResponse<{ result?: 'ALLOW' | 'DENY' }>;
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeRequiredAckResponse;

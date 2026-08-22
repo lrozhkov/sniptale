@@ -11,6 +11,7 @@ export const handledOffscreenRuntimeMessageTypes = [
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,
+  VideoMessageType.OFFSCREEN_READINESS_PROBE,
   VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
   VideoMessageType.OFFSCREEN_STOP_RECORDING,
   VideoMessageType.OFFSCREEN_PAUSE_RECORDING,

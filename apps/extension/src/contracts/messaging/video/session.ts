@@ -117,6 +117,12 @@ export type RuntimeVideoSessionRequestByType = {
     type: typeof VideoMessageType.OFFSCREEN_READY;
     offscreenStartupId: string;
   };
+  [VideoMessageType.OFFSCREEN_READINESS_PROBE]: {
+    type: typeof VideoMessageType.OFFSCREEN_READINESS_PROBE;
+    capabilityToken: string;
+    challenge: string;
+    offscreenStartupId: string;
+  };
   [VideoMessageType.OFFSCREEN_START_RECORDING]: RuntimeOffscreenStartRecordingMessage;
   [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeOffscreenSourceReadyMessage;
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeOffscreenBeginRecordingMessage;

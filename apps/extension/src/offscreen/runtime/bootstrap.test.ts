@@ -152,6 +152,54 @@ async function verifyCompletionOutboxReplaysBeforeReady() {
   ).toBeLessThan(offscreenMocks.sendRuntimeMessage.mock.invocationCallOrder[0]!);
 }
 
+async function verifyReadinessProbeWaitsForBootstrap() {
+  let resolveDb!: () => void;
+  offscreenMocks.initDB.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveDb = resolve;
+      })
+  );
+  const { bootstrapOffscreenDocument, probeOffscreenRuntimeReadiness } =
+    await import('./bootstrap');
+  bootstrapOffscreenDocument();
+  const probe = probeOffscreenRuntimeReadiness({
+    challenge: 'challenge-1',
+    offscreenStartupId: 'startup-1',
+  });
+  let settled = false;
+  void probe.finally(() => {
+    settled = true;
+  });
+
+  await flushBootstrapTasks();
+  expect(settled).toBe(false);
+
+  resolveDb();
+  await expect(probe).resolves.toEqual({
+    challenge: 'challenge-1',
+    offscreenStartupId: 'startup-1',
+    state: 'ready',
+  });
+}
+
+async function verifyReadinessProbeRejectsStaleStartupIdentity() {
+  const { bootstrapOffscreenDocument, probeOffscreenRuntimeReadiness } =
+    await import('./bootstrap');
+  bootstrapOffscreenDocument();
+
+  await expect(
+    probeOffscreenRuntimeReadiness({
+      challenge: 'challenge-stale',
+      offscreenStartupId: 'startup-stale',
+    })
+  ).resolves.toEqual({
+    challenge: 'challenge-stale',
+    offscreenStartupId: 'startup-1',
+    state: 'failed',
+  });
+}
+
 async function verifyPrivacyErasureBootstrapSkipsPersistenceInitialization() {
   const privacyErasureDocumentUrl =
     'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?' +
@@ -280,6 +328,14 @@ describe('offscreen bootstrap', () => {
     verifyTerminationReinitFlow
   );
   it('sends OFFSCREEN_READY with the current startup id', verifyReadyMessageIncludesStartupId);
+  it(
+    'keeps a readiness probe pending until bootstrap completes',
+    verifyReadinessProbeWaitsForBootstrap
+  );
+  it(
+    'rejects a readiness probe for a stale startup identity',
+    verifyReadinessProbeRejectsStaleStartupIdentity
+  );
   it(
     'replays a durable recording completion before OFFSCREEN_READY',
     verifyCompletionOutboxReplaysBeforeReady

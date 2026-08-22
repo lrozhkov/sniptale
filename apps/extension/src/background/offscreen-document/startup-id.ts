@@ -30,14 +30,14 @@ export function createOffscreenDocumentUrl(
 
 export function resolveExistingOffscreenStartupId(
   existingContexts: chrome.runtime.ExtensionContext[]
-): string {
+): string | null {
   for (const context of existingContexts) {
     const offscreenStartupId = parseOffscreenStartupId(readContextDocumentUrl(context));
     if (offscreenStartupId) {
       return offscreenStartupId;
     }
   }
-  return createOffscreenStartupId();
+  return null;
 }
 
 function readContextDocumentUrl(context: chrome.runtime.ExtensionContext): string | null {

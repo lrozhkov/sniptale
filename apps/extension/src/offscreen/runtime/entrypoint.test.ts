@@ -16,6 +16,7 @@ const {
 
 vi.mock('./bootstrap', () => ({
   bootstrapOffscreenDocument: bootstrapOffscreenDocumentMock,
+  probeOffscreenRuntimeReadiness: vi.fn(),
 }));
 
 vi.mock('./index', () => ({

@@ -11,6 +11,7 @@ const {
   resolveTrustedPopupRuntimeSenderUrlMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
   validateRecordingControlCapabilityMock,
+  waitForVideoCaptureSurfaceRecoveryMock,
   ensureActivePageAccessRuntimeMock,
 } = vi.hoisted(() => ({
   ensureMediaHubStorageHeadroomMock: vi.fn(),
@@ -23,7 +24,12 @@ const {
   resolveTrustedPopupRuntimeSenderUrlMock: vi.fn(),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   validateRecordingControlCapabilityMock: vi.fn(),
+  waitForVideoCaptureSurfaceRecoveryMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
+}));
+
+vi.mock('../../capture-surface/recovery', () => ({
+  waitForVideoCaptureSurfaceRecovery: waitForVideoCaptureSurfaceRecoveryMock,
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -136,6 +142,7 @@ function flushPromises() {
 function resetVideoControlMocks() {
   vi.clearAllMocks();
   ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValue(null);
+  waitForVideoCaptureSurfaceRecoveryMock.mockResolvedValue(undefined);
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   resolveTrustedPopupRuntimeSenderUrlMock.mockReturnValue(popupSenderUrl);
   validateRecordingControlCapabilityMock.mockReturnValue(true);
@@ -228,6 +235,13 @@ async function verifiesStopRecordingRoute() {
   await flushPromises();
 
   expect(ensureActiveVideoRecordingLeaseHydratedMock).toHaveBeenCalledTimes(1);
+  expect(waitForVideoCaptureSurfaceRecoveryMock).toHaveBeenCalledTimes(1);
+  expect(ensureActiveVideoRecordingLeaseHydratedMock.mock.invocationCallOrder[0]).toBeLessThan(
+    waitForVideoCaptureSurfaceRecoveryMock.mock.invocationCallOrder[0]!
+  );
+  expect(waitForVideoCaptureSurfaceRecoveryMock.mock.invocationCallOrder[0]).toBeLessThan(
+    validateRecordingControlCapabilityMock.mock.invocationCallOrder[0]!
+  );
   expect(validateRecordingControlCapabilityMock).toHaveBeenCalledWith({
     controlToken: 'control-token-1',
     ownerSenderUrl: popupSenderUrl,
@@ -236,6 +250,33 @@ async function verifiesStopRecordingRoute() {
   expect(markPostRecordPopupActivationOwnedByPopupMock).toHaveBeenCalledWith('recording-1');
   expect(stopRecordingMock).toHaveBeenCalledWith(true);
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+}
+
+async function verifiesControlWaitsForCaptureSurfaceRecovery() {
+  const sendResponse = createSendResponse();
+  let releaseRecovery!: () => void;
+  waitForVideoCaptureSurfaceRecoveryMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseRecovery = resolve;
+      })
+  );
+  stopRecordingMock.mockResolvedValue({ result: 'accepted' });
+
+  routeVideoControlMessage({
+    message: { type: VideoMessageType.STOP_RECORDING, ...controlCapability },
+    sendResponse,
+    sender: createPopupSender(),
+  });
+  await flushPromises();
+
+  expect(validateRecordingControlCapabilityMock).not.toHaveBeenCalled();
+  expect(stopRecordingMock).not.toHaveBeenCalled();
+
+  releaseRecovery();
+  await flushPromises();
+
+  expect(stopRecordingMock).toHaveBeenCalledOnce();
 }
 
 async function verifiesPauseAndResumeAsyncRoutes() {
@@ -278,5 +319,9 @@ describe('video-control route', () => {
   );
   it('returns async errors from the start flow', verifiesStartRecordingFailureResponse);
   it('handles stop recording without resolved tab routing', verifiesStopRecordingRoute);
+  it(
+    'waits for capture-surface recovery before external recording control',
+    verifiesControlWaitsForCaptureSurfaceRecovery
+  );
   it('handles pause and resume through async response helpers', verifiesPauseAndResumeAsyncRoutes);
 });

@@ -11,6 +11,29 @@ import {
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
 
 export const runtimeVideoOffscreenControlMessageContracts = {
+  [VideoMessageType.OFFSCREEN_READINESS_PROBE]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_READINESS_PROBE message',
+      createMessageGuard({
+        type: VideoMessageType.OFFSCREEN_READINESS_PROBE,
+        required: {
+          capabilityToken: isString,
+          challenge: isString,
+          offscreenStartupId: isString,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_READINESS_PROBE response',
+      createRuntimeResponseGuard({
+        required: {
+          challenge: isString,
+          offscreenStartupId: isString,
+          state: (value) => value === 'failed' || value === 'ready',
+        },
+      })
+    ),
+  },
   [VideoMessageType.OFFSCREEN_READY]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_READY message',

@@ -80,6 +80,10 @@ const idempotencyPolicyByType = {
     idempotent: true,
     reason: 'recording startup is correlated by recordingId when present',
   },
+  [VideoMessageType.OFFSCREEN_READINESS_PROBE]: {
+    idempotent: false,
+    reason: 'readiness is an identity-bound observation of the current bootstrap generation',
+  },
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: {
     idempotent: true,
     reason: 'recording begin is bound to a recording and stream generation',
