@@ -7,6 +7,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupPage } from '../navigation/actions';
 import type { PopupStartupDescriptor } from './descriptor';
 import type { PopupRouteProps } from './resource';
@@ -173,13 +174,22 @@ function useRecordingNavigationSync(
   navigateToDescriptor: (descriptor: PopupStartupDescriptor) => Promise<void>,
   setStartup: Dispatch<SetStateAction<PopupStartupDescriptor | null>>
 ): void {
+  const hasSyncedActiveRecording = useRef(false);
   useEffect(() => {
     let active = true;
     let dispose: (() => void) | undefined;
     void import('../message-sync').then(({ subscribeToRecordingMessages }) => {
       const unsubscribe = subscribeToRecordingMessages({
         onRecordingState: (recordingState) => {
-          if (recordingState.status !== 'IDLE' || page === 'video') {
+          if (recordingState.status === VideoRecordingStatus.IDLE) {
+            hasSyncedActiveRecording.current = false;
+            if (page === 'video') {
+              void navigateToDescriptor({ page: 'video', recordingSeed: recordingState });
+            }
+            return;
+          }
+          if (page === 'video' || !hasSyncedActiveRecording.current) {
+            hasSyncedActiveRecording.current = true;
             void navigateToDescriptor({ page: 'video', recordingSeed: recordingState });
           }
         },

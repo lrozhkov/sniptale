@@ -23,6 +23,7 @@ import {
   finalizeRecordingDiagnostics,
 } from '../../manager';
 import { browserAction } from '@sniptale/platform/browser/action';
+import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
@@ -240,7 +241,12 @@ async function openPopupForWindow(windowId: number): Promise<void> {
   } catch (error) {
     if (!isRetryablePopupOpenError(error)) throw error;
     await browserWindows.update(windowId, { focused: true });
-    await browserAction.openPopup({ windowId });
+    try {
+      await browserAction.openPopup({ windowId });
+    } catch (retryError) {
+      if (!isRetryablePopupOpenError(retryError)) throw retryError;
+      await openPostRecordPopupPage();
+    }
   }
 }
 
@@ -250,6 +256,21 @@ function isRetryablePopupOpenError(error: unknown): boolean {
     (error.message.includes('Cannot show popup for an inactive window') ||
       error.message.includes('Failed to open popup'))
   );
+}
+
+async function openPostRecordPopupPage(): Promise<void> {
+  const url = runtimeInfo.getURL('apps/extension/src/popup/index.html');
+  try {
+    await browserWindows.create({
+      focused: true,
+      height: 720,
+      type: 'popup',
+      url,
+      width: 430,
+    });
+  } catch {
+    await browserTabs.create({ url });
+  }
 }
 
 function toPostRecordResult(message: SavedRecordingMessage) {
