@@ -58,11 +58,11 @@ export class LiveVideoTimeline {
     };
     this.pendingTimestamp = adjustedTimestamp;
     this.advanceEligibilityPast(adjustedTimestamp);
-    // Compare against both the requested ceiling and the observed cadence so a steady 30 FPS
-    // source under a 60 FPS request does not become an all-keyframe stream.
+    // A delayed source frame changes sample duration, not reference-frame validity. Only an
+    // explicit segment restart below is allowed to request recovery from a new keyframe.
     const continuityBasis = Math.max(this.fallbackDuration, this.lastContinuousDuration ?? 0);
-    this.pendingKeyFrame = duration > continuityBasis * 2;
-    if (!this.pendingKeyFrame) this.lastContinuousDuration = duration;
+    this.pendingKeyFrame = false;
+    if (duration <= continuityBasis * 2) this.lastContinuousDuration = duration;
     return emitted;
   }
 

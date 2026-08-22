@@ -27,6 +27,7 @@ vi.mock('mediabunny', () => ({
 }));
 
 import { LiveVideoFrameBuffer } from './live-video-frame-buffer';
+import { evaluateLiveVideoByteBudget } from './live-video-budget';
 import { runLiveVideoEncoderPump } from './live-video-encoder-pump';
 
 beforeEach(() => {
@@ -45,6 +46,45 @@ beforeEach(() => {
 });
 
 describe('live video encoder pump', () => {
+  it('keeps a jittery 15-second screen recording inside its forced-keyframe byte budget', async () => {
+    const frameBuffer = new LiveVideoFrameBuffer(1_000);
+    const framePeriod = 1 / 60;
+    let timestamp = 0;
+    let frameIndex = 0;
+    while (timestamp < 15) {
+      const frame = new VideoFrame(new Uint8Array(4), {
+        codedHeight: 1,
+        codedWidth: 1,
+        format: 'RGBA',
+        timestamp: Math.round(timestamp * 1_000_000),
+      });
+      frameBuffer.enqueue({ frame, timestampSeconds: timestamp });
+      frameIndex += 1;
+      timestamp += frameIndex % 12 === 0 ? 0.08 : framePeriod;
+    }
+    frameBuffer.closeInput();
+    let modeledVideoBytes = 0;
+    const add = vi.fn(async (_sample: unknown, options?: VideoEncoderEncodeOptions) => {
+      modeledVideoBytes += options?.keyFrame ? 100_000 : 2_000;
+    });
+
+    const metrics = await runLiveVideoEncoderPump({
+      frameBuffer,
+      frameRate: 60,
+      onFrameDequeued: vi.fn(),
+      shouldEncodeTerminalFrame: () => true,
+      videoSource: { add },
+    });
+
+    const videoByteBudget = evaluateLiveVideoByteBudget({
+      configuredBitrate: 1_000_000,
+      duration: 15,
+      encodedBytes: modeledVideoBytes,
+    });
+    expect(metrics.forcedKeyFrames).toBe(1);
+    expect(videoByteBudget.withinBudget).toBe(true);
+  });
+
   it('drops a rate-capped frame without reassigning its timestamp to different content', async () => {
     const frameBuffer = new LiveVideoFrameBuffer(4);
     const first = new VideoFrame(new Uint8Array(4), {

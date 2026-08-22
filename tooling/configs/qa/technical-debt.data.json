@@ -9413,8 +9413,12 @@
         "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-budget.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-frame-buffer.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-frame-transform.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-output-metrics.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-session-diagnostics.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-timeline.ts",
         "apps/extension/src/offscreen/recording/encoding/resource-budget.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
@@ -9624,8 +9628,12 @@
         "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-budget.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-frame-buffer.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-frame-transform.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-output-metrics.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-session-diagnostics.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-timeline.ts",
         "apps/extension/src/offscreen/recording/encoding/resource-budget.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
@@ -16912,7 +16920,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/support/extension-browser-launch.ts",
-        "contentHash": "e476b711ec977d100bc14ed640552b6bfc4d8ef6bb7eab4f2c56cd600efb4039"
+        "contentHash": "162b4d4b4f7096798e467d0d44659a8f21ce60eff4e50c99355eb5c6e01c92fb"
       },
       "consumers": [
         "tooling/test/e2e/security/mv3-lifecycle.spec.ts",
@@ -18503,18 +18511,20 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "3b82fa33d2e1147152ddf5caf308fb1685bda2d8e60700e4c1df3cc3fceffe47"
+        "contentHash": "d3ce53f388b571d2a369cb027ed2cbc9c7612ed7c9bc9380731c0bdae71aa584"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"
       ],
       "surfaces": [
         "property:readBlobVideoMetrics/centerPixel",
+        "property:readMostlyStaticLiveMetrics/formats",
         "property:recordCanvasCadence/dimensions",
         "property:recordColdHighResolutionArtifact/dimensions",
         "property:recordColdHighResolutionArtifact/recorderOptions",
         "property:recordLiveVfrArtifact/encoding",
-        "property:recordLiveVfrArtifact/formats"
+        "property:recordLiveVfrArtifact/formats",
+        "property:recordMostlyStaticLiveArtifact/encoding"
       ]
     },
     {

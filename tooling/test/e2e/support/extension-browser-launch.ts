@@ -85,6 +85,7 @@ function getChromiumLaunchConfig(debugPort: number, extensionBuildDir?: string) 
   return {
     executablePath,
     args: [
+      ...(process.env.PLAYWRIGHT_HEADLESS === '1' ? ['--headless=new'] : []),
       '--no-sandbox',
       '--no-first-run',
       '--no-default-browser-check',
@@ -104,6 +105,19 @@ function getChromiumLaunchConfig(debugPort: number, extensionBuildDir?: string) 
 
 async function ensureChromiumExecutable(executablePath: string): Promise<void> {
   await chmod(executablePath, 0o755);
+}
+
+async function removeOwnedUserDataDir(userDataDir: string): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await rm(userDataDir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const code = error instanceof Error && 'code' in error ? error.code : null;
+      if (code !== 'ENOTEMPTY' && code !== 'EBUSY') throw error;
+      await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+  }
 }
 
 function appendErrorChunk(stderr: string, chunk: Buffer): string {
@@ -153,9 +167,14 @@ export async function launchExtensionBrowser(
       userDataDir,
     };
   } catch (error) {
+    const browserExit =
+      browserProcess.exitCode === null
+        ? new Promise<void>((resolve) => browserProcess.once('exit', () => resolve()))
+        : Promise.resolve();
     browserProcess.kill('SIGKILL');
+    await browserExit;
     if (ownsUserDataDir) {
-      await rm(userDataDir, { recursive: true, force: true });
+      await removeOwnedUserDataDir(userDataDir);
     }
     const details = stderr.trim();
     const suffix = details ? `\nChromium stderr:\n${details}` : '';

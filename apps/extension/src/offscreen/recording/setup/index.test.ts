@@ -420,28 +420,51 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
   }
 );
 
-it('rejects a TAB source that is more than one pixel below the measured viewport', async () => {
-  const source = createRecordingStream(2560, 1303);
-  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+it('records a full TAB source from the measured Chromium raster even when it differs from viewport', async () => {
+  mocks.acquire.mockResolvedValueOnce({
+    cursorCaptureMode: null,
+    stream: createRecordingStream(2560, 1303),
+  });
   mocks.createSourceVideo.mockReturnValueOnce({ videoHeight: 1303, videoWidth: 2560 });
-  const sourceSettings = {
-    ...settings,
-    outputProfile: {
-      ...settings.outputProfile,
-      resolution: VideoResolutionPreset.SOURCE,
-    },
-  };
 
   await expect(
     prepareRecordingStream({
       captureMode: CaptureMode.TAB,
-      settings: sourceSettings,
+      settings: {
+        ...settings,
+        outputProfile: { ...settings.outputProfile, resolution: VideoResolutionPreset.SOURCE },
+      },
       streamId: 'stream-mismatched-viewport',
       viewport: { width: 2560, height: 1305, devicePixelRatio: 1 },
     })
-  ).rejects.toThrow('source-dimensions-mismatch: expected TAB source 2560x1305');
+  ).resolves.toMatchObject({
+    rawVideoHeight: 1303,
+    rawVideoWidth: 2560,
+    tabOutputGeometry: expect.objectContaining({
+      outputSize: { height: 1302, width: 2560 },
+      sourceRect: { height: 1302, width: 2560, x: 0, y: 0 },
+      sourceSize: { height: 1303, width: 2560 },
+      tracksFullViewport: true,
+    }),
+  });
+});
 
-  expect(mocks.createTabOutput).not.toHaveBeenCalled();
+it('rejects TAB_CROP when the measured source cannot be mapped from viewport coordinates', async () => {
+  mocks.acquire.mockResolvedValueOnce({
+    cursorCaptureMode: null,
+    stream: createRecordingStream(2560, 1303),
+  });
+  mocks.createSourceVideo.mockReturnValueOnce({ videoHeight: 1303, videoWidth: 2560 });
+
+  await expect(
+    prepareRecordingStream({
+      captureMode: CaptureMode.TAB_CROP,
+      cropRegion: { height: 400, width: 600, x: 0, y: 0 },
+      settings,
+      streamId: 'stream-mismatched-crop-viewport',
+      viewport: { width: 2560, height: 1305, devicePixelRatio: 1 },
+    })
+  ).rejects.toThrow('source-dimensions-mismatch: expected TAB source 2560x1305');
 });
 
 it('keeps odd full-tab SOURCE on the source stream with an encoder-frame transform', async () => {
