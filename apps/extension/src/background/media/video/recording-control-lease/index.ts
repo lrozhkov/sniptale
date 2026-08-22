@@ -4,7 +4,10 @@ import {
   VideoRecordingStatus,
   type VideoRecordingRuntimeState,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { setVideoRecordingRuntimeState } from '../runtime/session-state';
+import {
+  getVideoRecordingRuntimeState,
+  setVideoRecordingRuntimeState,
+} from '../runtime/session-state';
 import {
   getVideoRecordingId,
   getVideoRecordingTabId,
@@ -166,6 +169,12 @@ export async function hydrateActiveVideoRecordingLease(): Promise<VideoRecording
 export async function ensureActiveVideoRecordingLeaseHydrated(): Promise<VideoRecordingControlLease | null> {
   const lease = getUnexpiredActiveLease();
   if (lease) {
+    if (
+      lease.phase === 'active' &&
+      getVideoRecordingRuntimeState().status === VideoRecordingStatus.IDLE
+    ) {
+      hydrateSessionFromLease(lease);
+    }
     return lease;
   }
   if (leaseHydrated) return null;

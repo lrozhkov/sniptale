@@ -214,6 +214,8 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   private activeVideoRead: ActiveVideoRead | null = null;
   private videoReadGeneration = 0;
   private videoPump: Promise<void> | null = null;
+  private readonly videoDrainRequested: Promise<void>;
+  private readonly resolveVideoDrainRequested: () => void;
   private readonly firstEncodedVideoPacket: Promise<void>;
   private readonly resolveFirstEncodedVideoPacket: () => void;
   private readonly rejectFirstEncodedVideoPacket: (error: Error) => void;
@@ -299,6 +301,11 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     this.resolveTerminal = resolveTerminal;
     this.rejectTerminal = rejectTerminal;
     void this.terminal.catch(() => undefined);
+    let resolveVideoDrainRequested!: () => void;
+    this.videoDrainRequested = new Promise<void>((resolve) => {
+      resolveVideoDrainRequested = resolve;
+    });
+    this.resolveVideoDrainRequested = resolveVideoDrainRequested;
     let resolveFirstEncodedVideoPacket!: () => void;
     let rejectFirstEncodedVideoPacket!: (error: Error) => void;
     this.firstEncodedVideoPacket = new Promise<void>((resolve, reject) => {
@@ -460,7 +467,10 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   private async finalizeOutput(): Promise<void> {
     try {
       this.phase = 'finalizing';
-      await this.videoReader.cancel();
+      this.input.stream.getVideoTracks().forEach((track) => track.stop());
+      this.videoFrameBuffer.closeInput();
+      this.resolveVideoDrainRequested();
+      void this.videoReader.cancel().catch(() => undefined);
       await this.videoPump;
       await this.output.finalize();
       this.logEncodedCadence();
@@ -560,7 +570,14 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         await this.videoReader.cancel().catch(() => undefined);
         throw error;
       });
-    const results = await Promise.allSettled([readPump, encodePump]);
+    // Chromium can leave a processor read pending after an MV3 worker restart even after the
+    // source track is stopped and reader cancellation is requested. Finalization owns the frame
+    // buffer boundary, so once it closes that input the encoder can drain accepted frames without
+    // treating browser reader settlement as part of the durable artifact transaction.
+    const results = await Promise.allSettled([
+      Promise.race([readPump, this.videoDrainRequested]),
+      encodePump,
+    ]);
     const failure = results.find(
       (result): result is PromiseRejectedResult => result.status === 'rejected'
     );

@@ -185,7 +185,7 @@ test('a full persistent-profile Chromium restart relocks secrets and drops memor
   let launched = await launchExtensionBrowser();
   const userDataDir = launched.userDataDir;
   try {
-    const extensionId = new URL(await resolveExtensionServiceWorkerUrl(launched.context)).host;
+    const { extensionId } = launched;
     const settings = await openRealExtensionPage(launched.context, extensionId, SETTINGS_PATH);
     expect(
       await sendRuntimeMessage(settings, {
@@ -225,8 +225,7 @@ test('a full persistent-profile Chromium restart relocks secrets and drops memor
     await closeExtensionBrowser(launched);
 
     launched = await launchExtensionBrowser({ userDataDir });
-    const restartedExtensionId = new URL(await resolveExtensionServiceWorkerUrl(launched.context))
-      .host;
+    const restartedExtensionId = launched.extensionId;
     expect(restartedExtensionId).toBe(extensionId);
     const restartedSettings = await openRealExtensionPage(
       launched.context,

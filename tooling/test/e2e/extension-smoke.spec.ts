@@ -75,8 +75,13 @@ async function expectBuiltSurfaceLayout(
 }
 
 test('background service worker boots', async ({ context, extensionId }) => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`, {
+    waitUntil: 'domcontentloaded',
+  });
   const serviceWorkerUrl = await resolveExtensionServiceWorkerUrl(context);
   await expect(serviceWorkerUrl).toContain(extensionId);
+  await page.close();
 });
 
 for (const extensionPage of builtExtensionPages) {

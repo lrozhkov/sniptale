@@ -18,6 +18,7 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
       'tooling/test/e2e/extension-critical-media.spec.ts',
       'tooling/test/e2e/extension-critical-offscreen.spec.ts',
       'tooling/test/e2e/extension-critical-popup.spec.ts',
+      'tooling/test/e2e/extension-critical-recording-restart.spec.ts',
       'tooling/test/e2e/extension-critical-video.spec.ts',
       'tooling/test/e2e/extension-critical-video-effects.spec.ts',
     ],
@@ -81,20 +82,25 @@ it('records build failure and blocks Playwright without invoking it', () => {
 });
 
 it('records Playwright result after a green E2E build', () => {
+  let playwrightHeadless: string | undefined;
   const result = runE2e({
     argv: ['--suite', 'critical'],
     buildRunner: () => ({ status: 0, stdout: '', stderr: '' }),
-    commandRunner: (_command, args) => ({
-      status: args.includes('tooling/test/e2e/extension-critical-video.spec.ts') ? 2 : 0,
-      stdout: 'playwright output',
-      stderr: '',
-    }),
+    commandRunner: (_command, args, options) => {
+      playwrightHeadless = options.env.PLAYWRIGHT_HEADLESS;
+      return {
+        status: args.includes('tooling/test/e2e/extension-critical-video.spec.ts') ? 2 : 0,
+        stdout: 'playwright output',
+        stderr: '',
+      };
+    },
   });
 
   expect(result.steps.map((step) => [step.label, step.status])).toEqual([
     ['E2E build', 'ok'],
     ['Playwright', 'failed'],
   ]);
+  expect(playwrightHeadless).toBe('0');
   expect(result.context).toEqual({
     mode: 'critical-headless',
     scope: 'runtime-smoke',
@@ -105,6 +111,7 @@ it('records Playwright result after a green E2E build', () => {
       'tooling/test/e2e/extension-critical-media.spec.ts',
       'tooling/test/e2e/extension-critical-offscreen.spec.ts',
       'tooling/test/e2e/extension-critical-popup.spec.ts',
+      'tooling/test/e2e/extension-critical-recording-restart.spec.ts',
       'tooling/test/e2e/extension-critical-video.spec.ts',
       'tooling/test/e2e/extension-critical-video-effects.spec.ts',
     ],

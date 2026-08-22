@@ -6,6 +6,7 @@ const {
   browserStorageSessionRemoveMock,
   browserStorageSessionSetMock,
   getVideoRecordingIdMock,
+  getVideoRecordingRuntimeStateMock,
   getVideoRecordingTabIdMock,
   setVideoRecordingIdMock,
   setVideoRecordingRuntimeStateMock,
@@ -16,6 +17,7 @@ const {
   browserStorageSessionRemoveMock: vi.fn(),
   browserStorageSessionSetMock: vi.fn(),
   getVideoRecordingIdMock: vi.fn(),
+  getVideoRecordingRuntimeStateMock: vi.fn(),
   getVideoRecordingTabIdMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
   setVideoRecordingRuntimeStateMock: vi.fn(),
@@ -50,6 +52,7 @@ vi.mock('./session-state', async (importOriginal) => ({
 }));
 vi.mock('./runtime/session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./runtime/session-state')>()),
+  getVideoRecordingRuntimeState: getVideoRecordingRuntimeStateMock,
   setVideoRecordingRuntimeState: setVideoRecordingRuntimeStateMock,
 }));
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
@@ -78,6 +81,7 @@ beforeEach(() => {
   browserStorageSessionRemoveMock.mockResolvedValue(undefined);
   browserStorageSessionSetMock.mockResolvedValue(undefined);
   getVideoRecordingIdMock.mockReturnValue('recording-1');
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ status: VideoRecordingStatus.IDLE });
   getVideoRecordingTabIdMock.mockReturnValue(42);
   resetActiveVideoRecordingLeaseForTests();
 });
@@ -215,6 +219,54 @@ it('hydrates active recording state from a persisted lease after restart', async
   });
   getVideoRecordingIdMock.mockReturnValue('recording-2');
   await expect(restoreCurrentRecordingFromLease('recording-2')).resolves.toBe(true);
+});
+
+it('reprojects a cached active lease after a late startup reset', async () => {
+  await issuePreparedVideoRecordingLease({
+    captureMode: CaptureMode.SCREEN,
+    ownerSenderUrl,
+  });
+  await activateVideoRecordingLease({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: null,
+  });
+  vi.clearAllMocks();
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ status: VideoRecordingStatus.IDLE });
+
+  await expect(ensureActiveVideoRecordingLeaseHydrated()).resolves.toMatchObject({
+    phase: 'active',
+    recordingId: 'recording-1',
+  });
+
+  expect(setVideoRecordingIdMock).toHaveBeenCalledWith('recording-1');
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      captureMode: CaptureMode.SCREEN,
+      status: VideoRecordingStatus.RECORDING,
+    })
+  );
+});
+
+it('does not overwrite a non-idle runtime state from a cached active lease', async () => {
+  await issuePreparedVideoRecordingLease({
+    captureMode: CaptureMode.SCREEN,
+    ownerSenderUrl,
+  });
+  await activateVideoRecordingLease({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: null,
+  });
+  vi.clearAllMocks();
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ status: VideoRecordingStatus.PAUSED });
+
+  await expect(ensureActiveVideoRecordingLeaseHydrated()).resolves.toMatchObject({
+    phase: 'active',
+    recordingId: 'recording-1',
+  });
+
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
 });
 
 it('keeps a recovered prepared lease out of active runtime state', async () => {

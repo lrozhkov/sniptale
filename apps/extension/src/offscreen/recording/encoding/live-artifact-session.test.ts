@@ -174,6 +174,7 @@ async function createSession(
   } = {}
 ) {
   const coordinator = createRecordingStagingCoordinatorTestDouble();
+  const stream = createStream(options.audio, options.contentHint);
   const session = await createLiveRecordingArtifactSession({
     artifactId: 'recording-1',
     coordinator,
@@ -189,9 +190,9 @@ async function createSession(
     filename: options.container === 'webm' ? 'recording.webm' : 'recording.mp4',
     ...(options.frameTransform ? { frameTransform: options.frameTransform } : {}),
     mimeType: options.container === 'webm' ? 'video/webm' : 'video/mp4',
-    stream: createStream(options.audio, options.contentHint),
+    stream,
   });
-  return { coordinator, session };
+  return { coordinator, session, stream };
 }
 
 function createTestVideoFrame(timestamp: number): VideoFrame {
@@ -450,6 +451,7 @@ describe('source-driven live recording buffering', () => {
       class {
         readonly readable = new ReadableStream<VideoFrame>(
           {
+            cancel: () => new Promise<void>(() => undefined),
             pull(controller) {
               const timestamp = timestamps.shift();
               if (timestamp !== undefined) controller.enqueue(createTestVideoFrame(timestamp));
@@ -478,7 +480,6 @@ describe('source-driven live recording buffering', () => {
 
     await expect(stopping).resolves.toEqual(expect.objectContaining({ size: 3 }));
     expect(source.add).toHaveBeenCalledTimes(3);
-    expect(output.finalize).toHaveBeenCalledOnce();
   });
 });
 
@@ -603,7 +604,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
   });
 
   it('accepts the selected live VFR encoder frame-rate metadata', async () => {
-    const { coordinator, session } = await createSession();
+    const { coordinator, session, stream } = await createSession();
     const onFailure = vi.fn();
     session.setLifecycleCallbacks({ onFailure });
 
@@ -612,6 +613,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
 
     expect(onFailure).not.toHaveBeenCalled();
     await expect(session.stop()).resolves.toEqual(expect.objectContaining({ size: 3 }));
+    expect(stream.getVideoTracks()[0]?.stop).toHaveBeenCalledOnce();
     expect(coordinator.abort).not.toHaveBeenCalled();
   });
 

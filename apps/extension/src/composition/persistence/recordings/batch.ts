@@ -95,7 +95,12 @@ async function saveRecordingEntries(
   if (completion && !inputs.some((input) => input.id === completion.primaryRecordingId)) {
     throw new Error('The primary completed recording is not present in the media batch.');
   }
-  await recoverRecordingAssetPublications();
+  // A prepared staging asset already owns a persistence-transition lease through publication.
+  // Re-entering transition recovery here can deadlock behind an exclusive recovery queued by a
+  // restarted MV3 worker, because that recovery is itself waiting for this asset lease to release.
+  if (!inputs.some((input) => input.preparedAsset !== undefined)) {
+    await recoverRecordingAssetPublications();
+  }
   const preparedInputs = await writeInputsToAssets(inputs);
   const entries = createEntries(preparedInputs);
   let journalCreated = false;

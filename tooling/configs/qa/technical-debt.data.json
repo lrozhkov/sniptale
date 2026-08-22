@@ -1651,6 +1651,7 @@
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
+        "apps/extension/src/background/media/video/runtime/post-record-popup-activation.ts",
         "apps/extension/src/background/media/video/runtime/router.ts",
         "apps/extension/src/background/media/video/runtime/sender-policy.ts",
         "apps/extension/src/background/media/video/runtime/session-state/badge-state/apply-badge-state.ts",
@@ -2258,6 +2259,7 @@
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
+        "apps/extension/src/background/media/video/runtime/post-record-popup-activation.ts",
         "apps/extension/src/background/media/video/runtime/router.ts",
         "apps/extension/src/background/media/video/runtime/sender-policy.ts",
         "apps/extension/src/background/media/video/runtime/session-state/badge-state/apply-badge-state.ts",
@@ -16920,17 +16922,17 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/support/extension-browser-launch.ts",
-        "contentHash": "162b4d4b4f7096798e467d0d44659a8f21ce60eff4e50c99355eb5c6e01c92fb"
+        "contentHash": "289c8198c07b4fe441b7accaec5b5a0b05fe50d8c44b78a8758cb5e54bdcd010"
       },
       "consumers": [
         "tooling/test/e2e/security/mv3-lifecycle.spec.ts",
         "tooling/test/e2e/security/production-surface.spec.ts",
+        "tooling/test/e2e/support/extension-browser-launch.test.ts",
         "tooling/test/e2e/support/extension-browser-launch.ts",
         "tooling/test/e2e/support/extension-fixture.ts"
       ],
       "surfaces": [
-        "property:getChromiumLaunchConfig/args",
-        "property:launchExtensionBrowser/stdio"
+        "property:launchExtensionBrowser/ignoreDefaultArgs"
       ]
     },
     {
@@ -17042,7 +17044,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/support/extension-fixture.ts",
-        "contentHash": "0700c7440cfeb0e9b722101cb502f728821169564c82844a0273d836ed2cadf6"
+        "contentHash": "72709647e1cdfa3ec176c2aacba9e3b44b7d586d7a682dc54a0add6e32d42c35"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical-full-page.spec.ts",
@@ -17050,6 +17052,7 @@
         "tooling/test/e2e/extension-critical-media.spec.ts",
         "tooling/test/e2e/extension-critical-offscreen.spec.ts",
         "tooling/test/e2e/extension-critical-popup.spec.ts",
+        "tooling/test/e2e/extension-critical-recording-restart.spec.ts",
         "tooling/test/e2e/extension-critical-video-effects.spec.ts",
         "tooling/test/e2e/extension-critical-video.spec.ts",
         "tooling/test/e2e/extension-smoke.spec.ts",
@@ -17059,7 +17062,6 @@
         "tooling/test/e2e/security/mv3-lifecycle.spec.ts",
         "tooling/test/e2e/security/permission-revocation.spec.ts",
         "tooling/test/e2e/security/privacy-erasure.spec.ts",
-        "tooling/test/e2e/security/production-surface.spec.ts",
         "tooling/test/e2e/security/secret-retention.spec.ts",
         "tooling/test/e2e/support/extension-fixture.ts",
         "tooling/test/e2e/support/security-helpers.ts"
@@ -19590,7 +19592,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/run-e2e.mjs",
-        "contentHash": "9f22cbf4f1558cc5075e5751e32a608a46ec7bb87ac8218ddaf01f44d6dac6fd"
+        "contentHash": "0f908ff6509f54c88e5c473d276783c143c662c374f0668d419d4fba9e0cf2e7"
       },
       "consumers": [
         "tooling/test/e2e/run-e2e.mjs",

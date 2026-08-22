@@ -34,12 +34,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "f54350fe183995449797b1ce72f4a81a447ad75b490b1df5bc2fd9aa456c419f"
+      "sha256": "8629dd2da258a23fe79d00c29e9a50109b3f775acc53e9d5d26dbd14525a5409"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "f54350fe183995449797b1ce72f4a81a447ad75b490b1df5bc2fd9aa456c419f"
+      "sha256": "8629dd2da258a23fe79d00c29e9a50109b3f775acc53e9d5d26dbd14525a5409"
     },
     {
       "category": "bundled-font",

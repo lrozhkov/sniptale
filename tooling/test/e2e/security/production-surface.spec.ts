@@ -2,7 +2,6 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { closeExtensionBrowser, launchExtensionBrowser } from '../support/extension-browser-launch';
-import { resolveExtensionServiceWorkerUrl } from '../support/extension-fixture';
 import { startHostServer } from '../support/host-server';
 
 const FORBIDDEN_RELEASE_MARKERS = [
@@ -50,7 +49,7 @@ test('production artifact exposes no security harness or internal web surface', 
   const launched = await launchExtensionBrowser({ extensionBuildDir: 'dist-release-e2e' });
   const hostServer = await startHostServer();
   try {
-    const extensionId = new URL(await resolveExtensionServiceWorkerUrl(launched.context)).host;
+    const { extensionId } = launched;
     const host = await launched.context.newPage();
     await host.goto(`${hostServer.origin}/fixtures/host-page.html?production-surface=1`);
     const fetchResults = await host.evaluate(

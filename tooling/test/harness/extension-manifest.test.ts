@@ -23,6 +23,17 @@ it('grants all-sites only to the isolated browser E2E artifact', () => {
   expect(sourceManifest).not.toHaveProperty('host_permissions');
 });
 
+it('pins one stable public identity only for browser E2E artifacts', () => {
+  const e2eManifest = buildManifestForMode(sourceManifest, 'test-e2e');
+  const securityManifest = buildManifestForMode(sourceManifest, 'security-e2e');
+  const releaseManifest = buildManifestForMode(sourceManifest, 'release');
+
+  expect(e2eManifest.key).toEqual(expect.stringMatching(/^[A-Za-z0-9+/]+={0,2}$/u));
+  expect(securityManifest.key).toBe(e2eManifest.key);
+  expect(releaseManifest).not.toHaveProperty('key');
+  expect(sourceManifest).not.toHaveProperty('key');
+});
+
 it('preserves the extension description from source to built manifests', () => {
   expect(sourceManifest.description).toBe(EXPECTED_DESCRIPTION);
   expect(buildManifestForMode(sourceManifest, 'test-e2e').description).toBe(EXPECTED_DESCRIPTION);
