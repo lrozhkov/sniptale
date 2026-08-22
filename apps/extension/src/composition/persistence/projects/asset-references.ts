@@ -4,6 +4,9 @@ import { createProjectAssetMediaId } from '../../../features/media-hub/media-id'
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseVideoProjectEntry } from './read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import type { PhysicalDeleteAssetOperation } from '../assets';
+import { PROJECT_ASSET_OWNER_KIND, PROJECT_MEDIA_ASSET_ROLE } from './asset-publication';
+import { parseProjectAssetEntry } from './read-guards';
 import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
@@ -12,7 +15,15 @@ import {
 
 type ProjectAssetDeleteStore = {
   delete(key: string): Promise<unknown>;
+  get(key: string): Promise<unknown>;
 };
+
+type ProjectAssetOwnerStore = {
+  delete(key: [string, string, string]): Promise<unknown>;
+  index(name: 'assetId'): { count(assetId: string): Promise<number> };
+};
+
+type ProjectAssetRefStore = { delete(key: string): Promise<unknown> };
 
 type ProjectAssetReferenceProjectStore = {
   getAll(): Promise<unknown[]>;
@@ -59,7 +70,10 @@ async function deleteUnreferencedProjectAssets(
   projectAssetStore: ProjectAssetDeleteStore,
   mediaLibraryStore: ProjectAssetMediaStore,
   projectAssetIds: string[],
-  referencedAssetIds: ReadonlySet<string>
+  referencedAssetIds: ReadonlySet<string>,
+  assetOwnerStore: ProjectAssetOwnerStore,
+  assetRefStore: ProjectAssetRefStore,
+  operation: PhysicalDeleteAssetOperation
 ): Promise<string[]> {
   const deletedAssetIds: string[] = [];
 
@@ -74,8 +88,20 @@ async function deleteUnreferencedProjectAssets(
       continue;
     }
 
+    const projectAsset = parseProjectAssetEntry(await projectAssetStore.get(projectAssetId));
     await projectAssetStore.delete(projectAssetId);
     await mediaLibraryStore.delete(mediaId);
+    if (projectAsset) {
+      await assetOwnerStore.delete([
+        PROJECT_ASSET_OWNER_KIND,
+        projectAssetId,
+        PROJECT_MEDIA_ASSET_ROLE,
+      ]);
+      if ((await assetOwnerStore.index('assetId').count(projectAsset.assetId)) === 0) {
+        await assetRefStore.delete(projectAsset.assetId);
+        operation.assetIds.push(projectAsset.assetId);
+      }
+    }
     deletedAssetIds.push(projectAssetId);
   }
 
@@ -83,7 +109,10 @@ async function deleteUnreferencedProjectAssets(
 }
 
 export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
+  assetOwnerStore: ProjectAssetOwnerStore;
+  assetRefStore: ProjectAssetRefStore;
   mediaLibraryStore: ProjectAssetMediaStore;
+  operation: PhysicalDeleteAssetOperation;
   ownerProjectId: string;
   projectAssetIds: string[];
   projectAssetStore: ProjectAssetDeleteStore;
@@ -102,7 +131,10 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
     args.projectAssetStore,
     args.mediaLibraryStore,
     args.projectAssetIds,
-    referencedAssetIds
+    referencedAssetIds,
+    args.assetOwnerStore,
+    args.assetRefStore,
+    args.operation
   );
 }
 

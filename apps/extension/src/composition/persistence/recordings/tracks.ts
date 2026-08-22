@@ -47,7 +47,7 @@ async function loadSavedRecordingTrackBlob(
   }
 
   return {
-    blob: recording.blob,
+    blob: recording.file,
     filename: recording.filename || track.filename,
     id: track.id,
   };

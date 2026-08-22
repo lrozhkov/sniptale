@@ -5,7 +5,7 @@ import {
   getBackgroundOwnedRouteContext,
   getContentRuntimeWakeupSenderBinding,
 } from '../../../routing-contracts/owned-route-context';
-import { authorizeBackgroundOwnedRoute } from './background-owned';
+import { authorizeBackgroundOwnedRoute } from './owned';
 import type { BackgroundOwnedAuthorizationRequest } from './background-owned.types';
 import {
   issueContentPrivilegedActionCapability,

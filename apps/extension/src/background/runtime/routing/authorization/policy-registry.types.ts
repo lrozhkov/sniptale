@@ -42,7 +42,7 @@ export type IpcAuthorizationRequest =
   | VideoControlNoTabAuthorizationRequest
   | VideoControlOwnerNoTabAuthorizationRequest;
 
-type AuthorizationPolicyKey = IncidentCapabilityFamily;
+export type AuthorizationPolicyKey = IncidentCapabilityFamily;
 
 export type SyncAuthorizationPolicyRegistryEntry = {
   readonly authorizationMode: 'sync';

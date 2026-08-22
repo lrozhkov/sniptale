@@ -98,6 +98,7 @@ function createProbeProps(
       gridViewportRef: { current: null },
       gridWidth: 800,
       importInputRef: { current: null },
+      importTriggerRef: { current: null },
       scrollTop: 12,
       viewportHeight: 600,
     },

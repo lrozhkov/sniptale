@@ -5,7 +5,7 @@ import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { syncScenarioCaptureEditorDocumentOverlays } from '../../../features/scenario/capture-step/editor-document';
 import {
   getScenarioAssetBlob,
-  getScenarioStepEditorDocumentRecord,
+  getScenarioStepEditorDocumentTransferRecord,
 } from '../../../composition/persistence/scenario/store/public';
 import type { ScenarioCaptureStep } from '../../../features/scenario/contracts/types/project';
 import {
@@ -31,10 +31,10 @@ async function createScenarioEmbeddedEditorUrl(args: {
   pageTitle: string;
   pageUrl: string;
   stepId: string;
-}): Promise<string> {
+}): Promise<{ url: string }> {
   const [blob, stepDocumentEntry] = await Promise.all([
     getScenarioAssetBlob(args.assetId),
-    getScenarioStepEditorDocumentRecord(args.stepId),
+    getScenarioStepEditorDocumentTransferRecord(args.stepId),
   ]);
   const syncedDocument = stepDocumentEntry?.document
     ? syncScenarioCaptureEditorDocumentOverlays(stepDocumentEntry.document, args.overlays)
@@ -46,12 +46,14 @@ async function createScenarioEmbeddedEditorUrl(args: {
     throw new Error(translate('shared.runtime.readBlobFailed'));
   }
 
-  return createScenarioEditorEmbedUrl({
-    dataUrl: bootstrapDataUrl,
-    document: syncedDocument,
-    title: args.pageTitle,
-    url: args.pageUrl,
-  });
+  return {
+    url: await createScenarioEditorEmbedUrl({
+      dataUrl: bootstrapDataUrl,
+      document: syncedDocument,
+      title: args.pageTitle,
+      url: args.pageUrl,
+    }),
+  };
 }
 
 export function ScenarioEmbeddedEditorHost(props: {

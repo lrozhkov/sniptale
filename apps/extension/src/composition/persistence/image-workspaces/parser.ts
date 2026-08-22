@@ -1,19 +1,20 @@
-import { isEditorDocument } from '../../../features/editor/document/guards';
+import { parsePersistedEditorDocument } from '../document-assets';
 import {
   isNullable,
   isNumber,
   isRecord,
   isString,
 } from '@sniptale/runtime-contracts/validation/primitives';
-import type { ImageWorkspaceEntry } from './contracts';
+import type { StoredImageWorkspaceEntry } from './contracts';
 
 const isNullableString = isNullable(isString);
 
-export function parseImageWorkspaceEntry(value: unknown): ImageWorkspaceEntry | null {
+export function parseImageWorkspaceEntry(value: unknown): StoredImageWorkspaceEntry | null {
   if (!isRecord(value)) return null;
+  const document = parsePersistedEditorDocument(value['document']);
   if (
     !isString(value['aggregateId']) ||
-    !isEditorDocument(value['document']) ||
+    !document ||
     !Number.isInteger(value['revision']) ||
     !isNumber(value['revision']) ||
     value['revision'] < 1 ||
@@ -27,7 +28,7 @@ export function parseImageWorkspaceEntry(value: unknown): ImageWorkspaceEntry | 
   return {
     aggregateId: value['aggregateId'],
     createdAt: value['createdAt'],
-    document: value['document'],
+    document,
     revision: value['revision'],
     sourceTitle: value['sourceTitle'],
     sourceUrl: value['sourceUrl'],

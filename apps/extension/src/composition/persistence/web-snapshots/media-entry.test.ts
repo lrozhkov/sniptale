@@ -4,7 +4,7 @@ import {
   type WebSnapshotManifest,
 } from '@sniptale/runtime-contracts/web-snapshot';
 import type { SaveWebSnapshotMediaAssetInput } from '../media-library/contracts';
-import type { WebSnapshotRecord } from './contracts';
+import type { StoredWebSnapshotRecord } from './contracts';
 
 const mediaMocks = vi.hoisted(() => ({
   measureImageBlobMock: vi.fn(),
@@ -76,11 +76,14 @@ it('sanitizes web snapshot provenance before creating the media entry', async ()
     packageBlob: new Blob(['zip'], { type: 'application/zip' }),
     screenshotBlob: new Blob(['png'], { type: 'image/png' }),
   };
-  const snapshot: WebSnapshotRecord = {
+  const snapshot: StoredWebSnapshotRecord = {
     createdAt: 100,
     id: 'snapshot-1',
     manifest,
-    packageBlob: input.packageBlob,
+    packageAssetId: 'package-asset',
+    screenshotAssetId: 'screenshot-asset',
+    screenshotMimeType: 'image/png',
+    screenshotSize: input.screenshotBlob.size,
     size: input.packageBlob.size,
     updatedAt: 100,
   };

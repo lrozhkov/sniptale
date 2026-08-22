@@ -52,9 +52,34 @@ type BackgroundOwnedAuthorizationDispatcher = {
   readonly policyAuthorityFamily: string;
 };
 
+export const backgroundOwnedAuthorizationBindings = {
+  'aggregate-promotion': authorizeAggregatePromotionRoute,
+  'ai-secret-unlock': authorizeAiSecretUnlockRoute,
+  'ai-settings-mutation': authorizeAiSettingsMutationRoute,
+  'ai-settings-navigation': authorizeAiSettingsNavigationRoute,
+  'ai-settings-query': authorizeAiSettingsQueryRoute,
+  'annotation-fork-session': authorizeAnnotationForkSessionRoute,
+  'content-action-capability-issuance': authorizeContentActionCapabilityIssuance,
+  'content-runtime-wakeup': authorizeContentRuntimeWakeupRoute,
+  'frame-annotation-raster': authorizeFrameAnnotationRasterRoute,
+  'llm-content-processing': authorizeContentLlmRoute,
+  'llm-scenario-editor-processing': authorizeScenarioEditorLlmRoute,
+  'llm-session': authorizeLlmSessionRequestRoute,
+  'local-data-erasure': authorizeLocalDataErasureRoute,
+  'native-app-runtime': authorizeNativeAppRoute,
+  'page-access': authorizePageAccessRoute,
+  'popup-export-job': authorizePopupExportJobRoute,
+  'popup-tab-route-capability-issuance': authorizePopupTabRouteCapabilityIssuance,
+  'settings-transfer': authorizeSettingsTransferRoute,
+  'voice-input-offscreen-event': authorizeVoiceInputOffscreenEvent,
+} satisfies Record<
+  BackgroundOwnedRouteInventoryEntry['handlerId'],
+  BackgroundOwnedAuthorizationDispatcher['authorize']
+>;
+
 export const backgroundOwnedAuthorizationDispatchers = backgroundOwnedRouteInventory.map(
   (entry) => ({
-    authorize: getBackgroundOwnedAuthorizationHandler(entry.handlerId),
+    authorize: backgroundOwnedAuthorizationBindings[entry.handlerId],
     handlerId: entry.handlerId,
     messageTypes: entry.messageTypes,
     ownerModule: entry.ownerModule,
@@ -299,51 +324,6 @@ export function authorizeBackgroundOwnedRouteMaybeAsync(
 
 function isPromise<TValue>(value: TValue | Promise<TValue>): value is Promise<TValue> {
   return typeof (value as { then?: unknown }).then === 'function';
-}
-
-function getBackgroundOwnedAuthorizationHandler(
-  handlerId: BackgroundOwnedRouteInventoryEntry['handlerId']
-): BackgroundOwnedAuthorizationDispatcher['authorize'] {
-  switch (handlerId) {
-    case 'aggregate-promotion':
-      return authorizeAggregatePromotionRoute;
-    case 'ai-secret-unlock':
-      return authorizeAiSecretUnlockRoute;
-    case 'ai-settings-query':
-      return authorizeAiSettingsQueryRoute;
-    case 'ai-settings-mutation':
-      return authorizeAiSettingsMutationRoute;
-    case 'ai-settings-navigation':
-      return authorizeAiSettingsNavigationRoute;
-    case 'annotation-fork-session':
-      return authorizeAnnotationForkSessionRoute;
-    case 'content-action-capability-issuance':
-      return authorizeContentActionCapabilityIssuance;
-    case 'content-runtime-wakeup':
-      return authorizeContentRuntimeWakeupRoute;
-    case 'frame-annotation-raster':
-      return authorizeFrameAnnotationRasterRoute;
-    case 'llm-content-processing':
-      return authorizeContentLlmRoute;
-    case 'llm-scenario-editor-processing':
-      return authorizeScenarioEditorLlmRoute;
-    case 'llm-session':
-      return authorizeLlmSessionRequestRoute;
-    case 'local-data-erasure':
-      return authorizeLocalDataErasureRoute;
-    case 'settings-transfer':
-      return authorizeSettingsTransferRoute;
-    case 'native-app-runtime':
-      return authorizeNativeAppRoute;
-    case 'page-access':
-      return authorizePageAccessRoute;
-    case 'popup-export-job':
-      return authorizePopupExportJobRoute;
-    case 'popup-tab-route-capability-issuance':
-      return authorizePopupTabRouteCapabilityIssuance;
-    case 'voice-input-offscreen-event':
-      return authorizeVoiceInputOffscreenEvent;
-  }
 }
 
 function getBackgroundOwnedPolicyEntries(): Array<[string, string]> {

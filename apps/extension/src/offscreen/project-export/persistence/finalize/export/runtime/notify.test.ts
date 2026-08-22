@@ -43,7 +43,6 @@ it('notifies completion with the export context and message payload', async () =
       format: VideoExportFormat.MP4,
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     })
   ).resolves.toBe(true);
 
@@ -52,7 +51,6 @@ it('notifies completion with the export context and message payload', async () =
       exportId: 'export-1',
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     },
     logger: expect.any(Object),
     logMessage: 'Failed to notify runtime about completed project export',
@@ -60,7 +58,6 @@ it('notifies completion with the export context and message payload', async () =
       type: VideoMessageType.PROJECT_EXPORT_COMPLETED,
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
       exportId: 'export-1',
       filename: 'export.mp4',
       format: VideoExportFormat.MP4,
@@ -79,7 +76,6 @@ it('does not emit completed notification when completion terminal resolves as ca
       format: VideoExportFormat.MP4,
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
     })
   ).resolves.toBe(false);
 
@@ -101,7 +97,6 @@ it('keeps accepted completion terminal when cancellation trips after terminal wr
         format: VideoExportFormat.MP4,
         jobId: 'job-1',
         projectId: 'project-1',
-        recordingId: 'recording-1',
       },
       { signal: abortController.signal }
     )

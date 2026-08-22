@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { downloadExportRecording } from './download';
+import { downloadProjectExport } from './download';
 
 const { createLoggerMock, sendRuntimeMessageBestEffortMock } = vi.hoisted(() => ({
   createLoggerMock: vi.fn(() => ({ debug: vi.fn() })),
@@ -22,20 +22,20 @@ afterEach(() => {
 });
 
 it('skips the download request when download-after-export is disabled', () => {
-  downloadExportRecording('recording-1', 'export.mp4', false);
+  downloadProjectExport('export-1', 'export.mp4', false);
 
   expect(sendRuntimeMessageBestEffortMock).not.toHaveBeenCalled();
 });
 
 it('requests a download when download-after-export is enabled', () => {
-  downloadExportRecording('recording-1', 'export.mp4', true);
+  downloadProjectExport('export-1', 'export.mp4', true);
 
   expect(sendRuntimeMessageBestEffortMock).toHaveBeenCalledWith({
     logger: expect.any(Object),
-    logMessage: 'Failed to trigger recording download after project export',
+    logMessage: 'Failed to trigger project export download',
     payload: {
-      type: VideoMessageType.DOWNLOAD_RECORDING,
-      recordingId: 'recording-1',
+      type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
+      exportId: 'export-1',
       filename: 'export.mp4',
     },
   });

@@ -6,6 +6,7 @@ import { useGallerySurfaceState } from './useGallerySurfaceState';
 
 type GalleryStorageWorkflowState = Pick<
   GalleryAppState['storage'],
+  | 'activeImport'
   | 'banner'
   | 'cleanupReport'
   | 'confirmDialog'
@@ -20,6 +21,7 @@ type GalleryStorageWorkflowState = Pick<
 type GalleryStorageWorkflowActions = Pick<
   GalleryAppStateController['actions']['storage'] & GalleryAppStateController['actions']['surface'],
   | 'refresh'
+  | 'setActiveImport'
   | 'setBanner'
   | 'setConfirmDialog'
   | 'setIsBusy'
@@ -38,6 +40,7 @@ function buildGalleryStorageWorkflowState(
   surface: ReturnType<typeof useGallerySurfaceState>
 ): GalleryStorageWorkflowState {
   return {
+    activeImport: surface.state.activeImport,
     banner: surface.state.banner,
     cleanupReport: library.cleanupReport,
     confirmDialog: surface.state.confirmDialog,
@@ -55,6 +58,7 @@ function buildGalleryStorageWorkflowActions(
   surface: ReturnType<typeof useGallerySurfaceState>
 ): GalleryStorageWorkflowActions {
   return {
+    setActiveImport: surface.actions.setActiveImport,
     refresh: library.refresh,
     setBanner: surface.actions.setBanner,
     setConfirmDialog: surface.actions.setConfirmDialog,

@@ -18,12 +18,15 @@ import type { GalleryItem } from '../../library/items';
 export interface GalleryAppLayoutProps {
   gridViewportRef: RefObject<HTMLDivElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;
+  importTriggerRef: RefObject<HTMLButtonElement | null>;
   filteredScenarioProjects?: ScenarioProjectSummary[];
   scenarioPreviewProject?: ScenarioProjectSummary | null;
   scenarioProjects?: ScenarioProjectSummary[];
   state: GalleryAppState;
   viewMode: GalleryViewMode;
   onImportFileChange: (file: File | null) => void;
+  onActiveImportCancel: () => void;
+  onActiveImportDismiss: () => void;
   onStorageManagerOpen: () => void;
   onStorageManagerClose: () => void;
   onConfirmDialogClose: () => void;

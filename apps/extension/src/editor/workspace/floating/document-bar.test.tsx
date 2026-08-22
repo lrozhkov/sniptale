@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   promoteImageAggregate: vi.fn(),
   saveImageAggregateCopyFromDocument: vi.fn(),
   autosaveActivate: vi.fn(),
+  autosaveRebindAggregate: vi.fn(),
   autosaveLastWriteError: null as unknown,
   connectAggregateEditorPresence: vi.fn(
     (_args: { aggregate: { id: string; kind: 'image' }; promote: () => Promise<void> }) => ({
@@ -78,6 +79,7 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
   useEditorController: () => ({
     autosaveService: {
       activate: mocks.autosaveActivate,
+      rebindAggregate: mocks.autosaveRebindAggregate,
       discardDraft: mocks.autosaveDiscard,
       flushAutosave: vi.fn(async () => undefined),
       getDurableRevision: vi.fn(() => 1),
@@ -514,7 +516,7 @@ it('offers reload and an atomic copy when another tab made the workspace stale',
   expect(mocks.saveImageAggregateCopyFromDocument).toHaveBeenCalledWith(
     expect.objectContaining({ sourceTitle: 'Captured page', targetAggregateId: expect.any(String) })
   );
-  expect(mocks.autosaveActivate).toHaveBeenCalledWith(
+  expect(mocks.autosaveRebindAggregate).toHaveBeenCalledWith(
     expect.objectContaining({ durableRevision: 1, sourceTitle: 'Captured page' })
   );
   expect(window.location.search).toContain('assetId=');

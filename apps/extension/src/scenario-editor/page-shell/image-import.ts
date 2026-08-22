@@ -1,5 +1,8 @@
 import { createScenarioImageElement } from '../../features/scenario/project/v3';
-import { prepareScenarioV3ImageAsset } from '../../composition/persistence/scenario/store/v3';
+import {
+  discardPreparedScenarioAsset,
+  stageScenarioV3ImageAsset,
+} from '../../composition/persistence/scenario/store/v3';
 import type { ScenarioAssetEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
   ScenarioElementFrame,
@@ -32,13 +35,15 @@ export async function insertImageFileIntoSelectedSlide(args: {
   }
 
   const dataUrl = await readScenarioEditorFileAsDataUrl(args.file);
-  const prepared = await prepareScenarioV3ImageAsset({ dataUrl, projectId: args.projectId });
+  const prepared = await stageScenarioV3ImageAsset({ dataUrl, projectId: args.projectId });
   const latestSession = args.getSession();
   const slide = latestSession.project.slides.find((candidate) => candidate.id === slideId);
   if (latestSession.project.id !== args.projectId || !slide) {
+    await discardPreparedScenarioAsset(prepared.entry);
     return;
   }
   if (!args.commitAggregateMutation) {
+    await discardPreparedScenarioAsset(prepared.entry);
     throw new Error('Scenario aggregate mutation owner is unavailable.');
   }
 

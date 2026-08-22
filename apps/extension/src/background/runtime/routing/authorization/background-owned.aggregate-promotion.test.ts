@@ -8,7 +8,7 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   },
 }));
 
-import { authorizeBackgroundOwnedRoute } from './background-owned';
+import { authorizeBackgroundOwnedRoute } from './owned';
 
 it('authorizes only the exact gallery document for aggregate promotion', () => {
   const request = (url: string) => ({

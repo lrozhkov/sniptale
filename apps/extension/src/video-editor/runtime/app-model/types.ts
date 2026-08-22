@@ -1,4 +1,4 @@
-import type { ProjectExportEntry } from '../../../composition/persistence/projects/contracts';
+import type { StoredProjectExportEntry } from '../../../composition/persistence/projects/contracts';
 
 interface RecordingListItem {
   id: string;
@@ -35,7 +35,7 @@ export interface SaveStateMeta {
 export interface VideoEditorLibrariesState {
   recordings: RecordingListItem[];
   projects: ProjectListItem[];
-  projectExports: ProjectExportEntry[];
+  projectExports: StoredProjectExportEntry[];
   refreshRecordings: () => Promise<void>;
   refreshProjects: () => Promise<void>;
   refreshProjectExports: (projectId: string | null) => Promise<void>;

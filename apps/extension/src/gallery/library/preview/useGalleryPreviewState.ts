@@ -7,9 +7,9 @@ import {
   type SetStateAction,
 } from 'react';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
+import { getWebSnapshotScreenshotFile } from '../../../composition/persistence/web-snapshots';
 import { isGalleryMediaItem } from '../items';
 import type { GalleryPreviewSessionState } from '../types';
-import { loadWebSnapshotScreenshotBlob } from '../../web-snapshot/package';
 import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
 
 const EMPTY_PREVIEW_STATE: GalleryPreviewSessionState = {
@@ -70,8 +70,7 @@ async function loadPreviewBlob(
     return (await getAggregatePreviewBlob({ id: assetId, kind: 'image' })) ?? null;
   }
   if (previewItem.kind === 'web-archive') {
-    const packageBlob = await getMediaAssetBlob(assetId);
-    return packageBlob ? loadWebSnapshotScreenshotBlob(packageBlob) : null;
+    return (await getWebSnapshotScreenshotFile(assetId)) ?? null;
   }
 
   return (await getMediaAssetBlob(assetId)) ?? null;

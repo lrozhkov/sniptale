@@ -30,7 +30,8 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 };
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
-const REQUIRED_MINIMUM_CHROME_VERSION = '140';
+const REQUIRED_MINIMUM_CHROME_VERSION = '148';
+const REQUIRED_MESSAGE_SERIALIZATION = 'structured_clone';
 const REQUIRED_BUILD_TARGET = 'chrome140';
 const REQUIRED_NODE_ENGINE = '>=22.12 <23';
 const REQUIRED_PACKAGE_DEPENDENCY_PREFIXES = {
@@ -105,6 +106,15 @@ function collectRuntimeBaselineViolations({ compilerOptions, manifest, viteConfi
       createViolation(
         MANIFEST_PATH,
         `minimum_chrome_version must be ${JSON.stringify(REQUIRED_MINIMUM_CHROME_VERSION)}`
+      )
+    );
+  }
+
+  if (manifest.message_serialization !== REQUIRED_MESSAGE_SERIALIZATION) {
+    violations.push(
+      createViolation(
+        MANIFEST_PATH,
+        `message_serialization must be ${JSON.stringify(REQUIRED_MESSAGE_SERIALIZATION)}`
       )
     );
   }

@@ -24,7 +24,7 @@ import type {
   SaveScreenshotMediaAssetInput,
   SaveWebSnapshotMediaAssetInput,
 } from '../../composition/persistence/media-library/contracts';
-import type { ProjectExportEntry } from '../../composition/persistence/projects/contracts';
+import type { SaveProjectExportInput } from '../../composition/persistence/projects/index.exports';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { isSafeArchiveEntryLeafFilename } from '@sniptale/platform/data/zip-profile/entry-filenames';
@@ -128,7 +128,7 @@ export async function saveProjectAssetSafely(
   publishMediaHubLibraryChanged('create', [`project-asset:${id}`]);
 }
 
-export async function saveProjectExportSafely(entry: ProjectExportEntry): Promise<void> {
+export async function saveProjectExportSafely(entry: SaveProjectExportInput): Promise<void> {
   assertSafeMediaFilename(entry.filename);
   await withMediaHubWriteGuard(translate('shared.mediaHub.saveProjectExportAction'), () =>
     commitProjectExport(entry)

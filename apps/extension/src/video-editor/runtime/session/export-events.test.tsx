@@ -148,7 +148,6 @@ it('applies owner-scoped completed export messages', () => {
       ...createEditorEventTarget(),
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
       exportId: 'export-1',
       filename: 'capture.mp4',
       format: 'mp4',
@@ -159,10 +158,9 @@ it('applies owner-scoped completed export messages', () => {
 
   expect(params.completeExport).toHaveBeenCalledWith({
     filename: 'capture.mp4',
-    recordingId: 'recording-1',
     exportId: 'export-1',
   });
-  expect(params.refreshRecordings).toHaveBeenCalledTimes(1);
+  expect(params.refreshRecordings).not.toHaveBeenCalled();
   expect(params.refreshProjects).toHaveBeenCalledTimes(1);
   expect(params.refreshProjectExports).toHaveBeenCalledWith('project-1');
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
@@ -178,7 +176,6 @@ it('acknowledges stale owner-scoped export messages without mutating editor stat
       ...createEditorEventTarget(),
       jobId: 'job-old',
       projectId: 'project-1',
-      recordingId: 'recording-1',
       exportId: 'export-1',
       filename: 'capture.mp4',
       format: 'mp4',
@@ -200,7 +197,6 @@ it('accepts terminal export events after a cancel request failure preserves the 
     ...createEditorEventTarget(),
     jobId: 'job-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     exportId: 'export-1',
     filename: 'capture.mp4',
     format: 'mp4',
@@ -208,10 +204,9 @@ it('accepts terminal export events after a cancel request failure preserves the 
 
   expect(params.completeExport).toHaveBeenCalledWith({
     filename: 'capture.mp4',
-    recordingId: 'recording-1',
     exportId: 'export-1',
   });
-  expect(params.refreshRecordings).toHaveBeenCalledTimes(1);
+  expect(params.refreshRecordings).not.toHaveBeenCalled();
 });
 
 it('ignores validated export messages for stale jobs', () => {
@@ -221,7 +216,6 @@ it('ignores validated export messages for stale jobs', () => {
     ...createEditorEventTarget(),
     jobId: 'job-old',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     exportId: 'export-1',
     filename: 'capture.mp4',
     format: 'mp4',
@@ -241,7 +235,6 @@ it('filters export messages against current authority without resubscribing', ()
     ...createEditorEventTarget(),
     jobId: 'job-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     exportId: 'export-1',
     filename: 'stale.mp4',
     format: 'mp4',
@@ -251,7 +244,6 @@ it('filters export messages against current authority without resubscribing', ()
     ...createEditorEventTarget(),
     jobId: 'job-2',
     projectId: 'project-1',
-    recordingId: 'recording-2',
     exportId: 'export-2',
     filename: 'current.mp4',
     format: 'mp4',
@@ -262,7 +254,6 @@ it('filters export messages against current authority without resubscribing', ()
     ...createEditorEventTarget(),
     jobId: 'job-2',
     projectId: 'project-1',
-    recordingId: 'recording-2',
     exportId: 'export-2',
     filename: 'duplicate.mp4',
     format: 'mp4',
@@ -271,7 +262,6 @@ it('filters export messages against current authority without resubscribing', ()
   expect(params.completeExport).toHaveBeenCalledOnce();
   expect(params.completeExport).toHaveBeenCalledWith({
     filename: 'current.mp4',
-    recordingId: 'recording-2',
     exportId: 'export-2',
   });
 });

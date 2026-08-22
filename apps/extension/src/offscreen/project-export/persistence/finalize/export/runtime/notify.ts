@@ -27,7 +27,6 @@ export async function notifyProjectExportCompleted(
     format: VideoExportFormat;
     jobId: string;
     projectId: string;
-    recordingId: string;
   },
   options: NotifyProjectExportCompletedOptions = {}
 ): Promise<boolean> {
@@ -41,7 +40,6 @@ export async function notifyProjectExportCompleted(
       exportId: params.exportId,
       jobId: params.jobId,
       projectId: params.projectId,
-      recordingId: params.recordingId,
     },
     logger,
     logMessage: 'Failed to notify runtime about completed project export',
@@ -49,7 +47,6 @@ export async function notifyProjectExportCompleted(
       type: VideoMessageType.PROJECT_EXPORT_COMPLETED,
       jobId: params.jobId,
       projectId: params.projectId,
-      recordingId: params.recordingId,
       exportId: params.exportId,
       filename: params.filename,
       format: params.format,

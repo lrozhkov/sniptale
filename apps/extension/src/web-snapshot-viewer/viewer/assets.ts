@@ -180,8 +180,8 @@ export async function loadWebSnapshotPackage(
     throw new Error('Web snapshot was not found.');
   }
 
-  assertCompressedViewerPackageSize(record.packageBlob);
-  const zip = await JSZip.loadAsync(record.packageBlob);
+  assertCompressedViewerPackageSize(record.packageFile);
+  const zip = await JSZip.loadAsync(record.packageFile);
   const bytesByPath = await readViewerPackageEntries(zip);
   const packageManifest = readViewerPackageManifest(bytesByPath);
   assertManifestMatchesRecord({ packageManifest, recordManifest: record.manifest });

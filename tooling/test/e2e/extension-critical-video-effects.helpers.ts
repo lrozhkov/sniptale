@@ -174,7 +174,7 @@ export async function countPersistedEffectInstances(page: Page): Promise<number>
   return page.evaluate(
     () =>
       new Promise<number>((resolve, reject) => {
-        const open = indexedDB.open('sniptale-video-db');
+        const open = indexedDB.open('sniptale-db');
         open.onerror = () => reject(open.error ?? new Error('IndexedDB open failed'));
         open.onsuccess = () => {
           const database = open.result;

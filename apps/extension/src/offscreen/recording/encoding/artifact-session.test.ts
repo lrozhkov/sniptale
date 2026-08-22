@@ -6,6 +6,7 @@ import type {
 } from '../../../composition/persistence/recordings/staging';
 import { createRecordingArtifactSession } from './artifact-session';
 import { TestMediaStream } from '../multi-source/media-stream.test-support';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 class FakeMediaRecorder {
   static constructorError: Error | null = null;
@@ -53,7 +54,7 @@ function createHarness(options: { appendError?: Error } = {}) {
       const file = new File(writtenParts, 'recording.webm', { type: 'video/webm' });
       return {
         artifactId: 'recording-1',
-        file,
+        asset: createPreparedRecordingAssetForTest(file, 'recording-1'),
         filename: file.name,
         mimeType: file.type,
         size: file.size,
@@ -98,7 +99,7 @@ describe('recording artifact session', () => {
     expect(session.recorder.start).toHaveBeenCalledWith(1_000);
     const artifact = await session.stop();
 
-    expect(await artifact.file.text()).toBe('requestedterminal');
+    expect(artifact.asset.ref.size).toBe(new Blob(['requestedterminal']).size);
     expect(harness.writer.finalize).toHaveBeenCalledOnce();
     expect(harness.coordinator.delete).not.toHaveBeenCalled();
   });
@@ -163,7 +164,10 @@ describe('recording artifact session', () => {
 
     const artifact = {
       artifactId: 'recording-1',
-      file: new File(['late'], 'recording.webm'),
+      asset: createPreparedRecordingAssetForTest(
+        new File(['late'], 'recording.webm'),
+        'recording-1'
+      ),
       filename: 'recording.webm',
       mimeType: 'video/webm',
       size: 4,

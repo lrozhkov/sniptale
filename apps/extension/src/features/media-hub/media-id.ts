@@ -5,3 +5,7 @@ export function createRecordingMediaId(recordingId: string): string {
 export function createProjectAssetMediaId(projectAssetId: string): string {
   return `project-asset:${projectAssetId}`;
 }
+
+export function createProjectExportMediaId(exportId: string): string {
+  return `export:${exportId}`;
+}

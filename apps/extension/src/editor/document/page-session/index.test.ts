@@ -114,11 +114,16 @@ describe('editor aggregate restore', () => {
     const entry = { aggregateId: 'image-1', document: createEditorDocumentFixture(), revision: 2 };
     mocks.restore.mockResolvedValue(entry);
     const { resolveEditorPageRestoreSource } = await import('./');
+    const isCurrent = vi.fn(() => true);
     await expect(
-      resolveEditorPageRestoreSource({ assetId: 'image-1', bootstrapId: 'boot' }, 'image-1', {
-        restoreDraft: mocks.restore,
-      })
+      resolveEditorPageRestoreSource(
+        { assetId: 'image-1', bootstrapId: 'boot' },
+        'image-1',
+        { restoreDraft: mocks.restore },
+        isCurrent
+      )
     ).resolves.toEqual({ kind: 'draft', entry });
+    expect(mocks.restore).toHaveBeenCalledWith('image-1', isCurrent);
     expect(mocks.bootstrap).not.toHaveBeenCalled();
   });
 

@@ -11,12 +11,15 @@ import type {
 
 type ImportedAssetEntryResult = ReturnType<typeof createImportedAssetEntry>;
 
-const { createScenarioAssetEntryFromBlobMock, persistScenarioCaptureArtifactsMock } = vi.hoisted(
-  () => ({
-    createScenarioAssetEntryFromBlobMock: vi.fn(),
-    persistScenarioCaptureArtifactsMock: vi.fn(),
-  })
-);
+const {
+  createScenarioAssetEntryFromBlobMock,
+  discardPreparedScenarioAssetMock,
+  persistScenarioCaptureArtifactsMock,
+} = vi.hoisted(() => ({
+  createScenarioAssetEntryFromBlobMock: vi.fn(),
+  discardPreparedScenarioAssetMock: vi.fn(),
+  persistScenarioCaptureArtifactsMock: vi.fn(),
+}));
 
 vi.mock(
   '../../../../../composition/persistence/scenario/store/capture-step/assets',
@@ -28,6 +31,7 @@ vi.mock(
     return {
       ...actual,
       createScenarioAssetEntryFromBlob: createScenarioAssetEntryFromBlobMock,
+      discardPreparedScenarioAsset: discardPreparedScenarioAssetMock,
       persistScenarioCaptureArtifacts: persistScenarioCaptureArtifactsMock,
     };
   }
@@ -87,6 +91,7 @@ function createInsertImageAction() {
 function createImportedAssetEntry(galleryAssetId: string | null = 'gallery-1') {
   return {
     assetEntry: {
+      assetId: 'opfs-asset-imported',
       id: 'asset-imported',
       projectId: 'project-1',
       galleryAssetId,
@@ -265,6 +270,24 @@ async function verifyPersistedProjectRevisionAppliedAfterInsert() {
   );
 }
 
+async function verifyChangedProjectDiscardsPreparedAsset() {
+  const deferred = createDeferredAssetEntry();
+  createScenarioAssetEntryFromBlobMock.mockImplementationOnce(() => deferred.promise);
+  const { action, getCurrentProject, setCurrentProject } = createInsertImageAction();
+  const pendingInsert = action(1, {
+    blob: new Blob(['image'], { type: 'image/png' }),
+    filename: 'Stale image.png',
+  });
+  setCurrentProject({ ...getCurrentProject(), id: 'project-2' });
+  const prepared = createImportedAssetEntry();
+  deferred.resolve(prepared);
+
+  await pendingInsert;
+
+  expect(discardPreparedScenarioAssetMock).toHaveBeenCalledWith(prepared.assetEntry);
+  expect(persistScenarioCaptureArtifactsMock).not.toHaveBeenCalled();
+}
+
 describe('createInsertImageStepAction', () => {
   it(
     'creates and persists an imported image step from an arbitrary blob source',
@@ -282,5 +305,9 @@ describe('createInsertImageStepAction', () => {
   it(
     'applies the persisted project revision after imported image insertion',
     verifyPersistedProjectRevisionAppliedAfterInsert
+  );
+  it(
+    'discards the prepared asset when the active project changes',
+    verifyChangedProjectDiscardsPreparedAsset
   );
 });

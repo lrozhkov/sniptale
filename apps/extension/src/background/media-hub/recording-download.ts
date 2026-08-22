@@ -1,4 +1,5 @@
 import { getRecording } from '../../composition/persistence/recordings/index';
+import { getProjectExport } from '../../composition/persistence/projects';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadSettings } from '../../composition/persistence/settings';
 import {
@@ -33,11 +34,28 @@ export async function downloadStoredRecording(
   }
 
   const downloadId = await executeDownloadBlob(
-    recordingEntry.blob,
+    recordingEntry.file,
     filename,
     await resolveDefaultVideoPresetId()
   );
   logger.log('Downloaded stored recording', { filename, recordingId });
+  return downloadId;
+}
+
+export async function downloadStoredProjectExport(
+  exportId: string,
+  filename: string
+): Promise<number | undefined> {
+  const projectExport = await getProjectExport(exportId);
+  if (!projectExport) {
+    throw new Error(`Project export ${exportId} is not available for download`);
+  }
+  const downloadId = await executeDownloadBlob(
+    projectExport.file,
+    filename,
+    await resolveDefaultVideoPresetId()
+  );
+  logger.log('Downloaded stored project export', { exportId, filename });
   return downloadId;
 }
 

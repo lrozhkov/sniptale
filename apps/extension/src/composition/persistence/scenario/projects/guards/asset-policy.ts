@@ -11,11 +11,15 @@ export function isSafeScenarioAssetImageMimeType(mimeType: string): boolean {
 }
 
 export function assertSafeScenarioAssetStorageInput(blob: Blob, mimeType: string): void {
+  assertSafeScenarioAssetStorageMetadata(blob.size, mimeType);
+}
+
+export function assertSafeScenarioAssetStorageMetadata(size: number, mimeType: string): void {
   if (!isSafeScenarioAssetImageMimeType(mimeType)) {
     throw new Error('Unsupported scenario asset MIME type.');
   }
 
-  if (blob.size <= 0 || blob.size > SCENARIO_ASSET_MAX_IMAGE_BYTES) {
+  if (!Number.isSafeInteger(size) || size <= 0 || size > SCENARIO_ASSET_MAX_IMAGE_BYTES) {
     throw new Error('Scenario asset exceeds storage size limit.');
   }
 }

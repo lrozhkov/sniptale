@@ -71,7 +71,7 @@ async function stubWebSnapshotRecord(args: {
     createdAt: 1,
     id: 'snapshot-1',
     manifest: args.manifest,
-    packageBlob,
+    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
     size: packageBlob.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);

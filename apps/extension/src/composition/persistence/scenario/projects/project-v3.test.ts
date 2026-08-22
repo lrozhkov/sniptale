@@ -1,5 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
+vi.mock('../../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../assets')>()),
+  recoverStandaloneAssetPublications: vi.fn(async () => 0),
+}));
+
 const { dbGetAllMock, dbGetMock, dbPutMock, initDBMock, txGetMock, txPutMock } = vi.hoisted(() => ({
   dbGetAllMock: vi.fn(),
   dbGetMock: vi.fn(),

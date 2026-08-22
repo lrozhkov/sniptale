@@ -94,6 +94,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047`
 - Repository/source: https://github.com/gpac/mp4box.js.git
 
+### `@zip.js/zip.js` 2.8.53
+
+- Installed path: `node_modules/@zip.js/zip.js`
+- Declared license expression: `BSD-3-Clause`
+- Selected license: `BSD-3-Clause`
+- License source class: `installed-file`
+- License source: `node_modules/@zip.js/zip.js/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt`](LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt)
+- License text SHA-256: `1b7ebc8d7889ed25491484ab2b102370742ca6c0b26650a0c62cc2269b579b84`
+- Repository/source: https://github.com/gildas-lormeau/zip.js.git
+
 ### `@zumer/snapdom` 2.23.2
 
 - Installed path: `node_modules/@zumer/snapdom`

@@ -10,7 +10,7 @@ import type {
   ScenarioStepEditorDocumentEntry,
 } from '../../composition/persistence/scenario/contracts';
 import type { VideoProjectEntry } from '../../composition/persistence/projects/contracts';
-import type { WebSnapshotRecord } from '../../composition/persistence/web-snapshots/contracts';
+import type { StoredWebSnapshotRecord } from '../../composition/persistence/web-snapshots/contracts';
 import type { StorageCleanupCandidate } from '../../features/media-hub/types';
 
 const OLD_DIAGNOSTICS_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -25,7 +25,7 @@ export interface StorageCleanupInventory {
   scenarioStepDocuments: ScenarioStepEditorDocumentEntry[];
   thumbnails: MediaThumbnailEntry[];
   videoProjects: VideoProjectEntry[];
-  webSnapshots?: WebSnapshotRecord[];
+  webSnapshots?: StoredWebSnapshotRecord[];
 }
 
 export function buildInventoryCleanupCandidates(args: {

@@ -49,11 +49,33 @@ type BackgroundOwnedRouteDispatcher = {
 const keepOpen = (handled: boolean): ActionResult | null =>
   handled ? { handled: true, keepChannelOpen: true } : null;
 
+export const backgroundOwnedHandlerBindings = {
+  'aggregate-promotion': routeAggregatePromotionAction,
+  'ai-secret-unlock': routeAiSecretUnlockAction,
+  'ai-settings-mutation': routeAiSettingsMutationAction,
+  'ai-settings-navigation': routeAiSettingsNavigationAction,
+  'ai-settings-query': routeAiSettingsQueryAction,
+  'annotation-fork-session': routeAnnotationForkSessionAction,
+  'content-action-capability-issuance': routeContentActionCapabilityIssuance,
+  'content-runtime-wakeup': routeContentRuntimeWakeupAction,
+  'frame-annotation-raster': routeFrameAnnotationRasterAction,
+  'llm-content-processing': routeLlmAction,
+  'llm-scenario-editor-processing': routeScenarioEditorLlmAction,
+  'llm-session': routeLlmSessionAction,
+  'local-data-erasure': routeLocalDataErasureAction,
+  'native-app-runtime': routeNativeAppRuntimeAction,
+  'page-access': routePageAccessAction,
+  'popup-export-job': routePopupExportJobAction,
+  'popup-tab-route-capability-issuance': routePopupTabRouteCapabilityAction,
+  'settings-transfer': routeSettingsTransferAction,
+  'voice-input-offscreen-event': routeVoiceInputOffscreenEventAction,
+} satisfies Record<BackgroundOwnedRouteHandlerId, BackgroundOwnedRouteHandler>;
+
 export const backgroundOwnedRouteDispatchers = backgroundOwnedRouteInventory.map((entry) => ({
   handlerId: entry.handlerId,
   messageTypes: entry.messageTypes,
   ownerModule: entry.ownerModule,
-  route: getBackgroundOwnedRouteHandler(entry.handlerId),
+  route: backgroundOwnedHandlerBindings[entry.handlerId],
 })) as readonly BackgroundOwnedRouteDispatcher[];
 
 export function dispatchBackgroundOwnedRoute(
@@ -64,51 +86,6 @@ export function dispatchBackgroundOwnedRoute(
     entry.messageTypes.includes(action.message.type)
   );
   return dispatcher?.route(action, routeContext) ?? { handled: false };
-}
-
-function getBackgroundOwnedRouteHandler(
-  handlerId: BackgroundOwnedRouteHandlerId
-): BackgroundOwnedRouteHandler {
-  switch (handlerId) {
-    case 'aggregate-promotion':
-      return routeAggregatePromotionAction;
-    case 'ai-secret-unlock':
-      return routeAiSecretUnlockAction;
-    case 'ai-settings-query':
-      return routeAiSettingsQueryAction;
-    case 'ai-settings-mutation':
-      return routeAiSettingsMutationAction;
-    case 'ai-settings-navigation':
-      return routeAiSettingsNavigationAction;
-    case 'annotation-fork-session':
-      return routeAnnotationForkSessionAction;
-    case 'content-action-capability-issuance':
-      return routeContentActionCapabilityIssuance;
-    case 'content-runtime-wakeup':
-      return routeContentRuntimeWakeupAction;
-    case 'frame-annotation-raster':
-      return routeFrameAnnotationRasterAction;
-    case 'llm-content-processing':
-      return routeLlmAction;
-    case 'llm-scenario-editor-processing':
-      return routeScenarioEditorLlmAction;
-    case 'llm-session':
-      return routeLlmSessionAction;
-    case 'local-data-erasure':
-      return routeLocalDataErasureAction;
-    case 'settings-transfer':
-      return routeSettingsTransferAction;
-    case 'native-app-runtime':
-      return routeNativeAppRuntimeAction;
-    case 'page-access':
-      return routePageAccessAction;
-    case 'popup-export-job':
-      return routePopupExportJobAction;
-    case 'popup-tab-route-capability-issuance':
-      return routePopupTabRouteCapabilityAction;
-    case 'voice-input-offscreen-event':
-      return routeVoiceInputOffscreenEventAction;
-  }
 }
 
 function routePopupExportJobAction(action: BackgroundOwnedAction): ActionResult | null {

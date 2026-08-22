@@ -40,6 +40,8 @@ let root: Root | null = null;
 function createCallbackProps() {
   return {
     onActiveTagsChange: vi.fn(),
+    onActiveImportCancel: vi.fn(),
+    onActiveImportDismiss: vi.fn(),
     onAddTag: vi.fn(),
     onApplySelectionTag: vi.fn(),
     onBackupExportConfirm: vi.fn(),
@@ -86,6 +88,7 @@ function createCallbackProps() {
 function createPendingExportState() {
   return {
     options: {
+      includeDrafts: false,
       scope: 'all' as const,
       includeSourceMetadata: true,
       includeTelemetry: true,
@@ -94,7 +97,9 @@ function createPendingExportState() {
     summary: {
       approximateSizeBytes: 4096,
       assetCount: 2,
+      draftCount: 0,
       dataClasses: {
+        drafts: false,
         mediaAssets: true,
         recordings: true,
         scenarioProjects: true,
@@ -119,6 +124,7 @@ function createLayoutProps() {
   return {
     gridViewportRef: { current: null },
     importInputRef: { current: null },
+    importTriggerRef: { current: null },
     ...createCallbackProps(),
     state: createGalleryState({ pendingExport: createPendingExportState() }),
     viewMode: 'compact-grid' as const,

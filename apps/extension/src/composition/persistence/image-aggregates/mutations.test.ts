@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 
 const mocks = vi.hoisted(() => ({
   blobToDataUrl: vi.fn(async () => 'data:image/png;base64,b3JpZ2luYWw='),
@@ -9,6 +10,51 @@ const mocks = vi.hoisted(() => ({
   getPresentation: vi.fn(),
   getWorkspace: vi.fn(),
   runMutation: vi.fn(),
+  initDB: vi.fn(),
+  assetSequence: 0,
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: mocks.initDB,
+}));
+
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  buildPhysicalDeleteOperation: () => ({
+    assetIds: [],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'delete-1',
+    status: 'pending',
+    updatedAt: 1,
+  }),
+  completePhysicalDeleteOperation: vi.fn(async () => undefined),
+  createAssetPublicationJournal: vi.fn(async (args) => ({
+    ...args,
+    createdAt: 1,
+    journalId: 'workspace-journal',
+  })),
+  discardPreparedAsset: vi.fn(async () => undefined),
+  publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
+  readAssetFile: vi.fn(
+    async (_ref, filename) => new File(['immutable-original'], filename, { type: 'image/png' })
+  ),
+  recoverStandaloneAssetPublications: vi.fn(async () => 0),
+  releaseAssetReadyProtection: vi.fn(async () => undefined),
+  writeBlobToAsset: vi.fn(async (blob: Blob) => {
+    const assetId = `workspace-asset-${++mocks.assetSequence}`;
+    return {
+      ref: {
+        assetId,
+        createdAt: 1,
+        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+        mimeType: blob.type || 'application/octet-stream',
+        sha256: null,
+        size: blob.size,
+      },
+    };
+  }),
 }));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
@@ -19,9 +65,9 @@ vi.mock('../media-library/index.library', () => ({
   getMediaLibraryEntry: mocks.getMedia,
 }));
 
-vi.mock('../image-workspaces', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../image-workspaces')>()),
-  getImageWorkspace: mocks.getWorkspace,
+vi.mock('../image-workspaces/read', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image-workspaces/read')>()),
+  readImageWorkspace: mocks.getWorkspace,
 }));
 
 vi.mock('../aggregate-presentations', async (importOriginal) => ({
@@ -81,39 +127,77 @@ function installTransaction(args: {
   targetWorkspace?: object;
   workspace?: object;
 }) {
+  const storedWorkspace =
+    args.workspace &&
+    'document' in args.workspace &&
+    (args.workspace.document as { version?: number }).version === 2
+      ? {
+          ...args.workspace,
+          document: createPersistedEditorDocumentFixture(
+            args.workspace.document as ReturnType<typeof createEditorDocumentFixture>
+          ),
+        }
+      : args.workspace;
   const sourceId = args.media?.id ?? args.sourceId ?? 'image-1';
   const puts = {
     media: vi.fn(),
     presentation: vi.fn(),
     workspace: vi.fn(),
   };
+  const mediaById = new Map<string, unknown>();
+  const workspaceById = new Map<string, unknown>();
+  const presentationById = new Map<string, unknown>();
+  if (args.media) mediaById.set(sourceId, args.media);
+  if (storedWorkspace) workspaceById.set(sourceId, storedWorkspace);
+  if (args.presentation) presentationById.set(sourceId, args.presentation);
+  if (args.targetAggregateId && args.targetMedia)
+    mediaById.set(args.targetAggregateId, args.targetMedia);
+  if (args.targetAggregateId && args.targetWorkspace)
+    workspaceById.set(args.targetAggregateId, args.targetWorkspace);
+  if (args.targetAggregateId && args.targetPresentation)
+    presentationById.set(args.targetAggregateId, args.targetPresentation);
+  puts.media.mockImplementation(
+    async (value: { id: string }) => void mediaById.set(value.id, value)
+  );
+  puts.workspace.mockImplementation(
+    async (value: { aggregateId: string }) => void workspaceById.set(value.aggregateId, value)
+  );
+  puts.presentation.mockImplementation(
+    async (value: { aggregateId: string }) => void presentationById.set(value.aggregateId, value)
+  );
   const stores = {
     aggregate_presentations: {
       get: vi.fn(async (key: [string, string]) => {
-        if (key[1] === sourceId) return args.presentation;
-        if (key[1] === args.targetAggregateId) return args.targetPresentation;
-        return undefined;
+        return presentationById.get(key[1]);
       }),
       put: puts.presentation,
     },
     image_workspaces: {
       get: vi.fn(async (key: string) => {
-        if (key === sourceId) return args.workspace;
-        if (key === args.targetAggregateId) return args.targetWorkspace;
-        return undefined;
+        return workspaceById.get(key);
       }),
       put: puts.workspace,
     },
     media_library: {
       get: vi.fn(async (key: string) => {
-        if (key === sourceId) return args.media;
-        if (key === args.targetAggregateId) return args.targetMedia;
-        return undefined;
+        return mediaById.get(key);
       }),
       put: puts.media,
     },
+    asset_refs: {
+      delete: vi.fn(),
+      put: vi.fn(),
+    },
+    asset_owners: {
+      delete: vi.fn(),
+      index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+      put: vi.fn(),
+    },
+    asset_operations: {
+      put: vi.fn(),
+    },
   } as const;
-  mocks.runMutation.mockImplementationOnce(async (effect) =>
+  mocks.runMutation.mockImplementation(async (effect) =>
     effect({
       transaction: vi.fn(() => ({
         done: Promise.resolve(),
@@ -127,6 +211,8 @@ function installTransaction(args: {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(Date, 'now').mockReturnValue(10);
+  mocks.assetSequence = 0;
+  mocks.initDB.mockResolvedValue({ get: vi.fn(async () => undefined) });
 });
 
 it('commits a workspace with integer CAS while preserving the immutable original', async () => {
@@ -145,9 +231,17 @@ it('commits a workspace with integer CAS while preserving the immutable original
 
   await expect(
     commitImageWorkspace({ aggregateId: media.id, document, expectedRevision: 2 })
-  ).resolves.toEqual({ revision: 3, updatedAt: 10 });
+  ).resolves.toMatchObject({
+    documentAssetsByRuntimeUrl: expect.any(Map),
+    revision: 3,
+    updatedAt: 10,
+  });
   expect(puts.workspace).toHaveBeenCalledWith(
-    expect.objectContaining({ aggregateId: media.id, document, revision: 3 })
+    expect.objectContaining({
+      aggregateId: media.id,
+      document: expect.objectContaining({ version: 3 }),
+      revision: 3,
+    })
   );
   expect(puts.media).toHaveBeenCalledWith(
     expect.objectContaining({ blob: media.blob, workspaceRevision: 3 })
@@ -160,7 +254,11 @@ it('creates a missing revision-zero aggregate and rejects non-initial missing ro
 
   await expect(
     commitImageWorkspace({ aggregateId: 'new-image', document, expectedRevision: 0 })
-  ).resolves.toEqual({ revision: 1, updatedAt: 10 });
+  ).resolves.toMatchObject({
+    documentAssetsByRuntimeUrl: expect.any(Map),
+    revision: 1,
+    updatedAt: 10,
+  });
   expect(puts.media).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'new-image', workspaceRevision: 0 })
   );
@@ -435,17 +533,17 @@ it('saves a complete library copy under a new aggregate id', async () => {
   ).resolves.toBe('image-copy');
   expect(puts.media).toHaveBeenCalledWith(
     expect.objectContaining({
-      blob: media.blob,
+      blob: expect.any(Blob),
       id: 'image-copy',
       lifecycle: expect.objectContaining({ storageClass: 'library' }),
-      workspaceRevision: 2,
+      workspaceRevision: 1,
     })
   );
   expect(puts.workspace).toHaveBeenCalledWith(
-    expect.objectContaining({ aggregateId: 'image-copy', revision: 2 })
+    expect.objectContaining({ aggregateId: 'image-copy', revision: 1 })
   );
   expect(puts.presentation).toHaveBeenCalledWith(
-    expect.objectContaining({ aggregateId: 'image-copy', presentationRevision: 2 })
+    expect.objectContaining({ aggregateId: 'image-copy', presentationRevision: 1 })
   );
 });
 
@@ -613,7 +711,11 @@ it('atomically saves unsaved editor state as a revision-one library copy', async
     })
   );
   expect(puts.workspace).toHaveBeenCalledWith(
-    expect.objectContaining({ aggregateId: 'stale-tab-copy', document, revision: 1 })
+    expect.objectContaining({
+      aggregateId: 'stale-tab-copy',
+      document: expect.objectContaining({ version: 3 }),
+      revision: 1,
+    })
   );
   expect(puts.presentation).toHaveBeenCalledWith(
     expect.objectContaining({

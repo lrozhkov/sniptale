@@ -5,10 +5,10 @@ it('creates scenario asset ids and maps asset entries', () => {
   expect(createScenarioAssetId()).toEqual(expect.any(String));
   expect(
     mapScenarioAssetEntry({
+      assetId: 'opfs-asset-1',
       id: 'asset-1',
       projectId: 'project-1',
       galleryAssetId: null,
-      blob: new Blob(['asset']),
       mimeType: 'image/png',
       width: 100,
       height: 50,

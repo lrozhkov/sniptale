@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { GalleryConfirmDialogState, PendingExportState, PendingImportState } from './types';
+import type {
+  ActiveImportState,
+  GalleryConfirmDialogState,
+  PendingExportState,
+  PendingImportState,
+} from './types';
 
 export function useGallerySurfaceState() {
+  const [activeImport, setActiveImport] = useState<ActiveImportState | null>(null);
   const [showStorageManager, setShowStorageManager] = useState(false);
   const [pendingImport, setPendingImport] = useState<PendingImportState | null>(null);
   const [pendingExport, setPendingExport] = useState<PendingExportState | null>(null);
@@ -17,6 +23,7 @@ export function useGallerySurfaceState() {
 
   return {
     actions: {
+      setActiveImport,
       setBanner,
       setConfirmDialog,
       setIsBusy,
@@ -25,6 +32,7 @@ export function useGallerySurfaceState() {
       setShowStorageManager,
     },
     state: {
+      activeImport,
       banner,
       confirmDialog,
       isBusy,

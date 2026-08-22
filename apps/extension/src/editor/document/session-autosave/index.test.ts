@@ -46,7 +46,7 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
-  getImageWorkspace: getWorkspaceMock,
+  recoverAndGetImageWorkspace: getWorkspaceMock,
 }));
 
 beforeEach(() => {
@@ -54,6 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   commitWorkspaceMock.mockImplementation(async (input) => ({
     aggregateId: input.aggregateId,
+    documentAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl ?? new Map(),
     revision: input.expectedRevision + 1,
   }));
 });
@@ -241,7 +242,7 @@ describe('image aggregate autosave', () => {
     expect(autosave.getLastWriteError()).toBeInstanceOf(Error);
 
     autosave.scheduleAutosave(createDocument('must-not-overwrite-copy'));
-    autosave.activate({
+    autosave.rebindAggregate({
       aggregateId: 'image-copy',
       durableRevision: 1,
       renderPresentation: null,
@@ -302,5 +303,97 @@ describe('image aggregate autosave', () => {
     emptyState.pendingDocument = null;
     await vi.advanceTimersByTimeAsync(400);
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe('image workspace hydration freshness', () => {
+  it('carries hydrated asset identity across consecutive autosaves', async () => {
+    const restoredAssets = new Map([
+      [
+        'blob:hydrated-source',
+        {
+          assetId: 'source-asset',
+          createdAt: 1,
+          location: { kind: 'opfs' as const, objectKey: 'objects/source-asset' },
+          mimeType: 'image/png',
+          sha256: null,
+          size: 6,
+        },
+      ],
+    ]);
+    getWorkspaceMock.mockResolvedValue({
+      aggregateId: 'image-2',
+      createdAt: 1,
+      document: createDocument('blob:hydrated-source'),
+      documentAssetsByRuntimeUrl: restoredAssets,
+      revision: 4,
+      sourceTitle: null,
+      sourceUrl: null,
+      updatedAt: 2,
+    });
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    await autosave.restoreDraft('image-2');
+
+    await autosave.persistSnapshot(() => createDocument('blob:hydrated-source'));
+    await autosave.persistSnapshot(() => createDocument('blob:hydrated-source'));
+
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock.mock.calls[0]?.[0].reusableAssetsByRuntimeUrl).toBe(restoredAssets);
+    expect(commitWorkspaceMock.mock.calls[1]?.[0].reusableAssetsByRuntimeUrl).toBe(restoredAssets);
+  });
+
+  it('discards a late hydrated draft without revoking the newer active document', async () => {
+    let resolveOlder!: (value: unknown) => void;
+    let resolveNewer!: (value: unknown) => void;
+    const releaseOlder = vi.fn();
+    const releaseNewer = vi.fn();
+    getWorkspaceMock
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOlder = resolve;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveNewer = resolve;
+        })
+      );
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    let generation = 1;
+    const older = autosave.restoreDraft('image-older', () => generation === 1);
+    generation = 2;
+    const newer = autosave.restoreDraft('image-newer', () => generation === 2);
+
+    resolveNewer({
+      aggregateId: 'image-newer',
+      createdAt: 1,
+      document: createDocument('newer'),
+      releaseDocumentAssets: releaseNewer,
+      revision: 8,
+      sourceTitle: null,
+      sourceUrl: null,
+      updatedAt: 2,
+    });
+    await expect(newer).resolves.toEqual(expect.objectContaining({ aggregateId: 'image-newer' }));
+    resolveOlder({
+      aggregateId: 'image-older',
+      createdAt: 1,
+      document: createDocument('older'),
+      releaseDocumentAssets: releaseOlder,
+      revision: 4,
+      sourceTitle: null,
+      sourceUrl: null,
+      updatedAt: 2,
+    });
+
+    await expect(older).resolves.toBeUndefined();
+    expect(releaseOlder).toHaveBeenCalledOnce();
+    expect(releaseNewer).not.toHaveBeenCalled();
+    expect(autosave.getDurableRevision()).toBe(8);
+
+    autosave.dispose();
+    expect(releaseNewer).toHaveBeenCalledOnce();
   });
 });

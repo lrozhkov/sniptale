@@ -5,6 +5,7 @@
     "docs/architecture/code-organization.md",
     "docs/architecture/i18n-architecture.md",
     "docs/architecture/parser-architecture.md",
+    "docs/architecture/persistence-contracts.md",
     "docs/architecture/platform-patterns-and-tradeoffs.md",
     "docs/architecture/repository-overview.md",
     "docs/architecture/runtime-contexts.md",

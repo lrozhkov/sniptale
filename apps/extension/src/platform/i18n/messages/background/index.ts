@@ -38,6 +38,10 @@ export const backgroundMessages = defineMessageSource({
       ru: 'Ошибка записи',
       en: 'Recording error',
     },
+    cameraFrameRateUnsupported: {
+      ru: 'Камера не поддерживает выбранную частоту кадров. Выберите другую частоту.',
+      en: 'The camera does not support the selected frame rate. Choose another frame rate.',
+    },
     recordingAlreadyRunning: {
       ru: 'Запись уже запущена.',
       en: 'A recording is already running.',

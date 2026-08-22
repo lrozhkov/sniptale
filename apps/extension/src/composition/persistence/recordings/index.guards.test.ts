@@ -4,8 +4,9 @@ import { parseRecordingEntries, parseRecordingEntry } from './index.guards.ts';
 
 function createRecordingEntry(id = 'recording-1') {
   return {
+    assetId: `asset-${id}`,
     id,
-    blob: new Blob(['video'], { type: 'video/webm' }),
+    mimeType: 'video/webm',
     filename: `${id}.webm`,
     createdAt: 1000,
     size: 5,
@@ -25,6 +26,7 @@ describe('recording entry guards', () => {
 
     expect(parseRecordingEntry(entry)).toEqual(withLegacyLifecycle(entry));
     expect(parseRecordingEntry({ ...entry, size: '5' })).toBeNull();
+    expect(parseRecordingEntry({ ...entry, assetId: '' })).toBeNull();
   });
 
   it('filters invalid entries from stored lists and reports invalid roots', () => {

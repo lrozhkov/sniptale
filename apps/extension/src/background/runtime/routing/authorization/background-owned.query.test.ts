@@ -22,7 +22,7 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   },
 }));
 
-import { authorizeBackgroundOwnedRoute } from './background-owned';
+import { authorizeBackgroundOwnedRoute } from './owned';
 
 function aiSettingsQueryRequest(
   message: AiSettingsQueryMessage,

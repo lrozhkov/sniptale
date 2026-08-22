@@ -72,17 +72,23 @@ export function resolveVideoProjectReadResult(result: VideoProjectReadResult): V
 }
 
 export interface ProjectAssetEntry {
+  assetId: string;
   id: string;
-  blob: Blob;
   mimeType: string;
   createdAt: number;
   size: number;
 }
 
+export interface HydratedProjectAssetEntry extends ProjectAssetEntry {
+  file: File;
+}
+
+export type StoredProjectAssetEntry = ProjectAssetEntry;
+
 export interface ProjectExportEntry {
+  assetId: string;
   id: string;
   projectId: string;
-  recordingId: string;
   filename: string;
   createdAt: number;
   size: number;
@@ -93,3 +99,9 @@ export interface ProjectExportEntry {
   format?: VideoExportFormat;
   mimeType?: string;
 }
+
+export interface HydratedProjectExportEntry extends ProjectExportEntry {
+  file: File;
+}
+
+export type StoredProjectExportEntry = ProjectExportEntry;

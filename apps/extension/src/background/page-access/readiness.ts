@@ -1,4 +1,7 @@
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  CONTENT_RUNTIME_PROTOCOL_VERSION,
+  VideoMessageType,
+} from '@sniptale/runtime-contracts/video/messages';
 import { getBackgroundRuntimeMessaging } from '../routing-contracts/runtime-messaging/services';
 export {
   waitForContentScreenshotMode,
@@ -29,7 +32,10 @@ function hasViewportProbePayload(response: unknown): boolean {
     return false;
   }
 
-  return isObject(response['coords']) || isObject(response['viewport']);
+  return (
+    response['contentRuntimeProtocolVersion'] === CONTENT_RUNTIME_PROTOCOL_VERSION &&
+    (isObject(response['coords']) || isObject(response['viewport']))
+  );
 }
 
 async function waitForContentRuntimeReadyAttempt(

@@ -1,5 +1,28 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
+vi.mock('../../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../assets')>()),
+  assertAssetWriteAdmission: vi.fn(async () => undefined),
+  createAssetPublicationJournal: vi.fn(async (args) => ({
+    ...args,
+    createdAt: 1,
+    journalId: 'scenario-journal',
+  })),
+  publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
+  recoverStandaloneAssetPublications: vi.fn(async () => 0),
+  releaseAssetReadyProtection: vi.fn(),
+  writeBlobToAsset: vi.fn(async (blob: Blob, options: { mimeType: string }) => ({
+    ref: {
+      assetId: 'opfs-scenario-asset',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/opfs-scenario-asset' },
+      mimeType: options.mimeType,
+      sha256: null,
+      size: blob.size,
+    },
+  })),
+}));
+
 const {
   dataUrlToBlobMock,
   deleteScenarioAssetMock,

@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 import { createMultiSourceLifecycle, type MultiSourceSession } from './state';
 import { setActiveMultiSourceSession } from './state';
 import { stopMultiSourceSession } from './stop';
@@ -10,7 +11,7 @@ function createArtifact(id: string): FinalizedRecordingStagingArtifact {
   const file = new File(['media'], `${id}.webm`, { type: 'video/webm' });
   return {
     artifactId: id,
-    file,
+    asset: createPreparedRecordingAssetForTest(file, id),
     filename: file.name,
     mimeType: file.type,
     size: file.size,

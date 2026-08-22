@@ -54,16 +54,17 @@ export function createScenarioPayloadResponse() {
 }
 
 export function createScenarioAssetEntryFixture() {
-  const blob = new Blob(['asset'], { type: 'image/png' });
+  const file = new File(['asset'], 'asset-1', { type: 'image/png' });
   return {
-    blob,
+    assetId: 'opfs-asset-1',
+    file,
     createdAt: 10,
     galleryAssetId: null,
     height: 1,
     id: 'asset-1',
-    mimeType: blob.type,
+    mimeType: file.type,
     projectId: 'project-1',
-    size: blob.size,
+    size: file.size,
     width: 1,
   };
 }

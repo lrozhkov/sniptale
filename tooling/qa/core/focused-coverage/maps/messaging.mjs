@@ -1,6 +1,19 @@
 export const MESSAGING_OWNER_MAPPINGS = [
   {
     allowCrossOwner: true,
+    owner: 'background-ingress-descriptor-contracts',
+    productionPrefix: 'apps/extension/src/contracts/messaging/contracts/runtime/background-ingress',
+    reason:
+      'Canonical background ingress metadata requires exhaustive registry and boundary proof.',
+    testFiles: [
+      'apps/extension/src/background/runtime/routing/action-kernel/registry.drift.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/route-completeness.test.ts',
+      'apps/extension/src/background/runtime/routing/boundary/parser.test.ts',
+      'apps/extension/src/background/media/video/runtime/sender-policy.test.ts',
+    ],
+  },
+  {
+    allowCrossOwner: true,
     owner: 'shared-aggregate-promotion-contract',
     productionFile: 'apps/extension/src/contracts/aggregate-promotion.ts',
     reason: 'Boundary, port, and coordinator tests cover aggregate promotion parsing and replies.',

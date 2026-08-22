@@ -27,8 +27,8 @@ export const COVERAGE_ROLLOUT_EXACT_FILES = {
     'apps/extension/src/video-editor/runtime/session/timeline-preview-plans.ts',
     'apps/extension/src/video-editor/runtime/session/timeline-previews.ts',
     'apps/extension/src/video-editor/runtime/session/types.ts',
-    'apps/extension/src/workflows/media-hub-backup/restore/batches.ts',
-    'apps/extension/src/workflows/media-hub-backup/restore/projects/index.ts',
+    'apps/extension/src/workflows/media-hub-backup/v6/restore-session.ts',
+    'apps/extension/src/workflows/media-hub-backup/v6/staging.ts',
   ],
   contentParserExport: [
     'apps/extension/src/content/parser/backends/contracts.ts',

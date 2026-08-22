@@ -1,4 +1,5 @@
 export type OffscreenDocumentState = {
+  creationPromise: Promise<boolean> | null;
   offscreenCreated: boolean;
   offscreenReady: boolean;
   startupFailed: boolean;
@@ -7,6 +8,7 @@ export type OffscreenDocumentState = {
 
 export function createInitialOffscreenDocumentState(): OffscreenDocumentState {
   return {
+    creationPromise: null,
     offscreenCreated: false,
     offscreenReady: false,
     startupFailed: false,

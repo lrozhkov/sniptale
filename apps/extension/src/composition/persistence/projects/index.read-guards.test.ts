@@ -17,9 +17,16 @@ const mocks = vi.hoisted(() => ({
   txDelete: vi.fn(),
   txGet: vi.fn(),
   txGetAll: vi.fn(),
+  recoverProjectMediaPublications: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('./asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: mocks.recoverProjectMediaPublications,
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal()),
   AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
@@ -52,6 +59,7 @@ function createDb() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.recoverProjectMediaPublications.mockResolvedValue(undefined);
   mocks.initDB.mockResolvedValue(createDb());
   mocks.txGetAll.mockResolvedValue([]);
 });
@@ -106,7 +114,6 @@ it('parses media library entries across supported source kinds', async () => {
         exportId: 'export-1',
         kind: 'project-export',
         projectId: 'project-1',
-        recordingId: 'recording-1',
       },
     }),
     createMediaLibraryEntry({
@@ -261,6 +268,7 @@ it('fails closed for malformed persisted project asset rows', async () => {
   await expect(getProjectAsset('asset-1')).resolves.toBeUndefined();
   await expect(listProjectAssets()).resolves.toEqual([
     {
+      assetId: 'asset-object-1',
       createdAt: 200,
       filename: 'from-library.png',
       id: 'asset-1',
@@ -292,7 +300,7 @@ it('parses scenario project and asset rows directly', async () => {
   } = await import('../scenario/read-guards');
   const blob = new Blob(['scenario'], { type: 'image/png' });
   const asset = {
-    blob,
+    assetId: 'opfs-scenario-asset-1',
     createdAt: 1,
     galleryAssetId: null,
     height: 20,
@@ -312,9 +320,19 @@ it('parses scenario project and asset rows directly', async () => {
   });
   expect(parseScenarioProjectEntry({ ...entry, project: { id: project.id } })).toBeNull();
   expect(parseScenarioAssetEntry(asset)).toEqual(asset);
-  expect(parseScenarioAssetEntry({ ...asset, blob: {} })).toBeNull();
-  expect(parsePendingScenarioAssetEntry({ ...asset, height: undefined, tabId: 7 })).toBeTruthy();
-  expect(parsePendingScenarioAssetEntry({ ...asset, tabId: -1 })).toBeNull();
+  expect(parseScenarioAssetEntry({ ...asset, assetId: null })).toBeNull();
+  expect(
+    parsePendingScenarioAssetEntry({
+      ...asset,
+      assetId: undefined,
+      blob,
+      height: undefined,
+      tabId: 7,
+    })
+  ).toBeTruthy();
+  expect(
+    parsePendingScenarioAssetEntry({ ...asset, assetId: undefined, blob, tabId: -1 })
+  ).toBeNull();
   expect(
     parseScenarioExportEntry({
       createdAt: 1,

@@ -4,9 +4,11 @@ import type {
   MediaHubBackupSummary,
   MediaHubLocalBackupSummary,
 } from '../../workflows/media-hub-backup/index';
+import type { MediaHubImportConflictStrategy } from '../../workflows/media-hub-backup/index';
 import type { StorageCleanupReport } from '../../features/media-hub/types';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
 import type { GalleryItem } from '../library/items';
+import type { ActiveImportState } from '../library/import-types';
 import type {
   FolderFilter,
   GalleryFolderCounts,
@@ -28,6 +30,8 @@ export type {
 
 export interface PendingImportState {
   file: File;
+  resumeOperationId?: string;
+  resumeStrategy?: MediaHubImportConflictStrategy;
   summary: MediaHubBackupSummary;
 }
 
@@ -35,6 +39,8 @@ export interface PendingExportState {
   options: MediaHubBackupExportOptions;
   summary: MediaHubLocalBackupSummary;
 }
+
+export type { ActiveImportState } from '../library/import-types';
 
 export interface GalleryConfirmDialogState {
   title: string;
@@ -72,6 +78,7 @@ interface GalleryAppPreviewState {
 }
 
 interface GalleryAppStorageState {
+  activeImport: ActiveImportState | null;
   storageInfo: StorageEstimateInfo | null;
   cleanupReport: StorageCleanupReport | null;
   showStorageManager: boolean;
@@ -104,6 +111,7 @@ export interface GalleryAppState {
 interface GalleryAppRefs {
   gridViewportRef: RefObject<HTMLDivElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;
+  importTriggerRef: RefObject<HTMLButtonElement | null>;
 }
 
 interface GalleryAppStorageActions {
@@ -132,6 +140,7 @@ interface GalleryAppPreviewActions {
 }
 
 interface GalleryAppSurfaceActions {
+  setActiveImport: Dispatch<SetStateAction<ActiveImportState | null>>;
   setShowStorageManager: Dispatch<SetStateAction<boolean>>;
   setPendingImport: Dispatch<SetStateAction<PendingImportState | null>>;
   setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;

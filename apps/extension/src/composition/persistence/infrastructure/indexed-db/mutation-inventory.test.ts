@@ -7,15 +7,19 @@ const inventoryRoots = [
   'apps/extension/src/background/capture/native-app/persistence',
   'apps/extension/src/composition/persistence',
   'apps/extension/src/editor/objects/custom-shapes',
-  'apps/extension/src/workflows/media-hub-backup/restore',
+  'apps/extension/src/workflows/media-hub-backup/v6/root-publication',
 ] as const;
 const delegatedMutationHelpers = new Set([
+  'apps/extension/src/composition/persistence/aggregate-presentations/backup-restore.ts',
   'apps/extension/src/composition/persistence/editor-bootstrap/retention-cleanup.ts',
+  'apps/extension/src/composition/persistence/effect-bundles/backup-restore.ts',
+  'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-lease.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
-  'apps/extension/src/composition/persistence/projects/mutation-stores.ts',
+  'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
+  'apps/extension/src/composition/persistence/web-snapshots/backup-restore.ts',
 ]);
 const indexedDbMutationPattern =
   /(?:\b(?:db|tx|store|cursor)|\b\w+Store)\.(?:put|delete|clear)\s*\(|\.transaction\([\s\S]{0,180}?["']readwrite["']/m;
@@ -56,12 +60,16 @@ it('keeps every IndexedDB mutation leaf behind the persistent mutation barrier',
 
 it('commits project assets and their media rows inside one admitted transaction', () => {
   const source = readFileSync(
-    join(repoRoot, 'apps/extension/src/composition/persistence/projects/index.ts'),
+    join(repoRoot, 'apps/extension/src/composition/persistence/projects/asset-publication.ts'),
     'utf8'
   );
 
   expect(source).not.toContain('upsertMediaEntry');
-  expect(source).toContain('[PROJECT_ASSETS_STORE, MEDIA_LIBRARY_STORE]');
+  expect(source).toContain(
+    'args.storeName,\n        MEDIA_LIBRARY_STORE,\n        ASSET_REFS_STORE'
+  );
+  expect(source).toContain('await domainStore.put(args.entry)');
+  expect(source).toContain('await tx.objectStore(MEDIA_LIBRARY_STORE).put(mediaEntry)');
 });
 
 it('keeps the complete extension-page localStorage writer inventory behind the same barrier', () => {

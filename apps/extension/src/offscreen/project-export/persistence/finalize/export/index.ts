@@ -1,8 +1,6 @@
 import {
   deleteProjectExportSafely,
-  deleteOrphanedRawRecordingsSafely,
   saveProjectExportSafely,
-  saveRecordingSafely,
 } from '../../../../../workflows/media-hub/store';
 import { type VideoProjectExportSettings } from '../../../../../features/video/project/types/export';
 import { type VideoProject } from '../../../../../features/video/project/types/model';
@@ -10,7 +8,7 @@ import { buildProjectExportEntry } from '../../entry';
 import { getExportFormatDescriptor } from '../../format';
 import { buildExportFilename } from './filename';
 import { buildSubtitleSidecarFiles } from './subtitle-sidecar';
-import { downloadExportRecording, downloadExportSidecar } from './runtime/index';
+import { downloadProjectExport, downloadExportSidecar } from './runtime/index';
 import { notifyProjectExportCompleted } from './runtime/notify';
 
 interface FinalizeExportOptions {
@@ -25,7 +23,6 @@ interface SaveCompletedProjectExportArgs {
   jobId: string;
   options: FinalizeExportOptions;
   project: VideoProject;
-  recordingId: string;
   settings: VideoProjectExportSettings;
 }
 
@@ -47,7 +44,6 @@ async function saveProjectExportAndAcceptCompletion(
         exportId: args.exportId,
         filename: args.filename,
         project: args.project,
-        recordingId: args.recordingId,
         settings: args.settings,
       })
     );
@@ -58,7 +54,6 @@ async function saveProjectExportAndAcceptCompletion(
     if (projectExportSaved) {
       await deleteProjectExportSafely(args.exportId);
     }
-    await deleteOrphanedRawRecordingsSafely([args.recordingId]);
     throw error;
   }
 }
@@ -71,7 +66,6 @@ async function acceptProjectExportCompletion(args: SaveCompletedProjectExportArg
       format: args.settings.format,
       jobId: args.jobId,
       projectId: args.project.id,
-      recordingId: args.recordingId,
     },
     args.options
   );
@@ -81,8 +75,7 @@ async function acceptProjectExportCompletion(args: SaveCompletedProjectExportArg
 }
 
 /**
- * Finalize a project export by persisting the recording, saving the export entry, and notifying
- * the runtime about the completed export.
+ * Finalize a project export by publishing its durable asset and notifying the runtime.
  */
 export async function finalizeExport(
   jobId: string,
@@ -100,10 +93,8 @@ export async function finalizeExport(
     timestamp,
   });
   const subtitleSidecarFiles = buildSubtitleSidecarFiles(project, settings, filename);
-  const recordingId = `export-${crypto.randomUUID()}`;
   const exportId = crypto.randomUUID();
 
-  await saveRecordingSafely(recordingId, blob, filename);
   await saveProjectExportAndAcceptCompletion({
     blob,
     exportId,
@@ -111,10 +102,9 @@ export async function finalizeExport(
     jobId,
     options,
     project,
-    recordingId,
     settings,
   });
 
-  downloadExportRecording(recordingId, filename, settings.downloadAfterExport);
+  downloadProjectExport(exportId, filename, settings.downloadAfterExport);
   subtitleSidecarFiles.forEach((file) => downloadExportSidecar(file.blob, file.filename));
 }

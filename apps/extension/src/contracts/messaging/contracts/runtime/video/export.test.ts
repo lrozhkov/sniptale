@@ -45,7 +45,6 @@ function createCompletedExportMessage() {
     format: 'mp4',
     jobId: 'job-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     type: VideoMessageType.PROJECT_EXPORT_COMPLETED,
   };
 }
@@ -128,6 +127,20 @@ it('rejects malformed project export input references and settings payloads', ()
 });
 
 it('parses recordingId-only download messages and rejects arbitrary URL payloads', () => {
+  expect(
+    runtimeVideoExportMessageContracts[VideoMessageType.DOWNLOAD_PROJECT_EXPORT].parseRequest({
+      exportId: 'export-1',
+      filename: 'project.mp4',
+      type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
+    })
+  ).toEqual(
+    expect.objectContaining({
+      exportId: 'export-1',
+      filename: 'project.mp4',
+      type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
+    })
+  );
+
   expect(
     runtimeVideoExportMessageContracts[VideoMessageType.DOWNLOAD_RECORDING].parseRequest({
       filename: 'capture.webm',

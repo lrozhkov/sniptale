@@ -1964,6 +1964,18 @@
   ],
   "scripts": [
     {
+      "id": "qa:archive-certify",
+      "disposition": "keep",
+      "owner": "media-transfer",
+      "rationale": "The package script is the release-scale ZIP64 archive certification entrypoint."
+    },
+    {
+      "id": "qa:archive-stress",
+      "disposition": "keep",
+      "owner": "media-transfer",
+      "rationale": "The package script is the bounded-memory pull-request archive stress entrypoint."
+    },
+    {
       "id": "qa:advisory",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2789,12 +2801,6 @@
     },
     {
       "tool": "verify-logging.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "The validation row proves a deterministic repository tool or canonical control."
-    },
-    {
-      "tool": "verify-main-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."

@@ -19,14 +19,14 @@ export type ActionKind =
 
 type ActionRouteSupport = 'internal' | 'parser-supported' | 'unsupported';
 
-export type ActionRouteHandlerAdapter =
+type ActionRouteHandlerAdapter =
   | 'routeBackgroundOwnedAction'
   | 'routeInternalSignalAction'
   | 'routeTabAction'
   | 'routeUnknownAction'
   | 'routeVideoRuntimeAction';
 
-export type ActionRouteAuthorityFamily =
+type ActionRouteAuthorityFamily =
   | 'background-owned-ipc'
   | 'capture-privileged-tab-route'
   | 'content-action-capability-issuance'
@@ -53,7 +53,7 @@ export type ActionRouteAuthorityFamily =
   | 'video-recording-surface-privileged-tab-route'
   | 'video-runtime-owner-policy';
 
-export type ActionRouteKeepChannelBehaviorSource =
+type ActionRouteKeepChannelBehaviorSource =
   | 'action-kernel-fixed-closed'
   | 'background-owned-route-handler'
   | 'popup-tab-route-capability-issuer'
@@ -69,6 +69,7 @@ export type ActionRouteMetadata = {
   readonly errorShape: string;
   readonly freshnessReplayPolicy: string;
   readonly handlerAdapter: ActionRouteHandlerAdapter;
+  readonly handlerId: string;
   readonly keepChannelBehaviorSource: ActionRouteKeepChannelBehaviorSource;
   readonly messageType: string | null;
   readonly ownerModule: string;

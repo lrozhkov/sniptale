@@ -5,12 +5,27 @@ import { createMemoryStateDomainAdapter } from '@sniptale/platform/data/state-ma
 import { stateManager } from '../state-manager';
 import {
   isActivePersistenceMutationPermit,
+  runWithPersistentDataErasureBarrier,
   runWithPersistenceMutationPermit,
   type PersistenceMutationPermit,
 } from '../mutation-barrier';
+import {
+  DatabaseAdmissionError,
+  PersistenceResetInterruptedError,
+  inspectDatabaseAdmission,
+  runAlphaPersistenceReset,
+  runRecoveryPersistenceReset,
+  type DatabaseAdmissionStatus,
+} from './admission';
 import { handleDatabaseUpgrade } from './upgrade/core.ts';
 import { runProvenanceUrlMaintenance } from './maintenance/provenance';
-import { DB_NAME, DB_VERSION, EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores.ts';
+import {
+  DB_NAME,
+  DB_VERSION,
+  EXPECTED_INDEXES,
+  EXPECTED_STORES,
+  LEGACY_ALPHA_DB_NAMES,
+} from './core.stores.ts';
 
 export * from './core.stores.ts';
 
@@ -30,7 +45,9 @@ interface MissingStoreIndexes {
 
 function createDbCoreState() {
   return {
+    databaseReady: false,
     dbTerminationListeners: new Set<DbTerminationListener>(),
+    preparationPromise: null as Promise<void> | null,
   };
 }
 
@@ -167,22 +184,48 @@ async function createPersistentStorageGrantPromise(): Promise<boolean> {
 async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
   await requestPersistentStorageGrant().catch(() => false);
   let openedDb: IDBPDatabase | null = null;
-  const db = await openDB(DB_NAME, DB_VERSION, {
+  let openingBlocked = false;
+  let rejectBlocked!: (error: DatabaseAdmissionError) => void;
+  const blockedResult = new Promise<never>((_resolve, reject) => {
+    rejectBlocked = reject;
+  });
+  const opening = openDB(DB_NAME, DB_VERSION, {
     upgrade: handleDatabaseUpgrade,
     blocked() {
+      openingBlocked = true;
       logger.warn('Database upgrade blocked by another tab');
+      rejectBlocked(
+        new DatabaseAdmissionError({
+          databaseVersion: null,
+          reason: 'connection-blocked',
+          status: 'blocked',
+        })
+      );
     },
     blocking() {
       logger.warn('This tab is blocking a database upgrade');
       openedDb?.close();
+      getDbCoreState().databaseReady = false;
       void stateManager.remove(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
     },
     terminated() {
       logger.error('Database connection terminated unexpectedly');
+      getDbCoreState().databaseReady = false;
       void stateManager.remove(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
       notifyDbTerminationListeners();
     },
+  }).then((db) => {
+    if (openingBlocked) {
+      db.close();
+      throw new DatabaseAdmissionError({
+        databaseVersion: null,
+        reason: 'connection-blocked',
+        status: 'blocked',
+      });
+    }
+    return db;
   });
+  const db = await Promise.race([opening, blockedResult]);
   openedDb = db;
 
   if (!hasExpectedStores(db)) {
@@ -205,11 +248,85 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
 
 export { requestPersistentStorageGrant as ensurePersistentStorage };
 
-export function initDB(permit?: PersistenceMutationPermit) {
+export function initDB(permit?: PersistenceMutationPermit): Promise<IDBPDatabase> {
   if (isActivePersistenceMutationPermit(permit)) {
+    if (!getDbCoreState().databaseReady) {
+      return Promise.reject(
+        new DatabaseAdmissionError({
+          databaseVersion: null,
+          reason: 'connection-blocked',
+          status: 'blocked',
+        })
+      );
+    }
     return openDbAuthority();
   }
-  return runWithPersistenceMutationPermit(() => openDbAuthority());
+  return prepareDatabase().then(() =>
+    runWithPersistenceMutationPermit((activePermit) => initDB(activePermit))
+  );
+}
+
+export async function prepareDatabaseForRecovery(): Promise<DatabaseAdmissionStatus> {
+  try {
+    await prepareDatabase(true);
+    return { databaseVersion: DB_VERSION, status: 'ready' };
+  } catch (error) {
+    if (error instanceof DatabaseAdmissionError) return error.admission;
+    throw error;
+  }
+}
+
+export { inspectDatabaseAdmission };
+
+async function prepareDatabase(allowAlphaReset = false): Promise<void> {
+  const state = getDbCoreState();
+  if (state.databaseReady) return;
+  if (state.preparationPromise) return state.preparationPromise;
+  const preparation = runWithPersistentDataErasureBarrier(async () => {
+    let admission = await inspectDatabaseAdmission();
+    if (
+      allowAlphaReset &&
+      admission.status === 'blocked' &&
+      (admission.reason === 'alpha-reset-required' ||
+        admission.reason === 'recovery-reset-required')
+    ) {
+      await closeDbAuthority();
+      if (admission.reason === 'alpha-reset-required') {
+        try {
+          await runAlphaPersistenceReset();
+        } catch (error) {
+          if (!(error instanceof PersistenceResetInterruptedError)) throw error;
+          throw new DatabaseAdmissionError({
+            databaseVersion: null,
+            reason: 'recovery-reset-failed',
+            status: 'blocked',
+          });
+        }
+      } else {
+        try {
+          await runRecoveryPersistenceReset();
+        } catch {
+          throw new DatabaseAdmissionError({
+            databaseVersion: null,
+            reason: 'recovery-reset-failed',
+            status: 'blocked',
+          });
+        }
+      }
+      admission = await inspectDatabaseAdmission();
+    }
+    if (admission.status !== 'ready') throw new DatabaseAdmissionError(admission);
+    await openDbAuthority();
+    const verified = await inspectDatabaseAdmission();
+    if (verified.status !== 'ready') throw new DatabaseAdmissionError(verified);
+    state.databaseReady = true;
+  });
+  state.preparationPromise = preparation;
+  try {
+    await preparation;
+  } finally {
+    if (state.preparationPromise === preparation) state.preparationPromise = null;
+  }
 }
 
 function openDbAuthority() {
@@ -228,31 +345,48 @@ function createDbPromise() {
   return dbPromise;
 }
 
-function deleteDatabase() {
+function deleteDatabase(name: string) {
   if (typeof indexedDB === 'undefined') {
     return Promise.reject(new Error('IndexedDB is unavailable'));
   }
 
   return new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(DB_NAME);
+    const request = indexedDB.deleteDatabase(name);
     request.onerror = () => reject(request.error ?? new Error('IndexedDB deletion failed'));
     request.onblocked = () => reject(new Error('IndexedDB deletion was blocked'));
     request.onsuccess = () => resolve();
   });
 }
 
-export async function eraseSniptaleDatabaseForPrivacyErasure(): Promise<void> {
+async function closeDbAuthority(): Promise<void> {
+  const state = getDbCoreState();
+  state.databaseReady = false;
   const cachedDb = await stateManager.read<IDBPDatabase>(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
   await stateManager.remove(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
   cachedDb?.close();
-  await deleteDatabase();
+}
+
+export async function eraseSniptaleDatabaseForPrivacyErasure(): Promise<void> {
+  await closeDbAuthority();
+  for (const name of [DB_NAME, ...LEGACY_ALPHA_DB_NAMES]) await deleteDatabase(name);
 }
 
 export async function verifySniptaleDatabaseAbsentAfterPrivacyErasure(): Promise<boolean> {
   if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') {
     return false;
   }
-  return (await indexedDB.databases()).every((database) => database.name !== DB_NAME);
+  const ownedNames = new Set([DB_NAME, ...LEGACY_ALPHA_DB_NAMES]);
+  return (await indexedDB.databases()).every(
+    (database) => !database.name || !ownedNames.has(database.name)
+  );
+}
+
+export async function resetDatabaseFromRecovery(): Promise<DatabaseAdmissionStatus> {
+  await runWithPersistentDataErasureBarrier(async () => {
+    await closeDbAuthority();
+    await runRecoveryPersistenceReset();
+  });
+  return prepareDatabaseForRecovery();
 }
 
 export function subscribeToDbTermination(listener: DbTerminationListener): () => void {

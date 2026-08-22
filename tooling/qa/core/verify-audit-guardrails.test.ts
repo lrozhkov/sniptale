@@ -211,14 +211,19 @@ it('keeps IndexedDB entrypoints behind explicit persistence authorities', () => 
     'apps/extension/src/background/session/cache.ts',
     "import { openDB } from 'idb'; export async function load() { return openDB('session-cache', 1); }\n"
   );
-  const good = writeFile(
+  const core = writeFile(
     root,
     'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.ts',
     "import { openDB } from 'idb'; export async function initDB() { return openDB('sniptale', 1); }\n"
+  );
+  const admission = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/infrastructure/indexed-db/admission.ts',
+    'export async function inspect() { return indexedDB.databases(); }\n'
   );
 
   expect(rules(collectPersistenceAuthorityViolations([bad]))).toContain(
     'persistence-authority-owner-bypass'
   );
-  expect(collectPersistenceAuthorityViolations([good])).toEqual([]);
+  expect(collectPersistenceAuthorityViolations([core, admission])).toEqual([]);
 });

@@ -7,21 +7,17 @@ const logger = createLogger({ namespace: 'OffscreenProjectExportPersistence' });
 /**
  * Request a download for the finalized recording when the caller enabled that follow-up.
  */
-export function downloadExportRecording(
-  recordingId: string,
-  filename: string,
-  enabled: boolean
-): void {
+export function downloadProjectExport(exportId: string, filename: string, enabled: boolean): void {
   if (!enabled) {
     return;
   }
 
   sendRuntimeMessageBestEffort({
     logger,
-    logMessage: 'Failed to trigger recording download after project export',
+    logMessage: 'Failed to trigger project export download',
     payload: {
-      type: VideoMessageType.DOWNLOAD_RECORDING,
-      recordingId,
+      type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
+      exportId,
       filename,
     },
   });

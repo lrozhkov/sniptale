@@ -5,7 +5,6 @@ import type {
 
 export interface VideoEditorExportResult {
   filename: string;
-  recordingId: string;
   exportId: string;
 }
 

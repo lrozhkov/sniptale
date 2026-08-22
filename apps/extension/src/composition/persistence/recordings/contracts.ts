@@ -10,13 +10,18 @@ import type {
 } from '../../../features/video/project/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
-export interface RecordingEntry {
+export interface StoredRecordingEntry {
+  assetId: string;
   id: string;
-  blob: Blob;
   filename: string;
   createdAt: number;
+  mimeType: string;
   size: number;
   lifecycle?: LibraryLifecycle;
+}
+
+export interface RecordingEntry extends StoredRecordingEntry {
+  file: File;
 }
 
 export interface RecordingTelemetryEntry {

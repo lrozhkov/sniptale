@@ -2,20 +2,12 @@ import {
   reject,
   type IpcAuthorizationResult,
 } from '../../../routing-contracts/authorization-result';
+import type { BackgroundIngressAuthorizationPolicyId } from '../../../../contracts/messaging/contracts/runtime';
 
-export type IncidentCapabilityFamily =
-  | 'background-owned'
-  | 'offscreen-runtime'
-  | 'popup-export-tab-route'
-  | 'privileged-tab-route:capture'
-  | 'privileged-tab-route:scenario'
-  | 'privileged-tab-route:tab-mode'
-  | 'privileged-tab-route:video-control'
-  | 'privileged-tab-route:video-recording-surface'
-  | 'project-export-runtime'
-  | 'video-control-camera-recorder-route'
-  | 'video-control-no-tab-route'
-  | 'video-control-owner-no-tab-route';
+export type IncidentCapabilityFamily = Exclude<
+  BackgroundIngressAuthorizationPolicyId,
+  `owner-local:${string}`
+>;
 
 const disabledFamilies = new Set<IncidentCapabilityFamily>();
 

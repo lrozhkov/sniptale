@@ -13,6 +13,12 @@ const projectsDbMocks = vi.hoisted(() => ({
   txGetAllMock: vi.fn(),
   txGetMock: vi.fn(),
   txPutMock: vi.fn(),
+  recoverProjectMediaPublicationsMock: vi.fn(),
+}));
+
+vi.mock('./asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: projectsDbMocks.recoverProjectMediaPublicationsMock,
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -53,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   projectsDbMocks.initDBMock.mockResolvedValue(createDb());
   projectsDbMocks.txGetAllMock.mockResolvedValue([]);
+  projectsDbMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
 });
 
 async function importProjectsDbModule() {

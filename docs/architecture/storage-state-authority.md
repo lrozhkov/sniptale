@@ -13,13 +13,13 @@ Browser storage, IndexedDB, in-memory caches, and React state must not act as pa
 
 ## Owners
 
-`apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts` owns the shared browser-storage adapter and state-domain registration. Named concerns under `apps/extension/src/composition/persistence/**` own cross-runtime settings, projects, media, browser-storage, IndexedDB, backup, export-ledger, and sensitive AI persistence.
+`apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts` owns the shared browser-storage adapter and state-domain registration. Named concerns under `apps/extension/src/composition/persistence/**` own cross-runtime settings, projects, media, browser-storage, IndexedDB, backup, export-ledger, and sensitive AI persistence. The shared database admission, logical domain versions, migration policy, and alpha cut are defined by [persistence contracts](persistence-contracts.md).
 
 `apps/extension/src/background/storage/**` owns background-only activation caches, diagnostics recovery, metadata history, recording/export leases, route capabilities, and scenario session recovery that must not become shared app contracts.
 
 Persisted DTOs and codecs for those background-only records stay under their named background storage concern. Feature runtimes may depend inward on that narrow contract; storage concerns must not import feature implementations to obtain persisted types, validation, or logging.
 
-Runtime-local project and workspace adapters stay with the editor, video editor, scenario editor, content runtime, or native-transfer owner when their lifecycle is intrinsic to that runtime. Durable schemas and historical upgrade ladders remain composition-owned.
+Runtime-local project and workspace adapters stay with the editor, video editor, scenario editor, content runtime, or native-transfer owner when their lifecycle is intrinsic to that runtime. Durable schemas, retained beta fixtures, and the supported upgrade graph remain composition-owned.
 
 ## Mutation invariants
 

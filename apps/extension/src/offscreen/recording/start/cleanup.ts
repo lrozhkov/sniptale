@@ -30,8 +30,6 @@ function cleanupOwnedRecordingResources(): void {
     }
   );
 
-  recordingContext.mediaRecorder = null;
-
   if (recordingContext.audioMixer) {
     recordingContext.audioMixer.cleanup().catch((error) => {
       logger.warn('Audio mixer cleanup failed', error);

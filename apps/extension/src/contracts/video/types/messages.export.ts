@@ -40,7 +40,6 @@ export interface ProjectExportCompletedMessage {
   type: typeof VideoMessageType.PROJECT_EXPORT_COMPLETED;
   jobId: string;
   projectId: string;
-  recordingId: string;
   exportId: string;
   filename: string;
   format: VideoExportFormat;

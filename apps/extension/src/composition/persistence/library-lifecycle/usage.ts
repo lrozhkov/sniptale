@@ -1,5 +1,5 @@
 import { listAggregatePresentations } from '../aggregate-presentations';
-import { listImageWorkspaces } from '../image-workspaces';
+import { recoverAndListStoredImageWorkspaces } from '../image-workspaces';
 import { getMediaThumbnail, listMediaLibrary } from '../media-library';
 import { listVideoProjectEntries } from '../projects';
 import {
@@ -7,7 +7,10 @@ import {
   listScenarioExports,
   listScenarioProjectEntries,
 } from '../scenario/projects';
-import { listScenarioStepEditorDocuments } from '../scenario/editor-documents';
+import { listStoredScenarioStepEditorDocuments } from '../scenario/editor-documents';
+import { parseAssetOwner, parseAssetRef, type AssetOwner, type AssetRef } from '../assets';
+import { ASSET_OWNERS_STORE, ASSET_REFS_STORE } from '../infrastructure/indexed-db/core';
+import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 
 export interface LibraryStorageUsage {
   draftsBytes: number;
@@ -18,13 +21,14 @@ export interface LibraryStorageUsage {
 type StorageClass = 'temporary' | 'library';
 
 export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
-  const [media, videoProjects, scenarioProjects, imageWorkspaces, presentations] =
+  const [media, videoProjects, scenarioProjects, imageWorkspaces, presentations, assetAuthority] =
     await Promise.all([
       listMediaLibrary(),
       listVideoProjectEntries(),
       listScenarioProjectEntries(),
-      listImageWorkspaces(),
+      recoverAndListStoredImageWorkspaces(),
       listAggregatePresentations(),
+      loadAssetUsageAuthority(),
     ]);
   const usage: LibraryStorageUsage = { draftsBytes: 0, libraryBytes: 0, totalBytes: 0 };
   const addBytes = (size: number, storageClass: StorageClass) => {
@@ -40,7 +44,7 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
 
   for (const entry of media) {
     const storageClass = entry.lifecycle?.storageClass ?? 'library';
-    addBytes(entry.size, storageClass);
+    addBytes(resolveMediaBytes(entry, assetAuthority), storageClass);
     if (entry.hasThumbnail) {
       const thumbnail = await getMediaThumbnail(entry.id);
       if (thumbnail) addBytes(thumbnail.blob.size, storageClass);
@@ -50,6 +54,12 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
     const parent = mediaById.get(workspace.aggregateId);
     if (parent) {
       addBytes(jsonBytes(workspace), parent.lifecycle?.storageClass ?? 'library');
+      for (const assetId of new Set(workspace.document.assets.map((asset) => asset.assetId))) {
+        addBytes(
+          assetAuthority.refsById.get(assetId)?.size ?? 0,
+          parent.lifecycle?.storageClass ?? 'library'
+        );
+      }
     }
   }
   for (const entry of videoProjects) {
@@ -65,11 +75,18 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
     const [assets, exports, stepDocuments, legacyThumbnail] = await Promise.all([
       listScenarioAssets(entry.id),
       listScenarioExports(entry.id),
-      listScenarioStepEditorDocuments(entry.id),
+      listStoredScenarioStepEditorDocuments(entry.id),
       getMediaThumbnail(`scenario:${entry.id}`),
     ]);
-    for (const asset of assets) addBytes(asset.size, storageClass);
-    for (const stepDocument of stepDocuments) addBytes(jsonBytes(stepDocument), storageClass);
+    for (const asset of assets) {
+      addBytes(assetAuthority.refsById.get(asset.assetId)?.size ?? 0, storageClass);
+    }
+    for (const stepDocument of stepDocuments) {
+      addBytes(jsonBytes(stepDocument), storageClass);
+      for (const assetId of new Set(stepDocument.document.assets.map((asset) => asset.assetId))) {
+        addBytes(assetAuthority.refsById.get(assetId)?.size ?? 0, storageClass);
+      }
+    }
     if (legacyThumbnail) addBytes(legacyThumbnail.blob.size, storageClass);
     for (const scenarioExport of exports) {
       addBytes(scenarioExport.size, storageClass);
@@ -88,6 +105,78 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
     if (presentation.previewBlob) addBytes(presentation.previewBlob.size, storageClass);
   }
   return usage;
+}
+
+interface AssetUsageAuthority {
+  ownersByDomainKey: Map<string, AssetOwner>;
+  refsById: Map<string, AssetRef>;
+}
+
+async function loadAssetUsageAuthority(): Promise<AssetUsageAuthority> {
+  const [rawRefs, rawOwners] = await runWithIndexedDbMutation(async (db) =>
+    Promise.all([db.getAll(ASSET_REFS_STORE), db.getAll(ASSET_OWNERS_STORE)])
+  );
+  const refs = Array.isArray(rawRefs) ? rawRefs.map(parseAssetRef).filter(isPresent) : [];
+  const owners = Array.isArray(rawOwners) ? rawOwners.map(parseAssetOwner).filter(isPresent) : [];
+  return {
+    ownersByDomainKey: new Map(
+      owners.map((owner) => [ownerDomainKey(owner.ownerKind, owner.ownerId, owner.role), owner])
+    ),
+    refsById: new Map(refs.map((ref) => [ref.assetId, ref])),
+  };
+}
+
+function resolveMediaBytes(
+  entry: Awaited<ReturnType<typeof listMediaLibrary>>[number],
+  authority: AssetUsageAuthority
+): number {
+  if (!entry.source) return entry.size;
+  if (entry.source.kind === 'web-snapshot') {
+    return [
+      authority.ownersByDomainKey.get(
+        ownerDomainKey('web-snapshot', entry.source.snapshotId, 'package')
+      ),
+      authority.ownersByDomainKey.get(
+        ownerDomainKey('web-snapshot', entry.source.snapshotId, 'screenshot')
+      ),
+    ].reduce(
+      (total, owner) => total + (owner ? (authority.refsById.get(owner.assetId)?.size ?? 0) : 0),
+      0
+    );
+  }
+  const owner =
+    entry.source.kind === 'recording'
+      ? authority.ownersByDomainKey.get(
+          ownerDomainKey('recording', entry.source.recordingId, 'body')
+        )
+      : entry.source.kind === 'project-export'
+        ? authority.ownersByDomainKey.get(
+            ownerDomainKey('project-export', entry.source.exportId, 'body')
+          )
+        : entry.source.kind === 'project-asset'
+          ? authority.ownersByDomainKey.get(
+              ownerDomainKey('project-asset', entry.source.projectAssetId, 'body')
+            )
+          : undefined;
+  if (owner) return authority.refsById.get(owner.assetId)?.size ?? 0;
+  return isDurableMediaSource(entry.source.kind) ? 0 : entry.size;
+}
+
+function isDurableMediaSource(kind: string): boolean {
+  return (
+    kind === 'recording' ||
+    kind === 'project-export' ||
+    kind === 'project-asset' ||
+    kind === 'web-snapshot'
+  );
+}
+
+function ownerDomainKey(ownerKind: string, ownerId: string, role: string): string {
+  return `${ownerKind}\u0000${ownerId}\u0000${role}`;
+}
+
+function isPresent<T>(value: T | null): value is T {
+  return value !== null;
 }
 
 function resolvePresentationStorageClass(

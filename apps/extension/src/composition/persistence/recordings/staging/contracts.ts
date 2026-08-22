@@ -1,4 +1,5 @@
 // policyStateIds: [] - staging byte budgets and storage contracts own bounded media resources, not caller authority.
+import type { PreparedAssetObject } from '../../assets';
 export const RECORDING_STAGING_PENDING_BYTES_LIMIT = 64 * 1024 * 1024;
 
 export interface RecordingStagingArtifactInput {
@@ -9,7 +10,7 @@ export interface RecordingStagingArtifactInput {
 
 export interface FinalizedRecordingStagingArtifact {
   artifactId: string;
-  file: File;
+  asset: PreparedAssetObject;
   filename: string;
   mimeType: string;
   size: number;
@@ -26,23 +27,4 @@ export interface RecordingStagingCoordinator {
   delete(): Promise<void>;
   getPendingBytes(): number;
   openArtifact(input: RecordingStagingArtifactInput): Promise<RecordingStagingArtifactWriter>;
-}
-
-export interface RecordingStagingStorageArtifact {
-  abort(): Promise<void>;
-  append(chunk: Blob): Promise<void>;
-  close(): Promise<void>;
-  getFile(): Promise<File>;
-  remove(): Promise<void>;
-}
-
-export interface RecordingStagingStorageSession {
-  createArtifact(): Promise<RecordingStagingStorageArtifact>;
-  remove(): Promise<void>;
-}
-
-export interface RecordingStagingStorageAdapter {
-  countSessions(): Promise<number>;
-  createSession(): Promise<RecordingStagingStorageSession>;
-  removeAllSessions(): Promise<number>;
 }

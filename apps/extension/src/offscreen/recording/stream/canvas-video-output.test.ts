@@ -7,9 +7,12 @@ import { createCanvasVideoOutput } from './canvas-video-output';
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function installCanvas(stream: MediaStream) {
+  const [track] = stream.getVideoTracks();
+  if (track && !('requestFrame' in track)) Object.assign(track, { requestFrame: vi.fn() });
   const context = { drawImage: vi.fn() };
   const canvas = Object.assign(document.createElement('canvas'), {
     captureStream: vi.fn(() => stream),
@@ -26,16 +29,16 @@ it('keeps drawing a static source through one constant-rate canvas stream', () =
   const drawLiveFrame = vi.fn(() => true);
   const release = vi.fn();
 
-  const stream = createCanvasVideoOutput({
+  const result = createCanvasVideoOutput({
     dimensions: { height: 720, width: 1280 },
     frameRate: 30,
     initializeDrawing: () => ({ drawLiveFrame }),
     release,
   });
 
-  expect(stream).toBe(output);
+  expect(result.stream).toBe(output);
   expect(canvas.captureStream).toHaveBeenCalledOnce();
-  expect(canvas.captureStream).toHaveBeenCalledWith(30);
+  expect(canvas.captureStream).toHaveBeenCalledWith(0);
   expect(drawLiveFrame).toHaveBeenCalledOnce();
   vi.advanceTimersByTime(1000);
   expect(drawLiveFrame).toHaveBeenCalledTimes(31);
@@ -47,8 +50,10 @@ it('keeps drawing a static source through one constant-rate canvas stream', () =
   expect(release).toHaveBeenCalledOnce();
 });
 
-it('uses the selected cadence without requiring a source callback contract', () => {
+it('requests frames explicitly so canvas capture does not impose a second cadence clock', () => {
   const output = createTrackedStream({ frameRate: 24, height: 480, width: 854 });
+  const requestFrame = vi.fn();
+  Object.assign(output.track, { requestFrame });
   const { canvas } = installCanvas(output);
 
   createCanvasVideoOutput({
@@ -59,6 +64,34 @@ it('uses the selected cadence without requiring a source callback contract', () 
   });
 
   expect(canvas.captureStream).toHaveBeenCalledOnce();
-  expect(canvas.captureStream).toHaveBeenCalledWith(24);
+  expect(canvas.captureStream).toHaveBeenCalledWith(0);
+  expect(requestFrame).toHaveBeenCalledOnce();
   output.track.stop();
+});
+
+it('exposes source processor failures instead of treating a stopped canvas track as normal end', async () => {
+  const output = createTrackedStream({ frameRate: 60, height: 720, width: 1280 });
+  const stopOutputTrack = output.track.stop;
+  const source = createTrackedStream({ frameRate: 60, height: 720, width: 1280 });
+  installCanvas(output);
+  const error = new Error('processor failed');
+  vi.stubGlobal(
+    'MediaStreamTrackProcessor',
+    class {
+      readonly readable = { pipeTo: vi.fn().mockRejectedValue(error) };
+    }
+  );
+  const release = vi.fn();
+
+  const result = createCanvasVideoOutput({
+    dimensions: { height: 720, width: 1280 },
+    frameRate: 60,
+    initializeDrawing: () => ({ drawLiveFrame: () => true }),
+    release,
+    sourceTrack: source.track,
+  });
+
+  await expect(result.failure).rejects.toBe(error);
+  expect(stopOutputTrack).toHaveBeenCalledOnce();
+  expect(release).toHaveBeenCalledOnce();
 });

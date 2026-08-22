@@ -13,6 +13,7 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ScenarioSessionPayload, ViewportCoordsPayload } from './types';
 import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { CONTENT_RUNTIME_PROTOCOL_VERSION } from '@sniptale/runtime-contracts/video/messages';
 
 export const recordingStateHealthValues = ['healthy', 'degraded', 'failed'] as const;
 
@@ -90,6 +91,7 @@ export type ToolbarStatusResponse = RuntimeMessageResponse<{
 }>;
 
 export type ViewportCoordsResponse = RuntimeMessageResponse<{
+  contentRuntimeProtocolVersion?: typeof CONTENT_RUNTIME_PROTOCOL_VERSION;
   coords?: ViewportCoordsPayload;
   viewport?: ViewportInfo;
 }>;

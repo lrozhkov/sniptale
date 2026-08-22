@@ -5,7 +5,11 @@ import {
   SCENARIO_VISUAL_BASELINE_TIME,
 } from './constants';
 
-export function createScenarioVisualBaselineAssets(projectId: string): ScenarioAssetEntry[] {
+type ScenarioVisualBaselineAsset = Omit<ScenarioAssetEntry, 'assetId'> & { blob: Blob };
+
+export function createScenarioVisualBaselineAssets(
+  projectId: string
+): ScenarioVisualBaselineAsset[] {
   return [
     createAsset({
       height: 900,
@@ -30,7 +34,7 @@ function createAsset(args: {
   projectId: string;
   svg: string;
   width: number;
-}): ScenarioAssetEntry {
+}): ScenarioVisualBaselineAsset {
   const blob = new Blob([args.svg], { type: 'image/svg+xml' });
   return {
     blob,

@@ -39,6 +39,7 @@ let root: Root | null = null;
 
 function createImportSummary() {
   return {
+    archiveFingerprint: 'a'.repeat(64),
     assetCount: 3,
     conflicts: ['asset-1', 'asset-2'],
     manifest: {
@@ -49,7 +50,9 @@ function createImportSummary() {
       thumbnailCount: 2,
       version: 1,
     },
+    rootCount: 3,
     thumbnailCount: 2,
+    totalBytes: 1024,
   };
 }
 
@@ -126,4 +129,32 @@ it('renders import summary, manifest banner, and strategy actions', async () => 
   expect(onImport).toHaveBeenNthCalledWith(1, 'replace');
   expect(onImport).toHaveBeenNthCalledWith(2, 'skip');
   expect(onImport).toHaveBeenNthCalledWith(3, 'duplicate');
+});
+
+it('locks a resumed restore to its persisted conflict strategy', async () => {
+  const onImport = vi.fn(async () => undefined);
+  act(() => {
+    root?.render(
+      <ImportConflictModalContent
+        fixedStrategy="skip"
+        summary={createImportSummary()}
+        onClose={vi.fn()}
+        onImport={onImport}
+      />
+    );
+  });
+
+  const { duplicateButton, replaceButton, skipButton } = getImportActionButtons();
+  expect(replaceButton.disabled).toBe(true);
+  expect(skipButton.disabled).toBe(false);
+  expect(duplicateButton.disabled).toBe(true);
+
+  await act(async () => {
+    replaceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    skipButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    duplicateButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+  });
+  expect(onImport).toHaveBeenCalledOnce();
+  expect(onImport).toHaveBeenCalledWith('skip');
 });

@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createPreparedRecordingAssetForTest } from '../../composition/persistence/recordings/staging/test-support';
 
 const {
   cleanupResourcesMock,
@@ -113,21 +114,26 @@ function bindActiveArtifactSession(binding: {
     recordingContext.stopRecordingResolve?.({ result: 'stopped' });
     return {
       artifactId: binding.recordingId,
-      file,
+      asset: createPreparedRecordingAssetForTest(file, binding.recordingId),
       filename: file.name,
       mimeType: file.type,
       size: file.size,
     };
   });
   recordingContext.stagingCoordinator = createRecordingStagingCoordinatorTestDouble();
-  recordingContext.bindStartingArtifactSession({
+  const artifactSession = {
     abort: vi.fn().mockResolvedValue(undefined),
-    recorder: mediaRecorder,
+    pause: () => mediaRecorder.pause(),
+    resume: () => mediaRecorder.resume(),
     setLifecycleCallbacks: vi.fn(),
     start: vi.fn(),
+    get state() {
+      return mediaRecorder.state;
+    },
     stop: artifactStop,
-  });
-  recordingContext.activateRecorder(mediaRecorder);
+  };
+  recordingContext.bindStartingArtifactSession(artifactSession);
+  recordingContext.activateRecorder(artifactSession);
   return artifactStop;
 }
 
@@ -139,7 +145,6 @@ beforeEach(() => {
   stopActiveSidecarRecordersWithFlushMock.mockResolvedValue(undefined);
   recordingContext.resetRecordingSession();
   recordingContext.durationTracker = createDurationTracker() as never;
-  recordingContext.mediaRecorder = null;
 });
 
 it('rejects duplicate starts when only a webcam sidecar session is active', async () => {
@@ -193,21 +198,23 @@ it('routes pause and resume to active webcam sidecars', () => {
   };
   recordingContext.beginRecordingSession(binding.recordingId);
   recordingContext.bindStreamInstance(binding);
-  recordingContext.mediaRecorder = {
-    pause: vi.fn(function pause(this: { state: RecordingState }) {
-      this.state = 'paused';
-    }),
+  recordingContext.artifactSession = {
+    abort: vi.fn(),
+    pause: vi.fn(),
     resume: vi.fn(),
+    setLifecycleCallbacks: vi.fn(),
+    start: vi.fn(),
     state: 'recording',
-  } as never;
+    stop: vi.fn(),
+  };
 
   pauseRecording(binding);
   expect(pauseActiveSidecarRecordersMock).toHaveBeenCalledOnce();
 
-  recordingContext.mediaRecorder = {
-    resume: vi.fn(),
+  recordingContext.artifactSession = {
+    ...recordingContext.artifactSession,
     state: 'paused',
-  } as never;
+  } as NonNullable<typeof recordingContext.artifactSession>;
 
   resumeRecording(binding);
   expect(resumeActiveSidecarRecordersMock).toHaveBeenCalledOnce();

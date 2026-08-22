@@ -5,6 +5,7 @@ import type { RecordingSidecarRecorder } from './types';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 import { createTrackedStream } from '../multi-source/media-stream.test-support';
 import { TestMediaRecorder } from '../multi-source/media-recorder.test-support';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 const { createWebcamSidecarRecorderMock, loggerDebugMock } = vi.hoisted(() => ({
   createWebcamSidecarRecorderMock: vi.fn(),
@@ -21,7 +22,7 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import {
   cleanupActiveSidecarRecorders,
-  getActiveSidecarVideoDimensions,
+  getActiveSidecarVideoProfiles,
   getActiveSidecarWebcamSettings,
   hasActiveSidecarSession,
   initializeSidecarRecorders,
@@ -45,7 +46,7 @@ function createSidecar(): RecordingSidecarRecorder {
       start: vi.fn(),
       stop: vi.fn().mockResolvedValue({
         artifactId: 'rec-webcam',
-        file,
+        asset: createPreparedRecordingAssetForTest(file, 'rec-webcam'),
         filename: file.name,
         mimeType: file.type,
         size: file.size,
@@ -130,7 +131,9 @@ describe('recording sidecar lifecycle', () => {
       settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
     });
 
-    expect(getActiveSidecarVideoDimensions()).toEqual([{ height: 720, width: 1280 }]);
+    expect(getActiveSidecarVideoProfiles()).toEqual([
+      { dimensions: { height: 720, width: 1280 }, frameRate: 30 },
+    ]);
     expect(stopActiveSidecarRecordersWithFlush()).toBe(stopActiveSidecarRecordersWithFlush());
   });
 
@@ -239,14 +242,14 @@ describe('recording sidecar lifecycle', () => {
         settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
       });
 
-      expect(() => getActiveSidecarVideoDimensions()).toThrow(
-        'Webcam recording dimensions are unavailable for rec-webcam.'
+      expect(() => getActiveSidecarVideoProfiles()).toThrow(
+        'Webcam recording profile is unavailable for rec-webcam.'
       );
     }
   );
 
   it('keeps stop and dimension reads idle-safe without an active session', async () => {
-    expect(getActiveSidecarVideoDimensions()).toEqual([]);
+    expect(getActiveSidecarVideoProfiles()).toEqual([]);
     expect(getActiveSidecarWebcamSettings()).toBeNull();
     await expect(stopActiveSidecarRecordersWithFlush()).resolves.toEqual([]);
   });

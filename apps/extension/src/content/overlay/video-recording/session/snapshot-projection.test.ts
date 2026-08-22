@@ -81,16 +81,22 @@ it.each([
   });
 });
 
-it('localizes snapshot errors without exposing the background message', () => {
+it('localizes the camera frame-rate failure code for the toolbar', () => {
   const dispatch = vi.fn();
   projectVideoRecordingSurfaceSnapshot(
-    { ...baseSnapshot, status: VideoRecordingStatus.IDLE, errorCode: 'capture failed' },
+    {
+      ...baseSnapshot,
+      status: VideoRecordingStatus.IDLE,
+      errorCode: 'camera-frame-rate-unsupported',
+    },
     'token-1',
     dispatch
   );
   expect(dispatch).toHaveBeenCalledOnce();
   expect(dispatch).toHaveBeenCalledWith(
-    expect.objectContaining({ type: 'snapshot', error: expect.any(String) })
+    expect.objectContaining({
+      type: 'snapshot',
+      error: 'Камера не поддерживает выбранную частоту кадров. Выберите другую частоту.',
+    })
   );
-  expect(dispatch.mock.calls[0]?.[0].error).not.toBe('capture failed');
 });

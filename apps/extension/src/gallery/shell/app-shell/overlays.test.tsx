@@ -60,7 +60,10 @@ function createLayoutProps() {
   return {
     gridViewportRef: { current: null },
     importInputRef: { current: null },
+    importTriggerRef: { current: null },
     onActiveTagsChange: vi.fn(),
+    onActiveImportCancel: vi.fn(),
+    onActiveImportDismiss: vi.fn(),
     onAddTag: vi.fn(),
     onApplySelectionTag: vi.fn(),
     onBackupExportConfirm: vi.fn(),
@@ -120,6 +123,7 @@ function createOpenOverlayProps(onConfirm = vi.fn()) {
     pendingImport: {
       file: new File(['backup'], 'backup.zip', { type: 'application/zip' }),
       summary: {
+        archiveFingerprint: 'a'.repeat(64),
         assetCount: 2,
         conflicts: ['asset-1'],
         manifest: {
@@ -130,7 +134,9 @@ function createOpenOverlayProps(onConfirm = vi.fn()) {
           thumbnailCount: 1,
           version: 1,
         },
+        rootCount: 2,
         thumbnailCount: 1,
+        totalBytes: 1024,
       },
     },
     previewItem: createMediaItem({ id: 'asset-7' }),

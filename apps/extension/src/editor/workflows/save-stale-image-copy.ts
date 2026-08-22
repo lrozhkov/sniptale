@@ -10,7 +10,7 @@ import { useEditorStore } from '../state/useEditorStore';
 type StaleImageCopyController = Pick<ImageEditorController, 'exportDocument' | 'renderForExport'>;
 
 export async function saveStaleEditorImageCopy(args: {
-  autosaveService: Pick<EditorSessionAutosaveService, 'activate'>;
+  autosaveService: Pick<EditorSessionAutosaveService, 'rebindAggregate'>;
   controller: StaleImageCopyController;
   isSourceActive: () => boolean;
   pageTitle: string;
@@ -31,7 +31,7 @@ export async function saveStaleEditorImageCopy(args: {
   if (!args.isSourceActive()) return 'stale';
 
   replaceEditorPageAggregateId(targetAggregateId);
-  args.autosaveService.activate({
+  args.autosaveService.rebindAggregate({
     aggregateId: targetAggregateId,
     durableRevision: 1,
     renderPresentation: () => args.controller.renderForExport({ format: 'png', quality: 1 }),

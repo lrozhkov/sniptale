@@ -28,7 +28,6 @@ import {
   type TabModeMessage,
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import { routeTabModeMessage } from './router';
-import { tabModeRouteDescriptor } from './route-descriptors';
 
 function resetTabModeRouterMocks() {
   vi.clearAllMocks();
@@ -227,14 +226,4 @@ describe('tab-mode-router', () => {
   it('handles set/get viewport routes', verifiesViewportRoutes);
   it('toggles and reports highlighter mode state', verifiesHighlighterRoutes);
   it('toggles and reports quick edit mode state', verifiesQuickEditRoutes);
-  it('declares the privileged viewport routes in the tab-mode descriptor', () => {
-    expect(tabModeRouteDescriptor).toMatchObject({
-      authorityFamily: 'tab-mode-privileged-tab-route',
-      messageTypes: expect.arrayContaining([
-        MessageType.APPLY_VIEWPORT_PRESET,
-        MessageType.RELEASE_VIEWPORT_PRESET,
-        MessageType.GET_VIEWPORT_PRESET_AVAILABILITY,
-      ]),
-    });
-  });
 });

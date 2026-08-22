@@ -14,8 +14,7 @@ const storeMocks = vi.hoisted(() => ({
   withMediaHubWriteGuardMock: vi.fn(),
 }));
 
-vi.mock('../../composition/persistence/media-library/index', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../composition/persistence/media-library/index')>()),
+vi.mock('../../composition/persistence/media-library/index', () => ({
   deleteMediaLibraryAsset: storeMocks.deleteMediaLibraryAssetMock,
   deleteMediaThumbnail: storeMocks.deleteMediaThumbnailMock,
 }));
@@ -49,6 +48,11 @@ vi.mock('../../composition/persistence/scenario/aggregate-mutations', async (imp
   commitScenarioAggregateSnapshotMutation: vi.fn(),
   deleteScenarioAggregate: vi.fn(),
   deleteOrphanedScenarioAggregateChild: storeMocks.deleteOrphanedScenarioAggregateChildMock,
+}));
+
+vi.mock('../../composition/persistence/scenario/aggregate-cleanup', () => ({
+  deleteOrphanedScenarioAggregateChild: storeMocks.deleteOrphanedScenarioAggregateChildMock,
+  deleteScenarioAggregate: vi.fn(),
 }));
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({

@@ -11,7 +11,7 @@ export async function loadBlobForSource(source: BlobAssetSource): Promise<Blob> 
     if (!entry) {
       throw new Error(`Recording ${source.recordingId} not found.`);
     }
-    return entry.blob;
+    return entry.file;
   }
 
   if (source.kind === 'scenario-asset') {
@@ -19,14 +19,14 @@ export async function loadBlobForSource(source: BlobAssetSource): Promise<Blob> 
     if (!scenarioAsset) {
       throw new Error(`Scenario asset ${source.scenarioAssetId} not found.`);
     }
-    return scenarioAsset.blob;
+    return scenarioAsset.file;
   }
 
   const projectAsset = await getProjectAsset(source.projectAssetId);
   if (!projectAsset) {
     throw new Error(`Project asset ${source.projectAssetId} not found.`);
   }
-  return projectAsset.blob;
+  return projectAsset.file;
 }
 
 export async function loadBlobForAsset(

@@ -1,5 +1,5 @@
 import {
-  getImageWorkspace,
+  recoverAndGetImageWorkspace,
   type ImageWorkspaceEntry,
 } from '../../../composition/persistence/image-workspaces';
 import { useEditorStore } from '../../state/useEditorStore';
@@ -12,13 +12,26 @@ import { setEditorSaveState } from './persistence';
 
 export function activateAutosaveContext(
   state: EditorSessionAutosaveState,
-  context: ActiveEditorSessionContext
+  context: ActiveEditorSessionContext,
+  options: { preserveHydratedDocument?: boolean } = {}
 ): void {
   clearPendingAutosaveTimer(state);
+  if (!options.preserveHydratedDocument) {
+    state.releaseHydratedDocument?.();
+    state.releaseHydratedDocument = null;
+    state.documentAssetsByRuntimeUrl = new Map();
+  }
   state.pendingDocument = null;
   state.lastWriteError = null;
   state.activeContext = context;
   useEditorStore.getState().setSessionId(context.aggregateId);
+}
+
+export function rebindAutosaveAggregate(
+  state: EditorSessionAutosaveState,
+  context: ActiveEditorSessionContext
+): void {
+  activateAutosaveContext(state, context, { preserveHydratedDocument: true });
 }
 
 export function updateAutosaveContext(
@@ -37,20 +50,28 @@ export function updateAutosaveContext(
 
 export async function restoreAutosaveDraft(
   state: EditorSessionAutosaveState,
-  aggregateId: string
+  aggregateId: string,
+  isCurrent: () => boolean = () => true
 ): Promise<ImageWorkspaceEntry | undefined> {
-  const entry = await getImageWorkspace(aggregateId);
+  const entry = await recoverAndGetImageWorkspace(aggregateId);
   if (!entry) {
     return undefined;
   }
+  if (!isCurrent()) {
+    entry.releaseDocumentAssets?.();
+    return undefined;
+  }
 
+  const renderPresentation = state.activeContext?.renderPresentation ?? null;
   activateAutosaveContext(state, {
     aggregateId: entry.aggregateId,
     durableRevision: entry.revision,
-    renderPresentation: state.activeContext?.renderPresentation ?? null,
+    renderPresentation,
     sourceUrl: entry.sourceUrl,
     sourceTitle: entry.sourceTitle,
   });
+  state.releaseHydratedDocument = entry.releaseDocumentAssets ?? null;
+  state.documentAssetsByRuntimeUrl = entry.documentAssetsByRuntimeUrl ?? new Map();
   setEditorSaveState('saved');
   return entry;
 }
@@ -60,6 +81,9 @@ export async function discardAutosaveDraft(
   _aggregateId?: string | null
 ): Promise<void> {
   clearPendingAutosaveTimer(state);
+  state.releaseHydratedDocument?.();
+  state.releaseHydratedDocument = null;
+  state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.lastWriteError = null;
   state.activeContext = null;
@@ -69,6 +93,9 @@ export async function discardAutosaveDraft(
 
 export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   clearPendingAutosaveTimer(state);
+  state.releaseHydratedDocument?.();
+  state.releaseHydratedDocument = null;
+  state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.activeContext = null;
 }

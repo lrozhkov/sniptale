@@ -101,7 +101,7 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
   );
 }
 
-export function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
+function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
   const assetIds = new Set(project.assets.map((asset) => asset.id));
   const trackIds = new Set(project.tracks.map((track) => track.id));
   const clipIds = new Set(project.clips.map((clip) => clip.id));

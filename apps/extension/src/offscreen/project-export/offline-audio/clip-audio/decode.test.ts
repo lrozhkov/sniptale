@@ -77,7 +77,7 @@ it('decodes clip audio once per asset and reuses the cached buffer', async () =>
     metadata: { hasAudio: true },
     source: { kind: 'project-asset', projectAssetId: 'project-asset-1' },
   });
-  getProjectAssetMock.mockResolvedValue({ blob: new Blob(['audio']) });
+  getProjectAssetMock.mockResolvedValue({ file: new Blob(['audio']) });
 
   const first = await decodeClipAudioBuffer(project, clip, decodedBuffers, decodeContext);
   const second = await decodeClipAudioBuffer(project, clip, decodedBuffers, decodeContext);
@@ -96,7 +96,7 @@ it('loads recording blobs when decoding recording-backed clips', async () => {
     metadata: { hasAudio: true },
     source: { kind: 'recording', recordingId: 'recording-1' },
   });
-  getRecordingMock.mockResolvedValue({ blob: new Blob(['recording']) });
+  getRecordingMock.mockResolvedValue({ file: new Blob(['recording']) });
 
   await decodeClipAudioBuffer(project, clip, decodedBuffers, decodeContext);
 

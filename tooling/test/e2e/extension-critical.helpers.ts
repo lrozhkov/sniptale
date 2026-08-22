@@ -133,6 +133,7 @@ export async function applyGalleryScreenshotBootstrap(
     sourceTitle: string;
     tags: string[];
     blobText: string;
+    storageClass?: 'library' | 'temporary';
   }
 ) {
   await page.addInitScript((value) => {
@@ -157,6 +158,11 @@ export async function applyGalleryScreenshotBootstrap(
             sourceTitle: value.sourceTitle,
             sourceFavicon: null,
             tags: value.tags,
+            lifecycle: {
+              savedAt: value.storageClass === 'temporary' ? null : value.createdAt,
+              storageClass: value.storageClass ?? 'library',
+              updatedAt: value.createdAt,
+            },
             blob: new Blob([value.blobText], { type: 'image/png' }),
           },
         },

@@ -21,6 +21,12 @@ const projectsDbMocks = vi.hoisted(() => ({
   txGetMock: vi.fn(),
   txPutMock: vi.fn(),
   upsertMediaEntryMock: vi.fn(),
+  recoverProjectMediaPublicationsMock: vi.fn(),
+}));
+
+vi.mock('./asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: projectsDbMocks.recoverProjectMediaPublicationsMock,
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -100,6 +106,7 @@ beforeEach(() => {
   projectsDbMocks.upsertMediaEntryMock.mockResolvedValue(undefined);
   projectsDbMocks.getRecordingMock.mockResolvedValue(undefined);
   projectsDbMocks.txGetAllMock.mockResolvedValue([]);
+  projectsDbMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
 });
 
 it('deletes removed project-owned assets while saving the next project snapshot', async () => {

@@ -1,62 +1,43 @@
+import { backgroundIngressContracts } from '../../../../contracts/messaging/contracts/runtime';
 import type { PolicyStateId } from '../../../routing-contracts/policy-state';
 
-export const BACKGROUND_OWNED_POLICY_STATE_IDS = [
-  'aggregate-editor-presence',
-  'ai-secret-unlock-requests',
-  'annotation-fork-sessions',
-  'content-action-activation-keys',
-  'content-action-auto-start-grants',
-  'content-action-capabilities',
-  'content-action-runtime-tokens',
-  'content-action-trusted-event-proofs',
-  'llm-session-tokens',
-  'page-access-tab-activation',
-  'popup-tab-route-capabilities',
-] as const satisfies readonly PolicyStateId[];
+export const BACKGROUND_OWNED_POLICY_STATE_IDS = collectPolicyStateIds('background-owned');
+export const OFFSCREEN_RUNTIME_POLICY_STATE_IDS = collectPolicyStateIds('offscreen-runtime');
+export const POPUP_EXPORT_TAB_ROUTE_POLICY_STATE_IDS =
+  collectPolicyStateIds('popup-export-tab-route');
+export const CAPTURE_PRIVILEGED_TAB_POLICY_STATE_IDS = collectPolicyStateIds(
+  'privileged-tab-route:capture'
+);
+export const SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS = collectPolicyStateIds(
+  'privileged-tab-route:scenario'
+);
+export const TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS = collectPolicyStateIds(
+  'privileged-tab-route:tab-mode'
+);
+export const VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS = collectPolicyStateIds(
+  'privileged-tab-route:video-control'
+);
+export const VIDEO_RECORDING_SURFACE_PRIVILEGED_TAB_POLICY_STATE_IDS = collectPolicyStateIds(
+  'privileged-tab-route:video-recording-surface'
+);
+export const PROJECT_EXPORT_RUNTIME_POLICY_STATE_IDS =
+  collectPolicyStateIds('project-export-runtime');
 
-export const OFFSCREEN_RUNTIME_POLICY_STATE_IDS = [
-  'project-export-capabilities',
-  'project-export-job-ledger',
-  'video-recording-control-lease',
-] as const satisfies readonly PolicyStateId[];
-
-export const POPUP_EXPORT_TAB_ROUTE_POLICY_STATE_IDS = [
-  'popup-tab-route-capabilities',
-] as const satisfies readonly PolicyStateId[];
-
-export const CAPTURE_PRIVILEGED_TAB_POLICY_STATE_IDS = [
-  'content-action-activation-keys',
-  'content-action-capabilities',
-  'content-action-runtime-tokens',
-  'content-action-trusted-event-proofs',
-] as const satisfies readonly PolicyStateId[];
-
-export const SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS = [
-  'tab-mode-runtime-state',
-] as const satisfies readonly PolicyStateId[];
-
-export const TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS = [
-  'content-action-activation-keys',
-  'content-action-capabilities',
-  'content-action-runtime-tokens',
-  'content-action-trusted-event-proofs',
-  'tab-mode-runtime-state',
-] as const satisfies readonly PolicyStateId[];
-
-export const VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS = [
-  'video-recording-control-lease',
-] as const satisfies readonly PolicyStateId[];
-
-export const VIDEO_RECORDING_SURFACE_PRIVILEGED_TAB_POLICY_STATE_IDS = [
-  'content-action-activation-keys',
-  'content-action-capabilities',
-  'content-action-runtime-tokens',
-  'content-action-trusted-event-proofs',
-  'video-recording-control-lease',
-  'video-recording-surface-lease',
-] as const satisfies readonly PolicyStateId[];
-
-export const PROJECT_EXPORT_RUNTIME_POLICY_STATE_IDS = [
-  'project-export-capabilities',
-  'project-export-job-ledger',
-] as const satisfies readonly PolicyStateId[];
+function collectPolicyStateIds(authorizationPolicyId: string): readonly PolicyStateId[] {
+  return [
+    ...new Set(
+      backgroundIngressContracts.flatMap((entry) => {
+        if (entry.classification !== 'routed') {
+          return [];
+        }
+        if (
+          entry.authorizationPolicyId !== authorizationPolicyId &&
+          !entry.alternateAuthorizationPolicyIds.includes(authorizationPolicyId)
+        ) {
+          return [];
+        }
+        return entry.policyStateIds as readonly PolicyStateId[];
+      })
+    ),
+  ];
+}

@@ -10,6 +10,7 @@ import { createSourceVideo, waitForSourceMetadata } from './video-source';
 
 type FixedVideoOutputStream = {
   dimensions: { height: number; width: number };
+  failure: Promise<never>;
   frameRate: number;
   stream: MediaStream;
 };
@@ -31,12 +32,12 @@ function createFrameDrawer(params: {
   outputBasis: { height: number; width: number };
   sourceRect: { height: number; width: number; x: number; y: number };
   video: HTMLVideoElement;
-}): () => boolean {
-  return () => {
+}): (frame?: VideoFrame) => boolean {
+  return (frame) => {
     fillCanvasBackground(params.ctx, params.canvas);
     const currentSource = {
-      height: params.video.videoHeight,
-      width: params.video.videoWidth,
+      height: frame?.displayHeight ?? params.video.videoHeight,
+      width: frame?.displayWidth ?? params.video.videoWidth,
     };
     if (currentSource.width <= 0 || currentSource.height <= 0) return false;
     const usesStableSource =
@@ -50,7 +51,7 @@ function createFrameDrawer(params: {
     params.ctx.imageSmoothingEnabled = scaled;
     if (scaled) params.ctx.imageSmoothingQuality = 'high';
     params.ctx.drawImage(
-      params.video,
+      frame ?? params.video,
       source.x,
       source.y,
       source.width,
@@ -89,13 +90,15 @@ export async function createFixedVideoOutputStream(
   try {
     await waitForSourceMetadata(video);
     const outputProfile = resolveVideoOutputProfile(settings);
+    const sourceTrack = sourceStream.getVideoTracks()[0];
+    if (!sourceTrack) throw new Error('Fixed video source stream returned no video track');
     const requestedFrameRate = Math.min(
       options.frameRate ?? outputProfile.frameRate,
       outputProfile.frameRate
     );
     const frameRate = resolveFixedVideoFrameRate(
       requestedFrameRate,
-      sourceStream.getVideoTracks()[0]?.getSettings().frameRate
+      sourceTrack.getSettings().frameRate
     );
     const geometry = createRecordingGeometryPlan({
       frameRateCap: outputProfile.frameRate,
@@ -104,7 +107,7 @@ export async function createFixedVideoOutputStream(
       sourceRect: { x: 0, y: 0, height: video.videoHeight, width: video.videoWidth },
     });
     const sourceRect = resolveAspectMatchedSourceFrame(geometry.sourceRect, geometry.outputSize);
-    const normalizedStream = createCanvasVideoOutput({
+    const normalized = createCanvasVideoOutput({
       ...(options.includeSourceAudio ? { audioTracks: sourceStream.getAudioTracks() } : {}),
       contentHint: options.contentHint ?? 'detail',
       dimensions: geometry.outputSize,
@@ -119,9 +122,15 @@ export async function createFixedVideoOutputStream(
         }),
       }),
       release,
+      sourceTrack,
     });
 
-    return { dimensions: geometry.outputSize, frameRate, stream: normalizedStream };
+    return {
+      dimensions: geometry.outputSize,
+      failure: normalized.failure,
+      frameRate,
+      stream: normalized.stream,
+    };
   } catch (error) {
     release();
     throw error;

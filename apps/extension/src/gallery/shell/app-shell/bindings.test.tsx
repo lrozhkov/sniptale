@@ -84,6 +84,9 @@ function createActions(): UseGalleryAppActionsResult {
       inspectExport: vi.fn(async () => createLocalBackupSummary()),
     },
     importing: {
+      cancelActiveImport: vi.fn(),
+      closePendingImport: vi.fn(),
+      dismissActiveImport: vi.fn(),
       importBackup: vi.fn(async () => undefined),
       importSelectedFile: vi.fn(async () => undefined),
     },

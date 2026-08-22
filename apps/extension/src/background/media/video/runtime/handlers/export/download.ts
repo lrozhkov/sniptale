@@ -1,6 +1,7 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   downloadRecordingSidecar,
+  downloadStoredProjectExport,
   downloadStoredRecording,
 } from '../../../../../media-hub/recording-download';
 import { respondAsyncRouteWithLogger } from '../../../../../routing-contracts/response';
@@ -22,6 +23,23 @@ export function handleDownloadRecording(
     sendResponse,
     logger,
     failureLogMessage: 'Failed to download recording through background route',
+  });
+  return { handled: true, keepChannelOpen: true };
+}
+
+export function handleDownloadProjectExport(
+  message: { exportId: string; filename: string },
+  sendResponse: ResponseSender
+): RouteResult {
+  logger.log('Downloading project export', message.filename);
+  respondAsyncRouteWithLogger({
+    work: downloadStoredProjectExport(message.exportId, message.filename).then((downloadId) => ({
+      success: true,
+      downloadId,
+    })),
+    sendResponse,
+    logger,
+    failureLogMessage: 'Failed to download project export through background route',
   });
   return { handled: true, keepChannelOpen: true };
 }

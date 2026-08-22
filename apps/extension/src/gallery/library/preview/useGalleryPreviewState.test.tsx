@@ -4,11 +4,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { getAggregatePreviewBlobMock, getMediaAssetBlobMock, loadWebSnapshotScreenshotBlobMock } =
+const { getAggregatePreviewBlobMock, getMediaAssetBlobMock, getWebSnapshotScreenshotFileMock } =
   vi.hoisted(() => ({
     getAggregatePreviewBlobMock: vi.fn(),
     getMediaAssetBlobMock: vi.fn(),
-    loadWebSnapshotScreenshotBlobMock: vi.fn(),
+    getWebSnapshotScreenshotFileMock: vi.fn(),
   }));
 
 vi.mock('../../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
@@ -26,8 +26,9 @@ vi.mock(
   })
 );
 
-vi.mock('../../web-snapshot/package', () => ({
-  loadWebSnapshotScreenshotBlob: loadWebSnapshotScreenshotBlobMock,
+vi.mock('../../../composition/persistence/web-snapshots', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/web-snapshots')>()),
+  getWebSnapshotScreenshotFile: getWebSnapshotScreenshotFileMock,
 }));
 
 import { useGalleryPreviewState } from './useGalleryPreviewState';
@@ -82,12 +83,10 @@ beforeEach(() => {
   root = createRoot(container);
 });
 
-it('uses the full stored screenshot from the ZIP package for web snapshot previews', async () => {
-  const packageBlob = new Blob(['zip'], { type: 'application/zip' });
-  const thumbnail = new Blob(['preview'], { type: 'image/png' });
+it('uses the durable screenshot object for web snapshot previews', async () => {
+  const thumbnail = new File(['preview'], 'screenshot.png', { type: 'image/png' });
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];
-  getMediaAssetBlobMock.mockResolvedValue(packageBlob);
-  loadWebSnapshotScreenshotBlobMock.mockResolvedValue(thumbnail);
+  getWebSnapshotScreenshotFileMock.mockResolvedValue(thumbnail);
 
   act(() => {
     root?.render(<HookProbe onValue={(value) => values.push(value)} />);
@@ -110,8 +109,8 @@ it('uses the full stored screenshot from the ZIP package for web snapshot previe
   });
   await flushEffects();
 
-  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('snapshot-1');
-  expect(loadWebSnapshotScreenshotBlobMock).toHaveBeenCalledWith(packageBlob);
+  expect(getWebSnapshotScreenshotFileMock).toHaveBeenCalledWith('snapshot-1');
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
   expect(URL.createObjectURL).toHaveBeenCalledWith(thumbnail);
   expect(latest()?.state.session.url).toBe('blob:preview');
 });

@@ -1,6 +1,8 @@
 import { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import {
   CaptureMode,
+  resolveVideoOutputProfile,
+  VideoRecordingFailureCode,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -50,20 +52,42 @@ async function acquireDesktopStream(settings: VideoRecordingSettings) {
 }
 
 async function acquireCameraStream(settings: VideoRecordingSettings) {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      ...(settings.webcamDeviceId ? { deviceId: { exact: settings.webcamDeviceId } } : {}),
-      ...buildWebcamQualityConstraints(resolveWebcamQualitySettings(settings)),
-    },
-  });
+  const requestedFrameRate = resolveVideoOutputProfile(settings).frameRate;
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        ...(settings.webcamDeviceId ? { deviceId: { exact: settings.webcamDeviceId } } : {}),
+        ...buildWebcamQualityConstraints(resolveWebcamQualitySettings(settings)),
+        frameRate: { exact: requestedFrameRate },
+      },
+    });
+  } catch (error) {
+    if (isCameraFrameRateConstraintFailure(error)) {
+      throw new Error(VideoRecordingFailureCode.CAMERA_FRAME_RATE_UNSUPPORTED, { cause: error });
+    }
+    throw error;
+  }
   logger.debug('Acquired camera recording stream', {
     deviceSelected: Boolean(settings.webcamDeviceId),
+    requestedFrameRate,
   });
   return {
     stream,
     cursorCaptureMode: null,
   };
+}
+
+function isCameraFrameRateConstraintFailure(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('name' in error)) {
+    return false;
+  }
+  if (error.name !== 'OverconstrainedError') {
+    return false;
+  }
+  const constraint = 'constraint' in error ? error.constraint : undefined;
+  return constraint === undefined || constraint === '' || constraint === 'frameRate';
 }
 
 type TabCaptureViewport = {
@@ -100,6 +124,9 @@ function resolvePhysicalTabCaptureSize(
     throw new Error('Tab capture physical geometry exceeds Chromium limits');
   }
   return {
+    // Keep max-only bounds on the measured WebContents grid. Chromium still maps an
+    // odd edge onto its even I420 output, but fixed min/max constraints would add
+    // another fixed-resolution requirement before that browser-owned conversion.
     height: Math.max(1, physicalHeight),
     width: Math.max(1, physicalWidth),
   };
@@ -107,7 +134,10 @@ function resolvePhysicalTabCaptureSize(
 
 function createTabSourceConstraints(
   streamId: string,
-  physicalSize: { height: number; width: number } | null = null
+  options: {
+    frameRate?: number;
+    physicalSize?: { height: number; width: number } | null;
+  } = {}
 ): MediaTrackConstraints {
   return {
     mandatory: {
@@ -115,7 +145,17 @@ function createTabSourceConstraints(
       chromeMediaSourceId: streamId,
       // Chromium seeds its WebContents capture scaler from the requested maximum frame size.
       // Keep that request on the tab's existing physical pixel grid; output scaling happens later.
-      ...(physicalSize ? { maxHeight: physicalSize.height, maxWidth: physicalSize.width } : {}),
+      ...(options.frameRate
+        ? { maxFrameRate: options.frameRate, minFrameRate: options.frameRate }
+        : {}),
+      ...(options.physicalSize
+        ? {
+            // Max-only bounds keep Chromium on a variable-resolution policy. Do not
+            // add matching minimums: fixed resolution would resample odd WebContents.
+            maxHeight: options.physicalSize.height,
+            maxWidth: options.physicalSize.width,
+          }
+        : {}),
     },
   } as MediaTrackConstraints;
 }
@@ -136,9 +176,13 @@ async function acquireTabStream({
     : false;
   const requestedPhysicalSize = resolvePhysicalTabCaptureSize(viewport);
 
+  const requestedFrameRate = resolveVideoOutputProfile(settings).frameRate;
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: audioConstraints,
-    video: createTabSourceConstraints(streamId, requestedPhysicalSize),
+    video: createTabSourceConstraints(streamId, {
+      frameRate: requestedFrameRate,
+      physicalSize: requestedPhysicalSize,
+    }),
   });
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {

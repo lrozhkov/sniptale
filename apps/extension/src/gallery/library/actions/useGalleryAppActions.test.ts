@@ -11,8 +11,11 @@ import { useGalleryAppActions } from './useGalleryAppActions';
 
 const actionMocks = vi.hoisted(() => ({
   copyPreviewItemMock: vi.fn(async () => undefined),
+  createCancelActiveImportActionMock: vi.fn(),
+  createDismissActiveImportActionMock: vi.fn(),
   createApplySelectionTagActionMock: vi.fn(),
   createBusyActionRunnerMock: vi.fn(),
+  createClosePendingImportActionMock: vi.fn(),
   createClosePendingExportActionMock: vi.fn(),
   createClosePreviewActionMock: vi.fn(),
   createConfirmExportBackupActionMock: vi.fn(),
@@ -34,12 +37,15 @@ const actionMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./backup', () => ({
+  createCancelActiveImportAction: actionMocks.createCancelActiveImportActionMock,
+  createClosePendingImportAction: actionMocks.createClosePendingImportActionMock,
   createClosePendingExportAction: actionMocks.createClosePendingExportActionMock,
   createConfirmExportBackupAction: actionMocks.createConfirmExportBackupActionMock,
   createExportBackupAction: actionMocks.createExportBackupActionMock,
   createImportAction: actionMocks.createImportActionMock,
   createImportSelectedFileAction: actionMocks.createImportSelectedFileActionMock,
   createInspectExportBackupAction: actionMocks.createInspectExportBackupActionMock,
+  createDismissActiveImportAction: actionMocks.createDismissActiveImportActionMock,
 }));
 
 vi.mock('./preview', () => ({
@@ -75,6 +81,9 @@ function prepareActionFactoryMocks() {
   actionMocks.createDeleteManyActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createStorageCleanupActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createClosePendingExportActionMock.mockReturnValue(vi.fn());
+  actionMocks.createClosePendingImportActionMock.mockReturnValue(vi.fn());
+  actionMocks.createCancelActiveImportActionMock.mockReturnValue(vi.fn());
+  actionMocks.createDismissActiveImportActionMock.mockReturnValue(vi.fn());
   actionMocks.createConfirmExportBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createExportBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createInspectExportBackupActionMock.mockReturnValue(vi.fn(async () => ({})));
@@ -97,6 +106,7 @@ describe('useGalleryAppActions', () => {
     });
     const actions = useGalleryAppActions(controller);
     const backupOptions = {
+      includeDrafts: false,
       scope: 'all' as const,
       includeSourceMetadata: true,
       includeTelemetry: true,
@@ -110,6 +120,9 @@ describe('useGalleryAppActions', () => {
     await actions.backup.inspectExport(backupOptions);
     await actions.importing.importSelectedFile(null);
     await actions.importing.importBackup('replace');
+    actions.importing.closePendingImport();
+    actions.importing.cancelActiveImport();
+    actions.importing.dismissActiveImport();
     await actions.selection.downloadZip();
     await actions.preview.saveMetadata();
     await actions.selection.applyTag();

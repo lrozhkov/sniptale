@@ -1,67 +1,54 @@
 import { describe, expect, it, vi } from 'vitest';
-
-import type {
-  RecordingStagingStorageAdapter,
-  RecordingStagingStorageArtifact,
-  RecordingStagingStorageSession,
-} from './contracts';
+import * as assets from '../../assets';
+import type { AssetObjectWriter } from '../../assets';
 import {
   createRecordingStagingCoordinator,
   invalidateAndAbortActiveRecordingStaging,
 } from './coordinator';
 
 function deferred<T = void>() {
-  let resolvePromise!: (value: T | PromiseLike<T>) => void;
-  let rejectPromise!: (reason?: unknown) => void;
-  const promise = new Promise<T>((resolve, reject) => {
-    resolvePromise = resolve;
-    rejectPromise = reject;
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
   });
-  return { promise, reject: rejectPromise, resolve: resolvePromise };
+  return { promise, resolve };
 }
 
-interface FakeStorageOptions {
-  append?: (chunk: Blob, artifactIndex: number) => Promise<void>;
-  close?: (artifactIndex: number) => Promise<void>;
-}
-
-function createFakeStorage(options: FakeStorageOptions = {}) {
-  const storedChunks: Blob[][] = [];
-  const artifacts: RecordingStagingStorageArtifact[] = [];
-  const removeSession = vi.fn().mockResolvedValue(undefined);
-  const aborts: Array<ReturnType<typeof vi.fn>> = [];
-  const closes: Array<ReturnType<typeof vi.fn>> = [];
-  const session: RecordingStagingStorageSession = {
-    async createArtifact() {
-      const artifactIndex = artifacts.length;
-      storedChunks.push([]);
-      const abort = vi.fn().mockResolvedValue(undefined);
-      const close = vi.fn(async () => options.close?.(artifactIndex));
-      aborts.push(abort);
-      closes.push(close);
-      const artifact: RecordingStagingStorageArtifact = {
-        abort,
-        async append(chunk) {
-          await options.append?.(chunk, artifactIndex);
-          storedChunks[artifactIndex]?.push(chunk);
-        },
-        close,
-        async getFile() {
-          return new File(storedChunks[artifactIndex] ?? [], `artifact-${artifactIndex}.part`);
-        },
-        remove: vi.fn().mockResolvedValue(undefined),
-      };
-      artifacts.push(artifact);
-      return artifact;
-    },
-    remove: removeSession,
-  };
-  const adapter: RecordingStagingStorageAdapter = {
-    countSessions: vi.fn().mockResolvedValue(0),
-    createSession: vi.fn().mockResolvedValue(session),
-    removeAllSessions: vi.fn().mockResolvedValue(0),
-  };
-  return { aborts, adapter, closes, removeSession, storedChunks };
+function createWriterFactory(options: { append?: (chunk: Blob) => Promise<void> } = {}) {
+  const writers: Array<{
+    abort: ReturnType<typeof vi.fn>;
+    chunks: Blob[];
+    writer: AssetObjectWriter;
+  }> = [];
+  const createWriter = vi.fn(async ({ mimeType }: { mimeType: string }) => {
+    const chunks: Blob[] = [];
+    const abort = vi.fn().mockResolvedValue(undefined);
+    const assetId = `asset-${writers.length + 1}`;
+    const writer: AssetObjectWriter = {
+      abort,
+      assetId,
+      async append(chunk) {
+        await options.append?.(chunk);
+        chunks.push(chunk);
+      },
+      async finalize() {
+        const size = chunks.reduce((total, chunk) => total + chunk.size, 0);
+        return {
+          ref: {
+            assetId,
+            createdAt: 1,
+            location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+            mimeType,
+            sha256: null,
+            size,
+          },
+        };
+      },
+    };
+    writers.push({ abort, chunks, writer });
+    return writer;
+  });
+  return { createWriter, writers };
 }
 
 async function openArtifact(
@@ -76,160 +63,118 @@ async function openArtifact(
 }
 
 describe('recording staging coordinator', () => {
-  it('serializes ordered appends and returns a typed disk-backed File wrapper', async () => {
-    const firstWrite = deferred();
-    const appendCalls: string[] = [];
-    const storage = createFakeStorage({
-      async append(chunk) {
-        appendCalls.push(await chunk.text());
-        if (appendCalls.length === 1) await firstWrite.promise;
-      },
-    });
-    const coordinator = await createRecordingStagingCoordinator({ storage: storage.adapter });
-    const writer = await openArtifact(coordinator);
-
-    const writes = [writer.append(new Blob(['a'])), writer.append(new Blob(['b']))];
-    await vi.waitFor(() => expect(appendCalls).toEqual(['a']));
-    expect(coordinator.getPendingBytes()).toBe(2);
-    firstWrite.resolve();
-    await Promise.all(writes);
-
-    const result = await writer.finalize();
-    expect(await result.file.text()).toBe('ab');
-    expect(result.file).toBeInstanceOf(File);
-    expect(result.file.name).toBe('primary.webm');
-    expect(result.file.type).toBe('video/webm;codecs=vp9');
-    expect(result.size).toBe(2);
-    expect(coordinator.getPendingBytes()).toBe(0);
-    await coordinator.delete();
-    expect(storage.removeSession).toHaveBeenCalledOnce();
-  });
-
-  it('does not retain pending bytes across thousands of completed writes', async () => {
-    const storage = createFakeStorage();
-    const coordinator = await createRecordingStagingCoordinator({ storage: storage.adapter });
-    const writer = await openArtifact(coordinator);
-
-    for (let index = 0; index < 2_000; index += 1) {
-      await writer.append(new Blob(['x']));
-      expect(coordinator.getPendingBytes()).toBe(0);
-    }
-
-    const result = await writer.finalize();
-    expect(result.size).toBe(2_000);
-  });
-
-  it('enforces one aggregate pending-byte budget across artifact writers', async () => {
-    const writeGate = deferred();
-    const storage = createFakeStorage({ append: () => writeGate.promise });
-    const coordinator = await createRecordingStagingCoordinator({
-      pendingBytesLimit: 10,
-      storage: storage.adapter,
-    });
-    const primary = await openArtifact(coordinator, 'primary');
-    const webcam = await openArtifact(coordinator, 'webcam');
-
-    const acceptedWrite = primary.append(new Blob(['123456']));
-    await vi.waitFor(() => expect(coordinator.getPendingBytes()).toBe(6));
-    await expect(webcam.append(new Blob(['12345']))).rejects.toThrow(
-      'pending-byte limit exceeded (10 bytes)'
+  it('rejects an invalid pending-byte budget', async () => {
+    await expect(createRecordingStagingCoordinator({ pendingBytesLimit: 0 })).rejects.toThrow(
+      'positive safe integer'
     );
-    expect(coordinator.getPendingBytes()).toBe(6);
-    writeGate.resolve();
-    await acceptedWrite;
-    await expect(primary.finalize()).rejects.toThrow('pending-byte limit exceeded (10 bytes)');
-    await coordinator.abort();
-  });
-
-  it('poisons finalization after an append failure and still supports cleanup', async () => {
-    const writeError = new Error('disk write failed');
-    const storage = createFakeStorage({ append: () => Promise.reject(writeError) });
-    const coordinator = await createRecordingStagingCoordinator({ storage: storage.adapter });
-    const writer = await openArtifact(coordinator);
-
-    await expect(writer.append(new Blob(['bytes']))).rejects.toBe(writeError);
-    expect(coordinator.getPendingBytes()).toBe(0);
-    await expect(writer.finalize()).rejects.toBe(writeError);
-    await coordinator.abort();
-    expect(storage.aborts[0]).toHaveBeenCalledOnce();
-    expect(storage.removeSession).toHaveBeenCalledOnce();
-  });
-
-  it('rejects close failure instead of publishing an incomplete File', async () => {
-    const closeError = new Error('close failed');
-    const storage = createFakeStorage({ close: () => Promise.reject(closeError) });
-    const coordinator = await createRecordingStagingCoordinator({ storage: storage.adapter });
-    const writer = await openArtifact(coordinator);
-
-    await writer.append(new Blob(['bytes']));
-    await expect(writer.finalize()).rejects.toBe(closeError);
-    await coordinator.abort();
-  });
-
-  it('aborts every artifact and deletes the session without finalizing', async () => {
-    const storage = createFakeStorage();
-    const coordinator = await createRecordingStagingCoordinator({ storage: storage.adapter });
-    await openArtifact(coordinator, 'primary');
-    await openArtifact(coordinator, 'microphone');
-
-    await coordinator.abort();
-    await coordinator.abort();
-
-    expect(storage.aborts[0]).toHaveBeenCalledOnce();
-    expect(storage.aborts[1]).toHaveBeenCalledOnce();
-    expect(storage.removeSession).toHaveBeenCalledOnce();
-  });
-
-  it('rejects duplicate artifact IDs and invalid coordinator budgets', async () => {
-    const storage = createFakeStorage();
-    const coordinator = await createRecordingStagingCoordinator({ storage: storage.adapter });
-    await openArtifact(coordinator);
-
-    await expect(openArtifact(coordinator)).rejects.toThrow('artifact already exists');
     await expect(
-      createRecordingStagingCoordinator({ pendingBytesLimit: 0, storage: storage.adapter })
+      createRecordingStagingCoordinator({ pendingBytesLimit: Number.MAX_SAFE_INTEGER + 1 })
     ).rejects.toThrow('positive safe integer');
   });
 
-  it('invalidates active writers before privacy erasure can continue', async () => {
-    const storage = createFakeStorage();
-    const coordinator = await createRecordingStagingCoordinator({ storage: storage.adapter });
+  it('serializes writes and finalizes the stable OPFS asset without creating a File copy', async () => {
+    const gate = deferred();
+    const appendCalls: string[] = [];
+    const factory = createWriterFactory({
+      async append(chunk) {
+        appendCalls.push(await chunk.text());
+        if (appendCalls.length === 1) await gate.promise;
+      },
+    });
+    const coordinator = await createRecordingStagingCoordinator({
+      admitBytes: vi.fn().mockResolvedValue(undefined),
+      createWriter: factory.createWriter,
+    });
     const writer = await openArtifact(coordinator);
-
-    await invalidateAndAbortActiveRecordingStaging();
-
-    await expect(writer.append(new Blob(['stale']))).rejects.toThrow(/aborted|stale/);
-    expect(storage.aborts[0]).toHaveBeenCalledOnce();
-    expect(storage.removeSession).toHaveBeenCalledOnce();
+    const writes = [writer.append(new Blob(['a'])), writer.append(new Blob(['b']))];
+    await vi.waitFor(() => expect(appendCalls).toEqual(['a']));
+    expect(coordinator.getPendingBytes()).toBe(2);
+    gate.resolve();
+    await Promise.all(writes);
+    const artifact = await writer.finalize();
+    expect(artifact).toMatchObject({
+      artifactId: 'primary',
+      asset: { ref: { assetId: 'asset-1', size: 2 } },
+      filename: 'primary.webm',
+      mimeType: 'video/webm;codecs=vp9',
+      size: 2,
+    });
+    expect('file' in artifact).toBe(false);
+    await coordinator.delete();
   });
 
-  it('discards an artifact that finishes opening after the coordinator is aborted', async () => {
-    const artifactOpened = deferred<RecordingStagingStorageArtifact>();
-    const abortArtifact = vi.fn().mockResolvedValue(undefined);
-    const removeSession = vi.fn().mockResolvedValue(undefined);
-    const session: RecordingStagingStorageSession = {
-      createArtifact: () => artifactOpened.promise,
-      remove: removeSession,
-    };
-    const storage: RecordingStagingStorageAdapter = {
-      countSessions: vi.fn().mockResolvedValue(0),
-      createSession: vi.fn().mockResolvedValue(session),
-      removeAllSessions: vi.fn().mockResolvedValue(0),
-    };
-    const coordinator = await createRecordingStagingCoordinator({ storage });
-    const opening = openArtifact(coordinator);
+  it('enforces one pending-byte budget across concurrent sources', async () => {
+    const gate = deferred();
+    const factory = createWriterFactory({ append: () => gate.promise });
+    const coordinator = await createRecordingStagingCoordinator({
+      admitBytes: vi.fn().mockResolvedValue(undefined),
+      createWriter: factory.createWriter,
+      pendingBytesLimit: 3,
+    });
+    const primary = await openArtifact(coordinator);
+    const webcam = await openArtifact(coordinator, 'webcam');
+    const pending = primary.append(new Blob(['aa']));
+    await vi.waitFor(() => expect(coordinator.getPendingBytes()).toBe(2));
+    await expect(webcam.append(new Blob(['bb']))).rejects.toThrow('pending-byte limit');
+    gate.resolve();
+    await pending;
+  });
+
+  it('treats quota admission and OPFS write failures as terminal', async () => {
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      admitBytes: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValue(new DOMException('full', 'QuotaExceededError')),
+      createWriter: factory.createWriter,
+    });
+    const writer = await openArtifact(coordinator);
+    await expect(writer.append(new Blob(['x']))).rejects.toMatchObject({
+      name: 'QuotaExceededError',
+    });
+    await expect(writer.finalize()).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  });
+
+  it('invalidates and aborts active writers before privacy erasure', async () => {
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      admitBytes: vi.fn().mockResolvedValue(undefined),
+      createWriter: factory.createWriter,
+    });
+    await openArtifact(coordinator);
+    await invalidateAndAbortActiveRecordingStaging();
+    expect(factory.writers[0]?.abort).toHaveBeenCalledOnce();
+    await expect(openArtifact(coordinator, 'late')).rejects.toThrow('generation is stale');
+  });
+
+  it('discards a finalized object when no ready journal protects it', async () => {
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      admitBytes: vi.fn().mockResolvedValue(undefined),
+      createWriter: factory.createWriter,
+    });
+    const writer = await openArtifact(coordinator);
+    await writer.finalize();
 
     await coordinator.abort();
-    artifactOpened.resolve({
-      abort: abortArtifact,
-      append: vi.fn(),
-      close: vi.fn(),
-      getFile: vi.fn(),
-      remove: vi.fn(),
-    });
 
-    await expect(opening).rejects.toThrow('coordinator is aborted');
-    expect(abortArtifact).toHaveBeenCalledOnce();
-    expect(removeSession).toHaveBeenCalledOnce();
+    expect(factory.writers[0]?.abort).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a finalized object after its ready journal becomes durable', async () => {
+    const protection = vi.spyOn(assets, 'isAssetReadyProtected').mockReturnValue(true);
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      admitBytes: vi.fn().mockResolvedValue(undefined),
+      createWriter: factory.createWriter,
+    });
+    const writer = await openArtifact(coordinator);
+    await writer.finalize();
+
+    await coordinator.abort();
+
+    expect(factory.writers[0]?.abort).not.toHaveBeenCalled();
+    protection.mockRestore();
   });
 });

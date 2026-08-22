@@ -6,6 +6,7 @@ const {
   getVideoRecordingTabIdMock,
   isControlledCursorCaptureEnabledMock,
   resetVideoRecordingRuntimeStateMock,
+  setVideoRecordingRuntimeStateMock,
   resetVideoRecordingStartSessionMock,
   sendRuntimeMessageMock,
   sendTabMessageMock,
@@ -20,6 +21,7 @@ const {
   getVideoRecordingTabIdMock: vi.fn(),
   isControlledCursorCaptureEnabledMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
+  setVideoRecordingRuntimeStateMock: vi.fn(),
   resetVideoRecordingStartSessionMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
@@ -59,6 +61,7 @@ vi.mock('../../../../../platform/runtime-messaging', async (importOriginal) => (
 vi.mock('../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session-state')>()),
   resetVideoRecordingRuntimeState: resetVideoRecordingRuntimeStateMock,
+  setVideoRecordingRuntimeState: setVideoRecordingRuntimeStateMock,
 }));
 
 vi.mock('../../session-state', async (importOriginal) => ({
@@ -142,6 +145,7 @@ function expectRuntimeStateReset(): void {
   expect(setVideoRecordingIdMock).toHaveBeenCalledWith(null);
   expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({ error: 'permission denied' });
 }
 
 async function verifyStartFailureBroadcast(): Promise<void> {

@@ -2,13 +2,39 @@
 
 const PERSISTENCE_LOCK_NAME = 'sniptale:persistence:privacy-erasure';
 const PERSISTENCE_TRANSITION_LOCK_NAME = `${PERSISTENCE_LOCK_NAME}:transition`;
+const DURABLE_ASSET_LIFECYCLE_LOCK_NAME = `${PERSISTENCE_LOCK_NAME}:durable-assets`;
+const DURABLE_ASSET_OPERATION_LOCK_NAME = `${PERSISTENCE_LOCK_NAME}:durable-asset-operations`;
 
 type PersistenceLockMode = 'exclusive' | 'shared';
 
 const persistenceMutationPermitBrand = Symbol('persistenceMutationPermit');
+const persistenceMutationTransitionPermitBrand = Symbol('persistenceMutationTransitionPermit');
+const durableAssetOperationPermitBrand = Symbol('durableAssetOperationPermit');
 
 export interface PersistenceMutationPermit {
   readonly [persistenceMutationPermitBrand]: true;
+}
+
+export interface DurableAssetOperationPermit {
+  readonly [durableAssetOperationPermitBrand]: true;
+}
+
+export interface PersistenceMutationTransitionPermit {
+  readonly [persistenceMutationTransitionPermitBrand]: true;
+}
+
+export function isActivePersistenceMutationTransitionPermit(
+  value: unknown
+): value is PersistenceMutationTransitionPermit {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    activePersistenceMutationTransitionPermits.has(value)
+  );
+}
+
+export interface PersistenceMutationTransitionLease {
+  release(): Promise<void>;
 }
 
 export interface PersistenceLockManager {
@@ -22,6 +48,8 @@ export interface PersistenceLockManager {
 let lockManagerForTests: PersistenceLockManager | null = null;
 const fallbackQueues = new Map<string, Promise<void>>();
 const activePersistenceMutationPermits = new WeakSet<object>();
+const activePersistenceMutationTransitionPermits = new WeakSet<object>();
+const activeDurableAssetOperationPermits = new WeakSet<object>();
 
 const fallbackLockManager: PersistenceLockManager = {
   request<T>(
@@ -107,11 +135,103 @@ export function runWithExclusivePersistenceMutationPermit<T>(
  * continuation cannot survive an MV3 worker restart and publish data after verified erasure.
  */
 export function runWithPersistenceMutationTransition<T>(
-  operation: () => T | Promise<T>
+  operation: (permit: PersistenceMutationTransitionPermit) => T | Promise<T>
 ): Promise<T> {
   return getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
+    async () => {
+      const permit: PersistenceMutationTransitionPermit = {
+        [persistenceMutationTransitionPermitBrand]: true,
+      };
+      activePersistenceMutationTransitionPermits.add(permit);
+      try {
+        return await operation(permit);
+      } finally {
+        activePersistenceMutationTransitionPermits.delete(permit);
+      }
+    }
+  );
+}
+
+export function runWithPersistenceMutationTransitionRecovery<T>(
+  permit: PersistenceMutationTransitionPermit | undefined,
+  operation: () => T | Promise<T>
+): Promise<T> {
+  if (permit && activePersistenceMutationTransitionPermits.has(permit)) {
+    return Promise.resolve().then(operation);
+  }
+  return runWithPersistenceMutationTransition(operation);
+}
+
+export async function acquirePersistenceMutationTransition(): Promise<PersistenceMutationTransitionLease> {
+  let releaseTransition!: () => void;
+  let resolveAcquired!: () => void;
+  let rejectAcquired!: (error: unknown) => void;
+  const released = new Promise<void>((resolve) => {
+    releaseTransition = resolve;
+  });
+  const acquired = new Promise<void>((resolve, reject) => {
+    resolveAcquired = resolve;
+    rejectAcquired = reject;
+  });
+  const lifetime = getPersistenceLockManager().request(
+    PERSISTENCE_TRANSITION_LOCK_NAME,
+    { mode: 'shared' },
+    async () => {
+      resolveAcquired();
+      await released;
+    }
+  );
+  void lifetime.catch(rejectAcquired);
+  await acquired;
+  let active = true;
+  return {
+    async release() {
+      if (!active) return;
+      active = false;
+      releaseTransition();
+      await lifetime;
+    },
+  };
+}
+
+export function runWithDurableAssetLifecycleLock<T>(operation: () => T | Promise<T>): Promise<T> {
+  return getPersistenceLockManager().request(
+    DURABLE_ASSET_LIFECYCLE_LOCK_NAME,
+    { mode: 'exclusive' },
+    operation
+  );
+}
+
+export function runWithDurableAssetOperation<T>(
+  operation: (permit: DurableAssetOperationPermit) => T | Promise<T>
+): Promise<T> {
+  return getPersistenceLockManager().request(
+    DURABLE_ASSET_OPERATION_LOCK_NAME,
+    { mode: 'exclusive' },
+    async () => {
+      const permit: DurableAssetOperationPermit = { [durableAssetOperationPermitBrand]: true };
+      activeDurableAssetOperationPermits.add(permit);
+      try {
+        return await operation(permit);
+      } finally {
+        activeDurableAssetOperationPermits.delete(permit);
+      }
+    }
+  );
+}
+
+export function runWithDurableAssetOperationRecovery<T>(
+  permit: DurableAssetOperationPermit | undefined,
+  operation: () => T | Promise<T>
+): Promise<T> {
+  if (permit && activeDurableAssetOperationPermits.has(permit)) {
+    return Promise.resolve().then(operation);
+  }
+  return getPersistenceLockManager().request(
+    DURABLE_ASSET_OPERATION_LOCK_NAME,
+    { mode: 'exclusive' },
     operation
   );
 }

@@ -6,9 +6,16 @@ import {
 import { createScenarioCaptureStep } from '../../features/scenario/project/public';
 import { type ScenarioCaptureStep } from '../../features/scenario/contracts/types/project';
 
-const { dataUrlToBlobMock, measureImageBlobMock } = vi.hoisted(() => ({
+const { dataUrlToBlobMock, measureImageBlobMock, writeBlobToAssetMock } = vi.hoisted(() => ({
   dataUrlToBlobMock: vi.fn(),
   measureImageBlobMock: vi.fn(),
+  writeBlobToAssetMock: vi.fn(),
+}));
+
+vi.mock('../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/persistence/assets')>()),
+  assertAssetWriteAdmission: vi.fn(async () => undefined),
+  writeBlobToAsset: writeBlobToAssetMock,
 }));
 
 vi.mock('../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -48,6 +55,16 @@ function registerCaptureStepEditsScope() {
     vi.spyOn(Date, 'now').mockReturnValue(123);
     dataUrlToBlobMock.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
     measureImageBlobMock.mockResolvedValue({ width: 1440, height: 900 });
+    writeBlobToAssetMock.mockImplementation(async (blob: Blob, options: { mimeType: string }) => ({
+      ref: {
+        assetId: 'opfs-edited-asset',
+        createdAt: 1,
+        location: { kind: 'opfs', objectKey: 'objects/opfs-edited-asset' },
+        mimeType: options.mimeType,
+        sha256: null,
+        size: blob.size,
+      },
+    }));
   });
 }
 

@@ -84,7 +84,7 @@ export async function ensureRecordingAsset(
     throw new Error(translate('videoEditor.app.recordingNotFound'));
   }
 
-  return buildProjectRecordingAsset(sourceRecordingId, entry.blob, entry.filename);
+  return buildProjectRecordingAsset(sourceRecordingId, entry.file, entry.filename);
 }
 
 export async function importRecordingProjectAsset(
@@ -95,7 +95,7 @@ export async function importRecordingProjectAsset(
     throw new Error(translate('videoEditor.app.recordingNotFound'));
   }
 
-  return buildProjectRecordingAsset(sourceRecordingId, entry.blob, entry.filename);
+  return buildProjectRecordingAsset(sourceRecordingId, entry.file, entry.filename);
 }
 
 async function buildImportedImageAsset(file: File): Promise<VideoProjectAsset> {

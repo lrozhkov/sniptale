@@ -1,6 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  CONTENT_RUNTIME_PROTOCOL_VERSION,
+  VideoMessageType,
+} from '@sniptale/runtime-contracts/video/messages';
 import { installBackgroundRuntimeMessagingMock } from '../routing-contracts/runtime-messaging/mock';
 import { browserScriptingExecuteScriptMock, sendTabMessageMock } from './service.test-support';
 import {
@@ -11,11 +14,13 @@ import {
 } from './readiness';
 
 const VIEWPORT_COORDS_RESPONSE = {
+  contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
   coords: { x: 0, y: 0, width: 100, height: 100, outerWidth: 100, outerHeight: 100 },
 };
 
 beforeEach(() => {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
+  sendTabMessageMock.mockResolvedValue(VIEWPORT_COORDS_RESPONSE);
 });
 
 it('waits for the top-level content runtime after injecting the runtime', async () => {
@@ -55,6 +60,34 @@ it('retries readiness while the newly injected runtime has not registered its br
 
   expect(sendTabMessage).toHaveBeenCalledTimes(2);
   expect(wait).toHaveBeenCalledWith(50);
+});
+
+it('does not accept a viewport response from a stale content runtime', async () => {
+  const wait = vi.fn(async () => undefined);
+  const sendTabMessage = vi
+    .fn()
+    .mockResolvedValueOnce({
+      coords: { x: 0, y: 0, width: 100, height: 100, outerWidth: 100, outerHeight: 100 },
+    })
+    .mockResolvedValueOnce(VIEWPORT_COORDS_RESPONSE);
+
+  await waitForContentRuntimeReady(12, { sendTabMessage, wait });
+
+  expect(sendTabMessage).toHaveBeenCalledTimes(2);
+  expect(wait).toHaveBeenCalledWith(50);
+});
+
+it('accepts the current content runtime protocol', async () => {
+  const wait = vi.fn(async () => undefined);
+  const sendTabMessage = vi.fn().mockResolvedValueOnce({
+    contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
+    coords: { x: 0, y: 0, width: 100, height: 100, outerWidth: 100, outerHeight: 100 },
+  });
+
+  await waitForContentRuntimeReady(12, { sendTabMessage, wait });
+
+  expect(sendTabMessage).toHaveBeenCalledTimes(1);
+  expect(wait).not.toHaveBeenCalled();
 });
 
 it('waits past a short listener registration delay before continuing active page actions', async () => {

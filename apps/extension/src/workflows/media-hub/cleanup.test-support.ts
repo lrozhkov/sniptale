@@ -1,8 +1,8 @@
 import { WebSnapshotCaptureMode } from '@sniptale/runtime-contracts/web-snapshot';
-import type { WebSnapshotRecord } from '../../composition/persistence/web-snapshots/contracts';
+import type { StoredWebSnapshotRecord } from '../../composition/persistence/web-snapshots/contracts';
 
-export function createCleanupWebSnapshotRecord(id: string): WebSnapshotRecord {
-  const packageBlob = new Blob(['snapshot'], { type: 'application/zip' });
+export function createCleanupWebSnapshotRecord(id: string): StoredWebSnapshotRecord {
+  const packageSize = 8;
   return {
     createdAt: 1,
     id,
@@ -25,13 +25,16 @@ export function createCleanupWebSnapshotRecord(id: string): WebSnapshotRecord {
       stats: {
         assetCount: 0,
         failedAssetCount: 0,
-        packageSize: packageBlob.size,
+        packageSize,
         warningCount: 0,
       },
       warnings: [],
     },
-    packageBlob,
-    size: packageBlob.size,
+    packageAssetId: `${id}-package`,
+    screenshotAssetId: `${id}-screenshot`,
+    screenshotMimeType: 'image/png',
+    screenshotSize: 3,
+    size: packageSize,
     updatedAt: 1,
   };
 }

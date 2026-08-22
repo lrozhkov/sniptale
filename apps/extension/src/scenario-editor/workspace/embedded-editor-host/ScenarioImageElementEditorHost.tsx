@@ -4,7 +4,7 @@ import { translate } from '../../../platform/i18n';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import {
   getScenarioAssetBlob,
-  getScenarioStepEditorDocumentRecord,
+  getScenarioStepEditorDocumentTransferRecord,
 } from '../../../composition/persistence/scenario/store/public';
 import type { ScenarioImageElement } from '@sniptale/runtime-contracts/scenario/types/v3';
 import {
@@ -17,10 +17,10 @@ import { useScenarioEmbeddedEditorRuntime } from './runtime';
 async function createImageElementEditorUrl(args: {
   documentId: string;
   element: ScenarioImageElement;
-}): Promise<string> {
+}): Promise<{ url: string }> {
   const [blob, documentEntry] = await Promise.all([
     getScenarioAssetBlob(args.element.assetRef.assetId),
-    getScenarioStepEditorDocumentRecord(args.documentId),
+    getScenarioStepEditorDocumentTransferRecord(args.documentId),
   ]);
   const dataUrl =
     documentEntry?.document.sourceImageData ?? (blob ? await blobToDataUrl(blob) : null);
@@ -29,12 +29,14 @@ async function createImageElementEditorUrl(args: {
     throw new Error(translate('shared.runtime.readBlobFailed'));
   }
 
-  return createScenarioEditorEmbedUrl({
-    dataUrl,
-    document: documentEntry?.document ?? null,
-    title: args.element.name,
-    url: args.element.captureContext?.page.url ?? '',
-  });
+  return {
+    url: await createScenarioEditorEmbedUrl({
+      dataUrl,
+      document: documentEntry?.document ?? null,
+      title: args.element.name,
+      url: args.element.captureContext?.page.url ?? '',
+    }),
+  };
 }
 
 export function ScenarioImageElementEditorHost(props: {

@@ -8,10 +8,44 @@ const persistenceMocks = vi.hoisted(() => ({
   listScenarioProjectEntries: vi.fn(),
   listVideoProjectEntries: vi.fn(),
   runWithIndexedDbMutation: vi.fn(),
+  recoverProjectMediaPublications: vi.fn(),
+  recoverImageWorkspacePublications: vi.fn(),
+  recoverRecordingAssetPublications: vi.fn(),
+  recoverScenarioAssetPublications: vi.fn(),
+  completePhysicalDeleteOperation: vi.fn(),
+}));
+
+vi.mock('../projects/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: persistenceMocks.recoverProjectMediaPublications,
+}));
+vi.mock('../recordings/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverRecordingAssetPublications: persistenceMocks.recoverRecordingAssetPublications,
+}));
+vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image-aggregates/mutations')>()),
+  recoverImageWorkspacePublications: persistenceMocks.recoverImageWorkspacePublications,
+}));
+vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
+  recoverScenarioAssetPublications: persistenceMocks.recoverScenarioAssetPublications,
 }));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
+}));
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  buildPhysicalDeleteOperation: () => ({
+    assetIds: [],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'delete-1',
+    status: 'pending',
+    updatedAt: 1,
+  }),
+  completePhysicalDeleteOperation: persistenceMocks.completePhysicalDeleteOperation,
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -33,6 +67,37 @@ beforeEach(() => {
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
+  persistenceMocks.recoverProjectMediaPublications.mockResolvedValue(0);
+  persistenceMocks.recoverImageWorkspacePublications.mockResolvedValue(0);
+  persistenceMocks.recoverRecordingAssetPublications.mockResolvedValue(0);
+  persistenceMocks.recoverScenarioAssetPublications.mockResolvedValue(0);
+  persistenceMocks.completePhysicalDeleteOperation.mockResolvedValue(undefined);
+});
+
+it('does not begin lifecycle cleanup while retained project journals cannot drain', async () => {
+  persistenceMocks.recoverProjectMediaPublications.mockRejectedValueOnce(
+    new Error('ready journal replay failed')
+  );
+
+  await expect(
+    cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
+  ).rejects.toThrow('ready journal replay failed');
+
+  expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
+});
+
+it('does not begin lifecycle cleanup while retained image workspace journals cannot drain', async () => {
+  persistenceMocks.recoverImageWorkspacePublications.mockRejectedValueOnce(
+    new Error('image workspace journal replay failed')
+  );
+
+  await expect(
+    cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
+  ).rejects.toThrow('image workspace journal replay failed');
+
+  expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
 });
 
 it('removes standalone media dependency graphs and aggregate sidecars atomically', async () => {
@@ -70,11 +135,12 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
     projectAssetId: 'asset-1',
   });
   const recording = {
-    blob: new Blob(['video'], { type: 'video/webm' }),
+    assetId: 'asset-recording-1',
     createdAt: 1,
     filename: 'recording.webm',
     id: 'recording-1',
     lifecycle,
+    mimeType: 'video/webm',
     size: 5,
   };
   persistenceMocks.listMediaLibrary.mockResolvedValue([recordingMedia, projectAssetMedia]);
@@ -103,6 +169,8 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
+          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          put: vi.fn(),
         })),
       })),
     })
@@ -176,7 +244,7 @@ it('commits expired linked and standalone draft cleanup through current transact
     updatedAt: 1,
   };
   const scenarioAsset = {
-    blob: new Blob(['asset'], { type: 'image/png' }),
+    assetId: 'opfs-scenario-asset-1',
     createdAt: 1,
     galleryAssetId: null,
     height: 1,
@@ -243,6 +311,37 @@ it('commits expired linked and standalone draft cleanup through current transact
     ],
     ['scenario_projects', new Map([[scenario.id, scenario]])],
     [
+      'asset_refs',
+      new Map([
+        [
+          scenarioAsset.assetId,
+          {
+            assetId: scenarioAsset.assetId,
+            createdAt: 1,
+            location: { kind: 'opfs', objectKey: `objects/${scenarioAsset.assetId}` },
+            mimeType: 'image/png',
+            sha256: null,
+            size: 5,
+          },
+        ],
+      ]),
+    ],
+    [
+      'asset_owners',
+      new Map([
+        [
+          JSON.stringify(['scenario-asset', scenarioAsset.id, 'body']),
+          {
+            assetId: scenarioAsset.assetId,
+            ownerId: scenarioAsset.id,
+            ownerKind: 'scenario-asset',
+            role: 'body',
+          },
+        ],
+      ]),
+    ],
+    ['asset_operations', new Map()],
+    [
       'scenario_assets',
       new Map([
         [scenarioAsset.id, scenarioAsset],
@@ -275,11 +374,18 @@ it('commits expired linked and standalone draft cleanup through current transact
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
+          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          put: vi.fn(async (value: { operationId?: string }) => {
+            if (value.operationId) valuesByStore.get(name)?.set(value.operationId, value);
+          }),
         })),
       })),
     })
   );
 
+  persistenceMocks.completePhysicalDeleteOperation.mockRejectedValueOnce(
+    new Error('OPFS delete unavailable')
+  );
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
@@ -302,4 +408,7 @@ it('commits expired linked and standalone draft cleanup through current transact
   );
   expect(deletes).toHaveBeenCalledWith('thumbnails', `scenario:${scenario.id}`);
   expect(deletes).toHaveBeenCalledWith('thumbnails', `scenario-export:${scenarioExport.id}`);
+  expect(persistenceMocks.completePhysicalDeleteOperation).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: [scenarioAsset.assetId], status: 'pending' })
+  );
 });

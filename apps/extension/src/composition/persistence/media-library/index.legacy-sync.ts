@@ -49,7 +49,7 @@ export async function syncLegacyMediaLibrary(): Promise<void> {
     await syncRecordingMirrors({
       currentMap,
       desiredManagedIds,
-      exportRecordingIds: new Set(projectExports.map((entry) => entry.recordingId)),
+      exportRecordingIds: new Set(),
       mediaStore,
       recordings,
       thumbnailsStore,

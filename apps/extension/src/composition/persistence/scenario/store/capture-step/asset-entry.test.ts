@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createScenarioAssetIdMock, dataUrlToBlobMock, measureImageBlobMock } = vi.hoisted(() => ({
-  createScenarioAssetIdMock: vi.fn(),
-  dataUrlToBlobMock: vi.fn(),
-  measureImageBlobMock: vi.fn(),
+const { createScenarioAssetIdMock, dataUrlToBlobMock, measureImageBlobMock, writeBlobToAssetMock } =
+  vi.hoisted(() => ({
+    createScenarioAssetIdMock: vi.fn(),
+    dataUrlToBlobMock: vi.fn(),
+    measureImageBlobMock: vi.fn(),
+    writeBlobToAssetMock: vi.fn(),
+  }));
+
+vi.mock('../../../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../assets')>()),
+  assertAssetWriteAdmission: vi.fn(async () => undefined),
+  writeBlobToAsset: writeBlobToAssetMock,
 }));
 
 vi.mock('../../../../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -28,6 +36,16 @@ beforeEach(() => {
   createScenarioAssetIdMock.mockReturnValue('asset-1');
   dataUrlToBlobMock.mockResolvedValue(new Blob(['pixel']));
   measureImageBlobMock.mockResolvedValue({ width: 1440, height: 900 });
+  writeBlobToAssetMock.mockImplementation(async (blob: Blob, options: { mimeType: string }) => ({
+    ref: {
+      assetId: 'opfs-asset-1',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/opfs-asset-1' },
+      mimeType: options.mimeType,
+      sha256: null,
+      size: blob.size,
+    },
+  }));
 });
 
 async function verifyAssetEntryCreation() {
@@ -46,6 +64,7 @@ async function verifyAssetEntryCreation() {
       now: 123,
       assetEntry: expect.objectContaining({
         id: 'asset-1',
+        assetId: 'opfs-asset-1',
         projectId: 'project-1',
         galleryAssetId: null,
         mimeType: 'image/png',
@@ -78,6 +97,7 @@ describe('capture-step asset entry', () => {
         now: 456,
         assetEntry: expect.objectContaining({
           id: 'asset-1',
+          assetId: 'opfs-asset-1',
           projectId: 'project-1',
           galleryAssetId: 'gallery-1',
           mimeType: 'image/webp',

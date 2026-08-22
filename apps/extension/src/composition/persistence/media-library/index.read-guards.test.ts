@@ -37,6 +37,11 @@ vi.mock('../web-snapshots', async (importOriginal) => ({
   getWebSnapshotRecord: vi.fn(),
 }));
 
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  listReadyJournals: vi.fn(async () => []),
+}));
+
 import {
   addMediaLibraryEntryTags,
   deleteMediaLibraryAsset,

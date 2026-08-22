@@ -1,6 +1,5 @@
 import type {
   Action,
-  ActionRouteHandlerAdapter,
   ActionRouteMetadata,
   ActionHandler,
   ActionResult,
@@ -11,6 +10,7 @@ import type {
   UnknownAction,
   VideoRuntimeAction,
 } from './types';
+import type { BackgroundIngressHandlerId } from '../../../../contracts/messaging/contracts/runtime';
 import { actionRouteMetadata, getActionRouteMetadata } from './routes';
 import {
   handleBackgroundOwnedAction,
@@ -22,9 +22,42 @@ import {
 
 type RegistryEntry = ActionRouteMetadata & { readonly handler: ActionHandler };
 
+type ActionRouteHandlerId = BackgroundIngressHandlerId | 'internal-signal' | 'unknown';
+
+export const actionRouteHandlerBindings = {
+  'aggregate-promotion': routeBackgroundOwnedAction,
+  'ai-secret-unlock': routeBackgroundOwnedAction,
+  'ai-settings-mutation': routeBackgroundOwnedAction,
+  'ai-settings-navigation': routeBackgroundOwnedAction,
+  'ai-settings-query': routeBackgroundOwnedAction,
+  'annotation-fork-session': routeBackgroundOwnedAction,
+  capture: routeTabAction,
+  'content-action-capability-issuance': routeBackgroundOwnedAction,
+  'content-runtime-wakeup': routeBackgroundOwnedAction,
+  'frame-annotation-raster': routeBackgroundOwnedAction,
+  'internal-signal': routeInternalSignalAction,
+  'llm-content-processing': routeBackgroundOwnedAction,
+  'llm-scenario-editor-processing': routeBackgroundOwnedAction,
+  'llm-session': routeBackgroundOwnedAction,
+  'local-data-erasure': routeBackgroundOwnedAction,
+  'native-app-runtime': routeBackgroundOwnedAction,
+  'page-access': routeBackgroundOwnedAction,
+  'popup-export': routeTabAction,
+  'popup-export-job': routeBackgroundOwnedAction,
+  'popup-tab-route-capability-issuance': routeBackgroundOwnedAction,
+  scenario: routeTabAction,
+  'settings-transfer': routeBackgroundOwnedAction,
+  'tab-mode': routeTabAction,
+  unknown: routeUnknownAction,
+  'video-control': routeTabAction,
+  'video-recording-surface': routeTabAction,
+  'video-runtime': routeVideoRuntimeAction,
+  'voice-input-offscreen-event': routeBackgroundOwnedAction,
+} satisfies Record<ActionRouteHandlerId, ActionHandler>;
+
 export const legacyActionRouteRegistry = actionRouteMetadata.map((entry) => ({
   ...entry,
-  handler: getHandlerAdapter(entry.handlerAdapter),
+  handler: getHandlerBinding(entry.handlerId as ActionRouteHandlerId),
 })) satisfies readonly RegistryEntry[];
 
 export function getActionRouteHandler(routeName: LegacyRouteName): ActionHandler | undefined {
@@ -33,19 +66,8 @@ export function getActionRouteHandler(routeName: LegacyRouteName): ActionHandler
 
 export { actionRouteMetadata, getActionRouteMetadata };
 
-function getHandlerAdapter(adapter: ActionRouteHandlerAdapter): ActionHandler {
-  switch (adapter) {
-    case 'routeBackgroundOwnedAction':
-      return routeBackgroundOwnedAction;
-    case 'routeInternalSignalAction':
-      return routeInternalSignalAction;
-    case 'routeTabAction':
-      return routeTabAction;
-    case 'routeUnknownAction':
-      return routeUnknownAction;
-    case 'routeVideoRuntimeAction':
-      return routeVideoRuntimeAction;
-  }
+function getHandlerBinding(handlerId: ActionRouteHandlerId): ActionHandler {
+  return actionRouteHandlerBindings[handlerId];
 }
 
 function routeInternalSignalAction(action: Action): ActionResult {

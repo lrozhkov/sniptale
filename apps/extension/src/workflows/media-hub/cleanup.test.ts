@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import type { ProjectExportEntry } from '../../composition/persistence/projects/contracts';
-import type { RecordingEntry } from '../../composition/persistence/recordings/contracts';
+import type { StoredRecordingEntry } from '../../composition/persistence/recordings/contracts';
 import { createVideoProject } from '../../composition/persistence/projects/index.test-support.ts';
 import {
   VideoProjectAssetType,
@@ -41,19 +41,20 @@ function createMediaItem(overrides: Partial<MediaLibraryItem> = {}): MediaLibrar
   };
 }
 
-function createRecording(
-  overrides: Partial<Omit<RecordingEntry, 'blob'>> = {}
-): Omit<RecordingEntry, 'blob'> {
+function createRecording(overrides: Partial<StoredRecordingEntry> = {}): StoredRecordingEntry {
   return {
+    assetId: overrides.assetId ?? 'asset-recording-1',
     createdAt: overrides.createdAt ?? 0,
     filename: overrides.filename ?? 'recording.webm',
     id: overrides.id ?? 'recording-1',
+    mimeType: overrides.mimeType ?? 'video/webm',
     size: overrides.size ?? 1000,
   };
 }
 
 function createProjectExport(overrides: Partial<ProjectExportEntry> = {}): ProjectExportEntry {
   return {
+    assetId: overrides.assetId ?? 'asset-export-1',
     createdAt: overrides.createdAt ?? 0,
     duration: overrides.duration ?? 20,
     filename: overrides.filename ?? 'export.mp4',
@@ -63,7 +64,6 @@ function createProjectExport(overrides: Partial<ProjectExportEntry> = {}): Proje
     id: overrides.id ?? 'export-1',
     mimeType: overrides.mimeType ?? 'video/mp4',
     projectId: overrides.projectId ?? 'project-1',
-    recordingId: overrides.recordingId ?? 'recording-export',
     size: overrides.size ?? 4000,
     width: overrides.width ?? 1920,
   };
@@ -136,7 +136,6 @@ function createCleanupMediaItems(now: number): MediaLibraryItem[] {
         exportId: 'export-1',
         kind: 'project-export',
         projectId: 'project-1',
-        recordingId: 'recording-export',
       },
     }),
     ...createWebSnapshotCleanupMediaItems(),
@@ -181,6 +180,7 @@ function createCleanupFixture(now: number) {
     projectExports: [createProjectExport()],
     projectAssets: [
       {
+        assetId: 'asset-project-asset-orphan',
         id: 'project-asset-orphan',
         filename: 'unused.png',
         mimeType: 'image/png',
@@ -188,6 +188,7 @@ function createCleanupFixture(now: number) {
         size: 600,
       },
       {
+        assetId: 'asset-project-asset-used',
         id: 'project-asset-used',
         filename: 'used.png',
         mimeType: 'image/png',
@@ -207,6 +208,7 @@ function createCleanupFixture(now: number) {
 function verifyCleanupCandidates(cleanup: ReturnType<typeof buildCleanupCandidates>) {
   expect(cleanup.orphanedRawRecordings).toEqual([
     expect.objectContaining({ id: 'orphan-new', kind: 'recording', target: 'recording' }),
+    expect.objectContaining({ id: 'recording-export', kind: 'recording', target: 'recording' }),
     expect.objectContaining({ id: 'orphan-old', kind: 'recording', target: 'recording' }),
   ]);
   expect(cleanup.heavyFiles).toEqual([

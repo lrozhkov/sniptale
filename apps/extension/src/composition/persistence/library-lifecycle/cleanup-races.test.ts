@@ -11,8 +11,33 @@ const persistenceMocks = vi.hoisted(() => ({
   runWithIndexedDbMutation: vi.fn(),
 }));
 
+vi.mock('../projects/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: vi.fn().mockResolvedValue(0),
+}));
+vi.mock('../recordings/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverRecordingAssetPublications: vi.fn().mockResolvedValue(0),
+}));
+vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image-aggregates/mutations')>()),
+  recoverImageWorkspacePublications: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
+}));
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  buildPhysicalDeleteOperation: () => ({
+    assetIds: [],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'delete-1',
+    status: 'pending',
+    updatedAt: 1,
+  }),
+  completePhysicalDeleteOperation: vi.fn(),
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -88,15 +113,16 @@ it.each([
 ])('keeps stale recording media when its authoritative recording is %s', async (_, lifecycle) => {
   const now = 40 * day;
   const recording = {
-    blob: new Blob(['video'], { type: 'video/webm' }),
+    assetId: 'asset-recording-1',
     createdAt: 1,
     filename: 'recording.webm',
     id: 'recording-1',
     lifecycle,
+    mimeType: 'video/webm',
     size: 5,
   };
   const media = {
-    blob: recording.blob,
+    blob: new Blob(['video'], { type: 'video/webm' }),
     createdAt: 1,
     duration: null,
     filename: recording.filename,
@@ -182,6 +208,8 @@ async function runExpiredVideoProjectCleanup(args: { mediaUpdatedAt: number; now
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
+          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          put: vi.fn(),
         })),
       })),
     })
@@ -218,15 +246,16 @@ it('removes recording telemetry and the project thumbnail with an expired record
     { lifecycle: createLibraryLifecycle('temporary', 1) }
   );
   const recording = {
-    blob: new Blob(['video'], { type: 'video/webm' }),
+    assetId: 'asset-recording-1',
     createdAt: 1,
     filename: 'recording.webm',
     id: 'recording-1',
     lifecycle: createLibraryLifecycle('temporary', 1),
+    mimeType: 'video/webm',
     size: 5,
   };
   const media = {
-    blob: recording.blob,
+    blob: new Blob(['video'], { type: 'video/webm' }),
     createdAt: 1,
     duration: null,
     filename: recording.filename,
@@ -264,6 +293,8 @@ it('removes recording telemetry and the project thumbnail with an expired record
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
+          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          put: vi.fn(),
         })),
       })),
     })

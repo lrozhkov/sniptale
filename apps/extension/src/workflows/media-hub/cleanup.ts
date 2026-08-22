@@ -4,10 +4,10 @@ import {
 } from '../../features/media-hub/references';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import type {
-  ProjectAssetEntry,
-  ProjectExportEntry,
+  StoredProjectAssetEntry,
+  StoredProjectExportEntry,
 } from '../../composition/persistence/projects/contracts';
-import type { RecordingEntry } from '../../composition/persistence/recordings/contracts';
+import type { StoredRecordingEntry } from '../../composition/persistence/recordings/contracts';
 import type { VideoProject } from '../../features/video/project/types/model';
 
 import {
@@ -36,9 +36,9 @@ export function sumBytes(items: Array<{ size: number }>): number {
 
 export function buildCleanupCandidates(params: {
   mediaItems: MediaLibraryItem[];
-  projectAssets?: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>;
-  recordings: Array<Omit<RecordingEntry, 'blob'>>;
-  projectExports: ProjectExportEntry[];
+  projectAssets?: Array<StoredProjectAssetEntry & { filename: string }>;
+  recordings: StoredRecordingEntry[];
+  projectExports: StoredProjectExportEntry[];
   projectDetails: Array<VideoProject | null>;
   rawInventory?: StorageCleanupInventory;
   topN?: number;
@@ -79,7 +79,7 @@ export function buildCleanupCandidates(params: {
 function collectCleanupReferences(args: {
   mediaItems: MediaLibraryItem[];
   projectDetails: Array<VideoProject | null>;
-  projectExports: ProjectExportEntry[];
+  projectExports: StoredProjectExportEntry[];
 }): {
   projectAssetIds: Set<string>;
   recordingIds: Set<string>;
@@ -95,7 +95,7 @@ function collectCleanupReferences(args: {
 }
 
 function getOrphanedRawRecordings(
-  recordings: Array<Omit<RecordingEntry, 'blob'>>,
+  recordings: StoredRecordingEntry[],
   referencedRecordingIds: Set<string>
 ): StorageCleanupCandidate[] {
   return recordings
@@ -122,9 +122,9 @@ function getOldScreenshots(mediaItems: MediaLibraryItem[]): StorageCleanupCandid
 
 function getBrokenMediaMirrors(args: {
   mediaItems: MediaLibraryItem[];
-  projectAssets: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>;
-  projectExports: ProjectExportEntry[];
-  recordings: Array<Omit<RecordingEntry, 'blob'>>;
+  projectAssets: Array<StoredProjectAssetEntry & { filename: string }>;
+  projectExports: StoredProjectExportEntry[];
+  recordings: StoredRecordingEntry[];
   webSnapshotIds?: Set<string>;
 }): StorageCleanupCandidate[] {
   const recordingIds = new Set(args.recordings.map((entry) => entry.id));
@@ -141,9 +141,7 @@ function getBrokenMediaMirrors(args: {
         return !recordingIds.has(item.source.recordingId);
       }
       if (item.source.kind === 'project-export') {
-        return (
-          !recordingIds.has(item.source.recordingId) || !projectExportIds.has(item.source.exportId)
-        );
+        return !projectExportIds.has(item.source.exportId);
       }
       if (item.source.kind === 'web-snapshot') {
         return !webSnapshotIds.has(item.source.snapshotId);
@@ -154,7 +152,7 @@ function getBrokenMediaMirrors(args: {
 }
 
 function getOrphanedProjectAssets(
-  projectAssets: Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>,
+  projectAssets: Array<StoredProjectAssetEntry & { filename: string }>,
   referencedProjectAssetIds: Set<string>
 ): StorageCleanupCandidate[] {
   return projectAssets
@@ -174,9 +172,7 @@ function getOrphanedProjectAssets(
     }));
 }
 
-function createRecordingCandidate(
-  recording: Omit<RecordingEntry, 'blob'>
-): StorageCleanupCandidate {
+function createRecordingCandidate(recording: StoredRecordingEntry): StorageCleanupCandidate {
   return {
     id: recording.id,
     filename: recording.filename,

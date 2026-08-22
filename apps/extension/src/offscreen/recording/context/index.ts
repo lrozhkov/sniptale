@@ -5,7 +5,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { TabOutputGeometry } from '../stream/tab-output';
 import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
-import type { RecordingArtifactSession } from '../encoding/artifact-session';
+import type { LiveRecordingArtifactSession } from '../encoding/live-artifact-session';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingContext' });
 
@@ -28,11 +28,10 @@ interface StopRequestHandlers {
 }
 
 class OffscreenRecordingContext {
-  mediaRecorder: MediaRecorder | null = null;
   videoStream: MediaStream | null = null;
   sourceStream: MediaStream | null = null;
   audioMixer: AudioMixer | null = null;
-  artifactSession: RecordingArtifactSession | null = null;
+  artifactSession: LiveRecordingArtifactSession | null = null;
   stagingCoordinator: RecordingStagingCoordinator | null = null;
   currentRecordingId: string | null = null;
   generation: number | null = null;
@@ -69,6 +68,7 @@ class OffscreenRecordingContext {
     handler: (error: Error) => void;
   } | null = null;
   #startingRecorderCancellation: (() => void) | null = null;
+  #artifactFinalizingHandler: (() => void) | null = null;
 
   get lifecycleState(): RecordingLifecycleState {
     return this.#lifecycleState;
@@ -142,21 +142,22 @@ class OffscreenRecordingContext {
     this.stagingCoordinator = coordinator;
   }
 
-  bindStartingArtifactSession(artifactSession: RecordingArtifactSession): void {
+  bindStartingArtifactSession(artifactSession: LiveRecordingArtifactSession): void {
     if (
       this.lifecycleState !== 'starting' ||
       this.stagingCoordinator === null ||
-      this.artifactSession !== null ||
-      this.mediaRecorder !== null
+      this.artifactSession !== null
     ) {
       throw new Error('Recording session cannot bind stale artifacts');
     }
     this.artifactSession = artifactSession;
-    this.mediaRecorder = artifactSession.recorder;
   }
 
-  registerStartingRecorderCancellation(mediaRecorder: MediaRecorder, cancel: () => void): void {
-    if (this.lifecycleState !== 'starting' || this.mediaRecorder !== mediaRecorder) {
+  registerStartingRecorderCancellation(
+    artifactSession: LiveRecordingArtifactSession,
+    cancel: () => void
+  ): void {
+    if (this.lifecycleState !== 'starting' || this.artifactSession !== artifactSession) {
       throw new Error('Recording session cannot register stale recorder cancellation');
     }
     this.#startingRecorderCancellation = cancel;
@@ -173,8 +174,8 @@ class OffscreenRecordingContext {
     return true;
   }
 
-  activateRecorder(mediaRecorder: MediaRecorder): void {
-    if (this.mediaRecorder !== mediaRecorder) {
+  activateRecorder(artifactSession: LiveRecordingArtifactSession): void {
+    if (this.artifactSession !== artifactSession) {
       throw new Error('Recording session cannot activate an unbound recorder');
     }
     this.#setLifecycleState('recording', 'activateRecorder');
@@ -188,6 +189,19 @@ class OffscreenRecordingContext {
     this.discardOnStop = handlers.discard ?? false;
   }
 
+  registerArtifactFinalizingHandler(handler: () => void): void {
+    if (this.lifecycleState !== 'stopping') {
+      throw new Error('Recording session cannot register finalization progress while not stopping');
+    }
+    this.#artifactFinalizingHandler = handler;
+  }
+
+  reportArtifactFinalizing(): void {
+    const handler = this.#artifactFinalizingHandler;
+    this.#artifactFinalizingHandler = null;
+    handler?.();
+  }
+
   clearStopRequest(): {
     reject: ((reason?: unknown) => void) | null;
     resolve: ((outcome?: RecordingStopOutcome) => void) | null;
@@ -197,6 +211,7 @@ class OffscreenRecordingContext {
     this.stopRecordingResolve = null;
     this.stopRecordingReject = null;
     this.#startingRecorderCancellation = null;
+    this.#artifactFinalizingHandler = null;
     return { resolve, reject };
   }
 
@@ -204,7 +219,7 @@ class OffscreenRecordingContext {
     return (
       this.#lifecycleState !== 'idle' ||
       this.currentRecordingId !== null ||
-      this.mediaRecorder !== null ||
+      this.artifactSession !== null ||
       this.sourceStream !== null ||
       this.videoStream !== null
     );
@@ -223,6 +238,7 @@ class OffscreenRecordingContext {
     this.stopRecordingResolve = null;
     this.stopRecordingReject = null;
     this.#startingRecorderCancellation = null;
+    this.#artifactFinalizingHandler = null;
     this.#sourceFailure = null;
     this.#sourceFailureHandler = null;
     this.#setLifecycleState('idle', 'resetRecordingSession');

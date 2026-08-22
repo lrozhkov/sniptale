@@ -224,10 +224,14 @@ export function GalleryTagsCard({
 }
 
 export function GalleryBackupActions({
+  importTriggerRef,
   isBusy,
   onExportBackup,
   onImportBackupClick,
-}: Pick<GallerySidebarProps, 'isBusy' | 'onExportBackup' | 'onImportBackupClick'>) {
+}: Pick<
+  GallerySidebarProps,
+  'importTriggerRef' | 'isBusy' | 'onExportBackup' | 'onImportBackupClick'
+>) {
   return (
     <div className="mt-auto pt-6 space-y-2">
       <button
@@ -248,6 +252,7 @@ export function GalleryBackupActions({
         <Download className="h-4 w-4 text-[var(--sniptale-color-text-muted)]" />
       </button>
       <button
+        ref={importTriggerRef}
         type="button"
         onClick={onImportBackupClick}
         disabled={isBusy}

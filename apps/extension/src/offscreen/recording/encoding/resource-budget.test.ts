@@ -9,49 +9,48 @@ import {
 } from './resource-budget';
 
 describe('recording resource budget', () => {
-  it('sums every live video encoder before applying the shared envelope', () => {
+  it('sums live video encoders at their independently negotiated rates', () => {
     expect(
       resolveAggregateRecordingPixelRate({
-        dimensions: [
-          { height: 1080, width: 1920 },
-          { height: 720, width: 1280 },
+        artifacts: [
+          { dimensions: { height: 1080, width: 1920 }, frameRate: 60 },
+          { dimensions: { height: 720, width: 1280 }, frameRate: 30 },
         ],
-        frameRate: VideoFrameRate.FPS30,
       })
-    ).toBe((1920 * 1080 + 1280 * 720) * 30);
+    ).toBe(1920 * 1080 * 60 + 1280 * 720 * 30);
   });
 
-  it('accepts the exact live ceiling and rejects aggregate overflow', () => {
+  it('accepts independent encoders and rejects only an artifact that exceeds its ceiling', () => {
     expect(() =>
       assertRecordingResourceBudget({
-        dimensions: [{ height: 2160, width: 3840 }],
+        artifacts: [
+          { dimensions: { height: 1304, width: 2560 }, frameRate: 60 },
+          { dimensions: { height: 1080, width: 1920 }, frameRate: 30 },
+        ],
         frameRate: VideoFrameRate.FPS30,
         resolution: VideoResolutionPreset.SOURCE,
       })
     ).not.toThrow();
     expect(() =>
       assertRecordingResourceBudget({
-        dimensions: [
-          { height: 2160, width: 3840 },
-          { height: 720, width: 1280 },
-        ],
+        artifacts: [{ dimensions: { height: 2160, width: 3840 }, frameRate: 60 }],
         frameRate: VideoFrameRate.FPS30,
         resolution: VideoResolutionPreset.SOURCE,
       })
-    ).toThrow('exceed the supported live encoding budget');
+    ).toThrow('exceeds its encoder resource budget');
   });
 
   it('rejects an empty aggregate and malformed dimensions', () => {
     expect(() =>
       assertRecordingResourceBudget({
-        dimensions: [],
+        artifacts: [],
         frameRate: VideoFrameRate.FPS30,
         resolution: VideoResolutionPreset.SOURCE,
       })
     ).toThrow('at least one video artifact');
     expect(() =>
       assertRecordingResourceBudget({
-        dimensions: [{ height: 0, width: 1920 }],
+        artifacts: [{ dimensions: { height: 0, width: 1920 }, frameRate: 30 }],
         frameRate: VideoFrameRate.FPS30,
         resolution: VideoResolutionPreset.SOURCE,
       })
@@ -61,7 +60,7 @@ describe('recording resource budget', () => {
   it('rejects a fixed 2160p profile above its canonical 24 fps tier', () => {
     expect(() =>
       assertRecordingResourceBudget({
-        dimensions: [{ height: 2160, width: 3840 }],
+        artifacts: [{ dimensions: { height: 2160, width: 3840 }, frameRate: 30 }],
         frameRate: VideoFrameRate.FPS30,
         resolution: VideoResolutionPreset.P2160,
       })

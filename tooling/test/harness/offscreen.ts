@@ -5,11 +5,14 @@ import type { ProjectExportInputReference } from '../../../apps/extension/src/co
 import type { VideoProject } from '../../../apps/extension/src/features/video/project/types';
 import { createCanvasVideoOutput } from '../../../apps/extension/src/offscreen/recording/stream/canvas-video-output';
 import { createRecordingArtifactSession } from '../../../apps/extension/src/offscreen/recording/encoding/artifact-session';
+import { createLiveRecordingArtifactSession } from '../../../apps/extension/src/offscreen/recording/encoding/live-artifact-session';
+import { createRecordingStagingCoordinator } from '../../../apps/extension/src/composition/persistence/recordings/staging';
 import {
-  createOpfsRecordingStagingStorage,
-  createRecordingStagingCoordinator,
-  type RecordingStagingStorageAdapter,
-} from '../../../apps/extension/src/composition/persistence/recordings/staging';
+  createAssetObjectWriter,
+  readAssetFile,
+  type AssetObjectWriter,
+} from '../../../apps/extension/src/composition/persistence/assets';
+import { BlobSource, EncodedPacketSink, Input, WEBM } from 'mediabunny';
 
 type HarnessMediaRecorderState = 'inactive' | 'recording' | 'paused';
 
@@ -34,7 +37,20 @@ type ColdHighResolutionRecordingResult = {
   width: number;
 };
 
+type LiveVfrRecordingResult = {
+  backwardTimestamps: number;
+  duplicateTimestamps: number;
+  durationSpanMs: number;
+  keyFrames: number;
+  packetCount: number;
+  summedDurationsMs: number;
+};
+
 type OffscreenHarnessBridge = {
+  recordCanvasCadence: (
+    frameRate: number,
+    recordingDurationMs: number
+  ) => Promise<StaticCanvasRecordingResult>;
   reset: () => Promise<void>;
   stageProjectExportInput: (
     jobId: string,
@@ -43,6 +59,7 @@ type OffscreenHarnessBridge = {
   setMediaRecorderState: (state: HarnessMediaRecorderState) => void;
   getMediaRecorderState: () => HarnessMediaRecorderState;
   recordColdHighResolutionSequence: () => Promise<ColdHighResolutionRecordingResult[]>;
+  recordLiveVfrArtifact: () => Promise<LiveVfrRecordingResult>;
   recordStaticCanvasArtifact: () => Promise<StaticCanvasRecordingResult>;
 };
 
@@ -87,32 +104,18 @@ function resolveStaticCanvasRecordingMimeType(): string {
   return mimeType;
 }
 
-function createObservedOpfsStorage(
+function createObservedAssetWriter(
   onAppend: (chunk: Blob) => void
-): RecordingStagingStorageAdapter {
-  const storage = createOpfsRecordingStagingStorage();
-  return {
-    countSessions: () => storage.countSessions(),
-    removeAllSessions: () => storage.removeAllSessions(),
-    async createSession() {
-      const session = await storage.createSession();
-      return {
-        remove: () => session.remove(),
-        async createArtifact() {
-          const artifact = await session.createArtifact();
-          return {
-            abort: () => artifact.abort(),
-            async append(chunk) {
-              onAppend(chunk);
-              await artifact.append(chunk);
-            },
-            close: () => artifact.close(),
-            getFile: () => artifact.getFile(),
-            remove: () => artifact.remove(),
-          };
-        },
-      };
-    },
+): (input: { assetId?: string; mimeType: string }) => Promise<AssetObjectWriter> {
+  return async (input) => {
+    const writer = await createAssetObjectWriter(input);
+    return {
+      ...writer,
+      async append(chunk) {
+        onAppend(chunk);
+        await writer.append(chunk);
+      },
+    };
   };
 }
 
@@ -128,7 +131,7 @@ async function recordColdHighResolutionArtifact(
   let startedAt = 0;
   let stopRequestedAt = Number.POSITIVE_INFINITY;
   const coordinator = await createRecordingStagingCoordinator({
-    storage: createObservedOpfsStorage(() => {
+    createWriter: createObservedAssetWriter(() => {
       appendTimes.push(performance.now() - startedAt);
     }),
   });
@@ -201,6 +204,107 @@ async function recordColdHighResolutionSequence(): Promise<ColdHighResolutionRec
   return [await recordColdHighResolutionArtifact(1), await recordColdHighResolutionArtifact(2)];
 }
 
+async function recordLiveVfrArtifact(): Promise<LiveVfrRecordingResult> {
+  const width = 640;
+  const height = 360;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new Error('The browser exposes no canvas for the live VFR smoke');
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+  if (typeof track?.requestFrame !== 'function') {
+    throw new Error('The browser exposes no explicit canvas frame requests for the live VFR smoke');
+  }
+  track.contentHint = 'text';
+  const coordinator = await createRecordingStagingCoordinator();
+  let finalized = false;
+  try {
+    const session = await createLiveRecordingArtifactSession({
+      artifactId: 'live-vfr-smoke',
+      coordinator,
+      encoding: {
+        audioBitrate: 128_000,
+        audioCodec: 'opus',
+        container: 'webm',
+        frameRate: 60,
+        videoBitrate: 2_000_000,
+        videoCodec: 'vp9',
+      },
+      filename: 'live-vfr-smoke.webm',
+      mimeType: 'video/webm',
+      stream,
+    });
+    const started = new Promise<void>((resolve, reject) => {
+      session.setLifecycleCallbacks({ onFailure: reject, onStart: resolve });
+    });
+    session.start();
+    const frameDelays = [0, 17, 34, 135, 152];
+    const startedAt = performance.now();
+    for (const [index, delay] of frameDelays.entries()) {
+      const remaining = startedAt + delay - performance.now();
+      if (remaining > 0) await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+      context.fillStyle = index % 2 === 0 ? '#ffffff' : '#111827';
+      context.fillRect(0, 0, width, height);
+      context.fillStyle = index % 2 === 0 ? '#111827' : '#ffffff';
+      context.font = '32px sans-serif';
+      context.fillText(`Frame ${index}`, 40, 80);
+      track.requestFrame();
+    }
+    await started;
+    await new Promise<void>((resolve) => setTimeout(resolve, 80));
+    const artifact = await session.stop();
+    const file = await readAssetFile(artifact.asset.ref, artifact.filename);
+    const input = new Input({ formats: [WEBM], source: new BlobSource(file) });
+    try {
+      const videoTrack = await input.getPrimaryVideoTrack();
+      if (!videoTrack) throw new Error('The live VFR artifact has no video track');
+      const sink = new EncodedPacketSink(videoTrack);
+      let packet = await sink.getFirstPacket();
+      let packetCount = 0;
+      let keyFrames = 0;
+      let duplicateTimestamps = 0;
+      let backwardTimestamps = 0;
+      let summedDurations = 0;
+      let firstTimestamp: number | null = null;
+      let lastEndTimestamp: number | null = null;
+      let previousTimestamp: number | null = null;
+      while (packet) {
+        packetCount += 1;
+        if (packet.type === 'key') keyFrames += 1;
+        firstTimestamp ??= packet.timestamp;
+        lastEndTimestamp = packet.timestamp + packet.duration;
+        summedDurations += packet.duration;
+        if (previousTimestamp !== null) {
+          if (packet.timestamp === previousTimestamp) duplicateTimestamps += 1;
+          if (packet.timestamp < previousTimestamp) backwardTimestamps += 1;
+        }
+        previousTimestamp = packet.timestamp;
+        packet = await sink.getNextPacket(packet);
+      }
+      finalized = true;
+      return {
+        backwardTimestamps,
+        duplicateTimestamps,
+        durationSpanMs:
+          firstTimestamp === null || lastEndTimestamp === null
+            ? 0
+            : (lastEndTimestamp - firstTimestamp) * 1_000,
+        keyFrames,
+        packetCount,
+        summedDurationsMs: summedDurations * 1_000,
+      };
+    } finally {
+      input.dispose();
+    }
+  } finally {
+    track.stop();
+    if (finalized) await coordinator.delete();
+    else await coordinator.abort().catch(() => undefined);
+  }
+}
+
 async function readBlobVideoMetrics(blob: Blob): Promise<{
   centerPixel: StaticCanvasRecordingResult['centerPixel'];
   decodedDurationMs: number;
@@ -262,11 +366,12 @@ async function readBlobVideoMetrics(blob: Blob): Promise<{
   }
 }
 
-async function recordStaticCanvasArtifact(): Promise<StaticCanvasRecordingResult> {
+async function recordCanvasCadence(
+  frameRate: number,
+  recordingDurationMs: number
+): Promise<StaticCanvasRecordingResult> {
   const width = 854;
   const height = 480;
-  const frameRate = 30;
-  const recordingDurationMs = 1_200;
   const source = document.createElement('canvas');
   source.width = width;
   source.height = height;
@@ -325,6 +430,10 @@ async function recordStaticCanvasArtifact(): Promise<StaticCanvasRecordingResult
   };
 }
 
+function recordStaticCanvasArtifact(): Promise<StaticCanvasRecordingResult> {
+  return recordCanvasCadence(30, 1_200);
+}
+
 function getRoot() {
   return document.getElementById('root');
 }
@@ -373,6 +482,8 @@ window.__sniptaleOffscreenHarness = {
     return harnessMediaRecorder?.state ?? 'inactive';
   },
   recordColdHighResolutionSequence,
+  recordLiveVfrArtifact,
+  recordCanvasCadence,
   recordStaticCanvasArtifact,
   stageProjectExportInput,
 };

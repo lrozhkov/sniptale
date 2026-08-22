@@ -143,8 +143,6 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
       'apps/extension/src/background/media-hub/web-snapshot.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.web-snapshot-provenance.test.ts',
       'apps/extension/src/features/web-snapshot/provenance.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/archive/web-snapshot-provenance.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/restore/web-snapshot.test.ts',
     ],
   },
   {
@@ -154,7 +152,6 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/media-hub/web-snapshot.test.ts',
       'apps/extension/src/content/parser/web-snapshot/package.test.ts',
-      'apps/extension/src/workflows/media-hub-backup/archive/web-snapshot-provenance.test.ts',
     ],
   },
 ];

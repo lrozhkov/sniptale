@@ -1,63 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { backgroundRuntimeTypes } from '../../../../contracts/messaging/parsers/supported-types.data.ts';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { actionRouteMetadata } from './routes';
+import { backgroundIngressContracts } from '../../../../contracts/messaging/contracts/runtime';
+import { backgroundRuntimeTypes } from '../../../../contracts/messaging/parsers/supported-types.data';
 
-type NonActionBackgroundRuntimeClassification =
-  | 'content-runtime-event'
-  | 'internal-signal'
-  | 'outbound-offscreen-command';
-
-const nonActionBackgroundRuntimeMessageTypes = new Map<
-  string,
-  NonActionBackgroundRuntimeClassification
->([
-  ['AREA_SELECTED', 'content-runtime-event'],
-  ['KEEP_ALIVE', 'internal-signal'],
-  [VideoMessageType.COUNTDOWN_COMPLETE, 'internal-signal'],
-  [VideoMessageType.DISPOSE_DESKTOP_MEDIA, 'outbound-offscreen-command'],
-  [VideoMessageType.REGION_SELECTED, 'content-runtime-event'],
-  [VideoMessageType.REGION_SELECTION_CANCELLED, 'content-runtime-event'],
-]);
-
-function collectMissingRuntimeRouteClassifications(args: {
-  backgroundRuntimeMessageTypes: readonly string[];
-  routeMessageTypes: ReadonlySet<string>;
-  nonActionMessageTypes: ReadonlyMap<string, NonActionBackgroundRuntimeClassification>;
+function collectMissingRuntimeClassifications(args: {
+  readonly acceptedTypes: readonly string[];
+  readonly classifiedTypes: ReadonlySet<string>;
 }): readonly string[] {
-  return args.backgroundRuntimeMessageTypes
-    .filter(
-      (messageType) =>
-        !args.routeMessageTypes.has(messageType) && !args.nonActionMessageTypes.has(messageType)
-    )
-    .sort();
-}
-
-function parserSupportedActionMessageTypes(): ReadonlySet<string> {
-  return new Set(
-    actionRouteMetadata
-      .filter((entry) => entry.support === 'parser-supported' && entry.messageType !== null)
-      .map((entry) => entry.messageType as string)
-  );
+  return args.acceptedTypes.filter((messageType) => !args.classifiedTypes.has(messageType)).sort();
 }
 
 describe('background runtime route completeness', () => {
-  it('classifies every background runtime parser contract as routed or explicitly non-action', () => {
+  it('classifies every accepted parser contract exactly once', () => {
+    const classifiedTypes = new Set(backgroundIngressContracts.map((entry) => entry.type));
     expect(
-      collectMissingRuntimeRouteClassifications({
-        backgroundRuntimeMessageTypes: [...backgroundRuntimeTypes],
-        nonActionMessageTypes: nonActionBackgroundRuntimeMessageTypes,
-        routeMessageTypes: parserSupportedActionMessageTypes(),
+      collectMissingRuntimeClassifications({
+        acceptedTypes: [...backgroundRuntimeTypes],
+        classifiedTypes,
       })
     ).toEqual([]);
   });
 
-  it('fails when a background runtime contract has no route or explicit classification', () => {
+  it('detects an accepted contract without a descriptor', () => {
+    const classifiedTypes = new Set(backgroundIngressContracts.map((entry) => entry.type));
     expect(
-      collectMissingRuntimeRouteClassifications({
-        backgroundRuntimeMessageTypes: [...backgroundRuntimeTypes, 'CONTRACT_ONLY_TEST_MESSAGE'],
-        nonActionMessageTypes: nonActionBackgroundRuntimeMessageTypes,
-        routeMessageTypes: parserSupportedActionMessageTypes(),
+      collectMissingRuntimeClassifications({
+        acceptedTypes: [...backgroundRuntimeTypes, 'CONTRACT_ONLY_TEST_MESSAGE'],
+        classifiedTypes,
       })
     ).toEqual(['CONTRACT_ONLY_TEST_MESSAGE']);
   });

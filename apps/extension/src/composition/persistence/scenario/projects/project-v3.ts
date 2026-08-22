@@ -4,7 +4,10 @@ import { isScenarioProjectV3 } from '../../../../features/scenario/project/v3';
 import { parseDbEntries } from '../../infrastructure/indexed-db/read-primitives';
 import { parseScenarioProjectEntry } from '../read-guards';
 import type { SaveScenarioProjectOptions } from './project';
-import { commitScenarioAggregateMutation } from '../aggregate-mutations';
+import {
+  commitScenarioAggregateMutation,
+  recoverScenarioAssetPublications,
+} from '../aggregate-mutations';
 
 export async function saveScenarioProjectV3(
   project: ScenarioProjectV3,
@@ -21,6 +24,7 @@ export async function saveScenarioProjectV3(
 }
 
 export async function getScenarioProjectV3(id: string): Promise<ScenarioProjectV3 | undefined> {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   const entry = parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, id)) ?? undefined;
   return isScenarioProjectV3(entry?.project) ? entry.project : undefined;
@@ -29,6 +33,7 @@ export async function getScenarioProjectV3(id: string): Promise<ScenarioProjectV
 export async function listScenarioProjectsV3(): Promise<
   Array<Pick<ScenarioProjectV3, 'createdAt' | 'id' | 'name' | 'tags' | 'updatedAt'>>
 > {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   const all = parseDbEntries(await db.getAll(SCENARIO_PROJECTS_STORE), parseScenarioProjectEntry);
   return all

@@ -1,4 +1,9 @@
-import { EXPECTED_STORES } from '../infrastructure/indexed-db/core.stores.ts';
+import {
+  ALPHA_RESET_JOURNAL_KEY,
+  DATABASE_BACKUP_RECEIPT_KEY,
+  DATABASE_RESET_JOURNAL_KEY,
+  EXPECTED_STORES,
+} from '../infrastructure/indexed-db/core.stores.ts';
 import {
   AI_CHROME_ENABLED_KEY,
   AI_DEFAULT_MODEL_KEY,
@@ -82,6 +87,9 @@ const aiProviderSecretKeys = [
 ] as const;
 
 const localSensitiveKeys = [
+  ALPHA_RESET_JOURNAL_KEY,
+  DATABASE_BACKUP_RECEIPT_KEY,
+  DATABASE_RESET_JOURNAL_KEY,
   'llm_request_history',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',

@@ -7,6 +7,7 @@ export {
 } from './project';
 export { getScenarioProjectV3, listScenarioProjectsV3, saveScenarioProjectV3 } from './project-v3';
 export {
+  discardPreparedScenarioAsset,
   deletePendingScenarioAsset,
   getPendingScenarioAsset,
   getScenarioAsset,

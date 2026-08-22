@@ -138,7 +138,7 @@ it('restores preview data URL MIME from asset metadata when the stored Blob type
   });
   getScenarioAssetMock.mockResolvedValue(
     createScenarioAssetEntry({
-      blob: new Blob(['asset']),
+      file: new File(['asset'], 'asset-1'),
       mimeType: 'image/png',
     })
   );
@@ -156,20 +156,21 @@ it('restores preview data URL MIME from asset metadata when the stored Blob type
 
 function createScenarioAssetEntry(
   overrides: Partial<{
-    blob: Blob;
+    file: File;
     mimeType: string;
   }> = {}
 ) {
-  const blob = overrides.blob ?? new Blob(['asset'], { type: 'image/png' });
+  const file = overrides.file ?? new File(['asset'], 'asset-1', { type: 'image/png' });
   return {
-    blob,
+    assetId: 'opfs-asset-1',
+    file,
     createdAt: 10,
     galleryAssetId: null,
     height: 1,
     id: 'asset-1',
-    mimeType: overrides.mimeType ?? blob.type,
+    mimeType: overrides.mimeType ?? file.type,
     projectId: 'project-1',
-    size: blob.size,
+    size: file.size,
     width: 1,
   };
 }

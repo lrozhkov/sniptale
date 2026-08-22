@@ -218,6 +218,7 @@
     "@iconify-icons/tabler",
     "@iconify/react",
     "@webav/mp4box.js",
+    "@zip.js/zip.js",
     "@zumer/snapdom",
     "dompurify",
     "fabric",

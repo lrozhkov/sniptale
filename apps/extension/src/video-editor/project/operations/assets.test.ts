@@ -123,7 +123,7 @@ function mockRecordingEntry(): Blob {
   const recordingBlob = new Blob(['video'], { type: 'video/webm' });
 
   getRecordingMock.mockResolvedValue({
-    blob: recordingBlob,
+    file: recordingBlob,
     createdAt: 1,
     filename: 'recording.webm',
     id: 'recording-1',

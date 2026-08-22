@@ -58,7 +58,6 @@ it('routes owner-scoped completed export messages and returns a runtime ack', ()
       ...createEditorEventTarget(),
       jobId: 'job-1',
       projectId: 'project-1',
-      recordingId: 'recording-1',
       exportId: 'export-1',
       filename: 'capture.mp4',
       format: 'mp4',
@@ -70,10 +69,9 @@ it('routes owner-scoped completed export messages and returns a runtime ack', ()
   expect(response).toEqual({ success: true, result: 'accepted' });
   expect(handlers.completeExport).toHaveBeenCalledWith({
     filename: 'capture.mp4',
-    recordingId: 'recording-1',
     exportId: 'export-1',
   });
-  expect(handlers.refreshRecordings).toHaveBeenCalledOnce();
+  expect(handlers.refreshRecordings).not.toHaveBeenCalled();
   expect(handlers.refreshProjects).toHaveBeenCalledOnce();
   expect(handlers.refreshProjectExports).toHaveBeenCalledWith('project-1');
 });
@@ -87,7 +85,6 @@ it('acknowledges stale export messages without mutating editor state', () => {
       ...createEditorEventTarget(),
       jobId: 'job-old',
       projectId: 'project-1',
-      recordingId: 'recording-1',
       exportId: 'export-1',
       filename: 'capture.mp4',
       format: 'mp4',
@@ -110,7 +107,6 @@ it('ignores completion after cancellation clears active export authority', () =>
       ...createEditorEventTarget(),
       jobId: 'job-cancelled',
       projectId: 'project-1',
-      recordingId: 'recording-1',
       exportId: 'export-1',
       filename: 'cancelled.mp4',
       format: 'mp4',

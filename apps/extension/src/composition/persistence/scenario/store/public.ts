@@ -9,4 +9,7 @@ export {
   updateScenarioProjectRecordMetadata,
 } from './project-records/index';
 export { saveScenarioExportRecord } from './project-records/exports';
-export { getScenarioStepEditorDocumentRecord } from './step-editor-documents/index';
+export {
+  getScenarioStepEditorDocumentRecord,
+  getScenarioStepEditorDocumentTransferRecord,
+} from './step-editor-documents/index';

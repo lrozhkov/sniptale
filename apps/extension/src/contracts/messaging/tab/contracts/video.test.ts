@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { MessageContractError } from '@sniptale/runtime-contracts/messaging/parsers/utils';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  CONTENT_RUNTIME_PROTOCOL_VERSION,
+  VideoMessageType,
+} from '@sniptale/runtime-contracts/video/messages';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { tabVideoMessageContracts } from './video';
 
@@ -74,12 +77,38 @@ function verifyRegionSelectionContracts() {
   ).toThrow(MessageContractError);
 }
 
-describe('tab-contracts/video region capture contracts', () => {
+describe('tab-contracts/video tab runtime contracts', () => {
   it(
     'validates controlled cursor capture pause and resume contracts',
     verifyControlledCursorCaptureLifecycleContracts
   );
   it('validates region-selection request binding contracts', verifyRegionSelectionContracts);
+});
+
+describe('tab-contracts/video content runtime readiness', () => {
+  it('accepts only the current content runtime protocol version when it is present', () => {
+    const response = {
+      success: true,
+      contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
+      viewport: {
+        devicePixelRatio: 1,
+        height: 720,
+        scrollX: 0,
+        scrollY: 0,
+        width: 1280,
+      },
+    };
+
+    expect(
+      tabVideoMessageContracts[VideoMessageType.GET_VIEWPORT_COORDS]?.parseResponse(response)
+    ).toBe(response);
+    expect(() =>
+      tabVideoMessageContracts[VideoMessageType.GET_VIEWPORT_COORDS]?.parseResponse({
+        ...response,
+        contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION + 1,
+      })
+    ).toThrow(MessageContractError);
+  });
 });
 
 describe('tab-contracts/video recording surface lifecycle', () => {

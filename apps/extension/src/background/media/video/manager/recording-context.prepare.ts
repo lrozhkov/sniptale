@@ -91,14 +91,20 @@ export async function initializeRecordingContext(props: {
   // The stream ID is intentionally acquired only after the final surface and crop UI are ready.
   const captureSource = await resolveCaptureSourceForMode(tabId, tab, captureMode, settings);
   if (!captureSource) return null;
-  const liveViewport = await readTabCaptureViewport(tabId);
-  if (
-    captureSource.captureViewport &&
-    !captureViewportsEqual(captureSource.captureViewport, liveViewport)
-  ) {
-    throw new Error('The tab viewport changed after the recording area was selected');
+  const liveViewport =
+    captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP
+      ? await readTabCaptureViewport(tabId)
+      : undefined;
+  if (liveViewport) {
+    if (
+      captureSource.captureViewport &&
+      !captureViewportsEqual(captureSource.captureViewport, liveViewport)
+    ) {
+      throw new Error('The tab viewport changed after the recording area was selected');
+    }
   }
   await announceCaptureSource(captureSource, captureMode, viewportPresetId);
+  const resolvedViewport = captureSource.captureViewport ?? liveViewport;
 
   return {
     captureMode,
@@ -107,7 +113,7 @@ export async function initializeRecordingContext(props: {
     settings,
     surface,
     tabId,
-    viewport: captureSource.captureViewport ?? liveViewport,
+    ...(resolvedViewport === undefined ? {} : { viewport: resolvedViewport }),
     viewportPresetId,
   };
 }

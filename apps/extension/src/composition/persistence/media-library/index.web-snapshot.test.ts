@@ -1,9 +1,4 @@
-import JSZip from 'jszip';
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  createWebSnapshotManifest,
-  WEB_SNAPSHOT_PACKAGE_PATHS,
-} from '../../../features/web-snapshot/manifest';
 import type { MediaLibraryEntry, MediaThumbnailEntry } from './contracts';
 
 const mocks = vi.hoisted(() => ({
@@ -12,11 +7,13 @@ const mocks = vi.hoisted(() => ({
   deleteRecording: vi.fn(),
   deleteWebSnapshotMediaAsset: vi.fn(),
   get: vi.fn(),
-  getWebSnapshotRecord: vi.fn(),
+  getWebSnapshotPackageFile: vi.fn(),
   initDB: vi.fn(),
   put: vi.fn(),
   rootDelete: vi.fn(),
   txDelete: vi.fn(),
+  txGet: vi.fn(),
+  txPut: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -37,7 +34,11 @@ vi.mock('../recordings/index', async (importOriginal) => ({
 vi.mock('../web-snapshots', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../web-snapshots')>()),
   deleteWebSnapshotMediaAsset: mocks.deleteWebSnapshotMediaAsset,
-  getWebSnapshotRecord: mocks.getWebSnapshotRecord,
+  getWebSnapshotPackageFile: mocks.getWebSnapshotPackageFile,
+}));
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  listReadyJournals: vi.fn(async () => []),
 }));
 
 import { deleteProjectAsset, deleteProjectExport } from '../projects/index';
@@ -59,7 +60,7 @@ beforeEach(() => {
     delete: mocks.rootDelete,
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: () => ({ delete: mocks.txDelete }),
+      objectStore: () => ({ delete: mocks.txDelete, get: mocks.txGet, put: mocks.txPut }),
     })),
   });
 });
@@ -87,36 +88,25 @@ function createMediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibr
 }
 
 it('resolves and deletes web snapshot media through the linked package owner', async () => {
-  const packageBlob = await createPackageBlob();
+  const packageFile = new File(['zip'], 'snapshot.zip', { type: 'application/zip' });
   const entry = createMediaEntry({
     id: 'asset-web',
     kind: 'web-archive',
     source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
   });
   mocks.get.mockResolvedValue(entry);
-  mocks.getWebSnapshotRecord.mockResolvedValue({ packageBlob });
+  mocks.getWebSnapshotPackageFile.mockResolvedValue(packageFile);
 
   await expect(getMediaAssetBlob('asset-web')).resolves.toBeInstanceOf(Blob);
   await deleteMediaLibraryAsset('asset-web');
 
-  expect(mocks.getWebSnapshotRecord).toHaveBeenCalledWith('snapshot-1');
+  expect(mocks.getWebSnapshotPackageFile).toHaveBeenCalledWith('snapshot-1');
   expect(mocks.deleteWebSnapshotMediaAsset).toHaveBeenCalledWith({
     assetId: 'asset-web',
     snapshotId: 'snapshot-1',
   });
   expect(mocks.txDelete).not.toHaveBeenCalledWith('asset-web');
 });
-
-async function createPackageBlob(): Promise<Blob> {
-  const manifest = createWebSnapshotManifest({
-    id: 'snapshot-1',
-    source: { faviconUrl: null, title: 'Snapshot', url: 'https://example.com/' },
-  });
-  const zip = new JSZip();
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(manifest));
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, '<main></main>');
-  return zip.generateAsync({ type: 'blob' });
-}
 
 it('updates metadata and handles thumbnail helpers through the media library stores', async () => {
   mocks.get.mockResolvedValueOnce(
@@ -169,7 +159,6 @@ it('deletes regular media assets after cleaning their source records', async () 
           exportId: 'export-1',
           kind: 'project-export',
           projectId: 'project-1',
-          recordingId: 'recording-2',
         },
       })
     )
@@ -190,7 +179,7 @@ it('deletes regular media assets after cleaning their source records', async () 
 
   expect(deleteRecording).toHaveBeenCalledWith('recording-1');
   expect(deleteProjectExport).toHaveBeenCalledWith('export-1');
-  expect(deleteRecording).toHaveBeenCalledWith('recording-2');
+  expect(deleteRecording).toHaveBeenCalledOnce();
   expect(deleteProjectAsset).toHaveBeenCalledWith('project-asset-1');
   expect(mocks.txDelete).toHaveBeenCalledWith('asset-recording');
   expect(mocks.txDelete).toHaveBeenCalledWith('asset-export');

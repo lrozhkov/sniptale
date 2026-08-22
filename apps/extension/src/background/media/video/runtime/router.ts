@@ -8,6 +8,7 @@ import type { VideoRuntimeMessage } from '../../../../contracts/video/types/mess
 import { appendContentDiagnosticEvent } from '../../../diagnostics/public/event-sink';
 import {
   handleDownloadRecording,
+  handleDownloadProjectExport,
   handleDownloadRecordingSidecar,
 } from './handlers/export/download';
 import { routeExportRuntimeMessage } from './handlers/export/route';
@@ -113,6 +114,9 @@ function routeRecordingRuntimeMessage(
   }
   if (message.type === VideoMessageType.DOWNLOAD_RECORDING) {
     return handleDownloadRecording(message, sendResponse);
+  }
+  if (message.type === VideoMessageType.DOWNLOAD_PROJECT_EXPORT) {
+    return handleDownloadProjectExport(message, sendResponse);
   }
   if (message.type === VideoMessageType.DOWNLOAD_RECORDING_SIDECAR) {
     return handleDownloadRecordingSidecar(message, sendResponse);

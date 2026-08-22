@@ -6,8 +6,8 @@ import {
 import { parseHydratableVideoProject } from '../../../features/video/project/validation';
 import { isNumber, isRecord, isString } from '../infrastructure/indexed-db/read-primitives';
 import type {
-  ProjectAssetEntry,
-  ProjectExportEntry,
+  StoredProjectAssetEntry,
+  StoredProjectExportEntry,
   UnsupportedVideoProjectMetadata,
   VideoProjectEntry,
   VideoProjectEntryReadResult,
@@ -26,11 +26,11 @@ function isVideoProject(value: unknown): value is VideoProject {
   return parseHydratableVideoProject(value) !== null;
 }
 
-export function parseProjectAssetEntry(value: unknown): ProjectAssetEntry | null {
+export function parseProjectAssetEntry(value: unknown): StoredProjectAssetEntry | null {
   if (!isRecord(value)) return null;
   if (
     !isString(value['id']) ||
-    !(value['blob'] instanceof Blob) ||
+    !isString(value['assetId']) ||
     !isString(value['mimeType']) ||
     !isNumber(value['createdAt']) ||
     !isNumber(value['size'])
@@ -38,7 +38,7 @@ export function parseProjectAssetEntry(value: unknown): ProjectAssetEntry | null
     return null;
   }
   return {
-    blob: value['blob'],
+    assetId: value['assetId'],
     createdAt: value['createdAt'],
     id: value['id'],
     mimeType: value['mimeType'],
@@ -46,14 +46,14 @@ export function parseProjectAssetEntry(value: unknown): ProjectAssetEntry | null
   };
 }
 
-export function parseProjectExportEntry(value: unknown): ProjectExportEntry | null {
+export function parseProjectExportEntry(value: unknown): StoredProjectExportEntry | null {
   if (!isRecord(value)) return null;
   const format = value['format'];
   const mimeType = value['mimeType'];
   if (
     !isString(value['id']) ||
+    !isString(value['assetId']) ||
     !isString(value['projectId']) ||
-    !isString(value['recordingId']) ||
     !isString(value['filename']) ||
     !isNumber(value['createdAt']) ||
     !isNumber(value['size']) ||
@@ -67,6 +67,7 @@ export function parseProjectExportEntry(value: unknown): ProjectExportEntry | nu
     return null;
   }
   return {
+    assetId: value['assetId'],
     createdAt: value['createdAt'],
     duration: value['duration'],
     filename: value['filename'],
@@ -74,7 +75,6 @@ export function parseProjectExportEntry(value: unknown): ProjectExportEntry | nu
     height: value['height'],
     id: value['id'],
     projectId: value['projectId'],
-    recordingId: value['recordingId'],
     size: value['size'],
     width: value['width'],
     ...(format === undefined ? {} : { format }),

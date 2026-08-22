@@ -4,18 +4,23 @@ import {
   importMediaHubBackup,
   inspectLocalMediaHubBackup,
   inspectMediaHubBackup,
+  listResumableMediaHubRestores,
+  readMediaHubRestoreSummary,
+  resumeMediaHubBackupImport,
   type MediaHubBackupExportOptions,
   type MediaHubImportConflictStrategy,
 } from '../../../workflows/media-hub-backup/index';
 import type { GalleryBackupExportController, GalleryImportController } from './controller-types';
 import type { GalleryItem } from '../items';
 import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
-import { downloadBlob, type GalleryBusyAction } from './shared';
+import { type GalleryBusyAction } from './shared';
 
 const activeBackupExportAbortControllers = new WeakMap<
   GalleryBackupExportController,
   AbortController
 >();
+const activeBackupImportAbortControllers = new Map<string, AbortController>();
+let importRunSequence = 0;
 
 function buildSelectedBackupScope(
   items: GalleryItem[]
@@ -47,6 +52,9 @@ function createInitialBackupExportOptions(
   }
 
   return createMediaHubBackupExportOptions({
+    includeDrafts: controller.state.selection.selectedItems.some(
+      (item) => item.lifecycle?.storageClass === 'temporary'
+    ),
     scope: 'selected',
     selected,
   });
@@ -57,6 +65,8 @@ export function createExportBackupAction(
   withBusy: GalleryBusyAction
 ) {
   return async () => {
+    const activeImport = controller.state.storage.activeImport;
+    if (activeImport?.status === 'running' || activeImport?.status === 'cancelling') return;
     await withBusy(async () => {
       const options = createInitialBackupExportOptions(controller);
       const summary = await inspectLocalMediaHubBackup(options);
@@ -77,14 +87,10 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
           return;
         }
         controller.actions.surface.setPendingExport({ options, summary });
-        const result = await exportMediaHubBackup(options, { signal: abortController.signal });
+        await exportMediaHubBackup(options, { signal: abortController.signal });
         if (abortController.signal.aborted) {
           return;
         }
-        downloadBlob(
-          result,
-          `media-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`
-        );
         controller.actions.surface.setPendingExport(null);
         await controller.actions.storage.refresh();
       } finally {
@@ -110,13 +116,29 @@ export function createInspectExportBackupAction() {
 
 export function createImportSelectedFileAction(controller: GalleryImportController) {
   return async (file: File | null, withBusy: GalleryBusyAction) => {
-    if (!file) {
+    if (
+      !file ||
+      controller.state.storage.activeImport?.status === 'running' ||
+      controller.state.storage.activeImport?.status === 'cancelling'
+    ) {
       return;
     }
 
     await withBusy(async () => {
       const summary = await inspectMediaHubBackup(file);
-      controller.actions.surface.setPendingImport({ file, summary });
+      const resumable = (await listResumableMediaHubRestores()).find(
+        (session) => session.archiveFingerprint === summary.archiveFingerprint
+      );
+      controller.actions.surface.setPendingImport({
+        file,
+        ...(resumable
+          ? {
+              resumeOperationId: resumable.operationId,
+              resumeStrategy: resumable.strategy,
+            }
+          : {}),
+        summary,
+      });
     });
 
     if (controller.refs.importInputRef.current) {
@@ -132,10 +154,115 @@ export function createImportAction(controller: GalleryImportController) {
       return;
     }
 
-    await withBusy(async () => {
-      await importMediaHubBackup(pendingImport.file, strategy);
-      controller.actions.surface.setPendingImport(null);
-      await controller.actions.storage.refresh();
+    const runId = `gallery-import-${Date.now()}-${++importRunSequence}`;
+    controller.actions.surface.setPendingImport(null);
+    controller.actions.surface.setActiveImport({
+      file: pendingImport.file,
+      id: runId,
+      progress: { bytesRead: 0, bytesWritten: 0, currentFilename: null, rootsComplete: 0 },
+      status: 'running',
+      strategy,
+      totalBytes: pendingImport.summary.totalBytes,
+      totalRoots: pendingImport.summary.rootCount,
     });
+    controller.refs.importTriggerRef.current?.focus();
+
+    await withBusy(async () => {
+      const abortController = new AbortController();
+      let operationId = pendingImport.resumeOperationId ?? null;
+      activeBackupImportAbortControllers.set(runId, abortController);
+      try {
+        const onProgress = (progress: {
+          bytesRead: number;
+          bytesWritten: number;
+          currentFilename: string | null;
+          rootsComplete: number;
+        }) => {
+          controller.actions.surface.setActiveImport((current) =>
+            current?.id === runId ? { ...current, progress } : current
+          );
+        };
+        const result = pendingImport.resumeOperationId
+          ? await resumeMediaHubBackupImport({
+              file: pendingImport.file,
+              operationId: pendingImport.resumeOperationId,
+              onProgress,
+              signal: abortController.signal,
+            })
+          : await importMediaHubBackup(pendingImport.file, strategy, {
+              onSessionCreated: (createdOperationId) => {
+                operationId = createdOperationId;
+              },
+              onProgress,
+              signal: abortController.signal,
+            });
+        if (abortController.signal.aborted) {
+          controller.actions.surface.setActiveImport((current) =>
+            current?.id === runId ? { ...current, result, status: 'cancelled' } : current
+          );
+          return;
+        }
+        controller.actions.surface.setActiveImport((current) =>
+          current?.id === runId ? { ...current, result, status: 'completed' } : current
+        );
+        await controller.actions.storage.refresh();
+      } catch {
+        let partialResult:
+          | {
+              conflictsResolved: number;
+              imported: number;
+              operationId: string;
+              skipped: number;
+            }
+          | undefined;
+        if (operationId) {
+          const session = await readMediaHubRestoreSummary(operationId).catch(() => null);
+          if (session) {
+            partialResult = {
+              conflictsResolved: session.conflictedRootCount,
+              imported: session.committedRootCount - session.skippedRootCount,
+              operationId: session.operationId,
+              skipped: session.skippedRootCount,
+            };
+          }
+        }
+        controller.actions.surface.setActiveImport((current) =>
+          current?.id === runId
+            ? {
+                ...current,
+                ...(partialResult ? { result: partialResult } : {}),
+                status: abortController.signal.aborted ? 'cancelled' : 'failed',
+              }
+            : current
+        );
+      } finally {
+        if (activeBackupImportAbortControllers.get(runId) === abortController) {
+          activeBackupImportAbortControllers.delete(runId);
+        }
+      }
+    });
+  };
+}
+
+export function createClosePendingImportAction(controller: GalleryImportController) {
+  return () => {
+    controller.actions.surface.setPendingImport(null);
+  };
+}
+
+export function createCancelActiveImportAction(controller: GalleryImportController) {
+  return () => {
+    const active = controller.state.storage.activeImport;
+    if (!active || active.status !== 'running') return;
+    controller.actions.surface.setActiveImport({ ...active, status: 'cancelling' });
+    activeBackupImportAbortControllers.get(active.id)?.abort();
+  };
+}
+
+export function createDismissActiveImportAction(controller: GalleryImportController) {
+  return () => {
+    const active = controller.state.storage.activeImport;
+    if (active?.status === 'running' || active?.status === 'cancelling') return;
+    controller.actions.surface.setActiveImport(null);
   };
 }

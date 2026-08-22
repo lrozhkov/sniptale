@@ -69,6 +69,7 @@ it('opens the storage manager from the query flag and updates the remaining surf
     value.actions.setPendingImport({
       file: new File(['backup'], 'backup.zip', { type: 'application/zip' }),
       summary: {
+        archiveFingerprint: 'a'.repeat(64),
         assetCount: 1,
         conflicts: [],
         manifest: {
@@ -79,7 +80,9 @@ it('opens the storage manager from the query flag and updates the remaining surf
           thumbnailCount: 0,
           version: 1,
         },
+        rootCount: 1,
         thumbnailCount: 0,
+        totalBytes: 512,
       },
     });
     value.actions.setConfirmDialog({

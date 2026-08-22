@@ -1,4 +1,4 @@
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { collectBackgroundIngressRouteTypes } from '../../../../contracts/messaging/contracts/runtime';
 import type { VideoRuntimeMessage } from '../../../../contracts/video/types/messages';
 import {
   isBackgroundInternalSignalMessage,
@@ -7,34 +7,9 @@ import {
 import { isVideoRuntimeMessage } from '../message-guards/guards/video-runtime';
 import type { BackgroundTabMessage, RuntimeMessageEnvelope } from '../message-guards/guards/shared';
 
-export const backgroundOwnedMessageTypes = [
-  MessageType.REQUEST_LLM_SESSION,
-  MessageType.AI_SETTINGS_QUERY,
-  MessageType.AI_SETTINGS_MUTATION,
-  MessageType.AI_SETTINGS_NAVIGATION,
-  MessageType.ANNOTATION_FORK_SESSION,
-  MessageType.AI_SECRET_UNLOCK,
-  MessageType.NATIVE_APP_QUERY,
-  MessageType.NATIVE_APP_MUTATION,
-  MessageType.PAGE_ACCESS,
-  MessageType.ERASE_LOCAL_EXTENSION_DATA,
-  MessageType.SETTINGS_TRANSFER,
-  MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
-  MessageType.PROCESS_WITH_LLM,
-  MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
-  MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY,
-  MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY,
-  MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN,
-  MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_PROOF,
-  MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY,
-  MessageType.CONTENT_RUNTIME_WAKEUP,
-  MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
-  MessageType.FRAME_ANNOTATION_RASTERIZE,
-  MessageType.START_POPUP_EXPORT_JOB,
-  MessageType.GET_POPUP_EXPORT_JOB_STATUS,
-  MessageType.CANCEL_POPUP_EXPORT_JOB,
-  MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
-] as const;
+const backgroundOwnedMessageTypes = collectBackgroundIngressRouteTypes({
+  actionKind: 'background-owned',
+});
 
 const backgroundOwnedMessageTypeSet = new Set<string>(backgroundOwnedMessageTypes);
 

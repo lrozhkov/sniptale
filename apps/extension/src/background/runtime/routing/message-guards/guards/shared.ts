@@ -35,7 +35,9 @@ import type { RouteCaptureMessage } from '../../../../capture/routes';
 
 export type BackgroundInternalSignalMessage =
   | { type: 'KEEP_ALIVE'; tabId?: number }
-  | { type: VideoMessageType.COUNTDOWN_COMPLETE; tabId?: number };
+  | { type: VideoMessageType.COUNTDOWN_COMPLETE; tabId?: number }
+  | RuntimeRequestByType[typeof VideoMessageType.REGION_SELECTED]
+  | RuntimeRequestByType[typeof VideoMessageType.REGION_SELECTION_CANCELLED];
 
 export type ScenarioMessage =
   | ScenarioCreateProjectMessage

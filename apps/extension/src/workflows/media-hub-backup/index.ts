@@ -1,16 +1,24 @@
+export type { MediaHubBackupExportOptions } from './v6/contracts';
+export type { MediaHubLocalBackupSummary } from './v6/contracts';
 export type {
-  MediaHubBackupExportOptions,
-  MediaHubBackupSummary,
+  MediaHubBackupSummaryV6 as MediaHubBackupSummary,
   MediaHubImportConflictStrategy,
-  MediaHubLocalBackupSummary,
-} from './contracts/types';
-export type { MediaHubImportResult } from './contracts/types';
+  MediaHubImportResultV6 as MediaHubImportResult,
+} from './v6/public';
 export {
   FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS,
   SUPPORT_MEDIA_HUB_BACKUP_EXPORT_OPTIONS,
   createMediaHubBackupExportOptions,
-} from './export/options';
-export { exportMediaHubBackup } from './export';
-export { importMediaHubBackup } from './import';
-export { inspectMediaHubBackup } from './inspect';
-export { inspectLocalMediaHubBackup } from './inspect/local';
+} from './v6/options';
+export {
+  exportMediaHubBackup,
+  exportScenarioProjectPackage,
+  exportVideoProjectPackage,
+  importPortableMediaPackage,
+  importMediaHubBackup,
+  inspectLocalMediaHubBackup,
+  inspectMediaHubBackup,
+  listResumableMediaHubRestores,
+  readMediaHubRestoreSummary,
+  resumeMediaHubBackupImport,
+} from './v6/public';

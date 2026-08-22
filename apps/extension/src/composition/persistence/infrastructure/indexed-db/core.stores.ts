@@ -1,6 +1,11 @@
-// Keep the IndexedDB name stable so existing user media/projects remain readable across rebrands.
-export const DB_NAME = 'sniptale-video-db';
-export const DB_VERSION = 25;
+// This is the first stable beta persistence generation. Alpha databases use a different name and
+// are intentionally excluded from the supported migration graph.
+export const DB_NAME = 'sniptale-db';
+export const DB_VERSION = 1;
+export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
+export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
+export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
+export const DATABASE_BACKUP_RECEIPT_KEY = 'sniptale.persistence.backup-receipt.v1';
 
 export const STORE_NAME = 'recordings';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
@@ -26,6 +31,10 @@ export const EDITOR_CUSTOM_SHAPES_STORE = 'editor_custom_shapes';
 export const STATE_MANAGER_STORE = 'state_manager';
 export const NATIVE_TRANSFER_SESSIONS_STORE = 'native_transfer_sessions';
 export const NATIVE_TRANSFER_CHUNKS_STORE = 'native_transfer_chunks';
+export const ASSET_REFS_STORE = 'asset_refs';
+export const ASSET_OWNERS_STORE = 'asset_owners';
+export const ASSET_OPERATIONS_STORE = 'asset_operations';
+export const SCHEMA_CONTRACTS_STORE = 'schema_contracts';
 
 export const EXPECTED_STORES = [
   STORE_NAME,
@@ -52,11 +61,16 @@ export const EXPECTED_STORES = [
   STATE_MANAGER_STORE,
   NATIVE_TRANSFER_SESSIONS_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_OPERATIONS_STORE,
+  SCHEMA_CONTRACTS_STORE,
 ] as const;
 
 export const EXPECTED_INDEXES = {
   [STORE_NAME]: ['createdAt'],
   [RECORDING_TELEMETRY_STORE]: ['updatedAt'],
+  [DIAGNOSTICS_META_STORE]: [],
   [DIAGNOSTICS_EVENTS_STORE]: ['recordingId'],
   [VIDEO_PROJECTS_STORE]: ['updatedAt'],
   [SCENARIO_PROJECTS_STORE]: ['updatedAt'],
@@ -67,6 +81,7 @@ export const EXPECTED_INDEXES = {
   [SCENARIO_EXPORTS_STORE]: ['projectId', 'createdAt'],
   [SCENARIO_STEP_EDITOR_DOCUMENTS_STORE]: ['projectId', 'updatedAt'],
   [MEDIA_LIBRARY_STORE]: ['createdAt', 'kind'],
+  [THUMBNAILS_STORE]: [],
   [IMAGE_WORKSPACES_STORE]: ['updatedAt'],
   [AGGREGATE_PRESENTATIONS_STORE]: ['updatedAt'],
   [WEB_SNAPSHOTS_STORE]: ['createdAt'],
@@ -77,4 +92,8 @@ export const EXPECTED_INDEXES = {
   [STATE_MANAGER_STORE]: ['domain', 'updatedAtEpochMs'],
   [NATIVE_TRANSFER_SESSIONS_STORE]: ['createdAt', 'updatedAt'],
   [NATIVE_TRANSFER_CHUNKS_STORE]: ['sessionId'],
-} as const satisfies Partial<Record<(typeof EXPECTED_STORES)[number], readonly string[]>>;
+  [ASSET_REFS_STORE]: ['createdAt'],
+  [ASSET_OWNERS_STORE]: ['assetId'],
+  [ASSET_OPERATIONS_STORE]: ['status', 'updatedAt'],
+  [SCHEMA_CONTRACTS_STORE]: [],
+} as const satisfies Record<(typeof EXPECTED_STORES)[number], readonly string[]>;

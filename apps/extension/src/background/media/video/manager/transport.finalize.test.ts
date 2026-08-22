@@ -99,6 +99,7 @@ it('does not dispatch a source after cancellation wins during diagnostics', asyn
 
 it('dispatches exact surface metadata and waits for source validation', async () => {
   const surface = {
+    intent: 'viewport-preset' as const,
     presetId: 'preset-1',
     target: 'window' as const,
     width: 1280,

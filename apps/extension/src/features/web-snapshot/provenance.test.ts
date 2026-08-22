@@ -44,6 +44,30 @@ describe('web snapshot package provenance sanitizer', () => {
       url: 'https://example.com/',
     });
   });
+
+  it('rejects a nested manifest that does not match strict outer archive metadata', async () => {
+    const packageBlob = await createPackageBlob(createAssetManifest());
+    const mismatched = createWebSnapshotManifest({
+      id: 'different-snapshot',
+      source: { faviconUrl: null, title: 'Different', url: 'https://example.com/' },
+    });
+
+    await expect(
+      sanitizeWebSnapshotPackageProvenance(packageBlob, mismatched, {
+        requireManifestMatch: true,
+      })
+    ).rejects.toThrow('does not match archive metadata');
+  });
+
+  it('rejects executable or otherwise undeclared package paths', async () => {
+    const zip = new JSZip();
+    zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(createAssetManifest()));
+    zip.file('scripts/payload.js', 'alert(1)');
+
+    await expect(
+      sanitizeWebSnapshotPackageProvenance(await zip.generateAsync({ type: 'blob' }), undefined)
+    ).rejects.toThrow('unexpected path');
+  });
 });
 
 describe('web snapshot package size metadata', () => {
@@ -102,5 +126,5 @@ async function createPackageBlob(
   const zip = new JSZip();
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(rawManifest));
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, '<main></main>');
-  return zip.generateAsync({ type: 'blob' });
+  return zip.generateAsync({ compression: 'DEFLATE', type: 'blob' });
 }

@@ -7,7 +7,7 @@ import { initTracer } from '@sniptale/platform/observability/message-tracer';
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { reconcileProjectExportJobs } from '../project-export';
-import { cleanupOrphanedRecordingStaging } from '../../composition/persistence/recordings/staging';
+import { recoverAssetPublications } from '../../composition/persistence/asset-publication-recovery';
 import { reconcileRecordingCompletionOutbox } from '../recording/post-record-publication';
 import { deleteAllFrameAnnotationRasterJobs } from '../../composition/persistence/frame-annotation-raster-jobs';
 
@@ -51,7 +51,7 @@ async function initializeOffscreenDb(offscreenStartupId: string): Promise<void> 
 
 async function reconcileOffscreenRuntimeState(): Promise<void> {
   await deleteAllFrameAnnotationRasterJobs();
-  await cleanupOrphanedRecordingStaging();
+  await recoverAssetPublications();
   await reconcileProjectExportJobs();
   await reconcileRecordingCompletionOutbox({ sendRuntimeMessage });
 }

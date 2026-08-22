@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "finalOwnerRules": [
     {
+      "sourcePrefix": "apps/extension/src/composition/archive-transfer",
+      "ownerId": "app-core.archive-transfer",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/frame-annotation-controls",
       "ownerId": "app-core.frame-annotation-controls",
       "ownerClass": "app-core"
@@ -307,6 +312,16 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/assets",
+      "ownerId": "persistence.assets",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/asset-publication-recovery",
+      "ownerId": "persistence.asset-publication-recovery",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/ai-settings",
       "ownerId": "persistence.ai-settings",
       "ownerClass": "persistence"
@@ -339,6 +354,11 @@
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/drawing-palette",
       "ownerId": "persistence.drawing-palette",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/document-assets",
+      "ownerId": "persistence.document-assets",
       "ownerClass": "persistence"
     },
     {
@@ -494,6 +514,11 @@
   ],
   "authorityOwners": [
     {
+      "id": "durable-opfs-assets",
+      "path": "apps/extension/src/composition/persistence/assets",
+      "stateKind": "authoritative-durable"
+    },
+    {
       "id": "frame-annotation-raster-jobs",
       "path": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
       "stateKind": "authoritative-staging"
@@ -547,6 +572,11 @@
       "id": "diagnostics",
       "path": "apps/extension/src/composition/persistence/diagnostics",
       "stateKind": "recovery-session"
+    },
+    {
+      "id": "document-assets",
+      "path": "apps/extension/src/composition/persistence/document-assets",
+      "stateKind": "authoritative-durable"
     },
     {
       "id": "editor-bootstrap-retention",

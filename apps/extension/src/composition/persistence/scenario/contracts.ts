@@ -3,6 +3,8 @@ import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/typ
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { ScenarioProject } from '../../../features/scenario/contracts/types/project';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
+import type { AssetRef } from '../assets';
+import type { PersistedEditorDocumentV3 } from '../document-assets';
 
 export interface ScenarioProjectEntry {
   id: string;
@@ -15,15 +17,23 @@ export interface ScenarioProjectEntry {
 }
 
 export interface ScenarioAssetEntry {
+  assetId: string;
   id: string;
   projectId: string;
   galleryAssetId: string | null;
-  blob: Blob;
   mimeType: string;
   width: number;
   height: number;
   createdAt: number;
   size: number;
+}
+
+export interface HydratedScenarioAssetEntry extends ScenarioAssetEntry {
+  file: File;
+}
+
+export interface PreparedScenarioAssetEntry extends ScenarioAssetEntry {
+  assetRef: AssetRef;
 }
 
 export interface PendingScenarioAssetEntry {
@@ -51,4 +61,12 @@ export interface ScenarioStepEditorDocumentEntry {
   document: EditorDocument;
   createdAt: number;
   updatedAt: number;
+  releaseDocumentAssets?(): void;
+}
+
+export interface StoredScenarioStepEditorDocumentEntry extends Omit<
+  ScenarioStepEditorDocumentEntry,
+  'document'
+> {
+  document: PersistedEditorDocumentV3;
 }

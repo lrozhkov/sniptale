@@ -64,14 +64,10 @@ async function closeOffscreenDocumentForPrivacyErasureForState(
   logger.log('Closed offscreen document for local data erasure');
 }
 
-async function ensureOffscreenDocumentForState(
+async function runOffscreenDocumentCreation(
   state: OffscreenDocumentState,
   justification: string
 ): Promise<boolean> {
-  if (state.offscreenCreated && !state.startupFailed) {
-    return false;
-  }
-
   if (state.startupFailed) {
     await closeOffscreenDocumentForState(state, 'runtime failure');
   }
@@ -113,6 +109,42 @@ async function ensureOffscreenDocumentForState(
   return true;
 }
 
+function ensureOffscreenDocumentForState(
+  state: OffscreenDocumentState,
+  justification: string
+): Promise<boolean> {
+  if (state.creationPromise) {
+    return state.creationPromise;
+  }
+
+  if (state.offscreenCreated && !state.startupFailed) {
+    return Promise.resolve(false);
+  }
+
+  const creation = runOffscreenDocumentCreation(state, justification);
+  let coordinatedCreation: Promise<boolean>;
+  coordinatedCreation = creation.then(
+    (created) => {
+      if (state.creationPromise === coordinatedCreation) {
+        state.creationPromise = null;
+      }
+      return created;
+    },
+    (error: unknown) => {
+      if (!state.offscreenCreated) {
+        state.offscreenReady = false;
+        state.expectedStartupId = null;
+      }
+      if (state.creationPromise === coordinatedCreation) {
+        state.creationPromise = null;
+      }
+      throw error;
+    }
+  );
+  state.creationPromise = coordinatedCreation;
+  return coordinatedCreation;
+}
+
 async function ensurePrivacyErasureOffscreenDocumentForState(
   state: OffscreenDocumentState
 ): Promise<void> {
@@ -150,7 +182,7 @@ export function createOffscreenDocumentService() {
     return markOffscreenDocumentReadyForState(state, offscreenStartupId);
   }
 
-  async function ensureOffscreenDocument(
+  function ensureOffscreenDocument(
     justification = 'Run extension-owned offscreen media work'
   ): Promise<boolean> {
     return ensureOffscreenDocumentForState(state, justification);
@@ -189,7 +221,7 @@ export function markOffscreenDocumentReady(offscreenStartupId?: string): boolean
   return defaultOffscreenDocumentService.getOwner().markOffscreenDocumentReady(offscreenStartupId);
 }
 
-export async function ensureOffscreenDocument(
+export function ensureOffscreenDocument(
   justification = 'Run extension-owned offscreen media work'
 ): Promise<boolean> {
   return defaultOffscreenDocumentService.getOwner().ensureOffscreenDocument(justification);

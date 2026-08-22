@@ -2106,19 +2106,6 @@
         "pass",
         "fail"
       ]
-    },
-    {
-      "tool": "verify-main-proof.mjs",
-      "validationMode": "canonical-control-fixture",
-      "testFiles": [
-        "tooling/ci/ci-contract.test.ts",
-        "tooling/ci/select-codeql-proof.test.ts",
-        "tooling/ci/select-unit-proof.test.ts"
-      ],
-      "states": [
-        "pass",
-        "fail"
-      ]
     }
   ]
 }

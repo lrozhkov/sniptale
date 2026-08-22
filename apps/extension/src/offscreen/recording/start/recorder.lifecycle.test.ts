@@ -2,21 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
-import type { RecordingArtifactSession } from '../encoding/artifact-session';
+import type { LiveRecordingArtifactSession } from '../encoding/live-artifact-session';
+import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 const {
-  buildVideoMediaRecorderOptionsMock,
   cleanupResourcesMock,
-  createRecordingArtifactSessionMock,
+  createLiveRecordingArtifactSessionMock,
   finalizeRecordingMock,
   getWebcamSettingsMock,
   sendRuntimeMessageMock,
   startSidecarsMock,
   stopSidecarsMock,
 } = vi.hoisted(() => ({
-  buildVideoMediaRecorderOptionsMock: vi.fn(),
   cleanupResourcesMock: vi.fn(),
-  createRecordingArtifactSessionMock: vi.fn(),
+  createLiveRecordingArtifactSessionMock: vi.fn(),
   finalizeRecordingMock: vi.fn(),
   getWebcamSettingsMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
@@ -24,23 +23,10 @@ const {
   stopSidecarsMock: vi.fn(),
 }));
 
-vi.mock('../encoding/artifact-session', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../encoding/artifact-session')>();
-  createRecordingArtifactSessionMock.mockImplementation(original.createRecordingArtifactSession);
-  return {
-    ...original,
-    createRecordingArtifactSession: createRecordingArtifactSessionMock,
-  };
-});
-
-vi.mock('../../../platform/media-utils/video-recording', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('../../../platform/media-utils/video-recording')>();
-  return {
-    ...original,
-    buildVideoMediaRecorderOptions: buildVideoMediaRecorderOptionsMock,
-  };
-});
+vi.mock('../encoding/live-artifact-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../encoding/live-artifact-session')>()),
+  createLiveRecordingArtifactSession: createLiveRecordingArtifactSessionMock,
+}));
 
 vi.mock('../finalizer', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../finalizer')>()),
@@ -48,7 +34,7 @@ vi.mock('../finalizer', async (importOriginal) => ({
 }));
 vi.mock('../sidecar', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../sidecar')>()),
-  getActiveSidecarVideoDimensions: vi.fn(() => []),
+  getActiveSidecarVideoProfiles: vi.fn(() => []),
   getActiveSidecarWebcamSettings: getWebcamSettingsMock,
   startActiveSidecarRecorders: startSidecarsMock,
   stopActiveSidecarRecordersWithFlush: stopSidecarsMock,
@@ -63,34 +49,9 @@ import { recordingContext } from '../context';
 import { PostRecordPublicationError } from '../post-record-publication';
 import { finalizeRecordingBootstrap } from './recorder';
 
-class MediaRecorderMock {
-  static isTypeSupported = vi.fn(() => true);
-  ondataavailable: ((event: BlobEvent) => void) | null = null;
-  onerror: ((event: Event) => void) | null = null;
-  onstart: ((event: Event) => void) | null = null;
-  onstop: ((event: Event) => void) | null = null;
-  state: RecordingState = 'inactive';
-  mimeType: string;
-
-  constructor(_stream: MediaStream, options: MediaRecorderOptions) {
-    this.mimeType = options.mimeType ?? '';
-  }
-
-  requestData = vi.fn(() => {
-    this.ondataavailable?.({ data: new Blob(['requested']) } as BlobEvent);
-  });
-  start = vi.fn(() => {
-    this.state = 'recording';
-    this.onstart?.(new Event('start'));
-  });
-  stop = vi.fn(() => {
-    this.ondataavailable?.({ data: new Blob(['terminal']) } as BlobEvent);
-    this.state = 'inactive';
-    this.onstop?.(new Event('stop'));
-  });
-}
-
-type RecordingLifecycleCallbacks = Parameters<RecordingArtifactSession['setLifecycleCallbacks']>[0];
+type RecordingLifecycleCallbacks = Parameters<
+  LiveRecordingArtifactSession['setLifecycleCallbacks']
+>[0];
 const videoTrackEndedListeners = new Set<EventListenerOrEventListenerObject>();
 
 function emitVideoTrackEnded(): void {
@@ -104,29 +65,47 @@ function emitVideoTrackEnded(): void {
   });
 }
 
-function createControllableArtifactSession(options: { abortError?: Error } = {}) {
+function createControllableArtifactSession(options: { abortError?: Error } = {}, register = true) {
   const file = new File(['terminal'], 'recording.webm', { type: 'video/webm' });
   const artifact = {
     artifactId: 'recording-lifecycle',
-    file,
+    asset: createPreparedRecordingAssetForTest(file, 'recording-lifecycle'),
     filename: file.name,
     mimeType: file.type,
     size: file.size,
   };
-  const recorder = new MediaRecorderMock(createVideoStream(), { mimeType: 'video/webm' });
   let callbacks: RecordingLifecycleCallbacks = {};
-  const artifactSession: RecordingArtifactSession = {
+  let state: RecordingState = 'inactive';
+  const artifactSession: LiveRecordingArtifactSession = {
     abort: options.abortError
       ? vi.fn().mockRejectedValue(options.abortError)
       : vi.fn().mockResolvedValue(undefined),
-    recorder: recorder as unknown as MediaRecorder,
+    pause: vi.fn(() => {
+      state = 'paused';
+    }),
+    resume: vi.fn(() => {
+      state = 'recording';
+    }),
     setLifecycleCallbacks: vi.fn((next: RecordingLifecycleCallbacks) => {
-      callbacks = next;
+      callbacks = {
+        ...next,
+        onStart: () => {
+          state = 'recording';
+          next.onStart?.();
+        },
+        onStop: async (artifact) => {
+          state = 'inactive';
+          await next.onStop?.(artifact);
+        },
+      };
     }),
     start: vi.fn(),
+    get state() {
+      return state;
+    },
     stop: vi.fn().mockResolvedValue(artifact),
   };
-  createRecordingArtifactSessionMock.mockResolvedValueOnce(artifactSession);
+  if (register) createLiveRecordingArtifactSessionMock.mockResolvedValueOnce(artifactSession);
   return {
     artifact,
     artifactSession,
@@ -171,6 +150,7 @@ async function bootstrapControllable(
     cursorCaptureMode?: 'embedded-fallback' | 'separate' | null;
     displaySurface?: string;
     omitSourceStream?: boolean;
+    transformFailure?: Promise<never>;
     webcamSettings?: { frameRate: number; height: number; width: number };
   } = {}
 ) {
@@ -195,6 +175,7 @@ async function bootstrapControllable(
       width: 1280,
       ...(params.displaySurface === undefined ? {} : { displaySurface: params.displaySurface }),
     },
+    transformFailure: params.transformFailure ?? null,
   });
   return fixture;
 }
@@ -202,13 +183,23 @@ async function bootstrapControllable(
 beforeEach(() => {
   vi.clearAllMocks();
   videoTrackEndedListeners.clear();
-  buildVideoMediaRecorderOptionsMock.mockReturnValue({
-    mimeType: 'video/webm;codecs=vp9',
-    videoBitsPerSecond: 8_000_000,
+  createLiveRecordingArtifactSessionMock.mockImplementation(async () => {
+    const fixture = createControllableArtifactSession({}, false);
+    const session = fixture.artifactSession;
+    vi.mocked(session.start).mockImplementation(() => {
+      fixture.getCallbacks().onStart?.();
+    });
+    let terminal: Promise<typeof fixture.artifact> | null = null;
+    vi.mocked(session.stop).mockImplementation(() => {
+      terminal ??= (async () => {
+        await fixture.getCallbacks().onStop?.(fixture.artifact);
+        return fixture.artifact;
+      })();
+      return terminal;
+    });
+    return session;
   });
-  vi.stubGlobal('MediaRecorder', MediaRecorderMock);
   recordingContext.resetRecordingSession();
-  recordingContext.mediaRecorder = null;
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
   finalizeRecordingMock.mockResolvedValue({
@@ -316,6 +307,30 @@ describe('primary recording artifact lifecycle', () => {
     );
   });
 
+  it('surfaces a transformed-video processor failure through the active lifecycle exactly once', async () => {
+    let rejectTransform!: (error: Error) => void;
+    const transformFailure = new Promise<never>((_resolve, reject) => {
+      rejectTransform = reject;
+    });
+    const fixture = await bootstrapControllable({ transformFailure });
+    fixture.getCallbacks().onStart?.();
+    cleanupResourcesMock.mockClear();
+    sendRuntimeMessageMock.mockClear();
+    const error = new Error('Video transform processor failed');
+
+    rejectTransform(error);
+    await vi.waitFor(() => expect(cleanupResourcesMock).toHaveBeenCalledOnce());
+    fixture.getCallbacks().onFailure?.(new Error('duplicate failure'));
+
+    expect(cleanupResourcesMock).toHaveBeenCalledOnce();
+    expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(1);
+    expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ error: error.message, phase: 'runtime' }),
+      })
+    );
+  });
+
   it('settles a bound stop failure once even when failure is replayed', async () => {
     const fixture = await bootstrapControllable();
     const resolve = vi.fn();
@@ -414,7 +429,7 @@ describe('primary recording stop finalization', () => {
 
     expect(finalizeRecordingMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        artifacts: [expect.objectContaining({ artifactId: 'recording-lifecycle', size: 17 })],
+        artifacts: [expect.objectContaining({ artifactId: 'recording-lifecycle', size: 8 })],
         primaryRecordingId: 'recording-lifecycle',
       })
     );
@@ -474,11 +489,13 @@ describe('primary recording bootstrap validation', () => {
     }
   );
 
-  it('rejects bootstrap when recorder options omit a MIME type', async () => {
+  it('rejects bootstrap when the selected live encoder is unsupported', async () => {
     recordingContext.beginRecordingSession('recording-lifecycle');
     recordingContext.videoStream = createVideoStream();
     recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
-    buildVideoMediaRecorderOptionsMock.mockReturnValueOnce({ videoBitsPerSecond: 8_000_000 });
+    createLiveRecordingArtifactSessionMock.mockRejectedValueOnce(
+      new Error('The selected live video encoder configuration is not supported.')
+    );
 
     await expect(
       finalizeRecordingBootstrap({
@@ -487,7 +504,7 @@ describe('primary recording bootstrap validation', () => {
         settings: DEFAULT_VIDEO_SETTINGS,
         trackSettings: { frameRate: 30, height: 720, width: 1280 },
       })
-    ).rejects.toThrow('Unsupported recorded video MIME type: (empty)');
+    ).rejects.toThrow('selected live video encoder configuration is not supported');
   });
 });
 

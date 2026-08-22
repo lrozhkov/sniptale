@@ -85,7 +85,7 @@ beforeEach(() => {
   browserDownloadsDownloadMock.mockResolvedValue(17);
   executeDownloadBlobMock.mockResolvedValue(17);
   blobToDataUrlMock.mockResolvedValue('data:video/webm;base64,dmlkZW8=');
-  getRecordingMock.mockResolvedValue({ blob: new Blob(['video'], { type: 'video/webm' }) });
+  getRecordingMock.mockResolvedValue({ file: new Blob(['video'], { type: 'video/webm' }) });
   loadSettingsMock.mockResolvedValue({
     defaultVideoPresetId: 'preset-1',
     presets: [{ id: 'preset-1', path: '../../Recordings\\Today' }],
@@ -98,7 +98,7 @@ afterEach(() => {
 
 it('downloads stored recordings through the blob download owner', async () => {
   const blob = new Blob(['video'], { type: 'video/webm' });
-  getRecordingMock.mockResolvedValue({ blob });
+  getRecordingMock.mockResolvedValue({ file: blob });
 
   await expect(downloadStoredRecording('recording-1', '../clip?.webm')).resolves.toBe(17);
 

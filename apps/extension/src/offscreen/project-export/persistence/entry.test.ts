@@ -53,12 +53,11 @@ function createExportSettings(): VideoProjectExportSettings {
 
 function createExpectedEntry() {
   return {
+    blob: expect.any(Blob),
     id: 'export-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     filename: 'Demo.mp4',
     createdAt: 1234567890,
-    size: 5,
     duration: 42,
     width: 1920,
     height: 1080,
@@ -84,7 +83,6 @@ describe('persistence entry helper', () => {
         exportId: 'export-1',
         filename: 'Demo.mp4',
         project: createProject(),
-        recordingId: 'recording-1',
         settings: createExportSettings(),
       })
     ).toEqual(createExpectedEntry());
@@ -97,7 +95,6 @@ describe('persistence entry helper', () => {
         exportId: 'export-2',
         filename: 'Demo-range.mp4',
         project: createProject(),
-        recordingId: 'recording-2',
         settings: {
           ...createExportSettings(),
           rangeEndSeconds: 10,

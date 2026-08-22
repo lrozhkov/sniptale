@@ -46,14 +46,12 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
   }
 
   if (
+    !isString(value['assetId']) ||
     !isString(value['id']) ||
     !isString(value['projectId']) ||
     !isNullableString(value['galleryAssetId']) ||
-    !(value['blob'] instanceof Blob) ||
     !isString(value['mimeType']) ||
     !isSafeScenarioAssetImageMimeType(value['mimeType']) ||
-    value['blob'].size <= 0 ||
-    value['blob'].size !== value['size'] ||
     !isPositiveNumber(value['width']) ||
     !isPositiveNumber(value['height']) ||
     !isNumber(value['createdAt']) ||
@@ -63,7 +61,7 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
   }
 
   return {
-    blob: value['blob'],
+    assetId: value['assetId'],
     createdAt: value['createdAt'],
     galleryAssetId: value['galleryAssetId'],
     height: value['height'],

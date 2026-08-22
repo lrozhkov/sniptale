@@ -53,7 +53,10 @@ function createLayoutProps() {
   return {
     gridViewportRef: { current: null },
     importInputRef: { current: null },
+    importTriggerRef: { current: null },
     onActiveTagsChange: vi.fn(),
+    onActiveImportCancel: vi.fn(),
+    onActiveImportDismiss: vi.fn(),
     onAddTag: vi.fn(),
     onApplySelectionTag: vi.fn(),
     onBackupExportConfirm: vi.fn(),

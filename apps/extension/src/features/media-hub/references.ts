@@ -23,12 +23,15 @@ function collectFromMediaSource(recordingIds: Set<string>, source: unknown): boo
   if (!isRecord(source) || !isString(source['kind'])) {
     return false;
   }
-  if (source['kind'] === 'recording' || source['kind'] === 'project-export') {
+  if (source['kind'] === 'recording') {
     if (!isString(source['recordingId'])) {
       return false;
     }
     recordingIds.add(source['recordingId']);
     return true;
+  }
+  if (source['kind'] === 'project-export') {
+    return isString(source['exportId']) && isString(source['projectId']);
   }
   if (source['kind'] === 'screenshot') {
     return true;
@@ -93,12 +96,8 @@ function collectFromMediaEntry(recordingIds: Set<string>, entry: unknown): boole
   return isRecord(entry) && collectFromMediaSource(recordingIds, entry['source']);
 }
 
-function collectFromProjectExport(recordingIds: Set<string>, entry: unknown): boolean {
-  if (!isRecord(entry) || !isString(entry['recordingId'])) {
-    return false;
-  }
-  recordingIds.add(entry['recordingId']);
-  return true;
+function collectFromProjectExport(entry: unknown): boolean {
+  return isRecord(entry) && isString(entry['id']) && isString(entry['projectId']);
 }
 
 function collectFromProject(recordingIds: Set<string>, project: unknown): boolean {
@@ -146,7 +145,7 @@ export function collectReferencedRecordingIdReferences(
   }
 
   for (const entry of args.projectExports) {
-    if (!collectFromProjectExport(recordingIds, entry)) {
+    if (!collectFromProjectExport(entry)) {
       invalidReferenceCount += 1;
     }
   }

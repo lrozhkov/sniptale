@@ -1,11 +1,17 @@
-import JSZip from 'jszip';
+import {
+  BlobReader,
+  BlobWriter,
+  TextReader,
+  TextWriter,
+  ZipReader,
+  ZipWriter,
+  type Entry,
+  type FileEntry,
+} from '@zip.js/zip.js';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import {
-  assertZipEntryCanInflate,
-  assertZipPackageInflationProfile,
-} from '@sniptale/platform/data/zip-profile';
-import {
+  assertSafeWebSnapshotPackagePath,
   isWebSnapshotManifest,
   parseWebSnapshotManifestJson,
   WEB_SNAPSHOT_PACKAGE_PATHS,
@@ -27,6 +33,26 @@ interface SanitizedWebSnapshotPackage {
 interface WebSnapshotPackageProvenanceOptions {
   includeSourceMetadata?: boolean;
   maxPackageBytes?: number;
+  requireManifestMatch?: boolean;
+}
+
+interface OpenWebSnapshotPackage {
+  entries: Entry[];
+  reader: ZipReader<Blob>;
+}
+
+function requireReadableEntry(entry: Entry): asserts entry is FileEntry {
+  if (entry.directory || !('getData' in entry)) {
+    throw new Error(`Web snapshot package entry is not readable: ${entry.filename}.`);
+  }
+}
+
+async function readEntryBlob(entry: Entry, mimeType: string): Promise<Blob> {
+  requireReadableEntry(entry);
+  return entry.getData(new BlobWriter(mimeType), {
+    checkCrc32: true,
+    checkLocalDirectory: true,
+  });
 }
 
 export function sanitizeWebSnapshotManifestProvenance(
@@ -61,53 +87,65 @@ export async function sanitizeWebSnapshotPackageProvenance(
   options: WebSnapshotPackageProvenanceOptions = {}
 ): Promise<SanitizedWebSnapshotPackage> {
   const maxPackageBytes = options.maxPackageBytes ?? MAX_WEB_SNAPSHOT_PACKAGE_BYTES;
-  assertWebSnapshotPackageBlobLimits(packageBlob, maxPackageBytes);
-  const zip = await JSZip.loadAsync(await packageBlob.arrayBuffer());
-  assertWebSnapshotInflatedProfile(zip);
-  const packageManifest = await readWebSnapshotPackageManifest(zip);
-  const outputManifest = sanitizeWebSnapshotManifestProvenance(
-    manifestOverride ?? packageManifest,
-    options
-  );
-  const packageOutputManifest = sanitizeWebSnapshotManifestProvenance(
-    applyProvenanceOverride(packageManifest, manifestOverride),
-    options
-  );
-  const normalizedPackageManifest = withPackageSize(packageOutputManifest, packageBlob.size);
-  const normalizedOutputManifest = withPackageSize(outputManifest, packageBlob.size);
-  const manifestChanged =
-    JSON.stringify(packageManifest) !== JSON.stringify(normalizedPackageManifest);
+  const opened = await openWebSnapshotPackage(packageBlob, maxPackageBytes);
+  try {
+    const packageManifest = await readWebSnapshotPackageManifest(opened.entries);
+    if (options.requireManifestMatch && manifestOverride) {
+      const normalizedPackage = withPackageSize(
+        sanitizeWebSnapshotManifestProvenance(packageManifest, options),
+        packageBlob.size
+      );
+      const normalizedOverride = withPackageSize(
+        sanitizeWebSnapshotManifestProvenance(manifestOverride, options),
+        packageBlob.size
+      );
+      if (JSON.stringify(normalizedPackage) !== JSON.stringify(normalizedOverride)) {
+        throw new Error('Web snapshot package manifest does not match archive metadata.');
+      }
+    }
+    const outputManifest = sanitizeWebSnapshotManifestProvenance(
+      manifestOverride ?? packageManifest,
+      options
+    );
+    const packageOutputManifest = sanitizeWebSnapshotManifestProvenance(
+      applyProvenanceOverride(packageManifest, manifestOverride),
+      options
+    );
+    const normalizedPackageManifest = withPackageSize(packageOutputManifest, packageBlob.size);
+    const normalizedOutputManifest = withPackageSize(outputManifest, packageBlob.size);
+    const manifestChanged =
+      JSON.stringify(packageManifest) !== JSON.stringify(normalizedPackageManifest);
 
-  if (!manifestChanged) {
+    if (!manifestChanged) {
+      return {
+        changed: false,
+        manifest: normalizedOutputManifest,
+        packageBlob,
+        size: packageBlob.size,
+      };
+    }
+
+    const sanitized = await generatePackageWithManifest(
+      opened.entries,
+      normalizedPackageManifest,
+      maxPackageBytes
+    );
     return {
-      changed: false,
-      manifest: normalizedOutputManifest,
-      packageBlob,
-      size: packageBlob.size,
+      changed: true,
+      manifest: withPackageSize(outputManifest, sanitized.packageBlob.size),
+      packageBlob: sanitized.packageBlob,
+      size: sanitized.packageBlob.size,
     };
+  } finally {
+    await opened.reader.close();
   }
-
-  const sanitizedPackage = await generatePackageWithManifest(
-    zip,
-    normalizedPackageManifest,
-    maxPackageBytes
-  );
-  return {
-    changed: true,
-    manifest: withPackageSize(outputManifest, sanitizedPackage.packageBlob.size),
-    packageBlob: sanitizedPackage.packageBlob,
-    size: sanitizedPackage.packageBlob.size,
-  };
 }
 
 function applyProvenanceOverride(
   packageManifest: WebSnapshotManifest,
   manifestOverride: WebSnapshotManifest | undefined
 ): WebSnapshotManifest {
-  if (!manifestOverride) {
-    return packageManifest;
-  }
-
+  if (!manifestOverride) return packageManifest;
   return {
     ...packageManifest,
     source: {
@@ -118,107 +156,143 @@ function applyProvenanceOverride(
   };
 }
 
-function assertWebSnapshotPackageBlobLimits(packageBlob: Blob, maxPackageBytes: number): void {
-  if (packageBlob.size > maxPackageBytes) {
-    throw new Error('Web snapshot package is too large.');
-  }
+function entryMaxBytes(entryPath: string): number {
+  return entryPath === WEB_SNAPSHOT_PACKAGE_PATHS.manifest
+    ? MAX_WEB_SNAPSHOT_MANIFEST_BYTES
+    : MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES;
 }
 
-function assertWebSnapshotSafePath(path: string): void {
-  const normalizedPath = path.replaceAll('\\', '/');
-  const segments = normalizedPath.split('/');
+function assertSafeDirectoryPath(path: string): void {
   if (
-    path !== normalizedPath ||
-    normalizedPath.startsWith('/') ||
-    segments.some((segment) => segment === '..' || segment === '')
+    path.startsWith('/') ||
+    path.includes('\\') ||
+    path.split('/').some((segment) => segment === '..' || segment === '.' || segment === '')
   ) {
     throw new Error('Web snapshot package contains an unsafe path.');
   }
 }
 
-function resolveWebSnapshotEntryMaxBytes(path: string): number {
-  return path === WEB_SNAPSHOT_PACKAGE_PATHS.manifest
-    ? MAX_WEB_SNAPSHOT_MANIFEST_BYTES
-    : MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES;
-}
-
-function assertWebSnapshotInflatedProfile(zip: JSZip): void {
-  assertZipPackageInflationProfile(Object.values(zip.files), {
-    assertPath: assertWebSnapshotSafePath,
-    createEntryError: (path) =>
-      new Error(
-        path === WEB_SNAPSHOT_PACKAGE_PATHS.manifest
-          ? 'Web snapshot package manifest is too large.'
-          : 'Web snapshot package entry is too large.'
-      ),
-    createFileCountError: () => new Error('Web snapshot package has too many files.'),
-    createTotalError: () => new Error('Web snapshot package inflated size is too large.'),
-    maxFileCount: MAX_WEB_SNAPSHOT_PACKAGE_FILE_COUNT,
-    maxTotalBytes: MAX_WEB_SNAPSHOT_PACKAGE_INFLATED_BYTES,
-    resolveEntryMaxBytes: resolveWebSnapshotEntryMaxBytes,
+async function openWebSnapshotPackage(
+  packageBlob: Blob,
+  maxPackageBytes: number
+): Promise<OpenWebSnapshotPackage> {
+  if (packageBlob.size > maxPackageBytes) throw new Error('Web snapshot package is too large.');
+  const reader = new ZipReader(new BlobReader(packageBlob), {
+    checkAmbiguity: true,
+    checkCrc32: true,
+    strictness: 'strict',
   });
+  try {
+    const entries: Entry[] = [];
+    const paths = new Set<string>();
+    let inflatedBytes = 0;
+    for await (const entry of reader.getEntriesGenerator({ checkAmbiguity: true })) {
+      if (entry.encrypted || entry.symlink) {
+        throw new Error('Web snapshot package contains an unsupported entry.');
+      }
+      const validatedPath = entry.directory ? entry.filename.replace(/\/$/u, '') : entry.filename;
+      if (entry.directory) {
+        assertSafeDirectoryPath(validatedPath);
+        continue;
+      }
+      assertSafeWebSnapshotPackagePath(validatedPath);
+      const canonicalPath = entry.filename.toLocaleLowerCase('en-US');
+      if (paths.has(canonicalPath)) {
+        throw new Error(`Web snapshot package contains a duplicate path: ${entry.filename}.`);
+      }
+      if (entry.uncompressedSize > entryMaxBytes(entry.filename)) {
+        throw new Error(
+          entry.filename === WEB_SNAPSHOT_PACKAGE_PATHS.manifest
+            ? 'Web snapshot package manifest is too large.'
+            : 'Web snapshot package entry is too large.'
+        );
+      }
+      inflatedBytes += entry.uncompressedSize;
+      if (inflatedBytes > MAX_WEB_SNAPSHOT_PACKAGE_INFLATED_BYTES) {
+        throw new Error('Web snapshot package inflated size is too large.');
+      }
+      paths.add(canonicalPath);
+      entries.push(entry);
+      if (entries.length > MAX_WEB_SNAPSHOT_PACKAGE_FILE_COUNT) {
+        throw new Error('Web snapshot package has too many files.');
+      }
+    }
+    return { entries, reader };
+  } catch (error) {
+    await reader.close().catch(() => undefined);
+    throw error;
+  }
 }
 
 async function generatePackageWithManifest(
-  zip: JSZip,
+  entries: readonly Entry[],
   manifest: WebSnapshotManifest,
   maxPackageBytes: number
 ): Promise<{ manifest: WebSnapshotManifest; packageBlob: Blob }> {
   let nextManifest = manifest;
-  let packageBlob = await writeManifestAndGeneratePackage(zip, nextManifest, maxPackageBytes);
+  let packageBlob = await writePackage(entries, nextManifest, maxPackageBytes);
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const sizedManifest = withPackageSize(nextManifest, packageBlob.size);
     if (JSON.stringify(sizedManifest) === JSON.stringify(nextManifest)) {
       return { manifest: nextManifest, packageBlob };
     }
-
     nextManifest = sizedManifest;
-    packageBlob = await writeManifestAndGeneratePackage(zip, nextManifest, maxPackageBytes);
+    packageBlob = await writePackage(entries, nextManifest, maxPackageBytes);
   }
-
   throw new Error('Web snapshot package manifest size did not stabilize.');
 }
 
-async function writeManifestAndGeneratePackage(
-  zip: JSZip,
+async function writePackage(
+  entries: readonly Entry[],
   manifest: WebSnapshotManifest,
   maxPackageBytes: number
 ): Promise<Blob> {
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(manifest, null, 2));
-  const packageBlob = await zip.generateAsync({ type: 'blob' });
-  assertWebSnapshotPackageBlobLimits(packageBlob, maxPackageBytes);
-  return packageBlob;
+  const output = new BlobWriter('application/zip');
+  const writer = new ZipWriter(output, { bufferedWrite: false, useWebWorkers: false });
+  try {
+    for (const entry of entries) {
+      if (entry.filename === WEB_SNAPSHOT_PACKAGE_PATHS.manifest) {
+        await writer.add(entry.filename, new TextReader(JSON.stringify(manifest, null, 2)), {
+          bufferedWrite: false,
+          level: 0,
+          useWebWorkers: false,
+        });
+        continue;
+      }
+      const blob = await readEntryBlob(entry, 'application/octet-stream');
+      await writer.add(entry.filename, new BlobReader(blob), {
+        bufferedWrite: false,
+        level: entry.compressionMethod === 0 ? 0 : 6,
+        useWebWorkers: false,
+      });
+    }
+    const packageBlob = await writer.close();
+    if (packageBlob.size > maxPackageBytes) throw new Error('Web snapshot package is too large.');
+    return packageBlob;
+  } catch (error) {
+    await writer.close().catch(() => undefined);
+    throw error;
+  }
 }
 
 function withPackageSize(manifest: WebSnapshotManifest, packageSize: number): WebSnapshotManifest {
-  return {
-    ...manifest,
-    stats: {
-      ...manifest.stats,
-      packageSize,
-    },
-  };
+  return { ...manifest, stats: { ...manifest.stats, packageSize } };
 }
 
-async function readWebSnapshotPackageManifest(zip: JSZip): Promise<WebSnapshotManifest> {
-  const manifestFile = zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest);
-  if (!manifestFile) {
-    throw new Error('Web snapshot package manifest is missing.');
-  }
-
-  assertZipEntryCanInflate(
-    manifestFile,
-    MAX_WEB_SNAPSHOT_MANIFEST_BYTES,
-    () => new Error('Web snapshot package manifest is too large.')
+async function readWebSnapshotPackageManifest(
+  entries: readonly Entry[]
+): Promise<WebSnapshotManifest> {
+  const manifestEntry = entries.find(
+    (entry) => entry.filename === WEB_SNAPSHOT_PACKAGE_PATHS.manifest
   );
-  const bytes = await manifestFile.async('uint8array');
-  if (bytes.byteLength > MAX_WEB_SNAPSHOT_MANIFEST_BYTES) {
-    throw new Error('Web snapshot package manifest is too large.');
-  }
-
-  const manifest = parseWebSnapshotManifestJson(new TextDecoder().decode(bytes));
-  if (!isWebSnapshotManifest(manifest)) {
+  if (!manifestEntry) throw new Error('Web snapshot package manifest is missing.');
+  requireReadableEntry(manifestEntry);
+  const text = await manifestEntry.getData(new TextWriter(), {
+    checkCrc32: true,
+    checkLocalDirectory: true,
+  });
+  const manifest = parseWebSnapshotManifestJson(text);
+  if (!isWebSnapshotManifest(manifest))
     throw new Error('Web snapshot package manifest is invalid.');
-  }
   return manifest;
 }

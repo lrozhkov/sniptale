@@ -142,6 +142,30 @@ it('creates a new offscreen document when none exists yet', async () => {
   expect(manager.hasOffscreenDocument()).toBe(true);
 });
 
+it('shares one creation flight across concurrent offscreen owners', async () => {
+  const manager = await loadOffscreenManager();
+
+  const recordingCreation = manager.ensureOffscreenDocument('recording');
+  const voiceCreation = manager.ensureOffscreenDocument('voice');
+  const exportCreation = manager.ensureOffscreenDocument('export');
+
+  expect(voiceCreation).toBe(recordingCreation);
+  expect(exportCreation).toBe(recordingCreation);
+  await expect(Promise.all([recordingCreation, voiceCreation, exportCreation])).resolves.toEqual([
+    true,
+    true,
+    true,
+  ]);
+  expect(browserRuntimeGetContextsMock).toHaveBeenCalledOnce();
+  expect(randomUuidMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
+    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
+    justification: 'recording',
+  });
+});
+
 it('creates an isolated lightweight local-storage document for privacy erasure', async () => {
   let readyListener: ((message: unknown, sender: chrome.runtime.MessageSender) => void) | undefined;
   browserRuntimeSubscribeToMessagesMock.mockImplementation((listener) => {
@@ -203,11 +227,42 @@ it('preserves the ready state when OFFSCREEN_READY arrives before createDocument
   const ensurePromise = manager.ensureOffscreenDocument('Custom recording reason');
   await Promise.resolve();
   manager.markOffscreenDocumentReady('startup-1');
+  const joinedEnsurePromise = manager.ensureOffscreenDocument('Voice input reason');
+
+  expect(joinedEnsurePromise).toBe(ensurePromise);
   resolveCreateDocument();
 
-  await ensurePromise;
+  await expect(Promise.all([ensurePromise, joinedEnsurePromise])).resolves.toEqual([true, true]);
   await expect(manager.waitForOffscreenReady(25)).resolves.toBeUndefined();
   expect(browserRuntimeSubscribeToMessagesMock).not.toHaveBeenCalled();
+});
+
+it('shares a creation rejection and admits a new generation after it settles', async () => {
+  const { createOffscreenDocumentService } = await loadOffscreenManager();
+  const manager = createOffscreenDocumentService();
+  const creationError = new Error('creation failed');
+  randomUuidMock.mockReturnValueOnce('startup-1').mockReturnValueOnce('startup-2');
+  browserOffscreenCreateDocumentMock.mockRejectedValueOnce(creationError);
+
+  const recordingCreation = manager.ensureOffscreenDocument('recording');
+  const voiceCreation = manager.ensureOffscreenDocument('voice');
+  const exportCreation = manager.ensureOffscreenDocument('export');
+
+  expect(voiceCreation).toBe(recordingCreation);
+  expect(exportCreation).toBe(recordingCreation);
+  await expect(Promise.all([recordingCreation, voiceCreation, exportCreation])).rejects.toBe(
+    creationError
+  );
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+  expect(manager.markOffscreenDocumentReady('startup-1')).toBe(false);
+
+  await expect(manager.ensureOffscreenDocument('retry')).resolves.toBe(true);
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledTimes(2);
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenLastCalledWith({
+    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
+    justification: 'retry',
+  });
 });
 
 it('closes a timed-out startup before creating a replacement offscreen document', async () => {
@@ -219,9 +274,20 @@ it('closes a timed-out startup before creating a replacement offscreen document'
   const waitResult = manager.waitForOffscreenReady(25).catch((error: unknown) => error);
   await vi.advanceTimersByTimeAsync(25);
   await expect(waitResult).resolves.toEqual(expect.any(Error));
-  await expect(manager.ensureOffscreenDocument('Retry recording')).resolves.toBe(true);
+  const recordingRetry = manager.ensureOffscreenDocument('Retry recording');
+  const voiceRetry = manager.ensureOffscreenDocument('Retry voice');
+  const exportRetry = manager.ensureOffscreenDocument('Retry export');
+
+  expect(voiceRetry).toBe(recordingRetry);
+  expect(exportRetry).toBe(recordingRetry);
+  await expect(Promise.all([recordingRetry, voiceRetry, exportRetry])).resolves.toEqual([
+    true,
+    true,
+    true,
+  ]);
 
   expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledTimes(2);
   expect(loggerWarnMock).toHaveBeenCalledWith('Closed failed offscreen document', {
     reason: 'runtime failure',
   });

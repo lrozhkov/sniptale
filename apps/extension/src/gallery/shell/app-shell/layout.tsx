@@ -29,6 +29,7 @@ function GallerySidebarSection(props: GalleryAppLayoutProps) {
       folderFilter={state.filters.folderFilter}
       scope={state.filters.scope}
       isBusy={state.storage.isBusy}
+      importTriggerRef={props.importTriggerRef}
       onActiveTagsChange={props.onActiveTagsChange}
       onExportBackup={props.onExportBackup}
       onFolderFilterChange={props.onFolderFilterChange}

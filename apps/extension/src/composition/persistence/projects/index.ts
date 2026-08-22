@@ -1,5 +1,8 @@
 import type { VideoProject } from '../../../features/video/project/types';
 import {
+  ASSET_OPERATIONS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
   initDB,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -7,7 +10,6 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { createProjectMutationStores } from './mutation-stores';
-import { buildProjectAssetMediaEntry } from '../media-library/entry-mapping';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import {
   collectProjectOwnedAssetIds,
@@ -15,10 +17,31 @@ import {
   syncProjectAssetMirrorLifecycles,
 } from './asset-references';
 import {
-  type ProjectAssetEntry,
+  type HydratedProjectAssetEntry,
+  type StoredProjectAssetEntry,
   type VideoProjectEntry,
   type VideoProjectReadResult,
 } from './contracts';
+import {
+  assertAssetWriteAdmission,
+  buildPhysicalDeleteOperation,
+  completePhysicalDeleteOperation,
+  createAssetPublicationJournal,
+  discardPreparedAsset,
+  parseAssetRef,
+  publishReadyJournalWithRetry,
+  readAssetFile,
+  releaseAssetReadyProtection,
+  writeBlobToAsset,
+} from '../assets';
+import {
+  PROJECT_ASSET_OWNER_KIND,
+  PROJECT_ASSET_PUBLICATION_DOMAIN,
+  PROJECT_MEDIA_ASSET_ROLE,
+  publishProjectAssetJournal,
+  recoverProjectMediaPublications,
+  type ProjectAssetPublicationPayload,
+} from './asset-publication';
 import {
   createInvalidVideoProjectListItem,
   createVideoProjectListItem,
@@ -46,14 +69,18 @@ export async function saveVideoProject(
   project: VideoProject,
   options: SaveVideoProjectOptions = {}
 ): Promise<VideoProjectEntry> {
-  const candidate = withVideoProjectCreatedAt(project);
-  if (!isHydratableVideoProject(candidate)) {
-    throw new Error('Invalid video project payload');
-  }
-  await verifyVideoProjectEffectSnapshotIntegrity(candidate);
-  return runWithIndexedDbMutation(async (db) => {
-    const { mediaLibraryStore, projectAssetStore, projectStore, tx } =
-      createProjectMutationStores(db);
+  const candidate = await prepareVideoProjectSave(project);
+  const physicalDelete = buildPhysicalDeleteOperation([]);
+  const saved = await runWithIndexedDbMutation(async (db) => {
+    const {
+      assetOperationStore,
+      assetOwnerStore,
+      assetRefStore,
+      mediaLibraryStore,
+      projectAssetStore,
+      projectStore,
+      tx,
+    } = createProjectMutationStores(db);
     const existing = parseVideoProjectEntry(await projectStore.get(project.id));
     const guardedSave = guardStaleVideoProjectSave({
       existing: existing ?? undefined,
@@ -95,18 +122,32 @@ export async function saveVideoProject(
       projectStore,
     });
     await deleteProjectAssetsUnreferencedByOtherProjects({
+      assetOwnerStore,
+      assetRefStore,
       mediaLibraryStore,
+      operation: physicalDelete,
       ownerProjectId: project.id,
       projectAssetIds: removedProjectAssetIds,
       projectAssetStore,
       projectStore,
     });
+    if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
     await tx.done;
     publishMediaHubLibraryChanged(existing ? 'update' : 'create', [
       `video-project:${candidate.id}`,
     ]);
     return entry;
   });
+  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
+  return saved;
+}
+
+async function prepareVideoProjectSave(project: VideoProject): Promise<VideoProject> {
+  const candidate = withVideoProjectCreatedAt(project);
+  if (!isHydratableVideoProject(candidate)) throw new Error('Invalid video project payload');
+  await verifyVideoProjectEffectSnapshotIntegrity(candidate);
+  await recoverProjectMediaPublications();
+  return candidate;
 }
 
 function withVideoProjectCreatedAt(project: VideoProject): VideoProject {
@@ -191,34 +232,48 @@ export async function saveProjectAsset(
   mimeType: string,
   filename = id
 ): Promise<void> {
-  const entry: ProjectAssetEntry = {
+  await recoverProjectMediaPublications();
+  await assertAssetWriteAdmission(blob.size);
+  const prepared = await writeBlobToAsset(blob, { mimeType });
+  const entry: StoredProjectAssetEntry = {
+    assetId: prepared.ref.assetId,
     id,
-    blob,
-    mimeType,
+    mimeType: prepared.ref.mimeType,
     createdAt: Date.now(),
-    size: blob.size,
+    size: prepared.ref.size,
   };
-
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([PROJECT_ASSETS_STORE, MEDIA_LIBRARY_STORE], 'readwrite');
-    await tx.objectStore(PROJECT_ASSETS_STORE).put(entry);
-    await tx.objectStore(MEDIA_LIBRARY_STORE).put({
-      ...buildProjectAssetMediaEntry(entry),
-      filename,
-      originalFilename: filename,
+  let journalCreated = false;
+  try {
+    const payload: ProjectAssetPublicationPayload = { entry, filename };
+    const journal = await createAssetPublicationJournal({
+      assetRefs: [prepared.ref],
+      domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
+      payload,
     });
-    await tx.done;
-  });
+    journalCreated = true;
+    await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
+    await releaseAssetReadyProtection([prepared.ref.assetId]);
+  } catch (error) {
+    if (!journalCreated) await discardPreparedAsset(prepared.ref.assetId);
+    throw error;
+  }
 }
 
-export async function getProjectAsset(id: string): Promise<ProjectAssetEntry | undefined> {
+export async function getProjectAsset(id: string): Promise<HydratedProjectAssetEntry | undefined> {
   const db = await initDB();
   const entry = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
-  return entry ?? undefined;
+  if (!entry) return undefined;
+  const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, entry.assetId));
+  if (!ref) return undefined;
+  try {
+    return { ...entry, file: await readAssetFile(ref, id) };
+  } catch {
+    return undefined;
+  }
 }
 
 export async function listProjectAssets(): Promise<
-  Array<Omit<ProjectAssetEntry, 'blob'> & { filename: string }>
+  Array<StoredProjectAssetEntry & { filename: string }>
 > {
   const db = await initDB();
   const entries = parseDbEntries(await db.getAll(PROJECT_ASSETS_STORE), parseProjectAssetEntry);
@@ -226,6 +281,7 @@ export async function listProjectAssets(): Promise<
   const mediaMap = new Map(mediaEntries.map((entry) => [entry.id, entry]));
 
   return entries.map((entry) => ({
+    assetId: entry.assetId,
     id: entry.id,
     mimeType: entry.mimeType,
     createdAt: entry.createdAt,
@@ -235,10 +291,32 @@ export async function listProjectAssets(): Promise<
 }
 
 export async function deleteProjectAsset(id: string): Promise<void> {
+  await recoverProjectMediaPublications();
+  const physicalDelete = buildPhysicalDeleteOperation([]);
   await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([PROJECT_ASSETS_STORE, MEDIA_LIBRARY_STORE], 'readwrite');
+    const tx = db.transaction(
+      [
+        PROJECT_ASSETS_STORE,
+        MEDIA_LIBRARY_STORE,
+        ASSET_OWNERS_STORE,
+        ASSET_REFS_STORE,
+        ASSET_OPERATIONS_STORE,
+      ],
+      'readwrite'
+    );
+    const entry = parseProjectAssetEntry(await tx.objectStore(PROJECT_ASSETS_STORE).get(id));
     await tx.objectStore(PROJECT_ASSETS_STORE).delete(id);
     await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id));
+    if (entry) {
+      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+      await ownerStore.delete([PROJECT_ASSET_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]);
+      if ((await ownerStore.index('assetId').count(entry.assetId)) === 0) {
+        await tx.objectStore(ASSET_REFS_STORE).delete(entry.assetId);
+        physicalDelete.assetIds.push(entry.assetId);
+        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
+      }
+    }
     await tx.done;
   });
+  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
 }

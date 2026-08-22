@@ -16,6 +16,7 @@ const { modalFramePropsMock, translateMock } = vi.hoisted(() => ({
 vi.mock('../../../platform/i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../platform/i18n')>();
   return {
+    includeDrafts: false,
     ...actual,
     translate: translateMock,
   };
@@ -45,11 +46,12 @@ function createExportOptions(
   overrides: Partial<MediaHubBackupExportOptions> = {}
 ): MediaHubBackupExportOptions {
   return {
-    scope: 'all',
-    includeSourceMetadata: true,
-    includeTelemetry: true,
-    includeWebSnapshots: true,
     ...overrides,
+    includeDrafts: overrides.includeDrafts ?? false,
+    includeSourceMetadata: overrides.includeSourceMetadata ?? true,
+    includeTelemetry: overrides.includeTelemetry ?? true,
+    includeWebSnapshots: overrides.includeWebSnapshots ?? true,
+    scope: overrides.scope ?? 'all',
   };
 }
 
@@ -57,7 +59,9 @@ function createLocalSummary(): MediaHubLocalBackupSummary {
   return {
     approximateSizeBytes: 4096,
     assetCount: 5,
+    draftCount: 0,
     dataClasses: {
+      drafts: false,
       mediaAssets: true,
       recordings: true,
       scenarioProjects: true,
@@ -196,7 +200,7 @@ it('updates individual privacy toggles and closes through the modal frame', asyn
   expect(container?.textContent).toContain('gallery.backupExportModal.scopeSelected');
 
   await act(async () => {
-    const telemetryToggle = container?.querySelector('input[type="checkbox"]');
+    const telemetryToggle = container?.querySelectorAll('input[type="checkbox"]')[1];
     telemetryToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     findButton('gallery.backupExportModal.export').dispatchEvent(
       new MouseEvent('click', { bubbles: true })

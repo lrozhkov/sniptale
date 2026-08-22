@@ -27,13 +27,16 @@ function createManifest(): WebSnapshotManifest {
   };
 }
 
-it('accepts only persisted web snapshot records with valid manifests and blobs', () => {
+it('accepts only persisted web snapshot records with valid manifests and asset refs', () => {
   expect(
     isWebSnapshotRecord({
       createdAt: 1,
       id: 'snapshot-1',
       manifest: createManifest(),
-      packageBlob: new Blob(['zip']),
+      packageAssetId: 'package-asset',
+      screenshotAssetId: 'screenshot-asset',
+      screenshotMimeType: 'image/png',
+      screenshotSize: 3,
       size: 3,
       updatedAt: 2,
     })
@@ -46,7 +49,10 @@ it('accepts only persisted web snapshot records with valid manifests and blobs',
       createdAt: 1,
       id: 'snapshot-1',
       manifest: createManifest(),
-      packageBlob: 'zip',
+      packageAssetId: '',
+      screenshotAssetId: 'screenshot-asset',
+      screenshotMimeType: 'image/png',
+      screenshotSize: 3,
       size: 3,
       updatedAt: 2,
     })

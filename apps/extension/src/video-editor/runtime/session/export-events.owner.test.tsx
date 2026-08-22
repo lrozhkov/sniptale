@@ -106,7 +106,6 @@ it('accepts normalized owner URLs when the editor location has query state', () 
     ...createEditorEventTarget(),
     jobId: 'job-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     exportId: 'export-1',
     filename: 'capture.mp4',
     format: 'mp4',
@@ -114,7 +113,6 @@ it('accepts normalized owner URLs when the editor location has query state', () 
 
   expect(params.completeExport).toHaveBeenCalledWith({
     filename: 'capture.mp4',
-    recordingId: 'recording-1',
     exportId: 'export-1',
   });
 });
@@ -127,7 +125,6 @@ it('ignores same-url export messages for another editor document', () => {
     targetDocumentId: 'editor-doc-2',
     jobId: 'job-1',
     projectId: 'project-1',
-    recordingId: 'recording-1',
     exportId: 'export-1',
     filename: 'capture.mp4',
     format: 'mp4',

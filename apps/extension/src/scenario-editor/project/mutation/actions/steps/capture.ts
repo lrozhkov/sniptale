@@ -74,6 +74,7 @@ export function createDuplicateStepAction(args: ScenarioProjectSelectionActionAr
     args.setError(null);
 
     let clonedEditorDocument;
+    let releaseSourceDocument: (() => void) | undefined;
     if (clonedStep.kind === 'capture') {
       try {
         const source = await getScenarioStepEditorDocumentRecord(stepId);
@@ -84,6 +85,7 @@ export function createDuplicateStepAction(args: ScenarioProjectSelectionActionAr
               stepId: clonedStep.id,
             })
           : undefined;
+        releaseSourceDocument = source?.releaseDocumentAssets;
       } catch (error) {
         args.setError(
           resolveScenarioActionErrorMessage(error, 'Failed to duplicate scenario capture step')
@@ -112,6 +114,8 @@ export function createDuplicateStepAction(args: ScenarioProjectSelectionActionAr
       args.setSelectedStepId(clonedStep.id);
     } catch (error) {
       args.setError(resolveScenarioActionErrorMessage(error, 'Failed to duplicate scenario step'));
+    } finally {
+      releaseSourceDocument?.();
     }
   };
 }

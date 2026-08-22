@@ -7,6 +7,19 @@ const persistenceMocks = vi.hoisted(() => ({
   runWithIndexedDbMutation: vi.fn(),
 }));
 
+vi.mock('../projects/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: vi.fn().mockResolvedValue(0),
+}));
+vi.mock('../recordings/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverRecordingAssetPublications: vi.fn().mockResolvedValue(0),
+}));
+vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image-aggregates/mutations')>()),
+  recoverImageWorkspacePublications: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
 }));

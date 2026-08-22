@@ -4,6 +4,7 @@ import {
 } from '../../../../../features/scenario/project/public';
 import {
   createScenarioAssetEntryFromBlob,
+  discardPreparedScenarioAsset,
   persistScenarioCaptureArtifacts,
 } from '../../../../../composition/persistence/scenario/store/capture-step/assets';
 import type { ScenarioProject } from '../../../../../features/scenario/contracts/types/project';
@@ -47,6 +48,7 @@ export function createInsertImageStepAction(args: {
     });
     const currentProject = args.getCurrentProject();
     if (!currentProject || currentProject.id !== initialProject.id) {
+      await discardPreparedScenarioAsset(assetEntry);
       return;
     }
 

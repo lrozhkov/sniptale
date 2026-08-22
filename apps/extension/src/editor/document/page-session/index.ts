@@ -146,9 +146,10 @@ async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRest
 export async function resolveEditorPageRestoreSource(
   locationState: EditorPageLocationState,
   aggregateId: string,
-  autosaveService: Pick<EditorSessionAutosaveService, 'restoreDraft'>
+  autosaveService: Pick<EditorSessionAutosaveService, 'restoreDraft'>,
+  isCurrent?: () => boolean
 ): Promise<EditorPageRestoreSource> {
-  const draftEntry = await autosaveService.restoreDraft(aggregateId);
+  const draftEntry = await autosaveService.restoreDraft(aggregateId, isCurrent);
   if (draftEntry) {
     return {
       kind: 'draft',

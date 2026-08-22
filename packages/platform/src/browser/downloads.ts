@@ -7,6 +7,11 @@ interface BrowserDownloadsAdapter {
   isAvailable(): boolean;
   download(options: chrome.downloads.DownloadOptions): Promise<number | undefined>;
   search(query: chrome.downloads.DownloadQuery): Promise<chrome.downloads.DownloadItem[]>;
+  subscribeToCreated(
+    listener: typeof chrome.downloads.onCreated.addListener extends (listener: infer T) => void
+      ? T
+      : never
+  ): () => void;
   subscribeToChanged(
     listener: typeof chrome.downloads.onChanged.addListener extends (listener: infer T) => void
       ? T
@@ -16,7 +21,11 @@ interface BrowserDownloadsAdapter {
 
 export const browserDownloads: BrowserDownloadsAdapter = {
   isAvailable() {
-    return typeof chrome !== 'undefined' && Boolean(chrome.downloads);
+    return (
+      typeof chrome !== 'undefined' &&
+      typeof chrome.downloads?.download === 'function' &&
+      Boolean(chrome.downloads.onChanged && chrome.downloads.onCreated)
+    );
   },
 
   download(options) {
@@ -39,6 +48,10 @@ export const browserDownloads: BrowserDownloadsAdapter = {
       (callback) => chrome.downloads.search(query, callback),
       'chrome.downloads is unavailable'
     );
+  },
+
+  subscribeToCreated(listener) {
+    return subscribeToChromeEvent(chrome.downloads?.onCreated, listener);
   },
 
   subscribeToChanged(listener) {

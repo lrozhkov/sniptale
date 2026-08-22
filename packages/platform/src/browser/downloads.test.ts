@@ -4,10 +4,12 @@ import { browserDownloads } from './downloads';
 
 function installChromeDownloadsStub() {
   const onChanged = { addListener: vi.fn(), removeListener: vi.fn() };
+  const onCreated = { addListener: vi.fn(), removeListener: vi.fn() };
   const chromeStub = {
     downloads: {
       download: vi.fn((_options, callback) => callback(7)),
       onChanged,
+      onCreated,
       search: vi.fn((_query, callback) => callback([{ id: 7 }])),
     },
     runtime: { lastError: undefined as { message: string } | undefined },
@@ -19,7 +21,7 @@ function installChromeDownloadsStub() {
     writable: true,
   });
 
-  return { chromeStub, onChanged };
+  return { chromeStub, onChanged, onCreated };
 }
 
 afterEach(() => {
@@ -38,8 +40,9 @@ function installChromeRuntimeOnlyStub() {
 }
 
 it('downloads, searches, and subscribes to download change events', async () => {
-  const { chromeStub, onChanged } = installChromeDownloadsStub();
-  const listener = vi.fn();
+  const { chromeStub, onChanged, onCreated } = installChromeDownloadsStub();
+  const createdListener = vi.fn<(item: chrome.downloads.DownloadItem) => void>();
+  const changedListener = vi.fn<(delta: chrome.downloads.DownloadDelta) => void>();
 
   expect(browserDownloads.isAvailable()).toBe(true);
   await expect(
@@ -47,13 +50,17 @@ it('downloads, searches, and subscribes to download change events', async () => 
   ).resolves.toBe(7);
   await expect(browserDownloads.search({ filenameRegex: 'capture' })).resolves.toEqual([{ id: 7 }]);
 
-  const unsubscribe = browserDownloads.subscribeToChanged(listener as never);
+  const unsubscribeCreated = browserDownloads.subscribeToCreated(createdListener);
+  const unsubscribe = browserDownloads.subscribeToChanged(changedListener);
   expect(chromeStub.downloads.download).toHaveBeenCalled();
   expect(chromeStub.downloads.search).toHaveBeenCalled();
-  expect(onChanged.addListener).toHaveBeenCalledWith(listener);
+  expect(onCreated.addListener).toHaveBeenCalledWith(createdListener);
+  expect(onChanged.addListener).toHaveBeenCalledWith(changedListener);
 
+  unsubscribeCreated();
   unsubscribe();
-  expect(onChanged.removeListener).toHaveBeenCalledWith(listener);
+  expect(onCreated.removeListener).toHaveBeenCalledWith(createdListener);
+  expect(onChanged.removeListener).toHaveBeenCalledWith(changedListener);
 });
 
 it('rejects download and search when chrome.downloads is unavailable', async () => {

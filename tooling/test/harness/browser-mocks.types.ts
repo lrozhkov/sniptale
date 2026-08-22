@@ -24,6 +24,11 @@ export type HarnessClipboardWrite = {
   types: string[];
 };
 
+export type HarnessSavedFile = {
+  bytes: number[];
+  filename: string;
+};
+
 type HarnessRuntimeFallbackMode = 'known-only' | 'typed-success';
 type HarnessTabSendMessageMode = 'error' | 'success';
 type HarnessMediaGetUserMediaMode = 'denied' | 'success';
@@ -58,6 +63,7 @@ export type SniptaleHarnessBridge = {
   emitTrustedOffscreenRuntimeMessage: (message: { type: string } & Record<string, unknown>) => void;
   getCreatedTabs: () => HarnessCreatedTab[];
   getClipboardWrites: () => HarnessClipboardWrite[];
+  getSavedFiles: () => HarnessSavedFile[];
   setRuntimeResponse: (messageType: string, response: RuntimeResponseOverride) => void;
   clearRuntimeResponses: () => void;
   setApiBehavior: (behavior: SniptaleHarnessApiBehaviorOverrides) => void;
@@ -68,12 +74,15 @@ export type SniptaleHarnessBridge = {
 export type SniptaleHarnessBootstrap = {
   storage?: Record<string, unknown>;
   mediaLibrary?: HarnessMediaLibraryAsset[];
+  recordings?: Array<{ bytes: string; filename: string; id: string; mimeType: string }>;
   videoProjects?: VideoProject[];
   runtimeResponses?: Record<string, RuntimeResponseOverride>;
   activeTab?: Partial<HarnessActiveTab>;
   apiBehavior?: SniptaleHarnessApiBehaviorOverrides;
   editorBootstrapPayload?: EditorBootstrapPayload;
   editorAutoApplyBrowserFrame?: boolean;
+  editorDispatchBootstrapPayload?: boolean;
+  preserveMediaLibrary?: boolean;
 };
 
 export const DEFAULT_ACTIVE_TAB: HarnessActiveTab = {

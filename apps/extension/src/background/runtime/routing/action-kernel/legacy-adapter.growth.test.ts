@@ -38,6 +38,7 @@ describe('legacy route adapter growth guard', () => {
     const source = readRepoFile(routeCompletenessProofPath);
 
     expect(source).toContain('backgroundRuntimeTypes');
-    expect(source).toContain('collectMissingRuntimeRouteClassifications');
+    expect(source).toContain('backgroundIngressContracts');
+    expect(source).toContain('collectMissingRuntimeClassifications');
   });
 });

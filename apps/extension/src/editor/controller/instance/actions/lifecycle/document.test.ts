@@ -57,6 +57,7 @@ function createAutosaveService(
     persistSnapshot: vi.fn(async (read) => {
       read();
     }),
+    rebindAggregate: vi.fn(),
     restoreDraft: vi.fn(async () => undefined),
     scheduleAutosave: vi.fn(),
     updateContext: vi.fn(),

@@ -2,13 +2,17 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type {
   MediaHubBackupExportOptions,
   MediaHubBackupSummary,
+  MediaHubImportConflictStrategy,
   MediaHubLocalBackupSummary,
 } from '../../../workflows/media-hub-backup/index';
 import type { GalleryItem } from '../items';
 import type { GalleryPreviewSessionState } from '../types';
+import type { ActiveImportState } from '../import-types';
 
 interface PendingImportState {
   file: File;
+  resumeOperationId?: string;
+  resumeStrategy?: MediaHubImportConflictStrategy;
   summary: MediaHubBackupSummary;
 }
 
@@ -51,6 +55,7 @@ interface GalleryPreviewActionState {
 
 interface GalleryImportActionState {
   storage: {
+    activeImport: ActiveImportState | null;
     pendingImport: PendingImportState | null;
   };
 }
@@ -58,6 +63,9 @@ interface GalleryImportActionState {
 interface GalleryBackupExportActionState {
   selection: {
     selectedItems: GalleryItem[];
+  };
+  storage: {
+    activeImport: ActiveImportState | null;
   };
 }
 
@@ -97,6 +105,7 @@ interface GalleryImportControllerActions {
     refresh: () => Promise<void>;
   };
   surface: {
+    setActiveImport: Dispatch<SetStateAction<ActiveImportState | null>>;
     setPendingImport: Dispatch<SetStateAction<PendingImportState | null>>;
   };
 }
@@ -106,6 +115,7 @@ interface GalleryBackupExportControllerActions {
     refresh: () => Promise<void>;
   };
   surface: {
+    setBanner: Dispatch<SetStateAction<string | null>>;
     setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   };
 }
@@ -124,6 +134,7 @@ export interface GalleryImportController {
   actions: GalleryImportControllerActions;
   refs: {
     importInputRef: RefObject<HTMLInputElement | null>;
+    importTriggerRef: RefObject<HTMLButtonElement | null>;
   };
   state: GalleryImportActionState;
 }

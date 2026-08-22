@@ -9,16 +9,16 @@ async function loadVideoEditorAssetUrl(
 ): Promise<readonly [string, string] | null> {
   if (asset.source.kind === 'recording') {
     const entry = await getRecording(asset.source.recordingId);
-    return entry ? [asset.id, URL.createObjectURL(entry.blob)] : null;
+    return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
   }
 
   if (asset.source.kind === 'scenario-asset') {
     const entry = await getScenarioAsset(asset.source.scenarioAssetId);
-    return entry ? [asset.id, URL.createObjectURL(entry.blob)] : null;
+    return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
   }
 
   const entry = await getProjectAsset(asset.source.projectAssetId);
-  return entry ? [asset.id, URL.createObjectURL(entry.blob)] : null;
+  return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
 }
 
 function revokeVideoEditorAssetUrl(url: string): void {

@@ -90,10 +90,8 @@ function handleProjectExportMessage(
   if (message.type === VideoMessageType.PROJECT_EXPORT_COMPLETED) {
     handlers.completeExport({
       filename: message.filename,
-      recordingId: message.recordingId,
       exportId: message.exportId,
     });
-    void handlers.refreshRecordings();
     void handlers.refreshProjects();
     if (message.projectId) {
       void handlers.refreshProjectExports(message.projectId);

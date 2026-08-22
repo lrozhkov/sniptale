@@ -146,9 +146,9 @@ export async function finalizeRecording(
       const settings = await loadSettings().catch(() => null);
       await saveRecordingsBatchWithCompletionSafely(
         input.artifacts.map((artifact) => ({
-          blob: artifact.file,
           filename: artifact.filename,
           id: artifact.artifactId,
+          preparedAsset: artifact.asset,
           storageClass:
             settings?.localStoragePolicy.defaultDestination ??
             DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,

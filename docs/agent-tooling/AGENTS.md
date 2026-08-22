@@ -61,7 +61,7 @@ Return to preflight and the minimal correction class when a proposed fix starts 
 
 Keep changes inside the selected owner seam. Use canonical browser, messaging, storage, parser, i18n, design-system, and security seams instead of reaching around them. Boundary payloads from JSON, storage, IPC, browser APIs, DOM, process output, or network calls stay `unknown` until a local parser or adapter narrows them.
 
-For runtime route changes, keep the action-kernel route registry, authorization policy registry, and drift tests synchronized. Legacy family routers are adapters; dispatch and authorization proof should run through listener/action-kernel paths.
+For background runtime route changes, update the canonical contracts-owned background-ingress descriptor and its exhaustive runtime handler/authorization bindings. Generated action-kernel, guard, sender, policy-state usage, documentation, and QA projections must not become independent authorities. Legacy family routers are adapters; dispatch and authorization proof should run through listener/action-kernel paths.
 
 Implement a coherent wave before running blocking QA. Use targeted commands only to investigate a specific wrapper failure, answer a focused debugging question, or satisfy an explicit user request.
 

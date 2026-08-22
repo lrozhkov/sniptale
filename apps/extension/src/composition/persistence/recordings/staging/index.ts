@@ -1,4 +1,3 @@
-export { cleanupOrphanedRecordingStaging } from './cleanup';
 export {
   createRecordingStagingCoordinator,
   invalidateAndAbortActiveRecordingStaging,
@@ -10,11 +9,4 @@ export {
   type RecordingStagingArtifactInput,
   type RecordingStagingArtifactWriter,
   type RecordingStagingCoordinator,
-  type RecordingStagingStorageAdapter,
-  type RecordingStagingStorageArtifact,
-  type RecordingStagingStorageSession,
 } from './contracts';
-export {
-  createOpfsRecordingStagingStorage,
-  type CreateOpfsRecordingStagingStorageOptions,
-} from './opfs-adapter';

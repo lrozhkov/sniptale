@@ -35,9 +35,9 @@ it('loads blobs for recording, scenario, and project asset sources', async () =>
   const scenarioBlob = new Blob(['scenario']);
   const projectBlob = new Blob(['asset']);
 
-  getRecordingMock.mockResolvedValue({ blob: recordingBlob });
-  getScenarioAssetMock.mockResolvedValue({ blob: scenarioBlob });
-  getProjectAssetMock.mockResolvedValue({ blob: projectBlob });
+  getRecordingMock.mockResolvedValue({ file: recordingBlob });
+  getScenarioAssetMock.mockResolvedValue({ file: scenarioBlob });
+  getProjectAssetMock.mockResolvedValue({ file: projectBlob });
 
   await expect(loadBlobForSource({ kind: 'recording', recordingId: 'rec-1' })).resolves.toBe(
     recordingBlob

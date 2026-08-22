@@ -2,8 +2,12 @@ import type {
   FinalizedRecordingStagingArtifact,
   RecordingStagingArtifactInput,
   RecordingStagingArtifactWriter,
-  RecordingStagingStorageArtifact,
 } from './contracts';
+import {
+  isAssetReadyProtected,
+  releaseAssetReadyProtection,
+  type AssetObjectWriter,
+} from '../../assets';
 
 type ArtifactPhase = 'open' | 'finalizing' | 'finalized' | 'aborted';
 
@@ -11,15 +15,17 @@ export interface RecordingStagingArtifactOwner {
   readonly phase: ArtifactPhase;
   readonly writer: RecordingStagingArtifactWriter;
   abort(): Promise<void>;
+  release(): Promise<void>;
 }
 
 interface CreateRecordingStagingArtifactOwnerInput {
+  admitBytes(size: number): Promise<void>;
   assertCoordinatorHealthy(): void;
   input: RecordingStagingArtifactInput;
   recordFailure(error: unknown): void;
   releasePendingBytes(size: number): void;
   reservePendingBytes(size: number): void;
-  storage: RecordingStagingStorageArtifact;
+  storage: AssetObjectWriter;
 }
 
 export function createRecordingStagingArtifactOwner(
@@ -32,7 +38,8 @@ export function createRecordingStagingArtifactOwner(
 
   const abort = () => {
     abortPromise ??= (async () => {
-      if (phase === 'finalized' || phase === 'aborted') return;
+      if (phase === 'aborted') return;
+      if (phase === 'finalized' && isAssetReadyProtected(input.storage.assetId)) return;
       phase = 'aborted';
       await tail.catch(() => undefined);
       await input.storage.abort();
@@ -51,7 +58,10 @@ export function createRecordingStagingArtifactOwner(
         return Promise.reject(error);
       }
 
-      const operation = tail.then(() => input.storage.append(chunk));
+      const operation = tail.then(async () => {
+        await input.admitBytes(chunk.size);
+        await input.storage.append(chunk);
+      });
       tail = operation.then(
         () => input.releasePendingBytes(chunk.size),
         (error: unknown) => {
@@ -73,19 +83,14 @@ export function createRecordingStagingArtifactOwner(
         try {
           await tail;
           input.assertCoordinatorHealthy();
-          await input.storage.close();
-          const sourceFile = await input.storage.getFile();
-          const file = new File([sourceFile], input.input.filename, {
-            lastModified: sourceFile.lastModified,
-            type: input.input.mimeType,
-          });
+          const prepared = await input.storage.finalize();
           phase = 'finalized';
           return {
             artifactId: input.input.artifactId,
-            file,
+            asset: prepared,
             filename: input.input.filename,
             mimeType: input.input.mimeType,
-            size: file.size,
+            size: prepared.ref.size,
           };
         } catch (error) {
           input.recordFailure(error);
@@ -102,5 +107,6 @@ export function createRecordingStagingArtifactOwner(
     },
     writer,
     abort,
+    release: () => releaseAssetReadyProtection([input.storage.assetId]),
   };
 }

@@ -103,7 +103,7 @@ it('re-sanitizes restored snapshot HTML before returning viewer srcdoc', async (
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageBlob,
+    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
     size: packageBlob.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -134,7 +134,7 @@ it('keeps safe navigation links while stripping unresolved offline resource link
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageBlob,
+    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
     size: packageBlob.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -169,7 +169,7 @@ it('sanitizes restored CSS package assets before object URL creation', async () 
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageBlob,
+    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
     size: packageBlob.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -201,7 +201,7 @@ it('sanitizes restored CSS package assets with non-lowercase extensions', async 
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageBlob,
+    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
     size: packageBlob.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);

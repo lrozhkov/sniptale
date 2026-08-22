@@ -12,7 +12,8 @@ const { createCanvasVideoOutputMock } = vi.hoisted(() => ({
   createCanvasVideoOutputMock: vi.fn(),
 }));
 
-vi.mock('../stream/canvas-video-output', () => ({
+vi.mock('../stream/canvas-video-output', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../stream/canvas-video-output')>()),
   createCanvasVideoOutput: createCanvasVideoOutputMock,
 }));
 
@@ -28,6 +29,10 @@ function createVideo(width = 1280, height = 720) {
   return video;
 }
 
+function createCanvasOutput(stream: MediaStream) {
+  return { failure: new Promise<never>(() => undefined), stream };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('MediaStream', TestMediaStream);
@@ -36,7 +41,7 @@ beforeEach(() => {
 it('shares one stable normalized output while leases own independent clones', async () => {
   const raw = createTrackedStream({ frameRate: 60, height: 720, width: 1280 });
   const output = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
-  createCanvasVideoOutputMock.mockReturnValue(output);
+  createCanvasVideoOutputMock.mockReturnValue(createCanvasOutput(output));
   const acquireRawStream = vi.fn().mockResolvedValue(raw);
   const owner = createCameraSourceOwner({
     acquireRawStream,
@@ -58,6 +63,7 @@ it('shares one stable normalized output while leases own independent clones', as
   });
   expect(createCanvasVideoOutputMock).toHaveBeenCalledOnce();
   const drawingOptions = createCanvasVideoOutputMock.mock.calls[0]?.[0];
+  expect(drawingOptions.sourceVideo).toBeUndefined();
   const context = {
     clearRect: vi.fn(),
     drawImage: vi.fn(),
@@ -85,7 +91,7 @@ it('shares one stable normalized output while leases own independent clones', as
 it('preserves requested camera dimensions for a separate recording track', async () => {
   const raw = createTrackedStream({ frameRate: 60, height: 1080, width: 1920 });
   createCanvasVideoOutputMock.mockReturnValue(
-    createTrackedStream({ frameRate: 60, height: 1080, width: 1920 })
+    createCanvasOutput(createTrackedStream({ frameRate: 60, height: 1080, width: 1920 }))
   );
   const acquireRawStream = vi.fn().mockResolvedValue(raw);
   const owner = createCameraSourceOwner({
@@ -118,6 +124,38 @@ it('preserves requested camera dimensions for a separate recording track', async
   lease.release();
 });
 
+it('records a separate camera track at its negotiated rate below the main output rate', async () => {
+  const raw = createTrackedStream({ frameRate: 30, height: 1080, width: 1920 });
+  createCanvasVideoOutputMock.mockReturnValue(
+    createCanvasOutput(createTrackedStream({ frameRate: 30, height: 1080, width: 1920 }))
+  );
+  const owner = createCameraSourceOwner({
+    acquireRawStream: vi.fn().mockResolvedValue(raw),
+    createVideo: () => createVideo(1920, 1080),
+    waitForMetadata: vi.fn().mockResolvedValue(undefined),
+  });
+
+  const lease = await owner.acquire({
+    ...DEFAULT_VIDEO_SETTINGS,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, frameRate: 60 },
+    webcamEnabled: true,
+    webcamPresentation: {
+      ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+      mode: 'separate-track',
+    },
+    webcamQuality: {
+      frameRate: WebcamFrameRatePreset.FPS60,
+      resolution: WebcamResolutionPreset.P1080,
+    },
+  });
+
+  expect(createCanvasVideoOutputMock).toHaveBeenCalledWith(
+    expect.objectContaining({ frameRate: 30 })
+  );
+  expect(lease.trackSettings).toMatchObject({ frameRate: 30, height: 1080, width: 1920 });
+  lease.release();
+});
+
 it('rejects malformed raw and normalized sources and cleans partial initialization', async () => {
   const noRawTrack = new TestMediaStream([]);
   const owner = createCameraSourceOwner({
@@ -127,8 +165,8 @@ it('rejects malformed raw and normalized sources and cleans partial initializati
   });
   await expect(owner.acquire(DEFAULT_VIDEO_SETTINGS)).rejects.toThrow('missing a video track');
 
-  const raw = createTrackedStream();
-  createCanvasVideoOutputMock.mockReturnValueOnce(new TestMediaStream([]));
+  const raw = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
+  createCanvasVideoOutputMock.mockReturnValueOnce(createCanvasOutput(new TestMediaStream([])));
   const normalizedOwner = createCameraSourceOwner({
     acquireRawStream: vi.fn().mockResolvedValue(raw),
     createVideo: () => createVideo(),
@@ -161,7 +199,7 @@ it('queues a device switch behind pending preview initialization', async () => {
   const initial = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
   const replacement = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
   createCanvasVideoOutputMock.mockReturnValue(
-    createTrackedStream({ frameRate: 30, height: 720, width: 1280 })
+    createCanvasOutput(createTrackedStream({ frameRate: 30, height: 720, width: 1280 }))
   );
   let resolveInitialMetadata!: () => void;
   const waitForMetadata = vi
@@ -200,8 +238,12 @@ it('supersedes a pending embedded preview before acquiring separate-track qualit
   const embeddedRaw = createTrackedStream({ frameRate: 30, height: 360, width: 640 });
   const separateRaw = createTrackedStream({ frameRate: 60, height: 1080, width: 1920 });
   createCanvasVideoOutputMock
-    .mockReturnValueOnce(createTrackedStream({ frameRate: 30, height: 360, width: 640 }))
-    .mockReturnValueOnce(createTrackedStream({ frameRate: 60, height: 1080, width: 1920 }));
+    .mockReturnValueOnce(
+      createCanvasOutput(createTrackedStream({ frameRate: 30, height: 360, width: 640 }))
+    )
+    .mockReturnValueOnce(
+      createCanvasOutput(createTrackedStream({ frameRate: 60, height: 1080, width: 1920 }))
+    );
   let resolveEmbeddedMetadata!: () => void;
   const waitForMetadata = vi
     .fn()
@@ -253,7 +295,7 @@ it('atomically swaps the raw input without replacing an acquired output track', 
   const initial = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
   const replacement = createTrackedStream({ frameRate: 30, height: 480, width: 640 });
   const output = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
-  createCanvasVideoOutputMock.mockReturnValue(output);
+  createCanvasVideoOutputMock.mockReturnValue(createCanvasOutput(output));
   const acquireRawStream = vi
     .fn()
     .mockResolvedValueOnce(initial)
@@ -322,7 +364,7 @@ it('switches an existing preview session before cloning it for an explicitly sel
   const initial = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
   const replacement = createTrackedStream({ frameRate: 30, height: 1080, width: 1920 });
   const output = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
-  createCanvasVideoOutputMock.mockReturnValue(output);
+  createCanvasVideoOutputMock.mockReturnValue(createCanvasOutput(output));
   const acquireRawStream = vi
     .fn()
     .mockResolvedValueOnce(initial)
@@ -361,7 +403,7 @@ it('rolls back a replacement that fails metadata validation', async () => {
   const initial = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
   const replacement = createTrackedStream({ frameRate: 30, height: 1080, width: 1920 });
   createCanvasVideoOutputMock.mockReturnValue(
-    createTrackedStream({ frameRate: 30, height: 720, width: 1280 })
+    createCanvasOutput(createTrackedStream({ frameRate: 30, height: 720, width: 1280 }))
   );
   const waitForMetadata = vi
     .fn()
@@ -384,7 +426,7 @@ it('rolls back a replacement that fails metadata validation', async () => {
 it('applies enabled state to every live lease and closes idempotently', async () => {
   const raw = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
   const output = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
-  createCanvasVideoOutputMock.mockReturnValue(output);
+  createCanvasVideoOutputMock.mockReturnValue(createCanvasOutput(output));
   const owner = createCameraSourceOwner({
     acquireRawStream: vi.fn().mockResolvedValue(raw),
     createVideo: () => createVideo(),

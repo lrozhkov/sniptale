@@ -46,11 +46,10 @@ it('collects recording references across media and project domains', () => {
         kind: 'project-export',
         exportId: 'export-1',
         projectId: 'project-1',
-        recordingId: 'export-recording',
       },
     },
   ];
-  const projectExports = [{ recordingId: 'project-export-recording' }];
+  const projectExports = [{ id: 'export-1', projectId: 'project-1' }];
   const projects = [
     null,
     {
@@ -66,8 +65,6 @@ it('collects recording references across media and project domains', () => {
   expect(collectReferencedRecordingIds({ mediaEntries, projectExports, projects })).toEqual(
     new Set([
       'media-recording',
-      'export-recording',
-      'project-export-recording',
       'base-recording',
       'source-recording',
       'project-recording',
@@ -104,7 +101,7 @@ it('skips malformed recording reference rows without dropping valid visible refe
       { source: { kind: 'recording' } },
       { source: { kind: 'recording', recordingId: 'media-recording' } },
     ],
-    projectExports: [{ recordingId: 'export-recording' }, { recordingId: 42 }],
+    projectExports: [{ id: 'export-1', projectId: 'project-1' }, { recordingId: 42 }],
     projects: [
       { assets: [], baseRecordingId: null, source: null },
       { assets: [], baseRecordingId: null, source: { kind: 'recording' } },
@@ -117,13 +114,7 @@ it('skips malformed recording reference rows without dropping valid visible refe
   });
 
   expect(result.recordingIds).toEqual(
-    new Set([
-      'media-recording',
-      'export-recording',
-      'base-recording',
-      'source-recording',
-      'origin-recording',
-    ])
+    new Set(['media-recording', 'base-recording', 'source-recording', 'origin-recording'])
   );
   expect(result.invalidReferenceCount).toBe(6);
 });

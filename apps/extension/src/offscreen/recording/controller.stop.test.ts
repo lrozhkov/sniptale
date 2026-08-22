@@ -34,7 +34,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   recordingContext.resetRecordingSession();
-  recordingContext.mediaRecorder = null;
 });
 
 it('publishes stopped with the session id when cancelling before recorder binding', async () => {

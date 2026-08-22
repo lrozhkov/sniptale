@@ -4,7 +4,11 @@ import { parseScenarioProjectEntry } from '../read-guards';
 import { initDB, SCENARIO_PROJECTS_STORE } from '../../infrastructure/indexed-db/core';
 import type { ScenarioProjectEntry } from '../contracts';
 import { parseScenarioProject } from './guards/project/root/parse';
-import { commitScenarioAggregateMutation, deleteScenarioAggregate } from '../aggregate-mutations';
+import {
+  commitScenarioAggregateMutation,
+  recoverScenarioAssetPublications,
+} from '../aggregate-mutations';
+import { deleteScenarioAggregate } from '../aggregate-cleanup';
 
 export interface SaveScenarioProjectOptions {
   baseUpdatedAt?: number | null;
@@ -27,6 +31,7 @@ export async function saveScenarioProject(
 }
 
 export async function getScenarioProject(id: string): Promise<ScenarioProject | undefined> {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   const entry = parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, id)) ?? undefined;
   return parseScenarioProject(entry?.project) ?? undefined;
@@ -35,6 +40,7 @@ export async function getScenarioProject(id: string): Promise<ScenarioProject | 
 export async function getScenarioProjectEntry(
   id: string
 ): Promise<ScenarioProjectEntry | undefined> {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   return parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, id)) ?? undefined;
 }
@@ -42,6 +48,7 @@ export async function getScenarioProjectEntry(
 export async function listScenarioProjects(): Promise<
   Array<Pick<ScenarioProject, 'id' | 'name' | 'updatedAt' | 'createdAt' | 'tags'>>
 > {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   const all = parseDbEntries(await db.getAll(SCENARIO_PROJECTS_STORE), parseScenarioProjectEntry);
   return all
@@ -58,6 +65,7 @@ export async function listScenarioProjects(): Promise<
 }
 
 export async function listScenarioProjectEntries(): Promise<ScenarioProjectEntry[]> {
+  await recoverScenarioAssetPublications();
   const db = await initDB();
   return parseDbEntries(await db.getAll(SCENARIO_PROJECTS_STORE), parseScenarioProjectEntry).sort(
     (left, right) => right.updatedAt - left.updatedAt

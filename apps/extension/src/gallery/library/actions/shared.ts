@@ -1,4 +1,5 @@
 import { writeBrowserClipboardItems } from '@sniptale/platform/browser/clipboard';
+import { browserDownloads } from '@sniptale/platform/browser/downloads';
 import { translate } from '../../../platform/i18n';
 import type { GallerySurfaceController } from './controller-types';
 
@@ -45,13 +46,63 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
   };
 }
 
-export function downloadBlob(blob: Blob, filename: string): void {
+export function downloadBlob(
+  blob: Blob,
+  filename: string,
+  release?: () => void | Promise<void>,
+  onReleaseError?: (error: unknown) => void
+): void {
   const url = URL.createObjectURL(blob);
+  trackBlobDownloadCleanup(url, release, onReleaseError);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
   link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function trackBlobDownloadCleanup(
+  url: string,
+  release?: () => void | Promise<void>,
+  onReleaseError?: (error: unknown) => void
+): void {
+  const tracksTerminalState = browserDownloads.isAvailable();
+  let settled = false;
+  let timeoutId: number | null = null;
+  let unsubscribeCreated: () => void = () => undefined;
+  let unsubscribeChanged: () => void = () => undefined;
+  const cleanup = () => {
+    if (settled) return;
+    settled = true;
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+    unsubscribeCreated();
+    unsubscribeChanged();
+    URL.revokeObjectURL(url);
+    if (release)
+      void Promise.resolve()
+        .then(release)
+        .catch((error: unknown) => onReleaseError?.(error));
+  };
+  if (!tracksTerminalState) {
+    timeoutId = window.setTimeout(cleanup, 1000);
+    return;
+  }
+
+  unsubscribeCreated = browserDownloads.subscribeToCreated((item) => {
+    if (item.url !== url && item.finalUrl !== url) return;
+    unsubscribeCreated();
+    unsubscribeCreated = () => undefined;
+    unsubscribeChanged = browserDownloads.subscribeToChanged((delta) => {
+      if (delta.id !== item.id) return;
+      const state = delta.state?.current;
+      if (state === 'complete' || state === 'interrupted') cleanup();
+    });
+    void browserDownloads
+      .search({ id: item.id })
+      .then(([current]) => {
+        if (current?.state === 'complete' || current?.state === 'interrupted') cleanup();
+      })
+      .catch(() => undefined);
+  });
 }
 
 export async function copyImageBlob(blob: Blob): Promise<void> {

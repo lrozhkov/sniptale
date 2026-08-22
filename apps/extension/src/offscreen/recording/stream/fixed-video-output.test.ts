@@ -13,6 +13,18 @@ vi.mock('./video-source', async (importOriginal) => ({
   waitForSourceMetadata: waitForSourceMetadataMock,
 }));
 
+vi.mock('./frame-pump', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./frame-pump')>();
+  return {
+    ...original,
+    startVideoFramePump: vi.fn((options: Parameters<typeof original.startVideoFramePump>[0]) => {
+      options.drawLiveFrame();
+      const timer = setTimeout(() => options.drawLiveFrame(), 0);
+      return () => clearTimeout(timer);
+    }),
+  };
+});
+
 import {
   resolveVideoOutputDimensions,
   VideoResolutionPreset,
@@ -157,11 +169,11 @@ it('caps an adapter cadence at the selected profile frame rate', async () => {
   });
 
   expect(result.frameRate).toBe(30);
-  expect(canvas.captureStream).toHaveBeenCalledWith(30);
+  expect(canvas.captureStream).toHaveBeenCalledWith(0);
   canvasStream.track.stop();
 });
 
-it('caps the fixed cadence once at the source track rate reported on start', async () => {
+it('rejects a selected fixed cadence that the source cannot provide', async () => {
   const canvasStream = createTrackedStream({ frameRate: 24, height: 720, width: 1280 });
   const sourceStream = createTrackedStream({ frameRate: 24, height: 720, width: 1280 });
   const { canvas } = installCanvasFixture(canvasStream);
@@ -172,11 +184,11 @@ it('caps the fixed cadence once at the source track rate reported on start', asy
     videoWidth: 1280,
   });
 
-  const result = await createFixedVideoOutputStream(sourceStream, createSettings());
+  await expect(createFixedVideoOutputStream(sourceStream, createSettings())).rejects.toThrow(
+    'requested 30 FPS, source provides 24 FPS'
+  );
 
-  expect(result.frameRate).toBe(24);
-  expect(canvas.captureStream).toHaveBeenCalledWith(24);
-  canvasStream.track.stop();
+  expect(canvas.captureStream).not.toHaveBeenCalled();
 });
 
 it('cleans up the source when canvas output creation fails', async () => {

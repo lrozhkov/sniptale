@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { TestMediaStream } from './multi-source/media-stream.test-support';
+import type { FinalizedRecordingStagingArtifact } from '../../composition/persistence/recordings/staging';
+import { createPreparedRecordingAssetForTest } from '../../composition/persistence/recordings/staging/test-support';
 
 const {
   cancelPendingMultiSourceRecordingStartMock,
@@ -123,20 +125,25 @@ function createActiveRecorderFixture() {
   return { recorder, stop: recorder.stop };
 }
 
+const boundArtifactSessions = new WeakMap<
+  ActiveMediaRecorderFixture,
+  NonNullable<typeof recordingContext.artifactSession>
+>();
+
+function requireBoundArtifactSession(recorder: ActiveMediaRecorderFixture) {
+  const session = boundArtifactSessions.get(recorder);
+  if (!session) throw new Error('Test recorder has no bound artifact session');
+  return session;
+}
+
 function bindArtifactSession(
   recorder: ActiveMediaRecorderFixture,
-  stopImplementation: () => Promise<{
-    artifactId: string;
-    file: File;
-    filename: string;
-    mimeType: string;
-    size: number;
-  }> = async () => {
+  stopImplementation: () => Promise<FinalizedRecordingStagingArtifact> = async () => {
     recorder.stop();
     const file = new File(['saved'], 'recording.webm', { type: 'video/webm' });
     return {
       artifactId: 'recording-delayed',
-      file,
+      asset: createPreparedRecordingAssetForTest(file, 'recording-delayed'),
       filename: file.name,
       mimeType: file.type,
       size: file.size,
@@ -145,13 +152,19 @@ function bindArtifactSession(
 ) {
   const stop = vi.fn(stopImplementation);
   recordingContext.stagingCoordinator ??= createRecordingStagingCoordinatorTestDouble();
-  recordingContext.bindStartingArtifactSession({
+  const artifactSession = {
     abort: vi.fn().mockResolvedValue(undefined),
-    recorder,
+    pause: () => recorder.pause(),
+    resume: () => recorder.resume(),
     setLifecycleCallbacks: vi.fn(),
     start: vi.fn(),
+    get state() {
+      return recorder.state;
+    },
     stop,
-  });
+  };
+  recordingContext.bindStartingArtifactSession(artifactSession);
+  boundArtifactSessions.set(recorder, artifactSession);
   return stop;
 }
 
@@ -164,7 +177,6 @@ beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   recordingContext.resetRecordingSession();
-  recordingContext.mediaRecorder = null;
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
   stopActiveSidecarRecordersWithFlushMock.mockResolvedValue(undefined);
@@ -181,7 +193,7 @@ it('waits for a delayed start and terminates activation before acknowledging sto
           recordingContext.beginRecordingSession('recording-delayed', 1);
           recordingContext.bindStreamInstance(sourceBinding);
           bindArtifactSession(recorder);
-          recordingContext.activateRecorder(recorder);
+          recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
           resolve();
         };
       })
@@ -210,7 +222,10 @@ it('cancels a bound recorder that has not emitted its native start event', async
     recordingContext.beginRecordingSession('recording-delayed', 1);
     recordingContext.bindStreamInstance(sourceBinding);
     bindArtifactSession(recorder);
-    recordingContext.registerStartingRecorderCancellation(recorder, cancelStartingRecorder);
+    recordingContext.registerStartingRecorderCancellation(
+      requireBoundArtifactSession(recorder),
+      cancelStartingRecorder
+    );
   });
 
   await startRecording(createStartParams());
@@ -225,7 +240,10 @@ it('delegates normal STOP to the artifact session as the only raw recorder stop 
   const { recorder, stop: rawRecorderStop } = createActiveRecorderFixture();
   const artifact = {
     artifactId: 'recording-delayed',
-    file: new File(['saved'], 'recording.webm', { type: 'video/webm' }),
+    asset: createPreparedRecordingAssetForTest(
+      new File(['saved'], 'recording.webm', { type: 'video/webm' }),
+      'recording-delayed'
+    ),
     filename: 'recording.webm',
     mimeType: 'video/webm',
     size: 5,
@@ -241,7 +259,7 @@ it('delegates normal STOP to the artifact session as the only raw recorder stop 
     recordingContext.beginRecordingSession('recording-delayed', 1);
     recordingContext.bindStreamInstance(sourceBinding);
     bindArtifactSession(recorder, artifactStop);
-    recordingContext.activateRecorder(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
   await startRecording(createStartParams());
@@ -256,7 +274,7 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
   const firstFile = new File(['first'], 'first.webm', { type: 'video/webm' });
   const firstArtifact = {
     artifactId: sourceBinding.recordingId,
-    file: firstFile,
+    asset: createPreparedRecordingAssetForTest(firstFile, sourceBinding.recordingId),
     filename: firstFile.name,
     mimeType: firstFile.type,
     size: firstFile.size,
@@ -270,7 +288,7 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
     recordingContext.beginRecordingSession(sourceBinding.recordingId, sourceBinding.generation);
     recordingContext.bindStreamInstance(sourceBinding);
     firstArtifactStop = bindArtifactSession(firstRecorder, () => firstTerminal);
-    recordingContext.activateRecorder(firstRecorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(firstRecorder));
   });
 
   await startRecording(createStartParams());
@@ -280,7 +298,6 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
   await flushPromises();
 
   expect(firstArtifactStop).toHaveBeenCalledTimes(2);
-  recordingContext.mediaRecorder = null;
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
   recordingContext.resetRecordingSession();
@@ -301,7 +318,7 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
     recordingContext.stopRecordingResolve?.({ result: 'stopped' });
     return {
       artifactId: nextBinding.recordingId,
-      file: nextFile,
+      asset: createPreparedRecordingAssetForTest(nextFile, nextBinding.recordingId),
       filename: nextFile.name,
       mimeType: nextFile.type,
       size: nextFile.size,
@@ -311,7 +328,7 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
     recordingContext.beginRecordingSession(nextBinding.recordingId, nextBinding.generation);
     recordingContext.bindStreamInstance(nextBinding);
     bindArtifactSession(nextRecorder, nextArtifactStop);
-    recordingContext.activateRecorder(nextRecorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(nextRecorder));
   });
 
   await expect(startRecording(nextParams)).resolves.toBeUndefined();
@@ -328,7 +345,7 @@ it('reports a source-ended finalization failure to the joining background STOP',
     bindArtifactSession(recorder, async () => {
       throw finalizationError;
     });
-    recordingContext.activateRecorder(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
   await startRecording(createStartParams());
@@ -352,6 +369,7 @@ it('keeps stop pending after recorder terminal progress until durable publicatio
     recordingContext.stopRecordingResolve?.();
   });
   recorder.onstop = () => {
+    recordingContext.reportArtifactFinalizing();
     void finalizeAndPublish();
   };
   stopRecorder.mockImplementationOnce(() => recorder.emitStop());
@@ -359,7 +377,7 @@ it('keeps stop pending after recorder terminal progress until durable publicatio
     recordingContext.beginRecordingSession('recording-delayed', 1);
     recordingContext.bindStreamInstance(sourceBinding);
     bindArtifactSession(recorder);
-    recordingContext.activateRecorder(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
   await startRecording(createStartParams());
@@ -397,7 +415,7 @@ it('fails once without recorder terminal progress and prevents late media public
     recordingContext.beginRecordingSession('recording-delayed', 1);
     recordingContext.bindStreamInstance(sourceBinding);
     bindArtifactSession(recorder);
-    recordingContext.activateRecorder(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
   await startRecording(createStartParams());
@@ -433,7 +451,7 @@ it('retries an already-saved result without restarting finalization or losing th
     recordingContext.beginRecordingSession('recording-delayed', 1);
     recordingContext.bindStreamInstance(sourceBinding);
     bindArtifactSession(recorder);
-    recordingContext.activateRecorder(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
   retryPendingPostRecordResultMock.mockResolvedValueOnce(true);
 
@@ -461,7 +479,7 @@ it('reconciles a committed result with a lost response before accepting the next
     recordingContext.beginRecordingSession('recording-delayed', 1);
     recordingContext.bindStreamInstance(sourceBinding);
     bindArtifactSession(recorder);
-    recordingContext.activateRecorder(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
   await startRecording(createStartParams());
 
@@ -477,7 +495,6 @@ it('reconciles a committed result with a lost response before accepting the next
   );
   await expect(stopRecording(sourceBinding)).rejects.toBeInstanceOf(PostRecordPublicationError);
   recordingContext.resetRecordingSession();
-  recordingContext.mediaRecorder = null;
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
 
@@ -514,7 +531,7 @@ it('does not resurrect a retired previous binding when the next start fails', as
     recordingContext.beginRecordingSession('recording-delayed', 1);
     recordingContext.bindStreamInstance(sourceBinding);
     bindArtifactSession(recorder);
-    recordingContext.activateRecorder(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
   await startRecording(createStartParams());
   retryPendingPostRecordResultMock.mockRejectedValueOnce(
@@ -529,7 +546,6 @@ it('does not resurrect a retired previous binding when the next start fails', as
   );
   await expect(stopRecording(sourceBinding)).rejects.toBeInstanceOf(PostRecordPublicationError);
   recordingContext.resetRecordingSession();
-  recordingContext.mediaRecorder = null;
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
 

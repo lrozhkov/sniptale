@@ -9,9 +9,24 @@ const deleteMocks = vi.hoisted(() => ({
   txDeleteMock: vi.fn(),
   txGetAllMock: vi.fn(),
   txGetMock: vi.fn(),
+  recoverProjectMediaPublicationsMock: vi.fn(),
+  completePhysicalDeleteOperationMock: vi.fn(),
+  txCountMock: vi.fn(),
+  txPutMock: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('./asset-publication', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverProjectMediaPublications: deleteMocks.recoverProjectMediaPublicationsMock,
+}));
+
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal()),
+  completePhysicalDeleteOperation: deleteMocks.completePhysicalDeleteOperationMock,
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal()),
   AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
@@ -49,7 +64,8 @@ function createDb() {
             : deleteMocks.txDeleteMock,
         get: deleteMocks.txGetMock,
         getAll: deleteMocks.txGetAllMock,
-        put: vi.fn(),
+        index: vi.fn(() => ({ count: deleteMocks.txCountMock })),
+        put: deleteMocks.txPutMock,
       })),
     })),
   };
@@ -62,6 +78,9 @@ beforeEach(() => {
     (id: string) => `project-asset:${id}`
   );
   deleteMocks.txGetAllMock.mockResolvedValue([]);
+  deleteMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
+  deleteMocks.completePhysicalDeleteOperationMock.mockResolvedValue(undefined);
+  deleteMocks.txCountMock.mockResolvedValue(0);
 });
 
 it('deletes project-owned assets and mirrored media entries when removing a project', async () => {
@@ -177,4 +196,47 @@ it('deletes the project row when the project payload is already missing', async 
     'video-project',
     'missing-project',
   ]);
+});
+
+it('persists and completes physical deletion after removing the last asset owner', async () => {
+  const { deleteVideoProject } = await import('./index');
+  const project = createVideoProjectEntry({
+    assets: [
+      {
+        createdAt: 1,
+        id: 'asset-final',
+        metadata: {
+          audioPeaks: null,
+          duration: 4,
+          hasAudio: false,
+          height: 720,
+          mimeType: 'video/mp4',
+          size: 10,
+          width: 1280,
+        },
+        name: 'Final asset',
+        source: { kind: 'project-asset', projectAssetId: 'asset-final' },
+        type: VideoProjectAssetType.VIDEO,
+      },
+    ],
+  });
+  deleteMocks.txGetMock
+    .mockResolvedValueOnce(project)
+    .mockResolvedValueOnce(undefined)
+    .mockResolvedValueOnce({
+      assetId: 'object-final',
+      createdAt: 1,
+      id: 'asset-final',
+      mimeType: 'video/mp4',
+      size: 10,
+    });
+
+  await expect(deleteVideoProject('project-1')).resolves.toEqual(['asset-final']);
+
+  expect(deleteMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: ['object-final'], kind: 'physical-delete' })
+  );
+  expect(deleteMocks.completePhysicalDeleteOperationMock).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: ['object-final'] })
+  );
 });
