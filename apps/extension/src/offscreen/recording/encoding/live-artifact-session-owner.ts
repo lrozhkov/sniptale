@@ -207,6 +207,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     const encodingDimensions = resolveEncodingDimensions(input);
     this.videoDiagnostics = new LiveVideoSessionDiagnostics({
       configuredBitrate: input.encoding.videoBitrate,
+      keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
       requestedFrameRate: input.encoding.frameRate,
       track: videoTrack,
     });
@@ -664,6 +665,12 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       logger.warn('Encoded live video exceeded its documented payload byte budget', {
         artifactId: this.input.artifactId,
         videoByteBudget: cadenceDiagnostic.videoByteBudget,
+      });
+    }
+    if (!cadenceDiagnostic.videoKeyFrameBudget.withinBudget) {
+      logger.warn('Encoded live video exceeded its documented keyframe budget', {
+        artifactId: this.input.artifactId,
+        videoKeyFrameBudget: cadenceDiagnostic.videoKeyFrameBudget,
       });
     }
     logger.info(`TAB_RECORDING_DIAGNOSTIC encoder-final ${JSON.stringify(cadenceDiagnostic)}`);

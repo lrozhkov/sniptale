@@ -1,5 +1,5 @@
 import type { EncodedPacket } from 'mediabunny';
-import { evaluateLiveVideoByteBudget } from './live-video-budget';
+import { evaluateLiveVideoByteBudget, evaluateLiveVideoKeyFrameBudget } from './live-video-budget';
 
 type ObservedVideoPacket = Pick<EncodedPacket, 'byteLength' | 'duration' | 'timestamp' | 'type'>;
 
@@ -36,7 +36,11 @@ export class LiveVideoOutputMetrics {
     return { firstPacket };
   }
 
-  summarize(configuredBitrate: number) {
+  summarize(input: {
+    configuredBitrate: number;
+    forcedKeyFrames: number;
+    keyFrameInterval: number;
+  }) {
     const duration =
       this.firstTimestamp === null || this.lastEndTimestamp === null
         ? 0
@@ -63,9 +67,15 @@ export class LiveVideoOutputMetrics {
       minimumGopInterval: this.minimumGopInterval,
       totalEncodedPacketDuration: this.totalPacketDuration,
       videoByteBudget: evaluateLiveVideoByteBudget({
-        configuredBitrate,
+        configuredBitrate: input.configuredBitrate,
         duration,
         encodedBytes: this.encodedBytes,
+      }),
+      videoKeyFrameBudget: evaluateLiveVideoKeyFrameBudget({
+        actualKeyFrames: this.actualKeyFrames,
+        configuredInterval: input.keyFrameInterval,
+        duration,
+        forcedKeyFrames: input.forcedKeyFrames,
       }),
     };
   }

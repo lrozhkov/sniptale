@@ -23,6 +23,7 @@ function createDiagnostics(
 ) {
   return new LiveVideoSessionDiagnostics({
     configuredBitrate: 1_000_000,
+    keyFrameInterval: 4,
     requestedFrameRate: 60,
     track,
   });
@@ -102,6 +103,7 @@ describe('LiveVideoSessionDiagnostics', () => {
         averageEncoderAddDurationMs: 6,
         averageFrameTransformDurationMs: 8,
         coalescedVideoFrames: 1,
+        encoderBackpressureRatio: 1 / 3,
         encoderBackpressureEvents: 1,
         forcedKeyFrames: 1,
         maxEncoderAddDurationMs: 12,
@@ -110,9 +112,12 @@ describe('LiveVideoSessionDiagnostics', () => {
         maxPendingEncodedPackets: 2,
         maxSourceFrameGapMs: 50,
         processorDiscardedFrames: 4,
+        processorDiscardedRatio: 4 / 9,
         processorTotalFrames: 9,
         requestedFrameRate: 60,
         sourceDeliveryRatio: expect.closeTo(0.5, 3),
+        sourceFrameGapBudgetMs: expect.closeTo(33.333_366, 5),
+        sourceFrameGapsOverCadenceBudget: 1,
         sourceFrameRate: expect.closeTo(30, 3),
         sourceVideoFrames: 3,
         submittedVideoFrames: 3,
@@ -131,6 +136,7 @@ describe('LiveVideoSessionDiagnostics', () => {
     ).toEqual(
       expect.objectContaining({
         processorDiscardedFrames: null,
+        processorDiscardedRatio: null,
         processorTotalFrames: null,
       })
     );

@@ -227,12 +227,27 @@ async function openPostRecordPopup(): Promise<void> {
   try {
     const tab = await browserTabs.get(tabId);
     if (typeof tab.windowId === 'number') {
-      await browserWindows.update(tab.windowId, { focused: true });
-      await browserAction.openPopup({ windowId: tab.windowId });
+      await openPopupForWindow(tab.windowId);
     }
   } catch (error) {
     logger.warn('Failed to open the video post-record popup', error);
   }
+}
+
+async function openPopupForWindow(windowId: number): Promise<void> {
+  try {
+    await browserAction.openPopup({ windowId });
+  } catch (error) {
+    if (!isInactiveWindowPopupError(error)) throw error;
+    await browserWindows.update(windowId, { focused: true });
+    await browserAction.openPopup({ windowId });
+  }
+}
+
+function isInactiveWindowPopupError(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message.includes('Cannot show popup for an inactive window')
+  );
 }
 
 function toPostRecordResult(message: SavedRecordingMessage) {

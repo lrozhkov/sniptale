@@ -18,6 +18,7 @@ type ProcessorCounterSource = object;
 
 type LiveVideoSessionDiagnosticsInput = Readonly<{
   configuredBitrate: number;
+  keyFrameInterval: number;
   requestedFrameRate: number;
   track: CaptureDiagnosticsTrack;
 }>;
@@ -44,6 +45,13 @@ function readOptionalProcessorCounter(
 ): number | null {
   const value: unknown = Reflect.get(processor, key);
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function readProcessorDiscardedRatio(processor: ProcessorCounterSource): number | null {
+  const discardedFrames = readOptionalProcessorCounter(processor, 'discardedFrames');
+  const totalFrames = readOptionalProcessorCounter(processor, 'totalFrames');
+  if (discardedFrames === null || totalFrames === null || totalFrames <= 0) return null;
+  return discardedFrames / totalFrames;
 }
 
 function readCaptureTrackDiagnostics(track: CaptureDiagnosticsTrack): LiveCaptureTrackDiagnostics {
@@ -77,6 +85,7 @@ export class LiveVideoSessionDiagnostics {
   private maxPendingEncodedPackets = 0;
   private maxSourceFrameGap = 0;
   private pendingEncodedPackets = 0;
+  private sourceFrameGapsOverCadenceBudget = 0;
   private readonly outputMetrics = new LiveVideoOutputMetrics();
   private sourceVideoFrames = 0;
   private videoPumpMetrics: LiveVideoEncoderPumpMetrics = { ...EMPTY_PUMP_METRICS };
@@ -114,10 +123,11 @@ export class LiveVideoSessionDiagnostics {
     this.sourceVideoFrames += 1;
     this.firstSourceVideoTimestamp ??= frame.timestamp;
     if (this.lastSourceVideoTimestamp !== null) {
-      this.maxSourceFrameGap = Math.max(
-        this.maxSourceFrameGap,
-        (frame.timestamp - this.lastSourceVideoTimestamp) / 1_000_000
-      );
+      const gap = (frame.timestamp - this.lastSourceVideoTimestamp) / 1_000_000;
+      this.maxSourceFrameGap = Math.max(this.maxSourceFrameGap, gap);
+      if (gap > (2 / this.input.requestedFrameRate) * 1.000001) {
+        this.sourceFrameGapsOverCadenceBudget += 1;
+      }
     }
     this.lastSourceVideoTimestamp = frame.timestamp;
   }
@@ -127,7 +137,11 @@ export class LiveVideoSessionDiagnostics {
   }
 
   summarize({ processor }: LiveVideoSessionDiagnosticsSummaryInput) {
-    const outputMetrics = this.outputMetrics.summarize(this.input.configuredBitrate);
+    const outputMetrics = this.outputMetrics.summarize({
+      configuredBitrate: this.input.configuredBitrate,
+      forcedKeyFrames: this.videoPumpMetrics.forcedKeyFrames,
+      keyFrameInterval: this.input.keyFrameInterval,
+    });
     const sourceFrameRate =
       this.firstSourceVideoTimestamp !== null &&
       this.lastSourceVideoTimestamp !== null &&
@@ -148,6 +162,11 @@ export class LiveVideoSessionDiagnostics {
             this.videoPumpMetrics.transformedVideoFrames
           : 0,
       encoderBackpressureEvents: this.videoPumpMetrics.videoEncoderBackpressureEvents,
+      encoderBackpressureRatio:
+        this.videoPumpMetrics.submittedVideoFrames > 0
+          ? this.videoPumpMetrics.videoEncoderBackpressureEvents /
+            this.videoPumpMetrics.submittedVideoFrames
+          : 0,
       coalescedVideoFrames: this.videoPumpMetrics.coalescedVideoFrames,
       captureTrack: this.captureTrack,
       maxEncoderAddDurationMs: this.videoPumpMetrics.maxEncoderAddDurationMs,
@@ -156,10 +175,13 @@ export class LiveVideoSessionDiagnostics {
       maxPendingEncodedPackets: this.maxPendingEncodedPackets,
       maxSourceFrameGapMs: this.maxSourceFrameGap * 1_000,
       processorDiscardedFrames: readOptionalProcessorCounter(processor, 'discardedFrames'),
+      processorDiscardedRatio: readProcessorDiscardedRatio(processor),
       processorTotalFrames: readOptionalProcessorCounter(processor, 'totalFrames'),
       requestedFrameRate: this.input.requestedFrameRate,
       forcedKeyFrames: this.videoPumpMetrics.forcedKeyFrames,
       sourceDeliveryRatio: sourceFrameRate / this.input.requestedFrameRate,
+      sourceFrameGapBudgetMs: (2_000 / this.input.requestedFrameRate) * 1.000001,
+      sourceFrameGapsOverCadenceBudget: this.sourceFrameGapsOverCadenceBudget,
       sourceFrameRate,
       sourceVideoFrames: this.sourceVideoFrames,
       submittedVideoFrames: this.videoPumpMetrics.submittedVideoFrames,

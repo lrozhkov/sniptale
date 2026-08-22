@@ -13,6 +13,16 @@ type LiveVideoByteBudget = Readonly<{
   withinBudget: boolean;
 }>;
 
+type LiveVideoKeyFrameBudget = Readonly<{
+  actualKeyFrames: number;
+  allowedKeyFrames: number;
+  configuredInterval: number;
+  duration: number;
+  excessKeyFrames: number;
+  forcedKeyFrames: number;
+  withinBudget: boolean;
+}>;
+
 /** Evaluates video payload only; audio and container bytes are deliberately excluded. */
 export function evaluateLiveVideoByteBudget(input: {
   configuredBitrate: number;
@@ -38,5 +48,41 @@ export function evaluateLiveVideoByteBudget(input: {
     configuredBytes,
     encodedBytes,
     withinBudget: encodedBytes <= allowedBytes,
+  };
+}
+
+/** Evaluates random-access cadence; ordinary source jitter must not fragment the GOP. */
+export function evaluateLiveVideoKeyFrameBudget(input: {
+  actualKeyFrames: number;
+  configuredInterval: number;
+  duration: number;
+  forcedKeyFrames: number;
+}): LiveVideoKeyFrameBudget {
+  const { actualKeyFrames, configuredInterval, duration, forcedKeyFrames } = input;
+  if (!Number.isSafeInteger(actualKeyFrames) || actualKeyFrames < 0) {
+    throw new Error('Actual live video keyframe count must be a non-negative safe integer.');
+  }
+  if (!Number.isFinite(configuredInterval) || configuredInterval <= 0) {
+    throw new Error('Configured live video keyframe interval must be positive and finite.');
+  }
+  if (!Number.isFinite(duration) || duration < 0) {
+    throw new Error('Live video keyframe budget duration must be non-negative and finite.');
+  }
+  if (!Number.isSafeInteger(forcedKeyFrames) || forcedKeyFrames < 0) {
+    throw new Error('Forced live video keyframe count must be a non-negative safe integer.');
+  }
+
+  const periodicKeyFrames = duration > 0 ? Math.floor(duration / configuredInterval) + 1 : 0;
+  // Allow one terminal/random-access variance frame from the browser encoder, but do not hide
+  // frame-gap-triggered GOP fragmentation.
+  const allowedKeyFrames = periodicKeyFrames + Math.max(1, forcedKeyFrames);
+  return {
+    actualKeyFrames,
+    allowedKeyFrames,
+    configuredInterval,
+    duration,
+    excessKeyFrames: Math.max(0, actualKeyFrames - allowedKeyFrames),
+    forcedKeyFrames,
+    withinBudget: actualKeyFrames <= allowedKeyFrames,
   };
 }
