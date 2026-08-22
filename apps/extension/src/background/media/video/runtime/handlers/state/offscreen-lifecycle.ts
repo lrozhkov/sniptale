@@ -24,6 +24,7 @@ import {
 } from '../../manager';
 import { browserAction } from '@sniptale/platform/browser/action';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { browserWindows } from '@sniptale/platform/browser/windows';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { markOffscreenDocumentReady } from '../../../../../offscreen-document/service';
 import { releaseVideoCaptureSurface } from '../../../capture-surface';
@@ -226,6 +227,7 @@ async function openPostRecordPopup(): Promise<void> {
   try {
     const tab = await browserTabs.get(tabId);
     if (typeof tab.windowId === 'number') {
+      await browserWindows.update(tab.windowId, { focused: true });
       await browserAction.openPopup({ windowId: tab.windowId });
     }
   } catch (error) {

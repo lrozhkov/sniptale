@@ -20,6 +20,7 @@ const {
   notifyRecordingStartFailedMock,
   openVideoEditorPageMock,
   openPopupMock,
+  updateWindowMock,
   getTabMock,
   resetCompletedVideoRecordingSessionMock,
   resetRecordingTabIdMock,
@@ -43,6 +44,7 @@ const {
   notifyRecordingStartFailedMock: vi.fn(),
   openVideoEditorPageMock: vi.fn(),
   openPopupMock: vi.fn(),
+  updateWindowMock: vi.fn(),
   getTabMock: vi.fn(),
   resetCompletedVideoRecordingSessionMock: vi.fn(),
   resetRecordingTabIdMock: vi.fn(),
@@ -88,6 +90,9 @@ vi.mock('@sniptale/platform/browser/action', () => ({
 }));
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: getTabMock },
+}));
+vi.mock('@sniptale/platform/browser/windows', () => ({
+  browserWindows: { update: updateWindowMock },
 }));
 vi.mock('../../../../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../../platform/runtime-messaging')>()),
@@ -178,6 +183,7 @@ beforeEach(() => {
   getRecordingTabIdMock.mockReturnValue(17);
   getTabMock.mockResolvedValue({ active: true, id: 17, windowId: 4 });
   openPopupMock.mockResolvedValue(undefined);
+  updateWindowMock.mockResolvedValue(undefined);
   openVideoEditorPageMock.mockResolvedValue(undefined);
   waitForStopSideEffectsMock.mockResolvedValue(undefined);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
@@ -557,6 +563,7 @@ it('opens the video popup without navigating directly to the editor after save',
   });
   await flushAsyncRoute();
   expect(openVideoEditorPageMock).not.toHaveBeenCalled();
+  expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
   expect(openPopupMock).toHaveBeenCalledWith({ windowId: 4 });
   expect(persistPendingVideoPostRecordResultMock).toHaveBeenCalledWith({
     primaryRecordingId: 'rec-2',
@@ -610,6 +617,7 @@ it('opens the post-record popup when persistence is already synchronized', async
   await flushAsyncRoute();
 
   expect(commitPendingVideoPostRecordResultMock).not.toHaveBeenCalled();
+  expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
   expect(openPopupMock).toHaveBeenCalledWith({ windowId: 4 });
   expectAcceptedLifecycleResponse(sendResponse);
 });
