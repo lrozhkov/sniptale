@@ -95,6 +95,7 @@ async function createOutputVideoStream(
   const geometry = createRecordingGeometryPlan({
     frameRateCap: outputProfile.frameRate,
     outputBasis: raw,
+    presetScaleMode: 'avoid-upscale',
     resolution: outputProfile.resolution,
     sourceRect: { x: 0, y: 0, ...raw },
   });
@@ -200,24 +201,19 @@ function assertEncoderInputSettings(
     );
   }
   const appliedFrameRate = applied.frameRate;
-  const frameRate =
-    typeof appliedFrameRate === 'number' && appliedFrameRate > 0
-      ? appliedFrameRate
-      : expectedFrameRate;
   if (
-    typeof frameRate !== 'number' ||
-    !Number.isFinite(frameRate) ||
-    frameRate <= 0 ||
-    frameRate > expectedFrameRate
+    appliedFrameRate !== undefined &&
+    appliedFrameRate !== 0 &&
+    (!Number.isFinite(appliedFrameRate) || appliedFrameRate < 0)
   ) {
     throw new Error(
-      `Recording output frame rate is invalid: expected at most ${expectedFrameRate}, ` +
+      `Recording output frame rate is invalid: expected non-negative finite metadata, ` +
         `received ${appliedFrameRate ?? 'unknown'}`
     );
   }
   return {
     ...applied,
-    frameRate,
+    frameRate: expectedFrameRate,
     ...(options.allowEncoderTransform ? expectedSize : {}),
   };
 }

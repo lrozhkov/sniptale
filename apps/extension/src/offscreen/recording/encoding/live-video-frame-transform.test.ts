@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const samples = vi.hoisted(() => [] as Array<{ frame: unknown; init: unknown }>);
+const videoFrames = vi.hoisted(() => [] as Array<{ init: unknown; source: unknown }>);
 
 vi.mock('mediabunny', () => ({
   VideoSample: class {
@@ -33,12 +34,20 @@ function createFrame(): VideoFrame {
 
 beforeEach(() => {
   samples.length = 0;
+  videoFrames.length = 0;
   drawImage.mockReset();
   fillRect.mockReset();
   context.fillStyle = '';
   context.imageSmoothingEnabled = false;
   context.imageSmoothingQuality = 'low';
-  vi.stubGlobal('VideoFrame', class {});
+  vi.stubGlobal(
+    'VideoFrame',
+    class {
+      constructor(source?: unknown, init?: unknown) {
+        videoFrames.push({ source, init });
+      }
+    }
+  );
   vi.stubGlobal(
     'OffscreenCanvas',
     class {
@@ -116,13 +125,13 @@ describe('live video frame transformer', () => {
 
   it('fails explicitly when the canvas surface is unavailable', () => {
     vi.stubGlobal('OffscreenCanvas', undefined);
-    expect(
-      () =>
-        new LiveVideoFrameTransformer({
-          fit: 'fill',
-          outputSize: { height: 2, width: 2 },
-          sourceRect: { height: 2, width: 2, x: 0, y: 0 },
-        })
+    const transformer = new LiveVideoFrameTransformer({
+      fit: 'fill',
+      outputSize: { height: 4, width: 4 },
+      sourceRect: { height: 2, width: 2, x: 0, y: 0 },
+    });
+    expect(() =>
+      transformer.transformFrame(createFrame(), { duration: 1 / 30, keyFrame: false, timestamp: 0 })
     ).toThrow('require OffscreenCanvas');
   });
 
@@ -135,13 +144,52 @@ describe('live video frame transformer', () => {
         }
       }
     );
-    expect(
-      () =>
-        new LiveVideoFrameTransformer({
-          fit: 'fill',
-          outputSize: { height: 2, width: 2 },
-          sourceRect: { height: 2, width: 2, x: 0, y: 0 },
-        })
+    const transformer = new LiveVideoFrameTransformer({
+      fit: 'fill',
+      outputSize: { height: 4, width: 4 },
+      sourceRect: { height: 2, width: 2, x: 0, y: 0 },
+    });
+    expect(() =>
+      transformer.transformFrame(createFrame(), { duration: 1 / 30, keyFrame: false, timestamp: 0 })
     ).toThrow('require a 2D OffscreenCanvas context');
+  });
+
+  it('uses a VideoFrame visibleRect for even crop-only transforms without rasterizing', () => {
+    vi.stubGlobal('OffscreenCanvas', undefined);
+    const transformer = new LiveVideoFrameTransformer({
+      fit: 'fill',
+      outputSize: { height: 1304, width: 2560 },
+      sourceRect: { height: 1304, width: 2560, x: 0, y: 0 },
+    });
+    const frame = createFrame();
+
+    transformer.transformFrame(frame, { duration: 1 / 60, keyFrame: false, timestamp: 3 });
+
+    expect(drawImage).not.toHaveBeenCalled();
+    expect(videoFrames.at(-1)).toEqual({
+      source: frame,
+      init: {
+        duration: 16_666,
+        timestamp: 3_000_000,
+        visibleRect: { height: 1304, width: 2560, x: 0, y: 0 },
+      },
+    });
+    expect(samples).toEqual([{ frame: expect.any(Object), init: undefined }]);
+  });
+
+  it('falls back to rasterization for crop-only transforms with odd sample alignment', () => {
+    const transformer = new LiveVideoFrameTransformer({
+      fit: 'fill',
+      outputSize: { height: 1304, width: 2558 },
+      sourceRect: { height: 1304, width: 2558, x: 1, y: 0 },
+    });
+    const frame = createFrame();
+
+    transformer.transformFrame(frame, { duration: 1 / 60, keyFrame: false, timestamp: 0 });
+
+    expect(drawImage).toHaveBeenCalledWith(frame, 1, 0, 2558, 1304, 0, 0, 2558, 1304);
+    expect(samples).toEqual([
+      { frame: expect.any(Object), init: { duration: 1 / 60, timestamp: 0 } },
+    ]);
   });
 });

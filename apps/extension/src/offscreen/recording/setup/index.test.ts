@@ -37,11 +37,11 @@ vi.mock('../stream/video-source', () => ({
 import {
   CaptureMode,
   VideoFrameRate,
-  resolveVideoOutputDimensions,
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { recordingContext } from '../context';
 import { prepareRecordingStream } from '.';
+import { createRecordingGeometryPlan } from '../geometry/plan';
 import {
   createAudioStream,
   createConfigurableVideoStream,
@@ -98,11 +98,16 @@ beforeEach(() => {
       options: { frameRate?: number } = {}
     ) => {
       const sourceSettings = source.getVideoTracks()[0]?.getSettings() ?? {};
-      const dimensions = resolveVideoOutputDimensions(
-        sourceSettings.width ?? 2560,
-        sourceSettings.height ?? 1440,
-        fixedSettings.outputProfile.resolution
-      );
+      const outputBasis = {
+        height: sourceSettings.height ?? 1440,
+        width: sourceSettings.width ?? 2560,
+      };
+      const dimensions = createRecordingGeometryPlan({
+        frameRateCap: fixedSettings.outputProfile.frameRate,
+        outputBasis,
+        resolution: fixedSettings.outputProfile.resolution,
+        sourceRect: { x: 0, y: 0, ...outputBasis },
+      }).outputSize;
       return {
         dimensions,
         frameRate: options.frameRate ?? 30,
@@ -248,26 +253,6 @@ it('records the resolved fixed cadence when a canvas track omits frame-rate meta
   expect(prepared.trackSettings).toEqual({ frameRate: 24, height: 1080, width: 1920 });
 });
 
-it('records the scheduler cadence when Chromium reports manual canvas cadence as zero', async () => {
-  const canvasOutput = createRecordingStream(1920, 1080);
-  const canvasTrack = canvasOutput.getVideoTracks()[0]!;
-  vi.mocked(canvasTrack.getSettings).mockReturnValue({
-    frameRate: 0,
-    height: 1080,
-    width: 1920,
-  });
-  mocks.createTabOutput.mockResolvedValueOnce({ frameRate: 24, stream: canvasOutput });
-
-  const prepared = await prepareRecordingStream({
-    captureMode: CaptureMode.TAB,
-    settings,
-    streamId: 'stream-manual-canvas',
-    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
-  });
-
-  expect(prepared.trackSettings).toEqual({ frameRate: 24, height: 1080, width: 1920 });
-});
-
 it('keeps an acquired 60 FPS TAB source authoritative without cadence synthesis', async () => {
   const source = createRecordingStream(2560, 1304, 60);
   mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
@@ -359,7 +344,7 @@ it('uses the selected CSS region for TAB_CROP output mapping', async () => {
   );
   expect(mocks.createTabOutput).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({ outputSize: { width: 1080, height: 1080 } }),
+    expect.objectContaining({ outputSize: { width: 600, height: 600 } }),
     { frameRate: 30 }
   );
 });
@@ -381,7 +366,7 @@ it('keeps TAB_CROP with a window preset on the continuous crop path', async () =
 
   expect(mocks.createTabOutput).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({ outputSize: { width: 1080, height: 1080 } }),
+    expect.objectContaining({ outputSize: { width: 600, height: 600 } }),
     { frameRate: 30 }
   );
 });

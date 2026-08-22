@@ -1,8 +1,9 @@
 import {
   resolveVideoOutputDimensions,
+  VideoResolutionPreset,
   type VideoFrameRate,
   type VideoOutputDimensions,
-  type VideoResolutionPreset,
+  type VideoResolutionPreset as VideoResolutionPresetValue,
 } from '@sniptale/runtime-contracts/video/types/types';
 
 export type RecordingPixelSize = Readonly<VideoOutputDimensions>;
@@ -25,8 +26,21 @@ export type RecordingGeometryPlan = Readonly<{
 type RecordingGeometryPlanInput = {
   frameRateCap: VideoFrameRate;
   outputBasis: RecordingPixelSize;
-  resolution: VideoResolutionPreset;
+  presetScaleMode?: 'allow-upscale' | 'avoid-upscale';
+  resolution: VideoResolutionPresetValue;
   sourceRect: RecordingSampleRect;
+};
+
+const RECORDING_PRESET_HEIGHTS: Readonly<
+  Record<Exclude<VideoResolutionPresetValue, 'SOURCE'>, number>
+> = {
+  [VideoResolutionPreset.P240]: 240,
+  [VideoResolutionPreset.P360]: 360,
+  [VideoResolutionPreset.P480]: 480,
+  [VideoResolutionPreset.P720]: 720,
+  [VideoResolutionPreset.P1080]: 1080,
+  [VideoResolutionPreset.P1440]: 1440,
+  [VideoResolutionPreset.P2160]: 2160,
 };
 
 function requirePositiveInteger(value: number, label: string): number {
@@ -92,12 +106,30 @@ function freezePlan(plan: RecordingGeometryPlan): RecordingGeometryPlan {
   return Object.freeze(plan);
 }
 
+function resolveRecordingOutputSize(
+  outputBasis: RecordingPixelSize,
+  resolution: VideoResolutionPresetValue,
+  presetScaleMode: RecordingGeometryPlanInput['presetScaleMode']
+): RecordingPixelSize {
+  if (resolution !== VideoResolutionPreset.SOURCE && presetScaleMode === 'avoid-upscale') {
+    const presetHeight = RECORDING_PRESET_HEIGHTS[resolution];
+    if (outputBasis.height <= presetHeight) {
+      return resolveVideoOutputDimensions(
+        outputBasis.width,
+        outputBasis.height,
+        VideoResolutionPreset.SOURCE
+      );
+    }
+  }
+  return resolveVideoOutputDimensions(outputBasis.width, outputBasis.height, resolution);
+}
+
 export function createRecordingGeometryPlan(
   input: RecordingGeometryPlanInput
 ): RecordingGeometryPlan {
   const outputBasis = freezeSize(input.outputBasis, 'Recording output basis');
   const outputSize = freezeSize(
-    resolveVideoOutputDimensions(outputBasis.width, outputBasis.height, input.resolution),
+    resolveRecordingOutputSize(outputBasis, input.resolution, input.presetScaleMode),
     'Recording output canvas'
   );
   const sourceRect = freezeSourceRect(
