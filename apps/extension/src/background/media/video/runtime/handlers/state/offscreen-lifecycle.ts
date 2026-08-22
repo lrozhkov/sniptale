@@ -238,15 +238,17 @@ async function openPopupForWindow(windowId: number): Promise<void> {
   try {
     await browserAction.openPopup({ windowId });
   } catch (error) {
-    if (!isInactiveWindowPopupError(error)) throw error;
+    if (!isRetryablePopupOpenError(error)) throw error;
     await browserWindows.update(windowId, { focused: true });
     await browserAction.openPopup({ windowId });
   }
 }
 
-function isInactiveWindowPopupError(error: unknown): boolean {
+function isRetryablePopupOpenError(error: unknown): boolean {
   return (
-    error instanceof Error && error.message.includes('Cannot show popup for an inactive window')
+    error instanceof Error &&
+    (error.message.includes('Cannot show popup for an inactive window') ||
+      error.message.includes('Failed to open popup'))
   );
 }
 

@@ -63,7 +63,7 @@ const mediabunny = vi.hoisted(() => {
           contentHint: Output.encoderContentHint ?? this.config.contentHint,
           displayHeight: 1304,
           displayWidth: 2560,
-          ...(Output.encoderFrameRate === null ? {} : { framerate: Output.encoderFrameRate }),
+          ...(this.frameRate === null ? {} : { framerate: this.frameRate }),
           hardwareAcceleration: this.config.hardwareAcceleration,
           height: 1304,
           latencyMode: this.config.latencyMode,
@@ -103,7 +103,6 @@ const mediabunny = vi.hoisted(() => {
 
   class Output {
     static instances: Output[] = [];
-    static encoderFrameRate: number | null = null;
     static encoderBitrateMode: VideoEncoderBitrateMode | null = null;
     static encoderContentHint: string | null = null;
     readonly cancel = vi.fn().mockResolvedValue(undefined);
@@ -206,7 +205,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   mediabunny.Output.instances.length = 0;
   mediabunny.VideoSample.instances.length = 0;
-  mediabunny.Output.encoderFrameRate = 60;
   mediabunny.Output.encoderBitrateMode = null;
   mediabunny.Output.encoderContentHint = null;
   processorInits.length = 0;
@@ -256,7 +254,7 @@ beforeEach(() => {
 });
 
 describe('source-driven live recording flow', () => {
-  it('supplies selected 60 FPS to rate control without changing source-timed VFR samples', async () => {
+  it('keeps live VFR samples out of muxer frame-rate snapping', async () => {
     const { session } = await createSession();
     const started = vi.fn();
     session.setLifecycleCallbacks({ onStart: started });
@@ -265,7 +263,7 @@ describe('source-driven live recording flow', () => {
     await vi.waitFor(() => expect(started).toHaveBeenCalledOnce());
 
     const output = mediabunny.Output.instances[0];
-    expect(output?.videoMetadata).toEqual({ frameRate: 60 });
+    expect(output?.videoMetadata).toEqual({});
     expect(output?.videoSource?.config).toEqual(
       expect.objectContaining({
         bitrate: 24_000_000,
@@ -587,18 +585,17 @@ describe('source-driven live recording lifecycle and capability failures', () =>
     await expect(session.stop()).resolves.toEqual(expect.objectContaining({ size: 3 }));
   });
 
-  it('rejects an encoder that changes the expected rate-control frame rate', async () => {
-    mediabunny.Output.encoderFrameRate = 30;
+  it('accepts a live VFR encoder config without frame-rate metadata snapping', async () => {
     const { coordinator, session } = await createSession();
     const onFailure = vi.fn();
     session.setLifecycleCallbacks({ onFailure });
 
     session.start();
-    await vi.waitFor(() => expect(onFailure).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
 
-    await expect(session.stop()).rejects.toThrow('did not preserve the requested frame rate');
-    expect(coordinator.abort).toHaveBeenCalledOnce();
-    expect(mediabunny.Output.instances[0]?.cancel).toHaveBeenCalledOnce();
+    expect(onFailure).not.toHaveBeenCalled();
+    await expect(session.stop()).resolves.toEqual(expect.objectContaining({ size: 3 }));
+    expect(coordinator.abort).not.toHaveBeenCalled();
   });
 
   it('rejects constant bitrate drift for VP9 without an exact codec string', async () => {
@@ -632,7 +629,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
   });
 
   it('preserves the encoder failure when lifecycle cleanup aborts the failed session', async () => {
-    mediabunny.Output.encoderFrameRate = 30;
+    mediabunny.Output.encoderBitrateMode = 'constant';
     const { session } = await createSession();
     const failed = vi.fn();
     session.setLifecycleCallbacks({
@@ -645,7 +642,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
     session.start();
     await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
 
-    await expect(session.stop()).rejects.toThrow('did not preserve the requested frame rate');
+    await expect(session.stop()).rejects.toThrow('did not preserve screen-efficient variable');
   });
 
   it('rejects stop before start and makes abort idempotent', async () => {
@@ -728,7 +725,6 @@ describe('source-driven live recording capability validation', () => {
         contentHint: 'text',
         hardwareAcceleration: 'no-preference',
         height: 1304,
-        framerate: 60,
         width: 2560,
       })
     );

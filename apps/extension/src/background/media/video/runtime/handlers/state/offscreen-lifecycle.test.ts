@@ -609,20 +609,21 @@ it('accepts a completed replay without requiring the original recording tab', as
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
-it('focuses the recording window and retries the post-record popup only when Chrome reports it inactive', async () => {
-  const sendResponse = createSendResponse();
-  openPopupMock
-    .mockRejectedValueOnce(new Error('Cannot show popup for an inactive window.'))
-    .mockResolvedValueOnce(undefined);
+it.each(['Cannot show popup for an inactive window.', 'Failed to open popup.'])(
+  'focuses the recording window and retries the post-record popup after %s',
+  async (errorMessage) => {
+    const sendResponse = createSendResponse();
+    openPopupMock.mockRejectedValueOnce(new Error(errorMessage)).mockResolvedValueOnce(undefined);
 
-  handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
-  await flushAsyncRoute();
+    handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
+    await flushAsyncRoute();
 
-  expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
-  expect(openPopupMock).toHaveBeenNthCalledWith(1, { windowId: 4 });
-  expect(openPopupMock).toHaveBeenNthCalledWith(2, { windowId: 4 });
-  expectAcceptedLifecycleResponse(sendResponse);
-});
+    expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
+    expect(openPopupMock).toHaveBeenNthCalledWith(1, { windowId: 4 });
+    expect(openPopupMock).toHaveBeenNthCalledWith(2, { windowId: 4 });
+    expectAcceptedLifecycleResponse(sendResponse);
+  }
+);
 
 it('opens the post-record popup when persistence is already synchronized', async () => {
   const sendResponse = createSendResponse();
