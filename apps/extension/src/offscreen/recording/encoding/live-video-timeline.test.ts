@@ -79,8 +79,8 @@ describe('LiveVideoTimeline', () => {
 
     expect(timeline.accept(0)).toEqual({ kind: 'pending' });
     expect(timeline.accept(0.016666)).toMatchObject({ kind: 'emit', timestamp: 0 });
-    expect(timeline.accept(0.033333)).toMatchObject({ kind: 'emit', timestamp: 0.016666 });
-    expect(timeline.accept(0.05)).toMatchObject({ kind: 'emit', timestamp: 0.033333 });
+    expect(timeline.accept(0.033333)).toMatchObject({ kind: 'emit', timestamp: 1 / 60 });
+    expect(timeline.accept(0.05)).toMatchObject({ kind: 'emit', timestamp: 2 / 60 });
   });
 
   it('does not treat ordinary source starvation as a timeline discontinuity', () => {
@@ -89,7 +89,10 @@ describe('LiveVideoTimeline', () => {
     timeline.accept(0);
     expect(timeline.accept(1 / 60)).toMatchObject({ keyFrame: true, timestamp: 0 });
     expect(timeline.accept(0.1)).toMatchObject({ keyFrame: false, timestamp: 1 / 60 });
-    expect(timeline.accept(0.1 + 1 / 60)).toMatchObject({ keyFrame: false, timestamp: 0.1 });
+    expect(timeline.accept(0.1 + 1 / 60)).toMatchObject({
+      keyFrame: false,
+      timestamp: 0.1,
+    });
   });
 
   it('uses the last observed interval for the terminal frame', () => {

@@ -12,11 +12,13 @@ type LiveVideoTimelineDecision =
 /** Owns the truthful VFR timeline between capture timestamps and encoded samples. */
 export class LiveVideoTimeline {
   private readonly fallbackDuration: number;
+  private readonly frameTickEpsilon = 0.000001;
   private lastContinuousDuration: number | null = null;
   private nextEligibleTimestamp: number | null = null;
-  private nextSegmentTimestampFloor: number | null = null;
+  private nextSegmentTickFloor: number | null = null;
   private pendingKeyFrame = true;
-  private pendingTimestamp: number | null = null;
+  private pendingSourceTimestamp: number | null = null;
+  private pendingTick: number | null = null;
   private sourceTimestampOffset = 0;
 
   constructor(requestedFrameRate: number) {
@@ -31,33 +33,37 @@ export class LiveVideoTimeline {
       throw new Error('Live video timestamp must be finite.');
     }
     const adjustedTimestamp = timestamp + this.sourceTimestampOffset;
-    if (this.pendingTimestamp === null) {
-      this.pendingTimestamp = adjustedTimestamp;
-      this.nextEligibleTimestamp = adjustedTimestamp + this.fallbackDuration;
+    const frameTick = this.toFrameTick(adjustedTimestamp);
+    if (this.pendingTick === null) {
+      this.pendingTick = frameTick;
+      this.pendingSourceTimestamp = adjustedTimestamp;
+      this.nextEligibleTimestamp = this.toTimestamp(frameTick + 1);
       return { kind: 'pending' };
     }
-    if (adjustedTimestamp <= this.pendingTimestamp) {
+    if (frameTick <= this.pendingTick) {
       return {
         kind: 'coalesce',
-        replacePending: adjustedTimestamp === this.pendingTimestamp,
+        replacePending: adjustedTimestamp === this.pendingSourceTimestamp,
       };
     }
 
-    const duration = adjustedTimestamp - this.pendingTimestamp;
     if (
       this.nextEligibleTimestamp !== null &&
-      adjustedTimestamp + 0.000001 < this.nextEligibleTimestamp
+      adjustedTimestamp + this.frameTickEpsilon < this.nextEligibleTimestamp
     ) {
       return { kind: 'coalesce', replacePending: false };
     }
+    const nextTick = Math.max(this.pendingTick + 1, frameTick);
+    const duration = (nextTick - this.pendingTick) * this.fallbackDuration;
     const emitted: LiveVideoTimelineDecision = {
       duration,
       keyFrame: this.pendingKeyFrame,
       kind: 'emit',
-      timestamp: this.pendingTimestamp,
+      timestamp: this.toTimestamp(this.pendingTick),
     };
-    this.pendingTimestamp = adjustedTimestamp;
-    this.advanceEligibilityPast(adjustedTimestamp);
+    this.pendingTick = nextTick;
+    this.pendingSourceTimestamp = adjustedTimestamp;
+    this.nextEligibleTimestamp = this.toTimestamp(this.pendingTick + 1);
     // A delayed source frame changes sample duration, not reference-frame validity. Only an
     // explicit segment restart below is allowed to request recovery from a new keyframe.
     const continuityBasis = Math.max(this.fallbackDuration, this.lastContinuousDuration ?? 0);
@@ -67,38 +73,40 @@ export class LiveVideoTimeline {
   }
 
   finish(): LiveVideoSampleTiming | null {
-    if (this.pendingTimestamp === null) return null;
+    if (this.pendingTick === null) return null;
     const timing = {
       duration: this.lastContinuousDuration ?? this.fallbackDuration,
       keyFrame: this.pendingKeyFrame,
-      timestamp: this.pendingTimestamp,
+      timestamp: this.toTimestamp(this.pendingTick),
     };
-    this.nextSegmentTimestampFloor = timing.timestamp + timing.duration;
-    this.pendingTimestamp = null;
+    this.nextSegmentTickFloor =
+      this.pendingTick + Math.max(1, Math.round(timing.duration / this.fallbackDuration));
+    this.pendingTick = null;
+    this.pendingSourceTimestamp = null;
     return timing;
   }
 
   restart(timestamp: number): void {
     if (!Number.isFinite(timestamp)) throw new Error('Live video timestamp must be finite.');
-    if (this.pendingTimestamp !== null) {
+    if (this.pendingTick !== null) {
       throw new Error('Live video timeline cannot restart with a pending sample.');
     }
-    const timestampFloor = this.nextSegmentTimestampFloor ?? timestamp;
+    const timestampFloor =
+      this.nextSegmentTickFloor === null ? timestamp : this.toTimestamp(this.nextSegmentTickFloor);
     this.sourceTimestampOffset = Math.max(0, timestampFloor - timestamp);
-    this.nextSegmentTimestampFloor = null;
+    this.nextSegmentTickFloor = null;
     this.lastContinuousDuration = null;
     this.pendingKeyFrame = true;
-    this.pendingTimestamp = timestamp + this.sourceTimestampOffset;
-    this.nextEligibleTimestamp = this.pendingTimestamp + this.fallbackDuration;
+    this.pendingTick = this.toFrameTick(timestamp + this.sourceTimestampOffset);
+    this.pendingSourceTimestamp = timestamp + this.sourceTimestampOffset;
+    this.nextEligibleTimestamp = this.toTimestamp(this.pendingTick + 1);
   }
 
-  private advanceEligibilityPast(timestamp: number): void {
-    if (this.nextEligibleTimestamp === null) {
-      this.nextEligibleTimestamp = timestamp + this.fallbackDuration;
-      return;
-    }
-    do {
-      this.nextEligibleTimestamp += this.fallbackDuration;
-    } while (this.nextEligibleTimestamp <= timestamp + 0.000001);
+  private toFrameTick(timestamp: number): number {
+    return Math.max(0, Math.round(timestamp / this.fallbackDuration));
+  }
+
+  private toTimestamp(frameTick: number): number {
+    return frameTick * this.fallbackDuration;
   }
 }

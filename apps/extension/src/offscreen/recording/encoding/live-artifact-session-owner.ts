@@ -117,6 +117,7 @@ function buildExactVideoEncoderConfig(
     contentHint,
     displayHeight: dimensions.height,
     displayWidth: dimensions.width,
+    framerate: input.encoding.frameRate,
     hardwareAcceleration: 'no-preference',
     height: dimensions.height,
     latencyMode: 'quality',
@@ -250,10 +251,10 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       sizeChangeBehavior: 'deny',
       onEncoderConfig: (config) => this.assertEncoderConfig(config),
     });
-    // Keep the live track VFR-owned by our sample timestamps. Mediabunny treats video track
-    // frameRate metadata as a request to snap packet timestamps/durations to that cadence in the
-    // muxer, which can collapse jittery screen-capture samples onto duplicate container PTS/DTS.
-    this.output.addVideoTrack(this.videoSource);
+    // Mediabunny uses track frameRate both as encoder rate-control metadata and as muxer cadence.
+    // LiveVideoTimeline owns pre-muxer tick coalescing so this metadata can stabilize WebM packet
+    // durations without manufacturing frames or collapsing multiple samples onto one timestamp.
+    this.output.addVideoTrack(this.videoSource, { frameRate: input.encoding.frameRate });
 
     this.audioSources = input.stream.getAudioTracks().map((track) => {
       const source = new MediaStreamAudioTrackSource(
@@ -454,6 +455,11 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   }
 
   private assertEncoderConfig(config: VideoEncoderConfig): void {
+    if (config.framerate !== this.input.encoding.frameRate) {
+      throw new Error(
+        'Live encoder did not preserve the requested frame rate as its rate-control expectation.'
+      );
+    }
     if (config.bitrateMode !== 'variable') {
       throw new Error('Live encoder did not preserve screen-efficient variable bitrate mode.');
     }
@@ -480,6 +486,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         config.height !== expected.height ||
         config.displayWidth !== expected.displayWidth ||
         config.displayHeight !== expected.displayHeight ||
+        config.framerate !== expected.framerate ||
         config.bitrate !== expected.bitrate ||
         config.alpha !== expected.alpha ||
         config.hardwareAcceleration !== expected.hardwareAcceleration ||

@@ -121,7 +121,7 @@ describe('live video encoder pump', () => {
 
     expect(samples.map(({ frame, init }) => ({ frame, timestamp: init.timestamp }))).toEqual([
       { frame: first, timestamp: 0 },
-      { frame: next, timestamp: 0.033334 },
+      { frame: next, timestamp: 1 / 30 },
     ]);
     expect(metrics).toEqual(expect.objectContaining({ coalescedVideoFrames: 1 }));
     expect(excess.close).toHaveBeenCalledOnce();
@@ -203,22 +203,22 @@ describe('live video encoder pump', () => {
     ).toEqual([
       {
         frame: frames[0],
-        init: { duration: 0.033334, timestamp: 0 },
+        init: { duration: 0.033333, timestamp: 0 },
         keyFrame: { keyFrame: true },
       },
       {
         frame: frames[1],
-        init: { duration: 0.033334, timestamp: 0.033334 },
+        init: { duration: 0.033333, timestamp: 0.033333 },
         keyFrame: undefined,
       },
       {
         frame: frames[2],
-        init: { duration: 0.033334, timestamp: 0.066668 },
+        init: { duration: 0.033333, timestamp: 0.066667 },
         keyFrame: { keyFrame: true },
       },
       {
         frame: frames[3],
-        init: { duration: 0.033334, timestamp: 0.100002 },
+        init: { duration: 0.033333, timestamp: 0.1 },
         keyFrame: undefined,
       },
     ]);

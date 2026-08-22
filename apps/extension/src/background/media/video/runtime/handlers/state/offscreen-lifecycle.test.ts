@@ -20,11 +20,8 @@ const {
   notifyRecordingStartFailedMock,
   openVideoEditorPageMock,
   openPopupMock,
-  createTabMock,
-  createWindowMock,
   updateWindowMock,
   getTabMock,
-  runtimeGetURLMock,
   resetCompletedVideoRecordingSessionMock,
   resetRecordingTabIdMock,
   resetVideoRecordingRuntimeStateMock,
@@ -47,11 +44,8 @@ const {
   notifyRecordingStartFailedMock: vi.fn(),
   openVideoEditorPageMock: vi.fn(),
   openPopupMock: vi.fn(),
-  createTabMock: vi.fn(),
-  createWindowMock: vi.fn(),
   updateWindowMock: vi.fn(),
   getTabMock: vi.fn(),
-  runtimeGetURLMock: vi.fn(),
   resetCompletedVideoRecordingSessionMock: vi.fn(),
   resetRecordingTabIdMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
@@ -94,15 +88,11 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 vi.mock('@sniptale/platform/browser/action', () => ({
   browserAction: { openPopup: openPopupMock },
 }));
-vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
-  runtimeInfo: { getURL: runtimeGetURLMock },
-}));
 vi.mock('@sniptale/platform/browser/tabs', () => ({
-  browserTabs: { create: createTabMock, get: getTabMock },
+  browserTabs: { get: getTabMock },
 }));
 vi.mock('@sniptale/platform/browser/windows', () => ({
-  browserWindows: { create: createWindowMock, update: updateWindowMock },
+  browserWindows: { update: updateWindowMock },
 }));
 vi.mock('../../../../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../../platform/runtime-messaging')>()),
@@ -193,10 +183,7 @@ beforeEach(() => {
   getRecordingTabIdMock.mockReturnValue(17);
   getTabMock.mockResolvedValue({ active: true, id: 17, windowId: 4 });
   openPopupMock.mockResolvedValue(undefined);
-  createTabMock.mockResolvedValue(undefined);
-  createWindowMock.mockResolvedValue(undefined);
   updateWindowMock.mockResolvedValue(undefined);
-  runtimeGetURLMock.mockImplementation((path: string) => `chrome-extension://test/${path}`);
   openVideoEditorPageMock.mockResolvedValue(undefined);
   waitForStopSideEffectsMock.mockResolvedValue(undefined);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
@@ -633,45 +620,20 @@ it.each(['Cannot show popup for an inactive window.', 'Failed to open popup.'])(
 
     expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
     expect(openPopupMock).toHaveBeenNthCalledWith(1, { windowId: 4 });
-    expect(openPopupMock).toHaveBeenNthCalledWith(2, { windowId: 4 });
+    expect(openPopupMock).toHaveBeenNthCalledWith(2);
     expectAcceptedLifecycleResponse(sendResponse);
   }
 );
 
-it.each(['Cannot show popup for an inactive window.', 'Failed to open popup.'])(
-  'opens the popup page when Chrome rejects the post-record popup retry after %s',
-  async (errorMessage) => {
-    const sendResponse = createSendResponse();
-    openPopupMock.mockRejectedValue(new Error(errorMessage));
-
-    handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
-    await flushAsyncRoute();
-
-    expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
-    expect(openPopupMock).toHaveBeenCalledTimes(2);
-    expect(createWindowMock).toHaveBeenCalledWith({
-      focused: true,
-      height: 720,
-      type: 'popup',
-      url: 'chrome-extension://test/apps/extension/src/popup/index.html',
-      width: 430,
-    });
-    expect(createTabMock).not.toHaveBeenCalled();
-    expectAcceptedLifecycleResponse(sendResponse);
-  }
-);
-
-it('opens the popup page in a tab when Chrome rejects the popup window handoff', async () => {
+it('keeps post-record completion accepted when the action popup activation retry is rejected', async () => {
   const sendResponse = createSendResponse();
   openPopupMock.mockRejectedValue(new Error('Failed to open popup.'));
-  createWindowMock.mockRejectedValueOnce(new Error('window denied'));
 
   handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
   await flushAsyncRoute();
 
-  expect(createTabMock).toHaveBeenCalledWith({
-    url: 'chrome-extension://test/apps/extension/src/popup/index.html',
-  });
+  expect(openPopupMock).toHaveBeenNthCalledWith(1, { windowId: 4 });
+  expect(openPopupMock).toHaveBeenNthCalledWith(2);
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
