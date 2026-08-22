@@ -17,6 +17,7 @@ import type {
   RecordingStagingArtifactWriter,
   RecordingStagingCoordinator,
 } from '../../../composition/persistence/recordings/staging';
+import { LiveVideoFrameBuffer } from './live-video-frame-buffer';
 
 type LiveArtifactSessionPhase =
   | 'ready'
@@ -66,10 +67,24 @@ interface CreateLiveRecordingArtifactSessionOwnerInput {
 
 type LiveEncoderContentHint = 'detail' | 'motion' | 'text';
 
+interface ActiveVideoRead {
+  generation: number;
+  settled: boolean;
+}
+
 const logger = createLogger({ namespace: 'LiveRecordingArtifactSession' });
+// Absorb short encoder or fragmented-writer stalls without permitting an unbounded raw-frame queue.
+const LIVE_VIDEO_FRAME_BUFFER_SIZE = 8;
+// Keep hidden browser buffering minimal; the owned queue above is the burst authority.
+const LIVE_VIDEO_PROCESSOR_BUFFER_SIZE = 1;
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function readOptionalProcessorCounter(processor: object, key: string): number | null {
+  const value: unknown = Reflect.get(processor, key);
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function describeVideoFrame(frame: VideoFrame) {
@@ -171,8 +186,25 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   private readonly expectedContentHint: LiveEncoderContentHint;
   private readonly expectedVideoEncoderConfig: VideoEncoderConfig | null;
   private readonly videoSource: VideoSampleSource;
+  private readonly videoProcessor: MediaStreamTrackProcessor<VideoFrame>;
   private readonly videoReader: ReadableStreamDefaultReader<VideoFrame>;
+  private readonly videoFrameBuffer = new LiveVideoFrameBuffer(LIVE_VIDEO_FRAME_BUFFER_SIZE);
   private readonly audioSources: MediaStreamAudioTrackSource[];
+  private sourceVideoFrames = 0;
+  private firstSourceVideoTimestamp: number | null = null;
+  private lastSourceVideoTimestamp: number | null = null;
+  private maxSourceFrameGap = 0;
+  private maxVideoFrameBufferDepth = 0;
+  private videoEncoderBackpressureEvents = 0;
+  private maxVideoEncoderAddDuration = 0;
+  private totalVideoEncoderAddDuration = 0;
+  private submittedVideoFrames = 0;
+  private pauseStartedAtMs: number | null = null;
+  private pendingPausedDuration = 0;
+  private resumeRequested = false;
+  private videoReadPending = false;
+  private activeVideoRead: ActiveVideoRead | null = null;
+  private videoReadGeneration = 0;
   private videoPump: Promise<void> | null = null;
   private readonly firstEncodedVideoPacket: Promise<void>;
   private readonly resolveFirstEncodedVideoPacket: () => void;
@@ -205,7 +237,11 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       })
     );
     this.output = new Output({ format: createOutputFormat(input.encoding.container), target });
-    this.videoReader = new MediaStreamTrackProcessor({ track: videoTrack }).readable.getReader();
+    this.videoProcessor = new MediaStreamTrackProcessor({
+      maxBufferSize: LIVE_VIDEO_PROCESSOR_BUFFER_SIZE,
+      track: videoTrack,
+    });
+    this.videoReader = this.videoProcessor.readable.getReader();
     this.videoSource = new VideoSampleSource({
       bitrate: input.encoding.videoBitrate,
       bitrateMode: 'constant',
@@ -314,13 +350,17 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   pause(): void {
     if (this.phase !== 'recording') return;
     this.phase = 'paused';
+    this.pauseStartedAtMs = performance.now();
+    this.resumeRequested = false;
+    this.videoFrameBuffer.notifyProducer();
     this.audioSources.forEach((source) => source.pause());
   }
 
   resume(): void {
     if (this.phase !== 'paused') return;
-    this.audioSources.forEach((source) => source.resume());
-    this.phase = 'recording';
+    this.resumeRequested = true;
+    this.scheduleResumeAfterPendingRead(this.activeVideoRead);
+    this.videoFrameBuffer.notifyProducer();
   }
 
   stop(): Promise<FinalizedRecordingStagingArtifact> {
@@ -339,6 +379,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     if (this.phase === 'finalized') return Promise.resolve();
     if (this.phase === 'aborted') return this.abortPromise ?? Promise.resolve();
     if (this.phase === 'failed') {
+      this.videoFrameBuffer.abort();
       this.abortPromise ??= Promise.allSettled([
         this.videoReader.cancel(),
         this.output.cancel(),
@@ -350,6 +391,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     const abortError = new Error(`Recording artifact ${this.input.artifactId} was aborted.`);
     this.rejectFirstEncodedVideoPacket(abortError);
     this.rejectTerminalOnce(abortError);
+    this.videoFrameBuffer.abort();
     this.abortPromise ??= Promise.allSettled([
       this.videoReader.cancel(),
       this.output.cancel(),
@@ -442,18 +484,36 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   }
 
   private async pumpVideoFrames(): Promise<void> {
+    const readPump = this.readVideoFramesIntoBuffer();
+    const encodePump = this.encodeBufferedVideoFrames().catch(async (error: unknown) => {
+      this.videoFrameBuffer.abort();
+      await this.videoReader.cancel().catch(() => undefined);
+      throw error;
+    });
+    const results = await Promise.allSettled([readPump, encodePump]);
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    );
+    if (!failure) return;
+    const error = toError(failure.reason);
+    this.videoFrameBuffer.abort();
+    await this.videoReader.cancel().catch(() => undefined);
+    this.handleVideoPumpFailure(error);
+  }
+
+  private async readVideoFramesIntoBuffer(): Promise<void> {
     let firstTimestamp: number | null = null;
-    let loggedFirstEncoderInput = false;
-    let pauseStartedAt: number | null = null;
     let pausedDuration = 0;
-    let submittedFrames = 0;
     try {
       while (true) {
-        const result = await this.videoReader.read();
+        if (!(await this.videoFrameBuffer.waitForSpace(() => this.phase === 'paused'))) {
+          break;
+        }
+        const result = await this.readNextVideoFrame();
         if (result.done) break;
         const frame = result.value;
+        this.observeSourceFrame(frame);
         if (this.phase === 'paused') {
-          pauseStartedAt ??= frame.timestamp;
           frame.close();
           continue;
         }
@@ -462,51 +522,157 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
           continue;
         }
         firstTimestamp ??= frame.timestamp;
-        if (pauseStartedAt !== null) {
-          pausedDuration += Math.max(0, frame.timestamp - pauseStartedAt);
-          pauseStartedAt = null;
+        if (this.pendingPausedDuration > 0) {
+          pausedDuration += this.pendingPausedDuration;
+          this.pendingPausedDuration = 0;
         }
-        const encoderFrame = cropVideoFrameForEncoder(frame, this.input.frameCrop);
-        if (!loggedFirstEncoderInput) {
-          loggedFirstEncoderInput = true;
-          logger.info(
-            `TAB_RECORDING_DIAGNOSTIC first-encoder-frame ${JSON.stringify({
-              frameCrop: this.input.frameCrop ?? null,
-              input: describeVideoFrame(encoderFrame),
-              source: describeVideoFrame(frame),
-            })}`
-          );
-          logger.info('Observed first encoder input frame', describeVideoFrame(encoderFrame));
-        }
-        const sample = new VideoSample(encoderFrame, {
-          timestamp: (frame.timestamp - firstTimestamp - pausedDuration) / 1_000_000,
+        const enqueued = this.videoFrameBuffer.enqueue({
+          frame,
+          timestampSeconds: (frame.timestamp - firstTimestamp - pausedDuration) / 1_000_000,
         });
-        try {
-          await this.videoSource.add(sample);
-        } finally {
-          sample.close();
-          if (encoderFrame !== frame) frame.close();
+        if (!enqueued) {
+          frame.close();
+          break;
         }
-        submittedFrames += 1;
-      }
-      if (this.phase === 'starting') {
-        throw new Error(
-          submittedFrames === 0
-            ? 'The recording source ended before the first video frame.'
-            : 'The recording source ended before the first encoded video packet.'
+        this.maxVideoFrameBufferDepth = Math.max(
+          this.maxVideoFrameBufferDepth,
+          this.videoFrameBuffer.depth
         );
       }
-    } catch (error) {
-      const failure = toError(error);
-      this.rejectFirstEncodedVideoPacket(failure);
-      const intentionalCancellation =
-        error instanceof DOMException &&
-        error.name === 'AbortError' &&
-        ['stopping', 'finalizing', 'aborted'].includes(this.phase);
-      if (intentionalCancellation || this.phase === 'failed' || this.phase === 'aborted') return;
-      if (this.phase === 'stopping' || this.phase === 'finalizing') throw failure;
-      this.fail(failure);
+    } finally {
+      this.videoFrameBuffer.closeInput();
     }
+  }
+
+  private async readNextVideoFrame(): Promise<ReadableStreamReadResult<VideoFrame>> {
+    const activeRead: ActiveVideoRead = {
+      generation: ++this.videoReadGeneration,
+      settled: false,
+    };
+    this.activeVideoRead = activeRead;
+    const read = this.videoReader.read();
+    void read.then(
+      () => {
+        activeRead.settled = true;
+      },
+      () => {
+        activeRead.settled = true;
+      }
+    );
+    this.scheduleResumeAfterPendingRead(activeRead);
+    try {
+      return await read;
+    } finally {
+      activeRead.settled = true;
+      if (this.activeVideoRead === activeRead) {
+        this.activeVideoRead = null;
+        this.videoReadPending = false;
+      }
+    }
+  }
+
+  private scheduleResumeAfterPendingRead(activeRead: ActiveVideoRead | null): void {
+    if (!activeRead || this.phase !== 'paused' || !this.resumeRequested) return;
+    setTimeout(() => {
+      if (
+        this.activeVideoRead !== activeRead ||
+        activeRead.settled ||
+        activeRead.generation !== this.videoReadGeneration ||
+        this.phase !== 'paused' ||
+        !this.resumeRequested
+      ) {
+        return;
+      }
+      this.videoReadPending = true;
+      this.completeResumeAfterProcessorDrain();
+    }, 0);
+  }
+
+  private completeResumeAfterProcessorDrain(): void {
+    if (
+      this.phase !== 'paused' ||
+      !this.resumeRequested ||
+      !this.videoReadPending ||
+      this.videoFrameBuffer.depth >= LIVE_VIDEO_FRAME_BUFFER_SIZE
+    ) {
+      return;
+    }
+    if (this.pauseStartedAtMs !== null) {
+      this.pendingPausedDuration += Math.max(0, performance.now() - this.pauseStartedAtMs) * 1_000;
+      this.pauseStartedAtMs = null;
+    }
+    this.resumeRequested = false;
+    this.audioSources.forEach((source) => source.resume());
+    this.phase = 'recording';
+  }
+
+  private async encodeBufferedVideoFrames(): Promise<void> {
+    let loggedFirstEncoderInput = false;
+    let submittedFrames = 0;
+    while (true) {
+      const entry = await this.videoFrameBuffer.dequeue();
+      if (!entry) break;
+      this.completeResumeAfterProcessorDrain();
+      const { frame, timestampSeconds } = entry;
+      const encoderFrame = cropVideoFrameForEncoder(frame, this.input.frameCrop);
+      if (!loggedFirstEncoderInput) {
+        loggedFirstEncoderInput = true;
+        logger.info(
+          `TAB_RECORDING_DIAGNOSTIC first-encoder-frame ${JSON.stringify({
+            frameCrop: this.input.frameCrop ?? null,
+            input: describeVideoFrame(encoderFrame),
+            source: describeVideoFrame(frame),
+          })}`
+        );
+        logger.info('Observed first encoder input frame', describeVideoFrame(encoderFrame));
+      }
+      const sample = new VideoSample(encoderFrame, { timestamp: timestampSeconds });
+      const addStartedAt = performance.now();
+      try {
+        await this.videoSource.add(sample);
+      } finally {
+        const addDuration = performance.now() - addStartedAt;
+        this.maxVideoEncoderAddDuration = Math.max(this.maxVideoEncoderAddDuration, addDuration);
+        this.totalVideoEncoderAddDuration += addDuration;
+        if (addDuration > 1_000 / this.input.encoding.frameRate) {
+          this.videoEncoderBackpressureEvents += 1;
+        }
+        sample.close();
+        if (encoderFrame !== frame) frame.close();
+      }
+      submittedFrames += 1;
+      this.submittedVideoFrames += 1;
+    }
+    if (this.phase === 'starting') {
+      throw new Error(
+        submittedFrames === 0
+          ? 'The recording source ended before the first video frame.'
+          : 'The recording source ended before the first encoded video packet.'
+      );
+    }
+  }
+
+  private observeSourceFrame(frame: VideoFrame): void {
+    this.sourceVideoFrames += 1;
+    this.firstSourceVideoTimestamp ??= frame.timestamp;
+    if (this.lastSourceVideoTimestamp !== null) {
+      this.maxSourceFrameGap = Math.max(
+        this.maxSourceFrameGap,
+        (frame.timestamp - this.lastSourceVideoTimestamp) / 1_000_000
+      );
+    }
+    this.lastSourceVideoTimestamp = frame.timestamp;
+  }
+
+  private handleVideoPumpFailure(error: Error): void {
+    this.rejectFirstEncodedVideoPacket(error);
+    const intentionalCancellation =
+      error instanceof DOMException &&
+      error.name === 'AbortError' &&
+      ['stopping', 'finalizing', 'aborted'].includes(this.phase);
+    if (intentionalCancellation || this.phase === 'failed' || this.phase === 'aborted') return;
+    if (this.phase === 'stopping' || this.phase === 'finalizing') throw error;
+    this.fail(error);
   }
 
   private logEncodedCadence(): void {
@@ -516,9 +682,31 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         : this.lastVideoEndTimestamp - this.firstVideoTimestamp;
     const cadenceDiagnostic = {
       actualFrameRate: duration > 0 ? this.encodedVideoFrames / duration : 0,
+      averageEncoderAddDurationMs:
+        this.submittedVideoFrames > 0
+          ? this.totalVideoEncoderAddDuration / this.submittedVideoFrames
+          : 0,
+      encoderBackpressureEvents: this.videoEncoderBackpressureEvents,
       duration,
       encodedVideoFrames: this.encodedVideoFrames,
+      maxEncoderAddDurationMs: this.maxVideoEncoderAddDuration,
+      maxFrameBufferDepth: this.maxVideoFrameBufferDepth,
+      maxSourceFrameGapMs: this.maxSourceFrameGap * 1_000,
+      processorDiscardedFrames: readOptionalProcessorCounter(
+        this.videoProcessor,
+        'discardedFrames'
+      ),
+      processorTotalFrames: readOptionalProcessorCounter(this.videoProcessor, 'totalFrames'),
       requestedFrameRate: this.input.encoding.frameRate,
+      sourceFrameRate:
+        this.firstSourceVideoTimestamp !== null &&
+        this.lastSourceVideoTimestamp !== null &&
+        this.lastSourceVideoTimestamp > this.firstSourceVideoTimestamp
+          ? ((this.sourceVideoFrames - 1) * 1_000_000) /
+            (this.lastSourceVideoTimestamp - this.firstSourceVideoTimestamp)
+          : 0,
+      sourceVideoFrames: this.sourceVideoFrames,
+      submittedVideoFrames: this.submittedVideoFrames,
     };
     logger.info(`TAB_RECORDING_DIAGNOSTIC encoder-final ${JSON.stringify(cadenceDiagnostic)}`);
     logger.info('Finalized source-driven live encoder', cadenceDiagnostic);
@@ -538,6 +726,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         'Recording failure handling also failed.'
       );
     }
+    this.videoFrameBuffer.abort();
     this.abortPromise ??= Promise.allSettled([
       this.videoReader.cancel(),
       this.output.cancel(),

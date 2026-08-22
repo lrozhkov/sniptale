@@ -4,6 +4,9 @@ import {
   createConfigurableVideoStream,
   createEmptyStream,
 } from '../multi-source/media-stream.test-support';
+import { createControlledVideoProcessorTestDouble } from './live-artifact-session.test-support';
+
+const processorInits = vi.hoisted(() => [] as MediaStreamTrackProcessorInit[]);
 
 const mediabunny = vi.hoisted(() => {
   class AppendOnlyStreamTarget {
@@ -177,6 +180,7 @@ beforeEach(() => {
   mediabunny.Output.encoderFrameRate = null;
   mediabunny.Output.encoderBitrateMode = null;
   mediabunny.Output.encoderContentHint = null;
+  processorInits.length = 0;
   vi.stubGlobal(
     'VideoFrame',
     class {
@@ -214,6 +218,9 @@ beforeEach(() => {
           controller.enqueue(createTestVideoFrame(0));
         },
       });
+      constructor(init: MediaStreamTrackProcessorInit) {
+        processorInits.push(init);
+      }
     }
   );
 });
@@ -239,6 +246,9 @@ describe('source-driven live recording flow', () => {
       })
     );
     expect(output?.videoSource?.add).toHaveBeenCalledOnce();
+    expect(processorInits[0]).toEqual(
+      expect.objectContaining({ maxBufferSize: 1, track: expect.any(Object) })
+    );
   });
 
   it('crops encoder input frames without a canvas stream when a full-tab source has odd bounds', async () => {
@@ -322,7 +332,9 @@ describe('source-driven live recording flow', () => {
     await expect(session.stop()).rejects.toThrow('was aborted');
     expect(output.cancel).toHaveBeenCalledOnce();
   });
+});
 
+describe('source-driven live recording buffering', () => {
   it('streams bytes into staging before exactly-once finalization', async () => {
     const { session } = await createSession();
     session.start();
@@ -336,9 +348,9 @@ describe('source-driven live recording flow', () => {
     expect(mediabunny.Output.instances[0]?.finalize).toHaveBeenCalledOnce();
   });
 
-  it('awaits encoder backpressure and submits every real source frame without queue drops', async () => {
+  it('drains real source frames into a bounded buffer during transient backpressure', async () => {
     const read = vi.fn();
-    const timestamps = [0, 16_667, 33_334];
+    const timestamps = Array.from({ length: 10 }, (_, index) => index * 16_667);
     vi.stubGlobal(
       'MediaStreamTrackProcessor',
       class {
@@ -363,12 +375,13 @@ describe('source-driven live recording flow', () => {
 
     session.start();
     await vi.waitFor(() => expect(source.add).toHaveBeenCalledOnce());
-    expect(read).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(9));
+    expect(source.add).toHaveBeenCalledOnce();
     releaseFirstAdd();
-    await vi.waitFor(() => expect(source.add).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(source.add).toHaveBeenCalledTimes(10));
 
-    expect(read).toHaveBeenCalledTimes(4);
-    expect(mediabunny.VideoSample.instances).toHaveLength(3);
+    expect(read).toHaveBeenCalledTimes(11);
+    expect(mediabunny.VideoSample.instances).toHaveLength(10);
     expect(
       mediabunny.VideoSample.instances.every((sample) => sample.close.mock.calls.length === 1)
     ).toBe(true);
@@ -413,6 +426,121 @@ describe('source-driven live recording flow', () => {
     expect(output.finalize).not.toHaveBeenCalled();
     expect(coordinator.abort).toHaveBeenCalledOnce();
   });
+
+  it('drains accepted buffered frames before successful finalization', async () => {
+    const timestamps = [0, 16_667, 33_334];
+    vi.stubGlobal(
+      'MediaStreamTrackProcessor',
+      class {
+        readonly readable = new ReadableStream<VideoFrame>(
+          {
+            pull(controller) {
+              const timestamp = timestamps.shift();
+              if (timestamp !== undefined) controller.enqueue(createTestVideoFrame(timestamp));
+            },
+          },
+          { highWaterMark: 0 }
+        );
+      }
+    );
+    const { session } = await createSession();
+    const output = mediabunny.Output.instances[0]!;
+    const source = output.videoSource!;
+    const encode = source.add.getMockImplementation()!;
+    let releaseSecondEncode!: () => void;
+    source.add
+      .mockImplementationOnce(encode)
+      .mockImplementationOnce(() => new Promise<void>((resolve) => (releaseSecondEncode = resolve)))
+      .mockImplementationOnce(encode);
+    session.start();
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
+    await vi.waitFor(() => expect(source.add).toHaveBeenCalledTimes(2));
+
+    const stopping = session.stop();
+    expect(output.finalize).not.toHaveBeenCalled();
+    releaseSecondEncode();
+
+    await expect(stopping).resolves.toEqual(expect.objectContaining({ size: 3 }));
+    expect(source.add).toHaveBeenCalledTimes(3);
+    expect(output.finalize).toHaveBeenCalledOnce();
+  });
+});
+
+describe('source-driven live recording pause buffering', () => {
+  it('drains and drops processor backlog across pause and resume while encoding is stalled', async () => {
+    const processor = createControlledVideoProcessorTestDouble();
+    vi.stubGlobal('MediaStreamTrackProcessor', processor.processor);
+    const { session } = await createSession();
+    const source = mediabunny.Output.instances[0]!.videoSource!;
+    const encode = source.add.getMockImplementation()!;
+    let releaseSecondEncode!: () => void;
+    source.add
+      .mockImplementationOnce(encode)
+      .mockImplementationOnce(() => new Promise<void>((resolve) => (releaseSecondEncode = resolve)))
+      .mockImplementation(encode);
+
+    session.start();
+    processor.deliver(createTestVideoFrame(0));
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
+    for (let index = 1; index <= 9; index += 1) {
+      processor.deliver(createTestVideoFrame(index * 16_667));
+    }
+    await vi.waitFor(() => expect(source.add).toHaveBeenCalledTimes(2));
+
+    session.pause();
+    await vi.waitFor(() => expect(processor.read).toHaveBeenCalledTimes(2));
+    const pausedFrame = createTestVideoFrame(166_670);
+    session.resume();
+    expect(session.state).toBe('paused');
+
+    // Opening one FIFO slot must not resume the session while the processor read that was
+    // pending during pause still has an unclassified frame.
+    releaseSecondEncode();
+    processor.deliver(pausedFrame);
+    await Promise.resolve();
+    expect(session.state).toBe('paused');
+    await vi.waitFor(() => expect(pausedFrame.close).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
+    const firstResumedFrame = createTestVideoFrame(216_671);
+    processor.deliver(firstResumedFrame);
+
+    await vi.waitFor(() => expect(firstResumedFrame.close).toHaveBeenCalledOnce());
+    expect(mediabunny.VideoSample.instances.at(-1)?.frame).toBe(firstResumedFrame);
+    expect(mediabunny.VideoSample.instances.every((sample) => sample.frame !== pausedFrame)).toBe(
+      true
+    );
+    await session.abort();
+  });
+
+  it('keeps the first resumed frame when no source frame arrived during pause', async () => {
+    let controller!: ReadableStreamDefaultController<VideoFrame>;
+    vi.stubGlobal(
+      'MediaStreamTrackProcessor',
+      class {
+        readonly readable = new ReadableStream<VideoFrame>({
+          start(streamController) {
+            controller = streamController;
+          },
+        });
+      }
+    );
+    const { session } = await createSession();
+    const source = mediabunny.Output.instances[0]!.videoSource!;
+    session.start();
+    controller.enqueue(createTestVideoFrame(0));
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
+    await Promise.resolve();
+
+    session.pause();
+    session.resume();
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
+    const firstResumedFrame = createTestVideoFrame(1_000_000);
+    controller.enqueue(firstResumedFrame);
+
+    await vi.waitFor(() => expect(source.add).toHaveBeenCalledTimes(2));
+    expect(mediabunny.VideoSample.instances.at(-1)?.frame).toBe(firstResumedFrame);
+    await session.abort();
+  });
 });
 
 describe('source-driven live recording lifecycle and capability failures', () => {
@@ -425,7 +553,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
     session.pause();
     expect(session.state).toBe('paused');
     session.resume();
-    expect(session.state).toBe('recording');
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
     expect(audioSource?.add).toHaveBeenCalledOnce();
   });
 
