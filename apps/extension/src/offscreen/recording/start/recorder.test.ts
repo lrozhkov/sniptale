@@ -170,6 +170,30 @@ function runMimeTypeSelectionSuite() {
       })
     );
   });
+
+  it('passes the encoder-adjacent frame transform to the live artifact owner', async () => {
+    recordingContext.sourceStream = createVideoStream();
+    recordingContext.videoStream = createVideoStream();
+    recordingContext.beginRecordingSession('recording-1');
+    recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+    const encoderFrameTransform = {
+      fit: 'fill' as const,
+      outputSize: { height: 720, width: 1280 },
+      sourceRect: { height: 720, width: 1280, x: 0, y: 0 },
+    };
+
+    await finalizeRecordingBootstrap({
+      encoderFrameTransform,
+      resolvedRecordingId: 'recording-1',
+      settings: { ...DEFAULT_VIDEO_SETTINGS, outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE },
+      trackSettings: { width: 1280, height: 720, frameRate: 30 },
+      durationTracker: createDurationTrackerDouble(),
+    });
+
+    expect(createLiveRecordingArtifactSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ frameTransform: encoderFrameTransform })
+    );
+  });
 }
 
 function runAudioFallbackMimeTypeSelectionSuite() {

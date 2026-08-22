@@ -6,9 +6,9 @@ import {
   revalidateTabOutputGeometry,
   type TabOutputGeometry,
 } from '../geometry/tab-source';
-import { createCropOutputStream, type CropOutputStream } from './crop-stream';
 import { applyVideoTrackContentHint } from '../../../platform/media-utils/video-recording';
 import { resolveFixedVideoFrameRate } from './frame-pump';
+import type { LiveVideoFrameTransform } from '../encoding/live-artifact-session';
 
 export {
   isSameTabOutputGeometry,
@@ -18,6 +18,12 @@ export {
   revalidateTabOutputGeometry,
 };
 export type { TabOutputGeometry };
+
+type TabOutputStream = {
+  frameRate: number;
+  frameTransform?: LiveVideoFrameTransform;
+  stream: MediaStream;
+};
 
 function canPassThroughSource(sourceStream: MediaStream, geometry: TabOutputGeometry): boolean {
   const [track] = sourceStream.getVideoTracks();
@@ -41,29 +47,11 @@ function canPassThroughSource(sourceStream: MediaStream, geometry: TabOutputGeom
   );
 }
 
-function canCropAtEncoderInput(geometry: TabOutputGeometry): boolean {
-  const { sourceRect, sourceSize, outputSize } = geometry;
-  return (
-    geometry.tracksFullViewport &&
-    geometry.resolution === 'SOURCE' &&
-    geometry.outputBasis.width === sourceSize.width &&
-    geometry.outputBasis.height === sourceSize.height &&
-    sourceRect.x === 0 &&
-    sourceRect.y === 0 &&
-    sourceRect.width === outputSize.width &&
-    sourceRect.height === outputSize.height &&
-    sourceRect.width <= sourceSize.width &&
-    sourceRect.height <= sourceSize.height &&
-    sourceSize.width - sourceRect.width <= 1 &&
-    sourceSize.height - sourceRect.height <= 1
-  );
-}
-
 export async function createTabOutputStream(
   sourceStream: MediaStream,
   geometry: TabOutputGeometry,
   options: { frameRate?: number } = {}
-): Promise<CropOutputStream> {
+): Promise<TabOutputStream> {
   const [sourceTrack] = sourceStream.getVideoTracks();
   if (!sourceTrack) throw new Error('Tab source stream returned no video track');
   const sourceFrameRate = sourceTrack.getSettings().frameRate;
@@ -75,14 +63,15 @@ export async function createTabOutputStream(
       stream: sourceStream,
     };
   }
-  if (canCropAtEncoderInput(geometry)) {
-    applyVideoTrackContentHint(sourceTrack, 'detail');
-    return {
-      encoderFrameCrop: geometry.sourceRect,
-      frameRate: requestedFrameRate,
-      stream: sourceStream,
-    };
-  }
   resolveFixedVideoFrameRate(requestedFrameRate, sourceFrameRate);
-  return createCropOutputStream(sourceStream, geometry, options);
+  applyVideoTrackContentHint(sourceTrack, 'detail');
+  return {
+    frameRate: requestedFrameRate,
+    frameTransform: {
+      fit: geometry.fillsOutput ? 'fill' : 'contain',
+      outputSize: geometry.outputSize,
+      sourceRect: geometry.sourceRect,
+    },
+    stream: sourceStream,
+  };
 }

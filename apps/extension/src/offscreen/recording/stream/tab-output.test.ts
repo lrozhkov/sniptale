@@ -1,19 +1,8 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-
-const mocks = vi.hoisted(() => ({
-  createCropOutputStream: vi.fn(),
-}));
-
-vi.mock('./crop-stream', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./crop-stream')>()),
-  createCropOutputStream: mocks.createCropOutputStream,
-}));
+import { expect, it } from 'vitest';
 
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import { createEmptyStream, createTrackedStream } from '../multi-source/media-stream.test-support';
 import { createTabOutputStream, resolveTabOutputGeometry } from './tab-output';
-
-beforeEach(() => vi.clearAllMocks());
 
 it('passes through a full acquired TAB raster without viewport reprojection', async () => {
   const stream = createTrackedStream({ frameRate: 30, height: 1440, width: 2560 });
@@ -31,7 +20,6 @@ it('passes through a full acquired TAB raster without viewport reprojection', as
     frameRate: 30,
     stream,
   });
-  expect(mocks.createCropOutputStream).not.toHaveBeenCalled();
   expect(geometry).toMatchObject({
     fit: 'contain',
     outputBasis: { width: 2560, height: 1440 },
@@ -63,11 +51,10 @@ it('passes through an exact full-tab SOURCE track without a canvas resample', as
     frameRate: 60,
     stream,
   });
-  expect(mocks.createCropOutputStream).not.toHaveBeenCalled();
   expect(track.contentHint).toBe('detail');
 });
 
-it('keeps an exact preset-sized full TAB on the single canvas transform path', async () => {
+it('keeps an exact preset-sized full TAB on the encoder-adjacent transform path', async () => {
   const stream = createTrackedStream({ frameRate: 30, height: 1080, width: 1920 });
   const geometry = resolveTabOutputGeometry(
     { x: 0, y: 0, width: 1920, height: 1080 },
@@ -79,11 +66,15 @@ it('keeps an exact preset-sized full TAB on the single canvas transform path', a
       tracksFullViewport: true,
     }
   );
-  const output = { frameRate: 30, stream: createEmptyStream() };
-  mocks.createCropOutputStream.mockResolvedValueOnce(output);
-
-  await expect(createTabOutputStream(stream, geometry, { frameRate: 30 })).resolves.toBe(output);
-  expect(mocks.createCropOutputStream).toHaveBeenCalledWith(stream, geometry, { frameRate: 30 });
+  await expect(createTabOutputStream(stream, geometry, { frameRate: 30 })).resolves.toEqual({
+    frameRate: 30,
+    frameTransform: {
+      fit: 'fill',
+      outputSize: { height: 1080, width: 1920 },
+      sourceRect: { height: 1080, width: 1920, x: 0, y: 0 },
+    },
+    stream,
+  });
 });
 
 it('keeps exact full SOURCE pass-through independent of optional track FPS metadata', async () => {
@@ -102,7 +93,6 @@ it('keeps exact full SOURCE pass-through independent of optional track FPS metad
     frameRate: 24,
     stream,
   });
-  expect(mocks.createCropOutputStream).not.toHaveBeenCalled();
 });
 
 it('uses an encoder-visible crop for an odd native full SOURCE without a canvas transform', async () => {
@@ -119,11 +109,14 @@ it('uses an encoder-visible crop for an odd native full SOURCE without a canvas 
   );
 
   await expect(createTabOutputStream(stream, geometry, { frameRate: 60 })).resolves.toEqual({
-    encoderFrameCrop: { x: 0, y: 0, width: 1920, height: 1080 },
     frameRate: 60,
+    frameTransform: {
+      fit: 'fill',
+      outputSize: { height: 1080, width: 1920 },
+      sourceRect: { x: 0, y: 0, width: 1920, height: 1080 },
+    },
     stream,
   });
-  expect(mocks.createCropOutputStream).not.toHaveBeenCalled();
 });
 
 it('rejects a TAB source without a video track before selecting a pipeline', async () => {

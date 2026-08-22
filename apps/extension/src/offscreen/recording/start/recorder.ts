@@ -23,6 +23,7 @@ import { handleRecordingStartError } from './session';
 import {
   createLiveRecordingArtifactSession,
   type LiveRecordingEncodingConfig,
+  type LiveVideoFrameTransform,
 } from '../encoding/live-artifact-session';
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
@@ -131,7 +132,7 @@ export async function finalizeRecordingBootstrap(params: {
   resolvedRecordingId: string;
   settings: VideoRecordingSettings;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
-  encoderFrameCrop?: { x: number; y: number; width: number; height: number } | null;
+  encoderFrameTransform?: LiveVideoFrameTransform | null;
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
   sourceBinding?: RecordingSourceBinding;
@@ -174,7 +175,7 @@ export async function finalizeRecordingBootstrap(params: {
     coordinator: stagingCoordinator,
     encoding: encoderConfig,
     filename: buildRecordingFilename(mimeType),
-    ...(params.encoderFrameCrop ? { frameCrop: params.encoderFrameCrop } : {}),
+    frameTransform: params.encoderFrameTransform ?? undefined,
     mimeType,
     stream: videoStream,
   });

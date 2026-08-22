@@ -1,5 +1,6 @@
 interface BufferedLiveVideoFrame {
   frame: VideoFrame;
+  startsNewSegment?: boolean;
   timestampSeconds: number;
 }
 

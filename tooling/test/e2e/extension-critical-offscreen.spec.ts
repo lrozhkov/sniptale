@@ -53,6 +53,14 @@ type OffscreenHarnessBridge = {
       width: number;
     }>
   >;
+  recordLiveVfrArtifact: () => Promise<{
+    backwardTimestamps: number;
+    duplicateTimestamps: number;
+    durationSpanMs: number;
+    keyFrames: number;
+    packetCount: number;
+    summedDurationsMs: number;
+  }>;
   recordStaticCanvasArtifact: () => Promise<{
     centerPixel: { alpha: number; blue: number; green: number; red: number };
     decodedDurationMs: number;
@@ -67,6 +75,18 @@ type OffscreenHarnessBridge = {
     project: VideoProject
   ) => Promise<ProjectExportInputReference>;
 };
+
+async function recordLiveVfrArtifact(page: Page) {
+  return page.evaluate(async () => {
+    const bridge = (
+      window as Window & {
+        __sniptaleOffscreenHarness?: OffscreenHarnessBridge;
+      }
+    ).__sniptaleOffscreenHarness;
+    if (!bridge) throw new Error('Offscreen harness bridge is unavailable');
+    return bridge.recordLiveVfrArtifact();
+  });
+}
 
 async function recordColdHighResolutionSequence(page: Page) {
   return page.evaluate(async () => {
@@ -327,6 +347,23 @@ test('offscreen canvas artifacts follow selected 24 and 60 FPS cadences', async 
   expect(at60.drawCount).toBeGreaterThan(at24.drawCount * 1.8);
   expect(at24.decodedDurationMs).toBeGreaterThanOrEqual(800);
   expect(at60.decodedDurationMs).toBeGreaterThanOrEqual(800);
+});
+
+test('source-timed live artifact has strict packet timestamps and truthful durations', async ({
+  page,
+  hostOrigin,
+}) => {
+  test.setTimeout(30_000);
+  await openOffscreenHarness(page, hostOrigin);
+
+  const artifact = await recordLiveVfrArtifact(page);
+
+  expect(artifact.packetCount).toBeGreaterThanOrEqual(3);
+  expect(artifact.keyFrames).toBeGreaterThanOrEqual(2);
+  expect(artifact.duplicateTimestamps).toBe(0);
+  expect(artifact.backwardTimestamps).toBe(0);
+  expect(artifact.durationSpanMs).toBeGreaterThanOrEqual(120);
+  expect(Math.abs(artifact.summedDurationsMs - artifact.durationSpanMs)).toBeLessThan(2);
 });
 
 test('cold and subsequent high-resolution recordings flush media before STOP', async ({

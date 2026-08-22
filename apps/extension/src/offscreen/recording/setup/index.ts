@@ -24,6 +24,9 @@ import {
 } from '../../../platform/media-utils/video-recording';
 import type { VideoOutputDimensions } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { createRecordingGeometryPlan } from '../geometry/plan';
+import { resolveAspectMatchedSourceFrame } from '../geometry/contain-frame';
+import type { LiveVideoFrameTransform } from '../encoding/live-artifact-session';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
 
@@ -38,7 +41,7 @@ type RecordingSetupParams = {
 };
 
 export type RecordingSetupResult = {
-  encoderFrameCrop: { x: number; y: number; width: number; height: number } | null;
+  encoderFrameTransform: LiveVideoFrameTransform | null;
   cursorCaptureMode: VideoCursorCaptureMode | null;
   rawTrackSettings: MediaTrackSettings;
   rawVideoHeight: number;
@@ -70,7 +73,7 @@ async function createOutputVideoStream(
   outputSize: VideoOutputDimensions;
   stream: MediaStream;
   tabOutputGeometry: TabOutputGeometry | null;
-  encoderFrameCrop: { x: number; y: number; width: number; height: number } | null;
+  encoderFrameTransform: LiveVideoFrameTransform | null;
   transformFailure: Promise<never> | null;
 }> {
   const frameRate = resolveVideoRecordingFrameRate(params.settings);
@@ -105,8 +108,8 @@ async function createOutputVideoStream(
       outputSize: tabOutputGeometry.outputSize,
       stream: tabOutput.stream,
       tabOutputGeometry,
-      encoderFrameCrop: tabOutput.encoderFrameCrop ?? null,
-      transformFailure: tabOutput.failure ?? null,
+      encoderFrameTransform: tabOutput.frameTransform ?? null,
+      transformFailure: null,
     };
   }
   if (params.captureMode === CaptureMode.CAMERA) {
@@ -116,18 +119,34 @@ async function createOutputVideoStream(
       outputSize: fixedOutput.outputSize,
       stream: fixedOutput.stream,
       tabOutputGeometry: null,
-      encoderFrameCrop: null,
+      encoderFrameTransform: null,
       transformFailure: fixedOutput.failure,
     };
   }
-  const fixedOutput = await createFixedOutputStream(source, params.settings);
+  const outputProfile = resolveVideoOutputProfile(params.settings);
+  const geometry = createRecordingGeometryPlan({
+    frameRateCap: outputProfile.frameRate,
+    outputBasis: raw,
+    resolution: outputProfile.resolution,
+    sourceRect: { x: 0, y: 0, ...raw },
+  });
+  const sourceRect = resolveAspectMatchedSourceFrame(geometry.sourceRect, geometry.outputSize);
+  const requiresTransform =
+    sourceRect.x !== 0 ||
+    sourceRect.y !== 0 ||
+    sourceRect.width !== raw.width ||
+    sourceRect.height !== raw.height ||
+    geometry.outputSize.width !== raw.width ||
+    geometry.outputSize.height !== raw.height;
   return {
-    frameRate: fixedOutput.frameRate,
-    outputSize: fixedOutput.outputSize,
-    stream: fixedOutput.stream,
+    frameRate,
+    outputSize: geometry.outputSize,
+    stream: source,
     tabOutputGeometry: null,
-    encoderFrameCrop: null,
-    transformFailure: fixedOutput.failure,
+    encoderFrameTransform: requiresTransform
+      ? { fit: 'fill', outputSize: geometry.outputSize, sourceRect }
+      : null,
+    transformFailure: null,
   };
 }
 
@@ -157,11 +176,11 @@ function assertEncoderInputSettings(
   track: MediaStreamTrack,
   expectedSize: VideoOutputDimensions,
   expectedFrameRate: number,
-  options: { allowSourceCrop?: boolean } = {}
+  options: { allowEncoderTransform?: boolean } = {}
 ): MediaTrackSettings {
   const applied = track.getSettings();
   if (
-    !options.allowSourceCrop &&
+    !options.allowEncoderTransform &&
     (applied.width !== expectedSize.width || applied.height !== expectedSize.height)
   ) {
     throw new Error(
@@ -170,8 +189,6 @@ function assertEncoderInputSettings(
     );
   }
   const appliedFrameRate = applied.frameRate;
-  // Manual CanvasCaptureMediaStreamTrack cadence is reported as 0 by Chromium even though
-  // requestFrame() is driven at the resolved scheduler rate.
   const frameRate =
     typeof appliedFrameRate === 'number' && appliedFrameRate > 0
       ? appliedFrameRate
@@ -190,7 +207,7 @@ function assertEncoderInputSettings(
   return {
     ...applied,
     frameRate,
-    ...(options.allowSourceCrop ? expectedSize : {}),
+    ...(options.allowEncoderTransform ? expectedSize : {}),
   };
 }
 
@@ -298,21 +315,16 @@ export async function prepareRecordingStream(
     outputTrack,
     output.outputSize,
     output.frameRate,
-    { allowSourceCrop: output.encoderFrameCrop !== null }
+    { allowEncoderTransform: output.encoderFrameTransform !== null }
   );
   const pipeline =
-    output.encoderFrameCrop !== null
-      ? 'source-encoder-crop'
-      : output.stream === sourceStream
-        ? 'source-pass-through'
-        : 'single-canvas-transform';
+    output.encoderFrameTransform !== null ? 'source-encoder-transform' : 'source-pass-through';
   const pipelineDiagnostic = {
     captureMode: params.captureMode ?? null,
-    encoderFrameCrop: output.encoderFrameCrop,
-    outputFrameRate: outputTrackSettings.frameRate ?? output.frameRate,
+    encoderFrameTransform: output.encoderFrameTransform,
     outputSize: output.outputSize,
     pipeline,
-    rawFrameRate: raw.trackSettings.frameRate ?? null,
+    reportedSourceFrameRate: raw.trackSettings.frameRate ?? null,
     rawSize: { height: raw.height, width: raw.width },
     requestedFrameRate: resolveVideoRecordingFrameRate(params.settings),
     sourceFidelity: tabSourceGeometry.fidelity,
@@ -330,12 +342,14 @@ export async function prepareRecordingStream(
     outputTrack,
     params.captureMode === CaptureMode.CAMERA
       ? 'motion'
-      : params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP
+      : params.captureMode === CaptureMode.SCREEN ||
+          params.captureMode === CaptureMode.TAB ||
+          params.captureMode === CaptureMode.TAB_CROP
         ? 'text'
         : 'detail'
   );
   return {
-    encoderFrameCrop: output.encoderFrameCrop,
+    encoderFrameTransform: output.encoderFrameTransform,
     cursorCaptureMode,
     rawTrackSettings: raw.trackSettings,
     rawVideoHeight: raw.height,

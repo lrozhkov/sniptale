@@ -4,13 +4,14 @@ import {
   type LiveRecordingArtifactSession,
   type LiveRecordingEncodingConfig,
 } from './live-artifact-session-owner';
+import type { LiveVideoFrameTransform } from './live-video-encoder-pump';
 
 interface CreateLiveRecordingArtifactSessionInput {
   artifactId: string;
   coordinator: RecordingStagingCoordinator;
   encoding: LiveRecordingEncodingConfig;
   filename: string;
-  frameCrop?: { x: number; y: number; width: number; height: number };
+  frameTransform?: LiveVideoFrameTransform | undefined;
   mimeType: string;
   stream: MediaStream;
 }
@@ -19,6 +20,7 @@ export type {
   LiveRecordingArtifactSession,
   LiveRecordingEncodingConfig,
 } from './live-artifact-session-owner';
+export type { LiveVideoFrameTransform } from './live-video-encoder-pump';
 
 export async function createLiveRecordingArtifactSession(
   input: CreateLiveRecordingArtifactSessionInput
@@ -32,7 +34,7 @@ export async function createLiveRecordingArtifactSession(
     artifactId: input.artifactId,
     coordinator: input.coordinator,
     encoding: input.encoding,
-    ...(input.frameCrop ? { frameCrop: input.frameCrop } : {}),
+    ...(input.frameTransform ? { frameTransform: input.frameTransform } : {}),
     stream: input.stream,
     writer,
   };

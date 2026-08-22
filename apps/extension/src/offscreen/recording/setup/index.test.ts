@@ -3,7 +3,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   acquire: vi.fn(),
   attachMicrophone: vi.fn(),
-  createCrop: vi.fn(),
   createFixedVideoOutput: vi.fn(),
   createSourceVideo: vi.fn(),
   createTabOutput: vi.fn(),
@@ -16,10 +15,6 @@ vi.mock('./capture', () => ({ acquireRecordingSourceStream: mocks.acquire }));
 vi.mock('./video', () => ({
   attachMicrophoneAudioIfEnabled: mocks.attachMicrophone,
   prepareStableTabRecordingAudio: mocks.attachMicrophone,
-}));
-vi.mock('../stream/crop-stream', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../stream/crop-stream')>()),
-  createCropStream: mocks.createCrop,
 }));
 vi.mock('../stream/fixed-video-output', () => ({
   createFixedVideoOutputStream: mocks.createFixedVideoOutput,
@@ -96,10 +91,6 @@ beforeEach(() => {
   mocks.acquire.mockResolvedValue({ cursorCaptureMode: null, stream: source });
   mocks.createSourceVideo.mockReturnValue({ videoHeight: 1440, videoWidth: 2560 });
   mocks.waitForSourceMetadata.mockResolvedValue(undefined);
-  mocks.createCrop.mockImplementation(
-    async (_source: MediaStream, cropGeometry: { outputSize: { width: number; height: number } }) =>
-      createRecordingStream(cropGeometry.outputSize.width, cropGeometry.outputSize.height)
-  );
   mocks.createFixedVideoOutput.mockImplementation(
     async (
       source: MediaStream,
@@ -121,12 +112,36 @@ beforeEach(() => {
   );
   mocks.createTabOutput.mockImplementation(
     async (
-      _source: MediaStream,
-      tabGeometry: { outputSize: { width: number; height: number } }
-    ) => ({
-      frameRate: 30,
-      stream: createRecordingStream(tabGeometry.outputSize.width, tabGeometry.outputSize.height),
-    })
+      source: MediaStream,
+      tabGeometry: {
+        fillsOutput?: boolean;
+        outputSize: { width: number; height: number };
+        sourceRect: { x: number; y: number; width: number; height: number };
+        sourceSize: { width: number; height: number };
+      },
+      options: { frameRate?: number } = {}
+    ) => {
+      const transformed =
+        tabGeometry.outputSize.width !== tabGeometry.sourceSize.width ||
+        tabGeometry.outputSize.height !== tabGeometry.sourceSize.height ||
+        tabGeometry.sourceRect.x !== 0 ||
+        tabGeometry.sourceRect.y !== 0 ||
+        tabGeometry.sourceRect.width !== tabGeometry.sourceSize.width ||
+        tabGeometry.sourceRect.height !== tabGeometry.sourceSize.height;
+      return {
+        frameRate: options.frameRate ?? 30,
+        ...(transformed
+          ? {
+              frameTransform: {
+                fit: tabGeometry.fillsOutput ? ('fill' as const) : ('contain' as const),
+                outputSize: tabGeometry.outputSize,
+                sourceRect: tabGeometry.sourceRect,
+              },
+            }
+          : {}),
+        stream: source,
+      };
+    }
   );
   mocks.attachMicrophone.mockResolvedValue(undefined);
 });
@@ -172,7 +187,6 @@ it('materializes the selected output geometry for a normal full-tab source', asy
     expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
     { frameRate: 30 }
   );
-  expect(mocks.createCrop).not.toHaveBeenCalled();
   expect(mocks.releaseSourceVideo).toHaveBeenCalledOnce();
 });
 
@@ -195,7 +209,6 @@ it('keeps a window-preset TAB output on the controlled tab canvas path', async (
     expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
     { frameRate: 30 }
   );
-  expect(mocks.createCrop).not.toHaveBeenCalled();
 });
 
 it('snapshots verified encoder metadata before audio stream composition', async () => {
@@ -431,13 +444,17 @@ it('rejects a TAB source that is more than one pixel below the measured viewport
   expect(mocks.createTabOutput).not.toHaveBeenCalled();
 });
 
-it('keeps odd full-tab SOURCE on the source stream with an encoder-frame crop', async () => {
+it('keeps odd full-tab SOURCE on the source stream with an encoder-frame transform', async () => {
   const source = createRecordingStream(2560, 1305, 60);
   mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
   mocks.createSourceVideo.mockReturnValueOnce({ videoHeight: 1305, videoWidth: 2560 });
   mocks.createTabOutput.mockResolvedValueOnce({
-    encoderFrameCrop: { height: 1304, width: 2560, x: 0, y: 0 },
     frameRate: 60,
+    frameTransform: {
+      fit: 'fill',
+      outputSize: { height: 1304, width: 2560 },
+      sourceRect: { height: 1304, width: 2560, x: 0, y: 0 },
+    },
     stream: source,
   });
   const sourceSettings = {
@@ -457,7 +474,11 @@ it('keeps odd full-tab SOURCE on the source stream with an encoder-frame crop', 
       viewport: { width: 2560, height: 1305, devicePixelRatio: 1 },
     })
   ).resolves.toMatchObject({
-    encoderFrameCrop: { height: 1304, width: 2560, x: 0, y: 0 },
+    encoderFrameTransform: {
+      fit: 'fill',
+      outputSize: { height: 1304, width: 2560 },
+      sourceRect: { height: 1304, width: 2560, x: 0, y: 0 },
+    },
     rawVideoHeight: 1305,
     rawVideoWidth: 2560,
     trackSettings: { frameRate: 60, height: 1304, width: 2560 },
@@ -521,7 +542,7 @@ it.each([CaptureMode.SCREEN, CaptureMode.CAMERA])(
   }
 );
 
-it('routes the primary full-source path through the dynamic fixed-video adapter', async () => {
+it('routes the primary full-source path through an encoder-adjacent transform', async () => {
   const source = createRecordingStream(2560, 1440, 30, { displaySurface: 'window' });
   const systemAudioTrack = createAudioStream().getAudioTracks()[0]!;
   vi.spyOn(source, 'getAudioTracks').mockReturnValue([systemAudioTrack]);
@@ -533,17 +554,17 @@ it('routes the primary full-source path through the dynamic fixed-video adapter'
     streamId: 'selected-window-source',
   });
 
-  expect(mocks.createFixedVideoOutput).toHaveBeenCalledWith(
-    source,
-    expect.objectContaining({ systemAudioEnabled: true }),
-    { frameRate: 30, includeSourceAudio: true, sourceOwnership: 'caller' }
-  );
-  expect(mocks.createCrop).not.toHaveBeenCalled();
+  expect(mocks.createFixedVideoOutput).not.toHaveBeenCalled();
   expect(prepared.trackSettings).toMatchObject({
     displaySurface: 'window',
     height: 1080,
     width: 1920,
   });
+  expect(prepared.encoderFrameTransform).toMatchObject({
+    fit: 'fill',
+    outputSize: { height: 1080, width: 1920 },
+  });
+  expect(recordingContext.videoStream).toBe(source);
 });
 
 it('materializes the selected 480p envelope on the actual recording stream', async () => {
@@ -563,16 +584,12 @@ it('materializes the selected 480p envelope on the actual recording stream', asy
     streamId: 'stream-480p',
   });
 
-  expect(mocks.createFixedVideoOutput).toHaveBeenCalledWith(
-    source,
-    expect.objectContaining({
-      outputProfile: expect.objectContaining({ resolution: VideoResolutionPreset.P480 }),
-    }),
-    { frameRate: 30, includeSourceAudio: true, sourceOwnership: 'caller' }
-  );
-  expect(mocks.createCrop).not.toHaveBeenCalled();
+  expect(mocks.createFixedVideoOutput).not.toHaveBeenCalled();
   expect(prepared.trackSettings).toMatchObject({ height: 480, width: 928 });
-  expect(recordingContext.videoStream?.getVideoTracks()[0]?.contentHint).toBe('detail');
+  expect(prepared.encoderFrameTransform).toMatchObject({
+    outputSize: { height: 480, width: 928 },
+  });
+  expect(recordingContext.videoStream?.getVideoTracks()[0]?.contentHint).toBe('text');
 });
 
 it('encodes a 2560x1440 full-tab source as an exact 854x480 output', async () => {
@@ -718,13 +735,11 @@ it('contains an odd-axis source in an encoder-safe even output', async () => {
     },
     streamId: 'stream-odd',
   });
-  expect(mocks.createFixedVideoOutput).toHaveBeenCalledWith(source, expect.anything(), {
-    frameRate: 30,
-    includeSourceAudio: true,
-    sourceOwnership: 'caller',
-  });
+  expect(mocks.createFixedVideoOutput).not.toHaveBeenCalled();
   expect(prepared.trackSettings).toMatchObject({ height: 720, width: 1278 });
-  expect(mocks.createCrop).not.toHaveBeenCalled();
+  expect(prepared.encoderFrameTransform).toMatchObject({
+    outputSize: { height: 720, width: 1278 },
+  });
 });
 
 it('fails when the raw or output stream has no video track', async () => {

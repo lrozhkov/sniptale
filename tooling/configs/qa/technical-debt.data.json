@@ -9413,7 +9413,9 @@
         "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-frame-buffer.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-timeline.ts",
         "apps/extension/src/offscreen/recording/encoding/resource-budget.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
         "apps/extension/src/offscreen/recording/finalizer.ts",
@@ -9455,7 +9457,6 @@
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
         "apps/extension/src/offscreen/recording/stream/canvas-video-output.ts",
-        "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
         "apps/extension/src/offscreen/recording/stream/fixed-video-output.ts",
         "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
         "apps/extension/src/offscreen/recording/stream/tab-output.ts",
@@ -9623,7 +9624,9 @@
         "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
         "apps/extension/src/offscreen/recording/encoding/live-artifact-session.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
         "apps/extension/src/offscreen/recording/encoding/live-video-frame-buffer.ts",
+        "apps/extension/src/offscreen/recording/encoding/live-video-timeline.ts",
         "apps/extension/src/offscreen/recording/encoding/resource-budget.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
         "apps/extension/src/offscreen/recording/finalizer.ts",
@@ -9665,7 +9668,6 @@
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
         "apps/extension/src/offscreen/recording/stream/canvas-video-output.ts",
-        "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
         "apps/extension/src/offscreen/recording/stream/fixed-video-output.ts",
         "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
         "apps/extension/src/offscreen/recording/stream/tab-output.ts",
@@ -18501,7 +18503,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "c45af96c4118dc6b89eb5d8788fe637848b5980ad6e294fb272e98eaba1c6b97"
+        "contentHash": "3b82fa33d2e1147152ddf5caf308fb1685bda2d8e60700e4c1df3cc3fceffe47"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"
@@ -18510,7 +18512,9 @@
         "property:readBlobVideoMetrics/centerPixel",
         "property:recordCanvasCadence/dimensions",
         "property:recordColdHighResolutionArtifact/dimensions",
-        "property:recordColdHighResolutionArtifact/recorderOptions"
+        "property:recordColdHighResolutionArtifact/recorderOptions",
+        "property:recordLiveVfrArtifact/encoding",
+        "property:recordLiveVfrArtifact/formats"
       ]
     },
     {
@@ -23378,7 +23382,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-recording.mjs",
-        "contentHash": "b78f65df4b07b56a11ebd7d9ab46f2a5dfa1d2fc884a472e77b609dfda7b055d"
+        "contentHash": "a6fe43f7aaed5cc310f5a8c345547b55750bc6f2b50cad1da71ec2b47741a26b"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",

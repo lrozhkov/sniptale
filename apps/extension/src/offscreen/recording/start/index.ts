@@ -136,7 +136,7 @@ async function startRecordingInternal(
     resolvedRecordingId: recordingId,
     settings: params.settings,
     cursorCaptureMode: prepared.cursorCaptureMode,
-    encoderFrameCrop: prepared.encoderFrameCrop,
+    encoderFrameTransform: prepared.encoderFrameTransform,
     trackSettings: prepared.trackSettings,
     durationTracker: recordingContext.durationTracker,
     sourceBinding: {
