@@ -563,8 +563,8 @@ it('opens the video popup without navigating directly to the editor after save',
   });
   await flushAsyncRoute();
   expect(openVideoEditorPageMock).not.toHaveBeenCalled();
-  expect(updateWindowMock).not.toHaveBeenCalled();
-  expect(openPopupMock).toHaveBeenCalledWith({ windowId: 4 });
+  expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
+  expect(openPopupMock).toHaveBeenCalledWith();
   expect(persistPendingVideoPostRecordResultMock).toHaveBeenCalledWith({
     primaryRecordingId: 'rec-2',
     projectId: null,
@@ -609,6 +609,38 @@ it('accepts a completed replay without requiring the original recording tab', as
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
+it('keeps post-record completion accepted when the recording tab is gone before popup activation', async () => {
+  const sendResponse = createSendResponse();
+  getTabMock.mockRejectedValueOnce(new Error('No tab with id: 17.'));
+
+  handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
+  await flushAsyncRoute();
+
+  expect(updateWindowMock).not.toHaveBeenCalled();
+  expect(openPopupMock).not.toHaveBeenCalled();
+  expectAcceptedLifecycleResponse(sendResponse);
+});
+
+it('opens the post-record popup from a restored recording lease after volatile stop state was cleared', async () => {
+  const sendResponse = createSendResponse();
+  getVideoRecordingIdMock.mockReturnValue(null);
+  getRecordingTabIdMock.mockReturnValue(null);
+  restoreCurrentRecordingFromLeaseMock.mockImplementation(async (recordingId: string) => {
+    getVideoRecordingIdMock.mockReturnValue(recordingId);
+    getRecordingTabIdMock.mockReturnValue(17);
+    return true;
+  });
+
+  handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
+  await flushAsyncRoute();
+
+  expect(restoreCurrentRecordingFromLeaseMock).toHaveBeenCalledWith('rec-1');
+  expect(getTabMock).toHaveBeenCalledWith(17);
+  expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
+  expect(openPopupMock).toHaveBeenCalledWith();
+  expectAcceptedLifecycleResponse(sendResponse);
+});
+
 it.each(['Cannot show popup for an inactive window.', 'Failed to open popup.'])(
   'focuses the recording window and retries the post-record popup after %s',
   async (errorMessage) => {
@@ -619,7 +651,7 @@ it.each(['Cannot show popup for an inactive window.', 'Failed to open popup.'])(
     await flushAsyncRoute();
 
     expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
-    expect(openPopupMock).toHaveBeenNthCalledWith(1, { windowId: 4 });
+    expect(openPopupMock).toHaveBeenNthCalledWith(1);
     expect(openPopupMock).toHaveBeenNthCalledWith(2);
     expectAcceptedLifecycleResponse(sendResponse);
   }
@@ -632,7 +664,7 @@ it('keeps post-record completion accepted when the action popup activation retry
   handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
   await flushAsyncRoute();
 
-  expect(openPopupMock).toHaveBeenNthCalledWith(1, { windowId: 4 });
+  expect(openPopupMock).toHaveBeenNthCalledWith(1);
   expect(openPopupMock).toHaveBeenNthCalledWith(2);
   expectAcceptedLifecycleResponse(sendResponse);
 });
@@ -645,7 +677,7 @@ it('opens the post-record popup when persistence is already synchronized', async
   await flushAsyncRoute();
 
   expect(commitPendingVideoPostRecordResultMock).not.toHaveBeenCalled();
-  expect(updateWindowMock).not.toHaveBeenCalled();
-  expect(openPopupMock).toHaveBeenCalledWith({ windowId: 4 });
+  expect(updateWindowMock).toHaveBeenCalledWith(4, { focused: true });
+  expect(openPopupMock).toHaveBeenCalledWith();
   expectAcceptedLifecycleResponse(sendResponse);
 });

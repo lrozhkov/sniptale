@@ -61,6 +61,10 @@ type SavedRecordingOperation = {
   promise: Promise<SavedRecordingOutcome>;
 };
 
+type PostRecordPopupDestination = {
+  windowId: number;
+};
+
 const savedRecordingOperations = new Map<string, SavedRecordingOperation>();
 
 export function handleOffscreenError(
@@ -197,8 +201,9 @@ async function processVideoSavedToIdb(
 ): Promise<SavedRecordingOutcome> {
   const existingState = await readStoredVideoPostRecordResult();
   if (isCompletedPostRecordReplay(existingState, message)) {
+    const popupDestination = await resolvePostRecordPopupDestination();
     await consumeRecordingCompletionOutbox(message, false);
-    await openPostRecordPopup();
+    await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
@@ -207,28 +212,37 @@ async function processVideoSavedToIdb(
     return 'superseded';
   }
 
+  const popupDestination = await resolvePostRecordPopupDestination();
   const synchronized = await synchronizePostRecordResult(message);
   if (synchronized === 'ready' || synchronized === 'acknowledged') {
     await consumeRecordingCompletionOutbox(message, false);
-    await openPostRecordPopup();
+    await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
   await completeSavedRecordingPersistence(message.recordingId);
   await consumeRecordingCompletionOutbox(message, true);
-  await openPostRecordPopup();
+  await openPostRecordPopup(popupDestination);
   finalizeSavedRecordingCompletion(message);
   return 'accepted';
 }
 
-async function openPostRecordPopup(): Promise<void> {
+async function resolvePostRecordPopupDestination(): Promise<PostRecordPopupDestination | null> {
   const tabId = getRecordingTabId();
-  if (tabId === null) return;
+  if (tabId === null) return null;
   try {
     const tab = await browserTabs.get(tabId);
-    if (typeof tab.windowId === 'number') {
-      await openPopupForWindow(tab.windowId);
-    }
+    return typeof tab.windowId === 'number' ? { windowId: tab.windowId } : null;
+  } catch (error) {
+    logger.warn('Failed to resolve the video post-record popup window', error);
+    return null;
+  }
+}
+
+async function openPostRecordPopup(destination: PostRecordPopupDestination | null): Promise<void> {
+  if (!destination) return;
+  try {
+    await openPopupForWindow(destination.windowId);
   } catch (error) {
     logger.warn('Failed to open the video post-record popup', error);
   }
@@ -236,10 +250,10 @@ async function openPostRecordPopup(): Promise<void> {
 
 async function openPopupForWindow(windowId: number): Promise<void> {
   try {
-    await browserAction.openPopup({ windowId });
+    await browserWindows.update(windowId, { focused: true });
+    await browserAction.openPopup();
   } catch (error) {
     if (!isRetryablePopupOpenError(error)) throw error;
-    await browserWindows.update(windowId, { focused: true });
     await browserAction.openPopup();
   }
 }

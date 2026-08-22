@@ -8,15 +8,21 @@ export type LiveVideoFrameTransform = Readonly<{
 }>;
 
 /** Owns the single reusable encoder-adjacent raster transform for non-SOURCE profiles. */
+type VideoFrameColorSpaceInit = VideoFrameInit & { colorSpace?: VideoColorSpaceInit };
+
 export class LiveVideoFrameTransformer {
   private canvas: OffscreenCanvas | null = null;
   private context: OffscreenCanvasRenderingContext2D | null = null;
 
   constructor(private readonly transform: LiveVideoFrameTransform) {}
 
-  transformFrame(frame: VideoFrame, timing: LiveVideoSampleTiming): VideoSample {
+  transformFrame(
+    frame: VideoFrame,
+    timing: LiveVideoSampleTiming,
+    colorSpace?: VideoColorSpaceInit
+  ): VideoSample {
     if (canUseVisibleRectTransform(this.transform)) {
-      return createVisibleRectSample(frame, this.transform.sourceRect, timing);
+      return createVisibleRectSample(frame, this.transform.sourceRect, timing, colorSpace);
     }
     const context = this.getRasterContext();
     const { fit, outputSize, sourceRect } = this.transform;
@@ -37,6 +43,7 @@ export class LiveVideoFrameTransformer {
       destination.height
     );
     return new VideoSample(this.canvas!, {
+      ...(colorSpace ? { colorSpace } : {}),
       duration: timing.duration,
       timestamp: timing.timestamp,
     });
@@ -79,21 +86,22 @@ function canUseVisibleRectTransform({
 function createVisibleRectSample(
   frame: VideoFrame,
   sourceRect: LiveVideoFrameTransform['sourceRect'],
-  timing: LiveVideoSampleTiming
+  timing: LiveVideoSampleTiming,
+  colorSpace?: VideoColorSpaceInit
 ): VideoSample {
   const duration = Math.trunc(timing.duration * 1_000_000);
-  return new VideoSample(
-    new VideoFrame(frame, {
-      timestamp: Math.trunc(timing.timestamp * 1_000_000),
-      visibleRect: {
-        height: sourceRect.height,
-        width: sourceRect.width,
-        x: sourceRect.x,
-        y: sourceRect.y,
-      },
-      ...(duration ? { duration } : {}),
-    })
-  );
+  const frameInit: VideoFrameColorSpaceInit = {
+    ...(colorSpace ? { colorSpace } : {}),
+    timestamp: Math.trunc(timing.timestamp * 1_000_000),
+    visibleRect: {
+      height: sourceRect.height,
+      width: sourceRect.width,
+      x: sourceRect.x,
+      y: sourceRect.y,
+    },
+    ...(duration ? { duration } : {}),
+  };
+  return new VideoSample(new VideoFrame(frame, frameInit as VideoFrameInit));
 }
 
 function resolveDestinationRect(

@@ -70,6 +70,13 @@ interface CreateLiveRecordingArtifactSessionOwnerInput {
 
 type LiveEncoderContentHint = 'detail' | 'motion' | 'text';
 
+const SCREEN_RECORDING_COLOR_SPACE: VideoColorSpaceInit = {
+  fullRange: true,
+  matrix: 'bt709',
+  primaries: 'bt709',
+  transfer: 'bt709',
+};
+
 interface ActiveVideoRead {
   generation: number;
   settled: boolean;
@@ -94,6 +101,12 @@ function createOutputFormat(container: 'mp4' | 'webm'): OutputFormat {
 function resolveLiveEncoderContentHint(track: MediaStreamVideoTrack): LiveEncoderContentHint {
   const hint = track.contentHint;
   return hint === 'motion' || hint === 'text' || hint === 'detail' ? hint : 'detail';
+}
+
+function resolveLiveSampleColorSpace(
+  contentHint: LiveEncoderContentHint
+): VideoColorSpaceInit | undefined {
+  return contentHint === 'text' ? SCREEN_RECORDING_COLOR_SPACE : undefined;
 }
 
 function matchesSelectedCodec(configuredCodec: string, selectedCodec: VideoCodec): boolean {
@@ -505,6 +518,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
 
   private async pumpVideoFrames(): Promise<void> {
     const readPump = this.readVideoFramesIntoBuffer();
+    const sampleColorSpace = resolveLiveSampleColorSpace(this.expectedContentHint);
     const encodePump = runLiveVideoEncoderPump({
       frameBuffer: this.videoFrameBuffer,
       frameRate: this.input.encoding.frameRate,
@@ -512,6 +526,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       onFrameDequeued: () => this.completeResumeAfterProcessorDrain(),
       onEncoderSubmissionFailed: () => this.videoDiagnostics.encoderSubmissionFailed(),
       onEncoderSubmissionStarted: () => this.videoDiagnostics.encoderSubmissionStarted(),
+      ...(sampleColorSpace ? { sampleColorSpace } : {}),
       shouldEncodeTerminalFrame: () => this.phase !== 'aborted' && this.phase !== 'failed',
       videoSource: this.videoSource,
     })

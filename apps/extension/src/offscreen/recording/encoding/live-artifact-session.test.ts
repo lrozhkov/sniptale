@@ -27,7 +27,7 @@ const mediabunny = vi.hoisted(() => {
     readonly close: ReturnType<typeof vi.fn>;
     constructor(
       readonly frame: VideoFrame,
-      readonly init: { duration: number; timestamp: number }
+      readonly init: { duration?: number; timestamp?: number } = {}
     ) {
       this.close = vi.fn(() => {
         if (typeof frame.close === 'function') frame.close();
@@ -74,8 +74,8 @@ const mediabunny = vi.hoisted(() => {
       }
       this.config.onEncodedPacket?.({
         byteLength: encodeOptions?.keyFrame ? 100_000 : 2_000,
-        duration: sample.init.duration,
-        timestamp: sample.init.timestamp,
+        duration: sample.init.duration ?? (sample.frame.duration ?? 0) / 1_000_000,
+        timestamp: sample.init.timestamp ?? sample.frame.timestamp / 1_000_000,
         type: encodeOptions?.keyFrame ? 'key' : 'delta',
       });
     });

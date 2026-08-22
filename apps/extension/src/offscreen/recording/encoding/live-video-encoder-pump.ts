@@ -25,6 +25,7 @@ interface RunLiveVideoEncoderPumpInput {
   frameBuffer: LiveVideoFrameBuffer;
   frameRate: number;
   frameTransform?: LiveVideoFrameTransform;
+  sampleColorSpace?: VideoColorSpaceInit;
   onFrameDequeued(): void;
   onEncoderSubmissionFailed?(): void;
   onEncoderSubmissionStarted?(): void;
@@ -34,6 +35,8 @@ interface RunLiveVideoEncoderPumpInput {
 }
 
 const logger = createLogger({ namespace: 'LiveVideoEncoderPump' });
+
+type VideoFrameColorSpaceInit = VideoFrameInit & { colorSpace?: VideoColorSpaceInit };
 
 function describeVideoFrame(frame: VideoFrame) {
   return {
@@ -62,10 +65,11 @@ async function encodeVideoFrame(
 ): Promise<void> {
   const sourceDescription = describeVideoFrame(frame);
   let sample: VideoSample | null = null;
+  let sourceFrameToClose: VideoFrame | null = null;
   try {
     if (input.frameTransformer) {
       const transformStartedAt = performance.now();
-      sample = input.frameTransformer.transformFrame(frame, timing);
+      sample = input.frameTransformer.transformFrame(frame, timing, input.sampleColorSpace);
       const transformDuration = performance.now() - transformStartedAt;
       metrics.maxFrameTransformDurationMs = Math.max(
         metrics.maxFrameTransformDurationMs,
@@ -73,6 +77,16 @@ async function encodeVideoFrame(
       );
       metrics.totalFrameTransformDurationMs += transformDuration;
       metrics.transformedVideoFrames += 1;
+    } else if (input.sampleColorSpace) {
+      const duration = Math.trunc(timing.duration * 1_000_000);
+      const frameInit: VideoFrameColorSpaceInit = {
+        colorSpace: input.sampleColorSpace,
+        ...(duration ? { duration } : {}),
+        timestamp: Math.trunc(timing.timestamp * 1_000_000),
+      };
+      const sampleFrame = new VideoFrame(frame, frameInit as VideoFrameInit);
+      sourceFrameToClose = frame;
+      sample = new VideoSample(sampleFrame);
     } else {
       sample = new VideoSample(frame, {
         duration: timing.duration,
@@ -114,6 +128,7 @@ async function encodeVideoFrame(
     metrics.submittedVideoFrames += 1;
   } finally {
     sample?.close();
+    sourceFrameToClose?.close();
     if (input.frameTransformer) frame.close();
   }
 }

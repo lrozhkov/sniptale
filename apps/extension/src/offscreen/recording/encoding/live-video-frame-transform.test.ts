@@ -100,6 +100,50 @@ describe('live video frame transformer', () => {
     expect(drawImage).toHaveBeenCalledWith(frame, 0, 0, 1600, 900, 0, 218.75, 1000, 562.5);
   });
 
+  it('passes screen color metadata through canvas and visible-rect samples', () => {
+    const colorSpace = {
+      fullRange: true,
+      matrix: 'bt709',
+      primaries: 'bt709',
+      transfer: 'bt709',
+    } satisfies VideoColorSpaceInit;
+    const canvasTransformer = new LiveVideoFrameTransformer({
+      fit: 'contain',
+      outputSize: { height: 1000, width: 1000 },
+      sourceRect: { height: 900, width: 1600, x: 0, y: 0 },
+    });
+    const visibleRectTransformer = new LiveVideoFrameTransformer({
+      fit: 'fill',
+      outputSize: { height: 100, width: 100 },
+      sourceRect: { height: 100, width: 100, x: 2, y: 4 },
+    });
+
+    canvasTransformer.transformFrame(
+      createFrame(),
+      { duration: 1 / 30, keyFrame: false, timestamp: 0 },
+      colorSpace
+    );
+    visibleRectTransformer.transformFrame(
+      createFrame(),
+      { duration: 1 / 30, keyFrame: false, timestamp: 1 },
+      colorSpace
+    );
+
+    expect(samples[0]?.init).toEqual(
+      expect.objectContaining({
+        colorSpace,
+        duration: 1 / 30,
+        timestamp: 0,
+      })
+    );
+    expect(videoFrames.at(-1)?.init).toEqual(
+      expect.objectContaining({
+        colorSpace,
+        timestamp: 1_000_000,
+      })
+    );
+  });
+
   it('covers without bars by centering the oversized destination', () => {
     const transformer = new LiveVideoFrameTransformer({
       fit: 'cover',

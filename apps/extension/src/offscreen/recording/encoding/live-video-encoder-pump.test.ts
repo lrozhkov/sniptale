@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-type TestVideoSampleInit = { duration: number; timestamp: number };
+type TestVideoSampleInit = {
+  colorSpace?: VideoColorSpaceInit;
+  duration?: number;
+  timestamp?: number;
+};
 
 const samples = vi.hoisted(() => [] as Array<{ frame: VideoFrame; init: TestVideoSampleInit }>);
 
@@ -15,7 +19,7 @@ vi.mock('mediabunny', () => ({
 
     constructor(
       readonly frame: VideoFrame,
-      readonly init: TestVideoSampleInit
+      readonly init: TestVideoSampleInit = {}
     ) {
       samples.push({ frame, init });
     }
@@ -36,9 +40,13 @@ beforeEach(() => {
     'VideoFrame',
     class {
       readonly close = vi.fn();
+      readonly colorSpace: VideoColorSpaceInit | undefined;
+      readonly duration: number | undefined;
       readonly timestamp: number;
 
-      constructor(_data: AllowSharedBufferSource, init: VideoFrameBufferInit) {
+      constructor(_data: AllowSharedBufferSource | VideoFrame, init: VideoFrameBufferInit) {
+        this.colorSpace = init.colorSpace ?? undefined;
+        this.duration = init.duration ?? undefined;
         this.timestamp = init.timestamp;
       }
     }
@@ -129,6 +137,41 @@ describe('live video encoder pump', () => {
     expect(next.close).toHaveBeenCalledOnce();
   });
 
+  it('marks screen samples as full-range without switching to a raster transform', async () => {
+    const frameBuffer = new LiveVideoFrameBuffer(2);
+    const frame = new VideoFrame(new Uint8Array(4), {
+      codedHeight: 1,
+      codedWidth: 1,
+      format: 'RGBA',
+      timestamp: 0,
+    });
+    frameBuffer.enqueue({ frame, timestampSeconds: 0 });
+    frameBuffer.closeInput();
+    const add = vi.fn(async (_sample: unknown, _options?: VideoEncoderEncodeOptions) => undefined);
+    const sampleColorSpace = {
+      fullRange: true,
+      matrix: 'bt709',
+      primaries: 'bt709',
+      transfer: 'bt709',
+    } satisfies VideoColorSpaceInit;
+
+    await runLiveVideoEncoderPump({
+      frameBuffer,
+      frameRate: 30,
+      onFrameDequeued: vi.fn(),
+      sampleColorSpace,
+      shouldEncodeTerminalFrame: () => true,
+      videoSource: { add },
+    });
+
+    expect(samples).toHaveLength(1);
+    expect(samples[0]?.frame).not.toBe(frame);
+    expect(samples[0]?.frame.colorSpace).toEqual(sampleColorSpace);
+    expect(samples[0]?.frame.timestamp).toBe(0);
+    expect(samples[0]?.init).toEqual({});
+    expect(frame.close).toHaveBeenCalledOnce();
+  });
+
   it('closes the already-dequeued successor when encoding the pending frame fails', async () => {
     const frameBuffer = new LiveVideoFrameBuffer(2);
     const first = new VideoFrame(new Uint8Array(4), {
@@ -195,8 +238,8 @@ describe('live video encoder pump', () => {
       samples.map(({ frame, init }, index) => ({
         frame,
         init: {
-          duration: Number(init.duration.toFixed(6)),
-          timestamp: Number(init.timestamp.toFixed(6)),
+          duration: Number(init.duration!.toFixed(6)),
+          timestamp: Number(init.timestamp!.toFixed(6)),
         },
         keyFrame: add.mock.calls[index]?.[1],
       }))
