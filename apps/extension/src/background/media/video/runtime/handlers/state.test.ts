@@ -130,12 +130,6 @@ import {
 } from './state/offscreen-lifecycle';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
-import {
-  captureSourceObtainedRouteDescriptor,
-  offscreenLifecycleRouteDescriptor,
-  projectExportLifecycleRouteDescriptor,
-  videoRuntimeStateRouteDescriptor,
-} from './state/route-descriptors';
 
 function createSendResponse() {
   return vi.fn<(response?: unknown) => void>();
@@ -167,27 +161,6 @@ beforeEach(() => {
   clearCameraRecorderControlGrantMock.mockResolvedValue(true);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
-});
-
-it('declares every state and offscreen lifecycle route under its canonical authority', () => {
-  expect(videoRuntimeStateRouteDescriptor).toMatchObject({
-    authorityFamily: 'video-runtime-owner-policy',
-    messageTypes: expect.arrayContaining([VideoMessageType.GET_RECORDING_STATE]),
-    ownerModule: 'apps/extension/src/background/media/video/runtime/router.ts',
-  });
-  expect(offscreenLifecycleRouteDescriptor).toMatchObject({
-    authorityFamily: 'offscreen-runtime-capability',
-    messageTypes: expect.arrayContaining([
-      VideoMessageType.OFFSCREEN_SOURCE_READY,
-      VideoMessageType.VIDEO_SAVED_TO_IDB,
-    ]),
-  });
-  expect(captureSourceObtainedRouteDescriptor.messageTypes).toEqual([
-    VideoMessageType.CAPTURE_SOURCE_OBTAINED,
-  ]);
-  expect(projectExportLifecycleRouteDescriptor.messageTypes).toContain(
-    VideoMessageType.PROJECT_EXPORT_COMPLETED
-  );
 });
 
 it('handles recording state and tab routes through the state owner', async () => {

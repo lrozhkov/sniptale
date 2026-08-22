@@ -14,7 +14,7 @@ Capabilities and leases bind the minimum applicable sender, tab or document, ope
 
 The service worker entrypoint is `apps/extension/src/background/index.ts`. It owns privileged browser APIs, service-worker lifecycle, route authorization and dispatch, capture/recording orchestration, background-local state, and coordination with extension pages and the offscreen document.
 
-`apps/extension/src/background/runtime/routing/action-kernel/routes.ts` is the route registry. `apps/extension/src/background/runtime/routing/action-kernel/owned-route-inventory.ts` supplies owner and authority metadata, and `apps/extension/src/background/runtime/routing/authorization/policy-registry.ts` owns runtime authorization policy. These registries and their drift tests change together.
+`apps/extension/src/contracts/messaging/contracts/runtime/background-ingress.data.ts` is the canonical background-ingress descriptor registry beside the runtime parser contracts. Action-kernel routes, message guards, sender classifications, policy-state usage, documentation metadata, and machine inventories are projections of that registry. Background runtime bindings remain exhaustive maps from descriptor-owned handler and authorization IDs to effectful owner functions.
 
 Action-kernel code owns execution policy and dispatch, not domain behavior. Feature behavior enters through named route and lifecycle entrypoints. Legacy family routers remain adapters; authorization and dispatch proof runs through listener/action-kernel paths.
 
@@ -75,4 +75,4 @@ Content AI egress uses `apps/extension/src/features/ai/privacy/index.ts` for DOM
 
 ## Adding or changing a runtime
 
-Update the runtime topology registry, manifest/build inputs, entrypoint ownership, documentation markers, and drift tests in one coherent change. A new privileged route also requires its contract parser, route owner, authorization policy, sender class, authority/freshness/replay behavior, failure response, and listener-path proof.
+Update the runtime topology registry, manifest/build inputs, entrypoint ownership, documentation markers, and drift tests in one coherent change. A new privileged background ingress route is declared once beside its contract parser with its handler, authorization, sender, authority/freshness/replay, policy-state, failure-response, and owner metadata; exhaustive runtime bindings and listener-path proof must resolve those declared IDs before effects.

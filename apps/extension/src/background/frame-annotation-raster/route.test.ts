@@ -30,7 +30,6 @@ vi.mock('../routing-contracts/runtime-messaging/services', async (importOriginal
   getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: mocks.send }),
 }));
 
-import { frameAnnotationRasterRouteDescriptor } from './route-descriptors';
 import { reserveMediaErasureExclusion } from '../mutation-exclusion/media-activity';
 import { routeFrameAnnotationRasterMessage } from './route';
 
@@ -72,9 +71,6 @@ async function cancelLease(leaseId: string): Promise<void> {
 it('routes a valid bounded reference through the offscreen owner', async () => {
   const leaseId = await prepareLease();
   const sendResponse = vi.fn();
-  expect(frameAnnotationRasterRouteDescriptor.messageTypes).toEqual([
-    MessageType.FRAME_ANNOTATION_RASTERIZE,
-  ]);
   expect(
     routeFrameAnnotationRasterMessage(
       {

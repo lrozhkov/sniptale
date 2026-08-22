@@ -1,27 +1,9 @@
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { PolicyStateId } from './policy-state';
 import type { ContentSenderBinding } from './capabilities/content-action/capability-store';
+import type { BackgroundOwnedIngressHandlerId } from '../../contracts/messaging/contracts/runtime';
 
-export type BackgroundOwnedRouteHandlerId =
-  | 'aggregate-promotion'
-  | 'ai-secret-unlock'
-  | 'ai-settings-query'
-  | 'ai-settings-mutation'
-  | 'ai-settings-navigation'
-  | 'annotation-fork-session'
-  | 'content-action-capability-issuance'
-  | 'content-runtime-wakeup'
-  | 'frame-annotation-raster'
-  | 'llm-content-processing'
-  | 'llm-scenario-editor-processing'
-  | 'llm-session'
-  | 'local-data-erasure'
-  | 'settings-transfer'
-  | 'native-app-runtime'
-  | 'page-access'
-  | 'popup-export-job'
-  | 'popup-tab-route-capability-issuance'
-  | 'voice-input-offscreen-event';
+export type BackgroundOwnedRouteHandlerId = BackgroundOwnedIngressHandlerId;
 
 export type BackgroundOwnedRouteInventoryEntry = {
   readonly handlerId: BackgroundOwnedRouteHandlerId;

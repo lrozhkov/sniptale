@@ -1,5 +1,8 @@
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../contracts/video/types/messages';
+import {
+  getBackgroundIngressDescriptor,
+  isBackgroundIngressRouteAuthorizedBy,
+} from '../../../../contracts/messaging/contracts/runtime';
 import { resolveExtensionDocumentSenderUrl } from '../../../../platform/runtime-messaging/document-sender';
 
 const CAMERA_RECORDER_DOCUMENT_PATH = 'apps/extension/src/camera-recorder/index.html';
@@ -11,30 +14,9 @@ type TrustedVideoEditorRuntimeSender = {
   senderUrl: string;
 };
 
-const offscreenOnlyRuntimeTypes = new Set<VideoRuntimeMessage['type']>([
-  VideoMessageType.RECORDING_DURATION_UPDATED,
-  VideoMessageType.OFFSCREEN_READY,
-  VideoMessageType.OFFSCREEN_RECORDING_STARTED,
-  VideoMessageType.OFFSCREEN_SOURCE_READY,
-  VideoMessageType.OFFSCREEN_RECORDING_STOPPED,
-  VideoMessageType.OFFSCREEN_RECORDING_PAUSED,
-  VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
-  VideoMessageType.OFFSCREEN_ERROR,
-  VideoMessageType.PROJECT_EXPORT_PROGRESS,
-  VideoMessageType.PROJECT_EXPORT_COMPLETED,
-  VideoMessageType.PROJECT_EXPORT_FAILED,
-  VideoMessageType.PROJECT_EXPORT_CANCELLED,
-  VideoMessageType.DESKTOP_MEDIA_OBTAINED,
-  VideoMessageType.DESKTOP_MEDIA_CANCELLED,
-  VideoMessageType.DESKTOP_MEDIA_FAILED,
-  VideoMessageType.DOWNLOAD_RECORDING_SIDECAR,
-  VideoMessageType.DOWNLOAD_RECORDING,
-  VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
-  VideoMessageType.VIDEO_SAVED_TO_IDB,
-]);
-
 export function isOffscreenOnlyVideoRuntimeMessage(message: VideoRuntimeMessage): boolean {
-  return offscreenOnlyRuntimeTypes.has(message.type);
+  const descriptor = getBackgroundIngressDescriptor(message.type);
+  return isBackgroundIngressRouteAuthorizedBy(descriptor, 'offscreen-runtime');
 }
 
 export function resolveTrustedVideoEditorRuntimeSenderUrl(

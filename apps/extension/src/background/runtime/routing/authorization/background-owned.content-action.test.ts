@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { AiSettingsMutationMessage } from '../../../../contracts/messaging/ai-settings-runtime';
-import { authorizeBackgroundOwnedRoute } from './background-owned';
+import { authorizeBackgroundOwnedRoute } from './owned';
 import type { BackgroundOwnedAuthorizationRequest } from './background-owned.types';
 import {
   getBackgroundOwnedRouteContext,

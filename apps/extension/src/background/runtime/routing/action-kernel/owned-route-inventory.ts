@@ -1,50 +1,10 @@
-import {
-  llmContentProcessingRouteDescriptor,
-  llmScenarioEditorProcessingRouteDescriptor,
-  llmSessionRouteDescriptor,
-} from '../../../ai/llm/route-descriptors';
-import {
-  aiSecretUnlockRouteDescriptor,
-  aiSettingsNavigationRouteDescriptor,
-  aiSettingsMutationRouteDescriptor,
-  aiSettingsQueryRouteDescriptor,
-} from '../../../ai/settings/route-descriptors';
-import { popupExportJobRouteDescriptor } from '../../../capture/popup-export/job/route-descriptors';
-import { localDataErasureRouteDescriptor } from '../../../application/privacy-erasure/route-descriptors';
-import { settingsTransferRouteDescriptor } from '../../../application/settings-transfer/route-descriptors';
-import { nativeAppRouteDescriptor } from '../../native-app/route-descriptors';
-import { contentActionRouteDescriptor } from '../../../routing-contracts/capabilities/content-action/route-descriptors';
+import { backgroundOwnedIngressRouteDescriptors } from '../../../../contracts/messaging/contracts/runtime';
+import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { BackgroundOwnedRouteInventoryEntry } from '../../../routing-contracts/owned-route-context';
-import { pageAccessRouteDescriptor } from '../../../page-access/route-descriptors';
-import { contentRuntimeWakeupRouteDescriptor } from '../../page-access/wakeup-route-descriptors';
-import { popupTabRouteCapabilityIssuanceDescriptor } from '../capabilities/popup-tab/route-descriptors';
-import type { BackgroundOwnedRouteDescriptor } from './route-descriptors';
-import { voiceInputOffscreenEventRouteDescriptor } from '../../../voice-input/route-descriptors';
-import { frameAnnotationRasterRouteDescriptor } from '../../../frame-annotation-raster/route-descriptors';
-import { annotationForkSessionRouteDescriptor } from '../../../annotation-fork-session/route-descriptors';
-import { aggregatePromotionRouteDescriptor } from '../../../application/aggregate-promotion/route-descriptors';
+import type { BackgroundOwnedRouteHandlerId } from '../../../routing-contracts/owned-route-context';
+import type { PolicyStateId } from '../../../routing-contracts/policy-state';
 
-export const backgroundOwnedRouteInventory = [
-  aggregatePromotionRouteDescriptor,
-  llmSessionRouteDescriptor,
-  aiSettingsQueryRouteDescriptor,
-  aiSettingsMutationRouteDescriptor,
-  aiSettingsNavigationRouteDescriptor,
-  annotationForkSessionRouteDescriptor,
-  aiSecretUnlockRouteDescriptor,
-  nativeAppRouteDescriptor,
-  pageAccessRouteDescriptor,
-  contentRuntimeWakeupRouteDescriptor,
-  localDataErasureRouteDescriptor,
-  settingsTransferRouteDescriptor,
-  popupExportJobRouteDescriptor,
-  llmContentProcessingRouteDescriptor,
-  llmScenarioEditorProcessingRouteDescriptor,
-  popupTabRouteCapabilityIssuanceDescriptor,
-  contentActionRouteDescriptor,
-  voiceInputOffscreenEventRouteDescriptor,
-  frameAnnotationRasterRouteDescriptor,
-] as const satisfies readonly BackgroundOwnedRouteDescriptor[];
+export const backgroundOwnedRouteInventory = collectBackgroundOwnedRouteInventory();
 
 export function getBackgroundOwnedRouteInventoryEntry(
   messageType: string
@@ -52,4 +12,27 @@ export function getBackgroundOwnedRouteInventoryEntry(
   return backgroundOwnedRouteInventory.find((entry) =>
     entry.messageTypes.some((entryMessageType) => entryMessageType === messageType)
   );
+}
+
+function collectBackgroundOwnedRouteInventory(): readonly BackgroundOwnedRouteInventoryEntry[] {
+  const entries = new Map<string, BackgroundOwnedRouteInventoryEntry>();
+  for (const descriptor of backgroundOwnedIngressRouteDescriptors) {
+    const existing = entries.get(descriptor.handlerId);
+    if (existing) {
+      entries.set(descriptor.handlerId, {
+        ...existing,
+        messageTypes: [...existing.messageTypes, descriptor.type as MessageType],
+      });
+      continue;
+    }
+    entries.set(descriptor.handlerId, {
+      handlerId: descriptor.handlerId as BackgroundOwnedRouteHandlerId,
+      messageTypes: [descriptor.type as MessageType],
+      ownerModule: descriptor.ownerModule,
+      policyAuthorityFamily: descriptor.policyAuthorityFamily,
+      policyStateIds: descriptor.policyStateIds as readonly PolicyStateId[],
+      routeAuthorityFamily: descriptor.routeAuthorityFamily,
+    });
+  }
+  return [...entries.values()];
 }

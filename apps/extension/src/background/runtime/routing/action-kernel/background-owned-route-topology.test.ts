@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import {
   backgroundOwnedAuthorizationDispatchers,
   backgroundOwnedPolicyAuthorityByMessageType,
-} from '../authorization/background-owned';
+} from '../authorization/owned';
 import { createBackgroundOwnedRoutePreauthorization } from '../../../routing-contracts/owned-route-context';
 import { hasPolicyStateDescriptor } from '../../../routing-contracts/policy-state';
 import { actionRouteMetadata } from './routes';

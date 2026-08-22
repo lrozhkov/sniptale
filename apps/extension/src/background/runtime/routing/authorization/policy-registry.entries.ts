@@ -30,6 +30,7 @@ import {
 } from './policy-registry.policy-state';
 import type {
   AuthorizationPolicyRegistryEntry,
+  AuthorizationPolicyKey,
   IpcAuthorizationRequest,
   OffscreenRuntimeAuthorizationRequest,
   PopupExportTabRouteAuthorizationRequest,
@@ -38,16 +39,15 @@ import type {
 const AUTHORIZATION_OWNER =
   'apps/extension/src/background/runtime/routing/authorization/privileged-tab.ts';
 
-export const authorizationPolicyRegistryEntries = [
-  {
+export const authorizationPolicyBindings = {
+  'background-owned': {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredBackgroundOwnedPolicy,
     key: 'background-owned',
     policyStateIds: BACKGROUND_OWNED_POLICY_STATE_IDS,
-    policyOwnerModule:
-      'apps/extension/src/background/runtime/routing/authorization/background-owned.ts',
+    policyOwnerModule: 'apps/extension/src/background/runtime/routing/authorization/owned.ts',
   },
-  {
+  'offscreen-runtime': {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredOffscreenRuntimePolicy,
     capabilityOwnerModule: 'apps/extension/src/background/offscreen-document/sender-policy.ts',
@@ -55,7 +55,7 @@ export const authorizationPolicyRegistryEntries = [
     policyStateIds: OFFSCREEN_RUNTIME_POLICY_STATE_IDS,
     policyOwnerModule: 'apps/extension/src/background/offscreen-document/sender-policy.ts',
   },
-  {
+  'popup-export-tab-route': {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredPopupExportTabRoutePolicy,
     capabilityOwnerModule:
@@ -65,15 +65,27 @@ export const authorizationPolicyRegistryEntries = [
     policyOwnerModule:
       'apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts',
   },
-  createPrivilegedTabPolicyEntry('capture', CAPTURE_PRIVILEGED_TAB_POLICY_STATE_IDS),
-  createPrivilegedTabPolicyEntry('scenario', SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS),
-  createPrivilegedTabPolicyEntry('tab-mode', TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS),
-  createPrivilegedTabPolicyEntry('video-control', VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS),
-  createPrivilegedTabPolicyEntry(
+  'privileged-tab-route:capture': createPrivilegedTabPolicyEntry(
+    'capture',
+    CAPTURE_PRIVILEGED_TAB_POLICY_STATE_IDS
+  ),
+  'privileged-tab-route:scenario': createPrivilegedTabPolicyEntry(
+    'scenario',
+    SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS
+  ),
+  'privileged-tab-route:tab-mode': createPrivilegedTabPolicyEntry(
+    'tab-mode',
+    TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS
+  ),
+  'privileged-tab-route:video-control': createPrivilegedTabPolicyEntry(
+    'video-control',
+    VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS
+  ),
+  'privileged-tab-route:video-recording-surface': createPrivilegedTabPolicyEntry(
     'video-recording-surface',
     VIDEO_RECORDING_SURFACE_PRIVILEGED_TAB_POLICY_STATE_IDS
   ),
-  {
+  'video-control-no-tab-route': {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredVideoControlNoTabPolicy,
     key: 'video-control-no-tab-route',
@@ -81,7 +93,7 @@ export const authorizationPolicyRegistryEntries = [
     policyOwnerModule:
       'apps/extension/src/background/runtime/routing/authorization/video-control-no-tab.ts',
   },
-  {
+  'video-control-camera-recorder-route': {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredVideoControlCameraRecorderPolicy,
     key: 'video-control-camera-recorder-route',
@@ -89,7 +101,7 @@ export const authorizationPolicyRegistryEntries = [
     policyOwnerModule:
       'apps/extension/src/background/runtime/routing/authorization/video-control-camera-recorder.ts',
   },
-  {
+  'video-control-owner-no-tab-route': {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredVideoControlOwnerNoTabPolicy,
     key: 'video-control-owner-no-tab-route',
@@ -97,7 +109,7 @@ export const authorizationPolicyRegistryEntries = [
     policyOwnerModule:
       'apps/extension/src/background/runtime/routing/authorization/video-control-owner-no-tab.ts',
   },
-  {
+  'project-export-runtime': {
     authorizationMode: 'async',
     authorize: authorizeProjectExportRuntimeMessageFromRoutes,
     capabilityOwnerModule:
@@ -107,7 +119,11 @@ export const authorizationPolicyRegistryEntries = [
     policyOwnerModule:
       'apps/extension/src/background/media/video/runtime/authorization/project-export.ts',
   },
-] as const satisfies readonly AuthorizationPolicyRegistryEntry[];
+} as const satisfies Record<AuthorizationPolicyKey, AuthorizationPolicyRegistryEntry>;
+
+export const authorizationPolicyRegistryEntries = Object.values(
+  authorizationPolicyBindings
+) as readonly AuthorizationPolicyRegistryEntry[];
 
 function createPrivilegedTabPolicyEntry(
   family: 'capture' | 'scenario' | 'tab-mode' | 'video-control' | 'video-recording-surface',

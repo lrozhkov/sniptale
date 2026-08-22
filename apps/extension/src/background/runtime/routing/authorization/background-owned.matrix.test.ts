@@ -37,7 +37,7 @@ vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) =
   isPopupTabRouteSenderUrl: authMocks.isPopupTabRouteSenderUrl,
 }));
 
-import { authorizeBackgroundOwnedRoute } from './background-owned';
+import { authorizeBackgroundOwnedRoute } from './owned';
 
 function request(
   type: MessageType,

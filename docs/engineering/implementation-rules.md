@@ -34,7 +34,7 @@ Heavy dependency ownership remains canonical:
 
 ## Boundary Discipline
 
-Messaging uses typed transport/contracts. UI, hooks, and ordinary orchestration do not call raw runtime messaging or listeners when a canonical transport exists. Runtime route authority goes through the action-kernel and authorization-policy registries; leaf owners may consume named preauthorization handles but do not re-decide authority.
+Messaging uses typed transport/contracts. UI, hooks, and ordinary orchestration do not call raw runtime messaging or listeners when a canonical transport exists. Background ingress parser, route, sender, freshness/replay, policy-state usage, and documentation metadata come from the contracts-owned background-ingress descriptor registry; runtime-only action and authorization bindings must be exhaustive. Leaf owners may consume named preauthorization handles but do not re-decide authority.
 
 Privileged browser APIs belong behind `@sniptale/platform/browser/**` or an app-local platform boundary. Product logging uses `@sniptale/platform/observability/logger` with a narrow namespace.
 
