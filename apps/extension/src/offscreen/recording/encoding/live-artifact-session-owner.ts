@@ -69,6 +69,7 @@ interface CreateLiveRecordingArtifactSessionOwnerInput {
 }
 
 type LiveEncoderContentHint = 'detail' | 'motion' | 'text';
+type LiveVideoBitrateMode = 'constant' | 'variable';
 
 const SCREEN_RECORDING_COLOR_SPACE: VideoColorSpaceInit = {
   fullRange: true,
@@ -109,6 +110,16 @@ function resolveLiveSampleColorSpace(
   return contentHint === 'text' ? SCREEN_RECORDING_COLOR_SPACE : undefined;
 }
 
+function resolveLiveVideoBitrateMode(
+  input: CreateLiveRecordingArtifactSessionOwnerInput
+): LiveVideoBitrateMode {
+  return input.frameTransform &&
+    input.encoding.container === 'webm' &&
+    input.encoding.videoCodec === 'vp9'
+    ? 'constant'
+    : 'variable';
+}
+
 function matchesSelectedCodec(configuredCodec: string, selectedCodec: VideoCodec): boolean {
   if (selectedCodec === 'avc') return configuredCodec.startsWith('avc1');
   if (selectedCodec === 'vp9')
@@ -125,7 +136,7 @@ function buildExactVideoEncoderConfig(
   return {
     alpha: 'discard',
     bitrate: input.encoding.videoBitrate,
-    bitrateMode: 'variable',
+    bitrateMode: resolveLiveVideoBitrateMode(input),
     codec: input.encoding.videoCodecString,
     contentHint,
     displayHeight: dimensions.height,
@@ -247,7 +258,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     this.videoReader = this.videoProcessor.readable.getReader();
     this.videoSource = new VideoSampleSource({
       bitrate: input.encoding.videoBitrate,
-      bitrateMode: 'variable',
+      bitrateMode: resolveLiveVideoBitrateMode(input),
       codec: input.encoding.videoCodec,
       contentHint: this.expectedContentHint,
       hardwareAcceleration: 'no-preference',
@@ -319,7 +330,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     const contentHint = resolveLiveEncoderContentHint(videoTrack);
     const selectedConfigSupported = await canEncodeVideo(input.encoding.videoCodec, {
       bitrate: input.encoding.videoBitrate,
-      bitrateMode: 'variable',
+      bitrateMode: resolveLiveVideoBitrateMode(input),
       contentHint,
       ...(input.encoding.videoCodecString
         ? { fullCodecString: input.encoding.videoCodecString }
@@ -433,7 +444,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         frameTransform: this.input.frameTransform ?? null,
         contentHint: this.expectedContentHint,
         captureTrack: this.videoDiagnostics.captureTrack,
-        bitrateMode: 'variable',
+        bitrateMode: resolveLiveVideoBitrateMode(this.input),
         keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
         videoBitrate: this.input.encoding.videoBitrate,
         videoCodec: this.input.encoding.videoCodec,
@@ -473,8 +484,11 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         'Live encoder did not preserve the requested frame rate as its rate-control expectation.'
       );
     }
-    if (config.bitrateMode !== 'variable') {
-      throw new Error('Live encoder did not preserve screen-efficient variable bitrate mode.');
+    const expectedBitrateMode = resolveLiveVideoBitrateMode(this.input);
+    if (config.bitrateMode !== expectedBitrateMode) {
+      throw new Error(
+        'Live encoder did not preserve screen-efficient variable or selected bitrate mode.'
+      );
     }
     if (config.contentHint !== this.expectedContentHint) {
       throw new Error('Live encoder did not preserve source content hint.');
@@ -501,6 +515,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         config.displayHeight !== expected.displayHeight ||
         config.framerate !== expected.framerate ||
         config.bitrate !== expected.bitrate ||
+        config.bitrateMode !== expected.bitrateMode ||
         config.alpha !== expected.alpha ||
         config.hardwareAcceleration !== expected.hardwareAcceleration ||
         config.latencyMode !== expected.latencyMode ||

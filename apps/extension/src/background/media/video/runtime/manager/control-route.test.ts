@@ -6,6 +6,7 @@ const {
   pauseRecordingMock,
   resumeRecordingMock,
   stopRecordingMock,
+  markPostRecordPopupActivationOwnedByPopupMock,
   loggerDebugMock,
   resolveTrustedPopupRuntimeSenderUrlMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
@@ -17,6 +18,7 @@ const {
   pauseRecordingMock: vi.fn(),
   resumeRecordingMock: vi.fn(),
   stopRecordingMock: vi.fn(),
+  markPostRecordPopupActivationOwnedByPopupMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   resolveTrustedPopupRuntimeSenderUrlMock: vi.fn(),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
@@ -64,6 +66,10 @@ vi.mock('./controls', () => ({
   resumeRecording: resumeRecordingMock,
   stopRecording: stopRecordingMock,
   updateRecordingSettings: vi.fn(),
+}));
+vi.mock('../post-record-popup-activation', () => ({
+  consumePostRecordPopupActivationOwnedByPopup: vi.fn(),
+  markPostRecordPopupActivationOwnedByPopup: markPostRecordPopupActivationOwnedByPopupMock,
 }));
 vi.mock('../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../recording-control-lease')>()),
@@ -227,6 +233,7 @@ async function verifiesStopRecordingRoute() {
     ownerSenderUrl: popupSenderUrl,
     recordingId: 'recording-1',
   });
+  expect(markPostRecordPopupActivationOwnedByPopupMock).toHaveBeenCalledWith('recording-1');
   expect(stopRecordingMock).toHaveBeenCalledWith(true);
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 }

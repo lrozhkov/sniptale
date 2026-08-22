@@ -34,6 +34,7 @@ const {
   commitPendingVideoPostRecordResultMock,
   persistPendingVideoPostRecordResultMock,
   readStoredVideoPostRecordResultMock,
+  consumePostRecordPopupActivationOwnedByPopupMock,
 } = vi.hoisted(() => ({
   finishVideoRecordingStopMock: vi.fn(),
   finalizeRecordingDiagnosticsMock: vi.fn(),
@@ -58,6 +59,7 @@ const {
   commitPendingVideoPostRecordResultMock: vi.fn(),
   persistPendingVideoPostRecordResultMock: vi.fn(),
   readStoredVideoPostRecordResultMock: vi.fn(),
+  consumePostRecordPopupActivationOwnedByPopupMock: vi.fn(),
 }));
 
 vi.mock('../../../../../storage/video/post-record-result', async (importOriginal) => ({
@@ -93,6 +95,10 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
 }));
 vi.mock('@sniptale/platform/browser/windows', () => ({
   browserWindows: { update: updateWindowMock },
+}));
+vi.mock('../../post-record-popup-activation', () => ({
+  consumePostRecordPopupActivationOwnedByPopup: consumePostRecordPopupActivationOwnedByPopupMock,
+  markPostRecordPopupActivationOwnedByPopup: vi.fn(),
 }));
 vi.mock('../../../../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../../platform/runtime-messaging')>()),
@@ -193,6 +199,7 @@ beforeEach(() => {
   persistPendingVideoPostRecordResultMock.mockResolvedValue('staged');
   readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
+  consumePostRecordPopupActivationOwnedByPopupMock.mockReturnValue(false);
 });
 
 it('handles offscreen lifecycle acknowledgements and failures through the lifecycle owner', async () => {
@@ -548,6 +555,7 @@ it('ignores stale offscreen recording errors and saved notifications', async () 
   await flushAsyncRoute();
   expect(finalizeRecordingDiagnosticsMock).not.toHaveBeenCalled();
   expect(openVideoEditorPageMock).not.toHaveBeenCalled();
+  expect(consumePostRecordPopupActivationOwnedByPopupMock).not.toHaveBeenCalled();
   expectSupersededLifecycleResponse(sendResponse);
 });
 
@@ -588,6 +596,25 @@ it('opens the video popup without navigating directly to the editor after save',
   await flushAsyncRoute();
   expect(openVideoEditorPageMock).not.toHaveBeenCalled();
   expectSupersededLifecycleResponse(sendResponse);
+});
+
+it('keeps the current action popup owner mounted after popup-initiated stop completion', async () => {
+  const sendResponse = createSendResponse();
+  consumePostRecordPopupActivationOwnedByPopupMock.mockReturnValueOnce(true);
+
+  handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
+  await flushAsyncRoute();
+
+  expect(consumePostRecordPopupActivationOwnedByPopupMock).toHaveBeenCalledWith('rec-1');
+  expect(updateWindowMock).not.toHaveBeenCalled();
+  expect(openPopupMock).not.toHaveBeenCalled();
+  expect(persistPendingVideoPostRecordResultMock).toHaveBeenCalledWith({
+    primaryRecordingId: 'rec-1',
+    projectId: null,
+    recordingId: 'rec-1',
+  });
+  expect(commitPendingVideoPostRecordResultMock).toHaveBeenCalledWith('rec-1');
+  expectAcceptedLifecycleResponse(sendResponse);
 });
 
 it('accepts a completed replay without requiring the original recording tab', async () => {

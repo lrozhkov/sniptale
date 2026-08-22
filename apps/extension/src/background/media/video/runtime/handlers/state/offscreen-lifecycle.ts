@@ -38,6 +38,7 @@ import {
 import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
 import { acquireMediaMutationPermit } from '../../../../../mutation-exclusion/media-activity';
 import { removeVideoRecordingCompletionOutbox } from '../../../../../../composition/persistence/recordings/completion-outbox';
+import { consumePostRecordPopupActivationOwnedByPopup } from '../../post-record-popup-activation';
 import {
   createAsyncLifecycleRoute,
   createAsyncLifecycleOutcomeRoute,
@@ -203,7 +204,8 @@ async function processVideoSavedToIdb(
   if (isCompletedPostRecordReplay(existingState, message)) {
     const popupDestination = await resolvePostRecordPopupDestination();
     await consumeRecordingCompletionOutbox(message, false);
-    await openPostRecordPopup(popupDestination);
+    const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
+    if (openSavedPopup) await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
@@ -214,15 +216,16 @@ async function processVideoSavedToIdb(
 
   const popupDestination = await resolvePostRecordPopupDestination();
   const synchronized = await synchronizePostRecordResult(message);
+  const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
   if (synchronized === 'ready' || synchronized === 'acknowledged') {
     await consumeRecordingCompletionOutbox(message, false);
-    await openPostRecordPopup(popupDestination);
+    if (openSavedPopup) await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
   await completeSavedRecordingPersistence(message.recordingId);
   await consumeRecordingCompletionOutbox(message, true);
-  await openPostRecordPopup(popupDestination);
+  if (openSavedPopup) await openPostRecordPopup(popupDestination);
   finalizeSavedRecordingCompletion(message);
   return 'accepted';
 }
@@ -246,6 +249,10 @@ async function openPostRecordPopup(destination: PostRecordPopupDestination | nul
   } catch (error) {
     logger.warn('Failed to open the video post-record popup', error);
   }
+}
+
+function shouldOpenPostRecordPopup(recordingId: string): boolean {
+  return !consumePostRecordPopupActivationOwnedByPopup(recordingId);
 }
 
 async function openPopupForWindow(windowId: number): Promise<void> {

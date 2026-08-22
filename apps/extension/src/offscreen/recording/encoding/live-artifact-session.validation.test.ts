@@ -61,6 +61,79 @@ describe('source-driven live recording input validation', () => {
     expect(coordinator.abort).toHaveBeenCalledOnce();
   });
 
+  it('preflights transformed VP9 WebM with constant rate control', async () => {
+    mediabunny.canEncodeVideo.mockResolvedValueOnce(false);
+    const coordinator = createRecordingStagingCoordinatorTestDouble();
+
+    await expect(
+      createLiveRecordingArtifactSession({
+        artifactId: 'recording-1',
+        coordinator,
+        encoding: {
+          audioBitrate: 128_000,
+          audioCodec: 'opus',
+          container: 'webm',
+          frameRate: 30,
+          videoBitrate: 8_000_000,
+          videoCodec: 'vp9',
+        },
+        filename: 'recording.webm',
+        frameTransform: {
+          fit: 'fill',
+          outputSize: { height: 1080, width: 2120 },
+          sourceRect: { height: 1304, width: 2560, x: 0, y: 0 },
+        },
+        mimeType: 'video/webm',
+        stream: createStream(2560, 1304),
+      })
+    ).rejects.toThrow('selected live video encoder configuration is not supported');
+
+    expect(mediabunny.canEncodeVideo).toHaveBeenCalledWith(
+      'vp9',
+      expect.objectContaining({
+        bitrate: 8_000_000,
+        bitrateMode: 'constant',
+        height: 1080,
+        width: 2120,
+      })
+    );
+    expect(coordinator.abort).toHaveBeenCalledOnce();
+  });
+
+  it('keeps pass-through VP9 WebM on variable rate control for static screen efficiency', async () => {
+    mediabunny.canEncodeVideo.mockResolvedValueOnce(false);
+    const coordinator = createRecordingStagingCoordinatorTestDouble();
+
+    await expect(
+      createLiveRecordingArtifactSession({
+        artifactId: 'recording-1',
+        coordinator,
+        encoding: {
+          audioBitrate: 128_000,
+          audioCodec: 'opus',
+          container: 'webm',
+          frameRate: 30,
+          videoBitrate: 8_000_000,
+          videoCodec: 'vp9',
+        },
+        filename: 'recording.webm',
+        mimeType: 'video/webm',
+        stream: createStream(2560, 1304),
+      })
+    ).rejects.toThrow('selected live video encoder configuration is not supported');
+
+    expect(mediabunny.canEncodeVideo).toHaveBeenCalledWith(
+      'vp9',
+      expect.objectContaining({
+        bitrate: 8_000_000,
+        bitrateMode: 'variable',
+        height: 1304,
+        width: 2560,
+      })
+    );
+    expect(coordinator.abort).toHaveBeenCalledOnce();
+  });
+
   it('rejects an encoder transform outside the captured source frame', async () => {
     const coordinator = createRecordingStagingCoordinatorTestDouble();
 

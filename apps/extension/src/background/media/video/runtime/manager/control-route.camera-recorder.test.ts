@@ -6,6 +6,7 @@ const {
   restoreAuthorizedCameraRecorderDocumentMock,
   resolveTrustedCameraRecorderRuntimeSenderUrlMock,
   resolveTrustedPopupRuntimeSenderUrlMock,
+  markPostRecordPopupActivationOwnedByPopupMock,
   stopRecordingMock,
   validateRecordingControlCapabilityMock,
 } = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const {
   restoreAuthorizedCameraRecorderDocumentMock: vi.fn(),
   resolveTrustedCameraRecorderRuntimeSenderUrlMock: vi.fn(),
   resolveTrustedPopupRuntimeSenderUrlMock: vi.fn(),
+  markPostRecordPopupActivationOwnedByPopupMock: vi.fn(),
   stopRecordingMock: vi.fn(),
   validateRecordingControlCapabilityMock: vi.fn(),
 }));
@@ -49,6 +51,10 @@ vi.mock('../sender-policy', async (importOriginal) => ({
 vi.mock('../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../camera-recorder-control')>()),
   restoreAuthorizedCameraRecorderDocument: restoreAuthorizedCameraRecorderDocumentMock,
+}));
+vi.mock('../post-record-popup-activation', () => ({
+  consumePostRecordPopupActivationOwnedByPopup: vi.fn(),
+  markPostRecordPopupActivationOwnedByPopup: markPostRecordPopupActivationOwnedByPopupMock,
 }));
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -109,6 +115,7 @@ it('authorizes registered camera recorder document controls through the active l
     senderUrl: cameraSender.url,
     tabId: 7,
   });
+  expect(markPostRecordPopupActivationOwnedByPopupMock).not.toHaveBeenCalled();
   expect(stopRecordingMock).toHaveBeenCalledTimes(1);
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 });
