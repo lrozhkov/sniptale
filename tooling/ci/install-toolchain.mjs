@@ -104,18 +104,18 @@ if (
   throw new Error('Playwright browser registry drifted from toolchain.lock.json.');
 }
 
-const expected = new Map([
-  ['node', lock.node.version],
-  ['codeql', lock.codeql.version],
-  ['osv-scanner', lock.osvScanner.version],
-  ['gitleaks', lock.gitleaks.version],
-  ['actionlint', lock.actionlint.version],
-  ['semgrep', lock.semgrep.version],
-  ['playwright', lock.playwright.version],
-]);
-for (const [command, version] of expected) {
+const expected = [
+  ['node', lock.node.version, ['--version']],
+  ['codeql', lock.codeql.version, ['--version']],
+  ['osv-scanner', lock.osvScanner.version, ['--version']],
+  ['gitleaks', lock.gitleaks.version, ['--version']],
+  ['actionlint', lock.actionlint.version, ['--version']],
+  ['semgrep', lock.semgrep.version, ['--legacy', '--version']],
+  ['playwright', lock.playwright.version, ['--version']],
+];
+for (const [command, version, args] of expected) {
   const executable = command === 'semgrep' ? '/opt/semgrep/bin/semgrep' : command;
-  const result = spawnSync(executable, ['--version'], { encoding: 'utf8' });
+  const result = spawnSync(executable, args, { encoding: 'utf8' });
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   if (result.status !== 0 || !output.includes(version)) {
     throw new Error(`${command} version drift: expected ${version}, got ${output.trim()}`);

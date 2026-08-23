@@ -51,8 +51,8 @@ function runInImage(id, command, args = [], options = {}) {
   );
 }
 
-function expectVersion(id, command, expected) {
-  const output = runInImage(id, command, ['--version']);
+function expectVersion(id, command, expected, args = ['--version']) {
+  const output = runInImage(id, command, args);
   if (!output.includes(expected)) {
     checks.at(-1).status = 'failed';
     throw new Error(`${id} version drift: expected ${expected}, got ${output.slice(0, 200)}`);
@@ -74,7 +74,7 @@ try {
   }
 
   expectVersion('node', 'node', lock.node.version);
-  expectVersion('semgrep', 'semgrep', lock.semgrep.version);
+  expectVersion('semgrep', 'semgrep', lock.semgrep.version, ['--legacy', '--version']);
   expectVersion('codeql', 'codeql', lock.codeql.version);
   expectVersion('osv-scanner', 'osv-scanner', lock.osvScanner.version);
   expectVersion('gitleaks', 'gitleaks', lock.gitleaks.version);

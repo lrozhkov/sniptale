@@ -171,7 +171,7 @@ function validateToolchainFiles({
     {
       name: 'Semgrep',
       executable: semgrepEntrypoint,
-      args: ['--version'],
+      args: ['--legacy', '--version'],
       expected: lock.semgrep.version,
     },
     ...(lane === 'release'

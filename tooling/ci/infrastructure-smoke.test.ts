@@ -31,7 +31,7 @@ browser_json='{"revision":"1234",'\
 case "$*" in
   *"image inspect"*) printf '%s\n' '["${image}"]' ;;
   *"node --version"*) printf '%s\n' 'v22.12.0' ;;
-  *"semgrep --version"*) printf '%s\n' '1.173.0' ;;
+  *"semgrep --legacy --version"*) printf '%s\n' '1.173.0' ;;
   *"codeql --version"*) printf '%s\n' '2.26.3' ;;
   *"osv-scanner --version"*) printf '%s\n' '2.5.1' ;;
   *"gitleaks --version"*) printf '%s\n' '8.30.1' ;;

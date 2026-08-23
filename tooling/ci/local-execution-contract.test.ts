@@ -24,6 +24,7 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(toolchain).toContain("!/^[a-f0-9]{64}$/u.test(tool?.sha256 ?? '')");
   expect(toolchain).toContain("{ flag: 'wx', mode: 0o755 }");
   expect(toolchain).toContain('includes(semgrepPython)');
+  expect(toolchain).toContain("args: ['--legacy', '--version']");
   expect(toolchain).toContain('delete result[name]');
   for (const tool of ['OSV Scanner', 'Gitleaks', 'actionlint', 'Semgrep', 'CodeQL', 'Stryker']) {
     expect(toolchain).toContain(`name: '${tool}'`);
