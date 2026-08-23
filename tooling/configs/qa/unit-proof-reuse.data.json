@@ -39,9 +39,9 @@
     "complete sorted input file inventory and contents",
     "complete sorted product test inventory",
     "complete product-suite harness and support inputs",
-    "Node platform, version, locale, and timezone",
+    "Node platform, version, locale, timezone, pool, and suite",
     "container digest when containerized",
-    "suite, pool, workers, and requested CPU/RAM profile"
+    "resource profile and worker counts are recorded as planning metadata and excluded from the semantic input digest"
   ],
   "proof": "Only a successful complete product full-suite run may write the receipt; every consumer recomputes all inputs.",
   "rollback": "Delete the disposable receipt or omit its read-only CI mount to force the complete unit suite.",

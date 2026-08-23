@@ -54,7 +54,7 @@ it('rejects a release CPU override below the non-test lane floor', () => {
       logicalCpuCount: 12,
       totalMemoryBytes: 16 * 1024 * 1024 * 1024,
     })
-  ).toThrow(/at least 2 for qa:release/u);
+  ).toThrow(/at least 2 for ci:release/u);
 });
 
 it('clamps explicit overrides to WSL-visible resources', () => {

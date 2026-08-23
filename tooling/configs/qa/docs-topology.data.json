@@ -28,6 +28,7 @@
   ],
   "generatedDocuments": [
     "THIRD_PARTY_NOTICES.md",
+    "docs/engineering/project-facts.md",
     "docs/engineering/tech-debt-report.md"
   ],
   "rootDocuments": [

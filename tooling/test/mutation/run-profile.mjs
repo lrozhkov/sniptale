@@ -20,7 +20,9 @@ mkdirSync(dirname(resultFile), { recursive: true });
 
 const startedAt = new Date().toISOString();
 const started = performance.now();
-const cli = resolve('tooling/test/mutation/node_modules/@stryker-mutator/core/bin/stryker.js');
+const cli = process.env.SNIPTALE_MUTATION_CLI
+  ? resolve(process.env.SNIPTALE_MUTATION_CLI)
+  : resolve('tooling/test/mutation/node_modules/@stryker-mutator/core/bin/stryker.js');
 const config = resolve('tooling/test/mutation/stryker.config.mjs');
 const result = spawnSync(process.execPath, [cli, 'run', config], {
   encoding: 'utf8',

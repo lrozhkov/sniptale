@@ -1,186 +1,120 @@
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import {
-  collectLaneArtifacts,
-  finalizeCandidateReleaseArchive,
-  selectelInfrastructureFromEnvironment,
-} from './artifacts.mjs';
+import { collectLaneArtifacts, selectelInfrastructureFromEnvironment } from './artifacts.mjs';
+import { createCandidateControlDigest } from './control-digest.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
 } from '../qa/runtime/resource-profile.mjs';
 
 const lane = process.argv[2];
-const trustedRoot = process.env.SNIPTALE_TRUSTED_CI_ROOT;
-const wrapper = (name, ...args) => [
-  'node',
-  [
-    ...(name === 'release' ? ['--max-old-space-size=8192'] : []),
-    trustedRoot
-      ? `/opt/sniptale-trusted/tooling/qa/wrappers/${name}.mjs`
-      : `tooling/qa/wrappers/${name}.mjs`,
-    ...args,
-  ],
-];
-const licenseCommand = [
-  'node',
-  [
-    trustedRoot
-      ? '/opt/sniptale-trusted/tooling/qa/audits/licenses.mjs'
-      : 'tooling/qa/audits/licenses.mjs',
-  ],
-];
-const laneCommands = {
-  release: [
-    wrapper('release-harness'),
-    wrapper('release'),
-    ...(process.env.SNIPTALE_RELEASE_AUDIT === '1'
-      ? [wrapper('audit', '--profile', 'release')]
-      : []),
-  ],
-  'release-audit': [wrapper('audit', '--profile', 'release')],
-  security: [wrapper('audit', '--profile', 'security'), licenseCommand],
-  coverage: [wrapper('audit', '--profile', 'coverage')],
-};
-const installCommands = [
-  ['install', ['npm', ['ci', '--ignore-scripts']]],
-  ['provision-canvas', ['npm', ['rebuild', 'canvas']]],
-  [
-    'verify-canvas',
-    [
-      'node',
-      [
-        '-e',
-        "const { createCanvas } = require('canvas'); if (!createCanvas(1, 1).getContext('2d')) process.exit(1);",
-      ],
-    ],
-  ],
-  ['provision-ast-grep', ['node', ['node_modules/@ast-grep/cli/postinstall.js']]],
-  ['verify-ast-grep', ['node_modules/.bin/ast-grep', ['--version']]],
-];
-const candidatePhaseCommands = new Map([
-  ...installCommands.map(([id, command]) => [`candidate-${id}`, command]),
-  ['candidate-release-harness', wrapper('release-harness')],
-  ['candidate-checkpoint', wrapper('checkpoint')],
-  ['candidate-closeout', wrapper('closeout', '-m', 'ci: verify exact candidate tree')],
-  ['candidate-release', wrapper('release')],
-  ['candidate-pr-audit', wrapper('audit', '--profile', 'pr')],
-  [
-    'candidate-receipts',
-    [
-      'node',
-      [
-        trustedRoot
-          ? '/opt/sniptale-trusted/tooling/ci/validate-coverage-proof.mjs'
-          : 'tooling/ci/validate-coverage-proof.mjs',
-      ],
-    ],
-  ],
-  ['candidate-security', wrapper('audit', '--profile', 'security')],
-  ['candidate-licenses', licenseCommand],
-  ['candidate-coverage', wrapper('audit', '--profile', 'coverage')],
-]);
-const candidateFinalizeLane = 'candidate-release-artifact';
-if (
-  ![...Object.keys(laneCommands), ...candidatePhaseCommands.keys(), candidateFinalizeLane].includes(
-    lane
-  )
-) {
-  throw new Error('Usage: run-lane.mjs <release|release-audit|security|coverage|candidate-PHASE>');
+if (!['proof', 'release'].includes(lane)) {
+  throw new Error('Usage: run-lane.mjs <proof|release>');
 }
 if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
-  throw new Error('Canonical lanes may only run inside the locked QA container.');
+  throw new Error('Canonical CI lanes may only run inside the locked QA container.');
 }
+
+const commands = [
+  ['install', 'npm', ['ci', '--ignore-scripts']],
+  ['provision-canvas', 'npm', ['rebuild', 'canvas']],
+  [
+    'verify-canvas',
+    'node',
+    [
+      '-e',
+      "const { createCanvas } = require('canvas'); if (!createCanvas(1, 1).getContext('2d')) process.exit(1);",
+    ],
+  ],
+  ['provision-ast-grep', 'node', ['node_modules/@ast-grep/cli/postinstall.js']],
+  ['verify-ast-grep', 'node_modules/.bin/ast-grep', ['--version']],
+  [
+    lane,
+    'node',
+    [
+      ...(lane === 'proof' ? ['--max-old-space-size=8192'] : ['--max-old-space-size=12288']),
+      `tooling/ci/${lane}-wrapper.mjs`,
+    ],
+  ],
+];
 
 const startedAtMs = Date.now();
 const phases = [];
-
-function runPhase(id, command) {
+const trustedRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const candidateControlDigest = createCandidateControlDigest();
+const trustedControlDigest = createCandidateControlDigest({ cwd: trustedRoot });
+const assertedCandidateControlDigest = process.env.SNIPTALE_TRUSTED_CANDIDATE_CONTROL_DIGEST;
+const assertedTrustedControlDigest = process.env.SNIPTALE_TRUSTED_CONTROL_DIGEST;
+if (!assertedCandidateControlDigest || !assertedTrustedControlDigest) {
+  throw new Error('Trusted launcher did not seal both control digests.');
+}
+if (
+  assertedCandidateControlDigest !== candidateControlDigest ||
+  assertedTrustedControlDigest !== trustedControlDigest
+) {
+  throw new Error('Trusted launcher control digests do not match the mounted workspaces.');
+}
+if (candidateControlDigest !== trustedControlDigest) {
+  throw new Error('Candidate controls differ from trusted base and require bootstrap bypass.');
+}
+let status = 0;
+for (const [id, executable, args] of commands) {
+  if (status !== 0) {
+    phases.push({
+      id,
+      command: null,
+      startedAt: null,
+      finishedAt: null,
+      status: 'blocked',
+      reason: 'earlier canonical phase failed',
+    });
+    continue;
+  }
   const startedAt = new Date().toISOString();
-  const result = spawnSync(command[0], command[1], { stdio: 'inherit', env: process.env });
-  const status = result.status ?? 1;
+  process.stdout.write(`[ci:phase] start ${id}\n`);
+  const result = spawnSync(executable, args, { stdio: 'inherit', env: process.env });
+  status = result.status ?? 1;
   phases.push({
     id,
-    command: [command[0], ...command[1]].join(' '),
+    command: [executable, ...args].join(' '),
     startedAt,
     finishedAt: new Date().toISOString(),
     status: status === 0 ? 'passed' : 'failed',
     exitCode: status,
   });
-  return status;
+  process.stdout.write(`[ci:phase] ${status === 0 ? 'passed' : 'failed'} ${id}\n`);
 }
 
-function blockPhase(id, reason) {
-  phases.push({ id, command: null, startedAt: null, finishedAt: null, status: 'blocked', reason });
+try {
+  const artifactPath = collectLaneArtifacts({
+    lane,
+    startedAtMs,
+    status: status === 0 ? 'passed' : 'failed',
+    command: commands.map(([, executable, args]) => [executable, ...args].join(' ')),
+    phases,
+    executionEnvironment: {
+      kind: 'locked-container',
+      digest: process.env.SNIPTALE_CI_CONTAINER_DIGEST,
+    },
+    candidateTree: process.env.SNIPTALE_CANDIDATE_TREE ?? null,
+    workspaceMode: process.env.SNIPTALE_WORKSPACE_MODE ?? 'committed',
+    trustedControlSha: process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? null,
+    trustedControlDigest,
+    controlDigest: candidateControlDigest,
+    resourceProfiles: {
+      bounded: resolveQaResourceProfile(),
+      release: resolveQaReleaseResourceProfile(),
+    },
+    infrastructure: selectelInfrastructureFromEnvironment(),
+  });
+  process.stdout.write(`SNIPTALE_ARTIFACT_PATH=${artifactPath}\n`);
+} catch (error) {
+  process.stderr.write(
+    `Artifact collection failed: ${error instanceof Error ? error.message : String(error)}\n`
+  );
+  status ||= 1;
 }
 
-function runStandardLane() {
-  let standardStatus = 0;
-  for (const [id, command] of installCommands) {
-    if (standardStatus !== 0) {
-      blockPhase(id, 'earlier install phase failed');
-      continue;
-    }
-    standardStatus = runPhase(id, command);
-  }
-  for (const [index, command] of laneCommands[lane].entries()) {
-    if (standardStatus !== 0) {
-      blockPhase(`${lane}-${index + 1}`, 'earlier lane command failed');
-      continue;
-    }
-    standardStatus = runPhase(`${lane}-${index + 1}`, command);
-  }
-  return standardStatus;
-}
-const candidatePhaseCommand = candidatePhaseCommands.get(lane);
-let status;
-if (lane === candidateFinalizeLane) {
-  const startedAtMs = Number(process.env.SNIPTALE_CANDIDATE_STARTED_AT_MS);
-  if (!Number.isSafeInteger(startedAtMs) || startedAtMs <= 0) {
-    throw new Error('Candidate artifact finalization requires a valid lane start time.');
-  }
-  try {
-    await finalizeCandidateReleaseArchive({
-      candidateRoot: process.cwd(),
-      startedAtMs,
-      expectedSha256: process.env.SNIPTALE_EXPECTED_RELEASE_ARCHIVE_SHA256,
-    });
-    status = 0;
-  } catch (error) {
-    process.stderr.write(
-      `Candidate release artifact finalization failed: ${error instanceof Error ? error.message : String(error)}\n`
-    );
-    status = 1;
-  }
-} else {
-  status = candidatePhaseCommand
-    ? runPhase(lane.slice('candidate-'.length), candidatePhaseCommand)
-    : runStandardLane();
-}
-
-if (!candidatePhaseCommand && lane !== candidateFinalizeLane) {
-  try {
-    const artifactPath = collectLaneArtifacts({
-      lane,
-      startedAtMs,
-      status: status === 0 ? 'passed' : 'failed',
-      command: phases.filter(({ command }) => command).map(({ command }) => command),
-      phases,
-      containerDigest: process.env.SNIPTALE_CI_CONTAINER_DIGEST,
-      candidateTree: process.env.SNIPTALE_CANDIDATE_TREE ?? null,
-      trustedControlSha: process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? null,
-      resourceProfiles: {
-        bounded: resolveQaResourceProfile(),
-        release: resolveQaReleaseResourceProfile(),
-      },
-      infrastructure: selectelInfrastructureFromEnvironment(),
-    });
-    process.stdout.write(`SNIPTALE_ARTIFACT_PATH=${artifactPath}\n`);
-  } catch (error) {
-    process.stderr.write(
-      `Artifact collection failed: ${error instanceof Error ? error.message : String(error)}\n`
-    );
-    status ||= 1;
-  }
-}
 process.exit(status);

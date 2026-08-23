@@ -27,6 +27,24 @@ export function VideoEditorFloatingInspectorStack({
   const controller = useVideoEditorSidebarController(diagnosticsContent);
   const layout = useWorkspaceLayoutContext();
   if (!controller) return null;
+
+  return (
+    <VideoEditorFloatingInspectorContent
+      controller={controller}
+      leftSidebarCollapsed={layout.leftSidebarCollapsed}
+    />
+  );
+}
+
+type VideoEditorFloatingInspectorContentProps = {
+  controller: NonNullable<ReturnType<typeof useVideoEditorSidebarController>>;
+  leftSidebarCollapsed: boolean;
+};
+
+function VideoEditorFloatingInspectorContent({
+  controller,
+  leftSidebarCollapsed,
+}: VideoEditorFloatingInspectorContentProps) {
   const sidebarProps = getWorkspaceSidebarProps(controller);
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
@@ -40,7 +58,7 @@ export function VideoEditorFloatingInspectorStack({
   );
   const resize = useInspectorResize();
 
-  if (layout.leftSidebarCollapsed) {
+  if (leftSidebarCollapsed) {
     return null;
   }
 

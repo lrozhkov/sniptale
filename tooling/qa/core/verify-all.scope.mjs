@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 import { resolveFocusedFiles } from './focused-qa-helpers.mjs';
+import { collectRepositoryFiles } from './git-fallback-repository.mjs';
 import { collectCodeFiles } from './shared.mjs';
 import { PRODUCT_QA_SUITE, createScopedQaContext } from './qa-scope.mjs';
 
@@ -118,6 +119,29 @@ export function resolveFullVerifyScope({ files = [] } = {}) {
 
   return {
     ...classifyFullVerifyScope({ targetFiles, codeFiles }),
+    allTargetFiles: scopedContext.allTargetFiles,
+    harnessTargetFiles: scopedContext.harnessTargetFiles,
+  };
+}
+
+export function resolveRepositoryVerifyScope() {
+  const allTargetFiles = collectRepositoryFiles(process.cwd());
+  const scopedContext = createScopedQaContext(
+    {
+      targetFiles: allTargetFiles,
+      existingTargetFiles: allTargetFiles,
+      codeFiles: collectCodeFiles(allTargetFiles),
+      jsLikeFiles: [],
+      fingerprint: '',
+    },
+    { suite: PRODUCT_QA_SUITE }
+  );
+  return {
+    ...buildFullSuiteResult(
+      scopedContext.targetFiles,
+      scopedContext.codeFiles,
+      'repository-wide canonical CI scope'
+    ),
     allTargetFiles: scopedContext.allTargetFiles,
     harnessTargetFiles: scopedContext.harnessTargetFiles,
   };

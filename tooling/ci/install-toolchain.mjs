@@ -69,6 +69,14 @@ run('/opt/semgrep/bin/pip', [
 if (sha256File('/tmp/playwright-package/package-lock.json') !== lock.playwright.npmLockSha256) {
   throw new Error('Playwright npm lock drifted from toolchain.lock.json.');
 }
+if (
+  sha256File('/tmp/mutation-package/package.json') !== lock.mutationRunner.packageJsonSha256 ||
+  sha256File('/tmp/mutation-package/package-lock.json') !== lock.mutationRunner.packageLockSha256
+) {
+  throw new Error('Mutation runner package drifted from toolchain.lock.json.');
+}
+fs.cpSync('/tmp/mutation-package', '/opt/sniptale-mutation', { recursive: true });
+run('npm', ['ci', '--ignore-scripts', '--prefix', '/opt/sniptale-mutation']);
 fs.cpSync('/tmp/playwright-package', '/opt/playwright-cli', { recursive: true });
 run('npm', ['ci', '--ignore-scripts', '--prefix', '/opt/playwright-cli']);
 process.env.PLAYWRIGHT_BROWSERS_PATH = '/opt/playwright';

@@ -186,7 +186,7 @@ export function removeLocalCodeqlProof({ cwd = process.cwd(), policy } = {}) {
 export function recordSuccessfulCodeqlProof({
   cwd = process.cwd(),
   sarifPath,
-  source = 'qa:audit',
+  source = 'ci:release',
   reusedFrom = null,
 } = {}) {
   const inputs = createCodeqlProofInputs({ cwd });

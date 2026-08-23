@@ -30,7 +30,6 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 };
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
-const REQUIRED_MINIMUM_CHROME_VERSION = '148';
 const REQUIRED_MESSAGE_SERIALIZATION = 'structured_clone';
 const REQUIRED_BUILD_TARGET = 'chrome140';
 const REQUIRED_NODE_ENGINE = '>=22.12 <23';
@@ -101,11 +100,11 @@ function collectRuntimeBaselineViolations({ compilerOptions, manifest, viteConfi
     );
   }
 
-  if (manifest.minimum_chrome_version !== REQUIRED_MINIMUM_CHROME_VERSION) {
+  if (!/^\d+$/u.test(manifest.minimum_chrome_version ?? '')) {
     violations.push(
       createViolation(
         MANIFEST_PATH,
-        `minimum_chrome_version must be ${JSON.stringify(REQUIRED_MINIMUM_CHROME_VERSION)}`
+        'minimum_chrome_version must be a decimal Chrome major version'
       )
     );
   }

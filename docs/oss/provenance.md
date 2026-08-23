@@ -1,6 +1,6 @@
 # OSS provenance
 
-This record describes the Sniptale release source and redistribution evidence published through `https://github.com/lrozhkov/sniptale`. Hosted security reporting remains outside this policy.
+This record describes the Sniptale release source and redistribution evidence published through `https://github.com/lrozhkov/sniptale`. Confidential vulnerability disclosure is independent of redistribution provenance and is owned by [SECURITY.md](../../.github/SECURITY.md).
 
 ## Project-authored material
 
@@ -18,8 +18,8 @@ The extension bundles three Manrope 5.2.8 WOFF2 files from `@fontsource-variable
 
 `@iconify-icons/tabler@1.2.95` embeds Tabler Icons 2.40.0 metadata but ships no license file. Its MIT text is read offline from `tooling/release/dependency-legal/sources/tabler-icons-2.40.0.LICENSE`, byte-identical to `https://raw.githubusercontent.com/tabler/tabler-icons/v2.40.0/LICENSE`, SHA-256 `896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f`. Policy pins the wrapper tarball URL/integrity, icon-set version, author identity/URL, SPDX license, package-declared license metadata URL, version-tagged origin, local source path, and digest. The package's mutable `master` URL is checked only as installed metadata identity; mutable or catalog URLs are never license evidence. An upstream tag can be retargeted, so the checked-in bytes and digest are the release authority.
 
-The production redistribution closure is not the whole-lock audit inventory. `npm run qa:audit` evaluates the full package-lock CycloneDX SBOM and writes ignored local evidence under `.tmp/licenses/`; the generated release notices cover only dependencies reachable from production roots and actually admitted to the extension artifact.
+The production redistribution closure is not the whole-lock audit inventory. `npm run ci:release` evaluates the full package-lock CycloneDX SBOM and writes ignored local evidence under `.tmp/licenses/`; the generated release notices cover only dependencies reachable from production roots and actually admitted to the extension artifact.
 
 ## Repository and publication scope
 
-The optional native companion is a separate repository and outside this source tree and artifact. The release policy records the current bounded legal, package, font, documentation, and consumer contract through explicit paths, identities, and digests; historical migration trees are not active authority. The canonical repository publishes source and deterministic archives through GitHub Releases with repository-enforced immutability under `vX.Y.Z` tags. A root `SECURITY.md`, hosted security-reporting channel, browser-store submission, and native-companion publication remain outside this release surface.
+The optional native companion is a separate repository and outside this source tree and artifact. The release policy records the current bounded legal, package, font, documentation, and consumer contract through explicit paths, identities, and digests; historical migration trees are not active authority. The canonical repository publishes source and deterministic archives through GitHub Releases under the machine-owned tag and immutability policy projected in the [generated project facts](../engineering/project-facts.md). Browser-store submission and native-companion publication remain outside this release surface.

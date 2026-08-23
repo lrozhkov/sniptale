@@ -19,7 +19,7 @@ function write(root: string, relativePath: string, contents: string) {
 
 it('discovers every supported release consumer category and ignores tests', async () => {
   const root = createTempRoot('oss-release-consumers-');
-  write(root, 'package.json', '{"scripts":{"qa:release":"node release.mjs"}}\n');
+  write(root, 'package.json', '{"scripts":{"ci:release":"node release.mjs"}}\n');
   write(root, 'tooling/qa/core/focused.mjs', "import './verify-oss-release-surface.mjs';\n");
   write(
     root,
@@ -67,7 +67,7 @@ it.each([
   'tooling/qa/core/qa-steps/definitions.data.mjs',
 ])('rejects an omitted authoritative release integration: %s', async (relativePath) => {
   const root = createTempRoot('oss-release-consumer-omission-');
-  write(root, 'package.json', '{"scripts":{"qa:release":"node release.mjs"}}\n');
+  write(root, 'package.json', '{"scripts":{"ci:release":"node release.mjs"}}\n');
   write(root, 'apps/extension/manifest.json', 'manrope-latin-wght-normal.woff2\n');
   write(root, 'apps/extension/build/layout.data.json', 'manrope-latin-wght-normal.woff2\n');
   write(root, 'apps/extension/vite.config.ts', 'manrope-latin-wght-normal.woff2\n');

@@ -45,6 +45,7 @@ const VERIFY_ALL_VIOLATION_STEP_ORDER = [
   'History revision semantics',
   'History detached snapshots',
   'History transaction lifecycle',
+  'Documentation facts',
   'Manifest integrity',
   'Manifest permissions',
   'Runtime topology',
@@ -188,7 +189,9 @@ it('keeps qa:closeout as checkpoint plus qa:build commit handoff', () => {
   expect(source).toContain('runCheckpoint');
   expect(handoffSource).toContain('runBuildChild(');
   expect(handoffSource).toContain("path.join(trustedRoot, 'tooling/qa/wrappers/build.mjs')");
-  expect(handoffSource).toContain("runNpm(['run', '--silent', 'qa:build', '--', ...buildArgs]");
+  expect(handoffSource).toContain(
+    "runNpm(['run', '--silent', 'qa:internal:build', '--', ...buildArgs]"
+  );
   expect(source).toContain("label: 'QA closeout'");
   expect(source).toContain('runObservedWrapper({');
   expect(source).toContain('blocking: true');

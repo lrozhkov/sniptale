@@ -11,7 +11,7 @@ it('keeps an initial branch push on changed-range proof without a release lane',
     gitRunner: () => ({ stdout: 'tooling/qa/hooks/pre-push.mjs\n' }),
   });
 
-  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:build']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:internal:build']);
   expect(commands).not.toContain('qa:release');
   expect(commands).not.toContain('build:release');
 });
@@ -23,5 +23,5 @@ it('gives only a changed-file checkpoint the larger pre-push heap budget', () =>
   expect(resolvePrePushNodeOptions('qa:release-harness', '--trace-warnings')).toBe(
     '--trace-warnings'
   );
-  expect(resolvePrePushNodeOptions('qa:build', '')).toBe('');
+  expect(resolvePrePushNodeOptions('qa:internal:build', '')).toBe('');
 });

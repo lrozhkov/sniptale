@@ -44,12 +44,16 @@ export function validateDocuments(root, policy) {
       }
     }
   }
-  if (existsSync(path.resolve(root, 'SECURITY.md'))) {
-    errors.push('SECURITY.md is excluded from this local release surface');
+  const securityPolicy = path.resolve(root, '.github/SECURITY.md');
+  if (
+    !existsSync(securityPolicy) ||
+    !/Report a vulnerability/iu.test(readFileSync(securityPolicy, 'utf8'))
+  ) {
+    errors.push('private vulnerability reporting guidance is missing');
   }
   const release = readFileSync(path.resolve(root, 'docs/oss/release.md'), 'utf8');
   errors.push(...contributionDocumentErrors(root));
-  for (const command of ['qa:release-harness', 'qa:checkpoint', 'qa:release', 'qa:audit']) {
+  for (const command of ['qa:release-harness', 'qa:checkpoint', 'qa:closeout', 'ci:release']) {
     if (!release.includes(command)) errors.push(`release documentation is missing ${command}`);
   }
   if (!release.includes('Corresponding Source') || !release.includes('AGPL-3.0-or-later')) {

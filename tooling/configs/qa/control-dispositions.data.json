@@ -184,6 +184,13 @@
       "sourceKind": "repository"
     },
     {
+      "id": "qa.rule.documentation-facts",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
       "id": "qa.rule.domain-fixture-realism",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -215,6 +222,13 @@
       "id": "qa.rule.export-artifact-boundaries",
       "disposition": "keep",
       "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.fast-proof-reuse",
+      "disposition": "keep",
+      "owner": "qa-platform",
       "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
       "sourceKind": "repository"
     },
@@ -418,6 +432,20 @@
       "id": "qa.rule.multi-message-transitions",
       "disposition": "keep",
       "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.mutation-persistence",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.mutation-secrets",
+      "disposition": "keep",
+      "owner": "qa-platform",
       "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
       "sourceKind": "repository"
     },
@@ -852,10 +880,42 @@
   ],
   "executables": [
     {
+      "path": "tooling/ci/admit-candidate-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/admit-gate-graph.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/check-control-authority.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This trusted-base admission blocks candidate QA controls from authorizing their own required result."
+    },
+    {
       "path": "tooling/ci/image-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/ci/proof-wrapper.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint.",
+      "proofReason": "Internal orchestration entrypoint is exercised transitively by release-harness."
+    },
+    {
+      "path": "tooling/ci/release-wrapper.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint.",
+      "proofReason": "Internal orchestration entrypoint is exercised transitively by release-harness."
     },
     {
       "path": "tooling/ci/select-codeql-proof.mjs",
@@ -868,13 +928,6 @@
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
-    },
-    {
-      "path": "tooling/ci/select-release-coverage.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "This is the release-bound informational coverage publication adapter.",
-      "proofReason": "Exact release identity and digest rejection are covered by the owner-local selector test."
     },
     {
       "path": "tooling/ci/select-unit-proof.mjs",
@@ -1089,6 +1142,12 @@
     },
     {
       "path": "tooling/qa/core/verify-detached-this-methods.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-documentation-facts.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "Executable behavior is owned by its canonical control identity."
@@ -1630,12 +1689,23 @@
     {
       "path": "tooling/configs/qa/audit-profiles.data.json",
       "consumers": [
+        "tooling/configs/ci/fast-gate-inputs.json",
         "tooling/qa/audits/profiles/registry.mjs",
         "tooling/qa/core/verify-external-audit-semantics.test-support.ts"
       ],
       "disposition": "adapt",
       "owner": "qa-platform",
       "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/build-proof-reuse.data.json",
+      "consumers": [
+        "tooling/configs/ci/fast-gate-inputs.json",
+        "tooling/qa/core/build-proof.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
     },
     {
       "path": "tooling/configs/qa/codeql-baseline.json",
@@ -1663,6 +1733,7 @@
     {
       "path": "tooling/configs/qa/codeql-proof-reuse.data.json",
       "consumers": [
+        "tooling/configs/ci/fast-gate-inputs.json",
         "tooling/qa/codeql/config.mjs"
       ],
       "disposition": "keep",
@@ -1684,6 +1755,7 @@
     {
       "path": "tooling/configs/qa/coverage-proof-reuse.data.json",
       "consumers": [
+        "tooling/configs/ci/fast-gate-inputs.json",
         "tooling/qa/core/coverage-proof.mjs"
       ],
       "disposition": "keep",
@@ -1705,6 +1777,15 @@
       "path": "tooling/configs/qa/docs-topology.data.json",
       "consumers": [
         "tooling/qa/core/docs-topology-policy.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/documentation-facts.data.json",
+      "consumers": [
+        "tooling/qa/core/documentation-facts.mjs"
       ],
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1788,6 +1869,8 @@
     {
       "path": "tooling/configs/qa/manifest-permissions.data.json",
       "consumers": [
+        "tooling/configs/qa/documentation-facts.data.json",
+        "tooling/qa/core/documentation-facts.mjs",
         "tooling/qa/core/guardrail-owner-audits.mjs",
         "tooling/qa/core/verify-focused.config.mjs",
         "tooling/qa/guards/architecture/verify-manifest-permissions.mjs",
@@ -1823,6 +1906,7 @@
     {
       "path": "tooling/configs/qa/oss-release.data.json",
       "consumers": [
+        "tooling/configs/qa/build-proof-reuse.data.json",
         "tooling/qa/core/oss-release-consumer-discovery.mjs",
         "tooling/release/oss-release-policy.mjs",
         "tooling/release/oss-release-policy.test-support.ts"
@@ -1941,6 +2025,7 @@
     {
       "path": "tooling/configs/qa/unit-proof-reuse.data.json",
       "consumers": [
+        "tooling/configs/ci/fast-gate-inputs.json",
         "tooling/qa/core/unit-test-proof.mjs"
       ],
       "disposition": "keep",
@@ -1964,31 +2049,19 @@
   ],
   "scripts": [
     {
-      "id": "qa:archive-certify",
-      "disposition": "keep",
-      "owner": "media-transfer",
-      "rationale": "The package script is the release-scale ZIP64 archive certification entrypoint."
-    },
-    {
-      "id": "qa:archive-stress",
-      "disposition": "keep",
-      "owner": "media-transfer",
-      "rationale": "The package script is the bounded-memory pull-request archive stress entrypoint."
-    },
-    {
       "id": "qa:advisory",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
-      "id": "qa:audit",
+      "id": "qa:archive-certify",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
-      "id": "qa:build",
+      "id": "qa:archive-stress",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The package script is a supported canonical QA operator entrypoint."
@@ -2084,6 +2157,12 @@
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
+      "id": "qa:internal:build",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
       "id": "qa:preflight",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2156,12 +2235,6 @@
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
-      "id": "qa:release",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "The package script is a supported canonical QA operator entrypoint."
-    },
-    {
       "id": "qa:release-harness",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2181,6 +2254,12 @@
     }
   ],
   "validationTools": [
+    {
+      "tool": "admit-candidate-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
     {
       "tool": "ast-grep.mjs",
       "disposition": "keep",
@@ -2224,6 +2303,12 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "fast-proof-reuse.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
       "tool": "gitleaks.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2243,6 +2328,12 @@
     },
     {
       "tool": "licenses.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "main-proof-transport.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
@@ -2309,6 +2400,12 @@
     },
     {
       "tool": "run-controller.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "run-profile.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
@@ -2596,6 +2693,12 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "verify-documentation-facts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
       "tool": "verify-domain-fixture-realism.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2801,6 +2904,12 @@
     },
     {
       "tool": "verify-logging.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-main-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."

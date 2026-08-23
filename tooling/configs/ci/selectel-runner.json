@@ -11,6 +11,18 @@
     "qualityWorkflow": ".github/workflows/quality-gate.yml",
     "releaseWorkflow": ".github/workflows/release.yml"
   },
+  "infrastructureSmoke": {
+    "workflowOption": "selectel-smoke",
+    "profileVariable": "SELECTEL_QA_PROFILES",
+    "runsCanonicalQa": false,
+    "requiredChecks": [
+      "immutable-image-present",
+      "locked-toolchain",
+      "playwright-chromium",
+      "container-metadata-denied",
+      "complete-cleanup"
+    ]
+  },
   "controllerEnvironment": {
     "secrets": [
       "SELECTEL_OS_APPLICATION_CREDENTIAL_ID",
@@ -79,10 +91,8 @@
     "volumeGiB": 260
   },
   "network": {
-    "name": "sniptale-github-actions",
-    "subnetName": "sniptale-github-actions-v4",
     "subnetCidr": "10.77.0.0/24",
-    "routerName": "sniptale-github-actions",
+    "lifecycle": "disposable-per-attempt",
     "securityGroupName": "sniptale-github-actions-no-ingress"
   },
   "lifecycle": {
@@ -106,6 +116,7 @@
     "jitConfigRetained": false,
     "releaseSigningKeyOnRunner": false,
     "persistentGhcrCredentialOnRunner": false,
+    "persistentNetworkResources": false,
     "sshKeyOnRunner": false
   },
   "artifacts": {
@@ -136,6 +147,8 @@
     "genuine-qa-failure-no-retry",
     "post-online-qa-failure-no-fallback",
     "cleanup-failure",
+    "router-interface-cleanup-failure",
+    "router-cleanup-failure",
     "expired-resource-sweep",
     "foreign-resource-preservation",
     "controller-secret-non-propagation",

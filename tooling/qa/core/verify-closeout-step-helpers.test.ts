@@ -15,8 +15,16 @@ it('passes release mode only to release wrapper build contexts', async () => {
     stdout: '',
   }));
 
-  await collectBuildStep({ buildRunner, releaseMode: true });
-  await collectBuildStep({ buildRunner, releaseMode: false });
+  await collectBuildStep({
+    buildRunner,
+    buildProofResolver: () => ({ matched: false }),
+    releaseMode: true,
+  });
+  await collectBuildStep({
+    buildRunner,
+    buildProofResolver: () => ({ matched: false }),
+    releaseMode: false,
+  });
 
   expect(buildRunner).toHaveBeenNthCalledWith(1, {
     enforceLint: false,
@@ -34,6 +42,7 @@ it('runs root/app equivalence for extension build-layout changes', async () => {
 
   await collectBuildStep({
     buildRunner,
+    buildProofResolver: () => ({ matched: false }),
     equivalenceRunner,
     targetFiles: ['apps/extension/vite.config.ts'],
   });
@@ -48,7 +57,12 @@ it.each(['apps/extension/postcss.config.js', 'apps/extension/tailwind.config.js'
     const buildRunner = vi.fn();
     const equivalenceRunner = vi.fn(async () => ({ status: 0, stderr: '', stdout: '' }));
 
-    await collectBuildStep({ buildRunner, equivalenceRunner, targetFiles: [targetFile] });
+    await collectBuildStep({
+      buildRunner,
+      buildProofResolver: () => ({ matched: false }),
+      equivalenceRunner,
+      targetFiles: [targetFile],
+    });
 
     expect(equivalenceRunner).toHaveBeenCalledWith({ mode: 'release' });
     expect(buildRunner).not.toHaveBeenCalled();
@@ -108,7 +122,11 @@ it('wraps release archive packaging as a process step', async () => {
     stdout: 'Release archive: /repo/build/sniptale.zip\n',
   }));
 
-  const step = await collectReleaseArchiveStep({ archiveRunner });
+  const step = await collectReleaseArchiveStep({
+    archiveRunner,
+    buildProofRecorder: () => ({}),
+    buildProofResolver: () => ({ matched: false }),
+  });
 
   expect(step).toEqual(
     expect.objectContaining({

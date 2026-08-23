@@ -95,7 +95,7 @@ export interface ClipSelectionPort extends Pick<VideoEditorSessionActions, Selec
 }
 
 /** Declarative effect-document and effect-instance editing capability. */
-export interface EffectEditingPort extends VideoEditorEffectInstanceActions {}
+export type EffectEditingPort = VideoEditorEffectInstanceActions;
 
 type AnnotationPresentationAction =
   | 'addTextOverlay'

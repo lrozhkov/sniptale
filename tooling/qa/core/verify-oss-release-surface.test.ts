@@ -34,8 +34,8 @@ function writePackage(root: string, relativePath: string, name: string, licensed
         ...(relativePath === 'package.json'
           ? {
               scripts: {
-                'qa:audit': 'node audit.mjs',
-                'qa:release': 'node release.mjs',
+                'ci:proof': 'node proof.mjs',
+                'ci:release': 'node ci-release.mjs',
                 'qa:release-harness': 'node release-harness.mjs',
               },
               workspaces: ['apps/extension', 'packages/*'],
@@ -85,7 +85,7 @@ function createPolicy(font: Buffer, legal: Map<string, string>) {
     ],
     legalFiles,
     bundledAssets: [manropeAsset(font)],
-    contributorFiles: ['README.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'],
+    contributorFiles: ['README.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', '.github/SECURITY.md'],
     releaseDocs: ['README.md', 'CONTRIBUTING.md', 'docs/oss/release.md'],
     releaseConsumerManifest: 'tooling/configs/qa/oss-release-consumers.data.json',
     dependencyLegal: {
@@ -96,7 +96,7 @@ function createPolicy(font: Buffer, legal: Map<string, string>) {
       reviewedSelections: [],
     },
     forbiddenReleaseDocFragments: ['src/shared', '/home/private/repo'],
-    securityReporting: 'excluded',
+    securityReporting: 'github-private-vulnerability-reporting',
     nativeCompanion: 'separate-repository',
     publication: 'github-immutable-release',
   };
@@ -157,8 +157,13 @@ function seedLegalAndContributorFiles(root: string, font: Buffer) {
   write(root, 'CODE_OF_CONDUCT.md', 'Enforcement owner: Lev Rozhkov\n');
   write(
     root,
+    '.github/SECURITY.md',
+    'Use GitHub **Report a vulnerability** for private reports.\n'
+  );
+  write(
+    root,
     'docs/oss/release.md',
-    'qa:release-harness qa:checkpoint qa:release qa:audit Corresponding Source AGPL-3.0-or-later\n'
+    'qa:release-harness qa:checkpoint qa:closeout ci:release Corresponding Source AGPL-3.0-or-later\n'
   );
   for (const relativePath of [
     'docs/agent-tooling/AGENTS.md',
@@ -231,7 +236,7 @@ it('accepts a complete release surface and rejects mutable publication policy', 
   const policy = { ...JSON.parse(readFileSync(policyPath, 'utf8')), publication: 'github-release' };
   writeFileSync(policyPath, `${JSON.stringify(policy, null, 2)}\n`);
   expect(collectOssReleaseSurfaceErrors(root)).toContain(
-    'OSS release policy must use immutable GitHub Releases without a security-reporting channel'
+    'OSS release policy must use immutable GitHub Releases and private vulnerability reporting'
   );
 });
 
@@ -269,15 +274,19 @@ it('rejects added or changed bundled font content', async () => {
   expect(parityErrors).toContain('Manrope installed license differs from canonical OFL text');
 });
 
-it('rejects retired layout instructions and an added security-reporting surface', async () => {
+it('rejects retired layout instructions and missing private-reporting guidance', async () => {
   const root = await createFixture();
-  write(root, 'docs/oss/release.md', 'qa:release src/shared\n');
-  write(root, 'SECURITY.md', '# Reporting\n');
+  write(
+    root,
+    'docs/oss/release.md',
+    'qa:release-harness qa:checkpoint qa:closeout ci:release src/shared Corresponding Source AGPL-3.0-or-later\n'
+  );
+  write(root, '.github/SECURITY.md', '# Reporting\n');
 
   expect(collectOssReleaseSurfaceErrors(root)).toEqual(
     expect.arrayContaining([
       'retired release documentation fragment in docs/oss/release.md: src/shared',
-      'SECURITY.md is excluded from this local release surface',
+      'private vulnerability reporting guidance is missing',
     ])
   );
 });

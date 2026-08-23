@@ -72,7 +72,7 @@ it('uses changed-range checkpoint and build proof for new branch pushes', () => 
     gitRunner: () => ({ stdout: 'src/example.ts\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint', 'qa:build']);
+  expect(commands).toEqual(['qa:checkpoint', 'qa:internal:build']);
 });
 
 it('runs release harness when pushed commits include tooling changes from a clean tree', () => {
@@ -81,7 +81,7 @@ it('runs release harness when pushed commits include tooling changes from a clea
     gitRunner: () => ({ stdout: 'tooling/qa/hooks/pre-push.mjs\n' }),
   });
 
-  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:build']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:internal:build']);
 });
 
 it('runs release harness for shared controls that affect product and harness authority', () => {
@@ -90,7 +90,7 @@ it('runs release harness for shared controls that affect product and harness aut
     gitRunner: () => ({ stdout: 'package.json\n.husky/pre-push\n' }),
   });
 
-  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:build']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:internal:build']);
 });
 
 it('skips release harness for a generated inventory-only push', () => {
@@ -99,7 +99,7 @@ it('skips release harness for a generated inventory-only push', () => {
     gitRunner: () => ({ stdout: 'tooling/configs/qa/technical-debt.data.json\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint', 'qa:build']);
+  expect(commands).toEqual(['qa:checkpoint', 'qa:internal:build']);
 });
 
 it('rejects malformed hook input instead of silently weakening pushed-range proof', () => {

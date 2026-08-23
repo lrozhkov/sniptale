@@ -22,14 +22,14 @@ function scriptResolvesTo(
 describe('canonical wrapper inventory', () => {
   it('covers every canonical wrapper family', () => {
     expect(Object.keys(QA_WRAPPER_CLI_CONTRACTS).sort()).toEqual([
+      'ci:proof',
+      'ci:release',
       'qa:advisory',
-      'qa:audit',
       'qa:build',
       'qa:checkpoint',
       'qa:closeout',
       'qa:e2e',
       'qa:preflight',
-      'qa:release',
       'qa:release-harness',
       'qa:structural-audit',
     ]);
@@ -58,7 +58,6 @@ describe('canonical wrapper argument contracts', () => {
     ['qa:preflight', ['--files', 'apps/a.ts', 'docs/a.md', '--verbose']],
     ['qa:build', ['--proof']],
     ['qa:closeout', ['-m', 'chore: proof']],
-    ['qa:audit', ['--profile', 'security']],
     ['qa:e2e', ['--suite=critical', '--headed']],
     ['qa:structural-audit', ['--verbose']],
   ])('parses declared arguments for %s', (wrapperId, argv) => {

@@ -63,7 +63,7 @@ async function collectUnitAndCoverageSteps({ codeFiles, maxWorkers, targetFiles,
   return collectUnitTestAndCoverageStepResults({
     cacheSource: 'build',
     codeFiles,
-    coverageDetailOverride: 'coverage handled by qa:audit',
+    coverageDetailOverride: 'coverage handled by ci:release',
     coverageEnabled: false,
     directFilesOverride: buildScope.testScope.directTestFiles,
     fullSuiteOverride: buildScope.testScope.fullSuite,

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-build-proof-reuse-policy",
+  "proofPath": ".tmp/qa/build-proof.json",
+  "inputRoots": [
+    "apps/extension/src",
+    "apps/extension/build",
+    "apps/extension/public",
+    "packages",
+    "tooling/release"
+  ],
+  "configFiles": [
+    "package.json",
+    "package-lock.json",
+    "apps/extension/package.json",
+    "apps/extension/manifest.json",
+    "apps/extension/vite.config.ts",
+    "apps/extension/tailwind.config.js",
+    "apps/extension/postcss.config.js",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    ".npmrc",
+    "LICENSE",
+    "LICENSES",
+    "NOTICE",
+    "THIRD_PARTY_DEPENDENCIES.json",
+    "THIRD_PARTY_NOTICES.md",
+    "tooling/configs/ci/toolchain.lock.json",
+    "tooling/configs/qa/build-proof-reuse.data.json",
+    "tooling/configs/qa/oss-release.data.json"
+  ],
+  "productionEnvironment": ["NODE_ENV", "VITE_TRACE_MESSAGES", "SNIPTALE_RELEASE_E2E_OUTPUT"],
+  "canonicalProducerIds": ["qa-release-archive-owner"],
+  "excludedDirectoryNames": [".git", ".tmp", "build", "dist", "node_modules"],
+  "proof": "A successful canonical build and deterministic package validation seal the exact ZIP bytes against the full product, public asset, manifest, workspace, build, dependency, toolchain, production-environment, legal/generated-inventory, and packaging-owner closure. ci:build has no canonical producer capability.",
+  "rollback": "Delete or omit the build proof and archive pair to force build and packaging.",
+  "collisionCheck": "Reuse materializes one verified archive through an exclusive temporary file and never accepts an unrelated ci:build output."
+}

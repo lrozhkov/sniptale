@@ -125,7 +125,7 @@ function fingerprintFiles(cwd, files) {
   });
 }
 
-function createExecutionIdentity({ maxWorkers, pool, suite }) {
+function createExecutionIdentity({ pool, suite }) {
   const containerDigest = process.env.SNIPTALE_CI_CONTAINER_DIGEST ?? null;
   if (containerDigest !== null && !/^sha256:[a-f0-9]{64}$/u.test(containerDigest)) {
     throw new Error('Malformed unit proof container digest.');
@@ -137,10 +137,15 @@ function createExecutionIdentity({ maxWorkers, pool, suite }) {
     node: process.version,
     platform: process.platform,
     pool,
-    requestedCpuTokens: process.env.SNIPTALE_QA_CPU_TOKENS ?? null,
-    requestedMemoryMiB: process.env.SNIPTALE_QA_MEMORY_MIB ?? null,
     suite,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+}
+
+function createPlanningIdentity({ maxWorkers }) {
+  return {
+    requestedCpuTokens: process.env.SNIPTALE_QA_CPU_TOKENS ?? null,
+    requestedMemoryMiB: process.env.SNIPTALE_QA_MEMORY_MIB ?? null,
     vitestMaxWorkers: maxWorkers,
   };
 }
@@ -155,9 +160,10 @@ export function createFullUnitProofInputs({
   const { files, productFiles } = collectInputFiles(cwd, policy);
   const fileDigests = fingerprintFiles(cwd, files);
   const testFiles = productFiles.filter((file) => TEST_FILE_PATTERN.test(file));
-  const execution = createExecutionIdentity({ maxWorkers, pool, suite });
+  const execution = createExecutionIdentity({ pool, suite });
+  const planning = createPlanningIdentity({ maxWorkers });
   const inputDigest = sha256Bytes(stableStringify({ execution, fileDigests, testFiles }));
-  return { execution, fileDigests, inputDigest, policy, testFiles };
+  return { execution, fileDigests, inputDigest, planning, policy, testFiles };
 }
 
 function createProofDigest(proof) {
@@ -177,6 +183,8 @@ function parseProof(value) {
     !Array.isArray(value.testFiles) ||
     typeof value.execution !== 'object' ||
     value.execution === null ||
+    typeof value.planning !== 'object' ||
+    value.planning === null ||
     createProofDigest(value) !== value.proofDigest
   ) {
     throw new Error('Malformed or corrupted full unit proof.');
@@ -237,6 +245,7 @@ export function recordSuccessfulFullUnitProof({
     outcome: 'passed',
     inputDigest: inputs.inputDigest,
     execution: inputs.execution,
+    planning: inputs.planning,
     fileDigests: inputs.fileDigests,
     testFiles: inputs.testFiles,
     producer: {

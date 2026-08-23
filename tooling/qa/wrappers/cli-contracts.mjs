@@ -76,8 +76,8 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
     command: 'qa:build',
     entrypoint: 'tooling/qa/wrappers/build.mjs',
     lifecycleLabel: 'QA build',
-    scripts: ['qa:build'],
-    usage: 'npm run qa:build -- [--proof | --commit -m <message> [--reuse-build]]',
+    scripts: ['qa:internal:build'],
+    usage: 'npm run qa:internal:build -- [--proof | --commit -m <message> [--reuse-build]]',
     description:
       'Build artifacts or perform the closeout build/commit handoff for the current diff.',
     options: [
@@ -116,30 +116,23 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
     description: 'Validate changed QA harness and control-plane files.',
     options: NO_OPTIONS,
   },
-  'qa:release': {
-    command: 'qa:release',
-    entrypoint: 'tooling/qa/wrappers/release.mjs',
-    lifecycleLabel: 'QA release',
-    scripts: ['qa:release'],
-    usage: 'npm run qa:release',
-    description: 'Run the repository-wide product release gate.',
+  'ci:proof': {
+    command: 'ci:proof',
+    entrypoint: 'tooling/ci/proof-wrapper.mjs',
+    lifecycleLabel: 'CI proof',
+    scripts: [],
+    usage: 'npm run ci:proof -- [--pr <number>] [--cpu N] [--memory-mib N] [--workers N]',
+    description: 'Run the complete fast proof through the canonical QA composition.',
     options: NO_OPTIONS,
   },
-  'qa:audit': {
-    command: 'qa:audit',
-    entrypoint: 'tooling/qa/wrappers/audit.mjs',
-    lifecycleLabel: 'QA audit',
-    scripts: ['qa:audit'],
-    usage: 'npm run qa:audit -- [--profile <repository|pr|security|coverage|release>]',
-    description: 'Run the configured repository audit profile.',
-    options: [
-      {
-        name: '--profile',
-        kind: 'value',
-        key: 'profile',
-        description: 'Audit profile: repository, pr, security, coverage, or release.',
-      },
-    ],
+  'ci:release': {
+    command: 'ci:release',
+    entrypoint: 'tooling/ci/release-wrapper.mjs',
+    lifecycleLabel: 'CI release',
+    scripts: [],
+    usage: 'npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]',
+    description: 'Run full release proof, audits, coverage, and mutation waves.',
+    options: NO_OPTIONS,
   },
   'qa:e2e': {
     command: 'qa:e2e',

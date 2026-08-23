@@ -276,7 +276,8 @@
     "README.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
-    "docs/README.md"
+    "docs/README.md",
+    ".github/SECURITY.md"
   ],
   "releaseDocs": [
     "README.md",
@@ -331,7 +332,7 @@
     "packages/legacy-shared",
     "Status: blocked for public OSS release"
   ],
-  "securityReporting": "excluded",
+  "securityReporting": "github-private-vulnerability-reporting",
   "nativeCompanion": "separate-repository",
   "publication": "github-immutable-release"
 }

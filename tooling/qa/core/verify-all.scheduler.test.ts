@@ -135,3 +135,17 @@ it('runs release tests only after every non-test lane at the minimum profile', a
   expect(scheduler.mock.calls[1]?.[0].map(({ id }) => id)).toEqual(['tests']);
   expect(startedLanes.at(-1)).toBe('tests');
 });
+
+it('cannot schedule Vitest when the shared caller selects the fast proof contract', async () => {
+  const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
+  const scheduler = vi.fn(runBoundedTasks);
+
+  const steps = await collectScheduledFullVerifySteps(
+    { releaseMode: true },
+    { includeTests: false, profile, scheduler, workerRunner }
+  );
+
+  expect(workerRunner.mock.calls.map(([input]) => input.lane)).not.toContain('tests');
+  expect(steps.map(({ label }) => label)).not.toContain('Unit tests');
+  expect(scheduler).toHaveBeenCalledTimes(1);
+});

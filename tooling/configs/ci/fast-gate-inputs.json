@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-fast-gate-input-policy",
+  "roots": [
+    ".github/workflows",
+    ".husky",
+    "apps",
+    "packages",
+    "tooling",
+    "LICENSES"
+  ],
+  "files": [
+    ".dependency-cruiser.cjs",
+    ".dockerignore",
+    ".editorconfig",
+    ".npmrc",
+    ".prettierignore",
+    ".prettierrc.json",
+    "eslint.config.js",
+    "package.json",
+    "package-lock.json",
+    "playwright.config.ts",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    "vitest.config.ts",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_DEPENDENCIES.json",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "excludedDirectoryNames": [".git", ".tmp", "dist", "node_modules"],
+  "excludedRoots": [],
+  "nonGateOnlyRoots": ["docs"],
+  "nonGateOnlyFiles": [
+    ".github/SECURITY.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "README.md"
+  ],
+  "ownerClosures": [
+    "tooling/configs/qa/build-proof-reuse.data.json",
+    "tooling/configs/qa/unit-proof-reuse.data.json",
+    "tooling/configs/qa/codeql-proof-reuse.data.json",
+    "tooling/configs/qa/coverage-proof-reuse.data.json",
+    "tooling/configs/qa/audit-profiles.data.json",
+    "tooling/ci/control-digest.mjs"
+  ],
+  "proof": "Selectel may be skipped only when the exact digest matches a successful base proof and every changed path belongs to the explicit non-gate-only registry. Unknown paths fail closed and require the gate.",
+  "rollback": "Remove the previous receipt or change any listed input to force the complete fast gate."
+}

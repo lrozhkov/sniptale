@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "22.16.0",
-    "image": "node:22.16.0-bookworm-slim@sha256:048ed02c5fd52e86fda6fbd2f6a76cf0d4492fd6c6fee9e2c463ed5108da0e34"
+    "version": "22.12.0",
+    "image": "node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213"
   },
   "openstackController": {
     "pythonVersion": "3.12.11",
@@ -65,5 +65,9 @@
     "version": "1.7.12",
     "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz",
     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+  },
+  "mutationRunner": {
+    "packageJsonSha256": "458e0b0ddd602a87d45842558af0291e6b7c5e5c9076b472dfa5f1df8273b296",
+    "packageLockSha256": "5a1afdee6e30abe0c6bb78c93305b6ed6ccf4b3ccd0d6a2f7c6ab9fbe3c2e2c1"
   }
 }

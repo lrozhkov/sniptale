@@ -1,7 +1,7 @@
 {
   "$comment": "CodeQL non-test finding baseline. Technical-debt metadata is owned by technical-debt.data.json.",
   "version": 1,
-  "description": "Constrained qa:audit CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
+  "description": "Constrained ci:release CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
   "findings": [
     {
       "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",

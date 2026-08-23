@@ -16,8 +16,16 @@ afterEach(() => {
 it('binds pull-request proof paths and manifests to the candidate rather than the event SHA', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-artifact-candidate-identity-'));
   temporaryRoots.push(root);
+  const policyDestination = path.join(root, 'tooling/configs/ci/proof-semantics.json');
+  fs.mkdirSync(path.dirname(policyDestination), { recursive: true });
+  fs.copyFileSync('tooling/configs/ci/proof-semantics.json', policyDestination);
   const moduleUrl = new URL('./artifacts.mjs', import.meta.url).href;
-  const script = `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)}; collectLaneArtifacts({ lane: 'candidate', startedAtMs: 0, status: 'failed', command: [], containerDigest: 'sha256:${'a'.repeat(64)}' });`;
+  const script = [
+    `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)};`,
+    'collectLaneArtifacts({ lane: "proof", startedAtMs: 0, status: "failed", command: [],',
+    `containerDigest: "sha256:${'a'.repeat(64)}", trustedControlDigest: "sha256:${'d'.repeat(64)}", controlDigest: "sha256:${'d'.repeat(64)}",`,
+    `gateInputDigest: "sha256:${'e'.repeat(64)}" });`,
+  ].join(' ');
   const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
     cwd: root,
     env: {
@@ -32,7 +40,12 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
   expect(result.status, result.stderr).toBe(0);
   const bundle = path.join(
     root,
-    `build/ci-artifacts/candidate-${'c'.repeat(40)}-24/proof-manifest.json`
+    `build/ci-artifacts/proof-${'c'.repeat(40)}-24/proof-manifest.json`
   );
-  expect(JSON.parse(fs.readFileSync(bundle, 'utf8'))).toMatchObject({ commit: 'c'.repeat(40) });
+  expect(JSON.parse(fs.readFileSync(bundle, 'utf8'))).toMatchObject({
+    commit: 'c'.repeat(40),
+    controlAuthority: 'trusted-base',
+    trustedControlDigest: `sha256:${'d'.repeat(64)}`,
+    controlDigest: `sha256:${'d'.repeat(64)}`,
+  });
 });

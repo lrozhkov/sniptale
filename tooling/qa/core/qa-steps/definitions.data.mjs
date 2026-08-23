@@ -114,10 +114,34 @@ export const CANONICAL_WRAPPER_IDS = Object.freeze([
   'qa:closeout',
   'qa:build',
   'qa:release-harness',
-  'qa:release',
-  'qa:audit',
+  'ci:proof',
+  'ci:release',
   'qa:e2e',
 ]);
+
+export const CI_COMPOSITION_STEPS = [
+  [
+    'fast-proof-reuse',
+    'Fast proof reuse',
+    'fast-proof-reuse.mjs',
+    'conditional',
+    'tooling/ci/fast-proof-reuse.mjs',
+  ],
+  [
+    'mutation-persistence',
+    'Mutation persistence',
+    'run-profile.mjs',
+    'conditional',
+    'tooling/test/mutation/run-profile.mjs',
+  ],
+  [
+    'mutation-secrets',
+    'Mutation secrets',
+    'run-profile.mjs',
+    'conditional',
+    'tooling/test/mutation/run-profile.mjs',
+  ],
+];
 
 export const WRAPPER_LIFECYCLE_STEPS = [
   [
@@ -239,6 +263,7 @@ export const AUDIT_STEPS = [
 ];
 
 export const FULL_VIOLATION_STEP_TOOLS = new Map([
+  ['Documentation facts', 'verify-documentation-facts.mjs'],
   ['Architecture guardrails', 'verify-architecture-guardrails.mjs'],
   ['Boundary casts', 'verify-boundary-casts.mjs'],
   ['Boundary inputs', 'verify-boundary-inputs.mjs'],

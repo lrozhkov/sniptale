@@ -3,9 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { parseRunRecord } from '../qa/runtime/observability/schema.mjs';
+import { createFastGateInputDigest, FAST_GATE_INPUT_POLICY_PATH } from './fast-gate-inputs.mjs';
 
 const root = process.cwd();
 const OUTPUT_ROOT = 'build/ci-artifacts';
+const PROOF_SEMANTICS_POLICY = 'tooling/configs/ci/proof-semantics.json';
 
 function relativePath(value, repositoryRoot = root) {
   const absolute = path.resolve(repositoryRoot, value);
@@ -25,11 +27,84 @@ function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function readProofSemanticsPolicy(repositoryRoot) {
+  const policy = JSON.parse(fs.readFileSync(path.join(repositoryRoot, PROOF_SEMANTICS_POLICY)));
+  if (
+    policy?.schemaVersion !== 1 ||
+    policy.artifactKind !== 'sniptale-proof-semantics-policy' ||
+    policy.controlAuthority !== 'trusted-base' ||
+    policy.invariants?.resourceProfileDoesNotChangeControlSemantics !== true ||
+    policy.invariants?.resourceProfileExcludedFromSemanticDigest !== true ||
+    policy.invariants?.resourceProfileAffectsReuseCompatibility !== true ||
+    policy.invariants?.fastGateNeverClaimsReleaseReadiness !== true ||
+    policy.invariants?.fullVitestIsReleaseOnly !== true ||
+    JSON.stringify(policy.invariants?.diffAwareWrappersExactly) !==
+      JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout']) ||
+    policy.invariants?.ciGatesAreRepositoryWide !== true ||
+    policy.gateCapabilities?.proof?.scope !== 'repository-wide' ||
+    policy.gateCapabilities?.proof?.fullVitest !== false ||
+    policy.gateCapabilities?.proof?.releaseReady !== false ||
+    policy.gateCapabilities?.release?.scope !== 'repository-wide' ||
+    policy.gateCapabilities?.release?.fullVitest !== true ||
+    policy.gateCapabilities?.release?.releaseReady !== true ||
+    policy.environmentAdmissibility?.releaseProvenanceRequires !== 'locked-container' ||
+    policy.invariants?.ciBuildIsNonProof !== true ||
+    policy.invariants?.ciBuildArtifactAdmissibleForProvenance !== false
+  ) {
+    throw new Error('Malformed proof semantics policy.');
+  }
+  return policy;
+}
+
+export function createProofSemanticDigest(identity) {
+  return `sha256:${crypto.createHash('sha256').update(stableStringify(identity)).digest('hex')}`;
+}
+
+function normalizeExecutionProfile(lane, resourceProfiles, infrastructure) {
+  const profile =
+    infrastructure?.resourceProfile ??
+    resourceProfiles?.[lane === 'release' ? 'release' : 'bounded'];
+  if (!profile) return null;
+  return {
+    cpuTokens: profile.cpuTokens,
+    memoryMiB: profile.memoryMiB,
+    vitestWorkers: profile.vitestWorkers ?? profile.vitestMaxWorkers,
+    playwrightWorkers:
+      profile.playwrightWorkers ?? Number(process.env.SNIPTALE_QA_PLAYWRIGHT_WORKERS || 1),
+    securityWorkers:
+      profile.securityWorkers ?? Number(process.env.SNIPTALE_QA_SECURITY_WORKERS || 1),
+  };
+}
+
+function reuseCompatibility(lane, executionProfile, semanticsPolicy) {
+  const minimum = semanticsPolicy.reuseCompatibility?.[lane]?.minimumExecutionProfile;
+  if (!minimum || !executionProfile) {
+    return { outcome: 'diagnostic-only', reason: 'no canonical execution profile' };
+  }
+  const belowMinimum = Object.entries(minimum)
+    .filter(([name, value]) => executionProfile[name] < value)
+    .map(([name, value]) => ({ name, minimum: value, actual: executionProfile[name] }));
+  return belowMinimum.length === 0
+    ? { outcome: 'compatible', minimumExecutionProfile: minimum }
+    : { outcome: 'incompatible', minimumExecutionProfile: minimum, belowMinimum };
+}
+
 function copyFile(
   source,
   destinationRoot,
   destination = source,
-  { notBeforeMs = null, repositoryRoot = root } = {}
+  { ignoreStale = false, notBeforeMs = null, repositoryRoot = root } = {}
 ) {
   const relativeSource = relativePath(source, repositoryRoot);
   const absoluteSource = path.join(repositoryRoot, relativeSource);
@@ -37,6 +112,7 @@ function copyFile(
   const details = fs.lstatSync(absoluteSource);
   if (!details.isFile() || details.isSymbolicLink()) throw new Error(`Unsafe artifact: ${source}`);
   if (notBeforeMs !== null && details.mtimeMs < notBeforeMs - 1000) {
+    if (ignoreStale) return false;
     throw new Error(`Stale artifact predates lane: ${source}`);
   }
   const relativeDestination = relativePath(destination, repositoryRoot);
@@ -60,18 +136,17 @@ function copyTree(source, destinationRoot, options = {}) {
   return true;
 }
 
+function copyExternalFile(source, destinationRoot, destination) {
+  const details = fs.lstatSync(source);
+  if (!details.isFile() || details.isSymbolicLink()) throw new Error(`Unsafe artifact: ${source}`);
+  const output = path.join(destinationRoot, destination);
+  fs.mkdirSync(path.dirname(output), { recursive: true });
+  fs.copyFileSync(source, output, fs.constants.COPYFILE_EXCL);
+}
+
 const LANE_WRAPPERS = {
-  candidate: new Set([
-    'qa:release-harness',
-    'qa:checkpoint',
-    'qa:closeout',
-    'qa:release',
-    'qa:audit',
-  ]),
-  release: new Set(['qa:release-harness', 'qa:release', 'qa:audit']),
-  'release-audit': new Set(['qa:audit']),
-  security: new Set(['qa:audit']),
-  coverage: new Set(['qa:audit']),
+  proof: new Set(['ci:proof']),
+  release: new Set(['ci:release']),
 };
 
 function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot) {
@@ -96,37 +171,6 @@ function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot) {
     ({ record }) => record.parentRunId === null && LANE_WRAPPERS[lane].has(record.wrapperId)
   );
   const selected = [...topLevel];
-  if (lane === 'candidate') {
-    for (const parent of topLevel.filter(({ record }) => record.wrapperId === 'qa:closeout')) {
-      const evidence = parent.record.steps
-        .filter((step) => step.stepId === 'qa.rule.full-build' && step.outcome === 'problems-found')
-        .flatMap(
-          (step) => step.diagnostic?.evidence.filter((item) => item.kind === 'child-run') ?? []
-        );
-      for (const childEvidence of evidence) {
-        const matches = available.filter(
-          ({ record, relative }) =>
-            record.runId === childEvidence.runId &&
-            record.wrapperId === 'qa:build' &&
-            record.status === 'problems-found' &&
-            record.exitCode !== null &&
-            record.exitCode !== 0 &&
-            record.parentRunId === parent.record.runId &&
-            record.rootRunId === parent.record.rootRunId &&
-            relative === childEvidence.recordPath &&
-            record.log.path === childEvidence.logPath
-        );
-        if (matches.length !== 1) {
-          throw new Error(
-            `Expected exactly one canonical qa:build child for ${parent.record.runId}, found ${matches.length}.`
-          );
-        }
-        if (!selected.some(({ record }) => record.runId === matches[0].record.runId)) {
-          selected.push(matches[0]);
-        }
-      }
-    }
-  }
   const copied = [];
   for (const { record, relative } of selected) {
     copyFile(relative, destinationRoot, relative, { repositoryRoot });
@@ -157,73 +201,24 @@ function newestReleaseArchive(startedAtMs, repositoryRoot = root) {
   return candidates[0];
 }
 
-export function candidateReleaseArchiveIdentity({ candidateRoot = root, startedAtMs }) {
-  const archive = newestReleaseArchive(startedAtMs, candidateRoot);
-  const archivePath = path.join(candidateRoot, archive);
-  return { archive, sha256: sha256(archivePath) };
-}
-
-export async function finalizeCandidateReleaseArchive({
-  candidateRoot = root,
-  startedAtMs,
-  expectedSha256,
-  archiveVerifier,
-}) {
-  if (!/^[a-f0-9]{64}$/u.test(expectedSha256 ?? '')) {
-    throw new Error('Candidate release ZIP requires its trusted post-release digest.');
-  }
-  const candidateArchive = newestReleaseArchive(startedAtMs, candidateRoot);
-  const candidateArchivePath = path.join(candidateRoot, candidateArchive);
-  if (sha256(candidateArchivePath) !== expectedSha256) {
-    throw new Error('Candidate release ZIP changed after canonical release validation.');
-  }
-  const verify =
-    archiveVerifier ?? (await import('../release/artifact-security.mjs')).verifyReleaseArchivePath;
-  await verify(candidateArchivePath, { repoRoot: candidateRoot });
-  return candidateArchive;
-}
-
 const LANE_FILES = {
-  candidate: [
+  proof: [
+    '.tmp/qa/build-proof.json',
+    '.tmp/semgrep/results.json',
+    '.tmp/semgrep/results.sarif',
+    '.tmp/osv/results.json',
+    '.tmp/gitleaks/report.json',
+    '.tmp/npm-audit/results.json',
+    '.tmp/npm-audit/signatures.json',
+  ],
+  release: [
+    '.tmp/qa/build-proof.json',
     '.tmp/qa/unit-proof.json',
     '.tmp/qa/codeql-proof.json',
     '.tmp/qa/coverage-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',
-    '.tmp/semgrep/results.json',
-    '.tmp/semgrep/results.sarif',
-    '.tmp/codeql/results.filtered.sarif',
-    '.tmp/osv/results.json',
-    '.tmp/gitleaks/report.json',
-    '.tmp/npm-audit/results.json',
-    '.tmp/npm-audit/signatures.json',
-    '.tmp/licenses/summary.json',
-    '.tmp/licenses/sbom.cdx.json',
-  ],
-  'release-audit': [
-    '.tmp/qa/codeql-proof.json',
-    '.tmp/coverage/canonical/coverage-final.json',
-    '.tmp/coverage/canonical/coverage-summary.json',
-    '.tmp/coverage/canonical/lcov.info',
-    '.tmp/semgrep/results.json',
-    '.tmp/semgrep/results.sarif',
-    '.tmp/codeql/results.filtered.sarif',
-    '.tmp/osv/results.json',
-    '.tmp/gitleaks/report.json',
-    '.tmp/npm-audit/results.json',
-    '.tmp/npm-audit/signatures.json',
-    '.tmp/licenses/summary.json',
-    '.tmp/licenses/sbom.cdx.json',
-    '.tmp/qa/coverage-proof.json',
-  ],
-  coverage: [
-    '.tmp/coverage/canonical/coverage-final.json',
-    '.tmp/coverage/canonical/coverage-summary.json',
-    '.tmp/coverage/canonical/lcov.info',
-    '.tmp/qa/coverage-proof.json',
-  ],
-  security: [
     '.tmp/semgrep/results.json',
     '.tmp/semgrep/results.sarif',
     '.tmp/codeql/results.filtered.sarif',
@@ -255,43 +250,41 @@ function createArtifactDestination(lane, repositoryRoot) {
 function collectLaneReports({ lane, startedAtMs, status, destinationRoot, repositoryRoot }) {
   const required = status === 'passed';
   for (const file of LANE_FILES[lane] ?? []) {
-    const heavyweightCandidateFile =
-      lane === 'candidate' &&
-      (file.includes('/codeql') ||
-        file.includes('/coverage/') ||
-        file.endsWith('coverage-proof.json'));
     const copied = copyFile(file, destinationRoot, file, {
+      ignoreStale: !required,
       notBeforeMs: startedAtMs,
       repositoryRoot,
     });
-    if (
-      required &&
-      !copied &&
-      (!heavyweightCandidateFile || process.env.SNIPTALE_CI_HEAVY_AUDIT === '1')
-    ) {
+    if (required && !copied) {
       throw new Error(`Required artifact is missing: ${file}`);
     }
   }
-  if (lane === 'coverage' || lane === 'candidate' || lane === 'release-audit') {
+  if (lane === 'release') {
     const copied = copyTree('.tmp/coverage/canonical/html', destinationRoot, {
       notBeforeMs: startedAtMs,
       repositoryRoot,
     });
-    if (
-      required &&
-      !copied &&
-      (lane !== 'candidate' || process.env.SNIPTALE_CI_HEAVY_AUDIT === '1')
-    ) {
+    if (required && !copied) {
       throw new Error('Required coverage HTML is missing.');
     }
+    const mutationCopied = copyTree('.tmp/mutation', destinationRoot, {
+      notBeforeMs: startedAtMs,
+      repositoryRoot,
+    });
+    if (required && !mutationCopied) throw new Error('Required mutation evidence is missing.');
+    if (process.env.SNIPTALE_REUSE_FAST_PROOF === '1') {
+      const proofPath = path.join(
+        process.env.SNIPTALE_FAST_PROOF_PATH ?? '',
+        'proof-manifest.json'
+      );
+      if (!fs.existsSync(proofPath)) throw new Error('Verified fast proof receipt is missing.');
+      copyExternalFile(proofPath, destinationRoot, 'fast-proof/proof-manifest.json');
+    }
   }
-  if ((lane === 'release' || lane === 'candidate') && required) {
+  if ((lane === 'release' || lane === 'proof') && required) {
     copyFile(newestReleaseArchive(startedAtMs, repositoryRoot), destinationRoot, undefined, {
       repositoryRoot,
     });
-    if (lane === 'release' && process.env.SNIPTALE_RELEASE_AUDIT === '1') {
-      copyFile('.tmp/licenses/sbom.cdx.json', destinationRoot, undefined, { repositoryRoot });
-    }
   }
   const runRecords = collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot);
   if (required && runRecords.length === 0) {
@@ -355,19 +348,30 @@ export function collectLaneArtifacts({
   command,
   phases = [],
   containerDigest,
+  executionEnvironment = containerDigest
+    ? { kind: 'locked-container', digest: containerDigest }
+    : null,
   candidateTree = null,
+  workspaceMode = 'committed',
   trustedControlSha = null,
+  trustedControlDigest = null,
+  controlDigest = null,
+  gateInputDigest = null,
   resourceProfiles = null,
   infrastructure = null,
   repositoryRoot = root,
 }) {
-  if (!['candidate', 'release', 'release-audit', 'security', 'coverage'].includes(lane)) {
+  if (!['proof', 'release'].includes(lane)) {
     throw new Error(`Unknown lane: ${lane}`);
   }
-  if (!/^sha256:[a-f0-9]{64}$/u.test(containerDigest ?? '')) {
-    throw new Error('Unknown or malformed container digest.');
+  if (
+    !['locked-container', 'host-wsl'].includes(executionEnvironment?.kind) ||
+    !/^sha256:[a-f0-9]{64}$/u.test(executionEnvironment?.digest ?? '')
+  ) {
+    throw new Error('Unknown or malformed execution environment identity.');
   }
   const resolvedRoot = path.resolve(repositoryRoot);
+  const semanticsPolicy = readProofSemanticsPolicy(resolvedRoot);
   const { commit, destinationRoot, relativeOutput } = createArtifactDestination(lane, resolvedRoot);
   collectLaneReports({
     lane,
@@ -377,21 +381,61 @@ export function collectLaneArtifacts({
     repositoryRoot: resolvedRoot,
   });
   const files = listArtifactFiles(destinationRoot);
+  if (!/^sha256:[a-f0-9]{64}$/u.test(controlDigest ?? '')) {
+    throw new Error('Canonical proof requires a candidate control digest.');
+  }
+  if (!/^sha256:[a-f0-9]{64}$/u.test(trustedControlDigest ?? '')) {
+    throw new Error('Canonical proof requires a trusted-base control digest.');
+  }
+  const resolvedGateInputDigest =
+    gateInputDigest ?? createFastGateInputDigest({ cwd: resolvedRoot });
+  if (!/^sha256:[a-f0-9]{64}$/u.test(resolvedGateInputDigest)) {
+    throw new Error('Canonical proof requires a fast gate input digest.');
+  }
+  const semanticIdentity = {
+    lane,
+    commit,
+    candidateTree,
+    trustedControlSha,
+    trustedControlDigest,
+    controlDigest,
+    gateInputDigest: resolvedGateInputDigest,
+    executionEnvironment,
+  };
+  const capability = semanticsPolicy.gateCapabilities[lane];
+  const executionProfile = normalizeExecutionProfile(lane, resourceProfiles, infrastructure);
   const manifest = {
     schemaVersion: 1,
     artifactKind: 'sniptale-ci-proof',
     lane,
     status,
+    evidenceDisposition: 'executed',
     commit,
     baseSha: process.env.SNIPTALE_BASE_SHA ?? null,
     candidateTree,
+    workspaceMode,
     trustedControlSha,
-    containerDigest,
+    trustedControlDigest,
+    controlAuthority: semanticsPolicy.controlAuthority,
+    gateClaim: capability.claim,
+    fullVitest: capability.fullVitest,
+    releaseReady: capability.releaseReady,
+    controlDigest,
+    proofSemanticDigest: createProofSemanticDigest(semanticIdentity),
+    proofSemanticsPolicy: PROOF_SEMANTICS_POLICY,
+    gateInputDigest: resolvedGateInputDigest,
+    gateInputPolicy: FAST_GATE_INPUT_POLICY_PATH,
+    executionEnvironment,
+    containerDigest:
+      executionEnvironment.kind === 'locked-container' ? executionEnvironment.digest : null,
     command,
     phases,
     resourceProfiles,
+    executionProfile,
+    reuseCompatibility: reuseCompatibility(lane, executionProfile, semanticsPolicy),
     infrastructure,
     proofReuse: {
+      build: proofReuseStatus(destinationRoot, '.tmp/qa/build-proof.json'),
       unit: proofReuseStatus(destinationRoot, '.tmp/qa/unit-proof.json'),
       codeql: proofReuseStatus(destinationRoot, '.tmp/qa/codeql-proof.json'),
       coverage: proofReuseStatus(destinationRoot, '.tmp/qa/coverage-proof.json'),

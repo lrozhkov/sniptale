@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-trusted-admission-policy",
+  "lanes": {
+    "proof": {
+      "claim": "fast-pr-gate",
+      "fullVitest": false,
+      "releaseReady": false,
+      "freshPhases": ["install", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "proof"],
+      "derivedPhases": ["non-gate-input-reuse"],
+      "requiredFiles": [
+        ".tmp/qa/build-proof.json",
+        ".tmp/semgrep/results.json",
+        ".tmp/semgrep/results.sarif",
+        ".tmp/osv/results.json",
+        ".tmp/gitleaks/report.json",
+        ".tmp/npm-audit/results.json",
+        ".tmp/npm-audit/signatures.json"
+      ],
+      "requiredPrefixes": [".tmp/qa-observability/runs/", ".tmp/qa-logs/"],
+      "reuse": { "build": ["fresh", "reused"], "unit": ["unavailable"], "codeql": ["unavailable"], "coverage": ["unavailable"] }
+    },
+    "release": {
+      "claim": "release-provenance",
+      "fullVitest": true,
+      "releaseReady": true,
+      "freshPhases": ["install", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "release"],
+      "derivedPhases": [],
+      "requiredFiles": [
+        ".tmp/qa/build-proof.json",
+        ".tmp/qa/unit-proof.json",
+        ".tmp/qa/codeql-proof.json",
+        ".tmp/qa/coverage-proof.json",
+        ".tmp/coverage/canonical/coverage-final.json",
+        ".tmp/coverage/canonical/coverage-summary.json",
+        ".tmp/coverage/canonical/lcov.info",
+        ".tmp/semgrep/results.json",
+        ".tmp/semgrep/results.sarif",
+        ".tmp/codeql/results.filtered.sarif",
+        ".tmp/osv/results.json",
+        ".tmp/gitleaks/report.json",
+        ".tmp/npm-audit/results.json",
+        ".tmp/npm-audit/signatures.json",
+        ".tmp/licenses/summary.json",
+        ".tmp/licenses/sbom.cdx.json"
+      ],
+      "requiredPrefixes": [
+        ".tmp/qa-observability/runs/",
+        ".tmp/qa-logs/",
+        ".tmp/coverage/canonical/html/",
+        ".tmp/mutation/persistence/",
+        ".tmp/mutation/secrets/"
+      ],
+      "reuse": { "build": ["fresh", "reused"], "unit": ["fresh", "reused"], "codeql": ["fresh", "reused"], "coverage": ["fresh", "reused"] }
+    }
+  },
+  "proof": "Trusted base admits candidate controls only when their complete digest is identical. Intentional control changes require the documented owner-only bootstrap.",
+  "rollback": "Reject the candidate bundle and execute a fresh gate after restoring the trusted admission owner."
+}

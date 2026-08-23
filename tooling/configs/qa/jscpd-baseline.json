@@ -1,7 +1,7 @@
 {
   "$comment": "Exact jscpd detector owner-family identity/scope. Disposition metadata is owned only by technical-debt.data.json.",
   "version": 3,
-  "description": "Constrained qa:audit jscpd inventory for the current repository tree.",
+  "description": "Constrained ci:release jscpd inventory for the current repository tree.",
   "families": [
     {
       "family": "apps/extension/src/settings/sections/styles",

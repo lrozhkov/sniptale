@@ -3,9 +3,8 @@ import path from 'node:path';
 
 import JSZip from 'jszip';
 
-import { parseSha256Sums } from './release-checksums.mjs';
-import { verifyMainProof } from './verify-main-proof.mjs';
 import { readProofInput, sha256ProofInput as sha256Bytes } from '../qa/core/proof-input.mjs';
+import { verifyReleaseProof } from './verify-main-proof.mjs';
 
 const ARCHIVE_FILE_DATE = new Date('1980-01-01T00:00:00.000Z');
 
@@ -69,32 +68,52 @@ async function writeEvidenceArchive(output, archiveName, sources, identity) {
   return sha256Bytes(archive);
 }
 
-const artifactRoot = process.argv[2];
-if (!artifactRoot || !fs.statSync(artifactRoot).isDirectory()) {
-  throw new Error(
-    'Usage: prepare-release-assets.mjs <main-proof-root> <release-audit-root> <commit>'
-  );
-}
-const releaseAuditRoot = process.argv[3] ? path.resolve(process.argv[3]) : null;
-const releaseCommit = process.argv[4];
-if (
-  !releaseAuditRoot ||
-  !fs.existsSync(releaseAuditRoot) ||
-  !fs.statSync(releaseAuditRoot).isDirectory()
-) {
-  throw new Error('Release audit artifact directory is missing.');
+function escapeSvg(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
-const mainRoot = path.resolve(artifactRoot);
-const output = path.join(mainRoot, 'release-assets');
+function writeBadge(output, name, label, value, color) {
+  const leftWidth = Math.max(36, label.length * 7 + 12);
+  const rightWidth = Math.max(36, String(value).length * 7 + 12);
+  const width = leftWidth + rightWidth;
+  const safeLabel = escapeSvg(label);
+  const safeValue = escapeSvg(value);
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="20" role="img" aria-label="${safeLabel}: ${safeValue}">`,
+    '<linearGradient id="s" x2="0" y2="100%">',
+    '<stop offset="0" stop-color="#bbb" stop-opacity=".1"/>',
+    '<stop offset="1" stop-opacity=".1"/></linearGradient>',
+    `<clipPath id="r"><rect width="${width}" height="20" rx="3" fill="#fff"/></clipPath>`,
+    `<g clip-path="url(#r)"><rect width="${leftWidth}" height="20" fill="#555"/>`,
+    `<rect x="${leftWidth}" width="${rightWidth}" height="20" fill="${color}"/>`,
+    `<rect width="${width}" height="20" fill="url(#s)"/></g>`,
+    '<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">',
+    `<text x="${leftWidth / 2}" y="15" fill="#010101" fill-opacity=".3">${safeLabel}</text>`,
+    `<text x="${leftWidth / 2}" y="14">${safeLabel}</text>`,
+    `<text x="${leftWidth + rightWidth / 2}" y="15" fill="#010101" fill-opacity=".3">${safeValue}</text>`,
+    `<text x="${leftWidth + rightWidth / 2}" y="14">${safeValue}</text>`,
+    '</g></svg>\n',
+  ].join('');
+  fs.writeFileSync(path.join(output, name), svg, { flag: 'wx' });
+}
+
+const [artifactRoot, releaseCommit] = process.argv.slice(2);
+if (!artifactRoot || !releaseCommit || !fs.statSync(artifactRoot).isDirectory()) {
+  throw new Error('Usage: prepare-release-assets.mjs <release-proof-root> <commit>');
+}
+const releaseRoot = path.resolve(artifactRoot);
+const output = path.join(releaseRoot, 'release-assets');
 fs.mkdirSync(output, { recursive: false });
-const verifiedMainProof = verifyMainProof(mainRoot, releaseCommit);
-const extensionZip = path.join(mainRoot, verifiedMainProof.zipFile);
+const verified = verifyReleaseProof(releaseRoot, releaseCommit);
+const extensionZip = path.join(releaseRoot, verified.zipFile);
 const extensionZipName = path.basename(extensionZip);
-const sbom = path.join(mainRoot, '.tmp/licenses/sbom.cdx.json');
-const mainProof = path.join(mainRoot, 'proof-manifest.json');
-const releaseAuditProof = path.join(releaseAuditRoot, 'proof-manifest.json');
-const evidenceName = `qa-evidence-${extensionZipName}`;
+const sbom = path.join(releaseRoot, '.tmp/licenses/sbom.cdx.json');
+const proofManifest = path.join(releaseRoot, 'proof-manifest.json');
+const evidenceName = `${path.basename(extensionZipName, '.zip')}-qa-evidence.zip`;
 
 for (const [source, name] of [
   [extensionZip, extensionZipName],
@@ -106,89 +125,60 @@ for (const [source, name] of [
 }
 
 const evidenceSources = [
-  ['proof/main-proof-manifest.json', mainProof],
-  ['proof/release-audit-proof-manifest.json', releaseAuditProof],
-  ['security/codeql.sarif', path.join(releaseAuditRoot, '.tmp/codeql/results.filtered.sarif')],
-  ['security/semgrep.sarif', path.join(releaseAuditRoot, '.tmp/semgrep/results.sarif')],
-  ['coverage/lcov.info', path.join(releaseAuditRoot, '.tmp/coverage/canonical/lcov.info')],
+  ['proof/release-proof-manifest.json', proofManifest],
+  ['proof/SHA256SUMS', path.join(releaseRoot, 'SHA256SUMS')],
+  ['security/codeql.sarif', path.join(releaseRoot, '.tmp/codeql/results.filtered.sarif')],
+  ['security/semgrep.sarif', path.join(releaseRoot, '.tmp/semgrep/results.sarif')],
+  ['coverage/lcov.info', path.join(releaseRoot, '.tmp/coverage/canonical/lcov.info')],
   [
     'coverage/coverage-final.json',
-    path.join(releaseAuditRoot, '.tmp/coverage/canonical/coverage-final.json'),
+    path.join(releaseRoot, '.tmp/coverage/canonical/coverage-final.json'),
   ],
   [
     'coverage/coverage-summary.json',
-    path.join(releaseAuditRoot, '.tmp/coverage/canonical/coverage-summary.json'),
+    path.join(releaseRoot, '.tmp/coverage/canonical/coverage-summary.json'),
   ],
-  ['proof/coverage-proof.json', path.join(releaseAuditRoot, '.tmp/qa/coverage-proof.json')],
-  ['proof/codeql-proof.json', path.join(releaseAuditRoot, '.tmp/qa/codeql-proof.json')],
-  ...collectTree(path.join(releaseAuditRoot, '.tmp/coverage/canonical/html'), 'coverage/html'),
+  ['proof/unit-proof.json', path.join(releaseRoot, '.tmp/qa/unit-proof.json')],
+  ['proof/coverage-proof.json', path.join(releaseRoot, '.tmp/qa/coverage-proof.json')],
+  ['proof/codeql-proof.json', path.join(releaseRoot, '.tmp/qa/codeql-proof.json')],
+  ...collectTree(path.join(releaseRoot, '.tmp/coverage/canonical/html'), 'coverage/html'),
+  ...collectTree(path.join(releaseRoot, '.tmp/mutation'), 'mutation'),
 ];
-const releaseAuditManifest = JSON.parse(
-  requireRegularFile(releaseAuditProof, 'release audit proof')
-);
-if (
-  releaseAuditManifest.schemaVersion !== 1 ||
-  releaseAuditManifest.artifactKind !== 'sniptale-ci-proof' ||
-  releaseAuditManifest.lane !== 'release-audit' ||
-  releaseAuditManifest.status !== 'passed' ||
-  releaseAuditManifest.commit !== releaseCommit
-) {
-  throw new Error('Release audit proof identity does not match the release commit.');
-}
-const releaseAuditDigests = new Map(
-  releaseAuditManifest.files.map(({ file, sha256 }) => [file, sha256])
-);
-const releaseAuditChecksums = parseSha256Sums(
-  requireRegularFile(path.join(releaseAuditRoot, 'SHA256SUMS'), 'release audit checksums'),
-  'release audit'
-);
-if (
-  releaseAuditChecksums.get('proof-manifest.json') !==
-  sha256Bytes(requireRegularFile(releaseAuditProof, 'release audit proof'))
-) {
-  throw new Error('Release audit proof checksum drifted.');
-}
-for (const [, source] of evidenceSources.filter(([, source]) =>
-  source.startsWith(releaseAuditRoot)
-)) {
-  const relative = path.relative(releaseAuditRoot, source).replaceAll(path.sep, '/');
-  const digest = sha256Bytes(requireRegularFile(source, 'release audit evidence'));
-  if (relative === 'proof-manifest.json') continue;
-  if (
-    releaseAuditDigests.get(relative) !== digest ||
-    releaseAuditChecksums.get(relative) !== digest
-  ) {
-    throw new Error(`Release audit evidence digest drifted: ${relative}`);
-  }
-}
+const proofSha256 = sha256Bytes(requireRegularFile(proofManifest, 'release proof'));
 const evidenceSha256 = await writeEvidenceArchive(output, evidenceName, evidenceSources, {
   commit: releaseCommit,
-  mainProofSha256: sha256Bytes(requireRegularFile(mainProof, 'main proof')),
-  releaseAuditProofSha256: sha256Bytes(
-    requireRegularFile(releaseAuditProof, 'release audit proof')
-  ),
+  releaseProofSha256: proofSha256,
 });
 
 const provenance = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   artifactKind: 'sniptale-release-provenance',
   commit: releaseCommit,
-  mainProofSha256: sha256Bytes(requireRegularFile(mainProof, 'main proof')),
-  releaseAuditProofSha256: sha256Bytes(
-    requireRegularFile(releaseAuditProof, 'release audit proof')
-  ),
+  releaseProofSha256: proofSha256,
   qaEvidence: { file: evidenceName, sha256: evidenceSha256 },
 };
 fs.writeFileSync(path.join(output, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`, {
   flag: 'wx',
 });
 
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const extensionManifest = JSON.parse(fs.readFileSync('apps/extension/manifest.json', 'utf8'));
+const coverageSummary = JSON.parse(
+  fs.readFileSync(path.join(releaseRoot, '.tmp/coverage/canonical/coverage-summary.json'), 'utf8')
+);
+const coverage = coverageSummary.total?.lines?.pct;
+if (!Number.isFinite(coverage)) throw new Error('Canonical line coverage is unavailable.');
+writeBadge(output, 'ci.svg', 'CI', 'passing', '#2cbe4e');
+writeBadge(output, 'coverage.svg', 'coverage', `${coverage}%`, '#2cbe4e');
+writeBadge(output, 'release.svg', 'release', `v${extensionManifest.version_name}`, '#007ec6');
+writeBadge(output, 'license.svg', 'license', packageJson.license, '#007ec6');
+
 const releaseAssets = fs
   .readdirSync(output, { withFileTypes: true })
   .filter((entry) => entry.isFile())
   .map((entry) => entry.name)
   .sort();
-if (releaseAssets.length !== 4) throw new Error('Release asset staging inventory drifted.');
+if (releaseAssets.length !== 8) throw new Error('Release asset staging inventory drifted.');
 const sums = releaseAssets.map(
   (name) => `${sha256Bytes(fs.readFileSync(path.join(output, name)))}  ${name}`
 );

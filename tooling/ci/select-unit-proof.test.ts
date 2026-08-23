@@ -10,6 +10,9 @@ vi.mock('./verify-main-proof.mjs', () => ({
   verifyMainProof: vi.fn(() => ({
     manifest: { files: [{ file: '.tmp/qa/unit-proof.json', sha256: 'a'.repeat(64) }] },
   })),
+  verifyReleaseProof: vi.fn(() => ({
+    manifest: { files: [{ file: '.tmp/qa/unit-proof.json', sha256: 'a'.repeat(64) }] },
+  })),
 }));
 
 const mockedVerifyMainProof = vi.mocked(verifyMainProof);
@@ -72,4 +75,21 @@ it('degrades discovery, JSON, and download failures to an absent reusable receip
     expect(fs.existsSync(artifactRoot)).toBe(false);
     expect(fs.existsSync(destination)).toBe(false);
   }
+});
+
+it('restores a content-addressed unit receipt from the latest release provenance artifact', async () => {
+  const root = createTempRoot('restore-release-unit-proof-');
+  const artifactRoot = path.join(root, 'release-unit-proof');
+  const destination = path.join(root, 'unit-proof.json');
+  const commit = 'b'.repeat(40);
+  const commandRunner = (args: string[]) => {
+    if (args[1] === 'list') return JSON.stringify([{ databaseId: 77, headSha: commit }]);
+    writeFile(artifactRoot, '.tmp/qa/unit-proof.json', '{"proof":true}\n');
+    return '';
+  };
+  const { restoreLatestReleaseUnitProof } = await import('./select-unit-proof.mjs');
+  expect(restoreLatestReleaseUnitProof(artifactRoot, destination, { commandRunner })).toBe(
+    destination
+  );
+  expect(fs.readFileSync(destination, 'utf8')).toBe('{"proof":true}\n');
 });

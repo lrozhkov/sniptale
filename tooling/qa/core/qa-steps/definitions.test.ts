@@ -41,6 +41,7 @@ it('records every canonical wrapper and decision lane', () => {
     'audit',
     'build',
     'build-commit',
+    'ci-composition',
     'closeout',
     'e2e',
     'focused-direct',

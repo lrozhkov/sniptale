@@ -66,35 +66,35 @@ function createFullVerifyWorkerContext(context) {
   };
 }
 
-function createTasks({ context, profile, workerRunner }) {
+function createTasks({ context, includeTests, profile, workerRunner }) {
   const workerContext = createFullVerifyWorkerContext(context);
-  return ['targetPaths', 'appOwners', 'typecheck', 'tests', 'lint', 'graph', 'light'].map(
-    (lane) => {
-      const resources = LANE_RESOURCES[lane];
-      const dedicatedReleaseTests = context.releaseMode && lane === 'tests';
-      const cpuTokens =
-        lane === 'tests'
-          ? dedicatedReleaseTests
-            ? profile.cpuTokens
-            : profile.vitestMaxWorkers
-          : resources.cpuTokens;
-      const memoryMiB = dedicatedReleaseTests ? profile.memoryMiB : resources.memoryMiB;
-      return {
-        id: lane,
-        cpuTokens,
-        exclusive: dedicatedReleaseTests,
-        memoryMiB,
-        run: ({ signal }) =>
-          workerRunner({
-            context: workerContext,
-            lane,
-            memoryMiB,
-            signal,
-            vitestMaxWorkers: profile.vitestMaxWorkers,
-          }),
-      };
-    }
-  );
+  const lanes = ['targetPaths', 'appOwners', 'typecheck', 'lint', 'graph', 'light'];
+  if (includeTests) lanes.splice(3, 0, 'tests');
+  return lanes.map((lane) => {
+    const resources = LANE_RESOURCES[lane];
+    const dedicatedReleaseTests = context.releaseMode && lane === 'tests';
+    const cpuTokens =
+      lane === 'tests'
+        ? dedicatedReleaseTests
+          ? profile.cpuTokens
+          : profile.vitestMaxWorkers
+        : resources.cpuTokens;
+    const memoryMiB = dedicatedReleaseTests ? profile.memoryMiB : resources.memoryMiB;
+    return {
+      id: lane,
+      cpuTokens,
+      exclusive: dedicatedReleaseTests,
+      memoryMiB,
+      run: ({ signal }) =>
+        workerRunner({
+          context: workerContext,
+          lane,
+          memoryMiB,
+          signal,
+          vitestMaxWorkers: profile.vitestMaxWorkers,
+        }),
+    };
+  });
 }
 
 function annotate(result, profile) {
@@ -127,7 +127,7 @@ function annotate(result, profile) {
   };
 }
 
-function assemble(results, releaseMode) {
+function assemble(results, releaseMode, includeTests) {
   const { appOwners, graph, light, lint, targetPaths, tests, typecheck } =
     indexTaskResults(results);
   const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
@@ -147,32 +147,39 @@ function assemble(results, releaseMode) {
     ...graph.dependencySteps,
     typecheck.typecheckStep,
     graph.deadExportsStep,
-    ...tests.testSteps,
+    ...(includeTests ? tests.testSteps : []),
   ];
 }
 
 export async function collectScheduledFullVerifySteps(
   context,
-  { profile = null, scheduler = runBoundedTasks, workerRunner = runFullVerifyLaneWorker } = {}
+  {
+    includeTests = true,
+    profile = null,
+    scheduler = runBoundedTasks,
+    workerRunner = runFullVerifyLaneWorker,
+  } = {}
 ) {
   const selectedProfile =
     profile ??
     (context.releaseMode ? resolveQaReleaseResourceProfile() : resolveQaResourceProfile());
-  const tasks = createTasks({ context, profile: selectedProfile, workerRunner });
-  const results = context.releaseMode
-    ? [
-        ...(await scheduler(
-          tasks.filter(({ id }) => id !== 'tests'),
-          { profile: selectedProfile }
-        )),
-        ...(await scheduler(
-          tasks.filter(({ id }) => id === 'tests'),
-          { profile: selectedProfile }
-        )),
-      ]
-    : await scheduler(tasks, { profile: selectedProfile });
+  const tasks = createTasks({ context, includeTests, profile: selectedProfile, workerRunner });
+  const results =
+    context.releaseMode && includeTests
+      ? [
+          ...(await scheduler(
+            tasks.filter(({ id }) => id !== 'tests'),
+            { profile: selectedProfile }
+          )),
+          ...(await scheduler(
+            tasks.filter(({ id }) => id === 'tests'),
+            { profile: selectedProfile }
+          )),
+        ]
+      : await scheduler(tasks, { profile: selectedProfile });
   return assemble(
     results.map((result) => ({ ...result, value: annotate(result, selectedProfile) })),
-    context.releaseMode
+    context.releaseMode,
+    includeTests
   );
 }

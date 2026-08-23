@@ -34,17 +34,22 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "8629dd2da258a23fe79d00c29e9a50109b3f775acc53e9d5d26dbd14525a5409"
+      "sha256": "e1e979df55890318c565939f1f71e7b40e7b79ad97de02b9cbfd9a39784a1ef8"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "8629dd2da258a23fe79d00c29e9a50109b3f775acc53e9d5d26dbd14525a5409"
+      "sha256": "e1e979df55890318c565939f1f71e7b40e7b79ad97de02b9cbfd9a39784a1ef8"
     },
     {
       "category": "bundled-font",
       "path": "packages/ui/src/styles/fonts.css",
       "sha256": "ea275a2cc153960b3d7f15cc248275ba32c430781dc283a71cbcb73cf629bf65"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/ci/derive-fast-proof.mjs",
+      "sha256": "eea7e9e9ef45d07db0a08bac3acf86a2760b7e3349bceb381967aac4c33aa5ef"
     },
     {
       "category": "bundled-font",
@@ -54,12 +59,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "64e93941764a0dd6c470d4aef1ef4987c74bf4fadfb3fb9270790f73a24d9c4c"
+      "sha256": "1219c268145d03d088158c5488400d1c764e99f9686c9bf84e9a7818a65ad342"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "64e93941764a0dd6c470d4aef1ef4987c74bf4fadfb3fb9270790f73a24d9c4c"
+      "sha256": "1219c268145d03d088158c5488400d1c764e99f9686c9bf84e9a7818a65ad342"
     },
     {
       "category": "validator-integration",
@@ -74,17 +79,17 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "bfe937a3285fb13ee24f0da7c773dcb6568d770425664ab475b9749dc248c326"
+      "sha256": "8ce94fd8f21d10598b7257c3760dec61047acb5aadd19de4cdccfd44d24c9f48"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "bfe937a3285fb13ee24f0da7c773dcb6568d770425664ab475b9749dc248c326"
+      "sha256": "8ce94fd8f21d10598b7257c3760dec61047acb5aadd19de4cdccfd44d24c9f48"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.mjs",
-      "sha256": "a60a3857c8f7dcf56207add730c004e54861497094cb799c7b8e0f2c7452f201"
+      "sha256": "dc39559c4693d4a3adc02596babe2f694c44768aee716dadfab658f943b17624"
     },
     {
       "category": "validator-integration",
@@ -99,22 +104,22 @@
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/verify-all.violation-steps.architecture.mjs",
-      "sha256": "76e5aa662907c7e73df6b9267b437980406e6b739d3689c45fc0ee14910105c1"
+      "sha256": "d5fc12ee0ec123042e9a81bebac5183b04f6f39271ea5f060fff98779632ed44"
     },
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
-      "sha256": "b3a00cf89d644b1f56591b5afcc2e2cdab848b9d28469a79d39d3c8a64db0319"
+      "sha256": "26c0dbce2c0539fe38f65a49f99641915ee1196326e33f74e7b77b3667f3c83f"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/verify-focused-triggered.execution.mjs",
-      "sha256": "b2e33e985597dd501a5a4878940e553c8aa203a22ca7e3af82b7f36261d4c7b0"
+      "sha256": "245729f999406beb0d0d5e7878dfd58c2defa519a0e9abb11d22fb9517613ef5"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/verify-focused-triggered.helpers.mjs",
-      "sha256": "02073cae7a59f3137af3c792d3cba1276e2b177e3060cf6bb6f33eefc2c2ab56"
+      "sha256": "cda1c448179d44caabb8c7c6b9bcfcbdc362e611eb8992f358be1a8ca4b07ec4"
     },
     {
       "category": "archive-integration",

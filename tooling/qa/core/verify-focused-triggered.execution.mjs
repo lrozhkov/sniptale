@@ -3,6 +3,7 @@ import { runConfigPolicyCheck } from './verify-config-policy.mjs';
 import { runDependencyAdmissionCheck } from '../guards/security/verify-dependency-admission.mjs';
 import { runDependencyGraphCheck } from './dependency-graph-runner.mjs';
 import { runDesignSystemCheck } from './verify-design-system.mjs';
+import { runDocumentationFactsCheck } from './verify-documentation-facts.mjs';
 import {
   recordSuccessfulBoundaryCheck,
   recordSuccessfulCycleCheck,
@@ -70,6 +71,13 @@ function runCanonicalFacadeTriggeredStep(targetFiles, qualityTargetFiles) {
 
 function runCoreOwnerChecks(targetFiles, deferOwnerGuards) {
   return [
+    timeSyncStep(() =>
+      createViolationStep(
+        'Documentation facts',
+        'Documentation fact violations found:',
+        runDocumentationFactsCheck()
+      )
+    ),
     timeSyncStep(() =>
       createViolationStep(
         'Package boundaries',

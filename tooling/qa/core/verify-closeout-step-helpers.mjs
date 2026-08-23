@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { runBuild, runExtensionBuildEquivalence } from './verify-build.mjs';
 import {
   formatDeadExportsReport,
@@ -17,6 +19,11 @@ import { runNamingCheck } from './verify-naming.mjs';
 import { runReleaseArchive } from './verify-release-archive.mjs';
 import { runSecurityCheck } from '../guards/security/verify-security.mjs';
 import { measureAsyncStep, measureSyncStep } from './step-timing.helpers.mjs';
+import {
+  materializeReusableBuildArchive,
+  recordSuccessfulBuildProof,
+  resolveReusableBuildProof,
+} from './build-proof.mjs';
 
 export function withDuration(step, durationMs) {
   return {
@@ -99,10 +106,15 @@ function requiresExtensionBuildEquivalence(targetFiles = []) {
 
 export async function collectBuildStep({
   buildRunner = runBuild,
+  buildProofResolver = resolveReusableBuildProof,
   equivalenceRunner = runExtensionBuildEquivalence,
   releaseMode = false,
   targetFiles = [],
 } = {}) {
+  const reusable = buildProofResolver();
+  if (reusable.matched) {
+    return createOkStep('Build', `reused verified build/ZIP proof ${reusable.proof.proofDigest}`);
+  }
   const { durationMs, value: buildResult } = await measureAsyncStep(() =>
     requiresExtensionBuildEquivalence(targetFiles)
       ? equivalenceRunner({ mode: 'release' })
@@ -114,14 +126,29 @@ export async function collectBuildStep({
   };
 }
 
-export async function collectReleaseArchiveStep({ archiveRunner = runReleaseArchive } = {}) {
+export async function collectReleaseArchiveStep({
+  archiveRunner = runReleaseArchive,
+  buildProofRecorder = recordSuccessfulBuildProof,
+  buildProofResolver = resolveReusableBuildProof,
+  reusableArchiveMaterializer = materializeReusableBuildArchive,
+} = {}) {
+  const reusable = buildProofResolver();
+  if (reusable.matched) {
+    const archivePath = reusableArchiveMaterializer(reusable);
+    buildProofRecorder({
+      archivePath,
+      producerId: 'qa-release-archive-owner',
+      reusedFrom: reusable.proof.proofDigest,
+    });
+    return createOkStep('Release archive', `reused verified archive ${path.basename(archivePath)}`);
+  }
   const { durationMs, value: archiveResult } = await measureAsyncStep(() => archiveRunner());
   const exitCode = archiveResult.status ?? archiveResult.exitCode ?? 0;
   if (exitCode === 0) {
-    return withDuration(
-      createOkStep('Release archive', String(archiveResult.stdout ?? '').trim()),
-      durationMs
-    );
+    const archiveOutput = String(archiveResult.stdout ?? '').trim();
+    const archivePath = archiveOutput.replace(/^Release archive:\s*/u, '');
+    buildProofRecorder({ archivePath, producerId: 'qa-release-archive-owner' });
+    return withDuration(createOkStep('Release archive', archiveOutput), durationMs);
   }
 
   return {

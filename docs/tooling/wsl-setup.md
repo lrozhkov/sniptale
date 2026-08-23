@@ -119,9 +119,9 @@ Check the resource ceiling seen by WSL with `nproc`, `lscpu`, and `free -h`. A `
 
 Use `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`, or `SNIPTALE_QA_VITEST_MAX_WORKERS` only for a measured operator override. Values must be positive integers, the memory budget must be at least 6144 MiB, and all values are clamped to WSL-visible ceilings. Heavy lane reservations are never reduced just to fit a smaller profile, so WSL must expose at least 7168 MiB total memory. Release requires at least 2 CPU tokens. Lower CPU tokens or Vitest workers when Windows is doing other sustained work; do not use an automatic/unbounded worker mode.
 
-`qa:release` deliberately saturates the WSL ceiling only during its exclusive repo-wide Vitest stage: on the current machine that means up to 12 CPU tokens, 12 workers, and visible memory minus 1 GiB. Windows still shares the physical processor and RAM, so use the same overrides to lower this release-only peak when interactive host work must remain responsive.
+`ci:proof` and `ci:release` run directly in WSL without Docker and use the same resource-profile owner as their GitHub container execution. The release gate deliberately saturates the visible ceiling only during exclusive full-product work. Windows still shares the physical processor and RAM, so lower the explicit CPU, memory, or worker overrides when interactive host work must remain responsive.
 
-`qa:audit` owns live npm audit, supply-chain inventory, full coverage, and external engines. It is not a normal environment or implementation gate. If an explicitly requested audit fails because the registry is unavailable, repair DNS/proxy/TLS/registry access rather than treating the result as a product defect.
+`ci:release` owns live npm audit, supply-chain inventory, full coverage, external engines, and mutation profiles. If it fails because the registry or a configured external binary is unavailable, repair DNS/proxy/TLS/registry/toolchain access rather than treating the result as a product defect.
 
 ## Extension Smoke
 

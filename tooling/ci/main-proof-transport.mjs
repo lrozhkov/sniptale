@@ -40,18 +40,71 @@ export function downloadSuccessfulMainProof({
       Number.isSafeInteger(run.databaseId) &&
       run.databaseId > 0
   );
-  if (matches.length === 0) throw new Error('Expected a successful main proof run.');
-  const runId = matches[0].databaseId;
-  commandRunner([
-    'run',
-    'download',
-    String(runId),
-    '--name',
-    `canonical-qa-${commit}-${runId}`,
-    '--dir',
-    artifactRoot,
-  ]);
-  return runId;
+  for (const { databaseId: runId } of matches) {
+    try {
+      commandRunner([
+        'run',
+        'download',
+        String(runId),
+        '--name',
+        `fast-proof-${commit}-${runId}`,
+        '--dir',
+        artifactRoot,
+      ]);
+      return runId;
+    } catch {
+      fs.rmSync(artifactRoot, { recursive: true, force: true });
+    }
+  }
+  throw new Error('Expected a successful main fast-proof artifact.');
+}
+
+export function downloadLatestReleaseProof({ artifactRoot, commandRunner = runGitHubCli }) {
+  const parsed = JSON.parse(
+    commandRunner([
+      'run',
+      'list',
+      '--workflow',
+      'quality-gate.yml',
+      '--branch',
+      'main',
+      '--event',
+      'workflow_dispatch',
+      '--status',
+      'success',
+      '--limit',
+      '20',
+      '--json',
+      'databaseId,headSha',
+    ])
+  );
+  if (!Array.isArray(parsed)) throw new Error('GitHub run discovery returned malformed JSON.');
+  for (const run of parsed) {
+    if (
+      !run ||
+      typeof run !== 'object' ||
+      !Number.isSafeInteger(run.databaseId) ||
+      run.databaseId <= 0 ||
+      !/^[a-f0-9]{40}$/u.test(run.headSha ?? '')
+    ) {
+      continue;
+    }
+    try {
+      commandRunner([
+        'run',
+        'download',
+        String(run.databaseId),
+        '--name',
+        `release-provenance-${run.headSha}-${run.databaseId}`,
+        '--dir',
+        artifactRoot,
+      ]);
+      return { runId: run.databaseId, commit: run.headSha };
+    } catch {
+      fs.rmSync(artifactRoot, { recursive: true, force: true });
+    }
+  }
+  throw new Error('Expected a successful release provenance proof run.');
 }
 
 export function removeSafeRestoreOutput(value, prefixes, { recursive }) {

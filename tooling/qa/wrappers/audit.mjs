@@ -10,22 +10,29 @@ import { createAuditProgressReporter } from './audit-progress.mjs';
 
 export { createAuditToolStep, MAX_AUDIT_FAILURE_PREVIEW };
 
+export async function collectAuditProfileResult({
+  profileId,
+  session,
+  progressReporter = createAuditProgressReporter,
+  stepCollector = collectAuditSteps,
+} = {}) {
+  const profile = resolveAuditProfile(profileId);
+  const context = { mode: `profile:${profile.id}`, scope: 'workspace' };
+  session?.attachRepositoryContext(context);
+  const onProgress = session ? progressReporter({ session }) : undefined;
+  return {
+    steps: await stepCollector({ profile, onProgress }),
+    context,
+  };
+}
+
 if (isExecutedAsScript(import.meta.url)) {
   const outcome = await runObservedWrapper({
     wrapperId: 'qa:audit',
     label: 'QA audit',
     blocking: true,
     execute: async ({ options, session }) => {
-      const profile = resolveAuditProfile(options.profile);
-      session.attachRepositoryContext({
-        mode: `profile:${profile.id}`,
-        scope: 'workspace',
-      });
-      const onProgress = createAuditProgressReporter({ session });
-      return {
-        steps: await collectAuditSteps({ profile, onProgress }),
-        context: { mode: `profile:${profile.id}`, scope: 'workspace' },
-      };
+      return collectAuditProfileResult({ profileId: options.profile, session });
     },
   });
   process.exitCode = outcome.exitCode;

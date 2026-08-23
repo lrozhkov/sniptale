@@ -21,12 +21,11 @@ it('keeps verified unit proof transport subordinate to the canonical QA owner', 
     },
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
-  expect(workflow.match(/Restore verified main receipts when available/gu)).toHaveLength(1);
+  expect(workflow).toContain('Restore verified reusable proof inputs');
   expect(workflow).toContain('select-unit-proof.mjs');
-  expect(workflow).toContain('select-unit-proof.mjs restore');
+  expect(workflow).toContain('select-unit-proof.mjs restore-latest-release');
   expect(workflow).toContain('SNIPTALE_UNIT_PROOF_PATH=$unit_proof');
-  expect(workflow).not.toContain('gh run list');
-  expect(workflow).not.toContain('runs=$(gh');
+  expect(workflow).toContain('unit_root="$RUNNER_TEMP/release-unit-proof"');
   expect(container).toContain("'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only'");
   expect(container).toContain('/opt/sniptale-unit-proof.json:ro');
   expect(artifacts).toContain("'.tmp/qa/unit-proof.json'");

@@ -289,7 +289,7 @@ it('reads invocation-time command snapshots from the canonical store', () => {
   expect(getCurrentVideoEditorExportStateSnapshot().jobId).toBe('job-latest');
 });
 
-function assertSelectorsRequireAProjection() {
+function useAssertSelectorsRequireAProjection() {
   // @ts-expect-error Capability hooks intentionally have no full-port overload.
   useVideoEditorPlaybackPort();
   // @ts-expect-error Capability hooks intentionally have no full-port overload.
@@ -312,4 +312,4 @@ function assertSelectorsRequireAProjection() {
   useVideoEditorDiagnosticsTelemetryPort();
 }
 
-void assertSelectorsRequireAProjection;
+void useAssertSelectorsRequireAProjection;

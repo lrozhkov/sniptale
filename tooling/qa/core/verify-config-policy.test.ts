@@ -127,7 +127,7 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'apps/extension/manifest.json',
-        message: 'minimum_chrome_version must be "148"',
+        message: 'minimum_chrome_version must be a decimal Chrome major version',
       }),
       expect.objectContaining({
         file: 'apps/extension/manifest.json',
@@ -223,7 +223,7 @@ it('accepts the Vite build target from a defineConfig callback return object', a
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([]);
 });
 
-it('reports missing strictness flags, build target, and chrome floor drift', async () => {
+it('reports missing strictness flags, build target, and malformed runtime config', async () => {
   const root = createTempRoot('verify-config-policy-fail-');
   writeConfigPolicyPackageJson(root, createFailingPackageJson());
   writeFile(
@@ -244,7 +244,7 @@ it('reports missing strictness flags, build target, and chrome floor drift', asy
   writeFile(
     root,
     'apps/extension/manifest.json',
-    JSON.stringify({ minimum_chrome_version: '116' }, null, 2)
+    JSON.stringify({ minimum_chrome_version: 'not-a-version' }, null, 2)
   );
   writeFile(root, 'apps/extension/vite.config.ts', 'export default { build: {} };\n');
 

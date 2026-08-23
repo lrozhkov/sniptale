@@ -129,14 +129,14 @@ export function resolveQaReleaseResourceProfile({
   const totalMemoryMiB = Math.max(1024, Math.floor(totalMemoryBytes / MIB));
   const physicalCoreCount = detectPhysicalCoreCount(cpuInfo, normalizedLogicalCpuCount);
   if (normalizedLogicalCpuCount < 2) {
-    throw new Error('qa:release requires at least 2 WSL-visible CPU tokens.');
+    throw new Error('ci:release requires at least 2 WSL-visible CPU tokens.');
   }
   const requestedCpuTokens = parsePositiveInteger(
     env.SNIPTALE_QA_CPU_TOKENS,
     'SNIPTALE_QA_CPU_TOKENS'
   );
   if (requestedCpuTokens != null && requestedCpuTokens < 2) {
-    throw new Error('SNIPTALE_QA_CPU_TOKENS must be at least 2 for qa:release.');
+    throw new Error('SNIPTALE_QA_CPU_TOKENS must be at least 2 for ci:release.');
   }
   const cpuTokens = Math.min(
     requestedCpuTokens ?? MAX_RELEASE_CPU_TOKENS,

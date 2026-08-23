@@ -267,7 +267,7 @@ async function collectDependencyGraphSteps(context, collectors) {
     : [await collectors.collectBoundaryStep(context), await collectors.collectCycleStep(context)];
 }
 
-async function collectCoreStepResults(context, collectors) {
+async function collectCoreStepResults(context, collectors, includeTests) {
   const steps = [
     collectors.collectLineLengthStep(context),
     collectors.collectOxlintStep(context),
@@ -284,7 +284,7 @@ async function collectCoreStepResults(context, collectors) {
     ...(await collectDependencyGraphSteps(context, collectors)),
     collectors.collectTypecheckStep(context),
     collectors.collectDeadExportsStep(context),
-    ...(await collectors.collectUnitAndCoverageSteps(context)),
+    ...(includeTests ? await collectors.collectUnitAndCoverageSteps(context) : []),
   ];
   return steps;
 }
@@ -297,6 +297,7 @@ async function appendPostVerifySteps(steps, context, collectors) {
 }
 
 export async function collectFullVerifyStepResults({
+  includeTests = true,
   releaseMode = false,
   verifyScope = resolveFullVerifyScope(),
   baseline = loadBaseline(),
@@ -315,12 +316,14 @@ export async function collectFullVerifyStepResults({
   }
   const steps =
     Object.keys(collectors).length === 0
-      ? await collectScheduledFullVerifySteps(context)
-      : await collectCoreStepResults(context, resolvedCollectors);
+      ? await collectScheduledFullVerifySteps(context, { includeTests })
+      : await collectCoreStepResults(context, resolvedCollectors, includeTests);
   await appendPostVerifySteps(steps, context, resolvedCollectors);
 
   return {
-    scopeDetail: collectUnitTestScopeDetail(context),
+    scopeDetail: includeTests
+      ? collectUnitTestScopeDetail(context)
+      : 'full Vitest deferred to ci:release',
     steps,
   };
 }

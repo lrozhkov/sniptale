@@ -1,103 +1,59 @@
 # Wrapper Summary
 
-Updated: 2026-07-26
+This document owns wrapper scope, freshness, locks, handoffs, and observability. The canonical implementation order is `implementation → qa:checkpoint → required review → qa:closeout`.
 
-This document owns wrapper lifecycle, scope/freshness state, locks, handoffs, and observability. Workflow belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), quality policy in [code-quality.md](code-quality.md), and command lookup in [operator-handbook.md](operator-handbook.md).
-
-The canonical order is `implementation → qa:checkpoint → required review → qa:closeout`. Wrapper speed and scope describe tool cost, not permission for weaker architecture or proof.
-
-## Scope Authority
+## Diff-local QA
 
 The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 
-- Product targets are implementation/application/package files plus shared controls.
-- Harness targets include `tooling/**` plus shared controls.
-- Shared controls participate in both scopes: `.github/workflows/**`, `docs/agent-tooling/**`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
+- `qa:preflight` is a read-only current-diff or explicit-file planning snapshot. It does not format, build, acquire the blocking lock, or write proof state.
+- `qa:advisory` is optional non-blocking diagnosis over the current diff.
+- `qa:structural-audit` is a manual report-only repository maintenance snapshot. It is never a PR or closeout gate.
+- `qa:release-harness` proves executable harness and shared-control changes and writes the freshness stamp consumed by downstream local wrappers.
+- `qa:checkpoint` formats supported non-Markdown targets, recollects the diff, then runs focused typecheck, tests, lint, graph/index, architecture/security controls, and eligible diff coverage. It does not build, stage, or commit.
+- `qa:closeout` reuses or runs checkpoint, hands its lock to the internal build phase, validates unchanged proof scope, stages allowed changes, rejects `tasks/**`, and commits only after green build proof.
 
-Whenever the current diff has executable harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Exact machine-owned technical-debt, OSS-consumer, and coverage-rollout inventories are data-only targets: checkpoint runs their owner validators without requiring a fresh harness stamp. The exemption belongs only to exact files classified by `qa-scope`, including an author-maintained data module when it has an explicit owner validator; it is never execution evidence for another policy file. Policy JSON, baselines, allowlists, and executable registries are not data-only. Documentation lists the categories; the classifier remains authoritative.
+The internal build phase is not a public standalone wrapper. Closeout and pre-push invoke it after fresh checkpoint/harness proof. It selects direct, related, saturated, or full unit scope from the existing deterministic owner, produces the artifact build, and writes build state. `ci:build` is different: it is an explicit quick `npm run build` bypass and makes no canonical QA claim.
 
-## Diff And Freshness Model
+Harness targets include executable `tooling/**`, workflows, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact data-only inventories are exempt only when `qa-scope` classifies them as such and their focused owner validator passes. A policy JSON, baseline, allowlist, or executable registry is not data-only.
 
-`qa:preflight`, `qa:advisory`, `qa:checkpoint`, `qa:closeout`, `qa:build`, and `qa:release-harness` resolve the current workspace state according to their contracts. Focused/checkpoint/build/closeout commands do not accept an explicit file scope; preflight alone accepts `--files <paths...>` for a read-only pre-edit structural snapshot. `qa:structural-audit` is a distinct manual repository-maintenance report, not an enforcement scope.
+## Freshness and proof reuse
 
-Freshness states bind proof to the relevant content fingerprint rather than a mutable claim:
+Harness state binds harness/shared-control content. Checkpoint state binds the current product diff and downstream handoff. Build state binds the build closure. Changing the relevant content invalidates that state.
 
-- harness state proves the current harness/shared-control scope
-- checkpoint state proves the current product scope and full-diff relationship used by downstream handoff
-- build state proves the current build closure
+Full product unit proof is separately content-addressed. The internal build phase and `ci:release` may reuse it only when product/workspace inputs, product tests and support, dependency and Vitest configuration, unit-runner owner, semantic Node/container identity, and suite/pool match. CPU, RAM, and worker values are recorded as planning metadata and do not change the semantic result. A missing, malformed, partial, externally unverified, or mismatched receipt triggers the complete unit suite. Unit reuse never skips build, security, coverage, or another unrelated control.
 
-Changing the relevant diff invalidates checkpoint/build-state reuse. Full product unit proof is content-addressed separately: `qa:build` and `qa:release` may reuse a successful receipt only when the complete product/workspace inputs, product test inventory, dependency and Vitest configuration, unit-runner owner, Node/container identity, suite/pool, and requested resource profile still match. Commit-only or security/reporting changes do not invalidate that receipt by themselves. A missing, malformed, partial, externally unverified, or mismatched receipt fails closed to the complete unit suite; the receipt never skips non-unit QA, artifact build, security, or coverage controls.
+Build/ZIP proof separately binds the full product, public asset, manifest, workspace, build configuration, dependency, Node/toolchain, production-environment, legal/generated-inventory, packaging-owner closure, and exact archive bytes. `ci:proof` and `ci:release` can consume that receipt when its complete digest matches. Only the internal release-archive owner can mint the receipt; the quick `ci:build` command is intentionally outside this owner and its artifact is never accepted.
 
-The pre-push hook materializes each immutable pushed range and runs applicable harness verification followed by `qa:checkpoint` and `qa:build` for both new and existing remote refs. Creating a remote branch does not imply release preparation: pre-push never invokes `qa:release` or `build:release`. It also rejects proof-time mutations or untracked inputs that are absent from the pushed object.
+CodeQL and coverage use the same fail-closed model in `ci:release`. Their complete input digests and required report hashes decide reuse; workflow YAML does not. A documentation-only change can reuse matching heavy proof, while changed production scope, queries, baseline, tests, configuration, dependencies, or image triggers recomputation.
 
-## Wrapper Lifecycles
+## Commit-bound gates
 
-### `qa:preflight`
+`ci:proof` and `ci:release` are the only public full gates:
 
-Read-only context collection. It reports scope, canonical owner/runtime, relevant documents, additional structural context excluding catalog findings, contracts/consumer-discovery needs, proof, build forecast, and explicitly non-blocking advisory findings. Current-diff mode uses behavioral files; `-- --files <paths...>` produces a non-blocking explicit planning snapshot without writing advisory/checkpoint state. Forecast and topology context stay bounded to the diff, exact mapped/adjacent owner tests, same-directory owner siblings, and direct HEAD import candidates; they do not build a repository-wide production index or claim complete consumer discovery without a bounded chain. Large path lists render a bounded head and tail with the total count and a full-list digest so later sections remain visible and the omitted middle remains comparable. It does not format, acquire the blocking lock, build, stage, or commit.
+Only `qa:release-harness`, `qa:checkpoint`, and `qa:closeout` are diff-aware. Both `ci:*` gates resolve the complete repository product snapshot through the same scope owner locally and on GitHub; neither may select an owner-local or focused control set from the current diff.
 
-### `qa:advisory`
+- `ci:proof` runs non-Vitest product verification, build/ZIP proof, and the fast PR security/dependency audit. Its machine policy explicitly marks `fullVitest: false` and `releaseReady: false`.
+- `ci:release` owns full Vitest together with complete product verification, the release audit, CodeQL, canonical coverage, SBOM/license controls, and persistence/secrets mutation profiles.
 
-Optional non-blocking diagnosis over the current diff. Its machine catalog contains only structural file/function pressure, UI proof gaps, and detached this-sensitive methods. UI visual-proof findings require a changed normalized view signature; callback-identity JSX event rewiring, test files, and state/controller-only wiring do not create screenshot guidance, while imperative render/style changes remain visible even inside handlers. Findings are always printed under an explicitly non-blocking heading and saved as sanitized diagnostic locations plus bounded advisory state v2. Normal implementation receives the same advisory block through `qa:checkpoint`; do not add advisory as a routine extra gate.
+Both run the same JS composition and QA owners directly on WSL; GitHub/Selectel executes a candidate control path only when its complete digest equals trusted base. A changed QA authority is proven locally and installed through the recorded bootstrap bypass before it can define an external required result. The controls and receipt schema are semantically aligned, but host differences can change an outcome. Local execution accepts `--cpu N`, `--memory-mib N`, and `--workers N` and marks dirty proof `local-workspace`; it is diagnostic. Release admission and external proof reuse accept only `committed` locked-image proof whose trusted-base admission verifies commit, tree, equal candidate/trusted-control digests, image digest, mandatory phases, capability claim, reports, hashes, and compatible execution profile.
 
-### `qa:structural-audit`
+`ci:proof -- --pr <number>` is the owner-only bypass mode. It starts from clean `origin/main`, materializes the exact remote PR commit, runs the same container owner, rechecks GitHub authority afterward, posts proof hashes, and never merges.
 
-Manual report-only architecture-maintenance snapshot over repository code. It combines structural concentration with a disjoint deterministic path-owner partition and explicitly overlapping forwarding-edge operation candidates. A forwarding-only module with one production consumer receives `Consolidate` with a stable merge target or a concrete `Keep` veto. Console output interleaves `Split`, `Consolidate`, and `Keep`, then prints the artifact location and a bounded structural preview so the observed 16 KiB limit cannot hide a decision family. The bounded sanitized schema-v2 artifact records partition and forwarding-edge counts, a complete compact forwarding-edge inventory, and sampled rich structural/cluster evidence at `.tmp/structural-audit/report.json`; it fails instead of silently truncating the compact inventory. The goal is fewer transitions without removing explicit runtime, owner, adapter, or contract boundaries. Findings never become a blocking result, and the lane is not part of PR gates, normal agent workflow, closeout, or `qa:audit`. It does not collect model-token or token-hotspot inventories.
+The audit profile and product release modules still own their established semantics internally. They are no longer separate public `qa:release`, `qa:audit`, `ci:security`, or `ci:coverage` commands, so there is no second composition to synchronize.
 
-### `qa:release-harness`
+## Locks and scheduling
 
-Blocking harness/shared-control proof. It runs the harness-owned formatting/static/type/test contract and writes the harness freshness state consumed by checkpoint, build, release, and closeout paths. Exact machine-owned technical-debt, OSS-consumer, and coverage-rollout inventories skip this wrapper only when `qa-scope` classifies them as inventory-only and their checkpoint owner validators pass; author-maintained data modules receive no broader exemption. A standalone build still requires that fresh checkpoint. It does not run product coverage or commit.
+Formatting is the first sequential checkpoint barrier. Independent focused lanes start only after it succeeds. Build and full product verification may use bounded concurrent lanes, then a saturated exclusive unit phase. Vite build remains exclusive.
 
-### `qa:checkpoint`
+`qa:release-harness`, `qa:checkpoint`, `qa:closeout`, `ci:proof`, and `ci:release` participate in the blocking lifecycle. Do not run them concurrently. Closeout performs the authorized lock handoff to its internal build.
 
-Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, prints and records advisory state, runs diff-scoped structural risk plus focused static/architecture/security controls, typechecks the affected owner-project and declared reverse-consumer closure when possible, runs directly changed and owner-selected tests, and checks eligible diff coverage. HEAD-proven deleted owner-local TypeScript paths with a path-segment-safe project match remain in their mapped closure; unproven missing or unmapped paths, broad shared contracts, and typecheck/configuration changes retain the full-workspace fallback. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
+Resource defaults and overrides are resolved by the existing resource-profile owner. Values are clamped to visible CPU and memory. They do not enter semantic proof identity or select a different control set. A separate execution-profile receipt and trusted minimum decide reuse compatibility, so a weak diagnostic run cannot seed canonical release provenance.
 
-Formatting is a strict sequential first barrier. Checkpoint recollects the diff only after formatting finishes, then starts independent `typecheck`, `tests`, `lint`, `graph/index`, and light-guard lanes through the bounded resource scheduler. Formatter failure starts none of those lanes. Lane completion order never changes the canonical result order or failure population.
+## Observability and failures
 
-### `qa:build`
+Canonical wrappers write a structured run record and bounded sanitized log under `.tmp`. Full gates additionally collect the allowlisted records, logs, reports, ZIP, receipts, proof manifest, and `SHA256SUMS` into `build/ci-artifacts`. Phase start/pass/fail markers remain visible in console output, while full logs survive as artifacts.
 
-Blocking broader product/build proof. It requires fresh matching checkpoint state and applicable harness state, runs broader checks/tests not owned by focused proof, produces the artifact build, and writes build state. Unit-test scope is selected automatically by `tooling/qa/core/verify-build.test-profiles.mjs`: small low-risk changes with complete owner-test proof use `owner-direct`; runtime, persistence, messaging, parser/export, package/public, ambiguous, or over-budget changes use `related-transitive`; test-only changes use `direct-changed`; changes without product test targets use `skip`. Selection is independent from scheduler execution: `bounded-concurrent` keeps Vitest in the normal build lane, while `saturated-exclusive` moves it after every non-test prerequisite and gives it the release resource profile. Full-suite fallback is always saturated. Related closure is saturated when it exceeds `SATURATED_RELATED_INPUT_LIMIT` (currently 32 inputs) or matches the measured high-fan-out families `package-and-app-core`, `messaging-runtime`, or `parser-snapshot-export`; `storage-persistence` remains threshold-driven until isolated run history proves unconditional saturation is useful. Deleted tests stay fingerprinted but are not executable. A deleted production chain uses direct surviving owner tests only when its complete HEAD consumer closure and current redirect closure resolve inside one changed owner group, every surviving changed production file has deterministic proof, and the resulting test set is bounded; this avoids repeating Vitest graph discovery after the graph has already been closed. Partial, cross-owner, missing, uncovered, dead-export-only, or ambiguous closure falls back to affected-consumer discovery or the full product suite. Full-suite product tests otherwise remain release/audit proof. Direct commit flags are operator/debug surfaces; normal commits use `qa:closeout`.
+Investigate a failed canonical stage with the focused direct command only when needed. Fix the owner defect, restore invalidated harness/checkpoint proof, and rerun the owning wrapper. Do not stack a manual closeout chain or repeat GitHub VM runs to debug a locally reproducible tooling failure.
 
-Build and release prerequisite checks use bounded lanes. Bounded build tests reserve 4 GiB, use up to four Vitest workers, and may overlap typecheck, graph, security, and static lanes. Saturated build tests and the `qa:release` repo-wide Vitest closure each run as a dedicated exclusive stage after their non-test lanes, using up to 12 WSL-visible CPU tokens, up to 12 workers, and all visible memory except 1 GiB by default; explicit resource overrides may lower every limit. Vite build remains exclusive: it starts only after every prerequisite lane, including saturated Vitest, has finished and no lane can overlap it. Release packaging starts only after the exclusive release-mode build succeeds.
-
-### `qa:closeout`
-
-Blocking commit owner. It reuses or runs checkpoint, hands the lock to `qa:build`, validates that the current diff still matches fresh proof, stages with `git add -A`, rejects staged `tasks/**`, and commits only after green build proof. Test-profile selection is deterministic from the current diff and has no manual narrow-mode override. Agents do not manually stage the candidate before closeout.
-
-### `qa:release`
-
-Blocking release-grade product proof. It requires applicable harness freshness, runs the full release verification contract, and builds in release mode. It is for release preparation, audit-grade proof, or explicit direction, not ordinary implementation closeout.
-
-### `qa:audit`
-
-Blocking manual audit lane selected by an audit profile. It owns full product coverage, repository evidence/topology inventory, supply-chain checks, and configured external engines with structured required/optional/excluded status. The report-only inventory controls atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm supply-chain controls persist sanitized result evidence at `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Green status means the control ran successfully, not that a report-only artifact contains zero findings. It is not a normal implementation gate and should not be run between ordinary implementation waves.
-
-The `coverage` profile requires only `full-product-coverage`. That owner filters the raw map to the canonical production scope and atomically publishes LCOV, JSON summary, filtered JSON, and HTML under `.tmp/coverage/canonical`; a missing production file, malformed map, or path outside the repository fails the control. The `security` profile retains its security-control contract. CI invokes these existing profiles rather than redefining their results.
-
-### Container-backed CI commands
-
-`ci:release`, `ci:security`, and `ci:coverage` remain narrow diagnostic container lanes over the corresponding canonical wrappers. Required PR and `main` proof uses one internal candidate lane: it materializes the exact candidate tree as a staged diff over its base, disables Git hooks, and retains a second authority clone outside the container mount. Each canonical phase runs in a separate disposable invocation of the same image, so detached candidate descendants cannot cross phase boundaries. Before Git-sensitive phases the host verifies the worktree through the inaccessible authority clone and reconstructs `.git`; it then runs `qa:release-harness`, `qa:checkpoint`, literal `qa:closeout`, candidate-tree equality, and `qa:release`. Ordinary PR and main proof then runs the fast `pr` audit profile and validates available heavyweight receipts without requiring CodeQL or coverage recomputation. Scheduled/manual main and signed-tag release admission extend the same owners with blocking full security and coverage controls. The trusted host collector writes one hashed bundle containing phase receipts, base/candidate/tree and control identities, container digest, resolved resource profiles, ZIP, SBOM, available SARIF, and coverage reports. `ci:proof -- --pr <number> [--cpu N] [--memory-mib N] [--workers N]` invokes the same candidate lane from a clean `origin/main` launcher, rechecks local and PR authority, and posts the proof digest; it never merges. The complete external topology and release contract are documented in [ci-cd.md](ci-cd.md).
-
-### `qa:e2e`
-
-Separate Playwright extension smoke. It is runtime acceptance proof, not a third product/harness wrapper mode and not automatically part of closeout.
-
-`qa:e2e:security` builds a production-mode artifact in the isolated `dist-release-e2e` directory and a release-like optional-permission artifact in `dist-security-e2e`, then runs the browser security regression suite. The production-surface scenario launches `dist-release-e2e` explicitly and proves that internal pages and security instrumentation are not web-exposed; the remaining scenarios launch the isolated instrumented artifact. The Linux native optional-permission proof requires `gcc`, X11/XTest development libraries, and an X server (the wrapper supplies Xvfb for headless runs). `qa:e2e:all` additionally builds and runs the ordinary smoke/critical artifact before the security scenarios.
-
-## Blocking Lock And Handoffs
-
-`qa:release-harness`, `qa:checkpoint`, `qa:closeout`, `qa:build`, `qa:release`, and `qa:audit` use one blocking-wrapper lock. Do not start them in parallel. `qa:closeout` performs an authorized lock handoff to its child build; users should not start another wrapper while that chain is active.
-
-A live process consuming CPU is not a hang merely because output is quiet. `qa:audit` records every control start/completion in its diagnostic log as execution proceeds and also prints phase transitions for its longest CodeQL and full-coverage controls. Use the run record and diagnostic log before interrupting a long full-suite, coverage, audit, or build step.
-
-## Observability
-
-Canonical wrappers write one structured run record and one bounded sanitized diagnostic log per invocation under `.tmp`. Advisory, preflight, checkpoint/closeout advisory reuse, and standalone structural steps expose a `consoleOutput` block before the summary; the common sanitizer removes secrets and workspace paths, caps the block at `16 KiB`, and marks truncation. Preflight labels non-finding structural context separately from non-blocking advisory findings, and advisory output renders watch-count findings as review signals so neither is mistaken for the blocking structural result. A wrapper renders each finding family once: checkpoint and closeout advisory output owns structural watches, while the structural step retains its blocking result and standalone/harness output without repeating the watch block. The zero case is explicit as `attention=0, watch=0`, and `--verbose` does not duplicate the block. Successful advisory findings are also stored as sanitized diagnostic locations. Other default output stays concise: overall result, duration, problem/control identifiers, the JSON run-record path, and the sanitized diagnostic-log path.
-
-The first step emitted by each scheduled lane records queue time, lane wall time, CPU/memory reservation, and the selected resource profile. Build unit-test detail also records independent selection and execution decisions, the related input count, the execution reason, and whether the full-suite result was executed or consumed from a validated proof; for example, `selection=related-transitive; execution=saturated-exclusive; related-inputs=198; reason=related-input-threshold; budget=12cpu/14969MiB`. Dead-export steps record whether the persistent import/export index was rebuilt, incrementally updated, or reused. These values are diagnostic state; harness/checkpoint/build fingerprints and the sealed full-unit input digest remain the proof authority.
-
-`npm run qa:stats -- [--wrapper <id>] [--task <id>]` aggregates records by wrapper, mode, root run, task, step, control, problem, and skip reason. Legacy JSONL timing files are read-only fallback and receive no new writes.
-
-## Failure Handling
-
-Investigate the failed wrapper stage with the direct command listed in [operator-handbook.md](operator-handbook.md) only when needed. Fix local defects, return to preflight for owner/topology/proof-scope mistakes, restore invalidated harness/checkpoint proof, and rerun the canonical wrapper rather than stacking a manual closeout chain.
+`npm run qa:stats -- [--wrapper <id>] [--task <id>]` aggregates local run records by wrapper, mode, root run, task, step, control, problem, and skip reason.

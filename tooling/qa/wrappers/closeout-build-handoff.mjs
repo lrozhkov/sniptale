@@ -13,7 +13,10 @@ const CLOSEOUT_BUILD_OWNER_PID_ENV = 'SNIPTALE_QA_CLOSEOUT_BUILD_OWNER_PID';
 
 function runBuildChild(buildArgs, options, dependencies) {
   if (dependencies.npmRunner) {
-    return dependencies.npmRunner(['run', '--silent', 'qa:build', '--', ...buildArgs], options);
+    return dependencies.npmRunner(
+      ['run', '--silent', 'qa:internal:build', '--', ...buildArgs],
+      options
+    );
   }
   const trustedRoot = process.env.SNIPTALE_TRUSTED_CI_ROOT;
   if (trustedRoot) {
@@ -27,7 +30,7 @@ function runBuildChild(buildArgs, options, dependencies) {
     }
     return runCommand(process.execPath, [entrypoint, ...buildArgs], options);
   }
-  return runNpm(['run', '--silent', 'qa:build', '--', ...buildArgs], options);
+  return runNpm(['run', '--silent', 'qa:internal:build', '--', ...buildArgs], options);
 }
 
 function createLockHandoffToken() {

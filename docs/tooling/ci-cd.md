@@ -1,78 +1,88 @@
 # Canonical CI/CD
 
-Updated: 2026-08-18
+This document owns external execution, proof transport, artifact retention, and release publication. Wrapper behavior is owned by [wrapper-summary.md](wrapper-summary.md), operator commands by [operator-handbook.md](operator-handbook.md), and changing product facts by the generated [project facts](../engineering/project-facts.md).
 
-This document owns the external execution topology, admission rules, proof transport, artifact retention, and release publication contract. Wrapper behavior remains owned by [wrapper-summary.md](wrapper-summary.md), operator commands by [operator-handbook.md](operator-handbook.md), and quality controls by [code-quality.md](code-quality.md).
+## One control composition
 
-## One QA Authority
+The repository has two full commit-bound owners:
 
-GitHub Actions does not define a second QA pipeline. Local work and external jobs invoke the same `qa:release-harness`, `qa:checkpoint`, `qa:closeout`, `qa:release`, and `qa:audit` owners from the locked QA image. Workflow YAML selects the lane, transports verified receipts, publishes artifacts, and manages the external runner; it does not redefine control composition, thresholds, scopes, baselines, or success.
+- `ci:proof` proves the Fast PR Gate: static, architecture, dependency, security, build, and packaging verification plus the fast PR audit profile. It deliberately does not run the complete Vitest suite and never claims release readiness.
+- `ci:release` runs the complete product verification including full Vitest, the release audit profile, canonical coverage, CodeQL, SBOM generation, and the persistence and secrets mutation profiles.
 
-Local `qa:*` commands run directly on the developer machine. `ci:release`, `ci:security`, `ci:coverage`, and `ci:proof` are local container adapters for reproducing the locked Linux/amd64 environment. Selectel is only an executor for GitHub Actions. Resource differences are allowed and are recorded in proof; they do not change the selected blocking controls.
+Both commands run the same JS composition and QA owners directly in WSL. GitHub runs those owners inside the pinned Linux/amd64 image on a Selectel runner. This provides semantic parity of controls and compatible receipt formats, not a promise that WSL and the image always have the same outcome: system libraries, Chromium, filesystem behavior, resource ceilings, ordering, and timing differ. The image fixes the canonical external environment; it does not own the control list. GitHub YAML supplies identity, verified reusable receipts, resources, artifact transport, and infrastructure lifecycle; it does not restate control scopes or success rules. A local dirty workspace is supported for development diagnosis and is recorded as `local-workspace`. Ordinary WSL proof is diagnostic and may support a documented operator decision, while GitHub reuse and release publication require a clean committed proof from the locked image. The clean local PR bypass also runs that image.
 
-The trusted control plane for a pull request is the base commit loaded by `pull_request_target`. Candidate code is checked out separately without credentials and represented as an uncommitted diff over the exact base in a disposable workspace. Literal `qa:closeout` may commit only inside that workspace. The host then requires the resulting parent and tree to equal the admitted base and candidate tree before restoring the exact candidate commit for commit-bound phases. Candidate changes to workflows or QA controls may build an informational image, but they cannot decide their own required result.
+The diff-local development flow remains separate and unchanged: `qa:release-harness → qa:checkpoint → required review → qa:closeout`. Exactly these three public wrappers are diff-aware and optimize feedback for the current change. `ci:proof` and `ci:release` always resolve a repository-wide snapshot and never narrow controls from the diff, whether their common owner runs directly in WSL or through the locked image on Selectel. The local wrappers are not run on a separate external VM and are not a second external gate.
 
-## Selectel Runner Lifecycle
+`ci:build` is the deliberately narrow local npm build bypass. It is not a release build, produces no canonical QA claim, and its output is never admissible for provenance or build/ZIP proof reuse.
 
-Both existing workflows use one topology:
+## Continuous Integration
 
-```text
-provision → canonical-qa or release-audit → artifact upload → cleanup
-```
-
-The protected `selectel-runner-controller` GitHub environment has two independent runtime authorities with the same schema: `SELECTEL_QA_PROFILES` supplies ordered placements and resource budgets for PR/main QA, while `SELECTEL_RELEASE_PROFILES` supplies them for tagged release audits. The release workflow maps its selected value into the controller's canonical `SELECTEL_QA_PROFILES` process input, so provisioning semantics stay single-owned. The repository contains only the bounded schema and allowed zone, flavor, volume, and resource combinations. `ci:github:plan` and `ci:github:apply` require both variables, validate both identically, and retain only their environment, SHA-256, and profile count in the sanitized settings snapshot.
-
-The controller validates the complete JSON before cloud access, normalizes it, hashes it, and tries profiles strictly in order. It may advance only after a confirmed infrastructure admission or provisioning failure and verified deletion of every partial VM, boot volume, port, and JIT registration. Cleanup failure stops fallback. External cloud resources are cleaned independently of GitHub runner-registration availability, every cleanup owner is attempted, and an incomplete cleanup writes a replayable `cleanup-failed` receipt with sanitized per-owner status before the gate fails closed. The first online JIT runner ends provisioning, and no fallback is permitted after canonical QA begins. QA failure, runner loss, or timeout remains a failure for that candidate and proceeds to cleanup. The independent tag/TTL sweeper removes expired managed resources and offline disposable registrations.
-
-The selected profile maps to `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`, `SNIPTALE_QA_VITEST_MAX_WORKERS`, `SNIPTALE_QA_PLAYWRIGHT_WORKERS`, and `SNIPTALE_QA_SECURITY_WORKERS`. Controller records and QA proof contain the normalized profile digest, zero-based selected profile index, zone, flavor, volume type and size, resource values, candidate/base/trusted-control commits, immutable QA image reference, region, and only a shortened SHA-256 of the Selectel project ID. Credentials, the raw project ID, JIT config, cloud-init body, and registry token are never artifacts.
-
-## Pull Request Gate
-
-A ready pull request runs the fast candidate-bound sequence:
+The existing `quality-gate.yml` has two execution modes and two bounded infrastructure diagnostics:
 
 ```text
-qa:release-harness
-→ qa:checkpoint
-→ literal qa:closeout
-→ candidate tree equality
-→ qa:release
-→ qa:audit --profile pr
-→ heavyweight receipt validation
-→ release artifact validation
+Fast PR Gate              → ci:proof
+Release provenance Gate   → exact fast proof reuse, or ci:proof on the same VM → ci:release
+Selectel connectivity     → read-only controller preflight
+Selectel infrastructure smoke → QA image + disposable VM/toolchain checks + complete cleanup
 ```
 
-The `pr` audit profile requires Gitleaks worktree scanning, npm audit, npm signature verification, OSV Scanner, and Semgrep. It excludes full CodeQL and full product coverage. CodeQL and coverage receipts are validated and transported when available, but their absence or content-addressed mismatch does not trigger heavyweight recomputation and does not block an ordinary PR. The final required `pr-gate` succeeds only when canonical QA and external cleanup both succeed.
+`selectel-smoke` is the first external rollout check after a CI-authority bootstrap. It uses `SELECTEL_QA_PROFILES`, provisions one disposable runner, verifies the immutable QA image, exact Node/Semgrep/CodeQL/OSV Scanner/Gitleaks/actionlint/Playwright versions, and starts every pinned Chromium/Headless Shell/FFmpeg executable so missing system libraries fail before a heavy lane. It also proves denial of container access to OpenStack metadata. It deliberately skips `npm ci`, `ci:proof`, `ci:release`, candidate proof admission, SARIF, and Codecov. Its final gate succeeds only when image resolution, provisioning, smoke checks, and the independent cleanup job all succeed. Heavy Fast and Release provenance gates are not dispatched until this smoke is green.
 
-The canonical artifact is uploaded before cleanup even when QA fails. Its job summary identifies the selected profile, profile digest, resolved resources, failed phase, artifact link, and exact `gh run download` command. PR artifacts are retained for 14 days.
+Ready pull requests and pushes to `main` use Fast PR Gate and `SELECTEL_QA_PROFILES`. Manual and scheduled release provenance use `SELECTEL_RELEASE_PROFILES`. Both variables have the same ordered profile schema. The controller tries profiles in order, stops at the first online runner, and may fall back only after complete cleanup of a failed provisioning attempt.
 
-## Main And Heavy Audit
+Release provenance first looks for a successful exact fast proof for the same commit, candidate tree, candidate-control digest, gate-input digest, and immutable image digest. A valid receipt records that the fast controls were already proven; full Vitest and all release-only controls still run. If the fast receipt is missing or mismatched, `ci:release` includes the missing fast controls on that same VM. It never creates a second Fast VM.
 
-A push to `main` runs the same fast canonical lane for the exact squash commit. A green proof publishes the already built QA and controller images under immutable `sha-<commit>` tags and moving `main` tags with OCI SBOM and provenance. Main artifacts are retained for 30 days.
+For pull requests, the workflow, mandatory control authority, phase orchestrator, artifact sealer, classifier, proof-admission envelope, final graph admission, and Selectel lifecycle controller come from the trusted base commit through `pull_request_target`. Before any candidate control executes, the trusted launcher independently recomputes both complete control digests from the candidate workspace and the read-only trusted mount, then verifies the sealed launcher assertions. The machine inventory in `tooling/ci/control-digest.mjs` covers executable control roots, root tool configuration, and recursively discovered TypeScript, Vite, Vitest, Playwright, ESLint, Prettier, PostCSS, and Tailwind configurations; its contract tests keep this closure inside the fail-closed Fast Gate registry. Normal PR execution is allowed only when the digests are byte-identical, so executing the candidate path is equivalent to executing trusted base. Candidate code never receives the workflow token, cloud credentials, OIDC capability, or authority to introduce a new required-control implementation.
 
-The weekly schedule and a normal `workflow_dispatch` enable the heavyweight extension of the same candidate lane: full security audit including CodeQL, followed by full canonical coverage. SARIF upload remains result presentation, not an independent authority. Codecov is updated only from coverage admitted from the latest immutable release, so its README badge describes released code rather than an arbitrary main or scheduled run. A Codecov outage is non-blocking and never changes the canonical release result.
+When the control digest differs, the external gate fails closed before running candidate code and points to the documented CI-authority bootstrap. The candidate controls must first pass the complete local diff-aware QA, `ci:proof`, and `ci:release` sequence; the authorized owner then merges that dedicated bootstrap PR through the recorded native bypass with Actions disabled. After merge, those controls are the new trusted base. This avoids both self-approval and a duplicate external candidate workflow. Both candidate and trusted-control digests, plus the trusted-control SHA, are sealed into semantic identity.
 
-## Verified Proof Reuse
+Before provisioning Selectel, the trusted base classifier fingerprints the machine-registered product, security, dependency, build, packaging, and QA-control closure in both base and candidate. Skip is allowed only when the digests are identical, an exact successful base fast proof is available, and every changed path belongs to the explicit non-gate-only registry. Any unknown path fails closed and provisions the normal gate. Candidate documentation/OSS validators then produce an explicitly `derived-reuse` receipt; it is never represented as an executed candidate run.
 
-Proof reuse is a fail-closed QA-owner decision, not a cache hit decided by YAML. The full-unit receipt binds product sources, tests, support, runner inputs, dependencies, Node/container identity, suite, pool, worker count, and resource profile. The CodeQL receipt binds production source scope, query packs, configuration, baseline, toolchain/image identity, and the filtered SARIF digest. The coverage receipt binds production sources, tests, coverage scope/configuration, dependency lock, image identity, and every canonical coverage report digest.
+The required gate accepts exactly one trusted graph: `derived proof` with all VM jobs skipped, or `VM proof + trusted admission + cleanup receipt`. Skipped jobs cannot satisfy the VM graph, and an unexpectedly executed VM job cannot satisfy the derived graph. Main fast proof publishes the already verified QA and controller images under immutable `sha-<commit>` tags and moving `main` tags with OCI SBOM and provenance.
 
-README, release notes, and unrelated documentation do not invalidate CodeQL or coverage receipts. A changed input, missing report, malformed receipt, changed image digest, or artifact hash mismatch rejects reuse. A blocking lane then performs the full control. Fast PR/main lanes merely report the heavyweight receipt as unavailable and continue with their own required controls.
+## Proof reuse
 
-## Release Admission And Assets
+Proof reuse is a fail-closed decision in the same QA owners, not a YAML cache shortcut.
 
-`release.yml` accepts only a GitHub-verified annotated `v<package.json version>` tag whose commit belongs to `main`, whose exact successful main proof exists, and whose immutable QA/controller images exist. The release audit uses one disposable Selectel runner and requires the complete `release` audit profile. CodeQL and coverage first attempt verified reuse and otherwise run fully. Missing, stale, corrupt, or differently bound proof fails closed through full recomputation or failed admission.
+- Unit proof binds product and test inputs, dependencies, runner configuration, semantic execution environment, suite, and pool. CPU, RAM, and worker counts are sealed as planning metadata but excluded from its semantic input digest.
+- Build/ZIP proof binds product sources, public assets, manifest, workspace packages, Vite/TypeScript and package configuration, lockfile, Node/toolchain compatibility, normalized production environment inputs, legal/generated inventories, packaging owner, and exact archive bytes. It can be reused by either gate. The receipt writer requires the internal release-archive producer capability, so `ci:build` cannot produce it.
+- CodeQL proof binds its production-only source scope, query packs, configuration, baseline, toolchain/image, and filtered SARIF.
+- Coverage proof binds production sources, tests, coverage configuration, dependency lock, image, and canonical reports.
 
-Publication consumes the already verified extension ZIP rather than rebuilding it. It creates a mutable draft, uploads and verifies the exact asset set and GitHub-computed digests, then publishes and verifies the immutable release. The public asset set is deliberately compact: the extension ZIP, `SHA256SUMS`, CycloneDX SBOM, provenance, and one deterministic QA evidence ZIP. The evidence archive contains the main and release-audit proof manifests, CodeQL and Semgrep SARIF, LCOV, filtered coverage JSON, summary JSON, CodeQL and coverage receipts, and the HTML coverage report. Release notes are generated inline by the workflow from the verified extension ZIP name; no repository release-notes file is created.
+Documentation-only or release-note changes may reuse a matching receipt. Any changed digest, malformed or partial receipt, unknown image, or report hash mismatch triggers the full control. Tests, specs, fixtures, and generated data are excluded from the production CodeQL source digest; product code and security-relevant tooling remain included.
 
-After immutable publication, an isolated informational job validates LCOV against the exact release-audit receipt and uploads it to Codecov under the released commit and `main` branch identity. The same job supports a narrow manual replay from an existing release workflow run, so a transient Codecov outage does not require repeating Selectel provisioning, CodeQL, coverage, or release publication.
+## Selectel lifecycle and resources
 
-If publication itself fails after a successful release audit and cleanup, the same workflow supports a bounded publish replay. An operator dispatches it with the failed run ID, its admitted commit SHA, and release tag. The publish job uses the current trusted `main` publication tooling, installs its locked dependencies, downloads only the admission/main/audit artifacts from the named run, and revalidates their exact source commit, signed tag, and immutable-release preconditions before publishing the verified asset set. Admission, Selectel provisioning, and the release audit remain skipped; successful replay then feeds its newly preserved release proof directly to the informational Codecov job.
+The controller writes an early provision receipt before candidate execution. Every attempt owns a disposable network, subnet, router interface, router, VM port, VM, and boot volume; only the no-ingress security group is shared. Cleanup waits for QA to stop using the runner but uses `always()`, does not depend on proof formation or proof upload succeeding, and can reconstruct its input from the early job output if artifact transport failed. It idempotently removes the JIT registration, VM, every recorded port, router interface, router, subnet, network, and boot volume after success, QA failure, or runner loss and writes each status to the summary. The scheduled tag/TTL sweeper independently discovers and removes expired resources across that complete set.
 
-The current CodeQL owner is the pinned CLI invoked by `qa:audit`, with the `security-and-quality` suite plus repository-owned queries. Heavy CodeQL is excluded from ordinary PR and fast-main lanes; verified content-addressed receipts are reused when production sources, query packs, configuration, baseline, toolchain, image, and SARIF all match. GitHub overlay analysis was evaluated against the measured release run (about 37 minutes of CodeQL). Although CLI overlay is available for JavaScript, GitHub's automatic large speedup currently applies to the default query suite and requires retaining an overlay-base database. Replacing the custom suite would weaken the canonical local/release control, while retaining a database would add a second cache lifecycle. Overlay is therefore not enabled until custom-suite parity is supported and a repository benchmark shows a net benefit over verified proof reuse.
+Sanitized controller and QA receipts contain the selected profile index and digest, zone, flavor, volume type/size, resource budgets, candidate/base/control identities, and immutable image reference. The Selectel project UUID is represented only by a shortened SHA-256. Credentials, raw project ID, JIT configuration, and cloud-init are never artifacts. The VM anonymously pulls the public immutable QA image, so no reusable registry or repository token enters Nova user-data. Trusted bootstrap installs and verifies a Docker forwarding deny for the OpenStack metadata address before starting the JIT runner; failure prevents candidate execution.
 
-## Failure Handling And Bypass
+CPU, memory, Vitest, Playwright, and security-worker limits come from the selected profile on GitHub. Local `ci:proof` and `ci:release` accept `--cpu`, `--memory-mib`, and `--workers`; otherwise the existing resource-profile owner derives bounded values from visible WSL resources. The machine policy separates `semanticDigest`, which identifies what was checked, from `executionProfile`, which records where and with what resources it ran, and `reuseCompatibility`, which determines whether that result may seed the current canonical lane. Resources never select a different control set or enter the semantic digest, but a profile below the trusted lane minimum is diagnostic-only and cannot become release provenance or a reuse source.
 
-Wrapper logs, run records, phase receipts, proof status, hashes, and available reports are collected even after a normal QA failure. Cleanup is a separate controller job and must confirm absence or deletion of the JIT registration, VM, volume, and port. A runner disappearing before it can upload local files is an infrastructure failure; the controller record and independent sweeper remain the recovery authorities.
+Every real VM run restores the npm download cache into a runner volume, then still executes `npm ci` against the exact candidate lockfile. PR runs are restore-only. Only trusted main and release-provenance execution may save the cache, whose key includes OS, architecture, the locked Node/toolchain generation, and lockfile digest. Cache availability changes download cost only; it cannot skip installation or satisfy a control.
 
-When GitHub resources are unavailable, the owner may run `npm run ci:proof -- --pr <number>` with optional local resource flags. It requires a clean worktree, exact local/remote PR SHA, trusted image/control identity, and complete local proof, then posts only the proof summary and digests. Merge remains a manual native GitHub PR-only ruleset bypass; the proof command never merges.
+## Artifacts and results
 
-Repository policy uses read-only default `GITHUB_TOKEN`, full-SHA Action pins, the selected Action allowlist, enabled vulnerability alerts, Dependabot security updates, private vulnerability reporting, immutable releases, squash/linear-history protection, required `pr-gate`, and the owner-only PR bypass. `ci:github:apply` writes a sanitized rollback snapshot before changes; restore requires that exact snapshot path.
+Canonical proof is uploaded even after a normal lane failure. The job summary names the failed phase, selected resources, artifact link, and exact `gh run download` command. PR artifacts are retained for 14 days; main, scheduled, provenance, controller, and deployment artifacts are retained for 30 days. Immutable release assets are retained by GitHub Releases.
+
+Fast proof contains the verified extension ZIP and build/ZIP receipt, Semgrep SARIF/JSON, dependency/security reports, wrapper run records, logs, proof manifest, and checksums. Release proof adds the full-unit receipt, CodeQL, canonical coverage JSON/LCOV/HTML, SBOM, licenses, mutation evidence, and their receipts. Raw CodeQL databases, npm caches, unfiltered engine logs, cloud secrets, and unrelated temporary files are excluded.
+
+SARIF upload is a presentation job over the canonical artifact. Codecov upload is informational and occurs only after immutable release publication from that exact release proof. Neither service owns thresholds or changes the blocking result.
+
+## Continuous Deployment
+
+`release.yml` is manual deployment only and never provisions Selectel. It accepts an existing signed `v<package version>` tag and a successful Release provenance Gate run for the same commit. By default the named run must be the latest successful provenance run for that commit. An explicit older-run bypass requires an operator note, which remains in the GitHub run summary.
+
+Admission verifies the annotated GitHub signature, package/tag match, `main` ancestry, release publisher, immutable-release setting, tag ruleset, exact provenance artifact, and all artifact hashes. Publication consumes the already verified extension ZIP; it does not rebuild or rerun QA. A failed publish can therefore be rerun without another VM.
+
+The immutable public asset set is compact: extension ZIP, CycloneDX SBOM, deterministic QA evidence ZIP, provenance JSON, `SHA256SUMS`, and release-owned CI/coverage/release/license SVG badges. The evidence ZIP contains the detailed reports and receipts instead of publishing them as a loose file collection. The release is created as a draft, every asset and GitHub digest is verified, then the release is published and verified immutable.
+
+## Bypass and recovery
+
+`npm run ci:proof -- --pr <number>` is the owner-only local PR bypass proof. It requires a clean `origin/main` launcher and exact remote candidate identity, runs the same container owner, rechecks authority after execution, posts the proof digest to the PR, and never merges. The native PR-only ruleset bypass remains manual.
+
+The bootstrap rollout order for a changed CI authority is fixed: complete the diff-aware local QA flow through `qa:closeout`, obtain green local `ci:proof`, obtain green local `ci:release`, then merge a dedicated bootstrap PR through the native bypass without dispatching a GitHub gate or provisioning a VM. Record the local proof paths and digests in that PR. Only after the new authority is on `main` may a separate version PR be created; that PR must pass the external Fast PR Gate and Release provenance Gate before deployment publishes the version. Repository Actions may be temporarily disabled only for the bounded bootstrap merge, with the sanitized policy snapshot recorded first and the exact policy restored immediately afterward.
+
+Before the external rollout begins, the local sequence establishes one green `ci:proof` and then one green `ci:release` baseline. They are not repeated during this rollout. After bootstrap, infrastructure is validated with `selectel-smoke`, then any external defect is corrected through the normal diff-aware QA flow and rerun only on the affected external gate. A new local full-gate run is required only for a later task or when the operator explicitly requests local diagnosis.
+
+Workflow dispatch accepts an operator note for exceptional runs. A non-latest release-provenance publication requires one. Notes do not weaken any cryptographic admission; they provide an auditable reason beside the immutable proof identity.
