@@ -253,6 +253,35 @@ async function verifyUnexpectedResponseSurface() {
   expect(loggerErrorMock).toHaveBeenCalledWith('Unexpected response structure from provider');
 }
 
+async function verifyNetworkFailureSurface() {
+  const { requestChatCompletion } = await import('./request');
+  const secretCanary = 'sk-transport-error-canary';
+  fetchMock.mockRejectedValue(
+    new Error(`socket failed Authorization: Bearer ${secretCanary} passphrase=never-log`)
+  );
+
+  let thrownError: unknown;
+  try {
+    await requestChatCompletion({
+      apiKey: secretCanary,
+      baseUrl: 'https://ollama.local',
+      modelCode: 'llama3.2',
+      systemPrompt: 'Return JSON',
+      userPrompt: 'Summarize this page',
+    });
+  } catch (error) {
+    thrownError = error;
+  }
+
+  expect(thrownError).toBeInstanceOf(Error);
+  expect((thrownError as Error).message).toBe(
+    translate('background.runtime.llmUnexpectedProcessingError')
+  );
+  expect(JSON.stringify(thrownError)).not.toContain(secretCanary);
+  expect(JSON.stringify(loggerDebugMock.mock.calls)).not.toContain(secretCanary);
+  expect(JSON.stringify(loggerErrorMock.mock.calls)).not.toContain(secretCanary);
+}
+
 describe('transport/request', () => {
   beforeEach(resetLlmTransportRequestMocks);
 
@@ -276,4 +305,5 @@ describe('transport/request', () => {
     'rejects successful HTTP responses without chat completion content',
     verifyUnexpectedResponseSurface
   );
+  it('maps secret-bearing network failures onto a fixed safe error', verifyNetworkFailureSurface);
 });

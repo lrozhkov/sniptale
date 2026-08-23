@@ -12562,6 +12562,7 @@
         "apps/extension/src/video-editor/project/state/track/groups.ts",
         "apps/extension/src/video-editor/project/state/track/utility-lanes.ts",
         "apps/extension/src/video-editor/runtime/commands/types.ts",
+        "apps/extension/src/video-editor/runtime/controller/composition/provider.tsx",
         "apps/extension/src/video-editor/runtime/controller/contracts/header.ts",
         "apps/extension/src/video-editor/runtime/controller/contracts/insertion.ts",
         "apps/extension/src/video-editor/runtime/controller/contracts/preview.ts",
@@ -12571,6 +12572,7 @@
         "apps/extension/src/video-editor/runtime/controller/contracts/workspace.ts",
         "apps/extension/src/video-editor/runtime/controller/selected-clip-actions.ts",
         "apps/extension/src/video-editor/runtime/controller/shell.ts",
+        "apps/extension/src/video-editor/runtime/controller/workspace/core.ts",
         "apps/extension/src/video-editor/runtime/controller/workspace/sidebar-placement-actions.ts",
         "apps/extension/src/video-editor/runtime/controller/workspace/sidebar.ts",
         "apps/extension/src/video-editor/runtime/controller/workspace/timeline.ts",
@@ -19265,6 +19267,30 @@
       ]
     },
     {
+      "id": "policy.source.profiles-mjs.60a51cc8c7",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/mutation/profiles.mjs",
+        "contentHash": "d5cab379539ac390b820eae253c5118005f299b8d64b3cfc44aa442a91510489"
+      },
+      "consumers": [
+        "tooling/test/mutation/profiles.mjs",
+        "tooling/test/mutation/run-profile.mjs",
+        "tooling/test/mutation/stryker.config.mjs"
+      ],
+      "surfaces": [
+        "binding:mutationProfiles",
+        "property:mutate",
+        "property:mutate[1]",
+        "property:persistence",
+        "property:secrets"
+      ]
+    },
+    {
       "id": "policy.source.proof-mjs.ab4f4fdeb9",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -19657,6 +19683,27 @@
         "property:release-audit",
         "property:resourceProfiles",
         "property:security"
+      ]
+    },
+    {
+      "id": "policy.source.run-profile-mjs.81965250c6",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/mutation/run-profile.mjs",
+        "contentHash": "8c1e830f6118c4e7308588e3564480472458021e06ab5eba3e48ac60ee3fc877"
+      },
+      "consumers": [
+        "tooling/test/mutation/run-profile.mjs"
+      ],
+      "surfaces": [
+        "binding:counts",
+        "binding:summary",
+        "property:env",
+        "property:stdio"
       ]
     },
     {
@@ -20313,6 +20360,28 @@
         "property:runStructuralAuditWrapper/targetFiles",
         "property:writeStructuralAuditArtifact/clusters",
         "property:writeStructuralAuditArtifact/summary"
+      ]
+    },
+    {
+      "id": "policy.source.stryker-config-mjs.e21c110eeb",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/mutation/stryker.config.mjs",
+        "contentHash": "5a93886469fd657c134fd16e30be7bfafe4d98811307aa1fe75e05990c92e4f0"
+      },
+      "consumers": [
+        "tooling/test/mutation/stryker.config.mjs"
+      ],
+      "surfaces": [
+        "property:ignorePatterns",
+        "property:jsonReporter",
+        "property:reporters",
+        "property:thresholds",
+        "property:vitest"
       ]
     },
     {
@@ -23185,7 +23254,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-test-coverage.rollout-files.data.mjs",
-        "contentHash": "ee6cc5ef36f0608fdcdf3d137eae99a90f6f25a61aca5c7af1c540f8778fb4c3"
+        "contentHash": "9168f9652ca98848644fc49d0b8f14bd3aab8d2023f97925fca7a84748ae7ff4"
       },
       "consumers": [
         "tooling/qa/core/verify-test-coverage.registry.mjs",
@@ -23536,6 +23605,25 @@
         "property:coverage",
         "property:exclude",
         "property:exclude[1]",
+        "property:setupFiles",
+        "property:test"
+      ]
+    },
+    {
+      "id": "policy.source.vitest-config-ts.7e4a8cd606",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/mutation/vitest.config.ts",
+        "contentHash": "ac309cad782ecab54b7f43c3aca903c61854c983cbddfc84ea1286f1bae3718b"
+      },
+      "consumers": [
+        "tooling/test/mutation/vitest.config.ts"
+      ],
+      "surfaces": [
         "property:setupFiles",
         "property:test"
       ]

@@ -1,0 +1,13 @@
+{
+  "name": "@sniptale/mutation-proof",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "persistence": "node ../../../tooling/test/mutation/run-profile.mjs persistence",
+    "secrets": "node ../../../tooling/test/mutation/run-profile.mjs secrets"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1"
+  }
+}
