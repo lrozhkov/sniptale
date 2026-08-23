@@ -6,9 +6,11 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createTempRoot, withCwd, writeFile, writeJson } from './test-helpers';
 
 const inheritedProofAuthority = process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
+const inheritedControlDigest = process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
 
 beforeEach(() => {
   delete process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'a'.repeat(64)}`;
 });
 
 afterEach(() => {
@@ -16,6 +18,21 @@ afterEach(() => {
   delete process.env.SNIPTALE_QA_MEMORY_MIB;
   if (inheritedProofAuthority == null) delete process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
   else process.env.SNIPTALE_UNIT_PROOF_AUTHORITY = inheritedProofAuthority;
+  if (inheritedControlDigest == null) delete process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
+  else process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = inheritedControlDigest;
+});
+
+it('rejects full-unit reuse across candidate control digests', async () => {
+  const root = createProofRoot();
+  await withCwd(root, async () => {
+    const module = await import('./unit-test-proof.mjs');
+    module.recordSuccessfulFullUnitProof({ cwd: root, maxWorkers: 2 });
+    process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'b'.repeat(64)}`;
+    expect(module.resolveReusableFullUnitProof({ cwd: root, maxWorkers: 2 })).toMatchObject({
+      matched: false,
+      reason: 'full unit proof control digest changed',
+    });
+  });
 });
 
 function createProofRoot() {

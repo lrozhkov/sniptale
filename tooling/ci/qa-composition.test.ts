@@ -64,11 +64,13 @@ it('keeps the trusted phase orchestrator aligned with admission policy', () => {
   );
   const runLane = fs.readFileSync('tooling/ci/run-lane.mjs', 'utf8');
   const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
+  const containerCommand = fs.readFileSync('tooling/ci/container-command.mjs', 'utf8');
   for (const lane of ['proof', 'release']) {
     for (const phase of admission.lanes[lane].freshPhases) {
-      expect(runLane, `${lane}:${phase}`).toContain(`'${phase}'`);
+      expect(containerCommand, `${lane}:${phase}`).toContain(`'${phase}'`);
     }
   }
   expect(container).toContain('${trustedRoot}:/opt/sniptale-trusted:ro');
-  expect(container).toContain('/opt/sniptale-trusted/tooling/ci/run-lane.mjs');
+  expect(container).toContain("path.join(trustedRoot, 'tooling/ci/run-lane.mjs')");
+  expect(runLane).toContain("spawnSync('docker', invocation");
 });

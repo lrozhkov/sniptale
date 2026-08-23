@@ -18,7 +18,9 @@ import {
 import { assertReleaseTagRuleset } from './release-tag-policy.mjs';
 import { createProofSemanticDigest } from './artifacts.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
+import { createCandidateControlDigest } from './control-digest.mjs';
 import { verifyImageProof, writeImageProof } from './image-proof.mjs';
+import { CANONICAL_IMAGE_ENVIRONMENT } from './container-command.mjs';
 
 it('distinguishes disabled settings from rollback snapshot failures', () => {
   expect(parseToggleState({ ok: true, error: '' }, 'setting')).toBe(true);
@@ -35,6 +37,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const installer = fs.readFileSync('tooling/ci/install-toolchain.mjs', 'utf8');
   const semgrepLock = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock', 'utf8');
   expect(dockerfile.startsWith(`FROM ${lock.node.image}\n`)).toBe(true);
+  expect(CANONICAL_IMAGE_ENVIRONMENT.NODE_VERSION).toBe(lock.node.version);
   expect(semgrepLock).toContain(`semgrep==${lock.semgrep.version}`);
   const playwrightLock = fs.readFileSync('tooling/configs/ci/playwright/package-lock.json');
   const projectLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
@@ -166,7 +169,7 @@ it('binds a reusable main proof to commit, tree, candidate controls, and semanti
       .digest('hex'),
   }));
   const executionEnvironment = { kind: 'locked-container', digest: `sha256:${'a'.repeat(64)}` };
-  const controlDigest = `sha256:${'b'.repeat(64)}`;
+  const controlDigest = createCandidateControlDigest();
   const trustedControlDigest = controlDigest;
   const gateInputDigest = `sha256:${'c'.repeat(64)}`;
   const manifest = {
@@ -180,6 +183,8 @@ it('binds a reusable main proof to commit, tree, candidate controls, and semanti
     trustedControlSha: commit,
     controlAuthority: 'trusted-base',
     trustedControlDigest,
+    controlsChanged: false,
+    controlDisposition: 'trusted-controls',
     evidenceDisposition: 'executed',
     gateClaim: 'fast-pr-gate',
     fullVitest: false,
@@ -216,6 +221,68 @@ it('binds a reusable main proof to commit, tree, candidate controls, and semanti
   expect(verifyMainProof(root, commit).zipFile).toBe('build/sniptale_0.3.3.zip');
   fs.appendFileSync(path.join(root, 'build/sniptale_0.3.3.zip'), 'drift\n');
   expect(() => verifyMainProof(root, commit)).toThrow('Main proof digest mismatch');
+});
+
+it('rejects equal but stale main-proof control digests', () => {
+  const root = createTempRoot('stale-main-proof-');
+  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  const tree = spawnSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).stdout.trim();
+  const staleDigest = `sha256:${'f'.repeat(64)}`;
+  writeFile(root, 'build/sniptale_0.3.3.zip', 'zip\n');
+  const files = [
+    {
+      file: 'build/sniptale_0.3.3.zip',
+      sha256: crypto.createHash('sha256').update('zip\n').digest('hex'),
+    },
+  ];
+  const executionEnvironment = { kind: 'locked-container', digest: `sha256:${'a'.repeat(64)}` };
+  const manifest = {
+    schemaVersion: 1,
+    artifactKind: 'sniptale-ci-proof',
+    lane: 'proof',
+    status: 'passed',
+    workspaceMode: 'committed',
+    commit,
+    candidateTree: tree,
+    trustedControlSha: commit,
+    trustedControlDigest: staleDigest,
+    controlDigest: staleDigest,
+    controlsChanged: false,
+    controlDisposition: 'trusted-controls',
+    controlAuthority: 'trusted-base',
+    evidenceDisposition: 'executed',
+    gateClaim: 'fast-pr-gate',
+    fullVitest: false,
+    releaseReady: false,
+    reuseCompatibility: { outcome: 'compatible' },
+    gateInputDigest: `sha256:${'c'.repeat(64)}`,
+    executionEnvironment,
+    containerDigest: executionEnvironment.digest,
+    proofSemanticDigest: createProofSemanticDigest({
+      lane: 'proof',
+      commit,
+      candidateTree: tree,
+      trustedControlSha: commit,
+      trustedControlDigest: staleDigest,
+      controlDigest: staleDigest,
+      gateInputDigest: `sha256:${'c'.repeat(64)}`,
+      executionEnvironment,
+    }),
+    files,
+  };
+  writeFile(root, 'proof-manifest.json', `${JSON.stringify(manifest)}\n`);
+  writeFile(
+    root,
+    'SHA256SUMS',
+    `${files[0].sha256}  ${files[0].file}\n${crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(path.join(root, 'proof-manifest.json')))
+      .digest('hex')}  proof-manifest.json\n`
+  );
+
+  expect(() => verifyMainProof(root, commit)).toThrow(
+    'proof identity does not match the release commit'
+  );
 });
 
 it('binds the published QA image digest to the exact successful main workflow', () => {
@@ -346,7 +413,7 @@ it('blocks local PR bypass for a dirty tree and unauthorized author', () => {
   expect(dirty.stderr).toContain('clean worktree');
 });
 
-it('runs only controls identical to trusted base and rechecks PR authority', () => {
+it('runs candidate controls once inside a trusted identity and admission envelope', () => {
   const initial = {
     localSha: 'a'.repeat(40),
     pr: {
@@ -366,13 +433,15 @@ it('runs only controls identical to trusted base and rechecks PR authority', () 
   const proofSource = fs.readFileSync('tooling/ci/proof.mjs', 'utf8');
   const laneSource = fs.readFileSync('tooling/ci/run-lane.mjs', 'utf8');
   const containerSource = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
+  const containerCommandSource = fs.readFileSync('tooling/ci/container-command.mjs', 'utf8');
   expect(proofSource).toContain('launcher must run from the clean origin/main commit');
-  expect(laneSource).toContain("['install', 'npm', ['ci', '--ignore-scripts']]");
-  expect(laneSource).toContain("'verify-project-toolchain'");
-  expect(laneSource).toContain("path.join(trustedRoot, 'tooling/ci/verify-project-toolchain.mjs')");
-  expect(laneSource).toContain('`tooling/ci/${lane}-wrapper.mjs`');
+  expect(containerCommandSource).toContain("['install', 'npm', ['ci', '--ignore-scripts']]");
+  expect(containerCommandSource).toContain("'verify-project-toolchain'");
+  expect(containerCommandSource).toContain(
+    '/opt/sniptale-trusted/tooling/ci/verify-project-toolchain.mjs'
+  );
+  expect(containerCommandSource).toContain('`tooling/ci/${lane}-wrapper.mjs`');
   expect(containerSource).toContain('resolveGithubRunIdentityEnvironment()');
-  expect(laneSource).toContain('candidateControlDigest !== trustedControlDigest');
   expect(laneSource).toContain('createCandidateControlDigest({ cwd: trustedRoot })');
   expect(laneSource).toContain('assertedCandidateControlDigest !== candidateControlDigest');
   expect(laneSource).toContain('assertedTrustedControlDigest !== trustedControlDigest');
@@ -382,8 +451,19 @@ it('runs only controls identical to trusted base and rechecks PR authority', () 
     'const trustedControlSha = process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? candidateIdentity.head'
   );
   expect(containerSource).toContain('${trustedRoot}:/opt/sniptale-trusted:ro');
-  expect(containerSource).toContain('/opt/sniptale-trusted/tooling/ci/run-lane.mjs');
-  expect(containerSource).toContain('candidateControlDigest !== trustedControlDigest');
+  expect(containerSource).toContain("[path.join(trustedRoot, 'tooling/ci/run-lane.mjs'), lane]");
+  expect(containerSource).toContain("SNIPTALE_CI_TRUSTED_HOST: '1'");
+  expect(laneSource).toContain("spawnSync('docker', invocation");
+  expect(laneSource).toContain('appendCandidatePhaseInvocation(dockerArgs');
+  expect(containerCommandSource).toContain("npm: '/usr/local/bin/npm'");
+  expect(containerSource).toContain('validateCandidateImageEnvironment(');
+  expect(containerSource).toContain(
+    'const controlsChanged = candidateControlDigest !== trustedControlDigest'
+  );
+  expect(containerSource).toContain('const reuseAllowed = !controlsChanged');
+  expect(containerSource).toContain(
+    'Release provenance requires QA controls already trusted by the main commit.'
+  );
   expect(containerSource).not.toContain('RUNNER_CONTROLLER_TOKEN');
   expect(containerSource).not.toContain('SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET');
 });

@@ -14,7 +14,7 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/manifest.json",
-      "sha256": "63462ae4c0af871b0de24391b3b463c830516585aca74ff85f7a661009a992d3"
+      "sha256": "a8a4f9763fc7c9d076cce78e57cbdfacffe65bce62cda20f437a2beca16a931c"
     },
     {
       "category": "bundled-font",
@@ -29,7 +29,7 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/vite.config.ts",
-      "sha256": "a9a4bfb4ad4c53b712bb75862897e015e91340bc7832d4b86102d019eb807723"
+      "sha256": "732df6746cbae0ce2e294ef049cfea925993a3714433393b54e223c1dd06538e"
     },
     {
       "category": "archive-integration",
@@ -49,7 +49,7 @@
     {
       "category": "validator-integration",
       "path": "tooling/ci/derive-fast-proof.mjs",
-      "sha256": "eea7e9e9ef45d07db0a08bac3acf86a2760b7e3349bceb381967aac4c33aa5ef"
+      "sha256": "238a75c8a36cc2f7415f8a9ac1593c58cd672350a9cab9fcba62b305fc3d0e3b"
     },
     {
       "category": "bundled-font",
@@ -69,7 +69,7 @@
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/harness-freshness-step.mjs",
-      "sha256": "882c8d31060b08751be9424bb8b12cc37b553f9a451e646d37c65ac4b7745bef"
+      "sha256": "2ccd95f046eef2519b2d62b3660630833d67e4377db506f578228f382c0ebbcf"
     },
     {
       "category": "archive-integration",

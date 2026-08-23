@@ -46,6 +46,8 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
   expect(JSON.parse(fs.readFileSync(bundle, 'utf8'))).toMatchObject({
     commit: 'c'.repeat(40),
     controlAuthority: 'trusted-base',
+    controlsChanged: false,
+    controlDisposition: 'trusted-controls',
     trustedControlDigest: `sha256:${'d'.repeat(64)}`,
     controlDigest: `sha256:${'d'.repeat(64)}`,
   });

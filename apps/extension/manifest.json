@@ -4,7 +4,6 @@
   "version": "0.3.2",
   "version_name": "0.3.2 alpha",
   "minimum_chrome_version": "148",
-  "message_serialization": "structured_clone",
   "description": "Workspace for capturing, understanding, annotating, recording, editing, and exporting the web.",
   "default_locale": "en",
   "incognito": "not_allowed",

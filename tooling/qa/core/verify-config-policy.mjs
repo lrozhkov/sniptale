@@ -32,7 +32,6 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 };
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
-const REQUIRED_MESSAGE_SERIALIZATION = 'structured_clone';
 const REQUIRED_BUILD_TARGET = 'chrome140';
 const REQUIRED_NODE_ENGINE = '>=22.12 <23';
 const REQUIRED_PACKAGE_DEPENDENCY_PREFIXES = {
@@ -111,11 +110,11 @@ function collectRuntimeBaselineViolations({ compilerOptions, manifest, viteConfi
     );
   }
 
-  if (manifest.message_serialization !== REQUIRED_MESSAGE_SERIALIZATION) {
+  if (Object.hasOwn(manifest, 'message_serialization')) {
     violations.push(
       createViolation(
         MANIFEST_PATH,
-        `message_serialization must be ${JSON.stringify(REQUIRED_MESSAGE_SERIALIZATION)}`
+        'message_serialization must remain absent until a production messaging owner requires it'
       )
     );
   }

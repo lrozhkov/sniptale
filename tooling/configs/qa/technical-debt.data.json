@@ -15196,7 +15196,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "9fdfbb093b80e0ed67319bbec35d5cdd470ed1f594fe83c3bc0031f9a3df045b"
+        "contentHash": "8bb383480e4ae4415972eda794b525e1d67354ee7e6748df847901695401655c"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",
@@ -15892,7 +15892,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/build-proof.mjs",
-        "contentHash": "f6849318c54d8ac2548e88c3ea94886652772e923a375ed1c902730e62b5453b"
+        "contentHash": "a4694b7c77ef677dba2ccdb3fc1149863a6e722fc426c3be8dc7def0c0032513"
       },
       "consumers": [
         "tooling/qa/core/build-proof.mjs",
@@ -16135,7 +16135,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/classify-fast-gate.mjs",
-        "contentHash": "976e021a6ece0d9e5c5475d1e8dc73f905ec1324d8af12340164d2fb4c97ee1c"
+        "contentHash": "445d13df04c1f14cc7d499962ca729d23f6edf16b3dfb6615e8f96057ee4452b"
       },
       "consumers": [
         "tooling/ci/classify-fast-gate.mjs"
@@ -16281,7 +16281,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/codeql-proof.mjs",
-        "contentHash": "f12ed0d385ffbe7b29cdc9f5f644f7d05a88d65bf450c2d7296a11d72b712ea0"
+        "contentHash": "c9b803daf44c039eb456ca7417506664d1e2b3a2d737afdd2edefce5f86c812a"
       },
       "consumers": [
         "tooling/ci/validate-coverage-proof.mjs",
@@ -16379,6 +16379,29 @@
       ]
     },
     {
+      "id": "policy.source.container-command-mjs.e4f4a811aa",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/container-command.mjs",
+        "contentHash": "eff5a7753af5ed6ae336b183ecabde6a60c293aadb51edd1d42dd4413d7a8fef"
+      },
+      "consumers": [
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/container-command.mjs",
+        "tooling/ci/container-command.test.ts",
+        "tooling/ci/container.mjs",
+        "tooling/ci/run-lane.mjs"
+      ],
+      "surfaces": [
+        "binding:CANONICAL_IMAGE_ENVIRONMENT",
+        "binding:EXECUTABLE_PATHS"
+      ]
+    },
+    {
       "id": "policy.source.container-mjs.d92e7b99f2",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -16387,14 +16410,15 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "58c552b88e20d344343d368186b1daf7b097af334d76534b33e7551faed5012d"
+        "contentHash": "408d4948a5d04388ac3f66dad368f9f9ed822d0a09b895738ec85e31fe7d458e"
       },
       "consumers": [
         "tooling/ci/container.mjs"
       ],
       "surfaces": [
         "binding:dockerArgs",
-        "binding:environment"
+        "binding:environment",
+        "binding:trustedHostEnvironment"
       ]
     },
     {
@@ -16539,19 +16563,23 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/control-digest.mjs",
-        "contentHash": "6b6d2ed41bf9edcce6e7cb55ee9d9776214e345f2423dcd3b6903b535d5dc184"
+        "contentHash": "19be23d27f76a821c3337923f51b5aac45b503e385e2410c33eb5cfb4362559d"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",
         "tooling/ci/admit-candidate-proof.test.ts",
         "tooling/ci/check-control-authority.mjs",
         "tooling/ci/check-control-authority.test.ts",
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/classify-fast-gate.mjs",
         "tooling/ci/container.mjs",
         "tooling/ci/control-digest.mjs",
         "tooling/ci/derive-fast-proof.mjs",
         "tooling/ci/fast-gate-inputs.test.ts",
         "tooling/ci/local.mjs",
-        "tooling/ci/run-lane.mjs"
+        "tooling/ci/run-lane.mjs",
+        "tooling/ci/verify-main-proof.mjs",
+        "tooling/qa/core/proof-input.mjs"
       ],
       "surfaces": [
         "binding:CONTROL_FILE_PATTERNS",
@@ -16616,7 +16644,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/coverage-proof.mjs",
-        "contentHash": "c6b8ced62312cdd35164359294637dbc8902794468d27b74e6fd00dcef2cd1e7"
+        "contentHash": "d4f6a393c7c57b710ceb65cf78453a46a4f34e5b66b5c88450e29c5dcee3ff6d"
       },
       "consumers": [
         "tooling/ci/validate-coverage-proof.mjs",
@@ -16983,7 +17011,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/derive-fast-proof.mjs",
-        "contentHash": "eea7e9e9ef45d07db0a08bac3acf86a2760b7e3349bceb381967aac4c33aa5ef"
+        "contentHash": "238a75c8a36cc2f7415f8a9ac1593c58cd672350a9cab9fcba62b305fc3d0e3b"
       },
       "consumers": [
         "tooling/ci/derive-fast-proof.mjs"
@@ -18692,7 +18720,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/local.mjs",
-        "contentHash": "f81f920a3b6b87d12536ad47416f91d8ededbc71188621f0b7575ad96c69c088"
+        "contentHash": "c44aa92ed4c85599ea91c9922b436a520506bd031935a3fb70ea4c27da879aa6"
       },
       "consumers": [
         "tooling/ci/local.mjs"
@@ -19856,6 +19884,8 @@
         "contentHash": "a86713b9b4ff7c748bfdc94971712a3c1b8eb93e33331827f383c0888b2fae2e"
       },
       "consumers": [
+        "tooling/ci/control-digest.mjs",
+        "tooling/ci/fast-gate-inputs.test.ts",
         "tooling/qa/core/audit-coverage-step.mjs",
         "tooling/qa/core/harness-freshness-step.mjs",
         "tooling/qa/core/qa-scope.mjs",
@@ -20174,7 +20204,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/run-e2e.mjs",
-        "contentHash": "0f908ff6509f54c88e5c473d276783c143c662c374f0668d419d4fba9e0cf2e7"
+        "contentHash": "352ded165d7ec3009fd3e2041887b4ba3a042f0a1d8dcbef2544c345ce2c49a4"
       },
       "consumers": [
         "tooling/test/e2e/run-e2e.mjs",
@@ -20182,6 +20212,7 @@
       ],
       "surfaces": [
         "binding:CRITICAL_SPECS",
+        "binding:E2E_BUILD_DIRS",
         "binding:SECURITY_SPECS",
         "binding:SMOKE_SPECS",
         "binding:SUITES",
@@ -20224,13 +20255,12 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "be93ec109014b87e8fd19de08cd3c08d11bfa86decd49d955b7bb1b46e74f714"
+        "contentHash": "d49ab56bc2494b9ff6c49af3b4ff732ee6a4673cb69eab04be2351f9545c655e"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
-        "binding:commands",
         "binding:phases",
         "property:executionEnvironment",
         "property:resourceProfiles"
@@ -21724,7 +21754,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/unit-test-proof.mjs",
-        "contentHash": "1fcd5ff72b7eaaf7722b3253a024661a268cc380fb8282e2271203776357a8be"
+        "contentHash": "517e6fd12c7387f795111b85edc65e964dc4669676ae2d824358c53f7819997f"
       },
       "consumers": [
         "tooling/qa/core/unit-test-proof.mjs",
@@ -22473,7 +22503,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-config-policy.mjs",
-        "contentHash": "287c96ed360d6725eae7f943474e4e34d6aafdf10002e09f6398ce868c64d143"
+        "contentHash": "96cfe64862fc14974ec8f6061e21f2437b896802ca708efbd7ef6f35b7248c8f"
       },
       "consumers": [
         "tooling/qa/core/verify-config-policy.mjs",
@@ -24288,7 +24318,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "apps/extension/vite.config.ts",
-        "contentHash": "a9a4bfb4ad4c53b712bb75862897e015e91340bc7832d4b86102d019eb807723"
+        "contentHash": "732df6746cbae0ce2e294ef049cfea925993a3714433393b54e223c1dd06538e"
       },
       "consumers": [
         "apps/extension/vite.config.ts",

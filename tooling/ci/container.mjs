@@ -11,6 +11,7 @@ import { verifyReusableFastProof } from './fast-proof-reuse.mjs';
 import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
 import { resolveReusableBuildProofHostPaths } from './build-proof-host.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
+import { validateCandidateImageEnvironment } from './container-command.mjs';
 import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
 import {
   resolveContainerDigest,
@@ -89,6 +90,7 @@ const candidateSha =
 const candidateIdentity = resolveCandidateIdentity(candidateSha);
 const candidateControlDigest = createCandidateControlDigest();
 const trustedControlDigest = createCandidateControlDigest({ cwd: trustedRoot });
+const controlsChanged = candidateControlDigest !== trustedControlDigest;
 const gateInputDigest = createFastGateInputDigest();
 
 if (process.env.SNIPTALE_CI_SKIP_BUILD !== '1') {
@@ -109,57 +111,89 @@ if (process.env.SNIPTALE_CI_SKIP_BUILD !== '1') {
 const digest = resolveContainerDigest(image, () =>
   command('docker', ['image', 'inspect', '--format={{.Id}}', image])
 );
+validateCandidateImageEnvironment(
+  JSON.parse(command('docker', ['image', 'inspect', '--format={{json .Config.Env}}', image]))
+);
 
 const trustedControlSha = process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? candidateIdentity.head;
 if (!/^[a-f0-9]{40}$/u.test(trustedControlSha ?? '')) {
   throw new Error('Canonical CI proof requires a trusted control commit SHA.');
 }
+if (lane === 'release' && (controlsChanged || trustedControlSha !== candidateIdentity.head)) {
+  throw new Error('Release provenance requires QA controls already trusted by the main commit.');
+}
 
-const reusableFastProof = process.env.SNIPTALE_FAST_PROOF_PATH
-  ? verifyReusableFastProof(process.env.SNIPTALE_FAST_PROOF_PATH, {
-      commit: candidateIdentity.head,
-      candidateTree: candidateIdentity.tree,
-      trustedControlSha,
-      trustedControlDigest,
-      containerDigest: digest,
-      controlDigest: candidateControlDigest,
-      gateInputDigest,
-    })
-  : null;
+const reuseAllowed = !controlsChanged;
+const requestedReuse = [
+  'SNIPTALE_FAST_PROOF_PATH',
+  'SNIPTALE_UNIT_PROOF_PATH',
+  'SNIPTALE_BUILD_PROOF_PATH',
+  'SNIPTALE_BUILD_ARCHIVE_PATH',
+  'SNIPTALE_CODEQL_PROOF_PATH',
+  'SNIPTALE_CODEQL_SARIF_PATH',
+  'SNIPTALE_COVERAGE_PROOF_PATH',
+  'SNIPTALE_COVERAGE_REPORTS_PATH',
+].some((name) => process.env[name]);
+if (!reuseAllowed && requestedReuse) {
+  process.stderr.write('QA controls changed; all reusable proof inputs are disabled.\n');
+}
+
+const reusableFastProof =
+  reuseAllowed && process.env.SNIPTALE_FAST_PROOF_PATH
+    ? verifyReusableFastProof(process.env.SNIPTALE_FAST_PROOF_PATH, {
+        commit: candidateIdentity.head,
+        candidateTree: candidateIdentity.tree,
+        trustedControlSha,
+        trustedControlDigest,
+        containerDigest: digest,
+        controlDigest: candidateControlDigest,
+        gateInputDigest,
+      })
+    : null;
 if (reusableFastProof) {
   const destination = path.join(root, 'build', path.basename(reusableFastProof.archivePath));
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.copyFileSync(reusableFastProof.archivePath, destination, fs.constants.COPYFILE_EXCL);
 }
 
-const unitProofHostPath = resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH);
+const unitProofHostPath = reuseAllowed
+  ? resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH)
+  : null;
 const buildProofHostPaths = reusableFastProof
   ? {
       proof: reusableFastProof.buildProofPath,
       archive: reusableFastProof.archivePath,
     }
-  : resolveReusableBuildProofHostPaths({
-      proofPath: process.env.SNIPTALE_BUILD_PROOF_PATH,
-      archivePath: process.env.SNIPTALE_BUILD_ARCHIVE_PATH,
-    });
-const codeqlProofHostPaths = resolveReusableCodeqlProofHostPaths({
-  proofPath: process.env.SNIPTALE_CODEQL_PROOF_PATH,
-  sarifPath: process.env.SNIPTALE_CODEQL_SARIF_PATH,
-});
-const coverageProofHostPaths = resolveReusableCoverageProofHostPaths({
-  proofPath: process.env.SNIPTALE_COVERAGE_PROOF_PATH,
-  reportsPath: process.env.SNIPTALE_COVERAGE_REPORTS_PATH,
-});
-if (process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
+  : reuseAllowed
+    ? resolveReusableBuildProofHostPaths({
+        proofPath: process.env.SNIPTALE_BUILD_PROOF_PATH,
+        archivePath: process.env.SNIPTALE_BUILD_ARCHIVE_PATH,
+      })
+    : null;
+const codeqlProofHostPaths = reuseAllowed
+  ? resolveReusableCodeqlProofHostPaths({
+      proofPath: process.env.SNIPTALE_CODEQL_PROOF_PATH,
+      sarifPath: process.env.SNIPTALE_CODEQL_SARIF_PATH,
+    })
+  : null;
+const coverageProofHostPaths = reuseAllowed
+  ? resolveReusableCoverageProofHostPaths({
+      proofPath: process.env.SNIPTALE_COVERAGE_PROOF_PATH,
+      reportsPath: process.env.SNIPTALE_COVERAGE_REPORTS_PATH,
+    })
+  : null;
+if (reuseAllowed && process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
   process.stderr.write('Reusable unit proof is unavailable; running the complete unit suite.\n');
 }
 if (
+  reuseAllowed &&
   (process.env.SNIPTALE_CODEQL_PROOF_PATH || process.env.SNIPTALE_CODEQL_SARIF_PATH) &&
   !codeqlProofHostPaths
 ) {
   process.stderr.write('Reusable CodeQL proof is unavailable; running complete CodeQL.\n');
 }
 if (
+  reuseAllowed &&
   (process.env.SNIPTALE_COVERAGE_PROOF_PATH || process.env.SNIPTALE_COVERAGE_REPORTS_PATH) &&
   !coverageProofHostPaths
 ) {
@@ -169,7 +203,7 @@ if (
 const environment = [
   'CI=1',
   'HUSKY=0',
-  'HOME=/tmp/sniptale-ci-home',
+  'HOME=/workspace/.tmp/ci-home',
   'SNIPTALE_CI_IN_CONTAINER=1',
   `SNIPTALE_CI_CONTAINER_DIGEST=${digest}`,
   `SNIPTALE_PROOF_SHA=${candidateIdentity.head}`,
@@ -179,6 +213,7 @@ const environment = [
   `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`,
   `SNIPTALE_TRUSTED_CONTROL_DIGEST=${trustedControlDigest}`,
   `SNIPTALE_TRUSTED_CANDIDATE_CONTROL_DIGEST=${candidateControlDigest}`,
+  `SNIPTALE_CANDIDATE_CONTROL_DIGEST=${candidateControlDigest}`,
   'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only',
   'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only',
   'SNIPTALE_COVERAGE_PROOF_AUTHORITY=external-only',
@@ -225,10 +260,6 @@ for (const name of [
 ]) {
   if (process.env[name]) environment.push(`${name}=${process.env[name]}`);
 }
-if (candidateControlDigest !== trustedControlDigest) {
-  throw new Error('Candidate controls differ from trusted base and require bootstrap bypass.');
-}
-
 const dockerArgs = [
   'run',
   '--rm',
@@ -282,16 +313,28 @@ if (reusableFastProof) {
   );
 }
 for (const value of environment) dockerArgs.push('--env', value);
-dockerArgs.push(
-  image,
-  'bash',
-  '-c',
-  'mkdir -p "$HOME" && exec node /opt/sniptale-trusted/tooling/ci/run-lane.mjs "$1"',
-  'sniptale-ci',
-  lane
+fs.mkdirSync(path.join(root, '.tmp/ci-home'), { recursive: true });
+const trustedIdentityEnvironment = Object.fromEntries(
+  environment
+    .map((value) => {
+      const separator = value.indexOf('=');
+      return [value.slice(0, separator), value.slice(separator + 1)];
+    })
+    .filter(([name]) => name.startsWith('SNIPTALE_'))
 );
+const trustedHostEnvironment = {
+  ...process.env,
+  ...trustedIdentityEnvironment,
+  SNIPTALE_CI_TRUSTED_HOST: '1',
+  SNIPTALE_CI_DOCKER_ARGS_JSON: JSON.stringify(dockerArgs),
+  SNIPTALE_CI_IMAGE: image,
+};
 
-const result = spawnSync('docker', dockerArgs, { stdio: 'inherit' });
+const result = spawnSync(
+  process.execPath,
+  [path.join(trustedRoot, 'tooling/ci/run-lane.mjs'), lane],
+  { stdio: 'inherit', env: trustedHostEnvironment }
+);
 const finalIdentity = resolveCandidateIdentity(candidateIdentity.head);
 if (finalIdentity.tree !== candidateIdentity.tree) {
   throw new Error('Canonical CI worktree changed the candidate tree.');

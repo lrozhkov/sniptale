@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "artifactKind": "sniptale-proof-semantics-policy",
   "controlAuthority": "trusted-base",
+  "controlDispositions": ["trusted-controls", "candidate-controls"],
   "semanticIdentity": [
     "lane",
     "commit",

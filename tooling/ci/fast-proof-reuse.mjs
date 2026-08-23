@@ -32,7 +32,9 @@ function validateFastProofIdentity(manifest, expected) {
     manifest.candidateTree !== expected.candidateTree ||
     manifest.trustedControlSha !== expected.trustedControlSha ||
     manifest.containerDigest !== expected.containerDigest ||
-    manifest.controlAuthority !== 'trusted-base'
+    manifest.controlAuthority !== 'trusted-base' ||
+    manifest.controlsChanged !== false ||
+    manifest.controlDisposition !== 'trusted-controls'
   ) {
     throw new Error('Fast proof identity does not match the release candidate.');
   }

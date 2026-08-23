@@ -87,6 +87,8 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
   const tree = execFileSync('git', ['-C', candidate, 'rev-parse', 'HEAD^{tree}'], {
     encoding: 'utf8',
   }).trim();
+  const controlDigest = createCandidateControlDigest({ cwd: candidate });
+  const trustedControlDigest = createCandidateControlDigest({ cwd: trusted });
   const baseSha = '1'.repeat(40);
   const archive = 'build/sniptale_0.3.3_test.zip';
   write(artifact, archive, 'zip');
@@ -96,7 +98,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     outcome: 'passed',
     inputDigest: '2'.repeat(64),
     archive: { file: path.basename(archive), sha256: sha256('zip') },
-    producer: { id: 'qa-release-archive-owner' },
+    producer: { id: 'qa-release-archive-owner', controlDigest },
   });
   write(artifact, '.tmp/qa/build-proof.json', `${JSON.stringify(build)}\n`);
   for (const file of [
@@ -143,8 +145,6 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
   };
   visit(artifact);
   files.sort((a, b) => a.file.localeCompare(b.file));
-  const controlDigest = createCandidateControlDigest({ cwd: candidate });
-  const trustedControlDigest = createCandidateControlDigest({ cwd: trusted });
   const gateInputDigest = createFastGateInputDigest({ cwd: candidate, policyRoot: trusted });
   const executionEnvironment = { kind: 'locked-container', digest: `sha256:${'3'.repeat(64)}` };
   const semantics = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
@@ -168,6 +168,9 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     trustedControlSha: commit,
     controlAuthority: 'trusted-base',
     trustedControlDigest,
+    controlsChanged: controlDigest !== trustedControlDigest,
+    controlDisposition:
+      controlDigest === trustedControlDigest ? 'trusted-controls' : 'candidate-controls',
     gateClaim: 'fast-pr-gate',
     fullVitest: false,
     releaseReady: false,
@@ -261,8 +264,30 @@ it('rejects missing phases and execution profiles below the trusted minimum', ()
   ).toThrow(/execution profile/u);
 });
 
-it('rejects candidate control drift before candidate-authored evidence can be admitted', () => {
+it('admits candidate control drift once and records the explicit authority disposition', () => {
   const value = fixture({ candidateControl: 'export const candidateGeneration = true;\n' });
+  expect(
+    admitCandidateProof({
+      artifactRoot: value.artifact,
+      baseSha: value.baseSha,
+      candidateRoot: value.candidate,
+      commit: value.commit,
+      expectedTrustedControlSha: value.commit,
+      lane: 'proof',
+      trustedRoot: value.trusted,
+    })
+  ).toMatchObject({
+    outcome: 'passed',
+    controlsChanged: true,
+    controlDisposition: 'candidate-controls',
+  });
+});
+
+it('rejects a candidate-control proof that conceals its control drift', () => {
+  const value = fixture({ candidateControl: 'export const candidateGeneration = true;\n' });
+  value.manifest.controlsChanged = false;
+  value.manifest.controlDisposition = 'trusted-controls';
+  resealArtifact(value.artifact, value.manifest);
   expect(() =>
     admitCandidateProof({
       artifactRoot: value.artifact,
@@ -273,5 +298,29 @@ it('rejects candidate control drift before candidate-authored evidence can be ad
       lane: 'proof',
       trustedRoot: value.trusted,
     })
-  ).toThrow(/differ from trusted base/u);
+  ).toThrow(/identity does not match/u);
+});
+
+it('rejects proof reuse across candidate control digests', () => {
+  const value = fixture();
+  const relative = '.tmp/qa/build-proof.json';
+  const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
+  receipt.producer.controlDigest = `sha256:${'f'.repeat(64)}`;
+  delete receipt.proofDigest;
+  write(value.artifact, relative, `${JSON.stringify(sealReceipt(receipt))}\n`);
+  const file = value.manifest.files.find((entry: { file: string }) => entry.file === relative);
+  file.sha256 = sha256(fs.readFileSync(path.join(value.artifact, relative)));
+  resealArtifact(value.artifact, value.manifest);
+
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: value.artifact,
+      baseSha: value.baseSha,
+      candidateRoot: value.candidate,
+      commit: value.commit,
+      expectedTrustedControlSha: value.commit,
+      lane: 'proof',
+      trustedRoot: value.trusted,
+    })
+  ).toThrow(/does not bind/u);
 });

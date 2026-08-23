@@ -44,6 +44,8 @@ function readProofSemanticsPolicy(repositoryRoot) {
     policy?.schemaVersion !== 1 ||
     policy.artifactKind !== 'sniptale-proof-semantics-policy' ||
     policy.controlAuthority !== 'trusted-base' ||
+    JSON.stringify(policy.controlDispositions) !==
+      JSON.stringify(['trusted-controls', 'candidate-controls']) ||
     policy.invariants?.resourceProfileDoesNotChangeControlSemantics !== true ||
     policy.invariants?.resourceProfileExcludedFromSemanticDigest !== true ||
     policy.invariants?.resourceProfileAffectsReuseCompatibility !== true ||
@@ -426,6 +428,8 @@ export function collectLaneArtifacts({
     gateInputDigest: resolvedGateInputDigest,
     executionEnvironment,
   };
+  const controlsChanged = controlDigest !== trustedControlDigest;
+  const controlDisposition = controlsChanged ? 'candidate-controls' : 'trusted-controls';
   const capability = semanticsPolicy.gateCapabilities[lane];
   const executionProfile = normalizeExecutionProfile(lane, resourceProfiles, infrastructure);
   const manifest = {
@@ -441,6 +445,8 @@ export function collectLaneArtifacts({
     trustedControlSha,
     trustedControlDigest,
     controlAuthority: semanticsPolicy.controlAuthority,
+    controlsChanged,
+    controlDisposition,
     gateClaim: capability.claim,
     fullVitest: capability.fullVitest,
     releaseReady: capability.releaseReady,

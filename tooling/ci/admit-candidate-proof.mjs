@@ -202,7 +202,9 @@ function validateManifestIdentity(manifest, expected) {
     manifest.baseSha !== expected.baseSha ||
     manifest.candidateTree !== expected.candidateTree ||
     manifest.trustedControlSha !== expected.trustedControlSha ||
-    manifest.controlAuthority !== 'trusted-base'
+    manifest.controlAuthority !== 'trusted-base' ||
+    manifest.controlsChanged !== expected.controlsChanged ||
+    manifest.controlDisposition !== expected.controlDisposition
   ) {
     throw new Error('Candidate proof identity does not match trusted admission inputs.');
   }
@@ -260,15 +262,23 @@ function validateReuseReceipts(root, manifest, lane, archives, lanePolicy) {
   const build = validateReceipt(root, '.tmp/qa/build-proof.json', 'sniptale-build-zip-proof');
   if (
     build.producer?.id !== 'qa-release-archive-owner' ||
+    build.producer.controlDigest !== manifest.controlDigest ||
     build.archive.file !== path.basename(archives[0]) ||
     build.archive.sha256 !== sha256(path.join(root, archives[0]))
   ) {
     throw new Error('Candidate build receipt does not bind the admitted ZIP.');
   }
   if (lane !== 'release') return;
-  validateReceipt(root, '.tmp/qa/unit-proof.json', 'sniptale-full-unit-proof');
-  validateReceipt(root, '.tmp/qa/codeql-proof.json', 'sniptale-codeql-proof');
-  validateReceipt(root, '.tmp/qa/coverage-proof.json', 'sniptale-coverage-proof');
+  for (const [relative, artifactKind] of [
+    ['.tmp/qa/unit-proof.json', 'sniptale-full-unit-proof'],
+    ['.tmp/qa/codeql-proof.json', 'sniptale-codeql-proof'],
+    ['.tmp/qa/coverage-proof.json', 'sniptale-coverage-proof'],
+  ]) {
+    const receipt = validateReceipt(root, relative, artifactKind);
+    if (receipt.producer?.controlDigest !== manifest.controlDigest) {
+      throw new Error(`Candidate receipt crosses QA control digests: ${relative}`);
+    }
+  }
 }
 
 export function admitCandidateProof({
@@ -293,9 +303,8 @@ export function admitCandidateProof({
   const candidateTree = git(resolvedCandidate, ['rev-parse', `${commit}^{tree}`]);
   const controlDigest = createCandidateControlDigest({ cwd: resolvedCandidate });
   const trustedControlDigest = createCandidateControlDigest({ cwd: trustedRoot });
-  if (controlDigest !== trustedControlDigest) {
-    throw new Error('Candidate controls differ from trusted base and require bootstrap bypass.');
-  }
+  const controlsChanged = controlDigest !== trustedControlDigest;
+  const controlDisposition = controlsChanged ? 'candidate-controls' : 'trusted-controls';
   const gateInputDigest = createFastGateInputDigest({
     cwd: resolvedCandidate,
     policyRoot: trustedRoot,
@@ -308,12 +317,20 @@ export function admitCandidateProof({
     trustedControlSha: expectedTrustedControlSha,
     trustedControlDigest,
     controlDigest,
+    controlsChanged,
+    controlDisposition,
     gateInputDigest,
     containerDigest: expectedContainerDigest,
   };
   validateManifestIdentity(manifest, expected);
   validateManifestDigests(manifest, expected);
   const derived = validateMandatoryPhases(manifest, lanePolicy);
+  if (derived && controlsChanged) {
+    throw new Error('Derived proof cannot cross candidate control digests.');
+  }
+  if (lane === 'release' && (controlsChanged || expectedTrustedControlSha !== commit)) {
+    throw new Error('Release proof requires QA controls already trusted by the main commit.');
+  }
   const { archives } = validateFileInventory(root, manifest, lanePolicy);
   validateExecutionCompatibility(manifest, lane, lanePolicy, trustedRoot);
   validateReuseReceipts(root, manifest, lane, archives, lanePolicy);
@@ -332,6 +349,8 @@ export function admitCandidateProof({
     trustedControlDigest,
     candidateTree,
     controlDigest,
+    controlsChanged,
+    controlDisposition,
     gateInputDigest,
     proofSemanticDigest: manifest.proofSemanticDigest,
     derived,

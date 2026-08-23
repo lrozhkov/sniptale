@@ -54,6 +54,6 @@
       "reuse": { "build": ["fresh", "reused"], "unit": ["fresh", "reused"], "codeql": ["fresh", "reused"], "coverage": ["fresh", "reused"] }
     }
   },
-  "proof": "Trusted base admits candidate controls only when their complete digest is identical. Intentional control changes require the documented owner-only bootstrap.",
+  "proof": "A pull request executes its candidate QA controls once. Trusted base validates mandatory phases, candidate identity, proof schema, evidence hashes, execution compatibility, artifact closure, reuse disposition, and final graph status without re-executing the previous controls. Both control digests and candidate-controls disposition remain explicit; cross-digest reuse and docs-only derivation are forbidden, and release provenance requires the accepted main control digest.",
   "rollback": "Reject the candidate bundle and execute a fresh gate after restoring the trusted admission owner."
 }

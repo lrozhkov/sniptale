@@ -4,7 +4,9 @@ import path from 'node:path';
 import { readCodeqlProofPolicy } from '../codeql/config.mjs';
 import {
   readProofInput as readRegularFile,
+  proofControlDigestMatches,
   resolveProofCommit as resolveCommit,
+  resolveProofControlDigest,
   sha256ProofInput as sha256,
   stableStringify,
 } from './proof-input.mjs';
@@ -141,12 +143,16 @@ function resolveProofSource(cwd, policy) {
 export function resolveReusableCodeqlProof(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const current = createCodeqlProofInputs(options);
+  const controlDigest = resolveProofControlDigest({ cwd });
   const source = resolveProofSource(cwd, current.policy);
   if (!source) return { matched: false, reason: 'no admissible CodeQL proof' };
   if (source.error) return { matched: false, reason: source.error };
   try {
     const proof = parseProof(JSON.parse(readRegularFile(source.proofPath, 'utf8')));
     const sarif = readRegularFile(source.sarifPath);
+    if (!proofControlDigestMatches(proof, controlDigest)) {
+      return { matched: false, reason: 'CodeQL proof control digest changed' };
+    }
     if (proof.inputDigest !== current.inputDigest) {
       return { matched: false, reason: 'CodeQL proof inputs changed' };
     }
@@ -190,6 +196,7 @@ export function recordSuccessfulCodeqlProof({
   reusedFrom = null,
 } = {}) {
   const inputs = createCodeqlProofInputs({ cwd });
+  const controlDigest = resolveProofControlDigest({ cwd });
   const sarif = readRegularFile(sarifPath);
   const proof = {
     schemaVersion: 1,
@@ -203,6 +210,7 @@ export function recordSuccessfulCodeqlProof({
     producer: {
       commit: resolveCommit(cwd),
       trustedControlSha: process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? null,
+      controlDigest,
       source,
     },
     reusedFrom,

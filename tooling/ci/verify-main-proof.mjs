@@ -5,13 +5,14 @@ import { spawnSync } from 'node:child_process';
 
 import { isExecutedAsScript } from '../qa/core/shared.mjs';
 import { createProofSemanticDigest } from './artifacts.mjs';
+import { createCandidateControlDigest } from './control-digest.mjs';
 
 function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-function readGit(args) {
-  const result = spawnSync('git', args, { encoding: 'utf8' });
+function readGit(args, cwd = process.cwd()) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed.`);
   return result.stdout.trim();
 }
@@ -31,7 +32,7 @@ function collectArtifactFiles(root) {
   return files.sort();
 }
 
-function validateMainProofIdentity(manifest, { commit, expectedTree, lane }) {
+function validateMainProofIdentity(manifest, { commit, controlDigest, expectedTree, lane }) {
   const expectedCapability =
     lane === 'release'
       ? { gateClaim: 'release-provenance', fullVitest: true, releaseReady: true }
@@ -45,8 +46,11 @@ function validateMainProofIdentity(manifest, { commit, expectedTree, lane }) {
     manifest.commit !== commit ||
     manifest.candidateTree !== expectedTree ||
     manifest.trustedControlSha !== commit ||
-    manifest.trustedControlDigest !== manifest.controlDigest ||
-    manifest.controlAuthority !== 'trusted-base'
+    manifest.trustedControlDigest !== controlDigest ||
+    manifest.controlDigest !== controlDigest ||
+    manifest.controlAuthority !== 'trusted-base' ||
+    manifest.controlsChanged !== false ||
+    manifest.controlDisposition !== 'trusted-controls'
   ) {
     throw new Error(`${lane} proof identity does not match the release commit.`);
   }
@@ -106,13 +110,14 @@ function validateMainProofChecksums(root, manifest, manifestPath, sumsPath) {
   return expected;
 }
 
-function verifyProof(root, commit, lane) {
+function verifyProof(root, commit, lane, { repositoryRoot = process.cwd() } = {}) {
   if (!/^[a-f0-9]{40}$/u.test(commit ?? '')) throw new Error('Expected a full main commit SHA.');
   const manifestPath = path.join(root, 'proof-manifest.json');
   const sumsPath = path.join(root, 'SHA256SUMS');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  const expectedTree = readGit(['rev-parse', `${commit}^{tree}`]);
-  validateMainProofIdentity(manifest, { commit, expectedTree, lane });
+  const expectedTree = readGit(['rev-parse', `${commit}^{tree}`], repositoryRoot);
+  const controlDigest = createCandidateControlDigest({ cwd: repositoryRoot });
+  validateMainProofIdentity(manifest, { commit, controlDigest, expectedTree, lane });
   const expectedSemanticDigest = createProofSemanticDigest({
     lane,
     commit,
@@ -134,12 +139,12 @@ function verifyProof(root, commit, lane) {
   return { manifest, zipFile: zipFiles[0] };
 }
 
-export function verifyMainProof(root, commit) {
-  return verifyProof(root, commit, 'proof');
+export function verifyMainProof(root, commit, options) {
+  return verifyProof(root, commit, 'proof', options);
 }
 
-export function verifyReleaseProof(root, commit) {
-  const result = verifyProof(root, commit, 'release');
+export function verifyReleaseProof(root, commit, options) {
+  const result = verifyProof(root, commit, 'release', options);
   const files = new Set(result.manifest.files.map(({ file }) => file));
   for (const required of [
     '.tmp/licenses/sbom.cdx.json',

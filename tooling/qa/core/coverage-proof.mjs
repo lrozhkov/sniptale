@@ -3,7 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { collectProductionCoverageFiles } from './coverage-audit-report.mjs';
-import { stableStringify } from './proof-input.mjs';
+import {
+  proofControlDigestMatches,
+  resolveProofControlDigest,
+  stableStringify,
+} from './proof-input.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/coverage-proof-reuse.data.json';
 const EXTERNAL_PROOF_ENV = 'SNIPTALE_COVERAGE_PROOF_PATH';
@@ -119,6 +123,7 @@ function parseProof(file) {
 
 export function resolveReusableCoverageProof({ cwd = process.cwd() } = {}) {
   const current = createCoverageProofInputs({ cwd });
+  const controlDigest = resolveProofControlDigest({ cwd });
   const externalProof = process.env[EXTERNAL_PROOF_ENV];
   const externalReports = process.env[EXTERNAL_REPORTS_ENV];
   const localAllowed = process.env[CANDIDATE_AUTHORITY_ENV] !== 'external-only';
@@ -129,6 +134,8 @@ export function resolveReusableCoverageProof({ cwd = process.cwd() } = {}) {
   if (!proofPath || !reportsRoot) return { matched: false, reason: 'no admissible coverage proof' };
   try {
     const proof = parseProof(proofPath);
+    if (!proofControlDigestMatches(proof, controlDigest))
+      return { matched: false, reason: 'coverage proof control digest changed' };
     if (proof.inputDigest !== current.inputDigest)
       return { matched: false, reason: 'coverage proof inputs changed' };
     if (
@@ -163,6 +170,7 @@ export function materializeReusableCoverageProof(reusable, { cwd = process.cwd()
 
 export function recordSuccessfulCoverageProof({ cwd = process.cwd(), reusedFrom = null } = {}) {
   const inputs = createCoverageProofInputs({ cwd });
+  const controlDigest = resolveProofControlDigest({ cwd });
   const reportsRoot = path.join(cwd, inputs.policy.reportDirectory);
   const proof = {
     schemaVersion: 1,
@@ -178,6 +186,7 @@ export function recordSuccessfulCoverageProof({ cwd = process.cwd(), reusedFrom 
     producer: {
       commit: process.env.SNIPTALE_PROOF_SHA ?? null,
       trustedControlSha: process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? null,
+      controlDigest,
     },
     reusedFrom,
     recordedAt: new Date().toISOString(),

@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { afterEach, expect, it } from 'vitest';
 
 import { createTempRoot, writeFile } from '../qa/core/test-helpers';
+import { isHarnessInventoryOnlyFile } from '../qa/core/qa-scope.mjs';
 import { CONTROL_FILES, CONTROL_ROOTS, createCandidateControlDigest } from './control-digest.mjs';
 import {
   classifyChangedPaths,
@@ -29,6 +30,18 @@ function seed(root: string) {
   writeFile(root, 'package.json', '{}\n');
   writeFile(root, 'README.md', 'first\n');
   writeFile(root, 'docs/guide.md', 'first\n');
+}
+
+function collectFiles(root: string, relative: string): string[] {
+  const absolute = path.join(root, relative);
+  if (!fs.existsSync(absolute)) return [];
+  const stat = fs.lstatSync(absolute);
+  if (stat.isFile()) return [relative.replaceAll(path.sep, '/')];
+  if (!stat.isDirectory()) return [];
+  return fs
+    .readdirSync(absolute)
+    .flatMap((entry) => collectFiles(root, path.join(relative, entry)))
+    .sort();
 }
 
 it('ignores documentation bytes but invalidates every product or QA-control input', () => {
@@ -71,6 +84,34 @@ it('binds candidate controls independently of resource planning and documentatio
   writeFile(root, 'tooling/qa/check.mjs', 'export const changed = true;\n');
   expect(createCandidateControlDigest({ cwd: root })).not.toBe(initial);
   delete process.env.SNIPTALE_QA_CPU_TOKENS;
+});
+
+it('keeps validated inventory data out of executable control identity but inside gate input', () => {
+  const root = createTempRoot('candidate-control-inventory-');
+  seed(root);
+  const inventory = 'tooling/configs/qa/technical-debt.data.json';
+  writeFile(root, inventory, '{"schemaVersion":1,"entries":[]}\n');
+  const initialControl = createCandidateControlDigest({ cwd: root });
+  const initialInput = createFastGateInputDigest({ cwd: root });
+
+  writeFile(root, inventory, '{"schemaVersion":1,"entries":[{"id":"changed"}]}\n');
+
+  expect(createCandidateControlDigest({ cwd: root })).toBe(initialControl);
+  expect(createFastGateInputDigest({ cwd: root })).not.toBe(initialInput);
+});
+
+it('keeps executable, suppressive policy, and unknown control files in control identity', () => {
+  const root = createTempRoot('candidate-control-fail-closed-');
+  seed(root);
+  writeFile(root, 'tooling/configs/qa/quality-baseline.json', '{"allowances":[]}\n');
+  const initial = createCandidateControlDigest({ cwd: root });
+
+  writeFile(root, 'tooling/configs/qa/quality-baseline.json', '{"allowances":["weak"]}\n');
+  const policyChanged = createCandidateControlDigest({ cwd: root });
+  expect(policyChanged).not.toBe(initial);
+
+  writeFile(root, 'tooling/qa/unknown-control.data.mjs', 'export const weakened = true;\n');
+  expect(createCandidateControlDigest({ cwd: root })).not.toBe(policyChanged);
 });
 
 it('discovers candidate-resolved control configurations outside the root file list', () => {
@@ -185,5 +226,21 @@ it('covers every registered build, package, security, and QA owner closure', () 
       const covered = inventory.has(input) || files.some((file) => file.startsWith(`${input}/`));
       expect(covered, `${owner} input is outside fast-gate closure: ${input}`).toBe(true);
     }
+  }
+});
+
+it('keeps every machine-proven control-digest exclusion in the fast-gate closure', () => {
+  const { files } = collectFastGateInputFiles();
+  const fastGateInputs = new Set(files);
+  const excludedControlInputs = CONTROL_ROOTS.flatMap((root) => collectFiles(process.cwd(), root))
+    .filter(isHarnessInventoryOnlyFile)
+    .sort();
+
+  expect(excludedControlInputs.length).toBeGreaterThan(3);
+  for (const file of excludedControlInputs) {
+    expect(
+      fastGateInputs.has(file),
+      `inventory exclusion escaped gate input identity: ${file}`
+    ).toBe(true);
   }
 });

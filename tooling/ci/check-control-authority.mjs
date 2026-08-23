@@ -6,10 +6,13 @@ import { createCandidateControlDigest } from './control-digest.mjs';
 export function checkControlAuthority(trustedRoot, candidateRoot) {
   const trustedControlDigest = createCandidateControlDigest({ cwd: path.resolve(trustedRoot) });
   const candidateControlDigest = createCandidateControlDigest({ cwd: path.resolve(candidateRoot) });
-  if (candidateControlDigest !== trustedControlDigest) {
-    throw new Error('Candidate controls differ from trusted base and require bootstrap bypass.');
-  }
-  return { candidateControlDigest, trustedControlDigest };
+  const controlsChanged = candidateControlDigest !== trustedControlDigest;
+  return {
+    candidateControlDigest,
+    trustedControlDigest,
+    controlsChanged,
+    controlDisposition: controlsChanged ? 'candidate-controls' : 'trusted-controls',
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

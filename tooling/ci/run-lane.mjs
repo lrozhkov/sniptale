@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 import { collectLaneArtifacts, selectelInfrastructureFromEnvironment } from './artifacts.mjs';
 import { resolveCiArtifactSession } from './artifact-observability.mjs';
+import {
+  appendCandidatePhaseInvocation,
+  createTrustedPhaseCommands,
+} from './container-command.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 import { formatObservedRunSummary } from '../qa/wrappers/observed/runner.mjs';
 import {
@@ -15,39 +19,18 @@ const lane = process.argv[2];
 if (!['proof', 'release'].includes(lane)) {
   throw new Error('Usage: run-lane.mjs <proof|release>');
 }
-if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
-  throw new Error('Canonical CI lanes may only run inside the locked QA container.');
+if (process.env.SNIPTALE_CI_TRUSTED_HOST !== '1') {
+  throw new Error('Canonical CI phase dispatch may only run from the trusted runner host.');
 }
 
 const trustedRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-const commands = [
-  ['install', 'npm', ['ci', '--ignore-scripts']],
-  [
-    'verify-project-toolchain',
-    'node',
-    [path.join(trustedRoot, 'tooling/ci/verify-project-toolchain.mjs')],
-  ],
-  ['provision-canvas', 'npm', ['rebuild', 'canvas']],
-  [
-    'verify-canvas',
-    'node',
-    [
-      '-e',
-      "const { createCanvas } = require('canvas'); if (!createCanvas(1, 1).getContext('2d')) process.exit(1);",
-    ],
-  ],
-  ['provision-ast-grep', 'node', ['node_modules/@ast-grep/cli/postinstall.js']],
-  ['verify-ast-grep', 'node_modules/.bin/ast-grep', ['--version']],
-  [
-    lane,
-    'node',
-    [
-      ...(lane === 'proof' ? ['--max-old-space-size=8192'] : ['--max-old-space-size=12288']),
-      `tooling/ci/${lane}-wrapper.mjs`,
-    ],
-  ],
-];
+const commands = createTrustedPhaseCommands(lane);
+const dockerArgs = JSON.parse(process.env.SNIPTALE_CI_DOCKER_ARGS_JSON ?? 'null');
+const image = process.env.SNIPTALE_CI_IMAGE;
+if (!Array.isArray(dockerArgs) || typeof image !== 'string' || image.length === 0) {
+  throw new Error('Trusted runner host did not provide a sealed candidate container plan.');
+}
 
 const startedAtMs = Date.now();
 const phases = [];
@@ -64,9 +47,6 @@ if (
 ) {
   throw new Error('Trusted launcher control digests do not match the mounted workspaces.');
 }
-if (candidateControlDigest !== trustedControlDigest) {
-  throw new Error('Candidate controls differ from trusted base and require bootstrap bypass.');
-}
 let status = 0;
 for (const [id, executable, args] of commands) {
   if (status !== 0) {
@@ -82,7 +62,8 @@ for (const [id, executable, args] of commands) {
   }
   const startedAt = new Date().toISOString();
   process.stdout.write(`[ci:phase] start ${id}\n`);
-  const result = spawnSync(executable, args, { stdio: 'inherit', env: process.env });
+  const invocation = appendCandidatePhaseInvocation(dockerArgs, { args, executable, image });
+  const result = spawnSync('docker', invocation, { stdio: 'inherit' });
   status = result.status ?? 1;
   phases.push({
     id,

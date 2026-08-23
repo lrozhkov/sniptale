@@ -15,6 +15,7 @@ const proofEnvironmentKeys = [
   'SNIPTALE_COVERAGE_PROOF_PATH',
   'SNIPTALE_COVERAGE_REPORTS_PATH',
   'SNIPTALE_COVERAGE_PROOF_AUTHORITY',
+  'SNIPTALE_CANDIDATE_CONTROL_DIGEST',
 ] as const;
 const originalProofEnvironment = new Map(
   proofEnvironmentKeys.map((key) => [key, process.env[key]])
@@ -22,6 +23,17 @@ const originalProofEnvironment = new Map(
 
 beforeEach(() => {
   for (const key of proofEnvironmentKeys) delete process.env[key];
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'a'.repeat(64)}`;
+});
+
+it('rejects coverage reuse across candidate control digests', () => {
+  const { root } = fixture();
+  recordSuccessfulCoverageProof({ cwd: root });
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'b'.repeat(64)}`;
+  expect(resolveReusableCoverageProof({ cwd: root })).toMatchObject({
+    matched: false,
+    reason: 'coverage proof control digest changed',
+  });
 });
 
 afterEach(() => {

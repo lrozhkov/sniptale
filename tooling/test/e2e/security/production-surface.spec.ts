@@ -27,7 +27,7 @@ async function collectArtifactText(root: string, relativePath = ''): Promise<str
 }
 
 test('production artifact exposes no security harness or internal web surface', async () => {
-  const buildRoot = join(process.cwd(), 'dist-release-e2e');
+  const buildRoot = join(process.cwd(), '.tmp/e2e-builds/release');
   const manifest = JSON.parse(await readFile(join(buildRoot, 'manifest.json'), 'utf8')) as {
     content_scripts?: unknown[];
     externally_connectable?: unknown;
@@ -46,7 +46,9 @@ test('production artifact exposes no security harness or internal web surface', 
   const artifactText = await collectArtifactText(buildRoot);
   for (const marker of FORBIDDEN_RELEASE_MARKERS) expect(artifactText).not.toContain(marker);
 
-  const launched = await launchExtensionBrowser({ extensionBuildDir: 'dist-release-e2e' });
+  const launched = await launchExtensionBrowser({
+    extensionBuildDir: '.tmp/e2e-builds/release',
+  });
   const hostServer = await startHostServer();
   try {
     const { extensionId } = launched;

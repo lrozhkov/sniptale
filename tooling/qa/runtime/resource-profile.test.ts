@@ -27,11 +27,11 @@ it('selects the bounded i7/WSL default profile', () => {
     logicalCpuCount: 12,
     memoryMiB: 12 * 1024,
     physicalCoreCount: 6,
-    vitestMaxWorkers: 4,
+    vitestMaxWorkers: 6,
   });
 });
 
-it('gives the dedicated release test stage all bounded WSL-visible capacity', () => {
+it('caps the local release test stage at the adaptive eight-worker default', () => {
   expect(
     resolveQaReleaseResourceProfile({
       cpuInfo: CPU_INFO,
@@ -42,8 +42,37 @@ it('gives the dedicated release test stage all bounded WSL-visible capacity', ()
   ).toMatchObject({
     cpuTokens: 12,
     memoryMiB: 15 * 1024,
-    vitestMaxWorkers: 12,
+    vitestMaxWorkers: 8,
   });
+});
+
+it('accepts the external release profile worker count as an explicit override', () => {
+  expect(
+    resolveQaReleaseResourceProfile({
+      cpuInfo: CPU_INFO,
+      env: { SNIPTALE_QA_VITEST_MAX_WORKERS: '12' },
+      logicalCpuCount: 12,
+      totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+    })
+  ).toMatchObject({ cpuTokens: 12, vitestMaxWorkers: 12 });
+});
+
+it('keeps the local default at four workers on a small host while clamping an override', () => {
+  const smallHost = {
+    cpuInfo: '',
+    logicalCpuCount: 2,
+    totalMemoryBytes: 8 * 1024 * 1024 * 1024,
+  };
+  expect(resolveQaResourceProfile({ ...smallHost, env: {} })).toMatchObject({
+    cpuTokens: 2,
+    vitestMaxWorkers: 4,
+  });
+  expect(
+    resolveQaResourceProfile({
+      ...smallHost,
+      env: { SNIPTALE_QA_VITEST_MAX_WORKERS: '8' },
+    })
+  ).toMatchObject({ cpuTokens: 2, vitestMaxWorkers: 2 });
 });
 
 it('rejects a release CPU override below the non-test lane floor', () => {
@@ -94,6 +123,7 @@ it('keeps the smallest supported override executable and rejects unsafe memory b
       env: {
         SNIPTALE_QA_CPU_TOKENS: '1',
         SNIPTALE_QA_MEMORY_MIB: '6144',
+        SNIPTALE_QA_VITEST_MAX_WORKERS: '1',
       },
       logicalCpuCount: 12,
       totalMemoryBytes: 16 * 1024 * 1024 * 1024,

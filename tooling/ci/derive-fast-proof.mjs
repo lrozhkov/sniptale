@@ -108,6 +108,8 @@ const manifest = {
   controlAuthority: 'trusted-base',
   trustedControlDigest: source.manifest.trustedControlDigest,
   controlDigest,
+  controlsChanged: false,
+  controlDisposition: 'trusted-controls',
   gateInputDigest,
   proofSemanticDigest: createProofSemanticDigest(semanticIdentity),
   command: ['verified non-gate input reuse'],

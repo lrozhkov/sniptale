@@ -23,7 +23,7 @@ Short command and review lookup. Full external behavior is in [ci-cd.md](ci-cd.m
 
 The normal local delivery order remains `qa:release-harness` when selected, `qa:checkpoint`, required review, then one `qa:closeout`. Do not repeatedly closeout/commit/push to debug CI: use local `ci:proof` and `ci:release` first.
 
-For a CI-authority bootstrap, finish that local QA/closeout sequence, then require green local `ci:proof` and green local `ci:release`. Merge the bootstrap PR with the native bypass while repository Actions are temporarily disabled, so no workflow or Selectel resource is launched; preserve the settings snapshot and proof digests in the PR and restore Actions immediately. Create the version bump only afterward in a separate PR, then require the external Fast PR Gate and Release provenance Gate before publication. A failure before external rollout restarts the full local sequence. After external rollout has begun, fixes still pass the diff-aware QA flow but may go directly back to the external gates unless they changed gate semantics or need local diagnosis.
+QA implementation, owner maps, generated inventories, and product code may change together in one ordinary PR. Candidate QA executes once under the trusted-base envelope; no separate bootstrap PR is required. The GitHub summary must show `QA controls changed` and both candidate and trusted control digests. Review QA changes normally and remember that the envelope proves phase, identity, schema, hash, execution, artifact, and graph completeness but does not rerun the previous controls. The accepted implementation becomes trusted only after merge to `main`.
 
 ## GitHub operations
 
@@ -33,7 +33,7 @@ The proof artifact name is `fast-proof-<commit>-<run-id>-<run-attempt>` or `rele
 
 To publish, first create and push a GitHub-verifiable annotated signing tag matching the package version. Then run **Actions → Continuous Deployment** with that tag and the successful Release provenance run ID. Deployment creates no VM and performs no QA rebuild. If publication fails, rerun deployment against the same provenance proof.
 
-Selecting an older successful provenance run requires `allow_non_latest_provenance` and a non-empty `bypass_reason`. Local PR bypass likewise leaves its proof digest in the PR; merge remains a manual native GitHub bypass.
+Selecting an older successful provenance run requires `allow_non_latest_provenance` and a non-empty `bypass_reason`. Local PR bypass likewise leaves its proof digest and reason in the PR; merge remains a manual native GitHub bypass. Use bypass only for an external-capacity failure or incident, never as the routine path for QA-control evolution.
 
 ## Local WSL setup
 

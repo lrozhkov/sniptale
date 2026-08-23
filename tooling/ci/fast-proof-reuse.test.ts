@@ -42,6 +42,8 @@ function fixture() {
     status: 'passed',
     workspaceMode: 'committed',
     controlAuthority: 'trusted-base',
+    controlsChanged: false,
+    controlDisposition: 'trusted-controls',
     evidenceDisposition: 'executed',
     gateClaim: 'fast-pr-gate',
     fullVitest: false,

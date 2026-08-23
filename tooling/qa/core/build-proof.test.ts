@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import {
   createBuildProofInputs,
@@ -13,6 +13,11 @@ import {
 } from './build-proof.mjs';
 
 const roots: string[] = [];
+const inheritedControlDigest = process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
+
+beforeEach(() => {
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'a'.repeat(64)}`;
+});
 
 function createRoot() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-build-proof-'));
@@ -51,7 +56,25 @@ function createRoot() {
 afterEach(() => {
   delete process.env.SNIPTALE_BUILD_PROOF_PATH;
   delete process.env.SNIPTALE_BUILD_ARCHIVE_PATH;
+  if (inheritedControlDigest == null) delete process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
+  else process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = inheritedControlDigest;
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
+});
+
+it('rejects build reuse across candidate control digests', () => {
+  const root = createRoot();
+  const archive = path.join(root, 'build/sniptale_0.3.3_2026-08-23.zip');
+  fs.writeFileSync(archive, 'verified archive');
+  recordSuccessfulBuildProof({
+    archivePath: archive,
+    cwd: root,
+    producerId: 'qa-release-archive-owner',
+  });
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'b'.repeat(64)}`;
+  expect(resolveReusableBuildProof({ cwd: root })).toMatchObject({
+    matched: false,
+    reason: 'build proof control digest changed',
+  });
 });
 
 it('reuses a build and ZIP only while every canonical input and archive digest matches', () => {

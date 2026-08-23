@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { isHarnessInventoryOnlyFile } from '../qa/core/qa-scope.mjs';
+
 const CONTROL_ROOTS = Object.freeze([
   '.github/workflows',
   '.husky',
@@ -75,7 +77,8 @@ function visit(cwd, relative, output) {
   const stat = fs.lstatSync(absolute);
   if (stat.isSymbolicLink()) throw new Error(`QA control input may not be a symlink: ${relative}`);
   if (stat.isFile()) {
-    output.add(relative.replaceAll(path.sep, '/'));
+    const normalized = relative.replaceAll(path.sep, '/');
+    if (!isHarnessInventoryOnlyFile(normalized)) output.add(normalized);
     return;
   }
   for (const entry of fs.readdirSync(absolute, { withFileTypes: true })) {

@@ -24,6 +24,11 @@ const CRITICAL_SPECS = [
   'tooling/test/e2e/extension-critical-video.spec.ts',
   'tooling/test/e2e/extension-critical-video-effects.spec.ts',
 ];
+const E2E_BUILD_DIRS = {
+  release: '.tmp/e2e-builds/release',
+  security: '.tmp/e2e-builds/security',
+  test: '.tmp/e2e-builds/test',
+};
 
 const SUITES = {
   smoke: SMOKE_SPECS,
@@ -88,19 +93,19 @@ function buildScriptsForSuite(suite) {
 
 function playwrightWavesForSuite(suite, specs) {
   if (suite === 'security') {
-    return [{ buildDir: 'dist-security-e2e', requiresDisplay: false, specs }];
+    return [{ buildDir: E2E_BUILD_DIRS.security, requiresDisplay: false, specs }];
   }
   if (suite === 'all') {
     return [
       {
-        buildDir: 'dist',
+        buildDir: E2E_BUILD_DIRS.test,
         requiresDisplay: true,
         specs: [...SMOKE_SPECS, ...CRITICAL_SPECS],
       },
-      { buildDir: 'dist-security-e2e', requiresDisplay: false, specs: SECURITY_SPECS },
+      { buildDir: E2E_BUILD_DIRS.security, requiresDisplay: false, specs: SECURITY_SPECS },
     ];
   }
-  return [{ buildDir: 'dist', requiresDisplay: suite === 'critical', specs }];
+  return [{ buildDir: E2E_BUILD_DIRS.test, requiresDisplay: suite === 'critical', specs }];
 }
 
 function createE2eContext(options) {

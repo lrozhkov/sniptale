@@ -62,10 +62,12 @@ function workspaceTree() {
 
 const commit = command(['rev-parse', 'HEAD']);
 const initialTree = workspaceTree();
+const localControlDigest = createCandidateControlDigest();
 Object.assign(environment, {
   SNIPTALE_CANDIDATE_SHA: commit,
   SNIPTALE_CANDIDATE_TREE: initialTree,
   SNIPTALE_TRUSTED_CONTROL_SHA: commit,
+  SNIPTALE_CANDIDATE_CONTROL_DIGEST: localControlDigest,
   SNIPTALE_PROOF_SHA: commit,
 });
 Object.assign(process.env, environment);
@@ -159,8 +161,8 @@ try {
     candidateTree: initialTree,
     workspaceMode: 'local-workspace',
     trustedControlSha: commit,
-    trustedControlDigest: createCandidateControlDigest(),
-    controlDigest: createCandidateControlDigest(),
+    trustedControlDigest: localControlDigest,
+    controlDigest: localControlDigest,
     resourceProfiles: {
       bounded: resolveQaResourceProfile({ env: environment }),
       release: resolveQaReleaseResourceProfile({ env: environment }),

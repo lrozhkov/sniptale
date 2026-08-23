@@ -75,11 +75,7 @@ function writePassingConfigPolicyFixture(root) {
   writeFile(
     root,
     'apps/extension/manifest.json',
-    JSON.stringify(
-      { minimum_chrome_version: '148', message_serialization: 'structured_clone' },
-      null,
-      2
-    )
+    JSON.stringify({ minimum_chrome_version: '148' }, null, 2)
   );
   writeFile(
     root,
@@ -141,7 +137,8 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'apps/extension/manifest.json',
-        message: 'message_serialization must be "structured_clone"',
+        message:
+          'message_serialization must remain absent until a production messaging owner requires it',
       }),
       expect.objectContaining({
         file: 'apps/extension/vite.config.ts',
@@ -254,7 +251,14 @@ it('reports missing strictness flags, build target, and malformed runtime config
   writeFile(
     root,
     'apps/extension/manifest.json',
-    JSON.stringify({ minimum_chrome_version: 'not-a-version' }, null, 2)
+    JSON.stringify(
+      {
+        minimum_chrome_version: 'not-a-version',
+        message_serialization: 'structured_clone',
+      },
+      null,
+      2
+    )
   );
   writeFile(root, 'apps/extension/vite.config.ts', 'export default { build: {} };\n');
 

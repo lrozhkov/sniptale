@@ -61,6 +61,11 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain(
     'node trusted-control/tooling/ci/check-control-authority.mjs trusted-control candidate'
   );
+  expect(workflow).toContain('name: Report candidate QA control disposition');
+  expect(workflow).toContain('QA controls changed: $CONTROLS_CHANGED');
+  expect(workflow).toContain('Control disposition: $disposition');
+  expect(workflow).toContain('name: Bind candidate and trusted QA control digests');
+  expect(workflow).not.toContain('Reject self-authorizing QA control drift');
   expect(workflow).toContain('trusted-admission:');
   expect(workflow).toContain('admit-candidate-proof.mjs');
   expect(workflow).toContain('admit-gate-graph.mjs');

@@ -2,7 +2,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { resolveProofCommit, stableStringify } from './proof-input.mjs';
+import {
+  proofControlDigestMatches,
+  resolveProofCommit,
+  resolveProofControlDigest,
+  stableStringify,
+} from './proof-input.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/build-proof-reuse.data.json';
 const EXTERNAL_PROOF_ENV = 'SNIPTALE_BUILD_PROOF_PATH';
@@ -120,11 +125,15 @@ function resolveSource(cwd, policy) {
 
 export function resolveReusableBuildProof({ cwd = process.cwd() } = {}) {
   const current = createBuildProofInputs({ cwd });
+  const controlDigest = resolveProofControlDigest({ cwd });
   try {
     const source = resolveSource(cwd, current.policy);
     if (!source) return { matched: false, reason: 'no admissible build proof' };
     if (source.error) return { matched: false, reason: source.error };
     const proof = parseProof(source.proofPath);
+    if (!proofControlDigestMatches(proof, controlDigest)) {
+      return { matched: false, reason: 'build proof control digest changed' };
+    }
     if (proof.inputDigest !== current.inputDigest) {
       return { matched: false, reason: 'build proof inputs changed' };
     }
@@ -153,6 +162,7 @@ export function recordSuccessfulBuildProof({
   reusedFrom = null,
 } = {}) {
   const inputs = createBuildProofInputs({ cwd });
+  const controlDigest = resolveProofControlDigest({ cwd });
   if (!inputs.policy.canonicalProducerIds.includes(producerId)) {
     throw new Error('Only the canonical release-archive owner may record build provenance.');
   }
@@ -170,6 +180,7 @@ export function recordSuccessfulBuildProof({
       id: producerId,
       commit: resolveProofCommit(cwd),
       controlSha: process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? null,
+      controlDigest,
     },
     reusedFrom,
     recordedAt: new Date().toISOString(),

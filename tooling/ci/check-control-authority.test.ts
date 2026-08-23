@@ -33,24 +33,33 @@ function seed(root: string, version: string, script: string) {
   }
 }
 
-it('allows coordinated version drift but rejects executable control drift', () => {
+it('allows coordinated version drift and reports executable candidate control drift', () => {
   const trusted = createTempRoot('trusted-controls-');
   const candidate = createTempRoot('candidate-controls-');
   seed(trusted, '0.3.2', 'node tooling/qa/control.mjs');
   seed(candidate, '0.3.3', 'node tooling/qa/control.mjs');
-  expect(checkControlAuthority(trusted, candidate).candidateControlDigest).toBeTruthy();
+  expect(checkControlAuthority(trusted, candidate)).toMatchObject({
+    controlsChanged: false,
+    controlDisposition: 'trusted-controls',
+  });
   writeFile(candidate, 'tooling/qa/control.mjs', 'process.exit(0);\n');
-  expect(() => checkControlAuthority(trusted, candidate)).toThrow(/bootstrap bypass/u);
+  expect(checkControlAuthority(trusted, candidate)).toMatchObject({
+    controlsChanged: true,
+    controlDisposition: 'candidate-controls',
+  });
 });
 
 it.each(['.oxlintrc.json', '.dependency-cruiser.cjs', '.oxfmtrc.json'])(
-  'rejects candidate drift in the live %s control configuration',
+  'reports candidate drift in the live %s control configuration',
   (controlFile) => {
     const trusted = createTempRoot('trusted-controls-');
     const candidate = createTempRoot('candidate-controls-');
     seed(trusted, '0.3.2', 'node tooling/qa/control.mjs');
     seed(candidate, '0.3.2', 'node tooling/qa/control.mjs');
     writeFile(candidate, controlFile, '{"weakened":true}\n');
-    expect(() => checkControlAuthority(trusted, candidate)).toThrow(/bootstrap bypass/u);
+    expect(checkControlAuthority(trusted, candidate)).toMatchObject({
+      controlsChanged: true,
+      controlDisposition: 'candidate-controls',
+    });
   }
 );

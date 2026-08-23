@@ -3,7 +3,9 @@ import path from 'node:path';
 
 import {
   readProofInput as readRegularFile,
+  proofControlDigestMatches,
   resolveProofCommit as resolveCommit,
+  resolveProofControlDigest,
   sha256ProofInput as sha256Bytes,
   stableStringify,
 } from './proof-input.mjs';
@@ -209,12 +211,16 @@ function resolveProofPath(cwd, policy) {
 
 export function resolveReusableFullUnitProof(options = {}) {
   const current = createFullUnitProofInputs(options);
+  const controlDigest = resolveProofControlDigest({ cwd: options.cwd ?? process.cwd() });
   const source = resolveProofPath(options.cwd ?? process.cwd(), current.policy);
   if (!source) {
     return { matched: false, reason: 'no admissible full unit proof' };
   }
   const proof = readProof(source.path);
   if (proof.error) return { matched: false, reason: proof.error };
+  if (!proofControlDigestMatches(proof, controlDigest)) {
+    return { matched: false, reason: 'full unit proof control digest changed' };
+  }
   if (proof.inputDigest !== current.inputDigest) {
     return { matched: false, reason: 'full unit proof inputs changed' };
   }
@@ -239,6 +245,7 @@ export function recordSuccessfulFullUnitProof({
   reusedFrom = null,
 } = {}) {
   const inputs = createFullUnitProofInputs({ cwd, maxWorkers, pool, suite });
+  const controlDigest = resolveProofControlDigest({ cwd });
   const proof = {
     schemaVersion: 1,
     artifactKind: 'sniptale-full-unit-proof',
@@ -251,6 +258,7 @@ export function recordSuccessfulFullUnitProof({
     producer: {
       commit: resolveCommit(cwd),
       trustedControlSha: process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? null,
+      controlDigest,
       source,
     },
     reusedFrom,
