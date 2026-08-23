@@ -20,6 +20,17 @@ import type {
 import { runLiveVideoEncoderPump, type LiveVideoFrameTransform } from './live-video-encoder-pump';
 import { LiveVideoFrameBuffer } from './live-video-frame-buffer';
 import { LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS } from './live-video-budget';
+import {
+  assertLiveVideoEncoderConfig,
+  buildExactVideoEncoderConfig,
+  buildNativeVideoEncoderConfig,
+  canUseNativeEncoderTransform,
+  resolveLiveEncoderContentHint,
+  resolveLiveEncodingDimensions,
+  resolveLiveVideoBitrateMode,
+  type LiveEncoderContentHint,
+} from './live-video-encoder-config';
+import { LiveNativeVideoEncoderSource } from './live-native-video-encoder-source';
 import { LiveVideoSessionDiagnostics } from './live-video-session-diagnostics';
 
 type LiveArtifactSessionPhase =
@@ -68,16 +79,6 @@ interface CreateLiveRecordingArtifactSessionOwnerInput {
   writer: RecordingStagingArtifactWriter;
 }
 
-type LiveEncoderContentHint = 'detail' | 'motion' | 'text';
-type LiveVideoBitrateMode = 'constant' | 'variable';
-
-const SCREEN_RECORDING_COLOR_SPACE: VideoColorSpaceInit = {
-  fullRange: true,
-  matrix: 'bt709',
-  primaries: 'bt709',
-  transfer: 'bt709',
-};
-
 interface ActiveVideoRead {
   generation: number;
   settled: boolean;
@@ -99,99 +100,6 @@ function createOutputFormat(container: 'mp4' | 'webm'): OutputFormat {
     : new WebMOutputFormat({ appendOnly: true, minimumClusterDuration: 1 });
 }
 
-function resolveLiveEncoderContentHint(track: MediaStreamVideoTrack): LiveEncoderContentHint {
-  const hint = track.contentHint;
-  return hint === 'motion' || hint === 'text' || hint === 'detail' ? hint : 'detail';
-}
-
-function resolveLiveSampleColorSpace(
-  contentHint: LiveEncoderContentHint
-): VideoColorSpaceInit | undefined {
-  return contentHint === 'text' ? SCREEN_RECORDING_COLOR_SPACE : undefined;
-}
-
-function resolveLiveVideoBitrateMode(
-  input: CreateLiveRecordingArtifactSessionOwnerInput
-): LiveVideoBitrateMode {
-  return input.frameTransform &&
-    input.encoding.container === 'webm' &&
-    input.encoding.videoCodec === 'vp9'
-    ? 'constant'
-    : 'variable';
-}
-
-function matchesSelectedCodec(configuredCodec: string, selectedCodec: VideoCodec): boolean {
-  if (selectedCodec === 'avc') return configuredCodec.startsWith('avc1');
-  if (selectedCodec === 'vp9')
-    return configuredCodec === 'vp9' || configuredCodec.startsWith('vp09');
-  return configuredCodec === selectedCodec || configuredCodec.startsWith(`${selectedCodec}.`);
-}
-
-function buildExactVideoEncoderConfig(
-  input: CreateLiveRecordingArtifactSessionOwnerInput,
-  dimensions: { height: number; width: number },
-  contentHint: LiveEncoderContentHint
-): VideoEncoderConfig | null {
-  if (!input.encoding.videoCodecString) return null;
-  return {
-    alpha: 'discard',
-    bitrate: input.encoding.videoBitrate,
-    bitrateMode: resolveLiveVideoBitrateMode(input),
-    codec: input.encoding.videoCodecString,
-    contentHint,
-    displayHeight: dimensions.height,
-    displayWidth: dimensions.width,
-    framerate: input.encoding.frameRate,
-    hardwareAcceleration: 'no-preference',
-    height: dimensions.height,
-    latencyMode: 'quality',
-    width: dimensions.width,
-    ...(input.encoding.videoCodec === 'avc' ? { avc: { format: 'avc' as const } } : {}),
-  };
-}
-
-function resolveEncodingDimensions(input: CreateLiveRecordingArtifactSessionOwnerInput): {
-  height: number;
-  width: number;
-} {
-  const [videoTrack] = input.stream.getVideoTracks();
-  if (!videoTrack) throw new Error('Live recording stream has no video track.');
-  const videoSettings = videoTrack.getSettings();
-  if (input.frameTransform) {
-    const { outputSize, sourceRect } = input.frameTransform;
-    const sourceWidth = videoSettings.width;
-    const sourceHeight = videoSettings.height;
-    if (
-      !Number.isInteger(outputSize.width) ||
-      !Number.isInteger(outputSize.height) ||
-      outputSize.width <= 0 ||
-      outputSize.height <= 0 ||
-      outputSize.width % 2 !== 0 ||
-      outputSize.height % 2 !== 0
-    ) {
-      throw new Error('Live recording transform output must use positive even dimensions.');
-    }
-    if (
-      typeof sourceWidth !== 'number' ||
-      typeof sourceHeight !== 'number' ||
-      ![sourceRect.x, sourceRect.y, sourceRect.width, sourceRect.height].every(Number.isFinite) ||
-      sourceRect.x < 0 ||
-      sourceRect.y < 0 ||
-      sourceRect.width <= 0 ||
-      sourceRect.height <= 0 ||
-      sourceRect.x + sourceRect.width > sourceWidth ||
-      sourceRect.y + sourceRect.height > sourceHeight
-    ) {
-      throw new Error('Live recording transform source rectangle is outside the source frame.');
-    }
-    return outputSize;
-  }
-  if (!videoSettings.width || !videoSettings.height) {
-    throw new Error('Live recording video dimensions are unavailable.');
-  }
-  return { height: videoSettings.height, width: videoSettings.width };
-}
-
 export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactSession {
   private abortPromise: Promise<void> | null = null;
   private callbacks: LiveRecordingArtifactLifecycleCallbacks = {};
@@ -201,7 +109,8 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   private readonly expectedContentHint: LiveEncoderContentHint;
   private readonly videoDiagnostics: LiveVideoSessionDiagnostics;
   private readonly expectedVideoEncoderConfig: VideoEncoderConfig | null;
-  private readonly videoSource: VideoSampleSource;
+  private readonly videoSource: Pick<VideoSampleSource, 'add'>;
+  private readonly nativeVideoSource: LiveNativeVideoEncoderSource | null;
   private readonly videoProcessor: MediaStreamTrackProcessor<VideoFrame>;
   private readonly videoReader: ReadableStreamDefaultReader<VideoFrame>;
   private readonly videoFrameBuffer = new LiveVideoFrameBuffer(LIVE_VIDEO_FRAME_BUFFER_SIZE);
@@ -230,7 +139,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     if (typeof MediaStreamTrackProcessor === 'undefined') {
       throw new Error('Source-driven recording requires MediaStreamTrackProcessor.');
     }
-    const encodingDimensions = resolveEncodingDimensions(input);
+    const encodingDimensions = resolveLiveEncodingDimensions(input);
     this.videoDiagnostics = new LiveVideoSessionDiagnostics({
       configuredBitrate: input.encoding.videoBitrate,
       keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
@@ -238,11 +147,23 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       track: videoTrack,
     });
     this.expectedContentHint = resolveLiveEncoderContentHint(videoTrack);
-    this.expectedVideoEncoderConfig = buildExactVideoEncoderConfig(
+    const explicitEncoderConfig = buildExactVideoEncoderConfig(
       input,
       encodingDimensions,
       this.expectedContentHint
     );
+    const nativeEncoderCandidate = buildNativeVideoEncoderConfig(
+      input,
+      encodingDimensions,
+      this.expectedContentHint
+    );
+    const nativeEncoderConfig = canUseNativeEncoderTransform(
+      input.frameTransform,
+      nativeEncoderCandidate
+    )
+      ? nativeEncoderCandidate
+      : null;
+    this.expectedVideoEncoderConfig = nativeEncoderConfig ?? explicitEncoderConfig;
 
     const target = new AppendOnlyStreamTarget(
       new WritableStream<Uint8Array>({
@@ -258,29 +179,48 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       track: videoTrack,
     });
     this.videoReader = this.videoProcessor.readable.getReader();
-    this.videoSource = new VideoSampleSource({
-      bitrate: input.encoding.videoBitrate,
-      bitrateMode: resolveLiveVideoBitrateMode(input),
-      codec: input.encoding.videoCodec,
-      contentHint: this.expectedContentHint,
-      hardwareAcceleration: 'no-preference',
-      keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
-      latencyMode: 'quality',
-      ...(input.encoding.videoCodecString
-        ? { fullCodecString: input.encoding.videoCodecString }
-        : {}),
-      onEncodedPacket: (packet) => {
-        if (this.videoDiagnostics.observeEncodedPacket(packet).firstPacket) {
-          this.resolveFirstEncodedVideoPacket();
-        }
-      },
-      sizeChangeBehavior: 'deny',
-      onEncoderConfig: (config) => this.assertEncoderConfig(config),
-    });
+    const observeEncodedPacket = (
+      packet: Parameters<LiveVideoSessionDiagnostics['observeEncodedPacket']>[0]
+    ) => {
+      if (this.videoDiagnostics.observeEncodedPacket(packet).firstPacket) {
+        this.resolveFirstEncodedVideoPacket();
+      }
+    };
+    if (nativeEncoderConfig && input.frameTransform) {
+      this.assertEncoderConfig(nativeEncoderConfig);
+      this.nativeVideoSource = new LiveNativeVideoEncoderSource({
+        encoderConfig: nativeEncoderConfig,
+        keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
+        onEncodedPacket: observeEncodedPacket,
+        sourceRect: input.frameTransform.sourceRect,
+        videoCodec: input.encoding.videoCodec,
+      });
+      this.videoSource = this.nativeVideoSource;
+    } else {
+      this.nativeVideoSource = null;
+      this.videoSource = new VideoSampleSource({
+        bitrate: input.encoding.videoBitrate,
+        bitrateMode: resolveLiveVideoBitrateMode(input),
+        codec: input.encoding.videoCodec,
+        contentHint: this.expectedContentHint,
+        hardwareAcceleration: 'no-preference',
+        keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
+        latencyMode: 'quality',
+        ...(input.encoding.videoCodecString
+          ? { fullCodecString: input.encoding.videoCodecString }
+          : {}),
+        onEncodedPacket: observeEncodedPacket,
+        sizeChangeBehavior: 'deny',
+        onEncoderConfig: (config) => this.assertEncoderConfig(config),
+      });
+    }
     // Mediabunny uses track frameRate both as encoder rate-control metadata and as muxer cadence.
     // LiveVideoTimeline owns pre-muxer tick coalescing so this metadata can stabilize WebM packet
     // durations without manufacturing frames or collapsing multiple samples onto one timestamp.
-    this.output.addVideoTrack(this.videoSource, { frameRate: input.encoding.frameRate });
+    this.output.addVideoTrack(
+      this.nativeVideoSource?.packetSource ?? (this.videoSource as VideoSampleSource),
+      { frameRate: input.encoding.frameRate }
+    );
 
     this.audioSources = input.stream.getAudioTracks().map((track) => {
       const source = new MediaStreamAudioTrackSource(
@@ -329,7 +269,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   static async assertSupported(input: CreateLiveRecordingArtifactSessionOwnerInput): Promise<void> {
     const [videoTrack] = input.stream.getVideoTracks();
     if (!videoTrack) throw new Error('Live recording stream has no video track.');
-    const { height, width } = resolveEncodingDimensions(input);
+    const { height, width } = resolveLiveEncodingDimensions(input);
     if (!width || !height) throw new Error('Live recording video dimensions are unavailable.');
     if (typeof VideoEncoder === 'undefined') {
       throw new Error('Source-driven recording requires VideoEncoder.');
@@ -350,7 +290,11 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     if (!selectedConfigSupported) {
       throw new Error('The selected live video encoder configuration is not supported.');
     }
-    const exactConfig = buildExactVideoEncoderConfig(input, { height, width }, contentHint);
+    const explicitConfig = buildExactVideoEncoderConfig(input, { height, width }, contentHint);
+    const nativeConfig = buildNativeVideoEncoderConfig(input, { height, width }, contentHint);
+    const exactConfig = canUseNativeEncoderTransform(input.frameTransform, nativeConfig)
+      ? nativeConfig
+      : explicitConfig;
     if (exactConfig && typeof VideoEncoder !== 'undefined') {
       const exactSupport = await VideoEncoder.isConfigSupported(exactConfig);
       if (!exactSupport.supported) {
@@ -427,6 +371,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     this.rejectFirstEncodedVideoPacket(abortError);
     this.rejectTerminalOnce(abortError);
     this.videoFrameBuffer.abort();
+    this.nativeVideoSource?.close();
     this.abortPromise ??= Promise.allSettled([
       this.videoReader.cancel(),
       this.output.cancel(),
@@ -449,6 +394,9 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         container: this.input.encoding.container,
         requestedCaptureFrameRate: this.input.encoding.frameRate,
         frameTransform: this.input.frameTransform ?? null,
+        transformStrategy: this.nativeVideoSource
+          ? 'native-webcodecs'
+          : 'sample-raster-or-pass-through',
         contentHint: this.expectedContentHint,
         captureTrack: this.videoDiagnostics.captureTrack,
         bitrateMode: resolveLiveVideoBitrateMode(this.input),
@@ -472,6 +420,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       this.resolveVideoDrainRequested();
       void this.videoReader.cancel().catch(() => undefined);
       await this.videoPump;
+      await this.nativeVideoSource?.finalize();
       await this.output.finalize();
       this.logEncodedCadence();
       const artifact = await this.input.writer.finalize();
@@ -489,50 +438,14 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   }
 
   private assertEncoderConfig(config: VideoEncoderConfig): void {
-    if (config.framerate !== this.input.encoding.frameRate) {
-      throw new Error(
-        'Live encoder did not preserve the requested frame rate as its rate-control expectation.'
-      );
-    }
-    const expectedBitrateMode = resolveLiveVideoBitrateMode(this.input);
-    if (config.bitrateMode !== expectedBitrateMode) {
-      throw new Error(
-        'Live encoder did not preserve screen-efficient variable or selected bitrate mode.'
-      );
-    }
-    if (config.contentHint !== this.expectedContentHint) {
-      throw new Error('Live encoder did not preserve source content hint.');
-    }
-    const dimensions = resolveEncodingDimensions(this.input);
-    if (
-      !matchesSelectedCodec(config.codec, this.input.encoding.videoCodec) ||
-      config.width !== dimensions.width ||
-      config.height !== dimensions.height ||
-      config.bitrate !== this.input.encoding.videoBitrate ||
-      config.alpha !== 'discard' ||
-      config.hardwareAcceleration !== 'no-preference' ||
-      config.latencyMode !== 'quality'
-    ) {
-      throw new Error('Live encoder did not preserve the selected video configuration.');
-    }
-    const expected = this.expectedVideoEncoderConfig;
-    if (
-      expected &&
-      (config.codec !== expected.codec ||
-        config.width !== expected.width ||
-        config.height !== expected.height ||
-        config.displayWidth !== expected.displayWidth ||
-        config.displayHeight !== expected.displayHeight ||
-        config.framerate !== expected.framerate ||
-        config.bitrate !== expected.bitrate ||
-        config.bitrateMode !== expected.bitrateMode ||
-        config.alpha !== expected.alpha ||
-        config.hardwareAcceleration !== expected.hardwareAcceleration ||
-        config.latencyMode !== expected.latencyMode ||
-        config.avc?.format !== expected.avc?.format)
-    ) {
-      throw new Error('Live encoder did not preserve the exact selected AVC configuration.');
-    }
+    assertLiveVideoEncoderConfig({
+      actual: config,
+      contentHint: this.expectedContentHint,
+      dimensions: resolveLiveEncodingDimensions(this.input),
+      encoding: this.input.encoding,
+      expected: this.expectedVideoEncoderConfig,
+      ...(this.input.frameTransform ? { frameTransform: this.input.frameTransform } : {}),
+    });
     logger.debug('Configured live WebCodecs encoder', {
       codec: config.codec,
       framerate: config.framerate,
@@ -543,7 +456,6 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
 
   private async pumpVideoFrames(): Promise<void> {
     const readPump = this.readVideoFramesIntoBuffer();
-    const sampleColorSpace = resolveLiveSampleColorSpace(this.expectedContentHint);
     const encodePump = runLiveVideoEncoderPump({
       frameBuffer: this.videoFrameBuffer,
       frameRate: this.input.encoding.frameRate,
@@ -551,9 +463,9 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       onFrameDequeued: () => this.completeResumeAfterProcessorDrain(),
       onEncoderSubmissionFailed: () => this.videoDiagnostics.encoderSubmissionFailed(),
       onEncoderSubmissionStarted: () => this.videoDiagnostics.encoderSubmissionStarted(),
-      ...(sampleColorSpace ? { sampleColorSpace } : {}),
       shouldEncodeTerminalFrame: () => this.phase !== 'aborted' && this.phase !== 'failed',
       videoSource: this.videoSource,
+      ...(this.nativeVideoSource ? { transformStrategy: 'native-encoder' as const } : {}),
     })
       .then((metrics) => {
         this.videoDiagnostics.setPumpMetrics(metrics);
@@ -584,6 +496,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     if (!failure) return;
     const error = toError(failure.reason);
     this.videoFrameBuffer.abort();
+    this.nativeVideoSource?.close();
     await this.videoReader.cancel().catch(() => undefined);
     this.handleVideoPumpFailure(error);
   }
@@ -740,6 +653,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       );
     }
     this.videoFrameBuffer.abort();
+    this.nativeVideoSource?.close();
     this.abortPromise ??= Promise.allSettled([
       this.videoReader.cancel(),
       this.output.cancel(),

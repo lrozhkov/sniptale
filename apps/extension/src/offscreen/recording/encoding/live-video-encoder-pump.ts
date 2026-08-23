@@ -25,23 +25,22 @@ interface RunLiveVideoEncoderPumpInput {
   frameBuffer: LiveVideoFrameBuffer;
   frameRate: number;
   frameTransform?: LiveVideoFrameTransform;
-  sampleColorSpace?: VideoColorSpaceInit;
   onFrameDequeued(): void;
   onEncoderSubmissionFailed?(): void;
   onEncoderSubmissionStarted?(): void;
   shouldEncodeTerminalFrame(): boolean;
   videoSource: Pick<VideoSampleSource, 'add'>;
   frameTransformer?: Pick<LiveVideoFrameTransformer, 'transformFrame'>;
+  transformStrategy?: 'native-encoder';
 }
 
 const logger = createLogger({ namespace: 'LiveVideoEncoderPump' });
-
-type VideoFrameColorSpaceInit = VideoFrameInit & { colorSpace?: VideoColorSpaceInit };
 
 function describeVideoFrame(frame: VideoFrame) {
   return {
     codedHeight: frame.codedHeight,
     codedWidth: frame.codedWidth,
+    colorSpace: frame.colorSpace,
     displayHeight: frame.displayHeight,
     displayWidth: frame.displayWidth,
     format: frame.format,
@@ -65,11 +64,10 @@ async function encodeVideoFrame(
 ): Promise<void> {
   const sourceDescription = describeVideoFrame(frame);
   let sample: VideoSample | null = null;
-  let sourceFrameToClose: VideoFrame | null = null;
   try {
     if (input.frameTransformer) {
       const transformStartedAt = performance.now();
-      sample = input.frameTransformer.transformFrame(frame, timing, input.sampleColorSpace);
+      sample = input.frameTransformer.transformFrame(frame, timing);
       const transformDuration = performance.now() - transformStartedAt;
       metrics.maxFrameTransformDurationMs = Math.max(
         metrics.maxFrameTransformDurationMs,
@@ -77,16 +75,6 @@ async function encodeVideoFrame(
       );
       metrics.totalFrameTransformDurationMs += transformDuration;
       metrics.transformedVideoFrames += 1;
-    } else if (input.sampleColorSpace) {
-      const duration = Math.trunc(timing.duration * 1_000_000);
-      const frameInit: VideoFrameColorSpaceInit = {
-        colorSpace: input.sampleColorSpace,
-        ...(duration ? { duration } : {}),
-        timestamp: Math.trunc(timing.timestamp * 1_000_000),
-      };
-      const sampleFrame = new VideoFrame(frame, frameInit as VideoFrameInit);
-      sourceFrameToClose = frame;
-      sample = new VideoSample(sampleFrame);
     } else {
       sample = new VideoSample(frame, {
         duration: timing.duration,
@@ -97,6 +85,7 @@ async function encodeVideoFrame(
       const encoderInput = {
         codedHeight: sample.codedHeight,
         codedWidth: sample.codedWidth,
+        colorSpace: sample.colorSpace,
         displayHeight: sample.displayHeight,
         displayWidth: sample.displayWidth,
         format: sample.format,
@@ -128,7 +117,6 @@ async function encodeVideoFrame(
     metrics.submittedVideoFrames += 1;
   } finally {
     sample?.close();
-    sourceFrameToClose?.close();
     if (input.frameTransformer) frame.close();
   }
 }
@@ -150,7 +138,11 @@ class LiveVideoEncoderPumpState {
   private readonly timeline: LiveVideoTimeline;
 
   constructor(private readonly input: RunLiveVideoEncoderPumpInput) {
-    if (input.frameTransform && !input.frameTransformer) {
+    if (
+      input.frameTransform &&
+      !input.frameTransformer &&
+      input.transformStrategy !== 'native-encoder'
+    ) {
       input.frameTransformer = new LiveVideoFrameTransformer(input.frameTransform);
     }
     this.timeline = new LiveVideoTimeline(input.frameRate);

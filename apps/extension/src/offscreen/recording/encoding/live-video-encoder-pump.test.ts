@@ -16,6 +16,7 @@ vi.mock('mediabunny', () => ({
     readonly displayWidth = 1;
     readonly format = 'RGBA';
     readonly visibleRect = null;
+    readonly colorSpace = { toJSON: () => ({}) };
 
     constructor(
       readonly frame: VideoFrame,
@@ -33,6 +34,7 @@ vi.mock('mediabunny', () => ({
 import { LiveVideoFrameBuffer } from './live-video-frame-buffer';
 import { evaluateLiveVideoByteBudget } from './live-video-budget';
 import { runLiveVideoEncoderPump } from './live-video-encoder-pump';
+import { VideoSample } from 'mediabunny';
 
 beforeEach(() => {
   samples.length = 0;
@@ -40,15 +42,22 @@ beforeEach(() => {
     'VideoFrame',
     class {
       readonly close = vi.fn();
-      readonly colorSpace: VideoColorSpaceInit | undefined;
+      readonly colorSpace: { toJSON(): VideoColorSpaceInit };
       readonly duration: number | undefined;
       readonly timestamp: number;
+      readonly visibleRect = null;
 
       constructor(_data: AllowSharedBufferSource | VideoFrame, init: VideoFrameBufferInit) {
-        this.colorSpace = init.colorSpace ?? undefined;
+        const colorSpace = init.colorSpace;
+        this.colorSpace = { toJSON: () => colorSpace ?? {} };
         this.duration = init.duration ?? undefined;
         this.timestamp = init.timestamp;
       }
+
+      readonly codedHeight = 1;
+      readonly codedWidth = 1;
+      readonly displayHeight = 1;
+      readonly displayWidth = 1;
     }
   );
 });
@@ -137,7 +146,7 @@ describe('live video encoder pump', () => {
     expect(next.close).toHaveBeenCalledOnce();
   });
 
-  it('marks screen samples as full-range without switching to a raster transform', async () => {
+  it('submits the source frame without overriding its color metadata', async () => {
     const frameBuffer = new LiveVideoFrameBuffer(2);
     const frame = new VideoFrame(new Uint8Array(4), {
       codedHeight: 1,
@@ -148,28 +157,64 @@ describe('live video encoder pump', () => {
     frameBuffer.enqueue({ frame, timestampSeconds: 0 });
     frameBuffer.closeInput();
     const add = vi.fn(async (_sample: unknown, _options?: VideoEncoderEncodeOptions) => undefined);
-    const sampleColorSpace = {
-      fullRange: true,
-      matrix: 'bt709',
-      primaries: 'bt709',
-      transfer: 'bt709',
-    } satisfies VideoColorSpaceInit;
-
+    const legacyColorOverride = {
+      sampleColorSpace: {
+        fullRange: true,
+        matrix: 'bt709',
+        primaries: 'bt709',
+        transfer: 'bt709',
+      },
+    } as const;
     await runLiveVideoEncoderPump({
       frameBuffer,
       frameRate: 30,
+      ...legacyColorOverride,
       onFrameDequeued: vi.fn(),
-      sampleColorSpace,
       shouldEncodeTerminalFrame: () => true,
       videoSource: { add },
     });
 
     expect(samples).toHaveLength(1);
-    expect(samples[0]?.frame).not.toBe(frame);
-    expect(samples[0]?.frame.colorSpace).toEqual(sampleColorSpace);
-    expect(samples[0]?.frame.timestamp).toBe(0);
-    expect(samples[0]?.init).toEqual({});
+    expect(samples[0]?.frame).toBe(frame);
+    expect(samples[0]?.init).toEqual({ duration: 1 / 30, timestamp: 0 });
     expect(frame.close).toHaveBeenCalledOnce();
+  });
+
+  it('submits a transformed sample while retaining source-frame ownership', async () => {
+    const frameBuffer = new LiveVideoFrameBuffer(2);
+    const sourceFrame = new VideoFrame(new Uint8Array(4), {
+      codedHeight: 1,
+      codedWidth: 1,
+      format: 'RGBA',
+      timestamp: 0,
+    });
+    const transformedFrame = new VideoFrame(new Uint8Array(4), {
+      codedHeight: 1,
+      codedWidth: 1,
+      format: 'RGBA',
+      timestamp: 0,
+    });
+    const transformedSample = new VideoSample(transformedFrame);
+    const transformFrame = vi.fn(() => transformedSample);
+    frameBuffer.enqueue({ frame: sourceFrame, timestampSeconds: 0 });
+    frameBuffer.closeInput();
+
+    const metrics = await runLiveVideoEncoderPump({
+      frameBuffer,
+      frameRate: 30,
+      frameTransformer: { transformFrame },
+      onFrameDequeued: vi.fn(),
+      shouldEncodeTerminalFrame: () => true,
+      videoSource: { add: vi.fn().mockResolvedValue(undefined) },
+    });
+
+    expect(transformFrame).toHaveBeenCalledWith(
+      sourceFrame,
+      expect.objectContaining({ timestamp: 0 })
+    );
+    expect(metrics.transformedVideoFrames).toBe(1);
+    expect(sourceFrame.close).toHaveBeenCalledOnce();
+    expect(transformedFrame.close).toHaveBeenCalledOnce();
   });
 
   it('closes the already-dequeued successor when encoding the pending frame fails', async () => {
