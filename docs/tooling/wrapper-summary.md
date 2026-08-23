@@ -15,6 +15,8 @@ The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 
 The internal build phase is not a public standalone wrapper. Closeout and pre-push invoke it after fresh checkpoint/harness proof. It selects direct, related, saturated, or full unit scope from the existing deterministic owner, produces the artifact build, and writes build state. `ci:build` is different: it is an explicit quick `npm run build` bypass and makes no canonical QA claim.
 
+Every real full gate performs `npm ci`; cached download bytes never replace dependency installation or exact lockfile validation. The project-local npm policy permits legacy peer resolution only for the retained residual ESLint lane while its parser has not yet declared compatibility with the compiler-API shim. Npm errors remain visible in the console. Remove the exception when the residual parser accepts the canonical compiler-API package or the lane is retired.
+
 Harness targets include executable `tooling/**`, workflows, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact data-only inventories are exempt only when `qa-scope` classifies them as such and their focused owner validator passes. A policy JSON, baseline, allowlist, or executable registry is not data-only.
 
 ## Freshness and proof reuse
