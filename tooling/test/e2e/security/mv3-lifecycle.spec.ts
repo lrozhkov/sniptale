@@ -21,6 +21,30 @@ import {
   SETTINGS_PATH,
 } from './support';
 
+async function sendFromOwnedContent(
+  extensionPage: import('@playwright/test').Page,
+  tabId: number,
+  message: Record<string, unknown>
+): Promise<unknown> {
+  const [injection] = await extensionPage.evaluate(
+    async ({ payload, targetTabId }) =>
+      chrome.scripting.executeScript({
+        target: { frameIds: [0], tabId: targetTabId },
+        func: async (runtimePayload) =>
+          chrome.runtime.sendMessage({
+            ...runtimePayload,
+            __sniptaleRuntimeFreshness: {
+              issuedAtEpochMs: Date.now(),
+              nonce: crypto.randomUUID(),
+            },
+          }),
+        args: [payload],
+      }),
+    { payload: message, targetTabId: tabId }
+  );
+  return injection?.result;
+}
+
 test('owning Port and worker-local control authority disappear on disconnect and restart', async ({
   context,
   extensionId,
@@ -172,6 +196,65 @@ test('worker termination drops admitted tab authority before any side effect', a
       tabId,
     })
   ).toMatchObject({ success: true });
+
+  await revokeAllSitesAccessFromSettings(settings);
+  await popup.close();
+  await target.close();
+  await settings.close();
+});
+
+test('scenario session reconstructs once while stale content authority remains fail-closed', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}) => {
+  const settings = await openRealExtensionPage(
+    context,
+    extensionId,
+    `${SETTINGS_PATH}?section=access-data`
+  );
+  await grantAllSitesAccessFromSettings(settings);
+  const target = await context.newPage();
+  await target.goto(`${hostOrigin}/fixtures/host-page.html?scenario-worker-restart=1`);
+  const popup = await openRealExtensionPage(context, extensionId, POPUP_PATH);
+  const tabId = await popup.evaluate(async (targetUrl) => {
+    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === targetUrl);
+    if (tab?.id === undefined) throw new Error('Scenario lifecycle target tab is unavailable');
+    return tab.id;
+  }, target.url());
+
+  expect(
+    await sendFromOwnedContent(popup, tabId, {
+      captureMode: 'by-click',
+      type: 'SCENARIO_SET_CAPTURE_MODE',
+    })
+  ).toMatchObject({ success: true });
+  expect(
+    await sendFromOwnedContent(popup, tabId, {
+      enabled: true,
+      type: 'SCENARIO_SET_ENABLED',
+    })
+  ).toMatchObject({ success: true });
+  const persistedBeforeRestart = await popup.evaluate(() =>
+    chrome.storage.session.get('scenario-tab-sessions')
+  );
+
+  await terminateExtensionServiceWorker(context);
+  expect(
+    await sendRuntimeMessage(popup, {
+      enabled: false,
+      tabId,
+      type: 'SCENARIO_SET_ENABLED',
+    })
+  ).toMatchObject({ success: false });
+  const restored = await sendFromOwnedContent(popup, tabId, { type: 'SCENARIO_GET_SESSION' });
+  expect(restored).toMatchObject({
+    session: { captureMode: 'by-click', enabled: true },
+    success: true,
+  });
+  expect(await popup.evaluate(() => chrome.storage.session.get('scenario-tab-sessions'))).toEqual(
+    persistedBeforeRestart
+  );
 
   await revokeAllSitesAccessFromSettings(settings);
   await popup.close();
