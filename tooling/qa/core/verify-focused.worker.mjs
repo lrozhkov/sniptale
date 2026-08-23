@@ -15,7 +15,7 @@ const FOCUSED_LANES = ['appOwners', 'targetPaths', 'typecheck', 'tests', 'lint',
 export function parseFocusedWorkerInput(value) {
   const input = parseLaneWorkerInput(value, {
     contextBooleanFields: [
-      'shouldRunFullEslint',
+      'shouldRunFullOxlint',
       'shouldRunManifestPermissions',
       'shouldRunRuntimeTopology',
     ],
@@ -38,16 +38,17 @@ export function parseFocusedWorkerInput(value) {
       'qualityCodeFiles',
       'qualityJsLikeFiles',
       'qualityTargetFiles',
-      'shouldRunFullEslint',
+      'shouldRunFullOxlint',
       'shouldRunManifestPermissions',
       'shouldRunRuntimeTopology',
       'targetFiles',
     ],
-    extraFields: ['typecheckMaxConcurrency'],
+    extraFields: ['typecheckCheckerCount', 'typecheckMaxConcurrency'],
     label: 'Focused QA worker',
     lanes: FOCUSED_LANES,
   });
   assertPositiveInteger(input.typecheckMaxConcurrency, 'Focused QA worker typecheckMaxConcurrency');
+  assertPositiveInteger(input.typecheckCheckerCount, 'Focused QA worker typecheckCheckerCount');
   if (input.typecheckMaxConcurrency > 2) {
     throw new Error('Focused QA worker typecheckMaxConcurrency cannot exceed 2.');
   }
@@ -60,7 +61,13 @@ export function parseFocusedWorkerInput(value) {
   };
 }
 
-export async function runFocusedLane({ context, lane, typecheckMaxConcurrency, vitestMaxWorkers }) {
+export async function runFocusedLane({
+  context,
+  lane,
+  typecheckCheckerCount,
+  typecheckMaxConcurrency,
+  vitestMaxWorkers,
+}) {
   if (lane === 'appOwners' || lane === 'targetPaths') {
     return collectFocusedOwnerLane({ lane });
   }
@@ -68,7 +75,10 @@ export async function runFocusedLane({ context, lane, typecheckMaxConcurrency, v
   if (lane === 'lint') return collectFocusedLintLane(context);
   if (lane === 'graph') return collectFocusedGraphLane(context);
   if (lane === 'typecheck') {
-    return collectFocusedTypecheckLane(context, { maxConcurrency: typecheckMaxConcurrency });
+    return collectFocusedTypecheckLane(context, {
+      checkerCount: typecheckCheckerCount,
+      maxConcurrency: typecheckMaxConcurrency,
+    });
   }
   if (lane === 'tests') {
     return collectFocusedTestLane(context, {

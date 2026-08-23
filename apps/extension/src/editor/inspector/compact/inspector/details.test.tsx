@@ -55,10 +55,10 @@ it('builds browser-frame detail commands with semantic icons and update handlers
 
   expect(commands.map((command) => command.icon)).toEqual(['browser', 'text', 'link']);
 
-  ((commands[1]?.content as any).props.children as any).props.onChange({
+  ((commands[1]!.content as any).props.children as any).props.onChange({
     currentTarget: { value: 'Sniptale title' },
   });
-  ((commands[2]?.content as any).props.children as any).props.onChange({
+  ((commands[2]!.content as any).props.children as any).props.onChange({
     currentTarget: { value: 'https://sniptale.dev' },
   });
 
@@ -138,12 +138,12 @@ it('builds frame-surface commands with explicit icons and routes background acti
   const params = createInspectorCommandParams();
   const commands = buildFrameSurfaceCommands(params as never);
   const backgroundEditorProps = (
-    (commands[0]?.content as any).props.children.props.children[1] as any
+    (commands[0]!.content as any).props.children.props.children[1] as any
   ).props;
   const backgroundBlurProps = (
-    (commands[0]?.content as any).props.children.props.children[2] as any
+    (commands[0]!.content as any).props.children.props.children[2] as any
   ).props;
-  const paddingFieldsProps = ((commands[1]?.content as any).props.children as any).props;
+  const paddingFieldsProps = ((commands[1]!.content as any).props.children as any).props;
 
   expect(commands.map((command) => command.icon)).toEqual(['color', 'size', undefined]);
 
@@ -183,9 +183,9 @@ it('builds workspace color commands with a separate save-default action', () => 
     workspaceBackgroundPalette: ['#ffffff', '#000000'],
   };
   const workspaceCommands = buildWorkspaceCompactCommands(params as never);
-  const workspaceColorContent = ((workspaceCommands[0]?.content as any).props.children as any).props
+  const workspaceColorContent = ((workspaceCommands[0]!.content as any).props.children as any).props
     .children as any[];
-  const workspacePresetContent = ((workspaceCommands[1]?.content as any).props.children as any)
+  const workspacePresetContent = ((workspaceCommands[1]!.content as any).props.children as any)
     .props.children as any[];
   const workspaceControl = workspaceColorContent[0]?.props;
   const workspaceColorDefaultAction = workspaceColorContent[1]?.props;
@@ -225,9 +225,9 @@ it('builds grid commands with commit-only color controls', () => {
       gridSnapEnabled: true,
     },
   } as never);
-  const gridControl = ((gridCommands[2]?.content as any).props.children as any).props;
-  const gridSizeControl = ((gridCommands[3]?.content as any).props.children as any).props;
-  const gridPaletteButtons = ((gridCommands[4]?.content as any).props.children.props.children ??
+  const gridControl = ((gridCommands[2]!.content as any).props.children as any).props;
+  const gridSizeControl = ((gridCommands[3]!.content as any).props.children as any).props;
+  const gridPaletteButtons = ((gridCommands[4]!.content as any).props.children.props.children ??
     []) as any[];
 
   expect(gridCommands.map((command) => command.id)).toEqual([

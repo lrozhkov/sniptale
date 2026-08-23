@@ -47,7 +47,7 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   );
   expect(workflow).toContain('PROOF_LANE:');
   expect(workflow).toContain("'release' || 'proof'");
-  expect(workflow).toContain('vars.SELECTEL_RELEASE_PROFILES || vars.SELECTEL_QA_PROFILES');
+  expect(workflow).toContain('SELECTEL_RELEASE_PROFILES is required for release provenance.');
   expect(workflow).toContain('SELECTEL_RELEASE_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}');
   expect(workflow).toContain('--env SELECTEL_QA_PROFILES="$SELECTEL_RELEASE_PROFILES"');
   expect(workflow).toContain(
@@ -68,7 +68,7 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain("needs.fast-classifier.outputs.reuse != 'true'");
   expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs "$PROOF_LANE"');
   expect(workflow).toContain(
-    'name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}'
+    'name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}'
   );
   expect(workflow).toContain('pr-gate:');
   expect(workflow).toContain('name: Fast PR Gate');
@@ -89,6 +89,8 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('needs: [qa-image, provision, canonical-qa, infrastructure-smoke]');
   expect(workflow).toContain('[ "$CLEANUP_RESULT" = success ]');
   expect(workflow).toContain('scheduled-sweeper:');
+  expect(workflow).toContain('needs: cleanup');
+  expect(workflow).toContain('recover-cleanup');
   expect(workflow).not.toContain('Build informational candidate controls');
   expect(workflow).not.toContain('container.mjs candidate');
   expect(candidateJob).not.toContain('qa:checkpoint');
@@ -98,6 +100,8 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).not.toContain('RUNNER_IMAGE_TOKEN');
   expect(workflow).not.toContain('RUNNER_IMAGE_USER');
   expect(workflow).toContain('docker manifest inspect "$SNIPTALE_QA_IMAGE"');
+  const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
+  expect(container).toContain('resolveContainerDigest(image');
 });
 
 it('reuses immutable images when image inputs are unchanged and records sanitized resources', () => {
@@ -142,7 +146,14 @@ it('publishes from one admitted provenance artifact without provisioning another
   expect(workflow).toContain('provenance_run_id:');
   expect(workflow).toContain('allow_non_latest_provenance:');
   expect(workflow).toContain('.display_title == "Release provenance Gate"');
-  expect(workflow).toContain('release-provenance-${release_sha}-${PROVENANCE_RUN_ID}');
+  expect(workflow).toContain(
+    'release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-${provenance_attempt}'
+  );
+  expect(workflow).toContain('provenance-attempt=$provenance_attempt');
+  expect(workflow).toContain("! -name '*-qa-evidence.zip'");
+  expect(coverageJob).toContain('needs.publish.outputs.provenance-attempt');
+  expect(workflow).toContain('event=workflow_dispatch&status=success');
+  expect(workflow).toContain('is not the latest successful run');
   expect(workflow).toContain('verify-main-proof.mjs release');
   expect(workflow).toContain('prepare-release-assets.mjs build/release-proof');
   expect(workflow).toContain("grep -q '(HTTP 404)'");

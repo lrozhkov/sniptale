@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import ts from 'typescript';
 import { expect, it } from 'vitest';
 
 import { createTempRoot, writeFile } from '../qa/core/test-helpers';
@@ -36,9 +37,54 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(dockerfile.startsWith(`FROM ${lock.node.image}\n`)).toBe(true);
   expect(semgrepLock).toContain(`semgrep==${lock.semgrep.version}`);
   const playwrightLock = fs.readFileSync('tooling/configs/ci/playwright/package-lock.json');
+  const projectLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+  const projectPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  const playwrightPackage = JSON.parse(
+    fs.readFileSync('tooling/configs/ci/playwright/package.json', 'utf8')
+  );
   expect(crypto.createHash('sha256').update(playwrightLock).digest('hex')).toBe(
     lock.playwright.npmLockSha256
   );
+  expect(playwrightPackage.dependencies['@playwright/test']).toBe(lock.playwright.version);
+  expect(projectLock.packages['node_modules/playwright'].version).toBe(lock.playwright.version);
+  expect(Object.keys(lock.projectToolchain).sort()).toEqual([
+    'oxfmt',
+    'oxlint',
+    'oxlintTsgolint',
+    'typescriptCompilerApi',
+    'typescriptCompilerApiShim',
+    'typescriptNative',
+    'viteReact',
+  ]);
+  const expectedToolchainPackages = {
+    oxfmt: ['node_modules/oxfmt', '0.64.0'],
+    oxlint: ['node_modules/oxlint', '1.79.0'],
+    oxlintTsgolint: ['node_modules/oxlint-tsgolint', '7.0.2001'],
+    typescriptCompilerApi: ['node_modules/@typescript/old', '6.0.3'],
+    typescriptCompilerApiShim: ['node_modules/typescript', '6.0.2'],
+    typescriptNative: ['node_modules/@typescript/native', '7.0.2'],
+    viteReact: ['node_modules/@vitejs/plugin-react', '6.1.0'],
+  };
+  for (const [toolId, tool] of Object.entries(lock.projectToolchain) as Array<
+    [
+      keyof typeof expectedToolchainPackages,
+      {
+        packagePath: string;
+        version: string;
+      },
+    ]
+  >) {
+    expect([tool.packagePath, tool.version]).toEqual(expectedToolchainPackages[toolId]);
+    expect(projectLock.packages[tool.packagePath].version).toBe(tool.version);
+  }
+  expect(projectPackage.devDependencies['@typescript/native']).toBe('npm:typescript@^7.0.2');
+  expect(projectPackage.devDependencies.typescript).toBe('npm:@typescript/typescript6@^6.0.2');
+  expect(projectLock.packages['node_modules/@typescript/native'].name).toBe('typescript');
+  expect(projectLock.packages['node_modules/typescript'].name).toBe('@typescript/typescript6');
+  expect(ts.version).toBe(lock.projectToolchain.typescriptCompilerApi.version);
+  expect(JSON.stringify(projectPackage)).not.toContain('@typescript/native-preview');
+  expect(projectPackage.devDependencies).not.toHaveProperty('prettier');
+  expect(projectPackage.devDependencies).not.toHaveProperty('eslint-config-prettier');
   expect(lock.playwright.assets).toHaveLength(3);
   expect(lock.debian.snapshot).toMatch(/^\d{8}T\d{6}Z$/u);
   expect(dockerfile).toContain(`${lock.debian.archiveUrl} bookworm main`);
@@ -179,6 +225,7 @@ it('binds the published QA image digest to the exact successful main workflow', 
     digest: `sha256:${'b'.repeat(64)}`,
     repository: 'lrozhkov/sniptale',
     runId: '42',
+    runAttempt: '2',
   };
   writeImageProof(root, identity);
   expect(verifyImageProof(root, identity).reference).toBe(
@@ -321,7 +368,10 @@ it('runs only controls identical to trusted base and rechecks PR authority', () 
   const containerSource = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
   expect(proofSource).toContain('launcher must run from the clean origin/main commit');
   expect(laneSource).toContain("['install', 'npm', ['ci', '--ignore-scripts']]");
+  expect(laneSource).toContain("'verify-project-toolchain'");
+  expect(laneSource).toContain("path.join(trustedRoot, 'tooling/ci/verify-project-toolchain.mjs')");
   expect(laneSource).toContain('`tooling/ci/${lane}-wrapper.mjs`');
+  expect(containerSource).toContain('resolveGithubRunIdentityEnvironment()');
   expect(laneSource).toContain('candidateControlDigest !== trustedControlDigest');
   expect(laneSource).toContain('createCandidateControlDigest({ cwd: trustedRoot })');
   expect(laneSource).toContain('assertedCandidateControlDigest !== candidateControlDigest');

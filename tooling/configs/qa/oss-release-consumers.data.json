@@ -4,12 +4,12 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "f3f5f1bb797d28027041f40d9ab8def97fad97b4ef5f9213f1ff1dfe77057ddf"
+      "sha256": "606735b5f7ed5cdb7c7c28142e1a27600c70bb4caaa51d1b7f5d609c0c33c107"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "f3f5f1bb797d28027041f40d9ab8def97fad97b4ef5f9213f1ff1dfe77057ddf"
+      "sha256": "606735b5f7ed5cdb7c7c28142e1a27600c70bb4caaa51d1b7f5d609c0c33c107"
     },
     {
       "category": "bundled-font",
@@ -29,17 +29,17 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/vite.config.ts",
-      "sha256": "032be1fc93ca816965761bec00024e7d7e477cf63261534e2fccaef1e6856d33"
+      "sha256": "a9a4bfb4ad4c53b712bb75862897e015e91340bc7832d4b86102d019eb807723"
     },
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "e1e979df55890318c565939f1f71e7b40e7b79ad97de02b9cbfd9a39784a1ef8"
+      "sha256": "8a5aed8110de16de5e65f7c8309103dbddc27b3fd54bd00448d966b259a097eb"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "e1e979df55890318c565939f1f71e7b40e7b79ad97de02b9cbfd9a39784a1ef8"
+      "sha256": "8a5aed8110de16de5e65f7c8309103dbddc27b3fd54bd00448d966b259a097eb"
     },
     {
       "category": "bundled-font",
@@ -59,12 +59,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "1219c268145d03d088158c5488400d1c764e99f9686c9bf84e9a7818a65ad342"
+      "sha256": "967d0bb342852e1ec2d67633391681c585ddc154a7062d07c9acb1a3406d6279"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "1219c268145d03d088158c5488400d1c764e99f9686c9bf84e9a7818a65ad342"
+      "sha256": "967d0bb342852e1ec2d67633391681c585ddc154a7062d07c9acb1a3406d6279"
     },
     {
       "category": "validator-integration",
@@ -79,12 +79,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "8ce94fd8f21d10598b7257c3760dec61047acb5aadd19de4cdccfd44d24c9f48"
+      "sha256": "9f5cde6490b19915596fa15736b83b69140cf31c78c82037074094e11fe6af1e"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "8ce94fd8f21d10598b7257c3760dec61047acb5aadd19de4cdccfd44d24c9f48"
+      "sha256": "9f5cde6490b19915596fa15736b83b69140cf31c78c82037074094e11fe6af1e"
     },
     {
       "category": "validator-integration",
@@ -109,12 +109,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
-      "sha256": "26c0dbce2c0539fe38f65a49f99641915ee1196326e33f74e7b77b3667f3c83f"
+      "sha256": "4e52fb0a8536b983b4b1621ac780e5069d04a6bc36f77cd625136e00bf86f531"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/verify-focused-triggered.execution.mjs",
-      "sha256": "245729f999406beb0d0d5e7878dfd58c2defa519a0e9abb11d22fb9517613ef5"
+      "sha256": "eabaef5d66e6157a27891aff3319260e5c2bad7e570cd7aabb405acf5217932e"
     },
     {
       "category": "validator-integration",

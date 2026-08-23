@@ -299,6 +299,7 @@ it('executes a build test lane in a real worker without starting Vite', async ()
     context: { codeFiles: [], targetFiles: [] },
     lane: 'tests',
     memoryMiB: 1024,
+    typecheckCheckerCount: 4,
     vitestMaxWorkers: 2,
   });
 

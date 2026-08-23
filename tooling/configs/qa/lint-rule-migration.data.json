@@ -1,0 +1,553 @@
+{
+  "schemaVersion": 1,
+  "retiredAuthority": "eslint.config.js",
+  "canonicalAuthority": ".oxlintrc.json",
+  "priorProfiles": [
+    {
+      "id": "eslint-js-recommended",
+      "scope": ["**/*.{ts,tsx}", "**/*.{js,mjs,cjs}"],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json"
+    },
+    {
+      "id": "typescript-eslint-recommended",
+      "scope": ["**/*.{ts,tsx}"],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json"
+    },
+    {
+      "id": "typescript-eslint-project-service",
+      "scope": ["apps/extension/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json"
+    },
+    {
+      "id": "react-hooks",
+      "scope": ["**/*.{ts,tsx}"],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json"
+    },
+    {
+      "id": "contract-no-restricted-syntax-enum",
+      "scope": [
+        "apps/extension/src/contracts/**/*.{ts,tsx}",
+        "packages/runtime-contracts/src/**/*.{ts,tsx}"
+      ],
+      "decision": "Custom guard",
+      "targetOwner": "tooling/qa/core/contract-enum-guard.mjs"
+    },
+    {
+      "id": "eslint-plugin-security",
+      "scope": ["**/*.{ts,tsx,js,mjs,cjs}"],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs"
+    }
+  ],
+  "priorScopeDefinitions": {
+    "typescript-general": {
+      "files": ["**/*.{ts,tsx}"],
+      "ignores": []
+    },
+    "product-typescript": {
+      "files": ["apps/extension/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
+      "ignores": [
+        "apps/extension/src/**/*.test.{ts,tsx}",
+        "apps/extension/src/**/*.spec.{ts,tsx}",
+        "apps/extension/src/**/*.d.ts",
+        "packages/*/src/**/*.test.{ts,tsx}",
+        "packages/*/src/**/*.spec.{ts,tsx}",
+        "packages/*/src/**/*.d.ts"
+      ]
+    },
+    "switch-exhaustiveness-owners": {
+      "files": [
+        "apps/extension/src/popup/**/*.{ts,tsx}",
+        "apps/extension/src/editor/**/*.{ts,tsx}",
+        "apps/extension/src/background/**/*.{ts,tsx}",
+        "apps/extension/src/{composition,contracts,features,foundation,platform,ui,workflows}/**/*.{ts,tsx}",
+        "packages/*/src/**/*.{ts,tsx}",
+        "apps/extension/src/video-editor/**/*.{ts,tsx}",
+        "apps/extension/src/offscreen/**/*.{ts,tsx}",
+        "apps/extension/src/content/**/*.{ts,tsx}"
+      ],
+      "ignores": [
+        "apps/extension/src/**/*.test.{ts,tsx}",
+        "apps/extension/src/**/*.spec.{ts,tsx}",
+        "apps/extension/src/**/*.d.ts",
+        "packages/*/src/**/*.test.{ts,tsx}",
+        "packages/*/src/**/*.spec.{ts,tsx}",
+        "packages/*/src/**/*.d.ts"
+      ]
+    },
+    "contract-roots": {
+      "files": [
+        "apps/extension/src/contracts/**/*.{ts,tsx}",
+        "packages/runtime-contracts/src/**/*.{ts,tsx}"
+      ],
+      "ignores": [
+        "apps/extension/src/**/*.test.{ts,tsx}",
+        "apps/extension/src/**/*.spec.{ts,tsx}",
+        "packages/*/src/**/*.test.{ts,tsx}",
+        "packages/*/src/**/*.spec.{ts,tsx}"
+      ]
+    },
+    "declaration-files": {
+      "files": ["**/*.d.ts"],
+      "ignores": []
+    },
+    "e2e": {
+      "files": ["tooling/test/e2e/**/*.{ts,tsx}"],
+      "ignores": []
+    },
+    "javascript": {
+      "files": ["**/*.{js,mjs,cjs}"],
+      "ignores": []
+    }
+  },
+  "explicitPriorRules": [
+    {
+      "priorRule": "@typescript-eslint/ban-ts-comment",
+      "priorApplications": [{ "scope": "typescript-general", "severity": "off" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/ban-ts-comment"
+    },
+    {
+      "priorRule": "@typescript-eslint/consistent-type-imports",
+      "priorApplications": [{ "scope": "product-typescript", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/consistent-type-imports"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-explicit-any",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "off" },
+        { "scope": "product-typescript", "severity": "error" }
+      ],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-explicit-any"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-floating-promises",
+      "priorApplications": [{ "scope": "product-typescript", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-floating-promises"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-namespace",
+      "priorApplications": [{ "scope": "declaration-files", "severity": "off" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-namespace"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-unsafe-argument",
+      "priorApplications": [{ "scope": "product-typescript", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-unsafe-argument"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-unsafe-assignment",
+      "priorApplications": [{ "scope": "product-typescript", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-unsafe-assignment"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-unsafe-call",
+      "priorApplications": [{ "scope": "product-typescript", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-unsafe-call"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-unsafe-member-access",
+      "priorApplications": [{ "scope": "product-typescript", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-unsafe-member-access"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-unsafe-return",
+      "priorApplications": [{ "scope": "product-typescript", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/no-unsafe-return"
+    },
+    {
+      "priorRule": "@typescript-eslint/no-unused-vars",
+      "priorApplications": [{ "scope": "typescript-general", "severity": "warn" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "no-unused-vars"
+    },
+    {
+      "priorRule": "@typescript-eslint/switch-exhaustiveness-check",
+      "priorApplications": [{ "scope": "switch-exhaustiveness-owners", "severity": "error" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "typescript/switch-exhaustiveness-check"
+    },
+    {
+      "priorRule": "no-console",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "off" },
+        { "scope": "javascript", "severity": "off" }
+      ],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "no-console"
+    },
+    {
+      "priorRule": "no-empty-pattern",
+      "priorApplications": [{ "scope": "e2e", "severity": "off" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "no-empty-pattern"
+    },
+    {
+      "priorRule": "no-irregular-whitespace",
+      "priorApplications": [{ "scope": "typescript-general", "severity": "off" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "no-irregular-whitespace"
+    },
+    {
+      "priorRule": "no-restricted-syntax",
+      "priorApplications": [{ "scope": "contract-roots", "severity": "error" }],
+      "decision": "Custom guard",
+      "targetOwner": "tooling/qa/core/contract-enum-guard.mjs",
+      "targetRule": "contract-enum"
+    },
+    {
+      "priorRule": "no-useless-escape",
+      "priorApplications": [{ "scope": "typescript-general", "severity": "off" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "no-useless-escape"
+    },
+    {
+      "priorRule": "no-var",
+      "priorApplications": [{ "scope": "declaration-files", "severity": "off" }],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "no-var"
+    },
+    {
+      "priorRule": "prefer-const",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "off" },
+        { "scope": "javascript", "severity": "off" }
+      ],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "prefer-const"
+    },
+    {
+      "priorRule": "react-hooks/exhaustive-deps",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "warn" },
+        { "scope": "e2e", "severity": "off" }
+      ],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "react/exhaustive-deps"
+    },
+    {
+      "priorRule": "react-hooks/rules-of-hooks",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "error" },
+        { "scope": "e2e", "severity": "off" }
+      ],
+      "decision": "Move",
+      "targetOwner": ".oxlintrc.json",
+      "targetRule": "react/rules-of-hooks"
+    },
+    {
+      "priorRule": "security/detect-bidi-characters",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "error" },
+        { "scope": "javascript", "severity": "error" }
+      ],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "targetRule": "security/detect-bidi-characters"
+    },
+    {
+      "priorRule": "security/detect-buffer-noassert",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "error" },
+        { "scope": "javascript", "severity": "error" }
+      ],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "targetRule": "security/detect-buffer-noassert"
+    },
+    {
+      "priorRule": "security/detect-eval-with-expression",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "error" },
+        { "scope": "javascript", "severity": "error" }
+      ],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "targetRule": "security/detect-eval-with-expression"
+    },
+    {
+      "priorRule": "security/detect-new-buffer",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "error" },
+        { "scope": "javascript", "severity": "error" }
+      ],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "targetRule": "security/detect-new-buffer"
+    },
+    {
+      "priorRule": "security/detect-non-literal-regexp",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "warn" },
+        { "scope": "javascript", "severity": "warn" }
+      ],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "targetRule": "security/detect-non-literal-regexp"
+    },
+    {
+      "priorRule": "security/detect-object-injection",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "off" },
+        { "scope": "javascript", "severity": "off" }
+      ],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "targetRule": "security/detect-object-injection"
+    },
+    {
+      "priorRule": "security/detect-unsafe-regex",
+      "priorApplications": [
+        { "scope": "typescript-general", "severity": "warn" },
+        { "scope": "javascript", "severity": "warn" }
+      ],
+      "decision": "Keep ESLint",
+      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "targetRule": "security/detect-unsafe-regex"
+    }
+  ],
+  "doNotAdopt": [
+    {
+      "priorDependency": "eslint-plugin-react-refresh",
+      "priorRule": "react-refresh/only-export-components",
+      "targetRule": "react/only-export-components",
+      "decision": "Do not adopt",
+      "reason": "The dependency was installed but the rule was absent from the effective ESLint and Oxlint policy; enabling it would add a new rule."
+    }
+  ],
+  "oxlint": {
+    "categoryDecisions": { "correctness": "off" },
+    "defaultActiveSeverity": "error",
+    "warningRuleIds": ["no-unused-vars", "react/exhaustive-deps"],
+    "mixedSeverityRuleIds": ["no-unused-vars"],
+    "activeRuleIds": [
+      "constructor-super",
+      "for-direction",
+      "getter-return",
+      "jsx-a11y/alt-text",
+      "jsx-a11y/aria-props",
+      "jsx-a11y/aria-proptypes",
+      "jsx-a11y/aria-role",
+      "jsx-a11y/aria-unsupported-elements",
+      "jsx-a11y/no-aria-hidden-on-focusable",
+      "jsx-a11y/role-has-required-aria-props",
+      "jsx-a11y/role-supports-aria-props",
+      "no-array-constructor",
+      "no-async-promise-executor",
+      "no-case-declarations",
+      "no-class-assign",
+      "no-compare-neg-zero",
+      "no-cond-assign",
+      "no-const-assign",
+      "no-constant-binary-expression",
+      "no-constant-condition",
+      "no-control-regex",
+      "no-debugger",
+      "no-delete-var",
+      "no-dupe-class-members",
+      "no-dupe-else-if",
+      "no-dupe-keys",
+      "no-duplicate-case",
+      "no-empty",
+      "no-empty-character-class",
+      "no-empty-pattern",
+      "no-empty-static-block",
+      "no-ex-assign",
+      "no-extra-boolean-cast",
+      "no-fallthrough",
+      "no-func-assign",
+      "no-global-assign",
+      "no-import-assign",
+      "no-invalid-regexp",
+      "no-irregular-whitespace",
+      "no-loss-of-precision",
+      "no-misleading-character-class",
+      "no-new-native-nonconstructor",
+      "no-nonoctal-decimal-escape",
+      "no-obj-calls",
+      "no-prototype-builtins",
+      "no-redeclare",
+      "no-regex-spaces",
+      "no-self-assign",
+      "no-setter-return",
+      "no-shadow-restricted-names",
+      "no-sparse-arrays",
+      "no-this-before-super",
+      "no-unassigned-vars",
+      "no-undef",
+      "no-unreachable",
+      "no-unsafe-finally",
+      "no-unsafe-negation",
+      "no-unsafe-optional-chaining",
+      "no-unused-expressions",
+      "no-unused-labels",
+      "no-unused-private-class-members",
+      "no-unused-vars",
+      "no-useless-assignment",
+      "no-useless-backreference",
+      "no-useless-catch",
+      "no-useless-escape",
+      "no-var",
+      "no-with",
+      "prefer-rest-params",
+      "prefer-spread",
+      "preserve-caught-error",
+      "react/exhaustive-deps",
+      "react/jsx-no-duplicate-props",
+      "react/jsx-no-script-url",
+      "react/jsx-no-target-blank",
+      "react/no-children-prop",
+      "react/no-danger-with-children",
+      "react/rules-of-hooks",
+      "react/void-dom-elements-no-children",
+      "require-yield",
+      "typescript/consistent-type-imports",
+      "typescript/no-duplicate-enum-values",
+      "typescript/no-empty-object-type",
+      "typescript/no-explicit-any",
+      "typescript/no-extra-non-null-assertion",
+      "typescript/no-floating-promises",
+      "typescript/no-misused-new",
+      "typescript/no-namespace",
+      "typescript/no-non-null-asserted-optional-chain",
+      "typescript/no-require-imports",
+      "typescript/no-this-alias",
+      "typescript/no-unnecessary-type-constraint",
+      "typescript/no-unsafe-argument",
+      "typescript/no-unsafe-assignment",
+      "typescript/no-unsafe-call",
+      "typescript/no-unsafe-declaration-merging",
+      "typescript/no-unsafe-function-type",
+      "typescript/no-unsafe-member-access",
+      "typescript/no-unsafe-return",
+      "typescript/no-wrapper-object-types",
+      "typescript/prefer-as-const",
+      "typescript/prefer-namespace-keyword",
+      "typescript/switch-exhaustiveness-check",
+      "typescript/triple-slash-reference",
+      "use-isnan",
+      "valid-typeof",
+      "vitest/no-disabled-tests",
+      "vitest/no-focused-tests"
+    ],
+    "disabledRuleIds": [
+      "constructor-super",
+      "getter-return",
+      "no-class-assign",
+      "no-console",
+      "no-const-assign",
+      "no-dupe-class-members",
+      "no-dupe-keys",
+      "no-empty-pattern",
+      "no-func-assign",
+      "no-import-assign",
+      "no-irregular-whitespace",
+      "no-new-native-nonconstructor",
+      "no-obj-calls",
+      "no-redeclare",
+      "no-setter-return",
+      "no-this-before-super",
+      "no-unreachable",
+      "no-unsafe-negation",
+      "no-useless-escape",
+      "no-var",
+      "no-with",
+      "prefer-const",
+      "react/exhaustive-deps",
+      "react/rules-of-hooks",
+      "typescript/ban-ts-comment",
+      "typescript/consistent-type-imports",
+      "typescript/no-explicit-any",
+      "typescript/no-floating-promises",
+      "typescript/no-namespace",
+      "typescript/no-unsafe-argument",
+      "typescript/no-unsafe-assignment",
+      "typescript/no-unsafe-call",
+      "typescript/no-unsafe-member-access",
+      "typescript/no-unsafe-return",
+      "typescript/switch-exhaustiveness-check"
+    ],
+    "retiredStrictParserRules": ["no-dupe-args", "no-octal"]
+  },
+  "customGuards": [
+    {
+      "id": "contract-enum",
+      "implementation": "tooling/qa/core/contract-enum-guard.mjs",
+      "executionOwner": "tooling/qa/core/verify-oxlint.mjs",
+      "compilerApi": "typescript@6",
+      "roots": ["apps/extension/src/contracts/", "packages/runtime-contracts/src/"]
+    }
+  ],
+  "residualEslint": [
+    {
+      "owner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "scope": ["**/*.{ts,tsx,js,mjs,cjs}"],
+      "rules": [
+        "security/detect-bidi-characters",
+        "security/detect-buffer-noassert",
+        "security/detect-eval-with-expression",
+        "security/detect-new-buffer",
+        "security/detect-non-literal-regexp",
+        "security/detect-object-injection",
+        "security/detect-unsafe-regex"
+      ],
+      "settings": {
+        "security/detect-bidi-characters": "error",
+        "security/detect-buffer-noassert": "error",
+        "security/detect-eval-with-expression": "error",
+        "security/detect-new-buffer": "error",
+        "security/detect-non-literal-regexp": "warn",
+        "security/detect-object-injection": "off",
+        "security/detect-unsafe-regex": "warn"
+      }
+    },
+    {
+      "owner": "tooling/qa/core/verify-sonarjs.mjs",
+      "scope": ["apps/extension/src/**", "packages/*/src/**"],
+      "rules": [
+        "sonarjs/arguments-order",
+        "sonarjs/different-types-comparison",
+        "sonarjs/no-all-duplicated-branches",
+        "sonarjs/no-duplicated-branches",
+        "sonarjs/no-duplicate-in-composite",
+        "sonarjs/no-misleading-array-reverse",
+        "sonarjs/no-nested-assignment",
+        "sonarjs/no-try-promise",
+        "sonarjs/reduce-initial-value"
+      ],
+      "defaultSeverity": "error"
+    }
+  ]
+}

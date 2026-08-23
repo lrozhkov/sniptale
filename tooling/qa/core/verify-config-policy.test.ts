@@ -12,7 +12,7 @@ function createPassingPackageJson() {
     devDependencies: {
       '@types/react': '^19.2.14',
       '@types/react-dom': '^19.2.3',
-      '@vitejs/plugin-react': '^5.2.0',
+      '@vitejs/plugin-react': '^6.1.0',
     },
   };
 }
@@ -51,6 +51,7 @@ function writePassingConfigPolicyFixture(root) {
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     /* Baseline guardrail */
     "forceConsistentCasingInFileNames": true,
+    "noUncheckedSideEffectImports": true,
     "verbatimModuleSyntax": true
   }
 }
@@ -63,6 +64,7 @@ function writePassingConfigPolicyFixture(root) {
       {
         compilerOptions: {
           forceConsistentCasingInFileNames: true,
+          noUncheckedSideEffectImports: true,
           verbatimModuleSyntax: true,
         },
       },
@@ -111,7 +113,11 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'package.json',
-        message: 'devDependencies.@vitejs/plugin-react must stay on the "^5.2."x baseline',
+        message: 'devDependencies.@vitejs/plugin-react must stay on the "^6.1."x baseline',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.json',
+        message: 'compilerOptions.noUncheckedSideEffectImports must be true',
       }),
       expect.objectContaining({
         file: 'tsconfig.json',
@@ -120,6 +126,10 @@ function expectConfigPolicyViolationsToContain(violations) {
       expect.objectContaining({
         file: 'tsconfig.json',
         message: 'compilerOptions.lib must be ["ES2024","DOM","DOM.Iterable"]',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.node.json',
+        message: 'compilerOptions.noUncheckedSideEffectImports must be true',
       }),
       expect.objectContaining({
         file: 'tsconfig.node.json',

@@ -5,8 +5,10 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { collectLaneArtifacts } from './artifacts.mjs';
+import { resolveCiArtifactSession } from './artifact-observability.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 import { ensureLocalToolchain } from './local-toolchain.mjs';
+import { formatObservedRunSummary } from '../qa/wrappers/observed/runner.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
@@ -26,6 +28,8 @@ const localToolchain = await ensureLocalToolchain({ lane });
 const environment = {
   ...localToolchain.environment,
   npm_config_cache: path.resolve('.tmp/npm-cache'),
+  PLAYWRIGHT_BROWSERS_PATH:
+    process.env.PLAYWRIGHT_BROWSERS_PATH ?? path.resolve('.playwright-browsers'),
   SNIPTALE_WORKSPACE_MODE: 'local-workspace',
 };
 const args = process.argv.slice(3);
@@ -82,8 +86,14 @@ const runtimeIdentity = {
 const startedAtMs = Date.now();
 const commands = [
   ['install', 'npm', ['ci', '--ignore-scripts']],
+  [
+    'verify-project-toolchain',
+    process.execPath,
+    [path.join(process.cwd(), 'tooling/ci/verify-project-toolchain.mjs')],
+  ],
   ['provision-canvas', 'npm', ['rebuild', 'canvas']],
   ['provision-ast-grep', process.execPath, ['node_modules/@ast-grep/cli/postinstall.js']],
+  ['playwright-smoke', process.execPath, ['tooling/ci/local-playwright-smoke.mjs']],
   [lane, process.execPath, [path.join(process.cwd(), `tooling/ci/${lane}-wrapper.mjs`)]],
 ];
 const phases = [];
@@ -122,7 +132,21 @@ if (finalTree !== initialTree) {
   process.stderr.write('Local CI gate changed tracked workspace content.\n');
   status = 1;
 }
+let artifactSession = null;
+let artifactSessionFinalized = false;
+let artifactFinalRecord = null;
 try {
+  artifactSession = resolveCiArtifactSession({ lane, phases, startedAtMs });
+  artifactSession.recordActivityTransition({
+    activityId: 'artifact-collection',
+    kind: 'artifact-collection',
+    state: 'queued',
+  });
+  artifactSession.recordActivityTransition({
+    activityId: 'artifact-collection',
+    kind: 'artifact-collection',
+    state: 'started',
+  });
   const artifact = collectLaneArtifacts({
     lane,
     startedAtMs,
@@ -141,9 +165,57 @@ try {
       bounded: resolveQaResourceProfile({ env: environment }),
       release: resolveQaReleaseResourceProfile({ env: environment }),
     },
+    beforeCollectRunRecords: () => {
+      artifactSession.recordActivityTransition({
+        activityId: 'artifact-collection',
+        kind: 'artifact-collection',
+        state: 'completed',
+      });
+      artifactFinalRecord = artifactSession.finalize();
+      artifactSessionFinalized = true;
+    },
   });
+  process.stdout.write(
+    `[ci:final-summary]\n${formatObservedRunSummary({
+      label: `CI ${lane}`,
+      record: artifactFinalRecord,
+      runPath: path.relative(process.cwd(), artifactSession.runPath).replaceAll(path.sep, '/'),
+    })}`
+  );
   process.stdout.write(`SNIPTALE_ARTIFACT_PATH=${artifact}\n`);
 } catch (error) {
+  if (artifactSession && !artifactSessionFinalized) {
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-collection',
+      kind: 'artifact-collection',
+      state: 'failed',
+    });
+    artifactSession.fail(error, {
+      stepId: 'wrapper.lifecycle',
+      problemId: 'artifact.collection.failed',
+    });
+  } else if (artifactSession) {
+    artifactSession.resume();
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-sealing',
+      kind: 'artifact-sealing',
+      state: 'queued',
+    });
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-sealing',
+      kind: 'artifact-sealing',
+      state: 'started',
+    });
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-sealing',
+      kind: 'artifact-sealing',
+      state: 'failed',
+    });
+    artifactSession.fail(error, {
+      stepId: 'wrapper.lifecycle',
+      problemId: 'artifact.sealing.failed',
+    });
+  }
   process.stderr.write(
     `Artifact collection failed: ${error instanceof Error ? error.message : String(error)}\n`
   );

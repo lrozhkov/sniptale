@@ -11,6 +11,7 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
   const artifacts = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
   const publisher = fs.readFileSync('tooling/ci/prepare-release-assets.mjs', 'utf8');
+  const evidence = fs.readFileSync('tooling/ci/release-evidence.mjs', 'utf8');
 
   expect(policy).toMatchObject({
     schemaVersion: 1,
@@ -36,18 +37,20 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   expect(container).toContain('/opt/sniptale-coverage-proof.json:ro');
   expect(container).toContain('/opt/sniptale-coverage-reports:ro');
   expect(artifacts).toContain("'.tmp/qa/coverage-proof.json'");
-  for (const asset of [
-    'codeql.sarif',
-    'semgrep.sarif',
+  for (const report of [
+    'results.filtered.sarif',
+    'results.sarif',
     'lcov.info',
     'coverage-final.json',
     'coverage-summary.json',
-    '-qa-evidence.zip',
-    'provenance.json',
+    '.tmp/coverage/canonical/html',
   ]) {
-    expect(publisher).toContain(asset);
+    expect(artifacts).toContain(report);
   }
-  expect(publisher).toContain("'coverage/html'");
+  expect(publisher).toContain('-qa-evidence.zip');
+  expect(publisher).toContain('provenance.json');
+  expect(publisher).toContain('collectProofEvidenceSources');
+  expect(evidence).toContain('manifest.files');
   expect(publisher).toContain("artifactKind: 'sniptale-release-qa-evidence'");
   expect(publisher).not.toContain('coverage-html.tar.gz');
 });

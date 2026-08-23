@@ -1,5 +1,5 @@
 import { collectAiHygieneReport } from './ai-hygiene-utils.mjs';
-import { filterImportOnlyDiffFiles, filterImportOrMockOnlyDiffFiles } from './import-only-diff.mjs';
+import { filterImportOrMockOnlyDiffFiles } from './import-only-diff.mjs';
 import {
   createFailureStep,
   createOkStep,
@@ -8,9 +8,9 @@ import {
 } from './focused-qa-results.mjs';
 import { runCodeStep } from './focused-qa-helpers.mjs';
 import { filterAllowedViolations } from './shared.mjs';
-import { lintWithEslint } from './verify-eslint.mjs';
 import { runFocusedDeadExportsCheck } from './verify-focused.dead-exports.helpers.mjs';
 import { runFocusedOxlintStep } from './verify-focused.oxlint-step.helpers.mjs';
+import { requiresFullOxlintClosure } from './verify-oxlint.mjs';
 import { formatDeadExportsReport } from './verify-dead-exports.mjs';
 import {
   FOCUSED_CODE_VIOLATION_STEPS,
@@ -33,34 +33,6 @@ import { runMessagingCheck } from './verify-messaging.mjs';
 import { runSonarjsCheck } from './verify-sonarjs.mjs';
 import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 import { timeAsyncStep, timeSyncStep } from './step-timing.helpers.mjs';
-
-async function runEslintStep(
-  jsLikeFiles,
-  { eslintRunner = lintWithEslint, fullClosure = false } = {}
-) {
-  const behavioralJsLikeFiles = fullClosure ? ['.'] : filterImportOnlyDiffFiles(jsLikeFiles);
-  if (behavioralJsLikeFiles.length === 0) {
-    return createSkippedStep('ESLint');
-  }
-
-  const eslintResult = await eslintRunner({
-    files: behavioralJsLikeFiles,
-    rulePrefix: fullClosure ? null : '@typescript-eslint/',
-    strict: true,
-  });
-  if (!eslintResult.failed) {
-    return createOkStep(
-      'ESLint',
-      fullClosure
-        ? 'full config closure'
-        : `type-aware rules; files=${behavioralJsLikeFiles.length}`
-    );
-  }
-
-  return createFailureStep('ESLint', 'failed', {
-    stdout: eslintResult.output,
-  });
-}
 
 function runAiHygieneStep(codeFiles, baseline) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
@@ -226,14 +198,12 @@ export async function collectFocusedLightLane({
   existingTargetFiles,
   jsLikeFiles,
   qualityCodeFiles = codeFiles,
-  qualityJsLikeFiles = jsLikeFiles,
   qualityTargetFiles = existingTargetFiles,
   targetFiles = existingTargetFiles,
   shouldRunManifestPermissions,
   shouldRunRuntimeTopology,
 }) {
   return {
-    oxlintStep: timeSyncStep(() => runFocusedOxlintStep(qualityJsLikeFiles)),
     qualitySteps: [
       timeSyncStep(() => runChangedLineReadabilityStep(qualityCodeFiles)),
       timeSyncStep(() => runAiHygieneStep(qualityCodeFiles, baseline)),
@@ -258,19 +228,16 @@ export function collectFocusedOwnerLane({ lane }) {
   return { ownerStep: collectOwnerGuardStep(lane) };
 }
 
-export async function collectFocusedLintLane(
-  {
-    codeFiles,
-    jsLikeFiles,
-    qualityCodeFiles = codeFiles,
-    qualityJsLikeFiles = jsLikeFiles,
-    shouldRunFullEslint,
-  },
-  { eslintRunner = lintWithEslint } = {}
-) {
+export async function collectFocusedLintLane({
+  codeFiles,
+  jsLikeFiles,
+  qualityCodeFiles = codeFiles,
+  qualityJsLikeFiles = jsLikeFiles,
+  shouldRunFullOxlint,
+}) {
   return {
-    eslintStep: await timeAsyncStep(() =>
-      runEslintStep(qualityJsLikeFiles, { eslintRunner, fullClosure: shouldRunFullEslint })
+    oxlintStep: timeSyncStep(() =>
+      runFocusedOxlintStep(qualityJsLikeFiles, { fullClosure: shouldRunFullOxlint })
     ),
     sonarjsStep: await timeAsyncStep(() => runSonarjsStep(qualityCodeFiles)),
     securityStep: await timeAsyncStep(() => runSecurityStep(codeFiles)),
@@ -292,10 +259,11 @@ export async function collectFocusedGraphLane(
 
 export async function collectFocusedTypecheckLane(
   { existingTargetFiles, targetFiles },
-  { maxConcurrency = 2 } = {}
+  { checkerCount, maxConcurrency = 1 } = {}
 ) {
   return {
     typecheckStep: await runFocusedTypecheckStep(targetFiles ?? existingTargetFiles, {
+      checkerCount,
       maxConcurrency,
     }),
   };
@@ -330,18 +298,9 @@ export async function collectFocusedStepResults(context, dependencies) {
     ...context,
     shouldRunManifestPermissions: context.shouldRunManifestPermissions(context.existingTargetFiles),
     shouldRunRuntimeTopology: context.shouldRunRuntimeTopology(context.existingTargetFiles),
-    shouldRunFullEslint: requiresFullEslintClosure(context.targetFiles),
+    shouldRunFullOxlint: requiresFullOxlintClosure(context.targetFiles),
   };
   return collectScheduledFocusedStepResults(workerContext, dependencies);
 }
 
-const FULL_ESLINT_CLOSURE_FILES = new Set([
-  'eslint.config.js',
-  'package-lock.json',
-  'package.json',
-  'tooling/qa/core/verify-eslint.mjs',
-]);
-
-export function requiresFullEslintClosure(targetFiles = []) {
-  return targetFiles.some((file) => FULL_ESLINT_CLOSURE_FILES.has(file));
-}
+export { requiresFullOxlintClosure } from './verify-oxlint.mjs';

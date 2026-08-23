@@ -8,6 +8,21 @@ export function runGitHubCli(args) {
   return result.stdout;
 }
 
+function resolveRunAttempt(runId, commandRunner) {
+  const attempt = Number(
+    commandRunner([
+      'api',
+      `repos/{owner}/{repo}/actions/runs/${runId}`,
+      '--jq',
+      '.run_attempt',
+    ]).trim()
+  );
+  if (!Number.isSafeInteger(attempt) || attempt < 1) {
+    throw new Error(`GitHub run ${runId} returned an invalid attempt.`);
+  }
+  return attempt;
+}
+
 export function downloadSuccessfulMainProof({
   artifactRoot,
   commandRunner = runGitHubCli,
@@ -42,12 +57,13 @@ export function downloadSuccessfulMainProof({
   );
   for (const { databaseId: runId } of matches) {
     try {
+      const attempt = resolveRunAttempt(runId, commandRunner);
       commandRunner([
         'run',
         'download',
         String(runId),
         '--name',
-        `fast-proof-${commit}-${runId}`,
+        `fast-proof-${commit}-${runId}-${attempt}`,
         '--dir',
         artifactRoot,
       ]);
@@ -90,16 +106,17 @@ export function downloadLatestReleaseProof({ artifactRoot, commandRunner = runGi
       continue;
     }
     try {
+      const attempt = resolveRunAttempt(run.databaseId, commandRunner);
       commandRunner([
         'run',
         'download',
         String(run.databaseId),
         '--name',
-        `release-provenance-${run.headSha}-${run.databaseId}`,
+        `release-provenance-${run.headSha}-${run.databaseId}-${attempt}`,
         '--dir',
         artifactRoot,
       ]);
-      return { runId: run.databaseId, commit: run.headSha };
+      return { runId: run.databaseId, runAttempt: attempt, commit: run.headSha };
     } catch {
       fs.rmSync(artifactRoot, { recursive: true, force: true });
     }

@@ -30,21 +30,17 @@ function createExportStateSetter<TArgs extends unknown[]>(
   ) => VideoEditorExportRuntimeState
 ) {
   return (...args: TArgs) =>
-    set(
-      (state): Partial<VideoEditorState> => ({
-        exportState: updateExportState(state.exportState, ...args),
-      })
-    );
+    set((state): Partial<VideoEditorState> => ({
+      exportState: updateExportState(state.exportState, ...args),
+    }));
 }
 
 export function createExportStateActions(set: VideoEditorStoreSet): VideoEditorExportActions {
   return {
     openExportDialog: () =>
-      set(
-        (state): Partial<VideoEditorState> => ({
-          exportState: openExportDialogState(state),
-        })
-      ),
+      set((state): Partial<VideoEditorState> => ({
+        exportState: openExportDialogState(state),
+      })),
     closeExportDialog: createExportStateSetter(set, closeExportDialogState),
     updateExportSettings: createExportStateSetter(set, updateExportSettingsState) as (
       patch: VideoEditorExportSettingsPatch

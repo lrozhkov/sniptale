@@ -9,12 +9,14 @@ import {
   runBoundedTasks,
 } from '../runtime/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from './owner-guard-step-helpers.mjs';
+import { TYPECHECK_CHECKERS, TYPESCRIPT_TOOL_VERSION } from './typescript-cli.mjs';
+import { OXLINT_TOOL_VERSION } from './verify-oxlint.mjs';
 
 const FOCUSED_WORKER_URL = new URL('./verify-focused.worker.mjs', import.meta.url);
 const LANE_RESOURCES = Object.freeze({
   appOwners: { cpuTokens: 1, memoryMiB: 1024 },
   targetPaths: { cpuTokens: 1, memoryMiB: 1024 },
-  typecheck: { cpuTokens: 2, memoryMiB: 3072 },
+  typecheck: { cpuTokens: TYPECHECK_CHECKERS.affected, memoryMiB: 5120 },
   tests: { memoryMiB: 4096 },
   lint: { cpuTokens: 1, memoryMiB: 3072 },
   graph: { cpuTokens: 1, memoryMiB: 1536 },
@@ -26,10 +28,9 @@ const FOCUSED_RESULT_SHAPES = Object.freeze({
   targetPaths: { ownerStep: 'step' },
   typecheck: { typecheckStep: 'step' },
   tests: { testSteps: 'steps' },
-  lint: { eslintStep: 'step', sonarjsStep: 'step', securityStep: 'step' },
+  lint: { oxlintStep: 'step', sonarjsStep: 'step', securityStep: 'step' },
   graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
   light: {
-    oxlintStep: 'step',
     qualitySteps: 'steps',
     triggeredStaticSteps: 'steps',
     policySteps: 'steps',
@@ -41,6 +42,7 @@ export function runFocusedLaneWorker({
   lane,
   memoryMiB,
   signal,
+  typecheckCheckerCount,
   typecheckMaxConcurrency,
   vitestMaxWorkers,
 }) {
@@ -49,7 +51,13 @@ export function runFocusedLaneWorker({
     memoryMiB,
     resultParser: (value) => parseLaneResult(value, { lane, shapes: FOCUSED_RESULT_SHAPES }),
     signal,
-    workerData: { context, lane, typecheckMaxConcurrency, vitestMaxWorkers },
+    workerData: {
+      context,
+      lane,
+      typecheckCheckerCount,
+      typecheckMaxConcurrency,
+      vitestMaxWorkers,
+    },
     workerUrl: FOCUSED_WORKER_URL,
   });
 }
@@ -65,7 +73,7 @@ function createFocusedWorkerContext(context) {
     qualityJsLikeFiles: context.qualityJsLikeFiles,
     qualityTargetFiles: context.qualityTargetFiles,
     shouldRunManifestPermissions: context.shouldRunManifestPermissions,
-    shouldRunFullEslint: context.shouldRunFullEslint,
+    shouldRunFullOxlint: context.shouldRunFullOxlint,
     shouldRunRuntimeTopology: context.shouldRunRuntimeTopology,
     targetFiles: context.targetFiles,
   };
@@ -73,24 +81,44 @@ function createFocusedWorkerContext(context) {
 
 function createFocusedLaneTasks({ context, profile, workerRunner }) {
   const workerContext = createFocusedWorkerContext(context);
-  const typecheckMaxConcurrency = Math.min(2, profile.cpuTokens);
+  const typecheckCheckerCount = Math.min(TYPECHECK_CHECKERS.affected, profile.cpuTokens);
+  const typecheckMaxConcurrency = 1;
   return ['targetPaths', 'appOwners', 'typecheck', 'tests', 'lint', 'graph', 'light'].map(
     (lane) => {
-      const fullEslintClosure = lane === 'lint' && context.shouldRunFullEslint;
-      const resources = fullEslintClosure
+      const fullOxlintClosure = lane === 'lint' && context.shouldRunFullOxlint;
+      const resources = fullOxlintClosure
         ? { cpuTokens: Math.min(2, profile.cpuTokens), memoryMiB: 6144 }
-        : LANE_RESOURCES[lane];
+        : lane === 'typecheck'
+          ? { ...LANE_RESOURCES.typecheck, cpuTokens: typecheckCheckerCount }
+          : LANE_RESOURCES[lane];
       const cpuTokens =
         lane === 'tests'
           ? profile.vitestMaxWorkers
           : lane === 'typecheck'
-            ? typecheckMaxConcurrency
+            ? typecheckCheckerCount
             : resources.cpuTokens;
       const memoryMiB = resources.memoryMiB;
       return {
         id: lane,
         cpuTokens,
+        dependencies: lane === 'lint' ? ['typecheck'] : [],
+        executionProfile:
+          lane === 'typecheck'
+            ? {
+                checkerCount: typecheckCheckerCount,
+                toolName: 'typescript',
+                toolVersion: TYPESCRIPT_TOOL_VERSION,
+              }
+            : lane === 'lint'
+              ? { toolName: 'oxlint', toolVersion: OXLINT_TOOL_VERSION }
+              : {},
         memoryMiB,
+        workers:
+          lane === 'tests'
+            ? profile.vitestMaxWorkers
+            : lane === 'typecheck'
+              ? typecheckCheckerCount
+              : 1,
         run: ({ signal }) =>
           workerRunner({
             context: workerContext,
@@ -98,6 +126,7 @@ function createFocusedLaneTasks({ context, profile, workerRunner }) {
             memoryMiB,
             signal,
             typecheckMaxConcurrency,
+            typecheckCheckerCount,
             vitestMaxWorkers: profile.vitestMaxWorkers,
           }),
       };
@@ -119,7 +148,7 @@ function annotateLaneResult(scheduled, profile) {
     return { ...value, testSteps: [appendTaskScheduleDetail(unitTestStep, detail), ...remaining] };
   }
   if (scheduled.id === 'lint') {
-    return { ...value, eslintStep: appendTaskScheduleDetail(value.eslintStep, detail) };
+    return { ...value, oxlintStep: appendTaskScheduleDetail(value.oxlintStep, detail) };
   }
   if (scheduled.id === 'graph') {
     return {
@@ -127,12 +156,13 @@ function annotateLaneResult(scheduled, profile) {
       dependencySteps: appendTaskScheduleDetailToFirst(value.dependencySteps, detail),
     };
   }
+  const [first, ...remaining] = value.qualitySteps;
   return {
     ...value,
-    oxlintStep: appendTaskScheduleDetail(
-      value.oxlintStep,
-      `${detail}; ${formatQaResourceProfile(profile)}`
-    ),
+    qualitySteps: [
+      appendTaskScheduleDetail(first, `${detail}; ${formatQaResourceProfile(profile)}`),
+      ...remaining,
+    ],
   };
 }
 
@@ -142,8 +172,7 @@ function assembleFocusedSteps(results) {
   const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
 
   return [
-    light.oxlintStep,
-    lint.eslintStep,
+    lint.oxlintStep,
     lint.sonarjsStep,
     ...light.qualitySteps,
     ...replaceDeferredOwnerGuardSteps(light.triggeredStaticSteps, ownerSteps),

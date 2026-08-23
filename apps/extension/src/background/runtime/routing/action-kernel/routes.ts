@@ -42,29 +42,27 @@ export const actionRouteMetadata = [
   },
   ...backgroundIngressContracts
     .filter((entry) => entry.classification === 'routed')
-    .map(
-      (entry): ActionRouteMetadata => ({
-        acceptedSenderClass: entry.acceptedSenderClass,
-        actionKind: entry.actionKind,
-        ...(entry.alternateAuthorityFamilies.length === 0
-          ? {}
-          : { alternateAuthorityFamilies: entry.alternateAuthorityFamilies }),
-        authorityFamily: entry.routeAuthorityFamily,
-        errorShape: entry.errorShape,
-        freshnessReplayPolicy: entry.freshnessReplayPolicy,
-        handlerAdapter: handlerAdapterForActionKind(entry.actionKind),
-        handlerId: entry.handlerId,
-        keepChannelBehaviorSource: entry.keepChannelBehaviorSource,
-        messageType: entry.type,
-        ownerModule: entry.ownerModule,
-        requiredAuthority: entry.requiredAuthority,
-        responseShape: entry.responseShape,
-        routeName: `${entry.actionKind}:${entry.type}` as LegacyRouteName,
-        sideEffects: entry.sideEffects,
-        support: 'parser-supported' as const,
-        transitiveStateOwner: entry.transitiveStateOwner,
-      })
-    ),
+    .map((entry): ActionRouteMetadata => ({
+      acceptedSenderClass: entry.acceptedSenderClass,
+      actionKind: entry.actionKind,
+      ...(entry.alternateAuthorityFamilies.length === 0
+        ? {}
+        : { alternateAuthorityFamilies: entry.alternateAuthorityFamilies }),
+      authorityFamily: entry.routeAuthorityFamily,
+      errorShape: entry.errorShape,
+      freshnessReplayPolicy: entry.freshnessReplayPolicy,
+      handlerAdapter: handlerAdapterForActionKind(entry.actionKind),
+      handlerId: entry.handlerId,
+      keepChannelBehaviorSource: entry.keepChannelBehaviorSource,
+      messageType: entry.type,
+      ownerModule: entry.ownerModule,
+      requiredAuthority: entry.requiredAuthority,
+      responseShape: entry.responseShape,
+      routeName: `${entry.actionKind}:${entry.type}` as LegacyRouteName,
+      sideEffects: entry.sideEffects,
+      support: 'parser-supported' as const,
+      transitiveStateOwner: entry.transitiveStateOwner,
+    })),
 ] as const satisfies readonly ActionRouteMetadata[];
 
 function handlerAdapterForActionKind(

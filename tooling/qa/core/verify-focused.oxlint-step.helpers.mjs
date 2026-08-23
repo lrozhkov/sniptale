@@ -1,8 +1,12 @@
 import { filterImportOnlyDiffFiles, isImportOrMockOnlyDiffFile } from './import-only-diff.mjs';
 import { createOkStep, createSkippedStep } from './focused-qa-results.mjs';
-import { runOxlint } from './verify-oxlint.mjs';
+import { DEFAULT_OXLINT_ROOTS, runOxlint } from './verify-oxlint.mjs';
 
-export function runFocusedOxlintStep(jsLikeFiles) {
+export function runFocusedOxlintStep(jsLikeFiles, { fullClosure = false } = {}) {
+  if (fullClosure) {
+    const step = runOxlint({ files: DEFAULT_OXLINT_ROOTS }).step;
+    return step.status === 'ok' ? createOkStep('Oxlint', 'full config closure') : step;
+  }
   const behavioralFiles = filterImportOnlyDiffFiles(jsLikeFiles);
   const behavioralFileSet = new Set(behavioralFiles);
   const importOnlyFiles = jsLikeFiles.filter(

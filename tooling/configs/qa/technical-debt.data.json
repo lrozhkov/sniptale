@@ -222,12 +222,12 @@
       "reviewBy": "2027-08-23",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:54:e6bf325d2c715403aa48c54bf949f2d6b032cdfbac3d0ae4f1296f2279370f9f:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:65:8829223ab389bbb640429c599638c4dce9193d1cdddbf3858835797c5aa2c4b1:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "e6bf325d2c715403aa48c54bf949f2d6b032cdfbac3d0ae4f1296f2279370f9f",
+        "contentHash": "8829223ab389bbb640429c599638c4dce9193d1cdddbf3858835797c5aa2c4b1",
         "file": "tooling/ci/local-toolchain.mjs",
-        "line": 54,
+        "line": 65,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
         "rule": "js/http-to-file-access"
       },
@@ -14163,7 +14163,7 @@
       "remediation": "Keep globs bounded to real package roots and review every ignore/wildcard change.",
       "exactSource": {
         "path": "tooling/configs/qa/knip.json",
-        "contentHash": "84bd8c4d6a4ff3083a737381e00f59fb5e4e7ee10089eb55c694cea280d8d7e6"
+        "contentHash": "f963abaa4b0ac6f48316127fd5b90a42b1970a8016f794c13082d5005512302c"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -14345,19 +14345,24 @@
       "remediation": "Limit ignored roots to generated, dependency, or explicitly non-source trees.",
       "exactSource": {
         "path": "tooling/qa/core/verify-oxlint.mjs",
-        "contentHash": "87850ce7f2ac39597eb91691c308822ce08a13c57b2bcd7805e9b8689af6c29f"
+        "contentHash": "2e748d74016f461b15e573e23c6c9062bd07f6b105f8dec7c538b0a8fe99535c"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
+        "tooling/qa/core/verify-all.scheduler.mjs",
+        "tooling/qa/core/verify-focused.execution.mjs",
         "tooling/qa/core/verify-focused.oxlint-step.helpers.mjs",
+        "tooling/qa/core/verify-focused.scheduler.mjs",
         "tooling/qa/core/verify-harness.execution.mjs",
+        "tooling/qa/core/verify-harness.scheduler.mjs",
         "tooling/qa/core/verify-oxlint.mjs",
         "tooling/qa/core/verify-oxlint.test.ts"
       ],
       "surfaces": [
-        "binding:BASE_OXLINT_ARGS",
+        "binding:DEFAULT_OXLINT_ROOTS",
+        "binding:FULL_OXLINT_CLOSURE_FILES",
         "binding:OXLINT_IGNORED_ROOT_SEGMENTS",
-        "binding:STRICT_OXLINT_ARGS"
+        "binding:REPO_WIDE_OXLINT_FILES"
       ]
     },
     {
@@ -15075,6 +15080,29 @@
       ]
     },
     {
+      "id": "policy.source.artifact-observability-mjs.79e605fc86",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/artifact-observability.mjs",
+        "contentHash": "beece672be94e10264dabe00bc706070d5975f7b5c2581591b337f38d1e5dde6"
+      },
+      "consumers": [
+        "tooling/ci/artifact-observability.mjs",
+        "tooling/ci/artifact-observability.test.ts",
+        "tooling/ci/local.mjs",
+        "tooling/ci/run-lane.mjs"
+      ],
+      "surfaces": [
+        "property:failedPhaseDiagnostic/evidence",
+        "property:failedPhaseDiagnostic/locations",
+        "property:resolveCiArtifactSession/problemIds"
+      ]
+    },
+    {
       "id": "policy.source.artifact-security-dynamic-mjs.5fce908a37",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -15168,7 +15196,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "9037e407e6e852e0d5bd5f4470a0b8603c7a665b63e302f073f3abd4b06e4155"
+        "contentHash": "9fdfbb093b80e0ed67319bbec35d5cdd470ed1f594fe83c3bc0031f9a3df045b"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",
@@ -15420,6 +15448,25 @@
       ]
     },
     {
+      "id": "policy.source.audit-mjs.589851dd52",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/wrappers/audit.mjs",
+        "contentHash": "55661c69b22eeb12724f2b82e51a4441d8011d46dcef28b728e7b330ee856060"
+      },
+      "consumers": [
+        "tooling/ci/qa-composition.mjs",
+        "tooling/qa/wrappers/audit.mjs"
+      ],
+      "surfaces": [
+        "property:recordSkippedAuditProfile/dependencies"
+      ]
+    },
+    {
       "id": "policy.source.audit-mjs.df51f5db07",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -15467,7 +15514,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/audit-progress.mjs",
-        "contentHash": "2ad4bb54dc25115e718e6c316333158e3b6faac5225bb1583176411182358ee6"
+        "contentHash": "c6887afd10f5f741e56c74a85c784bee3ca8ed822db34548a31db882fbdde8f1"
       },
       "consumers": [
         "tooling/qa/wrappers/audit-progress.mjs",
@@ -15475,7 +15522,8 @@
         "tooling/qa/wrappers/audit.mjs"
       ],
       "surfaces": [
-        "binding:TERMINAL_PROGRESS_CONTROLS"
+        "binding:TERMINAL_PROGRESS_CONTROLS",
+        "property:createAuditProgressReporter/anonymous-23/executionProfile"
       ]
     },
     {
@@ -15857,26 +15905,6 @@
       ]
     },
     {
-      "id": "policy.source.build-step-mjs.b085cfb09b",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/qa/core/build-step.mjs",
-        "contentHash": "40b6d69032b996ec2b23c346256d44fb5adf7777f3c0561c97d2e8064b28a216"
-      },
-      "consumers": [
-        "tooling/qa/core/build-step.mjs",
-        "tooling/qa/core/verify-build.mjs",
-        "tooling/qa/core/verify-closeout-step-helpers.test.ts"
-      ],
-      "surfaces": [
-        "property:runBuild/files"
-      ]
-    },
-    {
       "id": "policy.source.canonical-facade-targets-mjs.356ece3085",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -16084,7 +16112,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/checkpoint.mjs",
-        "contentHash": "191724e1f2221e89faafd77b1d814231b363205745700d9931b19205ac7a1099"
+        "contentHash": "b2af924b775f5dd05d28a8d5d427d5b5ccee2ce35d084f02c67a72bc18a987c0"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.mjs",
@@ -16323,21 +16351,25 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/constants.mjs",
-        "contentHash": "522fd54675c59c10fbe9d253f718ce467bb470008823da4340f1d6b0b329b5a6"
+        "contentHash": "ac9f8639234d4fbcd6f66e790e0a5e953862236ff0664ba4738d7de8fab8665b"
       },
       "consumers": [
         "tooling/qa/runtime/observability/constants.mjs",
         "tooling/qa/runtime/observability/index.mjs",
         "tooling/qa/runtime/observability/maintenance.mjs",
+        "tooling/qa/runtime/observability/resume.mjs",
         "tooling/qa/runtime/observability/root.mjs",
         "tooling/qa/runtime/observability/run-initialization.mjs",
         "tooling/qa/runtime/observability/run.mjs",
         "tooling/qa/runtime/observability/schema-parts.mjs",
         "tooling/qa/runtime/observability/schema.mjs",
         "tooling/qa/runtime/observability/schema.test.ts",
-        "tooling/qa/runtime/observability/storage.mjs"
+        "tooling/qa/runtime/observability/storage.mjs",
+        "tooling/qa/runtime/observability/timeline-schema.mjs"
       ],
       "surfaces": [
+        "binding:ACTIVITY_STATES",
+        "binding:ACTIVITY_WAIT_REASONS",
         "binding:CORRELATION_KEYS",
         "binding:DEFAULT_LIMITS",
         "binding:DEFAULT_PATHS",
@@ -16355,7 +16387,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "79c794dff640ef52a046c318129317ad85b56f2c73f811dff1f6d1c078509ce8"
+        "contentHash": "58c552b88e20d344343d368186b1daf7b097af334d76534b33e7551faed5012d"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -16423,6 +16455,26 @@
       ]
     },
     {
+      "id": "policy.source.contract-enum-guard-mjs.f7bebf5e44",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/contract-enum-guard.mjs",
+        "contentHash": "0c6dac194f8add95c4c35acfbe899634b8f4d11aaa3e9e8512e888ef7af6b721"
+      },
+      "consumers": [
+        "tooling/qa/core/contract-enum-guard.mjs",
+        "tooling/qa/core/contract-enum-guard.test.ts",
+        "tooling/qa/core/verify-oxlint.mjs"
+      ],
+      "surfaces": [
+        "binding:CONTRACT_ENUM_ROOTS"
+      ]
+    },
+    {
       "id": "policy.source.contract-mjs.0013ae4e22",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -16431,7 +16483,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/contract.mjs",
-        "contentHash": "07963e69a32f484bb7ff117b784caefe7e5f26990396c9b6c0f458d088163141"
+        "contentHash": "52c5bff97457d6ab3e0f6f84e94a009a7a8c3bcabfb18635312bdba3eb57fc73"
       },
       "consumers": [
         "tooling/qa/core/checkpoint-result.helpers.mjs",
@@ -16487,7 +16539,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/control-digest.mjs",
-        "contentHash": "c6d98bf01c8e826306542c4340842286e8196a37527f8b298c6b6a24300a8cb4"
+        "contentHash": "6b6d2ed41bf9edcce6e7cb55ee9d9776214e345f2423dcd3b6903b535d5dc184"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",
@@ -16700,7 +16752,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-        "contentHash": "8ce94fd8f21d10598b7257c3760dec61047acb5aadd19de4cdccfd44d24c9f48"
+        "contentHash": "9f5cde6490b19915596fa15736b83b69140cf31c78c82037074094e11fe6af1e"
       },
       "consumers": [
         "tooling/qa/audits/profiles/schema.mjs",
@@ -17253,51 +17305,33 @@
       ]
     },
     {
-      "id": "policy.source.eslint-config-js.a32a0887ed",
+      "id": "policy.source.eslint-security-adapter-mjs.6072a36e4d",
       "classification": "tool-filter",
-      "owner": "qa-platform",
+      "owner": "security-tooling",
       "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
       "rationale": "Keep this complete source-owned control population exact and review every change.",
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
-        "path": "eslint.config.js",
-        "contentHash": "f44b4c6540d4fab0ebf00bc78f1c465445a59042bea8caac9b77f8e398b6ece9"
+        "path": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+        "contentHash": "e5169208a032c8cb56d696b40138be1eb74f0018d86d8a79adc6e00232d44af4"
       },
       "consumers": [
-        "eslint.config.js"
+        "tooling/qa/core/lint-rule-migration.test.ts",
+        "tooling/qa/guards/security/eslint-security-adapter.mjs",
+        "tooling/qa/guards/security/eslint-security-adapter.test.ts",
+        "tooling/qa/guards/security/verify-security.mjs"
       ],
       "surfaces": [
-        "property:%40typescript-eslint%2Fconsistent-type-imports",
-        "property:%40typescript-eslint%2Fno-unused-vars",
-        "property:extends",
-        "property:extends[1]",
-        "property:files",
-        "property:files[1]",
-        "property:files[2]",
-        "property:files[3]",
-        "property:files[4]",
-        "property:files[5]",
-        "property:files[6]",
-        "property:globals",
-        "property:globals[1]",
-        "property:ignores",
-        "property:ignores[1]",
-        "property:ignores[2]",
-        "property:ignores[3]",
-        "property:languageOptions",
-        "property:languageOptions[1]",
-        "property:languageOptions[2]",
-        "property:no-restricted-syntax",
-        "property:parserOptions",
-        "property:plugins",
-        "property:plugins[1]",
-        "property:rules",
-        "property:rules[1]",
-        "property:rules[2]",
-        "property:rules[3]",
-        "property:rules[4]",
-        "property:rules[5]",
-        "property:rules[6]"
+        "binding:SECURITY_RULES",
+        "property:createBaseConfig/globals",
+        "property:createBaseConfig/languageOptions",
+        "property:createBaseConfig/plugins",
+        "property:createSecurityEslintConfig/ecmaFeatures",
+        "property:createSecurityEslintConfig/files",
+        "property:createSecurityEslintConfig/files[1]",
+        "property:createSecurityEslintConfig/ignores",
+        "property:createSecurityEslintConfig/languageOptions",
+        "property:createSecurityEslintConfig/parserOptions"
       ]
     },
     {
@@ -17509,14 +17543,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/extension-smoke.popup-startup.ts",
-        "contentHash": "e656c09461fa40f78be9b0cdb4cea19d9d8c146e718c5655b6e304f8807e32be"
+        "contentHash": "992f16f8b5a70000fea947c4f7eb04839ebe4954d61d3fbee6d3f18387e9d63a"
       },
       "consumers": [
         "tooling/test/e2e/extension-smoke.popup-startup.ts",
         "tooling/test/e2e/extension-smoke.spec.ts"
       ],
       "surfaces": [
-        "property:installFirstFrameThemeProbe/anonymous-99/backgrounds"
+        "property:installFirstFrameThemeProbe/anonymous-107/backgrounds"
       ]
     },
     {
@@ -17661,7 +17695,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-qa-helpers.mjs",
-        "contentHash": "3e443f5afc0c74b85af16ccdbd3c3457eecc08e3af8027c5186361c92c1c4967"
+        "contentHash": "b95e8e37ec3e5ea4ffbb3b96dbde88566b49515d11112f8e39f7bd89e1b4119a"
       },
       "consumers": [
         "tooling/qa/core/focused-qa-helpers.mjs",
@@ -18485,7 +18519,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/lane-worker-runner.mjs",
-        "contentHash": "63e19be2eb47953790873e6cd48cce74a90e57ce5d8a6b45d68c7e7460a76cb9"
+        "contentHash": "d94d330d116c9c45c3380b2f23af17fb123be1399cc32e58129d033f5fdd4eb3"
       },
       "consumers": [
         "tooling/qa/core/verify-all.scheduler.mjs",
@@ -18497,8 +18531,9 @@
         "tooling/qa/runtime/lane-worker-runner.test.ts"
       ],
       "surfaces": [
-        "property:runQaLaneWorker/anonymous-135/env",
-        "property:runQaLaneWorker/anonymous-135/stdio"
+        "property:runQaLaneWorker/anonymous-140/anonymous-219/executionProfile",
+        "property:runQaLaneWorker/anonymous-140/env",
+        "property:runQaLaneWorker/anonymous-140/stdio"
       ]
     },
     {
@@ -18657,7 +18692,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/local.mjs",
-        "contentHash": "43b2a4cd77d7256813ba3e4ff914514d706c3b69181af08a11a26040a8cece89"
+        "contentHash": "f81f920a3b6b87d12536ad47416f91d8ededbc71188621f0b7575ad96c69c088"
       },
       "consumers": [
         "tooling/ci/local.mjs"
@@ -18669,6 +18704,30 @@
         "binding:phases",
         "binding:runtimeIdentity",
         "property:resourceProfiles"
+      ]
+    },
+    {
+      "id": "policy.source.local-toolchain-mjs.3621eecc11",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/local-toolchain.mjs",
+        "contentHash": "8829223ab389bbb640429c599638c4dce9193d1cdddbf3858835797c5aa2c4b1"
+      },
+      "consumers": [
+        "tooling/ci/local-toolchain.mjs",
+        "tooling/ci/local.mjs"
+      ],
+      "surfaces": [
+        "property:validateToolchainFiles/args",
+        "property:validateToolchainFiles/args[1]",
+        "property:validateToolchainFiles/args[2]",
+        "property:validateToolchainFiles/args[3]",
+        "property:validateToolchainFiles/args[4]",
+        "property:validateToolchainFiles/args[5]"
       ]
     },
     {
@@ -19088,7 +19147,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/observed/output.mjs",
-        "contentHash": "6bc7463be6c4c47c0943fea225ab3a881c80663c457f21059a67e73803078dd9"
+        "contentHash": "918c4ad4d17515d67b700f13c21536e2aaa648ef9856ea0e30ab34d12e26291b"
       },
       "consumers": [
         "tooling/qa/wrappers/audit.test.ts",
@@ -19349,31 +19408,6 @@
       ]
     },
     {
-      "id": "policy.source.policy-mjs.de76dca223",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/ci/selectel/policy.mjs",
-        "contentHash": "ba2083a7ceb2d8d9585d99c444ec0e71f25e4c781c6000780c5999e690f74e38"
-      },
-      "consumers": [
-        "tooling/ci/github-policy.mjs",
-        "tooling/ci/selectel/policy.mjs",
-        "tooling/ci/selectel/sdk-controller.test.ts"
-      ],
-      "surfaces": [
-        "property:readSelectelPolicy/ru-3a",
-        "property:readSelectelPolicy/ru-3b",
-        "property:readSelectelPolicy/SL1.12-24576",
-        "property:readSelectelPolicy/SL1.12-24576[1]",
-        "property:readSelectelPolicy/SL1.24-49152",
-        "property:readSelectelPolicy/SL1.24-49152[1]"
-      ]
-    },
-    {
       "id": "policy.source.policy-populations-mjs.855365a4b2",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -19590,14 +19624,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/prepare-release-assets.mjs",
-        "contentHash": "84dc334fe528437ea357759bba176be9a641fd6496299a13f86d99f5c615c000"
+        "contentHash": "5c57c9afd9ae5dd75a69955419a76523906ccd92f4639917c524c91581cfa92e"
       },
       "consumers": [
         "tooling/ci/prepare-release-assets.mjs"
       ],
       "surfaces": [
-        "binding:evidenceSources",
         "binding:provenance",
+        "property:excludedFiles",
         "property:qaEvidence",
         "property:writeEvidenceArchive/compressionOptions"
       ]
@@ -19789,7 +19823,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/qa-composition.mjs",
-        "contentHash": "d2c103ea65e29bc800cf7b5e73542b3840f7fc641b0d7156df0e16f29a0cee60"
+        "contentHash": "895b1e3a8cb64a707866465c98b9350f4f20b8966f462b68516eacccb8354e20"
       },
       "consumers": [
         "tooling/ci/proof-wrapper.mjs",
@@ -19806,7 +19840,8 @@
         "property:collectCiReleaseResults/context[1]",
         "property:collectCiReleaseResults/context[2]",
         "property:collectCiReleaseResults/steps",
-        "property:collectCiReleaseResults/steps[1]"
+        "property:collectCiReleaseResults/steps[1]",
+        "property:runMutationProfile/executionProfile"
       ]
     },
     {
@@ -19818,7 +19853,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "136bf8a89fe8a06cbdd8272053c6b144b97523ca780a7141296faa10964e7680"
+        "contentHash": "a86713b9b4ff7c748bfdc94971712a3c1b8eb93e33331827f383c0888b2fae2e"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -20057,6 +20092,25 @@
       ]
     },
     {
+      "id": "policy.source.resume-mjs.5f3e9b5234",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/runtime/observability/resume.mjs",
+        "contentHash": "6b708c302961c6fbbc460675e7b4311463e558dbe1ec6385a58c95bf56fc9a29"
+      },
+      "consumers": [
+        "tooling/qa/runtime/observability/index.mjs",
+        "tooling/qa/runtime/observability/resume.mjs"
+      ],
+      "surfaces": [
+        "property:resumeLatestObservabilityRun/repositoryRoots"
+      ]
+    },
+    {
       "id": "policy.source.retired-identity-mjs.8dff022bd0",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -20086,14 +20140,18 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/run-controller.mjs",
-        "contentHash": "681ba451e80e0c884dc1efb839701e50141bd9fc42bdf88aab98da013ef7f2bd"
+        "contentHash": "c38283c03fa85c43945b49e87157e5f0d15a275f485817e01caa6ab6fdb578b5"
       },
       "consumers": [
+        "tooling/qa/runtime/observability/resume.mjs",
         "tooling/qa/runtime/observability/run-controller.mjs",
         "tooling/qa/runtime/observability/run.mjs"
       ],
       "surfaces": [
         "property:addStep/sensitiveValues",
+        "property:createQueuedActivity/dependencies",
+        "property:createQueuedActivity/executionProfile",
+        "property:createQueuedActivity/waitDurations",
         "property:fail/diagnostic",
         "property:fail/evidence",
         "property:fail/locations",
@@ -20143,15 +20201,18 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/run-initialization.mjs",
-        "contentHash": "7efa0c6d2fdfa313f9494f99a30dce3bf8490da63a73f24cdef3a17bccdf9c1f"
+        "contentHash": "74dfff36d8de7c08dbcb0bf0895f3c39dae8118c6737bc542818217947f45a9c"
       },
       "consumers": [
         "tooling/qa/runtime/observability/run-initialization.mjs",
         "tooling/qa/runtime/observability/run.mjs"
       ],
       "surfaces": [
+        "property:createRecord/activities",
+        "property:createRecord/events",
         "property:createRecord/log",
-        "property:createRecord/steps"
+        "property:createRecord/steps",
+        "property:createRecord/timeline"
       ]
     },
     {
@@ -20163,7 +20224,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "011a24698f9b30994e0421c70d747484deb97a5c26d36d0b59538c66527b2b58"
+        "contentHash": "be93ec109014b87e8fd19de08cd3c08d11bfa86decd49d955b7bb1b46e74f714"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
@@ -20226,11 +20287,13 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/observed/runner.mjs",
-        "contentHash": "a13a98c4f518e330e0737ded1264ea47032ad04b82dbca6cad4b0e5b0528ff4f"
+        "contentHash": "eb3c07a424b75ac7a7abff7f73e5ad354c0646455af24b3ca095c1c7a88bc12e"
       },
       "consumers": [
+        "tooling/ci/local.mjs",
         "tooling/ci/proof-wrapper.mjs",
         "tooling/ci/release-wrapper.mjs",
+        "tooling/ci/run-lane.mjs",
         "tooling/qa/wrappers/advisory.mjs",
         "tooling/qa/wrappers/audit.mjs",
         "tooling/qa/wrappers/build.mjs",
@@ -20307,6 +20370,7 @@
         "tooling/qa/core/verify-structural-risk.mjs",
         "tooling/qa/evidence/repo-audit-evidence/artifacts.mjs",
         "tooling/qa/runtime/observability/index.mjs",
+        "tooling/qa/runtime/observability/resume.mjs",
         "tooling/qa/runtime/observability/run-controller.mjs",
         "tooling/qa/runtime/observability/run-initialization.mjs",
         "tooling/qa/runtime/observability/sanitize.mjs",
@@ -20486,13 +20550,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/schema.mjs",
-        "contentHash": "e7622b5d408fc0714364744eee914a1f2e64470de54a6016de4f668d3e6feeed"
+        "contentHash": "8754e529172d1290af55c3cb842e3f4b5edd7173e8b502f528ed08a7d3e6dacd"
       },
       "consumers": [
         "tooling/ci/artifacts.mjs",
         "tooling/qa/runtime/observability/index.mjs",
         "tooling/qa/runtime/observability/lifecycle.test.ts",
         "tooling/qa/runtime/observability/maintenance.mjs",
+        "tooling/qa/runtime/observability/resume.mjs",
         "tooling/qa/runtime/observability/run-controller.mjs",
         "tooling/qa/runtime/observability/run-initialization.mjs",
         "tooling/qa/runtime/observability/run-record.mjs",
@@ -20501,7 +20566,8 @@
       ],
       "surfaces": [
         "binding:RECORD_KEYS",
-        "binding:STEP_KEYS"
+        "binding:STEP_KEYS",
+        "binding:V2_RECORD_KEYS"
       ]
     },
     {
@@ -20983,6 +21049,35 @@
       ]
     },
     {
+      "id": "policy.source.task-scheduler-mjs.b3cea455ad",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/runtime/task-scheduler.mjs",
+        "contentHash": "28564509f4b7d162e5285ee78ca3acddfa2f08a9eccbb527933f5af7b42dacd7"
+      },
+      "consumers": [
+        "tooling/qa/core/verify-all.scheduler.mjs",
+        "tooling/qa/core/verify-all.scheduler.test.ts",
+        "tooling/qa/core/verify-build.scheduler.mjs",
+        "tooling/qa/core/verify-build.scheduler.test.ts",
+        "tooling/qa/core/verify-focused.scheduler.mjs",
+        "tooling/qa/core/verify-focused.scheduler.test.ts",
+        "tooling/qa/core/verify-harness.scheduler.mjs",
+        "tooling/qa/core/verify-harness.scheduler.test.ts",
+        "tooling/qa/runtime/observability/lifecycle.test.ts",
+        "tooling/qa/runtime/task-scheduler.mjs",
+        "tooling/qa/runtime/task-scheduler.test.ts"
+      ],
+      "surfaces": [
+        "binding:WAIT_DURATION_FIELDS",
+        "property:queueTaskActivities/executionProfile"
+      ]
+    },
+    {
       "id": "policy.source.technical-debt-coverage-mjs.473a20cbd4",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -21060,7 +21155,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/technical-debt-policy-sources.mjs",
-        "contentHash": "82fd30d9e7b55a013760277a91dcf9d196dd7f4cafac02820013b8eaa06173f8"
+        "contentHash": "5ab6465276cd1df42f5f993bc2af924328ee8128da7cba0da6bc13879842b5d9"
       },
       "consumers": [
         "tooling/qa/core/technical-debt-policy-discovery.mjs",
@@ -21109,6 +21204,7 @@
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.test.ts",
+        "tooling/ci/artifact-observability.test.ts",
         "tooling/ci/check-control-authority.test.ts",
         "tooling/ci/ci-contract.test.ts",
         "tooling/ci/codeql-proof-host.test.ts",
@@ -21117,6 +21213,7 @@
         "tooling/ci/select-codeql-proof.test.ts",
         "tooling/ci/select-unit-proof.test.ts",
         "tooling/ci/unit-proof-host.test.ts",
+        "tooling/ci/verify-project-toolchain.test.ts",
         "tooling/qa/audits/canonical-sarif.test.ts",
         "tooling/qa/audits/execution-error.test.ts",
         "tooling/qa/audits/execution-evidence.test.ts",
@@ -21217,6 +21314,7 @@
         "tooling/qa/guards/architecture/verify-manifest-permissions.test.ts",
         "tooling/qa/guards/architecture/verify-runtime-topology.test.ts",
         "tooling/qa/guards/quality/verify-manual-mock-export-parity.test.ts",
+        "tooling/qa/guards/security/eslint-security-adapter.test.ts",
         "tooling/qa/guards/security/verify-diagnostic-sanitization.test.ts",
         "tooling/qa/guards/security/verify-fetch-ownership.test.ts",
         "tooling/qa/guards/security/verify-secret-storage.test.ts",
@@ -21268,6 +21366,56 @@
         "property:artifacts",
         "property:createLegalFixture/",
         "property:createLegalFixture/apps%2Fextension"
+      ]
+    },
+    {
+      "id": "policy.source.timeline-metrics-mjs.8902c9397b",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/runtime/observability/timeline-metrics.mjs",
+        "contentHash": "7531d3d6fd41b2922dc1ba6d16805046aa3d5c96ff857b2051daf230b1979996"
+      },
+      "consumers": [
+        "tooling/qa/runtime/observability/timeline-metrics.mjs",
+        "tooling/qa/runtime/observability/timeline-metrics.test.ts",
+        "tooling/qa/wrappers/observed/output.mjs"
+      ],
+      "surfaces": [
+        "property:criticalPath/activities",
+        "property:criticalPath/visit/activities",
+        "property:criticalPath/visit/activities[1]",
+        "property:criticalPath/visit/activities[2]",
+        "property:summarizeTimeline/activities"
+      ]
+    },
+    {
+      "id": "policy.source.timeline-schema-mjs.af1fe24669",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/runtime/observability/timeline-schema.mjs",
+        "contentHash": "cea0a314274d979c1836988fd37c2410986751ff4956213e5ca1ef4dc0b30231"
+      },
+      "consumers": [
+        "tooling/qa/runtime/observability/schema.mjs",
+        "tooling/qa/runtime/observability/timeline-schema.mjs",
+        "tooling/qa/runtime/observability/timeline-schema.test.ts"
+      ],
+      "surfaces": [
+        "binding:ACTIVITY_KEYS",
+        "binding:EVENT_KEYS",
+        "binding:PROFILE_KEYS",
+        "binding:TERMINAL_STATES",
+        "binding:WAIT_DURATION_KEYS",
+        "property:parseActivity/dependencies",
+        "property:parseActivity/waitDurations"
       ]
     },
     {
@@ -21463,6 +21611,32 @@
         "binding:OWNER_TEST_PROJECT_BY_ROOT",
         "binding:PROJECT_BY_ID",
         "property:resolveAffectedTypecheckProjects/projectIds"
+      ]
+    },
+    {
+      "id": "policy.source.typescript-cli-mjs.57f7b26f0e",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/typescript-cli.mjs",
+        "contentHash": "d15d5c5b8beeb3ab659e6a29571f9d7341a7ac5ee0d52f1990e7cb32032f2f87"
+      },
+      "consumers": [
+        "tooling/qa/core/typescript-cli.mjs",
+        "tooling/qa/core/typescript-cli.test.ts",
+        "tooling/qa/core/verify-all.scheduler.mjs",
+        "tooling/qa/core/verify-build.scheduler.mjs",
+        "tooling/qa/core/verify-focused.scheduler.mjs",
+        "tooling/qa/core/verify-harness.scheduler.mjs",
+        "tooling/qa/core/verify-typecheck.authority.test.ts",
+        "tooling/qa/core/verify-typecheck.mjs"
+      ],
+      "surfaces": [
+        "binding:CLI_ENTRIES",
+        "binding:TYPECHECK_CHECKERS"
       ]
     },
     {
@@ -21761,29 +21935,6 @@
       ]
     },
     {
-      "id": "policy.source.verify-all-execution-mjs.6438f3a5d6",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/qa/core/verify-all.execution.mjs",
-        "contentHash": "a5633dd017683d8b38c7ee814372e2396bddfad0ada963d88c96016c793f2ee5"
-      },
-      "consumers": [
-        "tooling/ci/qa-composition.mjs",
-        "tooling/qa/core/verify-all.execution.mjs",
-        "tooling/qa/core/verify-all.execution.test.ts",
-        "tooling/qa/core/verify-all.mjs",
-        "tooling/qa/core/verify-all.worker.mjs",
-        "tooling/qa/wrappers/release.mjs"
-      ],
-      "surfaces": [
-        "property:collectReleaseLintLane/anonymous-151/excludedRulePrefixes"
-      ]
-    },
-    {
       "id": "policy.source.verify-all-scheduler-mjs.487c30ac43",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -21792,7 +21943,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-all.scheduler.mjs",
-        "contentHash": "07a4fa8055b2acd6e9e71cfb90b95da6c4156cb15a22f72b5eb802137536580b"
+        "contentHash": "705e0b6f7c49cbd010def9580b231ef8999bf1f817cc70c370fb97e498d61cc3"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
@@ -21955,7 +22106,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-all.worker.mjs",
-        "contentHash": "5d4067842e1a15586ddb82e464fe62a5090e8bceb22ce8c8922fc2f120356f23"
+        "contentHash": "32818c93160a28cc5817caee827b526bd78b2d2fc4c57918c1be6c46b7c84924"
       },
       "consumers": [
         "tooling/qa/core/lane-worker-input-contracts.test.ts",
@@ -21966,7 +22117,8 @@
         "property:parseFullVerifyWorkerInput/context",
         "property:parseFullVerifyWorkerInput/contextBooleanFields",
         "property:parseFullVerifyWorkerInput/contextFields",
-        "property:parseFullVerifyWorkerInput/contextStringArrayFields"
+        "property:parseFullVerifyWorkerInput/contextStringArrayFields",
+        "property:parseFullVerifyWorkerInput/extraFields"
       ]
     },
     {
@@ -22138,7 +22290,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scheduler.mjs",
-        "contentHash": "79ee9890d390d0775ef6302beed1d8a2f30a372fd0eec0b11e55ced62cf585f5"
+        "contentHash": "a1e505d314c5e77da76a815559a58a682c515790fa83d593766b08efe53ca6ee"
       },
       "consumers": [
         "tooling/qa/core/verify-build.execution.mjs",
@@ -22197,7 +22349,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.worker.mjs",
-        "contentHash": "8be53e6d89b434d4ed422163b74bbadd779a5f823b18bdbc7568c947355f8a19"
+        "contentHash": "836f8c677eceaa0f9f39831457b96706f0f7f6d6a9bc139f8e543573509cced6"
       },
       "consumers": [
         "tooling/qa/core/lane-worker-input-contracts.test.ts",
@@ -22288,6 +22440,31 @@
       ]
     },
     {
+      "id": "policy.source.verify-closeout-step-helpers-mjs.991d1a51ed",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
+        "contentHash": "4e52fb0a8536b983b4b1621ac780e5069d04a6bc36f77cd625136e00bf86f531"
+      },
+      "consumers": [
+        "tooling/qa/core/full-verify-audit-steps.mjs",
+        "tooling/qa/core/verify-all.execution.mjs",
+        "tooling/qa/core/verify-build.execution.mjs",
+        "tooling/qa/core/verify-closeout-step-helpers.mjs",
+        "tooling/qa/core/verify-closeout-step-helpers.test.ts",
+        "tooling/qa/wrappers/build.mjs"
+      ],
+      "surfaces": [
+        "property:appendReleaseArchiveStepOrBlock/dependencies",
+        "property:collectReleaseArchiveStep/anonymous-164/dependencies",
+        "property:collectReleaseArchiveStep/dependencies"
+      ]
+    },
+    {
       "id": "policy.source.verify-config-policy-mjs.32e24382aa",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -22296,7 +22473,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-config-policy.mjs",
-        "contentHash": "3984e87c2fcd1a7b5c6ea86206cdf6876c89f7ee1b341db8980ed20a5ca75d75"
+        "contentHash": "287c96ed360d6725eae7f943474e4e34d6aafdf10002e09f6398ce868c64d143"
       },
       "consumers": [
         "tooling/qa/core/verify-config-policy.mjs",
@@ -22682,17 +22859,16 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.execution.mjs",
-        "contentHash": "e735507e52a28cfb331490cf6ff90c1d7b4ed543c9992c65af7eaff0f768e13b"
+        "contentHash": "948a52ca1ecd1907a10e16e0b033b450870a94ae59cbd758688fd87afe00fc06"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",
-        "tooling/qa/core/verify-focused.eslint-closure.test.ts",
         "tooling/qa/core/verify-focused.execution.mjs",
+        "tooling/qa/core/verify-focused.oxlint-closure.test.ts",
         "tooling/qa/core/verify-focused.worker.mjs",
         "tooling/qa/wrappers/checkpoint.mjs"
       ],
       "surfaces": [
-        "binding:FULL_ESLINT_CLOSURE_FILES",
         "property:collectFocusedLightLane/qualitySteps",
         "property:runAiHygieneStep/violations"
       ]
@@ -22706,7 +22882,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.scheduler.mjs",
-        "contentHash": "369baa7495db6a6a2adb6a1f25f436af6624d6ddc7c265dc977e41dd7d116008"
+        "contentHash": "a65db78d823f131838d0db06d21a030ba3ba12ed0516074c4742e0cbb4b66ee7"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.execution.mjs",
@@ -22716,6 +22892,7 @@
       "surfaces": [
         "binding:FOCUSED_RESULT_SHAPES",
         "binding:LANE_RESOURCES",
+        "property:annotateLaneResult/qualitySteps",
         "property:annotateLaneResult/testSteps",
         "property:appOwners",
         "property:appOwners[1]",
@@ -22788,7 +22965,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.worker.mjs",
-        "contentHash": "86c7c336f40e87f25634d8d7dd8414b7853b7b8a65635172afa6ea1493fec29b"
+        "contentHash": "b72b1be0d46644adad4fbb413df81a73805bfd52260e7ddb0f8d6a848eea9179"
       },
       "consumers": [
         "tooling/qa/core/lane-worker-input-contracts.test.ts",
@@ -22812,7 +22989,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-harness.execution.mjs",
-        "contentHash": "22df52b55fa7ed1c69079020c39b88136e1b8e0414f6aa64c062e82ddbe7cfe0"
+        "contentHash": "d5bb7ec6da38ca6649244f2d4ffcc6114345e84e81c41a53483153f6c1b196ea"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.execution.mjs",
@@ -22822,7 +22999,7 @@
       ],
       "surfaces": [
         "binding:DEPENDENCY_AUDIT_TARGETS",
-        "property:collectAiHygieneStep/anonymous-64/violations",
+        "property:collectAiHygieneStep/anonymous-63/violations",
         "property:collectHarnessStaticLane/steps",
         "property:collectHarnessStepResults/steps",
         "property:collectHarnessStepResults/steps[1]"
@@ -22837,7 +23014,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-harness.scheduler.mjs",
-        "contentHash": "1d3d1d9a6fa669140156527c389189f3873fc1caaa00d53ca94da9e8143e8ed2"
+        "contentHash": "3bb9280589374e66782c7fe581108070f7cfb1f07e0adbe3e51fcf5aa3143d24"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.execution.mjs",
@@ -22848,6 +23025,8 @@
         "binding:HARNESS_RESULT_SHAPES",
         "binding:LANE_RESOURCES",
         "property:annotate/steps",
+        "property:oxlint",
+        "property:oxlint[1]",
         "property:runHarnessLaneWorker/workerData",
         "property:static",
         "property:static[1]",
@@ -22866,7 +23045,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-harness.worker.mjs",
-        "contentHash": "0b63cebdb8930a9aab240f4dc695ae76f6c7c691367368e446c37e321369023d"
+        "contentHash": "fbce4e28e595808be6c08e592b53f9cc48a02f67e5e35f90ec3ecafb99b249d1"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.worker.mjs"
@@ -22875,7 +23054,8 @@
         "binding:HARNESS_LANES",
         "property:parseHarnessWorkerInput/context",
         "property:parseHarnessWorkerInput/contextFields",
-        "property:parseHarnessWorkerInput/contextStringArrayFields"
+        "property:parseHarnessWorkerInput/contextStringArrayFields",
+        "property:parseHarnessWorkerInput/extraFields"
       ]
     },
     {
@@ -23238,6 +23418,27 @@
       ]
     },
     {
+      "id": "policy.source.verify-oxfmt-mjs.52d046e358",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/verify-oxfmt.mjs",
+        "contentHash": "c8185f9e7e781b9b91d0af35aa22c87231bbd77db54436dfc19b4524087681a6"
+      },
+      "consumers": [
+        "tooling/qa/core/verify-harness.execution.mjs",
+        "tooling/qa/core/verify-oxfmt.mjs",
+        "tooling/qa/core/verify-oxfmt.test.ts",
+        "tooling/qa/wrappers/checkpoint.mjs"
+      ],
+      "surfaces": [
+        "binding:OPERATIONAL_ARGS"
+      ]
+    },
+    {
       "id": "policy.source.verify-package-boundaries-contracts-mjs.f108f70972",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -23255,6 +23456,27 @@
       "surfaces": [
         "binding:CONTRACT_PACKAGE_NAMES",
         "binding:FORBIDDEN_CONTRACT_GLOBALS"
+      ]
+    },
+    {
+      "id": "policy.source.verify-project-toolchain-mjs.80e3371599",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/verify-project-toolchain.mjs",
+        "contentHash": "2933fc118e366ab66f82d46280d9d4155a5522b29dc575e49e61c51d569fdb04"
+      },
+      "consumers": [
+        "tooling/ci/verify-project-toolchain.mjs",
+        "tooling/ci/verify-project-toolchain.test.ts"
+      ],
+      "surfaces": [
+        "binding:EXPECTED_PACKAGE_NAMES",
+        "binding:REQUIRED_ENTRIES",
+        "binding:REQUIRED_TOOL_IDS"
       ]
     },
     {
@@ -23285,7 +23507,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-qa-rule-coverage-contract.mjs",
-        "contentHash": "a214c7d3bd7947fffecd31b29fb4d805bd01a068817a6e8246de83b09a84d58e"
+        "contentHash": "ca254cfd8966bf1591db58dd858e536417068d90b599ac98f270badc95904088"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.execution.mjs",
@@ -23475,7 +23697,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/security/verify-security.mjs",
-        "contentHash": "2628f4c6a93001b478ff8d2649689d281391ec0ea8c95ae4e38c12a3674c907f"
+        "contentHash": "11e8922ad543fa6317ab2bf09c57f50f5ba6bb3e527e5f73ca89c7471c030ee3"
       },
       "consumers": [
         "tooling/qa/core/verify-closeout-step-helpers.mjs",
@@ -23542,6 +23764,7 @@
         "contentHash": "4bedabddc5ca3917332a24296759e0adf3612c5e8dfb2e2172941e1e80742dbc"
       },
       "consumers": [
+        "tooling/qa/core/lint-rule-migration.test.ts",
         "tooling/qa/core/verify-all.execution.mjs",
         "tooling/qa/core/verify-focused.execution.mjs",
         "tooling/qa/core/verify-sonarjs.mjs",
@@ -23775,7 +23998,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-typecheck-cache.mjs",
-        "contentHash": "d008b7d39f731e29d4c3ef20f112457ca8d076b871f2d8079782bda421a95f38"
+        "contentHash": "2730d4c4ca3b3086165a092f81bbb0d50525fb4a5836dc3f8aaa18023c531f0a"
       },
       "consumers": [
         "tooling/qa/core/verify-all.test-steps.mjs",
@@ -23796,13 +24019,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-typecheck.mjs",
-        "contentHash": "e31f4d56040e76a6f4b8c448247f0728ece779adfde6bd9e3232e2224baca2c3"
+        "contentHash": "b90ef4adf78c78b431112963c5bf1172e21dd3589749e39d1b1b54d3450c3a68"
       },
       "consumers": [
         "tooling/qa/core/verify-all.test-steps.mjs",
         "tooling/qa/core/verify-focused-triggered.execution.mjs",
         "tooling/qa/core/verify-harness.execution.mjs",
         "tooling/qa/core/verify-runners.test.ts",
+        "tooling/qa/core/verify-typecheck.authority.test.ts",
         "tooling/qa/core/verify-typecheck.mjs",
         "tooling/qa/core/verify-typecheck.parallel.test.ts",
         "tooling/qa/core/verify-typecheck.projects.test.ts"
@@ -23810,7 +24034,7 @@
       "surfaces": [
         "binding:APP_AMBIENT_DECLARATION_FILES",
         "binding:TEST_SUPPORT_FILES",
-        "property:runGeneratedProjectCommand/anonymous-173/stdio"
+        "property:runGeneratedProjectCommand/anonymous-203/stdio"
       ]
     },
     {
@@ -24064,23 +24288,24 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "apps/extension/vite.config.ts",
-        "contentHash": "032be1fc93ca816965761bec00024e7d7e477cf63261534e2fccaef1e6856d33"
+        "contentHash": "a9a4bfb4ad4c53b712bb75862897e015e91340bc7832d4b86102d019eb807723"
       },
       "consumers": [
-        "apps/extension/vite.config.ts"
+        "apps/extension/vite.config.ts",
+        "tooling/qa/core/verify-react-transform.test.ts"
       ],
       "surfaces": [
         "binding:MANROPE_FONT_FILES",
         "binding:RELEASE_OXC_MINIFY_OPTIONS",
         "binding:REQUIRED_APP_HTML_OUTPUTS",
-        "property:anonymous-143/allow",
-        "property:anonymous-143/build",
-        "property:anonymous-143/fs",
-        "property:anonymous-143/headers",
-        "property:anonymous-143/plugins",
-        "property:anonymous-143/resolve",
-        "property:anonymous-143/server",
-        "property:anonymous-143/worker",
+        "property:anonymous-147/allow",
+        "property:anonymous-147/build",
+        "property:anonymous-147/fs",
+        "property:anonymous-147/headers",
+        "property:anonymous-147/plugins",
+        "property:anonymous-147/resolve",
+        "property:anonymous-147/server",
+        "property:anonymous-147/worker",
         "property:compress",
         "property:createRollupOptions/output"
       ]

@@ -200,7 +200,10 @@ describe('resolvePreferredRoot hidden fallback heuristics', () => {
 
     const hiddenRoot = document.createElement('div');
     hiddenRoot.id = 'hidden-root';
-    hiddenRoot.hidden = true;
+    Object.defineProperty(hiddenRoot, 'hidden', {
+      configurable: true,
+      value: 'until-found',
+    });
     hiddenRoot.append(
       createParagraph(
         'Hidden article content appears here with enough text to beat the teaser shell and keep ' +

@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createTempRoot, initGitRepo, runGit, writeFile } from '../../core/test-helpers';
 import { createObservabilityRun } from './run.mjs';
 import { parseRunRecord } from './schema.mjs';
+import { withObservabilityTimeline } from './timeline-context.mjs';
+import { runBoundedTasks } from '../task-scheduler.mjs';
 
 function createRepository(prefix: string) {
   const root = createTempRoot(prefix);
@@ -164,6 +166,130 @@ describe('observability repeated control execution', () => {
     const record = run.finalize();
     expect(record.steps.map(({ outcome }) => outcome)).toEqual(['passed', 'skipped']);
     expect(record.summary).toMatchObject({ passed: 1, skipped: 1, stepCount: 2 });
+  });
+});
+
+describe('incremental activity timeline', () => {
+  it('persists real queue, execution, reuse, skip, and interruption transitions atomically', () => {
+    const root = createRepository('qa-observability-timeline-');
+    let now = Date.parse('2026-08-23T10:00:00.000Z');
+    const run = createObservabilityRun({
+      wrapperId: 'ci.proof',
+      rootDir: root,
+      clock: () => now,
+      createId: () => 'timeline-run-17',
+    });
+    run.recordActivityTransition({
+      activityId: 'lane.light',
+      kind: 'scheduler-lane',
+      state: 'queued',
+      reused: true,
+    });
+    now += 25;
+    run.recordActivityTransition({
+      activityId: 'lane.light',
+      kind: 'scheduler-lane',
+      state: 'started',
+      waitReasons: ['resource-tokens'],
+    });
+    now += 75;
+    run.recordActivityTransition({
+      activityId: 'lane.light',
+      kind: 'scheduler-lane',
+      state: 'completed',
+    });
+    run.recordActivityTransition({
+      activityId: 'control.reused',
+      kind: 'audit-control',
+      state: 'queued',
+      reused: true,
+    });
+    run.recordActivityTransition({
+      activityId: 'control.reused',
+      kind: 'audit-control',
+      state: 'skipped',
+    });
+    run.recordActivityTransition({
+      activityId: 'lane.pending',
+      kind: 'scheduler-lane',
+      state: 'queued',
+    });
+
+    const incremental = parseRunRecord(JSON.parse(fs.readFileSync(run.runPath, 'utf8')));
+    expect(
+      incremental.timeline.activities.find(({ activityId }) => activityId === 'lane.light')
+    ).toMatchObject({ durationMs: 75, queueDurationMs: 25, reused: true });
+
+    now += 10;
+    const interrupted = run.interrupt('SIGINT');
+    expect(interrupted.timeline.activities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ activityId: 'control.reused', state: 'skipped' }),
+        expect.objectContaining({ activityId: 'lane.pending', state: 'interrupted' }),
+      ])
+    );
+  });
+
+  it('persists distinct overlapping scheduler intervals instead of reconstructing them', async () => {
+    const root = createRepository('qa-observability-parallel-');
+    let now = Date.parse('2026-08-23T11:00:00.000Z');
+    const run = createObservabilityRun({
+      wrapperId: 'ci.proof',
+      rootDir: root,
+      clock: () => now,
+      createId: () => 'parallel-run-17',
+    });
+    let resolveFirst!: () => void;
+    let resolveSecond!: () => void;
+    const first = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const second = new Promise<void>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const scheduled = withObservabilityTimeline(run, () =>
+      runBoundedTasks(
+        [
+          { id: 'first', cpuTokens: 1, memoryMiB: 256, run: () => first },
+          { id: 'second', cpuTokens: 1, memoryMiB: 256, run: () => second },
+        ],
+        {
+          now: () => now,
+          profile: { cpuTokens: 2, memoryMiB: 512 },
+          schedulerId: 'persisted',
+        }
+      )
+    );
+    await vi.waitFor(() => {
+      expect(
+        run.snapshot().timeline.activities.filter(({ state }) => state === 'started')
+      ).toHaveLength(2);
+    });
+    now += 40;
+    resolveFirst();
+    await vi.waitFor(() =>
+      expect(
+        run
+          .snapshot()
+          .timeline.activities.find(({ activityId }) => activityId === 'persisted.lane.first')
+          ?.finishedAt
+      ).not.toBeNull()
+    );
+    now += 30;
+    resolveSecond();
+    await scheduled;
+    const record = run.finalize();
+    const firstActivity = record.timeline.activities.find(
+      ({ activityId }) => activityId === 'persisted.lane.first'
+    )!;
+    const secondActivity = record.timeline.activities.find(
+      ({ activityId }) => activityId === 'persisted.lane.second'
+    )!;
+    expect(firstActivity.startedAt).toBe(secondActivity.startedAt);
+    expect(firstActivity.finishedAt).not.toBe(secondActivity.finishedAt);
+    expect(Date.parse(secondActivity.startedAt!)).toBeLessThan(
+      Date.parse(firstActivity.finishedAt!)
+    );
   });
 });
 

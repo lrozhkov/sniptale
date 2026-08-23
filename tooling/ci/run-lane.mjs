@@ -3,7 +3,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { collectLaneArtifacts, selectelInfrastructureFromEnvironment } from './artifacts.mjs';
+import { resolveCiArtifactSession } from './artifact-observability.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
+import { formatObservedRunSummary } from '../qa/wrappers/observed/runner.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
@@ -17,8 +19,15 @@ if (process.env.SNIPTALE_CI_IN_CONTAINER !== '1') {
   throw new Error('Canonical CI lanes may only run inside the locked QA container.');
 }
 
+const trustedRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
 const commands = [
   ['install', 'npm', ['ci', '--ignore-scripts']],
+  [
+    'verify-project-toolchain',
+    'node',
+    [path.join(trustedRoot, 'tooling/ci/verify-project-toolchain.mjs')],
+  ],
   ['provision-canvas', 'npm', ['rebuild', 'canvas']],
   [
     'verify-canvas',
@@ -42,7 +51,6 @@ const commands = [
 
 const startedAtMs = Date.now();
 const phases = [];
-const trustedRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const candidateControlDigest = createCandidateControlDigest();
 const trustedControlDigest = createCandidateControlDigest({ cwd: trustedRoot });
 const assertedCandidateControlDigest = process.env.SNIPTALE_TRUSTED_CANDIDATE_CONTROL_DIGEST;
@@ -87,7 +95,21 @@ for (const [id, executable, args] of commands) {
   process.stdout.write(`[ci:phase] ${status === 0 ? 'passed' : 'failed'} ${id}\n`);
 }
 
+let artifactSession = null;
+let artifactSessionFinalized = false;
+let artifactFinalRecord = null;
 try {
+  artifactSession = resolveCiArtifactSession({ lane, phases, startedAtMs });
+  artifactSession.recordActivityTransition({
+    activityId: 'artifact-collection',
+    kind: 'artifact-collection',
+    state: 'queued',
+  });
+  artifactSession.recordActivityTransition({
+    activityId: 'artifact-collection',
+    kind: 'artifact-collection',
+    state: 'started',
+  });
   const artifactPath = collectLaneArtifacts({
     lane,
     startedAtMs,
@@ -108,9 +130,57 @@ try {
       release: resolveQaReleaseResourceProfile(),
     },
     infrastructure: selectelInfrastructureFromEnvironment(),
+    beforeCollectRunRecords: () => {
+      artifactSession.recordActivityTransition({
+        activityId: 'artifact-collection',
+        kind: 'artifact-collection',
+        state: 'completed',
+      });
+      artifactFinalRecord = artifactSession.finalize();
+      artifactSessionFinalized = true;
+    },
   });
+  process.stdout.write(
+    `[ci:final-summary]\n${formatObservedRunSummary({
+      label: `CI ${lane}`,
+      record: artifactFinalRecord,
+      runPath: path.relative(process.cwd(), artifactSession.runPath).replaceAll(path.sep, '/'),
+    })}`
+  );
   process.stdout.write(`SNIPTALE_ARTIFACT_PATH=${artifactPath}\n`);
 } catch (error) {
+  if (artifactSession && !artifactSessionFinalized) {
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-collection',
+      kind: 'artifact-collection',
+      state: 'failed',
+    });
+    artifactSession.fail(error, {
+      stepId: 'wrapper.lifecycle',
+      problemId: 'artifact.collection.failed',
+    });
+  } else if (artifactSession) {
+    artifactSession.resume();
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-sealing',
+      kind: 'artifact-sealing',
+      state: 'queued',
+    });
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-sealing',
+      kind: 'artifact-sealing',
+      state: 'started',
+    });
+    artifactSession.recordActivityTransition({
+      activityId: 'artifact-sealing',
+      kind: 'artifact-sealing',
+      state: 'failed',
+    });
+    artifactSession.fail(error, {
+      stepId: 'wrapper.lifecycle',
+      problemId: 'artifact.sealing.failed',
+    });
+  }
   process.stderr.write(
     `Artifact collection failed: ${error instanceof Error ? error.message : String(error)}\n`
   );

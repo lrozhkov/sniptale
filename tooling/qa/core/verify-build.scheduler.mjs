@@ -13,10 +13,11 @@ import {
   runBoundedTasks,
 } from '../runtime/task-scheduler.mjs';
 import { BUILD_TEST_EXECUTION_CLASSES } from './verify-build.test-profiles.mjs';
+import { TYPECHECK_CHECKERS, TYPESCRIPT_TOOL_VERSION } from './typescript-cli.mjs';
 
 const BUILD_WORKER_URL = new URL('./verify-build.worker.mjs', import.meta.url);
 const BUILD_LANE_RESOURCES = Object.freeze({
-  typecheck: { cpuTokens: 1, memoryMiB: 3072 },
+  typecheck: { cpuTokens: TYPECHECK_CHECKERS.full, memoryMiB: 5120 },
   tests: { memoryMiB: 4096 },
   security: { cpuTokens: 1, memoryMiB: 3072 },
   graph: { cpuTokens: 1, memoryMiB: 1536 },
@@ -42,6 +43,7 @@ export function runBuildLaneWorker({
   lane,
   memoryMiB,
   signal,
+  typecheckCheckerCount,
   vitestMaxWorkers,
 }) {
   return runQaLaneWorker({
@@ -49,7 +51,7 @@ export function runBuildLaneWorker({
     memoryMiB,
     resultParser: (value) => parseLaneResult(value, { lane, shapes: BUILD_RESULT_SHAPES }),
     signal,
-    workerData: { buildScope, context, lane, vitestMaxWorkers },
+    workerData: { buildScope, context, lane, typecheckCheckerCount, vitestMaxWorkers },
     workerUrl: BUILD_WORKER_URL,
   });
 }
@@ -74,8 +76,12 @@ function createBuildWorkerScope(buildScope) {
 function createTasks({ buildScope, context, profile, workerRunner }) {
   const workerBuildScope = createBuildWorkerScope(buildScope);
   const workerContext = createBuildWorkerContext(context);
+  const typecheckCheckerCount = Math.min(TYPECHECK_CHECKERS.full, profile.cpuTokens);
   return ['typecheck', 'tests', 'security', 'graph', 'static'].map((lane) => {
-    const resources = BUILD_LANE_RESOURCES[lane];
+    const resources =
+      lane === 'typecheck'
+        ? { ...BUILD_LANE_RESOURCES.typecheck, cpuTokens: typecheckCheckerCount }
+        : BUILD_LANE_RESOURCES[lane];
     const dedicatedSaturatedTests =
       buildScope.testScope.executionClass === BUILD_TEST_EXECUTION_CLASSES.saturated &&
       lane === 'tests';
@@ -90,7 +96,21 @@ function createTasks({ buildScope, context, profile, workerRunner }) {
       id: lane,
       cpuTokens,
       exclusive: dedicatedSaturatedTests,
+      executionProfile:
+        lane === 'typecheck'
+          ? {
+              checkerCount: typecheckCheckerCount,
+              toolName: 'typescript',
+              toolVersion: TYPESCRIPT_TOOL_VERSION,
+            }
+          : {},
       memoryMiB,
+      workers:
+        lane === 'tests'
+          ? profile.vitestMaxWorkers
+          : lane === 'typecheck'
+            ? typecheckCheckerCount
+            : 1,
       run: ({ signal }) =>
         workerRunner({
           buildScope: workerBuildScope,
@@ -98,6 +118,7 @@ function createTasks({ buildScope, context, profile, workerRunner }) {
           lane,
           memoryMiB,
           signal,
+          typecheckCheckerCount,
           vitestMaxWorkers: profile.vitestMaxWorkers,
         }),
     };

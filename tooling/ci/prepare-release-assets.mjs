@@ -5,6 +5,7 @@ import JSZip from 'jszip';
 
 import { readProofInput, sha256ProofInput as sha256Bytes } from '../qa/core/proof-input.mjs';
 import { verifyReleaseProof } from './verify-main-proof.mjs';
+import { collectProofEvidenceSources } from './release-evidence.mjs';
 
 const ARCHIVE_FILE_DATE = new Date('1980-01-01T00:00:00.000Z');
 
@@ -14,27 +15,6 @@ function requireRegularFile(file, label) {
   } catch (cause) {
     throw new Error(`Missing or unsafe ${label}: ${file}`, { cause });
   }
-}
-
-function collectTree(root, archiveRoot) {
-  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
-    throw new Error(`Missing release evidence directory: ${root}`);
-  }
-  const files = [];
-  function walk(directory, relativeDirectory = '') {
-    for (const entry of fs
-      .readdirSync(directory, { withFileTypes: true })
-      .sort((left, right) => left.name.localeCompare(right.name))) {
-      const absolute = path.join(directory, entry.name);
-      const relative = relativeDirectory ? `${relativeDirectory}/${entry.name}` : entry.name;
-      if (entry.isSymbolicLink()) throw new Error(`Unsafe release evidence symlink: ${absolute}`);
-      if (entry.isDirectory()) walk(absolute, relative);
-      else if (entry.isFile()) files.push([`${archiveRoot}/${relative}`, absolute]);
-      else throw new Error(`Unsafe release evidence entry: ${absolute}`);
-    }
-  }
-  walk(root);
-  return files;
 }
 
 async function writeEvidenceArchive(output, archiveName, sources, identity) {
@@ -124,26 +104,9 @@ for (const [source, name] of [
   });
 }
 
-const evidenceSources = [
-  ['proof/release-proof-manifest.json', proofManifest],
-  ['proof/SHA256SUMS', path.join(releaseRoot, 'SHA256SUMS')],
-  ['security/codeql.sarif', path.join(releaseRoot, '.tmp/codeql/results.filtered.sarif')],
-  ['security/semgrep.sarif', path.join(releaseRoot, '.tmp/semgrep/results.sarif')],
-  ['coverage/lcov.info', path.join(releaseRoot, '.tmp/coverage/canonical/lcov.info')],
-  [
-    'coverage/coverage-final.json',
-    path.join(releaseRoot, '.tmp/coverage/canonical/coverage-final.json'),
-  ],
-  [
-    'coverage/coverage-summary.json',
-    path.join(releaseRoot, '.tmp/coverage/canonical/coverage-summary.json'),
-  ],
-  ['proof/unit-proof.json', path.join(releaseRoot, '.tmp/qa/unit-proof.json')],
-  ['proof/coverage-proof.json', path.join(releaseRoot, '.tmp/qa/coverage-proof.json')],
-  ['proof/codeql-proof.json', path.join(releaseRoot, '.tmp/qa/codeql-proof.json')],
-  ...collectTree(path.join(releaseRoot, '.tmp/coverage/canonical/html'), 'coverage/html'),
-  ...collectTree(path.join(releaseRoot, '.tmp/mutation'), 'mutation'),
-];
+const evidenceSources = collectProofEvidenceSources(releaseRoot, verified.manifest, {
+  excludedFiles: [verified.zipFile, '.tmp/licenses/sbom.cdx.json'],
+});
 const proofSha256 = sha256Bytes(requireRegularFile(proofManifest, 'release proof'));
 const evidenceSha256 = await writeEvidenceArchive(output, evidenceName, evidenceSources, {
   commit: releaseCommit,

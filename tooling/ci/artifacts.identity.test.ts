@@ -32,6 +32,7 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
       ...process.env,
       GITHUB_SHA: 'b'.repeat(40),
       GITHUB_RUN_ID: '24',
+      GITHUB_RUN_ATTEMPT: '2',
       SNIPTALE_CANDIDATE_SHA: 'c'.repeat(40),
     },
     encoding: 'utf8',
@@ -40,7 +41,7 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
   expect(result.status, result.stderr).toBe(0);
   const bundle = path.join(
     root,
-    `build/ci-artifacts/proof-${'c'.repeat(40)}-24/proof-manifest.json`
+    `build/ci-artifacts/proof-${'c'.repeat(40)}-24-2/proof-manifest.json`
   );
   expect(JSON.parse(fs.readFileSync(bundle, 'utf8'))).toMatchObject({
     commit: 'c'.repeat(40),

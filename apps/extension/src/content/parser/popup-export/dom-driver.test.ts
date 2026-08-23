@@ -105,7 +105,7 @@ it('falls back to Escape when no close button exists', async () => {
   await closeFilePreviewPopup();
 
   expect(keydownHandler).toHaveBeenCalledTimes(1);
-  expect((keydownHandler.mock.calls[0]?.[0] as KeyboardEvent).key).toBe('Escape');
+  expect((keydownHandler.mock.calls[0]![0] as KeyboardEvent).key).toBe('Escape');
 });
 
 it('falls back to Escape when the close button is blocked by the click guard', async () => {
@@ -120,7 +120,7 @@ it('falls back to Escape when the close button is blocked by the click guard', a
   await closeFilePreviewPopup();
 
   expect(keydownHandler).toHaveBeenCalledTimes(1);
-  expect((keydownHandler.mock.calls[0]?.[0] as KeyboardEvent).key).toBe('Escape');
+  expect((keydownHandler.mock.calls[0]![0] as KeyboardEvent).key).toBe('Escape');
 });
 
 it('resolves a preview url after clicking the trigger', async () => {

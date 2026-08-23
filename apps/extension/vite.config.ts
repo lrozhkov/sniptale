@@ -49,6 +49,10 @@ const BUILD_ALIASES = Object.entries(layoutPolicy.aliases).map(([find, replaceme
   replacement: resolvePath(BUILD_LAYOUT.repositoryRoot, replacement),
 }));
 
+export function createReactTransformPlugins() {
+  return react({ jsxImportSource: 'react', jsxRuntime: 'automatic' });
+}
+
 function assertRequiredAppHtmlOutputs(): void {
   const declaredOutputs = new Set(layoutPolicy.htmlInputs.map((input) => input.outputPath));
   const missingOutputs = REQUIRED_APP_HTML_OUTPUTS.filter((path) => !declaredOutputs.has(path));
@@ -148,7 +152,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
-    react(),
+    createReactTransformPlugins(),
     crx({ manifest: buildManifestForMode(manifest, mode) }),
     buildContentRuntime(mode),
     buildContentRuntimeShim(mode),

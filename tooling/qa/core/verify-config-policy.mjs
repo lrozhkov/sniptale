@@ -21,11 +21,13 @@ const VITE_CONFIG_PATH = 'apps/extension/vite.config.ts';
 const REQUIRED_TSCONFIG_FLAGS = {
   target: 'ES2024',
   forceConsistentCasingInFileNames: true,
+  noUncheckedSideEffectImports: true,
   verbatimModuleSyntax: true,
 };
 
 const REQUIRED_TSCONFIG_NODE_FLAGS = {
   forceConsistentCasingInFileNames: true,
+  noUncheckedSideEffectImports: true,
   verbatimModuleSyntax: true,
 };
 
@@ -40,7 +42,7 @@ const REQUIRED_PACKAGE_DEPENDENCY_PREFIXES = {
 const REQUIRED_PACKAGE_DEV_DEPENDENCY_PREFIXES = {
   '@types/react': '^19.2.',
   '@types/react-dom': '^19.2.',
-  '@vitejs/plugin-react': '^5.2.',
+  '@vitejs/plugin-react': '^6.1.',
 };
 
 function createViolation(file, message) {

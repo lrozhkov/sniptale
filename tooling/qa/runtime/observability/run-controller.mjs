@@ -15,6 +15,62 @@ import {
 import { appendBoundedLog, writeJsonAtomic } from './storage.mjs';
 import { assertObservedQaRuleId } from '../../core/qa-steps/runtime-registry.mjs';
 
+function createQueuedActivity(input, timestamp) {
+  const { dependencies, executionProfile, kind, reused, waitDurations, waitReasons } = input;
+  return {
+    activityId: input.activityId,
+    kind,
+    state: 'queued',
+    queuedAt: timestamp,
+    startedAt: null,
+    finishedAt: null,
+    durationMs: null,
+    queueDurationMs: null,
+    dependencies: [...new Set(dependencies)],
+    waitReasons: [...new Set(waitReasons)].sort(),
+    waitDurations: {
+      dependencyMs: waitDurations.dependencyMs ?? 0,
+      resourceTokensMs: waitDurations.resourceTokensMs ?? 0,
+      concurrencyLimitMs: waitDurations.concurrencyLimitMs ?? 0,
+    },
+    executionProfile: {
+      cpuTokens: executionProfile.cpuTokens ?? null,
+      memoryMiB: executionProfile.memoryMiB ?? null,
+      workers: executionProfile.workers ?? null,
+      pid: executionProfile.pid ?? null,
+      workerId: executionProfile.workerId ?? null,
+      checkerCount: executionProfile.checkerCount ?? null,
+      toolName: executionProfile.toolName ?? null,
+      toolVersion: executionProfile.toolVersion ?? null,
+    },
+    reused,
+  };
+}
+
+function advanceActivity(activity, input, timestamp) {
+  if (activity.finishedAt !== null) throw new Error(`${input.activityId} is already terminal`);
+  activity.state = input.state;
+  activity.waitReasons = [...new Set([...activity.waitReasons, ...input.waitReasons])].sort();
+  activity.waitDurations = { ...activity.waitDurations, ...input.waitDurations };
+  activity.executionProfile = {
+    ...activity.executionProfile,
+    ...Object.fromEntries(
+      Object.entries(input.executionProfile).filter(([, value]) => value !== undefined)
+    ),
+  };
+  activity.reused ||= input.reused;
+  if (input.state === 'started') {
+    activity.startedAt = timestamp;
+    activity.queueDurationMs = elapsedMilliseconds(activity.queuedAt, timestamp);
+  }
+  if (['completed', 'failed', 'skipped', 'interrupted'].includes(input.state)) {
+    activity.finishedAt = timestamp;
+    activity.durationMs =
+      activity.startedAt === null ? 0 : elapsedMilliseconds(activity.startedAt, timestamp);
+    activity.queueDurationMs ??= elapsedMilliseconds(activity.queuedAt, timestamp);
+  }
+}
+
 export class ObservabilityRunController {
   #record;
   #repositoryRoots;
@@ -46,6 +102,71 @@ export class ObservabilityRunController {
   #persist() {
     this.#record.summary = summarizeSteps(this.#record.steps);
     writeJsonAtomic(this.runPath, parseRunRecord(this.#record));
+  }
+
+  resume() {
+    this.#finalized = false;
+    this.#record.status = 'running';
+    this.#record.exitCode = null;
+    this.#record.finishedAt = null;
+    this.#record.durationMs = null;
+    this.#record.ownerPid = process.pid;
+    this.#persist();
+    return this.snapshot();
+  }
+
+  recordActivityTransition({
+    activityId,
+    kind,
+    state,
+    dependencies = [],
+    waitReasons = [],
+    waitDurations = {},
+    executionProfile = {},
+    reused = false,
+    at,
+  }) {
+    this.#assertActive();
+    const timestamp = at ?? isoTimestamp(this.#clock);
+    const input = {
+      activityId,
+      kind,
+      state,
+      dependencies,
+      waitReasons,
+      waitDurations,
+      executionProfile,
+      reused,
+    };
+    let activity = this.#record.timeline.activities.find(
+      (candidate) => candidate.activityId === activityId
+    );
+    if (!activity) {
+      if (state !== 'queued') throw new Error(`${activityId} must be queued before ${state}`);
+      activity = createQueuedActivity(input, timestamp);
+      this.#record.timeline.activities.push(activity);
+    } else {
+      advanceActivity(activity, input, timestamp);
+    }
+    this.#record.timeline.events.push({
+      sequence: this.#record.timeline.events.length,
+      activityId,
+      state,
+      at: timestamp,
+    });
+    this.#persist();
+    return structuredClone(activity);
+  }
+
+  updateActivityExecutionProfile(activityId, executionProfile) {
+    this.#assertActive();
+    const activity = this.#record.timeline.activities.find(
+      (candidate) => candidate.activityId === activityId
+    );
+    if (!activity) throw new Error(`Unknown timeline activity: ${activityId}`);
+    activity.executionProfile = { ...activity.executionProfile, ...executionProfile };
+    this.#persist();
+    return structuredClone(activity.executionProfile);
   }
 
   writeLog(value) {
@@ -137,6 +258,15 @@ export class ObservabilityRunController {
   }
 
   fail(error, { stepId = 'wrapper.lifecycle', problemId = 'wrapper.unhandled-error' } = {}) {
+    for (const activity of this.#record.timeline.activities) {
+      if (activity.finishedAt === null) {
+        this.recordActivityTransition({
+          activityId: activity.activityId,
+          kind: activity.kind,
+          state: 'interrupted',
+        });
+      }
+    }
     const canonicalStepId = stepId === 'wrapper.lifecycle' ? 'qa.rule.wrapper-lifecycle' : stepId;
     assertObservedQaRuleId(canonicalStepId);
     const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -160,6 +290,15 @@ export class ObservabilityRunController {
   interrupt(signal = 'SIGTERM') {
     assertObservedQaRuleId('qa.rule.wrapper-interruption');
     const normalizedSignal = String(signal).toLowerCase().replaceAll('_', '-');
+    for (const activity of this.#record.timeline.activities) {
+      if (activity.finishedAt === null) {
+        this.recordActivityTransition({
+          activityId: activity.activityId,
+          kind: activity.kind,
+          state: 'interrupted',
+        });
+      }
+    }
     this.addStep({
       stepId: 'qa.rule.wrapper-interruption',
       outcome: 'interrupted',

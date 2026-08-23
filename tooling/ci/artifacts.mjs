@@ -150,7 +150,7 @@ const LANE_WRAPPERS = {
   release: new Set(['ci:release']),
 };
 
-function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot) {
+function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot, beforeCopyRecords) {
   const recordsRoot = path.join(repositoryRoot, '.tmp/qa-observability/runs');
   if (!fs.existsSync(recordsRoot)) return [];
   const available = [];
@@ -171,11 +171,7 @@ function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot) {
   const topLevel = available.filter(
     ({ record }) => record.parentRunId === null && LANE_WRAPPERS[lane].has(record.wrapperId)
   );
-  const selected = [...topLevel];
-  const copied = [];
-  for (const { record, relative } of selected) {
-    copyFile(relative, destinationRoot, relative, { repositoryRoot });
-    copied.push(relative);
+  const selected = [...topLevel].map(({ record, relative }) => {
     const absoluteLog = path.join(repositoryRoot, relativePath(record.log.path, repositoryRoot));
     if (!fs.existsSync(absoluteLog))
       throw new Error(`Canonical run log is missing: ${record.log.path}`);
@@ -185,6 +181,13 @@ function collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot) {
     ) {
       throw new Error(`Canonical run log identity drifted: ${record.log.path}`);
     }
+    return { record, relative };
+  });
+  beforeCopyRecords?.();
+  const copied = [];
+  for (const { record, relative } of selected) {
+    copyFile(relative, destinationRoot, relative, { repositoryRoot });
+    copied.push(relative);
     copyFile(record.log.path, destinationRoot, record.log.path, { repositoryRoot });
   }
   return copied.sort();
@@ -240,7 +243,10 @@ function createArtifactDestination(lane, repositoryRoot) {
       'local',
     'commit'
   );
-  const runId = safeSegment(process.env.GITHUB_RUN_ID ?? `${Date.now()}`, 'run id');
+  const runIdentity = process.env.GITHUB_RUN_ID
+    ? `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? '1'}`
+    : `${Date.now()}`;
+  const runId = safeSegment(runIdentity, 'run id');
   const relativeOutput = `${OUTPUT_ROOT}/${lane}-${commit}-${runId}`;
   const destinationRoot = path.join(repositoryRoot, relativeOutput);
   fs.mkdirSync(path.dirname(destinationRoot), { recursive: true });
@@ -248,7 +254,14 @@ function createArtifactDestination(lane, repositoryRoot) {
   return { commit, destinationRoot, relativeOutput };
 }
 
-function collectLaneReports({ lane, startedAtMs, status, destinationRoot, repositoryRoot }) {
+function collectLaneReports({
+  lane,
+  startedAtMs,
+  status,
+  destinationRoot,
+  repositoryRoot,
+  beforeCollectRunRecords,
+}) {
   const required = status === 'passed';
   for (const file of LANE_FILES[lane] ?? []) {
     const copied = copyFile(file, destinationRoot, file, {
@@ -289,7 +302,13 @@ function collectLaneReports({ lane, startedAtMs, status, destinationRoot, reposi
       repositoryRoot,
     });
   }
-  const runRecords = collectRunRecords(lane, startedAtMs, destinationRoot, repositoryRoot);
+  const runRecords = collectRunRecords(
+    lane,
+    startedAtMs,
+    destinationRoot,
+    repositoryRoot,
+    beforeCollectRunRecords
+  );
   if (required && runRecords.length === 0) {
     throw new Error('No canonical QA run record was produced.');
   }
@@ -363,6 +382,7 @@ export function collectLaneArtifacts({
   resourceProfiles = null,
   infrastructure = null,
   repositoryRoot = root,
+  beforeCollectRunRecords,
 }) {
   if (!['proof', 'release'].includes(lane)) {
     throw new Error(`Unknown lane: ${lane}`);
@@ -382,6 +402,7 @@ export function collectLaneArtifacts({
     status,
     destinationRoot,
     repositoryRoot: resolvedRoot,
+    beforeCollectRunRecords,
   });
   const files = listArtifactFiles(destinationRoot);
   if (!/^sha256:[a-f0-9]{64}$/u.test(controlDigest ?? '')) {

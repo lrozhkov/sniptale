@@ -111,7 +111,6 @@ it('keeps the release wrapper direct steps in the aggregate order around tests a
   expect(FULL_DIRECT_WRAPPER_STEPS.map(({ label }) => label)).toEqual([
     'Changed-line readability',
     'Oxlint',
-    'ESLint',
     'SonarJS',
     'AI hygiene',
     'Structural risk',
@@ -135,7 +134,6 @@ it('keeps the focused wrapper direct steps in the aggregate reporting order arou
   expect(FOCUSED_DIRECT_WRAPPER_STEPS.map(({ label }) => label)).toEqual([
     'Format',
     'Oxlint',
-    'ESLint',
     'SonarJS',
     'Changed-line readability',
     'AI hygiene',
@@ -166,7 +164,7 @@ it('keeps qa:checkpoint self-contained with advisory and a blocking-wrapper lock
 
   expect(cliSource).toContain("wrapperId: 'qa:checkpoint'");
   expect(source).toContain('qa:checkpoint does not create commits');
-  expect(source).toContain('runPrettierWrite(context.existingTargetFiles)');
+  expect(source).toContain('runFormatterWrite(context.existingTargetFiles)');
   expect(source).toContain('collectAndPersistAdvisoryReport(context, {');
   expect(advisoryHelper).toContain('writeAdvisoryState(');
   expect(source).toContain('assertFreshHarnessState');
@@ -207,7 +205,7 @@ it('keeps qa:preflight read-only and outside closeout state', () => {
   expect(source).toContain('const JS_LIKE_FILE_PATTERN = /\\.(?:ts|tsx|js|mjs|cjs)$/u;');
   expect(source).toContain('collectPreflightReport');
   expect(source).toContain('renderPreflightReport');
-  expect(source).not.toContain('runPrettierWrite');
+  expect(source).not.toContain('runFormatterWrite');
   expect(source).not.toContain('writeAdvisoryState');
   expect(source).not.toContain('writeCheckpointState');
   expect(source).not.toContain('acquireBlockingWrapperLock');

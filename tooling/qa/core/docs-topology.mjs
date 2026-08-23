@@ -138,8 +138,8 @@ export function docsTopologyErrors(root = process.cwd()) {
     path.endsWith('/README.md')
   );
   if (activeIndexes.length !== 1) errors.push('docs must have exactly one active index');
-  const prettierIgnore = readFileSync(resolve(root, '.prettierignore'), 'utf8').split(/\r?\n/u);
-  if (!prettierIgnore.includes('*.md'))
+  const formatterIgnore = readFileSync(resolve(root, '.oxfmtignore'), 'utf8').split(/\r?\n/u);
+  if (!formatterIgnore.includes('*.md'))
     errors.push('Markdown must remain excluded from formatting');
   return errors.sort();
 }

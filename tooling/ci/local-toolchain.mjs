@@ -13,6 +13,17 @@ function run(command, args, options = {}) {
   if (result.status !== 0) throw new Error(`${command} failed with status ${result.status}.`);
 }
 
+function requireToolVersion({ args, environment, executable, expected, name }) {
+  const result = spawnSync(executable, args, {
+    encoding: 'utf8',
+    env: normalizedProxyEnvironment(environment),
+  });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  if (result.status !== 0 || !output.includes(expected)) {
+    throw new Error(`${name} version drift: expected ${expected}, got ${output.trim()}`);
+  }
+}
+
 function normalizedProxyEnvironment(environment = process.env) {
   const result = { ...environment };
   for (const name of [
@@ -97,7 +108,18 @@ async function provisionReleaseTools({ downloads, environment, lock, mutation, r
   });
 }
 
-function validateToolchainFiles({ bin, codeql, lane, lockDigest, markerValue, mutation, semgrep }) {
+function validateToolchainFiles({
+  bin,
+  codeql,
+  environment,
+  lane,
+  lock,
+  lockDigest,
+  markerValue,
+  mutation,
+  mutationVersion,
+  semgrep,
+}) {
   if (
     markerValue.lane !== lane ||
     markerValue.lockDigest !== lockDigest ||
@@ -126,6 +148,53 @@ function validateToolchainFiles({ bin, codeql, lane, lockDigest, markerValue, mu
   const semgrepPython = path.join(semgrep, 'bin/python3');
   if (!fs.readFileSync(semgrepEntrypoint, 'utf8').slice(0, 1024).includes(semgrepPython)) {
     throw new Error('Local CI Semgrep launcher is not bound to its current toolchain root.');
+  }
+  for (const tool of [
+    {
+      name: 'OSV Scanner',
+      executable: path.join(bin, 'osv-scanner'),
+      args: ['--version'],
+      expected: lock.osvScanner.version,
+    },
+    {
+      name: 'Gitleaks',
+      executable: path.join(bin, 'gitleaks'),
+      args: ['version'],
+      expected: lock.gitleaks.version,
+    },
+    {
+      name: 'actionlint',
+      executable: path.join(bin, 'actionlint'),
+      args: ['-version'],
+      expected: lock.actionlint.version,
+    },
+    {
+      name: 'Semgrep',
+      executable: semgrepEntrypoint,
+      args: ['--version'],
+      expected: lock.semgrep.version,
+    },
+    ...(lane === 'release'
+      ? [
+          {
+            name: 'CodeQL',
+            executable: path.join(codeql, 'codeql'),
+            args: ['version'],
+            expected: lock.codeql.version,
+          },
+          {
+            name: 'Stryker',
+            executable: process.execPath,
+            args: [
+              path.join(mutation, 'node_modules/@stryker-mutator/core/bin/stryker.js'),
+              '--version',
+            ],
+            expected: mutationVersion,
+          },
+        ]
+      : []),
+  ]) {
+    requireToolVersion({ ...tool, environment });
   }
 }
 
@@ -178,6 +247,7 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
   const mutationPackageBytes = fs.readFileSync('tooling/test/mutation/package.json');
   const mutationLockBytes = fs.readFileSync('tooling/test/mutation/package-lock.json');
   const lock = JSON.parse(lockBytes);
+  const mutationPackage = JSON.parse(mutationPackageBytes);
   validateLock(lock);
   if (
     lane === 'release' &&
@@ -220,7 +290,18 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
     markerValue = { schemaVersion: 1, lane, lockDigest, ready: true };
     fs.writeFileSync(marker, `${JSON.stringify(markerValue, null, 2)}\n`, { flag: 'wx' });
   }
-  const paths = { bin, codeql, lane, lockDigest, markerValue, mutation, semgrep };
+  const paths = {
+    bin,
+    codeql,
+    environment,
+    lane,
+    lock,
+    lockDigest,
+    markerValue,
+    mutation,
+    mutationVersion: mutationPackage.devDependencies['@stryker-mutator/core'],
+    semgrep,
+  };
   validateToolchainFiles(paths);
   return {
     environment: createToolchainEnvironment({ ...paths, environment }),

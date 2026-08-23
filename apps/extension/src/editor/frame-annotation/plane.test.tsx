@@ -84,14 +84,14 @@ it('aligns the DOM scene to the canvas origin and excludes floating controls fro
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   const canvasRef = createRef<HTMLCanvasElement>();
   canvasRef.current = canvas;
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-    this: HTMLElement
-  ) {
-    if (this === canvas) return createRect({ left: 100, top: 150, width: 800, height: 600 });
-    if (this.dataset['ui'] === 'editor.frame-annotation-plane')
-      return createRect({ left: 20, top: 30, width: 1000, height: 800 });
-    return createRect({ left: 0, top: 0, width: 0, height: 0 });
-  });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      if (this === canvas) return createRect({ left: 100, top: 150, width: 800, height: 600 });
+      if (this.dataset['ui'] === 'editor.frame-annotation-plane')
+        return createRect({ left: 20, top: 30, width: 1000, height: 800 });
+      return createRect({ left: 0, top: 0, width: 0, height: 0 });
+    }
+  );
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);

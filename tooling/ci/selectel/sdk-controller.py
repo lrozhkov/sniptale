@@ -27,6 +27,7 @@ from openstack import exceptions
 
 ROOT = Path(os.environ.get("SNIPTALE_REPOSITORY_ROOT", "/workspace")).resolve()
 POLICY_PATH = ROOT / "tooling/configs/ci/selectel-runner.json"
+SEMANTICS_PATH = ROOT / "tooling/configs/ci/proof-semantics.json"
 
 
 def required(value: Any, label: str) -> str:
@@ -35,46 +36,124 @@ def required(value: Any, label: str) -> str:
     return value
 
 
+def managed_resource_description(
+    policy: dict[str, Any], run_id: str, run_attempt: str, profile_attempt: int, expires_at: int
+) -> str:
+    return ":".join(
+        (
+            policy["lifecycle"]["managedBy"],
+            policy["repository"],
+            run_id,
+            run_attempt,
+            str(profile_attempt),
+            str(expires_at),
+        )
+    )
+
+
+def parse_managed_resource_description(policy: dict[str, Any], resource):
+    parts = (getattr(resource, "description", "") or "").split(":")
+    if (
+        len(parts) != 6
+        or parts[0] != policy["lifecycle"]["managedBy"]
+        or parts[1] != policy["repository"]
+    ):
+        return None
+    numeric_values = tuple(
+        zip(parts[2:], ("run ID", "run attempt", "profile attempt", "expiry"), strict=True)
+    )
+    for value, label in numeric_values:
+        if not value.isdecimal() or str(int(value)) != value:
+            raise RuntimeError(f"Managed Selectel resource {label} is not canonical.")
+        if int(value) < 1:
+            raise RuntimeError(f"Managed Selectel resource {label} must be positive.")
+    profile_attempt = int(parts[4])
+    if profile_attempt < 1 or profile_attempt > policy["lifecycle"]["maxProfiles"]:
+        raise RuntimeError("Managed Selectel resource profile attempt is outside policy.")
+    return {
+        "runId": parts[2],
+        "runAttempt": parts[3],
+        "profileAttempt": profile_attempt,
+        "expiresAt": int(parts[5]),
+    }
+
+
 def read_policy() -> dict[str, Any]:
     policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
     compute = policy.get("compute", {})
+    zones = compute.get("allowedZones")
+    boot_sizes = compute.get("allowedBootVolumeGiB")
+    flavors = compute.get("allowedFlavors")
+    profiles = compute.get("allowedResourceProfilesByFlavor")
+    volume_types = compute.get("allowedVolumeTypesByZone")
+
+    def positive_record(value, fields):
+        return (
+            isinstance(value, dict)
+            and set(value) == set(fields)
+            and all(
+                not isinstance(value[field], bool)
+                and isinstance(value[field], int)
+                and value[field] > 0
+                for field in fields
+            )
+        )
+
+    flavor_fields = {"vcpus", "ramMiB"}
+    profile_fields = {
+        "cpuTokens", "memoryMiB", "vitestWorkers", "playwrightWorkers", "securityWorkers"
+    }
+    valid_shapes = (
+        isinstance(zones, list)
+        and bool(zones)
+        and len(set(zones)) == len(zones)
+        and all(isinstance(zone, str) and zone for zone in zones)
+        and isinstance(boot_sizes, list)
+        and bool(boot_sizes)
+        and all(not isinstance(size, bool) and isinstance(size, int) and size > 0 for size in boot_sizes)
+        and isinstance(flavors, dict)
+        and bool(flavors)
+        and all(positive_record(flavor, flavor_fields) for flavor in flavors.values())
+        and isinstance(profiles, dict)
+        and set(profiles) == set(flavors)
+        and all(positive_record(profile, profile_fields) for profile in profiles.values())
+        and isinstance(volume_types, dict)
+        and set(volume_types) == set(zones)
+        and all(
+            isinstance(types, list)
+            and bool(types)
+            and all(isinstance(volume_type, str) and volume_type for volume_type in types)
+            for types in volume_types.values()
+        )
+    )
+    valid_capacity = valid_shapes and all(
+        profiles[name]["cpuTokens"] <= flavor["vcpus"]
+        and profiles[name]["memoryMiB"] < flavor["ramMiB"]
+        and flavor["ramMiB"] - profiles[name]["memoryMiB"] >= 6144
+        and all(
+            profiles[name][worker] <= profiles[name]["cpuTokens"]
+            for worker in ("vitestWorkers", "playwrightWorkers", "securityWorkers")
+        )
+        for name, flavor in flavors.items()
+    )
     if (
-        policy.get("artifactKind") != "sniptale-selectel-runner-policy"
-        or compute.get("allowedZones") != ["ru-3a", "ru-3b"]
-        or compute.get("allowedBootVolumeGiB") != [80]
-        or compute.get("allowedFlavors")
-        != {
-            "SL1.24-49152": {"vcpus": 24, "ramMiB": 49152},
-            "SL1.12-24576": {"vcpus": 12, "ramMiB": 24576},
-        }
-        or compute.get("allowedVolumeTypesByZone")
-        != {"ru-3a": ["universal.ru-3a"], "ru-3b": ["basicssd.ru-3b"]}
-        or compute.get("allowedResourceProfilesByFlavor")
-        != {
-            "SL1.24-49152": {
-                "cpuTokens": 24,
-                "memoryMiB": 36864,
-                "vitestWorkers": 16,
-                "playwrightWorkers": 4,
-                "securityWorkers": 8,
-            },
-            "SL1.12-24576": {
-                "cpuTokens": 12,
-                "memoryMiB": 18432,
-                "vitestWorkers": 8,
-                "playwrightWorkers": 4,
-                "securityWorkers": 6,
-            },
-        }
+        policy.get("schemaVersion") != 1
+        or policy.get("artifactKind") != "sniptale-selectel-runner-policy"
+        or policy.get("environment") != "selectel-runner-controller"
+        or not valid_capacity
         or compute.get("preemptible") is not True
+        or compute.get("publicIp") is not False
+        or compute.get("ingress") is not False
         or policy.get("lifecycle", {}).get("maxProfiles") != 10
+        or not isinstance(policy.get("repository"), str)
+        or not policy.get("repository")
+        or ":" in policy.get("repository", "")
+        or not isinstance(policy.get("lifecycle", {}).get("managedBy"), str)
+        or not policy.get("lifecycle", {}).get("managedBy")
+        or ":" in policy.get("lifecycle", {}).get("managedBy", "")
         or policy.get("runner", {}).get("maxJobs") != 1
-        or policy.get("network")
-        != {
-            "subnetCidr": "10.77.0.0/24",
-            "lifecycle": "disposable-per-attempt",
-            "securityGroupName": "sniptale-github-actions-no-ingress",
-        }
+        or policy.get("network", {}).get("lifecycle") != "disposable-per-attempt"
+        or not isinstance(policy.get("network", {}).get("securityGroupNamePrefix"), str)
         or policy.get("trust", {}).get("persistentNetworkResources") is not False
     ):
         raise RuntimeError("Malformed Selectel runner policy.")
@@ -141,6 +220,16 @@ def read_profiles(policy: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
             raise RuntimeError(f"Selectel profile {index} duplicates an earlier profile.")
         seen.add(key)
         normalized_profiles.append(normalized)
+    lane = os.environ.get("SNIPTALE_PROOF_LANE", "proof")
+    if lane not in {"proof", "release"}:
+        raise RuntimeError(f"Unknown Selectel proof lane: {lane}.")
+    semantics = json.loads(SEMANTICS_PATH.read_text(encoding="utf-8"))
+    minimum = semantics.get("reuseCompatibility", {}).get(lane, {}).get("minimumExecutionProfile")
+    if not isinstance(minimum, dict):
+        raise RuntimeError(f"Selectel {lane} minimum execution profile is missing.")
+    for index, profile in enumerate(normalized_profiles):
+        if any(profile["qa"].get(key, 0) < value for key, value in minimum.items()):
+            raise RuntimeError(f"Selectel profile {index} is below the {lane} lane minimum.")
     normalized_document = json.dumps(
         {"profiles": normalized_profiles}, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
@@ -235,18 +324,14 @@ def select_resources(connection, policy: dict[str, Any], placement: dict[str, An
     }
 
 
-def ensure_security_group(connection, policy: dict[str, Any]):
-    network_policy = policy["network"]
-    security_group = exact(
-        connection.network.security_groups(name=network_policy["securityGroupName"]),
-        network_policy["securityGroupName"],
-        "security group",
+def create_security_group(connection, policy: dict[str, Any], name: str, description: str):
+    security_group_name = f"{policy['network']['securityGroupNamePrefix']}-{name}"
+    if list(connection.network.security_groups(name=security_group_name)):
+        raise RuntimeError("Selectel runner security group name collision.")
+    security_group = connection.network.create_security_group(
+        name=security_group_name,
+        description=description,
     )
-    if security_group is None:
-        security_group = connection.network.create_security_group(
-            name=network_policy["securityGroupName"],
-            description="Sniptale disposable runner: egress only, no ingress",
-        )
     if any(rule.get("direction") == "ingress" for rule in security_group.security_group_rules):
         raise RuntimeError("Selectel managed runner security group unexpectedly permits ingress.")
     return security_group
@@ -306,7 +391,10 @@ def create_run_network(
     record["routerInterfacePortIds"] = [router_ports[0].id]
     record["routerPortIds"] = [port.id for port in all_router_ports]
     persist()
-    return network, subnet, ensure_security_group(connection, policy)
+    security_group = create_security_group(connection, policy, name, description)
+    record["securityGroupId"] = security_group.id
+    persist()
+    return network, subnet, security_group
 
 
 def github_json(path: str, token: str, method="GET", body=None):
@@ -477,6 +565,7 @@ def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, An
         "runner": "absent",
         "server": "absent",
         "ports": "absent",
+        "securityGroups": "absent",
         "routerPorts": "absent",
         "router": "absent",
         "subnet": "absent",
@@ -505,6 +594,21 @@ def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, An
         except Exception as failure:
             result["ports"] = "failed"
             failures.append(("ports", failure))
+    if record.get("securityGroupId"):
+        try:
+            security_group = connection.network.find_security_group(
+                record["securityGroupId"], ignore_missing=True
+            )
+            if security_group is not None:
+                connection.network.delete_security_group(security_group, ignore_missing=True)
+            if connection.network.find_security_group(
+                record["securityGroupId"], ignore_missing=True
+            ) is not None:
+                raise RuntimeError("Selectel runner security group survived cleanup.")
+            result["securityGroups"] = "deleted"
+        except Exception as failure:
+            result["securityGroups"] = "failed"
+            failures.append(("securityGroups", failure))
     router = None
     subnet = None
     try:
@@ -652,6 +756,7 @@ def preflight(policy: dict[str, Any]):
 def provision(policy: dict[str, Any]):
     profiles, profiles_digest = read_profiles(policy)
     run_id = required(os.environ.get("GITHUB_RUN_ID"), "GITHUB_RUN_ID")
+    run_attempt = required(os.environ.get("GITHUB_RUN_ATTEMPT"), "GITHUB_RUN_ATTEMPT")
     candidate_sha = required(os.environ.get("SNIPTALE_CANDIDATE_SHA"), "SNIPTALE_CANDIDATE_SHA")
     base_sha = required(os.environ.get("SNIPTALE_BASE_SHA"), "SNIPTALE_BASE_SHA")
     trusted_control_sha = required(
@@ -685,15 +790,15 @@ def provision(policy: dict[str, Any]):
         "repository": policy["repository"],
         "workflow": required(os.environ.get("GITHUB_WORKFLOW"), "GITHUB_WORKFLOW"),
         "run-id": run_id,
-        "run-attempt": required(os.environ.get("GITHUB_RUN_ATTEMPT"), "GITHUB_RUN_ATTEMPT"),
+        "run-attempt": run_attempt,
         "candidate-sha": candidate_sha,
         "expires-at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(expires_at_epoch)),
     }
     last_failure = None
     for profile_index, placement in enumerate(profiles):
         attempt = str(profile_index + 1)
-        name = f"sniptale-{run_id}-{attempt}"
-        label = f"{policy['runner']['labelPrefix']}{run_id}-{attempt}"
+        name = f"sniptale-{run_id}-{run_attempt}-{attempt}"
+        label = f"{policy['runner']['labelPrefix']}{run_id}-{run_attempt}-{attempt}"
         if any(server.name == name for server in connection.compute.servers(name=name)):
             raise RuntimeError("Selectel runner server name collision.")
         record = {
@@ -712,6 +817,7 @@ def provision(policy: dict[str, Any]):
             "runnerLabel": label,
             "serverId": None,
             "portIds": [],
+            "securityGroupId": None,
             "routerPortIds": [],
             "routerInterfacePortIds": [],
             "routerId": None,
@@ -727,8 +833,8 @@ def provision(policy: dict[str, Any]):
         write_record(destination, controller_record)
         try:
             selected = select_resources(connection, policy, placement)
-            description = (
-                f"{policy['lifecycle']['managedBy']}:{run_id}:{attempt}:{expires_at_epoch}"
+            description = managed_resource_description(
+                policy, run_id, run_attempt, profile_index + 1, expires_at_epoch
             )
             network, subnet, security_group = create_run_network(
                 connection,
@@ -843,26 +949,40 @@ def cleanup_command(policy: dict[str, Any], record_file: str):
     record = json.loads(destination.read_text(encoding="utf-8"))
     if record.get("artifactKind") != "sniptale-selectel-provision-record" or record.get(
         "status"
-    ) not in {"online", "cleanup-failed"}:
+    ) not in {"online", "cleanup-failed", "profiles-exhausted", "admission-failed"}:
         raise RuntimeError("Malformed Selectel provision record.")
     token = required(os.environ.get("RUNNER_CONTROLLER_TOKEN"), "RUNNER_CONTROLLER_TOKEN")
     targets = [record]
-    if record.get("status") == "cleanup-failed" and isinstance(record.get("attempts"), list):
+    if record.get("status") in {
+        "cleanup-failed", "profiles-exhausted", "admission-failed"
+    } and isinstance(record.get("attempts"), list):
         targets = [
             attempt
             for attempt in record["attempts"]
-            if attempt.get("runnerId")
-            or attempt.get("serverId")
-            or attempt.get("portIds")
-            or attempt.get("routerPortIds")
-            or attempt.get("routerInterfacePortIds")
-            or attempt.get("routerId")
-            or attempt.get("subnetId")
-            or attempt.get("networkId")
-            or attempt.get("volumeIds")
+            if attempt.get("status") not in {"cleaned", "cleaned-after-provision-failure"}
+            and (
+                attempt.get("runnerId")
+                or attempt.get("serverId")
+                or attempt.get("portIds")
+                or attempt.get("securityGroupId")
+                or attempt.get("routerPortIds")
+                or attempt.get("routerInterfacePortIds")
+                or attempt.get("routerId")
+                or attempt.get("subnetId")
+                or attempt.get("networkId")
+                or attempt.get("volumeIds")
+            )
         ]
-        if not targets:
+        if not targets and record.get("status") == "cleanup-failed":
             raise RuntimeError("Cleanup-failed Selectel record has no replayable resources.")
+        if not targets:
+            record["cleanup"] = {"status": "already-cleaned"}
+            record["cleanupAttempts"] = 0
+            record["status"] = "cleaned"
+            record["cleanupFailure"] = None
+            write_record(destination, record)
+            print(json.dumps(record["cleanup"]))
+            return
     try:
         for target in targets:
             target["cleanup"], target["cleanupAttempts"] = cleanup_with_retries(
@@ -881,6 +1001,129 @@ def cleanup_command(policy: dict[str, Any], record_file: str):
     print(json.dumps(record["cleanup"]))
 
 
+def recover_cleanup(policy: dict[str, Any], record_file: str):
+    run_id = required(os.environ.get("GITHUB_RUN_ID"), "GITHUB_RUN_ID")
+    run_attempt = required(os.environ.get("GITHUB_RUN_ATTEMPT"), "GITHUB_RUN_ATTEMPT")
+    token = required(os.environ.get("RUNNER_CONTROLLER_TOKEN"), "RUNNER_CONTROLLER_TOKEN")
+    connection, _, project = connect(policy)
+    prefix = f"sniptale-{run_id}-{run_attempt}-"
+    attempts: dict[int, dict[str, Any]] = {}
+
+    def owned_profile_attempt(metadata: dict[str, Any]):
+        if (
+            metadata.get("managed-by") != policy["lifecycle"]["managedBy"]
+            or metadata.get("repository") != policy["repository"]
+            or metadata.get("run-id") != run_id
+            or metadata.get("run-attempt") != run_attempt
+        ):
+            return None
+        raw_profile_index = metadata.get("profile-index")
+        try:
+            profile_index = int(raw_profile_index)
+        except (TypeError, ValueError) as failure:
+            raise RuntimeError("Recovered Selectel profile index is malformed.") from failure
+        if str(profile_index) != raw_profile_index:
+            raise RuntimeError("Recovered Selectel profile index is not canonical.")
+        profile_attempt = profile_index + 1
+        if profile_attempt < 1 or profile_attempt > policy["lifecycle"]["maxProfiles"]:
+            raise RuntimeError("Recovered Selectel profile attempt is outside policy.")
+        return profile_attempt
+
+    def target(profile_attempt: int):
+        if profile_attempt < 1 or profile_attempt > policy["lifecycle"]["maxProfiles"]:
+            raise RuntimeError("Recovered Selectel profile attempt is outside policy.")
+        return attempts.setdefault(profile_attempt, {
+            "profileIndex": profile_attempt - 1,
+            "runnerId": None,
+            "serverId": None,
+            "portIds": [],
+            "securityGroupId": None,
+            "routerPortIds": [],
+            "routerInterfacePortIds": [],
+            "routerId": None,
+            "subnetId": None,
+            "networkId": None,
+            "volumeIds": [],
+            "status": "cleanup-failed",
+        })
+
+    def profile_from_description(resource):
+        identity = parse_managed_resource_description(policy, resource)
+        if (
+            identity is None
+            or identity["runId"] != run_id
+            or identity["runAttempt"] != run_attempt
+        ):
+            return None
+        return identity["profileAttempt"]
+
+    def assign(profile_attempt: int, key: str, value):
+        record = target(profile_attempt)
+        if record[key] is not None:
+            raise RuntimeError(f"Recovered Selectel {key} is ambiguous.")
+        record[key] = value
+
+    for server in connection.compute.servers(details=True):
+        metadata = server.metadata or {}
+        profile_attempt = owned_profile_attempt(metadata)
+        if profile_attempt is not None:
+            assign(profile_attempt, "serverId", server.id)
+    for volume in connection.block_storage.volumes(details=True):
+        metadata = volume.metadata or {}
+        profile_attempt = owned_profile_attempt(metadata)
+        if profile_attempt is not None:
+            target(profile_attempt)["volumeIds"].append(volume.id)
+    for key, resources in (
+        ("portIds", connection.network.ports()),
+        ("routerId", connection.network.routers()),
+        ("subnetId", connection.network.subnets()),
+        ("networkId", connection.network.networks()),
+        ("securityGroupId", connection.network.security_groups()),
+    ):
+        for resource in resources:
+            profile_attempt = profile_from_description(resource)
+            if profile_attempt is None:
+                continue
+            if key == "portIds":
+                target(profile_attempt)[key].append(resource.id)
+            else:
+                assign(profile_attempt, key, resource.id)
+    for profile_attempt, record in attempts.items():
+        if record["routerId"]:
+            router_ports = list(connection.network.ports(device_id=record["routerId"]))
+            record["routerPortIds"] = [port.id for port in router_ports]
+            record["routerInterfacePortIds"] = [
+                port.id
+                for port in router_ports
+                if getattr(port, "device_owner", "") == "network:router_interface"
+            ]
+    runners = github_json(
+        f"/repos/{policy['repository']}/actions/runners?per_page=100", token
+    ).get("runners", [])
+    for runner in runners:
+        name = runner.get("name", "")
+        if name.startswith(prefix):
+            profile_attempt = int(name.removeprefix(prefix))
+            assign(profile_attempt, "runnerId", runner["id"])
+    destination = Path(record_file).resolve()
+    record = {
+        "schemaVersion": 4,
+        "artifactKind": "sniptale-selectel-provision-record",
+        "runId": run_id,
+        "runAttempt": run_attempt,
+        "project": project,
+        "region": policy["controllerEnvironment"]["expectedRegion"],
+        "attempts": [attempts[index] for index in sorted(attempts)],
+        "status": "cleanup-failed" if attempts else "cleaned",
+        "cleanup": None if attempts else {"status": "already-absent"},
+    }
+    write_record(destination, record)
+    if attempts:
+        cleanup_command(policy, str(destination))
+    else:
+        print(json.dumps(record["cleanup"]))
+
+
 def sweep(policy: dict[str, Any]):
     connection, _, project = connect(policy)
     token = required(os.environ.get("RUNNER_CONTROLLER_TOKEN"), "RUNNER_CONTROLLER_TOKEN")
@@ -897,13 +1140,8 @@ def sweep(policy: dict[str, Any]):
             return False
 
     def expired_description(resource):
-        parts = (getattr(resource, "description", "") or "").split(":")
-        if len(parts) != 4 or parts[0] != policy["lifecycle"]["managedBy"]:
-            return False
-        try:
-            return int(parts[3]) <= now
-        except ValueError:
-            return False
+        identity = parse_managed_resource_description(policy, resource)
+        return identity is not None and identity["expiresAt"] <= now
 
     all_servers = list(connection.compute.servers(details=True))
     servers = [
@@ -938,12 +1176,10 @@ def sweep(policy: dict[str, Any]):
     for volume in volumes:
         connection.block_storage.delete_volume(volume, ignore_missing=True)
         connection.block_storage.wait_for_delete(volume, interval=2, wait=120)
-    live_server_ids = {server.id for server in all_servers if server not in servers}
     ports = [
         port
         for port in connection.network.ports()
-        if (port.description or "").startswith(f"{policy['lifecycle']['managedBy']}:")
-        and (not port.device_id or port.device_id not in live_server_ids)
+        if expired_description(port)
     ]
     for port in ports:
         connection.network.delete_port(port, ignore_missing=True)
@@ -978,13 +1214,29 @@ def sweep(policy: dict[str, Any]):
         connection.network.delete_network(network, ignore_missing=True)
         if connection.network.find_network(network.id, ignore_missing=True) is not None:
             raise RuntimeError("Expired Selectel network survived sweep cleanup.")
+    security_groups = [
+        security_group
+        for security_group in connection.network.security_groups()
+        if expired_description(security_group)
+    ]
+    for security_group in security_groups:
+        connection.network.delete_security_group(security_group, ignore_missing=True)
+        if connection.network.find_security_group(security_group.id, ignore_missing=True) is not None:
+            raise RuntimeError("Expired Selectel security group survived sweep cleanup.")
+    expired_runner_names = {server.name for server in servers}
+    for resource in [*ports, *routers, *subnets, *networks, *security_groups]:
+        identity = parse_managed_resource_description(policy, resource)
+        if identity is not None:
+            expired_runner_names.add(
+                f"sniptale-{identity['runId']}-{identity['runAttempt']}-{identity['profileAttempt']}"
+            )
     runners = github_json(
         f"/repos/{policy['repository']}/actions/runners?per_page=100", token
     ).get("runners", [])
     offline = [
         runner
         for runner in runners
-        if runner.get("name", "").startswith("sniptale-") and runner.get("status") == "offline"
+        if runner.get("name") in expired_runner_names and runner.get("status") == "offline"
     ]
     for runner in offline:
         delete_runner(policy, token, runner["id"])
@@ -1001,6 +1253,7 @@ def sweep(policy: dict[str, Any]):
             "routers": [item.id for item in routers],
             "subnets": [item.id for item in subnets],
             "networks": [item.id for item in networks],
+            "securityGroups": [item.id for item in security_groups],
             "runners": [item["id"] for item in offline],
         },
     }
@@ -1011,7 +1264,9 @@ def sweep(policy: dict[str, Any]):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["preflight", "provision", "cleanup", "sweep"])
+    parser.add_argument(
+        "command", choices=["preflight", "provision", "cleanup", "recover-cleanup", "sweep"]
+    )
     parser.add_argument("record", nargs="?")
     arguments = parser.parse_args()
     policy = read_policy()
@@ -1021,6 +1276,8 @@ def main():
         provision(policy)
     elif arguments.command == "cleanup":
         cleanup_command(policy, required(arguments.record, "attempt record"))
+    elif arguments.command == "recover-cleanup":
+        recover_cleanup(policy, required(arguments.record, "recovery record"))
     else:
         sweep(policy)
 

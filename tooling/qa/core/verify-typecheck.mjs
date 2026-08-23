@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { emitCommandResult, isExecutedAsScript, runRepoNodeEntry } from './shared.mjs';
+import { emitCommandResult, isExecutedAsScript, runCommand } from './shared.mjs';
 import {
   FULL_TYPECHECK_PROJECT_IDS,
   TYPECHECK_PROJECTS,
@@ -12,6 +12,12 @@ import {
   resolveAffectedTypecheckProjects,
 } from './typecheck-project-map.mjs';
 import { PRODUCT_SOURCE_ROOTS } from './src-production-targets.mjs';
+import {
+  TYPECHECK_CHECKERS,
+  TYPESCRIPT_TOOLCHAIN_ROOT,
+  TYPESCRIPT_TOOL_VERSION,
+  resolveCanonicalTypeScriptEntry,
+} from './typescript-cli.mjs';
 
 const TYPECHECK_TMP_ROOT = '.tmp/qa/typecheck';
 const TYPECHECK_PROJECT_ROOT = `${TYPECHECK_TMP_ROOT}/projects`;
@@ -19,8 +25,10 @@ const TYPECHECK_BUILD_INFO_ROOT = `${TYPECHECK_TMP_ROOT}/buildinfo`;
 const BASE_CONFIG_RELATIVE_PATH = '../../../../../tsconfig.json';
 const REPO_ROOT = '../../../../..';
 const VITE_ENV = `${REPO_ROOT}/apps/extension/src/vite-env.d.ts`;
+const UI_STYLE_IMPORTS = `${REPO_ROOT}/packages/ui/src/styles/imports.d.ts`;
 const APP_AMBIENT_DECLARATION_FILES = [
   VITE_ENV,
+  UI_STYLE_IMPORTS,
   `${REPO_ROOT}/packages/runtime-contracts/src/messaging/message-types/literals.d.ts`,
   `${REPO_ROOT}/packages/runtime-contracts/src/video/messages/index.literals.d.ts`,
   `${REPO_ROOT}/packages/runtime-contracts/src/video/types/types.literals.d.ts`,
@@ -109,6 +117,12 @@ function createProjectExclude(project) {
   return null;
 }
 
+export function createTypecheckArguments({ checkerCount, projectPath } = {}) {
+  const args = ['--checkers', String(checkerCount)];
+  if (projectPath) args.push('--project', projectPath);
+  return args;
+}
+
 export function createProjectConfig(project) {
   const projectConfig = {
     extends: BASE_CONFIG_RELATIVE_PATH,
@@ -149,11 +163,22 @@ function writeGeneratedTypecheckConfigs({ cwd }) {
   }
 }
 
-function runGeneratedProjectTypecheck({ cwd, projectIds }) {
+function runGeneratedProjectTypecheck({
+  checkerCount,
+  cwd,
+  projectIds,
+  toolchainRoot = TYPESCRIPT_TOOLCHAIN_ROOT,
+}) {
   const results = projectIds.map((projectId) =>
-    runRepoNodeEntry(
-      'node_modules/typescript/lib/tsc.js',
-      ['--project', toGeneratedProjectPath(projectId)],
+    runCommand(
+      process.execPath,
+      [
+        resolveCanonicalTypeScriptEntry({ cwd: toolchainRoot }),
+        ...createTypecheckArguments({
+          checkerCount,
+          projectPath: toGeneratedProjectPath(projectId),
+        }),
+      ],
       {
         cwd,
         maxBuffer: 16 * 1024 * 1024,
@@ -169,14 +194,21 @@ function runGeneratedProjectTypecheck({ cwd, projectIds }) {
   };
 }
 
-function runGeneratedProjectCommand({ cwd, projectId }) {
+function runGeneratedProjectCommand({
+  checkerCount,
+  cwd,
+  projectId,
+  toolchainRoot = TYPESCRIPT_TOOLCHAIN_ROOT,
+}) {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
       [
-        path.join(cwd, 'node_modules/typescript/lib/tsc.js'),
-        '--project',
-        toGeneratedProjectPath(projectId),
+        resolveCanonicalTypeScriptEntry({ cwd: toolchainRoot }),
+        ...createTypecheckArguments({
+          checkerCount,
+          projectPath: toGeneratedProjectPath(projectId),
+        }),
       ],
       { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
     );
@@ -233,10 +265,11 @@ export async function runTypecheckProjectGraph({ maxConcurrency = 2, projectIds,
 }
 
 async function runGeneratedProjectTypecheckAsync({
+  checkerCount,
   cwd,
   maxConcurrency,
   projectIds,
-  projectRunner = (projectId) => runGeneratedProjectCommand({ cwd, projectId }),
+  projectRunner = (projectId) => runGeneratedProjectCommand({ checkerCount, cwd, projectId }),
 }) {
   return runTypecheckProjectGraph({ maxConcurrency, projectIds, projectRunner });
 }
@@ -247,6 +280,8 @@ function appendTypecheckMetadata(result, metadata) {
     checkedProjectIds: metadata.projectIds,
     typecheckMode: metadata.mode,
     typecheckReason: metadata.reason,
+    typecheckCheckerCount: metadata.checkerCount ?? null,
+    typecheckToolVersion: TYPESCRIPT_TOOL_VERSION,
   };
 }
 
@@ -273,51 +308,101 @@ export function resolveTypecheckRun({ mode = 'full', targetFiles = [] } = {}) {
   };
 }
 
-export function runTypecheck({ cwd = process.cwd(), mode = 'full', targetFiles = [] } = {}) {
+export function runTypecheck({
+  checkerCount,
+  cwd = process.cwd(),
+  mode = 'full',
+  targetFiles = [],
+  toolchainRoot = TYPESCRIPT_TOOLCHAIN_ROOT,
+} = {}) {
   const metadata = resolveTypecheckRun({ mode, targetFiles });
+  const resolvedCheckerCount = checkerCount ?? TYPECHECK_CHECKERS[metadata.mode] ?? 1;
+  if (!Number.isInteger(resolvedCheckerCount) || resolvedCheckerCount < 1) {
+    throw new Error('Typecheck checkerCount must be a positive integer.');
+  }
   if (metadata.mode === 'skip') {
     return createSkippedTypecheckResult(metadata);
   }
 
   if (metadata.mode === 'full') {
-    const result = runRepoNodeEntry('node_modules/typescript/lib/tsc.js', [], {
-      cwd,
-      maxBuffer: 16 * 1024 * 1024,
-      stdio: 'pipe',
-    });
-    return appendTypecheckMetadata(result, metadata);
+    const result = runCommand(
+      process.execPath,
+      [
+        resolveCanonicalTypeScriptEntry({ cwd: toolchainRoot }),
+        ...createTypecheckArguments({ checkerCount: resolvedCheckerCount }),
+      ],
+      {
+        cwd,
+        maxBuffer: 16 * 1024 * 1024,
+        stdio: 'pipe',
+      }
+    );
+    return appendTypecheckMetadata(result, { ...metadata, checkerCount: resolvedCheckerCount });
   }
 
   writeGeneratedTypecheckConfigs({ cwd });
 
   const projectIds = metadata.projectIds.filter((projectId) => getTypecheckProject(projectId));
-  const result = runGeneratedProjectTypecheck({ cwd, projectIds });
+  const result = runGeneratedProjectTypecheck({
+    checkerCount: resolvedCheckerCount,
+    cwd,
+    projectIds,
+    toolchainRoot,
+  });
   return appendTypecheckMetadata(result, {
     ...metadata,
+    checkerCount: resolvedCheckerCount,
     projectIds,
   });
 }
 
 export async function runTypecheckAsync({
+  checkerCount,
   cwd = process.cwd(),
   maxConcurrency = 2,
   mode = 'full',
   projectRunner,
   targetFiles = [],
+  toolchainRoot = TYPESCRIPT_TOOLCHAIN_ROOT,
 } = {}) {
   const metadata = resolveTypecheckRun({ mode, targetFiles });
+  const resolvedCheckerCount = checkerCount ?? TYPECHECK_CHECKERS[metadata.mode] ?? 1;
+  if (!Number.isInteger(resolvedCheckerCount) || resolvedCheckerCount < 1) {
+    throw new Error('Typecheck checkerCount must be a positive integer.');
+  }
   if (metadata.mode === 'skip') return createSkippedTypecheckResult(metadata);
-  if (metadata.mode === 'full') return runTypecheck({ cwd, mode, targetFiles });
+  if (metadata.mode === 'full') {
+    return runTypecheck({
+      checkerCount: resolvedCheckerCount,
+      cwd,
+      mode,
+      targetFiles,
+      toolchainRoot,
+    });
+  }
 
   writeGeneratedTypecheckConfigs({ cwd });
   const projectIds = metadata.projectIds.filter((projectId) => getTypecheckProject(projectId));
   const result = await runGeneratedProjectTypecheckAsync({
+    checkerCount: resolvedCheckerCount,
     cwd,
     maxConcurrency,
     projectIds,
-    projectRunner,
+    projectRunner:
+      projectRunner ??
+      ((projectId) =>
+        runGeneratedProjectCommand({
+          checkerCount: resolvedCheckerCount,
+          cwd,
+          projectId,
+          toolchainRoot,
+        })),
   });
-  return appendTypecheckMetadata(result, { ...metadata, projectIds });
+  return appendTypecheckMetadata(result, {
+    ...metadata,
+    checkerCount: resolvedCheckerCount,
+    projectIds,
+  });
 }
 
 if (isExecutedAsScript(import.meta.url)) {

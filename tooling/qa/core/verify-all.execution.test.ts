@@ -4,7 +4,6 @@ function createAggregateCollectors() {
   return {
     collectLineLengthStep: () => ({ label: 'Changed-line readability', status: 'ok' }),
     collectOxlintStep: () => ({ label: 'Oxlint', status: 'ok' }),
-    collectEslintStep: async () => ({ label: 'ESLint', status: 'ok' }),
     collectSonarjsReleaseStep: async () => ({ label: 'SonarJS', status: 'ok' }),
     collectAiHygieneStep: () => ({ label: 'AI hygiene', status: 'ok' }),
     collectStructuralRiskStep: () => ({ label: 'Structural risk', status: 'ok' }),
@@ -40,8 +39,8 @@ function collectFailedReleaseStatuses(result) {
 function createHardfailCollectors(buildCollector) {
   return {
     ...createAggregateCollectors(),
-    collectEslintStep: async () => ({
-      label: 'ESLint',
+    collectOxlintStep: () => ({
+      label: 'Oxlint',
       status: 'failed',
       summary: 'failed',
     }),
@@ -78,8 +77,7 @@ it('aggregates release hardfail steps and skips build after earlier failures', a
   expect(result.scopeDetail).toBe('release full-suite tests without coverage');
   expect(collectFailedReleaseStatuses(result)).toEqual([
     ['Changed-line readability', 'ok'],
-    ['Oxlint', 'ok'],
-    ['ESLint', 'failed'],
+    ['Oxlint', 'failed'],
     ['SonarJS', 'ok'],
     ['AI hygiene', 'ok'],
     ['Structural risk', 'ok'],
@@ -191,7 +189,6 @@ it('accepts one dependency graph collector while preserving release step order',
   expect(result.steps.map((step) => step.label)).toEqual([
     'Changed-line readability',
     'Oxlint',
-    'ESLint',
     'AI hygiene',
     'Structural risk',
     'Naming',
@@ -240,26 +237,11 @@ it('keeps SonarJS release-only in the full verification collector', async () => 
   expect(sonarjsCollector).toHaveBeenCalledTimes(1);
 });
 
-it('shares one release ESLint analysis while preserving separate gate results', async () => {
+it('keeps Oxlint, SonarJS, and security as independent release owners', async () => {
   const module = await import('./verify-all.execution.mjs');
-  const rawResults = [{ filePath: '/repo/apps/extension/src/example.ts', messages: [] }];
-  const lintRunner = vi.fn(async () => ({
-    failed: false,
-    warningCount: 0,
-    errorCount: 0,
-    output: '',
-    results: rawResults,
-  }));
-  const eslintProjector = vi.fn(async () => ({
-    failed: false,
-    warningCount: 0,
-    errorCount: 0,
-    output: '',
-    results: rawResults,
-  }));
+  const oxlintCollector = vi.fn(() => ({ label: 'Oxlint', status: 'ok' as const }));
   const sonarjsCollector = vi.fn(async () => ({ label: 'SonarJS', status: 'ok' as const }));
   const securityCollector = vi.fn(async () => ({ label: 'Security', status: 'ok' as const }));
-  const overrideConfig = [{ files: ['synthetic-product-scope'] }];
 
   const result = await module.collectReleaseLintLane(
     {
@@ -268,47 +250,32 @@ it('shares one release ESLint analysis while preserving separate gate results', 
       targetFiles: ['apps/extension/src/example.ts'],
     },
     {
-      eslintProjector,
-      lintRunner,
-      overrideConfigFactory: () => overrideConfig,
+      oxlintCollector,
       securityCollector,
       sonarjsCollector,
     }
   );
 
-  expect(lintRunner).toHaveBeenCalledTimes(1);
-  expect(lintRunner).toHaveBeenCalledWith(
-    expect.objectContaining({ overrideConfig, strict: false })
-  );
-  expect(eslintProjector).toHaveBeenCalledWith(rawResults, {
-    excludedRulePrefixes: ['sonarjs/'],
-    strict: true,
-  });
+  expect(oxlintCollector).toHaveBeenCalledTimes(1);
   expect(sonarjsCollector).toHaveBeenCalledWith(
-    expect.objectContaining({ eslintResults: rawResults })
+    expect.not.objectContaining({ eslintResults: expect.anything() })
   );
   expect(securityCollector).toHaveBeenCalledWith(
-    expect.objectContaining({ eslintResults: rawResults })
+    expect.not.objectContaining({ eslintResults: expect.anything() })
   );
-  expect([result.eslintStep.label, result.sonarjsStep.label, result.securityStep.label]).toEqual([
-    'ESLint',
+  expect([result.oxlintStep.label, result.sonarjsStep.label, result.securityStep.label]).toEqual([
+    'Oxlint',
     'SonarJS',
     'Security',
   ]);
 });
 
-it('keeps non-release security repo-wide and scopes only shared release results', async () => {
+it('keeps full verification security repo-wide without a shared lint result bag', async () => {
   const module = await import('./full-verify-audit-steps.mjs');
   const securityCollector = vi.fn(async () => ({ label: 'Security', status: 'ok' as const }));
   const codeFiles = ['tooling/qa/core/example.mjs'];
 
-  await module.collectOptionalSecurityStep(
-    { codeFiles, eslintResults: null },
-    { securityCollector }
-  );
+  await module.collectOptionalSecurityStep({ codeFiles }, { securityCollector });
   expect(securityCollector).toHaveBeenLastCalledWith();
-
-  const eslintResults = [{ filePath: '/repo/tooling/qa/core/example.mjs', messages: [] }];
-  await module.collectOptionalSecurityStep({ codeFiles, eslintResults }, { securityCollector });
-  expect(securityCollector).toHaveBeenLastCalledWith({ eslintResults, files: codeFiles });
+  expect(securityCollector).toHaveBeenCalledTimes(1);
 });

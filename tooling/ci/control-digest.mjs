@@ -17,9 +17,9 @@ const CONTROL_FILES = Object.freeze([
   '.dockerignore',
   '.editorconfig',
   '.npmrc',
-  '.prettierignore',
-  '.prettierrc.json',
-  'eslint.config.js',
+  '.oxfmtignore',
+  '.oxfmtrc.json',
+  '.oxlintrc.json',
   'package.json',
   'package-lock.json',
   'playwright.config.ts',
@@ -28,10 +28,9 @@ const CONTROL_FILES = Object.freeze([
   'vitest.config.ts',
 ]);
 const CONTROL_FILE_PATTERNS = Object.freeze([
-  /(?:^|\/)eslint[.]config[.][cm]?[jt]s$/u,
+  /(?:^|\/)oxlint[.]config[.][cm]?[jt]s$/u,
   /(?:^|\/)playwright[.]config[.][cm]?[jt]s$/u,
   /(?:^|\/)postcss[.]config[.][cm]?[jt]s$/u,
-  /(?:^|\/)prettier[.]config[.][cm]?[jt]s$/u,
   /(?:^|\/)tailwind[.]config[.][cm]?[jt]s$/u,
   /(?:^|\/)vite[.]config[.][cm]?[jt]s$/u,
   /(?:^|\/)vitest[.]config[.][cm]?[jt]s$/u,
@@ -88,12 +87,14 @@ function visit(cwd, relative, output) {
 function isDiscoveredControlFile(relative) {
   const normalized = relative.replaceAll(path.sep, '/');
   const basename = path.posix.basename(normalized);
-  const isPrettierConfig = basename === '.prettierrc' || basename.startsWith('.prettierrc.');
+  const isOxfmtConfig = basename === '.oxfmtrc' || basename.startsWith('.oxfmtrc.');
+  const isOxlintConfig = basename === '.oxlintrc' || basename.startsWith('.oxlintrc.');
   const isTypeScriptConfig =
     basename === 'tsconfig.json' ||
     (basename.startsWith('tsconfig.') && basename.endsWith('.json'));
   return (
-    isPrettierConfig ||
+    isOxfmtConfig ||
+    isOxlintConfig ||
     isTypeScriptConfig ||
     CONTROL_FILE_PATTERNS.some((pattern) => pattern.test(normalized))
   );

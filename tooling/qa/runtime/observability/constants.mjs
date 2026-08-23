@@ -1,4 +1,19 @@
-export const OBSERVABILITY_SCHEMA_VERSION = 2;
+export const OBSERVABILITY_SCHEMA_VERSION = 3;
+
+export const ACTIVITY_STATES = Object.freeze([
+  'queued',
+  'started',
+  'completed',
+  'failed',
+  'skipped',
+  'interrupted',
+]);
+
+export const ACTIVITY_WAIT_REASONS = Object.freeze([
+  'dependency',
+  'resource-tokens',
+  'concurrency-limit',
+]);
 export const MAX_REPOSITORY_TARGET_FILES = 25_000;
 
 export const DEFAULT_PATHS = Object.freeze({

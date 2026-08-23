@@ -12,20 +12,25 @@ function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-export function writeImageProof(root, { commit, digest, repository, runId }) {
+export function writeImageProof(root, { commit, digest, repository, runAttempt, runId }) {
   if (!COMMIT_PATTERN.test(commit ?? '') || !DIGEST_PATTERN.test(digest ?? '')) {
     throw new Error('Image proof requires a full commit SHA and registry digest.');
   }
-  if (!/^\d+$/u.test(String(runId ?? '')) || repository !== 'lrozhkov/sniptale') {
+  if (
+    !/^\d+$/u.test(String(runId ?? '')) ||
+    !/^\d+$/u.test(String(runAttempt ?? '')) ||
+    repository !== 'lrozhkov/sniptale'
+  ) {
     throw new Error('Image proof repository or workflow run identity is invalid.');
   }
   fs.mkdirSync(root, { recursive: true });
   const proof = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     artifactKind: 'sniptale-qa-image-proof',
     repository,
     workflow: 'quality-gate.yml',
     workflowRunId: String(runId),
+    workflowRunAttempt: String(runAttempt),
     commit,
     image: IMAGE,
     digest,
@@ -38,7 +43,7 @@ export function writeImageProof(root, { commit, digest, repository, runId }) {
   return proof;
 }
 
-export function verifyImageProof(root, { commit, repository, runId }) {
+export function verifyImageProof(root, { commit, repository, runAttempt, runId }) {
   const entries = fs.readdirSync(root, { withFileTypes: true });
   if (
     entries.length !== 2 ||
@@ -57,11 +62,12 @@ export function verifyImageProof(root, { commit, repository, runId }) {
     throw new Error('Image proof checksum does not match.');
   }
   if (
-    proof.schemaVersion !== 1 ||
+    proof.schemaVersion !== 2 ||
     proof.artifactKind !== 'sniptale-qa-image-proof' ||
     proof.repository !== repository ||
     proof.workflow !== 'quality-gate.yml' ||
     proof.workflowRunId !== String(runId) ||
+    proof.workflowRunAttempt !== String(runAttempt) ||
     proof.commit !== commit ||
     proof.image !== IMAGE ||
     !DIGEST_PATTERN.test(proof.digest ?? '')
@@ -72,14 +78,16 @@ export function verifyImageProof(root, { commit, repository, runId }) {
 }
 
 if (isExecutedAsScript(import.meta.url)) {
-  const [mode, root, commit, runId, digest] = process.argv.slice(2);
+  const [mode, root, commit, runId, runAttempt, digest] = process.argv.slice(2);
   const repository = process.env.GITHUB_REPOSITORY ?? 'lrozhkov/sniptale';
   if (mode === 'write') {
-    writeImageProof(path.resolve(root), { commit, digest, repository, runId });
+    writeImageProof(path.resolve(root), { commit, digest, repository, runAttempt, runId });
   } else if (mode === 'verify') {
-    const proof = verifyImageProof(path.resolve(root), { commit, repository, runId });
+    const proof = verifyImageProof(path.resolve(root), { commit, repository, runAttempt, runId });
     process.stdout.write(`${proof.reference}\n`);
   } else {
-    throw new Error('Usage: image-proof.mjs <write|verify> <root> <commit> <run-id> [digest]');
+    throw new Error(
+      'Usage: image-proof.mjs <write|verify> <root> <commit> <run-id> <run-attempt> [digest]'
+    );
   }
 }

@@ -107,13 +107,13 @@ it('tracks DOM fullscreen open and close around the stage frame owner', () => {
   });
 
   act(() => {
-    (container?.querySelector('button') as HTMLButtonElement).click();
+    (container!.querySelector('button') as HTMLButtonElement).click();
   });
 
   expect(container?.querySelector('[data-testid="state"]')?.textContent).toBe('open');
 
   act(() => {
-    (container?.querySelectorAll('button')[1] as HTMLButtonElement).click();
+    (container!.querySelectorAll('button')[1] as HTMLButtonElement).click();
   });
 
   expect(container?.querySelector('[data-testid="state"]')?.textContent).toBe('closed');

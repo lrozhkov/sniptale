@@ -1,4 +1,5 @@
 import {
+  assertPositiveInteger,
   assertRecord,
   assertStringArray,
   parseLaneWorkerInput,
@@ -12,10 +13,11 @@ export function parseBuildWorkerInput(value) {
   const input = parseLaneWorkerInput(value, {
     contextFields: ['codeFiles', 'targetFiles'],
     contextStringArrayFields: ['codeFiles', 'targetFiles'],
-    extraFields: ['buildScope'],
+    extraFields: ['buildScope', 'typecheckCheckerCount'],
     label: 'Build QA worker',
     lanes: BUILD_LANES,
   });
+  assertPositiveInteger(input.typecheckCheckerCount, 'Build QA worker checker count');
   const buildScope = assertRecord(input.buildScope, 'Build QA worker buildScope');
   if (
     JSON.stringify(Object.keys(buildScope).sort()) !== JSON.stringify(['staticScope', 'testScope'])

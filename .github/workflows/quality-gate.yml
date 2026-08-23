@@ -56,22 +56,26 @@ jobs:
           SELECTEL_RELEASE_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+          SNIPTALE_PROOF_LANE: proof
         run: |
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME --env SELECTEL_QA_PROFILES \
+            --env SNIPTALE_PROOF_LANE \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             sniptale-controller:preflight preflight
           mv build/selectel-controller/preflight.json build/selectel-controller/preflight-qa.json
+          export SNIPTALE_PROOF_LANE=release
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_QA_PROFILES="$SELECTEL_RELEASE_PROFILES" \
+            --env SNIPTALE_PROOF_LANE \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             sniptale-controller:preflight preflight
           mv build/selectel-controller/preflight.json build/selectel-controller/preflight-release.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: selectel-connectivity-${{ github.sha }}-${{ github.run_id }}
+          name: selectel-connectivity-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/selectel-controller/preflight-*.json
           if-no-files-found: error
           retention-days: 30
@@ -122,7 +126,7 @@ jobs:
         id: derive
         if: steps.source.outcome == 'success'
         working-directory: candidate
-        run: node tooling/ci/derive-fast-proof.mjs "$RUNNER_TEMP/base-fast-proof" "build/ci-artifacts/proof-${CANDIDATE_SHA}-${GITHUB_RUN_ID}" "$BASE_SHA"
+        run: node tooling/ci/derive-fast-proof.mjs "$RUNNER_TEMP/base-fast-proof" "build/ci-artifacts/proof-${CANDIDATE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" "$BASE_SHA"
       - name: Publish docs-only admission decision
         id: admission
         if: always()
@@ -137,8 +141,8 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: steps.admission.outputs.reuse == 'true'
         with:
-          name: fast-proof-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/ci-artifacts/proof-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: fast-proof-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidate/build/ci-artifacts/proof-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
@@ -286,7 +290,8 @@ jobs:
       - name: Provision first available disposable runner
         env:
           CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
-          SELECTEL_QA_PROFILES: ${{ env.GATE_MODE == 'release-provenance' && vars.SELECTEL_RELEASE_PROFILES || vars.SELECTEL_QA_PROFILES }}
+          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}
+          SELECTEL_RELEASE_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
@@ -298,17 +303,28 @@ jobs:
           SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
           SNIPTALE_TRUSTED_CONTROL_SHA: ${{ env.TRUSTED_CONTROL_SHA }}
           SNIPTALE_QA_IMAGE: ${{ needs.qa-image.outputs.reference }}
+          SNIPTALE_PROOF_LANE: ${{ env.PROOF_LANE }}
         run: |
+          selected_profiles="$SELECTEL_QA_PROFILES"
+          if [ "$GATE_MODE" = release-provenance ]; then
+            selected_profiles="$SELECTEL_RELEASE_PROFILES"
+            if [ -z "$selected_profiles" ]; then
+              echo 'SELECTEL_RELEASE_PROFILES is required for release provenance.' >&2
+              exit 1
+            fi
+          fi
           anonymous_config="$RUNNER_TEMP/sniptale-anonymous-docker"
           mkdir -p "$anonymous_config"
           DOCKER_CONFIG="$anonymous_config" docker manifest inspect "$SNIPTALE_QA_IMAGE" >/dev/null
           printf '%s' "$CONTROLLER_IMAGE_TOKEN" | docker login ghcr.io --username "$CONTROLLER_IMAGE_USER" --password-stdin >/dev/null
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_QA_PROFILES --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_QA_PROFILES="$selected_profiles" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN \
             --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_BASE_SHA --env SNIPTALE_TRUSTED_CONTROL_SHA \
-            --env SNIPTALE_QA_IMAGE --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
+            --env SNIPTALE_QA_IMAGE --env SNIPTALE_PROOF_LANE \
+            --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
             "$CONTROLLER_IMAGE" provision
       - name: Export sanitized selected profile
         id: record
@@ -320,8 +336,8 @@ jobs:
             exit 0
           fi
           if jq -e '
-            (.runnerId != null or .serverId != null or (.portIds | length) > 0 or (.routerPortIds | length) > 0 or (.routerInterfacePortIds | length) > 0 or .routerId != null or .subnetId != null or .networkId != null or (.volumeIds | length) > 0) or
-            any(.attempts[]?; .runnerId != null or .serverId != null or (.portIds | length) > 0 or (.routerPortIds | length) > 0 or (.routerInterfacePortIds | length) > 0 or .routerId != null or .subnetId != null or .networkId != null or (.volumeIds | length) > 0)
+            (.runnerId != null or .serverId != null or (.portIds | length) > 0 or .securityGroupId != null or (.routerPortIds | length) > 0 or (.routerInterfacePortIds | length) > 0 or .routerId != null or .subnetId != null or .networkId != null or (.volumeIds | length) > 0) or
+            any(.attempts[]?; .runnerId != null or .serverId != null or (.portIds | length) > 0 or .securityGroupId != null or (.routerPortIds | length) > 0 or (.routerInterfacePortIds | length) > 0 or .routerId != null or .subnetId != null or .networkId != null or (.volumeIds | length) > 0)
           ' "$record" >/dev/null; then
             echo 'exists=true' >> "$GITHUB_OUTPUT"
             echo "receipt_b64=$(base64 -w0 "$record")" >> "$GITHUB_OUTPUT"
@@ -336,7 +352,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: selectel-provision-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: selectel-provision-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/selectel-controller/provision.json
           if-no-files-found: warn
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
@@ -409,6 +425,7 @@ jobs:
             fi
           fi
       - name: Run exact canonical commit gate
+        timeout-minutes: 225
         working-directory: candidate
         env:
           SNIPTALE_BASE_SHA: ${{ env.BASE_SHA }}
@@ -431,8 +448,19 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
-          path: candidate/build/ci-artifacts/${{ env.PROOF_LANE }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidate/build/ci-artifacts/${{ env.PROOF_LANE }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
+      - name: Upload incremental failure evidence when proof sealing did not complete
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: canonical-failure-evidence-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            candidate/.tmp/qa-observability/runs
+            candidate/.tmp/qa-logs
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
@@ -444,11 +472,11 @@ jobs:
       - name: Publish proof location and selected resources
         if: always()
         env:
-          ARTIFACT_NAME: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          ARTIFACT_NAME: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           ARTIFACT_URL: ${{ steps.canonical-proof.outputs.artifact-url }}
           BYPASS_REASON: ${{ inputs.bypass_reason || '' }}
         run: |
-          manifest="candidate/build/ci-artifacts/${PROOF_LANE}-${CANDIDATE_SHA}-${GITHUB_RUN_ID}/proof-manifest.json"
+          manifest="candidate/build/ci-artifacts/${PROOF_LANE}-${CANDIDATE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/proof-manifest.json"
           failed_phase=$(jq -r '.phases[]? | select(.status == "failed") | .id' "$manifest" 2>/dev/null | head -n 1)
           {
             echo "### ${PROOF_KIND}"
@@ -480,7 +508,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
         if: always()
         with:
-          name: selectel-smoke-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: selectel-smoke-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/selectel-controller/infrastructure-smoke.json
           if-no-files-found: warn
           retention-days: 30
@@ -515,7 +543,7 @@ jobs:
           }
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v6.0.0
         with:
-          name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: candidate-proof
       - name: Admit candidate evidence with trusted-base policy
         id: admit
@@ -539,14 +567,14 @@ jobs:
           echo "execution_path=$execution_path" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
         with:
-          name: trusted-admission-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: trusted-admission-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/trusted-admission/admission.json
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
   cleanup:
     needs: [qa-image, provision, canonical-qa, infrastructure-smoke]
-    if: always() && needs.provision.outputs.has-record == 'true'
+    if: always() && needs.qa-image.result == 'success' && needs.provision.result != 'skipped'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: selectel-runner-controller
@@ -558,16 +586,21 @@ jobs:
         continue-on-error: true
         with:
           {
-            name: 'selectel-provision-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
+            name: 'selectel-provision-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}',
             path: controller,
           }
       - name: Restore the early provision receipt independently of artifact transport
+        id: receipt
         env:
           PROVISION_RECEIPT_B64: ${{ needs.provision.outputs.receipt_b64 }}
         run: |
           mkdir -p controller
           if [ ! -f controller/provision.json ]; then
-            printf '%s' "$PROVISION_RECEIPT_B64" | base64 --decode > controller/provision.json
+            if [ -n "$PROVISION_RECEIPT_B64" ]; then
+              printf '%s' "$PROVISION_RECEIPT_B64" | base64 --decode > controller/provision.json
+            else
+              echo 'recovery=true' >> "$GITHUB_OUTPUT"
+            fi
           fi
       - name: Delete VM, volume, port, and JIT registration
         env:
@@ -577,14 +610,19 @@ jobs:
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
           RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
         run: |
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
+          command=cleanup
+          if [ ! -s controller/provision.json ]; then command=recover-cleanup; fi
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup /workspace/controller/provision.json
+            --env RUNNER_CONTROLLER_TOKEN --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
+            "$CONTROLLER_IMAGE" "$command" /workspace/controller/provision.json
       - name: Report cleanup status
         if: always()
         run: |
@@ -598,7 +636,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: selectel-cleanup-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}
+          name: selectel-cleanup-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: controller/provision.json
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
@@ -614,7 +652,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           {
-            name: '${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}',
+            name: '${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}',
             path: reports,
           }
       - id: reports
@@ -671,17 +709,17 @@ jobs:
           done
           docker buildx imagetools create --tag "ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}" --tag ghcr.io/lrozhkov/sniptale-qa:main "$QA_SOURCE"
           docker buildx imagetools create --tag "ghcr.io/lrozhkov/sniptale-controller:sha-${GITHUB_SHA}" --tag ghcr.io/lrozhkov/sniptale-controller:main "$CONTROLLER_SOURCE"
-          node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "${QA_SOURCE##*@}"
+          node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "${QA_SOURCE##*@}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: qa-image-proof-${{ github.sha }}-${{ github.run_id }}
+          name: qa-image-proof-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/qa-image-proof
           if-no-files-found: error
           retention-days: 30
 
   scheduled-sweeper:
-    needs: qa-image
-    if: github.event_name == 'schedule'
+    needs: cleanup
+    if: always() && github.event_name == 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: selectel-runner-controller
@@ -691,7 +729,7 @@ jobs:
         with: { persist-credentials: false }
       - name: Delete expired managed Selectel resources
         env:
-          CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
+          CONTROLLER_IMAGE: ghcr.io/lrozhkov/sniptale-controller:sha-${{ env.TRUSTED_CONTROL_SHA }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
@@ -708,7 +746,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: selectel-sweep-${{ github.sha }}-${{ github.run_id }}
+          name: selectel-sweep-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/selectel-controller/sweep.json
           if-no-files-found: error
           retention-days: 30

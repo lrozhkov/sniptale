@@ -9,11 +9,11 @@ const {
   initTracerMock: vi.fn(),
   initializeBackgroundRuntimeMock: vi.fn(),
   registerBackgroundRuntimeMessageListenerMock: vi.fn(),
-  scenarioSessionServiceCtorMock: vi.fn(function ScenarioSessionServiceMock(this: {
-    kind: string;
-  }) {
-    this.kind = 'scenario-session-service';
-  }),
+  scenarioSessionServiceCtorMock: vi.fn(
+    function ScenarioSessionServiceMock(this: { kind: string }) {
+      this.kind = 'scenario-session-service';
+    }
+  ),
 }));
 
 vi.mock('@sniptale/platform/observability/message-tracer', () => ({

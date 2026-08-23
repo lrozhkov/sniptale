@@ -42,6 +42,20 @@ it('machine-fixes full Vitest and release readiness to ci:release only', async (
     ])
   );
   expect(release.context).toMatchObject({ mode: 'ci:release' });
+
+  const reusedRelease = await collectCiReleaseResults({
+    reuseFastProof: true,
+    productProofCollector: async () => ({ steps: [passed] }),
+    auditCollector: async () => ({ steps: [passed] }),
+    mutationCollector: () => passed,
+  });
+  expect(reusedRelease).toMatchObject({ executionMode: 'reuse-fast-proof' });
+  expect(reusedRelease.steps).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ label: 'Fast proof reuse', status: 'skipped' }),
+      passed,
+    ])
+  );
 });
 
 it('keeps the trusted phase orchestrator aligned with admission policy', () => {

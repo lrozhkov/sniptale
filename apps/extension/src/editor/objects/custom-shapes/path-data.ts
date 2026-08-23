@@ -75,7 +75,7 @@ function readNumberToken(data: string, start: number): string | null {
 
 function tokenizePathData(data: string): string[] {
   const tokens: string[] = [];
-  for (let index = 0; index < data.length; ) {
+  for (let index = 0; index < data.length;) {
     const char = data[index];
     if (isWhitespaceOrComma(char)) {
       index += 1;

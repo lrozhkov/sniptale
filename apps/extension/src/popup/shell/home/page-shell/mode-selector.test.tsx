@@ -16,12 +16,12 @@ it('switches between shortcuts, tab and desktop capture with an expanded active 
     <ScreenshotModeSelector mode="tab" tabDisabledReason={null} onModeChange={onModeChange} />
   );
   (
-    getContainer()?.querySelector(
+    getContainer()!.querySelector(
       '[aria-label="popup.home.captureWindowLabel"]'
     ) as HTMLButtonElement
   ).click();
   (
-    getContainer()?.querySelector(
+    getContainer()!.querySelector(
       '[aria-label="popup.home.shortcutsModeLabel"]'
     ) as HTMLButtonElement
   ).click();
@@ -40,14 +40,14 @@ it('disables tab independently from desktop capture', async () => {
   );
   expect(
     (
-      getContainer()?.querySelector(
+      getContainer()!.querySelector(
         '[aria-label="popup.home.captureTabLabel"]'
       ) as HTMLButtonElement
     ).disabled
   ).toBe(true);
   expect(
     (
-      getContainer()?.querySelector(
+      getContainer()!.querySelector(
         '[aria-label="popup.home.captureWindowLabel"]'
       ) as HTMLButtonElement
     ).disabled

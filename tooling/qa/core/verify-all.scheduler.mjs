@@ -14,12 +14,14 @@ import {
   runBoundedTasks,
 } from '../runtime/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from './owner-guard-step-helpers.mjs';
+import { TYPECHECK_CHECKERS, TYPESCRIPT_TOOL_VERSION } from './typescript-cli.mjs';
+import { OXLINT_TOOL_VERSION } from './verify-oxlint.mjs';
 
 const FULL_VERIFY_WORKER_URL = new URL('./verify-all.worker.mjs', import.meta.url);
 const LANE_RESOURCES = Object.freeze({
   appOwners: { cpuTokens: 1, memoryMiB: 1024 },
   targetPaths: { cpuTokens: 1, memoryMiB: 1024 },
-  typecheck: { cpuTokens: 1, memoryMiB: 3072 },
+  typecheck: { cpuTokens: TYPECHECK_CHECKERS.full, memoryMiB: 5120 },
   graph: { cpuTokens: 1, memoryMiB: 2048 },
   lint: { cpuTokens: 2, memoryMiB: 6144 },
   tests: { memoryMiB: 4096 },
@@ -31,11 +33,10 @@ const FULL_RESULT_SHAPES = Object.freeze({
   targetPaths: { ownerStep: 'step' },
   typecheck: { typecheckStep: 'step' },
   tests: { testSteps: 'steps' },
-  lint: { eslintStep: 'step', sonarjsStep: 'nullable-step', securityStep: 'step' },
+  lint: { oxlintStep: 'step', sonarjsStep: 'nullable-step', securityStep: 'step' },
   graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
   light: {
     lineLengthStep: 'step',
-    oxlintStep: 'step',
     aiHygieneStep: 'step',
     structuralRiskStep: 'step',
     namingStep: 'step',
@@ -46,13 +47,20 @@ const FULL_RESULT_SHAPES = Object.freeze({
   },
 });
 
-export function runFullVerifyLaneWorker({ context, lane, memoryMiB, signal, vitestMaxWorkers }) {
+export function runFullVerifyLaneWorker({
+  context,
+  lane,
+  memoryMiB,
+  signal,
+  typecheckCheckerCount,
+  vitestMaxWorkers,
+}) {
   return runQaLaneWorker({
     label: `Full verification worker ${lane}`,
     memoryMiB,
     resultParser: (value) => parseLaneResult(value, { lane, shapes: FULL_RESULT_SHAPES }),
     signal,
-    workerData: { context, lane, vitestMaxWorkers },
+    workerData: { context, lane, typecheckCheckerCount, vitestMaxWorkers },
     workerUrl: FULL_VERIFY_WORKER_URL,
   });
 }
@@ -68,10 +76,14 @@ function createFullVerifyWorkerContext(context) {
 
 function createTasks({ context, includeTests, profile, workerRunner }) {
   const workerContext = createFullVerifyWorkerContext(context);
+  const typecheckCheckerCount = Math.min(TYPECHECK_CHECKERS.full, profile.cpuTokens);
   const lanes = ['targetPaths', 'appOwners', 'typecheck', 'lint', 'graph', 'light'];
   if (includeTests) lanes.splice(3, 0, 'tests');
   return lanes.map((lane) => {
-    const resources = LANE_RESOURCES[lane];
+    const resources =
+      lane === 'typecheck'
+        ? { ...LANE_RESOURCES.typecheck, cpuTokens: typecheckCheckerCount }
+        : LANE_RESOURCES[lane];
     const dedicatedReleaseTests = context.releaseMode && lane === 'tests';
     const cpuTokens =
       lane === 'tests'
@@ -83,14 +95,32 @@ function createTasks({ context, includeTests, profile, workerRunner }) {
     return {
       id: lane,
       cpuTokens,
+      dependencies: lane === 'lint' ? ['typecheck'] : [],
       exclusive: dedicatedReleaseTests,
+      executionProfile:
+        lane === 'typecheck'
+          ? {
+              checkerCount: typecheckCheckerCount,
+              toolName: 'typescript',
+              toolVersion: TYPESCRIPT_TOOL_VERSION,
+            }
+          : lane === 'lint'
+            ? { toolName: 'oxlint', toolVersion: OXLINT_TOOL_VERSION }
+            : {},
       memoryMiB,
+      workers:
+        lane === 'tests'
+          ? profile.vitestMaxWorkers
+          : lane === 'typecheck'
+            ? typecheckCheckerCount
+            : 1,
       run: ({ signal }) =>
         workerRunner({
           context: workerContext,
           lane,
           memoryMiB,
           signal,
+          typecheckCheckerCount,
           vitestMaxWorkers: profile.vitestMaxWorkers,
         }),
     };
@@ -110,7 +140,7 @@ function annotate(result, profile) {
     return appendTaskResultScheduleDetail(value, 'testSteps', detail, { list: true });
   }
   if (result.id === 'lint') {
-    return { ...value, eslintStep: appendTaskScheduleDetail(value.eslintStep, detail) };
+    return { ...value, oxlintStep: appendTaskScheduleDetail(value.oxlintStep, detail) };
   }
   if (result.id === 'graph') {
     return {
@@ -133,8 +163,7 @@ function assemble(results, releaseMode, includeTests) {
   const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
   return [
     light.lineLengthStep,
-    light.oxlintStep,
-    lint.eslintStep,
+    lint.oxlintStep,
     ...(releaseMode ? [lint.sonarjsStep] : []),
     light.aiHygieneStep,
     light.structuralRiskStep,

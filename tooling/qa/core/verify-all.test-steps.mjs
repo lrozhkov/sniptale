@@ -107,7 +107,7 @@ export async function collectCycleCheckStepResult({ targetFiles }) {
   return cycleStep;
 }
 
-export function collectTypecheckStepResult({ targetFiles }) {
+export function collectTypecheckStepResult({ checkerCount, targetFiles }) {
   const startedAtMs = Date.now();
   const reusableTypecheckState = resolveReusableTypecheckState({
     checkedProjectIds: FULL_TYPECHECK_PROJECT_IDS,
@@ -123,7 +123,7 @@ export function collectTypecheckStepResult({ targetFiles }) {
   }
 
   const { durationMs, value: typecheckResult } = measureSyncStep(() =>
-    runTypecheck({ mode: 'full', targetFiles })
+    runTypecheck({ checkerCount, mode: 'full', targetFiles })
   );
   if (typecheckResult.status !== 0) {
     return createFailureStep('Typecheck', 'failed', {
@@ -140,7 +140,11 @@ export function collectTypecheckStepResult({ targetFiles }) {
     source: 'full-verify',
   });
   return {
-    ...createOkStep('Typecheck'),
+    ...createOkStep(
+      'Typecheck',
+      `typescript=${typecheckResult.typecheckToolVersion}; ` +
+        `checkers=${typecheckResult.typecheckCheckerCount}`
+    ),
     durationMs,
   };
 }

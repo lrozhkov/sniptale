@@ -7,8 +7,11 @@ import {
 const TYPECHECK_TOOL = 'verify-typecheck.mjs';
 const TYPECHECK_MODE = 'workspace-state';
 const TYPECHECK_CONFIG_FILES = [
+  'package.json',
+  'package-lock.json',
   'tsconfig.json',
   'tsconfig.node.json',
+  'packages/ui/src/styles/imports.d.ts',
   'apps/extension/vite.config.ts',
   'apps/extension/build/content-runtime-build-id.ts',
   'apps/extension/build/injected-build.ts',
@@ -18,6 +21,7 @@ const TYPECHECK_CONFIG_FILES = [
   'apps/extension/build/extension-html-inputs.ts',
   'tooling/qa/core/typecheck-project-definitions.mjs',
   'tooling/qa/core/typecheck-project-map.mjs',
+  'tooling/qa/core/typescript-cli.mjs',
   'tooling/qa/core/verify-typecheck.mjs',
 ];
 

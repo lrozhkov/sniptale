@@ -43,7 +43,7 @@ it('allows coordinated version drift but rejects executable control drift', () =
   expect(() => checkControlAuthority(trusted, candidate)).toThrow(/bootstrap bypass/u);
 });
 
-it.each(['eslint.config.js', '.dependency-cruiser.cjs', '.prettierrc.json'])(
+it.each(['.oxlintrc.json', '.dependency-cruiser.cjs', '.oxfmtrc.json'])(
   'rejects candidate drift in the live %s control configuration',
   (controlFile) => {
     const trusted = createTempRoot('trusted-controls-');

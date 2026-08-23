@@ -93,6 +93,13 @@
       "sourceKind": "repository"
     },
     {
+      "id": "qa.rule.candidate-proof-admission",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Trusted-base admission remains the authority for candidate proof completeness.",
+      "sourceKind": "repository"
+    },
+    {
       "id": "qa.rule.changed-line-readability",
       "disposition": "keep",
       "owner": "maintainability-governance",
@@ -208,13 +215,6 @@
       "id": "qa.rule.entrypoint-wiring",
       "disposition": "keep",
       "owner": "architecture-boundaries",
-      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
-      "sourceKind": "repository"
-    },
-    {
-      "id": "qa.rule.eslint",
-      "disposition": "keep",
-      "owner": "qa-platform",
       "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
       "sourceKind": "repository"
     },
@@ -370,6 +370,20 @@
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.main-proof-transport",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Canonical main proof transport remains an explicit CI composition control.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.main-proof-verification",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Release admission verifies canonical main proof before reuse or publication.",
       "sourceKind": "repository"
     },
     {
@@ -942,6 +956,12 @@
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
+      "path": "tooling/ci/verify-project-toolchain.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This trusted phase validates the installed project toolchain against the machine lock before canonical controls execute."
+    },
+    {
       "path": "tooling/qa/audits/ast-grep.mjs",
       "disposition": "adapt",
       "owner": "qa-platform",
@@ -1165,12 +1185,6 @@
       "rationale": "Executable behavior is owned by its canonical control identity."
     },
     {
-      "path": "tooling/qa/core/verify-eslint.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "Executable behavior is owned by its canonical control identity."
-    },
-    {
       "path": "tooling/qa/core/verify-export-artifact-boundaries.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1297,6 +1311,12 @@
       "rationale": "Executable behavior is owned by its canonical control identity."
     },
     {
+      "path": "tooling/qa/core/verify-oxfmt.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
       "path": "tooling/qa/core/verify-package-boundaries.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1304,12 +1324,6 @@
     },
     {
       "path": "tooling/qa/core/verify-parser-snapshot-purity.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "Executable behavior is owned by its canonical control identity."
-    },
-    {
-      "path": "tooling/qa/core/verify-prettier.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "Executable behavior is owned by its canonical control identity."
@@ -1463,6 +1477,12 @@
       "disposition": "adapt",
       "owner": "qa-platform",
       "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/typescript-cli.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The exact TypeScript CLI owner prevents bare-bin and compatibility-package drift."
     },
     {
       "path": "tooling/qa/core/verify-typecheck.mjs",
@@ -1842,6 +1862,15 @@
       "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
     },
     {
+      "path": "tooling/configs/qa/formatter-migration.data.json",
+      "consumers": [
+        "tooling/qa/core/verify-oxfmt.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The formatter migration evidence pins every reviewed Oxfmt parity difference and retired authority."
+    },
+    {
       "path": "tooling/configs/qa/knip.json",
       "consumers": [
         "tooling/qa/policy/external-tools.mjs"
@@ -1865,6 +1894,15 @@
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/lint-rule-migration.data.json",
+      "consumers": [
+        "tooling/qa/core/verify-oxlint.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The exact lint migration matrix prevents rule, severity, scope, and residual-owner drift."
     },
     {
       "path": "tooling/configs/qa/manifest-permissions.data.json",
@@ -2187,12 +2225,6 @@
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
-      "id": "qa:raw:eslint",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "The package script is a supported canonical QA operator entrypoint."
-    },
-    {
       "id": "qa:raw:knip",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2205,7 +2237,13 @@
       "rationale": "The package script is a supported canonical QA operator entrypoint."
     },
     {
-      "id": "qa:raw:prettier",
+      "id": "qa:raw:oxfmt",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:oxlint",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The package script is a supported canonical QA operator entrypoint."
@@ -2711,12 +2749,6 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
-      "tool": "verify-eslint.mjs",
-      "disposition": "keep",
-      "owner": "qa-platform",
-      "rationale": "The validation row proves a deterministic repository tool or canonical control."
-    },
-    {
       "tool": "verify-export-artifact-boundaries.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -3005,7 +3037,7 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
-      "tool": "verify-prettier.mjs",
+      "tool": "verify-oxfmt.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."

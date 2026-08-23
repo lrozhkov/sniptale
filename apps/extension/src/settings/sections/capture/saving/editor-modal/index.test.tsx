@@ -214,7 +214,7 @@ it('updates its local state when the edited preset changes', async () => {
   expect((inputs[0] as HTMLInputElement).value).toBe('Exports');
   expect((inputs[1] as HTMLInputElement).value).toBe('exports/final');
   expect(
-    (container?.querySelector('button[aria-pressed]') as HTMLButtonElement).getAttribute(
+    (container!.querySelector('button[aria-pressed]') as HTMLButtonElement).getAttribute(
       'aria-pressed'
     )
   ).toBe('false');

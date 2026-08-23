@@ -2,6 +2,11 @@ import { fork, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { parseQaWorkerEnvelope } from './lane-worker-contract.mjs';
+import {
+  currentTimelineActivityId,
+  recordTimelineTransition,
+  updateTimelineExecutionProfile,
+} from './observability/timeline-context.mjs';
 
 const GRACEFUL_TERMINATION_MS = 1000;
 const FORCED_TERMINATION_MS = 2000;
@@ -133,6 +138,20 @@ export function runQaLaneWorker({
     throw new Error(`${label} requires a result parser.`);
   }
   return new Promise((resolve, reject) => {
+    const laneActivityId = currentTimelineActivityId();
+    const bootstrapActivityId = laneActivityId ? `${laneActivityId}.worker-bootstrap` : null;
+    if (bootstrapActivityId) {
+      recordTimelineTransition({
+        activityId: bootstrapActivityId,
+        kind: 'worker-bootstrap',
+        state: 'queued',
+      });
+      recordTimelineTransition({
+        activityId: bootstrapActivityId,
+        kind: 'worker-bootstrap',
+        state: 'started',
+      });
+    }
     const child = fork(fileURLToPath(workerUrl), workerArguments, {
       detached: process.platform !== 'win32',
       env: { ...process.env, SNIPTALE_QA_LANE_PROCESS: '1' },
@@ -140,6 +159,12 @@ export function runQaLaneWorker({
       serialization: 'advanced',
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     });
+    if (laneActivityId && child.pid) {
+      updateTimelineExecutionProfile(laneActivityId, {
+        pid: child.pid,
+        workerId: `process-${child.pid}`,
+      });
+    }
     let settlementStarted = false;
 
     const removeAbortListener = () => signal?.removeEventListener('abort', onAbort);
@@ -192,7 +217,31 @@ export function runQaLaneWorker({
     if (signal?.aborted) onAbort();
     else {
       child.send(workerData, (error) => {
-        if (error) finishRejected(error);
+        if (error) {
+          if (bootstrapActivityId) {
+            recordTimelineTransition({
+              activityId: bootstrapActivityId,
+              kind: 'worker-bootstrap',
+              state: 'failed',
+            });
+          }
+          finishRejected(error);
+          return;
+        }
+        if (bootstrapActivityId) {
+          recordTimelineTransition({
+            activityId: bootstrapActivityId,
+            kind: 'worker-bootstrap',
+            state: 'completed',
+            executionProfile: {
+              cpuTokens: null,
+              memoryMiB,
+              workers: 1,
+              pid: child.pid ?? null,
+              workerId: child.pid ? `process-${child.pid}` : null,
+            },
+          });
+        }
       });
     }
   });

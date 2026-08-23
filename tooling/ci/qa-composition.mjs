@@ -2,9 +2,11 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
 import { createProcessStep, createSkippedStep } from '../qa/core/focused-qa-results.mjs';
-import { collectAuditProfileResult } from '../qa/wrappers/audit.mjs';
+import { collectAuditProfileResult, recordSkippedAuditProfile } from '../qa/wrappers/audit.mjs';
 import { collectFullVerifyStepResults } from '../qa/core/verify-all.execution.mjs';
 import { resolveRepositoryVerifyScope } from '../qa/core/verify-all.scope.mjs';
+import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
+import { recordSkippedTimelineActivity } from '../qa/runtime/observability/timeline-context.mjs';
 
 const MUTATION_PROFILES = Object.freeze(['persistence', 'secrets']);
 const semantics = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
@@ -31,7 +33,7 @@ export async function collectCiProofResults({
     collectFullVerifyStepResults({
       includeTests: false,
       releaseMode: true,
-      verifyScope: resolveRepositoryVerifyScope(),
+      verifyScope: resolveCiScope(),
     }),
   auditCollector = collectAuditProfileResult,
 } = {}) {
@@ -43,6 +45,7 @@ export async function collectCiProofResults({
     createSkippedStep('Test coverage', 'release-only canonical coverage'),
   ];
   if (hasFailure(productSteps)) {
+    recordSkippedAuditProfile('pr');
     return {
       context: { mode: 'ci:proof', scope: 'commit' },
       steps: productSteps,
@@ -56,17 +59,38 @@ export async function collectCiProofResults({
 }
 
 function runMutationProfile(profile) {
-  const runner = process.env.SNIPTALE_TRUSTED_CI_ROOT
-    ? '/opt/sniptale-trusted/tooling/test/mutation/run-profile.mjs'
-    : 'tooling/test/mutation/run-profile.mjs';
-  const result = spawnSync(
-    process.execPath,
-    [runner, profile, process.env.GITHUB_RUN_ID ?? 'local'],
-    { encoding: 'utf8', env: process.env }
+  return runTimelineActivitySync(
+    {
+      activityId: `mutation-profile.${profile}`,
+      kind: 'mutation-profile',
+      executionProfile: {
+        cpuTokens: 1,
+        memoryMiB: null,
+        workers: 1,
+        pid: process.pid,
+        workerId: `process-${process.pid}`,
+      },
+    },
+    () => {
+      const runner = process.env.SNIPTALE_TRUSTED_CI_ROOT
+        ? '/opt/sniptale-trusted/tooling/test/mutation/run-profile.mjs'
+        : 'tooling/test/mutation/run-profile.mjs';
+      const result = spawnSync(
+        process.execPath,
+        [runner, profile, process.env.GITHUB_RUN_ID ?? 'local'],
+        { encoding: 'utf8', env: process.env }
+      );
+      return createProcessStep(`Mutation ${profile}`, result, {
+        advice: `Inspect .tmp/mutation/${profile}/${process.env.GITHUB_RUN_ID ?? 'local'}/summary.json`,
+      });
+    }
   );
-  return createProcessStep(`Mutation ${profile}`, result, {
-    advice: `Inspect .tmp/mutation/${profile}/${process.env.GITHUB_RUN_ID ?? 'local'}/summary.json`,
-  });
+}
+
+function resolveCiScope() {
+  return runTimelineActivitySync({ activityId: 'scope-resolution', kind: 'scope-resolution' }, () =>
+    resolveRepositoryVerifyScope()
+  );
 }
 
 export async function collectCiReleaseResults({
@@ -75,7 +99,7 @@ export async function collectCiReleaseResults({
   productProofCollector = () =>
     collectFullVerifyStepResults({
       releaseMode: true,
-      verifyScope: resolveRepositoryVerifyScope(),
+      verifyScope: resolveCiScope(),
     }),
   auditCollector = collectAuditProfileResult,
   mutationCollector = runMutationProfile,
@@ -83,11 +107,23 @@ export async function collectCiReleaseResults({
   capability('release');
   const productSteps = [
     ...(reuseFastProof
-      ? [createSkippedStep('Fast proof reuse', 'verified exact commit-bound proof receipt')]
+      ? [
+          runTimelineActivitySync(
+            { activityId: 'fast-proof-reuse', kind: 'proof-reuse', reused: true },
+            () => createSkippedStep('Fast proof reuse', 'verified exact commit-bound proof receipt')
+          ),
+        ]
       : []),
     ...(await productProofCollector()).steps,
   ];
   if (hasFailure(productSteps)) {
+    recordSkippedAuditProfile('release');
+    for (const profile of MUTATION_PROFILES) {
+      recordSkippedTimelineActivity({
+        activityId: `mutation-profile.${profile}`,
+        kind: 'mutation-profile',
+      });
+    }
     return {
       context: { mode: 'ci:release', scope: 'commit' },
       executionMode: reuseFastProof ? 'reuse-fast-proof' : 'default',
@@ -96,6 +132,12 @@ export async function collectCiReleaseResults({
   }
   const audit = await auditCollector({ profileId: 'release', session });
   if (hasFailure(audit.steps)) {
+    for (const profile of MUTATION_PROFILES) {
+      recordSkippedTimelineActivity({
+        activityId: `mutation-profile.${profile}`,
+        kind: 'mutation-profile',
+      });
+    }
     return {
       context: { mode: 'ci:release', scope: 'commit' },
       executionMode: reuseFastProof ? 'reuse-fast-proof' : 'default',

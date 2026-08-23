@@ -49,11 +49,11 @@ it('prepends frame mode commands before surface commands and updates frame draft
     'frame-background-mode',
     'surface-command',
   ]);
-  expect(((commands[0]?.content as any).props.children as any).props.ariaLabel).toBe('Размещение');
-  expect(((commands[1]?.content as any).props.children as any).props.ariaLabel).toBe('Тип фона');
+  expect(((commands[0]!.content as any).props.children as any).props.ariaLabel).toBe('Размещение');
+  expect(((commands[1]!.content as any).props.children as any).props.ariaLabel).toBe('Тип фона');
 
-  const layoutOnChange = ((commands[0]?.content as any).props.children as any).props.onChange;
-  const backgroundOnChange = ((commands[1]?.content as any).props.children as any).props.onChange;
+  const layoutOnChange = ((commands[0]!.content as any).props.children as any).props.onChange;
+  const backgroundOnChange = ((commands[1]!.content as any).props.children as any).props.onChange;
 
   layoutOnChange('solid');
   backgroundOnChange('color');
@@ -73,7 +73,7 @@ it('switches the frame placement note for fit-image layout mode', () => {
 
   const commands = buildFrameCompactCommands(params as never);
 
-  expect((commands[0]?.content as any).props.note).toBe(
+  expect((commands[0]!.content as any).props.note).toBe(
     translate('editor.compact.scenePlacementFitNote')
   );
 });

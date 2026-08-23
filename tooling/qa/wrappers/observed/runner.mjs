@@ -5,6 +5,7 @@ import {
   enforceRetention,
   recoverStaleRuns,
   resolveObservabilityRoot,
+  withObservabilityTimeline,
 } from '../../runtime/observability/index.mjs';
 import { assertQaExecutionContract } from '../../core/qa-steps/contract.mjs';
 import { acquireBlockingWrapperLock } from '../../runtime/blocking-wrapper-lock.helpers.mjs';
@@ -89,7 +90,9 @@ async function executeObservedCommand(input) {
       ...input,
       releaseLock: () => lock?.release(),
     });
-    const result = await input.execute({ options: input.parsed.values, session: input.session });
+    const result = await withObservabilityTimeline(input.session, () =>
+      input.execute({ options: input.parsed.values, session: input.session })
+    );
     return recordObservedResult(input.session, result, input.parsed.values.verbose ?? false, {
       executionMode: input.executionMode,
       invocationMode: input.invocationMode,

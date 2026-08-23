@@ -27,11 +27,9 @@ it('passes release mode only to release wrapper build contexts', async () => {
   });
 
   expect(buildRunner).toHaveBeenNthCalledWith(1, {
-    enforceLint: false,
     mode: 'release',
   });
   expect(buildRunner).toHaveBeenNthCalledWith(2, {
-    enforceLint: false,
     mode: undefined,
   });
 });

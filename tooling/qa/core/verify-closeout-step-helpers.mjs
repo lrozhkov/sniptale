@@ -1,4 +1,8 @@
 import path from 'node:path';
+import {
+  recordSkippedTimelineActivity,
+  runTimelineActivity,
+} from '../runtime/observability/timeline-context.mjs';
 
 import { runBuild, runExtensionBuildEquivalence } from './verify-build.mjs';
 import {
@@ -46,13 +50,13 @@ export function collectNamingStep() {
   return collectMeasuredViolationStep('Naming', 'Naming violations found:', runNamingCheck);
 }
 
-export async function collectSecurityStep({ eslintResults = null, files } = {}) {
+export async function collectSecurityStep({ files, strictWarnings = true } = {}) {
   if (Array.isArray(files) && files.length === 0) {
     return createSkippedStep('Security');
   }
 
   const { durationMs, value: securityResult } = await measureAsyncStep(() =>
-    runSecurityCheck(files, { eslintResults })
+    runSecurityCheck(files, { strictWarnings })
   );
   if (securityResult.eslintResult.failed) {
     return createFailureStep('Security', 'failed', {
@@ -113,12 +117,16 @@ export async function collectBuildStep({
 } = {}) {
   const reusable = buildProofResolver();
   if (reusable.matched) {
-    return createOkStep('Build', `reused verified build/ZIP proof ${reusable.proof.proofDigest}`);
+    return runTimelineActivity({ activityId: 'build', kind: 'build', reused: true }, () =>
+      createOkStep('Build', `reused verified build/ZIP proof ${reusable.proof.proofDigest}`)
+    );
   }
   const { durationMs, value: buildResult } = await measureAsyncStep(() =>
-    requiresExtensionBuildEquivalence(targetFiles)
-      ? equivalenceRunner({ mode: 'release' })
-      : buildRunner({ enforceLint: false, mode: releaseMode ? 'release' : undefined })
+    runTimelineActivity({ activityId: 'build', kind: 'build' }, () =>
+      requiresExtensionBuildEquivalence(targetFiles)
+        ? equivalenceRunner({ mode: 'release' })
+        : buildRunner({ mode: releaseMode ? 'release' : undefined })
+    )
   );
   return {
     ...createProcessStep('Build', buildResult),
@@ -134,15 +142,31 @@ export async function collectReleaseArchiveStep({
 } = {}) {
   const reusable = buildProofResolver();
   if (reusable.matched) {
-    const archivePath = reusableArchiveMaterializer(reusable);
-    buildProofRecorder({
-      archivePath,
-      producerId: 'qa-release-archive-owner',
-      reusedFrom: reusable.proof.proofDigest,
-    });
+    const archivePath = await runTimelineActivity(
+      {
+        activityId: 'release-archive',
+        kind: 'release-archive',
+        dependencies: ['build'],
+        reused: true,
+      },
+      () => {
+        const materialized = reusableArchiveMaterializer(reusable);
+        buildProofRecorder({
+          archivePath: materialized,
+          producerId: 'qa-release-archive-owner',
+          reusedFrom: reusable.proof.proofDigest,
+        });
+        return materialized;
+      }
+    );
     return createOkStep('Release archive', `reused verified archive ${path.basename(archivePath)}`);
   }
-  const { durationMs, value: archiveResult } = await measureAsyncStep(() => archiveRunner());
+  const { durationMs, value: archiveResult } = await measureAsyncStep(() =>
+    runTimelineActivity(
+      { activityId: 'release-archive', kind: 'release-archive', dependencies: ['build'] },
+      archiveRunner
+    )
+  );
   const exitCode = archiveResult.status ?? archiveResult.exitCode ?? 0;
   if (exitCode === 0) {
     const archiveOutput = String(archiveResult.stdout ?? '').trim();
@@ -159,6 +183,7 @@ export async function collectReleaseArchiveStep({
 
 export async function appendBuildStepOrBlock(steps, context, collectors) {
   if (steps.some((step) => step.status === 'failed')) {
+    recordSkippedTimelineActivity({ activityId: 'build', kind: 'build' });
     steps.push(createBlockedStep('Build', 'earlier hardfail steps failed'));
     return steps;
   }
@@ -170,6 +195,11 @@ export async function appendBuildStepOrBlock(steps, context, collectors) {
 export async function appendReleaseArchiveStepOrBlock(steps, collectors) {
   const buildStep = [...steps].reverse().find((step) => step.label === 'Build');
   if (buildStep?.status !== 'ok') {
+    recordSkippedTimelineActivity({
+      activityId: 'release-archive',
+      kind: 'release-archive',
+      dependencies: ['build'],
+    });
     steps.push(createBlockedStep('Release archive', 'release build did not complete'));
     return steps;
   }

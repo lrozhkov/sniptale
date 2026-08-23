@@ -5,12 +5,14 @@ import { expect, it } from 'vitest';
 it('runs local full gates directly in WSL and keeps Docker limited to external reproduction', () => {
   const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   const local = fs.readFileSync('tooling/ci/local.mjs', 'utf8');
+  const playwrightSmoke = fs.readFileSync('tooling/ci/local-playwright-smoke.mjs', 'utf8');
   const toolchain = fs.readFileSync('tooling/ci/local-toolchain.mjs', 'utf8');
   const proof = fs.readFileSync('tooling/ci/proof.mjs', 'utf8');
   expect(packageJson.scripts['ci:proof']).toBe('node tooling/ci/proof.mjs');
   expect(packageJson.scripts['ci:release']).toBe('node tooling/ci/local.mjs release');
   expect(packageJson.scripts['ci:build']).toBe('npm run build');
   expect(local).toContain('tooling/ci/${lane}-wrapper.mjs');
+  expect(local).toContain("['playwright-smoke', process.execPath");
   expect(local).toContain("kind: 'host-wsl'");
   expect(local).not.toContain("spawnSync('docker'");
   expect(toolchain).not.toContain("spawnSync('docker'");
@@ -23,6 +25,11 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(toolchain).toContain("{ flag: 'wx', mode: 0o755 }");
   expect(toolchain).toContain('includes(semgrepPython)');
   expect(toolchain).toContain('delete result[name]');
+  for (const tool of ['OSV Scanner', 'Gitleaks', 'actionlint', 'Semgrep', 'CodeQL', 'Stryker']) {
+    expect(toolchain).toContain(`name: '${tool}'`);
+  }
+  expect(playwrightSmoke).toContain('installed.version !== lock.playwright.version');
+  expect(playwrightSmoke).toContain('await chromium.launch({ headless: true })');
   expect(proof).toContain('if (prIndex < 0)');
   expect(proof).toContain("path.join(process.cwd(), 'tooling/ci/local.mjs')");
   expect(proof).toContain("'proof',");

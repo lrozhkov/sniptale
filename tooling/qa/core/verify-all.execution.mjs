@@ -1,13 +1,7 @@
 import { collectAiHygieneReport } from './ai-hygiene-utils.mjs';
 import { collectAuditStep, collectOptionalSecurityStep } from './full-verify-audit-steps.mjs';
 import { runDesignSystemCheck } from './verify-design-system.mjs';
-import { lintWithEslint, summarizeEslintResults } from './verify-eslint.mjs';
-import {
-  createFailureStep,
-  createOkStep,
-  createViolationStep,
-  createSkippedStep,
-} from './focused-qa-results.mjs';
+import { createViolationStep, createSkippedStep } from './focused-qa-results.mjs';
 import { runI18nCheck } from './verify-i18n.mjs';
 import { runLineLengthCheck } from '../guards/quality/verify-line-length.mjs';
 import { runOxlint } from './verify-oxlint.mjs';
@@ -22,7 +16,7 @@ import { resolveFullVerifyScope } from './verify-all.scope.mjs';
 import { collectViolationSteps } from './full-verify-violation-steps.mjs';
 import { filterAllowedViolations, loadBaseline } from './shared.mjs';
 import { measureAsyncStep, measureSyncStep } from './step-timing.helpers.mjs';
-import { createSonarjsEslintOverrideConfig, runSonarjsCheck } from './verify-sonarjs.mjs';
+import { runSonarjsCheck } from './verify-sonarjs.mjs';
 import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 import {
   appendBuildStepOrBlock,
@@ -71,23 +65,6 @@ function collectOxlintStep(context = {}) {
   return withDuration(result.step, durationMs);
 }
 
-async function collectEslintStep(context = {}) {
-  const files = resolveStaticProductLintFiles(context);
-  if (files.length === 0) {
-    return createSkippedStep('ESLint', 'no product lint files');
-  }
-
-  const { durationMs, value: eslintResult } = await measureAsyncStep(() =>
-    lintWithEslint({ files, strict: true })
-  );
-  return eslintResult.failed
-    ? createFailureStep('ESLint', 'failed', {
-        stdout: eslintResult.output,
-        durationMs,
-      })
-    : withDuration(createOkStep('ESLint'), durationMs);
-}
-
 function collectAiHygieneStep({ baseline, codeFiles }) {
   const { durationMs, value: report } = measureSyncStep(() => collectAiHygieneReport(codeFiles));
   return withDuration(
@@ -108,13 +85,13 @@ function collectStructuralRiskStep({ codeFiles }) {
   );
 }
 
-async function collectSonarjsReleaseStep({ eslintResults = null, releaseMode }) {
+async function collectSonarjsReleaseStep({ releaseMode }) {
   if (!releaseMode) {
     return createSkippedStep('SonarJS', 'release-only');
   }
 
   const { durationMs, value: sonarjsResult } = await measureAsyncStep(() =>
-    runSonarjsCheck({ eslintResults, scope: 'repo-wide' })
+    runSonarjsCheck({ scope: 'repo-wide' })
   );
   return withDuration(
     createViolationStep('SonarJS', 'SonarJS violations found:', sonarjsResult),
@@ -122,44 +99,18 @@ async function collectSonarjsReleaseStep({ eslintResults = null, releaseMode }) 
   );
 }
 
-function createEslintStep(eslintResult, durationMs) {
-  return eslintResult.failed
-    ? createFailureStep('ESLint', 'failed', {
-        stdout: eslintResult.output,
-        durationMs,
-      })
-    : withDuration(createOkStep('ESLint'), durationMs);
-}
-
 export async function collectReleaseLintLane(
   context,
   {
-    eslintProjector = summarizeEslintResults,
-    lintRunner = lintWithEslint,
-    overrideConfigFactory = createSonarjsEslintOverrideConfig,
+    oxlintCollector = collectOxlintStep,
     securityCollector = collectOptionalSecurityStep,
     sonarjsCollector = collectSonarjsReleaseStep,
   } = {}
 ) {
-  const { durationMs: lintDurationMs, value: combinedResult } = await measureAsyncStep(() =>
-    lintRunner({
-      files: PRODUCT_SOURCE_ROOTS,
-      overrideConfig: overrideConfigFactory(),
-      strict: false,
-    })
-  );
-  const { durationMs: projectionDurationMs, value: eslintResult } = await measureAsyncStep(() =>
-    eslintProjector(combinedResult.results, {
-      excludedRulePrefixes: ['sonarjs/'],
-      strict: true,
-    })
-  );
-  const sharedContext = { ...context, eslintResults: combinedResult.results };
-
   return {
-    eslintStep: createEslintStep(eslintResult, lintDurationMs + projectionDurationMs),
-    sonarjsStep: await sonarjsCollector(sharedContext),
-    securityStep: await securityCollector(sharedContext),
+    oxlintStep: oxlintCollector(context),
+    sonarjsStep: await sonarjsCollector(context),
+    securityStep: await securityCollector(context),
   };
 }
 
@@ -177,7 +128,6 @@ function createDefaultCollectors() {
   return {
     collectLineLengthStep,
     collectOxlintStep,
-    collectEslintStep,
     collectSonarjsReleaseStep,
     collectAiHygieneStep,
     collectStructuralRiskStep,
@@ -197,7 +147,8 @@ function createDefaultCollectors() {
     collectCycleStep: ({ targetFiles }) => collectCycleCheckStepResult({ targetFiles }),
     collectDependencyGraphSteps: ({ targetFiles }) =>
       collectDependencyGraphStepResults({ targetFiles }),
-    collectTypecheckStep: ({ targetFiles }) => collectTypecheckStepResult({ targetFiles }),
+    collectTypecheckStep: ({ checkerCount, targetFiles }) =>
+      collectTypecheckStepResult({ checkerCount, targetFiles }),
     collectDeadExportsStep,
     collectUnitAndCoverageSteps: ({ codeFiles, releaseMode, targetFiles, vitestMaxWorkers }) =>
       collectUnitTestAndCoverageStepResults({
@@ -214,7 +165,12 @@ function createDefaultCollectors() {
   };
 }
 
-export async function collectFullVerifyLane({ context, lane, vitestMaxWorkers }) {
+export async function collectFullVerifyLane({
+  context,
+  lane,
+  typecheckCheckerCount,
+  vitestMaxWorkers,
+}) {
   const collectors = createDefaultCollectors();
   const laneContext = { ...context, vitestMaxWorkers };
   if (lane === 'appOwners' || lane === 'targetPaths') {
@@ -223,7 +179,6 @@ export async function collectFullVerifyLane({ context, lane, vitestMaxWorkers })
   if (lane === 'light') {
     return {
       lineLengthStep: collectors.collectLineLengthStep(context),
-      oxlintStep: collectors.collectOxlintStep(context),
       aiHygieneStep: collectors.collectAiHygieneStep(context),
       structuralRiskStep: collectors.collectStructuralRiskStep(context),
       namingStep: collectors.collectNamingStep(context),
@@ -237,14 +192,13 @@ export async function collectFullVerifyLane({ context, lane, vitestMaxWorkers })
     };
   }
   if (lane === 'lint') {
-    if (context.releaseMode) {
-      return collectReleaseLintLane(context);
-    }
-    return {
-      eslintStep: await collectors.collectEslintStep(context),
-      sonarjsStep: null,
-      securityStep: await collectors.collectSecurityStep(context),
-    };
+    return context.releaseMode
+      ? collectReleaseLintLane(context)
+      : {
+          oxlintStep: collectors.collectOxlintStep(context),
+          sonarjsStep: null,
+          securityStep: await collectors.collectSecurityStep(context),
+        };
   }
   if (lane === 'graph') {
     return {
@@ -253,7 +207,12 @@ export async function collectFullVerifyLane({ context, lane, vitestMaxWorkers })
     };
   }
   if (lane === 'typecheck') {
-    return { typecheckStep: collectors.collectTypecheckStep(context) };
+    return {
+      typecheckStep: collectors.collectTypecheckStep({
+        ...context,
+        checkerCount: typecheckCheckerCount,
+      }),
+    };
   }
   if (lane === 'tests') {
     return { testSteps: await collectors.collectUnitAndCoverageSteps(laneContext) };
@@ -271,7 +230,6 @@ async function collectCoreStepResults(context, collectors, includeTests) {
   const steps = [
     collectors.collectLineLengthStep(context),
     collectors.collectOxlintStep(context),
-    await collectors.collectEslintStep(context),
     ...(context.releaseMode ? [await collectors.collectSonarjsReleaseStep(context)] : []),
     collectors.collectAiHygieneStep(context),
     collectors.collectStructuralRiskStep(context),

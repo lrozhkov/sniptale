@@ -4,12 +4,10 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 const mocks = vi.hoisted(() => ({
   ensure: vi.fn(async () => undefined),
   deleteJob: vi.fn(async () => undefined),
-  send: vi.fn(
-    async (): Promise<{ success: boolean; result?: string; error?: string }> => ({
-      success: true,
-      result: 'applied',
-    })
-  ),
+  send: vi.fn(async (): Promise<{ success: boolean; result?: string; error?: string }> => ({
+    success: true,
+    result: 'applied',
+  })),
   wait: vi.fn(async () => undefined),
 }));
 

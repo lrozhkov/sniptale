@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 it('keeps oxlint scoped to JS-like files and skips empty scopes', async () => {
   const module = await import('./verify-oxlint.mjs');
@@ -21,7 +21,7 @@ it('keeps oxlint scoped to JS-like files and skips empty scopes', async () => {
   );
 });
 
-it('runs strict oxlint hook and accessibility rules as errors', async () => {
+it('uses the single checked-in Oxlint policy authority', async () => {
   const module = await import('./verify-oxlint.mjs');
   const calls: unknown[][] = [];
 
@@ -33,27 +33,72 @@ it('runs strict oxlint hook and accessibility rules as errors', async () => {
     },
   });
 
+  expect(calls[0]?.[1]).toEqual([
+    '--config',
+    '.oxlintrc.json',
+    '--deny-warnings',
+    '--format',
+    'unix',
+    'tooling/qa/core/verify-oxlint.mjs',
+  ]);
+
+  const config = JSON.parse(fs.readFileSync('.oxlintrc.json', 'utf8')) as {
+    options: { typeAware: boolean };
+    rules: Record<string, string>;
+  };
+  expect(config.options.typeAware).toBe(true);
+  expect(config.rules).toMatchObject({
+    'jsx-a11y/aria-props': 'error',
+    'vitest/no-focused-tests': 'error',
+  });
+  expect(config.rules).not.toHaveProperty('react/only-export-components');
+});
+
+it('keeps fix mode behind the canonical wrapper and enum guard', async () => {
+  const module = await import('./verify-oxlint.mjs');
+  const calls: unknown[][] = [];
+  const contractEnumCollector = vi.fn(() => []);
+
+  module.runOxlint({
+    files: ['tooling/qa/core/verify-oxlint.mjs'],
+    fix: true,
+    commandRunner: (...args: unknown[]) => {
+      calls.push(args);
+      return { status: 0, stdout: '', stderr: '' };
+    },
+    contractEnumCollector,
+  });
+
   expect(calls[0]?.[1]).toEqual(
-    expect.arrayContaining([
-      '--react-plugin',
-      '--vitest-plugin',
-      '--jsx-a11y-plugin',
-      '-D',
-      'exhaustive-deps',
-      '-D',
-      'vitest/no-focused-tests',
-      '-D',
-      'vitest/no-disabled-tests',
-      '-D',
-      'jsx-a11y/aria-props',
-      '-D',
-      'react/jsx-no-target-blank',
-      '--format',
-      'unix',
-      'tooling/qa/core/verify-oxlint.mjs',
-      '--quiet',
-    ])
+    expect.arrayContaining(['--config', '.oxlintrc.json', '--fix', '--deny-warnings'])
   );
+  expect(contractEnumCollector).toHaveBeenCalledOnce();
+});
+
+it('runs the TS6 contract enum guard over the same canonical target closure', async () => {
+  const module = await import('./verify-oxlint.mjs');
+  const contractEnumCollector = vi.fn(() => [
+    {
+      rule: 'contract-enum',
+      file: 'tooling/qa/core/verify-oxlint.mjs',
+      line: 1,
+      column: 1,
+      message: 'fixture violation',
+    },
+  ]);
+
+  const result = module.runOxlint({
+    files: ['tooling/qa/core/verify-oxlint.mjs'],
+    commandRunner: () => ({ status: 0, stdout: '', stderr: '' }),
+    contractEnumCollector,
+  });
+
+  expect(contractEnumCollector).toHaveBeenCalledWith(['tooling/qa/core/verify-oxlint.mjs']);
+  expect(result.step).toMatchObject({
+    status: 'failed',
+    exitCode: 1,
+    stderr: expect.stringContaining('[contract-enum]'),
+  });
 });
 
 it('expands oxlint directories for release scans', async () => {
@@ -71,14 +116,29 @@ it('expands oxlint directories for release scans', async () => {
   expect(calls[0]?.[1]).toEqual(expect.arrayContaining(['tooling/qa/core/verify-oxlint.mjs']));
 });
 
+it('keeps the canonical roots equal to the complete supported repository lint inventory', async () => {
+  const module = await import('./verify-oxlint.mjs');
+  const repoWideFiles = module.collectOxlintFiles(['.']);
+  const canonicalFiles = module.collectOxlintFiles(module.DEFAULT_OXLINT_ROOTS);
+
+  expect(module.REPO_WIDE_OXLINT_FILES).toEqual([
+    '.dependency-cruiser.cjs',
+    'apps/extension/postcss.config.js',
+    'apps/extension/public/popup-theme-paint.js',
+    'apps/extension/tailwind.config.js',
+    'apps/extension/vite.config.ts',
+    'playwright.config.ts',
+    'vitest.config.ts',
+  ]);
+  expect(canonicalFiles).toEqual(repoWideFiles);
+});
+
 it('uses only current canonical default oxlint roots', async () => {
   const module = await import('./verify-oxlint.mjs');
 
   expect(module.DEFAULT_OXLINT_ROOTS).toContain('apps/extension/build');
   expect(module.DEFAULT_OXLINT_ROOTS).not.toContain('scripts');
   expect(
-    module.DEFAULT_OXLINT_ROOTS.every((root) =>
-      fs.statSync(path.join(process.cwd(), root)).isDirectory()
-    )
+    module.DEFAULT_OXLINT_ROOTS.every((root) => fs.existsSync(path.join(process.cwd(), root)))
   ).toBe(true);
 });

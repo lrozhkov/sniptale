@@ -47,6 +47,20 @@ function emitFailureTail(session, step) {
   process.stdout.write(`[${step.label}: failure output tail]\n${quoted}\n`);
 }
 
+function summarizeAdvisoryConsole(session, step) {
+  const findings = step.advisories ?? [];
+  if (findings.length <= 12) return null;
+  const top = findings.slice(0, 6).map((finding) => {
+    const id = finding.id ?? finding.family ?? 'advisory';
+    return `${finding.file ?? '<repository>'}: ${id}`;
+  });
+  return [
+    `${step.label}: ${findings.length} advisory findings (top ${top.length})`,
+    ...top.map((finding) => `- ${finding}`),
+    `Full findings: ${session.logRelativePath}`,
+  ].join('\n');
+}
+
 export function recordObservedResult(session, result, verbose, contract) {
   const steps = collectQaResultSteps(result);
   const executionMode =
@@ -61,9 +75,17 @@ export function recordObservedResult(session, result, verbose, contract) {
   });
   for (const step of steps) {
     if (step.consoleOutput) {
-      const consoleOutput = session.sanitizeConsoleOutput(step.consoleOutput);
+      const fullOutput = session.sanitizeConsoleOutput(step.consoleOutput, 1024 * 1024);
+      const consoleOutput =
+        summarizeAdvisoryConsole(session, step) ??
+        session.sanitizeConsoleOutput(step.consoleOutput);
       process.stdout.write(consoleOutput.endsWith('\n') ? consoleOutput : `${consoleOutput}\n`);
-      session.writeLog(`[${step.label}.console]\n${consoleOutput}\n`);
+      session.writeLog(`[${step.label}.console]\n${fullOutput}\n`);
+      if ((step.advisories?.length ?? 0) > 0) {
+        session.writeLog(
+          `[${step.label}.advisories]\n${JSON.stringify(step.advisories, null, 2)}\n`
+        );
+      }
     }
     const normalized = normalizeObservedStep(step);
     session.addStep(normalized.observation);

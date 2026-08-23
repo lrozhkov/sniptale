@@ -32,6 +32,9 @@ export function assertLifecycleConsistency(record) {
     throw new TypeError('a run cannot be its own parent');
   }
   const isRunning = record.status === 'running';
+  if (!isRunning && record.timeline?.activities.some(({ finishedAt }) => finishedAt === null)) {
+    throw new TypeError('finalized run cannot contain unfinished timeline activities');
+  }
   if (isRunning !== (record.finishedAt === null || record.durationMs === null)) {
     throw new TypeError('running state and finish fields are inconsistent');
   }

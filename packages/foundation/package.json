@@ -22,10 +22,10 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.10"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/foundation/src",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "node ../../tooling/qa/core/typescript-cli.mjs --noEmit --project tsconfig.json"
   }
 }

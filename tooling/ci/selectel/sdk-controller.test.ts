@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { validateSelectelQaProfiles } from './policy.mjs';
+import { validateSelectelProfilesForLane, validateSelectelQaProfiles } from './policy.mjs';
 
 const source = fs.readFileSync('tooling/ci/selectel/sdk-controller.py', 'utf8');
 const dockerfile = fs.readFileSync('tooling/ci/selectel/Dockerfile.controller', 'utf8');
@@ -35,7 +35,7 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
   expect(policy.network).toEqual({
     subnetCidr: '10.77.0.0/24',
     lifecycle: 'disposable-per-attempt',
-    securityGroupName: 'sniptale-github-actions-no-ingress',
+    securityGroupNamePrefix: 'sniptale-github-actions-no-ingress',
   });
   expect(policy.trust.persistentNetworkResources).toBe(false);
   expect(policy.imageSelector).toEqual({ name: 'Ubuntu 24.04 LTS 64-bit' });
@@ -60,8 +60,10 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
   expect(source).toContain('delete_router');
   expect(source).toContain('delete_subnet');
   expect(source).toContain('delete_network');
+  expect(source).toContain('delete_security_group');
   expect(source).toContain('sniptale-selectel-sweep-proof');
-  expect(source).toContain('port.device_id not in live_server_ids');
+  expect(source).toContain('if expired_description(port)');
+  expect(source).toContain('runner.get("name") in expired_runner_names');
   expect(source).toContain('volume_type=selected["volume_type"].name');
   expect(source).not.toContain('print(jit_config');
   expect(source).not.toContain('SELECTEL_OS_PROJECT_ID');
@@ -134,6 +136,7 @@ it('continues cloud cleanup when GitHub runner deletion fails and preserves part
     router: 'deleted',
     routerPorts: 'deleted',
     runner: 'failed',
+    securityGroups: 'deleted',
     server: 'deleted',
     subnet: 'deleted',
     volumes: 'deleted',
@@ -166,6 +169,18 @@ it('replays cleanup from nested resources after provisioning cleanup was interru
   const receipt = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
   expect(receipt.status).toBe('cleaned');
   expect(receipt.attempts[0].status).toBe('cleaned');
+});
+
+it('recovers cleanup by exact run and run-attempt identity when the receipt is unavailable', () => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', 'identity-recovery'],
+    { cwd: process.cwd(), encoding: 'utf8' }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const receipt = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
+  expect(receipt.status).toBe('cleaned');
+  expect(receipt.runAttempt).toBe('3');
 });
 
 const validProfiles = {
@@ -228,6 +243,15 @@ it('validates and hashes the ordered runtime profile document without storing it
   const python = validateWithPythonController(JSON.stringify(validProfiles));
   expect(python.status, python.stderr).toBe(0);
   expect(JSON.parse(python.stdout).digest).toBe(validated.digest);
+});
+
+it('rejects proof-compatible profiles that are below the canonical release minimum', () => {
+  expect(() =>
+    validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'proof')
+  ).not.toThrow();
+  expect(() => validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'release')).toThrow(
+    /release lane minimum/u
+  );
 });
 
 it.each([

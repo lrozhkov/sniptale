@@ -38,6 +38,7 @@ jobs:
       contents: write
     outputs:
       release-sha: ${{ steps.admission.outputs.release-sha }}
+      provenance-attempt: ${{ steps.admission.outputs.provenance-attempt }}
     steps:
       - name: Validate deployment inputs
         env:
@@ -77,6 +78,7 @@ jobs:
             .status == "completed" and .conclusion == "success" and .path == ".github/workflows/quality-gate.yml"
             and .display_title == "Release provenance Gate"
           ' <<<"$run" >/dev/null
+          provenance_attempt=$(jq -er '.run_attempt' <<<"$run")
           runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/quality-gate.yml/runs?branch=main&event=workflow_dispatch&status=success&head_sha=${release_sha}&per_page=100")
           latest=$(jq -s -r --arg sha "$release_sha" '[.[].workflow_runs[] | select(.head_sha == $sha and .display_title == "Release provenance Gate")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
           if [ "$PROVENANCE_RUN_ID" != "$latest" ] && [ "$ALLOW_NON_LATEST" != true ]; then
@@ -84,10 +86,11 @@ jobs:
             exit 1
           fi
           gh run download "$PROVENANCE_RUN_ID" \
-            --name "release-provenance-${release_sha}-${PROVENANCE_RUN_ID}" \
+            --name "release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-${provenance_attempt}" \
             --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "$release_sha"
           echo "release-sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "provenance-attempt=$provenance_attempt" >> "$GITHUB_OUTPUT"
           {
             echo '### Continuous Deployment admission'
             echo
@@ -102,7 +105,7 @@ jobs:
       - name: Preserve publication input and prepared assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: deployment-${{ steps.admission.outputs.release-sha }}-${{ github.run_id }}
+          name: deployment-${{ steps.admission.outputs.release-sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             build/release-proof/proof-manifest.json
             build/release-proof/SHA256SUMS
@@ -139,7 +142,7 @@ jobs:
           }
           trap cleanup_owned_release ERR
           version=$(jq -er .version package.json)
-          zip_assets=("$asset_root"/sniptale_*.zip)
+          mapfile -t zip_assets < <(find "$asset_root" -maxdepth 1 -type f -name 'sniptale_*.zip' ! -name '*-qa-evidence.zip' -print)
           test "${#zip_assets[@]}" -eq 1 && test -f "${zip_assets[0]}"
           zip_name=$(basename "${zip_assets[0]}")
           notes=$(mktemp)
@@ -190,7 +193,7 @@ jobs:
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
           gh run download "${{ inputs.provenance_run_id }}" \
-            --name "release-provenance-${{ needs.publish.outputs.release-sha }}-${{ inputs.provenance_run_id }}" \
+            --name "release-provenance-${{ needs.publish.outputs.release-sha }}-${{ inputs.provenance_run_id }}-${{ needs.publish.outputs.provenance-attempt }}" \
             --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "${{ needs.publish.outputs.release-sha }}"
       - name: Publish exact release coverage to Codecov

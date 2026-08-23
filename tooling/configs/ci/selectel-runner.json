@@ -93,7 +93,7 @@
   "network": {
     "subnetCidr": "10.77.0.0/24",
     "lifecycle": "disposable-per-attempt",
-    "securityGroupName": "sniptale-github-actions-no-ingress"
+    "securityGroupNamePrefix": "sniptale-github-actions-no-ingress"
   },
   "lifecycle": {
     "maxProfiles": 10,
@@ -112,7 +112,7 @@
   },
   "trust": {
     "candidateReceivesControllerSecrets": false,
-    "candidateControlsAreBlocking": false,
+    "candidateControlsAreBlocking": true,
     "jitConfigRetained": false,
     "releaseSigningKeyOnRunner": false,
     "persistentGhcrCredentialOnRunner": false,

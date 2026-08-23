@@ -5,7 +5,6 @@
     "apps/extension/build/**/*.{ts,js,mjs,cjs}",
     "packages/*/src/**/*.{ts,tsx,js,mjs,cjs}",
     "tooling/**/*.{ts,tsx,js,mjs,cjs}",
-    "eslint.config.js",
     "apps/extension/vite.config.ts"
   ],
   "project": [

@@ -38,7 +38,7 @@ function fixture() {
       requiredTargets: ['apps/extension/src/background/index.ts'],
     })
   );
-  write(root, '.prettierignore', '*.md\n');
+  write(root, '.oxfmtignore', '*.md\n');
   write(root, 'README.md', '# Repository\n');
   write(root, 'docs/README.md', '# Docs\n\n## Documentation policy\n');
   write(
@@ -246,7 +246,7 @@ it('rejects retired documentation trees and Markdown formatter admission', () =>
   write(root, 'docs/deprecated/history.md', '# Historical\n');
   write(root, 'docs/research/notes.md', '# Research\n');
   write(root, 'docs/migrations/plan.md', '# Migration\n');
-  write(root, '.prettierignore', 'src/**\n');
+  write(root, '.oxfmtignore', 'src/**\n');
 
   expect(targetOnlyPathErrors(root)).toEqual(
     expect.arrayContaining([

@@ -15,7 +15,6 @@ function laneValue(lane: string) {
   if (lane === 'targetPaths') return { ownerStep: step('Target-only paths') };
   if (lane === 'light') {
     return {
-      oxlintStep: step('Oxlint'),
       qualitySteps: [step('Changed-line readability'), step('AI hygiene')],
       triggeredStaticSteps: [step('App-core owners'), step('Target-only paths')],
       policySteps: [step('Runtime topology')],
@@ -23,7 +22,7 @@ function laneValue(lane: string) {
   }
   if (lane === 'lint') {
     return {
-      eslintStep: step('ESLint'),
+      oxlintStep: step('Oxlint'),
       sonarjsStep: step('SonarJS'),
       securityStep: step('Security'),
     };
@@ -57,7 +56,6 @@ it('assembles worker results in the canonical order rather than completion order
 
   expect(result.map(({ label }) => label)).toEqual([
     'Oxlint',
-    'ESLint',
     'SonarJS',
     'Changed-line readability',
     'AI hygiene',
@@ -91,13 +89,14 @@ it('executes the serializable no-test lane in a real worker', async () => {
       qualityCodeFiles: [],
       qualityJsLikeFiles: [],
       qualityTargetFiles: [],
-      shouldRunFullEslint: false,
+      shouldRunFullOxlint: false,
       shouldRunManifestPermissions: false,
       shouldRunRuntimeTopology: false,
       targetFiles: [],
     },
     lane: 'tests',
     memoryMiB: 1024,
+    typecheckCheckerCount: 2,
     typecheckMaxConcurrency: 2,
     vitestMaxWorkers: 2,
   });
@@ -116,7 +115,7 @@ it('adapts typecheck concurrency and reservation to a one-token profile', async 
       targetFiles: [],
     },
     {
-      profile: { ...profile, cpuTokens: 1, memoryMiB: 4096, vitestMaxWorkers: 1 },
+      profile: { ...profile, cpuTokens: 1, memoryMiB: 6144, vitestMaxWorkers: 1 },
       scheduler,
       workerRunner,
     }
@@ -126,11 +125,15 @@ it('adapts typecheck concurrency and reservation to a one-token profile', async 
   expect(scheduledTasks?.find(({ id }) => id === 'typecheck')).toMatchObject({ cpuTokens: 1 });
   expect(scheduledTasks?.find(({ id }) => id === 'tests')).toMatchObject({ memoryMiB: 4096 });
   expect(workerRunner).toHaveBeenCalledWith(
-    expect.objectContaining({ lane: 'typecheck', typecheckMaxConcurrency: 1 })
+    expect.objectContaining({
+      lane: 'typecheck',
+      typecheckCheckerCount: 1,
+      typecheckMaxConcurrency: 1,
+    })
   );
 });
 
-it('uses the release-proven lint budget for a full ESLint closure', async () => {
+it('uses the release-proven lint budget and serializes full Oxlint after typecheck', async () => {
   const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
   const scheduler = vi.fn(runBoundedTasks);
   await collectScheduledFocusedStepResults(
@@ -138,8 +141,8 @@ it('uses the release-proven lint budget for a full ESLint closure', async () => 
       codeFiles: [],
       existingTargetFiles: [],
       jsLikeFiles: [],
-      shouldRunFullEslint: true,
-      targetFiles: ['eslint.config.js'],
+      shouldRunFullOxlint: true,
+      targetFiles: ['.oxlintrc.json'],
     },
     { profile, scheduler, workerRunner }
   );
@@ -147,6 +150,7 @@ it('uses the release-proven lint budget for a full ESLint closure', async () => 
   const scheduledTasks = scheduler.mock.calls[0]?.[0];
   expect(scheduledTasks?.find(({ id }) => id === 'lint')).toMatchObject({
     cpuTokens: 2,
+    dependencies: ['typecheck'],
     memoryMiB: 6144,
   });
   expect(workerRunner).toHaveBeenCalledWith(

@@ -67,16 +67,24 @@ async function verifyImmediateApplication(
   await page.locator(POPUP_ROOT_SELECTOR).waitFor({ state: 'visible' });
   await expect(page.locator('[data-ui="shared.ui.popup-footer"]')).toHaveCount(0);
   const pendingTabs = page.locator('[data-ui="popup.app.tabs"] button');
-  await expect(pendingTabs).toHaveCount(3);
-  await expect(pendingTabs.nth(0)).toHaveText('Screenshots');
-  await expect(pendingTabs.nth(1)).toHaveText('Video');
-  await expect(pendingTabs.nth(2)).toHaveText('Export');
+  await expect(pendingTabs).toHaveCount(5);
+  await expect(pendingTabs.nth(0)).toHaveAttribute('aria-label', 'Screenshots');
+  await expect(pendingTabs.nth(1)).toHaveAttribute('aria-label', 'Video');
+  await expect(pendingTabs.nth(2)).toHaveAttribute('aria-label', 'Menu');
+  await expect(pendingTabs.nth(3)).toHaveAttribute('aria-label', 'Tools');
+  await expect(pendingTabs.nth(4)).toHaveAttribute('aria-label', 'Export');
   await expect(page.locator('[data-ui="popup.app.tabs"] button:disabled')).toHaveCount(0);
-  await expect(page.locator('[data-ui="popup.app.content"] > *')).toHaveCount(0);
+  await expect(page.locator('[data-ui="popup.app.route-skeleton"]')).toBeVisible();
   await expect(page.locator('[data-ui="popup.app.content"] > *')).toHaveCount(1, {
     timeout: 5_000,
   });
-  await expect(page.locator('[data-ui="popup.app.root"] button').nth(0)).toHaveText('Screenshots');
+  await expect(page.locator('[data-ui="popup.app.route-skeleton"]')).toHaveCount(0, {
+    timeout: 5_000,
+  });
+  await expect(page.locator('[data-ui="popup.app.tabs"] button').nth(0)).toHaveAttribute(
+    'aria-label',
+    'Screenshots'
+  );
   await expect(page.locator(REMOVED_STARTUP_SELECTOR)).toHaveCount(0);
   await page.evaluate(
     (storageKey) => chrome.storage.local.set({ [storageKey]: 'light' }),
@@ -173,7 +181,7 @@ async function verifyShellPaintsBeforeCapabilities(
     waitUntil: 'domcontentloaded',
   });
   await page.locator(POPUP_ROOT_SELECTOR).waitFor({ state: 'visible' });
-  await expect(page.locator('[data-ui="popup.app.tabs"] button')).toHaveCount(3);
+  await expect(page.locator('[data-ui="popup.app.tabs"] button')).toHaveCount(5);
   expect(
     await page.evaluate(
       () =>

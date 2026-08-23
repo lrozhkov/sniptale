@@ -35,6 +35,8 @@ The machine authority is source and policy, not prose. This mapping identifies t
 | Readability, AI hygiene, naming, suppression, and logging | `tooling/qa/core/quality.config.mjs`, `tooling/qa/core/verify-ai-hygiene.mjs`, `tooling/qa/guards/quality/**`, focused verifier definitions |
 | Coverage rollout, unit-test profiles, and thresholds | `tooling/qa/core/verify-test-coverage.registry.mjs`, exact-path inventory in `tooling/qa/core/verify-test-coverage.rollout-files.data.mjs`, `tooling/qa/core/verify-test-coverage.thresholds.mjs`, `tooling/qa/core/verify-build.test-profiles.mjs`, focused owner maps |
 | Audit requiredness and structured skips | `tooling/configs/qa/audit-profiles.data.json`, `tooling/qa/audits/profiles/**` |
+| Formatting and lint ownership | `.oxfmtrc.json`, `.oxfmtignore`, `.oxlintrc.json`, `tooling/configs/qa/formatter-migration.data.json`, `tooling/configs/qa/lint-rule-migration.data.json` |
+| Canonical TypeScript CLI and compatibility API | `tooling/qa/core/typescript-cli.mjs`, `@typescript/native` for TS7 CLI, `typescript` alias for TS6 compiler API only |
 | Baselines, exceptions, and technical debt | `tooling/configs/qa/*baseline*`, `tooling/configs/qa/technical-debt.data.json`, owner-specific policy registries |
 
 `qa:checkpoint` and broader lanes consume these authorities; documentation summarizes them and must not create a competing list of exact executable steps.
@@ -45,7 +47,9 @@ Exact coverage rollout paths live separately from the executable resolver so ren
 
 ### Static Correctness And Readability
 
-The enforced floor includes TypeScript/module hygiene, Oxlint, the type-aware ESLint subset, curated SonarJS correctness rules, formatting of supported non-Markdown files, changed-line readability, diff-scoped structural pressure, AI hygiene, naming, suppression bans, canonical logging, dead-export fallout, and cycle checks. Tests are not exempt, but their structural profile reflects their different role.
+The enforced floor includes TypeScript/module hygiene, type-aware Oxlint, residual security ESLint, release-only curated SonarJS correctness rules, Oxfmt formatting of supported non-Markdown files, changed-line readability, diff-scoped structural pressure, AI hygiene, naming, suppression bans, canonical logging, dead-export fallout, and cycle checks. Tests are not exempt, but their structural profile reflects their different role.
+
+Oxfmt is the only formatter authority. Oxlint owns ordinary, TypeScript-aware, React Hooks, Vitest, and JSX accessibility lint. The previously installed React Refresh ESLint dependency did not own an effective rule, so `react/only-export-components` is machine-recorded as `Do not adopt`; React Refresh transformation is instead owned by `@vitejs/plugin-react` 6 and its Oxc path. The narrow ESLint adapters remain only where parity is not available: security rules retain their exact focused/strict warning semantics, and the nine type-aware SonarJS rules run only in release verification. Native TypeScript 7 owns every blocking CLI typecheck; the package exposed as `typescript` is the TypeScript 6 compatibility shim for QA AST consumers and is never a canonical CLI fallback. The machine toolchain lock separately binds that shim and the actual `@typescript/old` runtime it loads.
 
 Metrics are signals, not architecture boundaries. A file below a limit may still have the wrong owner, and a line-count extraction is incomplete when the same public contract or hidden seam remains.
 

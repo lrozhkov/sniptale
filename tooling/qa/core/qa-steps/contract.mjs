@@ -63,7 +63,8 @@ function ciProofContract(hasFailure) {
 }
 
 function ciReleaseContract(mode, hasFailure) {
-  const proofLabels = mode === 'reuse-fast-proof' ? ['Fast proof reuse'] : RELEASE_LABELS;
+  const proofLabels =
+    mode === 'reuse-fast-proof' ? ['Fast proof reuse', ...RELEASE_LABELS] : RELEASE_LABELS;
   return hasFailure
     ? { required: proofLabels, optional: [...AUDIT_LABELS, ...MUTATION_LABELS] }
     : { required: [...proofLabels, ...AUDIT_LABELS, ...MUTATION_LABELS] };

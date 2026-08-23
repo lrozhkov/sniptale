@@ -25,8 +25,8 @@ function runSmoke(metadataReachable = false) {
   fs.writeFileSync(
     docker,
     `#!/bin/sh
-browser_json='{"revision":"1208",'\
-'"browserVersion":"145.0.7632.6",'\
+browser_json='{"revision":"1234",'\
+'"browserVersion":"151.0.7922.34",'\
 '"assets":[{"exists":true},{"exists":true},{"exists":true}]}'
 case "$*" in
   *"image inspect"*) printf '%s\n' '["${image}"]' ;;
@@ -36,10 +36,10 @@ case "$*" in
   *"osv-scanner --version"*) printf '%s\n' '2.5.1' ;;
   *"gitleaks --version"*) printf '%s\n' '8.30.1' ;;
   *"actionlint --version"*) printf '%s\n' '1.7.12' ;;
-  *"playwright --version"*) printf '%s\n' '1.58.2' ;;
+  *"playwright --version"*) printf '%s\n' '1.62.1' ;;
   *"node -e"*) printf '%s\n' "$browser_json" ;;
-  *"/opt/playwright/chromium-1208/"*) printf '%s\n' 'Chromium 145.0.7632.6' ;;
-  *"/opt/playwright/chromium_headless_shell-1208/"*) printf '%s\n' 'Chromium 145.0.7632.6' ;;
+  *"/opt/playwright/chromium-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
+  *"/opt/playwright/chromium_headless_shell-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
   *"/opt/playwright/ffmpeg-1011/"*) printf '%s\n' 'ffmpeg version 7' ;;
   *"curl --silent"*) [ "$MOCK_METADATA_REACHABLE" = 1 ] && exit 0 || exit 7 ;;
   *) exit 2 ;;
@@ -78,8 +78,8 @@ describe('Selectel infrastructure smoke', () => {
       'actionlint',
       'playwright',
       'playwright-chromium',
-      'playwright-asset-chromium-1208',
-      'playwright-asset-chromium_headless_shell-1208',
+      'playwright-asset-chromium-1234',
+      'playwright-asset-chromium_headless_shell-1234',
       'playwright-asset-ffmpeg-1011',
       'container-metadata-denied',
     ]);

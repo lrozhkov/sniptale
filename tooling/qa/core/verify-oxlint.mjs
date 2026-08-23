@@ -4,6 +4,10 @@
 
 import fs from 'node:fs';
 
+import {
+  collectContractEnumViolations,
+  formatContractEnumViolations,
+} from './contract-enum-guard.mjs';
 import { createProcessStep, createSkippedStep } from './focused-qa-results.mjs';
 import { DEFAULT_SCAN_ROOTS, IGNORED_ROOT_SEGMENTS } from './quality.config.mjs';
 import { collectRecursiveFiles } from './recursive-files.mjs';
@@ -20,51 +24,38 @@ const OXLINT_ENTRY = 'node_modules/oxlint/bin/oxlint';
 const JS_LIKE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
 const OXLINT_IGNORED_ROOT_SEGMENTS = new Set([
   ...IGNORED_ROOT_SEGMENTS,
+  '.playwright-browsers',
   '.tmp',
   'playwright-report',
   'test-results',
 ]);
 
-export const DEFAULT_OXLINT_ROOTS = DEFAULT_SCAN_ROOTS;
-export const BASE_OXLINT_ARGS = ['--react-plugin', '--vitest-plugin', '--jsx-a11y-plugin'];
-
-export const STRICT_OXLINT_ARGS = [
-  ...BASE_OXLINT_ARGS,
-  '-D',
-  'exhaustive-deps',
-  '-D',
-  'vitest/no-focused-tests',
-  '-D',
-  'vitest/no-disabled-tests',
-  '-D',
-  'jsx-a11y/aria-props',
-  '-D',
-  'jsx-a11y/aria-proptypes',
-  '-D',
-  'jsx-a11y/aria-role',
-  '-D',
-  'jsx-a11y/aria-unsupported-elements',
-  '-D',
-  'jsx-a11y/role-has-required-aria-props',
-  '-D',
-  'jsx-a11y/role-supports-aria-props',
-  '-D',
-  'jsx-a11y/alt-text',
-  '-D',
-  'jsx-a11y/no-aria-hidden-on-focusable',
-  '-D',
-  'react/jsx-no-target-blank',
-  '-D',
-  'react/jsx-no-script-url',
-  '-D',
-  'react/no-danger-with-children',
-  '-D',
-  'react/no-children-prop',
-  '-D',
-  'react/jsx-no-duplicate-props',
-  '-D',
-  'react/void-dom-elements-no-children',
+export const REPO_WIDE_OXLINT_FILES = [
+  '.dependency-cruiser.cjs',
+  'apps/extension/postcss.config.js',
+  'apps/extension/public/popup-theme-paint.js',
+  'apps/extension/tailwind.config.js',
+  'apps/extension/vite.config.ts',
+  'playwright.config.ts',
+  'vitest.config.ts',
 ];
+export const DEFAULT_OXLINT_ROOTS = [...DEFAULT_SCAN_ROOTS, ...REPO_WIDE_OXLINT_FILES];
+export const OXLINT_CONFIG_PATH = '.oxlintrc.json';
+export const OXLINT_TOOL_VERSION = JSON.parse(
+  fs.readFileSync(new URL('../../../node_modules/oxlint/package.json', import.meta.url), 'utf8')
+).version;
+const FULL_OXLINT_CLOSURE_FILES = new Set([
+  OXLINT_CONFIG_PATH,
+  'package-lock.json',
+  'package.json',
+  'tooling/configs/qa/lint-rule-migration.data.json',
+  'tooling/qa/core/contract-enum-guard.mjs',
+  'tooling/qa/core/verify-oxlint.mjs',
+]);
+
+export function requiresFullOxlintClosure(targetFiles = []) {
+  return targetFiles.some((file) => FULL_OXLINT_CLOSURE_FILES.has(file));
+}
 
 function isOxlintIgnored(file) {
   return (
@@ -111,15 +102,37 @@ export function collectOxlintFiles(files = []) {
   return [...new Set(result)].sort();
 }
 
-export function createOxlintArgs(targetFiles, { quiet = true } = {}) {
-  const args = [...STRICT_OXLINT_ARGS, '--format', 'unix', ...targetFiles];
-  if (quiet) {
-    args.push('--quiet');
-  }
-  return args;
+export function createOxlintArgs(targetFiles, { fix = false } = {}) {
+  return [
+    '--config',
+    OXLINT_CONFIG_PATH,
+    ...(fix ? ['--fix'] : []),
+    '--deny-warnings',
+    '--format',
+    'unix',
+    ...targetFiles,
+  ];
 }
 
-export function runOxlint({ files = [], quiet = true, commandRunner = runRepoNodeEntry } = {}) {
+function appendContractEnumResult(commandResult, violations) {
+  if (violations.length === 0) {
+    return commandResult;
+  }
+
+  const contractOutput = formatContractEnumViolations(violations);
+  return {
+    ...commandResult,
+    status: commandResult.status === 0 ? 1 : commandResult.status,
+    stderr: [commandResult.stderr, contractOutput].filter(Boolean).join('\n'),
+  };
+}
+
+export function runOxlint({
+  files = [],
+  fix = false,
+  commandRunner = runRepoNodeEntry,
+  contractEnumCollector = collectContractEnumViolations,
+} = {}) {
   const targetFiles = collectOxlintFiles(files);
   if (targetFiles.length === 0) {
     return {
@@ -128,20 +141,27 @@ export function runOxlint({ files = [], quiet = true, commandRunner = runRepoNod
     };
   }
 
+  const contractEnumViolations = contractEnumCollector(targetFiles);
+  const commandResult = commandRunner(OXLINT_ENTRY, createOxlintArgs(targetFiles, { fix }), {
+    stdio: 'pipe',
+  });
   return {
+    contractEnumViolations,
     skipped: false,
     step: createProcessStep(
       'Oxlint',
-      commandRunner(OXLINT_ENTRY, createOxlintArgs(targetFiles, { quiet }), {
-        stdio: 'pipe',
-      })
+      appendContractEnumResult(commandResult, contractEnumViolations)
     ),
   };
 }
 
 if (isExecutedAsScript(import.meta.url)) {
-  const files = parseFilesArgument(process.argv.slice(2));
-  const result = runOxlint({ files: files.length > 0 ? files : DEFAULT_OXLINT_ROOTS });
+  const argv = process.argv.slice(2);
+  const files = parseFilesArgument(argv);
+  const result = runOxlint({
+    files: files.length > 0 ? files : DEFAULT_OXLINT_ROOTS,
+    fix: argv.includes('--fix'),
+  });
   const { step } = result;
 
   if (step.status === 'failed') {

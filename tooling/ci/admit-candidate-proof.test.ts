@@ -44,7 +44,7 @@ function resealArtifact(root: string, manifest: Record<string, any>) {
   write(root, 'SHA256SUMS', `${sums.join('\n')}\n`);
 }
 
-function fixture() {
+function fixture({ candidateControl = 'export {};\n' } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-admission-'));
   roots.push(root);
   const trusted = path.join(root, 'trusted');
@@ -65,7 +65,7 @@ function fixture() {
   fastPolicy.ownerClosures = [];
   write(trusted, 'tooling/configs/ci/fast-gate-inputs.json', `${JSON.stringify(fastPolicy)}\n`);
   write(candidate, 'tooling/configs/ci/fast-gate-inputs.json', `${JSON.stringify(fastPolicy)}\n`);
-  write(candidate, 'tooling/qa/check.mjs', 'export {};\n');
+  write(candidate, 'tooling/qa/check.mjs', candidateControl);
   write(candidate, 'package.json', '{}\n');
   write(trusted, 'tooling/qa/check.mjs', 'export {};\n');
   write(trusted, 'package.json', '{}\n');
@@ -116,7 +116,7 @@ function fixture() {
     artifact,
     record,
     `${JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       wrapperId: 'ci:proof',
       status: 'all-passed',
       exitCode: 0,
@@ -127,6 +127,7 @@ function fixture() {
         ...controlMatrix.requiredPassed.map((stepId) => ({ stepId, outcome: 'passed' })),
         ...controlMatrix.allowedSkipped.map((stepId) => ({ stepId, outcome: 'skipped' })),
       ],
+      timeline: { events: [], activities: [] },
     })}\n`
   );
   const files = [] as Array<{ file: string; sha256: string }>;
@@ -191,6 +192,7 @@ function fixture() {
     }),
     phases: [
       'install',
+      'verify-project-toolchain',
       'provision-canvas',
       'verify-canvas',
       'provision-ast-grep',
@@ -260,8 +262,7 @@ it('rejects missing phases and execution profiles below the trusted minimum', ()
 });
 
 it('rejects candidate control drift before candidate-authored evidence can be admitted', () => {
-  const value = fixture();
-  write(value.candidate, 'tooling/qa/check.mjs', 'export const forged = true;\n');
+  const value = fixture({ candidateControl: 'export const candidateGeneration = true;\n' });
   expect(() =>
     admitCandidateProof({
       artifactRoot: value.artifact,

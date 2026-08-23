@@ -6,7 +6,7 @@
       "claim": "fast-pr-gate",
       "fullVitest": false,
       "releaseReady": false,
-      "freshPhases": ["install", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "proof"],
+      "freshPhases": ["install", "verify-project-toolchain", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "proof"],
       "derivedPhases": ["non-gate-input-reuse"],
       "requiredFiles": [
         ".tmp/qa/build-proof.json",
@@ -24,7 +24,7 @@
       "claim": "release-provenance",
       "fullVitest": true,
       "releaseReady": true,
-      "freshPhases": ["install", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "release"],
+      "freshPhases": ["install", "verify-project-toolchain", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "release"],
       "derivedPhases": [],
       "requiredFiles": [
         ".tmp/qa/build-proof.json",

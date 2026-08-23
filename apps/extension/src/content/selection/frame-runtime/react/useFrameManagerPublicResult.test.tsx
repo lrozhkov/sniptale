@@ -14,11 +14,9 @@ let latestPublicResult: ReturnType<typeof useFrameManagerPublicResult> | null = 
 let currentArgs: Parameters<typeof useFrameManagerPublicResult>[0] | null = null;
 
 function createArgs(): Parameters<typeof useFrameManagerPublicResult>[0] {
-  const getGlobalStepBadgeSettings = vi.fn(
-    (): GlobalStepBadgeSettings => ({
-      autoMode: false,
-    })
-  );
+  const getGlobalStepBadgeSettings = vi.fn((): GlobalStepBadgeSettings => ({
+    autoMode: false,
+  }));
 
   return {
     addAutoBlurFrames: vi.fn(),

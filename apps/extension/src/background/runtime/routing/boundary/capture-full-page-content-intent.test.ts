@@ -46,7 +46,7 @@ function issueFullPageExportContentIntent() {
     proofResponse,
     resolveContentSenderBindingForTest(createTopLevelContentSender(17, CONTENT_URL))
   );
-  const proof = (proofResponse.mock.calls[0]?.[0] as { trustedEventProof?: { proofToken: string } })
+  const proof = (proofResponse.mock.calls[0]![0] as { trustedEventProof?: { proofToken: string } })
     .trustedEventProof;
   if (!proof) {
     throw new Error('Expected full-page trusted-event proof');

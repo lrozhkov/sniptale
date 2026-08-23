@@ -31,8 +31,9 @@ const context = {
 };
 
 function laneValue(lane: string) {
-  if (lane === 'static') return { steps: [step('Oxlint'), step('ESLint')] };
+  if (lane === 'static') return { steps: [step('Changed-line readability')] };
   if (lane === 'typecheck') return { typecheckStep: step('Typecheck') };
+  if (lane === 'oxlint') return { oxlintStep: step('Oxlint') };
   return { unitTestStep: step('Unit tests') };
 }
 
@@ -46,7 +47,12 @@ it('uses the bounded profile and assembles canonical results independent of comp
     workerRunner,
   });
 
-  expect(steps.map(({ label }) => label)).toEqual(['Oxlint', 'ESLint', 'Typecheck', 'Unit tests']);
+  expect(steps.map(({ label }) => label)).toEqual([
+    'Changed-line readability',
+    'Typecheck',
+    'Oxlint',
+    'Unit tests',
+  ]);
   expect(steps[0]?.detail).toContain('profile=8cpu/12288MiB');
   expect(workerRunner).toHaveBeenCalledWith(
     expect.objectContaining({ lane: 'tests', vitestMaxWorkers: 4 })
@@ -54,9 +60,13 @@ it('uses the bounded profile and assembles canonical results independent of comp
   const tasks = scheduler.mock.calls[0]?.[0];
   expect(tasks?.map(({ id, cpuTokens, memoryMiB }) => ({ id, cpuTokens, memoryMiB }))).toEqual([
     { id: 'static', cpuTokens: 2, memoryMiB: 2048 },
-    { id: 'typecheck', cpuTokens: 1, memoryMiB: 3072 },
+    { id: 'typecheck', cpuTokens: 4, memoryMiB: 5120 },
+    { id: 'oxlint', cpuTokens: 2, memoryMiB: 5120 },
     { id: 'tests', cpuTokens: 4, memoryMiB: 4096 },
   ]);
+  expect(tasks?.find(({ id }) => id === 'oxlint')).toMatchObject({
+    dependencies: ['typecheck'],
+  });
 });
 
 it('adapts every lane to the smallest supported CPU profile', () => {
@@ -68,6 +78,7 @@ it('adapts every lane to the smallest supported CPU profile', () => {
   ).toEqual([
     { id: 'static', cpuTokens: 1 },
     { id: 'typecheck', cpuTokens: 1 },
+    { id: 'oxlint', cpuTokens: 1 },
     { id: 'tests', cpuTokens: 1 },
   ]);
 });
@@ -77,6 +88,7 @@ it('executes an empty test lane in a real child process', async () => {
     context,
     lane: 'tests',
     memoryMiB: 1024,
+    typecheckCheckerCount: 4,
     vitestMaxWorkers: 2,
   });
 

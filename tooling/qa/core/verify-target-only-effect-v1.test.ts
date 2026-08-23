@@ -37,7 +37,7 @@ it('rejects restoration from the complete exact EffectV1 retired inventory', () 
       requiredTargets: [],
     })
   );
-  write(root, '.prettierignore', '*.md\n');
+  write(root, '.oxfmtignore', '*.md\n');
   write(root, 'README.md', '# Repository\n');
   write(root, 'docs/README.md', '# Docs\n');
   write(

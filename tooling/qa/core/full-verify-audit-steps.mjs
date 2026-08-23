@@ -14,13 +14,11 @@ export function collectAuditStep() {
 }
 
 export async function collectOptionalSecurityStep(
-  { codeFiles, eslintResults = null },
+  { codeFiles },
   { securityCollector = collectSecurityStep } = {}
 ) {
   if (codeFiles.length === 0) {
     return createSkippedStep('Security');
   }
-  return Array.isArray(eslintResults)
-    ? securityCollector({ eslintResults, files: codeFiles })
-    : securityCollector();
+  return securityCollector();
 }

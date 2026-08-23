@@ -16,8 +16,7 @@ import {
   printViolations,
   readText,
 } from '../../core/shared.mjs';
-import { lintWithEslint, summarizeEslintResults } from '../../core/verify-eslint.mjs';
-import { toRelativePath } from '../../core/shared-paths.mjs';
+import { lintWithSecurityEslint } from './eslint-security-adapter.mjs';
 
 const SECURITY_VERIFIER_PATH = 'tooling/qa/guards/security/verify-security.mjs';
 
@@ -145,85 +144,26 @@ export function collectSecurityViolations(relativePaths, { readSource = readText
   };
 }
 
-function mergeEslintResults(results) {
-  return {
-    failed: results.some((result) => result.failed),
-    warningCount: results.reduce((count, result) => count + result.warningCount, 0),
-    errorCount: results.reduce((count, result) => count + result.errorCount, 0),
-    output: results
-      .map((result) => result.output)
-      .filter(Boolean)
-      .join('\n'),
-    results: results.flatMap((result) => result.results),
-  };
-}
-
 async function collectSecurityEslintResult(
   jsLikeFiles,
-  { eslintResults = null, lintRunner = lintWithEslint } = {}
+  { lintRunner = lintWithSecurityEslint, strictWarnings = false } = {}
 ) {
   if (jsLikeFiles.length === 0) {
     return { failed: false, warningCount: 0, errorCount: 0, output: '', results: [] };
   }
-  if (Array.isArray(eslintResults)) {
-    const jsLikeFileSet = new Set(jsLikeFiles);
-    const availableFileSet = new Set(
-      eslintResults.map((result) => toRelativePath(result.filePath))
-    );
-    const scopedResults = eslintResults.filter((result) =>
-      jsLikeFileSet.has(toRelativePath(result.filePath))
-    );
-    const missingFiles = jsLikeFiles.filter((file) => !availableFileSet.has(file));
-    const results = [
-      await summarizeEslintResults(scopedResults, {
-        quiet: true,
-        rulePrefix: 'security/',
-      }),
-      await summarizeEslintResults(scopedResults, {
-        rulePrefix: 'security/detect-unsafe-regex',
-        strict: true,
-      }),
-    ];
-    if (missingFiles.length > 0) {
-      results.push(
-        await lintRunner({
-          files: missingFiles,
-          quiet: true,
-          rulePrefix: 'security/',
-        }),
-        await lintRunner({
-          files: missingFiles,
-          rulePrefix: 'security/detect-unsafe-regex',
-          strict: true,
-        })
-      );
-    }
-    return mergeEslintResults(results);
-  }
-  return mergeEslintResults([
-    await lintRunner({
-      files: jsLikeFiles,
-      quiet: true,
-      rulePrefix: 'security/',
-    }),
-    await lintRunner({
-      files: jsLikeFiles,
-      rulePrefix: 'security/detect-unsafe-regex',
-      strict: true,
-    }),
-  ]);
+  return lintRunner({ files: jsLikeFiles, strictWarnings });
 }
 
 export async function runSecurityCheck(
   explicitFiles = [],
-  { eslintResults = null, lintRunner = lintWithEslint } = {}
+  { lintRunner = lintWithSecurityEslint, strictWarnings = false } = {}
 ) {
   const files = collectCodeFiles(explicitFiles);
   const { files: jsLikeFiles, violations: customViolations } = collectSecurityViolations(files);
 
   const eslintResult = await collectSecurityEslintResult(jsLikeFiles, {
-    eslintResults,
     lintRunner,
+    strictWarnings,
   });
 
   const violations = filterAllowedViolations(customViolations, loadBaseline());

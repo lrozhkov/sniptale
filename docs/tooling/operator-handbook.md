@@ -29,7 +29,7 @@ For a CI-authority bootstrap, finish that local QA/closeout sequence, then requi
 
 Ready PRs and pushes to `main` run Fast PR Gate with `SELECTEL_QA_PROFILES`. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Continuous Integration → Run workflow → release-provenance**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`. It reuses an exact fast proof when possible, otherwise completes the missing fast controls on the same release VM; full Vitest and release-readiness claims always remain owned by release provenance.
 
-The proof artifact name is `fast-proof-<commit>-<run-id>` or `release-provenance-<commit>-<run-id>`. The job summary contains its URL and exact download command. Proof is uploaded before cleanup. Confirm the cleanup receipt marks the runner registration, VM, VM ports, router interface, router, subnet, network, and volumes deleted before treating the run as complete.
+The proof artifact name is `fast-proof-<commit>-<run-id>-<run-attempt>` or `release-provenance-<commit>-<run-id>-<run-attempt>`. The job summary contains its URL and exact download command. Proof is uploaded before cleanup. Confirm the cleanup receipt marks the runner registration, VM, VM ports, disposable security group, router interface, router, subnet, network, and volumes deleted before treating the run as complete. When the early receipt is unavailable, the cleanup artifact must identify `recover-cleanup` for the exact run attempt rather than a repository-wide sweep.
 
 To publish, first create and push a GitHub-verifiable annotated signing tag matching the package version. Then run **Actions → Continuous Deployment** with that tag and the successful Release provenance run ID. Deployment creates no VM and performs no QA rebuild. If publication fails, rerun deployment against the same provenance proof.
 
@@ -37,7 +37,7 @@ Selecting an older successful provenance run requires `allow_non_latest_provenan
 
 ## Local WSL setup
 
-Ordinary local `ci:proof` and `ci:release` do not require Docker. They restore the repository-local npm download cache, still run exact `npm ci` plus native package bootstrap, and execute the same JS composition and QA owners directly with the locked external audit binaries. This is the fastest diagnostic path, not byte-for-byte environment equivalence. The GitHub job adds the pinned Linux image and is the canonical release-provenance environment; use the clean `ci:proof -- --pr` container bypass when external-environment equivalence is required locally.
+Ordinary local `ci:proof` and `ci:release` do not require Docker. They restore the repository-local npm download cache, still run exact `npm ci`, verify every installed project-toolchain package, alias, native entrypoint, and TypeScript compiler-API runtime against `toolchain.lock.json`, then perform native package bootstrap and execute the same JS composition and QA owners with the locked external audit binaries. This is the fastest diagnostic path, not byte-for-byte environment equivalence. The GitHub job adds the pinned Linux image and is the canonical release-provenance environment; use the clean `ci:proof -- --pr` container bypass when external-environment equivalence is required locally.
 
 `ci:proof` and `ci:release` are repository-wide in both environments. Diff awareness belongs only to `qa:release-harness`, `qa:checkpoint`, and `qa:closeout`; resource flags affect scheduling and reuse compatibility, never the selected control or file scope.
 
@@ -67,7 +67,10 @@ Use direct commands only to diagnose the failed owner:
 | Documentation facts | `node tooling/qa/core/verify-documentation-facts.mjs` |
 | Config baseline | `node tooling/qa/core/verify-config-policy.mjs` |
 | Typecheck | `node tooling/qa/core/verify-typecheck.mjs` |
-| ESLint | `node tooling/qa/core/verify-eslint.mjs` |
+| Oxlint | `node tooling/qa/core/verify-oxlint.mjs` |
+| Oxfmt | `node tooling/qa/core/verify-oxfmt.mjs` |
+| Residual security ESLint | `node tooling/qa/guards/security/verify-security.mjs` |
+| Release-only SonarJS ESLint | `node tooling/qa/core/verify-sonarjs.mjs` |
 | Build | `node tooling/qa/core/verify-build.mjs` |
 | Security guardrails | `node tooling/qa/guards/security/verify-security.mjs` |
 | Runtime boundaries | `node tooling/qa/guards/architecture/verify-boundaries.mjs` |

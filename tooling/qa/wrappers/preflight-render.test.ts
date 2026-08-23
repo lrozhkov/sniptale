@@ -106,7 +106,7 @@ it('stays read-only and outside the blocking closeout path', () => {
     .map((file) => fs.readFileSync(`tooling/qa/wrappers/${file}`, 'utf8'))
     .join('\n');
   for (const forbidden of [
-    'runPrettierWrite',
+    'runFormatterWrite',
     'writeAdvisoryState',
     'writeCheckpointState',
     'runNpm',

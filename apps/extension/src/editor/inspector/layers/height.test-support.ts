@@ -83,21 +83,21 @@ function getScrollHeightValue(element: HTMLElement, metrics: LayerHeightLayoutMe
 }
 
 function stubElementMeasurements(getMetrics: () => LayerHeightLayoutMetrics) {
-  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (
-    this: HTMLElement
-  ) {
-    return getClientHeightValue(this, getMetrics());
-  });
-  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
-    this: HTMLElement
-  ) {
-    return getOffsetHeightValue(this, getMetrics());
-  });
-  vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (
-    this: HTMLElement
-  ) {
-    return getScrollHeightValue(this, getMetrics());
-  });
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return getClientHeightValue(this, getMetrics());
+    }
+  );
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return getOffsetHeightValue(this, getMetrics());
+    }
+  );
+  vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return getScrollHeightValue(this, getMetrics());
+    }
+  );
 }
 
 export function stubLayerHeightMeasurementEnvironment(args: {

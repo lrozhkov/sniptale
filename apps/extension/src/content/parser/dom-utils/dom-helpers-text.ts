@@ -56,7 +56,7 @@ function isNarrativeHiddenElement(element: HTMLElement): boolean {
   const className = element.getAttribute('class') ?? '';
 
   return (
-    element.hidden ||
+    element.hidden !== false ||
     element.getAttribute('aria-hidden') === 'true' ||
     NARRATIVE_HIDDEN_CLASS_PATTERN.test(className) ||
     NARRATIVE_HIDDEN_STYLE_PATTERN.test(style)

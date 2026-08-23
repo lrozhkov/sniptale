@@ -158,7 +158,7 @@ function validateRunRecord(root, manifest, lane, derived, trustedRoot) {
     throw new Error('Candidate proof must contain one top-level run record.');
   const record = JSON.parse(fs.readFileSync(path.join(root, records[0]), 'utf8'));
   if (
-    record?.schemaVersion !== 2 ||
+    record?.schemaVersion !== 3 ||
     record.wrapperId !== `ci:${lane}` ||
     record.status !== 'all-passed' ||
     record.exitCode !== 0 ||

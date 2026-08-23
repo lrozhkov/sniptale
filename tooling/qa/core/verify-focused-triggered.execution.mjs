@@ -176,13 +176,21 @@ export async function runDependencyGraphTriggeredChecks(
   return [boundaryStep, cycleStep];
 }
 
-export async function runFocusedTypecheckStep(typecheckTargetFiles, { maxConcurrency = 2 } = {}) {
+export async function runFocusedTypecheckStep(
+  typecheckTargetFiles,
+  { checkerCount, maxConcurrency = 1 } = {}
+) {
   if (!shouldRunFocusedTypecheck(typecheckTargetFiles)) {
     return timeSyncStep(() => createSkippedStep('Typecheck'));
   }
 
   const { durationMs, value: result } = await measureAsyncStep(() =>
-    runTypecheckAsync({ maxConcurrency, mode: 'affected', targetFiles: typecheckTargetFiles })
+    runTypecheckAsync({
+      checkerCount,
+      maxConcurrency,
+      mode: 'affected',
+      targetFiles: typecheckTargetFiles,
+    })
   );
   const step = withStepDuration(
     (() => {
@@ -192,7 +200,8 @@ export async function runFocusedTypecheckStep(typecheckTargetFiles, { maxConcurr
         checkedProjectIds: result.checkedProjectIds,
         detail:
           processStep.status === 'ok'
-            ? `${result.typecheckMode}: ${result.checkedProjectIds.join(', ')}`
+            ? `${result.typecheckMode}: ${result.checkedProjectIds.join(', ')}; ` +
+              `typescript=${result.typecheckToolVersion}; checkers=${result.typecheckCheckerCount}`
             : processStep.detail,
         typecheckMode: result.typecheckMode,
       };

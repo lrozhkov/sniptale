@@ -12,6 +12,10 @@ import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
 import { resolveReusableBuildProofHostPaths } from './build-proof-host.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
+import {
+  resolveContainerDigest,
+  resolveGithubRunIdentityEnvironment,
+} from './container-identity.mjs';
 
 const lane = process.argv[2];
 if (!['proof', 'release'].includes(lane)) {
@@ -102,10 +106,9 @@ if (process.env.SNIPTALE_CI_SKIP_BUILD !== '1') {
   const inspect = spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' });
   if (inspect.status !== 0) runDocker(['pull', image]);
 }
-const digest = command('docker', ['image', 'inspect', '--format={{.Id}}', image]);
-if (!/^sha256:[a-f0-9]{64}$/u.test(digest)) {
-  throw new Error(`Unable to resolve immutable container digest for ${image}.`);
-}
+const digest = resolveContainerDigest(image, () =>
+  command('docker', ['image', 'inspect', '--format={{.Id}}', image])
+);
 
 const trustedControlSha = process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? candidateIdentity.head;
 if (!/^[a-f0-9]{40}$/u.test(trustedControlSha ?? '')) {
@@ -207,8 +210,8 @@ if (reusableFastProof) {
     'SNIPTALE_FAST_PROOF_PATH=/opt/sniptale-fast-proof'
   );
 }
+environment.push(...resolveGithubRunIdentityEnvironment());
 for (const name of [
-  'GITHUB_RUN_ID',
   'SNIPTALE_BASE_SHA',
   'SNIPTALE_QA_CPU_TOKENS',
   'SNIPTALE_QA_MEMORY_MIB',

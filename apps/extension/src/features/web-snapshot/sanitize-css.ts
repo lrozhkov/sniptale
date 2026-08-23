@@ -113,7 +113,7 @@ function stripLiteralCssFetchSyntax(value: string): string {
   let sanitized = '';
   const state: CssScanState = { inBlockComment: false, quote: null };
 
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < value.length;) {
     const char = value[index] ?? '';
     const nextChar = value[index + 1] ?? '';
 

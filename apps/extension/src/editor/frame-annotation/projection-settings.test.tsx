@@ -69,7 +69,7 @@ it('targets and removes the selected additional editor callout', () => {
       />
     )
   );
-  act(() => (popovers.callout?.['onDisable'] as () => void)());
+  act(() => (popovers.callout!['onDisable'] as () => void)());
 
   expect(onChange).toHaveBeenCalledWith(
     expect.objectContaining({
