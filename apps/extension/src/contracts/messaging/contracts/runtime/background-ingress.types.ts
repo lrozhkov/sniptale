@@ -75,12 +75,38 @@ type RuntimeMessageContract = {
   readonly parseResponse: (input: unknown) => unknown;
 };
 
+export type BackgroundIngressSemanticAuthority = {
+  readonly capabilityPolicyOwner: {
+    readonly alternateAuthorityFamilies: readonly BackgroundIngressAuthorityFamily[];
+    readonly alternatePolicyIds: readonly string[];
+    readonly policyAuthorityFamily: string;
+    readonly policyId: string;
+    readonly requiredAuthority: string;
+    readonly routeAuthorityFamily: BackgroundIngressAuthorityFamily;
+    readonly stateOwnerIds: readonly string[];
+  };
+  readonly evidencePolicy: {
+    readonly auditEventPolicy: 'existing-owner-evidence-only';
+    readonly errorShape: string;
+    readonly responseShape: string;
+  };
+  readonly handlerOwner: {
+    readonly handlerId: string;
+    readonly ownerModule: string;
+  };
+  readonly mutationOwners: {
+    readonly effectPolicy: string;
+    readonly transitiveStateOwner: string;
+  };
+};
+
 export type BackgroundIngressRouteDescriptor = Omit<
   BackgroundIngressRouteGroupData,
   'messageTypes'
 > & {
   readonly classification: 'routed';
   readonly contract: RuntimeMessageContract;
+  readonly semanticAuthority: BackgroundIngressSemanticAuthority;
   readonly type: RuntimeMessageType;
 };
 
