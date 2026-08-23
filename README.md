@@ -218,6 +218,8 @@ The companion can operate independently or connect to the extension through Chro
 
 The native companion is not included in this repository or extension artifact. Its distribution, maturity, platform coverage, and installation instructions may differ from the browser extension.
 
+The extension validates native messages, protocol compatibility, controller ownership, and capability limits. Install-health fields reported by the companion, including binary-signing and package-integrity status, are compatibility and repair signals from that companion rather than cryptographic attestation performed by the extension. Chrome's native-host registration, operating-system trust, and companion distribution remain outside the extension's verification boundary.
+
 ## Local-first does not mean zero network
 
 The main Sniptale workflow is local-first:

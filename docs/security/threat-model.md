@@ -17,6 +17,12 @@ Owner: security architecture. Review when a privileged entrypoint, store, permis
 
 Chromium APIs and the browser profile are trusted-computing-base assumptions, not confidential enclaves. Storage encryption and sender authorization reduce exposure but cannot protect against a compromised profile or extension runtime.
 
+## Native companion trust boundary
+
+The optional native companion is outside the extension artifact and this repository. Chrome's native-messaging host selection and the local operating system's native-host registration, executable loading, code-signing enforcement, and package distribution are trusted-computing-base assumptions. A compromised local account, replaced registered host, or compromised operating system is outside the extension's ability to attest.
+
+Native messages remain untrusted protocol input and must pass the native contract parsers, version negotiation, controller ownership, capability bounds, and request correlation before they affect extension state. The `signedBinary`, `rollbackProtected`, `notarized`, and `packageIntegrity` install fields are self-reported by the connected host. They drive compatibility and repair guidance; they are not cryptographic proof verified by the extension, do not identify the executable with a pinned key, and must not be presented as an extension security verdict.
+
 ## Adversaries
 
 Threats include malicious pages and frames, replayed or unauthorized senders, hostile archives/templates/renderers, compromised AI endpoints, unsafe DOM sinks, dependency/build compromise, hostile QA child processes or hooks, accidental retention, and local profile readers.
@@ -50,6 +56,7 @@ GitHub Actions treats pull-request source and dependency hooks as untrusted. The
 | Hostile DOM reaches unsafe sink | INV-DOM-SANITIZATION | sanitizer owner | Sanitizer and browser rendering defects |
 | Diagnostics retain sensitive data | INV-OBS-REDACTION | diagnostics owner | Existing user-controlled logs may persist |
 | Manifest or artifact exceeds policy | INV-ARTIFACT-BOUNDARY | build/release owner | Distribution relies on the release builder |
+| Native host report is mistaken for attestation | INV-NATIVE-TRUST | native adapter and compatibility owner | A locally replaced registered host is indistinguishable to the extension |
 
 The release invariant requires the production closure to be recomputed from the lockfile and installed tree, license exceptions to use checked-in version-tagged or commit-addressed bytes with an exact digest, bundled Manrope bytes to match their installed package sources and OFL text, and the archive legal payload to match policy digests. Ordinary validation remains offline.
 
