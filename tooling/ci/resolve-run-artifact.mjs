@@ -1,18 +1,15 @@
 import { spawnSync } from 'node:child_process';
 
 export function selectLatestRunArtifact(artifacts, prefix) {
-  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  const pattern = new RegExp(`^${escaped}(?<attempt>[1-9]\\d*)$`, 'u');
   const candidates = artifacts
     .filter((artifact) => artifact?.expired === false && typeof artifact.name === 'string')
-    .map((artifact) => ({ artifact, match: pattern.exec(artifact.name) }))
-    .filter(({ match }) => match)
-    .sort((left, right) => Number(left.match.groups.attempt) - Number(right.match.groups.attempt));
+    .filter((artifact) => artifact.name.startsWith(prefix))
+    .map((artifact) => ({ artifact, attempt: artifact.name.slice(prefix.length) }))
+    .filter(({ attempt }) => /^[1-9]\d*$/u.test(attempt))
+    .sort((left, right) => Number(left.attempt) - Number(right.attempt));
   if (candidates.length === 0) throw new Error(`No live run artifact matches ${prefix}<attempt>.`);
   const selected = candidates.at(-1);
-  const sameAttempt = candidates.filter(
-    ({ match }) => match.groups.attempt === selected.match.groups.attempt
-  );
+  const sameAttempt = candidates.filter(({ attempt }) => attempt === selected.attempt);
   if (sameAttempt.length !== 1) throw new Error('Run artifact attempt identity is ambiguous.');
   return selected.artifact.name;
 }

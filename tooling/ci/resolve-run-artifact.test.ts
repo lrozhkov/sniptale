@@ -13,6 +13,18 @@ it('reuses the latest successful producer artifact across downstream run attempt
   );
 });
 
+it('treats producer prefixes as literal artifact identity', () => {
+  expect(
+    selectLatestRunArtifact(
+      [
+        { name: 'proof-[candidate]-1', expired: false },
+        { name: 'proof-candidate-9', expired: false },
+      ],
+      'proof-[candidate]-'
+    )
+  ).toBe('proof-[candidate]-1');
+});
+
 it('fails closed for missing and ambiguous producer attempts', () => {
   expect(() => selectLatestRunArtifact([], 'fast-proof-abc-42-')).toThrow('No live run artifact');
   const duplicate = [
