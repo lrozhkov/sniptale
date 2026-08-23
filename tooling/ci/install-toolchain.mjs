@@ -77,6 +77,24 @@ if (
 }
 fs.cpSync('/tmp/mutation-package', '/opt/sniptale-mutation', { recursive: true });
 run('npm', ['ci', '--ignore-scripts', '--prefix', '/opt/sniptale-mutation']);
+const mutationTypescript = spawnSync(
+  'node',
+  [
+    '--input-type=module',
+    '--eval',
+    "const { default: ts } = await import('typescript'); process.stdout.write(ts.version);",
+  ],
+  { cwd: '/opt/sniptale-mutation', encoding: 'utf8' }
+);
+if (
+  mutationTypescript.status !== 0 ||
+  mutationTypescript.stdout.trim() !== lock.projectToolchain.typescriptCompilerApi.version
+) {
+  throw new Error(
+    `Mutation TypeScript drift: expected ${lock.projectToolchain.typescriptCompilerApi.version}, ` +
+      `got ${`${mutationTypescript.stdout ?? ''}${mutationTypescript.stderr ?? ''}`.trim()}`
+  );
+}
 fs.cpSync('/tmp/playwright-package', '/opt/playwright-cli', { recursive: true });
 run('npm', ['ci', '--ignore-scripts', '--prefix', '/opt/playwright-cli']);
 process.env.PLAYWRIGHT_BROWSERS_PATH = '/opt/playwright';

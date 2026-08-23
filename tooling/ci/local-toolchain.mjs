@@ -13,8 +13,9 @@ function run(command, args, options = {}) {
   if (result.status !== 0) throw new Error(`${command} failed with status ${result.status}.`);
 }
 
-function requireToolVersion({ args, environment, executable, expected, name }) {
+function requireToolVersion({ args, cwd, environment, executable, expected, name }) {
   const result = spawnSync(executable, args, {
+    cwd,
     encoding: 'utf8',
     env: normalizedProxyEnvironment(environment),
   });
@@ -190,6 +191,17 @@ function validateToolchainFiles({
               '--version',
             ],
             expected: mutationVersion,
+          },
+          {
+            name: 'Stryker TypeScript',
+            executable: process.execPath,
+            args: [
+              '--input-type=module',
+              '--eval',
+              "const { default: ts } = await import('typescript'); process.stdout.write(ts.version);",
+            ],
+            cwd: mutation,
+            expected: lock.projectToolchain.typescriptCompilerApi.version,
           },
         ]
       : []),

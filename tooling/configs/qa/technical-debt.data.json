@@ -18232,7 +18232,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/install-toolchain.mjs",
-        "contentHash": "44a5c331db9bbbd78c32185a1bf9ce0dbffd0832f971003a39f75ec060ae8b15"
+        "contentHash": "3bb221495fa6e66545c9c8b7ba0f3b5ec5798db27e3c3665c78f56b3ef065c0f"
       },
       "consumers": [
         "tooling/ci/install-toolchain.mjs"
@@ -18706,7 +18706,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/local-toolchain.mjs",
-        "contentHash": "f647870a65fcd9b788309f8d6638b314d5ac2b2dcb5d60cdd8e10a3ccd74f3f6"
+        "contentHash": "bde065a7fd378a21b22a1b17fa0ac57a7d9319f90ef236c703eb425682d0d38b"
       },
       "consumers": [
         "tooling/ci/local-toolchain.mjs",
@@ -18718,7 +18718,8 @@
         "property:validateToolchainFiles/args[2]",
         "property:validateToolchainFiles/args[3]",
         "property:validateToolchainFiles/args[4]",
-        "property:validateToolchainFiles/args[5]"
+        "property:validateToolchainFiles/args[5]",
+        "property:validateToolchainFiles/args[6]"
       ]
     },
     {
@@ -23461,7 +23462,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/verify-project-toolchain.mjs",
-        "contentHash": "2933fc118e366ab66f82d46280d9d4155a5522b29dc575e49e61c51d569fdb04"
+        "contentHash": "93c5a4ae44a9104dcfe60f5a6ad3effd29dbd80b545636bb3dc04802481c587c"
       },
       "consumers": [
         "tooling/ci/verify-project-toolchain.mjs",

@@ -32,6 +32,39 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
+function verifyMutationTypescriptAuthority(root, projectLock) {
+  const projectTypescript = projectLock.packages?.['node_modules/typescript'];
+  const projectCompilerApi = projectLock.packages?.['node_modules/@typescript/old'];
+  const mutationPackage = readJson(path.join(root, 'tooling/test/mutation/package.json'));
+  const mutationLock = readJson(path.join(root, 'tooling/test/mutation/package-lock.json'));
+  const mutationTypescript = mutationLock.packages?.['node_modules/typescript'];
+  const mutationCompilerApi = mutationLock.packages?.['node_modules/@typescript/old'];
+  if (
+    !projectTypescript?.name ||
+    !projectTypescript.version ||
+    !projectCompilerApi?.name ||
+    !projectCompilerApi.version
+  ) {
+    throw new Error('Project TypeScript lock identity is missing.');
+  }
+  const expectedSpec = `npm:${projectTypescript.name}@${projectTypescript.version}`;
+  if (mutationPackage.devDependencies?.typescript !== expectedSpec) {
+    throw new Error(
+      `Mutation TypeScript authority drift: expected ${expectedSpec}, ` +
+        `got ${String(mutationPackage.devDependencies?.typescript)}.`
+    );
+  }
+  for (const field of ['name', 'version', 'resolved', 'integrity']) {
+    if (mutationTypescript?.[field] !== projectTypescript[field]) {
+      throw new Error(`Mutation TypeScript ${field} drifted from the project lock.`);
+    }
+    if (mutationCompilerApi?.[field] !== projectCompilerApi?.[field]) {
+      throw new Error(`Mutation TypeScript compiler API ${field} drifted from the project lock.`);
+    }
+  }
+  return projectCompilerApi.version;
+}
+
 export function verifyProjectToolchain({ cwd = process.cwd() } = {}) {
   const root = path.resolve(cwd);
   const lock = readJson(path.join(root, 'tooling/configs/ci/toolchain.lock.json'));
@@ -75,8 +108,10 @@ export function verifyProjectToolchain({ cwd = process.cwd() } = {}) {
         `got ${runtimeTypescriptVersion}.`
     );
   }
+  const mutationTypescriptVersion = verifyMutationTypescriptAuthority(root, projectLock);
 
   return {
+    mutationTypescriptVersion,
     toolCount: REQUIRED_TOOL_IDS.length,
     typescriptCompilerApiVersion: runtimeTypescriptVersion,
   };
@@ -85,6 +120,8 @@ export function verifyProjectToolchain({ cwd = process.cwd() } = {}) {
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const result = verifyProjectToolchain();
   process.stdout.write(
-    `Project toolchain passed: tools=${result.toolCount}; typescript-api=${result.typescriptCompilerApiVersion}\n`
+    `Project toolchain passed: tools=${result.toolCount}; ` +
+      `typescript-api=${result.typescriptCompilerApiVersion}; ` +
+      `mutation-typescript=${result.mutationTypescriptVersion}\n`
   );
 }

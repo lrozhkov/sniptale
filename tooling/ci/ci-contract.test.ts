@@ -175,6 +175,8 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(lock.codeql.sha256).toMatch(/^[a-f0-9]{64}$/u);
   expect(installer).toContain("codeql.tar.gz', '-C', '/opt'");
   expect(installer).not.toContain('codeql.zip');
+  expect(installer).toContain("await import('typescript')");
+  expect(installer).toContain('typescriptCompilerApi.version');
   for (const excluded of ['.git', '.env', '.tmp', 'build', 'node_modules']) {
     expect(fs.readFileSync('.dockerignore', 'utf8').split('\n')).toContain(excluded);
   }
