@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadRecentColors, pushRecentColor } from '../../../composition/persistence/recent-colors';
 import type { VideoProjectSceneBackground } from '../../../features/video/project/types/index';
 import type { VideoEditorInspectorMode } from '../../contracts/workspace';
@@ -65,36 +65,50 @@ function useVideoEditorConfirmDialogState() {
     resolve?.(confirmed);
   }, []);
 
-  return {
-    confirmDialog,
-    onConfirmDialogCancel: () => closeDialog(false),
-    onConfirmDialogConfirm: () => closeDialog(true),
-    requestConfirm: (dialog: VideoEditorConfirmDialogState) =>
+  const onConfirmDialogCancel = useCallback(() => closeDialog(false), [closeDialog]);
+  const onConfirmDialogConfirm = useCallback(() => closeDialog(true), [closeDialog]);
+  const requestConfirm = useCallback(
+    (dialog: VideoEditorConfirmDialogState) =>
       new Promise<boolean>((resolve) => {
         resolveRef.current = resolve;
         setConfirmDialog(dialog);
       }),
+    []
+  );
+
+  return {
+    confirmDialog,
+    onConfirmDialogCancel,
+    onConfirmDialogConfirm,
+    requestConfirm,
   };
 }
 
 function useVideoEditorLibraryPanelState() {
   const [libraryPanelOpen, setLibraryPanelOpen] = useState(false);
 
+  const closeLibraryPanel = useCallback(() => setLibraryPanelOpen(false), []);
+  const openLibraryPanel = useCallback(() => setLibraryPanelOpen(true), []);
+  const toggleLibraryPanel = useCallback(() => setLibraryPanelOpen((value) => !value), []);
+
   return {
     libraryPanelOpen,
-    closeLibraryPanel: () => setLibraryPanelOpen(false),
-    openLibraryPanel: () => setLibraryPanelOpen(true),
-    toggleLibraryPanel: () => setLibraryPanelOpen((value) => !value),
+    closeLibraryPanel,
+    openLibraryPanel,
+    toggleLibraryPanel,
   };
 }
 
 function useAudioRecordingDialogState() {
   const [audioRecordingDialogOpen, setAudioRecordingDialogOpen] = useState(false);
 
+  const closeAudioRecordingDialog = useCallback(() => setAudioRecordingDialogOpen(false), []);
+  const openAudioRecordingDialog = useCallback(() => setAudioRecordingDialogOpen(true), []);
+
   return {
     audioRecordingDialogOpen,
-    closeAudioRecordingDialog: () => setAudioRecordingDialogOpen(false),
-    openAudioRecordingDialog: () => setAudioRecordingDialogOpen(true),
+    closeAudioRecordingDialog,
+    openAudioRecordingDialog,
   };
 }
 
@@ -140,23 +154,30 @@ function useSceneBackgroundColorState(): VideoEditorWorkspaceColorState {
   const recentColorState = useRecentColorsState();
   const [preview, setPreview] = useState<VideoProjectSceneBackground | null>(null);
 
-  return {
-    preview,
-    recentColors: recentColorState.recentColors,
-    rememberRecentColor: recentColorState.rememberRecentColor,
-    resetPreview: () => setPreview(null),
-    setPreview,
-  };
+  const resetPreview = useCallback(() => setPreview(null), []);
+
+  return useMemo(
+    () => ({
+      preview,
+      recentColors: recentColorState.recentColors,
+      rememberRecentColor: recentColorState.rememberRecentColor,
+      resetPreview,
+      setPreview,
+    }),
+    [preview, recentColorState.recentColors, recentColorState.rememberRecentColor, resetPreview]
+  );
 }
 
 function useVideoEditorInspectorState(): VideoEditorWorkspaceInspectorState {
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
 
-  return {
-    mode,
-    openGridSettings: () => setMode('grid'),
-    openSelection: () => setMode('selection'),
-  };
+  const openGridSettings = useCallback(() => setMode('grid'), []);
+  const openSelection = useCallback(() => setMode('selection'), []);
+
+  return useMemo(
+    () => ({ mode, openGridSettings, openSelection }),
+    [mode, openGridSettings, openSelection]
+  );
 }
 
 /**
@@ -177,28 +198,59 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
     setLeftSidebarCollapsed((value) => !value);
   }, []);
 
-  return {
-    audioRecordingDialogOpen: audioRecordingDialog.audioRecordingDialogOpen,
-    confirm: {
+  const clearPlaybackRange = useCallback(() => setPlaybackRange(null), []);
+  const confirm = useMemo(
+    () => ({
       dialog: confirmDialog.confirmDialog,
       onCancel: confirmDialog.onConfirmDialogCancel,
       onConfirm: confirmDialog.onConfirmDialogConfirm,
       request: confirmDialog.requestConfirm,
-    },
-    inspector,
-    libraryPanelOpen: libraryPanel.libraryPanelOpen,
-    leftSidebarCollapsed,
-    grid,
-    playbackRange,
-    sceneBackgroundColors,
-    clearPlaybackRange: () => setPlaybackRange(null),
-    closeAudioRecordingDialog: audioRecordingDialog.closeAudioRecordingDialog,
-    closeLibraryPanel: libraryPanel.closeLibraryPanel,
-    openAudioRecordingDialog: audioRecordingDialog.openAudioRecordingDialog,
-    openLibraryPanel: libraryPanel.openLibraryPanel,
-    preview,
-    setPlaybackRange,
-    toggleLibraryPanel: libraryPanel.toggleLibraryPanel,
-    toggleSidebarCollapsed,
-  };
+    }),
+    [
+      confirmDialog.confirmDialog,
+      confirmDialog.onConfirmDialogCancel,
+      confirmDialog.onConfirmDialogConfirm,
+      confirmDialog.requestConfirm,
+    ]
+  );
+
+  return useMemo(
+    () => ({
+      audioRecordingDialogOpen: audioRecordingDialog.audioRecordingDialogOpen,
+      confirm,
+      inspector,
+      libraryPanelOpen: libraryPanel.libraryPanelOpen,
+      leftSidebarCollapsed,
+      grid,
+      playbackRange,
+      sceneBackgroundColors,
+      clearPlaybackRange,
+      closeAudioRecordingDialog: audioRecordingDialog.closeAudioRecordingDialog,
+      closeLibraryPanel: libraryPanel.closeLibraryPanel,
+      openAudioRecordingDialog: audioRecordingDialog.openAudioRecordingDialog,
+      openLibraryPanel: libraryPanel.openLibraryPanel,
+      preview,
+      setPlaybackRange,
+      toggleLibraryPanel: libraryPanel.toggleLibraryPanel,
+      toggleSidebarCollapsed,
+    }),
+    [
+      audioRecordingDialog.audioRecordingDialogOpen,
+      audioRecordingDialog.closeAudioRecordingDialog,
+      audioRecordingDialog.openAudioRecordingDialog,
+      clearPlaybackRange,
+      confirm,
+      grid,
+      inspector,
+      leftSidebarCollapsed,
+      libraryPanel.closeLibraryPanel,
+      libraryPanel.libraryPanelOpen,
+      libraryPanel.openLibraryPanel,
+      libraryPanel.toggleLibraryPanel,
+      playbackRange,
+      preview,
+      sceneBackgroundColors,
+      toggleSidebarCollapsed,
+    ]
+  );
 }

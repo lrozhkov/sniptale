@@ -23,23 +23,50 @@ export interface VideoEditorActionHandlers {
   handleCancelExport: () => Promise<void>;
 }
 
-export interface UseVideoEditorActionHandlersParams {
-  project: VideoProject | null;
-  getCurrentProjectId?: () => string | null;
-  currentTime: number;
-  selectedClipId?: string | null;
-  projects: ProjectListItem[];
-  exportState: VideoEditorExportRuntimeState;
-  libraries: VideoEditorLibrariesState;
-  applyLoadedProject: ApplyLoadedProject;
+interface VideoEditorCommandErrorPort {
   setError: VideoEditorSessionActions['setError'];
+}
+
+export interface AssetHandlerPort extends VideoEditorCommandErrorPort {
+  getCurrentProject: () => VideoProject | null;
+  getCurrentProjectId: () => string | null;
+  getCurrentTime: () => number;
   upsertAsset: VideoEditorProjectActions['upsertAsset'];
   addAssetClip: VideoEditorProjectActions['addAssetClip'];
   moveClip: VideoEditorProjectActions['moveClip'];
   trimClipEnd: VideoEditorProjectActions['trimClipEnd'];
   trimClipStart: VideoEditorProjectActions['trimClipStart'];
+}
+
+export interface ExportHandlerPort {
+  getCurrentProject: () => VideoProject | null;
+  getCurrentSelectedClipId: () => string | null;
+  getCurrentExportState: () => VideoEditorExportRuntimeState;
   startExport: VideoEditorExportActions['startExport'];
   failExport: VideoEditorExportActions['failExport'];
   failExportCancellation: VideoEditorExportActions['failExportCancellation'];
   cancelExport: VideoEditorExportActions['cancelExport'];
+}
+
+export interface ProjectHandlerPort extends VideoEditorCommandErrorPort {
+  getCurrentProject: () => VideoProject | null;
+  projects: ProjectListItem[];
+  libraries: Pick<VideoEditorLibrariesState, 'refreshProjectExports' | 'refreshProjects'>;
+  applyLoadedProject: ApplyLoadedProject;
+}
+
+export interface VideoEditorCommandHandlers {
+  assets: Pick<
+    VideoEditorActionHandlers,
+    | 'handleAddRecording'
+    | 'handleImportAudio'
+    | 'handleImportImage'
+    | 'handleImportRecordedAudio'
+    | 'handleImportVideo'
+  >;
+  export: Pick<VideoEditorActionHandlers, 'handleStartExport' | 'handleCancelExport'>;
+  project: Pick<
+    VideoEditorActionHandlers,
+    'handleOpenProject' | 'handleCreateProject' | 'handleDeleteProject'
+  >;
 }

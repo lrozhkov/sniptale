@@ -112,14 +112,26 @@ export function useVideoEditorSelections(
   const selectedMotionRegion = useSelectedMotionRegion(project, selection);
   const selectedObjectTrack = useSelectedObjectTrack(project, selection);
 
-  return {
-    selection,
-    selectedActionEvent,
-    selectedClip,
-    selectedCursorSample,
-    selectedMotionRegion,
-    selectedObjectTrack,
-    selectedTrack,
-    selectedTransition,
-  };
+  return useMemo(
+    () => ({
+      selection,
+      selectedActionEvent,
+      selectedClip,
+      selectedCursorSample,
+      selectedMotionRegion,
+      selectedObjectTrack,
+      selectedTrack,
+      selectedTransition,
+    }),
+    [
+      selection,
+      selectedActionEvent,
+      selectedClip,
+      selectedCursorSample,
+      selectedMotionRegion,
+      selectedObjectTrack,
+      selectedTrack,
+      selectedTransition,
+    ]
+  );
 }

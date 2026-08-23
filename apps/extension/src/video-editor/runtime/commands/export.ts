@@ -1,58 +1,65 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { translate } from '../../../platform/i18n';
 import { getClipEndTime, getLinkedClipIds } from '../../../features/video/project/timeline';
 import { VideoExportScope } from '../../../features/video/project/types/index';
 import { cancelProjectExport, startProjectExport } from '../../project/operations/ops';
 import { toErrorMessage } from './helpers';
-import type { UseVideoEditorActionHandlersParams, VideoEditorActionHandlers } from './types';
+import type { ExportHandlerPort, VideoEditorActionHandlers } from './types';
 
 export function useExportHandlers(
-  params: UseVideoEditorActionHandlersParams
+  port: ExportHandlerPort
 ): Pick<VideoEditorActionHandlers, 'handleStartExport' | 'handleCancelExport'> {
   const handleStartExport = useCallback(async () => {
-    if (!params.project || !params.exportState.settings) {
+    const project = port.getCurrentProject();
+    const exportState = port.getCurrentExportState();
+    if (!project || !exportState.settings) {
       return;
     }
 
-    const resolvedSettings = resolveExportSettings(params);
+    const resolvedSettings = resolveExportSettings(port, project, exportState);
     if (!resolvedSettings) {
       return;
     }
 
     const jobId = crypto.randomUUID();
-    params.startExport(jobId);
+    port.startExport(jobId);
 
     try {
-      const response = await startProjectExport(jobId, params.project, resolvedSettings);
+      const response = await startProjectExport(jobId, project, resolvedSettings);
       if (!response?.success) {
-        params.failExport(response?.error || translate('videoEditor.app.exportStartFailed'));
+        port.failExport(response?.error || translate('videoEditor.app.exportStartFailed'));
       }
     } catch (exportError) {
-      params.failExport(toErrorMessage(exportError));
+      port.failExport(toErrorMessage(exportError));
     }
-  }, [params]);
+  }, [port]);
 
   const handleCancelExport = useCallback(async () => {
-    if (!params.exportState.jobId) {
+    const exportState = port.getCurrentExportState();
+    if (!exportState.jobId) {
       return;
     }
 
     try {
-      await cancelProjectExport(params.exportState.jobId);
-      params.cancelExport();
+      await cancelProjectExport(exportState.jobId);
+      port.cancelExport();
     } catch (cancelError) {
-      params.failExportCancellation(toErrorMessage(cancelError));
+      port.failExportCancellation(toErrorMessage(cancelError));
     }
-  }, [params]);
+  }, [port]);
 
-  return {
-    handleStartExport,
-    handleCancelExport,
-  };
+  return useMemo(
+    () => ({ handleStartExport, handleCancelExport }),
+    [handleCancelExport, handleStartExport]
+  );
 }
 
-function resolveExportSettings(params: UseVideoEditorActionHandlersParams) {
-  const { exportState, project, selectedClipId } = params;
+function resolveExportSettings(
+  port: ExportHandlerPort,
+  project: NonNullable<ReturnType<ExportHandlerPort['getCurrentProject']>>,
+  exportState: ReturnType<ExportHandlerPort['getCurrentExportState']>
+) {
+  const selectedClipId = port.getCurrentSelectedClipId();
   if (!project || !exportState.settings) {
     return null;
   }
@@ -62,13 +69,13 @@ function resolveExportSettings(params: UseVideoEditorActionHandlersParams) {
   }
 
   if (!selectedClipId) {
-    params.failExport(translate('videoEditor.exportDialog.selectedClipMissing'));
+    port.failExport(translate('videoEditor.exportDialog.selectedClipMissing'));
     return null;
   }
 
   const selectedClip = project.clips.find((clip) => clip.id === selectedClipId);
   if (!selectedClip) {
-    params.failExport(translate('videoEditor.exportDialog.selectedClipMissing'));
+    port.failExport(translate('videoEditor.exportDialog.selectedClipMissing'));
     return null;
   }
 

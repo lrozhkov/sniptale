@@ -1,7 +1,13 @@
 import { translate } from '../../../platform/i18n';
 import { CanvasInsertToolPanel, CanvasWorkspaceToolPanel } from '@sniptale/ui/canvas-tools';
 import { floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import {
+  useVideoEditorTimelineController,
+  useWorkspaceDialogsContext,
+  useWorkspaceGridContext,
+  useWorkspaceInspectorContext,
+} from '../../runtime/controller/composition/hooks';
+import { useVideoEditorClipSelectionPort } from '../../runtime/controller/store';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { buildVideoInsertActions, buildVideoWorkspaceActions } from './actions';
 
@@ -24,14 +30,15 @@ const TOP_PANEL_CLASS_NAME = floatingChromeClassNames(
 
 export function VideoEditorFloatingInsertPanel(props: {
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
-  controller: VideoEditorWorkspaceController;
   effectsLibraryDock: {
     isOpen: boolean;
     onToggle: () => void;
   };
   onActiveInsertKindChange: (kind: VideoPreviewCanvasInsertKind | null) => void;
 }) {
-  const insertion = props.controller.timeline.actions.insertion;
+  const timeline = useVideoEditorTimelineController();
+  if (!timeline) return null;
+  const insertion = timeline.actions.insertion;
 
   return (
     <div data-ui="video-editor.floating.insert-panel.stack" className={INSERT_STACK_CLASS_NAME}>
@@ -50,16 +57,29 @@ export function VideoEditorFloatingInsertPanel(props: {
   );
 }
 
-export function VideoEditorFloatingWorkspacePanel(props: {
-  controller: VideoEditorWorkspaceController;
-}) {
+export function VideoEditorFloatingWorkspacePanel() {
+  const grid = useWorkspaceGridContext();
+  const inspector = useWorkspaceInspectorContext();
+  const dialogs = useWorkspaceDialogsContext();
+  const selection = useVideoEditorClipSelectionPort((port) => port.selection);
+  const selectScene = useVideoEditorClipSelectionPort((port) => port.selectScene);
   return (
     <div
       data-ui="video-editor.floating.workspace-panel.stack"
       className={WORKSPACE_STACK_CLASS_NAME}
     >
       <CanvasWorkspaceToolPanel
-        actions={buildVideoWorkspaceActions(props.controller)}
+        actions={buildVideoWorkspaceActions({
+          grid: { magnetEnabled: grid.magnetEnabled, onToggleMagnet: grid.toggleMagnet },
+          inspectorMode: inspector.mode,
+          onOpenAudioRecordingDialog: dialogs.openAudioRecordingDialog,
+          onOpenGridSettings: inspector.openGridSettings,
+          onSelectScene: () => {
+            selectScene();
+            inspector.openSelection();
+          },
+          selection,
+        })}
         className={TOP_PANEL_CLASS_NAME}
         dataUi="video-editor.floating.workspace-panel"
         label={translate('shared.ui.commandPaletteWorkspaceSection')}

@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion/index';
 import type { VideoObjectTrack } from '../../../features/video/project/object-tracks';
-import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
+import { useVideoEditorStore } from '../../state/store';
 import { createWorkspaceProjectUpdaters } from './shared-actions';
 
 it('generates a camera path from a hidden detected cursor track that needs anchors', () => {
@@ -25,20 +25,20 @@ it('generates a camera path from a hidden detected cursor track that needs ancho
   ]);
 });
 
-function createStore(project: ReturnType<typeof createEmptyVideoProject>) {
+type TestVideoProject = ReturnType<typeof createEmptyVideoProject>;
+
+function createStore(project: TestVideoProject) {
   return {
-    currentTime: 0,
+    ...useVideoEditorStore.getInitialState(),
+    getCurrentTime: () => 0,
     project,
     recordingTelemetry: null,
     selectMotionRegion: vi.fn(),
-    updateProject: (updater) => {
+    updateProject: (updater: (current: TestVideoProject) => TestVideoProject) => {
       const nextProject = updater(project);
       Object.assign(project, nextProject);
     },
-  } as Pick<
-    VideoEditorControllerStorePort,
-    'currentTime' | 'project' | 'recordingTelemetry' | 'selectMotionRegion' | 'updateProject'
-  > as VideoEditorControllerStorePort;
+  };
 }
 
 function createCameraCursorTrack(

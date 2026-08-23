@@ -6,7 +6,8 @@ import {
   createCanvasFileToolAction,
   createCanvasToolAction,
 } from '@sniptale/ui/canvas-tools/descriptors';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import type { VideoEditorTimelineController } from '../../runtime/controller/contracts/timeline';
+import type { VideoEditorSelection } from '../../contracts/selection';
 import { PROJECT_MEDIA_ACCEPT_ATTRIBUTE } from '../../project/operations/import-validation';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
@@ -20,7 +21,7 @@ type FloatingEffectsLibraryDock = {
 export function buildVideoInsertActions(args: {
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   effectsLibraryDock: FloatingEffectsLibraryDock;
-  insertion: VideoEditorWorkspaceController['timeline']['actions']['insertion'];
+  insertion: VideoEditorTimelineController['actions']['insertion'];
   onActiveInsertKindChange: (kind: VideoPreviewCanvasInsertKind | null) => void;
 }) {
   return [
@@ -30,26 +31,33 @@ export function buildVideoInsertActions(args: {
   ] satisfies CanvasToolAction[];
 }
 
-export function buildVideoWorkspaceActions(controller: VideoEditorWorkspaceController) {
-  const gridActive = controller.header.inspectorMode === 'grid';
+export function buildVideoWorkspaceActions(controller: {
+  grid: { magnetEnabled: boolean; onToggleMagnet: () => void };
+  inspectorMode: 'grid' | 'selection';
+  onOpenAudioRecordingDialog: () => void;
+  onOpenGridSettings: () => void;
+  onSelectScene: () => void;
+  selection: VideoEditorSelection;
+}) {
+  const gridActive = controller.inspectorMode === 'grid';
   const sceneActive =
-    controller.header.inspectorMode === 'selection' &&
-    controller.sidebar.state.selection?.kind === VideoEditorSelectionKind.SCENE;
+    controller.inspectorMode === 'selection' &&
+    controller.selection.kind === VideoEditorSelectionKind.SCENE;
 
   return [
     createSceneWorkspaceAction(controller, sceneActive),
-    createSettingsWorkspaceAction('grid', gridActive, controller.header.onOpenGridSettings),
+    createSettingsWorkspaceAction('grid', gridActive, controller.onOpenGridSettings),
     createSettingsWorkspaceAction(
       'magnet',
-      controller.header.grid.magnetEnabled,
-      controller.header.grid.onToggleMagnet
+      controller.grid.magnetEnabled,
+      controller.grid.onToggleMagnet
     ),
     createCanvasToolAction({
       group: 'editor',
       id: 'record-audio',
       kind: 'record-audio',
       label: translate('videoEditor.app.recordAudioButton'),
-      onSelect: controller.header.onOpenAudioRecordingDialog,
+      onSelect: controller.onOpenAudioRecordingDialog,
     }),
   ] satisfies CanvasToolAction[];
 }
@@ -68,9 +76,7 @@ function createSelectMoveAction(
   });
 }
 
-function createMediaInsertAction(
-  insertion: VideoEditorWorkspaceController['timeline']['actions']['insertion']
-) {
+function createMediaInsertAction(insertion: VideoEditorTimelineController['actions']['insertion']) {
   return createCanvasFileToolAction({
     accept: PROJECT_MEDIA_ACCEPT_ATTRIBUTE,
     group: 'editor',
@@ -98,7 +104,10 @@ function createTemplatesInsertAction(
   });
 }
 
-function createSceneWorkspaceAction(controller: VideoEditorWorkspaceController, active: boolean) {
+function createSceneWorkspaceAction(
+  controller: Pick<Parameters<typeof buildVideoWorkspaceActions>[0], 'onSelectScene'>,
+  active: boolean
+) {
   return createCanvasToolAction({
     active,
     group: 'workspace',
@@ -106,7 +115,7 @@ function createSceneWorkspaceAction(controller: VideoEditorWorkspaceController, 
     id: 'scene',
     kind: 'scene',
     label: translate('videoEditor.sidebar.sceneProperties'),
-    onSelect: controller.header.onSelectScene,
+    onSelect: controller.onSelectScene,
   });
 }
 

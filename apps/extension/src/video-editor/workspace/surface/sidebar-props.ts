@@ -1,9 +1,9 @@
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import type { VideoEditorSidebarController } from '../../runtime/controller/contracts/sidebar';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import type { WorkspaceSidebarProps } from '../sidebar/contracts/props';
 
 export function getWorkspaceSidebarProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): WorkspaceSidebarProps {
   return {
     ...getWorkspaceSidebarStateProps(controller),
@@ -17,7 +17,7 @@ export function getWorkspaceSidebarProps(
 }
 
 function getWorkspaceSidebarStateProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
   | 'activeProjectId'
@@ -35,24 +35,24 @@ function getWorkspaceSidebarStateProps(
   | 'placementMode'
 > {
   return {
-    activeProjectId: controller.sidebar.state.activeProjectId,
-    collapsed: controller.sidebar.state.collapsed,
-    diagnosticsContent: controller.sidebar.state.diagnosticsContent,
-    diagnosticsOpen: controller.sidebar.state.diagnosticsOpen,
-    gridSettings: controller.sidebar.state.gridSettings,
-    inspectorMode: controller.sidebar.state.inspectorMode,
-    recentColors: controller.sidebar.state.recentColors,
-    project: controller.sidebar.state.project,
-    placementMode: controller.sidebar.state.placementMode,
-    projects: controller.sidebar.state.projects,
-    recordingId: controller.sidebar.state.recordingId,
-    recordings: controller.sidebar.state.recordings,
-    selection: controller.sidebar.state.selection,
+    activeProjectId: controller.state.activeProjectId,
+    collapsed: controller.state.collapsed,
+    diagnosticsContent: controller.state.diagnosticsContent,
+    diagnosticsOpen: controller.state.diagnosticsOpen,
+    gridSettings: controller.state.gridSettings,
+    inspectorMode: controller.state.inspectorMode,
+    recentColors: controller.state.recentColors,
+    project: controller.state.project,
+    placementMode: controller.state.placementMode,
+    projects: controller.state.projects,
+    recordingId: controller.state.recordingId,
+    recordings: controller.state.recordings,
+    selection: controller.state.selection,
   };
 }
 
 function getWorkspaceSidebarProjectActionProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
   | 'onAddActionEvent'
@@ -76,31 +76,30 @@ function getWorkspaceSidebarProjectActionProps(
   | 'onSetCursorCaptureMode'
 > {
   return {
-    onAddActionEvent: controller.sidebar.projectActions.onAddActionEvent,
-    onAddMotionRegion: controller.sidebar.projectActions.onAddMotionRegion,
-    onAddRecording: controller.sidebar.projectActions.onAddRecording,
-    onAddTrack: controller.sidebar.projectActions.onAddTrack,
-    onCreateProject: controller.sidebar.projectActions.onCreateProject,
-    onDeleteTrack: controller.sidebar.projectActions.onDeleteTrack,
-    onDeleteProject: controller.sidebar.projectActions.onDeleteProject,
-    onEnableCursorTrack: controller.sidebar.projectActions.onEnableCursorTrack,
-    onImportAudio: controller.sidebar.projectActions.onImportAudio,
-    onImportImage: controller.sidebar.projectActions.onImportImage,
-    onImportVideo: controller.sidebar.projectActions.onImportVideo,
-    onOpenProject: controller.sidebar.projectActions.onOpenProject,
-    onRenameTrack: controller.sidebar.projectActions.onRenameTrack,
-    onResizeProject: controller.sidebar.projectActions.onResizeProject,
-    onStartActionPointPlacement: controller.sidebar.projectActions.onStartActionPointPlacement,
-    onStartMotionAreaPlacement: controller.sidebar.projectActions.onStartMotionAreaPlacement,
-    onStartMotionFocusPlacement: controller.sidebar.projectActions.onStartMotionFocusPlacement,
-    onStartObjectTrackAnchorPlacement:
-      controller.sidebar.projectActions.onStartObjectTrackAnchorPlacement,
-    onSetCursorCaptureMode: controller.sidebar.projectActions.onSetCursorCaptureMode,
+    onAddActionEvent: controller.projectActions.onAddActionEvent,
+    onAddMotionRegion: controller.projectActions.onAddMotionRegion,
+    onAddRecording: controller.projectActions.onAddRecording,
+    onAddTrack: controller.projectActions.onAddTrack,
+    onCreateProject: controller.projectActions.onCreateProject,
+    onDeleteTrack: controller.projectActions.onDeleteTrack,
+    onDeleteProject: controller.projectActions.onDeleteProject,
+    onEnableCursorTrack: controller.projectActions.onEnableCursorTrack,
+    onImportAudio: controller.projectActions.onImportAudio,
+    onImportImage: controller.projectActions.onImportImage,
+    onImportVideo: controller.projectActions.onImportVideo,
+    onOpenProject: controller.projectActions.onOpenProject,
+    onRenameTrack: controller.projectActions.onRenameTrack,
+    onResizeProject: controller.projectActions.onResizeProject,
+    onStartActionPointPlacement: controller.projectActions.onStartActionPointPlacement,
+    onStartMotionAreaPlacement: controller.projectActions.onStartMotionAreaPlacement,
+    onStartMotionFocusPlacement: controller.projectActions.onStartMotionFocusPlacement,
+    onStartObjectTrackAnchorPlacement: controller.projectActions.onStartObjectTrackAnchorPlacement,
+    onSetCursorCaptureMode: controller.projectActions.onSetCursorCaptureMode,
   };
 }
 
 function getWorkspaceSidebarSceneBackgroundActionProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
   | 'onPreviewSceneBackground'
@@ -109,15 +108,15 @@ function getWorkspaceSidebarSceneBackgroundActionProps(
   | 'onSetSceneBackground'
 > {
   return {
-    onPreviewSceneBackground: controller.sidebar.projectActions.onPreviewSceneBackground,
-    onRememberRecentColor: controller.sidebar.projectActions.onRememberRecentColor,
-    onResetSceneBackgroundPreview: controller.sidebar.projectActions.onResetSceneBackgroundPreview,
-    onSetSceneBackground: controller.sidebar.projectActions.onSetSceneBackground,
+    onPreviewSceneBackground: controller.projectActions.onPreviewSceneBackground,
+    onRememberRecentColor: controller.projectActions.onRememberRecentColor,
+    onResetSceneBackgroundPreview: controller.projectActions.onResetSceneBackgroundPreview,
+    onSetSceneBackground: controller.projectActions.onSetSceneBackground,
   };
 }
 
 function getWorkspaceSidebarProjectEffectProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
   | 'onToggleCollapsed'
@@ -139,41 +138,37 @@ function getWorkspaceSidebarProjectEffectProps(
   | 'onUpdateEffectInstance'
 > {
   return {
-    onToggleCollapsed: controller.sidebar.projectActions.onToggleCollapsed,
-    onToggleDiagnostics: controller.sidebar.projectActions.onToggleDiagnostics,
-    onClearPlacementMode: controller.sidebar.projectActions.onClearPlacementMode,
-    onClearCursorSampleSkinOverride:
-      controller.sidebar.projectActions.onClearCursorSampleSkinOverride,
-    onUpdateActionEventDetails: controller.sidebar.projectActions.onUpdateActionEventDetails,
-    onUpdateCursorSampleInterpolation:
-      controller.sidebar.projectActions.onUpdateCursorSampleInterpolation,
-    onUpdateCursorSampleSkinOverride:
-      controller.sidebar.projectActions.onUpdateCursorSampleSkinOverride,
-    onUpdateCursorSampleVisibility:
-      controller.sidebar.projectActions.onUpdateCursorSampleVisibility,
-    onUpdateCursorSkin: controller.sidebar.projectActions.onUpdateCursorSkin,
-    onUpdateMotionRegion: controller.sidebar.projectActions.onUpdateMotionRegion,
-    onUpdateTransitionDuration: controller.sidebar.projectActions.onUpdateTransitionDuration,
-    onUpdateTransitionEasing: controller.sidebar.projectActions.onUpdateTransitionEasing,
-    onUpdateTransitionTemplate: controller.sidebar.projectActions.onUpdateTransitionTemplate,
-    onDeleteEffectInstance: controller.sidebar.projectActions.onDeleteEffectInstance,
-    onDuplicateEffectInstance: controller.sidebar.projectActions.onDuplicateEffectInstance,
-    onMoveEffectInstance: controller.sidebar.projectActions.onMoveEffectInstance,
-    onUpdateEffectInstance: controller.sidebar.projectActions.onUpdateEffectInstance,
+    onToggleCollapsed: controller.projectActions.onToggleCollapsed,
+    onToggleDiagnostics: controller.projectActions.onToggleDiagnostics,
+    onClearPlacementMode: controller.projectActions.onClearPlacementMode,
+    onClearCursorSampleSkinOverride: controller.projectActions.onClearCursorSampleSkinOverride,
+    onUpdateActionEventDetails: controller.projectActions.onUpdateActionEventDetails,
+    onUpdateCursorSampleInterpolation: controller.projectActions.onUpdateCursorSampleInterpolation,
+    onUpdateCursorSampleSkinOverride: controller.projectActions.onUpdateCursorSampleSkinOverride,
+    onUpdateCursorSampleVisibility: controller.projectActions.onUpdateCursorSampleVisibility,
+    onUpdateCursorSkin: controller.projectActions.onUpdateCursorSkin,
+    onUpdateMotionRegion: controller.projectActions.onUpdateMotionRegion,
+    onUpdateTransitionDuration: controller.projectActions.onUpdateTransitionDuration,
+    onUpdateTransitionEasing: controller.projectActions.onUpdateTransitionEasing,
+    onUpdateTransitionTemplate: controller.projectActions.onUpdateTransitionTemplate,
+    onDeleteEffectInstance: controller.projectActions.onDeleteEffectInstance,
+    onDuplicateEffectInstance: controller.projectActions.onDuplicateEffectInstance,
+    onMoveEffectInstance: controller.projectActions.onMoveEffectInstance,
+    onUpdateEffectInstance: controller.projectActions.onUpdateEffectInstance,
   };
 }
 
 function getWorkspaceSidebarObjectTrackEffectProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
   'onDeleteObjectTrack' | 'onSelectObjectTrack' | 'onUpsertObjectTrackCorrectionAnchor'
 > {
   return {
-    onDeleteObjectTrack: controller.sidebar.projectActions.onDeleteObjectTrack,
-    onSelectObjectTrack: controller.sidebar.projectActions.onSelectObjectTrack,
+    onDeleteObjectTrack: controller.projectActions.onDeleteObjectTrack,
+    onSelectObjectTrack: controller.projectActions.onSelectObjectTrack,
     onUpsertObjectTrackCorrectionAnchor:
-      controller.sidebar.projectActions.onUpsertObjectTrackCorrectionAnchor,
+      controller.projectActions.onUpsertObjectTrackCorrectionAnchor,
   };
 }
 
@@ -202,9 +197,9 @@ type WorkspaceSidebarClipActionProps = Pick<
 >;
 
 function getWorkspaceSidebarClipActionProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): WorkspaceSidebarClipActionProps {
-  const actions = controller.sidebar.clipActions;
+  const actions = controller.clipActions;
   return {
     onApplyMediaClipVisualsToTrack: actions.onApplyMediaClipVisualsToTrack,
     onConvertTextClipToAnnotation: actions.onConvertTextClipToAnnotation,
@@ -232,7 +227,7 @@ function getWorkspaceSidebarClipActionProps(
 }
 
 function getWorkspaceSidebarSelectionProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
   | 'selectedActionEvent'
@@ -244,18 +239,18 @@ function getWorkspaceSidebarSelectionProps(
   | 'selectedTransition'
 > {
   return {
-    selectedActionEvent: controller.sidebar.state.selectedActionEvent ?? null,
-    selectedClip: controller.sidebar.state.selectedClip,
-    selectedCursorSample: controller.sidebar.state.selectedCursorSample ?? null,
-    selectedMotionRegion: controller.sidebar.state.selectedMotionRegion ?? null,
+    selectedActionEvent: controller.state.selectedActionEvent ?? null,
+    selectedClip: controller.state.selectedClip,
+    selectedCursorSample: controller.state.selectedCursorSample ?? null,
+    selectedMotionRegion: controller.state.selectedMotionRegion ?? null,
     selectedObjectTrack: resolveSelectedObjectTrack(controller),
-    selectedTrack: controller.sidebar.state.selectedTrack,
-    selectedTransition: controller.sidebar.state.selectedTransition ?? null,
+    selectedTrack: controller.state.selectedTrack,
+    selectedTransition: controller.state.selectedTransition ?? null,
   };
 }
 
-function resolveSelectedObjectTrack(controller: VideoEditorWorkspaceController) {
-  const { project, selection } = controller.sidebar.state;
+function resolveSelectedObjectTrack(controller: VideoEditorSidebarController) {
+  const { project, selection } = controller.state;
   return selection.kind === VideoEditorSelectionKind.OBJECT_TRACK
     ? ((project.objectTracks ?? []).find((track) => track.id === selection.objectTrackId) ?? null)
     : null;

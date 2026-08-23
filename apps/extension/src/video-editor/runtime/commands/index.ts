@@ -1,10 +1,15 @@
 import { useAssetHandlers } from './assets';
 import { useExportHandlers } from './export';
 import { useProjectHandlers } from './project';
-import type { UseVideoEditorActionHandlersParams, VideoEditorActionHandlers } from './types';
+import type {
+  AssetHandlerPort,
+  ExportHandlerPort,
+  ProjectHandlerPort,
+  VideoEditorCommandHandlers,
+} from './types';
 import type { VideoEditorConfirmDialogState } from '../controller/workspace-state';
 
-export type { VideoEditorActionHandlers } from './types';
+export type { VideoEditorActionHandlers, VideoEditorCommandHandlers } from './types';
 
 interface VideoEditorActionConfirmHandlers {
   requestConfirm: (dialog: VideoEditorConfirmDialogState) => Promise<boolean>;
@@ -14,12 +19,16 @@ interface VideoEditorActionConfirmHandlers {
  * Binds project, import, and export commands to the current editor workspace state.
  */
 export function useVideoEditorActionHandlers(
-  params: UseVideoEditorActionHandlersParams,
+  ports: {
+    assets: AssetHandlerPort;
+    export: ExportHandlerPort;
+    project: ProjectHandlerPort;
+  },
   confirmHandlers: VideoEditorActionConfirmHandlers
-): VideoEditorActionHandlers {
+): VideoEditorCommandHandlers {
   return {
-    ...useProjectHandlers(params, confirmHandlers),
-    ...useAssetHandlers(params),
-    ...useExportHandlers(params),
+    assets: useAssetHandlers(ports.assets),
+    export: useExportHandlers(ports.export),
+    project: useProjectHandlers(ports.project, confirmHandlers),
   };
 }

@@ -1,10 +1,10 @@
 import { vi } from 'vitest';
 import type { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import type { VideoEditorSidebarController } from '../../runtime/controller/contracts/sidebar';
 import { createSceneSelection } from '../../project/selection/model';
 
 const noop = () => vi.fn();
-type SidebarProjectActions = VideoEditorWorkspaceController['sidebar']['projectActions'];
+type SidebarProjectActions = VideoEditorSidebarController['projectActions'];
 
 function createProjectCrudActions(): Pick<
   SidebarProjectActions,
@@ -106,7 +106,7 @@ function createSidebarProjectActions(): SidebarProjectActions {
   };
 }
 
-function createClipActions(): VideoEditorWorkspaceController['sidebar']['clipActions'] {
+function createClipActions(): VideoEditorSidebarController['clipActions'] {
   return {
     onApplyMediaClipVisualsToTrack: noop(),
     onConvertTextClipToAnnotation: noop(),
@@ -133,7 +133,7 @@ function createClipActions(): VideoEditorWorkspaceController['sidebar']['clipAct
 
 export function createSidebarController(
   project: ReturnType<typeof createEmptyVideoProject>
-): VideoEditorWorkspaceController['sidebar'] {
+): VideoEditorSidebarController {
   return {
     clipActions: createClipActions(),
     projectActions: createSidebarProjectActions(),

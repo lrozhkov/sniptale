@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import { VideoTimelinePlacementMode } from '../../../features/video/project/types';
-import type { UseVideoEditorActionHandlersParams } from './types';
-import { createInitialExportState } from '../../state/export-state';
+import type { ProjectHandlerPort } from './types';
+import { deleteProjectWorkspace, loadProjectWorkspace } from './project';
 
-const mockCreateBlankProject = vi.fn();
-const mockDeletePersistedProject = vi.fn();
-const mockOpenPersistedProject = vi.fn();
-const mockWaitForVideoEditorSave = vi.fn();
+const {
+  mockCreateBlankProject,
+  mockDeletePersistedProject,
+  mockOpenPersistedProject,
+  mockWaitForVideoEditorSave,
+} = vi.hoisted(() => ({
+  mockCreateBlankProject: vi.fn(),
+  mockDeletePersistedProject: vi.fn(),
+  mockOpenPersistedProject: vi.fn(),
+  mockWaitForVideoEditorSave: vi.fn(),
+}));
 
 vi.mock('../../project/operations/ops', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../project/operations/ops')>()),
@@ -62,10 +69,10 @@ function createCurrentProject() {
   };
 }
 
-function createProjectHandlerParams(): UseVideoEditorActionHandlersParams {
+function createProjectHandlerParams(): ProjectHandlerPort {
+  const project = createCurrentProject();
   return {
-    project: createCurrentProject(),
-    currentTime: 0,
+    getCurrentProject: () => project,
     projects: [
       createProjectListItem({
         id: 'current-project',
@@ -82,26 +89,12 @@ function createProjectHandlerParams(): UseVideoEditorActionHandlersParams {
         createdAt: 2,
       }),
     ],
-    exportState: createInitialExportState(),
     libraries: {
-      projects: [],
-      recordings: [],
-      projectExports: [],
       refreshProjects: vi.fn().mockResolvedValue(undefined),
-      refreshRecordings: vi.fn().mockResolvedValue(undefined),
       refreshProjectExports: vi.fn().mockResolvedValue(undefined),
     },
     applyLoadedProject: vi.fn(),
     setError: vi.fn(),
-    upsertAsset: vi.fn(),
-    addAssetClip: vi.fn(),
-    moveClip: vi.fn(),
-    trimClipEnd: vi.fn(),
-    trimClipStart: vi.fn(),
-    startExport: vi.fn(),
-    failExportCancellation: vi.fn(),
-    failExport: vi.fn(),
-    cancelExport: vi.fn(),
   };
 }
 
@@ -112,7 +105,6 @@ describe('deleteProjectWorkspace', () => {
   });
 
   it('skips deletion when the user cancels the confirm dialog', async () => {
-    const { deleteProjectWorkspace } = await import('./project');
     const params = createProjectHandlerParams();
     const requestConfirm = vi.fn().mockResolvedValue(false);
 
@@ -131,7 +123,6 @@ describe('deleteProjectWorkspace', () => {
   });
 
   it('deletes non-active projects after confirm and refreshes the project list', async () => {
-    const { deleteProjectWorkspace } = await import('./project');
     const params = createProjectHandlerParams();
     const requestConfirm = vi.fn().mockResolvedValue(true);
     mockDeletePersistedProject.mockResolvedValue([]);
@@ -145,7 +136,6 @@ describe('deleteProjectWorkspace', () => {
   });
 
   it('waits for the active project save before opening another project', async () => {
-    const { loadProjectWorkspace } = await import('./project');
     const params = createProjectHandlerParams();
     const nextProject = { ...createCurrentProject(), id: 'other-project', name: 'Project B' };
     mockOpenPersistedProject.mockResolvedValue(nextProject);
@@ -160,7 +150,6 @@ describe('deleteProjectWorkspace', () => {
   });
 
   it('keeps the active project open when its pending save fails', async () => {
-    const { loadProjectWorkspace } = await import('./project');
     const params = createProjectHandlerParams();
     mockWaitForVideoEditorSave.mockRejectedValue(new Error('Unsaved changes'));
     await expect(loadProjectWorkspace('other-project', params)).rejects.toThrow('Unsaved changes');
@@ -170,7 +159,6 @@ describe('deleteProjectWorkspace', () => {
   });
 
   it('applies only the latest project when different opens resolve out of order', async () => {
-    const { loadProjectWorkspace } = await import('./project');
     const params = createProjectHandlerParams();
     const resolvers = new Map<string, (project: ReturnType<typeof createCurrentProject>) => void>();
     mockOpenPersistedProject.mockImplementation(

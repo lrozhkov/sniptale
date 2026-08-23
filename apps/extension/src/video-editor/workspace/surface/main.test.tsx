@@ -8,6 +8,30 @@ const libraryPanelSpy = vi.fn();
 const floatingWorkspaceSpy = vi.fn();
 const previewSpy = vi.fn();
 const timelineSpy = vi.fn();
+const hookMocks = vi.hoisted(() => ({ controller: null as unknown }));
+
+function getHookController() {
+  return hookMocks.controller as ReturnType<typeof createWorkspaceController>;
+}
+
+vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorHeaderController: () => getHookController().header,
+  useVideoEditorLayoutController: () => getHookController().layout,
+  useVideoEditorPreviewController: () => getHookController().preview,
+  useVideoEditorSidebarController: () => getHookController().sidebar,
+  useVideoEditorTimelineController: () => getHookController().timeline,
+}));
+
+vi.mock('../../runtime/controller/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
+  useVideoEditorEffectEditingPort: (selector: (port: unknown) => unknown) =>
+    selector({ applyEffectDocument: vi.fn() }),
+}));
+
+vi.mock('./effects-library', () => ({
+  VideoEditorWorkspaceEffectsLibrary: () => <div data-testid="effects-library" />,
+}));
 
 vi.mock('../floating', () => ({
   VideoEditorFloatingWorkspace: (props: unknown) => {
@@ -238,29 +262,16 @@ function expectWorkspaceMarkup(markup: string) {
 }
 
 function verifyWorkspaceMainRouting() {
+  hookMocks.controller = createWorkspaceController();
   const markup = renderToStaticMarkup(
     <VideoEditorWorkspaceMain
-      controller={createWorkspaceController()}
+      diagnosticsContent="diagnostics"
       previewHeightStyle={{ height: '280px' }}
     />
   );
 
   expect(floatingWorkspaceSpy.mock.calls[0]?.[0]).toMatchObject({
-    controller: {
-      header: {
-        libraryPanelOpen: true,
-        leftSidebarCollapsed: true,
-        projectExportsCount: 2,
-        projectName: 'Workspace Main',
-      },
-      sidebar: {
-        state: {
-          activeProjectId: 'project-1',
-          collapsed: true,
-          diagnosticsContent: 'diagnostics',
-        },
-      },
-    },
+    diagnosticsContent: 'diagnostics',
   });
   expect(previewSpy.mock.calls[0]?.[0]).toMatchObject({
     currentTime: 8,

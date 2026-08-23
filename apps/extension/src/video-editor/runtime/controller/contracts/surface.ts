@@ -4,8 +4,6 @@ import type { VideoEditorProjectActions } from '../../../contracts/commands/proj
 import type { VideoEditorExportRuntimeState } from '../../../contracts/export-state';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
-import type { VideoEditorShellController } from './workspace';
-import type { VideoEditorWorkspaceController } from './workspace';
 
 export interface VideoEditorOverlaysController {
   confirmDialog: VideoEditorWorkspaceState['confirm']['dialog'];
@@ -46,22 +44,4 @@ export interface VideoEditorCommandPaletteController {
   toggleDiagnostics: () => void;
   togglePlaying: VideoEditorRuntimeController['togglePlayback'];
   toggleSidebarCollapsed: VideoEditorWorkspaceState['toggleSidebarCollapsed'];
-}
-
-interface VideoEditorSurfaceController {
-  palette: VideoEditorCommandPaletteController;
-  shell: VideoEditorShellController;
-}
-
-interface VideoEditorWorkspaceSurfaceController {
-  overlays: VideoEditorOverlaysController;
-  workspace: VideoEditorWorkspaceController | null;
-}
-
-export interface VideoEditorController
-  extends VideoEditorSurfaceController, VideoEditorWorkspaceSurfaceController {}
-
-export interface ReadyVideoEditorController
-  extends VideoEditorSurfaceController, VideoEditorWorkspaceSurfaceController {
-  workspace: VideoEditorWorkspaceController;
 }

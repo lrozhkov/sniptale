@@ -3,7 +3,7 @@ import { promoteStoredItem } from '../../../composition/persistence/library-life
 import { getVideoProject } from '../../../composition/persistence/projects';
 import { createVideoProjectListItem } from '../../../features/media-hub/video-project-list-items';
 import { ensureLibraryThumbnail } from '../../library/panel/thumbnails/ensure';
-import { useVideoEditorStore } from '../../state/store';
+import { getCurrentVideoEditorProjectSnapshot } from '../../runtime/controller/store';
 import { waitForVideoEditorSave } from '../../runtime/session/save-readiness';
 
 type ReadyVideoProject = Extract<Awaited<ReturnType<typeof getVideoProject>>, { status: 'ready' }>;
@@ -40,7 +40,7 @@ export async function refreshSavedVideoProjectPresentation(
 
 export async function promoteOpenVideoProject(projectId: string): Promise<void> {
   await waitForVideoEditorSave(projectId);
-  const currentProject = useVideoEditorStore.getState().project;
+  const currentProject = getCurrentVideoEditorProjectSnapshot();
   const stored = await getVideoProject(projectId);
   if (
     !currentProject ||

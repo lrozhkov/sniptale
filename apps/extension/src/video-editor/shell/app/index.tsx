@@ -1,43 +1,45 @@
 import React, { useState } from 'react';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
 import { useCommandPaletteHotkey } from '../../../ui/command-palette/hotkey';
-import { VideoEditorStatusScreen } from '../status-screen';
+import {
+  useVideoEditorCommandPaletteController,
+  useVideoEditorHistoryController,
+  useVideoEditorShellController,
+} from '../../runtime/controller/composition/hooks';
+import { VideoEditorCompositionProvider } from '../../runtime/controller/composition/provider';
 import { VideoEditorWorkspace } from '../../workspace/surface';
-import { useVideoEditorController } from '../../runtime/controller';
 import { VideoEditorCommandPalette } from '../command-palette';
+import { VideoEditorStatusScreen } from '../status-screen';
 
-/**
- * Boots the video editor entrypoint and delegates runtime work to focused hooks.
- */
+/** Boots the single editor composition owner around a stable shell-gate child. */
 export const App: React.FC = () => {
   usePageLocaleMetadata('videoEditor.app.documentTitle');
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const controller = useVideoEditorController();
-  const paletteEnabled = controller.shell.isReady && Boolean(controller.shell.project);
+  return (
+    <VideoEditorCompositionProvider>
+      <VideoEditorShellGate />
+    </VideoEditorCompositionProvider>
+  );
+};
 
+export function VideoEditorShellGate(): React.JSX.Element {
+  const shell = useVideoEditorShellController();
+  if (!shell.isReady) {
+    return <VideoEditorStatusScreen mode="loading" />;
+  }
+  if (shell.error || !shell.project) {
+    return <VideoEditorStatusScreen mode="error" error={shell.error ?? ''} />;
+  }
+  return <VideoEditorReadySurface />;
+}
+
+function VideoEditorReadySurface(): React.JSX.Element {
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   useCommandPaletteHotkey({
     isOpen: commandPaletteOpen,
     onOpen: () => setCommandPaletteOpen(true),
     onClose: () => setCommandPaletteOpen(false),
-    enabled: paletteEnabled,
+    enabled: true,
   });
-
-  if (!controller.shell.isReady) {
-    return <VideoEditorStatusScreen mode="loading" />;
-  }
-
-  if (controller.shell.error || !controller.shell.project) {
-    return <VideoEditorStatusScreen mode="error" error={controller.shell.error ?? ''} />;
-  }
-
-  if (!controller.workspace) {
-    return <VideoEditorStatusScreen mode="error" error={controller.shell.error ?? ''} />;
-  }
-
-  const readyController = {
-    ...controller,
-    workspace: controller.workspace,
-  };
 
   return (
     <div
@@ -46,13 +48,27 @@ export const App: React.FC = () => {
         'bg-[color:var(--sniptale-color-surface-canvas)]',
       ].join(' ')}
     >
-      <VideoEditorWorkspace controller={readyController} />
-      <VideoEditorCommandPalette
-        controller={controller.palette}
-        history={readyController.workspace.history}
+      <VideoEditorWorkspace />
+      <VideoEditorCommandPaletteContainer
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />
     </div>
   );
-};
+}
+
+function VideoEditorCommandPaletteContainer(props: {
+  isOpen: boolean;
+  onClose: () => void;
+}): React.JSX.Element {
+  const controller = useVideoEditorCommandPaletteController();
+  const history = useVideoEditorHistoryController();
+  return (
+    <VideoEditorCommandPalette
+      controller={controller}
+      history={history}
+      isOpen={props.isOpen}
+      onClose={props.onClose}
+    />
+  );
+}

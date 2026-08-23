@@ -1,9 +1,68 @@
 import type { VideoEditorRuntimeController } from '../../session';
+import type { SaveStateMeta, VideoEditorLibrariesState } from '../../app-model/types';
+import type { VideoEditorActionHandlers } from '../../commands';
+import type { VideoEditorSelections } from '../selections';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
-import type { VideoEditorControllerStorePort } from '../../../contracts/controller-store';
-import type { CreateVideoEditorWorkspaceArgs } from './types';
+import type {
+  AnnotationEditingPort,
+  ClipSelectionPort,
+  DiagnosticsTelemetryPort,
+  ExportPort,
+  PlaybackPort,
+  ProjectLifecyclePort,
+  RuntimeSessionPort,
+  TimelineEditingPort,
+} from '../../../contracts/controller-store';
 
-export function createWorkspaceDiagnosticsController(store: VideoEditorControllerStorePort) {
+type HeaderStore = Pick<ExportPort, 'openExportDialog'> &
+  Pick<ProjectLifecyclePort, 'renameProject'> &
+  Pick<ClipSelectionPort, 'selectScene'>;
+
+interface CreateWorkspaceHeaderArgs {
+  libraries: Pick<VideoEditorLibrariesState, 'projectExports'>;
+  saveStateMeta: SaveStateMeta;
+  store: HeaderStore;
+  workspace: Pick<
+    VideoEditorWorkspaceState,
+    | 'closeLibraryPanel'
+    | 'grid'
+    | 'inspector'
+    | 'leftSidebarCollapsed'
+    | 'libraryPanelOpen'
+    | 'openAudioRecordingDialog'
+    | 'openLibraryPanel'
+    | 'toggleLibraryPanel'
+    | 'toggleSidebarCollapsed'
+  >;
+}
+
+type PreviewStore = AnnotationEditingPort &
+  Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId'> &
+  Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
+  RuntimeSessionPort &
+  Pick<
+    TimelineEditingPort,
+    | 'addTrack'
+    | 'updateActionEventDetails'
+    | 'updateClipTransform'
+    | 'updateMotionRegion'
+    | 'upsertObjectTrackCorrectionAnchor'
+  >;
+
+interface CreateWorkspacePreviewArgs {
+  actions: Pick<
+    VideoEditorActionHandlers,
+    'handleImportAudio' | 'handleImportImage' | 'handleImportVideo'
+  >;
+  selections: Pick<VideoEditorSelections, 'selectedActionEvent' | 'selectedMotionRegion'>;
+  store: PreviewStore;
+  workspace: Pick<VideoEditorWorkspaceState, 'grid' | 'inspector' | 'playbackRange' | 'preview'>;
+}
+
+export function createWorkspaceDiagnosticsController(
+  store: Pick<DiagnosticsTelemetryPort, 'diagnosticsOpen' | 'setDiagnosticsOpen'> &
+    Pick<ProjectLifecyclePort, 'recordingId'>
+) {
   return {
     isOpen: store.diagnosticsOpen,
     onClose: () => store.setDiagnosticsOpen(false),
@@ -11,7 +70,7 @@ export function createWorkspaceDiagnosticsController(store: VideoEditorControlle
   };
 }
 
-function createHeaderGridController(workspace: VideoEditorWorkspaceState) {
+function createHeaderGridController(workspace: Pick<VideoEditorWorkspaceState, 'grid'>) {
   return {
     magnetEnabled: workspace.grid.magnetEnabled,
     onToggleMagnet: workspace.grid.toggleMagnet,
@@ -19,8 +78,8 @@ function createHeaderGridController(workspace: VideoEditorWorkspaceState) {
 }
 
 export function createWorkspaceHeaderController(
-  args: CreateVideoEditorWorkspaceArgs,
-  project: NonNullable<VideoEditorControllerStorePort['project']>
+  args: CreateWorkspaceHeaderArgs,
+  project: NonNullable<ProjectLifecyclePort['project']>
 ) {
   return {
     grid: createHeaderGridController(args.workspace),
@@ -52,7 +111,17 @@ export function createWorkspaceHeaderController(
   };
 }
 
-export function createWorkspaceLayoutController(workspace: VideoEditorWorkspaceState) {
+export function createWorkspaceLayoutController(
+  workspace: Pick<
+    VideoEditorWorkspaceState,
+    | 'audioRecordingDialogOpen'
+    | 'closeAudioRecordingDialog'
+    | 'leftSidebarCollapsed'
+    | 'openAudioRecordingDialog'
+    | 'preview'
+    | 'toggleSidebarCollapsed'
+  >
+) {
   return {
     audioRecordingDialogOpen: workspace.audioRecordingDialogOpen,
     closeAudioRecordingDialog: workspace.closeAudioRecordingDialog,
@@ -65,7 +134,7 @@ export function createWorkspaceLayoutController(workspace: VideoEditorWorkspaceS
   };
 }
 
-function createWorkspacePreviewImports(args: CreateVideoEditorWorkspaceArgs) {
+function createWorkspacePreviewImports(args: CreateWorkspacePreviewArgs) {
   return {
     audio: args.actions.handleImportAudio,
     image: args.actions.handleImportImage,
@@ -74,7 +143,7 @@ function createWorkspacePreviewImports(args: CreateVideoEditorWorkspaceArgs) {
 }
 
 function createWorkspacePreviewTransport(
-  args: CreateVideoEditorWorkspaceArgs,
+  args: CreateWorkspacePreviewArgs,
   runtime: VideoEditorRuntimeController
 ) {
   return {
@@ -87,7 +156,7 @@ function createWorkspacePreviewTransport(
   };
 }
 
-function createWorkspacePreviewSelection(args: CreateVideoEditorWorkspaceArgs) {
+function createWorkspacePreviewSelection(args: CreateWorkspacePreviewArgs) {
   return {
     placementMode: args.store.placementMode,
     selectedActionEvent: args.selections.selectedActionEvent,
@@ -96,7 +165,7 @@ function createWorkspacePreviewSelection(args: CreateVideoEditorWorkspaceArgs) {
   };
 }
 
-function createWorkspacePreviewPreferences(workspace: VideoEditorWorkspaceState) {
+function createWorkspacePreviewPreferences(workspace: Pick<VideoEditorWorkspaceState, 'preview'>) {
   const previewPreferences = workspace.preview.preferences;
   return {
     mode: previewPreferences.preferences.mode,
@@ -113,24 +182,24 @@ function createWorkspacePreviewPreferences(workspace: VideoEditorWorkspaceState)
   };
 }
 
-function selectPreviewClip(args: CreateVideoEditorWorkspaceArgs, clipId: string | null): void {
+function selectPreviewClip(args: CreateWorkspacePreviewArgs, clipId: string | null): void {
   args.store.selectClip(clipId);
   args.workspace.inspector.openSelection();
 }
 
-function selectPreviewScene(args: CreateVideoEditorWorkspaceArgs): void {
+function selectPreviewScene(args: CreateWorkspacePreviewArgs): void {
   args.store.selectScene();
   args.workspace.inspector.openSelection();
 }
 
 export function createWorkspacePreviewController(
-  args: CreateVideoEditorWorkspaceArgs,
+  args: CreateWorkspacePreviewArgs,
   runtime: VideoEditorRuntimeController,
-  project: NonNullable<VideoEditorControllerStorePort['project']>,
+  project: NonNullable<ProjectLifecyclePort['project']>,
   projectUpdaters: {
     addActionEvent: (
       preset: NonNullable<
-        NonNullable<VideoEditorControllerStorePort['project']>['actionEvents'][number]['preset']
+        NonNullable<ProjectLifecyclePort['project']>['actionEvents'][number]['preset']
       >
     ) => void;
     addMotionRegion: () => void;
@@ -173,7 +242,7 @@ export function createWorkspacePreviewController(
   };
 }
 
-function createWorkspacePreviewGrid(args: CreateVideoEditorWorkspaceArgs) {
+function createWorkspacePreviewGrid(args: CreateWorkspacePreviewArgs) {
   return {
     color: args.workspace.grid.gridColor,
     enabled: args.workspace.grid.gridEnabled,

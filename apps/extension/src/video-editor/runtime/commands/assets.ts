@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { deleteProjectAsset } from '../../../composition/persistence/projects/index';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -8,7 +8,7 @@ import {
 import { ensureRecordingAsset, importProjectAsset } from '../../project/operations/ops';
 import type { VideoEditorImportPlacement } from '../../contracts/insertion';
 import { toErrorMessage } from './helpers';
-import type { UseVideoEditorActionHandlersParams, VideoEditorActionHandlers } from './types';
+import type { AssetHandlerPort, VideoEditorActionHandlers } from './types';
 
 const logger = createLogger({ namespace: 'VideoEditorAssets' });
 type ImportableProjectAssetType =
@@ -35,10 +35,10 @@ async function cleanupStaleImportedAsset(asset: VideoProjectAsset): Promise<void
 
 async function isStaleImportedAsset(args: {
   asset: VideoProjectAsset;
-  params: UseVideoEditorActionHandlersParams;
+  port: AssetHandlerPort;
   targetProjectId: string;
 }): Promise<boolean> {
-  const currentProjectId = args.params.getCurrentProjectId?.() ?? args.params.project?.id ?? null;
+  const currentProjectId = args.port.getCurrentProjectId();
   if (currentProjectId === args.targetProjectId) {
     return false;
   }
@@ -50,24 +50,25 @@ async function isStaleImportedAsset(args: {
 async function importProjectAssetFile(
   file: File,
   assetType: ImportableProjectAssetType,
-  params: UseVideoEditorActionHandlersParams,
+  port: AssetHandlerPort,
   placement?: VideoEditorImportPlacement
 ): Promise<void> {
-  if (!params.project) {
+  const project = port.getCurrentProject();
+  if (!project) {
     return;
   }
 
-  const targetProjectId = params.project.id;
+  const targetProjectId = project.id;
   const asset = await importProjectAsset(file, assetType);
-  if (await isStaleImportedAsset({ asset, params, targetProjectId })) {
+  if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
     return;
   }
 
-  params.upsertAsset(asset);
-  params.addAssetClip(
+  port.upsertAsset(asset);
+  port.addAssetClip(
     asset,
     placement?.trackId ?? null,
-    placement?.startTime ?? params.currentTime,
+    placement?.startTime ?? port.getCurrentTime(),
     placement?.timelineLaneId
   );
 }
@@ -75,20 +76,22 @@ async function importProjectAssetFile(
 async function importRecordedAudioFile(
   file: File,
   trim: { trimEnd: number; trimStart: number },
-  params: UseVideoEditorActionHandlersParams
+  port: AssetHandlerPort
 ): Promise<void> {
-  if (!params.project) {
+  const project = port.getCurrentProject();
+  if (!project) {
     return;
   }
 
-  const targetProjectId = params.project.id;
+  const targetProjectId = project.id;
   const asset = await importProjectAsset(file, VideoProjectAssetType.AUDIO);
-  if (await isStaleImportedAsset({ asset, params, targetProjectId })) {
+  if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
     return;
   }
 
-  params.upsertAsset(asset);
-  const clipId = params.addAssetClip(asset, null, params.currentTime);
+  port.upsertAsset(asset);
+  const insertionTime = port.getCurrentTime();
+  const clipId = port.addAssetClip(asset, null, insertionTime);
   if (!clipId) {
     return;
   }
@@ -101,57 +104,58 @@ async function importRecordedAudioFile(
   );
 
   if (normalizedTrimStart > 0) {
-    params.trimClipStart(clipId, params.currentTime + normalizedTrimStart);
-    params.moveClip(clipId, params.currentTime);
+    port.trimClipStart(clipId, insertionTime + normalizedTrimStart);
+    port.moveClip(clipId, insertionTime);
   }
 
-  params.trimClipEnd(clipId, params.currentTime + normalizedTrimEnd - normalizedTrimStart);
+  port.trimClipEnd(clipId, insertionTime + normalizedTrimEnd - normalizedTrimStart);
 }
 
-function useRecordingAssetHandler(params: UseVideoEditorActionHandlersParams) {
+function useRecordingAssetHandler(port: AssetHandlerPort) {
   return useCallback(
     async (sourceRecordingId: string) => {
-      if (!params.project) {
+      const project = port.getCurrentProject();
+      if (!project) {
         return;
       }
 
       try {
-        const asset = await ensureRecordingAsset(params.project, sourceRecordingId);
+        const asset = await ensureRecordingAsset(project, sourceRecordingId);
         if (!asset) {
           return;
         }
 
-        params.upsertAsset(asset);
-        params.addAssetClip(asset, null, params.currentTime);
+        port.upsertAsset(asset);
+        port.addAssetClip(asset, null, port.getCurrentTime());
       } catch (assetError) {
         logger.error('Failed to add recording', assetError);
-        params.setError(toErrorMessage(assetError));
+        port.setError(toErrorMessage(assetError));
       }
     },
-    [params]
+    [port]
   );
 }
 
 function useProjectAssetImportHandler(
   assetType: ImportableProjectAssetType,
   failureLabel: string,
-  params: UseVideoEditorActionHandlersParams
+  port: AssetHandlerPort
 ) {
   return useCallback(
     async (file: File, placement?: VideoEditorImportPlacement) => {
       try {
-        await importProjectAssetFile(file, assetType, params, placement);
+        await importProjectAssetFile(file, assetType, port, placement);
       } catch (assetError) {
         logger.error(`Failed to import ${failureLabel}`, assetError);
-        params.setError(toErrorMessage(assetError));
+        port.setError(toErrorMessage(assetError));
       }
     },
-    [assetType, failureLabel, params]
+    [assetType, failureLabel, port]
   );
 }
 
 export function useAssetHandlers(
-  params: UseVideoEditorActionHandlersParams
+  port: AssetHandlerPort
 ): Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
@@ -160,39 +164,48 @@ export function useAssetHandlers(
   | 'handleImportRecordedAudio'
   | 'handleImportVideo'
 > {
-  const handleAddRecording = useRecordingAssetHandler(params);
+  const handleAddRecording = useRecordingAssetHandler(port);
   const handleImportImage = useProjectAssetImportHandler(
     VideoProjectAssetType.IMAGE,
     'image',
-    params
+    port
   );
   const handleImportVideo = useProjectAssetImportHandler(
     VideoProjectAssetType.VIDEO,
     'video',
-    params
+    port
   );
   const handleImportAudio = useProjectAssetImportHandler(
     VideoProjectAssetType.AUDIO,
     'audio',
-    params
+    port
   );
   const handleImportRecordedAudio = useCallback(
     async (file: File, trim: { trimEnd: number; trimStart: number }) => {
       try {
-        await importRecordedAudioFile(file, trim, params);
+        await importRecordedAudioFile(file, trim, port);
       } catch (assetError) {
         logger.error('Failed to import recorded audio', assetError);
-        params.setError(toErrorMessage(assetError));
+        port.setError(toErrorMessage(assetError));
       }
     },
-    [params]
+    [port]
   );
 
-  return {
-    handleAddRecording,
-    handleImportImage,
-    handleImportVideo,
-    handleImportAudio,
-    handleImportRecordedAudio,
-  };
+  return useMemo(
+    () => ({
+      handleAddRecording,
+      handleImportImage,
+      handleImportVideo,
+      handleImportAudio,
+      handleImportRecordedAudio,
+    }),
+    [
+      handleAddRecording,
+      handleImportAudio,
+      handleImportImage,
+      handleImportRecordedAudio,
+      handleImportVideo,
+    ]
+  );
 }

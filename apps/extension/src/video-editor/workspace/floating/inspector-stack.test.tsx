@@ -5,6 +5,13 @@ import { VideoEditorFloatingInspectorStack } from './inspector-stack';
 const { contentSpy } = vi.hoisted(() => ({
   contentSpy: vi.fn(),
 }));
+const hookMocks = vi.hoisted(() => ({ collapsed: false }));
+
+vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorSidebarController: () => ({}),
+  useWorkspaceLayoutContext: () => ({ leftSidebarCollapsed: hookMocks.collapsed }),
+}));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -41,17 +48,10 @@ vi.mock('../sidebar/view', () => ({
   getSelectionMeta: () => ({ icon: null, label: 'Scene', title: 'Scene properties' }),
 }));
 
-function createController(params: { collapsed: boolean }) {
-  return {
-    header: {
-      leftSidebarCollapsed: params.collapsed,
-    },
-  } as never;
-}
-
 it('hides the context inspector when the inspector rail state is collapsed', () => {
+  hookMocks.collapsed = true;
   const markup = renderToStaticMarkup(
-    <VideoEditorFloatingInspectorStack controller={createController({ collapsed: true })} />
+    <VideoEditorFloatingInspectorStack diagnosticsContent={null} />
   );
 
   expect(markup).toBe('');
@@ -59,8 +59,9 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
 });
 
 it('renders a context inspector surface without introducing a layers panel', () => {
+  hookMocks.collapsed = false;
   const markup = renderToStaticMarkup(
-    <VideoEditorFloatingInspectorStack controller={createController({ collapsed: false })} />
+    <VideoEditorFloatingInspectorStack diagnosticsContent={null} />
   );
 
   expect(markup).toContain('data-ui="video-editor.floating.context-inspector"');

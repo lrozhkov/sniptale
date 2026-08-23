@@ -1,5 +1,5 @@
 import { FloatingChromeRoot } from '@sniptale/ui/floating-chrome';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import type React from 'react';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorFloatingDocumentBar } from './document-bar';
 import { VideoEditorFloatingInspectorStack } from './inspector-stack';
@@ -7,7 +7,7 @@ import { VideoEditorFloatingInsertPanel, VideoEditorFloatingWorkspacePanel } fro
 
 type VideoEditorFloatingWorkspaceProps = {
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
-  controller: VideoEditorWorkspaceController;
+  diagnosticsContent: React.ReactNode;
   effectsLibraryDock: {
     isOpen: boolean;
     onToggle: () => void;
@@ -17,21 +17,20 @@ type VideoEditorFloatingWorkspaceProps = {
 
 export function VideoEditorFloatingWorkspace({
   activeInsertKind,
-  controller,
+  diagnosticsContent,
   effectsLibraryDock,
   onActiveInsertKindChange,
 }: VideoEditorFloatingWorkspaceProps) {
   return (
     <FloatingChromeRoot dataUi="video-editor.floating-workspace">
-      <VideoEditorFloatingDocumentBar header={controller.header} history={controller.history} />
+      <VideoEditorFloatingDocumentBar />
       <VideoEditorFloatingInsertPanel
         activeInsertKind={activeInsertKind}
-        controller={controller}
         effectsLibraryDock={effectsLibraryDock}
         onActiveInsertKindChange={onActiveInsertKindChange}
       />
-      <VideoEditorFloatingWorkspacePanel controller={controller} />
-      <VideoEditorFloatingInspectorStack controller={controller} />
+      <VideoEditorFloatingWorkspacePanel />
+      <VideoEditorFloatingInspectorStack diagnosticsContent={diagnosticsContent} />
     </FloatingChromeRoot>
   );
 }
