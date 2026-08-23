@@ -14,6 +14,13 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(local).toContain("kind: 'host-wsl'");
   expect(local).not.toContain("spawnSync('docker'");
   expect(toolchain).not.toContain("spawnSync('docker'");
+  expect(toolchain).toMatch(
+    /path\.join\(\s*os\.homedir\(\),\s*'\.cache',\s*'sniptale',\s*'ci-toolchain'/u
+  );
+  expect(toolchain).not.toContain("path.resolve('.tmp/ci-toolchain'");
+  expect(toolchain).toContain("url.origin !== 'https://github.com'");
+  expect(toolchain).toContain("!/^[a-f0-9]{64}$/u.test(tool?.sha256 ?? '')");
+  expect(toolchain).toContain("{ flag: 'wx', mode: 0o755 }");
   expect(proof).toContain('if (prIndex < 0)');
   expect(proof).toContain("path.join(process.cwd(), 'tooling/ci/local.mjs')");
   expect(proof).toContain("'proof',");

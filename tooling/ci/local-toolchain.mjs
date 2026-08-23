@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -30,12 +31,24 @@ function normalizedProxyEnvironment(environment = process.env) {
   return result;
 }
 
+function validateDownloadTool(tool) {
+  const url = new URL(tool?.url);
+  if (url.protocol !== 'https:' || url.origin !== 'https://github.com') {
+    throw new Error(`Local CI tool URL is outside the trusted origin: ${url.origin}`);
+  }
+  if (!/^[a-f0-9]{64}$/u.test(tool?.sha256 ?? '')) {
+    throw new Error(`Local CI tool has a malformed SHA-256 lock: ${url.href}`);
+  }
+  return { url: url.href, sha256: tool.sha256 };
+}
+
 async function download(tool, destination) {
-  const response = await fetch(tool.url);
-  if (!response.ok) throw new Error(`Download failed (${response.status}): ${tool.url}`);
+  const locked = validateDownloadTool(tool);
+  const response = await fetch(locked.url);
+  if (!response.ok) throw new Error(`Download failed (${response.status}): ${locked.url}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   const digest = sha256(bytes);
-  if (digest !== tool.sha256) throw new Error(`SHA-256 drift for ${tool.url}: ${digest}`);
+  if (digest !== locked.sha256) throw new Error(`SHA-256 drift for ${locked.url}: ${digest}`);
   fs.writeFileSync(destination, bytes, { flag: 'wx', mode: 0o755 });
 }
 
@@ -82,8 +95,7 @@ async function provisionReleaseTools({ downloads, environment, lock, mutation, r
   });
 }
 
-function validateToolchainFiles({ bin, codeql, lane, marker, lockDigest, mutation, semgrep }) {
-  const markerValue = JSON.parse(fs.readFileSync(marker, 'utf8'));
+function validateToolchainFiles({ bin, codeql, lane, lockDigest, markerValue, mutation, semgrep }) {
   if (
     markerValue.lane !== lane ||
     markerValue.lockDigest !== lockDigest ||
@@ -107,6 +119,15 @@ function validateToolchainFiles({ bin, codeql, lane, marker, lockDigest, mutatio
     if (!fs.existsSync(executable)) {
       throw new Error(`Local CI toolchain is incomplete: ${executable}`);
     }
+  }
+}
+
+function readToolchainMarker(marker) {
+  try {
+    return JSON.parse(fs.readFileSync(marker, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
   }
 }
 
@@ -166,29 +187,33 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
       ...(lane === 'release' ? [mutationPackageBytes, mutationLockBytes] : []),
     ])
   );
-  const root = path.resolve('.tmp/ci-toolchain', `${lane}-${lockDigest}`);
+  const root = path.join(
+    os.homedir(),
+    '.cache',
+    'sniptale',
+    'ci-toolchain',
+    `${lane}-${lockDigest}`
+  );
   const marker = path.join(root, 'ready.json');
   const bin = path.join(root, 'bin');
   const codeql = path.join(root, 'codeql');
   const semgrep = path.join(root, 'semgrep');
   const mutation = path.join(root, 'mutation');
-  if (!fs.existsSync(marker)) {
+  let markerValue = readToolchainMarker(marker);
+  if (markerValue === null) {
     fs.rmSync(root, { recursive: true, force: true });
-    fs.mkdirSync(bin, { recursive: true });
+    fs.mkdirSync(bin, { recursive: true, mode: 0o700 });
     const downloads = path.join(root, 'downloads');
-    fs.mkdirSync(downloads);
+    fs.mkdirSync(downloads, { mode: 0o700 });
     await provisionCommonTools({ bin, downloads, environment, lock, semgrep });
     if (lane === 'release') {
       await provisionReleaseTools({ downloads, environment, lock, mutation, root });
     }
     fs.rmSync(downloads, { recursive: true, force: true });
-    fs.writeFileSync(
-      marker,
-      `${JSON.stringify({ schemaVersion: 1, lane, lockDigest, ready: true }, null, 2)}\n`,
-      { flag: 'wx' }
-    );
+    markerValue = { schemaVersion: 1, lane, lockDigest, ready: true };
+    fs.writeFileSync(marker, `${JSON.stringify(markerValue, null, 2)}\n`, { flag: 'wx' });
   }
-  const paths = { bin, codeql, lane, lockDigest, marker, mutation, semgrep };
+  const paths = { bin, codeql, lane, lockDigest, markerValue, mutation, semgrep };
   validateToolchainFiles(paths);
   return {
     environment: createToolchainEnvironment({ ...paths, environment }),

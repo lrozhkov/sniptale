@@ -127,13 +127,14 @@ function copyTree(source, destinationRoot, options = {}) {
   const repositoryRoot = options.repositoryRoot ?? root;
   const absolute = path.resolve(repositoryRoot, relativePath(source, repositoryRoot));
   if (!fs.existsSync(absolute)) return false;
+  let copied = false;
   for (const entry of fs.readdirSync(absolute, { withFileTypes: true })) {
     const child = path.join(source, entry.name);
     if (entry.isSymbolicLink()) throw new Error(`Unsafe artifact symlink: ${child}`);
-    if (entry.isDirectory()) copyTree(child, destinationRoot, options);
-    else if (entry.isFile()) copyFile(child, destinationRoot, child, options);
+    if (entry.isDirectory()) copied = copyTree(child, destinationRoot, options) || copied;
+    else if (entry.isFile()) copied = copyFile(child, destinationRoot, child, options) || copied;
   }
-  return true;
+  return copied;
 }
 
 function copyExternalFile(source, destinationRoot, destination) {
@@ -261,6 +262,7 @@ function collectLaneReports({ lane, startedAtMs, status, destinationRoot, reposi
   }
   if (lane === 'release') {
     const copied = copyTree('.tmp/coverage/canonical/html', destinationRoot, {
+      ignoreStale: !required,
       notBeforeMs: startedAtMs,
       repositoryRoot,
     });
@@ -268,6 +270,7 @@ function collectLaneReports({ lane, startedAtMs, status, destinationRoot, reposi
       throw new Error('Required coverage HTML is missing.');
     }
     const mutationCopied = copyTree('.tmp/mutation', destinationRoot, {
+      ignoreStale: !required,
       notBeforeMs: startedAtMs,
       repositoryRoot,
     });

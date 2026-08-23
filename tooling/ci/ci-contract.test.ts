@@ -195,10 +195,10 @@ it('fails closed on missing or stale canonical reports and refuses artifact over
   fs.mkdirSync(path.dirname(policy), { recursive: true });
   fs.copyFileSync('tooling/configs/ci/proof-semantics.json', policy);
   const moduleUrl = new URL('./artifacts.mjs', import.meta.url).href;
-  const invocation = (startedAtMs: string, status: string) =>
+  const invocation = (startedAtMs: string, status: string, lane = 'proof') =>
     [
       `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)};`,
-      `collectLaneArtifacts({ lane: 'proof', startedAtMs: ${startedAtMs}, status: '${status}',`,
+      `collectLaneArtifacts({ lane: '${lane}', startedAtMs: ${startedAtMs}, status: '${status}',`,
       `command: [], containerDigest: 'sha256:${'a'.repeat(64)}',`,
       `trustedControlDigest: 'sha256:${'b'.repeat(64)}', controlDigest: 'sha256:${'b'.repeat(64)}',`,
       `gateInputDigest: 'sha256:${'c'.repeat(64)}' });`,
@@ -254,6 +254,22 @@ it('fails closed on missing or stale canonical reports and refuses artifact over
     }
   );
   expect(failedWithStale.status, failedWithStale.stderr).toBe(0);
+  writeFile(staleRoot, '.tmp/mutation/persistence/after/stryker-report.json', '{}\n');
+  fs.utimesSync(
+    path.join(staleRoot, '.tmp/mutation/persistence/after/stryker-report.json'),
+    new Date(0),
+    new Date(0)
+  );
+  const failedReleaseWithStaleTree = spawnSync(
+    process.execPath,
+    ['--input-type=module', '--eval', invocation('Date.now()', 'failed', 'release')],
+    {
+      cwd: staleRoot,
+      env: { ...process.env, GITHUB_SHA: 'e'.repeat(40), GITHUB_RUN_ID: '20' },
+      encoding: 'utf8',
+    }
+  );
+  expect(failedReleaseWithStaleTree.status, failedReleaseWithStaleTree.stderr).toBe(0);
 });
 
 it('blocks local PR bypass for a dirty tree and unauthorized author', () => {

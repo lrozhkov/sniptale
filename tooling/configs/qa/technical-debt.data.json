@@ -180,10 +180,10 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
+        "contentHash": "ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3",
         "file": "tooling/ci/install-toolchain.mjs",
         "line": 42,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
@@ -201,16 +201,37 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
+        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
       },
       "scope": {
-        "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
+        "contentHash": "ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3",
         "file": "tooling/ci/install-toolchain.mjs",
         "line": 37,
         "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
         "rule": "js/file-access-to-http"
       },
       "targetAction": "Keep CI build inputs trusted-control-bound and all downloads exact-digest-verified; any source drift requires renewed review."
+    },
+    {
+      "id": "accepted.codeql.local-toolchain-download-write",
+      "classification": "accepted-architecture",
+      "owner": "qa-platform",
+      "risk": "Downloaded tool bytes become executable in the local QA toolchain if the locked digest or destination policy is incorrectly reviewed.",
+      "reason": "The local adapter accepts only HTTPS GitHub release URLs, validates an exact SHA-256 lock before writing, uses exclusive creation, and writes only below the user-owned Sniptale toolchain cache.",
+      "removalCondition": "Remove this entry if CodeQL models the preceding digest check or the local adapter no longer writes downloaded tools.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "codeql",
+        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:52:c2f6610388fa236aa860c406cca628c30764bf9e1c47c58279390fdf78efb3ee:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+      },
+      "scope": {
+        "contentHash": "c2f6610388fa236aa860c406cca628c30764bf9e1c47c58279390fdf78efb3ee",
+        "file": "tooling/ci/local-toolchain.mjs",
+        "line": 52,
+        "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
+        "rule": "js/http-to-file-access"
+      },
+      "targetAction": "Retain the trusted-origin allowlist, exact pre-write SHA-256 verification, exclusive creation, and cache-root confinement; any source drift requires renewed review."
     },
     {
       "id": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
@@ -430,8 +451,8 @@
       },
       "scope": {
         "family": "apps/extension/src/features/media-hub",
-        "count": 1,
-        "lines": 12,
+        "count": 2,
+        "lines": 24,
         "sampleFingerprint": "cfec7dd03af566fb9a745004f2212301dfd53d0b7483b9b1e043d6584349543f"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
@@ -717,26 +738,6 @@
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
     {
-      "id": "noise.jscpd.composition-persistence-image-aggregates.f6cde71e69ba",
-      "classification": "tool-noise",
-      "owner": "composition-persistence-image-aggregates",
-      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
-      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
-      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
-      "reviewBy": "2027-08-12",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/composition/persistence/image-aggregates"
-      },
-      "scope": {
-        "count": 3,
-        "family": "apps/extension/src/composition/persistence/image-aggregates",
-        "lines": 32,
-        "sampleFingerprint": "f6cde71e69bae887b381660b8243b1e35f8c2c4e28113f7823757b4c93fc7ace"
-      },
-      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
-    },
-    {
       "id": "accepted.jscpd.composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl.bc2c20338af1",
       "classification": "accepted-architecture",
       "owner": "composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl",
@@ -869,10 +870,10 @@
         "key": "apps/extension/src/composition/persistence/scenario"
       },
       "scope": {
-        "count": 2,
+        "count": 3,
         "family": "apps/extension/src/composition/persistence/scenario",
-        "lines": 17,
-        "sampleFingerprint": "c6fc6038ef1de2f4020be9cfe5bbace660562d43bad5896c1df80e01673b2bef"
+        "lines": 28,
+        "sampleFingerprint": "3621c71be0f637b5bd3f932d680580e20b5a867e3a32a904ade0bca2562fc1b3"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -1217,26 +1218,6 @@
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
     {
-      "id": "noise.jscpd.workflows-media-hub-backup-restore.dd7a3692af13",
-      "classification": "tool-noise",
-      "owner": "workflows-media-hub-backup-restore",
-      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
-      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
-      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
-      "reviewBy": "2027-08-12",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/workflows/media-hub-backup/restore"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/workflows/media-hub-backup/restore",
-        "lines": 9,
-        "sampleFingerprint": "dd7a3692af131e06b85dcbc76d278efdfe953018e07349a5abe7438f87527f70"
-      },
-      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
-    },
-    {
       "id": "noise.jscpd.background-capture-routing.753a87f9cd4b",
       "classification": "tool-noise",
       "owner": "background-capture-routing",
@@ -1337,6 +1318,328 @@
         ]
       },
       "targetAction": "Keep the exact two-owner composition cycle stable and reject additional edges or owners."
+    },
+    {
+      "id": "accepted.jscpd.media-hub-backup-v6.88b2b0ce8a93",
+      "classification": "accepted-architecture",
+      "owner": "media-hub-backup-v6",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/workflows/media-hub-backup/v6"
+      },
+      "scope": {
+        "count": 5,
+        "family": "apps/extension/src/workflows/media-hub-backup/v6",
+        "lines": 100,
+        "sampleFingerprint": "88b2b0ce8a93c3bf079e6659fad731895a07065b103754f60fe406072ca0d703"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.offscreen-recording-encoding.2025fc821b73",
+      "classification": "accepted-architecture",
+      "owner": "offscreen-recording-encoding",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/offscreen/recording/encoding"
+      },
+      "scope": {
+        "count": 5,
+        "family": "apps/extension/src/offscreen/recording/encoding",
+        "lines": 55,
+        "sampleFingerprint": "2025fc821b7331fb7917b29949989ae587f9c78c9af41517a65f28df8eaaeb28"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.tooling-ci.d014f2731834",
+      "classification": "accepted-architecture",
+      "owner": "ci-tooling",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "tooling/ci"
+      },
+      "scope": {
+        "count": 2,
+        "family": "tooling/ci",
+        "lines": 14,
+        "sampleFingerprint": "48ad62c3e22e30ad1d7265d9c18a670f68aafa56acc24193046fdd37cf77cea6"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.projects-scenario.4dd67eaf74c8",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/scenario"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/scenario",
+        "lines": 23,
+        "sampleFingerprint": "4dd67eaf74c8135d0c97142fcb404e455086416c1357a5424f41444098acde7f"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.encoding-stream.cd8f19a3476f",
+      "classification": "accepted-architecture",
+      "owner": "offscreen-recording",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/offscreen/recording/encoding <-> apps/extension/src/offscreen/recording/stream"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/offscreen/recording/encoding <-> apps/extension/src/offscreen/recording/stream",
+        "lines": 16,
+        "sampleFingerprint": "cd8f19a3476fcd9297c47149eabca3fb46ca6197198a7c9c163cac8eacf6e1bf"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.document-assets.6d2625312ff5",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-document-assets",
+      "risk": "Overlapping or declarative clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The exact live sample is overlapping, declarative, or same-owner structure rather than a second behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact same-owner population.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/document-assets"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/document-assets",
+        "lines": 15,
+        "sampleFingerprint": "6d2625312ff54bf02b27508aa8efc17443314e8de754a9c6e73059a433aaaa98"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.qa-core.d9a8ef1d9c44",
+      "classification": "accepted-architecture",
+      "owner": "qa-core",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "tooling/qa/core"
+      },
+      "scope": {
+        "count": 1,
+        "family": "tooling/qa/core",
+        "lines": 13,
+        "sampleFingerprint": "d9a8ef1d9c444f11909032fda0c54b15196ab09baf1d857df53b6cd3ef6ae2cf"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.projects-web-snapshots.b0b43316f3fc",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/web-snapshots"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/web-snapshots",
+        "lines": 12,
+        "sampleFingerprint": "b0b43316f3fc853388bdff64499f522cc277615b2baebe36addd902d7d55596f"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.projects.0e5caf985819",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-projects",
+      "risk": "Overlapping or declarative clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The exact live sample is overlapping, declarative, or same-owner structure rather than a second behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact same-owner population.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/projects"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/projects",
+        "lines": 11,
+        "sampleFingerprint": "0e5caf98581912b48e3bc724cc5e6e127f3bca439d164a6985fa061de8f8952b"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.geometry-runtime-contracts.9966528f66d8",
+      "classification": "accepted-architecture",
+      "owner": "recording-contracts",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/offscreen/recording/geometry <-> packages/runtime-contracts/src"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/offscreen/recording/geometry <-> packages/runtime-contracts/src",
+        "lines": 11,
+        "sampleFingerprint": "9966528f66d82e80dfd1e44fd5eb6d725b1ed277540f3c5c8b9a7538b7066a60"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.document-assets-scenario.6206ce2a9782",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/document-assets <-> apps/extension/src/composition/persistence/scenario"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/document-assets <-> apps/extension/src/composition/persistence/scenario",
+        "lines": 10,
+        "sampleFingerprint": "6206ce2a9782c8564cf3f6f1a45e5f77f27344819f0fda0585288d6736c155f0"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.image-workspaces-scenario.fc42f20ece5a",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/image-workspaces <-> apps/extension/src/composition/persistence/scenario"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/image-workspaces <-> apps/extension/src/composition/persistence/scenario",
+        "lines": 10,
+        "sampleFingerprint": "fc42f20ece5a038a279d617f1cff42e421b386eeda1d9c78f5f3ed3d535d6e6b"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.scenario-web-snapshots.1d81fcf132d6",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence",
+      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
+      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
+      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/scenario <-> apps/extension/src/composition/persistence/web-snapshots"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/scenario <-> apps/extension/src/composition/persistence/web-snapshots",
+        "lines": 10,
+        "sampleFingerprint": "1d81fcf132d6a21e0e6ac9322da2425d25bc60fad391d93a591eed93ed3c1bba"
+      },
+      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.persistence-assets.a56a4e79cc20",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-assets",
+      "risk": "Overlapping or declarative clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The exact live sample is overlapping, declarative, or same-owner structure rather than a second behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact same-owner population.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/assets"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/assets",
+        "lines": 6,
+        "sampleFingerprint": "a56a4e79cc2032f882f4309b7ff2ab0b1d5a24eb8a1b7e0112afbdfac53d0a57"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.gitleaks.release-source-example-key.217",
+      "classification": "tool-noise",
+      "owner": "release-source-documentation",
+      "risk": "A synthetic example in immutable history resembles a generic API key and can obscure new secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret documentation example used to explain release-source policy.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "gitleaks",
+        "key": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217"
+      },
+      "scope": {
+        "commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
+        "file": "docs/architecture/release-source-architecture.md",
+        "fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
+        "line": 217,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.secret-redaction-fixture.11",
+      "classification": "tool-noise",
+      "owner": "secret-redaction-tests",
+      "risk": "A synthetic example in immutable history resembles a generic API key and can obscure new secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a synthetic non-secret fixture used to prove credential redaction.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "gitleaks",
+        "key": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11"
+      },
+      "scope": {
+        "commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
+        "file": "src/shared/security/secret-redaction.test.ts",
+        "fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
+        "line": 11,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
     }
   ],
   "coverageOwners": [
@@ -14865,7 +15168,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "821ff8202a50e9aa2fa98008123b56496b3f8c7166f7f2b7fda9c52d1123b824"
+        "contentHash": "9037e407e6e852e0d5bd5f4470a0b8603c7a665b63e302f073f3abd4b06e4155"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",
