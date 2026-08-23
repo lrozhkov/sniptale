@@ -21,6 +21,8 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(toolchain).toContain("url.origin !== 'https://github.com'");
   expect(toolchain).toContain("!/^[a-f0-9]{64}$/u.test(tool?.sha256 ?? '')");
   expect(toolchain).toContain("{ flag: 'wx', mode: 0o755 }");
+  expect(toolchain).toContain('includes(semgrepPython)');
+  expect(toolchain).toContain('delete result[name]');
   expect(proof).toContain('if (prIndex < 0)');
   expect(proof).toContain("path.join(process.cwd(), 'tooling/ci/local.mjs')");
   expect(proof).toContain("'proof',");

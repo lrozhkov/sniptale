@@ -24,7 +24,9 @@ function normalizedProxyEnvironment(environment = process.env) {
     'all_proxy',
   ]) {
     const value = result[name];
-    if (typeof value === 'string' && value.length > 0 && !/^https?:\/\//iu.test(value)) {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      delete result[name];
+    } else if (!/^https?:\/\//iu.test(value)) {
       result[name] = `http://${value}`;
     }
   }
@@ -119,6 +121,11 @@ function validateToolchainFiles({ bin, codeql, lane, lockDigest, markerValue, mu
     if (!fs.existsSync(executable)) {
       throw new Error(`Local CI toolchain is incomplete: ${executable}`);
     }
+  }
+  const semgrepEntrypoint = path.join(semgrep, 'bin/semgrep');
+  const semgrepPython = path.join(semgrep, 'bin/python3');
+  if (!fs.readFileSync(semgrepEntrypoint, 'utf8').slice(0, 1024).includes(semgrepPython)) {
+    throw new Error('Local CI Semgrep launcher is not bound to its current toolchain root.');
   }
 }
 

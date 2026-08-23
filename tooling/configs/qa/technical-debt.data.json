@@ -222,12 +222,12 @@
       "reviewBy": "2027-08-23",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:52:c2f6610388fa236aa860c406cca628c30764bf9e1c47c58279390fdf78efb3ee:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:54:e6bf325d2c715403aa48c54bf949f2d6b032cdfbac3d0ae4f1296f2279370f9f:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "c2f6610388fa236aa860c406cca628c30764bf9e1c47c58279390fdf78efb3ee",
+        "contentHash": "e6bf325d2c715403aa48c54bf949f2d6b032cdfbac3d0ae4f1296f2279370f9f",
         "file": "tooling/ci/local-toolchain.mjs",
-        "line": 52,
+        "line": 54,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
         "rule": "js/http-to-file-access"
       },
