@@ -95,8 +95,15 @@ async function verifyImmediateApplication(
     .toBe('light');
   await page.evaluate(
     async ({ localeStorageKey }) => {
+      const previousLocale = localStorage.getItem(localeStorageKey);
       localStorage.setItem(localeStorageKey, 'ru');
-      await chrome.storage.local.set({ [localeStorageKey]: 'ru' });
+      try {
+        await chrome.storage.local.set({ [localeStorageKey]: 'ru' });
+      } catch (error) {
+        if (previousLocale === null) localStorage.removeItem(localeStorageKey);
+        else localStorage.setItem(localeStorageKey, previousLocale);
+        throw error;
+      }
     },
     { localeStorageKey: LOCALE_STORAGE_KEY }
   );

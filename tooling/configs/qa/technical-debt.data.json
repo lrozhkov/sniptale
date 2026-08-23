@@ -17571,14 +17571,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/extension-smoke.popup-startup.ts",
-        "contentHash": "992f16f8b5a70000fea947c4f7eb04839ebe4954d61d3fbee6d3f18387e9d63a"
+        "contentHash": "28a17d0c0f0ba7dae2b24e213669e81959b0f44c21fb7197dbe470eb48ba8685"
       },
       "consumers": [
         "tooling/test/e2e/extension-smoke.popup-startup.ts",
         "tooling/test/e2e/extension-smoke.spec.ts"
       ],
       "surfaces": [
-        "property:installFirstFrameThemeProbe/anonymous-107/backgrounds"
+        "property:installFirstFrameThemeProbe/anonymous-114/backgrounds"
       ]
     },
     {
