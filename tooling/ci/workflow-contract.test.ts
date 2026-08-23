@@ -35,6 +35,38 @@ it('pins every external Action to an approved full commit SHA', () => {
   }
 });
 
+it('keeps credential-bearing environments restricted to main', () => {
+  const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
+  expect(policy.environments).toEqual({
+    'selectel-runner-controller': {
+      protected_branches: false,
+      custom_branch_policies: true,
+      branches: ['main'],
+    },
+    'release-publisher': {
+      protected_branches: false,
+      custom_branch_policies: true,
+      branches: ['main'],
+    },
+  });
+  const quality = fs.readFileSync(QUALITY, 'utf8');
+  const release = fs.readFileSync(RELEASE, 'utf8');
+  expect(quality).toContain(
+    "(github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')"
+  );
+  expect(release).toContain("if: github.ref == 'refs/heads/main'");
+});
+
+it('documents the no-run bootstrap graph for both PR and main push events', () => {
+  const quality = fs.readFileSync(QUALITY, 'utf8');
+  const guide = fs.readFileSync('docs/tooling/ci-cd.md', 'utf8');
+  expect(quality).toContain('github.event.pull_request.draft == false');
+  expect(quality).toContain("'ci-local-proof-bypass'");
+  expect(guide).toContain('apply the trusted `ci-local-proof-bypass` label');
+  expect(guide).toContain('with `[skip ci]` in the resulting `main` commit subject');
+  expect(guide).toContain('verify the skipped Actions run');
+});
+
 it('uses one external workflow for commit gates and the bounded infrastructure smoke', () => {
   const workflow = fs.readFileSync(QUALITY, 'utf8');
   const candidateJob = workflow.slice(
@@ -94,8 +126,14 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('needs: [qa-image, provision, canonical-qa, infrastructure-smoke]');
   expect(workflow).toContain('[ "$CLEANUP_RESULT" = success ]');
   expect(workflow).toContain('scheduled-sweeper:');
-  expect(workflow).toContain('needs: cleanup');
+  expect(workflow).toContain("github.event.schedule == '17 * * * *'");
+  expect(workflow).toContain("github.event.schedule == '23 4 * * 1'");
+  expect(workflow).toContain("github.event.schedule != '17 * * * *'");
   expect(workflow).toContain('recover-cleanup');
+  expect(workflow).toContain("github.ref == 'refs/heads/main'");
+  expect(workflow).toContain("'ci-local-proof-bypass'");
+  expect(workflow).toContain('continue-on-error: true');
+  expect(workflow).toContain('resolve-run-artifact.mjs');
   expect(workflow).not.toContain('Build informational candidate controls');
   expect(workflow).not.toContain('container.mjs candidate');
   expect(candidateJob).not.toContain('qa:checkpoint');
@@ -152,17 +190,23 @@ it('publishes from one admitted provenance artifact without provisioning another
   expect(workflow).toContain('allow_non_latest_provenance:');
   expect(workflow).toContain('.display_title == "Release provenance Gate"');
   expect(workflow).toContain(
-    'release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-${provenance_attempt}'
+    'artifact_prefix="release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-"'
   );
-  expect(workflow).toContain('provenance-attempt=$provenance_attempt');
+  expect(workflow).not.toContain('provenance-attempt=$provenance_attempt');
   expect(workflow).toContain("! -name '*-qa-evidence.zip'");
-  expect(coverageJob).toContain('needs.publish.outputs.provenance-attempt');
-  expect(workflow).toContain('event=workflow_dispatch&status=success');
-  expect(workflow).toContain('is not the latest successful run');
+  expect(coverageJob).toContain('resolve-run-artifact.mjs');
+  expect(workflow).toContain('event=workflow_dispatch&status=completed');
+  expect(workflow).toContain('.name == "Release provenance Gate" and .conclusion == "success"');
+  expect(workflow).toContain('is not the latest completed run');
   expect(workflow).toContain('verify-main-proof.mjs release');
   expect(workflow).toContain('prepare-release-assets.mjs build/release-proof');
   expect(workflow).toContain("grep -q '(HTTP 404)'");
   expect(workflow).toContain("created_release_id=''");
+  expect(workflow).toContain('classify-release-state.mjs');
+  expect(workflow).toContain('already_published=true');
+  expect(workflow).toContain('recreate-owned-draft');
+  expect(workflow).toContain("if: github.ref == 'refs/heads/main'");
+  expect(workflow).toContain('environment: release-publisher');
   expect(workflow).toContain('verify-published-release.mjs');
   expect(workflow).not.toContain('SELECTEL_');
   expect(workflow).not.toContain('  provision:');

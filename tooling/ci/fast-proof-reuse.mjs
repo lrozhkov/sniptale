@@ -2,23 +2,10 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { listRegularProofFiles } from './proof-file-inventory.mjs';
+
 function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
-}
-
-function listFiles(root) {
-  const files = [];
-  function visit(directory) {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      const absolute = path.join(directory, entry.name);
-      if (entry.isSymbolicLink()) throw new Error(`Fast proof contains a symlink: ${absolute}`);
-      if (entry.isDirectory()) visit(absolute);
-      else if (entry.isFile()) files.push(path.relative(root, absolute).replaceAll(path.sep, '/'));
-      else throw new Error(`Fast proof contains an unsupported filesystem entry: ${absolute}`);
-    }
-  }
-  visit(root);
-  return files.sort();
 }
 
 function validateFastProofIdentity(manifest, expected) {
@@ -75,7 +62,9 @@ function validateFastProofFiles(resolvedRoot, manifest, manifestPath, checksumsP
     throw new Error('Fast proof file inventory contains duplicate paths.');
   }
   const expected = [...declared, 'SHA256SUMS', 'proof-manifest.json'].sort();
-  if (JSON.stringify(listFiles(resolvedRoot)) !== JSON.stringify(expected)) {
+  if (
+    JSON.stringify(listRegularProofFiles(resolvedRoot, 'Fast proof')) !== JSON.stringify(expected)
+  ) {
     throw new Error('Fast proof physical artifact inventory is not exact.');
   }
   const expectedChecksums = [

@@ -4,7 +4,7 @@
   "description": "Constrained ci:release CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
   "findings": [
     {
-      "contentHash": "ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3",
+      "contentHash": "44a5c331db9bbbd78c32185a1bf9ce0dbffd0832f971003a39f75ec060ae8b15",
       "debtId": "accepted.codeql.locked-toolchain-download-write",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 42,
@@ -12,7 +12,7 @@
       "rule": "js/http-to-file-access"
     },
     {
-      "contentHash": "ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3",
+      "contentHash": "44a5c331db9bbbd78c32185a1bf9ce0dbffd0832f971003a39f75ec060ae8b15",
       "debtId": "accepted.codeql.locked-toolchain-download-url",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 37,
@@ -20,7 +20,7 @@
       "rule": "js/file-access-to-http"
     },
     {
-      "contentHash": "8829223ab389bbb640429c599638c4dce9193d1cdddbf3858835797c5aa2c4b1",
+      "contentHash": "f647870a65fcd9b788309f8d6638b314d5ac2b2dcb5d60cdd8e10a3ccd74f3f6",
       "debtId": "accepted.codeql.local-toolchain-download-write",
       "file": "tooling/ci/local-toolchain.mjs",
       "line": 65,

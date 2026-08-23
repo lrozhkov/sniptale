@@ -39,20 +39,27 @@ function terminalState(value) {
   return 'completed';
 }
 
+function completeTimelineActivity(input, value) {
+  recordTimelineTransition({
+    activityId: input.activityId,
+    kind: input.kind,
+    state: terminalState(value),
+  });
+  return value;
+}
+
+function failTimelineActivity(input, error) {
+  recordTimelineTransition({ activityId: input.activityId, kind: input.kind, state: 'failed' });
+  throw error;
+}
+
 export async function runTimelineActivity(input, runner) {
   recordTimelineTransition({ ...input, state: 'queued' });
   recordTimelineTransition({ activityId: input.activityId, kind: input.kind, state: 'started' });
   try {
-    const value = await runner();
-    recordTimelineTransition({
-      activityId: input.activityId,
-      kind: input.kind,
-      state: terminalState(value),
-    });
-    return value;
+    return completeTimelineActivity(input, await runner());
   } catch (error) {
-    recordTimelineTransition({ activityId: input.activityId, kind: input.kind, state: 'failed' });
-    throw error;
+    return failTimelineActivity(input, error);
   }
 }
 
@@ -60,16 +67,9 @@ export function runTimelineActivitySync(input, runner) {
   recordTimelineTransition({ ...input, state: 'queued' });
   recordTimelineTransition({ activityId: input.activityId, kind: input.kind, state: 'started' });
   try {
-    const value = runner();
-    recordTimelineTransition({
-      activityId: input.activityId,
-      kind: input.kind,
-      state: terminalState(value),
-    });
-    return value;
+    return completeTimelineActivity(input, runner());
   } catch (error) {
-    recordTimelineTransition({ activityId: input.activityId, kind: input.kind, state: 'failed' });
-    throw error;
+    return failTimelineActivity(input, error);
   }
 }
 

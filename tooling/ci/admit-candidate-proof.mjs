@@ -9,6 +9,7 @@ import { createCandidateControlDigest } from './control-digest.mjs';
 import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
 import { validateTrustedControlResults } from './trusted-control-matrix.mjs';
 import { stableStringify } from '../qa/core/proof-input.mjs';
+import { listRegularProofFiles } from './proof-file-inventory.mjs';
 
 const POLICY_PATH = 'tooling/configs/ci/trusted-admission-policy.json';
 const SEMANTICS_POLICY_PATH = 'tooling/configs/ci/proof-semantics.json';
@@ -59,22 +60,6 @@ function validateExecutionCompatibility(manifest, lane, lanePolicy, trustedRoot)
   }
 }
 
-function listPhysicalFiles(root) {
-  const files = [];
-  function visit(directory) {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      const absolute = path.join(directory, entry.name);
-      if (entry.isSymbolicLink())
-        throw new Error(`Candidate proof contains a symlink: ${absolute}`);
-      if (entry.isDirectory()) visit(absolute);
-      else if (entry.isFile()) files.push(path.relative(root, absolute).replaceAll(path.sep, '/'));
-      else throw new Error(`Candidate proof contains an unsupported entry: ${absolute}`);
-    }
-  }
-  visit(root);
-  return files.sort();
-}
-
 function validateFileInventory(root, manifest, lanePolicy) {
   if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
     throw new Error('Candidate proof file inventory is missing.');
@@ -116,7 +101,7 @@ function validateFileInventory(root, manifest, lanePolicy) {
   const archives = [...declared.keys()].filter((file) => /^build\/sniptale_.+\.zip$/u.test(file));
   if (archives.length !== 1)
     throw new Error('Candidate proof must contain exactly one release ZIP.');
-  const physical = listPhysicalFiles(root);
+  const physical = listRegularProofFiles(root, 'Candidate proof');
   const expectedPhysical = [...declared.keys(), 'SHA256SUMS', 'proof-manifest.json'].sort();
   if (JSON.stringify(physical) !== JSON.stringify(expectedPhysical)) {
     throw new Error('Candidate proof physical inventory is not exact.');

@@ -9,6 +9,7 @@ import {
   runBoundedTasks,
 } from '../runtime/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from './owner-guard-step-helpers.mjs';
+import { createSchedulerLaneTask } from './scheduler-lane-task.mjs';
 import { TYPECHECK_CHECKERS, TYPESCRIPT_TOOL_VERSION } from './typescript-cli.mjs';
 import { OXLINT_TOOL_VERSION } from './verify-oxlint.mjs';
 
@@ -98,10 +99,8 @@ function createFocusedLaneTasks({ context, profile, workerRunner }) {
             ? typecheckCheckerCount
             : resources.cpuTokens;
       const memoryMiB = resources.memoryMiB;
-      return {
-        id: lane,
+      return createSchedulerLaneTask({
         cpuTokens,
-        dependencies: lane === 'lint' ? ['typecheck'] : [],
         executionProfile:
           lane === 'typecheck'
             ? {
@@ -113,23 +112,13 @@ function createFocusedLaneTasks({ context, profile, workerRunner }) {
               ? { toolName: 'oxlint', toolVersion: OXLINT_TOOL_VERSION }
               : {},
         memoryMiB,
-        workers:
-          lane === 'tests'
-            ? profile.vitestMaxWorkers
-            : lane === 'typecheck'
-              ? typecheckCheckerCount
-              : 1,
-        run: ({ signal }) =>
-          workerRunner({
-            context: workerContext,
-            lane,
-            memoryMiB,
-            signal,
-            typecheckMaxConcurrency,
-            typecheckCheckerCount,
-            vitestMaxWorkers: profile.vitestMaxWorkers,
-          }),
-      };
+        lane,
+        profile,
+        typecheckCheckerCount,
+        workerArguments: { typecheckMaxConcurrency },
+        workerContext,
+        workerRunner,
+      });
     }
   );
 }

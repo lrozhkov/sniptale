@@ -5,10 +5,12 @@
   "reportDirectory": ".tmp/coverage/canonical",
   "productionRoots": ["apps/extension/src", "packages"],
   "testRoots": ["apps/extension", "packages", "tooling/test"],
+  "testSupportRoots": ["tooling/test/harness", "tooling/test/support"],
   "configFiles": [
     "package.json",
     "package-lock.json",
     "vitest.config.ts",
+    "tooling/test/harness/vitest.setup.ts",
     "tooling/configs/qa/coverage-proof-reuse.data.json",
     "tooling/qa/core/audit-coverage-step.mjs",
     "tooling/qa/core/coverage-audit-report.mjs",
@@ -43,7 +45,7 @@
   },
   "digests": [
     "canonical production source inventory and contents",
-    "product and tooling test inventory and contents",
+    "product and tooling test inventory, Vitest setup, harness, support, and helper contents",
     "coverage scope, thresholds, configuration, and owner implementation",
     "package manifest and lockfile",
     "QA image digest",

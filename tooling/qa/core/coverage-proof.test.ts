@@ -56,6 +56,8 @@ function fixture() {
   writeFile(root, 'apps/extension/src/example.ts', 'export const value = 1;\n');
   writeFile(root, 'apps/extension/src/example.test.ts', 'test("value", () => {});\n');
   writeFile(root, 'tooling/test/example.spec.ts', 'test("support", () => {});\n');
+  writeFile(root, 'tooling/test/harness/helper.ts', 'export const harness = true;\n');
+  writeFile(root, 'tooling/test/support/fixture.ts', 'export const fixture = true;\n');
   for (const file of policy.reportFiles)
     writeFile(root, `${policy.reportDirectory}/${file}`, `${file}\n`);
   return { policy, root };
@@ -79,6 +81,24 @@ it('reuses coverage only when production, tests, config, lock, image, and every 
   fs.writeFileSync(
     path.join(root, 'apps/extension/src/example.test.ts'),
     'test("value", () => {});\n'
+  );
+  fs.appendFileSync(path.join(root, 'tooling/test/harness/helper.ts'), 'changed\n');
+  expect(resolveReusableCoverageProof({ cwd: root })).toMatchObject({
+    matched: false,
+    reason: 'coverage proof inputs changed',
+  });
+  fs.writeFileSync(
+    path.join(root, 'tooling/test/harness/helper.ts'),
+    'export const harness = true;\n'
+  );
+  fs.appendFileSync(path.join(root, 'tooling/test/support/fixture.ts'), 'changed\n');
+  expect(resolveReusableCoverageProof({ cwd: root })).toMatchObject({
+    matched: false,
+    reason: 'coverage proof inputs changed',
+  });
+  fs.writeFileSync(
+    path.join(root, 'tooling/test/support/fixture.ts'),
+    'export const fixture = true;\n'
   );
   fs.appendFileSync(path.join(root, policy.reportDirectory, 'lcov.info'), 'tampered\n');
   expect(resolveReusableCoverageProof({ cwd: root })).toMatchObject({

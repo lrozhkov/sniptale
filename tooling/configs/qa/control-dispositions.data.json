@@ -932,6 +932,12 @@
       "proofReason": "Internal orchestration entrypoint is exercised transitively by release-harness."
     },
     {
+      "path": "tooling/ci/resolve-run-artifact.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This trusted consumer resolves the exact highest live producer-attempt artifact and fails closed on incomplete inventories."
+    },
+    {
       "path": "tooling/ci/select-codeql-proof.mjs",
       "disposition": "keep",
       "owner": "qa-platform",

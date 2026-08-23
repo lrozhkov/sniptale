@@ -2,14 +2,13 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { collectLaneArtifacts, selectelInfrastructureFromEnvironment } from './artifacts.mjs';
-import { resolveCiArtifactSession } from './artifact-observability.mjs';
+import { selectelInfrastructureFromEnvironment } from './artifacts.mjs';
 import {
   appendCandidatePhaseInvocation,
   createTrustedPhaseCommands,
 } from './container-command.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
-import { formatObservedRunSummary } from '../qa/wrappers/observed/runner.mjs';
+import { sealLaneArtifacts } from './seal-lane-artifacts.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
@@ -76,27 +75,14 @@ for (const [id, executable, args] of commands) {
   process.stdout.write(`[ci:phase] ${status === 0 ? 'passed' : 'failed'} ${id}\n`);
 }
 
-let artifactSession = null;
-let artifactSessionFinalized = false;
-let artifactFinalRecord = null;
-try {
-  artifactSession = resolveCiArtifactSession({ lane, phases, startedAtMs });
-  artifactSession.recordActivityTransition({
-    activityId: 'artifact-collection',
-    kind: 'artifact-collection',
-    state: 'queued',
-  });
-  artifactSession.recordActivityTransition({
-    activityId: 'artifact-collection',
-    kind: 'artifact-collection',
-    state: 'started',
-  });
-  const artifactPath = collectLaneArtifacts({
-    lane,
-    startedAtMs,
+const artifactSealed = sealLaneArtifacts({
+  lane,
+  phases,
+  startedAtMs,
+  label: `CI ${lane}`,
+  artifactInput: {
     status: status === 0 ? 'passed' : 'failed',
     command: commands.map(([, executable, args]) => [executable, ...args].join(' ')),
-    phases,
     executionEnvironment: {
       kind: 'locked-container',
       digest: process.env.SNIPTALE_CI_CONTAINER_DIGEST,
@@ -111,61 +97,8 @@ try {
       release: resolveQaReleaseResourceProfile(),
     },
     infrastructure: selectelInfrastructureFromEnvironment(),
-    beforeCollectRunRecords: () => {
-      artifactSession.recordActivityTransition({
-        activityId: 'artifact-collection',
-        kind: 'artifact-collection',
-        state: 'completed',
-      });
-      artifactFinalRecord = artifactSession.finalize();
-      artifactSessionFinalized = true;
-    },
-  });
-  process.stdout.write(
-    `[ci:final-summary]\n${formatObservedRunSummary({
-      label: `CI ${lane}`,
-      record: artifactFinalRecord,
-      runPath: path.relative(process.cwd(), artifactSession.runPath).replaceAll(path.sep, '/'),
-    })}`
-  );
-  process.stdout.write(`SNIPTALE_ARTIFACT_PATH=${artifactPath}\n`);
-} catch (error) {
-  if (artifactSession && !artifactSessionFinalized) {
-    artifactSession.recordActivityTransition({
-      activityId: 'artifact-collection',
-      kind: 'artifact-collection',
-      state: 'failed',
-    });
-    artifactSession.fail(error, {
-      stepId: 'wrapper.lifecycle',
-      problemId: 'artifact.collection.failed',
-    });
-  } else if (artifactSession) {
-    artifactSession.resume();
-    artifactSession.recordActivityTransition({
-      activityId: 'artifact-sealing',
-      kind: 'artifact-sealing',
-      state: 'queued',
-    });
-    artifactSession.recordActivityTransition({
-      activityId: 'artifact-sealing',
-      kind: 'artifact-sealing',
-      state: 'started',
-    });
-    artifactSession.recordActivityTransition({
-      activityId: 'artifact-sealing',
-      kind: 'artifact-sealing',
-      state: 'failed',
-    });
-    artifactSession.fail(error, {
-      stepId: 'wrapper.lifecycle',
-      problemId: 'artifact.sealing.failed',
-    });
-  }
-  process.stderr.write(
-    `Artifact collection failed: ${error instanceof Error ? error.message : String(error)}\n`
-  );
-  status ||= 1;
-}
+  },
+});
+if (!artifactSealed) status ||= 1;
 
 process.exit(status);

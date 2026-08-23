@@ -4,9 +4,11 @@ import path from 'node:path';
 
 import { collectProductionCoverageFiles } from './coverage-audit-report.mjs';
 import {
+  createProofDigest,
   proofControlDigestMatches,
   resolveProofControlDigest,
   stableStringify,
+  writeSealedProofJson,
 } from './proof-input.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/coverage-proof-reuse.data.json';
@@ -14,6 +16,7 @@ const EXTERNAL_PROOF_ENV = 'SNIPTALE_COVERAGE_PROOF_PATH';
 const EXTERNAL_REPORTS_ENV = 'SNIPTALE_COVERAGE_REPORTS_PATH';
 const CANDIDATE_AUTHORITY_ENV = 'SNIPTALE_COVERAGE_PROOF_AUTHORITY';
 const TEST_PATTERN = /(?:\.test|\.spec)\.(?:[cm]?[jt]sx?)$/u;
+const EXECUTABLE_TEST_SUPPORT_PATTERN = /\.(?:[cm]?[jt]sx?)$/u;
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -33,6 +36,7 @@ function readPolicy(cwd) {
     policy.reportDirectory !== '.tmp/coverage/canonical' ||
     !Array.isArray(policy.productionRoots) ||
     !Array.isArray(policy.testRoots) ||
+    !Array.isArray(policy.testSupportRoots) ||
     !Array.isArray(policy.configFiles) ||
     !Array.isArray(policy.reportFiles) ||
     !Array.isArray(policy.consumers) ||
@@ -74,6 +78,9 @@ export function createCoverageProofInputs({ cwd = process.cwd() } = {}) {
   const productionFiles = collectProductionCoverageFiles({ root: cwd });
   const tests = new Set();
   for (const root of policy.testRoots) walk(cwd, root, (file) => TEST_PATTERN.test(file), tests);
+  for (const root of policy.testSupportRoots) {
+    walk(cwd, root, (file) => EXECUTABLE_TEST_SUPPORT_PATTERN.test(file), tests);
+  }
   const configs = new Set(policy.configFiles);
   for (const file of configs)
     if (!fs.existsSync(path.join(cwd, file)))
@@ -101,12 +108,6 @@ function reportDigests(root, policy) {
     .map((file) => ({ file, sha256: sha256(regularBytes(path.join(root, file))) }));
 }
 
-function proofDigest(proof) {
-  const unsigned = { ...proof };
-  delete unsigned.proofDigest;
-  return sha256(stableStringify(unsigned));
-}
-
 function parseProof(file) {
   const proof = JSON.parse(regularBytes(file).toString('utf8'));
   if (
@@ -115,7 +116,7 @@ function parseProof(file) {
     proof.outcome !== 'passed' ||
     !/^[a-f0-9]{64}$/u.test(proof.inputDigest ?? '') ||
     !Array.isArray(proof.reports) ||
-    proofDigest(proof) !== proof.proofDigest
+    createProofDigest(proof) !== proof.proofDigest
   )
     throw new Error('Malformed or corrupted coverage proof.');
   return proof;
@@ -191,11 +192,6 @@ export function recordSuccessfulCoverageProof({ cwd = process.cwd(), reusedFrom 
     reusedFrom,
     recordedAt: new Date().toISOString(),
   };
-  const sealed = { ...proof, proofDigest: proofDigest(proof) };
   const destination = path.join(cwd, inputs.policy.proofPath);
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  const temporary = `${destination}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, `${JSON.stringify(sealed, null, 2)}\n`, { flag: 'wx' });
-  fs.renameSync(temporary, destination);
-  return sealed;
+  return writeSealedProofJson(destination, proof);
 }

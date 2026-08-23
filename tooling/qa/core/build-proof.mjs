@@ -3,10 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  createProofDigest,
   proofControlDigestMatches,
   resolveProofCommit,
   resolveProofControlDigest,
   stableStringify,
+  writeSealedProofJson,
 } from './proof-input.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/build-proof-reuse.data.json';
@@ -83,12 +85,6 @@ export function createBuildProofInputs({ cwd = process.cwd() } = {}) {
   };
 }
 
-function proofDigest(proof) {
-  const unsigned = { ...proof };
-  delete unsigned.proofDigest;
-  return sha256(stableStringify(unsigned));
-}
-
 function parseProof(file) {
   const proof = JSON.parse(readRegularFile(file).toString('utf8'));
   if (
@@ -98,7 +94,7 @@ function parseProof(file) {
     !/^[a-f0-9]{64}$/u.test(proof.inputDigest ?? '') ||
     !/^[a-f0-9]{64}$/u.test(proof.archive?.sha256 ?? '') ||
     !/^sniptale_[A-Za-z0-9._-]+\.zip$/u.test(proof.archive?.file ?? '') ||
-    proofDigest(proof) !== proof.proofDigest
+    createProofDigest(proof) !== proof.proofDigest
   ) {
     throw new Error('Malformed or corrupted build proof.');
   }
@@ -185,11 +181,6 @@ export function recordSuccessfulBuildProof({
     reusedFrom,
     recordedAt: new Date().toISOString(),
   };
-  const sealed = { ...proof, proofDigest: proofDigest(proof) };
   const destination = path.join(cwd, inputs.policy.proofPath);
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  const temporary = `${destination}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, `${JSON.stringify(sealed, null, 2)}\n`, { flag: 'wx' });
-  fs.renameSync(temporary, destination);
-  return sealed;
+  return writeSealedProofJson(destination, proof);
 }

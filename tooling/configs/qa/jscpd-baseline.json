@@ -74,13 +74,6 @@
       "debtId": "accepted.jscpd.composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl.bc2c20338af1"
     },
     {
-      "family": "tooling/ci",
-      "count": 2,
-      "lines": 14,
-      "sampleFingerprint": "48ad62c3e22e30ad1d7265d9c18a670f68aafa56acc24193046fdd37cf77cea6",
-      "debtId": "accepted.jscpd.tooling-ci.d014f2731834"
-    },
-    {
       "family": "apps/extension/src/settings/sections/capture",
       "count": 2,
       "lines": 81,
@@ -275,13 +268,6 @@
       "lines": 13,
       "sampleFingerprint": "f0e723f15aabf6b34ff32474fd0bce3ea2244f4e6bc4233858956622a078560a",
       "debtId": "accepted.jscpd.ui-highlighter-preset-editor-apps-extension-src-ui-surface-style-selector.f0e723f15aab"
-    },
-    {
-      "family": "tooling/qa/core",
-      "count": 1,
-      "lines": 13,
-      "sampleFingerprint": "d9a8ef1d9c444f11909032fda0c54b15196ab09baf1d857df53b6cd3ef6ae2cf",
-      "debtId": "accepted.jscpd.qa-core.d9a8ef1d9c44"
     },
     {
       "family": "apps/extension/src/background/ai/settings",

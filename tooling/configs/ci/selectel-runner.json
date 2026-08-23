@@ -52,6 +52,7 @@
     "allowedZones": ["ru-3a", "ru-3b"],
     "allowedFlavors": {
       "SL1.24-49152": { "vcpus": 24, "ramMiB": 49152 },
+      "SL1.16-32768": { "vcpus": 16, "ramMiB": 32768 },
       "SL1.12-24576": { "vcpus": 12, "ramMiB": 24576 }
     },
     "allowedVolumeTypesByZone": {
@@ -63,6 +64,13 @@
         "cpuTokens": 24,
         "memoryMiB": 36864,
         "vitestWorkers": 16,
+        "playwrightWorkers": 4,
+        "securityWorkers": 8
+      },
+      "SL1.16-32768": {
+        "cpuTokens": 16,
+        "memoryMiB": 24576,
+        "vitestWorkers": 12,
         "playwrightWorkers": 4,
         "securityWorkers": 8
       },

@@ -7,10 +7,18 @@ import ts from 'typescript';
 import { expect, it } from 'vitest';
 
 import { createTempRoot, writeFile } from '../qa/core/test-helpers';
-import { parseToggleState, requireSelectedActionsSnapshot } from './github-policy-response.mjs';
+import {
+  assertEnvironmentPolicySnapshot,
+  parseOptionalResourceSnapshot,
+  parseToggleState,
+  requireAbsentResource,
+  requireCompleteBranchPolicyInventory,
+  requireSelectedActionsSnapshot,
+} from './github-policy-response.mjs';
 import { assertProofAuthority } from './proof-authority.mjs';
 import {
   assertDraftRelease,
+  classifyExistingRelease,
   assertImmutableRelease,
   assertPublishedReleaseAssets,
   readExpectedReleaseAssetDigests,
@@ -29,6 +37,75 @@ it('distinguishes disabled settings from rollback snapshot failures', () => {
     parseToggleState({ ok: false, error: 'gh: Forbidden (HTTP 403)' }, 'setting')
   ).toThrow('Unable to snapshot setting');
   expect(() => requireSelectedActionsSnapshot(null)).toThrow('rollback state is unavailable');
+  expect(
+    parseOptionalResourceSnapshot(
+      { ok: false, error: 'gh: Not Found (HTTP 404)', value: null },
+      'environment'
+    )
+  ).toBeNull();
+  expect(() =>
+    parseOptionalResourceSnapshot(
+      { ok: false, error: 'gh: Forbidden (HTTP 403)', value: null },
+      'environment'
+    )
+  ).toThrow('Unable to snapshot environment');
+});
+
+it('requires complete environment branch inventories and exact reconciliation', () => {
+  const policies = requireCompleteBranchPolicyInventory(
+    [
+      { total_count: 2, branch_policies: [{ id: 1, name: 'main' }] },
+      { total_count: 2, branch_policies: [{ id: 2, name: 'release' }] },
+    ],
+    'environment policies'
+  );
+  expect(policies.map(({ name }) => name)).toEqual(['main', 'release']);
+  expect(() =>
+    requireCompleteBranchPolicyInventory(
+      [{ total_count: 2, branch_policies: [{ id: 1, name: 'main' }] }],
+      'environment policies'
+    )
+  ).toThrow('incomplete branch policy inventory');
+  expect(() =>
+    requireCompleteBranchPolicyInventory(
+      [
+        {
+          total_count: 2,
+          branch_policies: [
+            { id: 1, name: 'main' },
+            { id: 2, name: 'main' },
+          ],
+        },
+      ],
+      'environment policies'
+    )
+  ).toThrow('ambiguous branch policy inventory');
+  expect(() =>
+    assertEnvironmentPolicySnapshot(
+      {
+        deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+        branches: ['release'],
+      },
+      { protected_branches: false, custom_branch_policies: true, branches: ['main'] },
+      'publisher'
+    )
+  ).toThrow('did not reconcile');
+  const absent = { ok: false, error: 'gh: Not Found (HTTP 404)', value: null };
+  expect(() => requireAbsentResource(absent, absent, 'environment')).not.toThrow();
+  expect(() =>
+    requireAbsentResource(
+      { ok: false, error: 'gh: Forbidden (HTTP 403)', value: null },
+      absent,
+      'environment'
+    )
+  ).toThrow('Unable to restore absent environment');
+  expect(() =>
+    requireAbsentResource(
+      { ok: true, error: '', value: null },
+      { ok: true, error: '', value: { name: 'survivor' } },
+      'environment'
+    )
+  ).toThrow('resource survived deletion');
 });
 
 it('binds the Dockerfile base and tool versions to the machine lock', () => {
@@ -167,6 +244,49 @@ it('verifies the exact published asset set including SHA256SUMS itself', () => {
   expect(() =>
     assertImmutableRelease({ ...draft, draft: false, immutable: true }, '42', 'v0.3.3', expected)
   ).not.toThrow();
+  expect(
+    classifyExistingRelease(
+      { ...draft, name: 'Sniptale 0.3.3 alpha', prerelease: true, draft: false, immutable: true },
+      'v0.3.3',
+      'Sniptale 0.3.3 alpha',
+      expected
+    )
+  ).toEqual({ action: 'already-published', releaseId: '42' });
+  expect(
+    classifyExistingRelease(
+      {
+        ...draft,
+        assets: draft.assets.slice(0, 1),
+        name: 'Sniptale 0.3.3 alpha',
+        prerelease: true,
+      },
+      'v0.3.3',
+      'Sniptale 0.3.3 alpha',
+      expected
+    )
+  ).toEqual({ action: 'recreate-owned-draft', releaseId: '42' });
+  expect(() =>
+    classifyExistingRelease(
+      { ...draft, name: 'Unrelated', prerelease: true },
+      'v0.3.3',
+      'Sniptale 0.3.3 alpha',
+      expected
+    )
+  ).toThrow('does not belong');
+  for (const assets of [
+    [{ name: 'unexpected.zip', digest: `sha256:${'a'.repeat(64)}` }],
+    [{ name: 'extension.zip', digest: `sha256:${'f'.repeat(64)}` }],
+    [draft.assets[0], draft.assets[0]],
+  ]) {
+    expect(() =>
+      classifyExistingRelease(
+        { ...draft, assets, name: 'Sniptale 0.3.3 alpha', prerelease: true },
+        'v0.3.3',
+        'Sniptale 0.3.3 alpha',
+        expected
+      )
+    ).toThrow('unowned or mismatched asset');
+  }
 });
 
 it('binds a reusable main proof to commit, tree, candidate controls, and semantic inputs', () => {
@@ -418,10 +538,20 @@ it('blocks local PR bypass for a dirty tree and unauthorized author', () => {
   }
   const proofModule = new URL('./proof.mjs', import.meta.url);
   writeFile(root, 'dirty.txt', 'dirty\n');
-  const dirty = spawnSync(process.execPath, [proofModule.pathname, '--pr', '1'], {
+  const missingReason = spawnSync(process.execPath, [proofModule.pathname, '--pr', '1'], {
     cwd: root,
     encoding: 'utf8',
   });
+  expect(missingReason.status).not.toBe(0);
+  expect(missingReason.stderr).toContain('requires --reason');
+  const dirty = spawnSync(
+    process.execPath,
+    [proofModule.pathname, '--pr', '1', '--reason', 'capacity incident'],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    }
+  );
   expect(dirty.status).not.toBe(0);
   expect(dirty.stderr).toContain('clean worktree');
 });

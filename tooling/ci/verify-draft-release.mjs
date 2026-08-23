@@ -1,19 +1,9 @@
-import { spawnSync } from 'node:child_process';
+import {
+  assertDraftRelease,
+  readExpectedReleaseAssetDigests,
+  readReleaseVerificationInput,
+} from './release-verification.mjs';
 
-import { assertDraftRelease, readExpectedReleaseAssetDigests } from './release-verification.mjs';
-
-const [assetRoot, releaseId] = process.argv.slice(2);
-const repository = process.env.GITHUB_REPOSITORY ?? 'lrozhkov/sniptale';
-const tag = process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME;
-if (!assetRoot || !releaseId || !tag) {
-  throw new Error('Draft release verification requires assets, release ID, and tag.');
-}
-const result = spawnSync('gh', ['api', `repos/${repository}/releases/${releaseId}`], {
-  encoding: 'utf8',
-});
-if (result.status !== 0) {
-  throw new Error(`Unable to verify draft release: ${result.stderr.trim()}`);
-}
-const release = JSON.parse(result.stdout);
+const { assetRoot, release, releaseId, tag } = readReleaseVerificationInput('draft');
 assertDraftRelease(release, releaseId, tag, readExpectedReleaseAssetDigests(assetRoot));
 process.stdout.write(`Mutable draft assets verified: ${tag} (${releaseId})\n`);

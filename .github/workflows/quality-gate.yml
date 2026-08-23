@@ -1,5 +1,5 @@
 name: Continuous Integration
-run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
+run-name: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'Selectel TTL sweep' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
 
 on:
   pull_request_target:
@@ -8,6 +8,7 @@ on:
   push:
     branches: [main]
   schedule:
+    - cron: '17 * * * *'
     - cron: '23 4 * * 1'
   workflow_dispatch:
     inputs:
@@ -27,16 +28,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.gate || 'fast' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'schedule' && github.event.schedule || inputs.gate || 'fast' }}
   cancel-in-progress: true
 
 env:
   CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
   TRUSTED_CONTROL_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
-  GATE_MODE: ${{ github.event_name == 'schedule' && 'release-provenance' || github.event_name == 'workflow_dispatch' && inputs.gate || 'fast' }}
-  PROOF_LANE: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release' || 'proof' }}
-  PROOF_KIND: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release-provenance' || 'fast-proof' }}
+  GATE_MODE: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'sweep' || github.event_name == 'schedule' && 'release-provenance' || github.event_name == 'workflow_dispatch' && inputs.gate || 'fast' }}
+  PROOF_LANE: ${{ (github.event_name == 'schedule' && github.event.schedule != '17 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release' || 'proof' }}
+  PROOF_KIND: ${{ (github.event_name == 'schedule' && github.event.schedule != '17 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release-provenance' || 'fast-proof' }}
 
 jobs:
   selectel-controller-preflight:
@@ -81,7 +82,10 @@ jobs:
           retention-days: 30
 
   fast-classifier:
-    if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.labels.*.name, 'ci-local-proof-bypass')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
@@ -175,7 +179,10 @@ jobs:
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-connectivity') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'release-provenance' || github.ref == 'refs/heads/main') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke' || github.ref == 'refs/heads/main') &&
-      (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'schedule' || github.event.schedule != '17 * * * *') &&
+      (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) &&
+      (github.event_name != 'pull_request_target' || !contains(github.event.pull_request.labels.*.name, 'ci-local-proof-bypass'))
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
@@ -573,9 +580,17 @@ jobs:
             fetch-depth: 0,
             persist-credentials: false,
           }
+      - name: Resolve the exact available proof producer attempt
+        id: proof-artifact
+        working-directory: trusted-control
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          prefix="${PROOF_KIND}-${CANDIDATE_SHA}-${GITHUB_RUN_ID}-"
+          name=$(node tooling/ci/resolve-run-artifact.mjs "$GITHUB_RUN_ID" "$prefix")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v6.0.0
         with:
-          name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ steps.proof-artifact.outputs.name }}
           path: candidate-proof
       - name: Admit candidate evidence with trusted-base policy
         id: admit
@@ -608,7 +623,7 @@ jobs:
     needs: [qa-image, provision, canonical-qa, infrastructure-smoke]
     if: always() && needs.qa-image.result == 'success' && needs.provision.result != 'skipped'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: selectel-runner-controller
     permissions: { actions: read, contents: read, packages: read }
     steps:
@@ -676,17 +691,22 @@ jobs:
   security-results:
     needs: [canonical-qa, trusted-admission]
     if: needs.canonical-qa.result == 'success' && needs.trusted-admission.result == 'success'
+    continue-on-error: true
     runs-on: ubuntu-24.04
-    permissions: { security-events: write }
+    permissions: { actions: read, contents: read, security-events: write }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.CANDIDATE_SHA }}', path: candidate, persist-credentials: false }
+      - name: Resolve the exact available proof producer attempt
+        id: proof-artifact
+        working-directory: candidate
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          prefix="${PROOF_KIND}-${CANDIDATE_SHA}-${GITHUB_RUN_ID}-"
+          name=$(node tooling/ci/resolve-run-artifact.mjs "$GITHUB_RUN_ID" "$prefix")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            name: '${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}',
-            path: reports,
-          }
+        with: { name: '${{ steps.proof-artifact.outputs.name }}', path: reports }
       - id: reports
         run: |
           echo "semgrep=$([ -f reports/.tmp/semgrep/results.sarif ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -750,10 +770,9 @@ jobs:
           retention-days: 30
 
   scheduled-sweeper:
-    needs: cleanup
-    if: always() && github.event_name == 'schedule'
+    if: github.event_name == 'schedule' && github.event.schedule == '17 * * * *'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     environment: selectel-runner-controller
     permissions: { contents: read, packages: read }
     steps:
@@ -761,7 +780,7 @@ jobs:
         with: { persist-credentials: false }
       - name: Delete expired managed Selectel resources
         env:
-          CONTROLLER_IMAGE: ghcr.io/lrozhkov/sniptale-controller:sha-${{ env.TRUSTED_CONTROL_SHA }}
+          CONTROLLER_IMAGE: ghcr.io/lrozhkov/sniptale-controller:main
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
@@ -786,7 +805,11 @@ jobs:
   pr-gate:
     name: pr-gate
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
-    if: always() && github.event_name == 'pull_request_target'
+    if: >-
+      always() &&
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.labels.*.name, 'ci-local-proof-bypass')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -825,7 +848,10 @@ jobs:
   release-provenance-gate:
     name: Release provenance Gate
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
-    if: always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance'))
+    if: >-
+      always() &&
+      ((github.event_name == 'schedule' && github.event.schedule == '23 4 * * 1') ||
+      (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance'))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

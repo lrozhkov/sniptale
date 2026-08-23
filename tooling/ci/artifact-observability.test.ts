@@ -7,16 +7,20 @@ import { expect, it } from 'vitest';
 import { createTempRoot } from '../qa/core/test-helpers';
 import { resolveCiArtifactSession } from './artifact-observability.mjs';
 
-it.each(['run-lane.mjs', 'local.mjs'])(
-  'routes %s failure artifact collection through the shared CI lifecycle owner',
-  (file) => {
+it('routes both CI launchers through one artifact lifecycle owner', () => {
+  const owner = fs.readFileSync('tooling/ci/seal-lane-artifacts.mjs', 'utf8');
+  expect(owner).toContain(
+    "import { resolveCiArtifactSession } from './artifact-observability.mjs'"
+  );
+  expect(owner).toContain('resolveCiArtifactSession({ lane, phases, startedAtMs })');
+  expect(owner).toContain('collectLaneArtifacts({');
+  for (const file of ['run-lane.mjs', 'local.mjs']) {
     const source = fs.readFileSync(path.join('tooling/ci', file), 'utf8');
-    expect(source).toContain(
-      "import { resolveCiArtifactSession } from './artifact-observability.mjs'"
-    );
-    expect(source).toContain('resolveCiArtifactSession({ lane, phases, startedAtMs })');
+    expect(source).toContain("import { sealLaneArtifacts } from './seal-lane-artifacts.mjs'");
+    expect(source).toContain('sealLaneArtifacts({');
+    expect(source).not.toContain('resolveCiArtifactSession({');
   }
-);
+});
 
 it('seals canonical failure evidence when a prerequisite fails before the CI wrapper starts', () => {
   const root = createTempRoot('ci-prerequisite-evidence-');

@@ -42,7 +42,7 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
   expect(source).toContain('item.name == placement["flavor"]');
   expect(source).toContain('flavor.disk != 0');
   expect(source).toContain('int(image.min_disk or 0) > placement["volumeGiB"]');
-  expect(source).toContain('result["message"] = " ".join(message.split())[:500]');
+  expect(source).toContain('result["message"] = redact_failure_message(message, connection)');
   expect(source).toContain('record["failure"] = server_failure(');
   expect(source).toContain('cleanup_with_retries(');
   expect(source).toContain('for profile_index, placement in enumerate(profiles):');
@@ -156,6 +156,36 @@ it('writes a replayable cleanup-failed receipt when all retries are exhausted', 
   expect(JSON.parse(result.stdout).status).toBe('cleanup-failed');
 });
 
+it('redacts project and credential identities from persisted and console failure text', () => {
+  const script = [
+    'import json,runpy,sys,types',
+    'module=types.ModuleType("openstack")',
+    'module.connection=types.SimpleNamespace(Connection=object)',
+    'module.exceptions=types.SimpleNamespace(SDKException=Exception)',
+    'sys.modules["openstack"]=module',
+    'namespace=runpy.run_path("tooling/ci/selectel/sdk-controller.py", run_name="sniptale_test")',
+    'message="project-raw-uuid credential-id credential-secret runner-token"',
+    'namespace["remember_project_id_for_redaction"]("project-raw-uuid")',
+    'print(json.dumps(namespace["cleanup_failure"](RuntimeError(message))))',
+  ].join(';');
+  const result = spawnSync('python3', ['-c', script], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      SELECTEL_OS_APPLICATION_CREDENTIAL_ID: 'credential-id',
+      SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: 'credential-secret',
+      RUNNER_CONTROLLER_TOKEN: 'runner-token',
+      SNIPTALE_REPOSITORY_ROOT: process.cwd(),
+    },
+    encoding: 'utf8',
+  });
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).not.toMatch(
+    /project-raw-uuid|credential-id|credential-secret|runner-token/u
+  );
+  expect(JSON.parse(result.stdout).message).toContain('[REDACTED]');
+});
+
 it('replays cleanup from nested resources after provisioning cleanup was interrupted', () => {
   const result = spawnSync(
     'python3',
@@ -185,6 +215,19 @@ it('recovers cleanup by exact run and run-attempt identity when the receipt is u
 
 const validProfiles = {
   profiles: [
+    {
+      zone: 'ru-3b',
+      flavor: 'SL1.16-32768',
+      volumeType: 'basicssd.ru-3b',
+      volumeGiB: 80,
+      qa: {
+        cpuTokens: 16,
+        memoryMiB: 24576,
+        vitestWorkers: 12,
+        playwrightWorkers: 4,
+        securityWorkers: 8,
+      },
+    },
     {
       zone: 'ru-3a',
       flavor: 'SL1.24-49152',
@@ -238,7 +281,7 @@ function validateWithPythonController(raw: string | undefined) {
 
 it('validates and hashes the ordered runtime profile document without storing its value', () => {
   const validated = validateSelectelQaProfiles(JSON.stringify(validProfiles));
-  expect(validated.profiles).toHaveLength(2);
+  expect(validated.profiles).toHaveLength(3);
   expect(validated.digest).toMatch(/^sha256:[a-f0-9]{64}$/u);
   const python = validateWithPythonController(JSON.stringify(validProfiles));
   expect(python.status, python.stderr).toBe(0);
@@ -246,8 +289,12 @@ it('validates and hashes the ordered runtime profile document without storing it
 });
 
 it('rejects proof-compatible profiles that are below the canonical release minimum', () => {
+  const releaseProfiles = { profiles: validProfiles.profiles.slice(0, 2) };
   expect(() =>
     validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'proof')
+  ).not.toThrow();
+  expect(() =>
+    validateSelectelProfilesForLane(JSON.stringify(releaseProfiles), 'release')
   ).not.toThrow();
   expect(() => validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'release')).toThrow(
     /release lane minimum/u

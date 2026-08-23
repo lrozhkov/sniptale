@@ -31,14 +31,15 @@ concurrency:
 
 jobs:
   publish:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    environment: release-publisher
     permissions:
       actions: read
       contents: write
     outputs:
       release-sha: ${{ steps.admission.outputs.release-sha }}
-      provenance-attempt: ${{ steps.admission.outputs.provenance-attempt }}
     steps:
       - name: Validate deployment inputs
         env:
@@ -75,22 +76,27 @@ jobs:
           run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}")
           jq -e --arg sha "$release_sha" '
             .head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch" and
-            .status == "completed" and .conclusion == "success" and .path == ".github/workflows/quality-gate.yml"
+            .status == "completed" and .path == ".github/workflows/quality-gate.yml"
             and .display_title == "Release provenance Gate"
           ' <<<"$run" >/dev/null
-          provenance_attempt=$(jq -er '.run_attempt' <<<"$run")
-          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/quality-gate.yml/runs?branch=main&event=workflow_dispatch&status=success&head_sha=${release_sha}&per_page=100")
+          jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}/jobs?per_page=100")
+          jq -s -e '
+            [.[].jobs[] | select(.name == "Release provenance Gate" and .conclusion == "success")] |
+            length == 1
+          ' <<<"$jobs" >/dev/null
+          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/quality-gate.yml/runs?branch=main&event=workflow_dispatch&status=completed&head_sha=${release_sha}&per_page=100")
           latest=$(jq -s -r --arg sha "$release_sha" '[.[].workflow_runs[] | select(.head_sha == $sha and .display_title == "Release provenance Gate")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
           if [ "$PROVENANCE_RUN_ID" != "$latest" ] && [ "$ALLOW_NON_LATEST" != true ]; then
-            echo "Provenance run $PROVENANCE_RUN_ID is not the latest successful run $latest for $release_sha." >&2
+            echo "Provenance run $PROVENANCE_RUN_ID is not the latest completed run $latest for $release_sha." >&2
             exit 1
           fi
+          artifact_prefix="release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-"
+          artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROVENANCE_RUN_ID" "$artifact_prefix")
           gh run download "$PROVENANCE_RUN_ID" \
-            --name "release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-${provenance_attempt}" \
+            --name "$artifact_name" \
             --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "$release_sha"
           echo "release-sha=$release_sha" >> "$GITHUB_OUTPUT"
-          echo "provenance-attempt=$provenance_attempt" >> "$GITHUB_OUTPUT"
           {
             echo '### Continuous Deployment admission'
             echo
@@ -124,10 +130,27 @@ jobs:
         run: |
           asset_root=build/release-proof/release-assets
           GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" node tooling/ci/release-policy.mjs --recheck
+          version=$(jq -er .version package.json)
+          release_name="Sniptale ${version} alpha"
           lookup_error=$(mktemp)
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>"$lookup_error"; then
-            echo 'Refusing to replace an existing release.' >&2
-            exit 1
+          existing_release=$(mktemp)
+          already_published=false
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >"$existing_release" 2>"$lookup_error"; then
+            state=$(node tooling/ci/classify-release-state.mjs "$asset_root" "$RELEASE_TAG" "$release_name" <"$existing_release")
+            release_id=$(jq -er .releaseId <<<"$state")
+            case $(jq -er .action <<<"$state") in
+              already-published)
+                node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+                already_published=true
+                ;;
+              recreate-owned-draft)
+                gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+                ;;
+              *)
+                echo 'Existing release classifier returned an unknown action.' >&2
+                exit 1
+                ;;
+            esac
           elif ! grep -q '(HTTP 404)' "$lookup_error"; then
             cat "$lookup_error" >&2
             exit 1
@@ -141,7 +164,6 @@ jobs:
             fi
           }
           trap cleanup_owned_release ERR
-          version=$(jq -er .version package.json)
           mapfile -t zip_assets < <(find "$asset_root" -maxdepth 1 -type f -name 'sniptale_*.zip' ! -name '*-qa-evidence.zip' -print)
           test "${#zip_assets[@]}" -eq 1 && test -f "${zip_assets[0]}"
           zip_name=$(basename "${zip_assets[0]}")
@@ -166,15 +188,17 @@ jobs:
           This is an alpha preview (**v${version}-alpha**). Formats, workflows, and browser compatibility may change without backward compatibility; keep separate backups of important data.
           EOF
           request=$(mktemp)
-          jq -n --arg tag "$RELEASE_TAG" --arg name "Sniptale ${version} alpha" --rawfile body "$notes" \
+          jq -n --arg tag "$RELEASE_TAG" --arg name "$release_name" --rawfile body "$notes" \
             '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: true, generate_release_notes: false}' > "$request"
-          release=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$request")
-          release_id=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release")
-          created_release_id="$release_id"
-          node tooling/ci/upload-release-assets.mjs "$asset_root" "$release_id"
-          node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
-          node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+          if [ "$already_published" = false ]; then
+            release=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$request")
+            release_id=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release")
+            created_release_id="$release_id"
+            node tooling/ci/upload-release-assets.mjs "$asset_root" "$release_id"
+            node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
+            node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+          fi
 
   coverage-results:
     needs: publish
@@ -192,8 +216,10 @@ jobs:
       - name: Download exact published release proof
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
+          artifact_prefix="release-provenance-${{ needs.publish.outputs.release-sha }}-${{ inputs.provenance_run_id }}-"
+          artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "${{ inputs.provenance_run_id }}" "$artifact_prefix")
           gh run download "${{ inputs.provenance_run_id }}" \
-            --name "release-provenance-${{ needs.publish.outputs.release-sha }}-${{ inputs.provenance_run_id }}-${{ needs.publish.outputs.provenance-attempt }}" \
+            --name "$artifact_name" \
             --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "${{ needs.publish.outputs.release-sha }}"
       - name: Publish exact release coverage to Codecov

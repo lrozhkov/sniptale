@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { createCandidateControlDigest } from '../../ci/control-digest.mjs';
@@ -58,4 +59,22 @@ export function resolveProofControlDigest({ cwd = process.cwd(), env = process.e
 
 export function proofControlDigestMatches(proof, currentControlDigest) {
   return proof?.producer?.controlDigest === currentControlDigest;
+}
+
+export function writeAtomicProofJson(destination, proof) {
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  const temporary = `${destination}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify(proof, null, 2)}\n`, { flag: 'wx' });
+  fs.renameSync(temporary, destination);
+  return proof;
+}
+
+export function createProofDigest(proof) {
+  const unsigned = { ...proof };
+  delete unsigned.proofDigest;
+  return sha256ProofInput(stableStringify(unsigned));
+}
+
+export function writeSealedProofJson(destination, proof) {
+  return writeAtomicProofJson(destination, { ...proof, proofDigest: createProofDigest(proof) });
 }

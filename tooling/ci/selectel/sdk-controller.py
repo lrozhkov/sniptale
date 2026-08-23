@@ -28,6 +28,12 @@ from openstack import exceptions
 ROOT = Path(os.environ.get("SNIPTALE_REPOSITORY_ROOT", "/workspace")).resolve()
 POLICY_PATH = ROOT / "tooling/configs/ci/selectel-runner.json"
 SEMANTICS_PATH = ROOT / "tooling/configs/ci/proof-semantics.json"
+REDACTION_PROJECT_ID: str | None = None
+
+
+def remember_project_id_for_redaction(project_id: str):
+    global REDACTION_PROJECT_ID
+    REDACTION_PROJECT_ID = project_id
 
 
 def required(value: Any, label: str) -> str:
@@ -257,6 +263,7 @@ def connect(policy: dict[str, Any]):
     )
     connection.authorize()
     project_id = required(connection.current_project_id, "authenticated project ID")
+    remember_project_id_for_redaction(project_id)
     digest = hashlib.sha256(project_id.encode()).hexdigest()
     if digest != environment["expectedProjectSha256"]:
         raise RuntimeError("OpenStack token project does not match policy.")
@@ -516,6 +523,27 @@ def write_record(destination: Path, record: dict[str, Any]):
     destination.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
 
+def redact_failure_message(value: Any, connection=None) -> str:
+    message = " ".join(str(value).split())
+    sensitive = {
+        os.environ.get("SELECTEL_OS_APPLICATION_CREDENTIAL_ID"),
+        os.environ.get("SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET"),
+        os.environ.get("RUNNER_CONTROLLER_TOKEN"),
+    }
+    project_id = getattr(connection, "current_project_id", None)
+    if isinstance(project_id, str):
+        sensitive.add(project_id)
+    if isinstance(REDACTION_PROJECT_ID, str):
+        sensitive.add(REDACTION_PROJECT_ID)
+    for secret in sorted(
+        (item for item in sensitive if isinstance(item, str) and item),
+        key=len,
+        reverse=True,
+    ):
+        message = message.replace(secret, "[REDACTED]")
+    return message[:500]
+
+
 def server_failure(connection, server_id: str | None, failure: Exception):
     result = {"kind": type(failure).__name__}
     if not server_id:
@@ -530,15 +558,15 @@ def server_failure(connection, server_id: str | None, failure: Exception):
     if isinstance(code, int):
         result["code"] = code
     if isinstance(message, str) and message.strip():
-        result["message"] = " ".join(message.split())[:500]
+        result["message"] = redact_failure_message(message, connection)
     return result
 
 
-def cleanup_failure(failure: Exception):
+def cleanup_failure(failure: Exception, connection=None):
     result = {"kind": type(failure).__name__}
-    message = str(failure)
+    message = redact_failure_message(failure, connection)
     if message.strip():
-        result["message"] = " ".join(message.split())[:500]
+        result["message"] = message
     return result
 
 
@@ -687,7 +715,7 @@ def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, An
             failures.append(("runner", failure))
     if failures:
         details = "; ".join(
-            f"{owner}: {type(failure).__name__}: {' '.join(str(failure).split())[:500]}"
+            f"{owner}: {type(failure).__name__}: {redact_failure_message(failure, connection)}"
             for owner, failure in failures
         )
         raise RuntimeError(f"Selectel cleanup incomplete: {details}")
@@ -699,13 +727,14 @@ def cleanup_with_retries(
 ):
     failure = None
     for attempt in range(1, 4):
+        active_connection = connection
         try:
-            active_connection = connection if connection is not None else connect(policy)[0]
+            active_connection = active_connection if active_connection is not None else connect(policy)[0]
             return cleanup(active_connection, policy, token, record), attempt
         except Exception as current_failure:
             failure = current_failure
             record["cleanupAttempts"] = attempt
-            record["cleanupFailure"] = cleanup_failure(current_failure)
+            record["cleanupFailure"] = cleanup_failure(current_failure, active_connection)
             connection = None
             if attempt < 3:
                 time.sleep(5)
@@ -1286,5 +1315,5 @@ if __name__ == "__main__":
     try:
         main()
     except (exceptions.SDKException, RuntimeError) as failure:
-        print(f"Selectel controller failed: {failure}", file=sys.stderr)
+        print(f"Selectel controller failed: {redact_failure_message(failure)}", file=sys.stderr)
         sys.exit(1)

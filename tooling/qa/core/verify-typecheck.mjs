@@ -308,6 +308,15 @@ export function resolveTypecheckRun({ mode = 'full', targetFiles = [] } = {}) {
   };
 }
 
+function resolveTypecheckInvocation({ checkerCount, mode, targetFiles }) {
+  const metadata = resolveTypecheckRun({ mode, targetFiles });
+  const resolvedCheckerCount = checkerCount ?? TYPECHECK_CHECKERS[metadata.mode] ?? 1;
+  if (!Number.isInteger(resolvedCheckerCount) || resolvedCheckerCount < 1) {
+    throw new Error('Typecheck checkerCount must be a positive integer.');
+  }
+  return { metadata, resolvedCheckerCount };
+}
+
 export function runTypecheck({
   checkerCount,
   cwd = process.cwd(),
@@ -315,11 +324,11 @@ export function runTypecheck({
   targetFiles = [],
   toolchainRoot = TYPESCRIPT_TOOLCHAIN_ROOT,
 } = {}) {
-  const metadata = resolveTypecheckRun({ mode, targetFiles });
-  const resolvedCheckerCount = checkerCount ?? TYPECHECK_CHECKERS[metadata.mode] ?? 1;
-  if (!Number.isInteger(resolvedCheckerCount) || resolvedCheckerCount < 1) {
-    throw new Error('Typecheck checkerCount must be a positive integer.');
-  }
+  const { metadata, resolvedCheckerCount } = resolveTypecheckInvocation({
+    checkerCount,
+    mode,
+    targetFiles,
+  });
   if (metadata.mode === 'skip') {
     return createSkippedTypecheckResult(metadata);
   }
@@ -365,11 +374,11 @@ export async function runTypecheckAsync({
   targetFiles = [],
   toolchainRoot = TYPESCRIPT_TOOLCHAIN_ROOT,
 } = {}) {
-  const metadata = resolveTypecheckRun({ mode, targetFiles });
-  const resolvedCheckerCount = checkerCount ?? TYPECHECK_CHECKERS[metadata.mode] ?? 1;
-  if (!Number.isInteger(resolvedCheckerCount) || resolvedCheckerCount < 1) {
-    throw new Error('Typecheck checkerCount must be a positive integer.');
-  }
+  const { metadata, resolvedCheckerCount } = resolveTypecheckInvocation({
+    checkerCount,
+    mode,
+    targetFiles,
+  });
   if (metadata.mode === 'skip') return createSkippedTypecheckResult(metadata);
   if (metadata.mode === 'full') {
     return runTypecheck({

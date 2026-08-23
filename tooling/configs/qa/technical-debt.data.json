@@ -180,10 +180,10 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:44a5c331db9bbbd78c32185a1bf9ce0dbffd0832f971003a39f75ec060ae8b15:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3",
+        "contentHash": "44a5c331db9bbbd78c32185a1bf9ce0dbffd0832f971003a39f75ec060ae8b15",
         "file": "tooling/ci/install-toolchain.mjs",
         "line": 42,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
@@ -201,10 +201,10 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
+        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:44a5c331db9bbbd78c32185a1bf9ce0dbffd0832f971003a39f75ec060ae8b15:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
       },
       "scope": {
-        "contentHash": "ce734adfcd3fe1a3396b353e99a14744f6503e35908ba0c3b9adc59a9ca454f3",
+        "contentHash": "44a5c331db9bbbd78c32185a1bf9ce0dbffd0832f971003a39f75ec060ae8b15",
         "file": "tooling/ci/install-toolchain.mjs",
         "line": 37,
         "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
@@ -222,10 +222,10 @@
       "reviewBy": "2027-08-23",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:65:8829223ab389bbb640429c599638c4dce9193d1cdddbf3858835797c5aa2c4b1:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:65:f647870a65fcd9b788309f8d6638b314d5ac2b2dcb5d60cdd8e10a3ccd74f3f6:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "8829223ab389bbb640429c599638c4dce9193d1cdddbf3858835797c5aa2c4b1",
+        "contentHash": "f647870a65fcd9b788309f8d6638b314d5ac2b2dcb5d60cdd8e10a3ccd74f3f6",
         "file": "tooling/ci/local-toolchain.mjs",
         "line": 65,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
@@ -1360,26 +1360,6 @@
       "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
     },
     {
-      "id": "accepted.jscpd.tooling-ci.d014f2731834",
-      "classification": "accepted-architecture",
-      "owner": "ci-tooling",
-      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
-      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
-      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
-      "reviewBy": "2027-08-23",
-      "source": {
-        "kind": "jscpd",
-        "key": "tooling/ci"
-      },
-      "scope": {
-        "count": 2,
-        "family": "tooling/ci",
-        "lines": 14,
-        "sampleFingerprint": "48ad62c3e22e30ad1d7265d9c18a670f68aafa56acc24193046fdd37cf77cea6"
-      },
-      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
-    },
-    {
       "id": "accepted.jscpd.projects-scenario.4dd67eaf74c8",
       "classification": "accepted-architecture",
       "owner": "composition-persistence",
@@ -1438,26 +1418,6 @@
         "sampleFingerprint": "6d2625312ff54bf02b27508aa8efc17443314e8de754a9c6e73059a433aaaa98"
       },
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
-    },
-    {
-      "id": "accepted.jscpd.qa-core.d9a8ef1d9c44",
-      "classification": "accepted-architecture",
-      "owner": "qa-core",
-      "risk": "A generic extraction could collapse independently changing owners; unreviewed clone growth could still hide shared behavior.",
-      "reason": "The exact matches belong to independently changing typed, runtime, adapter, or proof owners; sharing them would broaden authority without removing duplicated behavior.",
-      "removalCondition": "Remove when the matched owners acquire one proven shared change reason and a narrower canonical owner.",
-      "reviewBy": "2027-08-23",
-      "source": {
-        "kind": "jscpd",
-        "key": "tooling/qa/core"
-      },
-      "scope": {
-        "count": 1,
-        "family": "tooling/qa/core",
-        "lines": 13,
-        "sampleFingerprint": "d9a8ef1d9c444f11909032fda0c54b15196ab09baf1d857df53b6cd3ef6ae2cf"
-      },
-      "targetAction": "Keep independent owners exact and reject unreviewed clone growth."
     },
     {
       "id": "accepted.jscpd.projects-web-snapshots.b0b43316f3fc",
@@ -15093,8 +15053,7 @@
       "consumers": [
         "tooling/ci/artifact-observability.mjs",
         "tooling/ci/artifact-observability.test.ts",
-        "tooling/ci/local.mjs",
-        "tooling/ci/run-lane.mjs"
+        "tooling/ci/seal-lane-artifacts.mjs"
       ],
       "surfaces": [
         "property:failedPhaseDiagnostic/evidence",
@@ -15204,8 +15163,8 @@
         "tooling/ci/artifacts.mjs",
         "tooling/ci/ci-contract.test.ts",
         "tooling/ci/derive-fast-proof.mjs",
-        "tooling/ci/local.mjs",
         "tooling/ci/run-lane.mjs",
+        "tooling/ci/seal-lane-artifacts.mjs",
         "tooling/ci/verify-main-proof.mjs"
       ],
       "surfaces": [
@@ -15892,7 +15851,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/build-proof.mjs",
-        "contentHash": "a4694b7c77ef677dba2ccdb3fc1149863a6e722fc426c3be8dc7def0c0032513"
+        "contentHash": "f4ae70248da61643c1b64c017d940fcb4f25171b1584d4a1719e14dab4ef3497"
       },
       "consumers": [
         "tooling/qa/core/build-proof.mjs",
@@ -16644,7 +16603,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/coverage-proof.mjs",
-        "contentHash": "d4f6a393c7c57b710ceb65cf78453a46a4f34e5b66b5c88450e29c5dcee3ff6d"
+        "contentHash": "8a89cc278cc6f8b48d5869b4545bc0a7a94c555d6e4258a6713e05ef7a4d1bd7"
       },
       "consumers": [
         "tooling/ci/validate-coverage-proof.mjs",
@@ -17952,7 +17911,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/github-policy.mjs",
-        "contentHash": "a6571ed84336458c91c9506442dc580ff670a7b2de9f8da4f2ac5a92939e0eff"
+        "contentHash": "6c1c19db09786c0f158c2ee56fe9e3005d891ec284d10c61d22cf6589b16e018"
       },
       "consumers": [
         "tooling/ci/github-policy.mjs"
@@ -17960,6 +17919,9 @@
       "surfaces": [
         "property:actions",
         "property:apply/body",
+        "property:applyEnvironment/body",
+        "property:applyEnvironment/body[1]",
+        "property:applyEnvironment/deployment_branch_policy",
         "property:desired/bypass_actors",
         "property:desired/ruleset",
         "property:security",
@@ -18720,7 +18682,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/local.mjs",
-        "contentHash": "c44aa92ed4c85599ea91c9922b436a520506bd031935a3fb70ea4c27da879aa6"
+        "contentHash": "75beb7de3c08403995772f561b47f70cd500b7e5c2d780bcd343b562dcd5d32f"
       },
       "consumers": [
         "tooling/ci/local.mjs"
@@ -18731,6 +18693,7 @@
         "binding:options",
         "binding:phases",
         "binding:runtimeIdentity",
+        "property:artifactInput",
         "property:resourceProfiles"
       ]
     },
@@ -19828,7 +19791,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/proof.mjs",
-        "contentHash": "cd7cc63db2ffdf603305917e41c423b5a0031a186de9caf624d61af3333bfd1e"
+        "contentHash": "619327adf007d62a855c4b1fed95a30700aab59f076cf8cfd03e0a6e98cd65f7"
       },
       "consumers": [
         "tooling/ci/proof.mjs"
@@ -20255,13 +20218,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "d49ab56bc2494b9ff6c49af3b4ff732ee6a4673cb69eab04be2351f9545c655e"
+        "contentHash": "d609294506dc9a6850550060badb7edb3a7222e3b5241a27e23979048e1e03b9"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
         "binding:phases",
+        "property:artifactInput",
         "property:executionEnvironment",
         "property:resourceProfiles"
       ]
@@ -20320,10 +20284,9 @@
         "contentHash": "eb3c07a424b75ac7a7abff7f73e5ad354c0646455af24b3ca095c1c7a88bc12e"
       },
       "consumers": [
-        "tooling/ci/local.mjs",
         "tooling/ci/proof-wrapper.mjs",
         "tooling/ci/release-wrapper.mjs",
-        "tooling/ci/run-lane.mjs",
+        "tooling/ci/seal-lane-artifacts.mjs",
         "tooling/qa/wrappers/advisory.mjs",
         "tooling/qa/wrappers/audit.mjs",
         "tooling/qa/wrappers/build.mjs",
@@ -21973,7 +21936,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-all.scheduler.mjs",
-        "contentHash": "705e0b6f7c49cbd010def9580b231ef8999bf1f817cc70c370fb97e498d61cc3"
+        "contentHash": "495bcbc46bd272129022ad8cb221d4d5625c67db4629319d84683724e1b0ac29"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
@@ -22912,7 +22875,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.scheduler.mjs",
-        "contentHash": "a65db78d823f131838d0db06d21a030ba3ba12ed0516074c4742e0cbb4b66ee7"
+        "contentHash": "c3945278b69b1f419d35b808b65072597450d01dafdc168ee2ee523a3e5e8784"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.execution.mjs",
@@ -22926,6 +22889,7 @@
         "property:annotateLaneResult/testSteps",
         "property:appOwners",
         "property:appOwners[1]",
+        "property:createFocusedLaneTasks/anonymous-88/workerArguments",
         "property:graph",
         "property:graph[1]",
         "property:light",
@@ -24049,7 +24013,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-typecheck.mjs",
-        "contentHash": "b90ef4adf78c78b431112963c5bf1172e21dd3589749e39d1b1b54d3450c3a68"
+        "contentHash": "540836753471c89218c170fb48b7715f3e3bbdf563bc58792fa5c298cdf12418"
       },
       "consumers": [
         "tooling/qa/core/verify-all.test-steps.mjs",

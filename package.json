@@ -134,6 +134,7 @@
     "oxfmt": "^0.64.0",
     "oxlint": "^1.79.0",
     "oxlint-tsgolint": "^7.0.2001",
+    "playwright": "^1.62.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "ts-morph": "^27.0.2",

@@ -20,6 +20,8 @@ function command(name, args, options = {}) {
 const args = process.argv.slice(2);
 const prIndex = args.indexOf('--pr');
 const prNumber = prIndex >= 0 ? args[prIndex + 1] : null;
+const reasonIndex = args.indexOf('--reason');
+const bypassReason = reasonIndex >= 0 ? args[reasonIndex + 1]?.trim() : null;
 const resourceOptions = [
   ['--cpu', 'SNIPTALE_QA_CPU_TOKENS'],
   ['--memory-mib', 'SNIPTALE_QA_MEMORY_MIB'],
@@ -58,11 +60,22 @@ if (prIndex < 0) {
 }
 if (!prNumber || !/^\d+$/u.test(prNumber)) {
   throw new Error(
-    'Usage: npm run ci:proof -- --pr <number> [--cpu N] [--memory-mib N] [--workers N]'
+    'Usage: npm run ci:proof -- --pr <number> --reason <audit note> [--cpu N] [--memory-mib N] [--workers N]'
   );
 }
 consumedArgumentIndexes.add(prIndex);
 consumedArgumentIndexes.add(prIndex + 1);
+if (reasonIndex < 0 || !bypassReason) {
+  throw new Error('PR bypass proof requires --reason <audit note>.');
+}
+if (bypassReason.length > 500 || /[\r\n\0]/u.test(bypassReason)) {
+  throw new Error('PR bypass reason must be one line of at most 500 characters.');
+}
+if (args.indexOf('--reason', reasonIndex + 1) >= 0) {
+  throw new Error('Duplicate ci:proof argument: --reason');
+}
+consumedArgumentIndexes.add(reasonIndex);
+consumedArgumentIndexes.add(reasonIndex + 1);
 const unknownPrArguments = args.filter((_value, index) => !consumedArgumentIndexes.has(index));
 if (unknownPrArguments.length > 0) {
   throw new Error(`Unknown ci:proof arguments: ${unknownPrArguments.join(', ')}`);
@@ -203,6 +216,7 @@ const proof = {
   commit: pr.headRefOid,
   baseSha: pr.baseRefOid,
   launcherCommit: launcherSha,
+  bypassReason,
   containerDigest: manifests[0].manifest.containerDigest,
   bundles: manifests.map(({ admission, directory, manifest, digest }) => ({
     directory,
@@ -226,6 +240,7 @@ const comment = [
   `Trusted launcher: \`${launcherSha}\``,
   `Container: \`${proof.containerDigest}\``,
   `Proof manifest SHA-256: \`${proofDigest}\``,
+  `Bypass reason: ${bypassReason}`,
   '',
   'Merge remains a manual native GitHub ruleset bypass.',
 ].join('\n');
