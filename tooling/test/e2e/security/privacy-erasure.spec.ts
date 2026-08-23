@@ -120,6 +120,90 @@ for (const mode of ERASURE_MODES) {
   });
 }
 
+test('worker termination during queued erasure remains retryable without late recreation', async ({
+  context,
+  extensionId,
+}) => {
+  const providerId = 'fe2f8878-3b33-449d-b680-a648466e69d4';
+  const secretCanary = `worker-erasure-secret-${providerId}`;
+  const control = await openSecurityControl(context, extensionId);
+  const writer = await openRealExtensionPage(context, extensionId, SETTINGS_PATH);
+  const eraser = await openRealExtensionPage(context, extensionId, SETTINGS_PATH);
+  await controlCheckpoint(control, 'pause', 'persistence-before-commit');
+
+  await writer.evaluate(
+    ({ apiKey, id }) => {
+      Object.assign(window, {
+        interruptedWriter: chrome.runtime
+          .sendMessage({
+            __sniptaleRuntimeFreshness: {
+              issuedAtEpochMs: Date.now(),
+              nonce: crypto.randomUUID(),
+            },
+            operation: 'add-provider',
+            provider: {
+              apiKey,
+              baseUrl: 'https://example.test/v1',
+              connectionType: 'openai-compatible',
+              createdAt: Date.now(),
+              id,
+              name: 'Interrupted erasure provider',
+            },
+            type: 'AI_SETTINGS_MUTATION',
+          })
+          .catch((error: unknown) => ({ interrupted: true, message: String(error) })),
+      });
+    },
+    { apiKey: secretCanary, id: providerId }
+  );
+  await controlCheckpoint(control, 'waitUntilPaused', 'persistence-before-commit');
+  await eraser.evaluate(() => {
+    Object.assign(window, {
+      interruptedErasure: chrome.runtime
+        .sendMessage({
+          __sniptaleRuntimeFreshness: {
+            issuedAtEpochMs: Date.now(),
+            nonce: crypto.randomUUID(),
+          },
+          includeAiProviderSecrets: true,
+          preservePreferences: false,
+          type: 'ERASE_LOCAL_EXTENSION_DATA',
+        })
+        .catch((error: unknown) => ({ interrupted: true, message: String(error) })),
+    });
+  });
+
+  await restartExtensionServiceWorker(context, eraser);
+  await writer.evaluate(
+    () => (window as typeof window & { interruptedWriter: Promise<unknown> }).interruptedWriter
+  );
+  await eraser.evaluate(
+    () => (window as typeof window & { interruptedErasure: Promise<unknown> }).interruptedErasure
+  );
+
+  const retry = await sendRuntimeMessage(eraser, {
+    includeAiProviderSecrets: true,
+    preservePreferences: false,
+    type: 'ERASE_LOCAL_EXTENSION_DATA',
+  });
+  expect(retry).toMatchObject({ success: true });
+  await restartExtensionServiceWorker(context, eraser);
+  expect(await collectRetentionText(eraser)).not.toContain(providerId);
+  expect(await collectRetentionText(eraser)).not.toContain(secretCanary);
+  expect(
+    JSON.stringify(
+      await sendRuntimeMessage(eraser, {
+        operation: 'read-settings-page-runtime-data',
+        type: 'AI_SETTINGS_QUERY',
+      })
+    )
+  ).not.toContain(providerId);
+
+  await eraser.close();
+  await writer.close();
+  await control.close();
+});
+
 test('factory reset cancels an export admitted before its first publication', async ({
   context,
   extensionId,
