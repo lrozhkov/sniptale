@@ -298,6 +298,7 @@ jobs:
 
   provision:
     needs: qa-image
+    if: ${{ !cancelled() && needs.qa-image.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: selectel-runner-controller
@@ -390,7 +391,10 @@ jobs:
 
   canonical-qa:
     needs: [qa-image, provision]
-    if: needs.provision.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke')
+    if: >-
+      !cancelled() &&
+      needs.provision.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke')
     runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision.outputs.label)) }}
     timeout-minutes: 240
     permissions: { actions: read, contents: read }
@@ -533,7 +537,11 @@ jobs:
 
   infrastructure-smoke:
     needs: [qa-image, provision]
-    if: needs.provision.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke'
+    if: >-
+      !cancelled() &&
+      needs.provision.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.gate == 'selectel-smoke'
     runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision.outputs.label)) }}
     timeout-minutes: 20
     permissions: { contents: read, packages: read }
