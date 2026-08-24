@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["eslint", "typescript", "react", "vitest", "jsx-a11y"],
+  "jsPlugins": [{ "name": "security", "specifier": "eslint-plugin-security" }],
   "categories": {
     "correctness": "off"
   },
@@ -22,6 +23,13 @@
     "test-results/**"
   ],
   "rules": {
+    "security/detect-bidi-characters": "error",
+    "security/detect-buffer-noassert": "error",
+    "security/detect-eval-with-expression": "error",
+    "security/detect-new-buffer": "error",
+    "security/detect-non-literal-regexp": "off",
+    "security/detect-object-injection": "off",
+    "security/detect-unsafe-regex": "warn",
     "react/exhaustive-deps": "warn",
     "react/rules-of-hooks": "error",
     "vitest/no-focused-tests": "error",

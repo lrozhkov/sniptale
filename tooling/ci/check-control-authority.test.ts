@@ -49,7 +49,7 @@ it('allows coordinated version drift and reports executable candidate control dr
   });
 });
 
-it.each(['.oxlintrc.json', '.dependency-cruiser.cjs', '.oxfmtrc.json'])(
+it.each(['.oxlintrc.json', '.oxlintrc.strict.json', '.dependency-cruiser.cjs', '.oxfmtrc.json'])(
   'reports candidate drift in the live %s control configuration',
   (controlFile) => {
     const trusted = createTempRoot('trusted-controls-');

@@ -28,7 +28,7 @@ function validateFastProofIdentity(manifest, expected) {
   if (
     manifest.evidenceDisposition !== 'executed' ||
     manifest.gateClaim !== 'fast-pr-gate' ||
-    manifest.fullVitest !== false ||
+    manifest.fullVitest !== true ||
     manifest.releaseReady !== false ||
     manifest.reuseCompatibility?.outcome !== 'compatible' ||
     manifest.controlDigest !== expected.controlDigest ||

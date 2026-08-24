@@ -3062,6 +3062,12 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "verify-project-toolchain.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves the locked project toolchain before canonical CI controls execute."
+    },
+    {
       "tool": "verify-qa-controls.mjs",
       "disposition": "keep",
       "owner": "qa-platform",

@@ -316,8 +316,8 @@ export function admitCandidateProof({
   const { archives } = validateFileInventory(root, manifest, lanePolicy);
   validateExecutionCompatibility(manifest, lane, lanePolicy, trustedRoot);
   validateReuseReceipts(root, manifest, lane, archives, lanePolicy);
-  if (lane === 'proof' && manifest.fullVitest !== false) {
-    throw new Error('Fast proof must not claim full Vitest or release readiness.');
+  if (lane === 'proof' && (manifest.fullVitest !== true || manifest.releaseReady !== false)) {
+    throw new Error('Fast proof must prove full Vitest without claiming release readiness.');
   }
   validateRunRecord(root, manifest, lane, derived, trustedRoot);
   if (derived) validateDerivedReuse(root, manifest, { baseSha, commit });

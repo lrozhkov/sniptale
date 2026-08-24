@@ -1,11 +1,13 @@
 export function createSchedulerLaneTask({
   cpuTokens,
+  dependencies = [],
   executionProfile,
   exclusive = false,
   lane,
   memoryMiB,
   profile,
   typecheckCheckerCount,
+  workers = null,
   workerArguments = {},
   workerContext,
   workerRunner,
@@ -13,16 +15,17 @@ export function createSchedulerLaneTask({
   return {
     id: lane,
     cpuTokens,
-    dependencies: [],
+    dependencies,
     exclusive,
     executionProfile,
     memoryMiB,
     workers:
-      lane === 'tests'
+      workers ??
+      (lane === 'tests'
         ? profile.vitestMaxWorkers
         : lane === 'typecheck'
           ? typecheckCheckerCount
-          : 1,
+          : 1),
     run: ({ signal }) =>
       workerRunner({
         ...workerArguments,

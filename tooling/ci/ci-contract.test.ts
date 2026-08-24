@@ -31,7 +31,11 @@ import { verifyImageProof, writeImageProof } from './image-proof.mjs';
 import { CANONICAL_IMAGE_ENVIRONMENT, createTrustedPhaseCommands } from './container-command.mjs';
 import { parseTrustedPhaseReceipt } from './trusted-phase-receipt.mjs';
 
-const IMPORT_SPECIFIER_PATTERN = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"]([^'"]+)['"]/gu;
+const IMPORT_SPECIFIER_PATTERNS = Object.freeze([
+  /\bfrom\s+['"]([^'"]+)['"]/gu,
+  /\bimport\s+['"]([^'"]+)['"]/gu,
+  /\bimport\(\s*['"]([^'"]+)['"]/gu,
+]);
 
 function collectExternalHostImports(entry: string) {
   const pending = [path.resolve(entry)];
@@ -42,15 +46,17 @@ function collectExternalHostImports(entry: string) {
     if (!current || visited.has(current)) continue;
     visited.add(current);
     const source = fs.readFileSync(current, 'utf8');
-    for (const match of source.matchAll(IMPORT_SPECIFIER_PATTERN)) {
-      const specifier = match[1];
-      if (!specifier) continue;
-      if (specifier.startsWith('node:')) continue;
-      if (!specifier.startsWith('.')) {
-        external.add(specifier);
-        continue;
+    for (const pattern of IMPORT_SPECIFIER_PATTERNS) {
+      for (const match of source.matchAll(pattern)) {
+        const specifier = match[1];
+        if (!specifier) continue;
+        if (specifier.startsWith('node:')) continue;
+        if (!specifier.startsWith('.')) {
+          external.add(specifier);
+          continue;
+        }
+        pending.push(path.resolve(path.dirname(current), specifier));
       }
-      pending.push(path.resolve(path.dirname(current), specifier));
     }
   }
   return [...external].sort();
@@ -58,11 +64,18 @@ function collectExternalHostImports(entry: string) {
 
 function collectWorkflowNodeEntrypoints() {
   const entrypoints = new Set<string>();
-  const pattern = /\bnode\s+(?:(?:\.\.\/)?trusted-control\/)?(tooling\/[A-Za-z0-9_./-]+\.mjs)\b/gu;
   for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
     const source = fs.readFileSync(workflow, 'utf8');
-    for (const match of source.matchAll(pattern)) {
-      if (match[1]) entrypoints.add(match[1]);
+    for (const line of source.split('\n')) {
+      const commandTokens = line.trim().split(/\s+/u);
+      const nodeIndex = commandTokens.indexOf('node');
+      if (nodeIndex === -1) continue;
+      const entrypoint = commandTokens[nodeIndex + 1]
+        ?.replace('../trusted-control/', '')
+        .replace('trusted-control/', '');
+      if (entrypoint?.startsWith('tooling/') && entrypoint.endsWith('.mjs')) {
+        entrypoints.add(entrypoint);
+      }
     }
   }
   return [...entrypoints].sort();
@@ -380,7 +393,7 @@ it('binds a reusable main proof to commit, tree, candidate controls, and semanti
     controlDisposition: 'trusted-controls',
     evidenceDisposition: 'executed',
     gateClaim: 'fast-pr-gate',
-    fullVitest: false,
+    fullVitest: true,
     releaseReady: false,
     reuseCompatibility: { outcome: 'compatible' },
     controlDigest,
@@ -445,7 +458,7 @@ it('rejects equal but stale main-proof control digests', () => {
     controlAuthority: 'trusted-base',
     evidenceDisposition: 'executed',
     gateClaim: 'fast-pr-gate',
-    fullVitest: false,
+    fullVitest: true,
     releaseReady: false,
     reuseCompatibility: { outcome: 'compatible' },
     gateInputDigest: `sha256:${'c'.repeat(64)}`,

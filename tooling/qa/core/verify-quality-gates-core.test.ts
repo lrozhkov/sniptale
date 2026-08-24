@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, it, vi } from 'vitest';
+import { expect, it } from 'vitest';
 
 import {
   createTempRoot,
@@ -146,88 +146,10 @@ it('ignores test fixtures when collecting security sink violations', async () =>
   expect(module.collectSecurityViolations(['src/shared/example.test.ts']).violations).toEqual([]);
 });
 
-it('blocks unsafe regex warnings in the security ESLint lane', async () => {
-  const module = await import('../guards/security/verify-security.mjs');
-  const calls: unknown[] = [];
-  const result = await module.runSecurityCheck(['tooling/qa/core/verify-oxlint.mjs'], {
-    lintRunner: async (options: unknown) => {
-      calls.push(options);
-      return {
-        failed: true,
-        warningCount: 1,
-        errorCount: 0,
-        output: 'unsafe regex warning',
-        results: [],
-      };
-    },
-  });
-
-  expect(calls).toEqual([
-    expect.objectContaining({ files: ['tooling/qa/core/verify-oxlint.mjs'] }),
-  ]);
-  expect(result.eslintResult).toEqual(expect.objectContaining({ failed: true, warningCount: 1 }));
-});
-
-it('does not accept a shared general-lint result bag as security authority', async () => {
+it('keeps custom security sinks separate from the Oxlint-owned plugin findings', async () => {
   const module = await import('../guards/security/verify-security.mjs');
   const relativeFile = 'tooling/qa/core/verify-oxlint.mjs';
-  const lintRunner = vi.fn(async () => ({
-    errorCount: 0,
-    failed: false,
-    output: '',
-    results: [],
-    warningCount: 0,
-  }));
-
-  const result = await module.runSecurityCheck([relativeFile], {
-    eslintResults: [
-      {
-        errorCount: 0,
-        fatalErrorCount: 0,
-        filePath: path.join(process.cwd(), relativeFile),
-        fixableErrorCount: 0,
-        fixableWarningCount: 0,
-        messages: [
-          {
-            column: 1,
-            line: 1,
-            message: 'unsafe regex warning',
-            ruleId: 'security/detect-unsafe-regex',
-            severity: 1,
-          },
-        ],
-        suppressedMessages: [],
-        warningCount: 1,
-      },
-    ],
-    lintRunner,
-  });
-
-  expect(lintRunner).toHaveBeenCalledWith({ files: [relativeFile], strictWarnings: false });
-  expect(result.eslintResult).toEqual(expect.objectContaining({ failed: false }));
-});
-
-it('lints the complete requested security scope once', async () => {
-  const module = await import('../guards/security/verify-security.mjs');
-  const missingFile = 'tooling/qa/core/verify-oxlint.mjs';
-  const lintRunner = vi.fn(async () => ({
-    errorCount: 0,
-    failed: false,
-    output: '',
-    results: [],
-    warningCount: 0,
-  }));
-
-  await module.runSecurityCheck([missingFile], {
-    eslintResults: [
-      {
-        filePath: path.join(process.cwd(), 'apps/extension/src/example.ts'),
-        messages: [],
-      },
-    ],
-    lintRunner,
-  });
-
-  expect(lintRunner).toHaveBeenCalledTimes(1);
-  expect(lintRunner).toHaveBeenCalledWith({ files: [missingFile], strictWarnings: false });
+  const result = await module.runSecurityCheck([relativeFile]);
+  expect(result).toEqual({ files: [relativeFile], violations: [] });
+  expect(result).not.toHaveProperty('eslintResult');
 });

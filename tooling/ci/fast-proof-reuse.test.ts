@@ -46,7 +46,7 @@ function fixture() {
     controlDisposition: 'trusted-controls',
     evidenceDisposition: 'executed',
     gateClaim: 'fast-pr-gate',
-    fullVitest: false,
+    fullVitest: true,
     releaseReady: false,
     reuseCompatibility: { outcome: 'compatible' },
     phases: [{ id: 'proof', status: 'passed' }],

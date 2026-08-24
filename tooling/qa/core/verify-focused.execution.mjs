@@ -116,12 +116,6 @@ async function runSecurityStep(codeFiles) {
   }
 
   const securityResult = await runSecurityCheck(behavioralCodeFiles);
-  if (securityResult.eslintResult.failed) {
-    return createFailureStep('Security', 'failed', {
-      stdout: securityResult.eslintResult.output,
-    });
-  }
-
   return createViolationStep('Security', 'Security violations found:', {
     violations: securityResult.violations,
   });

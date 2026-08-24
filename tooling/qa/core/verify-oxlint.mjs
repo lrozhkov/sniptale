@@ -41,11 +41,13 @@ export const REPO_WIDE_OXLINT_FILES = [
 ];
 export const DEFAULT_OXLINT_ROOTS = [...DEFAULT_SCAN_ROOTS, ...REPO_WIDE_OXLINT_FILES];
 export const OXLINT_CONFIG_PATH = '.oxlintrc.json';
+export const OXLINT_STRICT_CONFIG_PATH = '.oxlintrc.strict.json';
 export const OXLINT_TOOL_VERSION = JSON.parse(
   fs.readFileSync(new URL('../../../node_modules/oxlint/package.json', import.meta.url), 'utf8')
 ).version;
 const FULL_OXLINT_CLOSURE_FILES = new Set([
   OXLINT_CONFIG_PATH,
+  OXLINT_STRICT_CONFIG_PATH,
   'package-lock.json',
   'package.json',
   'tooling/configs/qa/lint-rule-migration.data.json',
@@ -102,11 +104,15 @@ export function collectOxlintFiles(files = []) {
   return [...new Set(result)].sort();
 }
 
-export function createOxlintArgs(targetFiles, { fix = false } = {}) {
+export function createOxlintArgs(
+  targetFiles,
+  { fix = false, strictSecurity = false, threads = null } = {}
+) {
   return [
     '--config',
-    OXLINT_CONFIG_PATH,
+    strictSecurity ? OXLINT_STRICT_CONFIG_PATH : OXLINT_CONFIG_PATH,
     ...(fix ? ['--fix'] : []),
+    ...(threads === null ? [] : [`--threads=${threads}`]),
     '--deny-warnings',
     '--format',
     'unix',
@@ -130,9 +136,14 @@ function appendContractEnumResult(commandResult, violations) {
 export function runOxlint({
   files = [],
   fix = false,
+  strictSecurity = false,
+  threads = null,
   commandRunner = runRepoNodeEntry,
   contractEnumCollector = collectContractEnumViolations,
 } = {}) {
+  if (threads !== null && (!Number.isInteger(threads) || threads < 1)) {
+    throw new Error('Oxlint threads must be a positive integer.');
+  }
   const targetFiles = collectOxlintFiles(files);
   if (targetFiles.length === 0) {
     return {
@@ -142,9 +153,11 @@ export function runOxlint({
   }
 
   const contractEnumViolations = contractEnumCollector(targetFiles);
-  const commandResult = commandRunner(OXLINT_ENTRY, createOxlintArgs(targetFiles, { fix }), {
-    stdio: 'pipe',
-  });
+  const commandResult = commandRunner(
+    OXLINT_ENTRY,
+    createOxlintArgs(targetFiles, { fix, strictSecurity, threads }),
+    { stdio: 'pipe' }
+  );
   return {
     contractEnumViolations,
     skipped: false,

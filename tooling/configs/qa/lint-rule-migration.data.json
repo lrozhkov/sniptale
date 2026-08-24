@@ -39,8 +39,8 @@
     {
       "id": "eslint-plugin-security",
       "scope": ["**/*.{ts,tsx,js,mjs,cjs}"],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs"
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json"
     }
   ],
   "priorScopeDefinitions": {
@@ -273,8 +273,8 @@
         { "scope": "typescript-general", "severity": "error" },
         { "scope": "javascript", "severity": "error" }
       ],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json",
       "targetRule": "security/detect-bidi-characters"
     },
     {
@@ -283,8 +283,8 @@
         { "scope": "typescript-general", "severity": "error" },
         { "scope": "javascript", "severity": "error" }
       ],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json",
       "targetRule": "security/detect-buffer-noassert"
     },
     {
@@ -293,8 +293,8 @@
         { "scope": "typescript-general", "severity": "error" },
         { "scope": "javascript", "severity": "error" }
       ],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json",
       "targetRule": "security/detect-eval-with-expression"
     },
     {
@@ -303,8 +303,8 @@
         { "scope": "typescript-general", "severity": "error" },
         { "scope": "javascript", "severity": "error" }
       ],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json",
       "targetRule": "security/detect-new-buffer"
     },
     {
@@ -313,8 +313,8 @@
         { "scope": "typescript-general", "severity": "warn" },
         { "scope": "javascript", "severity": "warn" }
       ],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json",
       "targetRule": "security/detect-non-literal-regexp"
     },
     {
@@ -323,8 +323,8 @@
         { "scope": "typescript-general", "severity": "off" },
         { "scope": "javascript", "severity": "off" }
       ],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json",
       "targetRule": "security/detect-object-injection"
     },
     {
@@ -333,8 +333,8 @@
         { "scope": "typescript-general", "severity": "warn" },
         { "scope": "javascript", "severity": "warn" }
       ],
-      "decision": "Keep ESLint",
-      "targetOwner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
+      "decision": "Move JS plugin",
+      "targetOwner": ".oxlintrc.json",
       "targetRule": "security/detect-unsafe-regex"
     }
   ],
@@ -350,7 +350,11 @@
   "oxlint": {
     "categoryDecisions": { "correctness": "off" },
     "defaultActiveSeverity": "error",
-    "warningRuleIds": ["no-unused-vars", "react/exhaustive-deps"],
+    "warningRuleIds": [
+      "no-unused-vars",
+      "react/exhaustive-deps",
+      "security/detect-unsafe-regex"
+    ],
     "mixedSeverityRuleIds": ["no-unused-vars"],
     "activeRuleIds": [
       "constructor-super",
@@ -433,6 +437,11 @@
       "react/rules-of-hooks",
       "react/void-dom-elements-no-children",
       "require-yield",
+      "security/detect-bidi-characters",
+      "security/detect-buffer-noassert",
+      "security/detect-eval-with-expression",
+      "security/detect-new-buffer",
+      "security/detect-unsafe-regex",
       "typescript/consistent-type-imports",
       "typescript/no-duplicate-enum-values",
       "typescript/no-empty-object-type",
@@ -487,6 +496,8 @@
       "prefer-const",
       "react/exhaustive-deps",
       "react/rules-of-hooks",
+      "security/detect-non-literal-regexp",
+      "security/detect-object-injection",
       "typescript/ban-ts-comment",
       "typescript/consistent-type-imports",
       "typescript/no-explicit-any",
@@ -511,28 +522,6 @@
     }
   ],
   "residualEslint": [
-    {
-      "owner": "tooling/qa/guards/security/eslint-security-adapter.mjs",
-      "scope": ["**/*.{ts,tsx,js,mjs,cjs}"],
-      "rules": [
-        "security/detect-bidi-characters",
-        "security/detect-buffer-noassert",
-        "security/detect-eval-with-expression",
-        "security/detect-new-buffer",
-        "security/detect-non-literal-regexp",
-        "security/detect-object-injection",
-        "security/detect-unsafe-regex"
-      ],
-      "settings": {
-        "security/detect-bidi-characters": "error",
-        "security/detect-buffer-noassert": "error",
-        "security/detect-eval-with-expression": "error",
-        "security/detect-new-buffer": "error",
-        "security/detect-non-literal-regexp": "warn",
-        "security/detect-object-injection": "off",
-        "security/detect-unsafe-regex": "warn"
-      }
-    },
     {
       "owner": "tooling/qa/core/verify-sonarjs.mjs",
       "scope": ["apps/extension/src/**", "packages/*/src/**"],

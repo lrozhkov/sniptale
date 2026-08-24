@@ -16,13 +16,14 @@ const FULL_VERIFY_LANES = [
 export function parseFullVerifyWorkerInput(value) {
   const input = parseLaneWorkerInput(value, {
     contextBooleanFields: ['releaseMode'],
-    contextFields: ['baseline', 'codeFiles', 'releaseMode', 'targetFiles'],
-    contextStringArrayFields: ['codeFiles', 'targetFiles'],
-    extraFields: ['typecheckCheckerCount'],
+    contextFields: ['baseline', 'codeFiles', 'excludedControlLabels', 'releaseMode', 'targetFiles'],
+    contextStringArrayFields: ['codeFiles', 'excludedControlLabels', 'targetFiles'],
+    extraFields: ['oxlintThreadCount', 'typecheckCheckerCount'],
     label: 'Full verification worker',
     lanes: FULL_VERIFY_LANES,
   });
   assertPositiveInteger(input.typecheckCheckerCount, 'Full verification worker checker count');
+  assertPositiveInteger(input.oxlintThreadCount, 'Full verification worker Oxlint thread count');
   return {
     ...input,
     context: {

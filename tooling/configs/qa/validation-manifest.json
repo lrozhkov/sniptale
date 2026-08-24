@@ -2167,6 +2167,18 @@
         "pass",
         "fail"
       ]
+    },
+    {
+      "tool": "verify-project-toolchain.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/verify-project-toolchain.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
     }
   ]
 }

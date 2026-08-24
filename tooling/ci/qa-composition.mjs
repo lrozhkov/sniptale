@@ -1,20 +1,19 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
-import {
-  createOkStep,
-  createProcessStep,
-  createSkippedStep,
-} from '../qa/core/focused-qa-results.mjs';
+import { createOkStep, createProcessStep } from '../qa/core/focused-qa-results.mjs';
 import { collectAuditProfileResult } from '../qa/wrappers/audit.mjs';
 import {
   collectFullVerifyStepResults,
   collectReleaseDeltaStepResults,
 } from '../qa/core/verify-all.execution.mjs';
-import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
 import { resolveRepositoryVerifyScope } from '../qa/core/verify-all.scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
 import { MUTATION_PROFILES, resolveMutationRunLabel } from './mutation-policy.mjs';
+import {
+  ciExcludedControlLabels,
+  createCiProductControlOccurrences,
+} from './product-control-policy.mjs';
 
 const semantics = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
 
@@ -22,7 +21,7 @@ function capability(lane) {
   const value = semantics.gateCapabilities?.[lane];
   if (
     value?.scope !== 'repository-wide' ||
-    (lane === 'proof' && (value.fullVitest !== false || value.releaseReady !== false)) ||
+    (lane === 'proof' && (value.fullVitest !== true || value.releaseReady !== false)) ||
     (lane === 'release' && (value.fullVitest !== true || value.releaseReady !== true))
   ) {
     throw new Error(`Malformed ${lane} gate capability policy.`);
@@ -34,19 +33,16 @@ export async function collectCiProofResults({
   session,
   productProofCollector = () =>
     collectFullVerifyStepResults({
-      includeTests: false,
+      includeTests: true,
       releaseMode: true,
+      excludedControlLabels: ciExcludedControlLabels('proof'),
       verifyScope: resolveCiScope(),
     }),
   auditCollector = collectAuditProfileResult,
 } = {}) {
   capability('proof');
   const product = await productProofCollector();
-  const productSteps = [
-    ...product.steps,
-    createSkippedStep('Unit tests', 'release-only full Vitest'),
-    createSkippedStep('Test coverage', 'release-only canonical coverage'),
-  ];
+  const productSteps = product.steps.filter(({ label }) => label !== 'Test coverage');
   const audit = await auditCollector({ profileId: 'pr', session });
   return {
     context: { mode: 'ci:proof', scope: 'commit' },
@@ -88,7 +84,7 @@ function resolveCiScope() {
   );
 }
 
-const RELEASE_DELTA_LABELS = new Set(['Unit tests', 'Test coverage', 'Build', 'Release archive']);
+const RELEASE_DELTA_LABELS = new Set(['SonarJS', 'Build', 'Release archive']);
 const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze([
   'audit-evidence',
   'npm-audit',
@@ -121,12 +117,36 @@ async function collectVerifiedFastProofReleaseSteps(releaseDeltaCollector) {
       { activityId: 'fast-proof-reuse', kind: 'proof-reuse', reused: true },
       () => createOkStep('Fast proof reuse', 'verified exact commit-bound proof receipt')
     ),
-    ...createReleaseControlOccurrences().map((occurrence) =>
+    ...createCiProductControlOccurrences('release').map((occurrence) =>
       RELEASE_DELTA_LABELS.has(occurrence.label)
         ? byLabel.get(occurrence.label)
         : createReusedFastControlStep(occurrence)
     ),
   ];
+}
+
+async function collectFreshFastProofReleaseSteps(productProofCollector, releaseDeltaCollector) {
+  const fast = await productProofCollector();
+  const delta = await releaseDeltaCollector();
+  const byLabel = new Map();
+  for (const step of [...fast.steps, ...delta.steps]) {
+    if (byLabel.has(step.label) && !RELEASE_DELTA_LABELS.has(step.label)) {
+      throw new Error(`Fresh Fast prerequisite repeats a control result: ${String(step.label)}`);
+    }
+    byLabel.set(step.label, step);
+  }
+  const occurrences = [
+    ...createCiProductControlOccurrences('proof'),
+    ...createCiProductControlOccurrences('release').filter(
+      ({ label }) =>
+        !createCiProductControlOccurrences('proof').some((step) => step.label === label)
+    ),
+  ];
+  return occurrences.map(({ label }) => {
+    const step = byLabel.get(label);
+    if (!step) throw new Error(`Missing release product control result: ${label}`);
+    return step;
+  });
 }
 
 export async function collectCiReleaseResults({
@@ -135,10 +155,12 @@ export async function collectCiReleaseResults({
   productProofCollector = () =>
     collectFullVerifyStepResults({
       releaseMode: true,
+      excludedControlLabels: ciExcludedControlLabels('proof'),
       verifyScope: resolveCiScope(),
     }),
   releaseDeltaCollector = () =>
     collectReleaseDeltaStepResults({
+      excludedControlLabels: ciExcludedControlLabels('release'),
       verifyScope: resolveCiScope(),
     }),
   auditCollector = collectAuditProfileResult,
@@ -147,7 +169,7 @@ export async function collectCiReleaseResults({
   capability('release');
   const productSteps = reuseFastProof
     ? await collectVerifiedFastProofReleaseSteps(releaseDeltaCollector)
-    : (await productProofCollector()).steps;
+    : await collectFreshFastProofReleaseSteps(productProofCollector, releaseDeltaCollector);
   const audit = await auditCollector({
     profileId: 'release',
     reusedControlIds: reuseFastProof ? REUSED_FAST_AUDIT_CONTROL_IDS : [],
@@ -155,7 +177,7 @@ export async function collectCiReleaseResults({
   });
   return {
     context: { mode: 'ci:release', scope: 'commit' },
-    executionMode: reuseFastProof ? 'reuse-fast-proof' : 'default',
+    executionMode: reuseFastProof ? 'reuse-fast-proof' : 'fresh-fast-proof',
     steps: [
       ...productSteps,
       ...audit.steps,
