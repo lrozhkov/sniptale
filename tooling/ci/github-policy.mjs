@@ -10,7 +10,7 @@ import {
   requireCompleteBranchPolicyInventory,
   requireSelectedActionsSnapshot,
 } from './github-policy-response.mjs';
-import { validateSelectelQaProfiles } from './selectel/policy.mjs';
+import { validateSelectelProfilesForLane } from './selectel/policy.mjs';
 
 const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
 const mode = process.argv[2] ?? 'plan';
@@ -66,11 +66,22 @@ function findRuleset(name) {
   return summary ? api(`repos/${repository}/rulesets/${summary.id}`).value : null;
 }
 
-function selectelProfilesSnapshot(name) {
+function selectelProfilesSnapshot(name, lane) {
+  const repositoryVariableEndpoint = `repos/${repository}/actions/variables/${name}`;
+  const repositoryVariable = parseOptionalResourceSnapshot(
+    api(repositoryVariableEndpoint, { allowFailure: true }),
+    repositoryVariableEndpoint
+  );
+  if (repositoryVariable !== null) {
+    const authority = `${selectelEnvironment} environment`;
+    throw new Error(
+      `${name} must exist only in the ${authority}; a repository variable would create a shadow authority.`
+    );
+  }
   const variable = api(
     `repos/${repository}/environments/${selectelEnvironment}/variables/${name}`
   ).value;
-  const validation = validateSelectelQaProfiles(variable?.value);
+  const validation = validateSelectelProfilesForLane(variable?.value, lane);
   return {
     name: variable?.name,
     environment: selectelEnvironment,
@@ -129,8 +140,8 @@ function snapshot() {
       Object.keys(policy.environments).map((name) => [name, environmentSnapshot(name)])
     ),
     selectelProfiles: {
-      qa: selectelProfilesSnapshot('SELECTEL_QA_PROFILES'),
-      release: selectelProfilesSnapshot('SELECTEL_RELEASE_PROFILES'),
+      qa: selectelProfilesSnapshot('SELECTEL_QA_PROFILES', 'proof'),
+      release: selectelProfilesSnapshot('SELECTEL_RELEASE_PROFILES', 'release'),
     },
   };
 }

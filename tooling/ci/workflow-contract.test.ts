@@ -114,6 +114,9 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   );
   expect(workflow).toContain('name: Continuous Integration');
   expect(workflow).toContain(
+    "inputs.gate == 'selectel-connectivity' && 'Selectel connectivity preflight'"
+  );
+  expect(workflow).toContain(
     "github.event.schedule == '17 * * * *' && 'sweep' || 'release-provenance'"
   );
   expect(workflow).toContain(
@@ -137,6 +140,16 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('SELECTEL_RELEASE_PROFILES is required for release provenance.');
   expect(workflow).toContain('SELECTEL_RELEASE_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}');
   expect(workflow).toContain('--env SELECTEL_QA_PROFILES="$SELECTEL_RELEASE_PROFILES"');
+  expect(
+    workflow.match(/docker run --rm --user "\$\(id -u\):\$\(id -g\)" --env HOME=\/tmp/g)
+  ).toHaveLength(6);
+  expect(workflow.match(/docker run --rm/g)).toHaveLength(6);
+  expect(workflow).toContain(
+    'mv build/selectel-controller/preflight.json build/selectel-controller/preflight-qa.json'
+  );
+  expect(workflow).toContain(
+    'mv build/selectel-controller/preflight.json build/selectel-controller/preflight-release.json'
+  );
   expect(workflow).toContain(
     "inputs.gate != 'release-provenance' || github.ref == 'refs/heads/main'"
   );

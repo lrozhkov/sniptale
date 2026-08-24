@@ -252,6 +252,13 @@ it('binds the CodeQL audit suite to the locked query suite and production-only s
   expect(policy.excludedFileMarkers).toEqual(expect.arrayContaining(['.test.', '.spec.']));
 });
 
+it('keeps Selectel execution profiles environment-scoped and lane-admitted', () => {
+  const source = fs.readFileSync('tooling/ci/github-policy.mjs', 'utf8');
+  expect(source).toContain("selectelProfilesSnapshot('SELECTEL_QA_PROFILES', 'proof')");
+  expect(source).toContain("selectelProfilesSnapshot('SELECTEL_RELEASE_PROFILES', 'release')");
+  expect(source).toContain('a repository variable would create a shadow authority');
+});
+
 it('rejects release tag ruleset exclusions and parameter drift', () => {
   const expected = JSON.parse(
     fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8')
