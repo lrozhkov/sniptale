@@ -216,6 +216,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(projectPackage.devDependencies).not.toHaveProperty('eslint-config-prettier');
   expect(lock.playwright.assets).toHaveLength(3);
   expect(lock.debian.snapshot).toMatch(/^\d{8}T\d{6}Z$/u);
+  expect(lock.node.baseDebianSnapshot).toBe(lock.debian.snapshot);
   expect(dockerfile).toContain(`${lock.debian.archiveUrl} bookworm main`);
   expect(dockerfile).toContain(`${lock.debian.securityArchiveUrl} bookworm-security main`);
   expect(dockerfile).not.toContain('deb.debian.org');
