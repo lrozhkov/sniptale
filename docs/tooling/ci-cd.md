@@ -23,7 +23,7 @@ The existing `quality-gate.yml` has two execution modes and three bounded infras
 Fast PR Gate              → ci:proof
 Release provenance Gate   → exact fast proof reuse, or ci:proof on the same VM → ci:release
 Selectel connectivity     → read-only controller preflight
-Selectel infrastructure smoke → QA image + disposable VM/toolchain checks + complete cleanup
+Selectel infrastructure smoke → host-command closure + QA image + disposable VM checks + complete cleanup
 Selectel recovery         → exact historical run/attempt cleanup without QA image or provisioning
 ```
 

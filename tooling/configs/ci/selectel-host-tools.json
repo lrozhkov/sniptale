@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-selectel-host-tools",
+  "packages": [
+    "ca-certificates",
+    "curl",
+    "docker.io",
+    "findutils",
+    "gh",
+    "git",
+    "iptables",
+    "jq",
+    "tar",
+    "zstd"
+  ],
+  "checks": [
+    { "id": "docker", "command": "docker", "args": ["--version"] },
+    { "id": "git", "command": "git", "args": ["--version"] },
+    { "id": "gh", "command": "gh", "args": ["--version"] },
+    { "id": "jq", "command": "jq", "args": ["--version"] },
+    { "id": "node", "command": "node", "args": ["--version"] },
+    { "id": "npm", "command": "npm", "args": ["--version"] },
+    { "id": "tar", "command": "tar", "args": ["--version"] },
+    { "id": "zstd", "command": "zstd", "args": ["--version"] },
+    { "id": "find", "command": "find", "args": ["--version"] }
+  ]
+}

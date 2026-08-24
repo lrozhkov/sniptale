@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import sys
 import time
@@ -28,6 +29,7 @@ from openstack import exceptions
 ROOT = Path(os.environ.get("SNIPTALE_REPOSITORY_ROOT", "/workspace")).resolve()
 POLICY_PATH = ROOT / "tooling/configs/ci/selectel-runner.json"
 SEMANTICS_PATH = ROOT / "tooling/configs/ci/proof-semantics.json"
+HOST_TOOLS_PATH = ROOT / "tooling/configs/ci/selectel-host-tools.json"
 REDACTION_PROJECT_ID: str | None = None
 
 
@@ -164,6 +166,44 @@ def read_policy() -> dict[str, Any]:
     ):
         raise RuntimeError("Malformed Selectel runner policy.")
     return policy
+
+
+def read_host_tools() -> dict[str, Any]:
+    tools = json.loads(HOST_TOOLS_PATH.read_text(encoding="utf-8"))
+    packages = tools.get("packages")
+    checks = tools.get("checks")
+    token_pattern = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
+    argument_pattern = re.compile(r"^--?[a-z0-9][a-z0-9-]*$")
+    if (
+        tools.get("schemaVersion") != 1
+        or tools.get("artifactKind") != "sniptale-selectel-host-tools"
+        or not isinstance(packages, list)
+        or not packages
+        or len(packages) != len(set(packages))
+        or any(
+            not isinstance(package, str) or not token_pattern.fullmatch(package)
+            for package in packages
+        )
+        or not isinstance(checks, list)
+        or not checks
+        or any(
+            not isinstance(check, dict)
+            or set(check) != {"id", "command", "args"}
+            or not isinstance(check["id"], str)
+            or not check["id"]
+            or not isinstance(check["command"], str)
+            or not token_pattern.fullmatch(check["command"])
+            or not isinstance(check["args"], list)
+            or any(
+                not isinstance(argument, str) or not argument_pattern.fullmatch(argument)
+                for argument in check["args"]
+            )
+            for check in checks
+        )
+        or len({check["id"] for check in checks}) != len(checks)
+    ):
+        raise RuntimeError("Malformed Selectel host tool registry.")
+    return tools
 
 
 def read_profiles(policy: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
@@ -493,9 +533,10 @@ def cloud_init(
         "shred -u /var/lib/cloud/instance/user-data.txt "
         "/var/lib/cloud/instance/scripts/runcmd 2>/dev/null || true"
     )
+    host_packages = ", ".join(read_host_tools()["packages"])
     source = f"""#cloud-config
 package_update: true
-packages: [ca-certificates, curl, docker.io, git, iptables, jq]
+packages: [{host_packages}]
 runcmd:
   - [systemctl, enable, --now, docker]
   - [useradd, --create-home, --shell, /bin/bash, runner]
