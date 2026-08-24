@@ -24,6 +24,11 @@ function createProjectToolchainFixture(prefix: string) {
     const packageJson = JSON.parse(fs.readFileSync(`${tool.packagePath}/package.json`, 'utf8'));
     writeJson(root, `${tool.packagePath}/package.json`, packageJson);
   }
+  writeJson(
+    root,
+    `${lock.dependencyGraph.packagePath}/package.json`,
+    JSON.parse(fs.readFileSync(`${lock.dependencyGraph.packagePath}/package.json`, 'utf8'))
+  );
   for (const entry of [
     'node_modules/oxfmt/bin/oxfmt',
     'node_modules/oxlint/bin/oxlint',
@@ -44,10 +49,21 @@ function createProjectToolchainFixture(prefix: string) {
 
 it('binds installed packages, aliases, entrypoints, and the TS6 runtime to the machine lock', () => {
   expect(verifyProjectToolchain()).toMatchObject({
+    dependencyCruiserVersion: '18.2.0',
     mutationTypescriptVersion: '6.0.3',
-    toolCount: 7,
+    toolCount: 8,
     typescriptCompilerApiVersion: '6.0.3',
   });
+});
+
+it('fails closed when dependency-cruiser drifts from the dependency graph lock', () => {
+  const root = createProjectToolchainFixture('dependency-cruiser-drift');
+  const packagePath = `${root}/node_modules/dependency-cruiser/package.json`;
+  const drifted = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  drifted.version = '0.0.0';
+  writeJson(root, 'node_modules/dependency-cruiser/package.json', drifted);
+
+  expect(() => verifyProjectToolchain({ cwd: root })).toThrow('dependencyCruiser version drift');
 });
 
 it('fails closed when an installed project tool drifts from the machine lock', () => {

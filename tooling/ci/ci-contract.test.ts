@@ -184,6 +184,13 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
     expect([tool.packagePath, tool.version]).toEqual(expectedToolchainPackages[toolId]);
     expect(projectLock.packages[tool.packagePath].version).toBe(tool.version);
   }
+  expect(lock.dependencyGraph).toEqual({
+    packagePath: 'node_modules/dependency-cruiser',
+    version: '18.2.0',
+  });
+  expect(projectLock.packages[lock.dependencyGraph.packagePath].version).toBe(
+    lock.dependencyGraph.version
+  );
   expect(projectPackage.devDependencies['@typescript/native']).toBe('npm:typescript@^7.0.2');
   expect(projectPackage.devDependencies.typescript).toBe('npm:@typescript/typescript6@^6.0.2');
   expect(projectLock.packages['node_modules/@typescript/native'].name).toBe('typescript');

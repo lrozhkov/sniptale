@@ -32,6 +32,29 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
+function verifyDependencyGraphToolchain(root, lock, projectLock) {
+  const tool = lock.dependencyGraph;
+  if (
+    !tool ||
+    tool.packagePath !== 'node_modules/dependency-cruiser' ||
+    typeof tool.version !== 'string'
+  ) {
+    throw new Error('Dependency graph toolchain lock is missing or invalid.');
+  }
+
+  const installedPackage = readJson(path.join(root, tool.packagePath, 'package.json'));
+  const lockedPackage = projectLock.packages?.[tool.packagePath];
+  if (installedPackage.version !== tool.version || lockedPackage?.version !== tool.version) {
+    const packageLockVersion = lockedPackage?.version ?? 'missing';
+    throw new Error(
+      `dependencyCruiser version drift: expected ${tool.version}, ` +
+        `installed ${installedPackage.version}, package-lock ${packageLockVersion}.`
+    );
+  }
+
+  return tool.version;
+}
+
 function verifyMutationTypescriptAuthority(root, projectLock) {
   const projectTypescript = projectLock.packages?.['node_modules/typescript'];
   const projectCompilerApi = projectLock.packages?.['node_modules/@typescript/old'];
@@ -109,10 +132,12 @@ export function verifyProjectToolchain({ cwd = process.cwd() } = {}) {
     );
   }
   const mutationTypescriptVersion = verifyMutationTypescriptAuthority(root, projectLock);
+  const dependencyCruiserVersion = verifyDependencyGraphToolchain(root, lock, projectLock);
 
   return {
+    dependencyCruiserVersion,
     mutationTypescriptVersion,
-    toolCount: REQUIRED_TOOL_IDS.length,
+    toolCount: REQUIRED_TOOL_IDS.length + 1,
     typescriptCompilerApiVersion: runtimeTypescriptVersion,
   };
 }

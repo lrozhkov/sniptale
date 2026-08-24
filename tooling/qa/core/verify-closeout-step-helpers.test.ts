@@ -74,7 +74,7 @@ it('forwards build mode to the underlying Vite build runner', async () => {
     stdout: '',
   }));
 
-  await runBuild({ buildRunner, enforceLint: false, mode: 'release' });
+  await runBuild({ buildRunner, mode: 'release' });
 
   expect(buildRunner).toHaveBeenCalledWith({
     cwd: undefined,
