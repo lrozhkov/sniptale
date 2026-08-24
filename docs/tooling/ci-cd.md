@@ -8,12 +8,13 @@ Workflow graphs live in [`quality-gate.yml`](../../.github/workflows/quality-gat
 
 ## Continuous Integration
 
-The single Continuous Integration workflow has four modes:
+The single Continuous Integration workflow has five modes:
 
 - Fast PR Gate runs `ci:proof`. It intentionally excludes full Vitest and does not prove release readiness.
 - Release provenance Gate runs `ci:release`. It may consume an exact Fast proof or complete the missing Fast phases on the same VM before release-only controls.
 - Selectel connectivity performs read-only controller admission.
 - Selectel infrastructure smoke provisions one disposable runner, verifies the locked image and runtime dependencies, skips QA, and proves cleanup.
+- Selectel recovery deletes resources for one exact historical run and attempt without building a QA image or provisioning a runner.
 
 Ready pull requests and `main` use the Fast gate. Manual and scheduled provenance use the Release gate. Fast execution reads `SELECTEL_QA_PROFILES`; provenance reads identically shaped `SELECTEL_RELEASE_PROFILES`. Profile order and lane minima are policy data, not documentation facts.
 
@@ -37,7 +38,7 @@ Every real run performs `npm ci` against the candidate lock. PRs may restore dow
 
 Provisioning writes an early identity-bound receipt. Each attempt owns a disposable runner registration, security group, network, subnet, router interface, router, VM port, VM, and boot volume. The project identifier is emitted only as a shortened SHA-256; credentials, raw project ID, JIT configuration, cloud-init, and registry tokens are excluded from artifacts.
 
-Cleanup runs with `always()` independently of QA proof and deletes the complete attempt-owned resource set. If the early receipt is unavailable, recovery is restricted to the exact run and attempt identity. An hourly TTL sweeper is the final recovery path, not normal cleanup.
+Cleanup runs with `always()` independently of QA proof and deletes the complete attempt-owned resource set. It accepts the incrementally written `provisioning` receipt, so cancellation at any acquisition step remains recoverable. If the early receipt is unavailable, recovery is restricted to the exact run and attempt identity. The recovery-only mode and hourly TTL sweeper build the controller from their checked-out trusted commit; neither depends on a moving image tag. They are recovery paths, not normal cleanup.
 
 ## Artifacts and presentation
 
@@ -49,7 +50,7 @@ SARIF and Codecov are presentation layers over admitted proof. Upload failure do
 
 Continuous Deployment is manual, restricted to `main`, and never provisions Selectel or reruns QA. It accepts a signed annotated version tag and an exact successful Release provenance run for the same commit. Admission verifies tag identity, version, ancestry, signature, proof hashes, accepted control digest, publisher policy, and release state.
 
-Publication consumes the verified extension archive and canonical evidence, creates an owned draft, verifies uploaded assets, and publishes an immutable alpha release. A retry may accept the exact immutable result or recreate only its own matching mutable draft; it rejects unrelated or mismatched release state.
+Publication consumes the verified extension archive and canonical evidence, creates an owned draft, verifies uploaded assets, and publishes an immutable alpha release marked as the repository's latest release. Alpha status remains in the release name and notes rather than GitHub's prerelease flag because release-owned README badges resolve through `releases/latest`. A retry may accept the exact immutable result or recreate only its own matching mutable draft; it rejects unrelated or mismatched release state.
 
 ## Bypass and recovery
 

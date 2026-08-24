@@ -278,6 +278,33 @@ const LANE_FILES = {
   ],
 };
 
+const REUSABLE_FAST_AUDIT_REPORTS = new Set([
+  '.tmp/npm-audit/results.json',
+  '.tmp/npm-audit/signatures.json',
+  '.tmp/osv/results.json',
+  '.tmp/semgrep/results.json',
+  '.tmp/semgrep/results.sarif',
+]);
+
+export function copyReusableFastAuditReport(
+  file,
+  destinationRoot,
+  proofRoot = process.env.SNIPTALE_FAST_PROOF_PATH
+) {
+  if (!proofRoot) throw new Error('Verified Fast proof root is missing.');
+  const manifest = JSON.parse(fs.readFileSync(path.join(proofRoot, 'proof-manifest.json'), 'utf8'));
+  const matches = (manifest.files ?? []).filter((entry) => entry.file === file);
+  if (matches.length !== 1 || !/^[a-f0-9]{64}$/u.test(matches[0].sha256 ?? '')) {
+    throw new Error(`Reusable Fast proof report identity is malformed: ${file}`);
+  }
+  const source = path.join(proofRoot, file);
+  if (sha256(source) !== matches[0].sha256) {
+    throw new Error(`Reusable Fast proof report digest mismatch: ${file}`);
+  }
+  copyExternalFile(source, destinationRoot, file);
+  return true;
+}
+
 function createArtifactDestination(lane, repositoryRoot) {
   const commit = safeSegment(
     process.env.SNIPTALE_CANDIDATE_SHA ??
@@ -307,11 +334,16 @@ function collectLaneReports({
 }) {
   const required = status === 'passed';
   for (const file of LANE_FILES[lane] ?? []) {
-    const copied = copyFile(file, destinationRoot, file, {
-      ignoreStale: !required,
-      notBeforeMs: startedAtMs,
-      repositoryRoot,
-    });
+    const copied =
+      lane === 'release' &&
+      process.env.SNIPTALE_REUSE_FAST_PROOF === '1' &&
+      REUSABLE_FAST_AUDIT_REPORTS.has(file)
+        ? copyReusableFastAuditReport(file, destinationRoot)
+        : copyFile(file, destinationRoot, file, {
+            ignoreStale: !required,
+            notBeforeMs: startedAtMs,
+            repositoryRoot,
+          });
     if (required && !copied) {
       throw new Error(`Required artifact is missing: ${file}`);
     }

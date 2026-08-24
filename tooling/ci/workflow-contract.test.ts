@@ -127,7 +127,7 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   );
   expect(workflow).not.toContain('cache-to: type=gha');
   expect(workflow).toContain(
-    'options: [fast, release-provenance, selectel-smoke, selectel-connectivity]'
+    'options:\n          [fast, release-provenance, selectel-smoke, selectel-connectivity, selectel-recovery]'
   );
   expect(workflow).toContain('PROOF_LANE:');
   expect(workflow).toContain("'release' || 'proof'");
@@ -210,6 +210,69 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('docker manifest inspect "$SNIPTALE_QA_IMAGE"');
   const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
   expect(container).toContain('resolveContainerDigest(image');
+});
+
+it('falls back to the full VM graph when docs-only proof installation or derivation fails', () => {
+  const workflow = fs.readFileSync(QUALITY, 'utf8');
+  const classifier = workflow.slice(
+    workflow.indexOf('  fast-classifier:'),
+    workflow.indexOf('\n  qa-image:')
+  );
+  const qaImage = workflow.slice(
+    workflow.indexOf('  qa-image:'),
+    workflow.indexOf('\n  provision:')
+  );
+  const install = classifier.slice(
+    classifier.indexOf('name: Install exact candidate dependencies'),
+    classifier.indexOf('name: Derive a candidate-bound proof')
+  );
+  const derive = classifier.slice(
+    classifier.indexOf('name: Derive a candidate-bound proof'),
+    classifier.indexOf('name: Publish docs-only admission decision')
+  );
+  expect(install).toContain('id: install');
+  expect(install).toContain('continue-on-error: true');
+  expect(derive).toContain("if: steps.install.outcome == 'success'");
+  expect(derive).toContain('continue-on-error: true');
+  expect(classifier).toContain('INSTALL_OUTCOME: ${{ steps.install.outcome }}');
+  expect(classifier).toContain('[ "$INSTALL_OUTCOME" = success ]');
+  expect(classifier).toContain('[ "$DERIVE_OUTCOME" = success ]');
+  expect(qaImage).toContain("needs.fast-classifier.outputs.reuse != 'true'");
+  expect(qaImage).toContain("needs.fast-classifier.result == 'success'");
+});
+
+it('keeps Selectel maintenance exact-main, recovery-only, and diagnostically replayable', () => {
+  const workflow = fs.readFileSync(QUALITY, 'utf8');
+  const qaImage = workflow.slice(
+    workflow.indexOf('  qa-image:'),
+    workflow.indexOf('\n  provision:')
+  );
+  const sweeper = workflow.slice(
+    workflow.indexOf('  scheduled-sweeper:'),
+    workflow.indexOf('\n  selectel-recovery:')
+  );
+  const recovery = workflow.slice(
+    workflow.indexOf('  selectel-recovery:'),
+    workflow.indexOf('\n  pr-gate:')
+  );
+  expect(qaImage).toContain("inputs.gate != 'selectel-recovery'");
+  expect(sweeper).toContain("with: { ref: '${{ github.sha }}', persist-credentials: false }");
+  expect(sweeper).toContain(
+    'docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .'
+  );
+  expect(sweeper).not.toContain('sniptale-controller:main');
+  expect(sweeper).not.toContain('docker login');
+  expect(sweeper).toContain('artifactKind: "sniptale-selectel-sweep-proof"');
+  expect(sweeper).toContain('failure: {kind: "ControllerExit", exitCode: $exitCode}');
+  expect(recovery).toContain("inputs.gate == 'selectel-recovery'");
+  expect(recovery).toContain("github.ref == 'refs/heads/main'");
+  expect(recovery).toContain(
+    'docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .'
+  );
+  expect(recovery).toContain('recover-cleanup /workspace/build/selectel-controller/recovery.json');
+  expect(recovery).not.toContain('needs:');
+  expect(recovery).not.toMatch(/"\$CONTROLLER_IMAGE" provision(?:\s|$)/u);
+  expect(recovery).not.toContain('SNIPTALE_QA_IMAGE');
 });
 
 it('reuses immutable images when image inputs are unchanged and records sanitized resources', () => {

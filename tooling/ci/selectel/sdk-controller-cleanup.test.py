@@ -209,6 +209,50 @@ def nested_receipt_replay():
     print(json.dumps(written, sort_keys=True))
 
 
+def partial_provisioning_receipt_replay():
+    cleaned = []
+
+    def pass_cleanup(policy, token, record, connection=None):
+        cleaned.append(record["serverId"])
+        return {"server": "deleted"}, 1
+
+    controller["cleanup_command"].__globals__["cleanup_with_retries"] = pass_cleanup
+    records = (
+        {
+            "artifactKind": "sniptale-selectel-provision-record",
+            "status": "provisioning",
+            "serverId": "top-level-server",
+        },
+        {
+            "artifactKind": "sniptale-selectel-provision-record",
+            "status": "provision-failed",
+            "attempts": [
+                {
+                    "status": "provisioning",
+                    "serverId": "nested-server",
+                    "portIds": [],
+                    "volumeIds": [],
+                }
+            ],
+        },
+    )
+    os.environ["RUNNER_CONTROLLER_TOKEN"] = "token"
+    written = []
+    for record in records:
+        with tempfile.NamedTemporaryFile(
+            mode="w+", encoding="utf8", delete=False
+        ) as destination:
+            json.dump(record, destination)
+            path = destination.name
+        controller["cleanup_command"]({}, path)
+        with open(path, encoding="utf8") as source:
+            written.append(json.load(source))
+    assert cleaned == ["top-level-server", "nested-server"]
+    assert [record["status"] for record in written] == ["cleaned", "cleaned"]
+    assert written[1]["attempts"][0]["status"] == "cleaned"
+    print(json.dumps({"cleaned": cleaned}, sort_keys=True))
+
+
 def identity_recovery():
     deleted = []
     owned_metadata = {
@@ -414,6 +458,8 @@ elif sys.argv[1:] == ["receipt-failure"]:
     receipt_failure()
 elif sys.argv[1:] == ["nested-receipt-replay"]:
     nested_receipt_replay()
+elif sys.argv[1:] == ["partial-provisioning-receipt-replay"]:
+    partial_provisioning_receipt_replay()
 elif sys.argv[1:] == ["identity-recovery"]:
     identity_recovery()
 else:

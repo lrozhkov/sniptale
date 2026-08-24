@@ -15155,7 +15155,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "8953be1d9222f599a4e1c4d5240707671caddb003fb004800126b1cf6d2de43d"
+        "contentHash": "808bbf4acf7c6e1ae41ab7bcf8e3ab1bce0b359bc6223b682018c06eb2817b83"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",
@@ -15171,6 +15171,7 @@
       "surfaces": [
         "binding:LANE_FILES",
         "binding:LANE_WRAPPERS",
+        "binding:REUSABLE_FAST_AUDIT_REPORTS",
         "property:collectLaneArtifacts/proofReuse",
         "property:proof",
         "property:proof[1]",
@@ -15416,7 +15417,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/audit.mjs",
-        "contentHash": "55661c69b22eeb12724f2b82e51a4441d8011d46dcef28b728e7b330ee856060"
+        "contentHash": "0c15a4714531991968b611ac3fa633f8fc0a2ae53aaf02fa576765d5930558eb"
       },
       "consumers": [
         "tooling/ci/qa-composition.mjs",
@@ -19841,7 +19842,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/qa-composition.mjs",
-        "contentHash": "5d59a4100e2b21df11964e294c97ce25c52d9aac1bf7c82f3868ec8206fe699f"
+        "contentHash": "ce64dcd6ff14d542cb006f66910440bf312838f1dcd34aabf94001a068cff9df"
       },
       "consumers": [
         "tooling/ci/proof-wrapper.mjs",
@@ -19850,6 +19851,8 @@
         "tooling/ci/release-wrapper.mjs"
       ],
       "surfaces": [
+        "binding:RELEASE_DELTA_LABELS",
+        "binding:REUSED_FAST_AUDIT_CONTROL_IDS",
         "property:collectCiProofResults/context",
         "property:collectCiProofResults/context[1]",
         "property:collectCiProofResults/steps",

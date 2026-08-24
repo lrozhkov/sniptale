@@ -128,17 +128,20 @@ async function collectRelatedUnitTestStepResult({
   coveragePlan,
   maxWorkers,
   pool,
+  reuseProof,
   suite,
   targetFiles,
   unitTestDetailOverride,
 }) {
-  const reusableUnitTestPlan = resolveReusableRelatedUnitTestPlan({
-    coveragePlan,
-    maxWorkers,
-    pool,
-    suite,
-    targetFiles,
-  });
+  const reusableUnitTestPlan = reuseProof
+    ? resolveReusableRelatedUnitTestPlan({
+        coveragePlan,
+        maxWorkers,
+        pool,
+        suite,
+        targetFiles,
+      })
+    : { matched: false };
 
   if (reusableUnitTestPlan.matched) {
     if (coveragePlan.forceFullSuite) {
@@ -184,6 +187,7 @@ async function collectUnitTestStepResult({
   maxWorkers,
   pool,
   releaseMode,
+  reuseProof,
   suite,
   targetFiles,
   unitTestDetailOverride,
@@ -216,6 +220,7 @@ async function collectUnitTestStepResult({
     coveragePlan,
     maxWorkers,
     pool,
+    reuseProof,
     suite,
     targetFiles,
     unitTestDetailOverride,
@@ -279,6 +284,7 @@ export async function collectUnitTestAndCoverageStepResults({
   relatedFilesOverride,
   releaseMode,
   pool = null,
+  reuseProof = true,
   suite = PRODUCT_QA_SUITE,
   targetFiles,
   unitTestDetailOverride,
@@ -299,6 +305,7 @@ export async function collectUnitTestAndCoverageStepResults({
     maxWorkers,
     pool,
     releaseMode,
+    reuseProof,
     suite,
     targetFiles,
     unitTestDetailOverride,

@@ -1,4 +1,4 @@
-import { createFailureStep } from '../core/focused-qa-results.mjs';
+import { createFailureStep, createOkStep } from '../core/focused-qa-results.mjs';
 import { measureAsyncStep, measureSyncStep } from '../core/step-timing.helpers.mjs';
 import { normalizeAuditFailure } from '../audits/execution-error.mjs';
 import { createProfileExcludedAuditStep } from './audit-tool-step.mjs';
@@ -48,6 +48,15 @@ function completeProgress(onProgress, controlId, label, step) {
 function collectMeasuredStep(profile, controlId, label, collector, toStep, onProgress, measure) {
   const policy = controlPolicy(profile, controlId);
   reportProgress(onProgress, { controlId, label, state: 'queued' });
+  if (profile.reusedControlIds?.has(controlId)) {
+    reportProgress(onProgress, { controlId, label, state: 'started' });
+    return completeProgress(
+      onProgress,
+      controlId,
+      label,
+      toTimedStep(createOkStep(label, 'reused verified exact commit-bound Fast proof'), 0)
+    );
+  }
   if (policy.requirement === 'excluded') {
     return completeProgress(
       onProgress,

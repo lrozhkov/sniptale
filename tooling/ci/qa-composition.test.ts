@@ -47,17 +47,33 @@ it('machine-fixes full Vitest and release readiness to ci:release only', async (
 
   const reusedRelease = await collectCiReleaseResults({
     reuseFastProof: true,
-    productProofCollector: async () => ({ steps: [passed] }),
+    productProofCollector: async () => {
+      throw new Error('verified Fast proof reuse must not rerun Fast controls');
+    },
+    releaseDeltaCollector: async () => ({
+      steps: [
+        { label: 'Unit tests', status: 'ok' },
+        { label: 'Test coverage', status: 'skipped' },
+        { label: 'Build', status: 'ok' },
+        { label: 'Release archive', status: 'ok' },
+      ],
+    }),
     auditCollector: async () => ({ steps: [passed] }),
     mutationCollector: () => passed,
   });
   expect(reusedRelease).toMatchObject({ executionMode: 'reuse-fast-proof' });
   expect(reusedRelease.steps).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ label: 'Fast proof reuse', status: 'skipped' }),
-      passed,
+      expect.objectContaining({ label: 'Fast proof reuse', status: 'ok' }),
+      expect.objectContaining({ label: 'Oxlint', status: 'ok' }),
+      expect.objectContaining({ label: 'Unit tests', status: 'ok' }),
+      expect.objectContaining({ label: 'Test coverage', status: 'skipped' }),
+      expect.objectContaining({ label: 'Build', status: 'ok' }),
+      expect.objectContaining({ label: 'Release archive', status: 'ok' }),
     ])
   );
+  expect(reusedRelease.steps.filter(({ label }) => label === 'Unit tests')).toHaveLength(1);
+  expect(reusedRelease.steps.filter(({ label }) => label === 'Build')).toHaveLength(1);
 });
 
 it('keeps the trusted phase orchestrator aligned with admission policy', () => {
@@ -87,6 +103,26 @@ it('derives trusted release control admission from the executable occurrence own
     } else {
       expect(proof.requiredPassed).toContain(id);
     }
-    expect(release.requiredPassed).toContain(id);
+    if (id === 'qa.rule.test-coverage') {
+      expect(release.allowedSkipped).toContain(id);
+    } else {
+      expect(release.requiredPassed).toContain(id);
+    }
   }
+  expect(release.requiredPassed).toContain('qa.rule.full-product-coverage');
+});
+
+it('fails closed when the release-only result closure is incomplete', async () => {
+  await expect(
+    collectCiReleaseResults({
+      reuseFastProof: true,
+      releaseDeltaCollector: async () => ({
+        steps: [
+          { label: 'Unit tests', status: 'ok' },
+          { label: 'Test coverage', status: 'skipped' },
+          { label: 'Build', status: 'ok' },
+        ],
+      }),
+    })
+  ).rejects.toThrow('Missing release-only control result: Release archive');
 });

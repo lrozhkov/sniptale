@@ -1,9 +1,17 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
-import { createProcessStep, createSkippedStep } from '../qa/core/focused-qa-results.mjs';
+import {
+  createOkStep,
+  createProcessStep,
+  createSkippedStep,
+} from '../qa/core/focused-qa-results.mjs';
 import { collectAuditProfileResult, recordSkippedAuditProfile } from '../qa/wrappers/audit.mjs';
-import { collectFullVerifyStepResults } from '../qa/core/verify-all.execution.mjs';
+import {
+  collectFullVerifyStepResults,
+  collectReleaseDeltaStepResults,
+} from '../qa/core/verify-all.execution.mjs';
+import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
 import { resolveRepositoryVerifyScope } from '../qa/core/verify-all.scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
 import { recordSkippedTimelineActivity } from '../qa/runtime/observability/timeline-context.mjs';
@@ -92,6 +100,47 @@ function resolveCiScope() {
   );
 }
 
+const RELEASE_DELTA_LABELS = new Set(['Unit tests', 'Test coverage', 'Build', 'Release archive']);
+const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze([
+  'audit-evidence',
+  'npm-audit',
+  'npm-audit-signatures',
+  'osv-scanner',
+  'semgrep',
+]);
+
+function createReusedFastControlStep({ id, label }) {
+  return runTimelineActivitySync(
+    { activityId: `fast-proof-reuse.${id}`, kind: 'proof-reuse', reused: true },
+    () => createOkStep(label, 'reused verified exact commit-bound Fast proof')
+  );
+}
+
+async function collectVerifiedFastProofReleaseSteps(releaseDeltaCollector) {
+  const delta = await releaseDeltaCollector();
+  const byLabel = new Map();
+  for (const step of delta.steps ?? []) {
+    if (!RELEASE_DELTA_LABELS.has(step.label) || byLabel.has(step.label)) {
+      throw new Error(`Malformed release-only control result: ${String(step.label)}`);
+    }
+    byLabel.set(step.label, step);
+  }
+  for (const label of RELEASE_DELTA_LABELS) {
+    if (!byLabel.has(label)) throw new Error(`Missing release-only control result: ${label}`);
+  }
+  return [
+    runTimelineActivitySync(
+      { activityId: 'fast-proof-reuse', kind: 'proof-reuse', reused: true },
+      () => createOkStep('Fast proof reuse', 'verified exact commit-bound proof receipt')
+    ),
+    ...createReleaseControlOccurrences().map((occurrence) =>
+      RELEASE_DELTA_LABELS.has(occurrence.label)
+        ? byLabel.get(occurrence.label)
+        : createReusedFastControlStep(occurrence)
+    ),
+  ];
+}
+
 export async function collectCiReleaseResults({
   session,
   reuseFastProof = false,
@@ -100,21 +149,17 @@ export async function collectCiReleaseResults({
       releaseMode: true,
       verifyScope: resolveCiScope(),
     }),
+  releaseDeltaCollector = () =>
+    collectReleaseDeltaStepResults({
+      verifyScope: resolveCiScope(),
+    }),
   auditCollector = collectAuditProfileResult,
   mutationCollector = runMutationProfile,
 } = {}) {
   capability('release');
-  const productSteps = [
-    ...(reuseFastProof
-      ? [
-          runTimelineActivitySync(
-            { activityId: 'fast-proof-reuse', kind: 'proof-reuse', reused: true },
-            () => createSkippedStep('Fast proof reuse', 'verified exact commit-bound proof receipt')
-          ),
-        ]
-      : []),
-    ...(await productProofCollector()).steps,
-  ];
+  const productSteps = reuseFastProof
+    ? await collectVerifiedFastProofReleaseSteps(releaseDeltaCollector)
+    : (await productProofCollector()).steps;
   if (hasFailure(productSteps)) {
     recordSkippedAuditProfile('release');
     for (const profile of MUTATION_PROFILES) {
@@ -129,7 +174,11 @@ export async function collectCiReleaseResults({
       steps: productSteps,
     };
   }
-  const audit = await auditCollector({ profileId: 'release', session });
+  const audit = await auditCollector({
+    profileId: 'release',
+    reusedControlIds: reuseFastProof ? REUSED_FAST_AUDIT_CONTROL_IDS : [],
+    session,
+  });
   if (hasFailure(audit.steps)) {
     for (const profile of MUTATION_PROFILES) {
       recordSkippedTimelineActivity({

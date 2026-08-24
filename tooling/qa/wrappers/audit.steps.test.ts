@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { AuditExecutionError } from '../audits/execution-error.mjs';
 import { resolveAuditProfile } from '../audits/profiles/index.mjs';
@@ -114,6 +114,33 @@ it('reports started and completed transitions around a profiled control', () => 
       state: 'completed',
       outcome: 'ok',
     }),
+  ]);
+});
+
+it('accepts a verified Fast audit control without executing its collector', () => {
+  const base = resolveAuditProfile('release');
+  const profile = { ...base, reusedControlIds: new Set(['semgrep']) };
+  const collector = vi.fn(() => ({ violations: [] }));
+  const progress = [];
+  const step = collectProfiledSyncStep(
+    profile,
+    'semgrep',
+    'Semgrep',
+    collector,
+    () => ({ label: 'Semgrep', status: 'failed' }),
+    (event) => progress.push(event)
+  );
+
+  expect(collector).not.toHaveBeenCalled();
+  expect(step).toMatchObject({
+    label: 'Semgrep',
+    status: 'ok',
+    detail: 'reused verified exact commit-bound Fast proof',
+  });
+  expect(progress).toEqual([
+    { controlId: 'semgrep', label: 'Semgrep', state: 'queued' },
+    { controlId: 'semgrep', label: 'Semgrep', state: 'started' },
+    expect.objectContaining({ controlId: 'semgrep', state: 'completed', outcome: 'ok' }),
   ]);
 });
 

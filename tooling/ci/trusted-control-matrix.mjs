@@ -15,18 +15,24 @@ export function createTrustedControlMatrix(lane, trustedRoot = process.cwd()) {
   }
   const requiredPassed = new Set(createReleaseControlOccurrences().map(({ id }) => id));
   const allowedSkipped = new Set();
+  const auditProfile = auditProfileForLane(lane, trustedRoot);
   if (lane === 'proof') {
     for (const id of ['qa.rule.unit-tests', 'qa.rule.test-coverage']) {
       requiredPassed.delete(id);
       allowedSkipped.add(id);
     }
   }
-  for (const [id, control] of auditProfileForLane(lane, trustedRoot).controls) {
+  for (const [id, control] of auditProfile.controls) {
     const ruleId = `qa.rule.${id}`;
     if (control.requirement === 'required') requiredPassed.add(ruleId);
     else allowedSkipped.add(ruleId);
   }
   if (lane === 'release') {
+    if (auditProfile.controls.get('full-product-coverage')?.requirement !== 'required') {
+      throw new Error('Release coverage audit must own canonical full-product coverage.');
+    }
+    requiredPassed.delete('qa.rule.test-coverage');
+    allowedSkipped.add('qa.rule.test-coverage');
     requiredPassed.add('qa.rule.mutation-persistence');
     requiredPassed.add('qa.rule.mutation-secrets');
   }
