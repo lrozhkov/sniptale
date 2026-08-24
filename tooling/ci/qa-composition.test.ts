@@ -211,6 +211,36 @@ it('runs the release audit and every mutation profile after returned failures', 
   ]);
 });
 
+it('shares one observed repository scope across fresh Fast and release-only controls', async () => {
+  const verifyScope = { kind: 'repository-scope' };
+  const scopeResolver = vi.fn(() => verifyScope);
+  const productProofCollector = vi.fn(async () => ({
+    steps: createCiProductControlOccurrences('proof').map(({ label }) => ({
+      label,
+      status: 'ok' as const,
+    })),
+  }));
+  const releaseDeltaCollector = vi.fn(async () => ({
+    steps: [
+      { label: 'SonarJS', status: 'ok' as const },
+      { label: 'Build', status: 'ok' as const },
+      { label: 'Release archive', status: 'ok' as const },
+    ],
+  }));
+
+  await collectCiReleaseResults({
+    scopeResolver,
+    productProofCollector,
+    releaseDeltaCollector,
+    auditCollector: async () => ({ steps: [] }),
+    mutationCollector: () => passed,
+  });
+
+  expect(scopeResolver).toHaveBeenCalledOnce();
+  expect(productProofCollector).toHaveBeenCalledWith(verifyScope);
+  expect(releaseDeltaCollector).toHaveBeenCalledWith(verifyScope);
+});
+
 it('keeps infrastructure exceptions fail-fast instead of treating them as control results', async () => {
   const auditCollector = vi.fn();
   const mutationCollector = vi.fn();

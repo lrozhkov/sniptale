@@ -152,24 +152,28 @@ async function collectFreshFastProofReleaseSteps(productProofCollector, releaseD
 export async function collectCiReleaseResults({
   session,
   reuseFastProof = false,
-  productProofCollector = () =>
+  scopeResolver = resolveCiScope,
+  productProofCollector = (verifyScope) =>
     collectFullVerifyStepResults({
       releaseMode: true,
       excludedControlLabels: ciExcludedControlLabels('proof'),
-      verifyScope: resolveCiScope(),
+      verifyScope,
     }),
-  releaseDeltaCollector = () =>
+  releaseDeltaCollector = (verifyScope) =>
     collectReleaseDeltaStepResults({
       excludedControlLabels: ciExcludedControlLabels('release'),
-      verifyScope: resolveCiScope(),
+      verifyScope,
     }),
   auditCollector = collectAuditProfileResult,
   mutationCollector = runMutationProfile,
 } = {}) {
   capability('release');
+  const verifyScope = scopeResolver();
+  const collectProductProof = () => productProofCollector(verifyScope);
+  const collectReleaseDelta = () => releaseDeltaCollector(verifyScope);
   const productSteps = reuseFastProof
-    ? await collectVerifiedFastProofReleaseSteps(releaseDeltaCollector)
-    : await collectFreshFastProofReleaseSteps(productProofCollector, releaseDeltaCollector);
+    ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta)
+    : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta);
   const audit = await auditCollector({
     profileId: 'release',
     reusedControlIds: reuseFastProof ? REUSED_FAST_AUDIT_CONTROL_IDS : [],
