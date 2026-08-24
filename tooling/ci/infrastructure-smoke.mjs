@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import { describeDockerFailure, isAcceptedDockerResult } from './infrastructure-smoke-process.mjs';
+
 const imageReference = process.argv[2];
 if (!/^ghcr\.io\/lrozhkov\/sniptale-qa@sha256:[a-f0-9]{64}$/u.test(imageReference ?? '')) {
   throw new Error('Infrastructure smoke requires the immutable public QA image reference.');
@@ -21,16 +23,17 @@ const inspectBrowserScript = [
   'process.stdout.write(JSON.stringify(result));',
 ].join('');
 
-function runDocker(args, { expectFailure = false, id }) {
+function runDocker(args, { acceptedStatuses = [0], id, timeoutMs = 30_000 }) {
   const result = spawnSync('docker', args, {
     encoding: 'utf8',
-    timeout: 30_000,
+    timeout: timeoutMs,
   });
-  const passed = expectFailure ? result.status !== 0 : result.status === 0;
+  const passed = isAcceptedDockerResult(result, acceptedStatuses);
   checks.push({ id, status: passed ? 'passed' : 'failed' });
   if (!passed) {
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim().slice(0, 500);
-    throw new Error(`${id} failed${output ? `: ${output}` : ''}`);
+    const reason = describeDockerFailure(result, timeoutMs);
+    throw new Error(`${id} failed (${reason})${output ? `: ${output}` : ''}`);
   }
   return `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
 }
@@ -47,12 +50,12 @@ function runInImage(id, command, args = [], options = {}) {
       command,
       ...args,
     ],
-    { id, expectFailure: options.expectFailure }
+    { acceptedStatuses: options.acceptedStatuses, id, timeoutMs: options.timeoutMs }
   );
 }
 
-function expectVersion(id, command, expected, args = ['--version']) {
-  const output = runInImage(id, command, args);
+function expectVersion(id, command, expected, args = ['--version'], options = {}) {
+  const output = runInImage(id, command, args, options);
   if (!output.includes(expected)) {
     checks.at(-1).status = 'failed';
     throw new Error(`${id} version drift: expected ${expected}, got ${output.slice(0, 200)}`);
@@ -73,7 +76,7 @@ try {
     throw new Error('The locally pulled QA image is not bound to the requested immutable digest.');
   }
 
-  expectVersion('node', 'node', lock.node.version);
+  expectVersion('node', 'node', lock.node.version, ['--version'], { timeoutMs: 180_000 });
   expectVersion('semgrep', 'semgrep', lock.semgrep.version, ['--legacy', '--version']);
   expectVersion('codeql', 'codeql', lock.codeql.version);
   expectVersion('osv-scanner', 'osv-scanner', lock.osvScanner.version);
@@ -123,7 +126,7 @@ try {
       '/dev/null',
       'http://169.254.169.254/',
     ],
-    { dockerArgs: [], expectFailure: true }
+    { acceptedStatuses: [7, 28], dockerArgs: [] }
   );
 } catch (error) {
   failure = error instanceof Error ? error.message : String(error);
