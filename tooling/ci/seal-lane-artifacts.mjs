@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { collectLaneArtifacts } from './artifacts.mjs';
 import { resolveCiArtifactSession } from './artifact-observability.mjs';
-import { formatObservedRunSummary } from '../qa/wrappers/observed/runner.mjs';
+import { formatObservedRunSummary } from '../qa/wrappers/observed/output.mjs';
 
 export function sealLaneArtifacts({ artifactInput, label, lane, phases, startedAtMs }) {
   let session = null;

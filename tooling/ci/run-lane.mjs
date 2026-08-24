@@ -1,18 +1,14 @@
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { selectelInfrastructureFromEnvironment } from './artifacts.mjs';
 import {
   appendCandidatePhaseInvocation,
   createTrustedPhaseCommands,
 } from './container-command.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
-import { sealLaneArtifacts } from './seal-lane-artifacts.mjs';
-import {
-  resolveQaReleaseResourceProfile,
-  resolveQaResourceProfile,
-} from '../qa/runtime/resource-profile.mjs';
 
 const lane = process.argv[2];
 if (!['proof', 'release'].includes(lane)) {
@@ -75,30 +71,35 @@ for (const [id, executable, args] of commands) {
   process.stdout.write(`[ci:phase] ${status === 0 ? 'passed' : 'failed'} ${id}\n`);
 }
 
-const artifactSealed = sealLaneArtifacts({
-  lane,
-  phases,
-  startedAtMs,
-  label: `CI ${lane}`,
-  artifactInput: {
-    status: status === 0 ? 'passed' : 'failed',
-    command: commands.map(([, executable, args]) => [executable, ...args].join(' ')),
-    executionEnvironment: {
-      kind: 'locked-container',
-      digest: process.env.SNIPTALE_CI_CONTAINER_DIGEST,
-    },
-    candidateTree: process.env.SNIPTALE_CANDIDATE_TREE ?? null,
-    workspaceMode: process.env.SNIPTALE_WORKSPACE_MODE ?? 'committed',
-    trustedControlSha: process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? null,
-    trustedControlDigest,
-    controlDigest: candidateControlDigest,
-    resourceProfiles: {
-      bounded: resolveQaResourceProfile(),
-      release: resolveQaReleaseResourceProfile(),
-    },
-    infrastructure: selectelInfrastructureFromEnvironment(),
-  },
-});
-if (!artifactSealed) status ||= 1;
+const receiptRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-trusted-phases-'));
+const receiptPath = path.join(receiptRoot, 'receipt.json');
+try {
+  fs.writeFileSync(
+    receiptPath,
+    `${JSON.stringify({ lane, phases, startedAtMs, status }, null, 2)}\n`,
+    { flag: 'wx', mode: 0o600 }
+  );
+  const sealInvocation = appendCandidatePhaseInvocation(
+    [
+      ...dockerArgs,
+      '--volume',
+      `${receiptPath}:/opt/sniptale-phase-receipt.json:ro`,
+      '--env',
+      'SNIPTALE_CI_TRUSTED_PHASE_SEAL=1',
+    ],
+    {
+      executable: 'node',
+      args: [
+        '/workspace/.sniptale-trusted-tooling/ci/seal-lane-in-container.mjs',
+        '/opt/sniptale-phase-receipt.json',
+      ],
+      image,
+    }
+  );
+  const sealed = spawnSync('docker', sealInvocation, { stdio: 'inherit' });
+  if (sealed.status !== 0) status ||= sealed.status ?? 1;
+} finally {
+  fs.rmSync(receiptRoot, { force: true, recursive: true });
+}
 
 process.exit(status);

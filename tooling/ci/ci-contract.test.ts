@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -28,7 +29,45 @@ import { createProofSemanticDigest } from './artifacts.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 import { verifyImageProof, writeImageProof } from './image-proof.mjs';
-import { CANONICAL_IMAGE_ENVIRONMENT } from './container-command.mjs';
+import { CANONICAL_IMAGE_ENVIRONMENT, createTrustedPhaseCommands } from './container-command.mjs';
+import { parseTrustedPhaseReceipt } from './trusted-phase-receipt.mjs';
+import { assertReservedMountAvailable } from './trusted-mount.mjs';
+
+const IMPORT_SPECIFIER_PATTERN = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"]([^'"]+)['"]/gu;
+
+function collectExternalHostImports(entry: string) {
+  const pending = [path.resolve(entry)];
+  const visited = new Set<string>();
+  const external = new Set<string>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || visited.has(current)) continue;
+    visited.add(current);
+    const source = fs.readFileSync(current, 'utf8');
+    for (const match of source.matchAll(IMPORT_SPECIFIER_PATTERN)) {
+      const specifier = match[1];
+      if (!specifier) continue;
+      if (specifier.startsWith('node:')) continue;
+      if (!specifier.startsWith('.')) {
+        external.add(specifier);
+        continue;
+      }
+      pending.push(path.resolve(path.dirname(current), specifier));
+    }
+  }
+  return [...external].sort();
+}
+
+it('rejects every candidate entry at the reserved trusted mount path', () => {
+  const root = createTempRoot('trusted-mount-collision-');
+  const mountPath = path.join(root, '.sniptale-trusted-tooling');
+  expect(() => assertReservedMountAvailable(mountPath)).not.toThrow();
+
+  fs.symlinkSync(path.join(root, 'missing-target'), mountPath);
+  expect(() => assertReservedMountAvailable(mountPath)).toThrow(
+    'Candidate workspace occupies the reserved trusted tooling mount path.'
+  );
+});
 
 it('distinguishes disabled settings from rollback snapshot failures', () => {
   expect(parseToggleState({ ok: true, error: '' }, 'setting')).toBe(true);
@@ -611,4 +650,72 @@ it('runs candidate controls once inside a trusted identity and admission envelop
   );
   expect(containerSource).not.toContain('RUNNER_CONTROLLER_TOKEN');
   expect(containerSource).not.toContain('SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET');
+});
+
+it('keeps host phase dispatch dependency-free and seals through trusted code in the container', () => {
+  const laneSource = fs.readFileSync('tooling/ci/run-lane.mjs', 'utf8');
+  const containerSource = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
+  const sealerSource = fs.readFileSync('tooling/ci/seal-lane-in-container.mjs', 'utf8');
+  const receiptSource = fs.readFileSync('tooling/ci/trusted-phase-receipt.mjs', 'utf8');
+  expect(collectExternalHostImports('tooling/ci/run-lane.mjs')).toEqual([]);
+  expect(collectExternalHostImports('tooling/ci/seal-lane-in-container.mjs')).toEqual([]);
+  expect(containerSource).toContain(
+    "${path.join(trustedRoot, 'tooling')}:/workspace/.sniptale-trusted-tooling:ro"
+  );
+  expect(containerSource).toContain('assertReservedMountAvailable(trustedToolingMount)');
+  expect(laneSource).toContain(
+    '/workspace/.sniptale-trusted-tooling/ci/seal-lane-in-container.mjs'
+  );
+  expect(laneSource).toContain('${receiptPath}:/opt/sniptale-phase-receipt.json:ro');
+  expect(sealerSource).toContain("process.env.SNIPTALE_CI_TRUSTED_PHASE_SEAL !== '1'");
+  expect(receiptSource).toContain('Trusted phase receipt differs from the mandatory phase graph');
+  const searchPaths =
+    createRequire(
+      '/workspace/.sniptale-trusted-tooling/ci/seal-lane-in-container.mjs'
+    ).resolve.paths('typescript') ?? [];
+  expect(searchPaths).toContain('/workspace/node_modules');
+  expect(searchPaths).not.toContain('/workspace/.tmp/node_modules');
+  expect(
+    searchPaths.filter(
+      (searchPath) =>
+        searchPath.startsWith('/workspace/') && searchPath !== '/workspace/node_modules'
+    )
+  ).toEqual([
+    '/workspace/.sniptale-trusted-tooling/ci/node_modules',
+    '/workspace/.sniptale-trusted-tooling/node_modules',
+  ]);
+});
+
+it('rejects forged or incomplete trusted phase receipts before artifact sealing', () => {
+  const commands = createTrustedPhaseCommands('proof');
+  const receipt = {
+    lane: 'proof',
+    startedAtMs: 1,
+    status: 0,
+    phases: commands.map(([id, executable, args]) => ({
+      id,
+      command: [executable, ...args].join(' '),
+      status: 'passed',
+    })),
+  };
+  expect(parseTrustedPhaseReceipt(receipt)).toMatchObject({ lane: 'proof', status: 0 });
+  expect(() =>
+    parseTrustedPhaseReceipt({
+      ...receipt,
+      phases: receipt.phases.map((phase, index) =>
+        index === 0 ? { ...phase, status: 'blocked', command: null } : phase
+      ),
+    })
+  ).toThrow('mandatory phase graph');
+  expect(() =>
+    parseTrustedPhaseReceipt({
+      ...receipt,
+      phases: receipt.phases.map((phase, index) =>
+        index === 1 ? { ...phase, id: 'candidate-defined-phase' } : phase
+      ),
+    })
+  ).toThrow('mandatory phase graph');
+  expect(() => parseTrustedPhaseReceipt({ ...receipt, status: 1 })).toThrow(
+    'result differs from its phase graph'
+  );
 });
