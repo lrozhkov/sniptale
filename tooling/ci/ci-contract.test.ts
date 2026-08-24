@@ -153,8 +153,10 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const semgrepLock = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock', 'utf8');
   expect(dockerfile.startsWith(`FROM ${lock.node.image}\n`)).toBe(true);
   expect(CANONICAL_IMAGE_ENVIRONMENT.NODE_VERSION).toBe(lock.node.version);
+  expect(dockerfile).toMatch(/apt-get install[^\n]*\bprocps\b/u);
   expect(semgrepLock).toContain(`semgrep==${lock.semgrep.version}`);
   expect(installer).toContain("['semgrep', lock.semgrep.version, ['--legacy', '--version']]");
+  expect(installer).toContain("run('ps', ['--version'])");
   const playwrightLock = fs.readFileSync('tooling/configs/ci/playwright/package-lock.json');
   const projectLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
   const projectPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'));

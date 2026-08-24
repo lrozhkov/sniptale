@@ -142,6 +142,7 @@ try {
     '/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js',
     '--version',
   ]);
+  runInImage('process-tools', 'ps', ['--version']);
 
   const browserAssets = lock.playwright.assets.map((asset) => ({
     id: asset.id,

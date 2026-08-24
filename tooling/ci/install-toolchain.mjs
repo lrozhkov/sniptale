@@ -96,6 +96,7 @@ if (mutationLauncher.status !== 0 || !mutationLauncher.stdout.includes(mutationV
       `got ${`${mutationLauncher.stdout ?? ''}${mutationLauncher.stderr ?? ''}`.trim()}`
   );
 }
+run('ps', ['--version']);
 const mutationTypescript = spawnSync(
   'node',
   [

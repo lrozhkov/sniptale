@@ -55,6 +55,7 @@ case "$*" in
   *"actionlint --version"*) printf '%s\n' '1.7.12' ;;
   *"playwright --version"*) printf '%s\n' '1.62.1' ;;
   *"/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js --version"*) printf '%s\n' '9.6.1' ;;
+  *"ps --version"*) printf '%s\n' 'ps from procps-ng 4.0.2' ;;
   *"node -e"*) printf '%s\n' "$browser_json" ;;
   *"/opt/playwright/chromium-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
   *"/opt/playwright/chromium_headless_shell-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
@@ -132,6 +133,7 @@ describe('Selectel infrastructure smoke', () => {
       'actionlint',
       'playwright',
       'stryker',
+      'process-tools',
       'playwright-chromium',
       'playwright-asset-chromium-1234',
       'playwright-asset-chromium_headless_shell-1234',

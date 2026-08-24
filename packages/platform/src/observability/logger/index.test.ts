@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { inspect } from 'node:util';
 
 import { installActiveTraceObserver } from '../message-tracer/runtime';
 import { createLogger } from './index';
@@ -165,6 +166,22 @@ describe('createLogger tracing payload sanitization', () => {
     expect(JSON.stringify(events)).not.toContain('sk-live-secret');
 
     dispose();
+  });
+
+  it('truncates Error stacks only between complete frames before colored Node inspection', () => {
+    const { sink, logger } = createTraceLogger();
+    const error = new Error('Authorization: Bearer sk-live-secret');
+    const header = 'Error: Authorization: ***\n';
+    const partialFrame = '    at failing (/workspace/node_modules/pkg';
+    const filler = 'x'.repeat(1000 - header.length - partialFrame.length);
+    error.stack = `${header}${filler}${partialFrame}/index.js:1:1)\n    at next (/workspace/src/a.ts:2:2)`;
+
+    logger.error(error);
+
+    const sanitizedError = sink.error.mock.calls[0]?.[1] as Error;
+    expect(sanitizedError.stack).toBe('Error: Authorization: ***\n... [truncated]');
+    expect(sanitizedError.stack).not.toContain('sk-live-secret');
+    expect(() => inspect(sanitizedError, { colors: true })).not.toThrow();
   });
 });
 

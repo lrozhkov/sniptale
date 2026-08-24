@@ -180,12 +180,12 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:42:3bb221495fa6e66545c9c8b7ba0f3b5ec5798db27e3c3665c78f56b3ef065c0f:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/install-toolchain.mjs:45:db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "3bb221495fa6e66545c9c8b7ba0f3b5ec5798db27e3c3665c78f56b3ef065c0f",
+        "contentHash": "db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e",
         "file": "tooling/ci/install-toolchain.mjs",
-        "line": 42,
+        "line": 45,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
         "rule": "js/http-to-file-access"
       },
@@ -201,12 +201,12 @@
       "reviewBy": "2027-08-18",
       "source": {
         "kind": "codeql",
-        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:37:3bb221495fa6e66545c9c8b7ba0f3b5ec5798db27e3c3665c78f56b3ef065c0f:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
+        "key": "js/file-access-to-http:tooling/ci/install-toolchain.mjs:40:db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e:b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4"
       },
       "scope": {
-        "contentHash": "3bb221495fa6e66545c9c8b7ba0f3b5ec5798db27e3c3665c78f56b3ef065c0f",
+        "contentHash": "db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e",
         "file": "tooling/ci/install-toolchain.mjs",
-        "line": 37,
+        "line": 40,
         "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
         "rule": "js/file-access-to-http"
       },
@@ -1558,48 +1558,6 @@
         "sampleFingerprint": "a56a4e79cc2032f882f4309b7ff2ab0b1d5a24eb8a1b7e0112afbdfac53d0a57"
       },
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
-    },
-    {
-      "id": "noise.gitleaks.release-source-example-key.217",
-      "classification": "tool-noise",
-      "owner": "release-source-documentation",
-      "risk": "A synthetic example in immutable history resembles a generic API key and can obscure new secret findings if reviewed too broadly.",
-      "reason": "The exact historical finding is a non-secret documentation example used to explain release-source policy.",
-      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
-      "reviewBy": "2027-08-23",
-      "source": {
-        "kind": "gitleaks",
-        "key": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217"
-      },
-      "scope": {
-        "commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
-        "file": "docs/architecture/release-source-architecture.md",
-        "fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
-        "line": 217,
-        "rule": "generic-api-key"
-      },
-      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
-    },
-    {
-      "id": "noise.gitleaks.secret-redaction-fixture.11",
-      "classification": "tool-noise",
-      "owner": "secret-redaction-tests",
-      "risk": "A synthetic example in immutable history resembles a generic API key and can obscure new secret findings if reviewed too broadly.",
-      "reason": "The exact historical finding is a synthetic non-secret fixture used to prove credential redaction.",
-      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
-      "reviewBy": "2027-08-23",
-      "source": {
-        "kind": "gitleaks",
-        "key": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11"
-      },
-      "scope": {
-        "commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
-        "file": "src/shared/security/secret-redaction.test.ts",
-        "fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
-        "line": 11,
-        "rule": "generic-api-key"
-      },
-      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
     }
   ],
   "coverageOwners": [
@@ -18215,7 +18173,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/infrastructure-smoke.mjs",
-        "contentHash": "c79e59e525b90ae297b649ac1ec040299c561b996cf9b44fa0152acba524f9cc"
+        "contentHash": "3ced5bb213fa0f69a21d55df402220d275b3b31315b80574cd74ae1333e98871"
       },
       "consumers": [
         "tooling/ci/infrastructure-smoke.mjs"
@@ -18236,7 +18194,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/install-toolchain.mjs",
-        "contentHash": "774ff38ad4d2938c9abd7471507a612bc556a14f898004abd269d089b5ea39dc"
+        "contentHash": "db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e"
       },
       "consumers": [
         "tooling/ci/install-toolchain.mjs"
