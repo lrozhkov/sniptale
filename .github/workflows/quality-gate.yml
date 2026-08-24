@@ -793,7 +793,12 @@ jobs:
 
   publish-qa-image:
     needs: [trusted-admission, cleanup, qa-image]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.trusted-admission.result == 'success' && needs.cleanup.result == 'success'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.gate == 'fast')) &&
+      needs.trusted-admission.result == 'success' &&
+      needs.cleanup.result == 'success'
     runs-on: ubuntu-24.04
     permissions: { contents: read, packages: write }
     steps:

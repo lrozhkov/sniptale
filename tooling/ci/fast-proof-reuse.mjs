@@ -125,3 +125,11 @@ export function verifyReusableFastProof(
     manifestPath,
   };
 }
+
+export function selectReusableFastProof(proofRoot, expected) {
+  try {
+    return verifyReusableFastProof(proofRoot, expected);
+  } catch {
+    return null;
+  }
+}

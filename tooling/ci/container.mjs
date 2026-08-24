@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveReusableCodeqlProofHostPaths } from './codeql-proof-host.mjs';
 import { resolveReusableCoverageProofHostPaths } from './coverage-proof-host.mjs';
-import { verifyReusableFastProof } from './fast-proof-reuse.mjs';
+import { selectReusableFastProof } from './fast-proof-reuse.mjs';
 import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
 import { resolveReusableBuildProofHostPaths } from './build-proof-host.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
@@ -140,7 +140,7 @@ if (!reuseAllowed && requestedReuse) {
 
 const reusableFastProof =
   reuseAllowed && process.env.SNIPTALE_FAST_PROOF_PATH
-    ? verifyReusableFastProof(process.env.SNIPTALE_FAST_PROOF_PATH, {
+    ? selectReusableFastProof(process.env.SNIPTALE_FAST_PROOF_PATH, {
         commit: candidateIdentity.head,
         candidateTree: candidateIdentity.tree,
         trustedControlSha,
@@ -150,6 +150,11 @@ const reusableFastProof =
         gateInputDigest,
       })
     : null;
+if (reuseAllowed && process.env.SNIPTALE_FAST_PROOF_PATH && !reusableFastProof) {
+  process.stderr.write(
+    'Reusable Fast proof is incompatible; running the complete Fast prerequisite on this runner.\n'
+  );
+}
 if (reusableFastProof) {
   const destination = path.join(root, 'build', path.basename(reusableFastProof.archivePath));
   fs.mkdirSync(path.dirname(destination), { recursive: true });
