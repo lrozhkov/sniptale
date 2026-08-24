@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { QA_STEP_OCCURRENCES } from '../qa/core/qa-steps/definitions.mjs';
+import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
 import { AUDIT_PROFILES_PATH, resolveAuditProfile } from '../qa/audits/profiles/index.mjs';
 
 function auditProfileForLane(lane, trustedRoot) {
@@ -13,11 +13,7 @@ export function createTrustedControlMatrix(lane, trustedRoot = process.cwd()) {
   if (!['proof', 'release'].includes(lane)) {
     throw new Error(`Unsupported trusted control lane: ${String(lane)}`);
   }
-  const requiredPassed = new Set(
-    QA_STEP_OCCURRENCES.filter(({ lane: ownerLane }) =>
-      ['release-direct', 'release-guardrail'].includes(ownerLane)
-    ).map(({ id }) => id)
-  );
+  const requiredPassed = new Set(createReleaseControlOccurrences().map(({ id }) => id));
   const allowedSkipped = new Set();
   if (lane === 'proof') {
     for (const id of ['qa.rule.unit-tests', 'qa.rule.test-coverage']) {

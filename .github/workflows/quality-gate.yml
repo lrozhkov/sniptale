@@ -111,6 +111,8 @@ jobs:
             fetch-depth: 0,
             persist-credentials: false,
           }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - name: Classify every fast-gate input with trusted base controls
         id: classify
         run: node trusted-control/tooling/ci/classify-fast-gate.mjs trusted-control candidate "$BASE_SHA" "$CANDIDATE_SHA"
@@ -209,6 +211,8 @@ jobs:
             fetch-depth: 0,
             persist-credentials: false,
           }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - name: Bind candidate and trusted QA control digests
         id: controls
         run: |
@@ -604,6 +608,8 @@ jobs:
             fetch-depth: 0,
             persist-credentials: false,
           }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - name: Resolve the exact available proof producer attempt
         id: proof-artifact
         working-directory: trusted-control
@@ -721,6 +727,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.CANDIDATE_SHA }}', path: candidate, persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - name: Resolve the exact available proof producer attempt
         id: proof-artifact
         working-directory: candidate
@@ -764,6 +772,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
@@ -838,6 +848,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - name: Admit one exact trusted GitHub job graph
         env:
           SNIPTALE_ADMISSION_RESULT: ${{ needs.trusted-admission.result }}
@@ -858,6 +870,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - env:
           SNIPTALE_ADMISSION_RESULT: ${{ needs.trusted-admission.result }}
           SNIPTALE_CANONICAL_RESULT: ${{ needs.canonical-qa.result }}
@@ -880,6 +894,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22.12.0 }
       - env:
           SNIPTALE_ADMISSION_RESULT: ${{ needs.trusted-admission.result }}
           SNIPTALE_CANONICAL_RESULT: ${{ needs.canonical-qa.result }}

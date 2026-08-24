@@ -16741,7 +16741,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-        "contentHash": "9f5cde6490b19915596fa15736b83b69140cf31c78c82037074094e11fe6af1e"
+        "contentHash": "d4d72e2d47fee59fdb2efd636aa651d4302149e31c35a7ab55175186c245cfb6"
       },
       "consumers": [
         "tooling/qa/audits/profiles/schema.mjs",
@@ -16750,6 +16750,7 @@
         "tooling/qa/core/qa-steps/contract.test.ts",
         "tooling/qa/core/qa-steps/definitions.data.mjs",
         "tooling/qa/core/qa-steps/definitions.mjs",
+        "tooling/qa/core/qa-steps/release-occurrences.mjs",
         "tooling/qa/core/qa-steps/runtime-registry.mjs",
         "tooling/qa/core/verify-external-audit-results.test.ts",
         "tooling/qa/core/verify-external-audit-semantics.test-support.ts",
@@ -16785,10 +16786,9 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/definitions.mjs",
-        "contentHash": "dc39559c4693d4a3adc02596babe2f694c44768aee716dadfab658f943b17624"
+        "contentHash": "27bba5dad779ad8177647f147d838de6dfade64ead46f57de800a3eaa412bc09"
       },
       "consumers": [
-        "tooling/ci/trusted-control-matrix.mjs",
         "tooling/qa/core/qa-controls/discovery.mjs",
         "tooling/qa/core/qa-steps/definitions.mjs",
         "tooling/qa/core/qa-steps/definitions.test.ts",
@@ -18159,6 +18159,7 @@
       "consumers": [
         "tooling/qa/core/qa-steps/definitions.mjs",
         "tooling/qa/core/qa-steps/policy/index.mjs",
+        "tooling/qa/core/qa-steps/release-occurrences.mjs",
         "tooling/qa/core/qa-steps/runtime-registry.mjs"
       ],
       "surfaces": [
@@ -20336,7 +20337,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/runtime-registry.mjs",
-        "contentHash": "96ace48f84092026369de1755827cd1353f96c88ae21a2045bd9fdefb2b8e84d"
+        "contentHash": "868891b3e8be207edce60bcc823c7dc20f532af222498575220776a9d1f1be12"
       },
       "consumers": [
         "tooling/qa/core/qa-steps/runtime-registry.mjs",
@@ -22086,7 +22087,6 @@
       "consumers": [
         "tooling/qa/core/full-verify-violation-steps.mjs",
         "tooling/qa/core/qa-steps/contract.mjs",
-        "tooling/qa/core/qa-steps/definitions.mjs",
         "tooling/qa/core/qa-steps/definitions.test.ts",
         "tooling/qa/core/verify-all.violation-steps.mjs",
         "tooling/qa/core/verify-wrapper-contract.test.ts"
