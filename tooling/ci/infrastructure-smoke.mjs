@@ -15,6 +15,9 @@ if (!/^ghcr\.io\/lrozhkov\/sniptale-qa@sha256:[a-f0-9]{64}$/u.test(imageReferenc
 }
 
 const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
+const hostTools = JSON.parse(
+  fs.readFileSync('tooling/configs/ci/selectel-host-tools.json', 'utf8')
+);
 const mutationPackage = JSON.parse(fs.readFileSync('tooling/test/mutation/package.json', 'utf8'));
 const mutationVersion = mutationPackage.devDependencies?.['@stryker-mutator/core'];
 if (typeof mutationVersion !== 'string' || mutationVersion.length === 0) {
@@ -46,6 +49,21 @@ function runDocker(args, { acceptedStatuses = [0], id, timeoutMs = 30_000 }) {
     throw new Error(`${id} failed (${reason})${output ? `: ${output}` : ''}`);
   }
   return `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+}
+
+function runHostCommand({ id, command, args }) {
+  const result = spawnSync(command, args, { encoding: 'utf8', timeout: 30_000 });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  const passed = result.error === undefined && result.signal === null && result.status === 0;
+  checks.push({
+    id: `host-${id}`,
+    status: passed ? 'passed' : 'failed',
+    ...(passed && output ? { version: output.split('\n')[0].slice(0, 200) } : {}),
+  });
+  if (!passed) {
+    const reason = result.error?.code ?? result.signal ?? `exit ${String(result.status)}`;
+    throw new Error(`host-${id} failed (${reason})${output ? `: ${output.slice(0, 500)}` : ''}`);
+  }
 }
 
 function runInImage(id, command, args = [], options = {}) {
@@ -80,6 +98,28 @@ function expectVersion(id, command, expected, args = ['--version'], options = {}
 
 let failure = null;
 try {
+  const hostToken = /^[a-z0-9][a-z0-9+.-]*$/u;
+  const hostArgument = /^--?[a-z0-9][a-z0-9-]*$/u;
+  if (
+    hostTools.schemaVersion !== 1 ||
+    hostTools.artifactKind !== 'sniptale-selectel-host-tools' ||
+    !Array.isArray(hostTools.checks) ||
+    hostTools.checks.length === 0 ||
+    new Set(hostTools.checks.map((check) => check?.id)).size !== hostTools.checks.length ||
+    hostTools.checks.some(
+      (check) =>
+        !check ||
+        Object.keys(check).sort().join(',') !== 'args,command,id' ||
+        !hostToken.test(check.id) ||
+        !hostToken.test(check.command) ||
+        !Array.isArray(check.args) ||
+        check.args.some((argument) => !hostArgument.test(argument))
+    )
+  ) {
+    throw new Error('Malformed Selectel host tool registry.');
+  }
+  for (const check of hostTools.checks) runHostCommand(check);
+
   const repoDigests = runDocker(
     ['image', 'inspect', imageReference, '--format', '{{json .RepoDigests}}'],
     {

@@ -114,6 +114,9 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   );
   expect(workflow).toContain('name: Continuous Integration');
   expect(workflow).toContain(
+    "github.event.schedule == '17 * * * *' && 'sweep' || 'release-provenance'"
+  );
+  expect(workflow).toContain(
     'QA_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-qa,ignore-error=true'
   );
   expect(workflow).toContain(
@@ -288,6 +291,16 @@ it('reuses immutable images when image inputs are unchanged and records sanitize
   expect(workflow).toContain('path: candidate/.tmp/npm-cache');
   expect(workflow).toContain('actions/cache/restore@');
   expect(workflow).toContain('actions/cache/save@');
+  const classifier = workflow.slice(
+    workflow.indexOf('  fast-classifier:'),
+    workflow.indexOf('\n  qa-image:')
+  );
+  expect(classifier).toContain('actions/cache/restore@');
+  expect(classifier).not.toContain('cache: npm');
+  expect(classifier).not.toContain('actions/cache/save@');
+  expect(classifier).toContain(
+    'npm_config_cache: ${{ github.workspace }}/candidate/.tmp/npm-cache'
+  );
   expect(workflow).toContain("if: success() && github.event_name != 'pull_request_target'");
   expect(workflow).toContain('node-22.12.0-toolchain-');
   expect(workflow).toContain('npm ci --ignore-scripts');
@@ -303,6 +316,18 @@ it('reuses immutable images when image inputs are unchanged and records sanitize
   expect(workflow).toContain(
     "retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}"
   );
+});
+
+it('makes immutable main image publication retry-safe only for the exact digest', () => {
+  const workflow = fs.readFileSync(QUALITY, 'utf8');
+  const publisher = workflow.slice(
+    workflow.indexOf('  publish-qa-image:'),
+    workflow.indexOf('\n  scheduled-sweeper:')
+  );
+  expect(publisher).toContain('expected=${binding#*|}');
+  expect(publisher).toContain('node tooling/ci/immutable-image-tag.mjs "$image" "$expected"');
+  expect(publisher).toContain('Immutable image tag admission: $image ($disposition)');
+  expect(publisher).not.toContain('Refusing to replace existing immutable image tag');
 });
 
 it('publishes from one admitted provenance artifact without provisioning another VM', () => {

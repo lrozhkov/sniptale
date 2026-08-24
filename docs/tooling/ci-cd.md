@@ -13,7 +13,7 @@ The single Continuous Integration workflow has five modes:
 - Fast PR Gate runs `ci:proof`. It intentionally excludes full Vitest and does not prove release readiness.
 - Release provenance Gate runs `ci:release`. It may consume an exact Fast proof or complete the missing Fast phases on the same VM before release-only controls.
 - Selectel connectivity performs read-only controller admission.
-- Selectel infrastructure smoke provisions one disposable runner, verifies the locked image and runtime dependencies, skips QA, and proves cleanup.
+- Selectel infrastructure smoke provisions one disposable runner, verifies the machine-owned host-command closure and locked image runtime, skips QA, and proves cleanup.
 - Selectel recovery deletes resources for one exact historical run and attempt without building a QA image or provisioning a runner.
 
 Ready pull requests and `main` use the Fast gate. Manual and scheduled provenance use the Release gate. Fast execution reads `SELECTEL_QA_PROFILES`; provenance reads identically shaped `SELECTEL_RELEASE_PROFILES`. Profile order and lane minima are policy data, not documentation facts.
