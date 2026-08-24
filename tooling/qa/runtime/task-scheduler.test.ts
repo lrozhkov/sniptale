@@ -285,6 +285,61 @@ it('normalizes camel-case task ids into stable timeline lane ids', async () => {
   );
 });
 
+it('registers dependency activities before their dependants in the persisted timeline', async () => {
+  const events: Array<{ activityId: string; dependencies?: string[]; state: string }> = [];
+
+  await runBoundedTasks(
+    [
+      {
+        id: 'typecheck',
+        cpuTokens: 1,
+        dependencies: ['lint'],
+        memoryMiB: 128,
+        run: () => 'typed',
+      },
+      { id: 'lint', cpuTokens: 1, memoryMiB: 128, run: () => 'linted' },
+    ],
+    {
+      onTransition: (event) => events.push(event),
+      profile,
+      schedulerId: 'dependencies',
+    }
+  );
+
+  const queued = events.filter(({ state }) => state === 'queued');
+  const lintIndex = queued.findIndex(({ activityId }) => activityId === 'dependencies.lane.lint');
+  const typecheckIndex = queued.findIndex(
+    ({ activityId }) => activityId === 'dependencies.lane.typecheck'
+  );
+  expect(lintIndex).toBeGreaterThanOrEqual(0);
+  expect(typecheckIndex).toBeGreaterThan(lintIndex);
+  expect(queued[typecheckIndex]?.dependencies).toEqual(['dependencies.lane.lint']);
+});
+
+it('rejects cyclic dependencies before queuing an invalid timeline reference', async () => {
+  await expect(
+    runBoundedTasks(
+      [
+        {
+          id: 'first',
+          cpuTokens: 1,
+          dependencies: ['second'],
+          memoryMiB: 128,
+          run: () => 'first',
+        },
+        {
+          id: 'second',
+          cpuTokens: 1,
+          dependencies: ['first'],
+          memoryMiB: 128,
+          run: () => 'second',
+        },
+      ],
+      { profile, schedulerId: 'cycle' }
+    )
+  ).rejects.toThrow('dependencies contain a cycle');
+});
+
 it('rejects task ids that collide after timeline normalization', async () => {
   await expect(
     runBoundedTasks(

@@ -123,7 +123,16 @@ function createWaitTracker() {
 }
 
 function queueTaskActivities(pending, schedulerId, transition) {
-  for (const task of pending) {
+  const remaining = [...pending];
+  const queuedIds = new Set();
+  while (remaining.length > 0) {
+    const index = remaining.findIndex((task) =>
+      task.dependencies.every((dependency) => queuedIds.has(dependency))
+    );
+    if (index === -1) {
+      throw new Error('Scheduled QA task dependencies contain a cycle.');
+    }
+    const [task] = remaining.splice(index, 1);
     transition({
       activityId: timelineLaneId(schedulerId, task.id),
       kind: 'scheduler-lane',
@@ -138,6 +147,7 @@ function queueTaskActivities(pending, schedulerId, transition) {
         ...(task.executionProfile ?? {}),
       },
     });
+    queuedIds.add(task.id);
   }
 }
 

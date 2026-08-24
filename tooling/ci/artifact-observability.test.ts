@@ -12,8 +12,8 @@ it('routes local and trusted-container sealing through one artifact lifecycle ow
   expect(owner).toContain(
     "import { resolveCiArtifactSession } from './artifact-observability.mjs'"
   );
-  expect(owner).toContain('resolveCiArtifactSession({ lane, phases, startedAtMs })');
-  expect(owner).toContain('collectLaneArtifacts({');
+  expect(owner).toContain('sessionResolver({ lane, phases, startedAtMs })');
+  expect(owner).toContain('artifactCollector({');
   const localSource = fs.readFileSync(path.join('tooling/ci', 'local.mjs'), 'utf8');
   const trustedSealerSource = fs.readFileSync(
     path.join('tooling/ci', 'seal-lane-in-container.mjs'),
