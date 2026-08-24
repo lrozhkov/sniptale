@@ -75,8 +75,24 @@ if (
 ) {
   throw new Error('Mutation runner package drifted from toolchain.lock.json.');
 }
+const mutationPackage = JSON.parse(fs.readFileSync('/tmp/mutation-package/package.json', 'utf8'));
+const mutationVersion = mutationPackage.devDependencies?.['@stryker-mutator/core'];
+if (typeof mutationVersion !== 'string' || mutationVersion.length === 0) {
+  throw new Error('Mutation runner version is missing from its canonical package manifest.');
+}
 fs.cpSync('/tmp/mutation-package', '/opt/sniptale-mutation', { recursive: true });
 run('npm', ['ci', '--ignore-scripts', '--prefix', '/opt/sniptale-mutation']);
+const mutationLauncher = spawnSync(
+  'node',
+  ['/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js', '--version'],
+  { cwd: '/opt/sniptale-mutation', encoding: 'utf8' }
+);
+if (mutationLauncher.status !== 0 || !mutationLauncher.stdout.includes(mutationVersion)) {
+  throw new Error(
+    `Mutation launcher drift: expected ${mutationVersion}, ` +
+      `got ${`${mutationLauncher.stdout ?? ''}${mutationLauncher.stderr ?? ''}`.trim()}`
+  );
+}
 const mutationTypescript = spawnSync(
   'node',
   [

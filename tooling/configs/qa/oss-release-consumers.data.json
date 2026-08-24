@@ -79,17 +79,17 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "9f5cde6490b19915596fa15736b83b69140cf31c78c82037074094e11fe6af1e"
+      "sha256": "d4d72e2d47fee59fdb2efd636aa651d4302149e31c35a7ab55175186c245cfb6"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "9f5cde6490b19915596fa15736b83b69140cf31c78c82037074094e11fe6af1e"
+      "sha256": "d4d72e2d47fee59fdb2efd636aa651d4302149e31c35a7ab55175186c245cfb6"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.mjs",
-      "sha256": "dc39559c4693d4a3adc02596babe2f694c44768aee716dadfab658f943b17624"
+      "sha256": "27bba5dad779ad8177647f147d838de6dfade64ead46f57de800a3eaa412bc09"
     },
     {
       "category": "validator-integration",

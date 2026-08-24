@@ -2,6 +2,17 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
+function collectWorkflowJobBlocks(workflow: string) {
+  const jobsStart = workflow.indexOf('\njobs:\n');
+  if (jobsStart < 0) throw new Error('Workflow jobs block is missing.');
+  const jobs = workflow.slice(jobsStart + 1);
+  const headers = [...jobs.matchAll(/^[ ]{2}([a-z0-9-]+):$/gmu)];
+  return headers.map((header, index) => ({
+    name: header[1],
+    source: jobs.slice(header.index, headers[index + 1]?.index ?? jobs.length),
+  }));
+}
+
 const QUALITY = '.github/workflows/quality-gate.yml';
 const RELEASE = '.github/workflows/release.yml';
 
@@ -33,6 +44,34 @@ it('pins every external Action to an approved full commit SHA', () => {
   ]) {
     expect(uses).toContain(pin);
   }
+});
+
+it('pins project Node for every workflow job that executes a repository Node entrypoint', () => {
+  for (const file of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
+    const workflow = fs.readFileSync(file, 'utf8');
+    for (const job of collectWorkflowJobBlocks(workflow)) {
+      if (!/\bnode (?:\.\.\/trusted-control\/|trusted-control\/)?tooling\//u.test(job.source)) {
+        continue;
+      }
+      expect(job.source, `${file}:${job.name}`).toContain(
+        'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+      );
+      expect(job.source, `${file}:${job.name}`).toContain('node-version: 22.12.0');
+      expect(
+        job.source.indexOf('actions/setup-node@'),
+        `${file}:${job.name}: setup-node must precede repository Node execution`
+      ).toBeLessThan(
+        job.source.search(/\bnode (?:\.\.\/trusted-control\/|trusted-control\/)?tooling\//u)
+      );
+    }
+  }
+});
+
+it('installs exact publication dependencies before the only npm-backed workflow entrypoint', () => {
+  const release = fs.readFileSync(RELEASE, 'utf8');
+  expect(release.indexOf('npm ci --ignore-scripts')).toBeLessThan(
+    release.indexOf('node tooling/ci/prepare-release-assets.mjs')
+  );
 });
 
 it('keeps credential-bearing environments restricted to main', () => {

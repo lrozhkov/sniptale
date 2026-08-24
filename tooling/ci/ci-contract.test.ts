@@ -56,6 +56,18 @@ function collectExternalHostImports(entry: string) {
   return [...external].sort();
 }
 
+function collectWorkflowNodeEntrypoints() {
+  const entrypoints = new Set<string>();
+  const pattern = /\bnode\s+(?:(?:\.\.\/)?trusted-control\/)?(tooling\/[A-Za-z0-9_./-]+\.mjs)\b/gu;
+  for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
+    const source = fs.readFileSync(workflow, 'utf8');
+    for (const match of source.matchAll(pattern)) {
+      if (match[1]) entrypoints.add(match[1]);
+    }
+  }
+  return [...entrypoints].sort();
+}
+
 it('distinguishes disabled settings from rollback snapshot failures', () => {
   expect(parseToggleState({ ok: true, error: '' }, 'setting')).toBe(true);
   expect(parseToggleState({ ok: false, error: 'gh: Not Found (HTTP 404)' }, 'setting')).toBe(false);
@@ -653,12 +665,25 @@ it('keeps host phase dispatch dependency-free and seals through trusted code in 
   const receiptSource = fs.readFileSync('tooling/ci/trusted-phase-receipt.mjs', 'utf8');
   expect(collectExternalHostImports('tooling/ci/run-lane.mjs')).toEqual([]);
   expect(collectExternalHostImports('tooling/ci/seal-lane-in-container.mjs')).toEqual([]);
+  for (const entry of collectWorkflowNodeEntrypoints()) {
+    const allowed = entry === 'tooling/ci/prepare-release-assets.mjs' ? ['jszip'] : [];
+    expect(collectExternalHostImports(entry), entry).toEqual(allowed);
+  }
   expect(containerSource).toContain('${trustedRoot}:/opt/sniptale-trusted:ro');
   expect(containerSource).not.toContain('.sniptale-trusted-tooling');
   expect(laneSource).toContain('/opt/sniptale-trusted/tooling/ci/seal-lane-in-container.mjs');
   expect(laneSource).toContain('${receiptPath}:/opt/sniptale-phase-receipt.json:ro');
   expect(sealerSource).toContain("process.env.SNIPTALE_CI_TRUSTED_PHASE_SEAL !== '1'");
   expect(receiptSource).toContain('Trusted phase receipt differs from the mandatory phase graph');
+});
+
+it('smokes the real locked mutation launcher while building the QA image', () => {
+  const installer = fs.readFileSync('tooling/ci/install-toolchain.mjs', 'utf8');
+  expect(installer).toContain(
+    '/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js'
+  );
+  expect(installer).toContain("'--version'");
+  expect(installer).toContain('mutationLauncher.status !== 0');
 });
 
 it('rejects forged or incomplete trusted phase receipts before artifact sealing', () => {

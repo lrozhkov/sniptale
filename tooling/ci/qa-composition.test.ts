@@ -2,7 +2,9 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
+import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
 import { collectCiProofResults, collectCiReleaseResults } from './qa-composition.mjs';
+import { createTrustedControlMatrix } from './trusted-control-matrix.mjs';
 
 const passed = { label: 'passed', status: 'ok' as const };
 
@@ -73,4 +75,18 @@ it('keeps the trusted phase orchestrator aligned with admission policy', () => {
   expect(container).toContain('${trustedRoot}:/opt/sniptale-trusted:ro');
   expect(container).toContain("path.join(trustedRoot, 'tooling/ci/run-lane.mjs')");
   expect(runLane).toContain("spawnSync('docker', invocation");
+});
+
+it('derives trusted release control admission from the executable occurrence owner', () => {
+  const occurrences = createReleaseControlOccurrences();
+  const proof = createTrustedControlMatrix('proof');
+  const release = createTrustedControlMatrix('release');
+  for (const { id } of occurrences) {
+    if (['qa.rule.unit-tests', 'qa.rule.test-coverage'].includes(id)) {
+      expect(proof.allowedSkipped).toContain(id);
+    } else {
+      expect(proof.requiredPassed).toContain(id);
+    }
+    expect(release.requiredPassed).toContain(id);
+  }
 });
