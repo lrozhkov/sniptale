@@ -154,6 +154,10 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
     "inputs.gate != 'release-provenance' || github.ref == 'refs/heads/main'"
   );
   expect(workflow).toContain('restore-fast-proof.mjs');
+  expect(workflow).not.toContain('if cd trusted-control');
+  expect(
+    workflow.match(/if \(cd trusted-control && node tooling\/ci\/restore-fast-proof\.mjs/g)
+  ).toHaveLength(2);
   expect(workflow).toContain(
     'classify-fast-gate.mjs trusted-control candidate "$BASE_SHA" "$CANDIDATE_SHA"'
   );
