@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
-import { verifyReusableFastProof } from './fast-proof-reuse.mjs';
+import { selectReusableFastProof, verifyReusableFastProof } from './fast-proof-reuse.mjs';
 
 const roots: string[] = [];
 const sha256 = (value: Buffer | string) => crypto.createHash('sha256').update(value).digest('hex');
@@ -80,4 +80,14 @@ it('rejects a modified proof payload even when the manifest still claims success
   const value = fixture();
   write(value.root, '.tmp/qa/build-proof.json', '{"modified":true}\n');
   expect(() => verifyReusableFastProof(value.root, value.identity)).toThrow(/digest mismatch/u);
+});
+
+it('treats an incompatible proof as unavailable so release can run its Fast prerequisite', () => {
+  const value = fixture();
+  expect(
+    selectReusableFastProof(value.root, {
+      ...value.identity,
+      containerDigest: `sha256:${'7'.repeat(64)}`,
+    })
+  ).toBeNull();
 });

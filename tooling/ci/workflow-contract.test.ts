@@ -348,6 +348,10 @@ it('makes immutable main image publication retry-safe only for the exact digest'
     workflow.indexOf('  publish-qa-image:'),
     workflow.indexOf('\n  scheduled-sweeper:')
   );
+  expect(publisher).toContain("github.ref == 'refs/heads/main'");
+  expect(publisher).toContain("github.event_name == 'push'");
+  expect(publisher).toContain("github.event_name == 'workflow_dispatch' && inputs.gate == 'fast'");
+  expect(publisher).not.toContain("inputs.gate == 'release-provenance'");
   expect(publisher).toContain('expected=${binding#*|}');
   expect(publisher).toContain('node tooling/ci/immutable-image-tag.mjs "$image" "$expected"');
   expect(publisher).toContain('Immutable image tag admission: $image ($disposition)');
