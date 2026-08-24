@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
   describeDockerFailure,
+  getInfrastructureSmokeEnvironment,
   getInfrastructureSmokeTimeoutMs,
   isAcceptedDockerResult,
 } from './infrastructure-smoke-process.mjs';
@@ -50,6 +51,7 @@ function runInImage(id, command, args = [], options = {}) {
       '--cap-drop=ALL',
       '--security-opt=no-new-privileges',
       ...(options.dockerArgs ?? ['--network=none']),
+      ...getInfrastructureSmokeEnvironment(id).flatMap((value) => ['--env', value]),
       imageReference,
       command,
       ...args,

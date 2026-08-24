@@ -2012,6 +2012,7 @@
     {
       "path": "tooling/configs/qa/semgrep.yml",
       "consumers": [
+        "tooling/ci/infrastructure-smoke-process.mjs",
         "tooling/qa/policy/external-tools.mjs"
       ],
       "disposition": "keep",

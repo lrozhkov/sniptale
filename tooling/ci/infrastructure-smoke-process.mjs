@@ -16,8 +16,17 @@ export function isAcceptedDockerResult(result, acceptedStatuses = [0]) {
 
 export function getInfrastructureSmokeTimeoutMs(id) {
   if (id === 'node') return 180_000;
-  if (id === 'semgrep') return 90_000;
   return 30_000;
+}
+
+export function getInfrastructureSmokeEnvironment(id) {
+  if (id !== 'semgrep') return [];
+  return [
+    'SEMGREP_ENABLE_VERSION_CHECK=0',
+    'SEMGREP_SEND_METRICS=off',
+    'SEMGREP_APP_TOKEN=',
+    'SEMGREP_SETTINGS_FILE=/tmp/sniptale-infrastructure-smoke-semgrep.yml',
+  ];
 }
 
 export function describeDockerFailure(result, timeoutMs) {
