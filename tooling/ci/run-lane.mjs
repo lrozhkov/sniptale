@@ -90,7 +90,7 @@ try {
     {
       executable: 'node',
       args: [
-        '/workspace/.sniptale-trusted-tooling/ci/seal-lane-in-container.mjs',
+        '/opt/sniptale-trusted/tooling/ci/seal-lane-in-container.mjs',
         '/opt/sniptale-phase-receipt.json',
       ],
       image,
