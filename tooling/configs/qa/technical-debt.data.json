@@ -15155,11 +15155,12 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "8bb383480e4ae4415972eda794b525e1d67354ee7e6748df847901695401655c"
+        "contentHash": "8953be1d9222f599a4e1c4d5240707671caddb003fb004800126b1cf6d2de43d"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",
         "tooling/ci/admit-candidate-proof.test.ts",
+        "tooling/ci/artifacts.identity.test.ts",
         "tooling/ci/artifacts.mjs",
         "tooling/ci/ci-contract.test.ts",
         "tooling/ci/derive-fast-proof.mjs",
@@ -18978,6 +18979,27 @@
       ]
     },
     {
+      "id": "policy.source.mutation-policy-mjs.107cb0faf3",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/mutation-policy.mjs",
+        "contentHash": "c7e07ba3e4041c5d57eb75fa31f675bd5f44739f04a93cf6bd37097f9dcc706e"
+      },
+      "consumers": [
+        "tooling/ci/artifacts.mjs",
+        "tooling/ci/mutation-policy.mjs",
+        "tooling/ci/qa-composition.mjs"
+      ],
+      "surfaces": [
+        "binding:MUTATION_EVIDENCE_FILES",
+        "binding:MUTATION_PROFILES"
+      ]
+    },
+    {
       "id": "policy.source.npm-audit-mjs.0340f80faa",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -19815,7 +19837,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/qa-composition.mjs",
-        "contentHash": "895b1e3a8cb64a707866465c98b9350f4f20b8966f462b68516eacccb8354e20"
+        "contentHash": "5d59a4100e2b21df11964e294c97ce25c52d9aac1bf7c82f3868ec8206fe699f"
       },
       "consumers": [
         "tooling/ci/proof-wrapper.mjs",
@@ -19824,7 +19846,6 @@
         "tooling/ci/release-wrapper.mjs"
       ],
       "surfaces": [
-        "binding:MUTATION_PROFILES",
         "property:collectCiProofResults/context",
         "property:collectCiProofResults/context[1]",
         "property:collectCiProofResults/steps",

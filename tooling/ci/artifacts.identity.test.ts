@@ -5,6 +5,8 @@ import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
+import { collectMutationEvidence } from './artifacts.mjs';
+
 const temporaryRoots: string[] = [];
 
 afterEach(() => {
@@ -51,4 +53,63 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
     trustedControlDigest: `sha256:${'d'.repeat(64)}`,
     controlDigest: `sha256:${'d'.repeat(64)}`,
   });
+});
+
+it('collects only the current mutation run label and ignores stale sibling evidence', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-mutation-evidence-'));
+  temporaryRoots.push(root);
+  const destinationRoot = path.join(root, 'artifact');
+  fs.mkdirSync(destinationRoot);
+  const startedAtMs = Date.now() - 1000;
+  for (const profile of ['persistence', 'secrets']) {
+    for (const file of ['stryker-report.json', 'summary.json']) {
+      const current = path.join(root, '.tmp/mutation', profile, '42', file);
+      fs.mkdirSync(path.dirname(current), { recursive: true });
+      fs.writeFileSync(current, '{}\n');
+    }
+    const stale = path.join(root, '.tmp/mutation', profile, 'after', 'summary.json');
+    fs.mkdirSync(path.dirname(stale), { recursive: true });
+    fs.writeFileSync(stale, 'stale\n');
+    fs.utimesSync(stale, new Date(0), new Date(0));
+  }
+
+  expect(
+    collectMutationEvidence({
+      destinationRoot,
+      environment: { GITHUB_RUN_ID: '42' },
+      notBeforeMs: startedAtMs,
+      repositoryRoot: root,
+      required: true,
+    })
+  ).toBe(4);
+  expect(fs.existsSync(path.join(destinationRoot, '.tmp/mutation/persistence/after'))).toBe(false);
+  expect(
+    fs.existsSync(path.join(destinationRoot, '.tmp/mutation/secrets/42/stryker-report.json'))
+  ).toBe(true);
+});
+
+it('rejects mutation evidence below a symlinked ancestor directory', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-mutation-symlink-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-mutation-outside-'));
+  temporaryRoots.push(root, outside);
+  const destinationRoot = path.join(root, 'artifact');
+  fs.mkdirSync(destinationRoot);
+  for (const file of ['stryker-report.json', 'summary.json']) {
+    const source = path.join(outside, file);
+    fs.writeFileSync(source, '{}\n');
+  }
+  const profileRoot = path.join(root, '.tmp/mutation/persistence');
+  fs.mkdirSync(profileRoot, { recursive: true });
+  fs.symlinkSync(outside, path.join(profileRoot, '42'), 'dir');
+
+  expect(() =>
+    collectMutationEvidence({
+      destinationRoot,
+      environment: { GITHUB_RUN_ID: '42' },
+      notBeforeMs: Date.now() - 1000,
+      repositoryRoot: root,
+      required: true,
+    })
+  ).toThrow('Unsafe artifact symlink: .tmp/mutation/persistence/42/stryker-report.json');
+  expect(fs.readdirSync(destinationRoot)).toEqual([]);
 });

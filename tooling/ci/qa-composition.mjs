@@ -7,8 +7,8 @@ import { collectFullVerifyStepResults } from '../qa/core/verify-all.execution.mj
 import { resolveRepositoryVerifyScope } from '../qa/core/verify-all.scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
 import { recordSkippedTimelineActivity } from '../qa/runtime/observability/timeline-context.mjs';
+import { MUTATION_PROFILES, resolveMutationRunLabel } from './mutation-policy.mjs';
 
-const MUTATION_PROFILES = Object.freeze(['persistence', 'secrets']);
 const semantics = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
 
 function capability(lane) {
@@ -75,11 +75,10 @@ function runMutationProfile(profile) {
       const runner = process.env.SNIPTALE_TRUSTED_CI_ROOT
         ? '/opt/sniptale-trusted/tooling/test/mutation/run-profile.mjs'
         : 'tooling/test/mutation/run-profile.mjs';
-      const result = spawnSync(
-        process.execPath,
-        [runner, profile, process.env.GITHUB_RUN_ID ?? 'local'],
-        { encoding: 'utf8', env: process.env }
-      );
+      const result = spawnSync(process.execPath, [runner, profile, resolveMutationRunLabel()], {
+        encoding: 'utf8',
+        env: process.env,
+      });
       return createProcessStep(`Mutation ${profile}`, result, {
         advice: `Inspect .tmp/mutation/${profile}/${process.env.GITHUB_RUN_ID ?? 'local'}/summary.json`,
       });

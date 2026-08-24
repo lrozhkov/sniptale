@@ -4,6 +4,11 @@ import path from 'node:path';
 
 import { parseRunRecord } from '../qa/runtime/observability/schema.mjs';
 import { createFastGateInputDigest, FAST_GATE_INPUT_POLICY_PATH } from './fast-gate-inputs.mjs';
+import {
+  MUTATION_EVIDENCE_FILES,
+  MUTATION_PROFILES,
+  resolveMutationRunLabel,
+} from './mutation-policy.mjs';
 
 const root = process.cwd();
 const OUTPUT_ROOT = 'build/ci-artifacts';
@@ -102,6 +107,17 @@ function reuseCompatibility(lane, executionProfile, semanticsPolicy) {
     : { outcome: 'incompatible', minimumExecutionProfile: minimum, belowMinimum };
 }
 
+function assertNoSymlinkComponents(relativeSource, repositoryRoot) {
+  let current = path.resolve(repositoryRoot);
+  for (const segment of relativeSource.split('/')) {
+    current = path.join(current, segment);
+    if (!fs.existsSync(current)) return;
+    if (fs.lstatSync(current).isSymbolicLink()) {
+      throw new Error(`Unsafe artifact symlink: ${relativeSource}`);
+    }
+  }
+}
+
 function copyFile(
   source,
   destinationRoot,
@@ -109,6 +125,7 @@ function copyFile(
   { ignoreStale = false, notBeforeMs = null, repositoryRoot = root } = {}
 ) {
   const relativeSource = relativePath(source, repositoryRoot);
+  assertNoSymlinkComponents(relativeSource, repositoryRoot);
   const absoluteSource = path.join(repositoryRoot, relativeSource);
   if (!fs.existsSync(absoluteSource)) return false;
   const details = fs.lstatSync(absoluteSource);
@@ -135,6 +152,30 @@ function copyTree(source, destinationRoot, options = {}) {
     if (entry.isSymbolicLink()) throw new Error(`Unsafe artifact symlink: ${child}`);
     if (entry.isDirectory()) copied = copyTree(child, destinationRoot, options) || copied;
     else if (entry.isFile()) copied = copyFile(child, destinationRoot, child, options) || copied;
+  }
+  return copied;
+}
+
+export function collectMutationEvidence({
+  destinationRoot,
+  environment = process.env,
+  notBeforeMs,
+  repositoryRoot = root,
+  required,
+}) {
+  const runLabel = resolveMutationRunLabel(environment);
+  let copied = 0;
+  for (const profile of MUTATION_PROFILES) {
+    for (const file of MUTATION_EVIDENCE_FILES) {
+      const source = `.tmp/mutation/${profile}/${runLabel}/${file}`;
+      const present = copyFile(source, destinationRoot, source, {
+        ignoreStale: !required,
+        notBeforeMs,
+        repositoryRoot,
+      });
+      if (present) copied += 1;
+      else if (required) throw new Error(`Required mutation evidence is missing: ${source}`);
+    }
   }
   return copied;
 }
@@ -284,12 +325,13 @@ function collectLaneReports({
     if (required && !copied) {
       throw new Error('Required coverage HTML is missing.');
     }
-    const mutationCopied = copyTree('.tmp/mutation', destinationRoot, {
-      ignoreStale: !required,
+    collectMutationEvidence({
+      destinationRoot,
+      environment: process.env,
       notBeforeMs: startedAtMs,
       repositoryRoot,
+      required,
     });
-    if (required && !mutationCopied) throw new Error('Required mutation evidence is missing.');
     if (process.env.SNIPTALE_REUSE_FAST_PROOF === '1') {
       const proofPath = path.join(
         process.env.SNIPTALE_FAST_PROOF_PATH ?? '',
