@@ -1,7 +1,16 @@
 import type { VideoEditorRuntimeController } from '../session';
 import type { VideoEditorActionHandlers } from '../commands';
 import type { VideoEditorWorkspaceState } from './workspace-state';
-import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
+import type {
+  AnnotationEditingPort,
+  ClipSelectionPort,
+  DiagnosticsTelemetryPort,
+  ExportPort,
+  HistoryPort,
+  PlaybackPort,
+  ProjectLifecyclePort,
+  TimelineEditingPort,
+} from '../../contracts/controller-store';
 import type { VideoEditorProjectHistoryController } from '../../contracts/commands/history';
 import type {
   VideoEditorCommandPaletteController,
@@ -11,7 +20,7 @@ import type { VideoEditorShellController } from './contracts/workspace';
 import { createSelectedClipActions } from './selected-clip-actions';
 
 export function createVideoEditorShellController(
-  store: VideoEditorControllerStorePort
+  store: Pick<ProjectLifecyclePort, 'error' | 'isReady' | 'project'>
 ): VideoEditorShellController {
   return {
     error: store.error,
@@ -22,7 +31,9 @@ export function createVideoEditorShellController(
 
 export function createVideoEditorOverlaysController(args: {
   actions: Pick<VideoEditorActionHandlers, 'handleCancelExport' | 'handleStartExport'>;
-  store: VideoEditorControllerStorePort;
+  store: ExportPort &
+    Pick<ProjectLifecyclePort, 'project'> &
+    Pick<ClipSelectionPort, 'selectedClipId'>;
   workspace: Pick<VideoEditorWorkspaceState, 'confirm'>;
 }): VideoEditorOverlaysController {
   return {
@@ -55,7 +66,12 @@ export function createVideoEditorOverlaysController(args: {
 
 export function createVideoEditorCommandPaletteController(args: {
   runtime: Pick<VideoEditorRuntimeController, 'togglePlayback'>;
-  store: VideoEditorControllerStorePort;
+  store: Pick<DiagnosticsTelemetryPort, 'diagnosticsOpen' | 'setDiagnosticsOpen'> &
+    Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
+    Pick<ClipSelectionPort, 'selectedClipId'> &
+    Pick<TimelineEditingPort, 'deleteClip' | 'duplicateClip' | 'splitClipAt'> &
+    Pick<AnnotationEditingPort, 'addShapeOverlay' | 'addTextOverlay'> &
+    Pick<ExportPort, 'openExportDialog'>;
   workspace: Pick<VideoEditorWorkspaceState, 'leftSidebarCollapsed' | 'toggleSidebarCollapsed'>;
 }): VideoEditorCommandPaletteController {
   const selectedClipActions = createSelectedClipActions(args.store);
@@ -78,7 +94,7 @@ export function createVideoEditorCommandPaletteController(args: {
 }
 
 export function createVideoEditorHistoryController(
-  store: VideoEditorControllerStorePort,
+  store: HistoryPort,
   enabled: boolean
 ): VideoEditorProjectHistoryController {
   return {

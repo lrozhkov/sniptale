@@ -71,11 +71,11 @@ Plan architecture work by owner/change-reason cluster and classify each candidat
 
 When an explicitly requested manual topology snapshot reports forwarding-only modules with one production consumer, treat them as overlapping edge-derived operation candidates rather than path-partition owners. Before declaring an area complete, require the artifact's complete compact edge inventory and classify every such candidate as `Consolidate` or retain it with explicit contract, runtime, cross-owner, unresolved-topology, or independent-change-reason `Keep` evidence. A zero `Consolidate` count is not proof that fragmentation is absent unless this edge inventory is empty or fully vetoed.
 
-Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has executable harness/shared-control targets. This includes executable `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact machine-owned inventory-only files classified by `tooling/qa/core/qa-scope.mjs` use checkpoint owner validators and do not require a fresh harness stamp; `qa:build` still requires that fresh checkpoint. Policy JSON, baselines, allowlists, and executable registries remain harness targets.
+Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has executable harness/shared-control targets. This includes executable `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact machine-owned inventory-only files classified by `tooling/qa/core/qa-scope.mjs` use checkpoint owner validators and do not require a fresh harness stamp; the internal closeout build still requires that fresh checkpoint. Policy JSON, baselines, allowlists, and executable registries remain harness targets.
 
 Run `npm run qa:checkpoint` after each substantial coherent implementation wave. It owns supported non-Markdown formatting, advisory state, focused static checks, typecheck, focused tests, and diff coverage; it does not build, stage, or commit.
 
-Subagents may perform read-only investigation, diagnosis, or disjoint implementation work. Do not assign them `qa:release-harness`, `qa:checkpoint`, `qa:build`, or `qa:closeout`; blocking wrappers stay in the main thread.
+Subagents may perform read-only investigation, diagnosis, or disjoint implementation work. Do not assign them `qa:release-harness`, `qa:checkpoint`, the internal build phase, or `qa:closeout`; blocking wrappers stay in the main thread.
 
 ## Required Review
 
@@ -99,7 +99,7 @@ Normal implementation flow:
 6. apply one consolidated correction and rerun only invalidated proof/review
 7. run `npm run qa:closeout -- -m "<commit message>"`
 
-`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes `qa:build`, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has executable harness/shared-control targets; exact machine-owned inventory-only targets are validated by their owner checks instead.
+`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes its internal build phase, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has executable harness/shared-control targets; exact machine-owned inventory-only targets are validated by their owner checks instead.
 
 Do not run a manual closeout chain, manually stage the candidate, start another blocking wrapper while closeout runs, stage `tasks/**`, or amend an existing commit unless the user explicitly requests it.
 

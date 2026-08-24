@@ -126,7 +126,7 @@ export function runGitleaksCheck({
   if (!executable) {
     throw new AuditExecutionError(
       'tool-unavailable',
-      'Gitleaks CLI is required for qa:audit. Install the official binary or set SNIPTALE_GITLEAKS_BIN.'
+      'Gitleaks CLI is required for the full audit. Install the official binary or set SNIPTALE_GITLEAKS_BIN.'
     );
   }
   validateScopes(scopes);

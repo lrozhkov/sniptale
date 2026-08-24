@@ -21,17 +21,17 @@ const VITE_CONFIG_PATH = 'apps/extension/vite.config.ts';
 const REQUIRED_TSCONFIG_FLAGS = {
   target: 'ES2024',
   forceConsistentCasingInFileNames: true,
+  noUncheckedSideEffectImports: true,
   verbatimModuleSyntax: true,
 };
 
 const REQUIRED_TSCONFIG_NODE_FLAGS = {
   forceConsistentCasingInFileNames: true,
+  noUncheckedSideEffectImports: true,
   verbatimModuleSyntax: true,
 };
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
-const REQUIRED_MINIMUM_CHROME_VERSION = '148';
-const REQUIRED_MESSAGE_SERIALIZATION = 'structured_clone';
 const REQUIRED_BUILD_TARGET = 'chrome140';
 const REQUIRED_NODE_ENGINE = '>=22.12 <23';
 const REQUIRED_PACKAGE_DEPENDENCY_PREFIXES = {
@@ -41,7 +41,7 @@ const REQUIRED_PACKAGE_DEPENDENCY_PREFIXES = {
 const REQUIRED_PACKAGE_DEV_DEPENDENCY_PREFIXES = {
   '@types/react': '^19.2.',
   '@types/react-dom': '^19.2.',
-  '@vitejs/plugin-react': '^5.2.',
+  '@vitejs/plugin-react': '^6.1.',
 };
 
 function createViolation(file, message) {
@@ -101,20 +101,20 @@ function collectRuntimeBaselineViolations({ compilerOptions, manifest, viteConfi
     );
   }
 
-  if (manifest.minimum_chrome_version !== REQUIRED_MINIMUM_CHROME_VERSION) {
+  if (!/^\d+$/u.test(manifest.minimum_chrome_version ?? '')) {
     violations.push(
       createViolation(
         MANIFEST_PATH,
-        `minimum_chrome_version must be ${JSON.stringify(REQUIRED_MINIMUM_CHROME_VERSION)}`
+        'minimum_chrome_version must be a decimal Chrome major version'
       )
     );
   }
 
-  if (manifest.message_serialization !== REQUIRED_MESSAGE_SERIALIZATION) {
+  if (Object.hasOwn(manifest, 'message_serialization')) {
     violations.push(
       createViolation(
         MANIFEST_PATH,
-        `message_serialization must be ${JSON.stringify(REQUIRED_MESSAGE_SERIALIZATION)}`
+        'message_serialization must remain absent until a production messaging owner requires it'
       )
     );
   }

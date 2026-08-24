@@ -37,7 +37,7 @@ const FONT_LITERAL_PATTERN =
 const VALIDATOR_PATTERN = /(?:verify-oss-release-surface(?:\.mjs)?|OSS release surface)/u;
 const ARCHIVE_PATTERN =
   /(?:from ['"].*oss-release-policy\.mjs['"]|package-dist\.mjs|release:package-only|verify-release-archive\.mjs)/u;
-const RELEASE_COMMAND_PATTERN = /"qa:(?:release|audit|release-harness)"\s*:/u;
+const RELEASE_COMMAND_PATTERN = /"(?:ci:(?:proof|release)|qa:release-harness)"\s*:/u;
 
 function normalize(relativePath) {
   return relativePath.replaceAll(path.sep, '/');

@@ -47,42 +47,23 @@ function renderHook(params: Parameters<typeof useAssetHandlers>[0]) {
   });
 }
 
-function createParams(): Parameters<typeof useAssetHandlers>[0] {
+type TestAssetHandlerPort = Parameters<typeof useAssetHandlers>[0] & { currentTime: number };
+
+function createParams(): TestAssetHandlerPort {
   const project = createEmptyVideoProject('Recorded audio');
-  return {
-    project,
-    getCurrentProjectId: () => project.id,
+  const params: TestAssetHandlerPort = {
     currentTime: 5,
-    projects: [],
-    exportState: {
-      dialogOpen: false,
-      isRunning: false,
-      jobId: null,
-      status: null,
-      settings: null,
-      error: null,
-      lastResult: null,
-    },
-    libraries: {
-      projects: [],
-      projectExports: [],
-      recordings: [],
-      refreshProjectExports: vi.fn().mockResolvedValue(undefined),
-      refreshProjects: vi.fn().mockResolvedValue(undefined),
-      refreshRecordings: vi.fn().mockResolvedValue(undefined),
-    },
+    getCurrentProject: () => project,
+    getCurrentProjectId: () => project.id,
+    getCurrentTime: () => params.currentTime,
     addAssetClip: vi.fn(() => 'clip-1'),
-    applyLoadedProject: vi.fn(),
-    cancelExport: vi.fn(),
-    failExportCancellation: vi.fn(),
-    failExport: vi.fn(),
     moveClip: vi.fn(),
     setError: vi.fn(),
-    startExport: vi.fn(),
     trimClipEnd: vi.fn(),
     trimClipStart: vi.fn(),
     upsertAsset: vi.fn(),
   };
+  return params;
 }
 
 beforeEach(() => {
@@ -130,6 +111,7 @@ describe('useAssetHandlers', () => {
 async function verifyRecordedAudioImport() {
   const params = createParams();
   renderHook(params);
+  params.currentTime = 8;
 
   await act(async () => {
     await latestHandlers?.handleImportRecordedAudio(new File(['voice'], 'voice.webm'), {
@@ -146,11 +128,11 @@ async function verifyRecordedAudioImport() {
   expect(params.addAssetClip).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'asset-1' }),
     null,
-    5
+    8
   );
-  expect(params.trimClipStart).toHaveBeenCalledWith('clip-1', 6.5);
-  expect(params.moveClip).toHaveBeenCalledWith('clip-1', 5);
-  expect(params.trimClipEnd).toHaveBeenCalledWith('clip-1', 7.5);
+  expect(params.trimClipStart).toHaveBeenCalledWith('clip-1', 9.5);
+  expect(params.moveClip).toHaveBeenCalledWith('clip-1', 8);
+  expect(params.trimClipEnd).toHaveBeenCalledWith('clip-1', 10.5);
 }
 
 async function verifyTimelineAssetPlacement() {

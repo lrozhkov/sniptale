@@ -28,12 +28,22 @@ function contributionFixture() {
   write(root, 'CODE_OF_CONDUCT.md', 'Enforcement owner: Lev Rozhkov\n');
   write(
     root,
+    '.github/SECURITY.md',
+    'Use GitHub **Report a vulnerability** for private reports.\n'
+  );
+  write(
+    root,
     'docs/oss/release.md',
-    'qa:release-harness qa:checkpoint qa:release qa:audit Corresponding Source AGPL-3.0-or-later\n'
+    'qa:release-harness qa:checkpoint qa:closeout ci:release Corresponding Source AGPL-3.0-or-later\n'
   );
   return {
     policy: {
-      contributorFiles: ['README.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'],
+      contributorFiles: [
+        'README.md',
+        'CONTRIBUTING.md',
+        'CODE_OF_CONDUCT.md',
+        '.github/SECURITY.md',
+      ],
       forbiddenReleaseDocFragments: [],
       releaseDocs: ['docs/oss/release.md'],
     },

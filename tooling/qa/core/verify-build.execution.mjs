@@ -46,7 +46,8 @@ function createStaticCollectors() {
         runRepoWideRootSideEffectCheck
       ),
     collectSecurityStep: ({ codeFiles }) => collectSecurityStep({ files: codeFiles }),
-    collectTypecheckStep: ({ targetFiles }) => collectTypecheckStepResult({ targetFiles }),
+    collectTypecheckStep: ({ checkerCount, targetFiles }) =>
+      collectTypecheckStepResult({ checkerCount, targetFiles }),
   };
 }
 
@@ -63,7 +64,7 @@ async function collectUnitAndCoverageSteps({ codeFiles, maxWorkers, targetFiles,
   return collectUnitTestAndCoverageStepResults({
     cacheSource: 'build',
     codeFiles,
-    coverageDetailOverride: 'coverage handled by qa:audit',
+    coverageDetailOverride: 'coverage handled by ci:release',
     coverageEnabled: false,
     directFilesOverride: buildScope.testScope.directTestFiles,
     fullSuiteOverride: buildScope.testScope.fullSuite,
@@ -86,7 +87,13 @@ function createDefaultCollectors() {
   };
 }
 
-export async function collectBuildLane({ context, buildScope, lane, vitestMaxWorkers }) {
+export async function collectBuildLane({
+  context,
+  buildScope,
+  lane,
+  typecheckCheckerCount,
+  vitestMaxWorkers,
+}) {
   const collectors = createDefaultCollectors();
   if (lane === 'static') {
     return {
@@ -105,7 +112,12 @@ export async function collectBuildLane({ context, buildScope, lane, vitestMaxWor
     };
   }
   if (lane === 'typecheck') {
-    return { typecheckStep: collectors.collectTypecheckStep(context, buildScope) };
+    return {
+      typecheckStep: collectors.collectTypecheckStep({
+        ...context,
+        checkerCount: typecheckCheckerCount,
+      }),
+    };
   }
   if (lane === 'tests') {
     return {

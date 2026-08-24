@@ -16,6 +16,12 @@ const OFFSCREEN_STARTUP_ID_PARAM = 'offscreenStartupId';
 const PRIVACY_ERASURE_MODE_PARAM = 'privacyErasure';
 const MISSING_OFFSCREEN_STARTUP_ID = 'missing-offscreen-startup-id';
 
+type OffscreenBootstrapState = 'bootstrapping' | 'failed' | 'ready';
+
+let bootstrapState: OffscreenBootstrapState = 'bootstrapping';
+let currentOffscreenStartupId = MISSING_OFFSCREEN_STARTUP_ID;
+let bootstrapCompletion: Promise<'failed' | 'ready'> = Promise.resolve('failed');
+
 function stringifyBootstrapError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -58,21 +64,59 @@ async function reconcileOffscreenRuntimeState(): Promise<void> {
 
 export function bootstrapOffscreenDocument(): void {
   const offscreenStartupId = resolveOffscreenStartupId();
+  currentOffscreenStartupId = offscreenStartupId;
+  bootstrapState = 'bootstrapping';
   initTracer('off');
   logger.debug('Offscreen document loaded');
   const runtimeReady = isPrivacyErasureOffscreenDocument()
     ? Promise.resolve()
     : initializeOffscreenDb(offscreenStartupId).then(() => reconcileOffscreenRuntimeState());
-  void runtimeReady
-    .then(() =>
-      sendRuntimeMessage({
-        type: VideoMessageType.OFFSCREEN_READY,
-        offscreenStartupId,
-      })
-    )
-    .catch((error) => {
-      void notifyOffscreenRuntimeFailure(error, offscreenStartupId);
-    });
+  bootstrapCompletion = runtimeReady.then(
+    async () => {
+      bootstrapState = 'ready';
+      try {
+        await sendRuntimeMessage({
+          type: VideoMessageType.OFFSCREEN_READY,
+          offscreenStartupId,
+        });
+      } catch (error) {
+        logger.error('Failed to notify runtime about offscreen readiness', error);
+      }
+      return 'ready' as const;
+    },
+    async (error) => {
+      bootstrapState = 'failed';
+      await notifyOffscreenRuntimeFailure(error, offscreenStartupId);
+      return 'failed' as const;
+    }
+  );
+}
+
+export async function probeOffscreenRuntimeReadiness(args: {
+  challenge: string;
+  offscreenStartupId: string;
+}): Promise<{
+  challenge: string;
+  offscreenStartupId: string;
+  state: 'failed' | 'ready';
+}> {
+  if (
+    args.offscreenStartupId !== currentOffscreenStartupId ||
+    currentOffscreenStartupId === MISSING_OFFSCREEN_STARTUP_ID
+  ) {
+    return {
+      challenge: args.challenge,
+      offscreenStartupId: currentOffscreenStartupId,
+      state: 'failed',
+    };
+  }
+
+  const state = bootstrapState === 'bootstrapping' ? await bootstrapCompletion : bootstrapState;
+  return {
+    challenge: args.challenge,
+    offscreenStartupId: currentOffscreenStartupId,
+    state,
+  };
 }
 
 function isPrivacyErasureOffscreenDocument(): boolean {

@@ -5,6 +5,8 @@ import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
+import { collectMutationEvidence } from './artifacts.mjs';
+
 const temporaryRoots: string[] = [];
 
 afterEach(() => {
@@ -16,14 +18,23 @@ afterEach(() => {
 it('binds pull-request proof paths and manifests to the candidate rather than the event SHA', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-artifact-candidate-identity-'));
   temporaryRoots.push(root);
+  const policyDestination = path.join(root, 'tooling/configs/ci/proof-semantics.json');
+  fs.mkdirSync(path.dirname(policyDestination), { recursive: true });
+  fs.copyFileSync('tooling/configs/ci/proof-semantics.json', policyDestination);
   const moduleUrl = new URL('./artifacts.mjs', import.meta.url).href;
-  const script = `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)}; collectLaneArtifacts({ lane: 'candidate', startedAtMs: 0, status: 'failed', command: [], containerDigest: 'sha256:${'a'.repeat(64)}' });`;
+  const script = [
+    `import { collectLaneArtifacts } from ${JSON.stringify(moduleUrl)};`,
+    'collectLaneArtifacts({ lane: "proof", startedAtMs: 0, status: "failed", command: [],',
+    `containerDigest: "sha256:${'a'.repeat(64)}", trustedControlDigest: "sha256:${'d'.repeat(64)}", controlDigest: "sha256:${'d'.repeat(64)}",`,
+    `gateInputDigest: "sha256:${'e'.repeat(64)}" });`,
+  ].join(' ');
   const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
     cwd: root,
     env: {
       ...process.env,
       GITHUB_SHA: 'b'.repeat(40),
       GITHUB_RUN_ID: '24',
+      GITHUB_RUN_ATTEMPT: '2',
       SNIPTALE_CANDIDATE_SHA: 'c'.repeat(40),
     },
     encoding: 'utf8',
@@ -32,7 +43,73 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
   expect(result.status, result.stderr).toBe(0);
   const bundle = path.join(
     root,
-    `build/ci-artifacts/candidate-${'c'.repeat(40)}-24/proof-manifest.json`
+    `build/ci-artifacts/proof-${'c'.repeat(40)}-24-2/proof-manifest.json`
   );
-  expect(JSON.parse(fs.readFileSync(bundle, 'utf8'))).toMatchObject({ commit: 'c'.repeat(40) });
+  expect(JSON.parse(fs.readFileSync(bundle, 'utf8'))).toMatchObject({
+    commit: 'c'.repeat(40),
+    controlAuthority: 'trusted-base',
+    controlsChanged: false,
+    controlDisposition: 'trusted-controls',
+    trustedControlDigest: `sha256:${'d'.repeat(64)}`,
+    controlDigest: `sha256:${'d'.repeat(64)}`,
+  });
+});
+
+it('collects only the current mutation run label and ignores stale sibling evidence', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-mutation-evidence-'));
+  temporaryRoots.push(root);
+  const destinationRoot = path.join(root, 'artifact');
+  fs.mkdirSync(destinationRoot);
+  const startedAtMs = Date.now() - 1000;
+  for (const profile of ['persistence', 'secrets']) {
+    for (const file of ['stryker-report.json', 'summary.json']) {
+      const current = path.join(root, '.tmp/mutation', profile, '42', file);
+      fs.mkdirSync(path.dirname(current), { recursive: true });
+      fs.writeFileSync(current, '{}\n');
+    }
+    const stale = path.join(root, '.tmp/mutation', profile, 'after', 'summary.json');
+    fs.mkdirSync(path.dirname(stale), { recursive: true });
+    fs.writeFileSync(stale, 'stale\n');
+    fs.utimesSync(stale, new Date(0), new Date(0));
+  }
+
+  expect(
+    collectMutationEvidence({
+      destinationRoot,
+      environment: { GITHUB_RUN_ID: '42' },
+      notBeforeMs: startedAtMs,
+      repositoryRoot: root,
+      required: true,
+    })
+  ).toBe(4);
+  expect(fs.existsSync(path.join(destinationRoot, '.tmp/mutation/persistence/after'))).toBe(false);
+  expect(
+    fs.existsSync(path.join(destinationRoot, '.tmp/mutation/secrets/42/stryker-report.json'))
+  ).toBe(true);
+});
+
+it('rejects mutation evidence below a symlinked ancestor directory', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-mutation-symlink-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-mutation-outside-'));
+  temporaryRoots.push(root, outside);
+  const destinationRoot = path.join(root, 'artifact');
+  fs.mkdirSync(destinationRoot);
+  for (const file of ['stryker-report.json', 'summary.json']) {
+    const source = path.join(outside, file);
+    fs.writeFileSync(source, '{}\n');
+  }
+  const profileRoot = path.join(root, '.tmp/mutation/persistence');
+  fs.mkdirSync(profileRoot, { recursive: true });
+  fs.symlinkSync(outside, path.join(profileRoot, '42'), 'dir');
+
+  expect(() =>
+    collectMutationEvidence({
+      destinationRoot,
+      environment: { GITHUB_RUN_ID: '42' },
+      notBeforeMs: Date.now() - 1000,
+      repositoryRoot: root,
+      required: true,
+    })
+  ).toThrow('Unsafe artifact symlink: .tmp/mutation/persistence/42/stryker-report.json');
+  expect(fs.readdirSync(destinationRoot)).toEqual([]);
 });

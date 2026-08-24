@@ -14,12 +14,15 @@ import {
   runBoundedTasks,
 } from '../runtime/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from './owner-guard-step-helpers.mjs';
+import { createSchedulerLaneTask } from './scheduler-lane-task.mjs';
+import { TYPECHECK_CHECKERS, TYPESCRIPT_TOOL_VERSION } from './typescript-cli.mjs';
+import { OXLINT_TOOL_VERSION } from './verify-oxlint.mjs';
 
 const FULL_VERIFY_WORKER_URL = new URL('./verify-all.worker.mjs', import.meta.url);
 const LANE_RESOURCES = Object.freeze({
   appOwners: { cpuTokens: 1, memoryMiB: 1024 },
   targetPaths: { cpuTokens: 1, memoryMiB: 1024 },
-  typecheck: { cpuTokens: 1, memoryMiB: 3072 },
+  typecheck: { cpuTokens: TYPECHECK_CHECKERS.full, memoryMiB: 5120 },
   graph: { cpuTokens: 1, memoryMiB: 2048 },
   lint: { cpuTokens: 2, memoryMiB: 6144 },
   tests: { memoryMiB: 4096 },
@@ -31,11 +34,10 @@ const FULL_RESULT_SHAPES = Object.freeze({
   targetPaths: { ownerStep: 'step' },
   typecheck: { typecheckStep: 'step' },
   tests: { testSteps: 'steps' },
-  lint: { eslintStep: 'step', sonarjsStep: 'nullable-step', securityStep: 'step' },
+  lint: { oxlintStep: 'step', sonarjsStep: 'nullable-step', securityStep: 'step' },
   graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
   light: {
     lineLengthStep: 'step',
-    oxlintStep: 'step',
     aiHygieneStep: 'step',
     structuralRiskStep: 'step',
     namingStep: 'step',
@@ -46,13 +48,20 @@ const FULL_RESULT_SHAPES = Object.freeze({
   },
 });
 
-export function runFullVerifyLaneWorker({ context, lane, memoryMiB, signal, vitestMaxWorkers }) {
+export function runFullVerifyLaneWorker({
+  context,
+  lane,
+  memoryMiB,
+  signal,
+  typecheckCheckerCount,
+  vitestMaxWorkers,
+}) {
   return runQaLaneWorker({
     label: `Full verification worker ${lane}`,
     memoryMiB,
     resultParser: (value) => parseLaneResult(value, { lane, shapes: FULL_RESULT_SHAPES }),
     signal,
-    workerData: { context, lane, vitestMaxWorkers },
+    workerData: { context, lane, typecheckCheckerCount, vitestMaxWorkers },
     workerUrl: FULL_VERIFY_WORKER_URL,
   });
 }
@@ -66,35 +75,45 @@ function createFullVerifyWorkerContext(context) {
   };
 }
 
-function createTasks({ context, profile, workerRunner }) {
+function createTasks({ context, includeTests, profile, workerRunner }) {
   const workerContext = createFullVerifyWorkerContext(context);
-  return ['targetPaths', 'appOwners', 'typecheck', 'tests', 'lint', 'graph', 'light'].map(
-    (lane) => {
-      const resources = LANE_RESOURCES[lane];
-      const dedicatedReleaseTests = context.releaseMode && lane === 'tests';
-      const cpuTokens =
-        lane === 'tests'
-          ? dedicatedReleaseTests
-            ? profile.cpuTokens
-            : profile.vitestMaxWorkers
-          : resources.cpuTokens;
-      const memoryMiB = dedicatedReleaseTests ? profile.memoryMiB : resources.memoryMiB;
-      return {
-        id: lane,
-        cpuTokens,
-        exclusive: dedicatedReleaseTests,
-        memoryMiB,
-        run: ({ signal }) =>
-          workerRunner({
-            context: workerContext,
-            lane,
-            memoryMiB,
-            signal,
-            vitestMaxWorkers: profile.vitestMaxWorkers,
-          }),
-      };
-    }
-  );
+  const typecheckCheckerCount = Math.min(TYPECHECK_CHECKERS.full, profile.cpuTokens);
+  const lanes = ['targetPaths', 'appOwners', 'typecheck', 'lint', 'graph', 'light'];
+  if (includeTests) lanes.splice(3, 0, 'tests');
+  return lanes.map((lane) => {
+    const resources =
+      lane === 'typecheck'
+        ? { ...LANE_RESOURCES.typecheck, cpuTokens: typecheckCheckerCount }
+        : LANE_RESOURCES[lane];
+    const dedicatedReleaseTests = context.releaseMode && lane === 'tests';
+    const cpuTokens =
+      lane === 'tests'
+        ? dedicatedReleaseTests
+          ? profile.cpuTokens
+          : profile.vitestMaxWorkers
+        : resources.cpuTokens;
+    const memoryMiB = dedicatedReleaseTests ? profile.memoryMiB : resources.memoryMiB;
+    return createSchedulerLaneTask({
+      cpuTokens,
+      exclusive: dedicatedReleaseTests,
+      executionProfile:
+        lane === 'typecheck'
+          ? {
+              checkerCount: typecheckCheckerCount,
+              toolName: 'typescript',
+              toolVersion: TYPESCRIPT_TOOL_VERSION,
+            }
+          : lane === 'lint'
+            ? { toolName: 'oxlint', toolVersion: OXLINT_TOOL_VERSION }
+            : {},
+      memoryMiB,
+      lane,
+      profile,
+      typecheckCheckerCount,
+      workerContext,
+      workerRunner,
+    });
+  });
 }
 
 function annotate(result, profile) {
@@ -110,7 +129,7 @@ function annotate(result, profile) {
     return appendTaskResultScheduleDetail(value, 'testSteps', detail, { list: true });
   }
   if (result.id === 'lint') {
-    return { ...value, eslintStep: appendTaskScheduleDetail(value.eslintStep, detail) };
+    return { ...value, oxlintStep: appendTaskScheduleDetail(value.oxlintStep, detail) };
   }
   if (result.id === 'graph') {
     return {
@@ -127,14 +146,13 @@ function annotate(result, profile) {
   };
 }
 
-function assemble(results, releaseMode) {
+function assemble(results, releaseMode, includeTests) {
   const { appOwners, graph, light, lint, targetPaths, tests, typecheck } =
     indexTaskResults(results);
   const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
   return [
     light.lineLengthStep,
-    light.oxlintStep,
-    lint.eslintStep,
+    lint.oxlintStep,
     ...(releaseMode ? [lint.sonarjsStep] : []),
     light.aiHygieneStep,
     light.structuralRiskStep,
@@ -147,32 +165,39 @@ function assemble(results, releaseMode) {
     ...graph.dependencySteps,
     typecheck.typecheckStep,
     graph.deadExportsStep,
-    ...tests.testSteps,
+    ...(includeTests ? tests.testSteps : []),
   ];
 }
 
 export async function collectScheduledFullVerifySteps(
   context,
-  { profile = null, scheduler = runBoundedTasks, workerRunner = runFullVerifyLaneWorker } = {}
+  {
+    includeTests = true,
+    profile = null,
+    scheduler = runBoundedTasks,
+    workerRunner = runFullVerifyLaneWorker,
+  } = {}
 ) {
   const selectedProfile =
     profile ??
     (context.releaseMode ? resolveQaReleaseResourceProfile() : resolveQaResourceProfile());
-  const tasks = createTasks({ context, profile: selectedProfile, workerRunner });
-  const results = context.releaseMode
-    ? [
-        ...(await scheduler(
-          tasks.filter(({ id }) => id !== 'tests'),
-          { profile: selectedProfile }
-        )),
-        ...(await scheduler(
-          tasks.filter(({ id }) => id === 'tests'),
-          { profile: selectedProfile }
-        )),
-      ]
-    : await scheduler(tasks, { profile: selectedProfile });
+  const tasks = createTasks({ context, includeTests, profile: selectedProfile, workerRunner });
+  const results =
+    context.releaseMode && includeTests
+      ? [
+          ...(await scheduler(
+            tasks.filter(({ id }) => id !== 'tests'),
+            { profile: selectedProfile }
+          )),
+          ...(await scheduler(
+            tasks.filter(({ id }) => id === 'tests'),
+            { profile: selectedProfile }
+          )),
+        ]
+      : await scheduler(tasks, { profile: selectedProfile });
   return assemble(
     results.map((result) => ({ ...result, value: annotate(result, selectedProfile) })),
-    context.releaseMode
+    context.releaseMode,
+    includeTests
   );
 }

@@ -50,7 +50,7 @@ function render(node: ReactNode) {
 
 function clickGradientControl(selector: string) {
   act(() => {
-    (container?.querySelector(selector) as HTMLButtonElement).click();
+    (container!.querySelector(selector) as HTMLButtonElement).click();
   });
 }
 

@@ -111,7 +111,7 @@ export function resolvePrePushCommands({ prePushInput = '', gitRunner = runGit }
   return [
     ...(hasHarnessVerificationQaTargets(context) ? ['qa:release-harness'] : []),
     'qa:checkpoint',
-    'qa:build',
+    'qa:internal:build',
   ];
 }
 

@@ -34,7 +34,7 @@ it('keeps model text budgets out of active QA runtime and manifests', () => {
   const files = [
     'package.json',
     'package-lock.json',
-    'eslint.config.js',
+    '.oxlintrc.json',
     ...collectFiles('tooling/configs/qa'),
     ...collectFiles('tooling/qa'),
   ];
@@ -46,26 +46,8 @@ it('keeps model text budgets out of active QA runtime and manifests', () => {
   expect(fs.existsSync('tooling/qa/core/verify-hotspot-regression.mjs')).toBe(false);
 });
 
-it('passes verify-prettier for formatted files and fails for unformatted files', async () => {
-  const root = createTempRoot('verify-prettier-');
-  writeFile(root, 'good.ts', 'export const value = 1;\n');
-  writeFile(root, 'bad.ts', 'export   const value=1;\n');
-  writeFile(root, 'README.md', '#Title\n\nA paragraph that should not be formatter-owned.\n');
-
-  const module = await withCwd(root, async () =>
-    importFresh<typeof import('./verify-prettier.mjs')>('./verify-prettier.mjs')
-  );
-
-  expect((await module.runPrettierCheck(['good.ts'])).failures).toEqual([]);
-  expect((await module.runPrettierCheck(['bad.ts'])).failures).toEqual(['bad.ts']);
-  expect(await module.runPrettierCheck(['README.md'])).toEqual({
-    checkedFiles: [],
-    failures: [],
-  });
-});
-
-it('keeps markdown documents outside standalone prettier scope', () => {
-  expect(fs.readFileSync('.prettierignore', 'utf8')).toContain('*.md');
+it('keeps markdown documents outside standalone Oxfmt scope', () => {
+  expect(fs.readFileSync('.oxfmtignore', 'utf8')).toContain('*.md');
 });
 
 it('flags only changed long lines in verify-line-length', async () => {
@@ -171,31 +153,31 @@ it('blocks unsafe regex warnings in the security ESLint lane', async () => {
     lintRunner: async (options: unknown) => {
       calls.push(options);
       return {
-        failed: calls.length === 2,
-        warningCount: calls.length === 2 ? 1 : 0,
+        failed: true,
+        warningCount: 1,
         errorCount: 0,
-        output: calls.length === 2 ? 'unsafe regex warning' : '',
+        output: 'unsafe regex warning',
         results: [],
       };
     },
   });
 
   expect(calls).toEqual([
-    expect.objectContaining({ quiet: true, rulePrefix: 'security/' }),
-    expect.objectContaining({
-      rulePrefix: 'security/detect-unsafe-regex',
-      strict: true,
-    }),
+    expect.objectContaining({ files: ['tooling/qa/core/verify-oxlint.mjs'] }),
   ]);
   expect(result.eslintResult).toEqual(expect.objectContaining({ failed: true, warningCount: 1 }));
 });
 
-it('reuses precomputed security findings for covered files', async () => {
+it('does not accept a shared general-lint result bag as security authority', async () => {
   const module = await import('../guards/security/verify-security.mjs');
   const relativeFile = 'tooling/qa/core/verify-oxlint.mjs';
-  const lintRunner = vi.fn(async () => {
-    throw new Error('covered files must not be linted again');
-  });
+  const lintRunner = vi.fn(async () => ({
+    errorCount: 0,
+    failed: false,
+    output: '',
+    results: [],
+    warningCount: 0,
+  }));
 
   const result = await module.runSecurityCheck([relativeFile], {
     eslintResults: [
@@ -221,11 +203,11 @@ it('reuses precomputed security findings for covered files', async () => {
     lintRunner,
   });
 
-  expect(lintRunner).not.toHaveBeenCalled();
-  expect(result.eslintResult).toEqual(expect.objectContaining({ failed: true, warningCount: 1 }));
+  expect(lintRunner).toHaveBeenCalledWith({ files: [relativeFile], strictWarnings: false });
+  expect(result.eslintResult).toEqual(expect.objectContaining({ failed: false }));
 });
 
-it('lints only security files missing from shared ESLint results', async () => {
+it('lints the complete requested security scope once', async () => {
   const module = await import('../guards/security/verify-security.mjs');
   const missingFile = 'tooling/qa/core/verify-oxlint.mjs';
   const lintRunner = vi.fn(async () => ({
@@ -246,7 +228,6 @@ it('lints only security files missing from shared ESLint results', async () => {
     lintRunner,
   });
 
-  expect(lintRunner).toHaveBeenCalledTimes(2);
-  expect(lintRunner).toHaveBeenNthCalledWith(1, expect.objectContaining({ files: [missingFile] }));
-  expect(lintRunner).toHaveBeenNthCalledWith(2, expect.objectContaining({ files: [missingFile] }));
+  expect(lintRunner).toHaveBeenCalledTimes(1);
+  expect(lintRunner).toHaveBeenCalledWith({ files: [missingFile], strictWarnings: false });
 });

@@ -1,5 +1,6 @@
 import { findObservedQaRule } from '../../core/qa-steps/runtime-registry.mjs';
 import { formatDuration } from '../../runtime/run-metrics.helpers.mjs';
+import { summarizeTimeline } from '../../runtime/observability/timeline-metrics.mjs';
 
 const SUMMARY_PROBLEM_LIMIT = 6;
 
@@ -137,6 +138,7 @@ export function normalizeObservedStep(step) {
 }
 
 export function formatObservedRunSummary({ label, record, runPath }) {
+  const timeline = summarizeTimeline(record);
   const problems = record.summary.problemIds;
   const result =
     record.status === 'skipped'
@@ -159,5 +161,30 @@ export function formatObservedRunSummary({ label, record, runPath }) {
       (logPath) => `Child run log: ${logPath}`
     ),
   ].filter(Boolean);
-  return `${label}: ${result} in ${formatDuration(record.durationMs ?? 0)}\n${problemLine}\n${pathLines.join('\n')}\n`;
+  const timingLines = record.timeline
+    ? [
+        [
+          `Timeline: wall=${formatDuration(timeline.wallClockMs)}`,
+          `critical=${formatDuration(timeline.criticalPathMs)}`,
+          `active=${formatDuration(timeline.activeExecutionMs)}`,
+        ].join('; '),
+        [
+          `Wait: queue=${formatDuration(timeline.queueWaitMs)}`,
+          `resource=${formatDuration(timeline.resourceWaitMs)}`,
+        ].join('; '),
+        `Slow: ${
+          timeline.topSlowActivities
+            .map(({ activityId, durationMs }) => `${activityId}=${formatDuration(durationMs)}`)
+            .join(', ') || 'none'
+        }`,
+        `Reused: ${timeline.reused.join(', ') || 'none'}`,
+        `Skipped: ${timeline.skipped.join(', ') || 'none'}`,
+      ]
+    : [];
+  return `${[
+    `${label}: ${result} in ${formatDuration(record.durationMs ?? 0)}`,
+    problemLine,
+    ...timingLines,
+    ...pathLines,
+  ].join('\n')}\n`;
 }

@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+__pycache__/
+*.pyc
 
 # Build output
 dist/
@@ -16,7 +18,6 @@ coverage/
 
 
 # Logs
-.eslintcache
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

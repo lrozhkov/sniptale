@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { validateSelectelQaProfiles } from './policy.mjs';
+import { validateSelectelProfilesForLane, validateSelectelQaProfiles } from './policy.mjs';
 
 const source = fs.readFileSync('tooling/ci/selectel/sdk-controller.py', 'utf8');
 const dockerfile = fs.readFileSync('tooling/ci/selectel/Dockerfile.controller', 'utf8');
@@ -32,11 +32,17 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
     'ru-3b': ['basicssd.ru-3b'],
   });
   expect(policy.compute).not.toHaveProperty('attemptPlacements');
+  expect(policy.network).toEqual({
+    subnetCidr: '10.77.0.0/24',
+    lifecycle: 'disposable-per-attempt',
+    securityGroupNamePrefix: 'sniptale-github-actions-no-ingress',
+  });
+  expect(policy.trust.persistentNetworkResources).toBe(false);
   expect(policy.imageSelector).toEqual({ name: 'Ubuntu 24.04 LTS 64-bit' });
   expect(source).toContain('item.name == placement["flavor"]');
   expect(source).toContain('flavor.disk != 0');
   expect(source).toContain('int(image.min_disk or 0) > placement["volumeGiB"]');
-  expect(source).toContain('result["message"] = " ".join(message.split())[:500]');
+  expect(source).toContain('result["message"] = redact_failure_message(message, connection)');
   expect(source).toContain('record["failure"] = server_failure(');
   expect(source).toContain('cleanup_with_retries(');
   expect(source).toContain('for profile_index, placement in enumerate(profiles):');
@@ -50,11 +56,48 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
   expect(source).toContain('generate-jitconfig');
   expect(source).toContain('wait_runner_online');
   expect(source).toContain('wait_for_delete');
+  expect(source).toContain('remove_interface_from_router');
+  expect(source).toContain('delete_router');
+  expect(source).toContain('delete_subnet');
+  expect(source).toContain('delete_network');
+  expect(source).toContain('delete_security_group');
   expect(source).toContain('sniptale-selectel-sweep-proof');
-  expect(source).toContain('port.device_id not in live_server_ids');
+  expect(source).toContain('if expired_description(port)');
+  expect(source).toContain('runner.get("name") in expired_runner_names');
   expect(source).toContain('volume_type=selected["volume_type"].name');
   expect(source).not.toContain('print(jit_config');
   expect(source).not.toContain('SELECTEL_OS_PROJECT_ID');
+  expect(source).not.toContain('RUNNER_IMAGE_TOKEN');
+  expect(source).not.toContain('RUNNER_IMAGE_USER');
+});
+
+it('keeps reusable GitHub credentials out of user-data and denies candidate metadata access', () => {
+  const script = [
+    'import base64,runpy,sys,types',
+    'module=types.ModuleType("openstack")',
+    'module.connection=types.SimpleNamespace(Connection=object)',
+    'module.exceptions=types.SimpleNamespace(SDKException=Exception)',
+    'sys.modules["openstack"]=module',
+    'namespace=runpy.run_path("tooling/ci/selectel/sdk-controller.py", run_name="sniptale_test")',
+    'policy=namespace["read_policy"]()',
+    'encoded,_=namespace["cloud_init"](policy,"one-shot-jit", "ghcr.io/lrozhkov/sniptale-qa@sha256:" + "a"*64)',
+    'print(base64.b64decode(encoded).decode())',
+  ].join(';');
+  const result = spawnSync('python3', ['-c', script], {
+    cwd: process.cwd(),
+    env: { ...process.env, SNIPTALE_REPOSITORY_ROOT: process.cwd() },
+    encoding: 'utf8',
+  });
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toContain('docker, pull, ghcr.io/lrozhkov/sniptale-qa@sha256:');
+  expect(result.stdout).toContain('DOCKER-USER');
+  expect(result.stdout).toContain('169.254.169.254/32');
+  expect(result.stdout).toContain('iptables --wait --check');
+  expect(result.stdout.indexOf('169.254.169.254/32')).toBeLessThan(
+    result.stdout.indexOf('./run.sh --jitconfig')
+  );
+  expect(result.stdout).not.toContain('docker login');
+  expect(result.stdout).not.toContain('RUNNER_IMAGE_TOKEN');
 });
 
 it('locks the controller image and complete SDK dependency closure', () => {
@@ -88,9 +131,14 @@ it('continues cloud cleanup when GitHub runner deletion fails and preserves part
   );
   expect(result.status, result.stderr).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual({
+    network: 'deleted',
     ports: 'deleted',
+    router: 'deleted',
+    routerPorts: 'deleted',
     runner: 'failed',
+    securityGroups: 'deleted',
     server: 'deleted',
+    subnet: 'deleted',
     volumes: 'deleted',
   });
 });
@@ -108,8 +156,78 @@ it('writes a replayable cleanup-failed receipt when all retries are exhausted', 
   expect(JSON.parse(result.stdout).status).toBe('cleanup-failed');
 });
 
+it('redacts project and credential identities from persisted and console failure text', () => {
+  const script = [
+    'import json,runpy,sys,types',
+    'module=types.ModuleType("openstack")',
+    'module.connection=types.SimpleNamespace(Connection=object)',
+    'module.exceptions=types.SimpleNamespace(SDKException=Exception)',
+    'sys.modules["openstack"]=module',
+    'namespace=runpy.run_path("tooling/ci/selectel/sdk-controller.py", run_name="sniptale_test")',
+    'message="project-raw-uuid credential-id credential-secret runner-token"',
+    'namespace["remember_project_id_for_redaction"]("project-raw-uuid")',
+    'print(json.dumps(namespace["cleanup_failure"](RuntimeError(message))))',
+  ].join(';');
+  const result = spawnSync('python3', ['-c', script], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      SELECTEL_OS_APPLICATION_CREDENTIAL_ID: 'credential-id',
+      SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: 'credential-secret',
+      RUNNER_CONTROLLER_TOKEN: 'runner-token',
+      SNIPTALE_REPOSITORY_ROOT: process.cwd(),
+    },
+    encoding: 'utf8',
+  });
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).not.toMatch(
+    /project-raw-uuid|credential-id|credential-secret|runner-token/u
+  );
+  expect(JSON.parse(result.stdout).message).toContain('[REDACTED]');
+});
+
+it('replays cleanup from nested resources after provisioning cleanup was interrupted', () => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', 'nested-receipt-replay'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const receipt = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
+  expect(receipt.status).toBe('cleaned');
+  expect(receipt.attempts[0].status).toBe('cleaned');
+});
+
+it('recovers cleanup by exact run and run-attempt identity when the receipt is unavailable', () => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', 'identity-recovery'],
+    { cwd: process.cwd(), encoding: 'utf8' }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const receipt = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
+  expect(receipt.status).toBe('cleaned');
+  expect(receipt.runAttempt).toBe('3');
+});
+
 const validProfiles = {
   profiles: [
+    {
+      zone: 'ru-3b',
+      flavor: 'SL1.16-32768',
+      volumeType: 'basicssd.ru-3b',
+      volumeGiB: 80,
+      qa: {
+        cpuTokens: 16,
+        memoryMiB: 24576,
+        vitestWorkers: 12,
+        playwrightWorkers: 4,
+        securityWorkers: 8,
+      },
+    },
     {
       zone: 'ru-3a',
       flavor: 'SL1.24-49152',
@@ -163,11 +281,24 @@ function validateWithPythonController(raw: string | undefined) {
 
 it('validates and hashes the ordered runtime profile document without storing its value', () => {
   const validated = validateSelectelQaProfiles(JSON.stringify(validProfiles));
-  expect(validated.profiles).toHaveLength(2);
+  expect(validated.profiles).toHaveLength(3);
   expect(validated.digest).toMatch(/^sha256:[a-f0-9]{64}$/u);
   const python = validateWithPythonController(JSON.stringify(validProfiles));
   expect(python.status, python.stderr).toBe(0);
   expect(JSON.parse(python.stdout).digest).toBe(validated.digest);
+});
+
+it('rejects proof-compatible profiles that are below the canonical release minimum', () => {
+  const releaseProfiles = { profiles: validProfiles.profiles.slice(0, 2) };
+  expect(() =>
+    validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'proof')
+  ).not.toThrow();
+  expect(() =>
+    validateSelectelProfilesForLane(JSON.stringify(releaseProfiles), 'release')
+  ).not.toThrow();
+  expect(() => validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'release')).toThrow(
+    /release lane minimum/u
+  );
 });
 
 it.each([

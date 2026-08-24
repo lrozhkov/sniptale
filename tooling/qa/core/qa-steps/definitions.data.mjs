@@ -1,7 +1,6 @@
 export const RELEASE_DIRECT_STEPS = [
   ['changed-line-readability', 'Changed-line readability', 'verify-line-length.mjs'],
   ['oxlint', 'Oxlint', 'verify-oxlint.mjs'],
-  ['eslint', 'ESLint', 'verify-eslint.mjs'],
   ['sonarjs', 'SonarJS', 'verify-sonarjs.mjs'],
   ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs'],
   ['structural-risk', 'Structural risk', 'verify-structural-risk.mjs'],
@@ -21,9 +20,8 @@ export const RELEASE_DIRECT_STEPS = [
 ];
 
 export const FOCUSED_DIRECT_STEPS = [
-  ['format', 'Format', 'verify-prettier.mjs'],
+  ['format', 'Format', 'verify-oxfmt.mjs'],
   ['oxlint', 'Oxlint', 'verify-oxlint.mjs'],
-  ['eslint', 'ESLint', 'verify-eslint.mjs'],
   ['sonarjs', 'SonarJS', 'verify-sonarjs.mjs'],
   ['changed-line-readability', 'Changed-line readability', 'verify-line-length.mjs'],
   ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs'],
@@ -40,9 +38,8 @@ export const FOCUSED_TRIGGERED_RUNTIME_STEPS = [
 ];
 
 export const HARNESS_STEPS = [
-  ['format', 'Format', 'verify-prettier.mjs', 'always'],
+  ['format', 'Format', 'verify-oxfmt.mjs', 'always'],
   ['oxlint', 'Oxlint', 'verify-oxlint.mjs', 'always'],
-  ['eslint', 'ESLint', 'verify-eslint.mjs', 'always'],
   ['changed-line-readability', 'Changed-line readability', 'verify-line-length.mjs', 'always'],
   ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs', 'always'],
   ['structural-risk', 'Structural risk', 'verify-structural-risk.mjs', 'always'],
@@ -114,10 +111,55 @@ export const CANONICAL_WRAPPER_IDS = Object.freeze([
   'qa:closeout',
   'qa:build',
   'qa:release-harness',
-  'qa:release',
-  'qa:audit',
+  'ci:proof',
+  'ci:release',
   'qa:e2e',
 ]);
+
+export const CI_COMPOSITION_STEPS = [
+  [
+    'candidate-proof-admission',
+    'Candidate proof admission',
+    'admit-candidate-proof.mjs',
+    'conditional',
+    'tooling/ci/admit-candidate-proof.mjs',
+  ],
+  [
+    'fast-proof-reuse',
+    'Fast proof reuse',
+    'fast-proof-reuse.mjs',
+    'conditional',
+    'tooling/ci/fast-proof-reuse.mjs',
+  ],
+  [
+    'main-proof-transport',
+    'Main proof transport',
+    'main-proof-transport.mjs',
+    'conditional',
+    'tooling/ci/main-proof-transport.mjs',
+  ],
+  [
+    'mutation-persistence',
+    'Mutation persistence',
+    'run-profile.mjs',
+    'conditional',
+    'tooling/test/mutation/run-profile.mjs',
+  ],
+  [
+    'mutation-secrets',
+    'Mutation secrets',
+    'run-profile.mjs',
+    'conditional',
+    'tooling/test/mutation/run-profile.mjs',
+  ],
+  [
+    'main-proof-verification',
+    'Main proof verification',
+    'verify-main-proof.mjs',
+    'conditional',
+    'tooling/ci/verify-main-proof.mjs',
+  ],
+];
 
 export const WRAPPER_LIFECYCLE_STEPS = [
   [
@@ -239,6 +281,7 @@ export const AUDIT_STEPS = [
 ];
 
 export const FULL_VIOLATION_STEP_TOOLS = new Map([
+  ['Documentation facts', 'verify-documentation-facts.mjs'],
   ['Architecture guardrails', 'verify-architecture-guardrails.mjs'],
   ['Boundary casts', 'verify-boundary-casts.mjs'],
   ['Boundary inputs', 'verify-boundary-inputs.mjs'],

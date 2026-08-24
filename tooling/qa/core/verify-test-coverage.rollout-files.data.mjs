@@ -2,7 +2,7 @@ export const COVERAGE_ROLLOUT_EXACT_FILES = {
   coreRuntimeOwners: [
     'apps/extension/src/video-editor/project/selection/model.ts',
     'apps/extension/src/video-editor/runtime/commands/types.ts',
-    'apps/extension/src/video-editor/runtime/controller/builders.ts',
+    'apps/extension/src/video-editor/runtime/controller/composition/provider.tsx',
     'apps/extension/src/video-editor/runtime/controller/contracts/header.ts',
     'apps/extension/src/video-editor/runtime/controller/contracts/insertion.ts',
     'apps/extension/src/video-editor/runtime/controller/contracts/preview.ts',
@@ -15,7 +15,7 @@ export const COVERAGE_ROLLOUT_EXACT_FILES = {
     'apps/extension/src/video-editor/runtime/controller/workspace/sidebar-placement-actions.ts',
     'apps/extension/src/video-editor/runtime/controller/workspace/sidebar.ts',
     'apps/extension/src/video-editor/runtime/controller/workspace/timeline.ts',
-    'apps/extension/src/video-editor/runtime/controller/workspace/types.ts',
+    'apps/extension/src/video-editor/runtime/controller/workspace/core.ts',
     'apps/extension/src/video-editor/runtime/playback/rate-slider.ts',
     'apps/extension/src/video-editor/runtime/session/auto-save.ts',
     'apps/extension/src/video-editor/runtime/session/export-event-route.ts',

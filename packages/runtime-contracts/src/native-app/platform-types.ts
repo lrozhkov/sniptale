@@ -25,6 +25,10 @@ export interface NativeAutostartState {
     | 'unknown';
 }
 
+/**
+ * Host-reported installation state used for compatibility and repair guidance.
+ * These fields are parsed protocol data, not extension-verified binary attestation.
+ */
 export interface NativeInstallState {
   platform: NativePlatform;
   appVersion: string;
@@ -32,10 +36,13 @@ export interface NativeInstallState {
   installerVersion: string;
   nativeHostManifestVersion: string;
   updateChannel: 'stable' | 'beta' | 'dev';
+  /** Reported by the connected native host; not verified against a pinned key by the extension. */
   signedBinary: boolean;
+  /** Reported by the connected native host; the extension does not verify OS rollback policy. */
   rollbackProtected: boolean;
   autostart: NativeAutostartState;
   notarized?: boolean;
+  /** Host-reported package health used to request repair, not an extension security verdict. */
   packageIntegrity: 'valid' | 'invalid' | 'unknown' | 'unsupported';
 }
 

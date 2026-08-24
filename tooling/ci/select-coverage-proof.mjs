@@ -3,10 +3,11 @@ import path from 'node:path';
 import { isExecutedAsScript } from '../qa/core/shared.mjs';
 import {
   downloadSuccessfulMainProof,
+  downloadLatestReleaseProof,
   removeSafeRestoreOutput,
   runGitHubCli,
 } from './main-proof-transport.mjs';
-import { verifyMainProof } from './verify-main-proof.mjs';
+import { verifyMainProof, verifyReleaseProof } from './verify-main-proof.mjs';
 
 const PROOF_FILE = '.tmp/qa/coverage-proof.json';
 const REPORT_DIRECTORY = '.tmp/coverage/canonical';
@@ -15,10 +16,11 @@ export function selectVerifiedCoverageProof(
   artifactRoot,
   commit,
   proofDestination,
-  reportsDestination
+  reportsDestination,
+  { verifier = verifyMainProof } = {}
 ) {
   const root = path.resolve(artifactRoot);
-  const { manifest } = verifyMainProof(root, commit);
+  const { manifest } = verifier(root, commit);
   const admitted = new Set(manifest.files.map(({ file }) => file));
   if (!admitted.has(PROOF_FILE))
     throw new Error('Successful main proof does not contain a coverage receipt.');
@@ -50,6 +52,29 @@ export function selectVerifiedCoverageProof(
   };
 }
 
+export function restoreLatestReleaseCoverageProof(
+  artifactRoot,
+  proofDestination,
+  reportsDestination,
+  { commandRunner = runGitHubCli } = {}
+) {
+  try {
+    const source = downloadLatestReleaseProof({ artifactRoot, commandRunner });
+    return selectVerifiedCoverageProof(
+      artifactRoot,
+      source.commit,
+      proofDestination,
+      reportsDestination,
+      { verifier: verifyReleaseProof }
+    );
+  } catch {
+    removeSafeRestoreOutput(artifactRoot, ['release-coverage-proof'], { recursive: true });
+    removeSafeRestoreOutput(proofDestination, ['coverage-proof'], { recursive: false });
+    removeSafeRestoreOutput(reportsDestination, ['coverage-reports'], { recursive: true });
+    return null;
+  }
+}
+
 export function restoreVerifiedMainCoverageProof(
   commit,
   artifactRoot,
@@ -70,6 +95,13 @@ export function restoreVerifiedMainCoverageProof(
 
 if (isExecutedAsScript(import.meta.url)) {
   const [mode, first, second, third, fourth] = process.argv.slice(2);
+  if (mode === 'restore-latest-release') {
+    const restored = restoreLatestReleaseCoverageProof(first, second, third);
+    if (restored) process.stdout.write(`${JSON.stringify(restored)}\n`);
+    else
+      process.stderr.write('Verified release coverage proof unavailable; running full coverage.\n');
+    process.exit(0);
+  }
   const restored =
     mode === 'restore'
       ? restoreVerifiedMainCoverageProof(first, second, third, fourth)

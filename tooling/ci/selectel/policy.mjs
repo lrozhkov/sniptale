@@ -6,45 +6,80 @@ import { stableStringify } from '../../qa/core/proof-input.mjs';
 
 export const SELECTEL_POLICY_PATH = 'tooling/configs/ci/selectel-runner.json';
 
+function isPositiveInteger(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
+function hasPositiveFields(value, fields) {
+  return (
+    value &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join('\0') === [...fields].sort().join('\0') &&
+    fields.every((field) => isPositiveInteger(value[field]))
+  );
+}
+
 export function readSelectelPolicy(root = process.cwd()) {
   const policy = JSON.parse(fs.readFileSync(path.join(root, SELECTEL_POLICY_PATH), 'utf8'));
+  const compute = policy?.compute;
+  const flavors = Object.entries(compute?.allowedFlavors ?? {});
+  const profiles = compute?.allowedResourceProfilesByFlavor ?? {};
+  const zones = compute?.allowedZones;
+  const volumeTypes = compute?.allowedVolumeTypesByZone ?? {};
   if (
     policy?.schemaVersion !== 1 ||
     policy.artifactKind !== 'sniptale-selectel-runner-policy' ||
     policy.environment !== 'selectel-runner-controller' ||
-    JSON.stringify(policy.compute?.allowedZones) !== JSON.stringify(['ru-3a', 'ru-3b']) ||
-    JSON.stringify(policy.compute?.allowedBootVolumeGiB) !== JSON.stringify([80]) ||
-    JSON.stringify(policy.compute?.allowedFlavors) !==
-      JSON.stringify({
-        'SL1.24-49152': { vcpus: 24, ramMiB: 49152 },
-        'SL1.12-24576': { vcpus: 12, ramMiB: 24576 },
-      }) ||
-    JSON.stringify(policy.compute?.allowedVolumeTypesByZone) !==
-      JSON.stringify({ 'ru-3a': ['universal.ru-3a'], 'ru-3b': ['basicssd.ru-3b'] }) ||
-    JSON.stringify(policy.compute?.allowedResourceProfilesByFlavor) !==
-      JSON.stringify({
-        'SL1.24-49152': {
-          cpuTokens: 24,
-          memoryMiB: 36864,
-          vitestWorkers: 16,
-          playwrightWorkers: 4,
-          securityWorkers: 8,
-        },
-        'SL1.12-24576': {
-          cpuTokens: 12,
-          memoryMiB: 18432,
-          vitestWorkers: 8,
-          playwrightWorkers: 4,
-          securityWorkers: 6,
-        },
-      }) ||
-    policy.compute?.preemptible !== true ||
-    policy.compute?.publicIp !== false ||
-    policy.compute?.ingress !== false ||
+    !Array.isArray(zones) ||
+    zones.length === 0 ||
+    zones.some((zone) => typeof zone !== 'string' || zone.length === 0) ||
+    new Set(zones).size !== zones.length ||
+    !Array.isArray(compute?.allowedBootVolumeGiB) ||
+    compute.allowedBootVolumeGiB.length === 0 ||
+    !compute.allowedBootVolumeGiB.every(isPositiveInteger) ||
+    flavors.length === 0 ||
+    flavors.some(([, flavor]) => !hasPositiveFields(flavor, ['vcpus', 'ramMiB'])) ||
+    Object.keys(profiles).sort().join('\0') !==
+      flavors
+        .map(([name]) => name)
+        .sort()
+        .join('\0') ||
+    Object.values(profiles).some(
+      (profile) =>
+        !hasPositiveFields(profile, [
+          'cpuTokens',
+          'memoryMiB',
+          'vitestWorkers',
+          'playwrightWorkers',
+          'securityWorkers',
+        ])
+    ) ||
+    flavors.some(([name, flavor]) => {
+      const profile = profiles[name];
+      return (
+        profile.cpuTokens > flavor.vcpus ||
+        profile.memoryMiB >= flavor.ramMiB ||
+        flavor.ramMiB - profile.memoryMiB < 6144 ||
+        ['vitestWorkers', 'playwrightWorkers', 'securityWorkers'].some(
+          (worker) => profile[worker] > profile.cpuTokens
+        )
+      );
+    }) ||
+    Object.keys(volumeTypes).sort().join('\0') !== [...zones].sort().join('\0') ||
+    Object.values(volumeTypes).some(
+      (types) => !Array.isArray(types) || types.length === 0 || types.some((type) => !type)
+    ) ||
+    compute?.preemptible !== true ||
+    compute?.publicIp !== false ||
+    compute?.ingress !== false ||
     policy.imageSelector?.name !== 'Ubuntu 24.04 LTS 64-bit' ||
     policy.lifecycle?.maxProfiles !== 10 ||
     policy.lifecycle?.ttlSeconds !== 10800 ||
     policy.runner?.maxJobs !== 1 ||
+    policy.network?.lifecycle !== 'disposable-per-attempt' ||
+    typeof policy.network?.securityGroupNamePrefix !== 'string' ||
+    policy.network.securityGroupNamePrefix.length === 0 ||
+    policy.trust?.persistentNetworkResources !== false ||
     !/^[a-f0-9]{64}$/u.test(policy.controllerEnvironment?.expectedProjectSha256 ?? '') ||
     policy.controllerEnvironment?.expectedRegion !== 'ru-3' ||
     !/^[a-f0-9]{64}$/u.test(policy.runner?.sha256 ?? '')
@@ -124,4 +159,25 @@ export function validateSelectelQaProfiles(raw, root = process.cwd()) {
     digest: `sha256:${crypto.createHash('sha256').update(normalized).digest('hex')}`,
     profiles: normalizedProfiles,
   };
+}
+
+export function validateSelectelProfilesForLane(raw, lane, root = process.cwd()) {
+  const validated = validateSelectelQaProfiles(raw, root);
+  if (!['proof', 'release'].includes(lane)) throw new Error(`Unknown Selectel lane: ${lane}`);
+  const semantics = JSON.parse(
+    fs.readFileSync(path.join(root, 'tooling/configs/ci/proof-semantics.json'), 'utf8')
+  );
+  const minimum = semantics.reuseCompatibility?.[lane]?.minimumExecutionProfile;
+  if (!minimum) throw new Error(`Selectel ${lane} minimum execution profile is missing.`);
+  for (const [index, profile] of validated.profiles.entries()) {
+    const actual = {
+      ...profile.qa,
+      vitestWorkers: profile.qa.vitestWorkers,
+    };
+    const below = Object.entries(minimum).filter(([key, value]) => actual[key] < value);
+    if (below.length > 0) {
+      throw new Error(`Selectel profile ${index} is below the ${lane} lane minimum.`);
+    }
+  }
+  return validated;
 }

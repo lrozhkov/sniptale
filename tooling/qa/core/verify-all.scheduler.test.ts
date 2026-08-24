@@ -16,7 +16,6 @@ function laneValue(lane: string) {
   if (lane === 'light') {
     return {
       lineLengthStep: step('Changed-line readability'),
-      oxlintStep: step('Oxlint'),
       aiHygieneStep: step('AI hygiene'),
       structuralRiskStep: step('Structural risk'),
       namingStep: step('Naming'),
@@ -28,7 +27,7 @@ function laneValue(lane: string) {
   }
   if (lane === 'lint') {
     return {
-      eslintStep: step('ESLint'),
+      oxlintStep: step('Oxlint'),
       sonarjsStep: step('SonarJS'),
       securityStep: step('Security'),
     };
@@ -63,7 +62,6 @@ it('keeps release result order while running the pre-build lanes concurrently', 
   expect(steps.map(({ label }) => label)).toEqual([
     'Changed-line readability',
     'Oxlint',
-    'ESLint',
     'SonarJS',
     'AI hygiene',
     'Structural risk',
@@ -88,6 +86,7 @@ it('keeps release result order while running the pre-build lanes concurrently', 
   const scheduledTasks = scheduler.mock.calls.flatMap(([tasks]) => tasks);
   expect(scheduledTasks?.find(({ id }) => id === 'lint')).toMatchObject({
     cpuTokens: 2,
+    dependencies: ['typecheck'],
     memoryMiB: 6144,
   });
   expect(scheduledTasks?.find(({ id }) => id === 'tests')).toMatchObject({
@@ -107,6 +106,7 @@ it('executes a non-release test lane in a real worker without starting build', a
     },
     lane: 'tests',
     memoryMiB: 1024,
+    typecheckCheckerCount: 4,
     vitestMaxWorkers: 2,
   });
 
@@ -134,4 +134,18 @@ it('runs release tests only after every non-test lane at the minimum profile', a
   expect(scheduler.mock.calls[0]?.[0].map(({ id }) => id)).not.toContain('tests');
   expect(scheduler.mock.calls[1]?.[0].map(({ id }) => id)).toEqual(['tests']);
   expect(startedLanes.at(-1)).toBe('tests');
+});
+
+it('cannot schedule Vitest when the shared caller selects the fast proof contract', async () => {
+  const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
+  const scheduler = vi.fn(runBoundedTasks);
+
+  const steps = await collectScheduledFullVerifySteps(
+    { releaseMode: true },
+    { includeTests: false, profile, scheduler, workerRunner }
+  );
+
+  expect(workerRunner.mock.calls.map(([input]) => input.lane)).not.toContain('tests');
+  expect(steps.map(({ label }) => label)).not.toContain('Unit tests');
+  expect(scheduler).toHaveBeenCalledTimes(1);
 });

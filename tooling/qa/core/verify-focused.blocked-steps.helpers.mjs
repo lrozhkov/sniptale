@@ -10,14 +10,14 @@ function createDeferredUnitStep(scope) {
   const decision = formatFocusedScopeDecision(scope, 'deferred');
   return createSkippedStep(
     'Unit tests',
-    `deferred: ambiguous focused scope; ${decision}; proof=qa:audit`
+    `deferred: ambiguous focused scope; ${decision}; proof=ci:release`
   );
 }
 
 function createDeferredCoverageStep(scope) {
   return createSkippedStep(
     'Test coverage',
-    `deferred to qa:audit; ${formatFocusedScopeDecision(scope, 'deferred')}`
+    `deferred to ci:release; ${formatFocusedScopeDecision(scope, 'deferred')}`
   );
 }
 

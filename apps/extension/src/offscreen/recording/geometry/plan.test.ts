@@ -5,15 +5,16 @@ import { createRecordingGeometryPlan, remapRecordingGeometryPlan } from './plan'
 describe('recording geometry plan', () => {
   it.each([
     [{ height: 985, width: 1904 }, VideoResolutionPreset.SOURCE, { height: 984, width: 1904 }],
-    [{ height: 500, width: 1086 }, VideoResolutionPreset.P1080, { height: 1080, width: 2346 }],
+    [{ height: 500, width: 1086 }, VideoResolutionPreset.P1080, { height: 500, width: 1086 }],
     [{ height: 1920, width: 1080 }, VideoResolutionPreset.P480, { height: 480, width: 270 }],
-    [{ height: 400, width: 2400 }, VideoResolutionPreset.P1440, { height: 1440, width: 8640 }],
+    [{ height: 400, width: 2400 }, VideoResolutionPreset.P1440, { height: 400, width: 2400 }],
   ])(
-    'resolves an exact encoder canvas from the declared output basis',
+    'resolves a screen-recording encoder canvas without upscaling the source',
     (basis, resolution, output) => {
       const plan = createRecordingGeometryPlan({
         frameRateCap: 30,
         outputBasis: basis,
+        presetScaleMode: 'avoid-upscale',
         resolution,
         sourceRect: { x: 0, y: 0, ...basis },
       });
@@ -25,6 +26,17 @@ describe('recording geometry plan', () => {
       expect(Object.isFrozen(plan.sourceRect)).toBe(true);
     }
   );
+
+  it('keeps fixed-output preset scaling by default', () => {
+    const plan = createRecordingGeometryPlan({
+      frameRateCap: 30,
+      outputBasis: { height: 500, width: 1086 },
+      resolution: VideoResolutionPreset.P1080,
+      sourceRect: { x: 0, y: 0, height: 500, width: 1086 },
+    });
+
+    expect(plan.outputSize).toEqual({ height: 1080, width: 2346 });
+  });
 
   it('removes only an odd physical edge for a one-to-one SOURCE sample', () => {
     const plan = createRecordingGeometryPlan({

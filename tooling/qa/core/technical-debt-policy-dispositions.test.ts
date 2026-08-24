@@ -92,7 +92,7 @@ describe('open-set policy surface discovery', () => {
 
   it('discovers policy collections in an exact source outside tooling', () => {
     const root = createRoot();
-    const sourcePath = 'eslint.config.js';
+    const sourcePath = '.dependency-cruiser.cjs';
     write(
       root,
       sourcePath,

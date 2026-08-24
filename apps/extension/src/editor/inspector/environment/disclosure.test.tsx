@@ -112,7 +112,7 @@ describe('WorkspacePanelBody', () => {
     });
 
     act(() => {
-      (container?.querySelector('[data-testid="color-control"]') as HTMLButtonElement).click();
+      (container!.querySelector('[data-testid="color-control"]') as HTMLButtonElement).click();
     });
 
     expect(applyWorkspaceColor).toHaveBeenCalledWith('#445566');
@@ -124,7 +124,7 @@ describe('WorkspacePanelBody', () => {
     expect(container?.textContent).not.toContain('editor.compact.behavior');
 
     act(() => {
-      (container?.querySelector('button[title="#111111"]') as HTMLButtonElement).click();
+      (container!.querySelector('button[title="#111111"]') as HTMLButtonElement).click();
     });
 
     expect(applyWorkspaceColor).toHaveBeenCalledWith('#111111');

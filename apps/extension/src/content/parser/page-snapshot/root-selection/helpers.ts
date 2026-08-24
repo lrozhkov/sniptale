@@ -81,7 +81,7 @@ function isHiddenCandidate(element: HTMLElement): boolean {
   const className = element.getAttribute('class') ?? '';
 
   return (
-    element.hidden ||
+    element.hidden !== false ||
     element.getAttribute('aria-hidden') === 'true' ||
     HIDDEN_CLASS_PATTERN.test(className) ||
     HIDDEN_STYLE_PATTERN.test(style)

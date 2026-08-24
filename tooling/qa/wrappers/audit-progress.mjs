@@ -21,8 +21,22 @@ export function createAuditProgressReporter({
   writeTerminal = (value) => process.stdout.write(value),
 } = {}) {
   return (event) => {
+    recordTimelineTransition({
+      activityId: `audit-control.${event.controlId}`,
+      kind: 'audit-control',
+      state: event.state,
+      reused: event.reused ?? false,
+      executionProfile: {
+        cpuTokens: 1,
+        memoryMiB: null,
+        workers: 1,
+        pid: process.pid,
+        workerId: `process-${process.pid}`,
+      },
+    });
     const line = `${formatAuditProgress(event)}\n`;
     session.writeLog(line);
     if (TERMINAL_PROGRESS_CONTROLS.has(event.controlId)) writeTerminal(line);
   };
 }
+import { recordTimelineTransition } from '../runtime/observability/timeline-context.mjs';

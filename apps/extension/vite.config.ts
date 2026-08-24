@@ -49,6 +49,10 @@ const BUILD_ALIASES = Object.entries(layoutPolicy.aliases).map(([find, replaceme
   replacement: resolvePath(BUILD_LAYOUT.repositoryRoot, replacement),
 }));
 
+export function createReactTransformPlugins() {
+  return react({ jsxImportSource: 'react', jsxRuntime: 'automatic' });
+}
+
 function assertRequiredAppHtmlOutputs(): void {
   const declaredOutputs = new Set(layoutPolicy.htmlInputs.map((input) => input.outputPath));
   const missingOutputs = REQUIRED_APP_HTML_OUTPUTS.filter((path) => !declaredOutputs.has(path));
@@ -148,7 +152,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
-    react(),
+    createReactTransformPlugins(),
     crx({ manifest: buildManifestForMode(manifest, mode) }),
     buildContentRuntime(mode),
     buildContentRuntimeShim(mode),
@@ -157,11 +161,13 @@ export default defineConfig(({ mode }) => ({
   define: buildDefines(mode),
   build: {
     outDir: BUILD_LAYOUT.outputRoot,
-    ...(mode === 'security-e2e'
-      ? { outDir: resolvePath(BUILD_LAYOUT.repositoryRoot, 'dist-security-e2e') }
-      : mode === 'release' && process.env.SNIPTALE_RELEASE_E2E_OUTPUT === '1'
-        ? { outDir: resolvePath(BUILD_LAYOUT.repositoryRoot, 'dist-release-e2e') }
-        : {}),
+    ...(mode === 'test-e2e'
+      ? { outDir: resolvePath(BUILD_LAYOUT.repositoryRoot, '.tmp/e2e-builds/test') }
+      : mode === 'security-e2e'
+        ? { outDir: resolvePath(BUILD_LAYOUT.repositoryRoot, '.tmp/e2e-builds/security') }
+        : mode === 'release' && process.env.SNIPTALE_RELEASE_E2E_OUTPUT === '1'
+          ? { outDir: resolvePath(BUILD_LAYOUT.repositoryRoot, '.tmp/e2e-builds/release') }
+          : {}),
     emptyOutDir: true,
     // Vite's preload helper resolves chunk URLs against the host page inside content scripts.
     modulePreload: false,

@@ -76,7 +76,7 @@ export function collectRepoAuditEvidence({ rootDir = process.cwd(), topCount = 1
     loopholes,
     recommendedAuditCommands: [
       'node tooling/qa/audits/evidence.mjs --json',
-      'npm run qa:audit',
+      'npm run ci:release',
       'npm run qa:structural-audit',
       'npm run qa:release-harness',
     ],

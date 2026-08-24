@@ -44,20 +44,6 @@ export function exitOnViolations(label, header, result) {
   }
 }
 
-export function exitOnPrettierFailures(failures) {
-  if (failures.length === 0) {
-    printOk('Prettier');
-    return;
-  }
-
-  printFailure('Prettier', 'formatting violations found');
-  process.stderr.write('Prettier formatting violations found:\n\n');
-  for (const file of failures) {
-    process.stderr.write(`- ${file}\n`);
-  }
-  process.exit(1);
-}
-
 export function exitOnLineLengthViolations(result) {
   if (result.violations.length > 0) {
     printFailure('Changed-line readability', 'violations found');

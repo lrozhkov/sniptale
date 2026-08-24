@@ -19,6 +19,9 @@ function verify(relativePath: string, contents = 'export const product = "Snipta
 
 it('accepts clean artifact paths and UTF-8 content', async () => {
   await expect(verify('assets/popup.js')).resolves.toBeUndefined();
+  await expect(
+    verify('assets/runtime.js', 'import "./target-lookup-BzwSCXIH.js";')
+  ).resolves.toBeUndefined();
 });
 
 it('rejects every retired product root in artifact paths and text', async () => {

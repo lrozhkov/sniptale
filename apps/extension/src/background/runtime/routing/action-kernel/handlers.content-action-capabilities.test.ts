@@ -46,7 +46,7 @@ function createContentIntentRequest() {
     proofResponse,
     resolveContentSenderBindingForTest(sender)
   );
-  const proof = (proofResponse.mock.calls[0]?.[0] as { trustedEventProof?: { proofToken: string } })
+  const proof = (proofResponse.mock.calls[0]![0] as { trustedEventProof?: { proofToken: string } })
     .trustedEventProof;
   if (!proof) {
     throw new Error('Expected trusted-event proof');

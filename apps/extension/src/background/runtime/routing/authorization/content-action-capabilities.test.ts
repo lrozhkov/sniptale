@@ -75,7 +75,7 @@ function issueContentIntent(actionType: ContentPrivilegedActionType) {
     proofResponse,
     resolveContentSenderBindingForTest(contentSender())
   );
-  const proof = (proofResponse.mock.calls[0]?.[0] as { trustedEventProof?: { proofToken: string } })
+  const proof = (proofResponse.mock.calls[0]![0] as { trustedEventProof?: { proofToken: string } })
     .trustedEventProof;
   if (!proof) {
     throw new Error('Expected trusted-event proof');
@@ -95,7 +95,7 @@ function issueContentIntent(actionType: ContentPrivilegedActionType) {
     resolveContentSenderBindingForTest(contentSender())
   );
   return (
-    sendResponse.mock.calls[0]?.[0] as {
+    sendResponse.mock.calls[0]![0] as {
       contentIntent: { requestId: string; token: string };
     }
   ).contentIntent;
@@ -127,7 +127,7 @@ function createIssuedContentIntentRequest() {
     proofResponse,
     resolveContentSenderBindingForTest(contentSender())
   );
-  const proof = (proofResponse.mock.calls[0]?.[0] as { trustedEventProof?: { proofToken: string } })
+  const proof = (proofResponse.mock.calls[0]![0] as { trustedEventProof?: { proofToken: string } })
     .trustedEventProof;
   if (!proof) {
     throw new Error('Expected trusted-event proof');

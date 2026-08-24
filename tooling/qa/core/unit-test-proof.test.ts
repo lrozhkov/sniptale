@@ -6,14 +6,33 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createTempRoot, withCwd, writeFile, writeJson } from './test-helpers';
 
 const inheritedProofAuthority = process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
+const inheritedControlDigest = process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
 
 beforeEach(() => {
   delete process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'a'.repeat(64)}`;
 });
 
 afterEach(() => {
+  delete process.env.SNIPTALE_QA_CPU_TOKENS;
+  delete process.env.SNIPTALE_QA_MEMORY_MIB;
   if (inheritedProofAuthority == null) delete process.env.SNIPTALE_UNIT_PROOF_AUTHORITY;
   else process.env.SNIPTALE_UNIT_PROOF_AUTHORITY = inheritedProofAuthority;
+  if (inheritedControlDigest == null) delete process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
+  else process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = inheritedControlDigest;
+});
+
+it('rejects full-unit reuse across candidate control digests', async () => {
+  const root = createProofRoot();
+  await withCwd(root, async () => {
+    const module = await import('./unit-test-proof.mjs');
+    module.recordSuccessfulFullUnitProof({ cwd: root, maxWorkers: 2 });
+    process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'b'.repeat(64)}`;
+    expect(module.resolveReusableFullUnitProof({ cwd: root, maxWorkers: 2 })).toMatchObject({
+      matched: false,
+      reason: 'full unit proof control digest changed',
+    });
+  });
 });
 
 function createProofRoot() {
@@ -83,7 +102,7 @@ it('reuses a sealed full-suite proof for the exact product, runner, and executio
   expect(result.reused).toMatchObject({ matched: true, source: 'local proof' });
 });
 
-it('invalidates full-suite proof when product, test config, workers, or receipt bytes drift', async () => {
+it('invalidates full-suite proof when product, test config, or receipt bytes drift', async () => {
   const root = createProofRoot();
   await withCwd(root, async () => {
     const module = await import('./unit-test-proof.mjs');
@@ -95,12 +114,28 @@ it('invalidates full-suite proof when product, test config, workers, or receipt 
     });
     writeFile(root, 'apps/extension/src/example.ts', 'export const value = 1;\n');
     expect(module.resolveReusableFullUnitProof({ cwd: root, maxWorkers: 3 })).toMatchObject({
-      matched: false,
+      matched: true,
     });
     fs.appendFileSync(path.join(root, '.tmp/qa/unit-proof.json'), 'corrupt');
     expect(module.resolveReusableFullUnitProof({ cwd: root, maxWorkers: 2 })).toMatchObject({
       matched: false,
     });
+  });
+});
+
+it('records resource planning without changing semantic unit proof inputs', async () => {
+  const root = createProofRoot();
+  await withCwd(root, async () => {
+    const module = await import('./unit-test-proof.mjs');
+    process.env.SNIPTALE_QA_CPU_TOKENS = '24';
+    process.env.SNIPTALE_QA_MEMORY_MIB = '24576';
+    const first = module.createFullUnitProofInputs({ cwd: root, maxWorkers: 12 });
+    process.env.SNIPTALE_QA_CPU_TOKENS = '16';
+    process.env.SNIPTALE_QA_MEMORY_MIB = '16384';
+    const second = module.createFullUnitProofInputs({ cwd: root, maxWorkers: 6 });
+
+    expect(second.inputDigest).toBe(first.inputDigest);
+    expect(second.planning).not.toEqual(first.planning);
   });
 });
 

@@ -28,6 +28,18 @@
     "privateVulnerabilityReporting": true,
     "immutableReleases": true
   },
+  "environments": {
+    "selectel-runner-controller": {
+      "protected_branches": false,
+      "custom_branch_policies": true,
+      "branches": ["main"]
+    },
+    "release-publisher": {
+      "protected_branches": false,
+      "custom_branch_policies": true,
+      "branches": ["main"]
+    }
+  },
   "ruleset": {
     "name": "Protect main",
     "target": "branch",

@@ -30,7 +30,7 @@ function registerNumberStepCommandTest() {
   it('builds number step commands without alphabet and wires normalized patch actions', () => {
     const params = createInspectorCommandParams();
     const commands = buildStepCompactCommands(params as never);
-    const typeControl = (commands[0]?.content as any).props.children as React.ReactElement<any>;
+    const typeControl = (commands[0]!.content as any).props.children as React.ReactElement<any>;
     const typeComponent = typeControl.type as { name?: string };
 
     expect(commands.map((command) => command.id)).toEqual([
@@ -78,7 +78,7 @@ function registerLetterStepCommandTest() {
       },
     };
     const commands = buildStepCompactCommands(params as never);
-    const typeControl = (commands[0]?.content as any).props.children as React.ReactElement<any>;
+    const typeControl = (commands[0]!.content as any).props.children as React.ReactElement<any>;
     const typeComponent = typeControl.type as { name?: string };
 
     expect(commands.map((command) => command.id)).toEqual([
@@ -96,7 +96,7 @@ function registerLetterStepCommandTest() {
     expect(typeComponent.name).toBe('SelectField');
 
     getStepValueInputProps(commands[1] as never).onChange({ currentTarget: { value: 'ж' } });
-    ((commands[2]?.content as any).props.children as React.ReactElement<any>).props.onChange(
+    ((commands[2]!.content as any).props.children as React.ReactElement<any>).props.onChange(
       'cyrillic'
     );
 

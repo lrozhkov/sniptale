@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { expect, it } from 'vitest';
 
-import { createTempRoot, importFresh, withCwd, writeFile, writeJson } from './test-helpers';
+import { createTempRoot, writeFile, writeJson } from './test-helpers';
 
 function writeDesignSystemFixtures(root: string) {
   writeFile(root, 'src/shared/ui/Button.tsx', 'export function Button() { return null; }\n');
@@ -63,81 +63,17 @@ it('runs verify-typecheck against a temporary project cwd', async () => {
       : null;
 
   expect(result.status).not.toBe(0);
+  expect(result).toMatchObject({
+    typecheckCheckerCount: 4,
+    typecheckMode: 'full',
+    typecheckToolVersion: '7.0.2',
+  });
   expect(
     result.stdout.includes("Type 'number' is not assignable to type 'string'") ||
       result.stderr.includes("Type 'number' is not assignable to type 'string'") ||
       errorCode === 'EPERM'
   ).toBe(true);
 }, 20000);
-
-it('runs verify-eslint against a temporary cwd with file-scoped failures', async () => {
-  const root = createTempRoot('verify-eslint-');
-  writeFile(
-    root,
-    'eslint.config.js',
-    [
-      'export default [',
-      '  {',
-      '    files: ["**/*.ts"],',
-      '    rules: { "no-unused-vars": "error" },',
-      '  },',
-      '];',
-      '',
-    ].join('\n')
-  );
-  writeFile(root, 'src/example.ts', 'const unused = 1;\n');
-
-  const result = await withCwd(root, async () => {
-    const module = await importFresh<typeof import('./verify-eslint.mjs')>('./verify-eslint.mjs');
-    return module.lintWithEslint({ files: ['src/example.ts'] });
-  });
-
-  expect(result.failed).toBe(true);
-  expect(result.output).toContain('unused');
-});
-
-it('projects shared ESLint results without letting excluded rules hide fatal errors', async () => {
-  const module = await import('./verify-eslint.mjs');
-  const result = await module.summarizeEslintResults(
-    [
-      {
-        errorCount: 1,
-        fatalErrorCount: 1,
-        filePath: path.join(process.cwd(), 'apps/extension/src/example.ts'),
-        fixableErrorCount: 0,
-        fixableWarningCount: 0,
-        messages: [
-          {
-            column: 1,
-            line: 1,
-            message: 'excluded finding',
-            ruleId: 'sonarjs/no-all-duplicated-branches',
-            severity: 2,
-          },
-          {
-            column: 1,
-            fatal: true,
-            line: 2,
-            message: 'parser failed',
-            ruleId: null,
-            severity: 2,
-          },
-        ],
-        suppressedMessages: [],
-        warningCount: 0,
-      },
-    ],
-    {
-      excludedRulePrefixes: ['sonarjs/'],
-      strict: true,
-    }
-  );
-
-  expect(result.failed).toBe(true);
-  expect(result.errorCount).toBe(1);
-  expect(result.output).toContain('parser failed');
-  expect(result.output).not.toContain('excluded finding');
-});
 
 it('runs verify-boundaries against a temporary source graph', async () => {
   const module = await import('../guards/architecture/verify-boundaries.mjs');

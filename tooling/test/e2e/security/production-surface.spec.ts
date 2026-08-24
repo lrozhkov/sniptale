@@ -2,7 +2,6 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { closeExtensionBrowser, launchExtensionBrowser } from '../support/extension-browser-launch';
-import { resolveExtensionServiceWorkerUrl } from '../support/extension-fixture';
 import { startHostServer } from '../support/host-server';
 
 const FORBIDDEN_RELEASE_MARKERS = [
@@ -28,7 +27,7 @@ async function collectArtifactText(root: string, relativePath = ''): Promise<str
 }
 
 test('production artifact exposes no security harness or internal web surface', async () => {
-  const buildRoot = join(process.cwd(), 'dist-release-e2e');
+  const buildRoot = join(process.cwd(), '.tmp/e2e-builds/release');
   const manifest = JSON.parse(await readFile(join(buildRoot, 'manifest.json'), 'utf8')) as {
     content_scripts?: unknown[];
     externally_connectable?: unknown;
@@ -47,10 +46,12 @@ test('production artifact exposes no security harness or internal web surface', 
   const artifactText = await collectArtifactText(buildRoot);
   for (const marker of FORBIDDEN_RELEASE_MARKERS) expect(artifactText).not.toContain(marker);
 
-  const launched = await launchExtensionBrowser({ extensionBuildDir: 'dist-release-e2e' });
+  const launched = await launchExtensionBrowser({
+    extensionBuildDir: '.tmp/e2e-builds/release',
+  });
   const hostServer = await startHostServer();
   try {
-    const extensionId = new URL(await resolveExtensionServiceWorkerUrl(launched.context)).host;
+    const { extensionId } = launched;
     const host = await launched.context.newPage();
     await host.goto(`${hostServer.origin}/fixtures/host-page.html?production-surface=1`);
     const fetchResults = await host.evaluate(

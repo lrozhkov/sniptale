@@ -12,9 +12,8 @@ import { filterAllowedViolations, loadBaseline } from './shared.mjs';
 import { HARNESS_QA_SUITE } from './qa-scope.mjs';
 import { measureAsyncStep, measureSyncStep } from './step-timing.helpers.mjs';
 import { runLineLengthCheck } from '../guards/quality/verify-line-length.mjs';
-import { lintWithEslint } from './verify-eslint.mjs';
-import { runOxlint } from './verify-oxlint.mjs';
-import { runPrettierCheck } from './verify-prettier.mjs';
+import { DEFAULT_OXLINT_ROOTS, requiresFullOxlintClosure, runOxlint } from './verify-oxlint.mjs';
+import { runFormatterCheck } from './verify-oxfmt.mjs';
 import { runQaRuleCoverageContractCheck } from './verify-qa-rule-coverage-contract.mjs';
 import { runTypecheck } from './verify-typecheck.mjs';
 import { runUnitTests } from './verify-unit-tests.mjs';
@@ -31,9 +30,9 @@ function collectMeasuredViolationStep(label, header, runner) {
   return { ...createViolationStep(label, header, value), durationMs };
 }
 
-function collectPrettierStep(context) {
+function collectFormatterStep(context) {
   return measureAsyncStep(async () => {
-    const result = await runPrettierCheck(context.existingTargetFiles);
+    const result = runFormatterCheck(context.existingTargetFiles);
     if (result.checkedFiles.length === 0) {
       return createSkippedStep('Format');
     }
@@ -124,28 +123,20 @@ function collectTechnicalDebtStep() {
   );
 }
 
-async function collectEslintStep(context) {
-  const jsLikeFiles = context.qualityJsLikeFiles ?? context.jsLikeFiles;
-  if (jsLikeFiles.length === 0) {
-    return createSkippedStep('ESLint');
-  }
-
-  const { durationMs, value } = await measureAsyncStep(() =>
-    lintWithEslint({ files: jsLikeFiles, strict: true })
-  );
-  return value.failed
-    ? createFailureStep('ESLint', 'failed', { stdout: value.output, durationMs })
-    : { ...createOkStep('ESLint'), durationMs };
-}
-
-function collectTypecheckStep(context) {
+function collectTypecheckStep(context, { checkerCount } = {}) {
   if (context.jsLikeFiles.length === 0) {
     return createSkippedStep('Typecheck');
   }
 
-  const { durationMs, value } = measureSyncStep(() => runTypecheck());
+  const { durationMs, value } = measureSyncStep(() => runTypecheck({ checkerCount }));
   return value.status === 0
-    ? { ...createOkStep('Typecheck'), durationMs }
+    ? {
+        ...createOkStep(
+          'Typecheck',
+          `typescript=${value.typecheckToolVersion}; checkers=${value.typecheckCheckerCount}`
+        ),
+        durationMs,
+      }
     : createFailureStep('Typecheck', 'failed', {
         stdout: value.stdout,
         stderr: value.stderr,
@@ -216,9 +207,6 @@ export async function collectHarnessStaticLane(
   { baseline = context.baseline ?? loadBaseline(), collectors = {} } = {}
 ) {
   const resolvedCollectors = {
-    collectOxlintStep: (nextContext) =>
-      runOxlint({ files: nextContext.qualityJsLikeFiles ?? nextContext.jsLikeFiles }).step,
-    collectEslintStep,
     collectLineLengthStep,
     collectAiHygieneStep,
     collectStructuralRiskStep,
@@ -232,8 +220,6 @@ export async function collectHarnessStaticLane(
 
   return {
     steps: [
-      resolvedCollectors.collectOxlintStep(context),
-      await resolvedCollectors.collectEslintStep(context),
       resolvedCollectors.collectLineLengthStep(context),
       resolvedCollectors.collectAiHygieneStep(context, baseline),
       resolvedCollectors.collectStructuralRiskStep(context),
@@ -249,8 +235,15 @@ export async function collectHarnessStaticLane(
   };
 }
 
-export function collectHarnessTypecheckLane(context) {
-  return { typecheckStep: collectTypecheckStep(context) };
+export function collectHarnessOxlintLane(context) {
+  const files = requiresFullOxlintClosure(context.harnessTargetFiles)
+    ? DEFAULT_OXLINT_ROOTS
+    : (context.qualityJsLikeFiles ?? context.jsLikeFiles);
+  return { oxlintStep: runOxlint({ files }).step };
+}
+
+export function collectHarnessTypecheckLane(context, options) {
+  return { typecheckStep: collectTypecheckStep(context, options) };
 }
 
 export async function collectHarnessTestLane(context, { maxWorkers }) {
@@ -277,7 +270,7 @@ export async function collectHarnessStepResults({
     };
   }
 
-  const formatStep = await (collectors.collectPrettierStep ?? collectPrettierStep)(context);
+  const formatStep = await (collectors.collectFormatterStep ?? collectFormatterStep)(context);
   if (formatStep.status === 'failed') {
     return { skipped: false, steps: [formatStep] };
   }

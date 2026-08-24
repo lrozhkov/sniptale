@@ -4,7 +4,7 @@ This runbook prepares and verifies a Sniptale artifact for publication from `htt
 
 ## Inputs
 
-- Node.js 22 and a clean `npm ci` installation.
+- The runtime declared by the repository toolchain authority and a clean `npm ci` installation.
 - Source under `apps/extension` and `packages`, locked by `package-lock.json`.
 - Project terms in `LICENSE` and `NOTICE`.
 - Bundled and dependency material in `THIRD_PARTY_NOTICES.md`, `THIRD_PARTY_DEPENDENCIES.json`, and `LICENSES/**`.
@@ -20,24 +20,24 @@ Pinned upstream refresh is an explicit reviewed acquisition: obtain a version-ta
 
 ## Canonical proof
 
-When tooling or policy changed, run the harness lane before product and release proof:
+Complete the normal diff-local implementation flow first, then run the full release gate locally:
 
 ```bash
 npm run qa:release-harness
 npm run qa:checkpoint
-npm run qa:release
-npm run qa:audit
+npm run qa:closeout -- -m "chore(release): prepare release"
+npm run ci:release
 ```
 
-`qa:release` runs product proof, creates a release-mode extension build, validates manifest/security boundaries, and writes a deterministic archive under `build/`. The archive combines extension files with the complete policy-owned legal payload and rejects missing files, extra dependency legal files, digest drift, unsafe paths, or collisions.
+`ci:release` runs the same release composition locally in WSL and externally through the pinned QA image. It performs product proof, complete audit and coverage, mutation profiles, creates the release-mode extension build, validates manifest/security boundaries, and writes a deterministic archive under `build/`. The archive combines extension files with the complete policy-owned legal payload and rejects missing files, extra dependency legal files, digest drift, unsafe paths, or collisions.
 
 The extension zip is not a stand-alone source distribution. Conveyance must make Corresponding Source for the exact artifact available under AGPL-3.0-or-later through the same distribution surface, including the repository tree, lockfile, build/QA tooling, legal notices, and producing commit identity.
 
 ## Hosted publication
 
-Publish only a commit already present on `main`. Enable and verify GitHub release immutability before starting; publication without that repository setting is prohibited. Create a draft release for tag `vX.Y.Z` from the matching package version, attach the deterministic archive from `build/`, and verify the target commit and asset digest before publishing the draft. After publication, verify that GitHub reports the release immutable and binds the tag and assets to the intended commit. GitHub's source archives at that tag provide the Corresponding Source alongside the extension archive.
+Publish only a commit already present on `main` with a successful Release provenance Gate. Create and push a GitHub-verifiable annotated tag matching the package version, then dispatch Continuous Deployment with the tag and exact provenance run ID. Deployment creates no VM and does not rebuild. It verifies repository immutability, the tag ruleset, proof hashes, draft assets, and published immutable identity. GitHub's source archives at that tag provide the Corresponding Source alongside the extension archive.
 
-`qa:audit` is the whole-repository audit lane. It generates `.tmp/licenses/sbom.cdx.json` and `.tmp/licenses/summary.json`, scans history for credentials, and runs configured static and supply-chain audits. Ignored evidence does not replace Git state or command status.
+The full audit inside `ci:release` generates `.tmp/licenses/sbom.cdx.json` and `.tmp/licenses/summary.json`, scans history for credentials, and runs configured static and supply-chain audits. Ignored evidence does not replace Git state or command status.
 
 After required review, use `npm run qa:closeout -- -m "chore(oss): update local release provenance"` for the coherent candidate.
 
@@ -45,4 +45,4 @@ After required review, use `npm run qa:closeout -- -m "chore(oss): update local 
 
 Load `dist/` for local browser smoke. Inspect the deterministic archive in `build/`; all policy legal files are mandatory. Before distribution, rollback is a revert of the complete candidate. After distribution, preserve history and make a forward corrective commit rather than rewriting published provenance.
 
-The release surface intentionally excludes a root `SECURITY.md` and hosted reporting instructions. Adding either requires a separately authorized policy change, not a publication or legal-generation side effect.
+Security reporting is independent of release packaging. Its current repository policy is projected in the [generated project facts](../engineering/project-facts.md), while contributor instructions remain in [SECURITY.md](../../.github/SECURITY.md).

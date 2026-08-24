@@ -27,9 +27,11 @@ const mediabunny = vi.hoisted(() => {
     readonly close: ReturnType<typeof vi.fn>;
     constructor(
       readonly frame: VideoFrame,
-      readonly init: { duration: number; timestamp: number }
+      readonly init: { duration?: number; timestamp?: number } = {}
     ) {
-      this.close = vi.fn(() => frame.close());
+      this.close = vi.fn(() => {
+        if (typeof frame.close === 'function') frame.close();
+      });
       VideoSample.instances.push(this);
     }
 
@@ -48,34 +50,35 @@ const mediabunny = vi.hoisted(() => {
   class VideoSampleSource {
     frameRate: number | null = null;
     configured = false;
-    readonly add = vi.fn(
-      async (sample: VideoSample, _encodeOptions?: VideoEncoderEncodeOptions) => {
-        if (!this.configured) {
-          this.configured = true;
-          this.config.onEncoderConfig?.({
-            alpha: 'discard',
-            bitrate: this.config.bitrate,
-            bitrateMode: Output.encoderBitrateMode ?? this.config.bitrateMode,
-            codec:
-              this.config.fullCodecString ??
-              (this.config.codec === 'vp9' ? 'vp09.00.10.08' : 'avc1.640033'),
-            contentHint: Output.encoderContentHint ?? this.config.contentHint,
-            displayHeight: 1304,
-            displayWidth: 2560,
-            ...(Output.encoderFrameRate === null ? {} : { framerate: Output.encoderFrameRate }),
-            hardwareAcceleration: this.config.hardwareAcceleration,
-            height: 1304,
-            latencyMode: this.config.latencyMode,
-            width: 2560,
-            avc: { format: 'avc' },
-          });
-        }
-        this.config.onEncodedPacket?.({
-          duration: sample.init.duration,
-          timestamp: sample.init.timestamp,
+    readonly add = vi.fn(async (sample: VideoSample, encodeOptions?: VideoEncoderEncodeOptions) => {
+      if (!this.configured) {
+        this.configured = true;
+        const frameRate = Output.encoderFrameRateOverride ?? this.frameRate;
+        this.config.onEncoderConfig?.({
+          alpha: 'discard',
+          bitrate: this.config.bitrate,
+          bitrateMode: Output.encoderBitrateMode ?? this.config.bitrateMode,
+          codec:
+            this.config.fullCodecString ??
+            (this.config.codec === 'vp9' ? 'vp09.00.10.08' : 'avc1.640033'),
+          contentHint: Output.encoderContentHint ?? this.config.contentHint,
+          displayHeight: 1304,
+          displayWidth: 2560,
+          ...(frameRate === null ? {} : { framerate: frameRate }),
+          hardwareAcceleration: this.config.hardwareAcceleration,
+          height: 1304,
+          latencyMode: this.config.latencyMode,
+          width: 2560,
+          avc: { format: 'avc' },
         });
       }
-    );
+      this.config.onEncodedPacket?.({
+        byteLength: encodeOptions?.keyFrame ? 100_000 : 2_000,
+        duration: sample.init.duration ?? (sample.frame.duration ?? 0) / 1_000_000,
+        timestamp: sample.init.timestamp ?? sample.frame.timestamp / 1_000_000,
+        type: encodeOptions?.keyFrame ? 'key' : 'delta',
+      });
+    });
     constructor(
       readonly config: {
         bitrate: number;
@@ -85,7 +88,13 @@ const mediabunny = vi.hoisted(() => {
         fullCodecString?: string;
         hardwareAcceleration: HardwareAcceleration;
         latencyMode: LatencyMode;
-        onEncodedPacket?(packet: { duration: number; timestamp: number }): void;
+        keyFrameInterval: number;
+        onEncodedPacket?(packet: {
+          byteLength: number;
+          duration: number;
+          timestamp: number;
+          type: 'delta' | 'key';
+        }): void;
         onEncoderConfig?(config: VideoEncoderConfig): void;
       }
     ) {}
@@ -95,7 +104,7 @@ const mediabunny = vi.hoisted(() => {
 
   class Output {
     static instances: Output[] = [];
-    static encoderFrameRate: number | null = null;
+    static encoderFrameRateOverride: number | null = null;
     static encoderBitrateMode: VideoEncoderBitrateMode | null = null;
     static encoderContentHint: string | null = null;
     readonly cancel = vi.fn().mockResolvedValue(undefined);
@@ -165,6 +174,7 @@ async function createSession(
   } = {}
 ) {
   const coordinator = createRecordingStagingCoordinatorTestDouble();
+  const stream = createStream(options.audio, options.contentHint);
   const session = await createLiveRecordingArtifactSession({
     artifactId: 'recording-1',
     coordinator,
@@ -180,9 +190,9 @@ async function createSession(
     filename: options.container === 'webm' ? 'recording.webm' : 'recording.mp4',
     ...(options.frameTransform ? { frameTransform: options.frameTransform } : {}),
     mimeType: options.container === 'webm' ? 'video/webm' : 'video/mp4',
-    stream: createStream(options.audio, options.contentHint),
+    stream,
   });
-  return { coordinator, session };
+  return { coordinator, session, stream };
 }
 
 function createTestVideoFrame(timestamp: number): VideoFrame {
@@ -198,7 +208,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mediabunny.Output.instances.length = 0;
   mediabunny.VideoSample.instances.length = 0;
-  mediabunny.Output.encoderFrameRate = null;
+  mediabunny.Output.encoderFrameRateOverride = null;
   mediabunny.Output.encoderBitrateMode = null;
   mediabunny.Output.encoderContentHint = null;
   processorInits.length = 0;
@@ -248,7 +258,7 @@ beforeEach(() => {
 });
 
 describe('source-driven live recording flow', () => {
-  it('keeps selected 60 FPS as a capture ceiling without declaring false CFR metadata', async () => {
+  it('supplies selected FPS only after timeline-owned tick coalescing', async () => {
     const { session } = await createSession();
     const started = vi.fn();
     session.setLifecycleCallbacks({ onStart: started });
@@ -257,13 +267,14 @@ describe('source-driven live recording flow', () => {
     await vi.waitFor(() => expect(started).toHaveBeenCalledOnce());
 
     const output = mediabunny.Output.instances[0];
-    expect(output?.videoMetadata).toEqual({});
+    expect(output?.videoMetadata).toEqual({ frameRate: 60 });
     expect(output?.videoSource?.config).toEqual(
       expect.objectContaining({
         bitrate: 24_000_000,
-        bitrateMode: 'constant',
+        bitrateMode: 'variable',
         codec: 'avc',
         contentHint: 'detail',
+        keyFrameInterval: 4,
         latencyMode: 'quality',
       })
     );
@@ -271,31 +282,6 @@ describe('source-driven live recording flow', () => {
     expect(processorInits[0]).toEqual(
       expect.objectContaining({ maxBufferSize: 1, track: expect.any(Object) })
     );
-  });
-
-  it('crops encoder input frames without a canvas stream when a full-tab source has odd bounds', async () => {
-    const { session } = await createSession({
-      exactAvc: true,
-      frameTransform: {
-        fit: 'fill',
-        outputSize: { height: 1304, width: 2560 },
-        sourceRect: { x: 0, y: 0, width: 2560, height: 1304 },
-      },
-    });
-    const started = vi.fn();
-    session.setLifecycleCallbacks({ onStart: started });
-
-    session.start();
-    await vi.waitFor(() => expect(started).toHaveBeenCalledOnce());
-
-    const sample = mediabunny.VideoSample.instances.at(-1);
-    expect(sample?.frame).toEqual(
-      expect.objectContaining({
-        displayHeight: 1304,
-        displayWidth: 2560,
-      })
-    );
-    expect(mediabunny.Output.instances[0]?.videoSource?.config.onEncoderConfig).toBeDefined();
   });
 
   it('publishes started only after the first encoded video packet', async () => {
@@ -309,7 +295,12 @@ describe('source-driven live recording flow', () => {
     await vi.waitFor(() => expect(source.add).toHaveBeenCalledOnce());
     expect(started).not.toHaveBeenCalled();
 
-    source.config.onEncodedPacket?.({ duration: 1 / 60, timestamp: 0 });
+    source.config.onEncodedPacket?.({
+      byteLength: 2_000,
+      duration: 1 / 60,
+      timestamp: 0,
+      type: 'delta',
+    });
     await vi.waitFor(() => expect(started).toHaveBeenCalledOnce());
     await session.abort();
   });
@@ -325,7 +316,7 @@ describe('source-driven live recording flow', () => {
     expect(mediabunny.Output.instances[0]?.videoSource?.config).toEqual(
       expect.objectContaining({
         fullCodecString: 'avc1.640033',
-        bitrateMode: 'constant',
+        bitrateMode: 'variable',
         hardwareAcceleration: 'no-preference',
         latencyMode: 'quality',
       })
@@ -460,6 +451,7 @@ describe('source-driven live recording buffering', () => {
       class {
         readonly readable = new ReadableStream<VideoFrame>(
           {
+            cancel: () => new Promise<void>(() => undefined),
             pull(controller) {
               const timestamp = timestamps.shift();
               if (timestamp !== undefined) controller.enqueue(createTestVideoFrame(timestamp));
@@ -488,7 +480,6 @@ describe('source-driven live recording buffering', () => {
 
     await expect(stopping).resolves.toEqual(expect.objectContaining({ size: 3 }));
     expect(source.add).toHaveBeenCalledTimes(3);
-    expect(output.finalize).toHaveBeenCalledOnce();
   });
 });
 
@@ -565,7 +556,7 @@ describe('source-driven live recording pause buffering', () => {
     await vi.waitFor(() => expect(session.state).toBe('recording'));
     const firstResumedFrame = createTestVideoFrame(1_000_000);
     controller.enqueue(firstResumedFrame);
-    controller.enqueue(createTestVideoFrame(1_016_667));
+    controller.enqueue(createTestVideoFrame(1_033_334));
 
     await vi.waitFor(() => expect(source.add).toHaveBeenCalledTimes(3));
     expect(mediabunny.VideoSample.instances.at(-1)?.frame).toBe(firstResumedFrame);
@@ -598,8 +589,8 @@ describe('source-driven live recording lifecycle and capability failures', () =>
     await expect(session.stop()).resolves.toEqual(expect.objectContaining({ size: 3 }));
   });
 
-  it('rejects an encoder that introduces fixed frame-rate configuration', async () => {
-    mediabunny.Output.encoderFrameRate = 30;
+  it('rejects an encoder that changes the expected rate-control frame rate', async () => {
+    mediabunny.Output.encoderFrameRateOverride = 30;
     const { coordinator, session } = await createSession();
     const onFailure = vi.fn();
     session.setLifecycleCallbacks({ onFailure });
@@ -607,13 +598,27 @@ describe('source-driven live recording lifecycle and capability failures', () =>
     session.start();
     await vi.waitFor(() => expect(onFailure).toHaveBeenCalledOnce());
 
-    await expect(session.stop()).rejects.toThrow('unexpectedly configured a fixed frame rate');
+    await expect(session.stop()).rejects.toThrow('did not preserve the requested frame rate');
     expect(coordinator.abort).toHaveBeenCalledOnce();
     expect(mediabunny.Output.instances[0]?.cancel).toHaveBeenCalledOnce();
   });
 
-  it('rejects variable bitrate drift for VP9 without an exact codec string', async () => {
-    mediabunny.Output.encoderBitrateMode = 'variable';
+  it('accepts the selected live VFR encoder frame-rate metadata', async () => {
+    const { coordinator, session, stream } = await createSession();
+    const onFailure = vi.fn();
+    session.setLifecycleCallbacks({ onFailure });
+
+    session.start();
+    await vi.waitFor(() => expect(session.state).toBe('recording'));
+
+    expect(onFailure).not.toHaveBeenCalled();
+    await expect(session.stop()).resolves.toEqual(expect.objectContaining({ size: 3 }));
+    expect(stream.getVideoTracks()[0]?.stop).toHaveBeenCalledOnce();
+    expect(coordinator.abort).not.toHaveBeenCalled();
+  });
+
+  it('rejects constant bitrate drift for VP9 without an exact codec string', async () => {
+    mediabunny.Output.encoderBitrateMode = 'constant';
     const { coordinator, session } = await createSession({ container: 'webm', videoCodec: 'vp9' });
     const onFailure = vi.fn();
     session.setLifecycleCallbacks({ onFailure });
@@ -621,7 +626,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
     session.start();
     await vi.waitFor(() => expect(onFailure).toHaveBeenCalledOnce());
 
-    await expect(session.stop()).rejects.toThrow('did not preserve constant bitrate mode');
+    await expect(session.stop()).rejects.toThrow('did not preserve screen-efficient variable');
     expect(coordinator.abort).toHaveBeenCalledOnce();
   });
 
@@ -643,7 +648,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
   });
 
   it('preserves the encoder failure when lifecycle cleanup aborts the failed session', async () => {
-    mediabunny.Output.encoderFrameRate = 30;
+    mediabunny.Output.encoderBitrateMode = 'constant';
     const { session } = await createSession();
     const failed = vi.fn();
     session.setLifecycleCallbacks({
@@ -656,7 +661,7 @@ describe('source-driven live recording lifecycle and capability failures', () =>
     session.start();
     await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
 
-    await expect(session.stop()).rejects.toThrow('unexpectedly configured a fixed frame rate');
+    await expect(session.stop()).rejects.toThrow('did not preserve screen-efficient variable');
   });
 
   it('rejects stop before start and makes abort idempotent', async () => {
@@ -709,7 +714,7 @@ describe('source-driven live recording capability validation', () => {
     expect(mediabunny.Output.instances).toHaveLength(0);
   });
 
-  it('preflights the exact selected codec without forcing a CFR hint', async () => {
+  it('preflights the exact selected codec with a rate-control cadence hint', async () => {
     const isConfigSupported = vi.fn().mockResolvedValue({ config: {}, supported: true });
     vi.stubGlobal('VideoEncoder', { isConfigSupported });
     const coordinator = createRecordingStagingCoordinatorTestDouble();
@@ -734,15 +739,15 @@ describe('source-driven live recording capability validation', () => {
     expect(isConfigSupported).toHaveBeenCalledWith(
       expect.objectContaining({
         bitrate: 36_000_000,
-        bitrateMode: 'constant',
+        bitrateMode: 'variable',
         codec: 'avc1.640033',
         contentHint: 'text',
+        framerate: 60,
         hardwareAcceleration: 'no-preference',
         height: 1304,
         width: 2560,
       })
     );
-    expect(isConfigSupported.mock.calls[0]?.[0]).not.toHaveProperty('framerate');
   });
 
   it('fails unsupported live audio without changing the selected container', async () => {

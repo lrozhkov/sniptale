@@ -6,6 +6,7 @@ import {
 } from './background-ingress.data';
 import type {
   BackgroundIngressDescriptor,
+  BackgroundIngressRouteGroupData,
   BackgroundIngressRouteDescriptor,
 } from './background-ingress.types';
 
@@ -31,6 +32,7 @@ export function defineBackgroundIngressContracts(
         ...group,
         classification: 'routed',
         contract: contracts[type],
+        semanticAuthority: semanticAuthorityFor(group),
         type,
       })
     )
@@ -40,6 +42,35 @@ export function defineBackgroundIngressContracts(
     contract: contracts[entry.type],
   }));
   return [...routed, ...nonAction];
+}
+
+function semanticAuthorityFor(
+  group: BackgroundIngressRouteGroupData
+): BackgroundIngressRouteDescriptor['semanticAuthority'] {
+  return {
+    capabilityPolicyOwner: {
+      alternateAuthorityFamilies: group.alternateAuthorityFamilies,
+      alternatePolicyIds: group.alternateAuthorizationPolicyIds,
+      policyAuthorityFamily: group.policyAuthorityFamily,
+      policyId: group.authorizationPolicyId,
+      requiredAuthority: group.requiredAuthority,
+      routeAuthorityFamily: group.routeAuthorityFamily,
+      stateOwnerIds: group.policyStateIds,
+    },
+    evidencePolicy: {
+      auditEventPolicy: 'existing-owner-evidence-only',
+      errorShape: group.errorShape,
+      responseShape: group.responseShape,
+    },
+    handlerOwner: {
+      handlerId: group.handlerId,
+      ownerModule: group.ownerModule,
+    },
+    mutationOwners: {
+      effectPolicy: group.sideEffects,
+      transitiveStateOwner: group.transitiveStateOwner,
+    },
+  };
 }
 
 export function defineBackgroundIngressContract(

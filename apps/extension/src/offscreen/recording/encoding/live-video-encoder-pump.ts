@@ -1,20 +1,23 @@
 import { VideoSample, type VideoSampleSource } from 'mediabunny';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { LiveVideoFrameBuffer } from './live-video-frame-buffer';
+import {
+  LiveVideoFrameTransformer,
+  type LiveVideoFrameTransform,
+} from './live-video-frame-transform';
 import { LiveVideoTimeline, type LiveVideoSampleTiming } from './live-video-timeline';
 
-export type LiveVideoFrameTransform = Readonly<{
-  fit: 'contain' | 'cover' | 'fill';
-  outputSize: Readonly<{ height: number; width: number }>;
-  sourceRect: Readonly<{ height: number; width: number; x: number; y: number }>;
-}>;
+export type { LiveVideoFrameTransform } from './live-video-frame-transform';
 
 export interface LiveVideoEncoderPumpMetrics {
   coalescedVideoFrames: number;
   forcedKeyFrames: number;
   maxEncoderAddDurationMs: number;
+  maxFrameTransformDurationMs: number;
   submittedVideoFrames: number;
   totalEncoderAddDurationMs: number;
+  totalFrameTransformDurationMs: number;
+  transformedVideoFrames: number;
   videoEncoderBackpressureEvents: number;
 }
 
@@ -23,8 +26,12 @@ interface RunLiveVideoEncoderPumpInput {
   frameRate: number;
   frameTransform?: LiveVideoFrameTransform;
   onFrameDequeued(): void;
+  onEncoderSubmissionFailed?(): void;
+  onEncoderSubmissionStarted?(): void;
   shouldEncodeTerminalFrame(): boolean;
   videoSource: Pick<VideoSampleSource, 'add'>;
+  frameTransformer?: Pick<LiveVideoFrameTransformer, 'transformFrame'>;
+  transformStrategy?: 'native-encoder';
 }
 
 const logger = createLogger({ namespace: 'LiveVideoEncoderPump' });
@@ -33,6 +40,7 @@ function describeVideoFrame(frame: VideoFrame) {
   return {
     codedHeight: frame.codedHeight,
     codedWidth: frame.codedWidth,
+    colorSpace: frame.colorSpace,
     displayHeight: frame.displayHeight,
     displayWidth: frame.displayWidth,
     format: frame.format,
@@ -55,35 +63,29 @@ async function encodeVideoFrame(
   metrics: LiveVideoEncoderPumpMetrics
 ): Promise<void> {
   const sourceDescription = describeVideoFrame(frame);
-  const sourceSample = new VideoSample(frame, {
-    duration: timing.duration,
-    timestamp: timing.timestamp,
-  });
   let sample: VideoSample | null = null;
-  const addStartedAt = performance.now();
   try {
-    if (input.frameTransform) {
-      const { fit, outputSize, sourceRect } = input.frameTransform;
-      sample = await sourceSample.transform({
-        alpha: 'discard',
-        crop: {
-          height: sourceRect.height,
-          left: sourceRect.x,
-          top: sourceRect.y,
-          width: sourceRect.width,
-        },
-        fit,
-        height: outputSize.height,
-        width: outputSize.width,
-      });
-      sourceSample.close();
+    if (input.frameTransformer) {
+      const transformStartedAt = performance.now();
+      sample = input.frameTransformer.transformFrame(frame, timing);
+      const transformDuration = performance.now() - transformStartedAt;
+      metrics.maxFrameTransformDurationMs = Math.max(
+        metrics.maxFrameTransformDurationMs,
+        transformDuration
+      );
+      metrics.totalFrameTransformDurationMs += transformDuration;
+      metrics.transformedVideoFrames += 1;
     } else {
-      sample = sourceSample;
+      sample = new VideoSample(frame, {
+        duration: timing.duration,
+        timestamp: timing.timestamp,
+      });
     }
     if (logFirstEncoderInput) {
       const encoderInput = {
         codedHeight: sample.codedHeight,
         codedWidth: sample.codedWidth,
+        colorSpace: sample.colorSpace,
         displayHeight: sample.displayHeight,
         displayWidth: sample.displayWidth,
         format: sample.format,
@@ -100,15 +102,22 @@ async function encodeVideoFrame(
       logger.info('Observed first encoder input frame', encoderInput);
     }
     if (timing.keyFrame) metrics.forcedKeyFrames += 1;
-    await input.videoSource.add(sample, timing.keyFrame ? { keyFrame: true } : undefined);
-    metrics.submittedVideoFrames += 1;
-  } finally {
+    const addStartedAt = performance.now();
+    input.onEncoderSubmissionStarted?.();
+    try {
+      await input.videoSource.add(sample, timing.keyFrame ? { keyFrame: true } : undefined);
+    } catch (error) {
+      input.onEncoderSubmissionFailed?.();
+      throw error;
+    }
     const addDuration = performance.now() - addStartedAt;
     metrics.maxEncoderAddDurationMs = Math.max(metrics.maxEncoderAddDurationMs, addDuration);
     metrics.totalEncoderAddDurationMs += addDuration;
     if (addDuration > 1_000 / input.frameRate) metrics.videoEncoderBackpressureEvents += 1;
+    metrics.submittedVideoFrames += 1;
+  } finally {
     sample?.close();
-    if (sample !== sourceSample) sourceSample.close();
+    if (input.frameTransformer) frame.close();
   }
 }
 
@@ -117,8 +126,11 @@ class LiveVideoEncoderPumpState {
     coalescedVideoFrames: 0,
     forcedKeyFrames: 0,
     maxEncoderAddDurationMs: 0,
+    maxFrameTransformDurationMs: 0,
     submittedVideoFrames: 0,
     totalEncoderAddDurationMs: 0,
+    totalFrameTransformDurationMs: 0,
+    transformedVideoFrames: 0,
     videoEncoderBackpressureEvents: 0,
   };
   private loggedFirstEncoderInput = false;
@@ -126,6 +138,13 @@ class LiveVideoEncoderPumpState {
   private readonly timeline: LiveVideoTimeline;
 
   constructor(private readonly input: RunLiveVideoEncoderPumpInput) {
+    if (
+      input.frameTransform &&
+      !input.frameTransformer &&
+      input.transformStrategy !== 'native-encoder'
+    ) {
+      input.frameTransformer = new LiveVideoFrameTransformer(input.frameTransform);
+    }
     this.timeline = new LiveVideoTimeline(input.frameRate);
   }
 

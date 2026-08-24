@@ -24,6 +24,7 @@ import { createAssetPublicationJournal, publishReadyJournalWithRetry } from './p
 import { recoverStandaloneAssetPublications } from './recovery';
 import type { AssetReadyJournal } from './contracts';
 import {
+  isActivePersistenceMutationTransitionPermit,
   runWithPersistenceMutationTransition,
   runWithPersistentDataErasureBarrier,
 } from '../infrastructure/mutation-barrier';
@@ -53,6 +54,34 @@ beforeEach(() => {
   deleteReadyJournalMock.mockResolvedValue(undefined);
   releaseTransitionsMock.mockResolvedValue(undefined);
   writeReadyJournalMock.mockResolvedValue(undefined);
+});
+
+it('rejects journal creation when secure IDs are unavailable', async () => {
+  const originalCrypto = globalThis.crypto;
+  vi.stubGlobal('crypto', { ...originalCrypto, randomUUID: undefined });
+
+  await expect(
+    createAssetPublicationJournal({
+      assetRefs: [ref],
+      domain: 'recording-assets',
+      payload: {},
+    })
+  ).rejects.toThrow('Secure journal IDs are unavailable.');
+  expect(writeReadyJournalMock).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});
+
+it('recognizes transition permits only during their admitted lifetime', async () => {
+  let expiredPermit: unknown;
+  expect(isActivePersistenceMutationTransitionPermit(null)).toBe(false);
+  expect(isActivePersistenceMutationTransitionPermit('permit')).toBe(false);
+
+  await runWithPersistenceMutationTransition((permit) => {
+    expiredPermit = permit;
+    expect(isActivePersistenceMutationTransitionPermit(permit)).toBe(true);
+  });
+
+  expect(isActivePersistenceMutationTransitionPermit(expiredPermit)).toBe(false);
 });
 
 it('persists ready before publication and removes it only after a successful retry', async () => {

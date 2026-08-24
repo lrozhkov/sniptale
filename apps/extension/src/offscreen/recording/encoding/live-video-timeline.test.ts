@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { LiveVideoTimeline } from './live-video-timeline';
 
 describe('LiveVideoTimeline', () => {
+  it.each([
+    ['static text delivery', [0, 0.2, 0.4, 0.9, 1.1]],
+    ['blinking caret delivery', [0, 0.1, 0.2, 0.35, 0.5]],
+    ['small local changes', [0, 0.02, 0.12, 0.15, 0.23]],
+    ['continuous scrolling', [0, 1 / 60, 2 / 60, 3 / 60, 4 / 60]],
+  ])('keeps one timeline across %s', (_label, timestamps) => {
+    const timeline = new LiveVideoTimeline(60);
+    const emitted = timestamps
+      .map((timestamp) => timeline.accept(timestamp))
+      .filter((decision) => decision.kind === 'emit');
+    const terminal = timeline.finish();
+
+    expect(emitted.filter((decision) => decision.keyFrame)).toHaveLength(1);
+    expect(terminal?.keyFrame).toBe(false);
+  });
+
   it('coalesces equal and backward source timestamps instead of emitting duplicate PTS', () => {
     const timeline = new LiveVideoTimeline(60);
 
@@ -63,17 +79,20 @@ describe('LiveVideoTimeline', () => {
 
     expect(timeline.accept(0)).toEqual({ kind: 'pending' });
     expect(timeline.accept(0.016666)).toMatchObject({ kind: 'emit', timestamp: 0 });
-    expect(timeline.accept(0.033333)).toMatchObject({ kind: 'emit', timestamp: 0.016666 });
-    expect(timeline.accept(0.05)).toMatchObject({ kind: 'emit', timestamp: 0.033333 });
+    expect(timeline.accept(0.033333)).toMatchObject({ kind: 'emit', timestamp: 1 / 60 });
+    expect(timeline.accept(0.05)).toMatchObject({ kind: 'emit', timestamp: 2 / 60 });
   });
 
-  it('marks the first fresh frame after a missed source interval as a recovery keyframe', () => {
+  it('does not treat ordinary source starvation as a timeline discontinuity', () => {
     const timeline = new LiveVideoTimeline(60);
 
     timeline.accept(0);
     expect(timeline.accept(1 / 60)).toMatchObject({ keyFrame: true, timestamp: 0 });
     expect(timeline.accept(0.1)).toMatchObject({ keyFrame: false, timestamp: 1 / 60 });
-    expect(timeline.accept(0.1 + 1 / 60)).toMatchObject({ keyFrame: true, timestamp: 0.1 });
+    expect(timeline.accept(0.1 + 1 / 60)).toMatchObject({
+      keyFrame: false,
+      timestamp: 0.1,
+    });
   });
 
   it('uses the last observed interval for the terminal frame', () => {
@@ -88,7 +107,7 @@ describe('LiveVideoTimeline', () => {
     });
   });
 
-  it('does not extend the terminal frame by the preceding discontinuity', () => {
+  it('does not turn a terminal frame into a keyframe after a source gap', () => {
     const timeline = new LiveVideoTimeline(60);
 
     timeline.accept(0);
@@ -96,7 +115,7 @@ describe('LiveVideoTimeline', () => {
     timeline.accept(1);
     expect(timeline.finish()).toEqual({
       duration: 1 / 30,
-      keyFrame: true,
+      keyFrame: false,
       timestamp: 1,
     });
   });

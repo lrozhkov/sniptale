@@ -1,13 +1,13 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { chmod, mkdtemp, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
 type LaunchedBrowser = {
   browser: Browser;
-  browserProcess: ChildProcessWithoutNullStreams;
   context: BrowserContext;
+  extensionId: string;
   userDataDir: string;
 };
 
@@ -15,53 +15,6 @@ type LaunchExtensionBrowserOptions = {
   extensionBuildDir?: string;
   userDataDir?: string;
 };
-
-async function reserveDebugPort(): Promise<number> {
-  const { createServer } = await import('node:net');
-
-  return await new Promise((resolve, reject) => {
-    const server = createServer();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      if (!address || typeof address === 'string') {
-        reject(new Error('Failed to reserve a debugging port'));
-        return;
-      }
-
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(address.port);
-      });
-    });
-  });
-}
-
-async function waitForWebSocketUrl(port: number): Promise<string> {
-  const deadline = Date.now() + 20_000;
-  const endpoint = `http://127.0.0.1:${port}/json/version`;
-
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(endpoint);
-      if (response.ok) {
-        const payload = (await response.json()) as { webSocketDebuggerUrl?: string };
-        if (payload.webSocketDebuggerUrl) {
-          return payload.webSocketDebuggerUrl;
-        }
-      }
-    } catch {
-      // Browser is still booting.
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
-  throw new Error(`Timed out waiting for Chromium CDP endpoint on port ${port}`);
-}
 
 async function ensurePage(context: BrowserContext): Promise<Page> {
   const pages = context.pages();
@@ -75,39 +28,67 @@ async function dismissFirstRunPrompt(page: Page): Promise<void> {
   }
 }
 
-function getChromiumLaunchConfig(debugPort: number, extensionBuildDir?: string) {
-  const extensionPath = join(
+function resolveExtensionPath(extensionBuildDir?: string): string {
+  return join(
     process.cwd(),
     extensionBuildDir ?? process.env.SNIPTALE_EXTENSION_BUILD_DIR ?? 'dist'
   );
-  const executablePath = chromium.executablePath();
-
-  return {
-    executablePath,
-    args: [
-      '--no-sandbox',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-search-engine-choice-screen',
-      '--disable-sync',
-      '--disable-features=SigninIntercept,ChromeSigninPromo,ChromeRefresh2023,SearchEngineChoice',
-      '--disable-crash-reporter',
-      '--disable-crashpad',
-      '--disable-breakpad',
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
-      `--remote-debugging-port=${debugPort}`,
-      'about:blank',
-    ],
-  };
 }
 
-async function ensureChromiumExecutable(executablePath: string): Promise<void> {
-  await chmod(executablePath, 0o755);
+function getChromiumLaunchArgs(): string[] {
+  return [
+    '--no-sandbox',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-search-engine-choice-screen',
+    '--disable-sync',
+    '--disable-features=SigninIntercept,ChromeSigninPromo,ChromeRefresh2023,SearchEngineChoice',
+    '--disable-crash-reporter',
+    '--disable-crashpad',
+    '--disable-breakpad',
+    '--enable-unsafe-extension-debugging',
+    '--auto-select-desktop-capture-source=Entire screen',
+    '--auto-select-screen-capture-source',
+  ];
 }
 
-function appendErrorChunk(stderr: string, chunk: Buffer): string {
-  return stderr + chunk.toString();
+export function deriveChromeExtensionId(manifestKey: string): string {
+  const decodedKey = Buffer.from(manifestKey, 'base64');
+  if (
+    decodedKey.length === 0 ||
+    decodedKey.toString('base64').replace(/=+$/u, '') !== manifestKey.replace(/=+$/u, '')
+  ) {
+    throw new Error('Extension manifest key is not valid base64');
+  }
+  const digest = createHash('sha256').update(decodedKey).digest('hex');
+  return digest
+    .slice(0, 32)
+    .replace(/[0-9a-f]/gu, (nibble) =>
+      String.fromCharCode('a'.charCodeAt(0) + Number.parseInt(nibble, 16))
+    );
+}
+
+async function resolvePinnedExtensionId(extensionPath: string): Promise<string | null> {
+  const manifest: unknown = JSON.parse(
+    await readFile(join(extensionPath, 'manifest.json'), 'utf8')
+  );
+  if (typeof manifest !== 'object' || manifest === null || !('key' in manifest)) return null;
+  const key = (manifest as { key?: unknown }).key;
+  if (typeof key !== 'string') throw new Error('Extension manifest key must be a string');
+  return deriveChromeExtensionId(key);
+}
+
+async function removeOwnedUserDataDir(userDataDir: string): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await rm(userDataDir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const code = error instanceof Error && 'code' in error ? error.code : null;
+      if (code !== 'ENOTEMPTY' && code !== 'EBUSY') throw error;
+      await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+  }
 }
 
 export async function launchExtensionBrowser(
@@ -115,29 +96,31 @@ export async function launchExtensionBrowser(
 ): Promise<LaunchedBrowser> {
   const ownsUserDataDir = options.userDataDir === undefined;
   const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), 'sniptale-pw-')));
-  const debugPort = await reserveDebugPort();
-  const launchConfig = getChromiumLaunchConfig(debugPort, options.extensionBuildDir);
-
-  await ensureChromiumExecutable(launchConfig.executablePath);
-
-  const browserProcess = spawn(
-    launchConfig.executablePath,
-    [...launchConfig.args, `--user-data-dir=${userDataDir}`],
-    { stdio: ['ignore', 'pipe', 'pipe'] }
-  );
-
-  let stderr = '';
-  browserProcess.stderr.on('data', (chunk) => {
-    stderr = appendErrorChunk(stderr, chunk);
-  });
+  const extensionPath = resolveExtensionPath(options.extensionBuildDir);
+  const expectedExtensionId = await resolvePinnedExtensionId(extensionPath);
+  let context: BrowserContext | null = null;
 
   try {
-    const wsEndpoint = await waitForWebSocketUrl(debugPort);
-    const browser = await chromium.connectOverCDP(wsEndpoint);
-    const context = browser.contexts()[0] ?? browser.contexts().at(0);
-
-    if (!context) {
-      throw new Error('Connected to Chromium, but no browser context was available');
+    context = await chromium.launchPersistentContext(userDataDir, {
+      args: getChromiumLaunchArgs(),
+      channel: 'chromium',
+      headless: process.env.PLAYWRIGHT_HEADLESS !== '0',
+      ignoreDefaultArgs: ['--disable-extensions'],
+    });
+    const browser = context.browser();
+    if (!browser) throw new Error('Persistent extension context has no browser owner');
+    const session = await browser.newBrowserCDPSession();
+    const loaded = (await session.send('Extensions.loadUnpacked', {
+      path: extensionPath,
+    })) as { id?: unknown };
+    await session.detach();
+    if (typeof loaded.id !== 'string') {
+      throw new Error('Chromium did not return an ID for the unpacked extension');
+    }
+    if (expectedExtensionId && loaded.id !== expectedExtensionId) {
+      throw new Error(
+        `Loaded extension ID ${loaded.id} does not match pinned manifest identity ${expectedExtensionId}`
+      );
     }
 
     await ensurePage(context);
@@ -148,20 +131,16 @@ export async function launchExtensionBrowser(
 
     return {
       browser,
-      browserProcess,
       context,
+      extensionId: loaded.id,
       userDataDir,
     };
   } catch (error) {
-    browserProcess.kill('SIGKILL');
+    await context?.close().catch(() => undefined);
     if (ownsUserDataDir) {
-      await rm(userDataDir, { recursive: true, force: true });
+      await removeOwnedUserDataDir(userDataDir);
     }
-    const details = stderr.trim();
-    const suffix = details ? `\nChromium stderr:\n${details}` : '';
-    throw new Error(`${error instanceof Error ? error.message : String(error)}${suffix}`, {
-      cause: error,
-    });
+    throw error;
   }
 }
 
@@ -170,13 +149,6 @@ export async function closeExtensionBrowser(
   options: { removeUserDataDir?: boolean } = {}
 ): Promise<void> {
   await launched.browser.close().catch(() => undefined);
-  if (launched.browserProcess.exitCode === null && !launched.browserProcess.killed) {
-    const exit = new Promise<void>((resolve) =>
-      launched.browserProcess.once('exit', () => resolve())
-    );
-    launched.browserProcess.kill('SIGKILL');
-    await exit;
-  }
   if (options.removeUserDataDir) {
     await rm(launched.userDataDir, { recursive: true, force: true });
   }

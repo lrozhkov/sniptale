@@ -1,6 +1,15 @@
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorRuntimeController } from '../../session';
-import type { VideoEditorControllerStorePort } from '../../../contracts/controller-store';
+import type {
+  AnnotationEditingPort,
+  ClipSelectionPort,
+  DiagnosticsTelemetryPort,
+  EffectEditingPort,
+  HistoryPort,
+  PlaybackPort,
+  ProjectLifecyclePort,
+  TimelineEditingPort,
+} from '../../../contracts/controller-store';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import {
   createWorkspaceTimelineEditingActions,
@@ -21,12 +30,12 @@ type TimelineControllerWorkspace = TimelineActionWorkspace & TimelineStateWorksp
 type TimelineProjectUpdaters = {
   addActionEvent: (
     preset: NonNullable<
-      NonNullable<VideoEditorControllerStorePort['project']>['actionEvents'][number]['preset']
+      NonNullable<ProjectLifecyclePort['project']>['actionEvents'][number]['preset']
     >
   ) => void;
   addMotionRegion: () => void;
   enableCursorTrack: () => void;
-  updateEffectInstance: VideoEditorControllerStorePort['updateEffectInstance'];
+  updateEffectInstance: EffectEditingPort['updateEffectInstance'];
 };
 type TimelineSelectedClipActions = {
   deleteSelectedClip: () => void;
@@ -35,7 +44,12 @@ type TimelineSelectedClipActions = {
 };
 
 function createWorkspaceTimelineActions(
-  store: VideoEditorControllerStorePort,
+  store: TimelineEditingPort &
+    AnnotationEditingPort &
+    ClipSelectionPort &
+    Pick<DiagnosticsTelemetryPort, 'toggleTelemetryLaneVisibility'> &
+    HistoryPort &
+    Pick<ProjectLifecyclePort, 'project' | 'setError'>,
   runtime: VideoEditorRuntimeController,
   actions: TimelineImportHandlers,
   workspace: TimelineActionWorkspace,
@@ -53,9 +67,13 @@ function createWorkspaceTimelineActions(
 }
 
 function createWorkspaceTimelineState(
-  store: VideoEditorControllerStorePort,
+  store: TimelineEditingPort &
+    ClipSelectionPort &
+    PlaybackPort &
+    Pick<DiagnosticsTelemetryPort, 'recordingTelemetry' | 'telemetryLaneVisible'> &
+    Pick<ProjectLifecyclePort, 'project'>,
   runtime: VideoEditorRuntimeController,
-  project: NonNullable<VideoEditorControllerStorePort['project']>,
+  project: NonNullable<ProjectLifecyclePort['project']>,
   workspace: TimelineStateWorkspace
 ) {
   return {
@@ -75,9 +93,19 @@ function createWorkspaceTimelineState(
 }
 
 export function createWorkspaceTimelineController(
-  store: VideoEditorControllerStorePort,
+  store: TimelineEditingPort &
+    AnnotationEditingPort &
+    ClipSelectionPort &
+    HistoryPort &
+    PlaybackPort &
+    EffectEditingPort &
+    Pick<
+      DiagnosticsTelemetryPort,
+      'recordingTelemetry' | 'telemetryLaneVisible' | 'toggleTelemetryLaneVisibility'
+    > &
+    Pick<ProjectLifecyclePort, 'project' | 'setError'>,
   runtime: VideoEditorRuntimeController,
-  project: NonNullable<VideoEditorControllerStorePort['project']>,
+  project: NonNullable<ProjectLifecyclePort['project']>,
   actions: TimelineImportHandlers,
   workspace: TimelineControllerWorkspace,
   projectUpdaters: TimelineProjectUpdaters,

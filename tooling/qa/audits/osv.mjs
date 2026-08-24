@@ -22,7 +22,7 @@ export function runOsvCheck({
   if (!executable) {
     throw new AuditExecutionError(
       'tool-unavailable',
-      'OSV-Scanner CLI is required for qa:audit. Install the official binary or set SNIPTALE_OSV_SCANNER_BIN.'
+      'OSV-Scanner CLI is required for the full audit. Install the official binary or set SNIPTALE_OSV_SCANNER_BIN.'
     );
   }
 

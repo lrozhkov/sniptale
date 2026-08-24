@@ -190,6 +190,17 @@
       ]
     },
     {
+      "tool": "verify-documentation-facts.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-documentation-facts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
       "tool": "verify-domain-fixture-realism.mjs",
       "validationMode": "fixture-test",
       "testFiles": [
@@ -645,18 +656,6 @@
       ]
     },
     {
-      "tool": "verify-eslint.mjs",
-      "validationMode": "fixture-test",
-      "testFiles": [
-        "tooling/qa/core/verify-runners.test.ts"
-      ],
-      "states": [
-        "pass",
-        "fail",
-        "skip"
-      ]
-    },
-    {
       "tool": "verify-export-artifact-boundaries.mjs",
       "validationMode": "fixture-test + live-smoke",
       "testFiles": [
@@ -1076,10 +1075,11 @@
       ]
     },
     {
-      "tool": "verify-prettier.mjs",
+      "tool": "verify-oxfmt.mjs",
       "validationMode": "fixture-test",
       "testFiles": [
-        "tooling/qa/core/verify-quality-gates-core.test.ts"
+        "tooling/qa/core/verify-oxfmt.test.ts",
+        "tooling/qa/core/verify-formatter-authority.test.ts"
       ],
       "states": [
         "pass",
@@ -2101,6 +2101,67 @@
       "validationMode": "canonical-control-fixture",
       "testFiles": [
         "tooling/qa/core/lane-worker-input-contracts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "fast-proof-reuse.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/ci/fast-proof-reuse.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "admit-candidate-proof.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/ci/admit-candidate-proof.test.ts",
+        "tooling/ci/trusted-control-matrix.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "main-proof-transport.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/ci/main-proof-transport.test.ts",
+        "tooling/ci/select-unit-proof.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "run-profile.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/test/mutation/run-profile.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-main-proof.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/ci/ci-contract.test.ts",
+        "tooling/ci/coverage-proof-contract.test.ts",
+        "tooling/ci/select-codeql-proof.test.ts",
+        "tooling/ci/select-unit-proof.test.ts",
+        "tooling/ci/workflow-contract.test.ts"
       ],
       "states": [
         "pass",

@@ -179,7 +179,7 @@ function collectReusableCodeqlResult({ controlRoot, enabled, sourceRoot }) {
   recordSuccessfulCodeqlProof({
     cwd: sourceRoot,
     sarifPath: filteredSarifPath,
-    source: 'qa:audit:reuse',
+    source: 'ci:release:reuse',
     reusedFrom: reusable.proof.proofDigest,
   });
   return {

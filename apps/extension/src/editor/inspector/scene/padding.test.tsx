@@ -127,15 +127,15 @@ it('renders padding controls without repeating the summary and forwards numeric 
   });
 
   expect(setFrameDraft).toHaveBeenCalledTimes(1);
-  expect(
-    (setFrameDraft.mock.calls[0]?.[0] as (frame: typeof FRAME) => typeof FRAME)(FRAME)
-  ).toEqual({
-    ...FRAME,
-    paddingBottom: 24,
-    paddingLeft: 24,
-    paddingRight: 24,
-    paddingTop: 24,
-  });
+  expect((setFrameDraft.mock.calls[0]![0] as (frame: typeof FRAME) => typeof FRAME)(FRAME)).toEqual(
+    {
+      ...FRAME,
+      paddingBottom: 24,
+      paddingLeft: 24,
+      paddingRight: 24,
+      paddingTop: 24,
+    }
+  );
 });
 
 it('maps frame padding to the shared linked-padding control', async () => {

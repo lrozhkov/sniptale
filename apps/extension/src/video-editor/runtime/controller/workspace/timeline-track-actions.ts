@@ -1,9 +1,14 @@
 import { translate } from '../../../../platform/i18n';
-import type { VideoEditorControllerStorePort } from '../../../contracts/controller-store';
+import type {
+  ProjectLifecyclePort,
+  TimelineEditingPort,
+} from '../../../contracts/controller-store';
+
+type TimelineTrackStore = TimelineEditingPort & Pick<ProjectLifecyclePort, 'project'>;
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 
 export function requestTrackDeletion(
-  store: VideoEditorControllerStorePort,
+  store: TimelineTrackStore,
   workspace: Pick<VideoEditorWorkspaceState, 'confirm'>,
   trackId: string
 ) {
@@ -34,7 +39,7 @@ export function requestTrackDeletion(
 }
 
 export function createTimelineTrackActions(
-  store: VideoEditorControllerStorePort,
+  store: TimelineTrackStore,
   workspace: Pick<VideoEditorWorkspaceState, 'confirm'>
 ) {
   return {

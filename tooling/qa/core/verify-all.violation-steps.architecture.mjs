@@ -14,10 +14,12 @@ import { runRepoWideInterfaceSurfaceCheck } from './verify-interface-surfaces.mj
 import { runRepoWideReturnedObjectSurfaceCheck } from './verify-interface-surfaces.mjs';
 import { runRepoWideRootSideEffectCheck } from './verify-root-side-effects.mjs';
 import { runRuntimeTopologyCheck } from '../guards/architecture/verify-runtime-topology.mjs';
+import { runDocumentationFactsCheck } from './verify-documentation-facts.mjs';
 import { runSharedStyleOwnershipCheck } from './verify-shared-style-ownership.mjs';
 import { runSharedUiBoundaryCheck } from './verify-shared-ui-boundaries.mjs';
 
 export const ARCHITECTURE_VIOLATION_STEPS = [
+  ['Documentation facts', 'Documentation fact violations found:', runDocumentationFactsCheck],
   ['Manifest integrity', 'Manifest integrity violations found:', runManifestIntegrityCheck],
   ['Manifest permissions', 'Manifest permission violations found:', runManifestPermissionsCheck],
   ['Runtime topology', 'Runtime topology violations found:', runRuntimeTopologyCheck],

@@ -69,6 +69,32 @@ run('/opt/semgrep/bin/pip', [
 if (sha256File('/tmp/playwright-package/package-lock.json') !== lock.playwright.npmLockSha256) {
   throw new Error('Playwright npm lock drifted from toolchain.lock.json.');
 }
+if (
+  sha256File('/tmp/mutation-package/package.json') !== lock.mutationRunner.packageJsonSha256 ||
+  sha256File('/tmp/mutation-package/package-lock.json') !== lock.mutationRunner.packageLockSha256
+) {
+  throw new Error('Mutation runner package drifted from toolchain.lock.json.');
+}
+fs.cpSync('/tmp/mutation-package', '/opt/sniptale-mutation', { recursive: true });
+run('npm', ['ci', '--ignore-scripts', '--prefix', '/opt/sniptale-mutation']);
+const mutationTypescript = spawnSync(
+  'node',
+  [
+    '--input-type=module',
+    '--eval',
+    "const { default: ts } = await import('typescript'); process.stdout.write(ts.version);",
+  ],
+  { cwd: '/opt/sniptale-mutation', encoding: 'utf8' }
+);
+if (
+  mutationTypescript.status !== 0 ||
+  mutationTypescript.stdout.trim() !== lock.projectToolchain.typescriptCompilerApi.version
+) {
+  throw new Error(
+    `Mutation TypeScript drift: expected ${lock.projectToolchain.typescriptCompilerApi.version}, ` +
+      `got ${`${mutationTypescript.stdout ?? ''}${mutationTypescript.stderr ?? ''}`.trim()}`
+  );
+}
 fs.cpSync('/tmp/playwright-package', '/opt/playwright-cli', { recursive: true });
 run('npm', ['ci', '--ignore-scripts', '--prefix', '/opt/playwright-cli']);
 process.env.PLAYWRIGHT_BROWSERS_PATH = '/opt/playwright';
@@ -96,18 +122,18 @@ if (
   throw new Error('Playwright browser registry drifted from toolchain.lock.json.');
 }
 
-const expected = new Map([
-  ['node', lock.node.version],
-  ['codeql', lock.codeql.version],
-  ['osv-scanner', lock.osvScanner.version],
-  ['gitleaks', lock.gitleaks.version],
-  ['actionlint', lock.actionlint.version],
-  ['semgrep', lock.semgrep.version],
-  ['playwright', lock.playwright.version],
-]);
-for (const [command, version] of expected) {
+const expected = [
+  ['node', lock.node.version, ['--version']],
+  ['codeql', lock.codeql.version, ['--version']],
+  ['osv-scanner', lock.osvScanner.version, ['--version']],
+  ['gitleaks', lock.gitleaks.version, ['--version']],
+  ['actionlint', lock.actionlint.version, ['--version']],
+  ['semgrep', lock.semgrep.version, ['--legacy', '--version']],
+  ['playwright', lock.playwright.version, ['--version']],
+];
+for (const [command, version, args] of expected) {
   const executable = command === 'semgrep' ? '/opt/semgrep/bin/semgrep' : command;
-  const result = spawnSync(executable, ['--version'], { encoding: 'utf8' });
+  const result = spawnSync(executable, args, { encoding: 'utf8' });
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   if (result.status !== 0 || !output.includes(version)) {
     throw new Error(`${command} version drift: expected ${version}, got ${output.trim()}`);

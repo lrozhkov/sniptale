@@ -1,89 +1,83 @@
 # Operator Handbook
 
-Updated: 2026-07-25
+Short command and review lookup. Full external behavior is in [ci-cd.md](ci-cd.md), wrapper behavior in [wrapper-summary.md](wrapper-summary.md), and changing product values in generated [project facts](../engineering/project-facts.md).
 
-Short command and review-skill lookup. Workflow belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), quality policy in [code-quality.md](code-quality.md), wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md), and GitHub/Selectel execution and release publication in [ci-cd.md](ci-cd.md).
-
-## Canonical Entrypoints
+## Canonical entrypoints
 
 | Need | Command | Notes |
 | --- | --- | --- |
 | Read-only context | `npm run qa:preflight` | Accepts `-- --files <paths...>` before a diff exists. |
+| Harness/shared-control proof | `npm run qa:release-harness` | Required when the live scope classifier reports executable harness targets. |
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
-| Harness/shared-control proof | `npm run qa:release-harness` | Required for `tooling/**`, `.github/workflows/**`, `docs/agent-tooling/**`, hooks, QA-affecting root/config files, and active `docs/tooling/**` guidance. |
-| Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, task-artifact guard, and commit. |
-| Publish committed changes | `git push` | The pre-push hook proves the immutable pushed range with checkpoint/build and applicable harness verification; it never promotes a new branch push to `qa:release` or `build:release`. |
-| Release-grade product proof | `npm run qa:release` | Release preparation or explicit audit-grade proof. |
-| Unpacked release-mode build | `npm run build:release` | Runs only Vite in release mode and writes `dist/`; does not typecheck, run QA, or package an archive. |
-| Package current release build | `npm run release:package-only` | Debug/package-only path; does not replace `qa:release`. |
-| Repository audit | `npm run qa:audit` | Manual audit profiles, full coverage, evidence, supply-chain checks, and external engines. |
-| Canonical container release lane | `npm run ci:release` | The same release-harness and release wrappers used by GitHub Actions; does not run checkpoint. |
-| Canonical container security lane | `npm run ci:security` | The `security` audit profile plus its publishable SBOM. |
-| Canonical container coverage lane | `npm run ci:coverage` | The isolated `coverage` audit profile and validated LCOV/JSON/HTML outputs. |
-| Local PR bypass proof | `npm run ci:proof -- --pr <number> [--cpu N] [--memory-mib N] [--workers N]` | Run from a clean checkout exactly at `origin/main`; accepts only owner-authored PRs, runs the same candidate workflow as GitHub, posts hashes after a final authority check, and leaves native bypass merge manual. |
-| GitHub policy preview/apply | `npm run ci:github:plan` / `npm run ci:github:apply` | Applies pinned-action, security, immutable-release, ruleset, and PR-only bypass policy after a rollback snapshot. |
-| Structural/topology maintenance snapshot | `npm run qa:structural-audit` | Manual report-only path-owner plus forwarding-edge fragmentation snapshot; not a PR, agent, closeout, or `qa:audit` gate. |
+| Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, artifact policy, and commit. |
+| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs Fast PR Gate controls directly in WSL without Docker. It excludes full Vitest and does not prove release readiness. Dirty workspace is diagnostic and non-admissible externally. |
+| Local full release gate | `npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]` | Runs the same composition owner as Release provenance Gate directly in WSL, including heavy audit and mutation profiles. |
+| Quick local build bypass | `npm run ci:build` | Runs the project npm build only; it is not a release build, emits no QA proof, and is never accepted for provenance. |
+| Local PR bypass proof | `npm run ci:proof -- --pr <number> --reason "<audit note>" [resource flags]` | Requires clean `origin/main`, validates exact remote PR authority, posts proof hashes and the mandatory reason, and never merges. |
+| Unpacked release build | `npm run build:release` | Release-mode Vite output only; no typecheck, full QA, or package admission. |
+| Package-only debugging | `npm run release:package-only` | Diagnostic packaging; does not replace `ci:proof` or `ci:release`. |
 | Extension smoke | `npm run qa:e2e` | Separate Playwright runtime acceptance path. |
-| Wrapper statistics | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` | Reads structured run records. |
-| WSL setup/recovery | [wsl-setup.md](wsl-setup.md) | Environment setup only. |
+| Structural maintenance snapshot | `npm run qa:structural-audit` | Manual report only; never a normal PR or closeout gate. |
+| Wrapper statistics | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` | Reads structured local run records. |
+| GitHub policy preview/apply | `npm run ci:github:plan` / `npm run ci:github:apply` | Writes a sanitized rollback snapshot before apply. |
 
-The live harness/shared-control classifier is `tooling/qa/core/qa-scope.mjs`; this table summarizes it. Machine-owned files explicitly marked inventory-only, including exact coverage rollout paths, use checkpoint owner validation without a fresh harness stamp. Changing matching, thresholds, traversal, or wrapper behavior still requires release-harness proof.
+The normal local delivery order remains `qa:release-harness` when selected, `qa:checkpoint`, required review, then one `qa:closeout`. Do not repeatedly closeout/commit/push to debug CI: use local `ci:proof` and `ci:release` first.
 
-Release publication accepts only the machine-owned release principal as both the original and triggering GitHub actor. It checks the live repository immutable-release setting and exact active no-bypass `v*` tag update/deletion ruleset, then requires the exact successful `main` proof, ZIP, SBOM, and immutable `sha-<commit>` QA image for the tagged commit. The tag lane runs only the release audit in that image, rechecks the verified tag authority immediately before creating the draft, and publishes both main and release-audit proof manifests. The exact draft release ID, asset set, and GitHub-computed digests are verified before publication makes them immutable, and the published immutable release is verified again afterward. The live-setting check first tries the workflow token; if that token cannot read repository Administration state, configure `RELEASE_POLICY_TOKEN` as a fine-grained read-only Administration token. A missing or unreadable live setting fails closed before release publication. The QA image resolves Debian and Playwright system dependencies from the immutable Debian snapshot recorded in `toolchain.lock.json`, then installs Playwright from its separate integrity-locked npm closure and digest-verified Chromium/headless-shell/FFmpeg archives.
+QA implementation, owner maps, generated inventories, and product code may change together in one ordinary PR. Candidate QA executes once under the trusted-base envelope; no separate bootstrap PR is required. The GitHub summary must show `QA controls changed` and both candidate and trusted control digests. Review QA changes normally and remember that the envelope proves phase, identity, schema, hash, execution, artifact, and graph completeness but does not rerun the previous controls. The accepted implementation becomes trusted only after merge to `main`.
 
-Pull-request required-check authority uses `pull_request_target`: GitHub loads the workflow and trusted CI control plane from the base commit, checks out the exact public candidate SHA separately without credentials, resolves the locked image only from the trusted base, and materializes the candidate tree as a staged diff over the exact base in a disposable Git workspace. Inside that workspace it executes `qa:release-harness`, `qa:checkpoint`, and literal `qa:closeout`, disables hooks, requires the closeout commit tree and parent to match the candidate and base, then runs `qa:release`, the fast `pr` security/dependency audit, license proof, and validation of any available CodeQL/coverage receipts. Full CodeQL and coverage are scheduled/manual informational controls and blocking release admission, not ordinary PR controls. Result jobs consume only the single allowlisted proof bundle; candidate code never receives the workflow token or OIDC capability.
+## GitHub operations
 
-Checkpoint and closeout choose unit-test profiles automatically. Small low-risk diffs with complete focused owner mappings run exact direct tests; a deleted consolidation also runs exact surviving owner tests when its complete previous-consumer and current-redirect closure stays inside one owner, every surviving changed production file has deterministic proof, and the owner-test set remains bounded. High-risk, public/shared, cross-owner, transitive, ambiguous, uncovered, or over-budget diffs retain Vitest affected-consumer discovery. The focused owner-expansion budget bounds transitively selected owner tests, while every changed direct test remains mandatory proof and does not consume that expansion budget. Inspect the `Unit tests` detail in the run log for `profile=...`; do not add a manual force-narrow flag.
+Ready PRs and pushes to `main` run Fast PR Gate with `SELECTEL_QA_PROFILES`. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Continuous Integration → Run workflow → release-provenance**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`. It reuses an exact fast proof when possible, otherwise completes the missing fast controls on the same release VM; full Vitest and release-readiness claims always remain owned by release provenance.
 
-Checkpoint formatting is always sequential and finishes before any verification lane starts. After that barrier, wrappers select a bounded WSL-visible profile. The default checkpoint and `bounded-concurrent` build-test caps are 8 CPU tokens, 12 GiB estimated resident memory, and 4 concurrent Vitest workers. An explicit measured Vitest override may raise that normal worker cap to 6 when the CPU budget permits. A build/closeout test scope classified as `saturated-exclusive` and `qa:release` are intentionally different: after their non-test prerequisite phase finishes, Vitest runs as a second exclusive phase with up to 12 WSL-visible CPU tokens, 12 workers, and all visible WSL memory except 1 GiB. Full-suite fallback, related closures above 32 inputs, and measured package/app-core, messaging-runtime, and parser/snapshot/export fan-out use that saturated class. Build remains exclusive after tests. Operator overrides are positive integers: `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`, and `SNIPTALE_QA_VITEST_MAX_WORKERS`; `ci:proof` exposes the same values as `--cpu`, `--memory-mib`, and `--workers`. CLI values override inherited environment values for that local proof. GitHub obtains CPU, memory, Vitest, Playwright, and security-worker budgets from the selected validated `SELECTEL_QA_PROFILES` entry for PR/main runs and the identically shaped `SELECTEL_RELEASE_PROFILES` entry for release runs; current admitted 24-vCPU and 12-vCPU combinations are recorded in the controller and QA proof. The release profile requires at least 2 CPU tokens, while its memory budget has a 6144 MiB minimum because the scheduler retains real heavy-lane reservations. Overrides are clamped to visible resources and never mean `auto`; the resolved bounded and release profiles are recorded in the proof manifest. Container installs keep dependency lifecycle scripts disabled, then provision only the locked native `canvas` binding and ast-grep binary explicitly; both receive executable smoke checks before any canonical wrapper runs.
+The proof artifact name is `fast-proof-<commit>-<run-id>-<producer-attempt>` or `release-provenance-<commit>-<run-id>-<producer-attempt>`. The job summary contains its URL and exact download command. A failed downstream-job retry discovers the highest live producer attempt from the run artifact inventory and does not rerun a green VM merely because the consumer attempt changed. Proof is uploaded before cleanup. Confirm the cleanup receipt marks the runner registration, VM, VM ports, disposable security group, router interface, router, subnet, network, and volumes deleted before treating the run as complete. When the early receipt is unavailable, the cleanup artifact must identify `recover-cleanup` for the exact run attempt rather than a repository-wide sweep. The independent hourly TTL sweep is recovery, not the normal cleanup path.
 
-Ordinary pull requests require the immutable QA and controller images published for their trusted base commit; absence fails closed because `main` is the image publication authority. Canonical phases print start and completion markers, and a failed buffered step prints a sanitized bounded error tail while retaining the full sanitized run record and log in the canonical proof artifact. The GitHub job summary names and links that artifact and includes the exact `gh run download` command; pull-request artifacts are retained for 14 days and `main` or scheduled artifacts for 30 days.
+To publish, first create and push a GitHub-verifiable annotated signing tag matching the package version. Then run **Actions → Continuous Deployment** with that tag and the successful Release provenance run ID. Deployment creates no VM and performs no QA rebuild. If publication fails, rerun deployment against the same provenance proof.
 
-## Review Skills
+Selecting an older successful provenance run requires `allow_non_latest_provenance` and a non-empty `bypass_reason`. Local PR bypass likewise leaves its proof digest and reason in the PR; merge remains a manual native GitHub bypass. Use bypass only for an external-capacity failure or incident, never as the routine path for QA-control evolution.
+
+For the one-time CI bootstrap, open the PR as draft, add `ci-local-proof-bypass`, and only then mark it ready. Merge it with `[skip ci]` in the squash commit subject; confirm that both the labeled PR graph and the resulting `main` push have no executing jobs before removing the label or dispatching `selectel-smoke`. This prevents the bootstrap itself from reserving the Selectel pool.
+
+## Local WSL setup
+
+Ordinary local `ci:proof` and `ci:release` do not require Docker. They restore the repository-local npm download cache, still run exact `npm ci`, verify every installed project-toolchain package, alias, native entrypoint, and TypeScript compiler-API runtime against `toolchain.lock.json`, then perform native package bootstrap and execute the same JS composition and QA owners with the locked external audit binaries. This is the fastest diagnostic path, not byte-for-byte environment equivalence. The GitHub job adds the pinned Linux image and is the canonical release-provenance environment; use the clean `ci:proof -- --pr <number> --reason "<audit note>"` container bypass when external-environment equivalence is required locally.
+
+`ci:proof` and `ci:release` are repository-wide in both environments. Diff awareness belongs only to `qa:release-harness`, `qa:checkpoint`, and `qa:closeout`; resource flags affect scheduling and reuse compatibility, never the selected control or file scope.
+
+Docker is required only when explicitly reproducing the external image or running the clean PR bypass mode. With Docker Desktop, enable WSL integration for this distribution and verify `docker version` before bypass proof.
+
+Use `--cpu`, `--memory-mib`, and `--workers` only for measured local limits. They override the corresponding existing resource environment values and remain clamped to WSL-visible resources. GitHub gets all five worker/resource values from the selected Selectel profile.
+
+Missing external audit binaries, their locked query packs, or browser dependencies fail the local full gate. Repair the WSL toolchain rather than treating a partial run as proof.
+
+## Review skills
 
 | Skill | Use |
 | --- | --- |
-| [Security Code Review](../agent-tooling/.agents/skills/security-code-review/SKILL.md) | Privilege, trust, privacy, secrets, AI/data, import/export, sanitization, and manifest risk. |
-| [Architecture Code Review](../agent-tooling/.agents/skills/architecture-code-review/SKILL.md) | Runtime ownership, contracts, state authority, parser, UI/i18n/design-system, and broad topology risk. |
-| [Topology Plan Review](../agent-tooling/.agents/skills/topology-plan-review/SKILL.md) | Pre-move bounded-manifest planning or independent review of a completed green large move. |
-| [Repo Audit](../agent-tooling/.agents/skills/repo-audit/SKILL.md) | Explicit whole-repository architecture/security/tooling/documentation audit only. |
+| Security Code Review | Privilege, trust, privacy, secrets, publication, infrastructure credentials, sanitization, and manifest risk. |
+| Architecture Code Review | Runtime ownership, contracts, state authority, parser, UI/i18n/design-system, and notable topology. |
+| Topology Plan Review | Large owner/path move planning or independent review of a completed topology wave. |
+| Repo Audit | Explicit whole-repository audit only. |
 
-Required closeout reviews run as independent read-only agents without inherited context only after the complete candidate and applicable harness plus checkpoint proof are green. Invoke them only when the current diff actually changes the skill's risk seam; owner-local extraction, test/proof-only changes, literal clone removal, and mechanical moves that preserve behavior, ownership, contracts, dependency direction, parser semantics, and security authority close as `not required: low-risk change`. Topology planning mode may run before implementation and is not the required closeout review.
+Required closeout review runs after the coherent candidate and applicable harness/checkpoint proof are green. Collect all findings before editing, classify them against the frozen acceptance criteria, then apply one consolidated correction.
 
-Use both focused review skills when both architecture and security risk are material. Repo Audit does not replace bounded reviews unless the user explicitly requested a whole-repository audit.
+## Focused debugging
 
-For an explicitly requested final whole-repository acceptance, use `npm run qa:audit`, then `npm run qa:e2e`, then invoke the independent Repo Audit review with both green results. The Repo Audit verdict is the last acceptance action; running later repository-wide proof makes the earlier verdict stale.
-
-## Direct Debug Commands
-
-Use direct commands only to investigate a specific wrapper failure or answer an explicit operator question. Do not stack them on normal closeout.
+Use direct commands only to diagnose the failed owner:
 
 | Area | Command |
 | --- | --- |
+| Documentation facts | `node tooling/qa/core/verify-documentation-facts.mjs` |
 | Config baseline | `node tooling/qa/core/verify-config-policy.mjs` |
 | Typecheck | `node tooling/qa/core/verify-typecheck.mjs` |
-| ESLint | `node tooling/qa/core/verify-eslint.mjs` |
-| SonarJS | `node tooling/qa/core/verify-sonarjs.mjs --files <paths...>` |
+| Oxlint | `node tooling/qa/core/verify-oxlint.mjs` |
+| Oxfmt | `node tooling/qa/core/verify-oxfmt.mjs` |
+| Residual security ESLint | `node tooling/qa/guards/security/verify-security.mjs` |
+| Release-only SonarJS ESLint | `node tooling/qa/core/verify-sonarjs.mjs` |
 | Build | `node tooling/qa/core/verify-build.mjs` |
 | Security guardrails | `node tooling/qa/guards/security/verify-security.mjs` |
 | Runtime boundaries | `node tooling/qa/guards/architecture/verify-boundaries.mjs` |
 | Runtime topology | `node tooling/qa/guards/architecture/verify-runtime-topology.mjs` |
 | Manifest permissions | `node tooling/qa/guards/architecture/verify-manifest-permissions.mjs` |
-| Cycles | `node tooling/qa/guards/architecture/verify-cycles.mjs` |
-| i18n | `node tooling/qa/core/verify-i18n.mjs` |
-| Design system | `node tooling/qa/core/verify-design-system.mjs` |
-| Canonical facades | `node tooling/qa/core/verify-canonical-facades.mjs` |
-| Line length | `node tooling/qa/guards/quality/verify-line-length.mjs` |
-| Diff structural risk | `node tooling/qa/core/verify-structural-risk.mjs` |
 | Task artifacts | `node tooling/qa/core/verify-task-artifacts.mjs` |
 
-Repo-wide audit inventory belongs in `qa:audit` unless a failed stage requires a direct adapter. Successful inventory steps break down their finding families and atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm evidence is written to `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Structural debt is deliberately separate: an operator may run `qa:structural-audit` for periodic architecture maintenance, but agents do not run it as implementation proof and its report never blocks. Its path-owner partition and overlapping forwarding-edge candidates have separate counts; every forwarding-only single-production-consumer edge is either `Consolidate` or an explicit `Keep` veto. Neither inventory collects model-token hotspots. Raw binary entrypoints are finite `qa:raw:*` package scripts; inspect `package.json` rather than assuming an arbitrary wildcard command exists.
-
-## Environment Rules
-
-- Run Linux-side `npm run ...` and `npm exec ...` from WSL; do not use Windows `cmd /c npm ...` or bare `npx ...`.
-- If temporary-directory permissions fail, retry with `TMPDIR=/tmp TMP=/tmp TEMP=/tmp`.
-- Treat `.wslconfig` CPU and memory values as VM ceilings, not dedicated resources. Windows and WSL still compete for the same physical cores, so do not set QA limits from the 12 logical-thread count alone.
-- External audit binaries use `PATH` or `SNIPTALE_SEMGREP_BIN`, `SNIPTALE_CODEQL_BIN`, `SNIPTALE_OSV_SCANNER_BIN`, and `SNIPTALE_GITLEAKS_BIN` overrides.
-- Treat DNS, proxy, TLS, registry, browser-dependency, and missing-binary failures as environment failures, not product regressions.
-- Do not manually stage the closeout candidate or stage `tasks/**`.
+Treat DNS, proxy, TLS, registry, browser dependency, Docker engine, and missing binary failures as environment failures. Do not manually stage a closeout candidate or stage `tasks/**`.

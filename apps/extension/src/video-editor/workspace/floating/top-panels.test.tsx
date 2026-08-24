@@ -10,6 +10,38 @@ import { PROJECT_MEDIA_ACCEPT_ATTRIBUTE } from '../../project/operations/import-
 import { createFloatingWorkspaceController } from './top-panels.test-support';
 import { VideoEditorFloatingInsertPanel, VideoEditorFloatingWorkspacePanel } from './top-panels';
 
+const hookMocks = vi.hoisted(() => ({ controller: null as unknown }));
+
+function getHookController() {
+  return hookMocks.controller as ReturnType<typeof createFloatingWorkspaceController>;
+}
+
+vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorTimelineController: () => getHookController().timeline,
+  useWorkspaceGridContext: () => ({
+    magnetEnabled: getHookController().header.grid.magnetEnabled,
+    toggleMagnet: getHookController().header.grid.onToggleMagnet,
+  }),
+  useWorkspaceInspectorContext: () => ({
+    mode: getHookController().header.inspectorMode,
+    openGridSettings: getHookController().header.onOpenGridSettings,
+    openSelection: vi.fn(),
+  }),
+  useWorkspaceDialogsContext: () => ({
+    openAudioRecordingDialog: getHookController().header.onOpenAudioRecordingDialog,
+  }),
+}));
+
+vi.mock('../../runtime/controller/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
+  useVideoEditorClipSelectionPort: (selector: (port: unknown) => unknown) =>
+    selector({
+      selection: getHookController().sidebar.state.selection,
+      selectScene: getHookController().header.onSelectScene,
+    }),
+}));
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -30,16 +62,16 @@ afterEach(() => {
 
 it('keeps temporary point-annotation tools out of the production insert panel', () => {
   const controller = createFloatingWorkspaceController();
+  hookMocks.controller = controller;
   const onActiveInsertKindChange = vi.fn();
   render(
     <>
       <VideoEditorFloatingInsertPanel
         activeInsertKind={null}
-        controller={controller}
         effectsLibraryDock={createEffectsLibraryDock()}
         onActiveInsertKindChange={onActiveInsertKindChange}
       />
-      <VideoEditorFloatingWorkspacePanel controller={controller} />
+      <VideoEditorFloatingWorkspacePanel />
     </>
   );
 
@@ -57,16 +89,16 @@ it('keeps temporary point-annotation tools out of the production insert panel', 
 
 it('routes media, templates, and workspace panel actions without a left rail', () => {
   const controller = createFloatingWorkspaceController();
+  hookMocks.controller = controller;
   const effectsLibraryDock = createEffectsLibraryDock();
   render(
     <>
       <VideoEditorFloatingInsertPanel
         activeInsertKind={null}
-        controller={controller}
         effectsLibraryDock={effectsLibraryDock}
         onActiveInsertKindChange={vi.fn()}
       />
-      <VideoEditorFloatingWorkspacePanel controller={controller} />
+      <VideoEditorFloatingWorkspacePanel />
     </>
   );
 
@@ -95,16 +127,16 @@ it('routes media, templates, and workspace panel actions without a left rail', (
 
 it('keeps templates as a single creation action in the top panels', () => {
   const controller = createFloatingWorkspaceController();
+  hookMocks.controller = controller;
   const effectsLibraryDock = createEffectsLibraryDock();
   render(
     <>
       <VideoEditorFloatingInsertPanel
         activeInsertKind={null}
-        controller={controller}
         effectsLibraryDock={effectsLibraryDock}
         onActiveInsertKindChange={vi.fn()}
       />
-      <VideoEditorFloatingWorkspacePanel controller={controller} />
+      <VideoEditorFloatingWorkspacePanel />
     </>
   );
 
@@ -114,14 +146,15 @@ it('keeps templates as a single creation action in the top panels', () => {
 
 it('shows scene properties status only when scene properties are visible', () => {
   const controller = createFloatingWorkspaceController();
-  render(<VideoEditorFloatingWorkspacePanel controller={controller} />);
+  hookMocks.controller = controller;
+  render(<VideoEditorFloatingWorkspacePanel />);
 
   expect(queryButtonByUi('video-editor.floating.workspace-panel.scene')?.dataset['active']).toBe(
     undefined
   );
 
   controller.header.inspectorMode = 'selection';
-  render(<VideoEditorFloatingWorkspacePanel controller={controller} />);
+  render(<VideoEditorFloatingWorkspacePanel />);
 
   const sceneButton = queryButtonByUi('video-editor.floating.workspace-panel.scene');
   expect(sceneButton?.dataset['active']).toBe('true');

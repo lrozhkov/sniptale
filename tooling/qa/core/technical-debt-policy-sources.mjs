@@ -17,7 +17,7 @@ export const POLICY_DISCOVERY_SOURCE_MANIFEST = Object.freeze({
     'apps/extension/postcss.config.js',
     'apps/extension/tailwind.config.js',
     'apps/extension/vite.config.ts',
-    'eslint.config.js',
+    '.oxlintrc.json',
     'playwright.config.ts',
     'vitest.config.ts',
   ]),

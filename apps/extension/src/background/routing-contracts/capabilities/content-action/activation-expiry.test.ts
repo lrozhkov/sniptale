@@ -49,7 +49,7 @@ function requestActivationKey(
     resolveContentSenderBindingForTest(sender)
   );
   return (
-    sendResponse.mock.calls[0]?.[0] as {
+    sendResponse.mock.calls[0]![0] as {
       activationKey?: ContentActionContract.ContentPrivilegedActionActivationKey;
     }
   ).activationKey;

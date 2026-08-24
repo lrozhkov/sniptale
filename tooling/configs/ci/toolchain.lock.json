@@ -2,8 +2,32 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "22.16.0",
-    "image": "node:22.16.0-bookworm-slim@sha256:048ed02c5fd52e86fda6fbd2f6a76cf0d4492fd6c6fee9e2c463ed5108da0e34"
+    "version": "22.12.0",
+    "image": "node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213"
+  },
+  "projectToolchain": {
+    "oxfmt": { "packagePath": "node_modules/oxfmt", "version": "0.64.0" },
+    "oxlint": { "packagePath": "node_modules/oxlint", "version": "1.79.0" },
+    "oxlintTsgolint": {
+      "packagePath": "node_modules/oxlint-tsgolint",
+      "version": "7.0.2001"
+    },
+    "typescriptNative": {
+      "packagePath": "node_modules/@typescript/native",
+      "version": "7.0.2"
+    },
+    "typescriptCompilerApiShim": {
+      "packagePath": "node_modules/typescript",
+      "version": "6.0.2"
+    },
+    "typescriptCompilerApi": {
+      "packagePath": "node_modules/@typescript/old",
+      "version": "6.0.3"
+    },
+    "viteReact": {
+      "packagePath": "node_modules/@vitejs/plugin-react",
+      "version": "6.1.0"
+    }
   },
   "openstackController": {
     "pythonVersion": "3.12.11",
@@ -18,22 +42,22 @@
     "suites": ["bookworm", "bookworm-updates", "bookworm-security"]
   },
   "playwright": {
-    "version": "1.58.2",
-    "npmLockSha256": "672c5b3c11d0b5fa56beeb113957254abb2dfa24d9bd7715cb5a2543262e81c5",
+    "version": "1.62.1",
+    "npmLockSha256": "6595faa266799d7485828963aada5aae944cdf0c9128408aead5832f8cfffabb",
     "browser": "chromium",
-    "browserRevision": "1208",
-    "browserVersion": "145.0.7632.6",
+    "browserRevision": "1234",
+    "browserVersion": "151.0.7922.34",
     "assets": [
       {
-        "id": "chromium-1208",
-        "url": "https://cdn.playwright.dev/builds/cft/145.0.7632.6/linux64/chrome-linux64.zip",
-        "sha256": "b5e3195041af345a668d110f5daf5581961fa3608626ea588c97dd0fe81c4e38",
+        "id": "chromium-1234",
+        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip",
+        "sha256": "ae8736ac28bc69278551500f219fc749575648263c43ec5990749eff43b9fcf8",
         "executable": "chrome-linux64/chrome"
       },
       {
-        "id": "chromium_headless_shell-1208",
-        "url": "https://cdn.playwright.dev/builds/cft/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip",
-        "sha256": "2536e97d8f410df0394b3e7c4252e88ce9f239f04f3af4e247a26caf45baf49e",
+        "id": "chromium_headless_shell-1234",
+        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-headless-shell-linux64.zip",
+        "sha256": "3cfc2bd00d1bafcf8a68dc74c9c92bb7150ddc8d26ade948a776316e1cec4f14",
         "executable": "chrome-headless-shell-linux64/chrome-headless-shell"
       },
       {
@@ -65,5 +89,9 @@
     "version": "1.7.12",
     "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz",
     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+  },
+  "mutationRunner": {
+    "packageJsonSha256": "45b63a6b4a3b43ba92ad6ffc3a1ca602bbb0ec1e97d035972e79f1aa3b2cade3",
+    "packageLockSha256": "3d388ccdce0fd7f05a858f684b0ee78960f4d2f40e48f24a24ee63c0feb46f41"
   }
 }

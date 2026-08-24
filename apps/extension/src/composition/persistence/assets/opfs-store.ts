@@ -20,10 +20,6 @@ const OBJECTS_DIRECTORY_NAME = 'objects';
 const WRITING_DIRECTORY_NAME = 'writing';
 const READY_DIRECTORY_NAME = 'ready';
 
-interface EnumerableDirectoryHandle extends FileSystemDirectoryHandle {
-  entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
-}
-
 interface AssetOpfsOptions {
   createId?: () => string;
   getOriginRoot?: () => Promise<FileSystemDirectoryHandle>;
@@ -449,7 +445,7 @@ export async function listReadyJournals(
     throw new Error('Asset journal enumeration is unavailable.');
   }
   const journals: AssetReadyJournal[] = [];
-  for await (const [, handle] of (ready as EnumerableDirectoryHandle).entries()) {
+  for await (const [, handle] of ready.entries()) {
     if (handle.kind !== 'file') continue;
     const parsed = parseAssetReadyJournal(
       JSON.parse(await (await (handle as FileSystemFileHandle).getFile()).text()) as unknown
@@ -501,7 +497,7 @@ export async function listAssetObjectIds(options: AssetOpfsOptions = {}): Promis
     throw new Error('Asset object enumeration is unavailable.');
   }
   const assetIds: string[] = [];
-  for await (const [assetId, handle] of (objects as EnumerableDirectoryHandle).entries()) {
+  for await (const [assetId, handle] of objects.entries()) {
     if (handle.kind === 'file') assetIds.push(assetId);
   }
   return assetIds.sort();
@@ -514,7 +510,7 @@ export async function listWritingAssetIds(options: AssetOpfsOptions = {}): Promi
     throw new Error('Asset writing-marker enumeration is unavailable.');
   }
   const assetIds: string[] = [];
-  for await (const [assetId, handle] of (writing as EnumerableDirectoryHandle).entries()) {
+  for await (const [assetId, handle] of writing.entries()) {
     if (handle.kind === 'file') assetIds.push(assetId);
   }
   return assetIds.sort();
@@ -579,7 +575,7 @@ export async function collectQuiescentWritingObjects(
   }
   const requestLock = options.requestExclusiveLock ?? defaultRequestExclusiveLock;
   let removed = 0;
-  for await (const [assetId, handle] of (writing as EnumerableDirectoryHandle).entries()) {
+  for await (const [assetId, handle] of writing.entries()) {
     if (handle.kind !== 'file') continue;
     await requestLock(assetLockName(assetId), { ifAvailable: true }, async (locked) => {
       if (!locked) return;

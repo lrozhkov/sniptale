@@ -1,6 +1,6 @@
 /**
  * Deterministic build gate.
- * Can block on repo-wide lint warnings before starting the Vite build.
+ * Builds the extension after canonical lint/typecheck owners have run.
  */
 
 import {
@@ -10,7 +10,6 @@ import {
   repoRoot,
   runRepoNodeEntry,
 } from '../core/shared.mjs';
-import { lintWithEslint } from '../core/verify-eslint.mjs';
 import {
   collectExtensionArtifactSnapshot,
   collectExtensionBuildArtifactViolations,
@@ -89,24 +88,7 @@ export async function runExtensionBuildEquivalence({
   };
 }
 
-export async function runBuild({
-  cwd,
-  enforceLint = true,
-  lintRunner = lintWithEslint,
-  buildRunner = runViteBuild,
-  mode,
-} = {}) {
-  if (enforceLint) {
-    const eslintResult = await lintRunner({ files: ['.'], strict: true });
-    if (eslintResult.failed) {
-      return {
-        status: 1,
-        stdout: eslintResult.output,
-        stderr: '',
-      };
-    }
-  }
-
+export async function runBuild({ cwd, buildRunner = runViteBuild, mode } = {}) {
   const buildResult = await buildRunner({ cwd, mode });
   return promoteBlockingCssBuildWarnings(buildResult);
 }

@@ -11,6 +11,18 @@
     "qualityWorkflow": ".github/workflows/quality-gate.yml",
     "releaseWorkflow": ".github/workflows/release.yml"
   },
+  "infrastructureSmoke": {
+    "workflowOption": "selectel-smoke",
+    "profileVariable": "SELECTEL_QA_PROFILES",
+    "runsCanonicalQa": false,
+    "requiredChecks": [
+      "immutable-image-present",
+      "locked-toolchain",
+      "playwright-chromium",
+      "container-metadata-denied",
+      "complete-cleanup"
+    ]
+  },
   "controllerEnvironment": {
     "secrets": [
       "SELECTEL_OS_APPLICATION_CREDENTIAL_ID",
@@ -40,6 +52,7 @@
     "allowedZones": ["ru-3a", "ru-3b"],
     "allowedFlavors": {
       "SL1.24-49152": { "vcpus": 24, "ramMiB": 49152 },
+      "SL1.16-32768": { "vcpus": 16, "ramMiB": 32768 },
       "SL1.12-24576": { "vcpus": 12, "ramMiB": 24576 }
     },
     "allowedVolumeTypesByZone": {
@@ -51,6 +64,13 @@
         "cpuTokens": 24,
         "memoryMiB": 36864,
         "vitestWorkers": 16,
+        "playwrightWorkers": 4,
+        "securityWorkers": 8
+      },
+      "SL1.16-32768": {
+        "cpuTokens": 16,
+        "memoryMiB": 24576,
+        "vitestWorkers": 12,
         "playwrightWorkers": 4,
         "securityWorkers": 8
       },
@@ -79,11 +99,9 @@
     "volumeGiB": 260
   },
   "network": {
-    "name": "sniptale-github-actions",
-    "subnetName": "sniptale-github-actions-v4",
     "subnetCidr": "10.77.0.0/24",
-    "routerName": "sniptale-github-actions",
-    "securityGroupName": "sniptale-github-actions-no-ingress"
+    "lifecycle": "disposable-per-attempt",
+    "securityGroupNamePrefix": "sniptale-github-actions-no-ingress"
   },
   "lifecycle": {
     "maxProfiles": 10,
@@ -102,10 +120,11 @@
   },
   "trust": {
     "candidateReceivesControllerSecrets": false,
-    "candidateControlsAreBlocking": false,
+    "candidateControlsAreBlocking": true,
     "jitConfigRetained": false,
     "releaseSigningKeyOnRunner": false,
     "persistentGhcrCredentialOnRunner": false,
+    "persistentNetworkResources": false,
     "sshKeyOnRunner": false
   },
   "artifacts": {
@@ -136,6 +155,8 @@
     "genuine-qa-failure-no-retry",
     "post-online-qa-failure-no-fallback",
     "cleanup-failure",
+    "router-interface-cleanup-failure",
+    "router-cleanup-failure",
     "expired-resource-sweep",
     "foreign-resource-preservation",
     "controller-secret-non-propagation",

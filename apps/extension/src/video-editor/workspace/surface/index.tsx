@@ -1,27 +1,20 @@
 import React from 'react';
 
 import { translate } from '../../../platform/i18n';
-import type { ReadyVideoEditorController } from '../../runtime/controller/contracts/surface';
+import {
+  useVideoEditorDiagnosticsController,
+  useVideoEditorLayoutController,
+  useVideoEditorOverlaysController,
+} from '../../runtime/controller/composition/hooks';
 import { DiagnosticsPanel } from '../../diagnostics/panel';
 import { VideoEditorWorkspaceMain } from './main';
 import { VideoEditorWorkspaceOverlays } from './overlays';
 
-interface VideoEditorWorkspaceProps {
-  controller: ReadyVideoEditorController;
-}
-
-function renderDiagnosticsContent(
-  controller: ReadyVideoEditorController['workspace']
-): React.ReactNode {
-  if (controller.diagnostics.isOpen && controller.diagnostics.recordingId) {
-    return (
-      <DiagnosticsPanel
-        recordingId={controller.diagnostics.recordingId}
-        onClose={controller.diagnostics.onClose}
-      />
-    );
+function useDiagnosticsContent(): React.ReactNode {
+  const diagnostics = useVideoEditorDiagnosticsController();
+  if (diagnostics.isOpen && diagnostics.recordingId) {
+    return <DiagnosticsPanel recordingId={diagnostics.recordingId} onClose={diagnostics.onClose} />;
   }
-
   return (
     <div
       className={[
@@ -36,11 +29,13 @@ function renderDiagnosticsContent(
   );
 }
 
-export function VideoEditorWorkspace({ controller }: VideoEditorWorkspaceProps): React.JSX.Element {
-  const previewHeightStyle = controller.workspace.layout.previewPaneHeight
-    ? { height: `${controller.workspace.layout.previewPaneHeight}px` }
+export function VideoEditorWorkspace(): React.JSX.Element {
+  const layout = useVideoEditorLayoutController();
+  const overlays = useVideoEditorOverlaysController();
+  const diagnosticsContent = useDiagnosticsContent();
+  const previewHeightStyle = layout.previewPaneHeight
+    ? { height: `${layout.previewPaneHeight}px` }
     : { height: '60%' };
-  const diagnosticsContent = renderDiagnosticsContent(controller.workspace);
 
   return (
     <div
@@ -58,18 +53,9 @@ export function VideoEditorWorkspace({ controller }: VideoEditorWorkspaceProps):
           'bg-[color:var(--sniptale-color-surface-canvas)]',
         ].join(' ')}
       />
-      <VideoEditorWorkspaceOverlays controller={controller.overlays} />
+      <VideoEditorWorkspaceOverlays controller={overlays} />
       <VideoEditorWorkspaceMain
-        controller={{
-          ...controller.workspace,
-          sidebar: {
-            ...controller.workspace.sidebar,
-            state: {
-              ...controller.workspace.sidebar.state,
-              diagnosticsContent,
-            },
-          },
-        }}
+        diagnosticsContent={diagnosticsContent}
         previewHeightStyle={previewHeightStyle}
       />
     </div>

@@ -24,6 +24,7 @@ import {
 } from '../../manager';
 import { browserAction } from '@sniptale/platform/browser/action';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { browserWindows } from '@sniptale/platform/browser/windows';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { markOffscreenDocumentReady } from '../../../../../offscreen-document/service';
 import { releaseVideoCaptureSurface } from '../../../capture-surface';
@@ -37,6 +38,7 @@ import {
 import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
 import { acquireMediaMutationPermit } from '../../../../../mutation-exclusion/media-activity';
 import { removeVideoRecordingCompletionOutbox } from '../../../../../../composition/persistence/recordings/completion-outbox';
+import { consumePostRecordPopupActivationOwnedByPopup } from '../../post-record-popup-activation';
 import {
   createAsyncLifecycleRoute,
   createAsyncLifecycleOutcomeRoute,
@@ -58,6 +60,10 @@ type SavedRecordingMessage = {
 type SavedRecordingOperation = {
   message: SavedRecordingMessage;
   promise: Promise<SavedRecordingOutcome>;
+};
+
+type PostRecordPopupDestination = {
+  windowId: number;
 };
 
 const savedRecordingOperations = new Map<string, SavedRecordingOperation>();
@@ -196,8 +202,10 @@ async function processVideoSavedToIdb(
 ): Promise<SavedRecordingOutcome> {
   const existingState = await readStoredVideoPostRecordResult();
   if (isCompletedPostRecordReplay(existingState, message)) {
+    const popupDestination = await resolvePostRecordPopupDestination();
     await consumeRecordingCompletionOutbox(message, false);
-    await openPostRecordPopup();
+    const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
+    if (openSavedPopup) await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
@@ -206,31 +214,63 @@ async function processVideoSavedToIdb(
     return 'superseded';
   }
 
+  const popupDestination = await resolvePostRecordPopupDestination();
   const synchronized = await synchronizePostRecordResult(message);
+  const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
   if (synchronized === 'ready' || synchronized === 'acknowledged') {
     await consumeRecordingCompletionOutbox(message, false);
-    await openPostRecordPopup();
+    if (openSavedPopup) await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
   await completeSavedRecordingPersistence(message.recordingId);
   await consumeRecordingCompletionOutbox(message, true);
-  await openPostRecordPopup();
+  if (openSavedPopup) await openPostRecordPopup(popupDestination);
   finalizeSavedRecordingCompletion(message);
   return 'accepted';
 }
 
-async function openPostRecordPopup(): Promise<void> {
+async function resolvePostRecordPopupDestination(): Promise<PostRecordPopupDestination | null> {
   const tabId = getRecordingTabId();
-  if (tabId === null) return;
+  if (tabId === null) return null;
   try {
     const tab = await browserTabs.get(tabId);
-    if (typeof tab.windowId === 'number') {
-      await browserAction.openPopup({ windowId: tab.windowId });
-    }
+    return typeof tab.windowId === 'number' ? { windowId: tab.windowId } : null;
+  } catch (error) {
+    logger.warn('Failed to resolve the video post-record popup window', error);
+    return null;
+  }
+}
+
+async function openPostRecordPopup(destination: PostRecordPopupDestination | null): Promise<void> {
+  if (!destination) return;
+  try {
+    await openPopupForWindow(destination.windowId);
   } catch (error) {
     logger.warn('Failed to open the video post-record popup', error);
   }
+}
+
+function shouldOpenPostRecordPopup(recordingId: string): boolean {
+  return !consumePostRecordPopupActivationOwnedByPopup(recordingId);
+}
+
+async function openPopupForWindow(windowId: number): Promise<void> {
+  try {
+    await browserWindows.update(windowId, { focused: true });
+    await browserAction.openPopup();
+  } catch (error) {
+    if (!isRetryablePopupOpenError(error)) throw error;
+    await browserAction.openPopup();
+  }
+}
+
+function isRetryablePopupOpenError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.includes('Cannot show popup for an inactive window') ||
+      error.message.includes('Failed to open popup'))
+  );
 }
 
 function toPostRecordResult(message: SavedRecordingMessage) {

@@ -2,7 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { parseToggleState, requireSelectedActionsSnapshot } from './github-policy-response.mjs';
+import {
+  assertEnvironmentPolicySnapshot,
+  parseOptionalResourceSnapshot,
+  parseToggleState,
+  requireAbsentResource,
+  requireCompleteBranchPolicyInventory,
+  requireSelectedActionsSnapshot,
+} from './github-policy-response.mjs';
 import { validateSelectelQaProfiles } from './selectel/policy.mjs';
 
 const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
@@ -11,8 +18,9 @@ const repository = policy.repository;
 const selectelEnvironment = 'selectel-runner-controller';
 const apiVersion = '2026-03-10';
 
-function api(endpoint, { method = 'GET', body, allowFailure = false } = {}) {
+function api(endpoint, { method = 'GET', body, allowFailure = false, paginate = false } = {}) {
   const args = ['api', '--header', `X-GitHub-Api-Version: ${apiVersion}`, endpoint];
+  if (paginate) args.push('--paginate', '--slurp');
   if (method !== 'GET') args.push('--method', method);
   if (body !== undefined) args.push('--input', '-');
   const result = spawnSync('gh', args, {
@@ -71,6 +79,26 @@ function selectelProfilesSnapshot(name) {
   };
 }
 
+function environmentSnapshot(name) {
+  const environmentEndpoint = `repos/${repository}/environments/${name}`;
+  const environment = parseOptionalResourceSnapshot(
+    api(environmentEndpoint, { allowFailure: true }),
+    environmentEndpoint
+  );
+  if (environment === null) return null;
+  const policyEndpoint = `${environmentEndpoint}/deployment-branch-policies`;
+  const policies = environment.deployment_branch_policy?.custom_branch_policies
+    ? requireCompleteBranchPolicyInventory(
+        api(`${policyEndpoint}?per_page=100`, { paginate: true }).value,
+        policyEndpoint
+      )
+    : [];
+  return {
+    deployment_branch_policy: environment.deployment_branch_policy,
+    branches: policies.map(({ name: branch }) => branch).sort(),
+  };
+}
+
 function snapshot() {
   const actions = api(`repos/${repository}/actions/permissions`).value;
   const selectedActions =
@@ -97,6 +125,9 @@ function snapshot() {
       const current = findRuleset(policy.releaseTagRuleset.name);
       return current ? { id: current.id, ...rulesetPayload(current) } : null;
     })(),
+    environments: Object.fromEntries(
+      Object.keys(policy.environments).map((name) => [name, environmentSnapshot(name)])
+    ),
     selectelProfiles: {
       qa: selectelProfilesSnapshot('SELECTEL_QA_PROFILES'),
       release: selectelProfilesSnapshot('SELECTEL_RELEASE_PROFILES'),
@@ -124,11 +155,41 @@ function desired() {
       rules: policy.ruleset.rules,
     },
     releaseTagRuleset: policy.releaseTagRuleset,
+    environments: policy.environments,
   };
 }
 
 function setToggle(endpoint, enabled) {
   api(endpoint, { method: enabled ? 'PUT' : 'DELETE' });
+}
+
+function applyEnvironment(name, value) {
+  api(`repos/${repository}/environments/${name}`, {
+    method: 'PUT',
+    body: {
+      deployment_branch_policy: {
+        protected_branches: value.protected_branches,
+        custom_branch_policies: value.custom_branch_policies,
+      },
+    },
+  });
+  if (value.custom_branch_policies) {
+    const endpoint = `repos/${repository}/environments/${name}/deployment-branch-policies`;
+    const current = requireCompleteBranchPolicyInventory(
+      api(`${endpoint}?per_page=100`, { paginate: true }).value,
+      endpoint
+    );
+    for (const branch of current) {
+      if (!value.branches.includes(branch.name)) {
+        api(`${endpoint}/${branch.id}`, { method: 'DELETE' });
+      }
+    }
+    const currentNames = new Set(current.map(({ name: branch }) => branch));
+    for (const branch of value.branches) {
+      if (!currentNames.has(branch)) api(endpoint, { method: 'POST', body: { name: branch } });
+    }
+  }
+  assertEnvironmentPolicySnapshot(environmentSnapshot(name), value, name);
 }
 
 function apply(value, { releaseTag = true } = {}) {
@@ -157,6 +218,9 @@ function apply(value, { releaseTag = true } = {}) {
     value.security.privateVulnerabilityReporting
   );
   setToggle(`repos/${repository}/immutable-releases`, value.security.immutableReleases);
+  for (const [name, environment] of Object.entries(value.environments ?? {})) {
+    applyEnvironment(name, environment);
+  }
   api(`repos/${repository}/rulesets/${policy.rulesetId}`, {
     method: 'PUT',
     body: value.ruleset,
@@ -229,9 +293,27 @@ if (mode === 'plan') {
         immutableReleases: previous.immutableReleases,
       },
       ruleset: previous.ruleset,
+      environments: Object.fromEntries(
+        Object.entries(previous.environments ?? {})
+          .filter(([, environment]) => environment)
+          .map(([name, environment]) => [
+            name,
+            {
+              ...environment.deployment_branch_policy,
+              branches: environment.branches,
+            },
+          ])
+      ),
     },
     { releaseTag: false }
   );
+  for (const [name, environment] of Object.entries(previous.environments ?? {})) {
+    if (environment === null) {
+      const endpoint = `repos/${repository}/environments/${name}`;
+      const deletion = api(endpoint, { method: 'DELETE', allowFailure: true });
+      requireAbsentResource(deletion, api(endpoint, { allowFailure: true }), endpoint);
+    }
+  }
   restoreReleaseTagRuleset(previous.releaseTagRuleset);
   process.stdout.write(`GitHub policy restored from ${snapshotPath}\n`);
 } else {

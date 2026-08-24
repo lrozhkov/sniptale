@@ -36,15 +36,18 @@ function completeProgress(onProgress, controlId, label, step) {
   reportProgress(onProgress, {
     controlId,
     label,
-    state: 'completed',
+    state:
+      step.status === 'failed' ? 'failed' : step.status === 'skipped' ? 'skipped' : 'completed',
     outcome: step.status,
     durationMs: step.durationMs,
+    reused: /\breus(?:e|ed)\b/iu.test(String(step.detail ?? '')),
   });
   return step;
 }
 
 function collectMeasuredStep(profile, controlId, label, collector, toStep, onProgress, measure) {
   const policy = controlPolicy(profile, controlId);
+  reportProgress(onProgress, { controlId, label, state: 'queued' });
   if (policy.requirement === 'excluded') {
     return completeProgress(
       onProgress,

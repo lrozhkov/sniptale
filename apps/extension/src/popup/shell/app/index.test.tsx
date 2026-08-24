@@ -233,6 +233,42 @@ it('routes a cross-page recording message to Video', async () => {
   });
 });
 
+it('keeps a manual popup tab selection while recording state sync continues', async () => {
+  const Home = () => <div data-testid="home-route" />;
+  const Video = () => <div data-testid="video-route" />;
+  const Tools = () => <div data-testid="tools-route" />;
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
+  mocks.loadRoute.mockImplementation((descriptor: { page: string }) => {
+    if (descriptor.page === 'video') return Promise.resolve(Video);
+    if (descriptor.page === 'tools') return Promise.resolve(Tools);
+    return Promise.resolve(Home);
+  });
+  const { PopupApp } = await import('./index');
+  act(() => root.render(<PopupApp />));
+  await vi.waitFor(() => expect(mocks.messageHandlers).toHaveBeenCalled());
+  const initialHandlers = mocks.messageHandlers.mock.calls.at(-1)?.[0] as {
+    onRecordingState(state: { status: string }): void;
+  };
+
+  await act(async () => initialHandlers.onRecordingState({ status: 'RECORDING' }));
+  await vi.waitFor(() =>
+    expect(container.querySelector('[data-testid="video-route"]')).not.toBeNull()
+  );
+
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('button[data-page="tools"]')?.click()
+  );
+  await vi.waitFor(() =>
+    expect(container.querySelector('[data-testid="tools-route"]')).not.toBeNull()
+  );
+  const toolsHandlers = mocks.messageHandlers.mock.calls.at(-1)?.[0] as typeof initialHandlers;
+
+  await act(async () => toolsHandlers.onRecordingState({ status: 'RECORDING' }));
+
+  expect(container.querySelector('[data-testid="tools-route"]')).not.toBeNull();
+  expect(container.querySelector('[data-testid="video-route"]')).toBeNull();
+});
+
 it('ignores a stale cold-route result when a newer navigation wins', async () => {
   const Home = () => <div data-testid="home-route" />;
   const Video = () => <div data-testid="video-route" />;

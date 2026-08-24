@@ -33,14 +33,3 @@ export interface VideoEditorHeaderController {
   projectName: string;
   saveStateMeta: SaveStateMeta;
 }
-
-export interface VideoEditorWorkspaceLayoutController {
-  audioRecordingDialogOpen: boolean;
-  closeAudioRecordingDialog: VideoEditorWorkspaceState['closeAudioRecordingDialog'];
-  handleStartVerticalResize: VideoEditorWorkspaceState['preview']['handleStartVerticalResize'];
-  leftSidebarCollapsed: boolean;
-  openAudioRecordingDialog: VideoEditorWorkspaceState['openAudioRecordingDialog'];
-  previewPaneHeight: number | null;
-  toggleSidebarCollapsed: VideoEditorWorkspaceState['toggleSidebarCollapsed'];
-  workspaceSplitRef: React.RefObject<HTMLDivElement | null>;
-}

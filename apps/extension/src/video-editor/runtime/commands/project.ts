@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -7,7 +7,7 @@ import {
   openPersistedProject,
 } from '../../project/operations/ops';
 import { toErrorMessage } from './helpers';
-import type { UseVideoEditorActionHandlersParams, VideoEditorActionHandlers } from './types';
+import type { ProjectHandlerPort, VideoEditorActionHandlers } from './types';
 import type { VideoEditorConfirmDialogState } from '../controller/workspace-state';
 import { waitForVideoEditorSave } from '../session/save-readiness';
 import { beginProjectTransition } from './project-transition';
@@ -16,39 +16,41 @@ const logger = createLogger({ namespace: 'VideoEditorProjects' });
 
 export async function loadProjectWorkspace(
   projectId: string,
-  params: UseVideoEditorActionHandlersParams
+  port: ProjectHandlerPort
 ): Promise<void> {
   const transition = beginProjectTransition();
   try {
-    if (params.project && params.project.id !== projectId) {
-      await waitForVideoEditorSave(params.project.id);
+    const currentProject = port.getCurrentProject();
+    if (currentProject && currentProject.id !== projectId) {
+      await waitForVideoEditorSave(currentProject.id);
       if (!transition.isCurrent()) return;
     }
     const project = await openPersistedProject(projectId);
     if (!transition.isCurrent()) return;
-    params.applyLoadedProject(project, project.baseRecordingId);
+    port.applyLoadedProject(project, project.baseRecordingId);
     await Promise.all([
-      params.libraries.refreshProjects(),
-      params.libraries.refreshProjectExports(project.id),
+      port.libraries.refreshProjects(),
+      port.libraries.refreshProjectExports(project.id),
     ]);
   } finally {
     transition.complete();
   }
 }
 
-async function createProjectWorkspace(params: UseVideoEditorActionHandlersParams): Promise<void> {
+async function createProjectWorkspace(port: ProjectHandlerPort): Promise<void> {
   const transition = beginProjectTransition();
   try {
-    if (params.project) {
-      await waitForVideoEditorSave(params.project.id);
+    const currentProject = port.getCurrentProject();
+    if (currentProject) {
+      await waitForVideoEditorSave(currentProject.id);
       if (!transition.isCurrent()) return;
     }
     const project = await createBlankProject();
     if (!transition.isCurrent()) return;
-    params.applyLoadedProject(project, null);
+    port.applyLoadedProject(project, null);
     await Promise.all([
-      params.libraries.refreshProjects(),
-      params.libraries.refreshProjectExports(project.id),
+      port.libraries.refreshProjects(),
+      port.libraries.refreshProjectExports(project.id),
     ]);
   } finally {
     transition.complete();
@@ -57,10 +59,10 @@ async function createProjectWorkspace(params: UseVideoEditorActionHandlersParams
 
 export async function deleteProjectWorkspace(
   projectId: string,
-  params: UseVideoEditorActionHandlersParams,
+  port: ProjectHandlerPort,
   requestConfirm: (dialog: VideoEditorConfirmDialogState) => Promise<boolean>
 ): Promise<void> {
-  const targetProject = params.projects.find((item) => item.id === projectId);
+  const targetProject = port.projects.find((item) => item.id === projectId);
   const confirmed = await requestConfirm({
     title: translate('common.actions.delete'),
     message: [
@@ -77,26 +79,26 @@ export async function deleteProjectWorkspace(
   }
 
   const remainingProjects = await deletePersistedProject(projectId);
-  if (params.project?.id !== projectId) {
-    await params.libraries.refreshProjects();
+  if (port.getCurrentProject()?.id !== projectId) {
+    await port.libraries.refreshProjects();
     return;
   }
 
   if (remainingProjects.length > 0) {
     const [nextProject] = remainingProjects;
     if (nextProject) {
-      await loadProjectWorkspace(nextProject.id, params);
+      await loadProjectWorkspace(nextProject.id, port);
       return;
     }
 
     return;
   }
 
-  await createProjectWorkspace(params);
+  await createProjectWorkspace(port);
 }
 
 export function useProjectHandlers(
-  params: UseVideoEditorActionHandlersParams,
+  port: ProjectHandlerPort,
   confirmHandlers: {
     requestConfirm: (dialog: VideoEditorConfirmDialogState) => Promise<boolean>;
   }
@@ -107,40 +109,39 @@ export function useProjectHandlers(
   const handleOpenProject = useCallback(
     async (projectId: string) => {
       try {
-        await loadProjectWorkspace(projectId, params);
+        await loadProjectWorkspace(projectId, port);
       } catch (projectError) {
         logger.error('Failed to open project', projectError);
-        params.setError(toErrorMessage(projectError));
+        port.setError(toErrorMessage(projectError));
         throw projectError;
       }
     },
-    [params]
+    [port]
   );
 
   const handleCreateProject = useCallback(async () => {
     try {
-      await createProjectWorkspace(params);
+      await createProjectWorkspace(port);
     } catch (projectError) {
       logger.error('Failed to create project', projectError);
-      params.setError(toErrorMessage(projectError));
+      port.setError(toErrorMessage(projectError));
     }
-  }, [params]);
+  }, [port]);
 
   const handleDeleteProject = useCallback(
     async (projectId: string) => {
       try {
-        await deleteProjectWorkspace(projectId, params, confirmHandlers.requestConfirm);
+        await deleteProjectWorkspace(projectId, port, confirmHandlers.requestConfirm);
       } catch (projectError) {
         logger.error('Failed to delete project', projectError);
-        params.setError(toErrorMessage(projectError));
+        port.setError(toErrorMessage(projectError));
       }
     },
-    [confirmHandlers, params]
+    [confirmHandlers, port]
   );
 
-  return {
-    handleOpenProject,
-    handleCreateProject,
-    handleDeleteProject,
-  };
+  return useMemo(
+    () => ({ handleOpenProject, handleCreateProject, handleDeleteProject }),
+    [handleCreateProject, handleDeleteProject, handleOpenProject]
+  );
 }

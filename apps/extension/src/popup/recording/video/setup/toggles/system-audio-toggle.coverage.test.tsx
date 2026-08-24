@@ -83,7 +83,7 @@ it('renders the enabled state and toggles system audio on click', () => {
     />
   );
   act(() => {
-    (container?.querySelector('button') as HTMLButtonElement).click();
+    (container!.querySelector('button') as HTMLButtonElement).click();
   });
 
   expect(mocks.buttonMock).toHaveBeenCalledWith(

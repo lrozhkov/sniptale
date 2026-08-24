@@ -7,6 +7,7 @@ import {
   validateRecordingControlCapability,
 } from '../../recording-control-lease';
 import { restoreAuthorizedCameraRecorderDocument } from '../camera-recorder-control';
+import { waitForVideoCaptureSurfaceRecovery } from '../../capture-surface/recovery';
 import {
   resolveTrustedCameraRecorderRuntimeSenderUrl,
   resolveTrustedPopupRuntimeSenderUrl,
@@ -26,6 +27,7 @@ export async function isAuthorizedRecordingControl(args: {
   sender: chrome.runtime.MessageSender | undefined;
 }): Promise<boolean> {
   await ensureActiveVideoRecordingLeaseHydrated();
+  await waitForVideoCaptureSurfaceRecovery();
   const ownerSenderUrl = await resolveRecordingControlOwnerSenderUrl(
     args.sender,
     args.message.recordingId

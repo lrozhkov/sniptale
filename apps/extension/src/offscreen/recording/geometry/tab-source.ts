@@ -201,6 +201,7 @@ export function resolveTabOutputGeometry(
   const plan = createRecordingGeometryPlan({
     frameRateCap: options.frameRateCap,
     outputBasis: { height: mapping.sourceRect.height, width: mapping.sourceRect.width },
+    presetScaleMode: 'avoid-upscale',
     resolution: options.resolution,
     sourceRect: mapping.sourceRect,
   });

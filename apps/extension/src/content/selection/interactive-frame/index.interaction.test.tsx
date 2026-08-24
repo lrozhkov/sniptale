@@ -191,7 +191,7 @@ function renderDeferredCalloutCollectionFrame() {
 function enterActiveCalloutText(value: string) {
   const editable = queryAllContentUiElements<HTMLElement>('[contenteditable="true"]')[0];
   expect(editable).toBeInstanceOf(HTMLElement);
-  expect((editable?.getRootNode() as ShadowRoot).activeElement).toBe(editable);
+  expect((editable!.getRootNode() as ShadowRoot).activeElement).toBe(editable);
   act(() => {
     if (!editable) return;
     editable.textContent = value;
@@ -371,7 +371,7 @@ describe('InteractiveFrame callout collection interactions', () => {
     expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(2);
     const editable = queryAllContentUiElements('[contenteditable="true"]');
     expect(editable).toHaveLength(1);
-    expect((editable[0]?.getRootNode() as ShadowRoot).activeElement).toBe(editable[0]);
+    expect((editable[0]!.getRootNode() as ShadowRoot).activeElement).toBe(editable[0]);
   });
 
   it('focuses a primary comment enabled from the quick action and removes it when left empty', () => {
@@ -385,7 +385,7 @@ describe('InteractiveFrame callout collection interactions', () => {
     expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(1);
     const editable = queryAllContentUiElements<HTMLElement>('[contenteditable="true"]')[0];
     expect(editable).toBeInstanceOf(HTMLElement);
-    expect((editable?.getRootNode() as ShadowRoot).activeElement).toBe(editable);
+    expect((editable!.getRootNode() as ShadowRoot).activeElement).toBe(editable);
 
     act(() => editable?.blur());
 
@@ -425,7 +425,7 @@ describe('InteractiveFrame callout collection interactions', () => {
 
     const editable = queryAllContentUiElements<HTMLElement>('[contenteditable="true"]')[0];
     expect(editable).toBeInstanceOf(HTMLElement);
-    expect((editable?.getRootNode() as ShadowRoot).activeElement).toBe(editable);
+    expect((editable!.getRootNode() as ShadowRoot).activeElement).toBe(editable);
     act(() => editable?.blur());
     expect(pagePreparationHistory.hasOpenTransactions()).toBe(false);
     pagePreparationHistory.unregisterBridge(historyBridge);

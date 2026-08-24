@@ -1,12 +1,13 @@
 import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
-import type { VideoEditorControllerStorePort } from '../../../contracts/controller-store';
+import { useVideoEditorStore, type VideoEditorState } from '../../../state/store';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import { createWorkspaceTimelineEditingActions } from './timeline-actions';
 
 function createStore(project = createEmptyVideoProject('Timeline actions')) {
-  const store = {
+  const store: VideoEditorState = {
+    ...useVideoEditorStore.getInitialState(),
     project,
     recordingId: 'recording-1',
     selectedClipId: null,
@@ -14,32 +15,29 @@ function createStore(project = createEmptyVideoProject('Timeline actions')) {
     setError: vi.fn(),
     updateClipPlaybackRate: vi.fn(),
     updateProject: vi.fn((updater: (currentProject: typeof project) => typeof project) => {
-      store.project = updater(store.project);
+      const currentProject = store.project;
+      if (currentProject) store.project = updater(currentProject);
     }),
   };
 
-  return store as Pick<
-    VideoEditorControllerStorePort,
-    | 'project'
-    | 'recordingId'
-    | 'selectedClipId'
-    | 'selection'
-    | 'setError'
-    | 'updateClipPlaybackRate'
-    | 'updateProject'
-  > as VideoEditorControllerStorePort;
+  return store;
 }
 
-function createWorkspace() {
+function createWorkspace(): Pick<
+  VideoEditorWorkspaceState,
+  'clearPlaybackRange' | 'confirm' | 'inspector' | 'setPlaybackRange'
+> {
   return {
     clearPlaybackRange: vi.fn(),
-    confirm: { request: vi.fn() },
-    inspector: { openSelection: vi.fn() },
+    confirm: {
+      dialog: null,
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+      request: vi.fn(),
+    },
+    inspector: { mode: 'selection', openGridSettings: vi.fn(), openSelection: vi.fn() },
     setPlaybackRange: vi.fn(),
-  } as unknown as Pick<
-    VideoEditorWorkspaceState,
-    'clearPlaybackRange' | 'confirm' | 'inspector' | 'setPlaybackRange'
-  >;
+  };
 }
 
 function createSelectedClipActions() {

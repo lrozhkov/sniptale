@@ -207,7 +207,7 @@ it('maps overlay clips and skips audio compatibility draws', async () => {
     expect.any(Map),
     1
   );
-  expect('scene' in (drawCompositionVisualLayerMock.mock.calls[1]?.[1].clip as object)).toBe(false);
+  expect('scene' in (drawCompositionVisualLayerMock.mock.calls[1]![1].clip as object)).toBe(false);
 });
 
 it('passes opacity multipliers through the compatibility layer bridge', async () => {

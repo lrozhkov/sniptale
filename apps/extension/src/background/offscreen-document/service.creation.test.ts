@@ -9,6 +9,7 @@ const {
   loggerDebugMock,
   loggerLogMock,
   loggerWarnMock,
+  sendRuntimeMessageMock,
   randomUuidMock,
 } = vi.hoisted(() => ({
   browserOffscreenCloseDocumentMock: vi.fn(),
@@ -19,7 +20,22 @@ const {
   loggerDebugMock: vi.fn(),
   loggerLogMock: vi.fn(),
   loggerWarnMock: vi.fn(),
+  sendRuntimeMessageMock: vi.fn(),
   randomUuidMock: vi.fn(),
+}));
+
+vi.mock('../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../routing-contracts/runtime-messaging/services')>()),
+  getBackgroundRuntimeMessaging: () => ({
+    sendRuntimeMessage: sendRuntimeMessageMock,
+  }),
+}));
+
+vi.mock('@sniptale/platform/security/offscreen-command-capability', () => ({
+  attachOffscreenCommandCapability: (message: object) => ({
+    ...message,
+    capabilityToken: 'probe-capability',
+  }),
 }));
 
 vi.mock('@sniptale/platform/browser/offscreen', async (importOriginal) => ({
@@ -69,6 +85,12 @@ beforeEach(() => {
   browserOffscreenCloseDocumentMock.mockResolvedValue(undefined);
   browserOffscreenCreateDocumentMock.mockResolvedValue(undefined);
   browserRuntimeSubscribeToMessagesMock.mockImplementation(() => vi.fn());
+  sendRuntimeMessageMock.mockResolvedValue({
+    success: true,
+    challenge: 'startup-1',
+    offscreenStartupId: 'startup-existing',
+    state: 'ready',
+  });
 });
 
 afterEach(() => {
@@ -108,24 +130,138 @@ it('reuses an existing offscreen context instead of creating a new one', async (
     contextTypes: ['OFFSCREEN_DOCUMENT'],
   });
   expect(browserOffscreenCreateDocumentMock).not.toHaveBeenCalled();
-  expect(loggerDebugMock).toHaveBeenCalledWith('Reusing existing ready offscreen document', {
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: 'OFFSCREEN_READINESS_PROBE',
+    challenge: 'startup-1',
+    offscreenStartupId: 'startup-existing',
+    capabilityToken: 'probe-capability',
+  });
+  expect(loggerDebugMock).toHaveBeenCalledWith('Reusing verified ready offscreen document', {
     offscreenStartupId: 'startup-existing',
   });
   expect(manager.hasOffscreenDocument()).toBe(true);
 });
 
-it('treats a reused offscreen context as already ready after worker state recovery', async () => {
+it('recreates a reused context whose readiness probe reports bootstrap failure', async () => {
+  const manager = await loadOffscreenManager();
+  browserRuntimeGetContextsMock.mockResolvedValue([
+    {
+      contextId: 'ctx-1',
+      documentUrl:
+        'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-existing',
+    } as chrome.runtime.ExtensionContext,
+  ]);
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    success: true,
+    challenge: 'startup-1',
+    offscreenStartupId: 'startup-existing',
+    state: 'failed',
+  });
+
+  await expect(manager.ensureOffscreenDocument('Recover failed document')).resolves.toBe(true);
+
+  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
+    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
+    justification: 'Recover failed document',
+  });
+});
+
+it('rejects a readiness response with a mismatched challenge and recreates the context', async () => {
+  const manager = await loadOffscreenManager();
+  browserRuntimeGetContextsMock.mockResolvedValue([
+    {
+      contextId: 'ctx-1',
+      documentUrl:
+        'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-existing',
+    } as chrome.runtime.ExtensionContext,
+  ]);
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    success: true,
+    challenge: 'stale-challenge',
+    offscreenStartupId: 'startup-existing',
+    state: 'ready',
+  });
+
+  await expect(manager.ensureOffscreenDocument('Replace stale response')).resolves.toBe(true);
+
+  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+});
+
+it('keeps ordinary ready signals provisional until the challenge-bound probe validates', async () => {
+  const manager = await loadOffscreenManager();
+  browserRuntimeGetContextsMock.mockResolvedValue([
+    {
+      contextId: 'ctx-1',
+      documentUrl:
+        'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-existing',
+    } as chrome.runtime.ExtensionContext,
+  ]);
+  let resolveProbe!: (response: unknown) => void;
+  sendRuntimeMessageMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveProbe = resolve;
+      })
+  );
+
+  const ensure = manager.ensureOffscreenDocument('Verify provisional identity');
+  await vi.waitFor(() => expect(sendRuntimeMessageMock).toHaveBeenCalledOnce());
+
+  expect(manager.markOffscreenDocumentReady('startup-existing')).toBe(false);
+  resolveProbe({
+    success: true,
+    challenge: 'stale-challenge',
+    offscreenStartupId: 'startup-existing',
+    state: 'ready',
+  });
+  await expect(ensure).resolves.toBe(true);
+
+  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+});
+
+it('times out an unresolved readiness probe before closing and recreating the context', async () => {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
   browserRuntimeGetContextsMock.mockResolvedValue([
-    { contextId: 'ctx-1' } as chrome.runtime.ExtensionContext,
+    {
+      contextId: 'ctx-1',
+      documentUrl:
+        'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-existing',
+    } as chrome.runtime.ExtensionContext,
+  ]);
+  sendRuntimeMessageMock.mockImplementationOnce(() => new Promise(() => undefined));
+
+  const ensure = manager.ensureOffscreenDocument('Replace timed-out context');
+  await vi.waitFor(() => expect(sendRuntimeMessageMock).toHaveBeenCalledOnce());
+  await vi.advanceTimersByTimeAsync(5000);
+  await expect(ensure).resolves.toBe(true);
+
+  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCloseDocumentMock.mock.invocationCallOrder[0]).toBeLessThan(
+    browserOffscreenCreateDocumentMock.mock.invocationCallOrder[0]!
+  );
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
+    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
+    justification: 'Replace timed-out context',
+  });
+});
+
+it('recreates an existing context whose startup identity cannot be resolved', async () => {
+  const manager = await loadOffscreenManager();
+  browserRuntimeGetContextsMock.mockResolvedValue([
+    { contextId: 'ctx-without-url' } as chrome.runtime.ExtensionContext,
   ]);
 
-  await manager.ensureOffscreenDocument('Reuse existing document');
+  await expect(manager.ensureOffscreenDocument('Replace unbound context')).resolves.toBe(true);
 
-  await expect(manager.waitForOffscreenReady(25)).resolves.toBeUndefined();
-
-  expect(browserRuntimeSubscribeToMessagesMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
 });
 
 it('creates a new offscreen document when none exists yet', async () => {

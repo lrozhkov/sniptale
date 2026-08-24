@@ -60,7 +60,7 @@ it('awaits the format barrier before scheduling any harness lane', async () => {
       harnessTargetFiles: ['tooling/qa/core/example.mjs'],
       harnessVerificationTargetFiles: ['tooling/qa/core/example.mjs'],
     },
-    collectors: { collectPrettierStep: () => formatResult },
+    collectors: { collectFormatterStep: () => formatResult },
     scheduledStepCollector,
   });
 
@@ -82,7 +82,7 @@ it('does not schedule harness lanes when the format barrier fails', async () => 
       harnessVerificationTargetFiles: ['tooling/qa/core/example.mjs'],
     },
     collectors: {
-      collectPrettierStep: async () => ({ label: 'Format', status: 'failed' as const }),
+      collectFormatterStep: async () => ({ label: 'Format', status: 'failed' as const }),
     },
     scheduledStepCollector,
   });

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "sniptale-proof-semantics-policy",
+  "controlAuthority": "trusted-base",
+  "controlDispositions": ["trusted-controls", "candidate-controls"],
+  "semanticIdentity": [
+    "lane",
+    "commit",
+    "candidateTree",
+    "trustedControlSha",
+    "trustedControlDigest",
+    "controlDigest",
+    "gateInputDigest",
+    "executionEnvironment"
+  ],
+  "planningMetadata": ["resourceProfiles", "infrastructure.resourceProfile"],
+  "gateCapabilities": {
+    "proof": {
+      "claim": "fast-pr-gate",
+      "scope": "repository-wide",
+      "fullVitest": false,
+      "releaseReady": false
+    },
+    "release": {
+      "claim": "release-provenance",
+      "scope": "repository-wide",
+      "fullVitest": true,
+      "releaseReady": true
+    }
+  },
+  "reuseCompatibility": {
+    "proof": {
+      "minimumExecutionProfile": {
+        "cpuTokens": 12,
+        "memoryMiB": 18432,
+        "vitestWorkers": 1,
+        "playwrightWorkers": 1,
+        "securityWorkers": 1
+      }
+    },
+    "release": {
+      "minimumExecutionProfile": {
+        "cpuTokens": 16,
+        "memoryMiB": 24576,
+        "vitestWorkers": 8,
+        "playwrightWorkers": 2,
+        "securityWorkers": 2
+      }
+    }
+  },
+  "environmentAdmissibility": {
+    "host-wsl": "diagnostic-and-documented-bypass-input-only",
+    "locked-container": "canonical-github-proof",
+    "releaseProvenanceRequires": "locked-container"
+  },
+  "invariants": {
+    "resourceProfileDoesNotChangeControlSemantics": true,
+    "resourceProfileExcludedFromSemanticDigest": true,
+    "resourceProfileAffectsReuseCompatibility": true,
+    "diffAwareWrappersExactly": ["qa:release-harness", "qa:checkpoint", "qa:closeout"],
+    "ciGatesAreRepositoryWide": true,
+    "fastGateNeverClaimsReleaseReadiness": true,
+    "fullVitestIsReleaseOnly": true,
+    "ciBuildIsNonProof": true,
+    "ciBuildArtifactAdmissibleForProvenance": false
+  }
+}

@@ -1,10 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './index';
 
 const useAppLocaleMock = vi.fn();
 const useCommandPaletteHotkeyMock = vi.fn();
-const useVideoEditorControllerMock = vi.fn();
+const shellControllerMock = vi.fn();
+const paletteControllerMock = vi.fn();
+const historyControllerMock = vi.fn();
 const workspaceSpy = vi.fn();
 const paletteSpy = vi.fn();
 const statusSpy = vi.fn();
@@ -18,8 +21,14 @@ vi.mock('../../../ui/command-palette/hotkey', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../ui/command-palette/hotkey')>()),
   useCommandPaletteHotkey: (params: unknown) => useCommandPaletteHotkeyMock(params),
 }));
-vi.mock('../../runtime/controller', () => ({
-  useVideoEditorController: () => useVideoEditorControllerMock(),
+vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorCommandPaletteController: () => paletteControllerMock(),
+  useVideoEditorHistoryController: () => historyControllerMock(),
+  useVideoEditorShellController: () => shellControllerMock(),
+}));
+vi.mock('../../runtime/controller/composition/provider', () => ({
+  VideoEditorCompositionProvider: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock('../../workspace/surface', () => ({
   VideoEditorWorkspace: (props: unknown) => {
@@ -40,8 +49,25 @@ vi.mock('../status-screen', () => ({
   },
 }));
 
-function renderAppWithController(controller: unknown) {
-  useVideoEditorControllerMock.mockReturnValue(controller);
+interface AppControllerFixture {
+  palette: Record<string, unknown>;
+  shell: {
+    error: string | null;
+    isReady: boolean;
+    project: { id: string } | null;
+  };
+}
+
+function renderAppWithController(controller: AppControllerFixture) {
+  shellControllerMock.mockReturnValue(controller.shell);
+  paletteControllerMock.mockReturnValue(controller.palette);
+  historyControllerMock.mockReturnValue({
+    canUndo: false,
+    canRedo: false,
+    error: null,
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
+  });
   renderToStaticMarkup(<App />);
 }
 
@@ -52,20 +78,6 @@ function createReadyController() {
       error: null,
       isReady: true,
       project: { id: 'project-1' },
-    },
-    workspace: {
-      diagnostics: {
-        isOpen: false,
-        onClose: vi.fn(),
-        recordingId: null,
-      },
-      layout: {
-        handleStartVerticalResize: vi.fn(),
-        leftSidebarCollapsed: false,
-        previewPaneHeight: 320,
-        toggleSidebarCollapsed: vi.fn(),
-        workspaceSplitRef: { current: null },
-      },
     },
   };
 }

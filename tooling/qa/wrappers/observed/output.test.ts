@@ -4,17 +4,17 @@ import { formatObservedRunSummary, normalizeObservedStep } from './output.mjs';
 
 it('normalizes a failure into stable control/problem IDs with remediation detail', () => {
   const normalized = normalizeObservedStep({
-    label: 'ESLint',
+    label: 'Oxlint',
     status: 'failed',
     summary: 'two violations',
     violations: [{ file: 'src/a.ts', line: 4, message: 'bad import' }],
   });
 
   expect(normalized.observation).toMatchObject({
-    controlIds: ['qa.rule.eslint'],
+    controlIds: ['qa.rule.oxlint'],
     outcome: 'problems-found',
-    problemIds: ['qa.rule.eslint.violations'],
-    stepId: 'qa.rule.eslint',
+    problemIds: ['qa.rule.oxlint.violations'],
+    stepId: 'qa.rule.oxlint',
   });
   expect(normalized.observation.log).toContain('src/a.ts:4 bad import');
   expect(normalized.observation.log).toContain('repository remediation:');
@@ -56,13 +56,13 @@ it('prints both the structured run record and the wrapper diagnostic log', () =>
         durationMs: 116_000,
         log: { path: '.tmp/qa-logs/2026-07-14/id.log' },
         steps: [],
-        summary: { problemIds: ['qa.rule.eslint.failed'] },
+        summary: { problemIds: ['qa.rule.oxlint.failed'] },
       },
     })
   ).toBe(
     [
       'QA checkpoint: problems found in 1m 56s',
-      'Problems: 1 — qa.rule.eslint.failed',
+      'Problems: 1 — qa.rule.oxlint.failed',
       'Run record: .tmp/qa-observability/runs/2026-07-14/id.json',
       'Run log: .tmp/qa-logs/2026-07-14/id.log',
       '',
@@ -138,7 +138,7 @@ it('keeps a successful parent summary concise when child evidence is present', (
 
 it('renders string violations without discarding their diagnostic text', () => {
   const normalized = normalizeObservedStep({
-    label: 'ESLint',
+    label: 'Oxlint',
     status: 'failed',
     violations: ['tooling/qa/file.mjs:17 concrete guard failure'],
   });

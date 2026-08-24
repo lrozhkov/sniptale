@@ -16,6 +16,7 @@ import { authorizationPolicyBindings } from '../authorization/policy-registry.en
 import { actionRouteHandlerBindings } from './registry';
 import { actionRouteMetadata } from './routes';
 import { backgroundOwnedHandlerBindings } from './owned-route-handlers';
+import { getBackgroundOwnedRouteInventoryEntry } from './owned-route-inventory';
 
 it('defines every accepted background contract exactly once beside its parser', () => {
   const types = backgroundIngressContracts.map((entry) => entry.type);
@@ -87,6 +88,57 @@ it('keeps handler and authorization bindings exact and policy-state references k
     }
   }
   expect(sorted(Object.keys(authorizationPolicyBindings))).toEqual(sorted(registeredPolicyIds));
+});
+
+it('resolves every privileged message through one complete semantic-authority path', () => {
+  const routed = backgroundIngressContracts.filter((entry) => entry.classification === 'routed');
+  const paths = new Map<string, string>();
+
+  for (const descriptor of routed) {
+    const authority = descriptor.semanticAuthority;
+    expect(authority.capabilityPolicyOwner).toEqual({
+      alternateAuthorityFamilies: descriptor.alternateAuthorityFamilies,
+      alternatePolicyIds: descriptor.alternateAuthorizationPolicyIds,
+      policyAuthorityFamily: descriptor.policyAuthorityFamily,
+      policyId: descriptor.authorizationPolicyId,
+      requiredAuthority: descriptor.requiredAuthority,
+      routeAuthorityFamily: descriptor.routeAuthorityFamily,
+      stateOwnerIds: descriptor.policyStateIds,
+    });
+    expect(authority.handlerOwner).toEqual({
+      handlerId: descriptor.handlerId,
+      ownerModule: descriptor.ownerModule,
+    });
+    expect(authority.mutationOwners).toEqual({
+      effectPolicy: descriptor.sideEffects,
+      transitiveStateOwner: descriptor.transitiveStateOwner,
+    });
+    expect(authority.evidencePolicy).toEqual({
+      auditEventPolicy: 'existing-owner-evidence-only',
+      errorShape: descriptor.errorShape,
+      responseShape: descriptor.responseShape,
+    });
+    if (descriptor.actionKind === 'background-owned') {
+      expect(getBackgroundOwnedRouteInventoryEntry(descriptor.type), descriptor.type).toEqual(
+        expect.objectContaining({
+          policyAuthorityFamily: authority.capabilityPolicyOwner.policyAuthorityFamily,
+          routeAuthorityFamily: authority.capabilityPolicyOwner.routeAuthorityFamily,
+        })
+      );
+    }
+
+    const path = [
+      descriptor.type,
+      authority.capabilityPolicyOwner.policyId,
+      authority.handlerOwner.handlerId,
+      authority.mutationOwners.transitiveStateOwner,
+      authority.evidencePolicy.auditEventPolicy,
+    ].join(' -> ');
+    expect(paths.has(descriptor.type), path).toBe(false);
+    paths.set(descriptor.type, path);
+  }
+
+  expect(paths.size).toBe(routed.length);
 });
 
 it('derives offscreen sender restriction from policy metadata without an explicit type set', () => {

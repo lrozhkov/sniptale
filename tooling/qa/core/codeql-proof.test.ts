@@ -13,6 +13,7 @@ const proofEnvironmentKeys = [
   'SNIPTALE_CODEQL_PROOF_PATH',
   'SNIPTALE_CODEQL_SARIF_PATH',
   'SNIPTALE_CODEQL_PROOF_AUTHORITY',
+  'SNIPTALE_CANDIDATE_CONTROL_DIGEST',
 ] as const;
 const originalProofEnvironment = new Map(
   proofEnvironmentKeys.map((key) => [key, process.env[key]])
@@ -20,6 +21,18 @@ const originalProofEnvironment = new Map(
 
 beforeEach(() => {
   for (const key of proofEnvironmentKeys) delete process.env[key];
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'a'.repeat(64)}`;
+});
+
+it('rejects CodeQL reuse across candidate control digests', async () => {
+  const { root, sarifPath } = createPolicyRoot();
+  const module = await import('./codeql-proof.mjs');
+  module.recordSuccessfulCodeqlProof({ cwd: root, sarifPath });
+  process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'b'.repeat(64)}`;
+  expect(module.resolveReusableCodeqlProof({ cwd: root })).toMatchObject({
+    matched: false,
+    reason: 'CodeQL proof control digest changed',
+  });
 });
 
 afterEach(() => {

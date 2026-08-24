@@ -92,7 +92,7 @@ describe('tab recording geometry', () => {
     }
   );
 
-  it('honors an explicit upscale preset with one output plan instead of replacing it with SOURCE', () => {
+  it('treats an upscale preset as a maximum for full-tab screen recording', () => {
     const geometry = resolveTabOutputGeometry(
       { x: 0, y: 0, width: 1904, height: 984 },
       { width: 1904, height: 984 },
@@ -106,8 +106,7 @@ describe('tab recording geometry', () => {
 
     expect(geometry.resolution).toBe(VideoResolutionPreset.P1440);
     expect(geometry.outputBasis).toEqual({ width: 1904, height: 984 });
-    expect(geometry.outputSize.height).toBe(1440);
-    expect(geometry.outputSize.width).toBeGreaterThan(1904);
+    expect(geometry.outputSize).toEqual({ width: 1904, height: 984 });
     expect(geometry.sourceRect).toEqual({ x: 0, y: 0, width: 1904, height: 984 });
   });
 

@@ -132,38 +132,38 @@ export const REPO_AUDIT_REPORT_DEFINITIONS = [
   },
   {
     tool: 'audits/ast-grep.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'audits/knip.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'audits/jscpd.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'audits/semgrep.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'audits/codeql.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'verify-npm-audit-signatures.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'audits/osv.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'audits/gitleaks.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
   {
     tool: 'audits/licenses.mjs',
-    commands: ['npm run qa:audit'],
+    commands: ['npm run ci:release'],
   },
 ];

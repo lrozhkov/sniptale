@@ -1,7 +1,12 @@
 import type React from 'react';
 import { ProjectTimeline } from '../../timeline/project';
 import { PreviewStage } from '../../preview/stage';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import {
+  useVideoEditorLayoutController,
+  useVideoEditorPreviewController,
+  useVideoEditorTimelineController,
+} from '../../runtime/controller/composition/hooks';
+import { useVideoEditorEffectEditingPort } from '../../runtime/controller/store';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorWorkspaceEffectsLibrary } from './effects-library';
 import type { WorkspaceEffectBundlesState } from './effect-bundles';
@@ -10,20 +15,18 @@ import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effec
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import type { EffectLibraryOperations } from '../../library/effects-dock/operations';
 import type { VideoEditorEffectCatalogItem } from '../../library/effects-dock/types';
+import type { EffectEditingPort } from '../../contracts/controller-store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
+  const layout = useVideoEditorLayoutController();
   return (
     <div
       data-ui="video-editor.workspace.canvas-shell"
-      className={getWorkspaceCanvasShellClassName(props.controller.header.leftSidebarCollapsed)}
+      className={getWorkspaceCanvasShellClassName(layout.leftSidebarCollapsed)}
     >
-      <div
-        ref={props.controller.layout.workspaceSplitRef}
-        className="flex h-full min-h-0 flex-col gap-0"
-      >
+      <div ref={layout.workspaceSplitRef} className="flex h-full min-h-0 flex-col gap-0">
         <div className="flex min-h-0 shrink-0 gap-3" style={props.previewHeightStyle}>
           <VideoEditorWorkspaceEffectsLibrary
-            controller={props.controller}
             effectBundles={props.effectBundles}
             effectOperations={props.effectOperations}
             isOpen={props.effectsLibraryDockOpen}
@@ -31,9 +34,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
           />
           <VideoEditorWorkspacePreview {...props} />
         </div>
-        <VideoEditorWorkspaceResizeHandle
-          onPointerDown={props.controller.layout.handleStartVerticalResize}
-        />
+        <VideoEditorWorkspaceResizeHandle onPointerDown={layout.handleStartVerticalResize} />
         <VideoEditorWorkspaceTimeline {...props} />
       </div>
     </div>
@@ -42,7 +43,6 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
 
 interface VideoEditorWorkspaceCanvasProps {
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
-  controller: VideoEditorWorkspaceController;
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   effectsLibraryDockOpen: boolean;
@@ -52,17 +52,19 @@ interface VideoEditorWorkspaceCanvasProps {
 }
 
 function VideoEditorWorkspacePreview(props: VideoEditorWorkspaceCanvasProps): React.JSX.Element {
+  const preview = useVideoEditorPreviewController();
+  if (!preview) return <div className="min-h-0 min-w-0 flex-1" />;
   return (
     <div className="min-h-0 min-w-0 flex-1">
-      <PreviewStage {...createWorkspacePreviewProps(props)} />
+      <PreviewStage {...createWorkspacePreviewProps(props, preview)} />
     </div>
   );
 }
 
 function createWorkspacePreviewProps(
-  props: VideoEditorWorkspaceCanvasProps
+  props: VideoEditorWorkspaceCanvasProps,
+  preview: NonNullable<ReturnType<typeof useVideoEditorPreviewController>>
 ): React.ComponentProps<typeof PreviewStage> {
-  const preview = props.controller.preview;
   return {
     activeInsertKind: props.activeInsertKind,
     assetUrls: preview.assetUrls,
@@ -88,7 +90,7 @@ function createWorkspacePreviewProps(
 }
 
 function createWorkspacePreviewActions(
-  preview: VideoEditorWorkspaceController['preview']
+  preview: NonNullable<ReturnType<typeof useVideoEditorPreviewController>>
 ): Pick<
   React.ComponentProps<typeof PreviewStage>,
   | 'onClearPlacementMode'
@@ -123,15 +125,18 @@ function createWorkspacePreviewActions(
 }
 
 function VideoEditorWorkspaceTimeline(props: VideoEditorWorkspaceCanvasProps): React.JSX.Element {
+  const controller = useVideoEditorTimelineController();
+  const onApplyEffectDocument = useVideoEditorEffectEditingPort((port) => port.applyEffectDocument);
+  if (!controller) return <div className="min-h-[220px] min-w-0 flex-1" />;
   return (
     <div className="min-h-[220px] min-w-0 flex-1">
       <ProjectTimeline
         {...getProjectTimelineProps(
-          props.controller,
+          controller,
           (payload, target, startTime) =>
             void applyDroppedEffectDocument({
               catalogs: props.effectBundles.catalogs,
-              onApplyEffectDocument: props.controller.sidebar.projectActions.onApplyEffectDocument,
+              onApplyEffectDocument,
               operations: props.effectOperations,
               payload,
               startTime,
@@ -145,7 +150,7 @@ function VideoEditorWorkspaceTimeline(props: VideoEditorWorkspaceCanvasProps): R
 
 interface ApplyDroppedEffectDocumentArgs {
   catalogs: readonly VideoEditorEffectCatalogItem[];
-  onApplyEffectDocument: VideoEditorWorkspaceController['sidebar']['projectActions']['onApplyEffectDocument'];
+  onApplyEffectDocument: EffectEditingPort['applyEffectDocument'];
   operations: EffectLibraryOperations;
   payload: VideoEditorEffectDocumentDragPayload;
   startTime: number;

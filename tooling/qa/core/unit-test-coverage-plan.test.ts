@@ -17,7 +17,7 @@ it('does not discover coverage targets for a fully specified no-coverage plan', 
     mode: 'skip',
     coverageTargetFiles: [],
     coverageCheckFiles: [],
-    detail: 'coverage handled by qa:audit',
+    detail: 'coverage handled by ci:release',
     relatedFiles: [],
   });
 });

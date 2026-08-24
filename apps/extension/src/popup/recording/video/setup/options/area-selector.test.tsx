@@ -88,7 +88,7 @@ it('maps the persisted tab modes to the lower recording-area selector', () => {
     expect.objectContaining({ value: 'manual-area', label: 't:popup.video.recordingAreaLabel' })
   );
   const options = (
-    mocks.select.mock.calls[0]?.[0] as {
+    mocks.select.mock.calls[0]![0] as {
       options: Array<{ description?: string; label: string; meta?: string }>;
     }
   ).options;

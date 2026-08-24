@@ -12,6 +12,7 @@ const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout
 const FOCUSED_OWNER_MAP_INVENTORY =
   'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs';
 const INSTANCE_OWNERSHIP_INVENTORY = 'tooling/configs/qa/instance-ownership.data.json';
+const OSS_RELEASE_CONSUMER_INVENTORY = 'tooling/configs/qa/oss-release-consumers.data.json';
 
 it('validates machine-owned inventory without consulting a harness stamp', () => {
   const harnessStateAsserter = vi.fn();
@@ -92,6 +93,28 @@ it('validates the live OSS consumer inventory for every harness change', () => {
       rule: 'oss-release-consumer-inventory',
     },
   ]);
+});
+
+it('owner-validates the OSS consumer inventory without consulting a harness stamp', () => {
+  const harnessStateAsserter = vi.fn();
+  const ossInventoryValidator = vi.fn(() => ({ violations: [] }));
+  const step = collectHarnessFreshnessStep(
+    {
+      harnessTargetFiles: [OSS_RELEASE_CONSUMER_INVENTORY],
+      harnessInventoryTargetFiles: [OSS_RELEASE_CONSUMER_INVENTORY],
+      harnessVerificationTargetFiles: [],
+    },
+    harnessStateAsserter,
+    'qa:checkpoint',
+    (context) => collectHarnessInventoryViolations(context, { ossInventoryValidator })
+  );
+
+  expect(step).toMatchObject({
+    status: 'ok',
+    detail: 'data-only inventory owner validators passed',
+  });
+  expect(ossInventoryValidator).toHaveBeenCalledOnce();
+  expect(harnessStateAsserter).not.toHaveBeenCalled();
 });
 
 it('owner-validates the exact coverage rollout inventory without consulting a harness stamp', () => {

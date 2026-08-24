@@ -9,7 +9,6 @@ it('keeps CodeQL scope, reuse authority, CI transport, and artifacts in one cont
     fs.readFileSync('tooling/configs/qa/codeql-proof-reuse.data.json', 'utf8')
   );
   const quality = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
-  const release = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
   const artifacts = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
 
@@ -29,11 +28,12 @@ it('keeps CodeQL scope, reuse authority, CI transport, and artifacts in one cont
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
   expect(() => assertCodeqlConfigIsFresh()).not.toThrow();
-  expect(quality.match(/Restore verified main receipts when available/gu)).toHaveLength(1);
-  expect(quality.match(/select-codeql-proof\.mjs restore/gu)).toHaveLength(1);
+  expect(quality).toContain('Restore verified reusable proof inputs');
+  expect(quality).toContain('select-codeql-proof.mjs restore-latest-release');
   expect(quality).toContain('SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof');
   expect(quality).toContain('SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif');
-  expect(release).toContain('Restore verified main CodeQL proof');
+  expect(quality).toContain('if [ "$PROOF_LANE" = release ]');
+  expect(quality).not.toContain('select-codeql-proof.mjs restore "$source_sha"');
   expect(container).toContain("'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only'");
   expect(container).toContain('/opt/sniptale-codeql-proof.json:ro');
   expect(container).toContain('/opt/sniptale-codeql-results.sarif:ro');

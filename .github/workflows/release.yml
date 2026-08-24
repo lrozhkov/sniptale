@@ -1,20 +1,23 @@
-name: Release
+name: Continuous Deployment
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
-      coverage_source_run_id:
-        description: Existing release workflow run ID containing admitted audit proof
+      release_tag:
+        description: Existing GitHub-verified annotated tag to publish (vX.Y.Z)
         required: true
         type: string
-      coverage_source_sha:
-        description: Exact published release commit SHA
+      provenance_run_id:
+        description: Successful Release provenance Gate run for the tagged commit
         required: true
         type: string
-      publish_source_tag:
-        description: Failed release tag to replay publication from the admitted source run; empty replays coverage only
+      allow_non_latest_provenance:
+        description: Publish from an older successful provenance run
+        required: false
+        default: false
+        type: boolean
+      bypass_reason:
+        description: Required audit note when a non-latest provenance run is selected
         required: false
         default: ''
         type: string
@@ -23,325 +26,131 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.release_tag }}
   cancel-in-progress: false
 
 jobs:
-  admission:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    outputs:
-      main-run-id: ${{ steps.main-proof.outputs.run-id }}
-      qa-image: ${{ steps.main-proof.outputs.qa-image }}
-      controller-image: ${{ steps.controller-image.outputs.reference }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    steps:
-      - name: Check out signed tag
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { fetch-depth: 0, persist-credentials: false }
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with: { node-version: 22.12.0, cache: npm }
-      - name: Validate tag, version, signature, and main ancestry
-        env: { GH_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}' }
-        run: node tooling/ci/release-policy.mjs
-      - name: Download exact successful main proof
-        id: main-proof
-        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
-        run: |
-          runs=$(gh run list --workflow quality-gate.yml --branch main --commit "$GITHUB_SHA" --event push --status success --limit 20 --json databaseId,headSha)
-          main_run_id=$(jq -er --arg sha "$GITHUB_SHA" '[.[] | select(.headSha == $sha)] | if length == 1 then .[0].databaseId else error("expected exactly one successful main proof") end' <<<"$runs")
-          artifact_name="canonical-qa-${GITHUB_SHA}-${main_run_id}"
-          gh run download "$main_run_id" --name "$artifact_name" --dir build/main-proof
-          image_proof_name="qa-image-proof-${GITHUB_SHA}-${main_run_id}"
-          gh run download "$main_run_id" --name "$image_proof_name" --dir build/image-proof
-          node tooling/ci/verify-main-proof.mjs build/main-proof "$GITHUB_SHA"
-          image_ref=$(node tooling/ci/image-proof.mjs verify build/image-proof "$GITHUB_SHA" "$main_run_id")
-          echo "run-id=$main_run_id" >> "$GITHUB_OUTPUT"
-          echo "qa-image=$image_ref" >> "$GITHUB_OUTPUT"
-      - name: Sign in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Resolve exact controller image
-        id: controller-image
-        env: { CONTROLLER_TAG: 'ghcr.io/lrozhkov/sniptale-controller:sha-${{ github.sha }}' }
-        run: |
-          digest=$(docker buildx imagetools inspect "$CONTROLLER_TAG" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
-          if ! printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'; then
-            echo 'Unable to resolve immutable release controller image' >&2
-            exit 1
-          fi
-          echo "reference=ghcr.io/lrozhkov/sniptale-controller@$digest" >> "$GITHUB_OUTPUT"
-      - name: Preserve admitted main proof
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-input-${{ github.sha }}-${{ github.run_id }}
-          path: build/main-proof
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 30
-      - name: Preserve release admission receipt
-        run: |
-          mkdir -p build/release-admission
-          cp .tmp/ci-release-admission.json build/release-admission/ci-release-admission.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-admission-${{ github.sha }}-${{ github.run_id }}
-          path: build/release-admission
-          if-no-files-found: error
-          retention-days: 30
-
-  provision:
-    needs: admission
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    environment: selectel-runner-controller
-    outputs:
-      has-record: ${{ steps.record.outputs.exists }}
-      label: ${{ steps.record.outputs.label }}
-      attempt: ${{ steps.record.outputs.attempt }}
-      profiles-digest: ${{ steps.record.outputs.profiles_digest }}
-      server-id: ${{ steps.record.outputs.server_id }}
-      availability-zone: ${{ steps.record.outputs.availability_zone }}
-      cpu-tokens: ${{ steps.record.outputs.cpu_tokens }}
-      memory-mib: ${{ steps.record.outputs.memory_mib }}
-      vitest-workers: ${{ steps.record.outputs.vitest_workers }}
-      playwright-workers: ${{ steps.record.outputs.playwright_workers }}
-      security-workers: ${{ steps.record.outputs.security_workers }}
-    permissions: { contents: read, packages: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ github.sha }}', persist-credentials: false }
-      - name: Provision disposable preemptible release runner
-        env:
-          CONTROLLER_IMAGE: ${{ needs.admission.outputs.controller-image }}
-          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
-          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
-          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
-          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
-          RUNNER_IMAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUNNER_IMAGE_USER: ${{ github.actor }}
-          SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
-          SNIPTALE_BASE_SHA: ${{ github.sha }}
-          SNIPTALE_TRUSTED_CONTROL_SHA: ${{ github.sha }}
-          SNIPTALE_QA_IMAGE: ${{ needs.admission.outputs.qa-image }}
-        run: |
-          printf '%s' "$RUNNER_IMAGE_TOKEN" | docker login ghcr.io --username "$RUNNER_IMAGE_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_QA_PROFILES --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN --env RUNNER_IMAGE_TOKEN --env RUNNER_IMAGE_USER \
-            --env SNIPTALE_CANDIDATE_SHA --env SNIPTALE_BASE_SHA --env SNIPTALE_TRUSTED_CONTROL_SHA \
-            --env SNIPTALE_QA_IMAGE --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
-            "$CONTROLLER_IMAGE" provision
-      - name: Export sanitized runner identity
-        id: record
-        if: always()
-        run: |
-          record=build/selectel-controller/provision.json
-          if [ ! -f "$record" ] || ! jq -e '.status == "online"' "$record" >/dev/null; then
-            echo 'exists=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo 'exists=true' >> "$GITHUB_OUTPUT"
-          echo "attempt=$(jq -er .selectedProfileIndex "$record")" >> "$GITHUB_OUTPUT"
-          echo "profiles_digest=$(jq -er .profilesDigest "$record")" >> "$GITHUB_OUTPUT"
-          echo "label=$(jq -er .runnerLabel "$record")" >> "$GITHUB_OUTPUT"
-          echo "server_id=$(jq -er .serverId "$record")" >> "$GITHUB_OUTPUT"
-          echo "availability_zone=$(jq -er .availabilityZone "$record")" >> "$GITHUB_OUTPUT"
-          echo "cpu_tokens=$(jq -er .resourceProfile.cpuTokens "$record")" >> "$GITHUB_OUTPUT"
-          echo "memory_mib=$(jq -er .resourceProfile.memoryMiB "$record")" >> "$GITHUB_OUTPUT"
-          echo "vitest_workers=$(jq -er .resourceProfile.vitestWorkers "$record")" >> "$GITHUB_OUTPUT"
-          echo "playwright_workers=$(jq -er .resourceProfile.playwrightWorkers "$record")" >> "$GITHUB_OUTPUT"
-          echo "security_workers=$(jq -er .resourceProfile.securityWorkers "$record")" >> "$GITHUB_OUTPUT"
-      - name: Preserve sanitized controller record
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-selectel-${{ github.sha }}-${{ github.run_id }}
-          path: |
-            build/selectel-controller/provision.json
-          if-no-files-found: warn
-          retention-days: 30
-
-  release-audit:
-    needs: [admission, provision]
-    if: needs.provision.result == 'success'
-    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision.outputs.label)) }}
-    timeout-minutes: 120
-    permissions: { actions: read, contents: read }
-    steps:
-      - name: Check out exact release commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false }
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with: { node-version: 22.12.0, cache: npm }
-      - name: Download admitted main proof
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            name: 'release-input-${{ github.sha }}-${{ github.run_id }}',
-            path: admitted-main-proof,
-          }
-      - name: Restore verified main CodeQL proof
-        run: |
-          codeql_proof="$RUNNER_TEMP/codeql-proof-${GITHUB_SHA}.json"
-          codeql_sarif="$RUNNER_TEMP/codeql-sarif-${GITHUB_SHA}.sarif"
-          node tooling/ci/select-codeql-proof.mjs admitted-main-proof "$GITHUB_SHA" "$codeql_proof" "$codeql_sarif" || true
-          if [ -f "$codeql_proof" ] && [ -f "$codeql_sarif" ]; then
-            echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
-            echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
-          fi
-      - name: Restore verified main coverage proof
-        run: |
-          coverage_proof="$RUNNER_TEMP/coverage-proof-${GITHUB_SHA}.json"
-          coverage_reports="$RUNNER_TEMP/coverage-reports-${GITHUB_SHA}"
-          node tooling/ci/select-coverage-proof.mjs admitted-main-proof "$GITHUB_SHA" "$coverage_proof" "$coverage_reports" || true
-          if [ -f "$coverage_proof" ] && [ -d "$coverage_reports" ]; then
-            echo "SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof" >> "$GITHUB_ENV"
-            echo "SNIPTALE_COVERAGE_REPORTS_PATH=$coverage_reports" >> "$GITHUB_ENV"
-          fi
-      - name: Run release-only canonical audit
-        env:
-          SNIPTALE_CANDIDATE_SHA: ${{ github.sha }}
-          SNIPTALE_CI_IMAGE: ${{ needs.admission.outputs.qa-image }}
-          SNIPTALE_CI_SKIP_BUILD: '1'
-          SNIPTALE_SELECTEL_ATTEMPT: ${{ needs.provision.outputs.attempt }}
-          SNIPTALE_SELECTEL_PROFILES_DIGEST: ${{ needs.provision.outputs.profiles-digest }}
-          SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision.outputs.server-id }}
-          SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision.outputs.availability-zone }}
-          SNIPTALE_QA_CPU_TOKENS: ${{ needs.provision.outputs.cpu-tokens }}
-          SNIPTALE_QA_MEMORY_MIB: ${{ needs.provision.outputs.memory-mib }}
-          SNIPTALE_QA_VITEST_MAX_WORKERS: ${{ needs.provision.outputs.vitest-workers }}
-          SNIPTALE_QA_PLAYWRIGHT_WORKERS: ${{ needs.provision.outputs.playwright-workers }}
-          SNIPTALE_QA_SECURITY_WORKERS: ${{ needs.provision.outputs.security-workers }}
-        run: node tooling/ci/container.mjs release-audit
-      - name: Preserve release audit proof
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-audit-${{ github.sha }}-${{ github.run_id }}
-          path: build/ci-artifacts/release-audit-${{ github.sha }}-${{ github.run_id }}
-          include-hidden-files: true
-          if-no-files-found: warn
-          retention-days: 30
-
-  cleanup:
-    needs: [admission, provision, release-audit]
-    if: always() && needs.provision.outputs.has-record == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    environment: selectel-runner-controller
-    permissions: { actions: read, contents: read, packages: read }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ github.sha }}', persist-credentials: false }
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with: { name: 'release-selectel-${{ github.sha }}-${{ github.run_id }}', path: attempt }
-      - name: Delete release VM, volume, port, and JIT registration
-        env:
-          CONTROLLER_IMAGE: ${{ needs.admission.outputs.controller-image }}
-          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
-          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
-          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
-          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
-        run: |
-          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
-            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
-            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" cleanup "/workspace/attempt/provision.json"
-      - name: Preserve cleanup proof
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-cleanup-${{ github.sha }}-${{ github.run_id }}
-          path: |
-            attempt/provision.json
-          if-no-files-found: error
-          retention-days: 30
-
   publish:
-    needs: [admission, release-audit, cleanup]
-    if: >-
-      always() &&
-      ((github.event_name == 'push' && needs.release-audit.result == 'success' && needs.cleanup.result == 'success') ||
-       (github.event_name == 'workflow_dispatch' && inputs.publish_source_tag != ''))
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
+    environment: release-publisher
     permissions:
       actions: read
       contents: write
+    outputs:
+      release-sha: ${{ steps.admission.outputs.release-sha }}
     steps:
+      - name: Validate deployment inputs
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
+          ALLOW_NON_LATEST: ${{ inputs.allow_non_latest_provenance }}
+          BYPASS_REASON: ${{ inputs.bypass_reason }}
+        run: |
+          printf '%s\n' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+          printf '%s\n' "$PROVENANCE_RUN_ID" | grep -Eq '^[1-9][0-9]*$'
+          if [ "$ALLOW_NON_LATEST" = true ] && [ -z "$BYPASS_REASON" ]; then
+            echo 'A non-latest provenance bypass requires an audit note.' >&2
+            exit 1
+          fi
       - name: Check out signed tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: 22.12.0, cache: npm }
       - name: Install exact publication dependencies
         run: npm ci --ignore-scripts
-      - name: Download admitted main proof and release audit
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          {
-            pattern: 'release-*-${{ inputs.coverage_source_sha || github.sha }}-${{ inputs.coverage_source_run_id || github.run_id }}',
-            path: build/release-inputs,
-            repository: '${{ github.repository }}',
-            run-id: '${{ inputs.coverage_source_run_id || github.run_id }}',
-            github-token: '${{ secrets.GITHUB_TOKEN }}',
-          }
-      - name: Restore canonical artifact roots
+      - name: Admit signed tag and exact provenance run
+        id: admission
         env:
-          SOURCE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
-          SOURCE_RUN_ID: ${{ inputs.coverage_source_run_id || github.run_id }}
+          GH_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_REF_NAME: ${{ inputs.release_tag }}
+          PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
+          ALLOW_NON_LATEST: ${{ inputs.allow_non_latest_provenance }}
+          BYPASS_REASON: ${{ inputs.bypass_reason }}
         run: |
-          mv build/release-inputs/release-input-${SOURCE_SHA}-${SOURCE_RUN_ID} build/main-proof
-          mv build/release-inputs/release-audit-${SOURCE_SHA}-${SOURCE_RUN_ID} build/release-audit
-          mkdir -p .tmp
-          mv build/release-inputs/release-admission-${SOURCE_SHA}-${SOURCE_RUN_ID}/ci-release-admission.json .tmp/ci-release-admission.json
+          release_sha=$(git rev-list -n 1 "$GITHUB_REF_NAME")
+          export GITHUB_SHA="$release_sha"
+          node tooling/ci/release-policy.mjs
+          run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}")
+          jq -e --arg sha "$release_sha" '
+            .head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch" and
+            .status == "completed" and .path == ".github/workflows/quality-gate.yml"
+            and .display_title == "Release provenance Gate"
+          ' <<<"$run" >/dev/null
+          jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}/jobs?per_page=100")
+          jq -s -e '
+            [.[].jobs[] | select(.name == "Release provenance Gate" and .conclusion == "success")] |
+            length == 1
+          ' <<<"$jobs" >/dev/null
+          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/quality-gate.yml/runs?branch=main&event=workflow_dispatch&status=completed&head_sha=${release_sha}&per_page=100")
+          latest=$(jq -s -r --arg sha "$release_sha" '[.[].workflow_runs[] | select(.head_sha == $sha and .display_title == "Release provenance Gate")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
+          if [ "$PROVENANCE_RUN_ID" != "$latest" ] && [ "$ALLOW_NON_LATEST" != true ]; then
+            echo "Provenance run $PROVENANCE_RUN_ID is not the latest completed run $latest for $release_sha." >&2
+            exit 1
+          fi
+          artifact_prefix="release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-"
+          artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROVENANCE_RUN_ID" "$artifact_prefix")
+          gh run download "$PROVENANCE_RUN_ID" \
+            --name "$artifact_name" \
+            --dir build/release-proof
+          node tooling/ci/verify-main-proof.mjs release build/release-proof "$release_sha"
+          echo "release-sha=$release_sha" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Continuous Deployment admission'
+            echo
+            echo "Tag: $GITHUB_REF_NAME"
+            echo "Commit: $release_sha"
+            echo "Release provenance run: $PROVENANCE_RUN_ID"
+            if [ -n "$BYPASS_REASON" ]; then echo "Bypass note: $BYPASS_REASON"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Prepare immutable release assets
-        env:
-          SOURCE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
-        run: node tooling/ci/prepare-release-assets.mjs build/main-proof build/release-audit "$SOURCE_SHA"
-      - name: Preserve release proof
+        env: { RELEASE_SHA: '${{ steps.admission.outputs.release-sha }}' }
+        run: node tooling/ci/prepare-release-assets.mjs build/release-proof "$RELEASE_SHA"
+      - name: Preserve publication input and prepared assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-${{ inputs.coverage_source_sha || github.sha }}-${{ github.run_id }}
+          name: deployment-${{ steps.admission.outputs.release-sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            build/main-proof
-            build/release-audit
+            build/release-proof/proof-manifest.json
+            build/release-proof/SHA256SUMS
+            build/release-proof/release-assets
+            .tmp/ci-release-admission.json
           include-hidden-files: true
+          if-no-files-found: error
           retention-days: 30
-      - name: Create draft, attach verified assets, and publish
+      - name: Create draft, attach verified assets, and publish immutable release
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          RELEASE_POLICY_READ_TOKEN: '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}'
-          RELEASE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
-          RELEASE_TAG: ${{ inputs.publish_source_tag || github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_POLICY_READ_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ steps.admission.outputs.release-sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GITHUB_REF_NAME: ${{ inputs.release_tag }}
         run: |
-          asset_root="build/main-proof/release-assets"
-          GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs --recheck
+          asset_root=build/release-proof/release-assets
+          GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" node tooling/ci/release-policy.mjs --recheck
+          version=$(jq -er .version package.json)
+          release_name="Sniptale ${version} alpha"
           lookup_error=$(mktemp)
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>"$lookup_error"; then
-            echo "Refusing to replace an existing release" >&2
-            exit 1
+          existing_release=$(mktemp)
+          already_published=false
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >"$existing_release" 2>"$lookup_error"; then
+            state=$(node tooling/ci/classify-release-state.mjs "$asset_root" "$RELEASE_TAG" "$release_name" <"$existing_release")
+            release_id=$(jq -er .releaseId <<<"$state")
+            case $(jq -er .action <<<"$state") in
+              already-published)
+                node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+                already_published=true
+                ;;
+              recreate-owned-draft)
+                gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+                ;;
+              *)
+                echo 'Existing release classifier returned an unknown action.' >&2
+                exit 1
+                ;;
+            esac
           elif ! grep -q '(HTTP 404)' "$lookup_error"; then
             cat "$lookup_error" >&2
             exit 1
@@ -349,101 +158,75 @@ jobs:
           created_release_id=''
           cleanup_owned_release() {
             if [ -z "$created_release_id" ]; then return; fi
-            release_state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}" --jq '[.tag_name, .draft, .immutable] | @tsv' 2>/dev/null || true)
-            if [ "$release_state" = "${RELEASE_TAG}"$'\ttrue\tfalse' ] || [ "$release_state" = "${RELEASE_TAG}"$'\tfalse\tfalse' ]; then
+            state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}" --jq '[.tag_name, .draft, .immutable] | @tsv' 2>/dev/null || true)
+            if [ "$state" = "${RELEASE_TAG}"$'\ttrue\tfalse' ] || [ "$state" = "${RELEASE_TAG}"$'\tfalse\tfalse' ]; then
               gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${created_release_id}"
             fi
           }
           trap cleanup_owned_release ERR
-          version=$(jq -er .version package.json)
-          zip_assets=("$asset_root"/sniptale_*.zip)
-          if [ "${#zip_assets[@]}" -ne 1 ] || [ ! -f "${zip_assets[0]}" ]; then
-            echo "Expected exactly one verified extension ZIP" >&2
-            exit 1
-          fi
+          mapfile -t zip_assets < <(find "$asset_root" -maxdepth 1 -type f -name 'sniptale_*.zip' ! -name '*-qa-evidence.zip' -print)
+          test "${#zip_assets[@]}" -eq 1 && test -f "${zip_assets[0]}"
           zip_name=$(basename "${zip_assets[0]}")
-          release_notes=$(mktemp)
-          cat > "$release_notes" <<EOF
+          notes=$(mktemp)
+          cat > "$notes" <<EOF
           Snip the web. Tell the story.
 
-          Fifth public alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
+          Alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
 
           ## Highlights
 
-          - Added one canonical, reproducible QA path for local machines and GitHub, preserving the established release-harness, checkpoint, closeout, release, security, and coverage semantics.
-          - Added disposable preemptible Selectel runners with bounded multi-zone capacity fallback, explicit resource profiles, no public ingress, and mandatory cleanup proof.
-          - Added verified unit, CodeQL, and coverage proof reuse, candidate-bound receipts, immutable QA images, SBOM and provenance, SARIF publication, coverage artifacts, and informational Codecov reporting.
-          - Improved CI failure diagnostics with retained wrapper run records, complete sanitized logs, report hashes, artifact download guidance, and deterministic proof manifests.
-          - Hardened release admission around signed tags, successful main proof, immutable release assets, checksums, CycloneDX SBOM, and exact artifact verification.
-          - Compact release evidence into one deterministic QA archive and publish the README coverage badge only from the latest immutable release.
-          - Added a private vulnerability reporting policy and documented the confidential disclosure channel.
+          - Unified local WSL and GitHub/Selectel validation behind the same commit-bound ci:proof and ci:release owners.
+          - Kept release-harness, checkpoint, and closeout as the fast diff-local development workflow.
+          - Added content-addressed proof reuse for product units, CodeQL, and coverage without weakening fail-closed validation.
+          - Published compact deterministic QA evidence, SBOM, provenance, checksums, and release-owned status badges.
+          - Added machine-checked documentation facts and confidential GitHub vulnerability reporting guidance.
 
           ## Install
 
           Download **${zip_name}**, unpack it, open **chrome://extensions**, enable Developer mode, choose Load unpacked, and select the unpacked directory.
 
-          This is still an alpha preview (**v${version}-alpha**). Formats, workflows, and browser compatibility may change without backward compatibility; keep separate backups of important data.
+          This is an alpha preview (**v${version}-alpha**). Formats, workflows, and browser compatibility may change without backward compatibility; keep separate backups of important data.
           EOF
-          release_request=$(mktemp)
-          jq -n \
-            --arg tag "$RELEASE_TAG" \
-            --arg name "Sniptale ${version} alpha" \
-            --rawfile body "$release_notes" \
-            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false, generate_release_notes: false}' \
-            > "$release_request"
-          release_json=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$release_request")
-          release_id=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release_json")
-          created_release_id="$release_id"
-          node tooling/ci/upload-release-assets.mjs "$asset_root" "$release_id"
-          node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
-          node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+          request=$(mktemp)
+          jq -n --arg tag "$RELEASE_TAG" --arg name "$release_name" --rawfile body "$notes" \
+            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: true, generate_release_notes: false}' > "$request"
+          if [ "$already_published" = false ]; then
+            release=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$request")
+            release_id=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release")
+            created_release_id="$release_id"
+            node tooling/ci/upload-release-assets.mjs "$asset_root" "$release_id"
+            node tooling/ci/verify-draft-release.mjs "$asset_root" "$release_id"
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
+            node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
+          fi
 
   coverage-results:
-    needs: [publish]
-    if: >-
-      always() &&
-      ((github.event_name == 'push' && needs.publish.result == 'success') ||
-       github.event_name == 'workflow_dispatch')
+    needs: publish
+    if: needs.publish.result == 'success'
+    continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    continue-on-error: true
     permissions:
       actions: read
       contents: read
       id-token: write
     steps:
-      - name: Check out trusted coverage publisher
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with: { node-version: 22.12.0, cache: npm }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ inputs.release_tag }}', persist-credentials: false }
       - name: Download exact published release proof
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: release-${{ inputs.coverage_source_sha || github.sha }}-${{ (needs.publish.result == 'success' && github.run_id) || inputs.coverage_source_run_id || github.run_id }}
-          path: build/release-proof
-          repository: ${{ github.repository }}
-          run-id: ${{ (needs.publish.result == 'success' && github.run_id) || inputs.coverage_source_run_id || github.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Admit coverage only from the latest immutable release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOURCE_SHA: ${{ inputs.coverage_source_sha || github.sha }}
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
-          release=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest")
-          test "$(jq -er .immutable <<<"$release")" = true
-          tag=$(jq -er .tag_name <<<"$release")
-          git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
-          test "$(git rev-list -n 1 "$tag")" = "$SOURCE_SHA"
-          node tooling/ci/select-release-coverage.mjs \
-            build/release-proof/release-audit "$SOURCE_SHA" build/codecov/lcov.info
-      - name: Publish release coverage to Codecov
+          artifact_prefix="release-provenance-${{ needs.publish.outputs.release-sha }}-${{ inputs.provenance_run_id }}-"
+          artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "${{ inputs.provenance_run_id }}" "$artifact_prefix")
+          gh run download "${{ inputs.provenance_run_id }}" \
+            --name "$artifact_name" \
+            --dir build/release-proof
+          node tooling/ci/verify-main-proof.mjs release build/release-proof "${{ needs.publish.outputs.release-sha }}"
+      - name: Publish exact release coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
-          files: build/codecov/lcov.info
+          files: build/release-proof/.tmp/coverage/canonical/lcov.info
           use_oidc: true
           override_branch: main
-          override_commit: ${{ inputs.coverage_source_sha || github.sha }}
+          override_commit: ${{ needs.publish.outputs.release-sha }}
           fail_ci_if_error: false

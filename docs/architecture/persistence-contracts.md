@@ -1,6 +1,6 @@
 # Persistence contracts
 
-The shared product database is `sniptale-db`. Its IndexedDB version and the logical versions in `schema_contracts` form one admission contract: the physical version selects a migration path, while each domain row proves the logical format expected by its owner. The first beta generation starts at database version 1 and domain version 1. Alpha database versions 1–30 are intentionally outside this graph.
+The shared product database is `sniptale-db`. Its IndexedDB version and the logical versions in `schema_contracts` form one admission contract: the physical version selects a migration path, while each domain row proves the logical format expected by its owner. The current physical version is projected in the [generated project facts](../engineering/project-facts.md); the first beta generation starts with domain version 1. Alpha database versions 1–30 are intentionally outside this graph.
 
 `apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts` is the exact registry for store ownership and data class. Every product store belongs to one domain. Durable authority must survive every supported beta migration; derived stores may be rebuilt only when the registry classifies them as rebuildable; operational stores require explicit restart or recovery behavior. `schema_contracts` itself is infrastructure metadata.
 

@@ -6,6 +6,7 @@ import type { VideoProject } from '../../../apps/extension/src/features/video/pr
 import { createCanvasVideoOutput } from '../../../apps/extension/src/offscreen/recording/stream/canvas-video-output';
 import { createRecordingArtifactSession } from '../../../apps/extension/src/offscreen/recording/encoding/artifact-session';
 import { createLiveRecordingArtifactSession } from '../../../apps/extension/src/offscreen/recording/encoding/live-artifact-session';
+import { LiveVideoOutputMetrics } from '../../../apps/extension/src/offscreen/recording/encoding/live-video-output-metrics';
 import { createRecordingStagingCoordinator } from '../../../apps/extension/src/composition/persistence/recordings/staging';
 import {
   createAssetObjectWriter,
@@ -46,6 +47,21 @@ type LiveVfrRecordingResult = {
   summedDurationsMs: number;
 };
 
+type MostlyStaticLiveRecordingResult = {
+  actualBitrate: number;
+  averageInterframeBytes: number;
+  backwardTimestamps: number;
+  contentChangeRequests: number;
+  duplicateTimestamps: number;
+  durationSeconds: number;
+  keyFrameByteShare: number;
+  keyFrames: number;
+  maximumGopInterval: number | null;
+  minimumGopInterval: number | null;
+  packetCount: number;
+  withinByteBudget: boolean;
+};
+
 type OffscreenHarnessBridge = {
   recordCanvasCadence: (
     frameRate: number,
@@ -60,6 +76,7 @@ type OffscreenHarnessBridge = {
   getMediaRecorderState: () => HarnessMediaRecorderState;
   recordColdHighResolutionSequence: () => Promise<ColdHighResolutionRecordingResult[]>;
   recordLiveVfrArtifact: () => Promise<LiveVfrRecordingResult>;
+  recordMostlyStaticLiveArtifact: () => Promise<MostlyStaticLiveRecordingResult>;
   recordStaticCanvasArtifact: () => Promise<StaticCanvasRecordingResult>;
 };
 
@@ -245,11 +262,12 @@ async function recordLiveVfrArtifact(): Promise<LiveVfrRecordingResult> {
     for (const [index, delay] of frameDelays.entries()) {
       const remaining = startedAt + delay - performance.now();
       if (remaining > 0) await new Promise<void>((resolve) => setTimeout(resolve, remaining));
-      context.fillStyle = index % 2 === 0 ? '#ffffff' : '#111827';
+      context.fillStyle = '#ffffff';
       context.fillRect(0, 0, width, height);
-      context.fillStyle = index % 2 === 0 ? '#111827' : '#ffffff';
+      context.fillStyle = '#111827';
       context.font = '32px sans-serif';
-      context.fillText(`Frame ${index}`, 40, 80);
+      context.fillText('Mostly static screen text', 40, 80);
+      if (index % 2 === 0) context.fillRect(386, 48, 2, 38);
       track.requestFrame();
     }
     await started;
@@ -302,6 +320,116 @@ async function recordLiveVfrArtifact(): Promise<LiveVfrRecordingResult> {
     track.stop();
     if (finalized) await coordinator.delete();
     else await coordinator.abort().catch(() => undefined);
+  }
+}
+
+async function recordMostlyStaticLiveArtifact(): Promise<MostlyStaticLiveRecordingResult> {
+  const width = 640;
+  const height = 360;
+  const configuredBitrate = 2_000_000;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new Error('The browser exposes no canvas for the static-content smoke');
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+  if (typeof track?.requestFrame !== 'function') {
+    throw new Error(
+      'The browser exposes no explicit canvas frame requests for the static-content smoke'
+    );
+  }
+  track.contentHint = 'text';
+  const coordinator = await createRecordingStagingCoordinator();
+  let finalized = false;
+  try {
+    const session = await createLiveRecordingArtifactSession({
+      artifactId: 'mostly-static-live-smoke',
+      coordinator,
+      encoding: {
+        audioBitrate: 128_000,
+        audioCodec: 'opus',
+        container: 'webm',
+        frameRate: 60,
+        videoBitrate: configuredBitrate,
+        videoCodec: 'vp9',
+      },
+      filename: 'mostly-static-live-smoke.webm',
+      mimeType: 'video/webm',
+      stream,
+    });
+    const started = new Promise<void>((resolve, reject) => {
+      session.setLifecycleCallbacks({ onFailure: reject, onStart: resolve });
+    });
+    session.start();
+    const contentChangeRequests = 31;
+    const startedAt = performance.now();
+    for (let index = 0; index < contentChangeRequests; index += 1) {
+      const targetTime = startedAt + index * 500;
+      const remaining = targetTime - performance.now();
+      if (remaining > 0) await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+      drawMostlyStaticScreen(context, { height, index, width });
+      track.requestFrame();
+    }
+    await started;
+    await new Promise<void>((resolve) => setTimeout(resolve, 80));
+    const artifact = await session.stop();
+    const file = await readAssetFile(artifact.asset.ref, artifact.filename);
+    const result = await readMostlyStaticLiveMetrics(file, configuredBitrate);
+    finalized = true;
+    return { ...result, contentChangeRequests };
+  } finally {
+    track.stop();
+    if (finalized) await coordinator.delete();
+    else await coordinator.abort().catch(() => undefined);
+  }
+}
+
+function drawMostlyStaticScreen(
+  context: CanvasRenderingContext2D,
+  input: { height: number; index: number; width: number }
+): void {
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, input.width, input.height);
+  context.fillStyle = '#111827';
+  context.font = '26px sans-serif';
+  context.fillText('Stable document text remains readable', 30, 70);
+  context.font = '18px sans-serif';
+  context.fillText(`Local revision ${Math.floor(input.index / 10)}`, 30, 112);
+  if (input.index % 2 === 0) context.fillRect(474, 46, 2, 32);
+}
+
+async function readMostlyStaticLiveMetrics(
+  file: File,
+  configuredBitrate: number
+): Promise<Omit<MostlyStaticLiveRecordingResult, 'contentChangeRequests'>> {
+  const input = new Input({ formats: [WEBM], source: new BlobSource(file) });
+  try {
+    const videoTrack = await input.getPrimaryVideoTrack();
+    if (!videoTrack) throw new Error('The static-content artifact has no video track');
+    const sink = new EncodedPacketSink(videoTrack);
+    const metrics = new LiveVideoOutputMetrics();
+    let packet = await sink.getFirstPacket();
+    while (packet) {
+      metrics.observe(packet);
+      packet = await sink.getNextPacket(packet);
+    }
+    const summary = metrics.summarize(configuredBitrate);
+    return {
+      actualBitrate: summary.videoByteBudget.actualBitrate,
+      averageInterframeBytes: summary.averageInterframeBytes,
+      backwardTimestamps: summary.backwardEncodedPacketTimestamps,
+      duplicateTimestamps: summary.duplicateEncodedPacketTimestamps,
+      durationSeconds: summary.duration,
+      keyFrameByteShare: summary.keyFrameByteShare,
+      keyFrames: summary.actualKeyFrames,
+      maximumGopInterval: summary.maximumGopInterval,
+      minimumGopInterval: summary.minimumGopInterval,
+      packetCount: summary.encodedVideoFrames,
+      withinByteBudget: summary.videoByteBudget.withinBudget,
+    };
+  } finally {
+    input.dispose();
   }
 }
 
@@ -483,6 +611,7 @@ window.__sniptaleOffscreenHarness = {
   },
   recordColdHighResolutionSequence,
   recordLiveVfrArtifact,
+  recordMostlyStaticLiveArtifact,
   recordCanvasCadence,
   recordStaticCanvasArtifact,
   stageProjectExportInput,

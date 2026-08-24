@@ -20,9 +20,15 @@ const CRITICAL_SPECS = [
   'tooling/test/e2e/extension-critical-media.spec.ts',
   'tooling/test/e2e/extension-critical-offscreen.spec.ts',
   'tooling/test/e2e/extension-critical-popup.spec.ts',
+  'tooling/test/e2e/extension-critical-recording-restart.spec.ts',
   'tooling/test/e2e/extension-critical-video.spec.ts',
   'tooling/test/e2e/extension-critical-video-effects.spec.ts',
 ];
+const E2E_BUILD_DIRS = {
+  release: '.tmp/e2e-builds/release',
+  security: '.tmp/e2e-builds/security',
+  test: '.tmp/e2e-builds/test',
+};
 
 const SUITES = {
   smoke: SMOKE_SPECS,
@@ -48,18 +54,18 @@ export function parseE2eOptions(argv = []) {
   };
 }
 
-function shouldUseXvfb({ headed }) {
-  return !headed && process.platform === 'linux' && !process.env.DISPLAY;
+function shouldUseXvfb({ headed }, { requiresDisplay }) {
+  return !headed && requiresDisplay && process.platform === 'linux' && !process.env.DISPLAY;
 }
 
-function createE2eEnv({ headed }) {
+function createE2eEnv({ headed }, { requiresDisplay }) {
   return {
     ...process.env,
     TMPDIR: '/tmp',
     TMP: '/tmp',
     TEMP: '/tmp',
     PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? '.playwright-browsers',
-    PLAYWRIGHT_HEADLESS: headed ? '0' : '1',
+    PLAYWRIGHT_HEADLESS: headed || requiresDisplay ? '0' : '1',
   };
 }
 
@@ -86,14 +92,20 @@ function buildScriptsForSuite(suite) {
 }
 
 function playwrightWavesForSuite(suite, specs) {
-  if (suite === 'security') return [{ buildDir: 'dist-security-e2e', specs }];
+  if (suite === 'security') {
+    return [{ buildDir: E2E_BUILD_DIRS.security, requiresDisplay: false, specs }];
+  }
   if (suite === 'all') {
     return [
-      { buildDir: 'dist', specs: [...SMOKE_SPECS, ...CRITICAL_SPECS] },
-      { buildDir: 'dist-security-e2e', specs: SECURITY_SPECS },
+      {
+        buildDir: E2E_BUILD_DIRS.test,
+        requiresDisplay: true,
+        specs: [...SMOKE_SPECS, ...CRITICAL_SPECS],
+      },
+      { buildDir: E2E_BUILD_DIRS.security, requiresDisplay: false, specs: SECURITY_SPECS },
     ];
   }
-  return [{ buildDir: 'dist', specs }];
+  return [{ buildDir: E2E_BUILD_DIRS.test, requiresDisplay: suite === 'critical', specs }];
 }
 
 function createE2eContext(options) {
@@ -140,10 +152,10 @@ export function runE2e({
     for (const wave of playwrightWavesForSuite(options.suite, options.specs)) {
       const playwrightArgs = ['exec', 'playwright', '--', 'test', ...wave.specs];
       const env = {
-        ...createE2eEnv(options),
+        ...createE2eEnv(options, wave),
         SNIPTALE_EXTENSION_BUILD_DIR: wave.buildDir,
       };
-      const result = shouldUseXvfb(options)
+      const result = shouldUseXvfb(options, wave)
         ? commandRunner('xvfb-run', ['-a', 'npm', ...playwrightArgs], { env, stdio: 'pipe' })
         : commandRunner('npm', playwrightArgs, { env, stdio: 'pipe' });
       results.push(result);

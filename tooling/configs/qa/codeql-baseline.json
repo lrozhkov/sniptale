@@ -1,10 +1,10 @@
 {
   "$comment": "CodeQL non-test finding baseline. Technical-debt metadata is owned by technical-debt.data.json.",
   "version": 1,
-  "description": "Constrained qa:audit CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
+  "description": "Constrained ci:release CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
   "findings": [
     {
-      "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
+      "contentHash": "3bb221495fa6e66545c9c8b7ba0f3b5ec5798db27e3c3665c78f56b3ef065c0f",
       "debtId": "accepted.codeql.locked-toolchain-download-write",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 42,
@@ -12,12 +12,20 @@
       "rule": "js/http-to-file-access"
     },
     {
-      "contentHash": "ade7649148298691982b6cba6456ac5601e0f7305f900cc2d0dac51023f91454",
+      "contentHash": "3bb221495fa6e66545c9c8b7ba0f3b5ec5798db27e3c3665c78f56b3ef065c0f",
       "debtId": "accepted.codeql.locked-toolchain-download-url",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 37,
       "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
       "rule": "js/file-access-to-http"
+    },
+    {
+      "contentHash": "bde065a7fd378a21b22a1b17fa0ac57a7d9319f90ef236c703eb425682d0d38b",
+      "debtId": "accepted.codeql.local-toolchain-download-write",
+      "file": "tooling/ci/local-toolchain.mjs",
+      "line": 66,
+      "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
+      "rule": "js/http-to-file-access"
     }
   ]
 }

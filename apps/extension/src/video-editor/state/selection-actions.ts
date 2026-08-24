@@ -12,11 +12,9 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
   return {
     clearPlacementMode: () => set({ placementMode: null }),
     setCurrentTime: (time: number) =>
-      set(
-        (state): Partial<VideoEditorState> => ({
-          currentTime: clampNumber(time, 0, Math.max(0, state.project?.duration ?? 0)),
-        })
-      ),
+      set((state): Partial<VideoEditorState> => ({
+        currentTime: clampNumber(time, 0, Math.max(0, state.project?.duration ?? 0)),
+      })),
     setPlaying: (isPlaying: boolean) => set({ isPlaying }),
     togglePlaying: () => set((state) => ({ isPlaying: !state.isPlaying })),
     setPixelsPerSecond: (pixelsPerSecond: number) =>
@@ -62,17 +60,15 @@ export function resolveInitialSelectedTrackId(
 
 function createSelectSceneAction(set: VideoEditorStoreSet): VideoEditorState['selectScene'] {
   return () =>
-    set(
-      (state): Partial<VideoEditorState> => ({
-        placementMode: resolvePlacementModeAfterSelectionChange(
-          createSceneSelection(),
-          state.placementMode
-        ),
-        selection: createSceneSelection(),
-        selectedClipId: null,
-        selectedTrackId: state.selectedTrackId ?? resolveInitialSelectedTrackId(state.project),
-      })
-    );
+    set((state): Partial<VideoEditorState> => ({
+      placementMode: resolvePlacementModeAfterSelectionChange(
+        createSceneSelection(),
+        state.placementMode
+      ),
+      selection: createSceneSelection(),
+      selectedClipId: null,
+      selectedTrackId: state.selectedTrackId ?? resolveInitialSelectedTrackId(state.project),
+    }));
 }
 
 function createSelectTrackAction(set: VideoEditorStoreSet): VideoEditorState['selectTrack'] {

@@ -76,7 +76,7 @@ describe('observed wrapper lifecycle', () => {
         lockFactory,
         execute: async () => ({
           context: { suite: 'product', targetFiles: ['src/a.ts'] },
-          steps: [{ label: 'ESLint', status: 'ok', durationMs: 3 }],
+          steps: [{ label: 'Oxlint', status: 'ok', durationMs: 3 }],
         }),
       });
       expect(success.exitCode).toBe(0);
@@ -245,6 +245,46 @@ describe('observed wrapper console output', () => {
         stdout.indexOf('QA advisory: all passed')
       );
       expect(log).toContain('[Advisory report.console]');
+    });
+    output.mockRestore();
+  });
+
+  it('summarizes a large advisory inventory in the console and preserves every finding in the log', async () => {
+    const root = createTempRoot('observed-wrapper-large-advisory-');
+    initGitRepo(root);
+    const writes: string[] = [];
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    await withCwd(root, async () => {
+      const advisories = Array.from({ length: 20 }, (_, index) => ({
+        id: `finding-${index}`,
+        file: `src/file-${index}.ts`,
+        reason: `reason-${index}`,
+      }));
+      const result = await runObservedWrapper({
+        wrapperId: 'qa:advisory',
+        label: 'QA advisory',
+        contractValidator: ignoreStepContract,
+        environment: createPrivateEnvironment(root),
+        execute: async () => ({
+          steps: [
+            {
+              label: 'Advisory report',
+              status: 'ok',
+              consoleOutput: 'bounded rendered report',
+              advisories,
+            },
+          ],
+        }),
+      });
+      const stdout = writes.join('');
+      const log = fs.readFileSync(`${root}/${result.record.log.path}`, 'utf8');
+      expect(stdout).toContain('Advisory report: 20 advisory findings (top 6)');
+      expect(stdout).not.toContain('finding-19');
+      expect(log).toContain('[Advisory report.advisories]');
+      expect(log).toContain('finding-19');
     });
     output.mockRestore();
   });

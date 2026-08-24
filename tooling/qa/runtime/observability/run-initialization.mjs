@@ -57,6 +57,7 @@ function createRecord(options, identity, startedAt, paths, log, repository) {
     ),
     summary: emptySummary(),
     steps: [],
+    timeline: { events: [], activities: [] },
     log: {
       path: paths.logRelativePath,
       digest: log.digest,

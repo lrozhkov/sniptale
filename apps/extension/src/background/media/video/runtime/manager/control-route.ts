@@ -26,6 +26,7 @@ import {
   stopRecording,
   updateRecordingSettings,
 } from './controls';
+import { markPostRecordPopupActivationOwnedByPopup } from '../post-record-popup-activation';
 
 const logger = createLogger({ namespace: 'BackgroundVideoControlRoute' });
 
@@ -51,7 +52,12 @@ export function routeVideoControlMessage(args: RouteVideoControlMessageArgs): bo
     case VideoMessageType.STOP_RECORDING:
       return routeAuthorizedRecordingControl(
         { message, sendResponse, sender },
-        () => stopRecording(message.discard ?? false),
+        () => {
+          if (resolveTrustedPopupRuntimeSenderUrl(sender)) {
+            markPostRecordPopupActivationOwnedByPopup(message.recordingId);
+          }
+          return stopRecording(message.discard ?? false);
+        },
         sendAcceptedOrInactiveRecordingResponse
       );
     case VideoMessageType.CANCEL_RECORDING_START:

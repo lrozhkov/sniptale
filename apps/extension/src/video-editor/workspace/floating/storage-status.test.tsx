@@ -23,10 +23,12 @@ vi.mock('../../../workflows/aggregate-editor-presence/client', async (importOrig
   ...(await importOriginal<typeof import('../../../workflows/aggregate-editor-presence/client')>()),
   connectAggregateEditorPresence: mocks.connectPresence,
 }));
-vi.mock('../../state/store', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../state/store')>()),
-  useVideoEditorStore: (selector: (state: typeof mocks.videoState) => unknown) =>
-    selector(mocks.videoState),
+vi.mock('../../runtime/controller/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
+  useVideoEditorProjectStorageStatus: () => ({
+    projectUpdatedAt: mocks.videoState.project?.updatedAt ?? null,
+    saveState: mocks.videoState.saveState,
+  }),
 }));
 vi.mock('./storage-promotion', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./storage-promotion')>()),

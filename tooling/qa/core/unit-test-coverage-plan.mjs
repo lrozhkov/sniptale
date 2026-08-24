@@ -12,7 +12,7 @@ export function resolveCoveragePlan({
       mode: 'skip',
       coverageTargetFiles: [],
       coverageCheckFiles: [],
-      detail: 'coverage handled by qa:audit',
+      detail: 'coverage handled by ci:release',
       relatedFiles: [...relatedFilesOverride],
     };
   }
@@ -72,7 +72,7 @@ export function createPlannedCoverage({
     relatedFiles: relatedFilesOverride ?? coveragePlan.relatedFiles,
     detail:
       coverageDetailOverride ??
-      (coverageEnabled ? coveragePlan.detail : 'coverage handled by qa:audit'),
+      (coverageEnabled ? coveragePlan.detail : 'coverage handled by ci:release'),
   };
 }
 

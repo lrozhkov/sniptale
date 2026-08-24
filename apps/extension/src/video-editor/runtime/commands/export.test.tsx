@@ -15,7 +15,8 @@ import {
   type VideoProjectVideoClip,
 } from '../../../features/video/project/types';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import type { UseVideoEditorActionHandlersParams } from './types';
+import type { ExportHandlerPort } from './types';
+import type { VideoEditorExportRuntimeState } from '../../contracts/export-state';
 import { useExportHandlers } from './export';
 
 const { cancelProjectExportMock, startProjectExportMock } = vi.hoisted(() => ({
@@ -81,7 +82,7 @@ function createSelectedClip(trackId: string) {
   } satisfies VideoProjectVideoClip;
 }
 
-function createExportState() {
+function createExportState(): VideoEditorExportRuntimeState {
   return {
     dialogOpen: true,
     error: null,
@@ -103,36 +104,29 @@ function createExportState() {
   };
 }
 
-function createParams(): UseVideoEditorActionHandlersParams {
+type TestExportHandlerPort = ExportHandlerPort & {
+  exportState: ReturnType<typeof createExportState>;
+  project: ReturnType<typeof createEmptyVideoProject>;
+  selectedClipId: string | null;
+};
+
+function createParams(): TestExportHandlerPort {
   const project = createEmptyVideoProject('Export selection');
   project.clips = [createSelectedClip(project.tracks[0]!.id)];
 
-  return {
-    applyLoadedProject: vi.fn(),
+  const params: TestExportHandlerPort = {
     cancelExport: vi.fn(),
-    currentTime: 0,
     exportState: createExportState(),
     failExportCancellation: vi.fn(),
     failExport: vi.fn(),
-    libraries: {
-      projectExports: [],
-      projects: [],
-      recordings: [],
-      refreshProjectExports: vi.fn().mockResolvedValue(undefined),
-      refreshProjects: vi.fn().mockResolvedValue(undefined),
-      refreshRecordings: vi.fn().mockResolvedValue(undefined),
-    },
-    moveClip: vi.fn(),
+    getCurrentExportState: () => params.exportState,
+    getCurrentProject: () => params.project,
+    getCurrentSelectedClipId: () => params.selectedClipId,
     project,
-    projects: [],
     selectedClipId: 'clip-1',
-    setError: vi.fn(),
     startExport: vi.fn(),
-    trimClipEnd: vi.fn(),
-    trimClipStart: vi.fn(),
-    upsertAsset: vi.fn(),
-    addAssetClip: vi.fn(),
   };
+  return params;
 }
 
 beforeEach(() => {
@@ -159,7 +153,9 @@ afterEach(() => {
 
 it('exports only the selected clip range when the dialog scope targets a clip', async () => {
   const params = createParams();
+  params.selectedClipId = null;
   renderHook(params);
+  params.selectedClipId = 'clip-1';
 
   await act(async () => {
     await latestHandlers?.handleStartExport();
@@ -180,8 +176,8 @@ it('exports only the selected clip range when the dialog scope targets a clip', 
 
 it('fails export when selected-clip scope is requested without an active clip', async () => {
   const params = createParams();
-  params.selectedClipId = null;
   renderHook(params);
+  params.selectedClipId = null;
 
   await act(async () => {
     await latestHandlers?.handleStartExport();

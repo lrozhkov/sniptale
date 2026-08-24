@@ -6,16 +6,24 @@ const {
   restoreAuthorizedCameraRecorderDocumentMock,
   resolveTrustedCameraRecorderRuntimeSenderUrlMock,
   resolveTrustedPopupRuntimeSenderUrlMock,
+  markPostRecordPopupActivationOwnedByPopupMock,
   stopRecordingMock,
   validateRecordingControlCapabilityMock,
+  waitForVideoCaptureSurfaceRecoveryMock,
 } = vi.hoisted(() => ({
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   getActiveVideoRecordingLeaseSnapshotMock: vi.fn(),
   restoreAuthorizedCameraRecorderDocumentMock: vi.fn(),
   resolveTrustedCameraRecorderRuntimeSenderUrlMock: vi.fn(),
   resolveTrustedPopupRuntimeSenderUrlMock: vi.fn(),
+  markPostRecordPopupActivationOwnedByPopupMock: vi.fn(),
   stopRecordingMock: vi.fn(),
   validateRecordingControlCapabilityMock: vi.fn(),
+  waitForVideoCaptureSurfaceRecoveryMock: vi.fn(),
+}));
+
+vi.mock('../../capture-surface/recovery', () => ({
+  waitForVideoCaptureSurfaceRecovery: waitForVideoCaptureSurfaceRecoveryMock,
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -50,6 +58,10 @@ vi.mock('../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../camera-recorder-control')>()),
   restoreAuthorizedCameraRecorderDocument: restoreAuthorizedCameraRecorderDocumentMock,
 }));
+vi.mock('../post-record-popup-activation', () => ({
+  consumePostRecordPopupActivationOwnedByPopup: vi.fn(),
+  markPostRecordPopupActivationOwnedByPopup: markPostRecordPopupActivationOwnedByPopupMock,
+}));
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { routeVideoControlMessage } from './control-route';
@@ -78,6 +90,7 @@ beforeEach(() => {
   });
   restoreAuthorizedCameraRecorderDocumentMock.mockResolvedValue(true);
   validateRecordingControlCapabilityMock.mockReturnValue(true);
+  waitForVideoCaptureSurfaceRecoveryMock.mockResolvedValue(undefined);
   stopRecordingMock.mockResolvedValue({ result: 'accepted' });
 });
 
@@ -103,12 +116,14 @@ it('authorizes registered camera recorder document controls through the active l
     ownerSenderUrl: popupSenderUrl,
     recordingId: 'recording-1',
   });
+  expect(waitForVideoCaptureSurfaceRecoveryMock).toHaveBeenCalledOnce();
   expect(restoreAuthorizedCameraRecorderDocumentMock).toHaveBeenCalledWith({
     documentId: 'camera-document-1',
     recordingId: 'recording-1',
     senderUrl: cameraSender.url,
     tabId: 7,
   });
+  expect(markPostRecordPopupActivationOwnedByPopupMock).not.toHaveBeenCalled();
   expect(stopRecordingMock).toHaveBeenCalledTimes(1);
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 });

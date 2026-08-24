@@ -107,6 +107,7 @@ describe('recording asset publication', () => {
 
     expect(mocks.assertAdmission).not.toHaveBeenCalled();
     expect(mocks.writeBlob).not.toHaveBeenCalled();
+    expect(mocks.recover).not.toHaveBeenCalled();
     expect(mocks.preparePublication).toHaveBeenCalledWith(
       expect.objectContaining({ payload: expect.objectContaining({ completion }) })
     );

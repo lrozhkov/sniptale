@@ -107,21 +107,36 @@ function createStatusHandler(providerLabel?: string) {
   };
 }
 
+function throwSafeTransportError(): never {
+  throw new Error(translate('background.runtime.llmUnexpectedProcessingError'));
+}
+
 async function sendChatRequest(
   apiUrl: string,
   apiKey: string,
   payload: object,
   handleStatus: (status: number, errorData: unknown) => void
 ): Promise<string> {
-  const response = await postJsonWithTimeout({
-    url: apiUrl,
-    body: payload,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    timeoutErrorMessage: translate('background.runtime.llmRequestTimeout'),
-  });
+  let response: Awaited<ReturnType<typeof postJsonWithTimeout>>;
+  try {
+    response = await postJsonWithTimeout({
+      url: apiUrl,
+      body: payload,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      timeoutErrorMessage: translate('background.runtime.llmRequestTimeout'),
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === translate('background.runtime.llmRequestTimeout')
+    ) {
+      throw error;
+    }
+    throwSafeTransportError();
+  }
 
   logger.debug('Received chat completion response', { apiUrl, status: response.status });
 

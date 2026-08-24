@@ -5,6 +5,35 @@ import { runtimeVideoOffscreenControlMessageContracts } from './control';
 const readyContract =
   runtimeVideoOffscreenControlMessageContracts[VideoMessageType.OFFSCREEN_READY];
 
+it('binds offscreen readiness probes and responses to startup identity and challenge', () => {
+  const contract =
+    runtimeVideoOffscreenControlMessageContracts[VideoMessageType.OFFSCREEN_READINESS_PROBE];
+  const request = {
+    type: VideoMessageType.OFFSCREEN_READINESS_PROBE,
+    capabilityToken: 'capability-token-1',
+    challenge: 'challenge-1',
+    offscreenStartupId: 'startup-1',
+  };
+
+  expect(contract.parseRequest(request)).toEqual(request);
+  expect(
+    contract.parseResponse({
+      success: true,
+      challenge: 'challenge-1',
+      offscreenStartupId: 'startup-1',
+      state: 'ready',
+    })
+  ).toEqual({
+    success: true,
+    challenge: 'challenge-1',
+    offscreenStartupId: 'startup-1',
+    state: 'ready',
+  });
+  expect(() => contract.parseResponse({ success: true, state: 'ready' })).toThrow(
+    /OFFSCREEN_READINESS_PROBE/
+  );
+});
+
 it('requires the startup id on offscreen ready messages', () => {
   expect(
     readyContract.parseRequest({

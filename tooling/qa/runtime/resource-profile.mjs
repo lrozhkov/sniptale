@@ -6,7 +6,8 @@ const DEFAULT_CPU_TOKEN_CAP = 8;
 const DEFAULT_MEMORY_CAP_MIB = 12 * 1024;
 const RESERVED_SYSTEM_MEMORY_MIB = 3 * 1024;
 const MIN_QA_MEMORY_MIB = 6144;
-const DEFAULT_CONCURRENT_VITEST_WORKERS = 4;
+const MIN_LOCAL_VITEST_WORKERS = 4;
+const MAX_LOCAL_VITEST_WORKERS = 8;
 const MAX_VITEST_WORKERS = 20;
 const MAX_RELEASE_CPU_TOKENS = 24;
 const MAX_RELEASE_VITEST_WORKERS = 20;
@@ -84,13 +85,17 @@ function resolveMemoryBudgetMiB({ env, totalMemoryMiB }) {
   );
 }
 
+function resolveLocalVitestWorkers(cpuTokens) {
+  return Math.min(MAX_LOCAL_VITEST_WORKERS, Math.max(MIN_LOCAL_VITEST_WORKERS, cpuTokens - 2));
+}
+
 function resolveVitestWorkers({ cpuTokens, env }) {
   const requested = parsePositiveInteger(
     env.SNIPTALE_QA_VITEST_MAX_WORKERS,
     'SNIPTALE_QA_VITEST_MAX_WORKERS'
   );
-  const defaultWorkers = Math.max(1, Math.min(DEFAULT_CONCURRENT_VITEST_WORKERS, cpuTokens - 3));
-  return Math.min(requested ?? defaultWorkers, MAX_VITEST_WORKERS, cpuTokens);
+  const defaultWorkers = resolveLocalVitestWorkers(cpuTokens);
+  return requested == null ? defaultWorkers : Math.min(requested, MAX_VITEST_WORKERS, cpuTokens);
 }
 
 export function resolveQaResourceProfile({
@@ -129,14 +134,14 @@ export function resolveQaReleaseResourceProfile({
   const totalMemoryMiB = Math.max(1024, Math.floor(totalMemoryBytes / MIB));
   const physicalCoreCount = detectPhysicalCoreCount(cpuInfo, normalizedLogicalCpuCount);
   if (normalizedLogicalCpuCount < 2) {
-    throw new Error('qa:release requires at least 2 WSL-visible CPU tokens.');
+    throw new Error('ci:release requires at least 2 WSL-visible CPU tokens.');
   }
   const requestedCpuTokens = parsePositiveInteger(
     env.SNIPTALE_QA_CPU_TOKENS,
     'SNIPTALE_QA_CPU_TOKENS'
   );
   if (requestedCpuTokens != null && requestedCpuTokens < 2) {
-    throw new Error('SNIPTALE_QA_CPU_TOKENS must be at least 2 for qa:release.');
+    throw new Error('SNIPTALE_QA_CPU_TOKENS must be at least 2 for ci:release.');
   }
   const cpuTokens = Math.min(
     requestedCpuTokens ?? MAX_RELEASE_CPU_TOKENS,
@@ -157,9 +162,10 @@ export function resolveQaReleaseResourceProfile({
     'SNIPTALE_QA_VITEST_MAX_WORKERS'
   );
   const vitestMaxWorkers = Math.min(
-    requestedVitestWorkers ?? cpuTokens,
-    MAX_RELEASE_VITEST_WORKERS,
-    cpuTokens
+    requestedVitestWorkers == null
+      ? resolveLocalVitestWorkers(cpuTokens)
+      : Math.min(requestedVitestWorkers, cpuTokens),
+    MAX_RELEASE_VITEST_WORKERS
   );
 
   return Object.freeze({

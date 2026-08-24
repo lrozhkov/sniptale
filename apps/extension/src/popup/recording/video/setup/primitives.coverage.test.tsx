@@ -85,7 +85,7 @@ describe('popup video setup shared controls', () => {
     );
 
     act(() => {
-      (container?.querySelector('button') as HTMLButtonElement).click();
+      (container!.querySelector('button') as HTMLButtonElement).click();
     });
 
     expect(mocks.buttonMock).toHaveBeenCalledWith(

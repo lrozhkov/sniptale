@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   listProjectExports,
   listVideoProjects,
@@ -45,12 +45,22 @@ export function useVideoEditorLibraries(): VideoEditorLibrariesState {
     setProjectExports(entries.toSorted((a, b) => b.createdAt - a.createdAt));
   }, []);
 
-  return {
-    recordings,
-    projects,
-    projectExports,
-    refreshRecordings,
-    refreshProjects,
-    refreshProjectExports,
-  };
+  return useMemo(
+    () => ({
+      recordings,
+      projects,
+      projectExports,
+      refreshRecordings,
+      refreshProjects,
+      refreshProjectExports,
+    }),
+    [
+      projectExports,
+      projects,
+      recordings,
+      refreshProjectExports,
+      refreshProjects,
+      refreshRecordings,
+    ]
+  );
 }

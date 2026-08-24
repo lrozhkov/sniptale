@@ -24,6 +24,5 @@ cd "$repo_root"
   -x "tasks" "tasks/*" \
   -x "respViewver" "respViewver/*" \
   -x "*.tsbuildinfo" \
-  -x ".eslintcache"
 
 echo "Backup ready: ${archive_path}"

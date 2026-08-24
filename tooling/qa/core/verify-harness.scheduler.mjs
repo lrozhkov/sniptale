@@ -6,27 +6,38 @@ import {
   formatTaskScheduleDetail,
   runBoundedTasks,
 } from '../runtime/task-scheduler.mjs';
+import { TYPECHECK_CHECKERS, TYPESCRIPT_TOOL_VERSION } from './typescript-cli.mjs';
+import { OXLINT_TOOL_VERSION } from './verify-oxlint.mjs';
 
 const HARNESS_WORKER_URL = new URL('./verify-harness.worker.mjs', import.meta.url);
 const LANE_RESOURCES = Object.freeze({
   static: { cpuTokens: 2, memoryMiB: 2048 },
-  typecheck: { cpuTokens: 1, memoryMiB: 3072 },
+  typecheck: { cpuTokens: TYPECHECK_CHECKERS.full, memoryMiB: 5120 },
+  oxlint: { cpuTokens: 2, memoryMiB: 5120 },
   tests: { memoryMiB: 4096 },
 });
 
 const HARNESS_RESULT_SHAPES = Object.freeze({
   static: { steps: 'steps' },
   typecheck: { typecheckStep: 'step' },
+  oxlint: { oxlintStep: 'step' },
   tests: { unitTestStep: 'step' },
 });
 
-export function runHarnessLaneWorker({ context, lane, memoryMiB, signal, vitestMaxWorkers }) {
+export function runHarnessLaneWorker({
+  context,
+  lane,
+  memoryMiB,
+  signal,
+  typecheckCheckerCount,
+  vitestMaxWorkers,
+}) {
   return runQaLaneWorker({
     label: `Harness QA worker ${lane}`,
     memoryMiB,
     resultParser: (value) => parseLaneResult(value, { lane, shapes: HARNESS_RESULT_SHAPES }),
     signal,
-    workerData: { context, lane, vitestMaxWorkers },
+    workerData: { context, lane, typecheckCheckerCount, vitestMaxWorkers },
     workerUrl: HARNESS_WORKER_URL,
   });
 }
@@ -45,22 +56,46 @@ function createHarnessWorkerContext(context) {
 
 export function createHarnessLaneTasks({ context, profile, workerRunner = runHarnessLaneWorker }) {
   const workerContext = createHarnessWorkerContext(context);
-  return ['static', 'typecheck', 'tests'].map((lane) => {
-    const resources = LANE_RESOURCES[lane];
+  const typecheckCheckerCount = Math.min(TYPECHECK_CHECKERS.full, profile.cpuTokens);
+  return ['static', 'typecheck', 'oxlint', 'tests'].map((lane) => {
+    const resources =
+      lane === 'typecheck'
+        ? { ...LANE_RESOURCES.typecheck, cpuTokens: typecheckCheckerCount }
+        : LANE_RESOURCES[lane];
     const cpuTokens =
       lane === 'tests'
         ? profile.vitestMaxWorkers
-        : Math.min(resources.cpuTokens, profile.cpuTokens);
+        : lane === 'typecheck'
+          ? typecheckCheckerCount
+          : Math.min(resources.cpuTokens, profile.cpuTokens);
     return {
       id: lane,
       cpuTokens,
+      dependencies: lane === 'oxlint' ? ['typecheck'] : [],
+      executionProfile:
+        lane === 'typecheck'
+          ? {
+              checkerCount: typecheckCheckerCount,
+              toolName: 'typescript',
+              toolVersion: TYPESCRIPT_TOOL_VERSION,
+            }
+          : lane === 'oxlint'
+            ? { toolName: 'oxlint', toolVersion: OXLINT_TOOL_VERSION }
+            : {},
       memoryMiB: resources.memoryMiB,
+      workers:
+        lane === 'tests'
+          ? profile.vitestMaxWorkers
+          : lane === 'typecheck'
+            ? typecheckCheckerCount
+            : 1,
       run: ({ signal }) =>
         workerRunner({
           context: workerContext,
           lane,
           memoryMiB: resources.memoryMiB,
           signal,
+          typecheckCheckerCount,
           vitestMaxWorkers: profile.vitestMaxWorkers,
         }),
     };
@@ -85,6 +120,12 @@ function annotate(result, profile) {
       typecheckStep: appendTaskScheduleDetail(result.value.typecheckStep, detail),
     };
   }
+  if (result.id === 'oxlint') {
+    return {
+      ...result.value,
+      oxlintStep: appendTaskScheduleDetail(result.value.oxlintStep, detail),
+    };
+  }
   return {
     ...result.value,
     unitTestStep: appendTaskScheduleDetail(result.value.unitTestStep, detail),
@@ -96,6 +137,7 @@ function assemble(results) {
   return [
     ...lanes.get('static').steps,
     lanes.get('typecheck').typecheckStep,
+    lanes.get('oxlint').oxlintStep,
     lanes.get('tests').unitTestStep,
   ];
 }

@@ -3,10 +3,11 @@ import path from 'node:path';
 import { isExecutedAsScript } from '../qa/core/shared.mjs';
 import {
   downloadSuccessfulMainProof,
+  downloadLatestReleaseProof,
   removeSafeRestoreOutput,
   runGitHubCli,
 } from './main-proof-transport.mjs';
-import { verifyMainProof } from './verify-main-proof.mjs';
+import { verifyMainProof, verifyReleaseProof } from './verify-main-proof.mjs';
 
 const CODEQL_PROOF_FILE = '.tmp/qa/codeql-proof.json';
 const CODEQL_SARIF_FILE = '.tmp/codeql/results.filtered.sarif';
@@ -28,10 +29,11 @@ export function selectVerifiedCodeqlProof(
   artifactRoot,
   commit,
   proofDestination,
-  sarifDestination
+  sarifDestination,
+  { verifier = verifyMainProof } = {}
 ) {
   const root = path.resolve(artifactRoot);
-  const { manifest } = verifyMainProof(root, commit);
+  const { manifest } = verifier(root, commit);
   copyVerifiedFile(root, manifest, CODEQL_PROOF_FILE, path.resolve(proofDestination));
   try {
     copyVerifiedFile(root, manifest, CODEQL_SARIF_FILE, path.resolve(sarifDestination));
@@ -40,6 +42,29 @@ export function selectVerifiedCodeqlProof(
     throw error;
   }
   return { proofPath: path.resolve(proofDestination), sarifPath: path.resolve(sarifDestination) };
+}
+
+export function restoreLatestReleaseCodeqlProof(
+  artifactRoot,
+  proofDestination,
+  sarifDestination,
+  { commandRunner = runGitHubCli } = {}
+) {
+  try {
+    const source = downloadLatestReleaseProof({ artifactRoot, commandRunner });
+    return selectVerifiedCodeqlProof(
+      artifactRoot,
+      source.commit,
+      proofDestination,
+      sarifDestination,
+      { verifier: verifyReleaseProof }
+    );
+  } catch {
+    removeSafeRestoreOutput(artifactRoot, ['release-codeql-proof'], { recursive: true });
+    removeSafeRestoreOutput(proofDestination, ['codeql-proof'], { recursive: false });
+    removeSafeRestoreOutput(sarifDestination, ['codeql-sarif'], { recursive: false });
+    return null;
+  }
 }
 
 export function restoreVerifiedMainCodeqlProof(
@@ -71,6 +96,17 @@ if (isExecutedAsScript(import.meta.url)) {
     const restored = restoreVerifiedMainCodeqlProof(first, second, third, fourth);
     if (restored) process.stdout.write(`${JSON.stringify(restored)}\n`);
     else process.stderr.write('Verified main CodeQL proof unavailable; running full CodeQL.\n');
+    process.exit(0);
+  }
+  if (mode === 'restore-latest-release') {
+    if (!first || !second || !third) {
+      throw new Error(
+        'Usage: select-codeql-proof.mjs restore-latest-release <artifact-root> <proof-destination> <sarif-destination>'
+      );
+    }
+    const restored = restoreLatestReleaseCodeqlProof(first, second, third);
+    if (restored) process.stdout.write(`${JSON.stringify(restored)}\n`);
+    else process.stderr.write('Verified release CodeQL proof unavailable; running full CodeQL.\n');
     process.exit(0);
   }
   const [artifactRoot, commit, proofDestination, sarifDestination] = [mode, first, second, third];

@@ -12,7 +12,18 @@ export {
 } from './maintenance.mjs';
 export { collectRepositoryContext } from './repository-context.mjs';
 export { resolveObservabilityRoot } from './root.mjs';
+export { resumeLatestObservabilityRun } from './resume.mjs';
 export { createObservabilityRun, summarizeSteps } from './run.mjs';
+export {
+  currentTimelineActivityId,
+  recordTimelineTransition,
+  recordSkippedTimelineActivity,
+  runTimelineActivity,
+  runTimelineActivitySync,
+  updateTimelineExecutionProfile,
+  withObservabilityTimeline,
+  withTimelineActivity,
+} from './timeline-context.mjs';
 export {
   collectSensitiveEnvironmentValues,
   sanitizeDiagnostic,

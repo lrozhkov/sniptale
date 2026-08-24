@@ -36,6 +36,32 @@ it('rejects native host manifest drift and update-channel mismatch', async () =>
   ).toBe('repair-required');
 });
 
+it.each([
+  { install: { packageIntegrity: 'invalid' as const }, signal: 'invalid package' },
+  { install: { rollbackProtected: false }, signal: 'rollback protection absent' },
+  { install: { signedBinary: false }, signal: 'binary signature absent' },
+])('uses host-reported install health as repair guidance: $signal', async ({ install }) => {
+  const { resolveNativeHandshakeFailure } = await import('./compatibility');
+
+  expect(
+    resolveNativeHandshakeFailure(
+      createNativeHello({ install: { ...createNativeHello().install, ...install } })
+    )
+  ).toBe('repair-required');
+});
+
+it('does not turn unavailable host package-integrity reporting into attestation failure', async () => {
+  const { resolveNativeHandshakeFailure } = await import('./compatibility');
+
+  expect(
+    resolveNativeHandshakeFailure(
+      createNativeHello({
+        install: { ...createNativeHello().install, packageIntegrity: 'unsupported' },
+      })
+    )
+  ).toBeNull();
+});
+
 it('resolves native host channels from manifest names and versions', async () => {
   const { resolveNativeHostName } = await import('./host');
 

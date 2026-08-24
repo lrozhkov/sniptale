@@ -11,6 +11,7 @@ import {
 import { assertLifecycleConsistency } from './schema-consistency.mjs';
 import { parseDiagnostic } from './diagnostic-schema.mjs';
 import { parseCorrelation, parseLog, parseRepository, parseSummary } from './schema-parts.mjs';
+import { parseTimeline } from './timeline-schema.mjs';
 
 export {
   parseCorrelation,
@@ -18,7 +19,7 @@ export {
   readRunIdentityEnvironment,
 } from './schema-parts.mjs';
 
-const RECORD_KEYS = [
+const V2_RECORD_KEYS = [
   'schemaVersion',
   'runId',
   'rootRunId',
@@ -36,6 +37,7 @@ const RECORD_KEYS = [
   'steps',
   'log',
 ];
+const RECORD_KEYS = [...V2_RECORD_KEYS.slice(0, -1), 'timeline', 'log'];
 const STEP_KEYS = [
   'stepId',
   'outcome',
@@ -80,8 +82,9 @@ export function parseStep(value) {
 
 export function parseRunRecord(value) {
   assertObject(value, 'run record');
-  assertExactKeys(value, RECORD_KEYS, 'run record');
-  if (value.schemaVersion !== OBSERVABILITY_SCHEMA_VERSION) {
+  const isLegacyV2 = value.schemaVersion === 2;
+  assertExactKeys(value, isLegacyV2 ? V2_RECORD_KEYS : RECORD_KEYS, 'run record');
+  if (!isLegacyV2 && value.schemaVersion !== OBSERVABILITY_SCHEMA_VERSION) {
     throw new TypeError(`Unsupported observability schema version: ${String(value.schemaVersion)}`);
   }
   assertId(value.runId, 'runId');
@@ -103,6 +106,7 @@ export function parseRunRecord(value) {
     correlation: parseCorrelation(value.correlation),
     summary: parseSummary(value.summary),
     steps: value.steps.map(parseStep),
+    ...(isLegacyV2 ? {} : { timeline: parseTimeline(value.timeline) }),
     log: parseLog(value.log, value),
   };
   assertLifecycleConsistency(record);

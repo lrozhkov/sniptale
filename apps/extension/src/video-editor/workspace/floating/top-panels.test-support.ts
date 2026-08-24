@@ -1,14 +1,16 @@
 import { createRef } from 'react';
 import { vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import type { VideoEditorHeaderController } from '../../runtime/controller/contracts/header';
+import type { VideoEditorPreviewController } from '../../runtime/controller/contracts/preview';
+import type { VideoEditorTimelineController } from '../../runtime/controller/contracts/timeline';
 import { createSceneSelection } from '../../project/selection/model';
 import { createSidebarController } from './top-panels-sidebar.test-support';
 
 const noop = () => vi.fn();
-type TimelineActions = VideoEditorWorkspaceController['timeline']['actions'];
+type TimelineActions = VideoEditorTimelineController['actions'];
 
-function createInsertionActions(): VideoEditorWorkspaceController['timeline']['actions']['insertion'] {
+function createInsertionActions(): VideoEditorTimelineController['actions']['insertion'] {
   return {
     onAddActionEvent: noop(),
     onAddAnnotationOverlay: noop(),
@@ -26,7 +28,7 @@ function createInsertionActions(): VideoEditorWorkspaceController['timeline']['a
   };
 }
 
-function createHeaderController(): VideoEditorWorkspaceController['header'] {
+function createHeaderController(): VideoEditorHeaderController {
   return {
     grid: { magnetEnabled: true, onToggleMagnet: noop() },
     inspectorMode: 'grid',
@@ -120,8 +122,8 @@ function createTimelineEditActions(): Omit<
 
 function createTimelineController(
   project: ReturnType<typeof createEmptyVideoProject>,
-  insertion: VideoEditorWorkspaceController['timeline']['actions']['insertion']
-): VideoEditorWorkspaceController['timeline'] {
+  insertion: VideoEditorTimelineController['actions']['insertion']
+): VideoEditorTimelineController {
   return {
     actions: {
       insertion,
@@ -147,8 +149,8 @@ function createTimelineController(
 
 function createPreviewController(
   project: ReturnType<typeof createEmptyVideoProject>,
-  insertion: VideoEditorWorkspaceController['timeline']['actions']['insertion']
-): VideoEditorWorkspaceController['preview'] {
+  insertion: VideoEditorTimelineController['actions']['insertion']
+): VideoEditorPreviewController {
   const { onImport, ...editing } = insertion;
   return {
     assetUrls: {},
@@ -210,7 +212,7 @@ function createFloatingPreviewSelection() {
   };
 }
 
-export function createFloatingWorkspaceController(): VideoEditorWorkspaceController {
+export function createFloatingWorkspaceController() {
   const project = createEmptyVideoProject('Floating workspace');
   const insertion = createInsertionActions();
 

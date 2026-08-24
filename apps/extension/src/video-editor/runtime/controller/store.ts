@@ -1,131 +1,77 @@
 import { useShallow } from 'zustand/react/shallow';
+import type {
+  AnnotationEditingPort,
+  ClipSelectionPort,
+  DiagnosticsTelemetryPort,
+  EffectEditingPort,
+  ExportPort,
+  HistoryPort,
+  PlaybackPort,
+  ProjectLifecyclePort,
+  RuntimeSessionPort,
+  TimelineEditingPort,
+  VideoEditorProjectStorageStatus,
+} from '../../contracts/controller-store';
 import { useVideoEditorStore, type VideoEditorState } from '../../state/store';
-import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
 
-export function getCurrentVideoEditorProjectSnapshot() {
-  return useVideoEditorStore.getState().project;
+type PortSelector<Port, Selection> = (port: Port) => Selection;
+
+function usePort<Port, Selection>(
+  selectPort: (state: VideoEditorState) => Port,
+  selector: PortSelector<Port, Selection>
+): Selection {
+  return useVideoEditorStore(useShallow((state) => selector(selectPort(state))));
 }
 
-function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
+function selectPlaybackPort(state: VideoEditorState): PlaybackPort {
   return {
-    cancelExport: state.cancelExport,
-    beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
-    closeTrackGap: state.closeTrackGap,
-    completeExport: state.completeExport,
     currentTime: state.currentTime,
-    deleteClip: state.deleteClip,
-    failExportCancellation: state.failExportCancellation,
-    failExport: state.failExport,
     isPlaying: state.isPlaying,
-    pixelsPerSecond: state.pixelsPerSecond,
-    project: state.project,
-    projectHistory: state.projectHistory,
-    recordingTelemetry: state.recordingTelemetry,
-    recordingId: state.recordingId,
-    selectedClipId: state.selectedClipId,
     setCurrentTime: state.setCurrentTime,
-    setDiagnosticsOpen: state.setDiagnosticsOpen,
-    setError: state.setError,
     setPlaying: state.setPlaying,
-    setProject: state.setProject,
-    syncProjectRevision: state.syncProjectRevision,
-    setRecordingTelemetry: state.setRecordingTelemetry,
-    setReady: state.setReady,
-    setSaveState: state.setSaveState,
-    undoProject: state.undoProject,
-    redoProject: state.redoProject,
-    endProjectHistoryTransaction: state.endProjectHistoryTransaction,
-    isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
-    splitClipAt: state.splitClipAt,
-    updateExportStatus: state.updateExportStatus,
+    togglePlaying: state.togglePlaying,
   };
 }
 
-function selectVideoEditorWorkspaceSceneStoreSlice(state: VideoEditorState) {
+function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort {
   return {
-    addShapeOverlay: state.addShapeOverlay,
-    addSubtitleOverlay: state.addSubtitleOverlay,
-    addVideoBlock: state.addVideoBlock,
-    addAnnotationOverlay: state.addAnnotationOverlay,
-    addTextOverlay: state.addTextOverlay,
-    addTrackLogicalLane: state.addTrackLogicalLane,
+    addAssetClip: state.addAssetClip,
     addTrack: state.addTrack,
-    currentTime: state.currentTime,
-    clearPlacementMode: state.clearPlacementMode,
+    addTrackLogicalLane: state.addTrackLogicalLane,
+    addVideoBlock: state.addVideoBlock,
+    applyMediaClipVisualsToTrack: state.applyMediaClipVisualsToTrack,
     clearCursorSampleSkinOverride: state.clearCursorSampleSkinOverride,
+    clearUtilityLane: state.clearUtilityLane,
+    closeTrackGap: state.closeTrackGap,
     deleteActionEvent: state.deleteActionEvent,
     deleteClip: state.deleteClip,
     deleteCursorSample: state.deleteCursorSample,
+    deleteMotionRegion: state.deleteMotionRegion,
     deleteObjectTrack: state.deleteObjectTrack,
     deleteTrack: state.deleteTrack,
-    deleteMotionRegion: state.deleteMotionRegion,
     detachClipGroup: state.detachClipGroup,
-    diagnosticsOpen: state.diagnosticsOpen,
     duplicateClip: state.duplicateClip,
     insertCursorSample: state.insertCursorSample,
-    isPlaying: state.isPlaying,
     moveClip: state.moveClip,
     moveTrack: state.moveTrack,
-    openExportDialog: state.openExportDialog,
     pixelsPerSecond: state.pixelsPerSecond,
-    placementMode: state.placementMode,
-    project: state.project,
-    recordingId: state.recordingId,
-    telemetryLaneVisible: state.telemetryLaneVisible,
-    renameProject: state.renameProject,
     renameTrack: state.renameTrack,
-    updateProject: state.updateProject,
-  };
-}
-
-function selectVideoEditorWorkspaceSelectionStoreSlice(state: VideoEditorState) {
-  return {
-    ...selectVideoEditorWorkspaceSelectionCoreSlice(state),
-    ...selectVideoEditorWorkspaceSelectionMutationSlice(state),
-  };
-}
-
-function selectVideoEditorWorkspaceSelectionCoreSlice(state: VideoEditorState) {
-  return {
-    selection: state.selection,
-    selectedClipId: state.selectedClipId,
-    selectedTrackId: state.selectedTrackId,
-    selectActionSegment: state.selectActionSegment,
-    selectCursorSegment: state.selectCursorSegment,
-    selectMotionRegion: state.selectMotionRegion,
-    selectObjectTrack: state.selectObjectTrack,
-    selectScene: state.selectScene,
-    selectClip: state.selectClip,
-    selectTrack: state.selectTrack,
-    selectTransition: state.selectTransition,
-    setDiagnosticsOpen: state.setDiagnosticsOpen,
     setPixelsPerSecond: state.setPixelsPerSecond,
-    setPlaying: state.setPlaying,
-    togglePlaying: state.togglePlaying,
-    toggleTelemetryLaneVisibility: state.toggleTelemetryLaneVisibility,
+    splitClipAt: state.splitClipAt,
     toggleTrackLock: state.toggleTrackLock,
     toggleTrackVisibility: state.toggleTrackVisibility,
     toggleUtilityLaneLock: state.toggleUtilityLaneLock,
     toggleUtilityLaneVisibility: state.toggleUtilityLaneVisibility,
-    clearUtilityLane: state.clearUtilityLane,
     trimClipEnd: state.trimClipEnd,
     trimClipStart: state.trimClipStart,
-  };
-}
-
-function selectVideoEditorWorkspaceSelectionMutationSlice(state: VideoEditorState) {
-  return {
+    updateActionEventDetails: state.updateActionEventDetails,
+    updateClipAudioEnvelope: state.updateClipAudioEnvelope,
     updateClipFades: state.updateClipFades,
-    updateClipPlaybackRate: state.updateClipPlaybackRate,
     updateClipMuted: state.updateClipMuted,
+    updateClipPlaybackRate: state.updateClipPlaybackRate,
     updateClipTransform: state.updateClipTransform,
     updateClipTransitions: state.updateClipTransitions,
     updateClipVolume: state.updateClipVolume,
-    updateClipAudioEnvelope: state.updateClipAudioEnvelope,
-    applyMediaClipVisualsToTrack: state.applyMediaClipVisualsToTrack,
-    applyEffectDocument: state.applyEffectDocument,
-    convertTextClipToAnnotation: state.convertTextClipToAnnotation,
-    updateActionEventDetails: state.updateActionEventDetails,
     updateCursorSampleInterpolation: state.updateCursorSampleInterpolation,
     updateCursorSampleSkinOverride: state.updateCursorSampleSkinOverride,
     updateCursorSampleVisibility: state.updateCursorSampleVisibility,
@@ -134,16 +80,35 @@ function selectVideoEditorWorkspaceSelectionMutationSlice(state: VideoEditorStat
     updateMediaClipShadowIntensity: state.updateMediaClipShadowIntensity,
     updateMediaClipShadowMode: state.updateMediaClipShadowMode,
     updateMotionRegion: state.updateMotionRegion,
-    updateAnnotationClipContent: state.updateAnnotationClipContent,
-    updateAnnotationClipStyle: state.updateAnnotationClipStyle,
-    updateAnnotationClipTemplate: state.updateAnnotationClipTemplate,
-    updateShapeClipStyle: state.updateShapeClipStyle,
-    updateSubtitleTrackStyle: state.updateSubtitleTrackStyle,
-    updateTextClipContent: state.updateTextClipContent,
-    updateTextClipStyle: state.updateTextClipStyle,
+    updateProject: state.updateProject,
     updateTransitionDuration: state.updateTransitionDuration,
     updateTransitionEasing: state.updateTransitionEasing,
     updateTransitionTemplate: state.updateTransitionTemplate,
+    upsertAsset: state.upsertAsset,
+    upsertObjectTrack: state.upsertObjectTrack,
+    upsertObjectTrackCorrectionAnchor: state.upsertObjectTrackCorrectionAnchor,
+  };
+}
+
+function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
+  return {
+    selectedClipId: state.selectedClipId,
+    selectedTrackId: state.selectedTrackId,
+    selection: state.selection,
+    selectActionSegment: state.selectActionSegment,
+    selectClip: state.selectClip,
+    selectCursorSegment: state.selectCursorSegment,
+    selectMotionRegion: state.selectMotionRegion,
+    selectObjectTrack: state.selectObjectTrack,
+    selectScene: state.selectScene,
+    selectTrack: state.selectTrack,
+    selectTransition: state.selectTransition,
+  };
+}
+
+function selectEffectEditingPort(state: VideoEditorState): EffectEditingPort {
+  return {
+    applyEffectDocument: state.applyEffectDocument,
     deleteEffectInstance: state.deleteEffectInstance,
     duplicateEffectInstance: state.duplicateEffectInstance,
     moveEffectInstance: state.moveEffectInstance,
@@ -151,64 +116,181 @@ function selectVideoEditorWorkspaceSelectionMutationSlice(state: VideoEditorStat
   };
 }
 
-function selectVideoEditorShellStoreSlice(state: VideoEditorState) {
+function selectAnnotationEditingPort(state: VideoEditorState): AnnotationEditingPort {
   return {
-    closeExportDialog: state.closeExportDialog,
-    error: state.error,
-    exportState: state.exportState,
-    isReady: state.isReady,
-    project: state.project,
-    saveState: state.saveState,
-    updateExportSettings: state.updateExportSettings,
+    addAnnotationOverlay: state.addAnnotationOverlay,
+    addShapeOverlay: state.addShapeOverlay,
+    addSubtitleOverlay: state.addSubtitleOverlay,
+    addTextOverlay: state.addTextOverlay,
+    convertTextClipToAnnotation: state.convertTextClipToAnnotation,
+    updateAnnotationClipContent: state.updateAnnotationClipContent,
+    updateAnnotationClipStyle: state.updateAnnotationClipStyle,
+    updateAnnotationClipTemplate: state.updateAnnotationClipTemplate,
+    updateShapeClipStyle: state.updateShapeClipStyle,
+    updateSubtitleTrackStyle: state.updateSubtitleTrackStyle,
+    updateTextClipContent: state.updateTextClipContent,
+    updateTextClipStyle: state.updateTextClipStyle,
   };
 }
 
-function selectVideoEditorActionStoreSlice(state: VideoEditorState) {
+function selectHistoryPort(state: VideoEditorState): HistoryPort {
   return {
-    addAssetClip: state.addAssetClip,
+    beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
+    endProjectHistoryTransaction: state.endProjectHistoryTransaction,
+    isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
+    projectHistoryTransactionActive: state.projectHistory.transaction !== null,
+    projectHistoryStatus: {
+      canUndo: state.projectHistory.transaction === null && state.projectHistory.past.length > 0,
+      canRedo: state.projectHistory.transaction === null && state.projectHistory.future.length > 0,
+      error: state.projectHistory.error,
+    },
+    redoProject: state.redoProject,
+    undoProject: state.undoProject,
+  };
+}
+
+function selectExportPort(state: VideoEditorState): ExportPort {
+  return {
     cancelExport: state.cancelExport,
-    failExportCancellation: state.failExportCancellation,
+    closeExportDialog: state.closeExportDialog,
+    completeExport: state.completeExport,
+    exportState: state.exportState,
     failExport: state.failExport,
+    failExportCancellation: state.failExportCancellation,
+    openExportDialog: state.openExportDialog,
     startExport: state.startExport,
+    updateExportSettings: state.updateExportSettings,
+    updateExportStatus: state.updateExportStatus,
+  };
+}
+
+function selectProjectLifecyclePort(state: VideoEditorState): ProjectLifecyclePort {
+  return {
+    error: state.error,
+    isReady: state.isReady,
+    project: state.project,
+    recordingId: state.recordingId,
+    renameProject: state.renameProject,
+    saveState: state.saveState,
+    setError: state.setError,
+    setProject: state.setProject,
+    setReady: state.setReady,
+    setSaveState: state.setSaveState,
+    syncProjectRevision: state.syncProjectRevision,
+  };
+}
+
+function selectRuntimeSessionPort(state: VideoEditorState): RuntimeSessionPort {
+  return {
+    clearPlacementMode: state.clearPlacementMode,
+    placementMode: state.placementMode,
     startActionPointPlacement: state.startActionPointPlacement,
     startMotionAreaPlacement: state.startMotionAreaPlacement,
     startMotionFocusPlacement: state.startMotionFocusPlacement,
     startMotionPathStopAreaPlacement: state.startMotionPathStopAreaPlacement,
     startMotionPathStopPointPlacement: state.startMotionPathStopPointPlacement,
     startObjectTrackAnchorPlacement: state.startObjectTrackAnchorPlacement,
-    upsertAsset: state.upsertAsset,
-    upsertObjectTrack: state.upsertObjectTrack,
-    upsertObjectTrackCorrectionAnchor: state.upsertObjectTrackCorrectionAnchor,
   };
 }
 
-function selectVideoEditorControllerStorePort(
-  state: VideoEditorState
-): VideoEditorControllerStorePort {
-  const runtime = selectVideoEditorRuntimeStoreSlice(state);
+function selectDiagnosticsTelemetryPort(state: VideoEditorState): DiagnosticsTelemetryPort {
   return {
-    ...runtime,
-    ...selectVideoEditorWorkspaceSceneStoreSlice(state),
-    ...selectVideoEditorWorkspaceSelectionStoreSlice(state),
-    ...selectVideoEditorShellStoreSlice(state),
-    ...selectVideoEditorActionStoreSlice(state),
-    projectHistoryTransactionActive: runtime.projectHistory.transaction !== null,
-    projectHistoryStatus: {
-      canUndo:
-        runtime.projectHistory.transaction === null && runtime.projectHistory.past.length > 0,
-      canRedo:
-        runtime.projectHistory.transaction === null && runtime.projectHistory.future.length > 0,
-      error: runtime.projectHistory.error,
-    },
+    diagnosticsOpen: state.diagnosticsOpen,
+    recordingTelemetry: state.recordingTelemetry,
+    setDiagnosticsOpen: state.setDiagnosticsOpen,
+    setRecordingTelemetry: state.setRecordingTelemetry,
+    telemetryLaneVisible: state.telemetryLaneVisible,
+    toggleTelemetryLaneVisibility: state.toggleTelemetryLaneVisibility,
   };
 }
 
-export function useVideoEditorControllerStorePort(): VideoEditorControllerStorePort {
-  return useVideoEditorStore(useShallow(selectVideoEditorControllerStorePort));
+export function useVideoEditorPlaybackPort<Selection>(
+  selector: PortSelector<PlaybackPort, Selection>
+): Selection {
+  return usePort(selectPlaybackPort, selector);
+}
+
+export function useVideoEditorTimelineEditingPort<Selection>(
+  selector: PortSelector<TimelineEditingPort, Selection>
+): Selection {
+  return usePort(selectTimelineEditingPort, selector);
+}
+
+export function useVideoEditorClipSelectionPort<Selection>(
+  selector: PortSelector<ClipSelectionPort, Selection>
+): Selection {
+  return usePort(selectClipSelectionPort, selector);
+}
+
+export function useVideoEditorEffectEditingPort<Selection>(
+  selector: PortSelector<EffectEditingPort, Selection>
+): Selection {
+  return usePort(selectEffectEditingPort, selector);
+}
+
+export function useVideoEditorAnnotationEditingPort<Selection>(
+  selector: PortSelector<AnnotationEditingPort, Selection>
+): Selection {
+  return usePort(selectAnnotationEditingPort, selector);
+}
+
+export function useVideoEditorHistoryPort<Selection>(
+  selector: PortSelector<HistoryPort, Selection>
+): Selection {
+  return usePort(selectHistoryPort, selector);
+}
+
+export function useVideoEditorExportPort<Selection>(
+  selector: PortSelector<ExportPort, Selection>
+): Selection {
+  return usePort(selectExportPort, selector);
+}
+
+export function useVideoEditorProjectLifecyclePort<Selection>(
+  selector: PortSelector<ProjectLifecyclePort, Selection>
+): Selection {
+  return usePort(selectProjectLifecyclePort, selector);
+}
+
+export function useVideoEditorRuntimeSessionPort<Selection>(
+  selector: PortSelector<RuntimeSessionPort, Selection>
+): Selection {
+  return usePort(selectRuntimeSessionPort, selector);
+}
+
+export function useVideoEditorDiagnosticsTelemetryPort<Selection>(
+  selector: PortSelector<DiagnosticsTelemetryPort, Selection>
+): Selection {
+  return usePort(selectDiagnosticsTelemetryPort, selector);
+}
+
+export function useVideoEditorProjectStorageStatus(): VideoEditorProjectStorageStatus {
+  return useVideoEditorStore(
+    useShallow((state) => ({
+      projectUpdatedAt: state.project?.updatedAt ?? null,
+      saveState: state.saveState,
+    }))
+  );
+}
+
+export function getCurrentVideoEditorProjectSnapshot() {
+  return useVideoEditorStore.getState().project;
 }
 
 export function getCurrentVideoEditorProjectId(): string | null {
   return useVideoEditorStore.getState().project?.id ?? null;
+}
+
+export function getCurrentVideoEditorCurrentTime(): number {
+  return useVideoEditorStore.getState().currentTime;
+}
+
+export function getCurrentVideoEditorSelectedClipId(): string | null {
+  return useVideoEditorStore.getState().selectedClipId;
+}
+
+export function getCurrentVideoEditorExportStateSnapshot() {
+  return useVideoEditorStore.getState().exportState;
 }
 
 export function getCurrentVideoEditorExportJobId(): string | null {

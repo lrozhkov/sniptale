@@ -61,6 +61,20 @@ type OffscreenHarnessBridge = {
     packetCount: number;
     summedDurationsMs: number;
   }>;
+  recordMostlyStaticLiveArtifact: () => Promise<{
+    actualBitrate: number;
+    averageInterframeBytes: number;
+    backwardTimestamps: number;
+    contentChangeRequests: number;
+    duplicateTimestamps: number;
+    durationSeconds: number;
+    keyFrameByteShare: number;
+    keyFrames: number;
+    maximumGopInterval: number | null;
+    minimumGopInterval: number | null;
+    packetCount: number;
+    withinByteBudget: boolean;
+  }>;
   recordStaticCanvasArtifact: () => Promise<{
     centerPixel: { alpha: number; blue: number; green: number; red: number };
     decodedDurationMs: number;
@@ -85,6 +99,18 @@ async function recordLiveVfrArtifact(page: Page) {
     ).__sniptaleOffscreenHarness;
     if (!bridge) throw new Error('Offscreen harness bridge is unavailable');
     return bridge.recordLiveVfrArtifact();
+  });
+}
+
+async function recordMostlyStaticLiveArtifact(page: Page) {
+  return page.evaluate(async () => {
+    const bridge = (
+      window as Window & {
+        __sniptaleOffscreenHarness?: OffscreenHarnessBridge;
+      }
+    ).__sniptaleOffscreenHarness;
+    if (!bridge) throw new Error('Offscreen harness bridge is unavailable');
+    return bridge.recordMostlyStaticLiveArtifact();
   });
 }
 
@@ -359,11 +385,36 @@ test('source-timed live artifact has strict packet timestamps and truthful durat
   const artifact = await recordLiveVfrArtifact(page);
 
   expect(artifact.packetCount).toBeGreaterThanOrEqual(3);
-  expect(artifact.keyFrames).toBeGreaterThanOrEqual(2);
+  // Ordinary source jitter changes sample duration; it must not invalidate reference frames.
+  expect(artifact.keyFrames).toBe(1);
   expect(artifact.duplicateTimestamps).toBe(0);
   expect(artifact.backwardTimestamps).toBe(0);
   expect(artifact.durationSpanMs).toBeGreaterThanOrEqual(120);
   expect(Math.abs(artifact.summedDurationsMs - artifact.durationSpanMs)).toBeLessThan(2);
+});
+
+test('mostly static screen content keeps a long GOP and the configured byte budget', async ({
+  page,
+  hostOrigin,
+}) => {
+  test.setTimeout(45_000);
+  await openOffscreenHarness(page, hostOrigin);
+
+  const artifact = await recordMostlyStaticLiveArtifact(page);
+
+  expect(artifact.durationSeconds).toBeGreaterThanOrEqual(14.5);
+  expect(artifact.contentChangeRequests).toBe(31);
+  expect(artifact.packetCount).toBeGreaterThanOrEqual(25);
+  expect(artifact.keyFrames).toBeGreaterThanOrEqual(3);
+  expect(artifact.keyFrames).toBeLessThanOrEqual(5);
+  expect(artifact.minimumGopInterval).toBeGreaterThanOrEqual(3.5);
+  expect(artifact.maximumGopInterval).toBeLessThanOrEqual(4.5);
+  expect(artifact.backwardTimestamps).toBe(0);
+  expect(artifact.duplicateTimestamps).toBe(0);
+  expect(artifact.averageInterframeBytes).toBeGreaterThan(0);
+  expect(artifact.actualBitrate).toBeGreaterThan(0);
+  expect(artifact.keyFrameByteShare).toBeGreaterThan(0);
+  expect(artifact.withinByteBudget).toBe(true);
 });
 
 test('cold and subsequent high-resolution recordings flush media before STOP', async ({

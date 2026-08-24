@@ -7,7 +7,11 @@ import {
   type ViewportSize,
 } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { dismissFirstRunPrompt, launchExtensionBrowser } from './extension-browser-launch';
+import {
+  closeExtensionBrowser,
+  dismissFirstRunPrompt,
+  launchExtensionBrowser,
+} from './extension-browser-launch';
 import { startHostServer } from './host-server';
 
 type ExtensionPageOptions = {
@@ -52,30 +56,6 @@ async function removeWithRetry(targetPath: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
     }
   }
-}
-
-async function stopBrowserProcess(
-  browserProcess: ReturnType<typeof launchExtensionBrowser> extends Promise<infer T>
-    ? T['browserProcess']
-    : never
-): Promise<void> {
-  if (browserProcess.exitCode !== null || browserProcess.killed) {
-    return;
-  }
-
-  const exitPromise = new Promise<void>((resolve) => {
-    browserProcess.once('exit', () => resolve());
-  });
-
-  browserProcess.kill('SIGKILL');
-  await exitPromise;
-}
-
-async function closeConnectedBrowser(context: BrowserContext): Promise<void> {
-  await context
-    .browser()
-    ?.close()
-    .catch(() => undefined);
 }
 
 async function createBrowserSession(context: BrowserContext): Promise<CDPSession> {
@@ -161,10 +141,6 @@ export async function terminateExtensionServiceWorker(context: BrowserContext): 
   return target.targetId;
 }
 
-async function resolveExtensionId(context: BrowserContext): Promise<string> {
-  return new URL(await resolveExtensionServiceWorkerUrl(context)).host;
-}
-
 export const test = base.extend<ExtensionFixture>({
   launchedExtension: [
     async ({}, use) => {
@@ -173,8 +149,7 @@ export const test = base.extend<ExtensionFixture>({
       try {
         await use(launched);
       } finally {
-        await closeConnectedBrowser(launched.context);
-        await stopBrowserProcess(launched.browserProcess);
+        await closeExtensionBrowser(launched);
         await removeWithRetry(launched.userDataDir);
       }
     },
@@ -198,8 +173,7 @@ export const test = base.extend<ExtensionFixture>({
 
   extensionId: [
     async ({ launchedExtension }, use) => {
-      const extensionId = await resolveExtensionId(launchedExtension.context);
-      await use(extensionId);
+      await use(launchedExtension.extensionId);
     },
     { scope: 'worker' },
   ],
@@ -274,7 +248,7 @@ export const test = base.extend<ExtensionFixture>({
       try {
         await use(hostServer);
       } finally {
-        await new Promise<void>((resolve, reject) => {
+        const closed = new Promise<void>((resolve, reject) => {
           hostServer.server.close((error) => {
             if (error) {
               reject(error);
@@ -283,6 +257,8 @@ export const test = base.extend<ExtensionFixture>({
             resolve();
           });
         });
+        hostServer.server.closeAllConnections();
+        await closed;
       }
     },
     { scope: 'worker' },

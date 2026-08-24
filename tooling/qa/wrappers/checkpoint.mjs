@@ -9,7 +9,7 @@ import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
 import { collectFocusedStepResults } from '../core/verify-focused.execution.mjs';
 import { FOCUSED_CODE_VIOLATION_STEPS } from '../core/verify-focused.code-steps.mjs';
 import { createOkStep, createSkippedStep } from '../core/focused-qa-results.mjs';
-import { runPrettierWrite } from '../core/verify-prettier.mjs';
+import { runFormatterWrite } from '../core/verify-oxfmt.mjs';
 import { PRODUCT_QA_SUITE, createScopedQaContext, hasHarnessQaTargets } from '../core/qa-scope.mjs';
 import { collectHarnessFreshnessStep } from '../core/harness-freshness-step.mjs';
 import { assertFreshHarnessState } from '../core/verify-harness.state.helpers.mjs';
@@ -80,7 +80,7 @@ async function collectFormatStep(context) {
   }
 
   return timeAsyncStep(async () => {
-    const result = await runPrettierWrite(context.existingTargetFiles);
+    const result = runFormatterWrite(context.existingTargetFiles);
     return createOkStep(
       'Format',
       `formatted=${result.writtenFiles.length}; barrier=sequential-before-verification`

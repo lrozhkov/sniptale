@@ -4,7 +4,13 @@ import { getClipEndTime } from '../../../../features/video/project/timeline';
 import { getProjectTransitionById } from '../../../../features/video/project/transition/project';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type { VideoEditorRuntimeController } from '../../session';
-import type { VideoEditorControllerStorePort } from '../../../contracts/controller-store';
+import type {
+  ClipSelectionPort,
+  DiagnosticsTelemetryPort,
+  HistoryPort,
+  ProjectLifecyclePort,
+  TimelineEditingPort,
+} from '../../../contracts/controller-store';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import { createTimelineTrackActions } from './timeline-track-actions';
 import { createAutoTransformRecordingAction } from './timeline-auto-transform';
@@ -20,7 +26,18 @@ type SelectedClipActions = {
   splitSelectedClip: () => void;
 };
 
-function createActionEventMover(store: VideoEditorControllerStorePort) {
+type TimelineActionStore = TimelineEditingPort &
+  ClipSelectionPort &
+  Pick<DiagnosticsTelemetryPort, 'toggleTelemetryLaneVisibility'> &
+  Pick<
+    HistoryPort,
+    | 'beginProjectHistoryTransaction'
+    | 'endProjectHistoryTransaction'
+    | 'isProjectHistoryTransactionCurrent'
+  > &
+  Pick<ProjectLifecyclePort, 'project' | 'setError'>;
+
+function createActionEventMover(store: TimelineActionStore) {
   return (actionEventId: string, time: number) => {
     store.updateProject((project) => ({
       ...project,
@@ -36,13 +53,13 @@ function createActionEventMover(store: VideoEditorControllerStorePort) {
   };
 }
 
-function createActionEventResizer(store: VideoEditorControllerStorePort) {
+function createActionEventResizer(store: TimelineActionStore) {
   return (actionEventId: string, duration: number) => {
     store.updateActionEventDetails(actionEventId, { duration });
   };
 }
 
-function createCursorSegmentMover(store: VideoEditorControllerStorePort) {
+function createCursorSegmentMover(store: TimelineActionStore) {
   return (
     sampleId: string,
     nextSampleId: string | null,
@@ -84,7 +101,7 @@ function createCursorSegmentMover(store: VideoEditorControllerStorePort) {
   };
 }
 
-function createTransitionMover(store: VideoEditorControllerStorePort) {
+function createTransitionMover(store: TimelineActionStore) {
   return (transitionId: string, startTime: number) => {
     const project = store.project;
     if (!project) {
@@ -102,7 +119,7 @@ function createTransitionMover(store: VideoEditorControllerStorePort) {
   };
 }
 
-function createMotionRegionMover(store: VideoEditorControllerStorePort) {
+function createMotionRegionMover(store: TimelineActionStore) {
   return (motionRegionId: string, startTime: number) => {
     store.updateProject((project) => ({
       ...project,
@@ -115,7 +132,7 @@ function createMotionRegionMover(store: VideoEditorControllerStorePort) {
   };
 }
 
-function createMotionRegionResizer(store: VideoEditorControllerStorePort) {
+function createMotionRegionResizer(store: TimelineActionStore) {
   return (motionRegionId: string, startTime: number, duration: number) => {
     store.updateProject((project) => ({
       ...project,
@@ -129,8 +146,8 @@ function createMotionRegionResizer(store: VideoEditorControllerStorePort) {
 }
 
 function deleteSelectedTimelineObject(
-  selection: VideoEditorControllerStorePort['selection'],
-  store: VideoEditorControllerStorePort,
+  selection: ClipSelectionPort['selection'],
+  store: TimelineActionStore,
   selectedClipActions: Pick<SelectedClipActions, 'deleteSelectedClip'>
 ) {
   switch (selection.kind) {
@@ -156,7 +173,7 @@ function deleteSelectedTimelineObject(
 }
 
 export function createWorkspaceTimelineEditingActions(
-  store: VideoEditorControllerStorePort,
+  store: TimelineActionStore,
   workspace: TimelineWorkspace,
   selectedClipActions: SelectedClipActions
 ) {
@@ -196,7 +213,7 @@ export function createWorkspaceTimelineEditingActions(
   };
 }
 
-function createSelectedClipPlaybackRateAction(store: VideoEditorControllerStorePort) {
+function createSelectedClipPlaybackRateAction(store: TimelineActionStore) {
   return (playbackRate: number) => {
     if (!store.selectedClipId) {
       return;
@@ -207,7 +224,7 @@ function createSelectedClipPlaybackRateAction(store: VideoEditorControllerStoreP
 }
 
 export function createWorkspaceTimelineSelectionActions(
-  store: VideoEditorControllerStorePort,
+  store: TimelineActionStore,
   runtime: VideoEditorRuntimeController,
   workspace: TimelineWorkspace
 ) {

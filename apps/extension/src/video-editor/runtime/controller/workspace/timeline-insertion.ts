@@ -1,10 +1,16 @@
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoBlockKind } from '../../../../features/video/project/types/index';
-import type { VideoEditorControllerStorePort } from '../../../contracts/controller-store';
+import type {
+  AnnotationEditingPort,
+  ProjectLifecyclePort,
+  TimelineEditingPort,
+} from '../../../contracts/controller-store';
 import { translate } from '../../../../platform/i18n';
 
 export function createWorkspaceTimelineInsertionActions(
-  store: VideoEditorControllerStorePort,
+  store: AnnotationEditingPort &
+    Pick<TimelineEditingPort, 'addTrack' | 'addVideoBlock'> &
+    Pick<ProjectLifecyclePort, 'setError'>,
   actions: Pick<
     VideoEditorActionHandlers,
     'handleImportAudio' | 'handleImportImage' | 'handleImportVideo'
@@ -12,7 +18,7 @@ export function createWorkspaceTimelineInsertionActions(
   projectUpdaters: {
     addActionEvent: (
       preset: NonNullable<
-        NonNullable<VideoEditorControllerStorePort['project']>['actionEvents'][number]['preset']
+        NonNullable<ProjectLifecyclePort['project']>['actionEvents'][number]['preset']
       >
     ) => void;
     addMotionRegion: (startTime?: number) => void;

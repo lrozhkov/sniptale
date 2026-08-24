@@ -35,8 +35,14 @@ const WINDOWS_RESERVED_STEMS = new Set([
   ...Array.from({ length: 9 }, (_, index) => `com${index + 1}`),
   ...Array.from({ length: 9 }, (_, index) => `lpt${index + 1}`),
 ]);
-const INVALID_SEGMENT_CHARACTER = /[<>:"/\\|?*\u0000-\u001f\u007f]/gu;
+const INVALID_SEGMENT_CHARACTERS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
 const MAX_ARCHIVE_SEGMENT_LENGTH = 120;
+
+function replaceInvalidSegmentCharacters(value: string): string {
+  return Array.from(value, (character) =>
+    hasControlCharacter(character) || INVALID_SEGMENT_CHARACTERS.has(character) ? '-' : character
+  ).join('');
+}
 
 function truncateSegment(value: string, maxLength: number): string {
   return Array.from(value).slice(0, maxLength).join('');
@@ -49,7 +55,7 @@ function removeTerminalWindowsCharacters(value: string): string {
 }
 
 export function sanitizeArchivePathSegment(value: string, fallback = 'Untitled'): string {
-  const normalized = value.normalize('NFC').replace(INVALID_SEGMENT_CHARACTER, '-').trim();
+  const normalized = replaceInvalidSegmentCharacters(value.normalize('NFC')).trim();
   const truncated = removeTerminalWindowsCharacters(
     truncateSegment(normalized, MAX_ARCHIVE_SEGMENT_LENGTH)
   );

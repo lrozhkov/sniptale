@@ -5,6 +5,20 @@ import { VideoEditorWorkspace } from './';
 const overlaysSpy = vi.fn();
 const mainSpy = vi.fn();
 
+vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorDiagnosticsController: () => ({
+    isOpen: false,
+    onClose: vi.fn(),
+    recordingId: null,
+  }),
+  useVideoEditorLayoutController: () => ({ previewPaneHeight: 300 }),
+  useVideoEditorOverlaysController: () => ({
+    exportDialog: {},
+    exportProgress: {},
+  }),
+}));
+
 vi.mock('./overlays', () => ({
   VideoEditorWorkspaceOverlays: (props: unknown) => {
     overlaysSpy(props);
@@ -26,45 +40,7 @@ describe('VideoEditorWorkspace', () => {
   });
 
   it('passes narrowed overlay and workspace slices plus diagnostics content', () => {
-    const markup = renderToStaticMarkup(
-      <VideoEditorWorkspace
-        controller={{
-          overlays: { exportDialog: {}, exportProgress: {} } as never,
-          palette: {} as never,
-          shell: {} as never,
-          workspace: {
-            diagnostics: {
-              isOpen: false,
-              onClose: vi.fn(),
-              recordingId: null,
-            },
-            header: {} as never,
-            history: {
-              canUndo: false,
-              canRedo: false,
-              error: null,
-              onUndo: vi.fn(),
-              onRedo: vi.fn(),
-            },
-            layout: {
-              audioRecordingDialogOpen: false,
-              closeAudioRecordingDialog: vi.fn(),
-              handleStartVerticalResize: vi.fn(),
-              leftSidebarCollapsed: false,
-              openAudioRecordingDialog: vi.fn(),
-              previewPaneHeight: 300,
-              toggleSidebarCollapsed: vi.fn(),
-              workspaceSplitRef: { current: null },
-            },
-            preview: {} as never,
-            sidebar: {
-              diagnosticsContent: null,
-            } as never,
-            timeline: {} as never,
-          },
-        }}
-      />
-    );
+    const markup = renderToStaticMarkup(<VideoEditorWorkspace />);
 
     expect(markup).toContain('data-ui="video-editor.workspace.root"');
     expect(markup).toContain('data-ui="video-editor.workspace.backdrop"');

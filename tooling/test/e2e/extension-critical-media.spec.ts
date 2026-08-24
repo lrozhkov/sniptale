@@ -96,7 +96,9 @@ browserTest(
         );
         await complete(read);
         reopened.close();
-        const objectText = await (await objects.getFileHandle(fixture.opfsObjects[0]!.assetId))
+        const objectText = await (
+          await objects.getFileHandle(fixture.opfsObjects[0]!.assetId)
+        )
           .getFile()
           .then((file) => file.text());
         return {

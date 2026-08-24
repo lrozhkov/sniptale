@@ -20,6 +20,7 @@ import {
 import { collectChangedOwnerFacadeFiles } from './verify-canonical-facades.mjs';
 
 export const FOCUSED_TRIGGERED_STEP_DEFINITIONS = [
+  { label: 'Documentation facts', tool: 'verify-documentation-facts.mjs' },
   { label: 'Runtime topology', tool: 'verify-runtime-topology.mjs' },
   { label: 'Manifest permissions', tool: 'verify-manifest-permissions.mjs' },
   { label: 'Config policy', tool: 'verify-config-policy.mjs' },

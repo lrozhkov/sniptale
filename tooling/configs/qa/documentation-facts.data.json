@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "generatedDocument": "docs/engineering/project-facts.md",
+  "facts": [
+    {
+      "id": "product-version",
+      "authority": "package.json#/version",
+      "consumers": ["workspace package versions", "extension manifest version", "release tag admission"]
+    },
+    {
+      "id": "minimum-browser-version",
+      "authority": "apps/extension/manifest.json#/minimum_chrome_version",
+      "consumers": ["README browser requirement", "compatibility guidance"]
+    },
+    {
+      "id": "manifest-capabilities",
+      "authority": "tooling/configs/qa/manifest-permissions.data.json",
+      "consumers": ["extension manifest", "permission disclosure", "permission architecture"]
+    },
+    {
+      "id": "security-reporting",
+      "authority": "tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting",
+      "consumers": [".github/SECURITY.md", "README disclosure", "threat model"]
+    },
+    {
+      "id": "persistence-version",
+      "authority": "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION",
+      "consumers": ["persistence contracts", "product maturity guidance"]
+    },
+    {
+      "id": "runtime-topology",
+      "authority": "tooling/qa/core/runtime-topology.data.json",
+      "consumers": ["runtime architecture", "entrypoint guards", "build inputs"]
+    },
+    {
+      "id": "background-route-owners",
+      "authority": "apps/extension/src/contracts/messaging/contracts/runtime/background-ingress*.data.ts",
+      "consumers": ["background handler bindings", "authorization bindings", "runtime documentation"]
+    },
+    {
+      "id": "release-policy",
+      "authority": "tooling/configs/ci/github-policy.json",
+      "consumers": ["GitHub rulesets", "release admission", "CI badge"]
+    }
+  ],
+  "consumerAssertions": [
+    {
+      "factId": "minimum-browser-version",
+      "file": "README.md",
+      "mustContain": ["[generated project facts](docs/engineering/project-facts.md)"],
+      "forbiddenKinds": ["browser-version-literal"]
+    },
+    {
+      "factId": "security-reporting",
+      "file": "README.md",
+      "mustContain": ["[SECURITY.md](.github/SECURITY.md)"],
+      "forbiddenKinds": ["security-reporting-contradiction"]
+    },
+    {
+      "factId": "security-reporting",
+      "file": "docs/security/threat-model.md",
+      "mustContain": ["[generated project facts](../engineering/project-facts.md)", "[SECURITY.md](../../.github/SECURITY.md)"],
+      "forbiddenKinds": ["security-reporting-contradiction"]
+    },
+    {
+      "factId": "security-reporting",
+      "file": "docs/oss/provenance.md",
+      "mustContain": ["[SECURITY.md](../../.github/SECURITY.md)"],
+      "forbiddenKinds": ["security-reporting-contradiction"]
+    },
+    {
+      "factId": "security-reporting",
+      "file": "docs/oss/release.md",
+      "mustContain": ["[generated project facts](../engineering/project-facts.md)", "[SECURITY.md](../../.github/SECURITY.md)"],
+      "forbiddenKinds": ["security-reporting-contradiction"]
+    },
+    {
+      "factId": "persistence-version",
+      "file": "README.md",
+      "mustContain": ["[generated project facts](docs/engineering/project-facts.md)"],
+      "forbiddenKinds": ["persistence-current-version"]
+    },
+    {
+      "factId": "persistence-version",
+      "file": "docs/architecture/persistence-contracts.md",
+      "mustContain": ["[generated project facts](../engineering/project-facts.md)"],
+      "forbiddenKinds": ["persistence-current-version"]
+    },
+    {
+      "factId": "release-policy",
+      "file": "README.md",
+      "mustContain": ["releases/latest/download/ci.svg", "releases/latest/download/release.svg"],
+      "forbiddenKinds": ["workflow-status-badge"]
+    }
+  ]
+}

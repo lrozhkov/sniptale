@@ -12,7 +12,7 @@ function createPassingPackageJson() {
     devDependencies: {
       '@types/react': '^19.2.14',
       '@types/react-dom': '^19.2.3',
-      '@vitejs/plugin-react': '^5.2.0',
+      '@vitejs/plugin-react': '^6.1.0',
     },
   };
 }
@@ -51,6 +51,7 @@ function writePassingConfigPolicyFixture(root) {
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     /* Baseline guardrail */
     "forceConsistentCasingInFileNames": true,
+    "noUncheckedSideEffectImports": true,
     "verbatimModuleSyntax": true
   }
 }
@@ -63,6 +64,7 @@ function writePassingConfigPolicyFixture(root) {
       {
         compilerOptions: {
           forceConsistentCasingInFileNames: true,
+          noUncheckedSideEffectImports: true,
           verbatimModuleSyntax: true,
         },
       },
@@ -73,11 +75,7 @@ function writePassingConfigPolicyFixture(root) {
   writeFile(
     root,
     'apps/extension/manifest.json',
-    JSON.stringify(
-      { minimum_chrome_version: '148', message_serialization: 'structured_clone' },
-      null,
-      2
-    )
+    JSON.stringify({ minimum_chrome_version: '148' }, null, 2)
   );
   writeFile(
     root,
@@ -111,7 +109,11 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'package.json',
-        message: 'devDependencies.@vitejs/plugin-react must stay on the "^5.2."x baseline',
+        message: 'devDependencies.@vitejs/plugin-react must stay on the "^6.1."x baseline',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.json',
+        message: 'compilerOptions.noUncheckedSideEffectImports must be true',
       }),
       expect.objectContaining({
         file: 'tsconfig.json',
@@ -123,15 +125,20 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'tsconfig.node.json',
+        message: 'compilerOptions.noUncheckedSideEffectImports must be true',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.node.json',
         message: 'compilerOptions.verbatimModuleSyntax must be true',
       }),
       expect.objectContaining({
         file: 'apps/extension/manifest.json',
-        message: 'minimum_chrome_version must be "148"',
+        message: 'minimum_chrome_version must be a decimal Chrome major version',
       }),
       expect.objectContaining({
         file: 'apps/extension/manifest.json',
-        message: 'message_serialization must be "structured_clone"',
+        message:
+          'message_serialization must remain absent until a production messaging owner requires it',
       }),
       expect.objectContaining({
         file: 'apps/extension/vite.config.ts',
@@ -223,7 +230,7 @@ it('accepts the Vite build target from a defineConfig callback return object', a
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([]);
 });
 
-it('reports missing strictness flags, build target, and chrome floor drift', async () => {
+it('reports missing strictness flags, build target, and malformed runtime config', async () => {
   const root = createTempRoot('verify-config-policy-fail-');
   writeConfigPolicyPackageJson(root, createFailingPackageJson());
   writeFile(
@@ -244,7 +251,14 @@ it('reports missing strictness flags, build target, and chrome floor drift', asy
   writeFile(
     root,
     'apps/extension/manifest.json',
-    JSON.stringify({ minimum_chrome_version: '116' }, null, 2)
+    JSON.stringify(
+      {
+        minimum_chrome_version: 'not-a-version',
+        message_serialization: 'structured_clone',
+      },
+      null,
+      2
+    )
   );
   writeFile(root, 'apps/extension/vite.config.ts', 'export default { build: {} };\n');
 

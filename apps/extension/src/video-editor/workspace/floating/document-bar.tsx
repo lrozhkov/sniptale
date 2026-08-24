@@ -3,7 +3,11 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import {
+  useVideoEditorHeaderController,
+  useVideoEditorHistoryController,
+} from '../../runtime/controller/composition/hooks';
+import type { VideoEditorHeaderController } from '../../runtime/controller/contracts/header';
 import { VideoProjectStorageStatus } from './storage-status';
 import { requestVideoEditorSaveRetry } from '../../runtime/session/save-retry';
 
@@ -20,8 +24,8 @@ const PROJECT_TITLE_CLASS_NAME = [
 ].join(' ');
 
 type VideoEditorDocumentBarProps = {
-  header: VideoEditorWorkspaceController['header'];
-  history: VideoEditorWorkspaceController['history'];
+  header: VideoEditorHeaderController;
+  history: ReturnType<typeof useVideoEditorHistoryController>;
 };
 
 function VideoEditorProjectTitle({
@@ -74,7 +78,10 @@ function VideoEditorSaveStateBadge({
   );
 }
 
-export function VideoEditorFloatingDocumentBar({ header, history }: VideoEditorDocumentBarProps) {
+export function VideoEditorFloatingDocumentBar() {
+  const header = useVideoEditorHeaderController();
+  const history = useVideoEditorHistoryController();
+  if (!header) return null;
   return (
     <div data-ui="video-editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar

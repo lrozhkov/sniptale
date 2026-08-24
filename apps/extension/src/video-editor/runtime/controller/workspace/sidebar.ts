@@ -3,12 +3,57 @@ import type { VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
-import type { VideoEditorControllerStorePort as EditorStore } from '../../../contracts/controller-store';
+import type {
+  AnnotationEditingPort,
+  ClipSelectionPort,
+  DiagnosticsTelemetryPort,
+  EffectEditingPort,
+  ProjectLifecyclePort,
+  RuntimeSessionPort,
+  TimelineEditingPort,
+} from '../../../contracts/controller-store';
+
+type EditorStore = AnnotationEditingPort &
+  ClipSelectionPort &
+  DiagnosticsTelemetryPort &
+  EffectEditingPort &
+  RuntimeSessionPort &
+  TimelineEditingPort &
+  Pick<ProjectLifecyclePort, 'project' | 'recordingId'>;
+type SidebarCommandHandlers = Pick<
+  VideoEditorActionHandlers,
+  | 'handleAddRecording'
+  | 'handleCreateProject'
+  | 'handleDeleteProject'
+  | 'handleImportAudio'
+  | 'handleImportImage'
+  | 'handleImportRecordedAudio'
+  | 'handleImportVideo'
+  | 'handleOpenProject'
+>;
 import type { VideoEditorSidebarController } from '../contracts/sidebar';
 import type { VideoEditorWorkspaceProjectUpdaters as ProjectUpdaters } from '../shared-actions';
-import type { CreateVideoEditorWorkspaceArgs } from './types';
 import { requestTrackDeletion } from './timeline-track-actions';
 import { createWorkspaceSidebarPlacementActions } from './sidebar-placement-actions';
+
+interface CreateWorkspaceSidebarArgs {
+  actions: SidebarCommandHandlers;
+  diagnosticsContent: React.ReactNode;
+  libraries: VideoEditorLibrariesState;
+  selections: VideoEditorSelections;
+  store: EditorStore;
+  workspace: SidebarWorkspace;
+}
+
+type SidebarWorkspace = Pick<
+  VideoEditorWorkspaceState,
+  | 'confirm'
+  | 'grid'
+  | 'inspector'
+  | 'leftSidebarCollapsed'
+  | 'sceneBackgroundColors'
+  | 'toggleSidebarCollapsed'
+>;
 
 function createWorkspaceSidebarClipActions(store: EditorStore) {
   return {
@@ -36,10 +81,10 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
 }
 
 function createWorkspaceSidebarProjectActions(args: {
-  actions: VideoEditorActionHandlers;
+  actions: SidebarCommandHandlers;
   projectUpdaters: ProjectUpdaters;
   store: EditorStore;
-  workspace: VideoEditorWorkspaceState;
+  workspace: SidebarWorkspace;
 }) {
   return {
     ...createWorkspaceSidebarPlacementActions(args.store),
@@ -99,7 +144,7 @@ function createWorkspaceSidebarCursorActions(args: {
 
 function createWorkspaceSidebarBackgroundActions(args: {
   projectUpdaters: ProjectUpdaters;
-  workspace: VideoEditorWorkspaceState;
+  workspace: Pick<SidebarWorkspace, 'sceneBackgroundColors'>;
 }) {
   return {
     onSetSceneBackground: args.projectUpdaters.setSceneBackground,
@@ -115,7 +160,7 @@ function createWorkspaceSidebarState(args: {
   project: NonNullable<EditorStore['project']>;
   selections: VideoEditorSelections;
   store: EditorStore;
-  workspace: VideoEditorWorkspaceState;
+  workspace: SidebarWorkspace;
 }) {
   return {
     activeProjectId: args.project.id,
@@ -150,7 +195,7 @@ function createWorkspaceSidebarState(args: {
 }
 
 export function createWorkspaceSidebarController(
-  args: CreateVideoEditorWorkspaceArgs,
+  args: CreateWorkspaceSidebarArgs,
   project: NonNullable<EditorStore['project']>,
   projectUpdaters: ProjectUpdaters
 ): VideoEditorSidebarController {

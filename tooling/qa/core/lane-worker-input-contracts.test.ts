@@ -14,7 +14,7 @@ function focusedContext() {
     qualityCodeFiles: [],
     qualityJsLikeFiles: [],
     qualityTargetFiles: [],
-    shouldRunFullEslint: false,
+    shouldRunFullOxlint: false,
     shouldRunManifestPermissions: false,
     shouldRunRuntimeTopology: false,
     targetFiles: [],
@@ -39,6 +39,7 @@ it('rejects malformed nested focused baseline allowances', () => {
     parseFocusedWorkerInput({
       context,
       lane: 'light',
+      typecheckCheckerCount: 2,
       typecheckMaxConcurrency: 2,
       vitestMaxWorkers: 4,
     })
@@ -59,6 +60,7 @@ it('rejects omitted build-scope booleans instead of narrowing test proof', () =>
       },
       context: { codeFiles: [], targetFiles: [] },
       lane: 'tests',
+      typecheckCheckerCount: 4,
       vitestMaxWorkers: 4,
     })
   ).toThrow(/invalid field population/u);
@@ -75,6 +77,7 @@ it('rejects extra full-verification context authority', () => {
         unexpectedAuthority: true,
       },
       lane: 'tests',
+      typecheckCheckerCount: 4,
       vitestMaxWorkers: 4,
     })
   ).toThrow(/invalid field population/u);

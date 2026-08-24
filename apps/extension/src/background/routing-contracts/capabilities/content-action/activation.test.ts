@@ -68,7 +68,7 @@ function requestRuntimeToken(
 
 function readActivationKey(response: ReturnType<typeof vi.fn>) {
   return (
-    response.mock.calls[0]?.[0] as {
+    response.mock.calls[0]![0] as {
       activationKey?: { expiresAtEpochMs: number; keyId: string; secret: string };
     }
   ).activationKey;

@@ -75,8 +75,13 @@ async function expectBuiltSurfaceLayout(
 }
 
 test('background service worker boots', async ({ context, extensionId }) => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`, {
+    waitUntil: 'domcontentloaded',
+  });
   const serviceWorkerUrl = await resolveExtensionServiceWorkerUrl(context);
   await expect(serviceWorkerUrl).toContain(extensionId);
+  await page.close();
 });
 
 for (const extensionPage of builtExtensionPages) {
@@ -261,12 +266,15 @@ test('built popup restores the correct first tab and never empties content on co
     sample();
   });
 
-  const topTabs = page.locator('button[data-active]').first().locator('xpath=..').locator('button');
-  await topTabs.nth(0).click();
-  await expect(topTabs.nth(0)).toHaveAttribute('data-active', 'true');
-  await topTabs.nth(1).click();
+  const topTabs = page.locator('[data-ui="popup.app.tabs"]');
+  await topTabs.locator('button[data-page="screenshots"]').click();
+  await expect(topTabs.locator('button[data-page="screenshots"]')).toHaveAttribute(
+    'data-active',
+    'true'
+  );
+  await topTabs.locator('button[data-page="video"]').click();
   await expect(page.locator('[data-ui="popup.video-setup.start-recording-button"]')).toBeVisible();
-  await topTabs.nth(2).click();
+  await topTabs.locator('button[data-page="export"]').click();
   await expect(page.locator('[data-ui="popup.export.export-button"]')).toBeVisible();
 
   const observedEmptyContent = await page.evaluate(

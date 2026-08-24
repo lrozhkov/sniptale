@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 
-import { classifyFullVerifyScope, resolveFullVerifyScope } from './verify-all.scope.mjs';
+import {
+  classifyFullVerifyScope,
+  resolveFullVerifyScope,
+  resolveRepositoryVerifyScope,
+} from './verify-all.scope.mjs';
 import { createTempRoot, importFresh, withCwd, writeFile } from './test-helpers';
 
 it('uses owner-local affected mode for editor-only code changes', () => {
@@ -120,6 +124,21 @@ it('filters harness files out of resolved product release scope', async () => {
     'apps/extension/src/editor/workspace/toolbar/EditorToolbar.tsx',
   ]);
   expect(result.harnessTargetFiles).toEqual(['tooling/qa/core/example.test.ts']);
+});
+
+it('resolves canonical CI scope from the repository snapshot rather than the current diff', () => {
+  const productFile = 'packages/foundation/src/default-owner/index.ts';
+  const harnessFile = 'tooling/qa/core/verify-all.scope.mjs';
+  const result = resolveRepositoryVerifyScope();
+
+  expect(result).toMatchObject({
+    mode: 'full-suite',
+    detail: 'repository-wide canonical CI scope',
+  });
+  expect(result.targetFiles).toContain(productFile);
+  expect(result.codeFiles).toContain(productFile);
+  expect(result.targetFiles).not.toContain(harnessFile);
+  expect(result.harnessTargetFiles).toContain(harnessFile);
 });
 
 it('keeps deleted files in the diff scope without routing them to source readers', async () => {

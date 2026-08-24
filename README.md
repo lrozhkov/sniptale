@@ -1,6 +1,6 @@
 # Sniptale
 
-[![CI](https://github.com/lrozhkov/sniptale/actions/workflows/quality-gate.yml/badge.svg?branch=main&event=push)](https://github.com/lrozhkov/sniptale/actions/workflows/quality-gate.yml?query=branch%3Amain) [![Coverage](https://codecov.io/gh/lrozhkov/sniptale/branch/main/graph/badge.svg)](https://codecov.io/gh/lrozhkov/sniptale) [![Release](https://img.shields.io/github/v/release/lrozhkov/sniptale?sort=semver)](https://github.com/lrozhkov/sniptale/releases/latest) [![License](https://img.shields.io/github/license/lrozhkov/sniptale)](https://github.com/lrozhkov/sniptale/blob/main/LICENSE)
+[![CI](https://github.com/lrozhkov/sniptale/releases/latest/download/ci.svg)](https://github.com/lrozhkov/sniptale/actions/workflows/quality-gate.yml) [![Coverage](https://github.com/lrozhkov/sniptale/releases/latest/download/coverage.svg)](https://github.com/lrozhkov/sniptale/releases/latest) [![Release](https://github.com/lrozhkov/sniptale/releases/latest/download/release.svg)](https://github.com/lrozhkov/sniptale/releases/latest) [![License](https://github.com/lrozhkov/sniptale/releases/latest/download/license.svg)](https://github.com/lrozhkov/sniptale/blob/main/LICENSE)
 
 **Snip the web. Tell the story.**
 
@@ -30,9 +30,9 @@ This remains an alpha distribution rather than a Chrome Web Store release. See [
 
 ### Requirements
 
-- Node.js `>=22.12 <23`
+- The Node.js range declared in the root `package.json`
 - npm
-- Chrome 140 or newer
+- The Chrome baseline listed in the [generated project facts](docs/engineering/project-facts.md)
 
 Install the exact dependency versions from `package-lock.json` and create a release-mode Vite build:
 
@@ -132,7 +132,7 @@ The interface supports Russian and English, plus system, light, and dark appeara
 
 Screenshots, recordings, audio, exports, video projects, scenario projects and exports, and saved web snapshots can be retained in a local IndexedDB-backed media library.
 
-The future beta persistence contract starts from a clean `sniptale-db` version 1 baseline with independently versioned logical domains. Alpha database versions are intentionally not migration sources; once beta begins, every released beta fixture remains supported for forward migration without silent loss of durable data.
+The future beta persistence contract starts from the clean `sniptale-db` baseline recorded in the [generated project facts](docs/engineering/project-facts.md), with independently versioned logical domains. Alpha database versions are intentionally not migration sources; once beta begins, every released beta fixture remains supported for forward migration without silent loss of durable data.
 
 The Gallery includes search, sorting, tags, multiple view densities, previews, rename and download actions, image copy, multi-selection, batch tag updates, ZIP download, and links into the relevant editor or viewer. A storage manager can identify old, large, and orphaned items and estimate reclaimable space.
 
@@ -218,6 +218,8 @@ The companion can operate independently or connect to the extension through Chro
 
 The native companion is not included in this repository or extension artifact. Its distribution, maturity, platform coverage, and installation instructions may differ from the browser extension.
 
+The extension validates native messages, protocol compatibility, controller ownership, and capability limits. Install-health fields reported by the companion, including binary-signing and package-integrity status, are compatibility and repair signals from that companion rather than cryptographic attestation performed by the extension. Chrome's native-host registration, operating-system trust, and companion distribution remain outside the extension's verification boundary.
+
 ## Local-first does not mean zero network
 
 The main Sniptale workflow is local-first:
@@ -267,7 +269,7 @@ AI implementation is controlled by a repository-local quality system rather than
 
 The normal workflow combines:
 
-- TypeScript type checking, ESLint, Prettier, unit and integration tests, and Playwright extension E2E suites;
+- native TypeScript 7 type checking, Oxlint, Oxfmt, residual security/SonarJS analysis, unit and integration tests, and Playwright extension E2E suites;
 - dependency-boundary and runtime-topology checks;
 - coverage, dead-code, cycle, duplication, complexity, and ownership checks;
 - manifest-permission, message-boundary, storage-authority, network-egress, diagnostic-sanitization, and other security guards;

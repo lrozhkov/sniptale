@@ -106,6 +106,7 @@ it('reports started and completed transitions around a profiled control', () => 
 
   expect(step.status).toBe('ok');
   expect(progress).toEqual([
+    { controlId: 'npm-audit', label: 'npm audit', state: 'queued' },
     { controlId: 'npm-audit', label: 'npm audit', state: 'started' },
     expect.objectContaining({
       controlId: 'npm-audit',
@@ -137,11 +138,12 @@ it('normalizes async projection failures and completes progress as failed', asyn
   });
   expect(step.stderr).toContain('projection failed');
   expect(progress).toEqual([
+    { controlId: 'codeql', label: 'CodeQL', state: 'queued' },
     { controlId: 'codeql', label: 'CodeQL', state: 'started' },
     expect.objectContaining({
       controlId: 'codeql',
       label: 'CodeQL',
-      state: 'completed',
+      state: 'failed',
       outcome: 'failed',
     }),
   ]);

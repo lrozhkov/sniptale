@@ -82,6 +82,38 @@ it('invalidates the cached typecheck state after a config change', async () => {
   });
 });
 
+it('invalidates the cached typecheck state after the compiler lock changes', async () => {
+  const root = createTempRoot('verify-typecheck-cache-toolchain-');
+  writeJson(root, 'package.json', { devDependencies: { '@typescript/native': '7.0.2' } });
+  writeJson(root, 'package-lock.json', { lockfileVersion: 3, packages: {} });
+  writeJson(root, 'tsconfig.json', { compilerOptions: { strict: true }, include: ['src'] });
+  writeJson(root, 'tsconfig.node.json', { compilerOptions: { composite: true } });
+  writeFile(root, 'apps/extension/vite.config.ts', 'export default {};\n');
+  writeFile(root, 'src/example.ts', 'export const value = 1;\n');
+
+  const result = await withCwd(root, async () => {
+    const module = await import('./verify-typecheck-cache.mjs');
+    module.recordSuccessfulTypecheck({
+      cwd: root,
+      targetFiles: ['src/example.ts'],
+      source: 'focused',
+    });
+    writeJson(root, 'package-lock.json', {
+      lockfileVersion: 3,
+      packages: { 'node_modules/@typescript/native': { version: '7.0.3' } },
+    });
+    return module.resolveReusableTypecheckState({
+      cwd: root,
+      targetFiles: ['src/example.ts'],
+    });
+  });
+
+  expect(result).toEqual({
+    matched: false,
+    reason: 'workspace state changed since the last successful typecheck',
+  });
+});
+
 it('invalidates the cached typecheck state when the checked project set changes', async () => {
   const root = createTempRoot('verify-typecheck-cache-projects-');
   writeJson(root, 'tsconfig.json', { compilerOptions: { strict: true }, include: ['src'] });

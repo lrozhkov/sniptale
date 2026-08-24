@@ -18,14 +18,14 @@ it('keeps the lightweight wrapper registry aligned with the executable rule cata
   const observedLabels = new Set(OBSERVED_QA_RULES.map((rule) => rule.label));
   const canonicalWrapperIds = new Set([
     'qa:advisory',
-    'qa:audit',
     'qa:build',
     'qa:checkpoint',
     'qa:closeout',
     'qa:e2e',
     'qa:preflight',
-    'qa:release',
     'qa:release-harness',
+    'ci:proof',
+    'ci:release',
   ]);
   for (const canonical of QA_RULE_DEFINITIONS.filter((rule) =>
     rule.runsIn.some((wrapperId) => canonicalWrapperIds.has(wrapperId))

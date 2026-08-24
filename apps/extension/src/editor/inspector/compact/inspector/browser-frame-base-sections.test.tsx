@@ -9,8 +9,8 @@ it('builds browser-frame base commands and routes async updates', async () => {
     insertOrUpdateBrowserFrame,
   };
   const commands = buildBrowserFrameBaseCommands(params as never);
-  const canvasControl = (commands[1]?.content as any).props.children;
-  const contentControl = (commands[2]?.content as any).props.children;
+  const canvasControl = (commands[1]!.content as any).props.children;
+  const contentControl = (commands[2]!.content as any).props.children;
 
   expect(commands.map((command) => command.id)).toEqual([
     'browser-frame-action',

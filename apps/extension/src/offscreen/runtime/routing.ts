@@ -48,6 +48,7 @@ import {
 } from '../recording/camera-source/peer';
 import { listVideoRecordingMediaDevices } from '../recording/camera-source/device-catalog';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import { probeOffscreenRuntimeReadiness } from './bootstrap';
 
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
 
@@ -105,6 +106,7 @@ export function resolveOffscreenErrorPhase(
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
+    case VideoMessageType.OFFSCREEN_READINESS_PROBE:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
@@ -130,6 +132,8 @@ export function resolveOffscreenRuntimeResponseMode(
   switch (type) {
     case VideoMessageType.OFFSCREEN_START_RECORDING:
       return 'immediate-ack';
+    case VideoMessageType.OFFSCREEN_READINESS_PROBE:
+      return 'deferred-ack';
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
@@ -181,12 +185,15 @@ export async function handleOffscreenRuntimeMessage(
   | DesktopFrameResult
   | CameraSourcePeerAnswer
   | { mediaDevices: VideoRecordingMediaDevice[] }
+  | { challenge: string; offscreenStartupId: string; state: 'failed' | 'ready' }
   | 'accepted'
   | 'applied'
   | 'copied'
   | 'stale'
 > {
   switch (message.type) {
+    case VideoMessageType.OFFSCREEN_READINESS_PROBE:
+      return probeOffscreenRuntimeReadiness(message);
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER:
       return answerCameraSourceOffer({
         peerId: message.peerId,

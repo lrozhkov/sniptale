@@ -1,10 +1,10 @@
 import type { ProjectTimelineProps } from '../../timeline/project/types';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import type { VideoEditorTimelineController } from '../../runtime/controller/contracts/timeline';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 
 export function getProjectTimelineProps(
-  controller: VideoEditorWorkspaceController,
+  controller: VideoEditorTimelineController,
   onDropEffectDocument: (
     payload: VideoEditorEffectDocumentDragPayload,
     target: VideoProjectEffectTarget,
@@ -14,13 +14,13 @@ export function getProjectTimelineProps(
   return {
     ...getProjectTimelineStateProps(controller),
     ...getProjectTimelineActionProps(controller),
-    insertion: controller.timeline.actions.insertion,
+    insertion: controller.actions.insertion,
     onDropEffectDocument,
   };
 }
 
 function getProjectTimelineStateProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorTimelineController
 ): Pick<
   ProjectTimelineProps,
   | 'currentTime'
@@ -37,24 +37,23 @@ function getProjectTimelineStateProps(
   | 'timelinePreviews'
 > {
   return {
-    currentTime: controller.timeline.state.currentTime,
-    isPlaying: controller.timeline.state.isPlaying,
-    magnetEnabled: controller.timeline.state.magnetEnabled,
-    pixelsPerSecond: controller.timeline.state.pixelsPerSecond,
-    playbackRange: controller.timeline.state.playbackRange,
-    project: controller.timeline.state.project,
-    recordingTelemetry: controller.timeline.state
-      .recordingTelemetry as ProjectTimelineProps['recordingTelemetry'],
-    selection: controller.timeline.state.selection,
-    selectedClipId: controller.timeline.state.selectedClipId,
-    selectedTrackId: controller.timeline.state.selectedTrackId,
-    telemetryLaneVisible: controller.timeline.state.telemetryLaneVisible,
-    timelinePreviews: controller.timeline.state.timelinePreviews,
+    currentTime: controller.state.currentTime,
+    isPlaying: controller.state.isPlaying,
+    magnetEnabled: controller.state.magnetEnabled,
+    pixelsPerSecond: controller.state.pixelsPerSecond,
+    playbackRange: controller.state.playbackRange,
+    project: controller.state.project,
+    recordingTelemetry: controller.state.recordingTelemetry,
+    selection: controller.state.selection,
+    selectedClipId: controller.state.selectedClipId,
+    selectedTrackId: controller.state.selectedTrackId,
+    telemetryLaneVisible: controller.state.telemetryLaneVisible,
+    timelinePreviews: controller.state.timelinePreviews,
   };
 }
 
 function getProjectTimelineActionProps(
-  controller: VideoEditorWorkspaceController
+  controller: VideoEditorTimelineController
 ): Omit<
   ProjectTimelineProps,
   keyof ReturnType<typeof getProjectTimelineStateProps> | 'insertion' | 'onDropEffectDocument'
@@ -65,56 +64,56 @@ function getProjectTimelineActionProps(
   };
 }
 
-function getTimelineMutationActionProps(controller: VideoEditorWorkspaceController) {
+function getTimelineMutationActionProps(controller: VideoEditorTimelineController) {
   return {
-    historyTransaction: controller.timeline.actions.historyTransaction,
-    onAutoTransformRecording: controller.timeline.actions.onAutoTransformRecording,
-    onAddTrackLogicalLane: controller.timeline.actions.onAddTrackLogicalLane,
-    onClearPlaybackRange: controller.timeline.actions.onClearPlaybackRange,
-    onCloseTrackGap: controller.timeline.actions.onCloseTrackGap,
-    onDeleteSelectedClip: controller.timeline.actions.onDeleteSelectedClip,
-    onDeleteSelectedTimelineObject: controller.timeline.actions.onDeleteSelectedTimelineObject,
-    onDeleteTrack: controller.timeline.actions.onDeleteTrack,
-    onClearUtilityLane: controller.timeline.actions.onClearUtilityLane,
-    onDuplicateSelectedClip: controller.timeline.actions.onDuplicateSelectedClip,
-    onMoveActionEvent: controller.timeline.actions.onMoveActionEvent,
-    onMoveClip: controller.timeline.actions.onMoveClip,
-    onMoveTrack: controller.timeline.actions.onMoveTrack,
-    onRenameTrack: controller.timeline.actions.onRenameTrack,
-    onSplitSelectedClip: controller.timeline.actions.onSplitSelectedClip,
-    onToggleTrackLock: controller.timeline.actions.onToggleTrackLock,
-    onToggleTrackVisibility: controller.timeline.actions.onToggleTrackVisibility,
-    onToggleUtilityLaneLock: controller.timeline.actions.onToggleUtilityLaneLock,
-    onToggleUtilityLaneVisibility: controller.timeline.actions.onToggleUtilityLaneVisibility,
-    onTrimClipEnd: controller.timeline.actions.onTrimClipEnd,
-    onTrimClipStart: controller.timeline.actions.onTrimClipStart,
-    onUpdateEffectInstance: controller.timeline.actions.onUpdateEffectInstance,
-    onUpdateSelectedClipPlaybackRate: controller.timeline.actions.onUpdateSelectedClipPlaybackRate,
+    historyTransaction: controller.actions.historyTransaction,
+    onAutoTransformRecording: controller.actions.onAutoTransformRecording,
+    onAddTrackLogicalLane: controller.actions.onAddTrackLogicalLane,
+    onClearPlaybackRange: controller.actions.onClearPlaybackRange,
+    onCloseTrackGap: controller.actions.onCloseTrackGap,
+    onDeleteSelectedClip: controller.actions.onDeleteSelectedClip,
+    onDeleteSelectedTimelineObject: controller.actions.onDeleteSelectedTimelineObject,
+    onDeleteTrack: controller.actions.onDeleteTrack,
+    onClearUtilityLane: controller.actions.onClearUtilityLane,
+    onDuplicateSelectedClip: controller.actions.onDuplicateSelectedClip,
+    onMoveActionEvent: controller.actions.onMoveActionEvent,
+    onMoveClip: controller.actions.onMoveClip,
+    onMoveTrack: controller.actions.onMoveTrack,
+    onRenameTrack: controller.actions.onRenameTrack,
+    onSplitSelectedClip: controller.actions.onSplitSelectedClip,
+    onToggleTrackLock: controller.actions.onToggleTrackLock,
+    onToggleTrackVisibility: controller.actions.onToggleTrackVisibility,
+    onToggleUtilityLaneLock: controller.actions.onToggleUtilityLaneLock,
+    onToggleUtilityLaneVisibility: controller.actions.onToggleUtilityLaneVisibility,
+    onTrimClipEnd: controller.actions.onTrimClipEnd,
+    onTrimClipStart: controller.actions.onTrimClipStart,
+    onUpdateEffectInstance: controller.actions.onUpdateEffectInstance,
+    onUpdateSelectedClipPlaybackRate: controller.actions.onUpdateSelectedClipPlaybackRate,
   };
 }
 
-function getTimelineInteractionActionProps(controller: VideoEditorWorkspaceController) {
+function getTimelineInteractionActionProps(controller: VideoEditorTimelineController) {
   return {
-    onMoveCursorSegment: controller.timeline.actions.onMoveCursorSegment,
-    onMoveMotionRegion: controller.timeline.actions.onMoveMotionRegion,
-    onMoveTransitionSegment: controller.timeline.actions.onMoveTransitionSegment,
-    onResizeActionEvent: controller.timeline.actions.onResizeActionEvent,
-    onResizeMotionRegion: controller.timeline.actions.onResizeMotionRegion,
-    onSeek: controller.timeline.actions.onSeek,
-    onSeekToStart: controller.timeline.actions.onSeekToStart,
-    onSelectActionSegment: controller.timeline.actions.onSelectActionSegment,
-    onSelectClip: controller.timeline.actions.onSelectClip,
-    onSelectCursorSegment: controller.timeline.actions.onSelectCursorSegment,
-    onSelectMotionRegion: controller.timeline.actions.onSelectMotionRegion,
-    onSelectObjectTrack: controller.timeline.actions.onSelectObjectTrack,
-    onSelectScene: controller.timeline.actions.onSelectScene,
-    onSelectTrack: controller.timeline.actions.onSelectTrack,
-    onSelectTransition: controller.timeline.actions.onSelectTransition,
-    onSetPlaybackRange: controller.timeline.actions.onSetPlaybackRange,
-    onTimelinePreviewSuspendedChange: controller.timeline.actions.onTimelinePreviewSuspendedChange,
-    onTimelinePreviewViewportChange: controller.timeline.actions.onTimelinePreviewViewportChange,
-    onTogglePlay: controller.timeline.actions.onTogglePlay,
-    onToggleTelemetryLaneVisibility: controller.timeline.actions.onToggleTelemetryLaneVisibility,
-    onZoomChange: controller.timeline.actions.onZoomChange,
+    onMoveCursorSegment: controller.actions.onMoveCursorSegment,
+    onMoveMotionRegion: controller.actions.onMoveMotionRegion,
+    onMoveTransitionSegment: controller.actions.onMoveTransitionSegment,
+    onResizeActionEvent: controller.actions.onResizeActionEvent,
+    onResizeMotionRegion: controller.actions.onResizeMotionRegion,
+    onSeek: controller.actions.onSeek,
+    onSeekToStart: controller.actions.onSeekToStart,
+    onSelectActionSegment: controller.actions.onSelectActionSegment,
+    onSelectClip: controller.actions.onSelectClip,
+    onSelectCursorSegment: controller.actions.onSelectCursorSegment,
+    onSelectMotionRegion: controller.actions.onSelectMotionRegion,
+    onSelectObjectTrack: controller.actions.onSelectObjectTrack,
+    onSelectScene: controller.actions.onSelectScene,
+    onSelectTrack: controller.actions.onSelectTrack,
+    onSelectTransition: controller.actions.onSelectTransition,
+    onSetPlaybackRange: controller.actions.onSetPlaybackRange,
+    onTimelinePreviewSuspendedChange: controller.actions.onTimelinePreviewSuspendedChange,
+    onTimelinePreviewViewportChange: controller.actions.onTimelinePreviewViewportChange,
+    onTogglePlay: controller.actions.onTogglePlay,
+    onToggleTelemetryLaneVisibility: controller.actions.onToggleTelemetryLaneVisibility,
+    onZoomChange: controller.actions.onZoomChange,
   };
 }

@@ -14,6 +14,7 @@ vi.mock('../../../ui/page-bootstrap', async (importOriginal) => ({
 
 vi.mock('./', () => ({
   App: () => null,
+  VideoEditorShellGate: () => null,
 }));
 
 vi.mock('@sniptale/platform/observability/message-tracer', () => ({

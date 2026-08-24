@@ -4,7 +4,7 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { getVideoProject } from '../../../composition/persistence/projects';
 import { translate } from '../../../platform/i18n';
 import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
-import { useVideoEditorStore } from '../../state/store';
+import { useVideoEditorProjectStorageStatus } from '../../runtime/controller/store';
 import { promoteOpenVideoProject, refreshSavedVideoProjectPresentation } from './storage-promotion';
 
 export function VideoProjectStorageStatus() {
@@ -14,8 +14,7 @@ export function VideoProjectStorageStatus() {
       : new URLSearchParams(window.location.search).get('project');
   const [temporary, setTemporary] = useState<boolean | null>(null);
   const [promotionState, setPromotionState] = useState<'idle' | 'saving' | 'error'>('idle');
-  const projectUpdatedAt = useVideoEditorStore((state) => state.project?.updatedAt ?? null);
-  const saveState = useVideoEditorStore((state) => state.saveState);
+  const { projectUpdatedAt, saveState } = useVideoEditorProjectStorageStatus();
   const promote = useCallback(async () => {
     if (!projectId) return;
     setPromotionState('saving');

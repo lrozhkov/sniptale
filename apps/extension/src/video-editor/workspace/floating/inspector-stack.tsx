@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
-import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import {
+  useVideoEditorSidebarController,
+  useWorkspaceLayoutContext,
+} from '../../runtime/controller/composition/hooks';
 import { getWorkspaceSidebarProps } from '../surface/sidebar-props';
 import { WorkspaceSidebarPanelContent } from '../sidebar/panel-content';
 import { useWorkspaceSidebarState } from '../sidebar/state';
@@ -15,10 +18,33 @@ const INSPECTOR_STACK_CLASS_NAME = [
 ].join(' ');
 
 type VideoEditorInspectorStackProps = {
-  controller: VideoEditorWorkspaceController;
+  diagnosticsContent: ReactNode;
 };
 
-export function VideoEditorFloatingInspectorStack({ controller }: VideoEditorInspectorStackProps) {
+export function VideoEditorFloatingInspectorStack({
+  diagnosticsContent,
+}: VideoEditorInspectorStackProps) {
+  const controller = useVideoEditorSidebarController(diagnosticsContent);
+  const layout = useWorkspaceLayoutContext();
+  if (!controller) return null;
+
+  return (
+    <VideoEditorFloatingInspectorContent
+      controller={controller}
+      leftSidebarCollapsed={layout.leftSidebarCollapsed}
+    />
+  );
+}
+
+type VideoEditorFloatingInspectorContentProps = {
+  controller: NonNullable<ReturnType<typeof useVideoEditorSidebarController>>;
+  leftSidebarCollapsed: boolean;
+};
+
+function VideoEditorFloatingInspectorContent({
+  controller,
+  leftSidebarCollapsed,
+}: VideoEditorFloatingInspectorContentProps) {
   const sidebarProps = getWorkspaceSidebarProps(controller);
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
@@ -32,7 +58,7 @@ export function VideoEditorFloatingInspectorStack({ controller }: VideoEditorIns
   );
   const resize = useInspectorResize();
 
-  if (controller.header.leftSidebarCollapsed) {
+  if (leftSidebarCollapsed) {
     return null;
   }
 

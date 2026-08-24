@@ -34,7 +34,7 @@ function normalizeCssForFetchDetection(value: string): string {
   let normalized = '';
   let quote: '"' | "'" | null = null;
 
-  for (let index = 0; index < source.length; ) {
+  for (let index = 0; index < source.length;) {
     const char = source[index] ?? '';
     const nextChar = source[index + 1] ?? '';
     if (quote) {

@@ -1,134 +1,225 @@
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import {
-  candidateReleaseArchiveIdentity,
-  collectLaneArtifacts,
-  selectelInfrastructureFromEnvironment,
-} from './artifacts.mjs';
-import {
-  materializeCandidateWorkspace,
-  restoreCandidateCommit,
-  restoreCandidateDiff,
-  verifyCandidateCloseout,
-  verifyCandidateFinalState,
-} from './candidate-workspace.mjs';
-import {
-  resolveQaReleaseResourceProfile,
-  resolveQaResourceProfile,
-} from '../qa/runtime/resource-profile.mjs';
-import { prepareTrustedControlDependencyMount } from './trusted-control-dependencies.mjs';
-import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
 import { resolveReusableCodeqlProofHostPaths } from './codeql-proof-host.mjs';
 import { resolveReusableCoverageProofHostPaths } from './coverage-proof-host.mjs';
+import { verifyReusableFastProof } from './fast-proof-reuse.mjs';
+import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
+import { resolveReusableBuildProofHostPaths } from './build-proof-host.mjs';
+import { createCandidateControlDigest } from './control-digest.mjs';
+import { validateCandidateImageEnvironment } from './container-command.mjs';
+import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
+import {
+  resolveContainerDigest,
+  resolveGithubRunIdentityEnvironment,
+} from './container-identity.mjs';
 
 const lane = process.argv[2];
-if (!['candidate', 'release', 'release-audit', 'security', 'coverage'].includes(lane)) {
-  throw new Error('Usage: container.mjs <candidate|release|release-audit|security|coverage>');
+if (!['proof', 'release'].includes(lane)) {
+  throw new Error('Usage: container.mjs <proof|release>');
 }
+
 const root = process.cwd();
-const trustedCiRoot = process.env.SNIPTALE_TRUSTED_CI_ROOT;
-const controlRoot = trustedCiRoot ? path.resolve(trustedCiRoot) : root;
-if (trustedCiRoot && !fs.statSync(controlRoot).isDirectory()) {
-  throw new Error('Trusted CI root must be a materialized directory.');
-}
-const lockBytes = fs.readFileSync(path.join(controlRoot, 'tooling/configs/ci/toolchain.lock.json'));
+const trustedRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+if (!fs.statSync(trustedRoot).isDirectory()) throw new Error('Trusted CI root is unavailable.');
+const lockBytes = fs.readFileSync(path.join(root, 'tooling/configs/ci/toolchain.lock.json'));
 const lockDigest = crypto.createHash('sha256').update(lockBytes).digest('hex');
 const image = process.env.SNIPTALE_CI_IMAGE ?? `sniptale-qa:${lockDigest.slice(0, 16)}`;
 
-function readGit(args, cwd = root) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+function command(executable, args, options = {}) {
+  const result = spawnSync(executable, args, { encoding: 'utf8', ...options });
   if (result.status !== 0) {
-    throw new Error(`git ${args.join(' ')} failed: ${(result.stderr ?? '').trim()}`);
+    throw new Error(
+      `${executable} ${args.join(' ')} failed: ${[result.stdout, result.stderr]
+        .filter(Boolean)
+        .join('\n')
+        .trim()}`
+    );
   }
   return result.stdout.trim();
 }
 
-function run(args, options = {}) {
+function runDocker(args, options = {}) {
   const result = spawnSync('docker', args, { stdio: 'inherit', ...options });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-if (process.env.SNIPTALE_CI_SKIP_BUILD !== '1') {
-  run([
-    'build',
-    '--platform',
-    'linux/amd64',
-    '--file',
-    path.join(controlRoot, 'tooling/ci/Dockerfile'),
-    '--tag',
-    image,
-    controlRoot,
-  ]);
+function assertCleanCommit(expectedSha) {
+  const head = command('git', ['rev-parse', 'HEAD']);
+  if (expectedSha !== 'local' && head !== expectedSha) {
+    throw new Error(`Candidate HEAD mismatch: expected ${expectedSha}, observed ${head}.`);
+  }
+  command('git', ['diff', '--quiet']);
+  command('git', ['diff', '--cached', '--quiet']);
+  return { head, tree: command('git', ['rev-parse', 'HEAD^{tree}']) };
 }
-const inspect = spawnSync('docker', ['image', 'inspect', '--format={{.Id}}', image], {
-  encoding: 'utf8',
-});
-if (inspect.status !== 0 || !/^sha256:[a-f0-9]{64}$/u.test(inspect.stdout.trim())) {
-  throw new Error(`Unable to resolve immutable container digest for ${image}.`);
+
+function materializeWorkspaceTree() {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-ci-index-'));
+  const indexPath = path.join(temporaryRoot, 'index');
+  const environment = { ...process.env, GIT_INDEX_FILE: indexPath };
+  try {
+    command('git', ['read-tree', 'HEAD'], { env: environment });
+    command('git', ['add', '--all', '--', '.'], { env: environment });
+    return command('git', ['write-tree'], { env: environment });
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
 }
-const digest = inspect.stdout.trim();
+
+function resolveCandidateIdentity(expectedSha) {
+  if (process.env.SNIPTALE_LOCAL_WORKSPACE === '1') {
+    return {
+      head: command('git', ['rev-parse', 'HEAD']),
+      tree: materializeWorkspaceTree(),
+      workspaceMode: 'local-workspace',
+    };
+  }
+  return { ...assertCleanCommit(expectedSha), workspaceMode: 'committed' };
+}
+
 const candidateSha =
   process.env.SNIPTALE_CANDIDATE_SHA ??
   process.env.GITHUB_SHA ??
   process.env.SNIPTALE_PROOF_SHA ??
   'local';
-const candidateWorkspace =
-  lane === 'candidate'
-    ? materializeCandidateWorkspace({
-        root,
-        baseSha: process.env.SNIPTALE_BASE_SHA || readGit(['rev-parse', `${candidateSha}^`]),
-        candidateSha,
+const candidateIdentity = resolveCandidateIdentity(candidateSha);
+const candidateControlDigest = createCandidateControlDigest();
+const trustedControlDigest = createCandidateControlDigest({ cwd: trustedRoot });
+const controlsChanged = candidateControlDigest !== trustedControlDigest;
+const gateInputDigest = createFastGateInputDigest();
+
+if (process.env.SNIPTALE_CI_SKIP_BUILD !== '1') {
+  runDocker([
+    'build',
+    '--platform',
+    'linux/amd64',
+    '--file',
+    path.join(root, 'tooling/ci/Dockerfile'),
+    '--tag',
+    image,
+    root,
+  ]);
+} else {
+  const inspect = spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' });
+  if (inspect.status !== 0) runDocker(['pull', image]);
+}
+const digest = resolveContainerDigest(image, () =>
+  command('docker', ['image', 'inspect', '--format={{.Id}}', image])
+);
+validateCandidateImageEnvironment(
+  JSON.parse(command('docker', ['image', 'inspect', '--format={{json .Config.Env}}', image]))
+);
+
+const trustedControlSha = process.env.SNIPTALE_TRUSTED_CONTROL_SHA ?? candidateIdentity.head;
+if (!/^[a-f0-9]{40}$/u.test(trustedControlSha ?? '')) {
+  throw new Error('Canonical CI proof requires a trusted control commit SHA.');
+}
+if (lane === 'release' && (controlsChanged || trustedControlSha !== candidateIdentity.head)) {
+  throw new Error('Release provenance requires QA controls already trusted by the main commit.');
+}
+
+const reuseAllowed = !controlsChanged;
+const requestedReuse = [
+  'SNIPTALE_FAST_PROOF_PATH',
+  'SNIPTALE_UNIT_PROOF_PATH',
+  'SNIPTALE_BUILD_PROOF_PATH',
+  'SNIPTALE_BUILD_ARCHIVE_PATH',
+  'SNIPTALE_CODEQL_PROOF_PATH',
+  'SNIPTALE_CODEQL_SARIF_PATH',
+  'SNIPTALE_COVERAGE_PROOF_PATH',
+  'SNIPTALE_COVERAGE_REPORTS_PATH',
+].some((name) => process.env[name]);
+if (!reuseAllowed && requestedReuse) {
+  process.stderr.write('QA controls changed; all reusable proof inputs are disabled.\n');
+}
+
+const reusableFastProof =
+  reuseAllowed && process.env.SNIPTALE_FAST_PROOF_PATH
+    ? verifyReusableFastProof(process.env.SNIPTALE_FAST_PROOF_PATH, {
+        commit: candidateIdentity.head,
+        candidateTree: candidateIdentity.tree,
+        trustedControlSha,
+        trustedControlDigest,
+        containerDigest: digest,
+        controlDigest: candidateControlDigest,
+        gateInputDigest,
       })
     : null;
-const candidateStartedAtMs = Date.now();
-const unitProofHostPath = resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH);
-if (process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
+if (reusableFastProof) {
+  const destination = path.join(root, 'build', path.basename(reusableFastProof.archivePath));
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.copyFileSync(reusableFastProof.archivePath, destination, fs.constants.COPYFILE_EXCL);
+}
+
+const unitProofHostPath = reuseAllowed
+  ? resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH)
+  : null;
+const buildProofHostPaths = reusableFastProof
+  ? {
+      proof: reusableFastProof.buildProofPath,
+      archive: reusableFastProof.archivePath,
+    }
+  : reuseAllowed
+    ? resolveReusableBuildProofHostPaths({
+        proofPath: process.env.SNIPTALE_BUILD_PROOF_PATH,
+        archivePath: process.env.SNIPTALE_BUILD_ARCHIVE_PATH,
+      })
+    : null;
+const codeqlProofHostPaths = reuseAllowed
+  ? resolveReusableCodeqlProofHostPaths({
+      proofPath: process.env.SNIPTALE_CODEQL_PROOF_PATH,
+      sarifPath: process.env.SNIPTALE_CODEQL_SARIF_PATH,
+    })
+  : null;
+const coverageProofHostPaths = reuseAllowed
+  ? resolveReusableCoverageProofHostPaths({
+      proofPath: process.env.SNIPTALE_COVERAGE_PROOF_PATH,
+      reportsPath: process.env.SNIPTALE_COVERAGE_REPORTS_PATH,
+    })
+  : null;
+if (reuseAllowed && process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
   process.stderr.write('Reusable unit proof is unavailable; running the complete unit suite.\n');
 }
-const codeqlProofHostPaths = resolveReusableCodeqlProofHostPaths({
-  proofPath: process.env.SNIPTALE_CODEQL_PROOF_PATH,
-  sarifPath: process.env.SNIPTALE_CODEQL_SARIF_PATH,
-});
-const coverageProofHostPaths = resolveReusableCoverageProofHostPaths({
-  proofPath: process.env.SNIPTALE_COVERAGE_PROOF_PATH,
-  reportsPath: process.env.SNIPTALE_COVERAGE_REPORTS_PATH,
-});
 if (
+  reuseAllowed &&
   (process.env.SNIPTALE_CODEQL_PROOF_PATH || process.env.SNIPTALE_CODEQL_SARIF_PATH) &&
   !codeqlProofHostPaths
 ) {
   process.stderr.write('Reusable CodeQL proof is unavailable; running complete CodeQL.\n');
 }
-const executionRoot = candidateWorkspace?.workspace ?? root;
-const trustedControlSha =
-  process.env.SNIPTALE_TRUSTED_CONTROL_SHA ??
-  (trustedCiRoot ? null : readGit(['rev-parse', 'HEAD'], controlRoot));
-if (lane === 'candidate' && !/^[a-f0-9]{40}$/u.test(trustedControlSha ?? '')) {
-  throw new Error('Canonical candidate proof requires a trusted control commit SHA.');
+if (
+  reuseAllowed &&
+  (process.env.SNIPTALE_COVERAGE_PROOF_PATH || process.env.SNIPTALE_COVERAGE_REPORTS_PATH) &&
+  !coverageProofHostPaths
+) {
+  process.stderr.write('Reusable coverage proof is unavailable; running complete coverage.\n');
 }
+
 const environment = [
   'CI=1',
   'HUSKY=0',
-  'HOME=/tmp/sniptale-ci-home',
+  'HOME=/workspace/.tmp/ci-home',
   'SNIPTALE_CI_IN_CONTAINER=1',
   `SNIPTALE_CI_CONTAINER_DIGEST=${digest}`,
-  `SNIPTALE_PROOF_SHA=${candidateSha}`,
-  `GITHUB_SHA=${candidateSha}`,
+  `SNIPTALE_PROOF_SHA=${candidateIdentity.head}`,
+  `SNIPTALE_CANDIDATE_SHA=${candidateIdentity.head}`,
+  `SNIPTALE_CANDIDATE_TREE=${candidateIdentity.tree}`,
+  `SNIPTALE_WORKSPACE_MODE=${candidateIdentity.workspaceMode}`,
+  `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`,
+  `SNIPTALE_TRUSTED_CONTROL_DIGEST=${trustedControlDigest}`,
+  `SNIPTALE_TRUSTED_CANDIDATE_CONTROL_DIGEST=${candidateControlDigest}`,
+  `SNIPTALE_CANDIDATE_CONTROL_DIGEST=${candidateControlDigest}`,
+  'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only',
+  'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only',
+  'SNIPTALE_COVERAGE_PROOF_AUTHORITY=external-only',
+  'SNIPTALE_BUILD_PROOF_AUTHORITY=external-only',
+  'SNIPTALE_MUTATION_CLI=/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js',
 ];
-if (candidateWorkspace) {
-  environment.push(
-    `SNIPTALE_BASE_SHA=${candidateWorkspace.baseSha}`,
-    `SNIPTALE_CANDIDATE_TREE=${candidateWorkspace.candidateTree}`,
-    `SNIPTALE_TRUSTED_CONTROL_SHA=${trustedControlSha}`,
-    `SNIPTALE_CANDIDATE_STARTED_AT_MS=${candidateStartedAtMs}`,
-    'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only',
-    'SNIPTALE_CODEQL_PROOF_AUTHORITY=external-only',
-    'SNIPTALE_COVERAGE_PROOF_AUTHORITY=external-only'
-  );
-}
 if (unitProofHostPath) environment.push('SNIPTALE_UNIT_PROOF_PATH=/opt/sniptale-unit-proof.json');
 if (codeqlProofHostPaths) {
   environment.push(
@@ -142,11 +233,21 @@ if (coverageProofHostPaths) {
     'SNIPTALE_COVERAGE_REPORTS_PATH=/opt/sniptale-coverage-reports'
   );
 }
-if (trustedCiRoot) environment.push('SNIPTALE_TRUSTED_CI_ROOT=/opt/sniptale-trusted');
+if (buildProofHostPaths) {
+  environment.push(
+    'SNIPTALE_BUILD_PROOF_PATH=/opt/sniptale-build-proof.json',
+    'SNIPTALE_BUILD_ARCHIVE_PATH=/opt/sniptale-build-archive.zip'
+  );
+}
+if (reusableFastProof) {
+  environment.push(
+    'SNIPTALE_REUSE_FAST_PROOF=1',
+    'SNIPTALE_FAST_PROOF_PATH=/opt/sniptale-fast-proof'
+  );
+}
+environment.push(...resolveGithubRunIdentityEnvironment());
 for (const name of [
-  'GITHUB_RUN_ID',
   'SNIPTALE_BASE_SHA',
-  'SNIPTALE_RELEASE_AUDIT',
   'SNIPTALE_QA_CPU_TOKENS',
   'SNIPTALE_QA_MEMORY_MIB',
   'SNIPTALE_QA_VITEST_MAX_WORKERS',
@@ -156,11 +257,10 @@ for (const name of [
   'SNIPTALE_SELECTEL_SERVER_ID',
   'SNIPTALE_SELECTEL_AVAILABILITY_ZONE',
   'SNIPTALE_SELECTEL_PROFILES_DIGEST',
-  'SNIPTALE_CI_HEAVY_AUDIT',
 ]) {
   if (process.env[name]) environment.push(`${name}=${process.env[name]}`);
 }
-const baseContainerArgs = [
+const dockerArgs = [
   'run',
   '--rm',
   '--platform',
@@ -173,20 +273,17 @@ const baseContainerArgs = [
   '--tmpfs',
   '/tmp:rw,exec,nosuid,nodev,size=4g',
   '--volume',
-  `${executionRoot}:/workspace`,
+  `${root}:/workspace`,
+  '--volume',
+  `${path.join(root, '.git')}:/workspace/.git:ro`,
+  '--volume',
+  `${trustedRoot}:/opt/sniptale-trusted:ro`,
 ];
-if (trustedCiRoot) {
-  baseContainerArgs.push(
-    '--volume',
-    `${controlRoot}:/opt/sniptale-trusted:ro`,
-    ...prepareTrustedControlDependencyMount({ controlRoot, executionRoot, trustedCiRoot })
-  );
-}
 if (unitProofHostPath) {
-  baseContainerArgs.push('--volume', `${unitProofHostPath}:/opt/sniptale-unit-proof.json:ro`);
+  dockerArgs.push('--volume', `${unitProofHostPath}:/opt/sniptale-unit-proof.json:ro`);
 }
 if (codeqlProofHostPaths) {
-  baseContainerArgs.push(
+  dockerArgs.push(
     '--volume',
     `${codeqlProofHostPaths.proof}:/opt/sniptale-codeql-proof.json:ro`,
     '--volume',
@@ -194,186 +291,52 @@ if (codeqlProofHostPaths) {
   );
 }
 if (coverageProofHostPaths) {
-  baseContainerArgs.push(
+  dockerArgs.push(
     '--volume',
     `${coverageProofHostPaths.proof}:/opt/sniptale-coverage-proof.json:ro`,
     '--volume',
     `${coverageProofHostPaths.reports}:/opt/sniptale-coverage-reports:ro`
   );
 }
-for (const value of environment) baseContainerArgs.push('--env', value);
-
-function runContainer(containerLane, additionalEnvironment = []) {
-  return spawnSync(
-    'docker',
-    [
-      ...baseContainerArgs,
-      ...additionalEnvironment.flatMap((value) => ['--env', value]),
-      image,
-      'bash',
-      '-c',
-      trustedCiRoot
-        ? 'mkdir -p "$HOME" && exec node /opt/sniptale-trusted/tooling/ci/run-lane.mjs "$1"'
-        : 'mkdir -p "$HOME" && exec node tooling/ci/run-lane.mjs "$1"',
-      'sniptale-ci',
-      containerLane,
-    ],
-    { stdio: 'inherit' }
+if (buildProofHostPaths) {
+  dockerArgs.push(
+    '--volume',
+    `${buildProofHostPaths.proof}:/opt/sniptale-build-proof.json:ro`,
+    '--volume',
+    `${buildProofHostPaths.archive}:/opt/sniptale-build-archive.zip:ro`
   );
 }
-
-const candidatePhaseDefinitions = [
-  { id: 'install', command: 'npm ci --ignore-scripts' },
-  { id: 'provision-canvas', command: 'npm rebuild canvas' },
-  { id: 'verify-canvas', command: 'canvas 2d context smoke' },
-  { id: 'provision-ast-grep', command: 'node node_modules/@ast-grep/cli/postinstall.js' },
-  { id: 'verify-ast-grep', command: 'node_modules/.bin/ast-grep --version' },
-  { id: 'release-harness', command: 'qa:release-harness', authority: 'diff' },
-  { id: 'checkpoint', command: 'qa:checkpoint', authority: 'diff' },
-  { id: 'closeout', command: 'qa:closeout', authority: 'diff' },
-  {
-    id: 'candidate-tree',
-    command: 'verify closeout tree and restore trusted candidate Git authority',
-    authority: 'closeout',
-  },
-  { id: 'release', command: 'qa:release', authority: 'commit' },
-  { id: 'pr-audit', command: 'qa:audit --profile pr', authority: 'commit' },
-  { id: 'receipts', command: 'validate available heavyweight receipts', authority: 'commit' },
-  ...(process.env.SNIPTALE_CI_HEAVY_AUDIT === '1'
-    ? [{ id: 'security', command: 'qa:audit --profile security', authority: 'commit' }]
-    : []),
-  { id: 'licenses', command: 'license audit', authority: 'commit' },
-  ...(process.env.SNIPTALE_CI_HEAVY_AUDIT === '1'
-    ? [{ id: 'coverage', command: 'qa:audit --profile coverage', authority: 'commit' }]
-    : []),
-  {
-    id: 'release-artifact',
-    command: 'verify release ZIP from the trusted control plane',
-    authority: 'commit',
-  },
-];
-
-function restoreCandidateAuthority(mode) {
-  const input = { ...candidateWorkspace, cwd: candidateWorkspace.workspace };
-  if (mode === 'diff') return restoreCandidateDiff(input);
-  if (mode === 'commit') return restoreCandidateCommit(input);
-  if (mode === 'closeout') {
-    verifyCandidateCloseout(input);
-    return restoreCandidateCommit(input);
-  }
-  return null;
+if (reusableFastProof) {
+  dockerArgs.push(
+    '--volume',
+    `${path.resolve(process.env.SNIPTALE_FAST_PROOF_PATH)}:/opt/sniptale-fast-proof:ro`
+  );
 }
+for (const value of environment) dockerArgs.push('--env', value);
+fs.mkdirSync(path.join(root, '.tmp/ci-home'), { recursive: true });
+const trustedIdentityEnvironment = Object.fromEntries(
+  environment
+    .map((value) => {
+      const separator = value.indexOf('=');
+      return [value.slice(0, separator), value.slice(separator + 1)];
+    })
+    .filter(([name]) => name.startsWith('SNIPTALE_'))
+);
+const trustedHostEnvironment = {
+  ...process.env,
+  ...trustedIdentityEnvironment,
+  SNIPTALE_CI_TRUSTED_HOST: '1',
+  SNIPTALE_CI_DOCKER_ARGS_JSON: JSON.stringify(dockerArgs),
+  SNIPTALE_CI_IMAGE: image,
+};
 
-function runCandidatePhases() {
-  const phases = [];
-  let failed = false;
-  let releaseArchiveSha256 = null;
-  for (const phase of candidatePhaseDefinitions) {
-    if (failed) {
-      phases.push({
-        id: phase.id,
-        command: null,
-        startedAt: null,
-        finishedAt: null,
-        status: 'blocked',
-        reason: 'earlier canonical candidate phase failed',
-      });
-      continue;
-    }
-    const startedAt = new Date().toISOString();
-    process.stdout.write(`[ci:phase] start ${phase.id}\n`);
-    try {
-      if (phase.authority) restoreCandidateAuthority(phase.authority);
-      const result =
-        phase.id === 'candidate-tree'
-          ? { status: 0 }
-          : runContainer(
-              `candidate-${phase.id}`,
-              phase.id === 'release-artifact'
-                ? [`SNIPTALE_EXPECTED_RELEASE_ARCHIVE_SHA256=${releaseArchiveSha256}`]
-                : []
-            );
-      const status = result.status ?? 1;
-      if (phase.id === 'release' && status === 0) {
-        releaseArchiveSha256 = candidateReleaseArchiveIdentity({
-          candidateRoot: candidateWorkspace.workspace,
-          startedAtMs: candidateStartedAtMs,
-        }).sha256;
-      }
-      phases.push({
-        id: phase.id,
-        command: phase.command,
-        startedAt,
-        finishedAt: new Date().toISOString(),
-        status: status === 0 ? 'passed' : 'failed',
-        exitCode: status,
-      });
-      failed = status !== 0;
-      process.stdout.write(`[ci:phase] ${status === 0 ? 'passed' : 'failed'} ${phase.id}\n`);
-    } catch (error) {
-      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-      phases.push({
-        id: phase.id,
-        command: phase.command,
-        startedAt,
-        finishedAt: new Date().toISOString(),
-        status: 'failed',
-        exitCode: 1,
-      });
-      failed = true;
-      process.stdout.write(`[ci:phase] failed ${phase.id}\n`);
-    }
-  }
-  return { phases, status: failed ? 1 : 0 };
+const result = spawnSync(
+  process.execPath,
+  [path.join(trustedRoot, 'tooling/ci/run-lane.mjs'), lane],
+  { stdio: 'inherit', env: trustedHostEnvironment }
+);
+const finalIdentity = resolveCandidateIdentity(candidateIdentity.head);
+if (finalIdentity.tree !== candidateIdentity.tree) {
+  throw new Error('Canonical CI worktree changed the candidate tree.');
 }
-
-const candidateResult = candidateWorkspace ? runCandidatePhases() : null;
-const standardResult = candidateWorkspace ? null : runContainer(lane);
-try {
-  if (candidateWorkspace) {
-    const passed = candidateResult.status === 0;
-    if (passed) {
-      verifyCandidateFinalState({ ...candidateWorkspace, cwd: candidateWorkspace.workspace });
-    }
-    const selectelInfrastructure = selectelInfrastructureFromEnvironment();
-    collectLaneArtifacts({
-      lane: 'candidate',
-      startedAtMs: candidateStartedAtMs,
-      status: passed ? 'passed' : 'failed',
-      command: ['qa:release-harness', 'qa:checkpoint', 'qa:closeout', 'qa:release', 'qa:audit'],
-      phases: candidateResult.phases,
-      containerDigest: digest,
-      candidateTree: candidateWorkspace.candidateTree,
-      trustedControlSha,
-      resourceProfiles: {
-        bounded: resolveQaResourceProfile(),
-        release: resolveQaReleaseResourceProfile(),
-      },
-      infrastructure: selectelInfrastructure,
-      repositoryRoot: candidateWorkspace.workspace,
-    });
-    const artifactRoot = path.join(candidateWorkspace.workspace, 'build/ci-artifacts');
-    const matches = fs.existsSync(artifactRoot)
-      ? fs
-          .readdirSync(artifactRoot)
-          .filter((entry) => entry.startsWith(`candidate-${candidateSha}-`))
-      : [];
-    if (matches.length !== 1) {
-      throw new Error(`Expected exactly one candidate proof bundle, found ${matches.length}.`);
-    }
-    const destinationRoot = path.join(root, 'build/ci-artifacts');
-    fs.mkdirSync(destinationRoot, { recursive: true });
-    fs.cpSync(path.join(artifactRoot, matches[0]), path.join(destinationRoot, matches[0]), {
-      recursive: true,
-      errorOnExist: true,
-      force: false,
-    });
-  }
-} finally {
-  if (candidateWorkspace) {
-    fs.rmSync(candidateWorkspace.temporaryRoot, { recursive: true, force: true });
-  }
-}
-if ((candidateResult?.status ?? standardResult?.status ?? 1) !== 0) {
-  process.exit(candidateResult?.status ?? standardResult?.status ?? 1);
-}
+process.exit(result.status ?? 1);

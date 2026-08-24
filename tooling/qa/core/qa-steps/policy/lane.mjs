@@ -9,7 +9,11 @@ const LANE_POLICY = {
     requiredBy: [],
     execution: 'manual',
   },
-  audit: { runsIn: ['qa:audit'], requiredBy: ['qa:audit'], execution: 'always' },
+  audit: {
+    runsIn: ['ci:proof', 'ci:release'],
+    requiredBy: ['ci:proof', 'ci:release'],
+    execution: 'always',
+  },
   build: { runsIn: ['qa:build'], requiredBy: ['qa:build', 'qa:closeout'], execution: 'always' },
   'build-commit': {
     runsIn: ['qa:build'],
@@ -26,6 +30,11 @@ const LANE_POLICY = {
     requiredBy: ['qa:closeout'],
     execution: 'conditional',
   },
+  'ci-composition': {
+    runsIn: ['ci:release'],
+    requiredBy: ['ci:release'],
+    execution: 'conditional',
+  },
   e2e: { runsIn: ['qa:e2e'], requiredBy: ['qa:e2e'], execution: 'always' },
   'focused-guardrail': {
     runsIn: ['qa:checkpoint'],
@@ -39,18 +48,18 @@ const LANE_POLICY = {
   },
   harness: {
     runsIn: ['qa:release-harness'],
-    requiredBy: ['qa:release-harness', 'qa:checkpoint', 'qa:build', 'qa:release', 'qa:closeout'],
+    requiredBy: ['qa:release-harness', 'qa:checkpoint', 'qa:build', 'qa:closeout'],
     execution: 'always',
   },
   manual: { runsIn: ['manual-audit'], requiredBy: [], execution: 'manual' },
   'release-direct': {
-    runsIn: ['qa:release'],
-    requiredBy: ['qa:release'],
+    runsIn: ['ci:proof', 'ci:release'],
+    requiredBy: ['ci:proof', 'ci:release'],
     execution: 'always',
   },
   'release-guardrail': {
-    runsIn: ['qa:release'],
-    requiredBy: ['qa:release'],
+    runsIn: ['ci:proof', 'ci:release'],
+    requiredBy: ['ci:proof', 'ci:release'],
     execution: 'always',
   },
   'wrapper-lifecycle': {
