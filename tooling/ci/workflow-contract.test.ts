@@ -15,6 +15,10 @@ function collectWorkflowJobBlocks(workflow: string) {
 
 const QUALITY = '.github/workflows/quality-gate.yml';
 const RELEASE = '.github/workflows/release.yml';
+const TOOLCHAIN = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8')) as {
+  node: { version: string };
+};
+const PROJECT_NODE_VERSION = TOOLCHAIN.node.version;
 
 function workflowUses(source: string) {
   return source
@@ -56,7 +60,7 @@ it('pins project Node for every workflow job that executes a repository Node ent
       expect(job.source, `${file}:${job.name}`).toContain(
         'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
       );
-      expect(job.source, `${file}:${job.name}`).toContain('node-version: 22.12.0');
+      expect(job.source, `${file}:${job.name}`).toContain(`node-version: ${PROJECT_NODE_VERSION}`);
       expect(
         job.source.indexOf('actions/setup-node@'),
         `${file}:${job.name}: setup-node must precede repository Node execution`
@@ -176,8 +180,11 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('needs.trusted-admission.outputs.execution_path');
   expect(workflow).toContain("needs.fast-classifier.outputs.reuse != 'true'");
   expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs "$PROOF_LANE"');
-  expect(candidateJob).toMatch(
-    /actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020[\s\S]*node-version: 22\.12\.0[\s\S]*Restore verified reusable proof inputs/u
+  expect(
+    candidateJob.indexOf('actions/setup-node@820762786026740c76f36085b0efc47a31fe5020')
+  ).toBeLessThan(candidateJob.indexOf(`node-version: ${PROJECT_NODE_VERSION}`));
+  expect(candidateJob.indexOf(`node-version: ${PROJECT_NODE_VERSION}`)).toBeLessThan(
+    candidateJob.indexOf('Restore verified reusable proof inputs')
   );
   expect(candidateJob).toContain('if [ -f "$manifest" ]; then');
   expect(candidateJob).toContain('Artifact: not produced before the failure.');
@@ -319,7 +326,7 @@ it('reuses immutable images when image inputs are unchanged and records sanitize
     'npm_config_cache: ${{ github.workspace }}/candidate/.tmp/npm-cache'
   );
   expect(workflow).toContain("if: success() && github.event_name != 'pull_request_target'");
-  expect(workflow).toContain('node-22.12.0-toolchain-');
+  expect(workflow).toContain(`node-${PROJECT_NODE_VERSION}-toolchain-`);
   expect(workflow).toContain('npm ci --ignore-scripts');
   expect(workflow).not.toContain('SELECTEL_OS_PROJECT_ID');
   expect(workflow).toContain(

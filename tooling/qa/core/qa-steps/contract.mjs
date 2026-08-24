@@ -56,18 +56,14 @@ const MUTATION_LABELS = tupleLabels(CI_COMPOSITION_STEPS).filter((label) =>
   label.startsWith('Mutation ')
 );
 
-function ciProofContract(hasFailure) {
-  return hasFailure
-    ? { required: RELEASE_LABELS, optional: AUDIT_LABELS }
-    : { required: [...RELEASE_LABELS, ...AUDIT_LABELS] };
+function ciProofContract() {
+  return { required: [...RELEASE_LABELS, ...AUDIT_LABELS] };
 }
 
-function ciReleaseContract(mode, hasFailure) {
+function ciReleaseContract(mode) {
   const proofLabels =
     mode === 'reuse-fast-proof' ? ['Fast proof reuse', ...RELEASE_LABELS] : RELEASE_LABELS;
-  return hasFailure
-    ? { required: proofLabels, optional: [...AUDIT_LABELS, ...MUTATION_LABELS] }
-    : { required: [...proofLabels, ...AUDIT_LABELS, ...MUTATION_LABELS] };
+  return { required: [...proofLabels, ...AUDIT_LABELS, ...MUTATION_LABELS] };
 }
 
 function buildContract(mode, hasFailure) {
@@ -150,8 +146,8 @@ function resolveContract({ wrapperId, mode, hasFailure, formatBarrierFailure }) 
   if (wrapperId === 'qa:checkpoint') return checkpointContract(mode, hasFailure);
   if (wrapperId === 'qa:build') return buildContract(mode, hasFailure);
   if (wrapperId === 'qa:closeout') return closeoutContract(mode, hasFailure);
-  if (wrapperId === 'ci:proof') return ciProofContract(hasFailure);
-  if (wrapperId === 'ci:release') return ciReleaseContract(mode, hasFailure);
+  if (wrapperId === 'ci:proof') return ciProofContract();
+  if (wrapperId === 'ci:release') return ciReleaseContract(mode);
   if (wrapperId === 'qa:e2e') return { required: tupleLabels(E2E_STEPS) };
   throw new Error(`No QA execution contract for ${wrapperId}`);
 }

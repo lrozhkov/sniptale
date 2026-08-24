@@ -33,7 +33,7 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
 const REQUIRED_BUILD_TARGET = 'chrome140';
-const REQUIRED_NODE_ENGINE = '>=22.12 <23';
+const REQUIRED_NODE_ENGINE = '>=22.22.1 <23';
 const REQUIRED_PACKAGE_DEPENDENCY_PREFIXES = {
   react: '^19.2.',
   'react-dom': '^19.2.',

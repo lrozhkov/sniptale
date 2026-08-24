@@ -15,7 +15,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=22.12 <23"
+    "node": ">=22.22.1 <23"
   },
   "workspaces": [
     "apps/extension",

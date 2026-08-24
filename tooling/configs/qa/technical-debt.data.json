@@ -16348,7 +16348,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container-command.mjs",
-        "contentHash": "eff5a7753af5ed6ae336b183ecabde6a60c293aadb51edd1d42dd4413d7a8fef"
+        "contentHash": "486973056babe128b3cd6ae7021b46ba5adf07f283af7c1710b52edde1fc9ccf"
       },
       "consumers": [
         "tooling/ci/ci-contract.test.ts",
@@ -16469,7 +16469,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/contract.mjs",
-        "contentHash": "52c5bff97457d6ab3e0f6f84e94a009a7a8c3bcabfb18635312bdba3eb57fc73"
+        "contentHash": "412012ccdaac8908e409d6f632dbe97aae3041fe1149ef862fd5fd38c06e0d86"
       },
       "consumers": [
         "tooling/qa/core/checkpoint-result.helpers.mjs",
@@ -16501,7 +16501,6 @@
         "property:checkpointContract/required[1]",
         "property:checkpointContract/required[2]",
         "property:ciProofContract/required",
-        "property:ciReleaseContract/optional",
         "property:ciReleaseContract/required",
         "property:closeoutContract/optional",
         "property:closeoutContract/optional[1]",
@@ -19842,7 +19841,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/qa-composition.mjs",
-        "contentHash": "ce64dcd6ff14d542cb006f66910440bf312838f1dcd34aabf94001a068cff9df"
+        "contentHash": "29aa4e12523ad5648a23c051fe51ffc1bc94a8196017283b40d2dae9883db377"
       },
       "consumers": [
         "tooling/ci/proof-wrapper.mjs",
@@ -19854,13 +19853,9 @@
         "binding:RELEASE_DELTA_LABELS",
         "binding:REUSED_FAST_AUDIT_CONTROL_IDS",
         "property:collectCiProofResults/context",
-        "property:collectCiProofResults/context[1]",
         "property:collectCiProofResults/steps",
         "property:collectCiReleaseResults/context",
-        "property:collectCiReleaseResults/context[1]",
-        "property:collectCiReleaseResults/context[2]",
         "property:collectCiReleaseResults/steps",
-        "property:collectCiReleaseResults/steps[1]",
         "property:runMutationProfile/executionProfile"
       ]
     },
@@ -20559,6 +20554,26 @@
         "binding:SCENARIO_STAGE_OWNER_MAPPINGS",
         "property:testFiles",
         "property:testFiles[1]"
+      ]
+    },
+    {
+      "id": "policy.source.scheduler-lane-task-mjs.159a0ebe05",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/scheduler-lane-task.mjs",
+        "contentHash": "459066e4defd0094c22a44d3a880fa515da035cd3d878c88687fa01f0c8fb2ba"
+      },
+      "consumers": [
+        "tooling/qa/core/scheduler-lane-task.mjs",
+        "tooling/qa/core/verify-all.scheduler.mjs",
+        "tooling/qa/core/verify-focused.scheduler.mjs"
+      ],
+      "surfaces": [
+        "property:createSchedulerLaneTask/dependencies"
       ]
     },
     {
@@ -22512,7 +22527,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-config-policy.mjs",
-        "contentHash": "96cfe64862fc14974ec8f6061e21f2437b896802ca708efbd7ef6f35b7248c8f"
+        "contentHash": "6e61469c07e0cd58a1562f1044f0ee2800f21a472a498277926f770c5c8d9b5b"
       },
       "consumers": [
         "tooling/qa/core/verify-config-policy.mjs",

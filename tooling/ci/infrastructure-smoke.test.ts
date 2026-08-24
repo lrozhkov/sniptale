@@ -47,7 +47,7 @@ browser_json='{"revision":"1234",'\
 case "$*" in
   --version) printf '%s\n' 'Docker version 28.0.0' ;;
   *"image inspect"*) printf '%s\n' '["${image}"]' ;;
-  *"node --version"*) [ "$MOCK_NODE_FAILURE" = 1 ] && exit 124 || printf '%s\n' 'v22.12.0' ;;
+  *"node --version"*) [ "$MOCK_NODE_FAILURE" = 1 ] && exit 124 || printf '%s\n' 'v22.22.1' ;;
   *"semgrep --legacy --version"*) printf '%s\n' '1.173.0' ;;
   *"codeql --version"*) printf '%s\n' '2.26.3' ;;
   *"osv-scanner --version"*) printf '%s\n' '2.5.1' ;;

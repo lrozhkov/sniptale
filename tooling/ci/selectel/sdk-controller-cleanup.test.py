@@ -452,6 +452,203 @@ def identity_recovery():
     print(json.dumps(written, sort_keys=True))
 
 
+def server_create_reconciliation():
+    identity = {
+        "managed-by": "sniptale-github-actions",
+        "repository": "repo",
+        "run-id": "42",
+        "run-attempt": "3",
+        "candidate-sha": "candidate",
+        "profile-index": "0",
+    }
+    record = {
+        "runnerName": "sniptale-42-3-1",
+        "serverIdentity": identity,
+        "serverId": None,
+        "serverCreatePostAttempts": 1,
+        "serverCreateOutcome": "pending",
+    }
+
+    def server(resource_id, metadata=None):
+        return types.SimpleNamespace(
+            id=resource_id,
+            name=record["runnerName"],
+            metadata=identity if metadata is None else metadata,
+        )
+
+    class Compute:
+        def __init__(self, servers):
+            self.matches = servers
+            self.deleted = []
+
+        def servers(self, name=None, details=True):
+            assert name == record["runnerName"]
+            assert details is True
+            return self.matches
+
+        def find_server(self, resource_id, ignore_missing=True):
+            return next((item for item in self.matches if item.id == resource_id), None)
+
+        def delete_server(self, resource, ignore_missing=True):
+            self.deleted.append(resource.id)
+
+        def wait_for_delete(self, resource, interval, wait):
+            return None
+
+    def connection(servers):
+        return types.SimpleNamespace(
+            compute=Compute(servers),
+            network=types.SimpleNamespace(),
+            block_storage=types.SimpleNamespace(),
+        )
+
+    policy = {"lifecycle": {"serverCreateReconciliation": {"attempts": 3, "intervalSeconds": 1}}}
+    connections = iter((connection([]), connection([server("owned-server")])))
+    globals_ = controller["reconcile_server_create"].__globals__
+    globals_["connect"] = lambda unused_policy: (next(connections), "raw-project", "sha256:project")
+    globals_["time"].sleep = lambda seconds: None
+    reconciled, active_connection = controller["reconcile_server_create"](policy, record)
+    assert reconciled.id == "owned-server"
+    assert active_connection.compute.matches[0].id == "owned-server"
+
+    empty_connection = connection([])
+    globals_["connect"] = lambda unused_policy: (
+        empty_connection,
+        "raw-project",
+        "sha256:project",
+    )
+    missing, active_connection = controller["reconcile_server_create"](policy, record)
+    assert missing is None
+    assert active_connection is empty_connection
+
+    duplicate_connection = connection([server("owned-1"), server("owned-2")])
+    globals_["connect"] = lambda unused_policy: (
+        duplicate_connection,
+        "raw-project",
+        "sha256:project",
+    )
+    try:
+        controller["reconcile_server_create"](policy, record)
+    except RuntimeError as failure:
+        assert "duplicate owned servers" in str(failure)
+    else:
+        raise AssertionError("duplicate owned servers were admitted")
+
+    foreign_connection = connection(
+        [server("foreign", {**identity, "managed-by": "foreign-controller"})]
+    )
+    globals_["connect"] = lambda unused_policy: (
+        foreign_connection,
+        "raw-project",
+        "sha256:project",
+    )
+    try:
+        controller["reconcile_server_create"](policy, record)
+    except RuntimeError as failure:
+        assert "foreign name collision" in str(failure)
+    else:
+        raise AssertionError("foreign server name collision was admitted")
+
+    ambiguous_failure = type(
+        "ConnectFailure",
+        (Exception,),
+        {"__module__": "keystoneauth1.exceptions.connection"},
+    )("response lost")
+
+    class CreateCompute:
+        def __init__(self, failure):
+            self.failure = failure
+            self.create_calls = 0
+
+        def create_server(self, **attributes):
+            self.create_calls += 1
+            assert attributes == {"name": record["runnerName"]}
+            raise self.failure
+
+    ambiguous_create = types.SimpleNamespace(compute=CreateCompute(ambiguous_failure))
+    reconciliation_calls = []
+    globals_["reconcile_server_create"] = lambda unused_policy, unused_record: (
+        reconciliation_calls.append("read-only") or server("reconciled-server"),
+        connection([server("reconciled-server")]),
+    )
+    created, _, outcome = controller["create_server_once"](
+        policy, record, ambiguous_create, {"name": record["runnerName"]}
+    )
+    assert created.id == "reconciled-server"
+    assert outcome == "reconciled"
+    assert ambiguous_create.compute.create_calls == 1
+    assert reconciliation_calls == ["read-only"]
+
+    rejected_create = types.SimpleNamespace(compute=CreateCompute(RuntimeError("HTTP 400")))
+    reconciliation_calls.clear()
+    try:
+        controller["create_server_once"](
+            policy, record, rejected_create, {"name": record["runnerName"]}
+        )
+    except RuntimeError as failure:
+        assert str(failure) == "HTTP 400"
+    else:
+        raise AssertionError("definitive Nova rejection was reinterpreted")
+    assert rejected_create.compute.create_calls == 1
+    assert reconciliation_calls == []
+
+    unresolved_create = types.SimpleNamespace(compute=CreateCompute(ambiguous_failure))
+    globals_["reconcile_server_create"] = lambda unused_policy, unused_record: (
+        None,
+        connection([]),
+    )
+    try:
+        controller["create_server_once"](
+            policy, record, unresolved_create, {"name": record["runnerName"]}
+        )
+    except controller["UnresolvedServerCreateFailure"]:
+        pass
+    else:
+        raise AssertionError("unresolved Nova create was admitted")
+    assert unresolved_create.compute.create_calls == 1
+
+    failed_reconciliation_create = types.SimpleNamespace(
+        compute=CreateCompute(ambiguous_failure)
+    )
+
+    def fail_reconciliation(unused_policy, unused_record):
+        raise RuntimeError("read reconciliation failed")
+
+    globals_["reconcile_server_create"] = fail_reconciliation
+    try:
+        controller["create_server_once"](
+            policy,
+            record,
+            failed_reconciliation_create,
+            {"name": record["runnerName"]},
+        )
+    except controller["UnresolvedServerCreateFailure"] as failure:
+        assert "reconciliation failed" in str(failure)
+        assert isinstance(failure.__cause__, RuntimeError)
+        assert isinstance(failure.__cause__.__context__, type(ambiguous_failure))
+    else:
+        raise AssertionError("failed read reconciliation lost ambiguous mutation state")
+    assert failed_reconciliation_create.compute.create_calls == 1
+
+    cleanup_connection = connection([server("cleanup-server")])
+    cleanup_record = {**record, "serverCreateOutcome": "unresolved"}
+    result = controller["cleanup"](cleanup_connection, {}, "token", cleanup_record)
+    assert cleanup_record["serverId"] == "cleanup-server"
+    assert cleanup_record["serverCreateOutcome"] == "reconciled-for-cleanup"
+    assert cleanup_connection.compute.deleted == ["cleanup-server"]
+    assert result["server"] == "deleted"
+    print(
+        json.dumps(
+            {
+                "reconciled": reconciled.id,
+                "missing": missing,
+                "cleanup": cleanup_record["serverCreateOutcome"],
+            },
+            sort_keys=True,
+        )
+    )
+
+
 if sys.argv[1:] == ["runner-api-failure"]:
     runner_api_failure()
 elif sys.argv[1:] == ["receipt-failure"]:
@@ -462,5 +659,7 @@ elif sys.argv[1:] == ["partial-provisioning-receipt-replay"]:
     partial_provisioning_receipt_replay()
 elif sys.argv[1:] == ["identity-recovery"]:
     identity_recovery()
+elif sys.argv[1:] == ["server-create-reconciliation"]:
+    server_create_reconciliation()
 else:
     raise RuntimeError("Unknown cleanup proof case.")

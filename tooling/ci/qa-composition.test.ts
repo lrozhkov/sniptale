@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
 import { collectCiProofResults, collectCiReleaseResults } from './qa-composition.mjs';
@@ -125,4 +125,76 @@ it('fails closed when the release-only result closure is incomplete', async () =
       }),
     })
   ).rejects.toThrow('Missing release-only control result: Release archive');
+});
+
+it('runs the Fast audit after returned product failures and aggregates both results', async () => {
+  const auditCollector = vi.fn(async () => ({
+    steps: [{ label: 'npm audit', status: 'failed' as const }],
+  }));
+
+  const result = await collectCiProofResults({
+    productProofCollector: async () => ({
+      steps: [{ label: 'Oxlint', status: 'failed' as const }],
+    }),
+    auditCollector,
+  });
+
+  expect(auditCollector).toHaveBeenCalledWith({ profileId: 'pr', session: undefined });
+  expect(result.steps).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ label: 'Oxlint', status: 'failed' }),
+      expect.objectContaining({ label: 'npm audit', status: 'failed' }),
+    ])
+  );
+});
+
+it('runs the release audit and every mutation profile after returned failures', async () => {
+  const auditCollector = vi.fn(async () => ({
+    steps: [{ label: 'CodeQL', status: 'failed' as const }],
+  }));
+  const mutationCollector = vi.fn((profile: string) => ({
+    label: `Mutation ${profile}`,
+    status: 'failed' as const,
+  }));
+
+  const result = await collectCiReleaseResults({
+    productProofCollector: async () => ({
+      steps: [{ label: 'Unit tests', status: 'failed' as const }],
+    }),
+    auditCollector,
+    mutationCollector,
+  });
+
+  expect(auditCollector).toHaveBeenCalledWith({
+    profileId: 'release',
+    reusedControlIds: [],
+    session: undefined,
+  });
+  expect(mutationCollector.mock.calls.map(([profile]) => profile)).toEqual([
+    'persistence',
+    'secrets',
+  ]);
+  expect(result.steps.map(({ label, status }) => [label, status])).toEqual([
+    ['Unit tests', 'failed'],
+    ['CodeQL', 'failed'],
+    ['Mutation persistence', 'failed'],
+    ['Mutation secrets', 'failed'],
+  ]);
+});
+
+it('keeps infrastructure exceptions fail-fast instead of treating them as control results', async () => {
+  const auditCollector = vi.fn();
+  const mutationCollector = vi.fn();
+
+  await expect(
+    collectCiReleaseResults({
+      productProofCollector: async () => {
+        throw new Error('worker result envelope is unavailable');
+      },
+      auditCollector,
+      mutationCollector,
+    })
+  ).rejects.toThrow('worker result envelope is unavailable');
+  expect(auditCollector).not.toHaveBeenCalled();
+  expect(mutationCollector).not.toHaveBeenCalled();
 });

@@ -13,7 +13,7 @@ export function createSchedulerLaneTask({
   return {
     id: lane,
     cpuTokens,
-    dependencies: lane === 'lint' ? ['typecheck'] : [],
+    dependencies: [],
     exclusive,
     executionProfile,
     memoryMiB,

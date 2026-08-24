@@ -6,7 +6,7 @@ import {
   createProcessStep,
   createSkippedStep,
 } from '../qa/core/focused-qa-results.mjs';
-import { collectAuditProfileResult, recordSkippedAuditProfile } from '../qa/wrappers/audit.mjs';
+import { collectAuditProfileResult } from '../qa/wrappers/audit.mjs';
 import {
   collectFullVerifyStepResults,
   collectReleaseDeltaStepResults,
@@ -14,7 +14,6 @@ import {
 import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
 import { resolveRepositoryVerifyScope } from '../qa/core/verify-all.scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
-import { recordSkippedTimelineActivity } from '../qa/runtime/observability/timeline-context.mjs';
 import { MUTATION_PROFILES, resolveMutationRunLabel } from './mutation-policy.mjs';
 
 const semantics = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
@@ -29,10 +28,6 @@ function capability(lane) {
     throw new Error(`Malformed ${lane} gate capability policy.`);
   }
   return value;
-}
-
-function hasFailure(steps) {
-  return steps.some(({ status }) => status === 'failed');
 }
 
 export async function collectCiProofResults({
@@ -52,13 +47,6 @@ export async function collectCiProofResults({
     createSkippedStep('Unit tests', 'release-only full Vitest'),
     createSkippedStep('Test coverage', 'release-only canonical coverage'),
   ];
-  if (hasFailure(productSteps)) {
-    recordSkippedAuditProfile('pr');
-    return {
-      context: { mode: 'ci:proof', scope: 'commit' },
-      steps: productSteps,
-    };
-  }
   const audit = await auditCollector({ profileId: 'pr', session });
   return {
     context: { mode: 'ci:proof', scope: 'commit' },
@@ -160,38 +148,11 @@ export async function collectCiReleaseResults({
   const productSteps = reuseFastProof
     ? await collectVerifiedFastProofReleaseSteps(releaseDeltaCollector)
     : (await productProofCollector()).steps;
-  if (hasFailure(productSteps)) {
-    recordSkippedAuditProfile('release');
-    for (const profile of MUTATION_PROFILES) {
-      recordSkippedTimelineActivity({
-        activityId: `mutation-profile.${profile}`,
-        kind: 'mutation-profile',
-      });
-    }
-    return {
-      context: { mode: 'ci:release', scope: 'commit' },
-      executionMode: reuseFastProof ? 'reuse-fast-proof' : 'default',
-      steps: productSteps,
-    };
-  }
   const audit = await auditCollector({
     profileId: 'release',
     reusedControlIds: reuseFastProof ? REUSED_FAST_AUDIT_CONTROL_IDS : [],
     session,
   });
-  if (hasFailure(audit.steps)) {
-    for (const profile of MUTATION_PROFILES) {
-      recordSkippedTimelineActivity({
-        activityId: `mutation-profile.${profile}`,
-        kind: 'mutation-profile',
-      });
-    }
-    return {
-      context: { mode: 'ci:release', scope: 'commit' },
-      executionMode: reuseFastProof ? 'reuse-fast-proof' : 'default',
-      steps: [...productSteps, ...audit.steps],
-    };
-  }
   return {
     context: { mode: 'ci:release', scope: 'commit' },
     executionMode: reuseFastProof ? 'reuse-fast-proof' : 'default',
