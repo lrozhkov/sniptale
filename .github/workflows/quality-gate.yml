@@ -189,6 +189,9 @@ jobs:
       reference: ${{ steps.reference.outputs.reference }}
       controller-reference: ${{ steps.reference.outputs.controller-reference }}
     permissions: { contents: read, packages: write }
+    env:
+      QA_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-qa,ignore-error=true
+      CONTROLLER_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-controller,ignore-error=true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -267,7 +270,7 @@ jobs:
           sbom: true
           provenance: mode=max
           cache-from: type=gha,scope=sniptale-qa
-          cache-to: type=gha,mode=max,scope=sniptale-qa
+          cache-to: ${{ github.event_name != 'pull_request_target' && env.QA_CACHE_EXPORT || '' }}
       - name: Build exact candidate controller image
         id: build-controller
         if: steps.select.outputs['controller-build'] == 'true'
@@ -284,7 +287,7 @@ jobs:
           sbom: true
           provenance: mode=max
           cache-from: type=gha,scope=sniptale-controller
-          cache-to: type=gha,mode=max,scope=sniptale-controller
+          cache-to: ${{ github.event_name != 'pull_request_target' && env.CONTROLLER_CACHE_EXPORT || '' }}
       - name: Bind exact image references
         id: reference
         env:

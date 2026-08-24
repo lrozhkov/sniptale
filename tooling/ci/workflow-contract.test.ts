@@ -75,6 +75,19 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   );
   expect(workflow).toContain('name: Continuous Integration');
   expect(workflow).toContain(
+    'QA_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-qa,ignore-error=true'
+  );
+  expect(workflow).toContain(
+    'CONTROLLER_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-controller,ignore-error=true'
+  );
+  expect(workflow).toContain(
+    "cache-to: ${{ github.event_name != 'pull_request_target' && env.QA_CACHE_EXPORT || '' }}"
+  );
+  expect(workflow).toContain(
+    "cache-to: ${{ github.event_name != 'pull_request_target' && env.CONTROLLER_CACHE_EXPORT || '' }}"
+  );
+  expect(workflow).not.toContain('cache-to: type=gha');
+  expect(workflow).toContain(
     'options: [fast, release-provenance, selectel-smoke, selectel-connectivity]'
   );
   expect(workflow).toContain('PROOF_LANE:');
