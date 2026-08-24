@@ -281,7 +281,6 @@ export const AUDIT_STEPS = [
 ];
 
 export const FULL_VIOLATION_STEP_TOOLS = new Map([
-  ['Documentation facts', 'verify-documentation-facts.mjs'],
   ['Architecture guardrails', 'verify-architecture-guardrails.mjs'],
   ['Boundary casts', 'verify-boundary-casts.mjs'],
   ['Boundary inputs', 'verify-boundary-inputs.mjs'],
@@ -291,10 +290,10 @@ export const FULL_VIOLATION_STEP_TOOLS = new Map([
   ['Sniptale identity', 'verify-sniptale-identity.mjs'],
   ['Contract optionality drift', 'verify-contract-optionality-drift.mjs'],
   ['Messaging schema casts', 'verify-messaging-schema-casts.mjs'],
-  ['Contract parser coverage', 'verify-contract-parser-coverage.mjs'],
   ['Network fetch policy', 'verify-network-fetch-policy.mjs'],
   ['Export artifact boundaries', 'verify-export-artifact-boundaries.mjs'],
   ['Backup import atomicity', 'verify-backup-import-atomicity.mjs'],
+  ['Contract parser coverage', 'verify-contract-parser-coverage.mjs'],
   ['Resource budget consistency', 'verify-resource-budget-consistency.mjs'],
   ['Resource lifecycle pairs', 'verify-resource-lifecycle-pairs.mjs'],
   ['State-machine proof', 'verify-state-machine-proof.mjs'],
@@ -315,12 +314,12 @@ export const FULL_VIOLATION_STEP_TOOLS = new Map([
   ['Lifecycle intent loss', 'verify-lifecycle-intent.mjs'],
   ['Success/failure asymmetry', 'verify-success-failure-asymmetry.mjs'],
   ['Destructive async swaps', 'verify-destructive-async-swaps.mjs'],
-  ['Detached controller methods', 'verify-detached-controller-methods.mjs'],
   ['Storage write patterns', 'verify-storage-write-patterns.mjs'],
   ['Parser snapshot purity', 'verify-parser-snapshot-purity.mjs'],
   ['History revision semantics', 'verify-history-revision-semantics.mjs'],
   ['History detached snapshots', 'verify-history-detached-snapshots.mjs'],
   ['History transaction lifecycle', 'verify-history-transaction-lifecycle.mjs'],
+  ['Documentation facts', 'verify-documentation-facts.mjs'],
   ['Manifest integrity', 'verify-manifest-integrity.mjs'],
   ['Manifest permissions', 'verify-manifest-permissions.mjs'],
   ['Runtime topology', 'verify-runtime-topology.mjs'],
@@ -343,6 +342,7 @@ export const FULL_VIOLATION_STEP_TOOLS = new Map([
 
 export const FOCUSED_VIOLATION_STEP_TOOLS = new Map([
   ...FULL_VIOLATION_STEP_TOOLS,
+  ['Detached controller methods', 'verify-detached-controller-methods.mjs'],
   ['Domain fixture realism', 'verify-domain-fixture-realism.mjs'],
   ['Naming', 'verify-naming.mjs'],
 ]);

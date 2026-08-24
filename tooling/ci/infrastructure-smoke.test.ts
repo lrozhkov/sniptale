@@ -24,9 +24,14 @@ function runSmoke(metadataReachable = false, nodeFailure = false) {
   roots.push(root);
   fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
   fs.mkdirSync(path.join(root, 'tooling/configs/ci'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'tooling/test/mutation'), { recursive: true });
   fs.copyFileSync(
     'tooling/configs/ci/toolchain.lock.json',
     path.join(root, 'tooling/configs/ci/toolchain.lock.json')
+  );
+  fs.copyFileSync(
+    'tooling/test/mutation/package.json',
+    path.join(root, 'tooling/test/mutation/package.json')
   );
   const docker = path.join(root, 'bin/docker');
   fs.writeFileSync(
@@ -44,6 +49,7 @@ case "$*" in
   *"gitleaks --version"*) printf '%s\n' '8.30.1' ;;
   *"actionlint --version"*) printf '%s\n' '1.7.12' ;;
   *"playwright --version"*) printf '%s\n' '1.62.1' ;;
+  *"/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js --version"*) printf '%s\n' '9.6.1' ;;
   *"node -e"*) printf '%s\n' "$browser_json" ;;
   *"/opt/playwright/chromium-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
   *"/opt/playwright/chromium_headless_shell-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
@@ -102,6 +108,7 @@ describe('Selectel infrastructure smoke', () => {
       'gitleaks',
       'actionlint',
       'playwright',
+      'stryker',
       'playwright-chromium',
       'playwright-asset-chromium-1234',
       'playwright-asset-chromium_headless_shell-1234',

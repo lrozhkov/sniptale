@@ -1,4 +1,3 @@
-import { VERIFY_ALL_VIOLATION_STEPS } from '../verify-all.violation-steps.mjs';
 import {
   FOCUSED_CODE_VIOLATION_STEPS,
   FOCUSED_CONTEXTUAL_VIOLATION_STEPS,
@@ -14,14 +13,13 @@ import {
   E2E_STEPS,
   FOCUSED_DIRECT_STEPS,
   FOCUSED_VIOLATION_STEP_TOOLS,
-  FULL_VIOLATION_STEP_TOOLS,
   HARNESS_STEPS,
-  RELEASE_DIRECT_STEPS,
   STRUCTURAL_AUDIT_STEPS,
   WRAPPER_LIFECYCLE_STEPS,
 } from './definitions.data.mjs';
 import { REPO_AUDIT_REPORT_DEFINITIONS } from '../../evidence/repo-audit-evidence/registry.data.mjs';
 import { createQaStepOccurrence } from './policy/index.mjs';
+import { createReleaseControlOccurrences } from './release-occurrences.mjs';
 
 export { FOCUSED_VIOLATION_STEP_TOOLS, FULL_VIOLATION_STEP_TOOLS } from './definitions.data.mjs';
 
@@ -80,12 +78,7 @@ function createManualOccurrences(canonicalOccurrences) {
 }
 
 const NON_MANUAL_STEP_OCCURRENCES = Object.freeze([
-  ...createTupleOccurrences(RELEASE_DIRECT_STEPS, 'release-direct', 'tool'),
-  ...createViolationOccurrences(
-    VERIFY_ALL_VIOLATION_STEPS,
-    FULL_VIOLATION_STEP_TOOLS,
-    'release-guardrail'
-  ),
+  ...createReleaseControlOccurrences(),
   ...createTupleOccurrences(FOCUSED_DIRECT_STEPS, 'focused-direct', 'tool'),
   ...createViolationOccurrences(
     FOCUSED_CODE_VIOLATION_STEPS,

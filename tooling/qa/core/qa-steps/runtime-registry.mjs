@@ -9,13 +9,12 @@ import {
   FOCUSED_DIRECT_STEPS,
   FOCUSED_TRIGGERED_RUNTIME_STEPS,
   FOCUSED_VIOLATION_STEP_TOOLS,
-  FULL_VIOLATION_STEP_TOOLS,
   HARNESS_STEPS,
-  RELEASE_DIRECT_STEPS,
   STRUCTURAL_AUDIT_STEPS,
   WRAPPER_LIFECYCLE_STEPS,
 } from './definitions.data.mjs';
 import { createQaStepOccurrence } from './policy/index.mjs';
+import { createReleaseControlOccurrences } from './release-occurrences.mjs';
 
 function fromTuple(tuple, lane, kind = 'tool') {
   const [id, label, tool, execution, source, runsIn] = tuple;
@@ -29,8 +28,7 @@ function fromToolMap(toolMap, lane) {
 }
 
 const occurrences = [
-  ...RELEASE_DIRECT_STEPS.map((tuple) => fromTuple(tuple, 'release-direct')),
-  ...fromToolMap(FULL_VIOLATION_STEP_TOOLS, 'release-guardrail'),
+  ...createReleaseControlOccurrences(),
   ...FOCUSED_DIRECT_STEPS.map((tuple) => fromTuple(tuple, 'focused-direct')),
   ...FOCUSED_TRIGGERED_RUNTIME_STEPS.map((tuple) =>
     fromTuple(tuple, 'focused-triggered', 'guardrail')
