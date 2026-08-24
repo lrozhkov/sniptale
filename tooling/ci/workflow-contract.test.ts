@@ -111,15 +111,23 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('name: Fast PR Gate');
   expect(workflow).toContain('name: Release provenance Gate');
   expect(workflow).toContain('name: Selectel infrastructure smoke');
-  expect(workflow).toContain(
-    "needs.provision.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke'"
+  expect(workflow).toContain("if: ${{ !cancelled() && needs.qa-image.result == 'success' }}");
+  const candidateCondition = candidateJob.slice(
+    candidateJob.indexOf('    if:'),
+    candidateJob.indexOf('    runs-on:')
   );
-  expect(workflow).toContain(
-    [
-      "needs.provision.result == 'success' && ",
-      "(github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke')",
-    ].join('')
+  expect(candidateCondition).toContain('!cancelled() &&');
+  expect(candidateCondition).toContain("needs.provision.result == 'success'");
+  expect(candidateCondition).toContain(
+    "(github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke')"
   );
+  const infrastructureJob = workflow.slice(
+    workflow.indexOf('  infrastructure-smoke:'),
+    workflow.indexOf('\n  trusted-admission:')
+  );
+  expect(infrastructureJob).toContain('!cancelled() &&');
+  expect(infrastructureJob).toContain("needs.provision.result == 'success'");
+  expect(infrastructureJob).toContain("inputs.gate == 'selectel-smoke'");
   expect(workflow).toContain(
     "node tooling/ci/infrastructure-smoke.mjs '${{ needs.qa-image.outputs.reference }}'"
   );
