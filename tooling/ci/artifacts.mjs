@@ -53,7 +53,8 @@ function readProofSemanticsPolicy(repositoryRoot) {
       JSON.stringify(['trusted-controls', 'candidate-controls']) ||
     policy.invariants?.resourceProfileDoesNotChangeControlSemantics !== true ||
     policy.invariants?.resourceProfileExcludedFromSemanticDigest !== true ||
-    policy.invariants?.resourceProfileAffectsReuseCompatibility !== true ||
+    policy.invariants?.resourceProfileAffectsReuseCompatibility !== false ||
+    policy.reuseCompatibility?.authority !== 'environment-profile' ||
     policy.invariants?.fastGateNeverClaimsReleaseReadiness !== true ||
     policy.invariants?.fullVitestIsReleaseOnly !== true ||
     JSON.stringify(policy.invariants?.diffAwareWrappersExactly) !==
@@ -94,17 +95,14 @@ function normalizeExecutionProfile(lane, resourceProfiles, infrastructure) {
   };
 }
 
-function reuseCompatibility(lane, executionProfile, semanticsPolicy) {
-  const minimum = semanticsPolicy.reuseCompatibility?.[lane]?.minimumExecutionProfile;
-  if (!minimum || !executionProfile) {
+function reuseCompatibility(executionProfile, semanticsPolicy) {
+  if (!executionProfile) {
     return { outcome: 'diagnostic-only', reason: 'no canonical execution profile' };
   }
-  const belowMinimum = Object.entries(minimum)
-    .filter(([name, value]) => executionProfile[name] < value)
-    .map(([name, value]) => ({ name, minimum: value, actual: executionProfile[name] }));
-  return belowMinimum.length === 0
-    ? { outcome: 'compatible', minimumExecutionProfile: minimum }
-    : { outcome: 'incompatible', minimumExecutionProfile: minimum, belowMinimum };
+  if (semanticsPolicy.reuseCompatibility?.authority !== 'environment-profile') {
+    return { outcome: 'incompatible', reason: 'unknown execution-profile authority' };
+  }
+  return { outcome: 'compatible', authority: 'environment-profile' };
 }
 
 function assertNoSymlinkComponents(relativeSource, repositoryRoot) {
@@ -536,7 +534,7 @@ export function collectLaneArtifacts({
     phases,
     resourceProfiles,
     executionProfile,
-    reuseCompatibility: reuseCompatibility(lane, executionProfile, semanticsPolicy),
+    reuseCompatibility: reuseCompatibility(executionProfile, semanticsPolicy),
     infrastructure,
     proofReuse: {
       build: proofReuseStatus(destinationRoot, '.tmp/qa/build-proof.json'),

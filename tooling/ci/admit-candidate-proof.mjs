@@ -44,14 +44,11 @@ function validateExecutionCompatibility(manifest, lane, lanePolicy, trustedRoot)
   const semantics = JSON.parse(
     fs.readFileSync(path.join(trustedRoot, SEMANTICS_POLICY_PATH), 'utf8')
   );
-  const minimum = semantics.reuseCompatibility?.[lane]?.minimumExecutionProfile;
   if (
     manifest.reuseCompatibility?.outcome !== 'compatible' ||
+    manifest.reuseCompatibility?.authority !== semantics.reuseCompatibility?.authority ||
+    semantics.reuseCompatibility?.authority !== 'environment-profile' ||
     !profile ||
-    !minimum ||
-    JSON.stringify(manifest.reuseCompatibility.minimumExecutionProfile) !==
-      JSON.stringify(minimum) ||
-    Object.entries(minimum).some(([name, value]) => profile[name] < value) ||
     manifest.gateClaim !== lanePolicy.claim ||
     manifest.fullVitest !== lanePolicy.fullVitest ||
     manifest.releaseReady !== lanePolicy.releaseReady

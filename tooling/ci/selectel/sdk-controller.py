@@ -28,7 +28,6 @@ from openstack import exceptions
 
 ROOT = Path(os.environ.get("SNIPTALE_REPOSITORY_ROOT", "/workspace")).resolve()
 POLICY_PATH = ROOT / "tooling/configs/ci/selectel-runner.json"
-SEMANTICS_PATH = ROOT / "tooling/configs/ci/proof-semantics.json"
 HOST_TOOLS_PATH = ROOT / "tooling/configs/ci/selectel-host-tools.json"
 REDACTION_PROJECT_ID: str | None = None
 
@@ -93,11 +92,6 @@ def parse_managed_resource_description(policy: dict[str, Any], resource):
 def read_policy() -> dict[str, Any]:
     policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
     compute = policy.get("compute", {})
-    zones = compute.get("allowedZones")
-    boot_sizes = compute.get("allowedBootVolumeGiB")
-    flavors = compute.get("allowedFlavors")
-    profiles = compute.get("allowedResourceProfilesByFlavor")
-    volume_types = compute.get("allowedVolumeTypesByZone")
     server_reconciliation = policy.get("lifecycle", {}).get("serverCreateReconciliation")
 
     def positive_record(value, fields):
@@ -112,48 +106,12 @@ def read_policy() -> dict[str, Any]:
             )
         )
 
-    flavor_fields = {"vcpus", "ramMiB"}
-    profile_fields = {
-        "cpuTokens", "memoryMiB", "vitestWorkers", "playwrightWorkers", "securityWorkers"
-    }
-    valid_shapes = (
-        isinstance(zones, list)
-        and bool(zones)
-        and len(set(zones)) == len(zones)
-        and all(isinstance(zone, str) and zone for zone in zones)
-        and isinstance(boot_sizes, list)
-        and bool(boot_sizes)
-        and all(not isinstance(size, bool) and isinstance(size, int) and size > 0 for size in boot_sizes)
-        and isinstance(flavors, dict)
-        and bool(flavors)
-        and all(positive_record(flavor, flavor_fields) for flavor in flavors.values())
-        and isinstance(profiles, dict)
-        and set(profiles) == set(flavors)
-        and all(positive_record(profile, profile_fields) for profile in profiles.values())
-        and isinstance(volume_types, dict)
-        and set(volume_types) == set(zones)
-        and all(
-            isinstance(types, list)
-            and bool(types)
-            and all(isinstance(volume_type, str) and volume_type for volume_type in types)
-            for types in volume_types.values()
-        )
-    )
-    valid_capacity = valid_shapes and all(
-        profiles[name]["cpuTokens"] <= flavor["vcpus"]
-        and profiles[name]["memoryMiB"] < flavor["ramMiB"]
-        and flavor["ramMiB"] - profiles[name]["memoryMiB"] >= 6144
-        and all(
-            profiles[name][worker] <= profiles[name]["cpuTokens"]
-            for worker in ("vitestWorkers", "playwrightWorkers", "securityWorkers")
-        )
-        for name, flavor in flavors.items()
-    )
     if (
         policy.get("schemaVersion") != 1
         or policy.get("artifactKind") != "sniptale-selectel-runner-policy"
         or policy.get("environment") != "selectel-runner-controller"
-        or not valid_capacity
+        or compute.get("operatingSystem") != "Ubuntu 24.04 LTS"
+        or compute.get("architecture") != "x86_64"
         or compute.get("preemptible") is not True
         or compute.get("publicIp") is not False
         or compute.get("ingress") is not False
@@ -225,7 +183,6 @@ def read_profiles(policy: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
         raise RuntimeError("SELECTEL_QA_PROFILES profiles must be a non-empty array.")
     if len(profiles) > policy["lifecycle"]["maxProfiles"]:
         raise RuntimeError("SELECTEL_QA_PROFILES exceeds the bounded profile count.")
-    compute = policy["compute"]
     normalized_profiles = []
     seen = set()
     for index, profile in enumerate(profiles):
@@ -245,19 +202,10 @@ def read_profiles(policy: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
         flavor_name = profile["flavor"]
         volume_type = profile["volumeType"]
         volume_gib = profile["volumeGiB"]
-        flavor = compute["allowedFlavors"].get(flavor_name)
-        if zone not in compute["allowedZones"] or flavor is None:
-            raise RuntimeError(f"Selectel profile {index} uses an unknown zone or flavor.")
-        if volume_type not in compute["allowedVolumeTypesByZone"].get(zone, []):
-            raise RuntimeError(f"Selectel profile {index} uses an unknown volume type for its zone.")
-        if isinstance(volume_gib, bool) or volume_gib not in compute["allowedBootVolumeGiB"]:
-            raise RuntimeError(f"Selectel profile {index} uses an unsupported volume size.")
-        if qa != compute["allowedResourceProfilesByFlavor"].get(flavor_name):
-            raise RuntimeError(f"Selectel profile {index} uses an unknown flavor/resource combination.")
-        if qa["cpuTokens"] > flavor["vcpus"] or qa["memoryMiB"] >= flavor["ramMiB"]:
-            raise RuntimeError(f"Selectel profile {index} oversubscribes CPU or memory.")
-        if flavor["ramMiB"] - qa["memoryMiB"] < 6144:
-            raise RuntimeError(f"Selectel profile {index} does not reserve enough system memory.")
+        if any(not isinstance(value, str) or not value for value in (zone, flavor_name, volume_type)):
+            raise RuntimeError(f"Selectel profile {index} resource identity is malformed.")
+        if isinstance(volume_gib, bool) or not isinstance(volume_gib, int) or volume_gib <= 0:
+            raise RuntimeError(f"Selectel profile {index} volume size is malformed.")
         if any(qa[name] > qa["cpuTokens"] for name in ("vitestWorkers", "playwrightWorkers", "securityWorkers")):
             raise RuntimeError(f"Selectel profile {index} workers exceed CPU tokens.")
         normalized = {
@@ -275,13 +223,6 @@ def read_profiles(policy: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
     lane = os.environ.get("SNIPTALE_PROOF_LANE", "proof")
     if lane not in {"proof", "release"}:
         raise RuntimeError(f"Unknown Selectel proof lane: {lane}.")
-    semantics = json.loads(SEMANTICS_PATH.read_text(encoding="utf-8"))
-    minimum = semantics.get("reuseCompatibility", {}).get(lane, {}).get("minimumExecutionProfile")
-    if not isinstance(minimum, dict):
-        raise RuntimeError(f"Selectel {lane} minimum execution profile is missing.")
-    for index, profile in enumerate(normalized_profiles):
-        if any(profile["qa"].get(key, 0) < value for key, value in minimum.items()):
-            raise RuntimeError(f"Selectel profile {index} is below the {lane} lane minimum.")
     normalized_document = json.dumps(
         {"profiles": normalized_profiles}, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
@@ -342,12 +283,9 @@ def select_resources(connection, policy: dict[str, Any], placement: dict[str, An
     if len(flavors) != 1:
         raise RuntimeError("Configured Selectel flavor is unavailable or ambiguous.")
     flavor = flavors[0]
-    if (
-        flavor.vcpus != compute["allowedFlavors"][placement["flavor"]]["vcpus"]
-        or flavor.ram != compute["allowedFlavors"][placement["flavor"]]["ramMiB"]
-        or flavor.disk != 0
-    ):
-        raise RuntimeError("Configured Selectel flavor drifted from the canonical resource profile.")
+    qa = placement["qa"]
+    if flavor.vcpus < qa["cpuTokens"] or flavor.ram <= qa["memoryMiB"] or flavor.disk != 0:
+        raise RuntimeError("Configured Selectel flavor cannot satisfy the environment resource profile.")
     images = []
     for image in connection.image.images(status="active"):
         if image.name == selector["name"]:

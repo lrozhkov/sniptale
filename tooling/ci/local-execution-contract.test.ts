@@ -44,7 +44,7 @@ it('fixes resource profiles as planning-only metadata and rejects ci:build prove
     invariants: {
       resourceProfileDoesNotChangeControlSemantics: true,
       resourceProfileExcludedFromSemanticDigest: true,
-      resourceProfileAffectsReuseCompatibility: true,
+      resourceProfileAffectsReuseCompatibility: false,
       fastGateNeverClaimsReleaseReadiness: true,
       fullVitestIsReleaseOnly: true,
       ciBuildIsNonProof: true,

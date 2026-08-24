@@ -181,7 +181,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     executionProfile,
     reuseCompatibility: {
       outcome: 'compatible',
-      minimumExecutionProfile: semantics.reuseCompatibility.proof.minimumExecutionProfile,
+      authority: semantics.reuseCompatibility.authority,
     },
     proofSemanticDigest: createProofSemanticDigest({
       lane: 'proof',
@@ -233,7 +233,7 @@ it('admits a complete candidate proof only through trusted-base policy', () => {
   ).toMatchObject({ outcome: 'passed', derived: false });
 });
 
-it('rejects missing phases and execution profiles below the trusted minimum', () => {
+it('rejects missing phases or profile authority without imposing resource minimums', () => {
   const missing = fixture();
   missing.manifest.phases.pop();
   resealArtifact(missing.artifact, missing.manifest);
@@ -251,7 +251,7 @@ it('rejects missing phases and execution profiles below the trusted minimum', ()
   const weak = fixture();
   weak.manifest.executionProfile.cpuTokens = 2;
   resealArtifact(weak.artifact, weak.manifest);
-  expect(() =>
+  expect(
     admitCandidateProof({
       artifactRoot: weak.artifact,
       baseSha: weak.baseSha,
@@ -260,6 +260,20 @@ it('rejects missing phases and execution profiles below the trusted minimum', ()
       expectedTrustedControlSha: weak.commit,
       lane: 'proof',
       trustedRoot: weak.trusted,
+    })
+  ).toMatchObject({ outcome: 'passed' });
+  const unowned = fixture();
+  delete unowned.manifest.reuseCompatibility.authority;
+  resealArtifact(unowned.artifact, unowned.manifest);
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: unowned.artifact,
+      baseSha: unowned.baseSha,
+      candidateRoot: unowned.candidate,
+      commit: unowned.commit,
+      expectedTrustedControlSha: unowned.commit,
+      lane: 'proof',
+      trustedRoot: unowned.trusted,
     })
   ).toThrow(/execution profile/u);
 });
