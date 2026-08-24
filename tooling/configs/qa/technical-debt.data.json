@@ -15048,7 +15048,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifact-observability.mjs",
-        "contentHash": "beece672be94e10264dabe00bc706070d5975f7b5c2581591b337f38d1e5dde6"
+        "contentHash": "715294e0ce1cd79f2329a67715c1144b6f693f67b782a33ccbfa310cfc6d4c7f"
       },
       "consumers": [
         "tooling/ci/artifact-observability.mjs",
@@ -15164,8 +15164,8 @@
         "tooling/ci/artifacts.mjs",
         "tooling/ci/ci-contract.test.ts",
         "tooling/ci/derive-fast-proof.mjs",
-        "tooling/ci/run-lane.mjs",
         "tooling/ci/seal-lane-artifacts.mjs",
+        "tooling/ci/seal-lane-in-container.mjs",
         "tooling/ci/verify-main-proof.mjs"
       ],
       "surfaces": [
@@ -16354,7 +16354,8 @@
         "tooling/ci/container-command.mjs",
         "tooling/ci/container-command.test.ts",
         "tooling/ci/container.mjs",
-        "tooling/ci/run-lane.mjs"
+        "tooling/ci/run-lane.mjs",
+        "tooling/ci/trusted-phase-receipt.mjs"
       ],
       "surfaces": [
         "binding:CANONICAL_IMAGE_ENVIRONMENT",
@@ -16370,7 +16371,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container.mjs",
-        "contentHash": "408d4948a5d04388ac3f66dad368f9f9ed822d0a09b895738ec85e31fe7d458e"
+        "contentHash": "7c5e62343673d1686dfb3d5fe755603c281e607ecce438e24b1912f8f5695bb3"
       },
       "consumers": [
         "tooling/ci/container.mjs"
@@ -19165,6 +19166,7 @@
         "contentHash": "918c4ad4d17515d67b700f13c21536e2aaa648ef9856ea0e30ab34d12e26291b"
       },
       "consumers": [
+        "tooling/ci/seal-lane-artifacts.mjs",
         "tooling/qa/wrappers/audit.test.ts",
         "tooling/qa/wrappers/observed/output.mjs",
         "tooling/qa/wrappers/observed/output.test.ts",
@@ -20119,6 +20121,7 @@
         "contentHash": "6b708c302961c6fbbc460675e7b4311463e558dbe1ec6385a58c95bf56fc9a29"
       },
       "consumers": [
+        "tooling/ci/artifact-observability.mjs",
         "tooling/qa/runtime/observability/index.mjs",
         "tooling/qa/runtime/observability/resume.mjs"
       ],
@@ -20241,16 +20244,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/run-lane.mjs",
-        "contentHash": "d609294506dc9a6850550060badb7edb3a7222e3b5241a27e23979048e1e03b9"
+        "contentHash": "0d73a00f8ce37cbedd2abed3faf1c245a738e94cb6d7d059af62619e85ce3829"
       },
       "consumers": [
         "tooling/ci/run-lane.mjs"
       ],
       "surfaces": [
         "binding:phases",
-        "property:artifactInput",
-        "property:executionEnvironment",
-        "property:resourceProfiles"
+        "property:args"
       ]
     },
     {
@@ -20309,7 +20310,6 @@
       "consumers": [
         "tooling/ci/proof-wrapper.mjs",
         "tooling/ci/release-wrapper.mjs",
-        "tooling/ci/seal-lane-artifacts.mjs",
         "tooling/qa/wrappers/advisory.mjs",
         "tooling/qa/wrappers/audit.mjs",
         "tooling/qa/wrappers/build.mjs",
@@ -20629,6 +20629,26 @@
         "binding:LOG_KEYS",
         "binding:REPOSITORY_KEYS",
         "binding:SUMMARY_KEYS"
+      ]
+    },
+    {
+      "id": "policy.source.seal-lane-in-container-mjs.c24370d3b7",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/ci/seal-lane-in-container.mjs",
+        "contentHash": "62e15521aefe2d7e34d6eeea981b768885d753e72ee31da2d473f917b226c889"
+      },
+      "consumers": [
+        "tooling/ci/seal-lane-in-container.mjs"
+      ],
+      "surfaces": [
+        "property:artifactInput",
+        "property:executionEnvironment",
+        "property:resourceProfiles"
       ]
     },
     {

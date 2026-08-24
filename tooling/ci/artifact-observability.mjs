@@ -1,7 +1,5 @@
-import {
-  createObservabilityRun,
-  resumeLatestObservabilityRun,
-} from '../qa/runtime/observability/index.mjs';
+import { createObservabilityRun } from '../qa/runtime/observability/run.mjs';
+import { resumeLatestObservabilityRun } from '../qa/runtime/observability/resume.mjs';
 
 function failedPhaseDiagnostic(phase) {
   return {

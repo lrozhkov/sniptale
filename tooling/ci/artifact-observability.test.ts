@@ -7,19 +7,26 @@ import { expect, it } from 'vitest';
 import { createTempRoot } from '../qa/core/test-helpers';
 import { resolveCiArtifactSession } from './artifact-observability.mjs';
 
-it('routes both CI launchers through one artifact lifecycle owner', () => {
+it('routes local and trusted-container sealing through one artifact lifecycle owner', () => {
   const owner = fs.readFileSync('tooling/ci/seal-lane-artifacts.mjs', 'utf8');
   expect(owner).toContain(
     "import { resolveCiArtifactSession } from './artifact-observability.mjs'"
   );
   expect(owner).toContain('resolveCiArtifactSession({ lane, phases, startedAtMs })');
   expect(owner).toContain('collectLaneArtifacts({');
-  for (const file of ['run-lane.mjs', 'local.mjs']) {
-    const source = fs.readFileSync(path.join('tooling/ci', file), 'utf8');
+  const localSource = fs.readFileSync(path.join('tooling/ci', 'local.mjs'), 'utf8');
+  const trustedSealerSource = fs.readFileSync(
+    path.join('tooling/ci', 'seal-lane-in-container.mjs'),
+    'utf8'
+  );
+  const hostDispatcherSource = fs.readFileSync(path.join('tooling/ci', 'run-lane.mjs'), 'utf8');
+  for (const source of [localSource, trustedSealerSource]) {
     expect(source).toContain("import { sealLaneArtifacts } from './seal-lane-artifacts.mjs'");
     expect(source).toContain('sealLaneArtifacts({');
     expect(source).not.toContain('resolveCiArtifactSession({');
   }
+  expect(hostDispatcherSource).toContain('seal-lane-in-container.mjs');
+  expect(hostDispatcherSource).not.toContain('sealLaneArtifacts');
 });
 
 it('seals canonical failure evidence when a prerequisite fails before the CI wrapper starts', () => {
