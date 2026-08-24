@@ -5,6 +5,8 @@ import { spawnSync } from 'node:child_process';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { describeDockerFailure, isAcceptedDockerResult } from './infrastructure-smoke-process.mjs';
+
 const roots: string[] = [];
 const image = `ghcr.io/lrozhkov/sniptale-qa@sha256:${'a'.repeat(64)}`;
 
@@ -12,7 +14,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
-function runSmoke(metadataReachable = false) {
+function runSmoke(metadataReachable = false, nodeFailure = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-infrastructure-smoke-'));
   roots.push(root);
   fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
@@ -30,7 +32,7 @@ browser_json='{"revision":"1234",'\
 '"assets":[{"exists":true},{"exists":true},{"exists":true}]}'
 case "$*" in
   *"image inspect"*) printf '%s\n' '["${image}"]' ;;
-  *"node --version"*) printf '%s\n' 'v22.12.0' ;;
+  *"node --version"*) [ "$MOCK_NODE_FAILURE" = 1 ] && exit 124 || printf '%s\n' 'v22.12.0' ;;
   *"semgrep --legacy --version"*) printf '%s\n' '1.173.0' ;;
   *"codeql --version"*) printf '%s\n' '2.26.3' ;;
   *"osv-scanner --version"*) printf '%s\n' '2.5.1' ;;
@@ -55,6 +57,7 @@ esac
       ...process.env,
       PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
       MOCK_METADATA_REACHABLE: metadataReachable ? '1' : '0',
+      MOCK_NODE_FAILURE: nodeFailure ? '1' : '0',
     },
   });
   const receipt = JSON.parse(
@@ -90,5 +93,40 @@ describe('Selectel infrastructure smoke', () => {
     expect(result.status).toBe(1);
     expect(receipt.status).toBe('failed');
     expect(receipt.checks.at(-1)).toEqual({ id: 'container-metadata-denied', status: 'failed' });
+  });
+
+  it('records the failing container exit instead of a generic tool failure', () => {
+    const { receipt, result } = runSmoke(false, true);
+    expect(result.status).toBe(1);
+    expect(receipt.status).toBe('failed');
+    expect(receipt.failure).toBe('node failed (exit 124)');
+    expect(receipt.checks.at(-1)).toEqual({ id: 'node', status: 'failed' });
+  });
+
+  it('accepts only concrete curl denial exits and rejects process failures', () => {
+    expect(isAcceptedDockerResult({ error: undefined, signal: null, status: 7 }, [7, 28])).toBe(
+      true
+    );
+    expect(isAcceptedDockerResult({ error: undefined, signal: null, status: 28 }, [7, 28])).toBe(
+      true
+    );
+    expect(isAcceptedDockerResult({ error: undefined, signal: null, status: 125 }, [7, 28])).toBe(
+      false
+    );
+
+    const timedOut = spawnSync(process.execPath, ['-e', 'setTimeout(() => {}, 1000)'], {
+      timeout: 10,
+    });
+    expect(timedOut.error?.code).toBe('ETIMEDOUT');
+    expect(isAcceptedDockerResult(timedOut, [7, 28])).toBe(false);
+    expect(describeDockerFailure(timedOut, 10)).toBe('timed out after 10ms');
+
+    const missing = spawnSync('/sniptale-missing-docker', []);
+    expect(isAcceptedDockerResult(missing, [7, 28])).toBe(false);
+    expect(describeDockerFailure(missing, 30_000)).toBe('spawn error ENOENT');
+
+    const signalled = spawnSync('sh', ['-c', 'kill -TERM $$']);
+    expect(isAcceptedDockerResult(signalled, [7, 28])).toBe(false);
+    expect(describeDockerFailure(signalled, 30_000)).toBe('signal SIGTERM');
   });
 });

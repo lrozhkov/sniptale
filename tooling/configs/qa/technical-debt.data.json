@@ -18213,7 +18213,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/infrastructure-smoke.mjs",
-        "contentHash": "6b4f30d550a90317c7c030eda511e9d0a1ad4fc26feec1d493c45d73706a0b1b"
+        "contentHash": "95ec7ef6267782fdaecf2ad28ac5474acc1d5bf0a2edbea141dee3e226df9dc9"
       },
       "consumers": [
         "tooling/ci/infrastructure-smoke.mjs"
@@ -18221,6 +18221,7 @@
       "surfaces": [
         "binding:checks",
         "binding:receipt",
+        "property:acceptedStatuses",
         "property:dockerArgs"
       ]
     },
