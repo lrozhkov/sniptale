@@ -117,6 +117,11 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('needs.trusted-admission.outputs.execution_path');
   expect(workflow).toContain("needs.fast-classifier.outputs.reuse != 'true'");
   expect(workflow).toContain('node ../trusted-control/tooling/ci/container.mjs "$PROOF_LANE"');
+  expect(candidateJob).toMatch(
+    /actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020[\s\S]*node-version: 22\.12\.0[\s\S]*Restore verified reusable proof inputs/u
+  );
+  expect(candidateJob).toContain('if [ -f "$manifest" ]; then');
+  expect(candidateJob).toContain('Artifact: not produced before the failure.');
   expect(workflow).toContain(
     'name: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}'
   );
