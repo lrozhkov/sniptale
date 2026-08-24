@@ -5,7 +5,11 @@ import { spawnSync } from 'node:child_process';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { describeDockerFailure, isAcceptedDockerResult } from './infrastructure-smoke-process.mjs';
+import {
+  describeDockerFailure,
+  getInfrastructureSmokeTimeoutMs,
+  isAcceptedDockerResult,
+} from './infrastructure-smoke-process.mjs';
 
 const roots: string[] = [];
 const image = `ghcr.io/lrozhkov/sniptale-qa@sha256:${'a'.repeat(64)}`;
@@ -67,6 +71,13 @@ esac
 }
 
 describe('Selectel infrastructure smoke', () => {
+  it('bounds only image and Python cold starts above the default smoke timeout', () => {
+    expect(getInfrastructureSmokeTimeoutMs('node')).toBe(180_000);
+    expect(getInfrastructureSmokeTimeoutMs('semgrep')).toBe(90_000);
+    expect(getInfrastructureSmokeTimeoutMs('codeql')).toBe(30_000);
+    expect(getInfrastructureSmokeTimeoutMs('playwright-asset-chromium-1234')).toBe(30_000);
+  });
+
   it('admits the immutable image, locked toolchain, browser assets, and metadata deny', () => {
     const { receipt, result } = runSmoke();
     expect(result.status).toBe(0);

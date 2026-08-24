@@ -2,7 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { describeDockerFailure, isAcceptedDockerResult } from './infrastructure-smoke-process.mjs';
+import {
+  describeDockerFailure,
+  getInfrastructureSmokeTimeoutMs,
+  isAcceptedDockerResult,
+} from './infrastructure-smoke-process.mjs';
 
 const imageReference = process.argv[2];
 if (!/^ghcr\.io\/lrozhkov\/sniptale-qa@sha256:[a-f0-9]{64}$/u.test(imageReference ?? '')) {
@@ -50,7 +54,11 @@ function runInImage(id, command, args = [], options = {}) {
       command,
       ...args,
     ],
-    { acceptedStatuses: options.acceptedStatuses, id, timeoutMs: options.timeoutMs }
+    {
+      acceptedStatuses: options.acceptedStatuses,
+      id,
+      timeoutMs: options.timeoutMs ?? getInfrastructureSmokeTimeoutMs(id),
+    }
   );
 }
 
@@ -76,7 +84,7 @@ try {
     throw new Error('The locally pulled QA image is not bound to the requested immutable digest.');
   }
 
-  expectVersion('node', 'node', lock.node.version, ['--version'], { timeoutMs: 180_000 });
+  expectVersion('node', 'node', lock.node.version);
   expectVersion('semgrep', 'semgrep', lock.semgrep.version, ['--legacy', '--version']);
   expectVersion('codeql', 'codeql', lock.codeql.version);
   expectVersion('osv-scanner', 'osv-scanner', lock.osvScanner.version);

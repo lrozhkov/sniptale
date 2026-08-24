@@ -14,6 +14,12 @@ export function isAcceptedDockerResult(result, acceptedStatuses = [0]) {
   );
 }
 
+export function getInfrastructureSmokeTimeoutMs(id) {
+  if (id === 'node') return 180_000;
+  if (id === 'semgrep') return 90_000;
+  return 30_000;
+}
+
 export function describeDockerFailure(result, timeoutMs) {
   if (result.error?.code === 'ETIMEDOUT') return `timed out after ${timeoutMs}ms`;
   if (result.error)
