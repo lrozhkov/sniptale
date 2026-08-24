@@ -8,9 +8,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf '%s\n' \
-      'deb https://snapshot.debian.org/archive/debian/20250521T000000Z bookworm main' \
-      'deb https://snapshot.debian.org/archive/debian/20250521T000000Z bookworm-updates main' \
-      'deb https://snapshot.debian.org/archive/debian-security/20250521T000000Z bookworm-security main' \
+      'deb https://snapshot.debian.org/archive/debian/20260316T000000Z bookworm main' \
+      'deb https://snapshot.debian.org/archive/debian/20260316T000000Z bookworm-updates main' \
+      'deb https://snapshot.debian.org/archive/debian-security/20260316T000000Z bookworm-security main' \
       > /etc/apt/sources.list \
     && printf '%s\n' \
       'Acquire::Check-Valid-Until "false";' \

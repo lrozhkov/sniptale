@@ -10,6 +10,9 @@ const dockerfile = fs.readFileSync('/tmp/Sniptale.Dockerfile', 'utf8');
 if (!dockerfile.startsWith(`FROM ${lock.node.image}\n`)) {
   throw new Error('Dockerfile base image drifted from toolchain.lock.json.');
 }
+if (lock.node.baseDebianSnapshot !== lock.debian.snapshot) {
+  throw new Error('Node base Debian snapshot drifted from the canonical Debian snapshot.');
+}
 for (const expectedSource of [
   `${lock.debian.archiveUrl} bookworm main`,
   `${lock.debian.archiveUrl} bookworm-updates main`,
