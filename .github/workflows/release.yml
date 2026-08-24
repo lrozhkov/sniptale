@@ -189,7 +189,7 @@ jobs:
           EOF
           request=$(mktemp)
           jq -n --arg tag "$RELEASE_TAG" --arg name "$release_name" --rawfile body "$notes" \
-            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: true, generate_release_notes: false}' > "$request"
+            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false, generate_release_notes: false}' > "$request"
           if [ "$already_published" = false ]; then
             release=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$request")
             release_id=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release")

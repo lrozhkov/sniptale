@@ -1,11 +1,12 @@
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
-import { collectMutationEvidence } from './artifacts.mjs';
+import { collectMutationEvidence, copyReusableFastAuditReport } from './artifacts.mjs';
 
 const temporaryRoots: string[] = [];
 
@@ -112,4 +113,29 @@ it('rejects mutation evidence below a symlinked ancestor directory', () => {
     })
   ).toThrow('Unsafe artifact symlink: .tmp/mutation/persistence/42/stryker-report.json');
   expect(fs.readdirSync(destinationRoot)).toEqual([]);
+});
+
+it('copies Fast audit evidence only when the sealed manifest and bytes agree', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-fast-audit-reuse-'));
+  temporaryRoots.push(root);
+  const proofRoot = path.join(root, 'proof');
+  const destinationRoot = path.join(root, 'release');
+  const relative = '.tmp/semgrep/results.json';
+  const source = path.join(proofRoot, relative);
+  fs.mkdirSync(path.dirname(source), { recursive: true });
+  fs.mkdirSync(destinationRoot);
+  fs.writeFileSync(source, '{"results":[]}\n');
+  const digest = crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex');
+  fs.writeFileSync(
+    path.join(proofRoot, 'proof-manifest.json'),
+    `${JSON.stringify({ files: [{ file: relative, sha256: digest }] })}\n`
+  );
+
+  expect(copyReusableFastAuditReport(relative, destinationRoot, proofRoot)).toBe(true);
+  expect(fs.readFileSync(path.join(destinationRoot, relative), 'utf8')).toBe('{"results":[]}\n');
+
+  fs.writeFileSync(source, '{"results":["tampered"]}\n');
+  expect(() => copyReusableFastAuditReport(relative, destinationRoot, proofRoot)).toThrow(
+    'Reusable Fast proof report digest mismatch'
+  );
 });

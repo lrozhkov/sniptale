@@ -30,6 +30,7 @@ import {
 } from './verify-closeout-step-helpers.mjs';
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { PRODUCT_SOURCE_ROOTS } from './src-production-targets.mjs';
+import { resolveQaReleaseResourceProfile } from '../runtime/resource-profile.mjs';
 import { resolveProductUnitTestPool } from './verify-unit-tests.mjs';
 import { collectScheduledFullVerifySteps } from './verify-all.scheduler.mjs';
 import { collectOwnerGuardStep } from './owner-guard-step-helpers.mjs';
@@ -150,13 +151,20 @@ function createDefaultCollectors() {
     collectTypecheckStep: ({ checkerCount, targetFiles }) =>
       collectTypecheckStepResult({ checkerCount, targetFiles }),
     collectDeadExportsStep,
-    collectUnitAndCoverageSteps: ({ codeFiles, releaseMode, targetFiles, vitestMaxWorkers }) =>
+    collectUnitAndCoverageSteps: ({
+      codeFiles,
+      releaseMode,
+      reuseUnitProof,
+      targetFiles,
+      vitestMaxWorkers,
+    }) =>
       collectUnitTestAndCoverageStepResults({
         codeFiles,
         coverageEnabled: false,
         maxWorkers: vitestMaxWorkers ?? null,
         pool: resolveProductUnitTestPool(),
         releaseMode,
+        reuseProof: reuseUnitProof ?? true,
         suite: PRODUCT_QA_SUITE,
         targetFiles,
       }),
@@ -282,6 +290,26 @@ export async function collectFullVerifyStepResults({
     scopeDetail: includeTests
       ? collectUnitTestScopeDetail(context)
       : 'full Vitest deferred to ci:release',
+    steps,
+  };
+}
+
+export async function collectReleaseDeltaStepResults({
+  verifyScope = resolveFullVerifyScope(),
+  baseline = loadBaseline(),
+  collectors = {},
+} = {}) {
+  const context = createReleaseContext({ releaseMode: true, verifyScope, baseline });
+  const resolvedCollectors = { ...createDefaultCollectors(), ...collectors };
+  const profile = resolveQaReleaseResourceProfile();
+  const steps = await resolvedCollectors.collectUnitAndCoverageSteps({
+    ...context,
+    reuseUnitProof: false,
+    vitestMaxWorkers: profile.vitestMaxWorkers,
+  });
+  await appendPostVerifySteps(steps, context, resolvedCollectors);
+  return {
+    scopeDetail: 'verified Fast proof plus fresh release full-suite tests',
     steps,
   };
 }

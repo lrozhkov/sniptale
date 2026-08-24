@@ -978,14 +978,19 @@ def cleanup_command(policy: dict[str, Any], record_file: str):
     record = json.loads(destination.read_text(encoding="utf-8"))
     if record.get("artifactKind") != "sniptale-selectel-provision-record" or record.get(
         "status"
-    ) not in {"online", "cleanup-failed", "profiles-exhausted", "admission-failed"}:
+    ) not in {
+        "provisioning",
+        "provision-failed",
+        "online",
+        "cleanup-failed",
+        "profiles-exhausted",
+        "admission-failed",
+    }:
         raise RuntimeError("Malformed Selectel provision record.")
     token = required(os.environ.get("RUNNER_CONTROLLER_TOKEN"), "RUNNER_CONTROLLER_TOKEN")
     targets = [record]
-    if record.get("status") in {
-        "cleanup-failed", "profiles-exhausted", "admission-failed"
-    } and isinstance(record.get("attempts"), list):
-        targets = [
+    if isinstance(record.get("attempts"), list):
+        attempt_targets = [
             attempt
             for attempt in record["attempts"]
             if attempt.get("status") not in {"cleaned", "cleaned-after-provision-failure"}
@@ -1002,9 +1007,27 @@ def cleanup_command(policy: dict[str, Any], record_file: str):
                 or attempt.get("volumeIds")
             )
         ]
-        if not targets and record.get("status") == "cleanup-failed":
+        if attempt_targets:
+            targets = attempt_targets
+        has_top_level_resources = any(
+            (
+                record.get("runnerId"),
+                record.get("serverId"),
+                record.get("portIds"),
+                record.get("securityGroupId"),
+                record.get("routerPortIds"),
+                record.get("routerInterfacePortIds"),
+                record.get("routerId"),
+                record.get("subnetId"),
+                record.get("networkId"),
+                record.get("volumeIds"),
+            )
+        )
+        if not attempt_targets and not has_top_level_resources and record.get(
+            "status"
+        ) == "cleanup-failed":
             raise RuntimeError("Cleanup-failed Selectel record has no replayable resources.")
-        if not targets:
+        if not attempt_targets and not has_top_level_resources:
             record["cleanup"] = {"status": "already-cleaned"}
             record["cleanupAttempts"] = 0
             record["status"] = "cleaned"

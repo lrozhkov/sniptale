@@ -1,5 +1,5 @@
 name: Continuous Integration
-run-name: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'Selectel TTL sweep' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
+run-name: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'Selectel TTL sweep' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-recovery' && 'Selectel exact-run recovery' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
 
 on:
   pull_request_target:
@@ -17,7 +17,18 @@ on:
         required: true
         default: release-provenance
         type: choice
-        options: [fast, release-provenance, selectel-smoke, selectel-connectivity]
+        options:
+          [fast, release-provenance, selectel-smoke, selectel-connectivity, selectel-recovery]
+      recovery_run_id:
+        description: Exact GitHub run ID whose Selectel resources should be recovered
+        required: false
+        default: ''
+        type: string
+      recovery_run_attempt:
+        description: Exact GitHub run attempt whose Selectel resources should be recovered
+        required: false
+        default: ''
+        type: string
       bypass_reason:
         description: Optional operator note recorded in the run summary
         required: false
@@ -144,12 +155,15 @@ jobs:
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: node ../trusted-control/tooling/ci/restore-fast-proof.mjs "$BASE_SHA" "$RUNNER_TEMP/base-fast-proof"
       - name: Install exact candidate dependencies for non-gate validators
+        id: install
         if: steps.source.outcome == 'success'
+        continue-on-error: true
         working-directory: candidate
         run: npm ci --ignore-scripts
       - name: Derive a candidate-bound proof without Selectel
         id: derive
-        if: steps.source.outcome == 'success'
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
         working-directory: candidate
         run: node tooling/ci/derive-fast-proof.mjs "$RUNNER_TEMP/base-fast-proof" "build/ci-artifacts/proof-${CANDIDATE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" "$BASE_SHA"
       - name: Publish docs-only admission decision
@@ -158,10 +172,11 @@ jobs:
         env:
           REUSABLE_INPUTS: ${{ steps.classify.outputs.reuse }}
           SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
           DERIVE_OUTCOME: ${{ steps.derive.outcome }}
         run: |
           reuse=false
-          if [ "$REUSABLE_INPUTS" = true ] && [ "$SOURCE_OUTCOME" = success ] && [ "$DERIVE_OUTCOME" = success ]; then reuse=true; fi
+          if [ "$REUSABLE_INPUTS" = true ] && [ "$SOURCE_OUTCOME" = success ] && [ "$INSTALL_OUTCOME" = success ] && [ "$DERIVE_OUTCOME" = success ]; then reuse=true; fi
           echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: steps.admission.outputs.reuse == 'true'
@@ -179,6 +194,7 @@ jobs:
       needs.fast-classifier.outputs.reuse != 'true' &&
       (needs.fast-classifier.result == 'success' || needs.fast-classifier.result == 'skipped') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-connectivity') &&
+      (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-recovery') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'release-provenance' || github.ref == 'refs/heads/main') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke' || github.ref == 'refs/heads/main') &&
       (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
@@ -808,31 +824,81 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: selectel-runner-controller
-    permissions: { contents: read, packages: read }
+    permissions: { contents: read }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - name: Build the controller from the exact scheduled main commit
+        run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .
       - name: Delete expired managed Selectel resources
         env:
-          CONTROLLER_IMAGE: ghcr.io/lrozhkov/sniptale-controller:main
+          CONTROLLER_IMAGE: sniptale-controller:${{ github.sha }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
           SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
           SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
           RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
         run: |
-          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
+          status=0
           docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
-            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" sweep
+            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" sweep || status=$?
+          if [ ! -f build/selectel-controller/sweep.json ]; then
+            mkdir -p build/selectel-controller
+            if [ "$status" -eq 0 ]; then status=1; fi
+            jq -n --argjson exitCode "$status" '{
+              schemaVersion: 3,
+              artifactKind: "sniptale-selectel-sweep-proof",
+              status: "failed",
+              failure: {kind: "ControllerExit", exitCode: $exitCode}
+            }' > build/selectel-controller/sweep.json
+          fi
+          exit "$status"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: selectel-sweep-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/selectel-controller/sweep.json
+          if-no-files-found: error
+          retention-days: 30
+
+  selectel-recovery:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.gate == 'selectel-recovery'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: selectel-runner-controller
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - name: Build the controller from the exact dispatched main commit
+        run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .
+      - name: Recover one exact Selectel run attempt without provisioning
+        env:
+          CONTROLLER_IMAGE: sniptale-controller:${{ github.sha }}
+          RECOVERY_RUN_ID: ${{ inputs.recovery_run_id }}
+          RECOVERY_RUN_ATTEMPT: ${{ inputs.recovery_run_attempt }}
+          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
+          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
+        run: |
+          printf '%s\n' "$RECOVERY_RUN_ID" | grep -Eq '^[1-9][0-9]*$'
+          printf '%s\n' "$RECOVERY_RUN_ATTEMPT" | grep -Eq '^[1-9][0-9]*$'
+          mkdir -p build/selectel-controller
+          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            --env RUNNER_CONTROLLER_TOKEN \
+            --env GITHUB_RUN_ID="$RECOVERY_RUN_ID" --env GITHUB_RUN_ATTEMPT="$RECOVERY_RUN_ATTEMPT" \
+            "$CONTROLLER_IMAGE" recover-cleanup /workspace/build/selectel-controller/recovery.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: selectel-recovery-${{ inputs.recovery_run_id }}-${{ inputs.recovery_run_attempt }}-${{ github.run_id }}
+          path: build/selectel-controller/recovery.json
           if-no-files-found: error
           retention-days: 30
 

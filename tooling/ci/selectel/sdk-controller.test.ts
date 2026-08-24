@@ -201,6 +201,21 @@ it('replays cleanup from nested resources after provisioning cleanup was interru
   expect(receipt.attempts[0].status).toBe('cleaned');
 });
 
+it('replays cleanup from partial top-level and nested provisioning receipts', () => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', 'partial-provisioning-receipt-replay'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toEqual({
+    cleaned: ['top-level-server', 'nested-server'],
+  });
+});
+
 it('recovers cleanup by exact run and run-attempt identity when the receipt is unavailable', () => {
   const result = spawnSync(
     'python3',

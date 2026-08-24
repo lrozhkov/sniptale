@@ -78,7 +78,7 @@ export function classifyExistingRelease(release, expectedTag, expectedName, expe
   if (
     release?.tag_name !== expectedTag ||
     release?.name !== expectedName ||
-    release?.prerelease !== true
+    release?.prerelease !== false
   ) {
     throw new Error('Existing release does not belong to the exact Sniptale alpha publication.');
   }
