@@ -17,7 +17,6 @@ import {
   resolveContainerDigest,
   resolveGithubRunIdentityEnvironment,
 } from './container-identity.mjs';
-import { assertReservedMountAvailable } from './trusted-mount.mjs';
 
 const lane = process.argv[2];
 if (!['proof', 'release'].includes(lane)) {
@@ -27,8 +26,6 @@ if (!['proof', 'release'].includes(lane)) {
 const root = process.cwd();
 const trustedRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 if (!fs.statSync(trustedRoot).isDirectory()) throw new Error('Trusted CI root is unavailable.');
-const trustedToolingMount = path.join(root, '.sniptale-trusted-tooling');
-assertReservedMountAvailable(trustedToolingMount);
 const lockBytes = fs.readFileSync(path.join(root, 'tooling/configs/ci/toolchain.lock.json'));
 const lockDigest = crypto.createHash('sha256').update(lockBytes).digest('hex');
 const image = process.env.SNIPTALE_CI_IMAGE ?? `sniptale-qa:${lockDigest.slice(0, 16)}`;
@@ -281,8 +278,6 @@ const dockerArgs = [
   `${path.join(root, '.git')}:/workspace/.git:ro`,
   '--volume',
   `${trustedRoot}:/opt/sniptale-trusted:ro`,
-  '--volume',
-  `${path.join(trustedRoot, 'tooling')}:/workspace/.sniptale-trusted-tooling:ro`,
 ];
 if (unitProofHostPath) {
   dockerArgs.push('--volume', `${unitProofHostPath}:/opt/sniptale-unit-proof.json:ro`);
