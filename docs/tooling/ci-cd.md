@@ -17,13 +17,14 @@ The diff-local development flow remains separate and unchanged: `qa:release-harn
 
 ## Continuous Integration
 
-The existing `quality-gate.yml` has two execution modes and two bounded infrastructure diagnostics:
+The existing `quality-gate.yml` has two execution modes and three bounded infrastructure diagnostics:
 
 ```text
 Fast PR Gate              → ci:proof
 Release provenance Gate   → exact fast proof reuse, or ci:proof on the same VM → ci:release
 Selectel connectivity     → read-only controller preflight
 Selectel infrastructure smoke → QA image + disposable VM/toolchain checks + complete cleanup
+Selectel recovery         → exact historical run/attempt cleanup without QA image or provisioning
 ```
 
 `selectel-smoke` is the first external infrastructure check after a material runner or controller change. It uses `SELECTEL_QA_PROFILES`, provisions one disposable runner, verifies the immutable QA image, exact Node/Semgrep/CodeQL/OSV Scanner/Gitleaks/actionlint/Playwright versions, and starts every pinned Chromium/Headless Shell/FFmpeg executable so missing system libraries fail before a heavy lane. It also proves denial of container access to OpenStack metadata. It deliberately skips `npm ci`, `ci:proof`, `ci:release`, candidate proof admission, SARIF, and Codecov. Its final gate succeeds only when image resolution, provisioning, smoke checks, and the independent cleanup job all succeed. Heavy Fast and Release provenance gates are not dispatched until this smoke is green.
@@ -57,7 +58,7 @@ Documentation-only or release-note changes may reuse a matching receipt only whe
 
 The controller writes an early provision receipt before candidate execution. Every `run-id/run-attempt/profile-attempt` identity owns a disposable no-ingress security group, network, subnet, router interface, router, VM port, VM, and boot volume. Cleanup waits for QA to stop using the runner but uses `always()` and does not depend on proof formation or upload. It prefers the early receipt, but if the provision job lost that receipt it reconstructs only the exact current run/run-attempt identity from OpenStack metadata, managed descriptions, and the JIT runner name. It idempotently removes the JIT registration and the complete resource set after success, QA failure, cancellation, or runner loss.
 
-The independent TTL sweeper runs hourly from the trusted `main` controller image; it does not enter the QA/release graph or provision a runner. It deletes ports and offline runner registrations only when their complete managed identity is expired; a merely detached port or offline but unexpired JIT runner is not sufficient. The normal `always()` cleanup still runs immediately and has a timeout large enough for all bounded deletion retries. This prevents sweeper/provision races and limits the cost of an interrupted cleanup to the configured TTL plus at most one sweep interval.
+Cleanup accepts the incrementally written `provisioning` receipt, so cancellation at any acquisition step remains recoverable. The independent TTL sweeper runs hourly from the exact checked-out trusted `main` controller; it does not depend on a moving controller tag, enter the QA/release graph, or provision a runner. It deletes ports and offline runner registrations only when their complete managed identity is expired; a merely detached port or offline but unexpired JIT runner is not sufficient. The main-only recovery mode uses the same exact controller and targets one numeric historical run/attempt without building a QA image. The normal `always()` cleanup still runs immediately and has a timeout large enough for all bounded deletion retries. This prevents sweeper/provision races and limits the cost of an interrupted cleanup to the configured TTL plus at most one sweep interval.
 
 Sanitized controller and QA receipts contain the selected profile index and digest, zone, flavor, volume type/size, resource budgets, candidate/base/control identities, and immutable image reference. The Selectel project UUID is represented only by a shortened SHA-256. Controller exceptions and OpenStack fault messages are redacted against the authenticated project and every credential value before console or receipt serialization. Credentials, raw project ID, JIT configuration, and cloud-init are never artifacts. The VM anonymously pulls the public immutable QA image, so no reusable registry or repository token enters Nova user-data. Trusted bootstrap installs and verifies a Docker forwarding deny for the OpenStack metadata address before starting the JIT runner; failure prevents candidate execution.
 
@@ -81,7 +82,7 @@ SARIF upload is a presentation job over the canonical artifact. Codecov upload i
 
 Admission verifies the annotated GitHub signature, package/tag match, `main` ancestry, release publisher, immutable-release setting, tag ruleset, exact provenance artifact, and all artifact hashes. Publication consumes the already verified extension ZIP; it does not rebuild or rerun QA. A retry verifies and accepts an already immutable exact tag/name/asset set, recreates only an exact owned mutable draft, and rejects every unrelated or mismatched release state. A failed publish can therefore be rerun without another VM, including a failure after GitHub made the release immutable.
 
-The immutable public asset set is compact: extension ZIP, CycloneDX SBOM, deterministic QA evidence ZIP, provenance JSON, `SHA256SUMS`, and release-owned CI/coverage/release/license SVG badges. The evidence ZIP contains the detailed reports and receipts instead of publishing them as a loose file collection. The release is created as a draft, every asset and GitHub digest is verified, then the release is published and verified immutable.
+The immutable public asset set is compact: extension ZIP, CycloneDX SBOM, deterministic QA evidence ZIP, provenance JSON, `SHA256SUMS`, and release-owned CI/coverage/release/license SVG badges. The evidence ZIP contains the detailed reports and receipts instead of publishing them as a loose file collection. The release is created as a draft, every asset and GitHub digest is verified, then the immutable alpha release is published as the repository's latest release. Alpha status remains in the release name and notes rather than GitHub's prerelease flag because release-owned README badges resolve through `releases/latest`.
 
 ## Bypass and recovery
 

@@ -286,7 +286,7 @@ it('verifies the exact published asset set including SHA256SUMS itself', () => {
   ).not.toThrow();
   expect(
     classifyExistingRelease(
-      { ...draft, name: 'Sniptale 0.3.3 alpha', prerelease: true, draft: false, immutable: true },
+      { ...draft, name: 'Sniptale 0.3.3 alpha', prerelease: false, draft: false, immutable: true },
       'v0.3.3',
       'Sniptale 0.3.3 alpha',
       expected
@@ -298,7 +298,7 @@ it('verifies the exact published asset set including SHA256SUMS itself', () => {
         ...draft,
         assets: draft.assets.slice(0, 1),
         name: 'Sniptale 0.3.3 alpha',
-        prerelease: true,
+        prerelease: false,
       },
       'v0.3.3',
       'Sniptale 0.3.3 alpha',
@@ -307,7 +307,7 @@ it('verifies the exact published asset set including SHA256SUMS itself', () => {
   ).toEqual({ action: 'recreate-owned-draft', releaseId: '42' });
   expect(() =>
     classifyExistingRelease(
-      { ...draft, name: 'Unrelated', prerelease: true },
+      { ...draft, name: 'Unrelated', prerelease: false },
       'v0.3.3',
       'Sniptale 0.3.3 alpha',
       expected
@@ -320,7 +320,7 @@ it('verifies the exact published asset set including SHA256SUMS itself', () => {
   ]) {
     expect(() =>
       classifyExistingRelease(
-        { ...draft, assets, name: 'Sniptale 0.3.3 alpha', prerelease: true },
+        { ...draft, assets, name: 'Sniptale 0.3.3 alpha', prerelease: false },
         'v0.3.3',
         'Sniptale 0.3.3 alpha',
         expected

@@ -168,6 +168,41 @@ it('packages the release archive after a green release build', async () => {
   expect(archiveCollector).toHaveBeenCalledTimes(1);
 });
 
+it('runs only fresh full tests and release artifact owners after verified Fast proof reuse', async () => {
+  const module = await import('./verify-all.execution.mjs');
+  const testsCollector = vi.fn(async (_context) => [
+    { label: 'Unit tests', status: 'ok' as const },
+    { label: 'Test coverage', status: 'skipped' as const },
+  ]);
+  const buildCollector = vi.fn(async () => ({ label: 'Build', status: 'ok' as const }));
+  const archiveCollector = vi.fn(async () => ({
+    label: 'Release archive',
+    status: 'ok' as const,
+  }));
+
+  const result = await module.collectReleaseDeltaStepResults({
+    verifyScope: createVerifyScope(),
+    baseline: [],
+    collectors: {
+      collectUnitAndCoverageSteps: testsCollector,
+      collectBuildStep: buildCollector,
+      collectReleaseArchiveStep: archiveCollector,
+    },
+  });
+
+  expect(result.steps.map(({ label }) => label)).toEqual([
+    'Unit tests',
+    'Test coverage',
+    'Build',
+    'Release archive',
+  ]);
+  expect(testsCollector).toHaveBeenCalledWith(
+    expect.objectContaining({ releaseMode: true, reuseUnitProof: false })
+  );
+  expect(buildCollector).toHaveBeenCalledTimes(1);
+  expect(archiveCollector).toHaveBeenCalledTimes(1);
+});
+
 it('accepts one dependency graph collector while preserving release step order', async () => {
   const module = await import('./verify-all.execution.mjs');
   const graphCollector = vi.fn(async () => [

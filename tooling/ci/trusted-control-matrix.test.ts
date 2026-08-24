@@ -43,6 +43,8 @@ it('requires base-owned fast and release control matrices while permitting decla
       'qa.rule.mutation-secrets',
     ])
   );
+  expect(release.allowedSkipped).toContain('qa.rule.test-coverage');
+  expect(release.requiredPassed).not.toContain('qa.rule.test-coverage');
   expect(() => validateTrustedControlResults(recordFor('proof'), 'proof')).not.toThrow();
   expect(() => validateTrustedControlResults(recordFor('release'), 'release')).not.toThrow();
 });
@@ -57,6 +59,13 @@ it('rejects missing, skipped, failed, or duplicated mandatory candidate results'
   skipped.steps.find(({ stepId }) => stepId === 'qa.rule.unit-tests')!.outcome = 'skipped';
   expect(() => validateTrustedControlResults(skipped, 'release')).toThrow(
     'did not pass mandatory trusted control: qa.rule.unit-tests'
+  );
+  const skippedCoverageAudit = recordFor('release');
+  skippedCoverageAudit.steps.find(
+    ({ stepId }) => stepId === 'qa.rule.full-product-coverage'
+  )!.outcome = 'skipped';
+  expect(() => validateTrustedControlResults(skippedCoverageAudit, 'release')).toThrow(
+    'did not pass mandatory trusted control: qa.rule.full-product-coverage'
   );
   const duplicated = recordFor('proof');
   duplicated.steps.push({ stepId: 'qa.rule.semgrep', outcome: 'passed' });
