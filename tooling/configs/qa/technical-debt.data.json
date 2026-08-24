@@ -19794,7 +19794,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/qa-composition.mjs",
-        "contentHash": "f3f086a20d8ee36d8c73193d181e23cc8967d60d1d209e9629daafe40453015e"
+        "contentHash": "63c8d105684e3ffacc2867c8c4c95cf647db28af3e4e470dcacee1f88adc1c0f"
       },
       "consumers": [
         "tooling/ci/proof-wrapper.mjs",
