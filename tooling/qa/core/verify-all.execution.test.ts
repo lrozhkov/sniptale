@@ -193,6 +193,28 @@ it('runs only SonarJS and release artifact owners after verified Fast proof reus
   expect(archiveCollector).toHaveBeenCalledTimes(1);
 });
 
+it('keeps the fresh Fast build and archive instead of repeating artifact owners', async () => {
+  const module = await import('./verify-all.execution.mjs');
+  const sonarjsCollector = vi.fn(async () => ({ label: 'SonarJS', status: 'ok' as const }));
+  const buildCollector = vi.fn();
+  const archiveCollector = vi.fn();
+
+  const result = await module.collectReleaseDeltaStepResults({
+    verifyScope: createVerifyScope(),
+    baseline: [],
+    includeArtifactSteps: false,
+    collectors: {
+      collectSonarjsReleaseStep: sonarjsCollector,
+      collectBuildStep: buildCollector,
+      collectReleaseArchiveStep: archiveCollector,
+    },
+  });
+
+  expect(result.steps.map(({ label }) => label)).toEqual(['SonarJS']);
+  expect(buildCollector).not.toHaveBeenCalled();
+  expect(archiveCollector).not.toHaveBeenCalled();
+});
+
 it('accepts one dependency graph collector while preserving release step order', async () => {
   const module = await import('./verify-all.execution.mjs');
   const graphCollector = vi.fn(async () => [

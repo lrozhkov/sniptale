@@ -159,9 +159,10 @@ export async function collectCiReleaseResults({
       excludedControlLabels: ciExcludedControlLabels('proof'),
       verifyScope,
     }),
-  releaseDeltaCollector = (verifyScope) =>
+  releaseDeltaCollector = (verifyScope, { includeArtifactSteps }) =>
     collectReleaseDeltaStepResults({
       excludedControlLabels: ciExcludedControlLabels('release'),
+      includeArtifactSteps,
       verifyScope,
     }),
   auditCollector = collectAuditProfileResult,
@@ -170,10 +171,11 @@ export async function collectCiReleaseResults({
   capability('release');
   const verifyScope = scopeResolver();
   const collectProductProof = () => productProofCollector(verifyScope);
-  const collectReleaseDelta = () => releaseDeltaCollector(verifyScope);
+  const collectReleaseDelta = (includeArtifactSteps) => () =>
+    releaseDeltaCollector(verifyScope, { includeArtifactSteps });
   const productSteps = reuseFastProof
-    ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta)
-    : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta);
+    ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta(true))
+    : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta(false));
   const audit = await auditCollector({
     profileId: 'release',
     reusedControlIds: reuseFastProof ? REUSED_FAST_AUDIT_CONTROL_IDS : [],
