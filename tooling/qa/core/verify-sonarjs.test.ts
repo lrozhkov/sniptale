@@ -225,6 +225,7 @@ it('adds curated SonarJS rules only to production source files', async () => {
   const eslint = new ESLint({
     cwd: repoRoot,
     overrideConfig: verifier.createSonarjsEslintOverrideConfig(),
+    overrideConfigFile: true,
   });
   const paths = [
     'apps/extension/src/contracts/settings/index.ts',

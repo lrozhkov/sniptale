@@ -84,6 +84,7 @@ it('restores a content-addressed unit receipt from the latest release provenance
   const commit = 'b'.repeat(40);
   const commandRunner = (args: string[]) => {
     if (args[1] === 'list') return JSON.stringify([{ databaseId: 77, headSha: commit }]);
+    if (args[0] === 'api') return '1\n';
     writeFile(artifactRoot, '.tmp/qa/unit-proof.json', '{"proof":true}\n');
     return '';
   };

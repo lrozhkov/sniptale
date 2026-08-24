@@ -18,6 +18,11 @@ const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json'
 const hostTools = JSON.parse(
   fs.readFileSync('tooling/configs/ci/selectel-host-tools.json', 'utf8')
 );
+const mutationPackage = JSON.parse(fs.readFileSync('tooling/test/mutation/package.json', 'utf8'));
+const mutationVersion = mutationPackage.devDependencies?.['@stryker-mutator/core'];
+if (typeof mutationVersion !== 'string' || mutationVersion.length === 0) {
+  throw new Error('Mutation runner version is missing from its canonical package manifest.');
+}
 const destination = 'build/selectel-controller/infrastructure-smoke.json';
 const checks = [];
 const startedAt = new Date().toISOString();
@@ -133,6 +138,10 @@ try {
   expectVersion('gitleaks', 'gitleaks', lock.gitleaks.version);
   expectVersion('actionlint', 'actionlint', lock.actionlint.version);
   expectVersion('playwright', 'playwright', lock.playwright.version);
+  expectVersion('stryker', 'node', mutationVersion, [
+    '/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js',
+    '--version',
+  ]);
 
   const browserAssets = lock.playwright.assets.map((asset) => ({
     id: asset.id,

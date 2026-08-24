@@ -67,7 +67,7 @@ it('does not invoke Vitest coverage when focused owner scope is deferred', async
   expect(runUnitTests).not.toHaveBeenCalled();
   expect(steps.map((step) => [step.label, step.status, step.summary ?? step.detail])).toEqual([
     ['Unit tests', 'skipped', 'skipped: no local test owner in diff'],
-    ['Test coverage', 'skipped', expect.stringContaining('deferred to qa:audit')],
+    ['Test coverage', 'skipped', expect.stringContaining('deferred to ci:release')],
   ]);
 });
 

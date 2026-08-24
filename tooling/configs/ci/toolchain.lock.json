@@ -29,6 +29,10 @@
       "version": "6.1.0"
     }
   },
+  "dependencyGraph": {
+    "packagePath": "node_modules/dependency-cruiser",
+    "version": "18.2.0"
+  },
   "openstackController": {
     "pythonVersion": "3.12.11",
     "image": "python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
@@ -91,7 +95,7 @@
     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
   },
   "mutationRunner": {
-    "packageJsonSha256": "45b63a6b4a3b43ba92ad6ffc3a1ca602bbb0ec1e97d035972e79f1aa3b2cade3",
-    "packageLockSha256": "3d388ccdce0fd7f05a858f684b0ee78960f4d2f40e48f24a24ee63c0feb46f41"
+    "packageJsonSha256": "6daf99b028772fe29b6a3a530e3c6b968fa57a551e30c2e0be10b9675c8f1770",
+    "packageLockSha256": "b4d726999eef958f7257e790ede029459fa41476c79f4ea630c1312167d6c3ac"
   }
 }

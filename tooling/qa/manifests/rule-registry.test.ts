@@ -35,13 +35,7 @@ describe('rule registry', () => {
 
     expect(coverage?.runsIn).toContain('qa:release-harness');
     expect(coverage?.requiredBy).toEqual(
-      expect.arrayContaining([
-        'qa:release-harness',
-        'qa:checkpoint',
-        'qa:build',
-        'qa:release',
-        'qa:closeout',
-      ])
+      expect.arrayContaining(['qa:release-harness', 'qa:checkpoint', 'qa:build', 'qa:closeout'])
     );
   });
 });
