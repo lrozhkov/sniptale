@@ -15155,7 +15155,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/artifacts.mjs",
-        "contentHash": "808bbf4acf7c6e1ae41ab7bcf8e3ab1bce0b359bc6223b682018c06eb2817b83"
+        "contentHash": "0bc1d45527032b677a116f03769de99868ef4c8e29e6ea559fb764dc20ee7a88"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",

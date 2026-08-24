@@ -49,42 +49,8 @@
     "onlineTimeoutSeconds": 600
   },
   "compute": {
-    "allowedZones": ["ru-3a", "ru-3b"],
-    "allowedFlavors": {
-      "SL1.24-49152": { "vcpus": 24, "ramMiB": 49152 },
-      "SL1.16-32768": { "vcpus": 16, "ramMiB": 32768 },
-      "SL1.12-24576": { "vcpus": 12, "ramMiB": 24576 }
-    },
-    "allowedVolumeTypesByZone": {
-      "ru-3a": ["universal.ru-3a"],
-      "ru-3b": ["basicssd.ru-3b"]
-    },
-    "allowedResourceProfilesByFlavor": {
-      "SL1.24-49152": {
-        "cpuTokens": 24,
-        "memoryMiB": 36864,
-        "vitestWorkers": 16,
-        "playwrightWorkers": 4,
-        "securityWorkers": 8
-      },
-      "SL1.16-32768": {
-        "cpuTokens": 16,
-        "memoryMiB": 24576,
-        "vitestWorkers": 12,
-        "playwrightWorkers": 4,
-        "securityWorkers": 8
-      },
-      "SL1.12-24576": {
-        "cpuTokens": 12,
-        "memoryMiB": 18432,
-        "vitestWorkers": 8,
-        "playwrightWorkers": 4,
-        "securityWorkers": 6
-      }
-    },
     "operatingSystem": "Ubuntu 24.04 LTS",
     "architecture": "x86_64",
-    "allowedBootVolumeGiB": [80],
     "publicIp": false,
     "ingress": false,
     "preemptible": true,

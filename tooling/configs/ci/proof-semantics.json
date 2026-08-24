@@ -29,24 +29,7 @@
     }
   },
   "reuseCompatibility": {
-    "proof": {
-      "minimumExecutionProfile": {
-        "cpuTokens": 12,
-        "memoryMiB": 18432,
-        "vitestWorkers": 1,
-        "playwrightWorkers": 1,
-        "securityWorkers": 1
-      }
-    },
-    "release": {
-      "minimumExecutionProfile": {
-        "cpuTokens": 16,
-        "memoryMiB": 24576,
-        "vitestWorkers": 8,
-        "playwrightWorkers": 2,
-        "securityWorkers": 2
-      }
-    }
+    "authority": "environment-profile"
   },
   "environmentAdmissibility": {
     "host-wsl": "diagnostic-and-documented-bypass-input-only",
@@ -56,7 +39,7 @@
   "invariants": {
     "resourceProfileDoesNotChangeControlSemantics": true,
     "resourceProfileExcludedFromSemanticDigest": true,
-    "resourceProfileAffectsReuseCompatibility": true,
+    "resourceProfileAffectsReuseCompatibility": false,
     "diffAwareWrappersExactly": ["qa:release-harness", "qa:checkpoint", "qa:closeout"],
     "ciGatesAreRepositoryWide": true,
     "fastGateNeverClaimsReleaseReadiness": true,

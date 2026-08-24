@@ -25,12 +25,11 @@ it('keeps cloud protocols in the pinned official OpenStack SDK', () => {
 
 it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () => {
   const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/selectel-runner.json', 'utf8'));
-  expect(policy.compute.allowedZones).toEqual(['ru-3a', 'ru-3b']);
-  expect(policy.compute.allowedBootVolumeGiB).toEqual([80]);
-  expect(policy.compute.allowedVolumeTypesByZone).toEqual({
-    'ru-3a': ['universal.ru-3a'],
-    'ru-3b': ['basicssd.ru-3b'],
-  });
+  expect(policy.compute).not.toHaveProperty('allowedZones');
+  expect(policy.compute).not.toHaveProperty('allowedFlavors');
+  expect(policy.compute).not.toHaveProperty('allowedBootVolumeGiB');
+  expect(policy.compute).not.toHaveProperty('allowedVolumeTypesByZone');
+  expect(policy.compute).not.toHaveProperty('allowedResourceProfilesByFlavor');
   expect(policy.compute).not.toHaveProperty('attemptPlacements');
   expect(policy.network).toEqual({
     subnetCidr: '10.77.0.0/24',
@@ -341,17 +340,13 @@ it('validates and hashes the ordered runtime profile document without storing it
   expect(JSON.parse(python.stdout).digest).toBe(validated.digest);
 });
 
-it('rejects proof-compatible profiles that are below the canonical release minimum', () => {
-  const releaseProfiles = { profiles: validProfiles.profiles.slice(0, 2) };
+it('accepts the same environment-owned profiles for proof and release lanes', () => {
   expect(() =>
     validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'proof')
   ).not.toThrow();
   expect(() =>
-    validateSelectelProfilesForLane(JSON.stringify(releaseProfiles), 'release')
+    validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'release')
   ).not.toThrow();
-  expect(() => validateSelectelProfilesForLane(JSON.stringify(validProfiles), 'release')).toThrow(
-    /release lane minimum/u
-  );
 });
 
 it.each([
@@ -363,15 +358,6 @@ it.each([
     'unknown profile field',
     JSON.stringify({ profiles: [{ ...validProfiles.profiles[0], extra: 1 }] }),
   ],
-  ['unknown zone', JSON.stringify({ profiles: [{ ...validProfiles.profiles[0], zone: 'ru-9z' }] })],
-  [
-    'unknown flavor',
-    JSON.stringify({ profiles: [{ ...validProfiles.profiles[0], flavor: 'custom' }] }),
-  ],
-  [
-    'wrong volume type',
-    JSON.stringify({ profiles: [{ ...validProfiles.profiles[0], volumeType: 'basic.ru-3a' }] }),
-  ],
   [
     'invalid workers',
     JSON.stringify({
@@ -381,10 +367,10 @@ it.each([
     }),
   ],
   [
-    'oversubscribed resources',
+    'workers above CPU tokens',
     JSON.stringify({
       profiles: [
-        { ...validProfiles.profiles[0], qa: { ...validProfiles.profiles[0].qa, cpuTokens: 25 } },
+        { ...validProfiles.profiles[0], qa: { ...validProfiles.profiles[0].qa, cpuTokens: 4 } },
       ],
     }),
   ],
@@ -395,4 +381,32 @@ it.each([
 ])('rejects %s runtime profiles', (_label, raw) => {
   expect(() => validateSelectelQaProfiles(raw)).toThrow();
   expect(validateWithPythonController(raw).status).not.toBe(0);
+});
+
+it('leaves zone, flavor, volume, and scheduler capacity to the environment profile', () => {
+  const environmentProfile = {
+    profiles: [
+      {
+        zone: 'ru-custom',
+        flavor: 'project-owned-flavor',
+        volumeType: 'project-owned-volume-type',
+        volumeGiB: 96,
+        qa: {
+          cpuTokens: 20,
+          memoryMiB: 30720,
+          vitestWorkers: 10,
+          playwrightWorkers: 3,
+          securityWorkers: 5,
+        },
+      },
+    ],
+  };
+  const raw = JSON.stringify(environmentProfile);
+  expect(validateSelectelProfilesForLane(raw, 'proof').profiles).toEqual(
+    environmentProfile.profiles
+  );
+  expect(validateSelectelProfilesForLane(raw, 'release').profiles).toEqual(
+    environmentProfile.profiles
+  );
+  expect(validateWithPythonController(raw).status).toBe(0);
 });

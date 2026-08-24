@@ -16,7 +16,7 @@ The single Continuous Integration workflow has five modes:
 - Selectel infrastructure smoke provisions one disposable runner, verifies the machine-owned host-command closure and locked image runtime, skips QA, and proves cleanup.
 - Selectel recovery deletes resources for one exact historical run and attempt without building a QA image or provisioning a runner.
 
-Ready pull requests and `main` use the Fast gate. Manual and scheduled provenance use the Release gate. Fast execution reads `SELECTEL_QA_PROFILES`; provenance reads identically shaped `SELECTEL_RELEASE_PROFILES`. Both variables have one authority in the `selectel-runner-controller` environment; repository-scoped duplicates are rejected. Profile order and lane minima are policy data, not documentation facts.
+Ready pull requests and `main` use the Fast gate. Manual and scheduled provenance use the Release gate. Fast execution reads `SELECTEL_QA_PROFILES`; provenance reads identically shaped `SELECTEL_RELEASE_PROFILES`. Both variables have one authority in the `selectel-runner-controller` environment; repository-scoped resource tables and lane minima are forbidden. The controller validates the document shape and safe lifecycle, then checks the requested zone, flavor, volume type and capacity against live Selectel APIs.
 
 ## Candidate admission
 
