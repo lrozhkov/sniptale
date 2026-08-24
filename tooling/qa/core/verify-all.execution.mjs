@@ -320,6 +320,7 @@ export async function collectReleaseDeltaStepResults({
   verifyScope = resolveFullVerifyScope(),
   baseline = loadBaseline(),
   excludedControlLabels = [],
+  includeArtifactSteps = true,
   collectors = {},
 } = {}) {
   const context = createReleaseContext({
@@ -332,7 +333,7 @@ export async function collectReleaseDeltaStepResults({
   const steps = context.excludedControlLabels.includes('SonarJS')
     ? []
     : [await resolvedCollectors.collectSonarjsReleaseStep(context)];
-  await appendPostVerifySteps(steps, context, resolvedCollectors);
+  if (includeArtifactSteps) await appendPostVerifySteps(steps, context, resolvedCollectors);
   return {
     scopeDetail: 'verified Fast proof plus release-only product controls',
     steps,

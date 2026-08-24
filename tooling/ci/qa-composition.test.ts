@@ -238,7 +238,9 @@ it('shares one observed repository scope across fresh Fast and release-only cont
 
   expect(scopeResolver).toHaveBeenCalledOnce();
   expect(productProofCollector).toHaveBeenCalledWith(verifyScope);
-  expect(releaseDeltaCollector).toHaveBeenCalledWith(verifyScope);
+  expect(releaseDeltaCollector).toHaveBeenCalledWith(verifyScope, {
+    includeArtifactSteps: false,
+  });
 });
 
 it('keeps infrastructure exceptions fail-fast instead of treating them as control results', async () => {
