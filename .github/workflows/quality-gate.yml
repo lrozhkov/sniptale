@@ -460,7 +460,7 @@ jobs:
         run: |
           source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
           build_root="$RUNNER_TEMP/base-fast-proof-${source_sha}"
-          if cd trusted-control && node tooling/ci/restore-fast-proof.mjs "$source_sha" "$build_root"; then
+          if (cd trusted-control && node tooling/ci/restore-fast-proof.mjs "$source_sha" "$build_root"); then
             build_proof="$build_root/.tmp/qa/build-proof.json"
             build_archive=$(find "$build_root/build" -maxdepth 1 -type f -name 'sniptale_*.zip' -print -quit)
             if [ -f "$build_proof" ] && [ -n "$build_archive" ]; then
@@ -490,7 +490,7 @@ jobs:
               echo "SNIPTALE_COVERAGE_REPORTS_PATH=$coverage_reports" >> "$GITHUB_ENV"
             fi
             fast_root="$RUNNER_TEMP/fast-proof-${CANDIDATE_SHA}"
-            if cd trusted-control && node tooling/ci/restore-fast-proof.mjs "$CANDIDATE_SHA" "$fast_root"; then
+            if (cd trusted-control && node tooling/ci/restore-fast-proof.mjs "$CANDIDATE_SHA" "$fast_root"); then
               echo "SNIPTALE_FAST_PROOF_PATH=$fast_root" >> "$GITHUB_ENV"
             fi
           fi
