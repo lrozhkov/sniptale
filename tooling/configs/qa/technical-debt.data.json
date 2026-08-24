@@ -18213,7 +18213,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/infrastructure-smoke.mjs",
-        "contentHash": "e88c0b7266d75bd6ecd3318620ca8c790e8a33020e074baf9c4654991dbcc71c"
+        "contentHash": "b7e6ea15a89efb3313a45c4a68c80b57ff476396a09b230df4fa06b6f266fb5d"
       },
       "consumers": [
         "tooling/ci/infrastructure-smoke.mjs"

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   describeDockerFailure,
+  getInfrastructureSmokeEnvironment,
   getInfrastructureSmokeTimeoutMs,
   isAcceptedDockerResult,
 } from './infrastructure-smoke-process.mjs';
@@ -71,11 +72,21 @@ esac
 }
 
 describe('Selectel infrastructure smoke', () => {
-  it('bounds only image and Python cold starts above the default smoke timeout', () => {
+  it('bounds only the immutable image cold start above the default smoke timeout', () => {
     expect(getInfrastructureSmokeTimeoutMs('node')).toBe(180_000);
-    expect(getInfrastructureSmokeTimeoutMs('semgrep')).toBe(90_000);
+    expect(getInfrastructureSmokeTimeoutMs('semgrep')).toBe(30_000);
     expect(getInfrastructureSmokeTimeoutMs('codeql')).toBe(30_000);
     expect(getInfrastructureSmokeTimeoutMs('playwright-asset-chromium-1234')).toBe(30_000);
+  });
+
+  it('runs the Semgrep version check with the canonical offline environment', () => {
+    expect(getInfrastructureSmokeEnvironment('semgrep')).toEqual([
+      'SEMGREP_ENABLE_VERSION_CHECK=0',
+      'SEMGREP_SEND_METRICS=off',
+      'SEMGREP_APP_TOKEN=',
+      'SEMGREP_SETTINGS_FILE=/tmp/sniptale-infrastructure-smoke-semgrep.yml',
+    ]);
+    expect(getInfrastructureSmokeEnvironment('codeql')).toEqual([]);
   });
 
   it('admits the immutable image, locked toolchain, browser assets, and metadata deny', () => {
