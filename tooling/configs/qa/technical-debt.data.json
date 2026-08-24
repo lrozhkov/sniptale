@@ -17914,7 +17914,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/github-policy.mjs",
-        "contentHash": "6c1c19db09786c0f158c2ee56fe9e3005d891ec284d10c61d22cf6589b16e018"
+        "contentHash": "8f7d502a3a2fb7c87285fd5e02a369e7e465c9a0b580d31c6e48dedb2f42cfb5"
       },
       "consumers": [
         "tooling/ci/github-policy.mjs"

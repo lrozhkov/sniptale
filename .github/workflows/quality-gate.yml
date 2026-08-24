@@ -1,5 +1,5 @@
 name: Continuous Integration
-run-name: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'Selectel TTL sweep' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-recovery' && 'Selectel exact-run recovery' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
+run-name: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'Selectel TTL sweep' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-recovery' && 'Selectel exact-run recovery' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-connectivity' && 'Selectel connectivity preflight' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
 
 on:
   pull_request_target:
@@ -70,14 +70,16 @@ jobs:
           SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
           SNIPTALE_PROOF_LANE: proof
         run: |
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME --env SELECTEL_QA_PROFILES \
             --env SNIPTALE_PROOF_LANE \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             sniptale-controller:preflight preflight
           mv build/selectel-controller/preflight.json build/selectel-controller/preflight-qa.json
           export SNIPTALE_PROOF_LANE=release
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_QA_PROFILES="$SELECTEL_RELEASE_PROFILES" \
             --env SNIPTALE_PROOF_LANE \
@@ -379,7 +381,8 @@ jobs:
           mkdir -p "$anonymous_config"
           DOCKER_CONFIG="$anonymous_config" docker manifest inspect "$SNIPTALE_QA_IMAGE" >/dev/null
           printf '%s' "$CONTROLLER_IMAGE_TOKEN" | docker login ghcr.io --username "$CONTROLLER_IMAGE_USER" --password-stdin >/dev/null
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_QA_PROFILES="$selected_profiles" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
@@ -718,7 +721,8 @@ jobs:
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin >/dev/null
           command=cleanup
           if [ ! -s controller/provision.json ]; then command=recover-cleanup; fi
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
@@ -849,7 +853,8 @@ jobs:
           RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
         run: |
           status=0
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" sweep || status=$?
@@ -897,7 +902,8 @@ jobs:
           printf '%s\n' "$RECOVERY_RUN_ID" | grep -Eq '^[1-9][0-9]*$'
           printf '%s\n' "$RECOVERY_RUN_ATTEMPT" | grep -Eq '^[1-9][0-9]*$'
           mkdir -p build/selectel-controller
-          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace" \
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
             --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN \
