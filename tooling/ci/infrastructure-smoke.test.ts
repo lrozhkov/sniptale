@@ -28,6 +28,10 @@ function runSmoke(metadataReachable = false, nodeFailure = false) {
     'tooling/configs/ci/toolchain.lock.json',
     path.join(root, 'tooling/configs/ci/toolchain.lock.json')
   );
+  fs.copyFileSync(
+    'tooling/configs/ci/selectel-host-tools.json',
+    path.join(root, 'tooling/configs/ci/selectel-host-tools.json')
+  );
   const docker = path.join(root, 'bin/docker');
   fs.writeFileSync(
     docker,
@@ -36,6 +40,7 @@ browser_json='{"revision":"1234",'\
 '"browserVersion":"151.0.7922.34",'\
 '"assets":[{"exists":true},{"exists":true},{"exists":true}]}'
 case "$*" in
+  --version) printf '%s\n' 'Docker version 28.0.0' ;;
   *"image inspect"*) printf '%s\n' '["${image}"]' ;;
   *"node --version"*) [ "$MOCK_NODE_FAILURE" = 1 ] && exit 124 || printf '%s\n' 'v22.12.0' ;;
   *"semgrep --legacy --version"*) printf '%s\n' '1.173.0' ;;
@@ -54,6 +59,15 @@ esac
 `,
     { mode: 0o755 }
   );
+  for (const command of ['git', 'gh', 'jq', 'node', 'npm', 'tar', 'zstd', 'find']) {
+    fs.writeFileSync(
+      path.join(root, 'bin', command),
+      `#!/bin/sh\nprintf '%s\\n' '${command} test-version'\n`,
+      {
+        mode: 0o755,
+      }
+    );
+  }
   const script = path.resolve('tooling/ci/infrastructure-smoke.mjs');
   const result = spawnSync(process.execPath, [script, image], {
     cwd: root,
@@ -94,6 +108,15 @@ describe('Selectel infrastructure smoke', () => {
     expect(result.status).toBe(0);
     expect(receipt.status).toBe('passed');
     expect(receipt.checks.map((check: { id: string }) => check.id)).toEqual([
+      'host-docker',
+      'host-git',
+      'host-gh',
+      'host-jq',
+      'host-node',
+      'host-npm',
+      'host-tar',
+      'host-zstd',
+      'host-find',
       'immutable-image-present',
       'node',
       'semgrep',
@@ -108,6 +131,39 @@ describe('Selectel infrastructure smoke', () => {
       'playwright-asset-ffmpeg-1011',
       'container-metadata-denied',
     ]);
+  });
+
+  it('fails before image checks when a required host transport is unavailable', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-infrastructure-smoke-missing-'));
+    roots.push(root);
+    fs.mkdirSync(path.join(root, 'tooling/configs/ci'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'tooling/test/mutation'), { recursive: true });
+    fs.copyFileSync(
+      'tooling/configs/ci/toolchain.lock.json',
+      path.join(root, 'tooling/configs/ci/toolchain.lock.json')
+    );
+    fs.copyFileSync(
+      'tooling/configs/ci/selectel-host-tools.json',
+      path.join(root, 'tooling/configs/ci/selectel-host-tools.json')
+    );
+    fs.copyFileSync(
+      'tooling/test/mutation/package.json',
+      path.join(root, 'tooling/test/mutation/package.json')
+    );
+    const result = spawnSync(
+      process.execPath,
+      [path.resolve('tooling/ci/infrastructure-smoke.mjs'), image],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, PATH: path.join(root, 'empty-bin') } }
+    );
+    const receipt = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'build/selectel-controller/infrastructure-smoke.json'),
+        'utf8'
+      )
+    );
+    expect(result.status).toBe(1);
+    expect(receipt.checks[0]).toEqual({ id: 'host-docker', status: 'failed' });
+    expect(receipt.failure).toMatch(/^host-docker failed/u);
   });
 
   it('fails closed when a container can reach OpenStack metadata', () => {

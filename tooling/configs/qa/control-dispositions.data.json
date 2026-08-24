@@ -918,6 +918,12 @@
       "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
     },
     {
+      "path": "tooling/ci/immutable-image-tag.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This trusted publication admission permits an immutable tag only when absent or already bound to the exact expected digest."
+    },
+    {
       "path": "tooling/ci/proof-wrapper.mjs",
       "disposition": "keep",
       "owner": "qa-platform",

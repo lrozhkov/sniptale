@@ -69,6 +69,8 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
   expect(source).not.toContain('SELECTEL_OS_PROJECT_ID');
   expect(source).not.toContain('RUNNER_IMAGE_TOKEN');
   expect(source).not.toContain('RUNNER_IMAGE_USER');
+  expect(source).toContain('token_pattern.fullmatch(package)');
+  expect(source).toContain('argument_pattern.fullmatch(argument)');
 });
 
 it('keeps reusable GitHub credentials out of user-data and denies candidate metadata access', () => {
@@ -90,6 +92,23 @@ it('keeps reusable GitHub credentials out of user-data and denies candidate meta
   });
   expect(result.status, result.stderr).toBe(0);
   expect(result.stdout).toContain('docker, pull, ghcr.io/lrozhkov/sniptale-qa@sha256:');
+  const hostTools = JSON.parse(
+    fs.readFileSync('tooling/configs/ci/selectel-host-tools.json', 'utf8')
+  );
+  for (const packageName of hostTools.packages) {
+    expect(result.stdout).toContain(packageName);
+  }
+  expect(hostTools.checks.map((check: { command: string }) => check.command)).toEqual([
+    'docker',
+    'git',
+    'gh',
+    'jq',
+    'node',
+    'npm',
+    'tar',
+    'zstd',
+    'find',
+  ]);
   expect(result.stdout).toContain('DOCKER-USER');
   expect(result.stdout).toContain('169.254.169.254/32');
   expect(result.stdout).toContain('iptables --wait --check');
