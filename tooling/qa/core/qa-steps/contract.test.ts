@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 
-import { HARNESS_STEPS } from './definitions.data.mjs';
+import { createReleaseControlOccurrences } from './release-occurrences.mjs';
+import { AUDIT_STEPS, CI_COMPOSITION_STEPS, HARNESS_STEPS } from './definitions.data.mjs';
 import { assertQaExecutionContract, assertQaResultContract } from './contract.mjs';
 
 function steps(labels: string[], status: 'failed' | 'ok' = 'ok') {
@@ -120,6 +121,33 @@ it('models clean, harness-only, and reused closeout populations explicitly', () 
         skipped: false,
         steps: steps(['QA checkpoint', 'Full build']),
       },
+    })
+  ).not.toThrow();
+});
+
+it('requires fail-late CI evidence after an earlier control failure', () => {
+  const releaseSteps = createReleaseControlOccurrences().map(({ label }, index) => ({
+    label,
+    status: index === 0 ? ('failed' as const) : ('ok' as const),
+  }));
+  const auditSteps = AUDIT_STEPS.map(([, label]) => ({ label, status: 'ok' as const }));
+  const mutationSteps = CI_COMPOSITION_STEPS.filter(([, label]) =>
+    label.startsWith('Mutation ')
+  ).map(([, label]) => ({ label, status: 'ok' as const }));
+
+  expect(() => assertQaExecutionContract({ wrapperId: 'ci:proof', steps: releaseSteps })).toThrow(
+    /missing=.*Full product coverage/u
+  );
+  expect(() =>
+    assertQaExecutionContract({
+      wrapperId: 'ci:release',
+      steps: [...releaseSteps, ...auditSteps],
+    })
+  ).toThrow(/missing=.*Mutation persistence/u);
+  expect(() =>
+    assertQaExecutionContract({
+      wrapperId: 'ci:release',
+      steps: [...releaseSteps, ...auditSteps, ...mutationSteps],
     })
   ).not.toThrow();
 });

@@ -86,7 +86,7 @@ it('keeps release result order while running the pre-build lanes concurrently', 
   const scheduledTasks = scheduler.mock.calls.flatMap(([tasks]) => tasks);
   expect(scheduledTasks?.find(({ id }) => id === 'lint')).toMatchObject({
     cpuTokens: 2,
-    dependencies: ['typecheck'],
+    dependencies: [],
     memoryMiB: 6144,
   });
   expect(scheduledTasks?.find(({ id }) => id === 'tests')).toMatchObject({

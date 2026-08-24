@@ -166,6 +166,9 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   );
   expect(playwrightPackage.dependencies['@playwright/test']).toBe(lock.playwright.version);
   expect(projectLock.packages['node_modules/playwright'].version).toBe(lock.playwright.version);
+  const expectedNodeEngine = `>=${lock.node.version} <23`;
+  expect(projectPackage.engines.node).toBe(expectedNodeEngine);
+  expect(projectLock.packages[''].engines.node).toBe(expectedNodeEngine);
   expect(Object.keys(lock.projectToolchain).sort()).toEqual([
     'oxfmt',
     'oxlint',

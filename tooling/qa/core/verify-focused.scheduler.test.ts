@@ -133,7 +133,7 @@ it('adapts typecheck concurrency and reservation to a one-token profile', async 
   );
 });
 
-it('uses the release-proven lint budget and serializes full Oxlint after typecheck', async () => {
+it('uses the release-proven lint budget without a false TypeScript dependency', async () => {
   const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
   const scheduler = vi.fn(runBoundedTasks);
   await collectScheduledFocusedStepResults(
@@ -150,7 +150,7 @@ it('uses the release-proven lint budget and serializes full Oxlint after typeche
   const scheduledTasks = scheduler.mock.calls[0]?.[0];
   expect(scheduledTasks?.find(({ id }) => id === 'lint')).toMatchObject({
     cpuTokens: 2,
-    dependencies: ['typecheck'],
+    dependencies: [],
     memoryMiB: 6144,
   });
   expect(workerRunner).toHaveBeenCalledWith(

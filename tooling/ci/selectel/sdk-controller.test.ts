@@ -50,7 +50,7 @@ it('binds preemptibility, private networking, JIT, cleanup, and TTL proof', () =
   expect(source).toContain('profilesDigest');
   expect(source).toContain('selectedProfileIndex');
   expect(source).not.toContain('fault.get("details")');
-  expect(source).toContain('tags=["preemptible"]');
+  expect(source).toContain('"tags": ["preemptible"]');
   expect(source).toContain('delete_on_termination": True');
   expect(source).toContain('server unexpectedly has a public floating IP');
   expect(source).toContain('generate-jitconfig');
@@ -245,6 +245,25 @@ it('recovers cleanup by exact run and run-attempt identity when the receipt is u
   const receipt = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
   expect(receipt.status).toBe('cleaned');
   expect(receipt.runAttempt).toBe('3');
+});
+
+it('reconciles an ambiguous Nova create without a second POST and preserves cleanup ownership', () => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', 'server-create-reconciliation'],
+    { cwd: process.cwd(), encoding: 'utf8' }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toEqual({
+    cleanup: 'reconciled-for-cleanup',
+    missing: null,
+    reconciled: 'owned-server',
+  });
+  expect(source.match(/connection\.compute\.create_server\(/gu)).toHaveLength(1);
+  expect(source).toContain(
+    'connection = connect(policy)[0]\n            record["serverCreatePostAttempts"] = 1'
+  );
+  expect(source).not.toContain('connect_retries=');
 });
 
 const validProfiles = {

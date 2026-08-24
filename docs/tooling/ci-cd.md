@@ -38,6 +38,8 @@ Every real run performs `npm ci` against the candidate lock. PRs may restore dow
 
 Provisioning writes an early identity-bound receipt. Each attempt owns a disposable runner registration, security group, network, subnet, router interface, router, VM port, VM, and boot volume. The project identifier is emitted only as a shortened SHA-256; credentials, raw project ID, JIT configuration, cloud-init, and registry tokens are excluded from artifacts.
 
+Nova server creation uses one POST over a fresh verified connection. If its response is lost, the controller retries only exact-owned read reconciliation; it never repeats the POST or falls through to another resource profile.
+
 Cleanup runs with `always()` independently of QA proof and deletes the complete attempt-owned resource set. It accepts the incrementally written `provisioning` receipt, so cancellation at any acquisition step remains recoverable. If the early receipt is unavailable, recovery is restricted to the exact run and attempt identity. The recovery-only mode and hourly TTL sweeper build the controller from their checked-out trusted commit; neither depends on a moving image tag. They are recovery paths, not normal cleanup.
 
 ## Artifacts and presentation

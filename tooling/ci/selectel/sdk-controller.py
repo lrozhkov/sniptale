@@ -33,6 +33,10 @@ HOST_TOOLS_PATH = ROOT / "tooling/configs/ci/selectel-host-tools.json"
 REDACTION_PROJECT_ID: str | None = None
 
 
+class UnresolvedServerCreateFailure(RuntimeError):
+    """Nova may have accepted the single create request but returned no response."""
+
+
 def remember_project_id_for_redaction(project_id: str):
     global REDACTION_PROJECT_ID
     REDACTION_PROJECT_ID = project_id
@@ -94,6 +98,7 @@ def read_policy() -> dict[str, Any]:
     flavors = compute.get("allowedFlavors")
     profiles = compute.get("allowedResourceProfilesByFlavor")
     volume_types = compute.get("allowedVolumeTypesByZone")
+    server_reconciliation = policy.get("lifecycle", {}).get("serverCreateReconciliation")
 
     def positive_record(value, fields):
         return (
@@ -153,6 +158,7 @@ def read_policy() -> dict[str, Any]:
         or compute.get("publicIp") is not False
         or compute.get("ingress") is not False
         or policy.get("lifecycle", {}).get("maxProfiles") != 10
+        or not positive_record(server_reconciliation, {"attempts", "intervalSeconds"})
         or not isinstance(policy.get("repository"), str)
         or not policy.get("repository")
         or ":" in policy.get("repository", "")
@@ -603,6 +609,81 @@ def server_failure(connection, server_id: str | None, failure: Exception):
     return result
 
 
+def exact_owned_server(connection, record: dict[str, Any]):
+    name = record.get("runnerName")
+    identity = record.get("serverIdentity")
+    if not isinstance(name, str) or not name or not isinstance(identity, dict) or not identity:
+        raise RuntimeError("Selectel server reconciliation identity is missing.")
+    candidates = [
+        server
+        for server in connection.compute.servers(name=name, details=True)
+        if server.name == name
+    ]
+    owned = [
+        server
+        for server in candidates
+        if all((server.metadata or {}).get(key) == value for key, value in identity.items())
+    ]
+    if len(owned) > 1:
+        raise RuntimeError("Selectel server reconciliation found duplicate owned servers.")
+    if len(owned) != len(candidates):
+        raise RuntimeError("Selectel server reconciliation found a foreign name collision.")
+    return owned[0] if owned else None
+
+
+def reconcile_server_create(policy: dict[str, Any], record: dict[str, Any]):
+    settings = policy["lifecycle"]["serverCreateReconciliation"]
+    connection = None
+    for attempt in range(1, settings["attempts"] + 1):
+        connection = connect(policy)[0]
+        server = exact_owned_server(connection, record)
+        if server is not None:
+            return server, connection
+        if attempt < settings["attempts"]:
+            time.sleep(settings["intervalSeconds"])
+    return None, connection
+
+
+def is_ambiguous_server_create_failure(failure: Exception) -> bool:
+    failure_type = type(failure)
+    return (
+        failure_type.__name__ == "ConnectFailure"
+        and failure_type.__module__ == "keystoneauth1.exceptions.connection"
+    )
+
+
+def create_server_once(
+    policy: dict[str, Any], record: dict[str, Any], connection, attributes: dict[str, Any]
+):
+    try:
+        return connection.compute.create_server(**attributes), connection, "acknowledged"
+    except Exception as failure:
+        if not is_ambiguous_server_create_failure(failure):
+            raise
+        try:
+            server, reconciled_connection = reconcile_server_create(policy, record)
+        except Exception as reconciliation_failure:
+            raise UnresolvedServerCreateFailure(
+                "Selectel server create response was ambiguous and reconciliation failed."
+            ) from reconciliation_failure
+        if server is None:
+            raise UnresolvedServerCreateFailure(
+                "Selectel server create response was ambiguous and no owned server was visible."
+            ) from failure
+        return server, reconciled_connection, "reconciled"
+
+
+def discover_pending_server(connection, record: dict[str, Any]):
+    if record.get("serverId") or record.get("serverCreatePostAttempts") != 1:
+        return
+    if record.get("serverCreateOutcome") not in {"pending", "unresolved"}:
+        return
+    server = exact_owned_server(connection, record)
+    if server is not None:
+        record["serverId"] = server.id
+        record["serverCreateOutcome"] = "reconciled-for-cleanup"
+
+
 def cleanup_failure(failure: Exception, connection=None):
     result = {"kind": type(failure).__name__}
     message = redact_failure_message(failure, connection)
@@ -643,6 +724,11 @@ def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, An
     }
     record["cleanup"] = result
     failures = []
+
+    try:
+        discover_pending_server(connection, record)
+    except Exception as failure:
+        failures.append(("serverDiscovery", failure))
 
     if record.get("serverId"):
         try:
@@ -886,6 +972,9 @@ def provision(policy: dict[str, Any]):
             "runnerName": name,
             "runnerLabel": label,
             "serverId": None,
+            "serverIdentity": None,
+            "serverCreatePostAttempts": 0,
+            "serverCreateOutcome": "not-started",
             "portIds": [],
             "securityGroupId": None,
             "routerPortIds": [],
@@ -922,6 +1011,7 @@ def provision(policy: dict[str, Any]):
             user_data, user_data_digest = cloud_init(policy, jit_config, image_reference)
             record["cloudInitDigest"] = user_data_digest
             metadata = {**common_metadata, "profile-index": str(profile_index)}
+            record["serverIdentity"] = metadata
             write_record(destination, controller_record)
             volume_name = f"{name}-boot"
             if list(connection.block_storage.volumes(name=volume_name)):
@@ -951,16 +1041,19 @@ def provision(policy: dict[str, Any]):
                 description=description,
             )
             record["portIds"] = [port.id]
+            connection = connect(policy)[0]
+            record["serverCreatePostAttempts"] = 1
+            record["serverCreateOutcome"] = "pending"
             write_record(destination, controller_record)
-            server = connection.compute.create_server(
-                name=name,
-                flavor_id=selected["flavor"].id,
-                availability_zone=selected["zone"],
-                networks=[{"port": port.id}],
-                metadata=metadata,
-                tags=["preemptible"],
-                user_data=user_data,
-                block_device_mapping_v2=[
+            server_attributes = {
+                "name": name,
+                "flavor_id": selected["flavor"].id,
+                "availability_zone": selected["zone"],
+                "networks": [{"port": port.id}],
+                "metadata": metadata,
+                "tags": ["preemptible"],
+                "user_data": user_data,
+                "block_device_mapping_v2": [
                     {
                         "boot_index": 0,
                         "uuid": volume.id,
@@ -969,7 +1062,19 @@ def provision(policy: dict[str, Any]):
                         "delete_on_termination": True,
                     }
                 ],
-            )
+            }
+            try:
+                server, connection, record["serverCreateOutcome"] = create_server_once(
+                    policy, record, connection, server_attributes
+                )
+            except UnresolvedServerCreateFailure:
+                record["serverCreateOutcome"] = "unresolved"
+                write_record(destination, controller_record)
+                raise
+            except Exception:
+                record["serverCreateOutcome"] = "rejected"
+                write_record(destination, controller_record)
+                raise
             record["serverId"] = server.id
             write_record(destination, controller_record)
             server = connection.compute.wait_for_server(
@@ -1034,7 +1139,10 @@ def cleanup_command(policy: dict[str, Any], record_file: str):
         attempt_targets = [
             attempt
             for attempt in record["attempts"]
-            if attempt.get("status") not in {"cleaned", "cleaned-after-provision-failure"}
+            if (
+                attempt.get("status") not in {"cleaned", "cleaned-after-provision-failure"}
+                or attempt.get("serverCreateOutcome") == "unresolved"
+            )
             and (
                 attempt.get("runnerId")
                 or attempt.get("serverId")

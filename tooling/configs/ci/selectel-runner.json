@@ -105,6 +105,7 @@
   },
   "lifecycle": {
     "maxProfiles": 10,
+    "serverCreateReconciliation": { "attempts": 6, "intervalSeconds": 5 },
     "ttlSeconds": 10800,
     "nameTemplate": "sniptale-<run-id>-<attempt>",
     "requiredMetadata": [
@@ -152,6 +153,7 @@
     "cloud-init-failure",
     "runner-loss",
     "in-job-infrastructure-fallback",
+    "ambiguous-server-create-response",
     "genuine-qa-failure-no-retry",
     "post-online-qa-failure-no-fallback",
     "cleanup-failure",

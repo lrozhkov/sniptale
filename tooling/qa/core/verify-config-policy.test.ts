@@ -4,7 +4,7 @@ import { createTempRoot, importFresh, writeFile } from './test-helpers';
 
 function createPassingPackageJson() {
   return {
-    engines: { node: '>=22.12 <23' },
+    engines: { node: '>=22.22.1 <23' },
     dependencies: {
       react: '^19.2.5',
       'react-dom': '^19.2.5',
@@ -97,11 +97,11 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'package.json',
-        message: 'engines.node must be ">=22.12 <23"',
+        message: 'engines.node must be ">=22.22.1 <23"',
       }),
       expect.objectContaining({
         file: 'package-lock.json',
-        message: 'packages[""].engines.node must be ">=22.12 <23"',
+        message: 'packages[""].engines.node must be ">=22.22.1 <23"',
       }),
       expect.objectContaining({
         file: 'package.json',
@@ -184,7 +184,7 @@ it('rejects lockfile engine drift independently from the root package', async ()
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
     rule: 'config-policy',
     file: 'package-lock.json',
-    message: 'packages[""].engines.node must be ">=22.12 <23"',
+    message: 'packages[""].engines.node must be ">=22.22.1 <23"',
   });
 });
 
