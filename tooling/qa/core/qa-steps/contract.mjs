@@ -11,10 +11,9 @@ import {
   E2E_STEPS,
   FOCUSED_DIRECT_STEPS,
   HARNESS_STEPS,
-  RELEASE_DIRECT_STEPS,
   STRUCTURAL_AUDIT_STEPS,
 } from './definitions.data.mjs';
-import { VERIFY_ALL_VIOLATION_STEPS } from '../verify-all.violation-steps.mjs';
+import { createCiProductControlOccurrences } from '../../../ci/product-control-policy.mjs';
 
 export const QA_EXECUTION_CONTRACT_WRAPPERS = CANONICAL_WRAPPER_IDS;
 
@@ -47,22 +46,25 @@ const CHECKPOINT_LABELS = [
   ...FOCUSED_TRIGGERED_STEP_DEFINITIONS.map(({ label }) => label),
   ...tupleLabels(ADVISORY_STEPS),
 ];
-const RELEASE_LABELS = [
-  ...tupleLabels(RELEASE_DIRECT_STEPS),
-  ...violationLabels(VERIFY_ALL_VIOLATION_STEPS),
-];
+const CI_PROOF_LABELS = createCiProductControlOccurrences('proof').map(({ label }) => label);
+const CI_RELEASE_LABELS = createCiProductControlOccurrences('release').map(({ label }) => label);
 const AUDIT_LABELS = tupleLabels(AUDIT_STEPS);
 const MUTATION_LABELS = tupleLabels(CI_COMPOSITION_STEPS).filter((label) =>
   label.startsWith('Mutation ')
 );
 
 function ciProofContract() {
-  return { required: [...RELEASE_LABELS, ...AUDIT_LABELS] };
+  return { required: [...CI_PROOF_LABELS, ...AUDIT_LABELS] };
 }
 
 function ciReleaseContract(mode) {
   const proofLabels =
-    mode === 'reuse-fast-proof' ? ['Fast proof reuse', ...RELEASE_LABELS] : RELEASE_LABELS;
+    mode === 'reuse-fast-proof'
+      ? ['Fast proof reuse', ...CI_RELEASE_LABELS]
+      : [
+          ...CI_PROOF_LABELS,
+          ...CI_RELEASE_LABELS.filter((label) => !CI_PROOF_LABELS.includes(label)),
+        ];
   return { required: [...proofLabels, ...AUDIT_LABELS, ...MUTATION_LABELS] };
 }
 

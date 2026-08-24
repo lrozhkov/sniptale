@@ -23,7 +23,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -f /etc/apt/apt.conf.d/98sniptale-ca-bootstrap \
     && apt-get update \
-    && apt-get install -y --no-install-recommends curl git jq python3 python3-venv tar unzip \
+    && apt-get install -y --no-install-recommends curl git jq procps python3 python3-venv tar unzip \
     && rm -rf /var/lib/apt/lists/*
 
 COPY tooling/configs/ci/toolchain.lock.json /tmp/toolchain.lock.json

@@ -168,12 +168,9 @@ it('packages the release archive after a green release build', async () => {
   expect(archiveCollector).toHaveBeenCalledTimes(1);
 });
 
-it('runs only fresh full tests and release artifact owners after verified Fast proof reuse', async () => {
+it('runs only SonarJS and release artifact owners after verified Fast proof reuse', async () => {
   const module = await import('./verify-all.execution.mjs');
-  const testsCollector = vi.fn(async (_context) => [
-    { label: 'Unit tests', status: 'ok' as const },
-    { label: 'Test coverage', status: 'skipped' as const },
-  ]);
+  const sonarjsCollector = vi.fn(async () => ({ label: 'SonarJS', status: 'ok' as const }));
   const buildCollector = vi.fn(async () => ({ label: 'Build', status: 'ok' as const }));
   const archiveCollector = vi.fn(async () => ({
     label: 'Release archive',
@@ -184,21 +181,14 @@ it('runs only fresh full tests and release artifact owners after verified Fast p
     verifyScope: createVerifyScope(),
     baseline: [],
     collectors: {
-      collectUnitAndCoverageSteps: testsCollector,
+      collectSonarjsReleaseStep: sonarjsCollector,
       collectBuildStep: buildCollector,
       collectReleaseArchiveStep: archiveCollector,
     },
   });
 
-  expect(result.steps.map(({ label }) => label)).toEqual([
-    'Unit tests',
-    'Test coverage',
-    'Build',
-    'Release archive',
-  ]);
-  expect(testsCollector).toHaveBeenCalledWith(
-    expect.objectContaining({ releaseMode: true, reuseUnitProof: false })
-  );
+  expect(result.steps.map(({ label }) => label)).toEqual(['SonarJS', 'Build', 'Release archive']);
+  expect(sonarjsCollector).toHaveBeenCalledWith(expect.objectContaining({ releaseMode: true }));
   expect(buildCollector).toHaveBeenCalledTimes(1);
   expect(archiveCollector).toHaveBeenCalledTimes(1);
 });

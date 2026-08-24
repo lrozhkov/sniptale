@@ -4,7 +4,7 @@ import { runDesignSystemCheck } from './verify-design-system.mjs';
 import { createViolationStep, createSkippedStep } from './focused-qa-results.mjs';
 import { runI18nCheck } from './verify-i18n.mjs';
 import { runLineLengthCheck } from '../guards/quality/verify-line-length.mjs';
-import { runOxlint } from './verify-oxlint.mjs';
+import { DEFAULT_OXLINT_ROOTS, runOxlint } from './verify-oxlint.mjs';
 import {
   collectBoundaryCheckStepResult,
   collectCycleCheckStepResult,
@@ -29,8 +29,6 @@ import {
   withDuration,
 } from './verify-closeout-step-helpers.mjs';
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
-import { PRODUCT_SOURCE_ROOTS } from './src-production-targets.mjs';
-import { resolveQaReleaseResourceProfile } from '../runtime/resource-profile.mjs';
 import { resolveProductUnitTestPool } from './verify-unit-tests.mjs';
 import { collectScheduledFullVerifySteps } from './verify-all.scheduler.mjs';
 import { collectOwnerGuardStep } from './owner-guard-step-helpers.mjs';
@@ -55,13 +53,17 @@ function collectLineLengthStep({ codeFiles } = {}) {
   );
 }
 
-function resolveStaticProductLintFiles({ codeFiles = [], releaseMode = false } = {}) {
-  return releaseMode ? PRODUCT_SOURCE_ROOTS : codeFiles;
+function resolveStaticLintFiles({ codeFiles = [], releaseMode = false } = {}) {
+  return releaseMode ? DEFAULT_OXLINT_ROOTS : codeFiles;
 }
 
 function collectOxlintStep(context = {}) {
   const { durationMs, value: result } = measureSyncStep(() =>
-    runOxlint({ files: resolveStaticProductLintFiles(context) })
+    runOxlint({
+      files: resolveStaticLintFiles(context),
+      strictSecurity: context.releaseMode === true,
+      threads: context.oxlintThreadCount ?? null,
+    })
   );
   return withDuration(result.step, durationMs);
 }
@@ -110,16 +112,19 @@ export async function collectReleaseLintLane(
 ) {
   return {
     oxlintStep: oxlintCollector(context),
-    sonarjsStep: await sonarjsCollector(context),
+    sonarjsStep: (context.excludedControlLabels ?? []).includes('SonarJS')
+      ? null
+      : await sonarjsCollector(context),
     securityStep: await securityCollector(context),
   };
 }
 
-function createReleaseContext({ releaseMode, verifyScope, baseline }) {
+function createReleaseContext({ releaseMode, verifyScope, baseline, excludedControlLabels = [] }) {
   return {
     releaseMode,
     verifyScope,
     baseline,
+    excludedControlLabels,
     codeFiles: verifyScope.codeFiles,
     targetFiles: verifyScope.targetFiles,
   };
@@ -176,19 +181,24 @@ function createDefaultCollectors() {
 export async function collectFullVerifyLane({
   context,
   lane,
+  oxlintThreadCount,
   typecheckCheckerCount,
   vitestMaxWorkers,
 }) {
   const collectors = createDefaultCollectors();
-  const laneContext = { ...context, vitestMaxWorkers };
+  const laneContext = { ...context, oxlintThreadCount, vitestMaxWorkers };
   if (lane === 'appOwners' || lane === 'targetPaths') {
     return { ownerStep: collectOwnerGuardStep(lane) };
   }
   if (lane === 'light') {
     return {
-      lineLengthStep: collectors.collectLineLengthStep(context),
+      lineLengthStep: context.excludedControlLabels.includes('Changed-line readability')
+        ? null
+        : collectors.collectLineLengthStep(context),
       aiHygieneStep: collectors.collectAiHygieneStep(context),
-      structuralRiskStep: collectors.collectStructuralRiskStep(context),
+      structuralRiskStep: context.excludedControlLabels.includes('Structural risk')
+        ? null
+        : collectors.collectStructuralRiskStep(context),
       namingStep: collectors.collectNamingStep(context),
       violationSteps: await collectors.collectViolationSteps({
         ...context,
@@ -201,9 +211,9 @@ export async function collectFullVerifyLane({
   }
   if (lane === 'lint') {
     return context.releaseMode
-      ? collectReleaseLintLane(context)
+      ? collectReleaseLintLane(laneContext)
       : {
-          oxlintStep: collectors.collectOxlintStep(context),
+          oxlintStep: collectors.collectOxlintStep(laneContext),
           sonarjsStep: null,
           securityStep: await collectors.collectSecurityStep(context),
         };
@@ -236,11 +246,17 @@ async function collectDependencyGraphSteps(context, collectors) {
 
 async function collectCoreStepResults(context, collectors, includeTests) {
   const steps = [
-    collectors.collectLineLengthStep(context),
+    ...(context.excludedControlLabels.includes('Changed-line readability')
+      ? []
+      : [collectors.collectLineLengthStep(context)]),
     collectors.collectOxlintStep(context),
-    ...(context.releaseMode ? [await collectors.collectSonarjsReleaseStep(context)] : []),
+    ...(context.releaseMode && !context.excludedControlLabels.includes('SonarJS')
+      ? [await collectors.collectSonarjsReleaseStep(context)]
+      : []),
     collectors.collectAiHygieneStep(context),
-    collectors.collectStructuralRiskStep(context),
+    ...(context.excludedControlLabels.includes('Structural risk')
+      ? []
+      : [collectors.collectStructuralRiskStep(context)]),
     collectors.collectNamingStep(context),
     ...(await collectors.collectViolationSteps(context)),
     collectors.collectI18nStep(context),
@@ -267,9 +283,15 @@ export async function collectFullVerifyStepResults({
   releaseMode = false,
   verifyScope = resolveFullVerifyScope(),
   baseline = loadBaseline(),
+  excludedControlLabels = [],
   collectors = {},
 } = {}) {
-  const context = createReleaseContext({ releaseMode, verifyScope, baseline });
+  const context = createReleaseContext({
+    releaseMode,
+    verifyScope,
+    baseline,
+    excludedControlLabels,
+  });
   const resolvedCollectors = {
     ...createDefaultCollectors(),
     ...collectors,
@@ -289,7 +311,7 @@ export async function collectFullVerifyStepResults({
   return {
     scopeDetail: includeTests
       ? collectUnitTestScopeDetail(context)
-      : 'full Vitest deferred to ci:release',
+      : 'full Vitest supplied by the Fast Gate prerequisite',
     steps,
   };
 }
@@ -297,19 +319,22 @@ export async function collectFullVerifyStepResults({
 export async function collectReleaseDeltaStepResults({
   verifyScope = resolveFullVerifyScope(),
   baseline = loadBaseline(),
+  excludedControlLabels = [],
   collectors = {},
 } = {}) {
-  const context = createReleaseContext({ releaseMode: true, verifyScope, baseline });
-  const resolvedCollectors = { ...createDefaultCollectors(), ...collectors };
-  const profile = resolveQaReleaseResourceProfile();
-  const steps = await resolvedCollectors.collectUnitAndCoverageSteps({
-    ...context,
-    reuseUnitProof: false,
-    vitestMaxWorkers: profile.vitestMaxWorkers,
+  const context = createReleaseContext({
+    releaseMode: true,
+    verifyScope,
+    baseline,
+    excludedControlLabels,
   });
+  const resolvedCollectors = { ...createDefaultCollectors(), ...collectors };
+  const steps = context.excludedControlLabels.includes('SonarJS')
+    ? []
+    : [await resolvedCollectors.collectSonarjsReleaseStep(context)];
   await appendPostVerifySteps(steps, context, resolvedCollectors);
   return {
-    scopeDetail: 'verified Fast proof plus fresh release full-suite tests',
+    scopeDetail: 'verified Fast proof plus release-only product controls',
     steps,
   };
 }

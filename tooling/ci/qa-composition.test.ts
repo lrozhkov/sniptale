@@ -4,13 +4,14 @@ import { expect, it, vi } from 'vitest';
 
 import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
 import { collectCiProofResults, collectCiReleaseResults } from './qa-composition.mjs';
+import { createCiProductControlOccurrences } from './product-control-policy.mjs';
 import { createTrustedControlMatrix } from './trusted-control-matrix.mjs';
 
 const passed = { label: 'passed', status: 'ok' as const };
 
-it('machine-fixes full Vitest and release readiness to ci:release only', async () => {
+it('machine-fixes full Vitest to Fast proof and release readiness to release provenance', async () => {
   const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
-  expect(policy.gateCapabilities.proof).toMatchObject({ fullVitest: false, releaseReady: false });
+  expect(policy.gateCapabilities.proof).toMatchObject({ fullVitest: true, releaseReady: false });
   expect(policy.gateCapabilities.proof.scope).toBe('repository-wide');
   expect(policy.gateCapabilities.release).toMatchObject({
     scope: 'repository-wide',
@@ -23,26 +24,39 @@ it('machine-fixes full Vitest and release readiness to ci:release only', async (
     'qa:closeout',
   ]);
   const source = fs.readFileSync('tooling/ci/qa-composition.mjs', 'utf8');
-  expect(source).toContain('includeTests: false');
+  const executionSource = fs.readFileSync('tooling/qa/core/verify-all.execution.mjs', 'utf8');
+  expect(source).toContain('includeTests: true');
   expect(source).toContain('resolveRepositoryVerifyScope()');
   expect(source).not.toContain('resolveFullVerifyScope');
   expect(source).not.toContain('runReleaseWrapper');
+  expect(executionSource).toContain('releaseMode ? DEFAULT_OXLINT_ROOTS : codeFiles');
   const proof = await collectCiProofResults({
-    productProofCollector: async () => ({ steps: [passed] }),
+    productProofCollector: async () => ({
+      steps: [
+        passed,
+        { label: 'Unit tests', status: 'ok' },
+        { label: 'Test coverage', status: 'skipped' },
+      ],
+    }),
     auditCollector: async () => ({ steps: [passed] }),
   });
   const release = await collectCiReleaseResults({
-    productProofCollector: async () => ({ steps: [passed] }),
+    reuseFastProof: true,
+    releaseDeltaCollector: async () => ({
+      steps: [
+        { label: 'SonarJS', status: 'ok' },
+        { label: 'Build', status: 'ok' },
+        { label: 'Release archive', status: 'ok' },
+      ],
+    }),
     auditCollector: async () => ({ steps: [passed] }),
     mutationCollector: () => passed,
   });
   expect(proof.context).toMatchObject({ mode: 'ci:proof' });
   expect(proof.steps).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ label: 'Unit tests', status: 'skipped' }),
-      expect.objectContaining({ label: 'Test coverage', status: 'skipped' }),
-    ])
+    expect.arrayContaining([expect.objectContaining({ label: 'Unit tests', status: 'ok' })])
   );
+  expect(proof.steps.map(({ label }) => label)).not.toContain('Test coverage');
   expect(release.context).toMatchObject({ mode: 'ci:release' });
 
   const reusedRelease = await collectCiReleaseResults({
@@ -52,8 +66,7 @@ it('machine-fixes full Vitest and release readiness to ci:release only', async (
     },
     releaseDeltaCollector: async () => ({
       steps: [
-        { label: 'Unit tests', status: 'ok' },
-        { label: 'Test coverage', status: 'skipped' },
+        { label: 'SonarJS', status: 'ok' },
         { label: 'Build', status: 'ok' },
         { label: 'Release archive', status: 'ok' },
       ],
@@ -66,13 +79,12 @@ it('machine-fixes full Vitest and release readiness to ci:release only', async (
     expect.arrayContaining([
       expect.objectContaining({ label: 'Fast proof reuse', status: 'ok' }),
       expect.objectContaining({ label: 'Oxlint', status: 'ok' }),
-      expect.objectContaining({ label: 'Unit tests', status: 'ok' }),
-      expect.objectContaining({ label: 'Test coverage', status: 'skipped' }),
+      expect.objectContaining({ label: 'SonarJS', status: 'ok' }),
       expect.objectContaining({ label: 'Build', status: 'ok' }),
       expect.objectContaining({ label: 'Release archive', status: 'ok' }),
     ])
   );
-  expect(reusedRelease.steps.filter(({ label }) => label === 'Unit tests')).toHaveLength(1);
+  expect(reusedRelease.steps.map(({ label }) => label)).not.toContain('Unit tests');
   expect(reusedRelease.steps.filter(({ label }) => label === 'Build')).toHaveLength(1);
 });
 
@@ -93,20 +105,24 @@ it('keeps the trusted phase orchestrator aligned with admission policy', () => {
   expect(runLane).toContain("spawnSync('docker', invocation");
 });
 
-it('derives trusted release control admission from the executable occurrence owner', () => {
+it('derives trusted CI control admission from the executable occurrence owner', () => {
   const occurrences = createReleaseControlOccurrences();
   const proof = createTrustedControlMatrix('proof');
   const release = createTrustedControlMatrix('release');
+  const proofIds = new Set(createCiProductControlOccurrences('proof').map(({ id }) => id));
+  const releaseIds = new Set(createCiProductControlOccurrences('release').map(({ id }) => id));
   for (const { id } of occurrences) {
-    if (['qa.rule.unit-tests', 'qa.rule.test-coverage'].includes(id)) {
-      expect(proof.allowedSkipped).toContain(id);
-    } else {
+    if (proofIds.has(id) && !proof.allowedSkipped.includes(id)) {
       expect(proof.requiredPassed).toContain(id);
+    } else if (!proofIds.has(id)) {
+      expect(proof.requiredPassed).not.toContain(id);
+      expect(proof.allowedSkipped).not.toContain(id);
     }
-    if (id === 'qa.rule.test-coverage') {
-      expect(release.allowedSkipped).toContain(id);
-    } else {
+    if (releaseIds.has(id) && !release.allowedSkipped.includes(id)) {
       expect(release.requiredPassed).toContain(id);
+    } else if (!releaseIds.has(id)) {
+      expect(release.requiredPassed).not.toContain(id);
+      expect(release.allowedSkipped).not.toContain(id);
     }
   }
   expect(release.requiredPassed).toContain('qa.rule.full-product-coverage');
@@ -118,8 +134,7 @@ it('fails closed when the release-only result closure is incomplete', async () =
       reuseFastProof: true,
       releaseDeltaCollector: async () => ({
         steps: [
-          { label: 'Unit tests', status: 'ok' },
-          { label: 'Test coverage', status: 'skipped' },
+          { label: 'SonarJS', status: 'ok' },
           { label: 'Build', status: 'ok' },
         ],
       }),
@@ -159,7 +174,17 @@ it('runs the release audit and every mutation profile after returned failures', 
 
   const result = await collectCiReleaseResults({
     productProofCollector: async () => ({
-      steps: [{ label: 'Unit tests', status: 'failed' as const }],
+      steps: createCiProductControlOccurrences('proof').map(({ label }) => ({
+        label,
+        status: label === 'Unit tests' ? ('failed' as const) : ('ok' as const),
+      })),
+    }),
+    releaseDeltaCollector: async () => ({
+      steps: [
+        { label: 'SonarJS', status: 'ok' as const },
+        { label: 'Build', status: 'ok' as const },
+        { label: 'Release archive', status: 'ok' as const },
+      ],
     }),
     auditCollector,
     mutationCollector,
@@ -175,7 +200,11 @@ it('runs the release audit and every mutation profile after returned failures', 
     'secrets',
   ]);
   expect(result.steps.map(({ label, status }) => [label, status])).toEqual([
-    ['Unit tests', 'failed'],
+    ...createCiProductControlOccurrences('proof').map(({ label }) => [
+      label,
+      label === 'Unit tests' ? 'failed' : 'ok',
+    ]),
+    ['SonarJS', 'ok'],
     ['CodeQL', 'failed'],
     ['Mutation persistence', 'failed'],
     ['Mutation secrets', 'failed'],

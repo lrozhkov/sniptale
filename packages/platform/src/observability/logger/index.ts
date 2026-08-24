@@ -26,6 +26,18 @@ function sanitizeSinkString(value: string): string {
   return redactSensitiveString(value, LOGGER_MAX_PAYLOAD_SIZE);
 }
 
+function sanitizeErrorStack(value: string, fallbackHeader: string): string {
+  const truncationMarker = '... [truncated]';
+  const redacted = redactSensitiveString(value, LOGGER_MAX_PAYLOAD_SIZE);
+  if (!redacted.endsWith(truncationMarker)) {
+    return redacted;
+  }
+
+  const lastCompleteLine = redacted.lastIndexOf('\n', LOGGER_MAX_PAYLOAD_SIZE);
+  const completeStack = lastCompleteLine < 0 ? fallbackHeader : redacted.slice(0, lastCompleteLine);
+  return `${completeStack}\n${truncationMarker}`;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object') {
     return false;
@@ -78,7 +90,10 @@ function sanitizeSinkArg(arg: unknown): unknown {
     const sanitizedError = new Error(redactSensitiveString(arg.message, LOGGER_MAX_PAYLOAD_SIZE));
     sanitizedError.name = arg.name;
     if (arg.stack !== undefined) {
-      sanitizedError.stack = redactSensitiveString(arg.stack, LOGGER_MAX_PAYLOAD_SIZE);
+      sanitizedError.stack = sanitizeErrorStack(
+        arg.stack,
+        `${sanitizedError.name}: [message truncated]`
+      );
     }
     return sanitizedError;
   }

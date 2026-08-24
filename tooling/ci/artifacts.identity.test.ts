@@ -6,7 +6,7 @@ import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
-import { collectMutationEvidence, copyReusableFastAuditReport } from './artifacts.mjs';
+import { collectMutationEvidence, copyReusableFastReport } from './artifacts.mjs';
 
 const temporaryRoots: string[] = [];
 
@@ -131,11 +131,11 @@ it('copies Fast audit evidence only when the sealed manifest and bytes agree', (
     `${JSON.stringify({ files: [{ file: relative, sha256: digest }] })}\n`
   );
 
-  expect(copyReusableFastAuditReport(relative, destinationRoot, proofRoot)).toBe(true);
+  expect(copyReusableFastReport(relative, destinationRoot, proofRoot)).toBe(true);
   expect(fs.readFileSync(path.join(destinationRoot, relative), 'utf8')).toBe('{"results":[]}\n');
 
   fs.writeFileSync(source, '{"results":["tampered"]}\n');
-  expect(() => copyReusableFastAuditReport(relative, destinationRoot, proofRoot)).toThrow(
+  expect(() => copyReusableFastReport(relative, destinationRoot, proofRoot)).toThrow(
     'Reusable Fast proof report digest mismatch'
   );
 });

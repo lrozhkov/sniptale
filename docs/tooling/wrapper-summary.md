@@ -15,7 +15,7 @@ The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 
 The internal build phase is not a public standalone wrapper. Closeout and pre-push invoke it after fresh checkpoint/harness proof. It selects direct, related, saturated, or full unit scope from the existing deterministic owner, produces the artifact build, and writes build state. `ci:build` is different: it is an explicit quick `npm run build` bypass and makes no canonical QA claim.
 
-Every real full gate performs `npm ci`; cached download bytes never replace dependency installation or exact lockfile validation. The project-local npm policy permits legacy peer resolution only for the retained residual ESLint lane while its parser has not yet declared compatibility with the compiler-API shim. Npm errors remain visible in the console. Remove the exception when the residual parser accepts the canonical compiler-API package or the lane is retired.
+Every real full gate performs `npm ci`; cached download bytes never replace dependency installation or exact lockfile validation. The project-local npm policy permits legacy peer resolution only for the retained release-only SonarJS ESLint toolchain while its parser has not yet declared compatibility with the compiler-API shim. Npm errors remain visible in the console. Remove the exception when that parser accepts the canonical compiler-API package or the lane is retired.
 
 Harness targets include executable `tooling/**`, workflows, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact data-only inventories are exempt only when `qa-scope` classifies them as such and their focused owner validator passes. A policy JSON, baseline, allowlist, or executable registry is not data-only.
 
@@ -23,7 +23,7 @@ Harness targets include executable `tooling/**`, workflows, hooks, QA-affecting 
 
 Harness state binds harness/shared-control content. Checkpoint state binds the current product diff and downstream handoff. Build state binds the build closure. Changing the relevant content invalidates that state.
 
-Full product unit proof is separately content-addressed. The internal build phase and `ci:release` may reuse it only when product/workspace inputs, product tests and support, dependency and Vitest configuration, unit-runner owner, semantic Node/container identity, and suite/pool match. CPU, RAM, and worker values are recorded as planning metadata and do not change the semantic result. A missing, malformed, partial, externally unverified, or mismatched receipt triggers the complete unit suite. Unit reuse never skips build, security, coverage, or another unrelated control.
+Full product unit proof is separately content-addressed and owned by `ci:proof`. The internal build phase may reuse it only when product/workspace inputs, product tests and support, dependency and Vitest configuration, unit-runner owner, semantic Node/container identity, and suite/pool match. CPU, RAM, and worker values are recorded as planning metadata and do not change the semantic result. A missing, malformed, partial, externally unverified, or mismatched receipt triggers the complete unit suite. Unit reuse never skips build, security, coverage, or another unrelated control.
 
 Build/ZIP proof separately binds the full product, public asset, manifest, workspace, build configuration, dependency, Node/toolchain, production-environment, legal/generated-inventory, packaging-owner closure, and exact archive bytes. `ci:proof` and `ci:release` can consume that receipt when its complete digest matches. Only the internal release-archive owner can mint the receipt; the quick `ci:build` command is intentionally outside this owner and its artifact is never accepted.
 
@@ -35,8 +35,10 @@ CodeQL and coverage use the same fail-closed model in `ci:release`. Their comple
 
 Only `qa:release-harness`, `qa:checkpoint`, and `qa:closeout` are diff-aware. Both `ci:*` gates resolve the complete repository product snapshot through the same scope owner locally and on GitHub; neither may select an owner-local or focused control set from the current diff.
 
-- `ci:proof` runs non-Vitest product verification, build/ZIP proof, and the fast PR security/dependency audit. Its machine policy explicitly marks `fullVitest: false` and `releaseReady: false`.
-- `ci:release` owns full Vitest together with complete product verification, the release audit, CodeQL, canonical coverage, SBOM/license controls, and persistence/secrets mutation profiles.
+Structural risk, interface surfaces, changed-line readability, and UI automation seams are absent from both commit-wide CI contracts because their comparison authority is the live diff. They remain blocking in `qa:checkpoint` and `qa:closeout`. Other target-aware controls may report only their exact machine-declared `no-applicable-targets` disposition; trusted admission rejects a different skip reason.
+
+- `ci:proof` runs full Vitest, repository-wide product verification excluding release-only SonarJS, build/ZIP proof, and the fast PR security/dependency audit. It proves the Fast Gate but does not claim release readiness.
+- `ci:release` requires the exact Fast proof and does not rerun its unit suite. It adds release-only SonarJS, the release audit, CodeQL, canonical coverage, SBOM/license controls, and persistence/secrets mutation profiles. If an exact reusable Fast proof is unavailable, the same wrapper first executes the Fast prerequisite on the current machine and then runs the release-only delta.
 
 Both run the same JS composition and QA owners directly on WSL. On a PR, GitHub/Selectel executes the candidate QA implementation exactly once. The read-only trusted-base launcher records both control digests and independently validates mandatory phase presence, candidate commit/tree, receipt schema, evidence closure and hashes, environment-owned execution-profile authority, capability claim, artifact closure, and final graph result. A digest mismatch is reported as `QA controls changed` and `candidate-controls`; it does not require a bootstrap PR. The launcher does not rerun the previous control implementation, so QA changes rely on normal human review and become canonical only after merge to `main`. Candidate execution receives no GitHub token, Selectel credentials, OIDC authority, or write access to the trusted mount.
 
@@ -50,7 +52,7 @@ The audit profile and product release modules still own their established semant
 
 ## Locks and scheduling
 
-Formatting is the first sequential checkpoint barrier. Independent focused lanes start only after it succeeds. Build and full product verification may use bounded concurrent lanes, then a saturated exclusive unit phase. Vite build remains exclusive.
+Formatting is the first sequential checkpoint barrier. Independent focused lanes start only after it succeeds. In full verification, lightweight target/owner lanes may overlap Oxlint; Oxlint receives its declared CPU threads, native typecheck waits for it, and parser-heavy graph/light lanes wait for both. Full Vitest then runs as the saturated exclusive Fast phase. Vite build remains exclusive.
 
 `qa:release-harness`, `qa:checkpoint`, `qa:closeout`, `ci:proof`, and `ci:release` participate in the blocking lifecycle. Do not run them concurrently. Closeout performs the authorized lock handoff to its internal build.
 

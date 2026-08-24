@@ -69,6 +69,7 @@ const SHARED_CONTROL_FILES = new Set([
   '.oxfmtignore',
   '.oxfmtrc.json',
   '.oxlintrc.json',
+  '.oxlintrc.strict.json',
   'package-lock.json',
   'package.json',
   'playwright.config.ts',

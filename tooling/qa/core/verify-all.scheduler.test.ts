@@ -85,10 +85,23 @@ it('keeps release result order while running the pre-build lanes concurrently', 
   );
   const scheduledTasks = scheduler.mock.calls.flatMap(([tasks]) => tasks);
   expect(scheduledTasks?.find(({ id }) => id === 'lint')).toMatchObject({
-    cpuTokens: 2,
+    cpuTokens: 6,
     dependencies: [],
     memoryMiB: 6144,
+    workers: 6,
   });
+  expect(scheduledTasks?.find(({ id }) => id === 'typecheck')?.dependencies).toEqual(['lint']);
+  expect(scheduledTasks?.find(({ id }) => id === 'graph')?.dependencies).toEqual([
+    'lint',
+    'typecheck',
+  ]);
+  expect(scheduledTasks?.find(({ id }) => id === 'light')?.dependencies).toEqual([
+    'lint',
+    'typecheck',
+  ]);
+  expect(workerRunner).toHaveBeenCalledWith(
+    expect.objectContaining({ lane: 'lint', oxlintThreadCount: 6 })
+  );
   expect(scheduledTasks?.find(({ id }) => id === 'tests')).toMatchObject({
     cpuTokens: 8,
     exclusive: true,
@@ -101,11 +114,13 @@ it('executes a non-release test lane in a real worker without starting build', a
     context: {
       baseline: { allowances: [] },
       codeFiles: [],
+      excludedControlLabels: [],
       releaseMode: false,
       targetFiles: [],
     },
     lane: 'tests',
     memoryMiB: 1024,
+    oxlintThreadCount: 2,
     typecheckCheckerCount: 4,
     vitestMaxWorkers: 2,
   });

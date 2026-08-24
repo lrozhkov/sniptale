@@ -21,6 +21,24 @@ function focusedContext() {
   };
 }
 
+it('accepts the execution-only Oxlint thread allocation in the full worker contract', () => {
+  expect(
+    parseFullVerifyWorkerInput({
+      context: {
+        baseline: { allowances: [] },
+        codeFiles: [],
+        excludedControlLabels: [],
+        releaseMode: true,
+        targetFiles: [],
+      },
+      lane: 'lint',
+      oxlintThreadCount: 6,
+      typecheckCheckerCount: 4,
+      vitestMaxWorkers: 4,
+    }).oxlintThreadCount
+  ).toBe(6);
+});
+
 it('rejects malformed nested focused baseline allowances', () => {
   const context = {
     ...focusedContext(),
@@ -72,11 +90,13 @@ it('rejects extra full-verification context authority', () => {
       context: {
         baseline: { allowances: [] },
         codeFiles: [],
+        excludedControlLabels: [],
         releaseMode: false,
         targetFiles: [],
         unexpectedAuthority: true,
       },
       lane: 'tests',
+      oxlintThreadCount: 2,
       typecheckCheckerCount: 4,
       vitestMaxWorkers: 4,
     })

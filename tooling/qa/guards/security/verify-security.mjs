@@ -16,7 +16,6 @@ import {
   printViolations,
   readText,
 } from '../../core/shared.mjs';
-import { lintWithSecurityEslint } from './eslint-security-adapter.mjs';
 
 const SECURITY_VERIFIER_PATH = 'tooling/qa/guards/security/verify-security.mjs';
 
@@ -144,48 +143,19 @@ export function collectSecurityViolations(relativePaths, { readSource = readText
   };
 }
 
-async function collectSecurityEslintResult(
-  jsLikeFiles,
-  { lintRunner = lintWithSecurityEslint, strictWarnings = false } = {}
-) {
-  if (jsLikeFiles.length === 0) {
-    return { failed: false, warningCount: 0, errorCount: 0, output: '', results: [] };
-  }
-  return lintRunner({ files: jsLikeFiles, strictWarnings });
-}
-
-export async function runSecurityCheck(
-  explicitFiles = [],
-  { lintRunner = lintWithSecurityEslint, strictWarnings = false } = {}
-) {
+export async function runSecurityCheck(explicitFiles = []) {
   const files = collectCodeFiles(explicitFiles);
   const { files: jsLikeFiles, violations: customViolations } = collectSecurityViolations(files);
-
-  const eslintResult = await collectSecurityEslintResult(jsLikeFiles, {
-    lintRunner,
-    strictWarnings,
-  });
-
   const violations = filterAllowedViolations(customViolations, loadBaseline());
 
   return {
-    eslintResult,
     files: jsLikeFiles,
     violations,
   };
 }
 
 if (isExecutedAsScript(import.meta.url)) {
-  const { eslintResult, violations } = await runSecurityCheck(
-    parseFilesArgument(process.argv.slice(2))
-  );
-
-  if (eslintResult.output) {
-    process.stdout.write(eslintResult.output);
-  }
-  if (eslintResult.failed) {
-    process.exit(1);
-  }
+  const { violations } = await runSecurityCheck(parseFilesArgument(process.argv.slice(2)));
 
   if (violations.length > 0) {
     printViolations('Security violations found:', violations);

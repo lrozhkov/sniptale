@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { createReleaseControlOccurrences } from './release-occurrences.mjs';
+import { createCiProductControlOccurrences } from '../../../ci/product-control-policy.mjs';
 import { AUDIT_STEPS, CI_COMPOSITION_STEPS, HARNESS_STEPS } from './definitions.data.mjs';
 import { assertQaExecutionContract, assertQaResultContract } from './contract.mjs';
 
@@ -126,7 +126,11 @@ it('models clean, harness-only, and reused closeout populations explicitly', () 
 });
 
 it('requires fail-late CI evidence after an earlier control failure', () => {
-  const releaseSteps = createReleaseControlOccurrences().map(({ label }, index) => ({
+  const proofSteps = createCiProductControlOccurrences('proof').map(({ label }, index) => ({
+    label,
+    status: index === 0 ? ('failed' as const) : ('ok' as const),
+  }));
+  const releaseSteps = createCiProductControlOccurrences('release').map(({ label }, index) => ({
     label,
     status: index === 0 ? ('failed' as const) : ('ok' as const),
   }));
@@ -135,19 +139,26 @@ it('requires fail-late CI evidence after an earlier control failure', () => {
     label.startsWith('Mutation ')
   ).map(([, label]) => ({ label, status: 'ok' as const }));
 
-  expect(() => assertQaExecutionContract({ wrapperId: 'ci:proof', steps: releaseSteps })).toThrow(
+  expect(() => assertQaExecutionContract({ wrapperId: 'ci:proof', steps: proofSteps })).toThrow(
     /missing=.*Full product coverage/u
   );
   expect(() =>
     assertQaExecutionContract({
       wrapperId: 'ci:release',
-      steps: [...releaseSteps, ...auditSteps],
+      mode: 'reuse-fast-proof',
+      steps: [{ label: 'Fast proof reuse', status: 'ok' }, ...releaseSteps, ...auditSteps],
     })
   ).toThrow(/missing=.*Mutation persistence/u);
   expect(() =>
     assertQaExecutionContract({
       wrapperId: 'ci:release',
-      steps: [...releaseSteps, ...auditSteps, ...mutationSteps],
+      mode: 'reuse-fast-proof',
+      steps: [
+        { label: 'Fast proof reuse', status: 'ok' },
+        ...releaseSteps,
+        ...auditSteps,
+        ...mutationSteps,
+      ],
     })
   ).not.toThrow();
 });

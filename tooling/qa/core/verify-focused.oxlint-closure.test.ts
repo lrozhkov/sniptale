@@ -4,6 +4,7 @@ import { requiresFullOxlintClosure } from './verify-focused.execution.mjs';
 
 it.each([
   '.oxlintrc.json',
+  '.oxlintrc.strict.json',
   'package.json',
   'package-lock.json',
   'tooling/qa/core/verify-oxlint.mjs',

@@ -101,6 +101,13 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     producer: { id: 'qa-release-archive-owner', controlDigest },
   });
   write(artifact, '.tmp/qa/build-proof.json', `${JSON.stringify(build)}\n`);
+  const unit = sealReceipt({
+    schemaVersion: 1,
+    artifactKind: 'sniptale-full-unit-proof',
+    outcome: 'passed',
+    producer: { controlDigest },
+  });
+  write(artifact, '.tmp/qa/unit-proof.json', `${JSON.stringify(unit)}\n`);
   for (const file of [
     '.tmp/semgrep/results.json',
     '.tmp/semgrep/results.sarif',
@@ -127,7 +134,11 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
       log: { path: log },
       steps: [
         ...controlMatrix.requiredPassed.map((stepId) => ({ stepId, outcome: 'passed' })),
-        ...controlMatrix.allowedSkipped.map((stepId) => ({ stepId, outcome: 'skipped' })),
+        ...controlMatrix.allowedSkipped.map((stepId) => ({
+          stepId,
+          outcome: 'skipped',
+          skipReasonId: controlMatrix.allowedSkippedReasons[stepId],
+        })),
       ],
       timeline: { events: [], activities: [] },
     })}\n`
@@ -172,7 +183,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     controlDisposition:
       controlDigest === trustedControlDigest ? 'trusted-controls' : 'candidate-controls',
     gateClaim: 'fast-pr-gate',
-    fullVitest: false,
+    fullVitest: true,
     releaseReady: false,
     controlDigest,
     gateInputDigest,
@@ -204,7 +215,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     ].map((id) => ({ id, status: 'passed' })),
     proofReuse: {
       build: 'fresh',
-      unit: 'unavailable',
+      unit: 'fresh',
       codeql: 'unavailable',
       coverage: 'unavailable',
     },

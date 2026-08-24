@@ -4,12 +4,13 @@
   "lanes": {
     "proof": {
       "claim": "fast-pr-gate",
-      "fullVitest": false,
+      "fullVitest": true,
       "releaseReady": false,
       "freshPhases": ["install", "verify-project-toolchain", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "proof"],
       "derivedPhases": ["non-gate-input-reuse"],
       "requiredFiles": [
         ".tmp/qa/build-proof.json",
+        ".tmp/qa/unit-proof.json",
         ".tmp/semgrep/results.json",
         ".tmp/semgrep/results.sarif",
         ".tmp/osv/results.json",
@@ -18,7 +19,7 @@
         ".tmp/npm-audit/signatures.json"
       ],
       "requiredPrefixes": [".tmp/qa-observability/runs/", ".tmp/qa-logs/"],
-      "reuse": { "build": ["fresh", "reused"], "unit": ["unavailable"], "codeql": ["unavailable"], "coverage": ["unavailable"] }
+      "reuse": { "build": ["fresh", "reused"], "unit": ["fresh", "reused"], "codeql": ["unavailable"], "coverage": ["unavailable"] }
     },
     "release": {
       "claim": "release-provenance",

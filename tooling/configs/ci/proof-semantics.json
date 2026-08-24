@@ -18,7 +18,7 @@
     "proof": {
       "claim": "fast-pr-gate",
       "scope": "repository-wide",
-      "fullVitest": false,
+      "fullVitest": true,
       "releaseReady": false
     },
     "release": {
@@ -43,7 +43,8 @@
     "diffAwareWrappersExactly": ["qa:release-harness", "qa:checkpoint", "qa:closeout"],
     "ciGatesAreRepositoryWide": true,
     "fastGateNeverClaimsReleaseReadiness": true,
-    "fullVitestIsReleaseOnly": true,
+    "fullVitestOwnedByFastGate": true,
+    "releaseProvenanceRequiresFastProof": true,
     "ciBuildIsNonProof": true,
     "ciBuildArtifactAdmissibleForProvenance": false
   }

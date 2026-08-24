@@ -2,7 +2,6 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { createSecurityEslintConfig } from '../guards/security/eslint-security-adapter.mjs';
 import { SONARJS_RULE_IDS } from './verify-sonarjs.mjs';
 
 type RuleSetting = string | [string, ...unknown[]];
@@ -94,38 +93,34 @@ const EXPECTED_RULE_DECISIONS: Record<string, [string, string, string]> = {
   'react-hooks/exhaustive-deps': ['Move', '.oxlintrc.json', 'react/exhaustive-deps'],
   'react-hooks/rules-of-hooks': ['Move', '.oxlintrc.json', 'react/rules-of-hooks'],
   'security/detect-bidi-characters': [
-    'Keep ESLint',
-    'tooling/qa/guards/security/eslint-security-adapter.mjs',
+    'Move JS plugin',
+    '.oxlintrc.json',
     'security/detect-bidi-characters',
   ],
   'security/detect-buffer-noassert': [
-    'Keep ESLint',
-    'tooling/qa/guards/security/eslint-security-adapter.mjs',
+    'Move JS plugin',
+    '.oxlintrc.json',
     'security/detect-buffer-noassert',
   ],
   'security/detect-eval-with-expression': [
-    'Keep ESLint',
-    'tooling/qa/guards/security/eslint-security-adapter.mjs',
+    'Move JS plugin',
+    '.oxlintrc.json',
     'security/detect-eval-with-expression',
   ],
-  'security/detect-new-buffer': [
-    'Keep ESLint',
-    'tooling/qa/guards/security/eslint-security-adapter.mjs',
-    'security/detect-new-buffer',
-  ],
+  'security/detect-new-buffer': ['Move JS plugin', '.oxlintrc.json', 'security/detect-new-buffer'],
   'security/detect-non-literal-regexp': [
-    'Keep ESLint',
-    'tooling/qa/guards/security/eslint-security-adapter.mjs',
+    'Move JS plugin',
+    '.oxlintrc.json',
     'security/detect-non-literal-regexp',
   ],
   'security/detect-object-injection': [
-    'Keep ESLint',
-    'tooling/qa/guards/security/eslint-security-adapter.mjs',
+    'Move JS plugin',
+    '.oxlintrc.json',
     'security/detect-object-injection',
   ],
   'security/detect-unsafe-regex': [
-    'Keep ESLint',
-    'tooling/qa/guards/security/eslint-security-adapter.mjs',
+    'Move JS plugin',
+    '.oxlintrc.json',
     'security/detect-unsafe-regex',
   ],
 };
@@ -283,14 +278,10 @@ it('resolves every migration target to its current canonical owner', () => {
     ...Object.keys(config.rules),
     ...config.overrides.flatMap(({ rules = {} }) => Object.keys(rules)),
   ]);
-  const securityRules = new Set(Object.keys(createSecurityEslintConfig()[1]?.rules ?? {}));
-
   for (const row of migration.explicitPriorRules) {
     expect(fs.existsSync(row.targetOwner), row.priorRule).toBe(true);
-    if (row.decision === 'Move') {
+    if (row.decision === 'Move' || row.decision === 'Move JS plugin') {
       expect(oxlintRules.has(row.targetRule), row.priorRule).toBe(true);
-    } else if (row.decision === 'Keep ESLint') {
-      expect(securityRules.has(row.targetRule), row.priorRule).toBe(true);
     } else {
       expect(row).toMatchObject({
         decision: 'Custom guard',
@@ -310,17 +301,23 @@ it('pins the custom TS6 guard roots and canonical execution owner', () => {
   ]);
 });
 
-it('pins the exact residual ESLint Security and SonarJS rule sets', () => {
-  const securityRules = Object.keys(createSecurityEslintConfig()[1]?.rules ?? {}).sort();
-  const expectedSecurity = migration.residualEslint.find(({ owner }) =>
-    owner.endsWith('eslint-security-adapter.mjs')
-  );
+it('pins Security as an Oxlint JS plugin and SonarJS as the only residual ESLint set', () => {
+  const oxlintConfig = JSON.parse(fs.readFileSync('.oxlintrc.json', 'utf8')) as {
+    jsPlugins: Array<{ name: string; specifier: string }>;
+    rules: Record<string, string>;
+  };
   const expectedSonarjs = migration.residualEslint.find(({ owner }) =>
     owner.endsWith('verify-sonarjs.mjs')
   );
 
-  expect(expectedSecurity?.rules.toSorted()).toEqual(securityRules);
-  expect(expectedSecurity?.settings).toEqual(createSecurityEslintConfig()[1]?.rules);
+  expect(oxlintConfig.jsPlugins).toContainEqual({
+    name: 'security',
+    specifier: 'eslint-plugin-security',
+  });
+  expect(migration.residualEslint).toHaveLength(1);
+  expect(
+    Object.keys(oxlintConfig.rules).filter((rule) => rule.startsWith('security/'))
+  ).toHaveLength(7);
   expect(expectedSonarjs?.rules.toSorted()).toEqual(SONARJS_RULE_IDS.toSorted());
   expect(expectedSonarjs?.defaultSeverity).toBe('error');
 });

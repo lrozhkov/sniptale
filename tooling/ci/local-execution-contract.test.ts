@@ -46,7 +46,8 @@ it('fixes resource profiles as planning-only metadata and rejects ci:build prove
       resourceProfileExcludedFromSemanticDigest: true,
       resourceProfileAffectsReuseCompatibility: false,
       fastGateNeverClaimsReleaseReadiness: true,
-      fullVitestIsReleaseOnly: true,
+      fullVitestOwnedByFastGate: true,
+      releaseProvenanceRequiresFastProof: true,
       ciBuildIsNonProof: true,
       ciBuildArtifactAdmissibleForProvenance: false,
     },
@@ -54,7 +55,7 @@ it('fixes resource profiles as planning-only metadata and rejects ci:build prove
   expect(policy.semanticIdentity).not.toContain('resourceProfiles');
   expect(policy.gateCapabilities.proof).toMatchObject({
     scope: 'repository-wide',
-    fullVitest: false,
+    fullVitest: true,
     releaseReady: false,
   });
   expect(policy.gateCapabilities.release).toMatchObject({

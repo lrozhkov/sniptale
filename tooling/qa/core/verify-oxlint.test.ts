@@ -54,6 +54,26 @@ it('uses the single checked-in Oxlint policy authority', async () => {
   expect(config.rules).not.toHaveProperty('react/only-export-components');
 });
 
+it('binds strict security mode and scheduler CPU tokens to the same Oxlint process', async () => {
+  const module = await import('./verify-oxlint.mjs');
+  const calls: unknown[][] = [];
+  module.runOxlint({
+    files: ['tooling/qa/core/verify-oxlint.mjs'],
+    strictSecurity: true,
+    threads: 6,
+    commandRunner: (...args: unknown[]) => {
+      calls.push(args);
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+  expect(calls[0]?.[1]).toEqual(
+    expect.arrayContaining(['.oxlintrc.strict.json', '--threads=6', '--deny-warnings'])
+  );
+  expect(() =>
+    module.runOxlint({ files: ['tooling/qa/core/verify-oxlint.mjs'], threads: 0 })
+  ).toThrow('Oxlint threads must be a positive integer.');
+});
+
 it('keeps fix mode behind the canonical wrapper and enum guard', async () => {
   const module = await import('./verify-oxlint.mjs');
   const calls: unknown[][] = [];

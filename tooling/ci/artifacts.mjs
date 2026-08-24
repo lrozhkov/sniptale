@@ -56,12 +56,13 @@ function readProofSemanticsPolicy(repositoryRoot) {
     policy.invariants?.resourceProfileAffectsReuseCompatibility !== false ||
     policy.reuseCompatibility?.authority !== 'environment-profile' ||
     policy.invariants?.fastGateNeverClaimsReleaseReadiness !== true ||
-    policy.invariants?.fullVitestIsReleaseOnly !== true ||
+    policy.invariants?.fullVitestOwnedByFastGate !== true ||
+    policy.invariants?.releaseProvenanceRequiresFastProof !== true ||
     JSON.stringify(policy.invariants?.diffAwareWrappersExactly) !==
       JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout']) ||
     policy.invariants?.ciGatesAreRepositoryWide !== true ||
     policy.gateCapabilities?.proof?.scope !== 'repository-wide' ||
-    policy.gateCapabilities?.proof?.fullVitest !== false ||
+    policy.gateCapabilities?.proof?.fullVitest !== true ||
     policy.gateCapabilities?.proof?.releaseReady !== false ||
     policy.gateCapabilities?.release?.scope !== 'repository-wide' ||
     policy.gateCapabilities?.release?.fullVitest !== true ||
@@ -249,6 +250,7 @@ function newestReleaseArchive(startedAtMs, repositoryRoot = root) {
 const LANE_FILES = {
   proof: [
     '.tmp/qa/build-proof.json',
+    '.tmp/qa/unit-proof.json',
     '.tmp/semgrep/results.json',
     '.tmp/semgrep/results.sarif',
     '.tmp/osv/results.json',
@@ -276,7 +278,8 @@ const LANE_FILES = {
   ],
 };
 
-const REUSABLE_FAST_AUDIT_REPORTS = new Set([
+const REUSABLE_FAST_REPORTS = new Set([
+  '.tmp/qa/unit-proof.json',
   '.tmp/npm-audit/results.json',
   '.tmp/npm-audit/signatures.json',
   '.tmp/osv/results.json',
@@ -284,7 +287,7 @@ const REUSABLE_FAST_AUDIT_REPORTS = new Set([
   '.tmp/semgrep/results.sarif',
 ]);
 
-export function copyReusableFastAuditReport(
+export function copyReusableFastReport(
   file,
   destinationRoot,
   proofRoot = process.env.SNIPTALE_FAST_PROOF_PATH
@@ -335,8 +338,8 @@ function collectLaneReports({
     const copied =
       lane === 'release' &&
       process.env.SNIPTALE_REUSE_FAST_PROOF === '1' &&
-      REUSABLE_FAST_AUDIT_REPORTS.has(file)
-        ? copyReusableFastAuditReport(file, destinationRoot)
+      REUSABLE_FAST_REPORTS.has(file)
+        ? copyReusableFastReport(file, destinationRoot)
         : copyFile(file, destinationRoot, file, {
             ignoreStale: !required,
             notBeforeMs: startedAtMs,

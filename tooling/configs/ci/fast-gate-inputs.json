@@ -17,6 +17,7 @@
     ".oxfmtignore",
     ".oxfmtrc.json",
     ".oxlintrc.json",
+    ".oxlintrc.strict.json",
     "package.json",
     "package-lock.json",
     "playwright.config.ts",

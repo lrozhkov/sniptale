@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=43, tool-noise=36.
-- Enforced source: codeql=3, gitleaks=10, jscpd=64, license=1, scc=1.
+- Classification: accepted-architecture=43, tool-noise=34.
+- Enforced source: codeql=3, gitleaks=8, jscpd=64, license=1, scc=1.
 
 ## Active structural debt
 
@@ -24,5 +24,5 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registered policy dispositions
 
-- permanent-policy=24, tool-filter=398.
+- permanent-policy=24, tool-filter=397.
 - Exact scopes, source hashes, owners, reasons, remediation, and expiry data remain in the machine registry.

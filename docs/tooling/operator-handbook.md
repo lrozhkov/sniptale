@@ -10,7 +10,7 @@ Short command and review lookup. Full external behavior is in [ci-cd.md](ci-cd.m
 | Harness/shared-control proof | `npm run qa:release-harness` | Required when the live scope classifier reports executable harness targets. |
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, artifact policy, and commit. |
-| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs Fast PR Gate controls directly in WSL without Docker. It excludes full Vitest and does not prove release readiness. Dirty workspace is diagnostic and non-admissible externally. |
+| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs Fast PR Gate controls directly in WSL without Docker, including full Vitest but excluding release-only SonarJS, coverage, CodeQL, mutation, and release audit controls. It does not prove release readiness. Dirty workspace is diagnostic and non-admissible externally. |
 | Local full release gate | `npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]` | Runs the same composition owner as Release provenance Gate directly in WSL, including heavy audit and mutation profiles. |
 | Quick local build bypass | `npm run ci:build` | Runs the project npm build only; it is not a release build, emits no QA proof, and is never accepted for provenance. |
 | Local PR bypass proof | `npm run ci:proof -- --pr <number> --reason "<audit note>" [resource flags]` | Requires clean `origin/main`, validates exact remote PR authority, posts proof hashes and the mandatory reason, and never merges. |
@@ -27,7 +27,7 @@ QA implementation, owner maps, generated inventories, and product code may chang
 
 ## GitHub operations
 
-Ready PRs and pushes to `main` run Fast PR Gate with `SELECTEL_QA_PROFILES`. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Continuous Integration → Run workflow → release-provenance**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`. It reuses an exact fast proof when possible, otherwise completes the missing fast controls on the same release VM; full Vitest and release-readiness claims always remain owned by release provenance.
+Ready PRs and pushes to `main` run Fast PR Gate with `SELECTEL_QA_PROFILES`. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Continuous Integration → Run workflow → release-provenance**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`. It reuses an exact fast proof when possible, otherwise completes the missing Fast controls on the same release VM. Full Vitest belongs to Fast proof; release readiness additionally requires the release-only controls.
 
 The proof artifact name is `fast-proof-<commit>-<run-id>-<producer-attempt>` or `release-provenance-<commit>-<run-id>-<producer-attempt>`. The job summary contains its URL and exact download command. A failed downstream-job retry discovers the highest live producer attempt from the run artifact inventory and does not rerun a green VM merely because the consumer attempt changed. Proof is uploaded before cleanup. Confirm the cleanup receipt marks the runner registration, VM, VM ports, disposable security group, router interface, router, subnet, network, and volumes deleted before treating the run as complete. When the early receipt is unavailable, the cleanup artifact must identify `recover-cleanup` for the exact run attempt rather than a repository-wide sweep. The independent hourly TTL sweep is recovery, not the normal cleanup path.
 
@@ -73,7 +73,7 @@ Use direct commands only to diagnose the failed owner:
 | Typecheck | `node tooling/qa/core/verify-typecheck.mjs` |
 | Oxlint | `node tooling/qa/core/verify-oxlint.mjs` |
 | Oxfmt | `node tooling/qa/core/verify-oxfmt.mjs` |
-| Residual security ESLint | `node tooling/qa/guards/security/verify-security.mjs` |
+| Security Oxlint JS-plugin rules | `node tooling/qa/core/verify-oxlint.mjs` |
 | Release-only SonarJS ESLint | `node tooling/qa/core/verify-sonarjs.mjs` |
 | Build | `node tooling/qa/core/verify-build.mjs` |
 | Security guardrails | `node tooling/qa/guards/security/verify-security.mjs` |

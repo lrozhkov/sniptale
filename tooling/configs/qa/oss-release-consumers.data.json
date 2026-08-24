@@ -59,12 +59,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "967d0bb342852e1ec2d67633391681c585ddc154a7062d07c9acb1a3406d6279"
+      "sha256": "7413bf27c985e0b3fe4bc655d89d8b6147acc792f1bfb90389e9dbcab5495d91"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "967d0bb342852e1ec2d67633391681c585ddc154a7062d07c9acb1a3406d6279"
+      "sha256": "7413bf27c985e0b3fe4bc655d89d8b6147acc792f1bfb90389e9dbcab5495d91"
     },
     {
       "category": "validator-integration",
@@ -109,7 +109,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
-      "sha256": "4e52fb0a8536b983b4b1621ac780e5069d04a6bc36f77cd625136e00bf86f531"
+      "sha256": "dc7f48c01a04a824621c4e58e10623bbb7e786923c643c8840d8dec30dd5fce7"
     },
     {
       "category": "validator-integration",

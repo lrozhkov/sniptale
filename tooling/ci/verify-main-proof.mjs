@@ -36,7 +36,7 @@ function validateMainProofIdentity(manifest, { commit, controlDigest, expectedTr
   const expectedCapability =
     lane === 'release'
       ? { gateClaim: 'release-provenance', fullVitest: true, releaseReady: true }
-      : { gateClaim: 'fast-pr-gate', fullVitest: false, releaseReady: false };
+      : { gateClaim: 'fast-pr-gate', fullVitest: true, releaseReady: false };
   if (
     manifest.schemaVersion !== 1 ||
     manifest.artifactKind !== 'sniptale-ci-proof' ||
