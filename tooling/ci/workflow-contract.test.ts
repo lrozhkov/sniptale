@@ -121,7 +121,7 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
     "inputs.gate == 'selectel-connectivity' && 'Selectel connectivity preflight'"
   );
   expect(workflow).toContain(
-    "github.event.schedule == '17 * * * *' && 'sweep' || 'release-provenance'"
+    "github.event.schedule == '17 3 * * *' && 'sweep' || 'release-provenance'"
   );
   expect(workflow).toContain(
     'QA_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-qa,ignore-error=true'
@@ -218,9 +218,9 @@ it('uses one external workflow for commit gates and the bounded infrastructure s
   expect(workflow).toContain('needs: [qa-image, provision, canonical-qa, infrastructure-smoke]');
   expect(workflow).toContain('[ "$CLEANUP_RESULT" = success ]');
   expect(workflow).toContain('scheduled-sweeper:');
-  expect(workflow).toContain("github.event.schedule == '17 * * * *'");
+  expect(workflow).toContain("github.event.schedule == '17 3 * * *'");
   expect(workflow).toContain("github.event.schedule == '23 4 * * 1'");
-  expect(workflow).toContain("github.event.schedule != '17 * * * *'");
+  expect(workflow).toContain("github.event.schedule != '17 3 * * *'");
   expect(workflow).toContain('recover-cleanup');
   expect(workflow).toContain("github.ref == 'refs/heads/main'");
   expect(workflow).toContain("'ci-local-proof-bypass'");
@@ -367,6 +367,7 @@ it('publishes from one admitted provenance artifact without provisioning another
   const coverageJob = workflow.slice(workflow.indexOf('  coverage-results:'));
   expect(workflow).toContain('name: Continuous Deployment');
   expect(workflow).toContain('release_tag:');
+  expect(workflow).toContain('release_notes:');
   expect(workflow).toContain('provenance_run_id:');
   expect(workflow).toContain('allow_non_latest_provenance:');
   expect(workflow).toContain('.display_title == "Release provenance Gate"');
@@ -381,6 +382,8 @@ it('publishes from one admitted provenance artifact without provisioning another
   expect(workflow).toContain('is not the latest completed run');
   expect(workflow).toContain('verify-main-proof.mjs release');
   expect(workflow).toContain('prepare-release-assets.mjs build/release-proof');
+  expect(workflow).toContain('printf \'\\n%s\\n\\n\' "$RELEASE_NOTES" >> "$notes"');
+  expect(workflow).not.toContain('Unified local WSL and GitHub/Selectel validation');
   expect(workflow).toContain('release_sha=$(git rev-list -n 1 "$RELEASE_TAG")');
   expect(workflow).toContain('GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs');
   expect(workflow).not.toContain('release_sha=$(git rev-list -n 1 "$GITHUB_REF_NAME")');
@@ -398,4 +401,7 @@ it('publishes from one admitted provenance artifact without provisioning another
   expect(coverageJob).toContain('id-token: write');
   expect(coverageJob).toContain('use_oidc: true');
   expect(coverageJob).toContain('continue-on-error: true');
+  expect(coverageJob).toContain('fail_ci_if_error: true');
+  expect(workflow).not.toContain('releases/latest/download/ci.svg');
+  expect(workflow).not.toContain('release-owned status badges');
 });

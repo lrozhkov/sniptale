@@ -48,39 +48,6 @@ async function writeEvidenceArchive(output, archiveName, sources, identity) {
   return sha256Bytes(archive);
 }
 
-function escapeSvg(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
-
-function writeBadge(output, name, label, value, color) {
-  const leftWidth = Math.max(36, label.length * 7 + 12);
-  const rightWidth = Math.max(36, String(value).length * 7 + 12);
-  const width = leftWidth + rightWidth;
-  const safeLabel = escapeSvg(label);
-  const safeValue = escapeSvg(value);
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="20" role="img" aria-label="${safeLabel}: ${safeValue}">`,
-    '<linearGradient id="s" x2="0" y2="100%">',
-    '<stop offset="0" stop-color="#bbb" stop-opacity=".1"/>',
-    '<stop offset="1" stop-opacity=".1"/></linearGradient>',
-    `<clipPath id="r"><rect width="${width}" height="20" rx="3" fill="#fff"/></clipPath>`,
-    `<g clip-path="url(#r)"><rect width="${leftWidth}" height="20" fill="#555"/>`,
-    `<rect x="${leftWidth}" width="${rightWidth}" height="20" fill="${color}"/>`,
-    `<rect width="${width}" height="20" fill="url(#s)"/></g>`,
-    '<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">',
-    `<text x="${leftWidth / 2}" y="15" fill="#010101" fill-opacity=".3">${safeLabel}</text>`,
-    `<text x="${leftWidth / 2}" y="14">${safeLabel}</text>`,
-    `<text x="${leftWidth + rightWidth / 2}" y="15" fill="#010101" fill-opacity=".3">${safeValue}</text>`,
-    `<text x="${leftWidth + rightWidth / 2}" y="14">${safeValue}</text>`,
-    '</g></svg>\n',
-  ].join('');
-  fs.writeFileSync(path.join(output, name), svg, { flag: 'wx' });
-}
-
 const [artifactRoot, releaseCommit] = process.argv.slice(2);
 if (!artifactRoot || !releaseCommit || !fs.statSync(artifactRoot).isDirectory()) {
   throw new Error('Usage: prepare-release-assets.mjs <release-proof-root> <commit>');
@@ -124,24 +91,12 @@ fs.writeFileSync(path.join(output, 'provenance.json'), `${JSON.stringify(provena
   flag: 'wx',
 });
 
-const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-const extensionManifest = JSON.parse(fs.readFileSync('apps/extension/manifest.json', 'utf8'));
-const coverageSummary = JSON.parse(
-  fs.readFileSync(path.join(releaseRoot, '.tmp/coverage/canonical/coverage-summary.json'), 'utf8')
-);
-const coverage = coverageSummary.total?.lines?.pct;
-if (!Number.isFinite(coverage)) throw new Error('Canonical line coverage is unavailable.');
-writeBadge(output, 'ci.svg', 'CI', 'passing', '#2cbe4e');
-writeBadge(output, 'coverage.svg', 'coverage', `${coverage}%`, '#2cbe4e');
-writeBadge(output, 'release.svg', 'release', `v${extensionManifest.version_name}`, '#007ec6');
-writeBadge(output, 'license.svg', 'license', packageJson.license, '#007ec6');
-
 const releaseAssets = fs
   .readdirSync(output, { withFileTypes: true })
   .filter((entry) => entry.isFile())
   .map((entry) => entry.name)
   .sort();
-if (releaseAssets.length !== 8) throw new Error('Release asset staging inventory drifted.');
+if (releaseAssets.length !== 4) throw new Error('Release asset staging inventory drifted.');
 const sums = releaseAssets.map(
   (name) => `${sha256Bytes(fs.readFileSync(path.join(output, name)))}  ${name}`
 );

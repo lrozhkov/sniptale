@@ -52,5 +52,8 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   expect(publisher).toContain('collectProofEvidenceSources');
   expect(evidence).toContain('manifest.files');
   expect(publisher).toContain("artifactKind: 'sniptale-release-qa-evidence'");
+  expect(publisher).not.toContain('writeBadge');
+  expect(publisher).not.toContain("'ci.svg'");
+  expect(publisher).toContain('releaseAssets.length !== 4');
   expect(publisher).not.toContain('coverage-html.tar.gz');
 });

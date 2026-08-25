@@ -7,6 +7,10 @@ on:
         description: Existing GitHub-verified annotated tag to publish (vX.Y.Z)
         required: true
         type: string
+      release_notes:
+        description: Product-facing Markdown inserted before the generated install instructions
+        required: true
+        type: string
       provenance_run_id:
         description: Successful Release provenance Gate run for the tagged commit
         required: true
@@ -44,11 +48,13 @@ jobs:
       - name: Validate deployment inputs
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
           PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
           ALLOW_NON_LATEST: ${{ inputs.allow_non_latest_provenance }}
           BYPASS_REASON: ${{ inputs.bypass_reason }}
         run: |
           printf '%s\n' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+          test -n "$(printf '%s' "$RELEASE_NOTES" | tr -d '[:space:]')"
           printf '%s\n' "$PROVENANCE_RUN_ID" | grep -Eq '^[1-9][0-9]*$'
           if [ "$ALLOW_NON_LATEST" = true ] && [ -z "$BYPASS_REASON" ]; then
             echo 'A non-latest provenance bypass requires an audit note.' >&2
@@ -126,6 +132,7 @@ jobs:
           RELEASE_POLICY_READ_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
           RELEASE_SHA: ${{ steps.admission.outputs.release-sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
           asset_root=build/release-proof/release-assets
           GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs --recheck
@@ -171,15 +178,9 @@ jobs:
           Snip the web. Tell the story.
 
           Alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
-
-          ## Highlights
-
-          - Unified local WSL and GitHub/Selectel validation behind the same commit-bound ci:proof and ci:release owners.
-          - Kept release-harness, checkpoint, and closeout as the fast diff-local development workflow.
-          - Added content-addressed proof reuse for product units, CodeQL, and coverage without weakening fail-closed validation.
-          - Published compact deterministic QA evidence, SBOM, provenance, checksums, and release-owned status badges.
-          - Added machine-checked documentation facts and confidential GitHub vulnerability reporting guidance.
-
+          EOF
+          printf '\n%s\n\n' "$RELEASE_NOTES" >> "$notes"
+          cat >> "$notes" <<EOF
           ## Install
 
           Download **${zip_name}**, unpack it, open **chrome://extensions**, enable Developer mode, choose Load unpacked, and select the unpacked directory.
@@ -230,4 +231,4 @@ jobs:
           use_oidc: true
           override_branch: main
           override_commit: ${{ needs.publish.outputs.release-sha }}
-          fail_ci_if_error: false
+          fail_ci_if_error: true
