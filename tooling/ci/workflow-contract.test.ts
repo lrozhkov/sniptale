@@ -381,6 +381,9 @@ it('publishes from one admitted provenance artifact without provisioning another
   expect(workflow).toContain('is not the latest completed run');
   expect(workflow).toContain('verify-main-proof.mjs release');
   expect(workflow).toContain('prepare-release-assets.mjs build/release-proof');
+  expect(workflow).toContain('release_sha=$(git rev-list -n 1 "$RELEASE_TAG")');
+  expect(workflow).toContain('GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs');
+  expect(workflow).not.toContain('release_sha=$(git rev-list -n 1 "$GITHUB_REF_NAME")');
   expect(workflow).toContain("grep -q '(HTTP 404)'");
   expect(workflow).toContain("created_release_id=''");
   expect(workflow).toContain('classify-release-state.mjs');

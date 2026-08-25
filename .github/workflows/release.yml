@@ -65,14 +65,14 @@ jobs:
         id: admission
         env:
           GH_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
-          GITHUB_REF_NAME: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
           PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
           ALLOW_NON_LATEST: ${{ inputs.allow_non_latest_provenance }}
           BYPASS_REASON: ${{ inputs.bypass_reason }}
         run: |
-          release_sha=$(git rev-list -n 1 "$GITHUB_REF_NAME")
+          release_sha=$(git rev-list -n 1 "$RELEASE_TAG")
           export GITHUB_SHA="$release_sha"
-          node tooling/ci/release-policy.mjs
+          GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs
           run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}")
           jq -e --arg sha "$release_sha" '
             .head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch" and
@@ -100,7 +100,7 @@ jobs:
           {
             echo '### Continuous Deployment admission'
             echo
-            echo "Tag: $GITHUB_REF_NAME"
+            echo "Tag: $RELEASE_TAG"
             echo "Commit: $release_sha"
             echo "Release provenance run: $PROVENANCE_RUN_ID"
             if [ -n "$BYPASS_REASON" ]; then echo "Bypass note: $BYPASS_REASON"; fi
@@ -126,10 +126,9 @@ jobs:
           RELEASE_POLICY_READ_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
           RELEASE_SHA: ${{ steps.admission.outputs.release-sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          GITHUB_REF_NAME: ${{ inputs.release_tag }}
         run: |
           asset_root=build/release-proof/release-assets
-          GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" node tooling/ci/release-policy.mjs --recheck
+          GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs --recheck
           version=$(jq -er .version package.json)
           release_name="Sniptale ${version} alpha"
           lookup_error=$(mktemp)
