@@ -40,19 +40,19 @@ Provisioning writes an early identity-bound receipt. Each attempt owns a disposa
 
 Nova server creation uses one POST over a fresh verified connection. If its response is lost, the controller retries only exact-owned read reconciliation; it never repeats the POST or falls through to another resource profile.
 
-Cleanup runs with `always()` independently of QA proof and deletes the complete attempt-owned resource set. It accepts the incrementally written `provisioning` receipt, so cancellation at any acquisition step remains recoverable. If the early receipt is unavailable, recovery is restricted to the exact run and attempt identity. The recovery-only mode and hourly TTL sweeper build the controller from their checked-out trusted commit; neither depends on a moving image tag. They are recovery paths, not normal cleanup.
+Cleanup runs with `always()` independently of QA proof and deletes the complete attempt-owned resource set. It accepts the incrementally written `provisioning` receipt, so cancellation at any acquisition step remains recoverable. If the early receipt is unavailable, recovery is restricted to the exact run and attempt identity. The recovery-only mode and daily TTL sweeper build the controller from their checked-out trusted commit; neither depends on a moving image tag. They are recovery paths, not normal cleanup, and a successful cleanup does not trigger another sweep.
 
 ## Artifacts and presentation
 
 Canonical artifacts are attempt-qualified and sealed with a manifest and checksums. Normal failures still upload sanitized run records and logs; timeout handling preserves the latest atomically written observability state when the runner remains responsive. Retention, allowlists, report scope, release assets, and immutable image publication are machine policy.
 
-SARIF and Codecov are presentation layers over admitted proof. Upload failure does not change the blocking gate result.
+SARIF and Codecov are presentation layers over admitted proof. Upload failure does not change the blocking gate result, but the presentation job reports the failed upload rather than turning it into a false successful publication. README badges use the standard GitHub, Codecov, and Shields endpoints; badge SVG files are not release assets.
 
 ## Continuous Deployment
 
 Continuous Deployment is manual, restricted to `main`, and never provisions Selectel or reruns QA. It accepts a signed annotated version tag and an exact successful Release provenance run for the same commit. Admission verifies tag identity, version, ancestry, signature, proof hashes, accepted control digest, publisher policy, and release state.
 
-Publication consumes the verified extension archive and canonical evidence, creates an owned draft, verifies uploaded assets, and publishes an immutable alpha release marked as the repository's latest release. Alpha status remains in the release name and notes rather than GitHub's prerelease flag because release-owned README badges resolve through `releases/latest`. A retry may accept the exact immutable result or recreate only its own matching mutable draft; it rejects unrelated or mismatched release state.
+Publication consumes the verified extension archive and canonical evidence, creates an owned draft, verifies uploaded assets, and publishes an immutable alpha release marked as the repository's latest release. The operator supplies product-facing Markdown as a deployment input; the workflow adds the stable introduction, install instructions, and alpha warning instead of hard-coding version-specific highlights or storing a release-notes file in the repository. A retry may accept the exact immutable result or recreate only its own matching mutable draft; it rejects unrelated or mismatched release state.
 
 ## Bypass and recovery
 

@@ -89,7 +89,12 @@
     {
       "factId": "release-policy",
       "file": "README.md",
-      "mustContain": ["releases/latest/download/ci.svg", "releases/latest/download/release.svg"],
+      "mustContain": [
+        "img.shields.io/github/actions/workflow/status/lrozhkov/sniptale/release.yml",
+        "codecov.io/gh/lrozhkov/sniptale/branch/main/graph/badge.svg",
+        "img.shields.io/github/v/release/lrozhkov/sniptale",
+        "img.shields.io/github/license/lrozhkov/sniptale"
+      ],
       "forbiddenKinds": ["workflow-status-badge"]
     }
   ]

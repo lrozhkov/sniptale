@@ -19569,7 +19569,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/prepare-release-assets.mjs",
-        "contentHash": "5c57c9afd9ae5dd75a69955419a76523906ccd92f4639917c524c91581cfa92e"
+        "contentHash": "2d14db649796c2a740b07996a30f4389cca5fa7c30838a3c5956fc8d07d97183"
       },
       "consumers": [
         "tooling/ci/prepare-release-assets.mjs"

@@ -1,5 +1,5 @@
 name: Continuous Integration
-run-name: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'Selectel TTL sweep' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-recovery' && 'Selectel exact-run recovery' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-connectivity' && 'Selectel connectivity preflight' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
+run-name: ${{ github.event_name == 'schedule' && github.event.schedule == '17 3 * * *' && 'Selectel TTL sweep' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-recovery' && 'Selectel exact-run recovery' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke' && 'Selectel infrastructure smoke' || github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-connectivity' && 'Selectel connectivity preflight' || (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'Release provenance Gate' || 'Fast PR Gate' }}
 
 on:
   pull_request_target:
@@ -8,7 +8,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '17 * * * *'
+    - cron: '17 3 * * *'
     - cron: '23 4 * * 1'
   workflow_dispatch:
     inputs:
@@ -39,16 +39,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'schedule' && (github.event.schedule == '17 * * * *' && 'sweep' || 'release-provenance') || inputs.gate || 'fast' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'schedule' && (github.event.schedule == '17 3 * * *' && 'sweep' || 'release-provenance') || inputs.gate || 'fast' }}
   cancel-in-progress: true
 
 env:
   CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
   TRUSTED_CONTROL_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
-  GATE_MODE: ${{ github.event_name == 'schedule' && github.event.schedule == '17 * * * *' && 'sweep' || github.event_name == 'schedule' && 'release-provenance' || github.event_name == 'workflow_dispatch' && inputs.gate || 'fast' }}
-  PROOF_LANE: ${{ (github.event_name == 'schedule' && github.event.schedule != '17 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release' || 'proof' }}
-  PROOF_KIND: ${{ (github.event_name == 'schedule' && github.event.schedule != '17 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release-provenance' || 'fast-proof' }}
+  GATE_MODE: ${{ github.event_name == 'schedule' && github.event.schedule == '17 3 * * *' && 'sweep' || github.event_name == 'schedule' && 'release-provenance' || github.event_name == 'workflow_dispatch' && inputs.gate || 'fast' }}
+  PROOF_LANE: ${{ (github.event_name == 'schedule' && github.event.schedule != '17 3 * * *' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release' || 'proof' }}
+  PROOF_KIND: ${{ (github.event_name == 'schedule' && github.event.schedule != '17 3 * * *' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance')) && 'release-provenance' || 'fast-proof' }}
 
 jobs:
   selectel-controller-preflight:
@@ -207,7 +207,7 @@ jobs:
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'release-provenance' || github.ref == 'refs/heads/main') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke' || github.ref == 'refs/heads/main') &&
       (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
-      (github.event_name != 'schedule' || github.event.schedule != '17 * * * *') &&
+      (github.event_name != 'schedule' || github.event.schedule != '17 3 * * *') &&
       (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) &&
       (github.event_name != 'pull_request_target' || !contains(github.event.pull_request.labels.*.name, 'ci-local-proof-bypass'))
     runs-on: ubuntu-24.04
@@ -838,7 +838,7 @@ jobs:
           retention-days: 30
 
   scheduled-sweeper:
-    if: github.event_name == 'schedule' && github.event.schedule == '17 * * * *'
+    if: github.event_name == 'schedule' && github.event.schedule == '17 3 * * *'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: selectel-runner-controller
