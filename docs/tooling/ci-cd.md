@@ -46,7 +46,7 @@ Cleanup runs with `always()` independently of QA proof and deletes the complete 
 
 Canonical artifacts are attempt-qualified and sealed with a manifest and checksums. Normal failures still upload sanitized run records and logs; timeout handling preserves the latest atomically written observability state when the runner remains responsive. Retention, allowlists, report scope, release assets, and immutable image publication are machine policy.
 
-SARIF and Codecov are presentation layers over admitted proof. Upload failure does not change the blocking gate result, but the presentation job reports the failed upload rather than turning it into a false successful publication. README badges use the standard GitHub, Codecov, and Shields endpoints; badge SVG files are not release assets.
+SARIF and Coveralls are presentation layers over admitted proof. Upload failure does not change the blocking gate result, but the presentation job reports the failed upload rather than turning it into a false successful publication. Coveralls receives the admitted release LCOV with the job-scoped `GITHUB_TOKEN`; it does not own coverage thresholds. README badges use the standard GitHub, Coveralls, and Shields endpoints; badge SVG files are not release assets.
 
 ## Continuous Deployment
 

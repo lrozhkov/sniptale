@@ -91,7 +91,7 @@
       "file": "README.md",
       "mustContain": [
         "img.shields.io/github/actions/workflow/status/lrozhkov/sniptale/release.yml",
-        "codecov.io/gh/lrozhkov/sniptale/branch/main/graph/badge.svg",
+        "coveralls.io/repos/github/lrozhkov/sniptale/badge.svg?branch=main",
         "img.shields.io/github/v/release/lrozhkov/sniptale",
         "img.shields.io/github/license/lrozhkov/sniptale"
       ],
