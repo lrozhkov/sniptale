@@ -44,7 +44,7 @@ it('pins every external Action to an approved full commit SHA', () => {
     'docker/login-action@dbcb813823bdd20940b903addbd779551569679f',
     'docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a',
     'github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd',
-    'codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f',
+    'coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329',
   ]) {
     expect(uses).toContain(pin);
   }
@@ -398,10 +398,11 @@ it('publishes from one admitted provenance artifact without provisioning another
   expect(workflow).not.toContain('SELECTEL_');
   expect(workflow).not.toContain('  provision:');
   expect(publishJob).not.toContain('id-token: write');
-  expect(coverageJob).toContain('id-token: write');
-  expect(coverageJob).toContain('use_oidc: true');
+  expect(coverageJob).not.toContain('id-token: write');
+  expect(coverageJob).toContain('github-token: ${{ secrets.GITHUB_TOKEN }}');
+  expect(coverageJob).toContain('coverage-reporter-version: v0.6.22');
   expect(coverageJob).toContain('continue-on-error: true');
-  expect(coverageJob).toContain('fail_ci_if_error: true');
+  expect(coverageJob).toContain('fail-on-error: true');
   expect(workflow).not.toContain('releases/latest/download/ci.svg');
   expect(workflow).not.toContain('release-owned status badges');
 });

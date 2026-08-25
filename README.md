@@ -1,6 +1,6 @@
 # Sniptale
 
-[![CI](https://img.shields.io/github/actions/workflow/status/lrozhkov/sniptale/release.yml?branch=main&event=workflow_dispatch&label=CI)](https://github.com/lrozhkov/sniptale/actions/workflows/release.yml) [![Coverage](https://codecov.io/gh/lrozhkov/sniptale/branch/main/graph/badge.svg)](https://codecov.io/gh/lrozhkov/sniptale) [![Release](https://img.shields.io/github/v/release/lrozhkov/sniptale?sort=semver&label=Release)](https://github.com/lrozhkov/sniptale/releases/latest) [![License](https://img.shields.io/github/license/lrozhkov/sniptale?label=License)](https://github.com/lrozhkov/sniptale/blob/main/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/lrozhkov/sniptale/release.yml?branch=main&event=workflow_dispatch&label=CI)](https://github.com/lrozhkov/sniptale/actions/workflows/release.yml) [![Coverage](https://coveralls.io/repos/github/lrozhkov/sniptale/badge.svg?branch=main)](https://coveralls.io/github/lrozhkov/sniptale?branch=main) [![Release](https://img.shields.io/github/v/release/lrozhkov/sniptale?sort=semver&label=Release)](https://github.com/lrozhkov/sniptale/releases/latest) [![License](https://img.shields.io/github/license/lrozhkov/sniptale?label=License)](https://github.com/lrozhkov/sniptale/blob/main/LICENSE)
 
 **Snip the web. Tell the story.**
 

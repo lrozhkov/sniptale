@@ -209,7 +209,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ inputs.release_tag }}', persist-credentials: false }
@@ -224,11 +223,13 @@ jobs:
             --name "$artifact_name" \
             --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "${{ needs.publish.outputs.release-sha }}"
-      - name: Publish exact release coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+      - name: Publish exact release coverage to Coveralls
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
         with:
-          files: build/release-proof/.tmp/coverage/canonical/lcov.info
-          use_oidc: true
-          override_branch: main
-          override_commit: ${{ needs.publish.outputs.release-sha }}
-          fail_ci_if_error: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/release-proof/.tmp/coverage/canonical/lcov.info
+          format: lcov
+          git-branch: main
+          git-commit: ${{ needs.publish.outputs.release-sha }}
+          fail-on-error: true
+          coverage-reporter-version: v0.6.22
