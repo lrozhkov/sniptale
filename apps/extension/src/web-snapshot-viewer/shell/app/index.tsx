@@ -7,6 +7,11 @@ import { blockSnapshotFrameNavigation } from '../../viewer/frame-navigation';
 import { loadWebSnapshotPackage, revokeWebSnapshotObjectUrls } from '../../viewer/assets';
 import { WebSnapshotFrame } from '../../viewer/iframe';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
+import {
+  WebSnapshotViewerModeSwitch,
+  WebSnapshotVisualSurface,
+  type WebSnapshotViewerMode,
+} from './view-mode';
 
 const viewerHeaderClassName = [
   'flex min-h-[52px] items-center justify-between border-b',
@@ -61,37 +66,51 @@ function useViewerDocumentTitle(loaded: LoadedWebSnapshotPackage | null): AppLoc
 function SnapshotViewerHeader(props: {
   loaded: LoadedWebSnapshotPackage;
   locale: AppLocale;
+  metadataVisible: boolean;
+  mode: WebSnapshotViewerMode;
   onHide: () => void;
+  onModeChange: (mode: WebSnapshotViewerMode) => void;
 }) {
   const hideHeaderLabel = translate('webSnapshotViewer.app.hideHeader', props.locale);
 
   return (
     <header className={viewerHeaderClassName}>
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-          {getHeaderTitle(props.loaded, props.locale)}
+      {props.metadataVisible ? (
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+            {getHeaderTitle(props.loaded, props.locale)}
+          </div>
+          <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]">
+            {props.loaded.manifest.source.url}
+          </div>
+          <div className="truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
+            {translate('webSnapshotViewer.app.pngDprHint', props.locale)}
+          </div>
         </div>
-        <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]">
-          {props.loaded.manifest.source.url}
-        </div>
-        <div className="truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
-          {translate('webSnapshotViewer.app.pngDprHint', props.locale)}
-        </div>
+      ) : null}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <WebSnapshotViewerModeSwitch
+          locale={props.locale}
+          mode={props.mode}
+          onModeChange={props.onModeChange}
+        />
+        {props.metadataVisible ? (
+          <button
+            type="button"
+            aria-label={hideHeaderLabel}
+            title={hideHeaderLabel}
+            className={[
+              'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
+              'text-[var(--sniptale-color-text-muted)] transition hover:bg-[var(--sniptale-color-surface-hover)]',
+              'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
+              'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+            ].join(' ')}
+            onClick={props.onHide}
+          >
+            <X aria-hidden="true" size={16} strokeWidth={2} />
+          </button>
+        ) : null}
       </div>
-      <button
-        type="button"
-        aria-label={hideHeaderLabel}
-        title={hideHeaderLabel}
-        className={[
-          'ml-3 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
-          'text-[var(--sniptale-color-text-muted)] transition hover:bg-[var(--sniptale-color-surface-hover)]',
-          'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
-          'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
-        ].join(' ')}
-        onClick={props.onHide}
-      >
-        <X aria-hidden="true" size={16} strokeWidth={2} />
-      </button>
     </header>
   );
 }
@@ -184,34 +203,47 @@ function useSnapshotPreparationFrame(loaded: LoadedWebSnapshotPackage) {
 function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; locale: AppLocale }) {
   const [headerVisible, setHeaderVisible] = useState(true);
   const [currentViewport, setCurrentViewport] = useState<ViewerViewport>(null);
+  const [mode, setMode] = useState<WebSnapshotViewerMode>('visual');
   const { handleIframeElementChange, handleIframeLoaded, iframeRef, preparationIframe } =
     useSnapshotPreparationFrame(props.loaded);
 
   return (
     <main className="flex h-screen flex-col bg-[var(--sniptale-color-surface-canvas)]">
-      {headerVisible ? (
-        <SnapshotViewerHeader
-          loaded={props.loaded}
-          locale={props.locale}
-          onHide={() => setHeaderVisible(false)}
-        />
-      ) : null}
+      <SnapshotViewerHeader
+        loaded={props.loaded}
+        locale={props.locale}
+        metadataVisible={headerVisible}
+        mode={mode}
+        onHide={() => setHeaderVisible(false)}
+        onModeChange={setMode}
+      />
       <section className="relative min-h-0 flex-1 overflow-auto">
-        <SnapshotFrameSurface
-          currentViewport={currentViewport}
-          iframeRef={iframeRef}
-          loaded={props.loaded}
-          locale={props.locale}
-          onIframeElementChange={handleIframeElementChange}
-          onIframeLoaded={handleIframeLoaded}
-        />
-        {preparationIframe ? (
-          <SnapshotPreparationHost
-            iframe={preparationIframe}
-            manifest={props.loaded.manifest}
-            onViewportChange={setCurrentViewport}
+        {mode === 'visual' ? (
+          <WebSnapshotVisualSurface
+            locale={props.locale}
+            screenshotUrl={props.loaded.screenshotUrl}
+            sourceTitle={props.loaded.manifest.source.title}
+            viewport={props.loaded.manifest.viewport}
           />
-        ) : null}
+        ) : (
+          <>
+            <SnapshotFrameSurface
+              currentViewport={currentViewport}
+              iframeRef={iframeRef}
+              loaded={props.loaded}
+              locale={props.locale}
+              onIframeElementChange={handleIframeElementChange}
+              onIframeLoaded={handleIframeLoaded}
+            />
+            {preparationIframe ? (
+              <SnapshotPreparationHost
+                iframe={preparationIframe}
+                manifest={props.loaded.manifest}
+                onViewportChange={setCurrentViewport}
+              />
+            ) : null}
+          </>
+        )}
       </section>
     </main>
   );

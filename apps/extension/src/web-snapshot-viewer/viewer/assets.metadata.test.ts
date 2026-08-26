@@ -14,11 +14,19 @@ const NativeURL = URL;
 
 const mocks = vi.hoisted(() => ({
   getWebSnapshotRecord: vi.fn(),
+  getWebSnapshotScreenshotFile: vi.fn(),
+  validateRetainedWebSnapshotScreenshot: vi.fn(),
+}));
+
+vi.mock('../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/web-snapshot/screenshot-validation')>()),
+  validateRetainedWebSnapshotScreenshot: mocks.validateRetainedWebSnapshotScreenshot,
 }));
 
 vi.mock('../../composition/persistence/web-snapshots', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/web-snapshots')>()),
   getWebSnapshotRecord: mocks.getWebSnapshotRecord,
+  getWebSnapshotScreenshotFile: mocks.getWebSnapshotScreenshotFile,
 }));
 
 import { loadWebSnapshotPackage } from './assets';
@@ -90,6 +98,10 @@ function stubObjectUrlStatics(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getWebSnapshotScreenshotFile.mockResolvedValue(
+    new File(['png'], 'snapshot.png', { type: 'image/png' })
+  );
+  mocks.validateRetainedWebSnapshotScreenshot.mockResolvedValue({ height: 720, width: 1280 });
   stubObjectUrlStatics();
 });
 
@@ -123,7 +135,7 @@ it('uses verified manifest MIME metadata for viewer asset blobs', async () => {
 
   expect(loaded.html).toContain('href="blob:style"');
   expect(loaded.html).toContain('src="blob:image"');
-  expect(createdBlobs.map((blob) => blob.type)).toEqual(['image/png', 'text/css']);
+  expect(createdBlobs.map((blob) => blob.type)).toEqual(['image/png', 'text/css', 'image/png']);
 });
 
 it('rejects asset packages when manifest hashes do not match content', async () => {

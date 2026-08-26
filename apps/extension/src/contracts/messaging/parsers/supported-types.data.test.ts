@@ -36,6 +36,7 @@ it('limits popup and offscreen boundaries to their dedicated runtime contracts',
 
 it('keeps background runtime ownership for capture command messages', () => {
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.ENABLE_SCREENSHOT_MODE)).toBe(true);
+  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.EXPORT_CAPTURE_FULL_PAGE)).toBe(true);
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.START_POPUP_EXPORT_JOB)).toBe(true);
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.GET_POPUP_EXPORT_JOB_STATUS)).toBe(
     true

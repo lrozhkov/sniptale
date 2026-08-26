@@ -18,6 +18,7 @@ import {
   recoverWebSnapshotPublications,
   WEB_SNAPSHOT_PUBLICATION_DOMAIN,
 } from './publication';
+import { validateWebSnapshotScreenshotBlob } from '../../../features/web-snapshot/screenshot-validation';
 
 function stageMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error ?? 'Unknown error');
@@ -78,6 +79,9 @@ async function writeSnapshotObjects(
 export async function saveWebSnapshotMediaAsset(
   input: SaveWebSnapshotMediaAssetInput
 ): Promise<{ assetId: string; snapshot: StoredWebSnapshotRecord }> {
+  const screenshotDimensions = await runStage('validate web snapshot screenshot', () =>
+    validateWebSnapshotScreenshotBlob(input.screenshotBlob)
+  );
   await recoverWebSnapshotPublications();
   const assetId = input.id ?? crypto.randomUUID();
   const now = Date.now();
@@ -101,7 +105,7 @@ export async function saveWebSnapshotMediaAsset(
   let journalCreated = false;
   try {
     const mediaEntry = await runStage('create web snapshot media entry', () =>
-      createWebSnapshotMediaEntry({ assetId, input, now, snapshot })
+      createWebSnapshotMediaEntry({ assetId, input, now, screenshotDimensions, snapshot })
     );
     const journal = await createAssetPublicationJournal({
       assetRefs: [packageObject.ref, screenshotObject.ref],

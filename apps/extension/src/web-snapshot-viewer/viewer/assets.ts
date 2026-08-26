@@ -5,15 +5,20 @@ import {
   WEB_SNAPSHOT_PACKAGE_PATHS,
 } from '../../features/web-snapshot/manifest';
 import { sanitizeWebSnapshotHtml } from '../../features/web-snapshot/public';
-import { getWebSnapshotRecord } from '../../composition/persistence/web-snapshots';
+import {
+  getWebSnapshotRecord,
+  getWebSnapshotScreenshotFile,
+} from '../../composition/persistence/web-snapshots';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import { assertZipPackageInflationProfile } from '@sniptale/platform/data/zip-profile';
 import { createViewerAssetObjectUrls } from './asset-objects';
+import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
 
 export interface LoadedWebSnapshotPackage {
   html: string;
   manifest: WebSnapshotManifest;
   objectUrls: string[];
+  screenshotUrl: string;
 }
 
 const MAX_VIEWER_FILE_COUNT = 500;
@@ -159,6 +164,14 @@ function assertCompressedViewerPackageSize(packageBlob: Blob): void {
   }
 }
 
+async function readViewerScreenshot(snapshotId: string): Promise<Blob> {
+  const screenshot = await getWebSnapshotScreenshotFile(snapshotId);
+  if (!screenshot || screenshot.size === 0) {
+    throw new Error('Web snapshot screenshot is missing.');
+  }
+  return screenshot;
+}
+
 function assertManifestMatchesRecord(args: {
   packageManifest: WebSnapshotManifest;
   recordManifest: WebSnapshotManifest;
@@ -185,6 +198,11 @@ export async function loadWebSnapshotPackage(
   const bytesByPath = await readViewerPackageEntries(zip);
   const packageManifest = readViewerPackageManifest(bytesByPath);
   assertManifestMatchesRecord({ packageManifest, recordManifest: record.manifest });
+  const screenshot = await readViewerScreenshot(snapshotId);
+  await validateRetainedWebSnapshotScreenshot({
+    packageBytes: readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.screenshot),
+    screenshotBlob: screenshot,
+  });
 
   const assetEntries = Array.from(bytesByPath).filter(([path]) => path.startsWith('assets/'));
   const htmlBytes = readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml);
@@ -197,6 +215,8 @@ export async function loadWebSnapshotPackage(
   try {
     const sanitizedHtml = sanitizeWebSnapshotHtml(html, record.manifest.source.url);
     const rewrittenHtml = rewriteAssetReferences(sanitizedHtml, urlsByPath);
+    const screenshotUrl = URL.createObjectURL(screenshot);
+    objectUrls.push(screenshotUrl);
     return {
       html: sanitizeWebSnapshotHtml(rewrittenHtml, record.manifest.source.url, {
         allowedObjectUrls: objectUrls,
@@ -204,6 +224,7 @@ export async function loadWebSnapshotPackage(
       }),
       manifest: record.manifest,
       objectUrls,
+      screenshotUrl,
     };
   } catch (error) {
     revokeWebSnapshotObjectUrls(objectUrls);

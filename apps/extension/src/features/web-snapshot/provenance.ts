@@ -141,6 +141,22 @@ export async function sanitizeWebSnapshotPackageProvenance(
   }
 }
 
+export async function readWebSnapshotPackageScreenshotBytes(
+  packageBlob: Blob
+): Promise<Uint8Array> {
+  const opened = await openWebSnapshotPackage(packageBlob, MAX_WEB_SNAPSHOT_PACKAGE_BYTES);
+  try {
+    const screenshot = opened.entries.find(
+      (entry) => !entry.directory && entry.filename === WEB_SNAPSHOT_PACKAGE_PATHS.screenshot
+    );
+    if (!screenshot) throw new Error('Web snapshot package is missing screenshot.');
+    const blob = await readEntryBlob(screenshot, 'application/octet-stream');
+    return new Uint8Array(await blob.arrayBuffer());
+  } finally {
+    await opened.reader.close();
+  }
+}
+
 function applyProvenanceOverride(
   packageManifest: WebSnapshotManifest,
   manifestOverride: WebSnapshotManifest | undefined

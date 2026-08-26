@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import JSZip from 'jszip';
 import type {
   ArchiveRestoreSession,
   AssetReadyJournal,
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   runMutation: vi.fn(),
   sanitizeSnapshot: vi.fn(),
   writeBlob: vi.fn(),
+  validateRetainedScreenshot: vi.fn(),
 }));
 
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
@@ -30,6 +32,12 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
 vi.mock('../../../../features/web-snapshot/provenance', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../features/web-snapshot/provenance')>()),
   sanitizeWebSnapshotPackageProvenance: mocks.sanitizeSnapshot,
+}));
+vi.mock('../../../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../features/web-snapshot/screenshot-validation')
+  >()),
+  validateRetainedWebSnapshotScreenshot: mocks.validateRetainedScreenshot,
 }));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: mocks.runMutation,
@@ -67,6 +75,10 @@ const session = {
   strategy: 'replace' as const,
   updatedAt: 1,
 } satisfies ArchiveRestoreSession;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('media v6 root publication', () => {
   it('publishes screenshot metadata and the restore checkpoint atomically', async () => {
@@ -162,14 +174,20 @@ describe('media v6 web snapshot root validation', () => {
       ...stored.manifest,
       source: { faviconUrl: null, title: null, url: null },
     };
-    mocks.readFile.mockResolvedValue(
-      new File(['hostile-package'], 'snapshot.zip', { type: 'application/zip' })
-    );
+    const zip = new JSZip();
+    zip.file('page-screenshot.png', 'png');
+    const safePackage = await zip.generateAsync({ type: 'blob' });
+    mocks.readFile
+      .mockResolvedValueOnce(
+        new File(['hostile-package'], 'snapshot.zip', { type: 'application/zip' })
+      )
+      .mockResolvedValueOnce(new File(['png'], 'screenshot.png', { type: 'image/png' }));
+    mocks.validateRetainedScreenshot.mockResolvedValue({ height: 720, width: 1280 });
     mocks.sanitizeSnapshot.mockResolvedValue({
       changed: true,
       manifest: safeManifest,
-      packageBlob: new Blob(['safe-package'], { type: 'application/zip' }),
-      size: 12,
+      packageBlob: safePackage,
+      size: safePackage.size,
     });
     mocks.writeBlob.mockResolvedValue({
       ref: {
@@ -178,7 +196,7 @@ describe('media v6 web snapshot root validation', () => {
         location: { kind: 'opfs', objectKey: 'objects/safe-package' },
         mimeType: 'application/zip',
         sha256: null,
-        size: 12,
+        size: safePackage.size,
       },
     });
     mocks.discard.mockResolvedValue(undefined);
@@ -261,10 +279,120 @@ describe('media v6 web snapshot root validation', () => {
     expect(mocks.discard).toHaveBeenCalledWith('hostile-package');
     expect(result.staged[0]?.ref.assetId).toBe('safe-package');
     expect(result.envelope.metadata).toMatchObject({
-      webSnapshot: { entry: { manifest: safeManifest, size: 12 } },
+      webSnapshot: { entry: { manifest: safeManifest, size: safePackage.size } },
     });
   });
+});
 
+describe('media v6 web snapshot hostile screenshot rejection', () => {
+  it.each([
+    'Web snapshot screenshot is invalid.',
+    'Web snapshot screenshot dimensions exceed safe limits.',
+    'Web snapshot retained screenshot does not match the package.',
+  ])(
+    'rejects unsafe retained screenshot roots before replacement or publication: %s',
+    async (message) => {
+      const manifest = createWebSnapshotManifest({
+        id: 'snapshot',
+        source: { faviconUrl: null, title: 'Snapshot', url: 'https://example.com/' },
+      });
+      const zip = new JSZip();
+      zip.file('page-screenshot.png', 'png');
+      const packageBlob = await zip.generateAsync({ type: 'blob' });
+      mocks.readFile
+        .mockResolvedValueOnce(new File([packageBlob], 'snapshot.zip', { type: 'application/zip' }))
+        .mockResolvedValueOnce(new File(['unsafe'], 'screenshot.png', { type: 'image/png' }));
+      mocks.sanitizeSnapshot.mockResolvedValue({
+        changed: false,
+        manifest,
+        packageBlob,
+        size: packageBlob.size,
+      });
+      mocks.validateRetainedScreenshot.mockRejectedValue(new Error(message));
+
+      await expect(
+        mediaLibraryRootPublisher.prepareStaged!({
+          envelope: {
+            descriptor: {
+              mediaSubtype: 'library-item',
+              metadataPath: '_sniptale/metadata/media/snapshot.json',
+              objectCount: 2,
+              rootId: 'snapshot',
+              rootKind: 'media',
+              totalBytes: packageBlob.size + 6,
+            },
+            metadata: portableJson({
+              entry: {
+                createdAt: 1,
+                duration: null,
+                filename: 'snapshot.zip',
+                height: 720,
+                id: 'snapshot',
+                kind: 'web-archive',
+                mimeType: 'application/x-sniptale-web-snapshot+zip',
+                originalFilename: 'snapshot.zip',
+                size: packageBlob.size,
+                source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
+                sourceFavicon: null,
+                sourceTitle: 'Snapshot',
+                sourceUrl: 'https://example.com/',
+                tags: [],
+                updatedAt: 1,
+                width: 1280,
+              },
+              originalObjectId: 'package-object',
+              webSnapshot: {
+                entry: {
+                  createdAt: 1,
+                  id: 'snapshot',
+                  manifest,
+                  screenshotMimeType: 'image/png',
+                  screenshotSize: 6,
+                  size: packageBlob.size,
+                  updatedAt: 1,
+                },
+                packageObjectId: 'package-object',
+                screenshotObjectId: 'screenshot-object',
+              },
+            }),
+            objects: [],
+          },
+          staged: [
+            {
+              objectId: 'package-object',
+              ref: {
+                assetId: 'package',
+                createdAt: 1,
+                location: { kind: 'opfs', objectKey: 'objects/package' },
+                mimeType: 'application/zip',
+                sha256: null,
+                size: packageBlob.size,
+              },
+            },
+            {
+              objectId: 'screenshot-object',
+              ref: {
+                assetId: 'screenshot',
+                createdAt: 1,
+                location: { kind: 'opfs', objectKey: 'objects/screenshot' },
+                mimeType: 'image/png',
+                sha256: null,
+                size: 6,
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow(message);
+
+      expect(mocks.writeBlob).not.toHaveBeenCalled();
+      expect(mocks.discard).not.toHaveBeenCalled();
+      expect(mocks.checkpoint).not.toHaveBeenCalled();
+      expect(mocks.runMutation).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('media v6 web snapshot role validation', () => {
   it('rejects role-inappropriate nested snapshot MIME types before publication', async () => {
     const stored = createCleanupWebSnapshotRecord('snapshot');
     stored.manifest = createWebSnapshotManifest({

@@ -231,7 +231,7 @@ export const backgroundIngressTabRouteGroups = [
     alternateAuthorizationPolicyIds: [],
     alternateAuthorityFamilies: [],
     authorizationPolicyId: 'privileged-tab-route:capture',
-    boundary: 'legacy-unreachable',
+    boundary: 'background-runtime',
     errorShape: 'tab route error response through capture/background router',
     freshnessReplayPolicy: 'resolved tab, frame, document, or capability must match',
     handlerId: 'capture',

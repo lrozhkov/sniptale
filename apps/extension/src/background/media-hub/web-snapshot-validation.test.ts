@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
   WebSnapshotCaptureMode,
   type WebSnapshotManifest,
@@ -7,6 +7,18 @@ import {
 } from '@sniptale/runtime-contracts/web-snapshot';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../features/web-snapshot/manifest';
 import { validateWebSnapshotPackage } from './web-snapshot-validation';
+
+const validateRetainedScreenshotMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/web-snapshot/screenshot-validation')>()),
+  validateRetainedWebSnapshotScreenshot: validateRetainedScreenshotMock,
+}));
+
+beforeEach(() => {
+  validateRetainedScreenshotMock.mockReset();
+  validateRetainedScreenshotMock.mockResolvedValue({ height: 720, width: 1280 });
+});
 
 function createManifest(overrides: Partial<WebSnapshotManifest> = {}): WebSnapshotManifest {
   return {
@@ -70,4 +82,47 @@ it('rejects package manifests that do not match the payload manifest identity', 
       screenshotBlob: new Blob(['png'], { type: 'image/png' }),
     })
   ).rejects.toThrow('Web snapshot package manifest does not match payload manifest');
+});
+
+it('accepts a retained screenshot that is byte-identical to the package screenshot', async () => {
+  const manifest = createManifest();
+
+  await expect(
+    validateWebSnapshotPackage({
+      packageBlob: await createPackageBlob(JSON.stringify(manifest)),
+      payload: createPayload(manifest),
+      screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    })
+  ).resolves.toBeUndefined();
+});
+
+it('rejects a retained screenshot that differs from the package screenshot', async () => {
+  const manifest = createManifest();
+  validateRetainedScreenshotMock.mockRejectedValue(
+    new Error('Web snapshot retained screenshot does not match the package')
+  );
+
+  await expect(
+    validateWebSnapshotPackage({
+      packageBlob: await createPackageBlob(JSON.stringify(manifest)),
+      payload: createPayload(manifest),
+      screenshotBlob: new Blob(['different'], { type: 'image/png' }),
+    })
+  ).rejects.toThrow('Web snapshot retained screenshot does not match the package');
+});
+
+it.each([
+  'Web snapshot screenshot is invalid.',
+  'Web snapshot screenshot dimensions exceed safe limits.',
+])('rejects unsafe retained screenshots at background admission: %s', async (message) => {
+  const manifest = createManifest();
+  validateRetainedScreenshotMock.mockRejectedValue(new Error(message));
+
+  await expect(
+    validateWebSnapshotPackage({
+      packageBlob: await createPackageBlob(JSON.stringify(manifest)),
+      payload: createPayload(manifest),
+      screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    })
+  ).rejects.toThrow(message);
 });

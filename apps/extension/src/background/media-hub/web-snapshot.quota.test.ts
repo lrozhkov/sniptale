@@ -143,6 +143,19 @@ describe('web snapshot media hub quota boundary', () => {
     );
   });
 
+  it.each([
+    'Web snapshot screenshot is invalid.',
+    'Web snapshot screenshot dimensions exceed safe limits.',
+  ])('does not check storage or save when screenshot admission rejects: %s', async (message) => {
+    const { saveWebSnapshotToMediaHub } = await loadWebSnapshotOwner();
+    mocks.validatePackage.mockRejectedValue(new Error(message));
+
+    await expect(saveWebSnapshotToMediaHub(createSavePayload())).rejects.toThrow(message);
+
+    expect(mocks.ensureHeadroom).not.toHaveBeenCalled();
+    expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
+  });
+
   it('preserves unrecognized failures inside the headroom stage boundary', async () => {
     const { saveWebSnapshotToMediaHub } = await loadWebSnapshotOwner();
     mocks.ensureHeadroom.mockRejectedValue(new Error('storage backend offline'));

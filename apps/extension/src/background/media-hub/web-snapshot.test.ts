@@ -60,6 +60,14 @@ function createManifest(): WebSnapshotManifest {
   };
 }
 
+function createPngBytes(): Uint8Array {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes[19] = 1;
+  bytes[23] = 1;
+  return bytes;
+}
+
 async function createPackageBase64(
   manifest: WebSnapshotManifest,
   extras: Record<string, string> = {}
@@ -67,7 +75,7 @@ async function createPackageBase64(
   const zip = new JSZip();
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(manifest));
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, '<!doctype html><main>Snapshot</main>');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, 'png');
+  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, createPngBytes());
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.computedStyles, '{}');
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot, '<main>Snapshot</main>');
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.errors, '');
@@ -90,7 +98,7 @@ async function createPayload(
 ) {
   const manifest = createManifest();
   const packageBase64 = overrides.packageChunkBase64 ?? (await createPackageBase64(manifest));
-  const screenshotBase64 = Buffer.from('png').toString('base64');
+  const screenshotBase64 = Buffer.from(createPngBytes()).toString('base64');
   return {
     packageBlob: new Blob([Buffer.from(packageBase64, 'base64')], {
       type: 'application/x-sniptale-web-snapshot+zip',
@@ -155,6 +163,10 @@ beforeEach(() => {
   vi.restoreAllMocks();
   mocks.ensureHeadroom.mockReset();
   mocks.saveWebSnapshot.mockReset();
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn().mockResolvedValue({ close: vi.fn(), height: 1, width: 1 })
+  );
   vi.stubGlobal('atob', (value: string) => Buffer.from(value, 'base64').toString('binary'));
 });
 

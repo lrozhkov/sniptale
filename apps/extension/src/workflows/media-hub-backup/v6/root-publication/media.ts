@@ -43,7 +43,10 @@ import type {
 import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../../../../composition/persistence/recordings/telemetry.guards';
 import { createRecordingMediaId } from '../../../../features/media-hub/media-id';
-import { sanitizeWebSnapshotPackageProvenance } from '../../../../features/web-snapshot/provenance';
+import {
+  readWebSnapshotPackageScreenshotBytes,
+  sanitizeWebSnapshotPackageProvenance,
+} from '../../../../features/web-snapshot/provenance';
 import { isWebSnapshotManifest } from '../../../../features/web-snapshot/manifest';
 import { putWebSnapshotBackupRestore } from '../../../../composition/persistence/web-snapshots/backup-restore';
 import { parseStoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots';
@@ -54,6 +57,7 @@ import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import type { MediaHubBackupRootEnvelope } from '../contracts';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
+import { validateRetainedWebSnapshotScreenshot } from '../../../../features/web-snapshot/screenshot-validation';
 
 type MutableStore = {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -202,12 +206,19 @@ function remapMediaIdentity(
 type PortableMedia = ReturnType<typeof parsePortableMediaMetadata>;
 
 const WEB_SNAPSHOT_SCREENSHOT_MIME_TYPES: readonly string[] = [
-  'image/avif',
-  'image/gif',
   'image/jpeg',
   'image/png',
   'image/webp',
 ];
+async function validateRestoredWebSnapshotScreenshot(args: {
+  packageBlob: Blob;
+  screenshotBlob: Blob;
+}): Promise<void> {
+  await validateRetainedWebSnapshotScreenshot({
+    packageBytes: await readWebSnapshotPackageScreenshotBytes(args.packageBlob),
+    screenshotBlob: args.screenshotBlob,
+  });
+}
 
 async function replaceSanitizedSnapshotPackage(args: {
   envelope: MediaHubBackupRootEnvelope;
@@ -233,6 +244,14 @@ async function replaceSanitizedSnapshotPackage(args: {
     metadata.webSnapshot.entry.manifest,
     { requireManifestMatch: true }
   );
+  const screenshotFile = await readAssetFile(
+    screenshotObject.ref,
+    `${metadata.entry.id}-screenshot`
+  );
+  await validateRestoredWebSnapshotScreenshot({
+    packageBlob: sanitized.packageBlob,
+    screenshotBlob: screenshotFile,
+  });
   let staged = args.staged;
   if (sanitized.changed) {
     const replacement = await writeBlobToAsset(sanitized.packageBlob);

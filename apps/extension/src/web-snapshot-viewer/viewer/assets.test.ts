@@ -13,11 +13,19 @@ const NativeURL = URL;
 
 const mocks = vi.hoisted(() => ({
   getWebSnapshotRecord: vi.fn(),
+  getWebSnapshotScreenshotFile: vi.fn(),
+  validateRetainedWebSnapshotScreenshot: vi.fn(),
 }));
 
 vi.mock('../../composition/persistence/web-snapshots', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/web-snapshots')>()),
   getWebSnapshotRecord: mocks.getWebSnapshotRecord,
+  getWebSnapshotScreenshotFile: mocks.getWebSnapshotScreenshotFile,
+}));
+
+vi.mock('../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/web-snapshot/screenshot-validation')>()),
+  validateRetainedWebSnapshotScreenshot: mocks.validateRetainedWebSnapshotScreenshot,
 }));
 
 import { loadWebSnapshotPackage } from './assets';
@@ -181,6 +189,10 @@ function mockLargeViewerZip(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getWebSnapshotScreenshotFile.mockResolvedValue(
+    new File(['png'], 'snapshot.png', { type: 'image/png' })
+  );
+  mocks.validateRetainedWebSnapshotScreenshot.mockResolvedValue({ height: 720, width: 1280 });
   stubObjectUrlStatics();
 });
 
@@ -198,13 +210,45 @@ it('loads a valid package and rewrites captured asset references to object URLs'
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
 
-  expect(loaded.objectUrls).toEqual(['blob:snapshot-asset', 'blob:snapshot-asset']);
+  expect(loaded.objectUrls).toEqual([
+    'blob:snapshot-asset',
+    'blob:snapshot-asset',
+    'blob:snapshot-asset',
+  ]);
+  expect(loaded.screenshotUrl).toBe('blob:snapshot-asset');
   expect(loaded.html).toContain('src="blob:snapshot-asset"');
   expect(loaded.html).toContain('<a>Document</a>');
   expect(loaded.html).not.toContain('href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
-  expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
 });
+
+it('rejects a missing retained screenshot before creating package asset URLs', async () => {
+  await stubWebSnapshotRecord({ extras: { 'assets/image.png': 'png' } });
+  mocks.getWebSnapshotScreenshotFile.mockResolvedValue(undefined);
+
+  await expect(loadWebSnapshotPackage('snapshot-1')).rejects.toThrow(
+    'Web snapshot screenshot is missing.'
+  );
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+});
+
+it.each([
+  'Web snapshot screenshot is too large.',
+  'Web snapshot screenshot is invalid.',
+  'Web snapshot screenshot dimensions exceed safe limits.',
+])(
+  'rejects an unsafe retained screenshot before creating package asset URLs: %s',
+  async (message) => {
+    await stubWebSnapshotRecord({ extras: { 'assets/image.png': 'png' } });
+    mocks.validateRetainedWebSnapshotScreenshot.mockRejectedValue(new Error(message));
+
+    await expect(loadWebSnapshotPackage('snapshot-1')).rejects.toThrow(message);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  }
+);
 
 it('rejects unsafe package paths before creating asset object URLs', async () => {
   await stubWebSnapshotRecord({

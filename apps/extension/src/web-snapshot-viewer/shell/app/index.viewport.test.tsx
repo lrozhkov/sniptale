@@ -71,7 +71,12 @@ function createViewerManifest(overrides: Partial<WebSnapshotManifest> = {}): Web
 function createLoadedPackage(
   manifest: Partial<WebSnapshotManifest> = {}
 ): LoadedWebSnapshotPackage {
-  return { html: '<p>Snapshot</p>', manifest: createViewerManifest(manifest), objectUrls: [] };
+  return {
+    html: '<p>Snapshot</p>',
+    manifest: createViewerManifest(manifest),
+    objectUrls: [],
+    screenshotUrl: 'blob:snapshot-screenshot',
+  };
 }
 
 async function renderViewer(): Promise<void> {
@@ -81,6 +86,9 @@ async function renderViewer(): Promise<void> {
 }
 
 async function loadSnapshotIframe(): Promise<void> {
+  act(() => {
+    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
+  });
   await act(async () => {
     mocks.latestFrameLoad?.();
   });
@@ -124,6 +132,9 @@ it('uses the saved capture viewport as the default snapshot iframe surface', asy
   );
 
   await renderViewer();
+  act(() => {
+    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
+  });
 
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('2560px');
@@ -134,6 +145,9 @@ it('keeps the fluid viewer surface for legacy snapshots without viewport metadat
   mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage());
 
   await renderViewer();
+  act(() => {
+    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
+  });
 
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('');

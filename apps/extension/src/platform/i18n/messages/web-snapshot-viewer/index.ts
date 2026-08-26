@@ -9,6 +9,22 @@ export const webSnapshotViewerMessages = defineMessageSource({
     documentTitleFallback: sharedWebSnapshotProductNameMessage,
     documentTitleSuffix: sharedWebSnapshotProductNameMessage,
     frameTitle: sharedWebSnapshotSingularNameMessage,
+    modeLabel: {
+      ru: 'Режим просмотра веб-снимка',
+      en: 'Web snapshot view mode',
+    },
+    visualMode: {
+      ru: 'Визуальная копия',
+      en: 'Visual copy',
+    },
+    staticDocumentMode: {
+      ru: 'Статический документ',
+      en: 'Static document',
+    },
+    visualAlt: {
+      ru: 'Сохранённая визуальная копия веб-страницы',
+      en: 'Saved visual copy of the web page',
+    },
     hideHeader: {
       ru: 'Скрыть заголовок снимка',
       en: 'Hide snapshot header',

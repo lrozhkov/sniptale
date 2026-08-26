@@ -177,6 +177,20 @@ describe('media-utils image measurement flows', () => {
     });
     expect(closeMock).toHaveBeenCalled();
 
+    createImageBitmapMock.mockResolvedValueOnce({
+      close: closeMock,
+      height: 400,
+      width: 200,
+    });
+    await createImageThumbnailBlob(new Blob(['image']), 320, 180, { verticalAnchor: 'top' });
+    expect(FakeOffscreenCanvas.context?.drawImage).toHaveBeenLastCalledWith(
+      expect.anything(),
+      0,
+      0,
+      320,
+      640
+    );
+
     FakeOffscreenCanvas.context = null;
     await expect(createImageThumbnailBlob(new Blob(['image']))).rejects.toThrow(
       'shared.runtime.thumbnailContextFailed'

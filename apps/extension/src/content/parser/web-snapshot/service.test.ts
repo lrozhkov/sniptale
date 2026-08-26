@@ -31,22 +31,6 @@ vi.mock('./package', () => ({
 
 import { buildCurrentPageWebSnapshot } from './service';
 
-const CHROMIUM_DECODABLE_FALLBACK_SCREENSHOT_DATA_URL =
-  'data:image/png;base64,' +
-  [
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4AWJiYGBgAAAAAP//',
-    'XRcpzQAAAAZJREFUAwAADwADJDd96QAAAABJRU5ErkJggg==',
-  ].join('');
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read blob.'));
-    reader.onloadend = () => resolve(String(reader.result ?? ''));
-    reader.readAsDataURL(blob);
-  });
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   const snapshotDocument = document.implementation.createHTMLDocument('prepared');
@@ -125,40 +109,19 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
   expect(result.snapshotSessionId).toBe('snapshot-session-1');
 });
 
-it('keeps web snapshot export usable when full-page screenshot capture fails', async () => {
+it('fails before packaging when the required full-page screenshot capture fails', async () => {
   mocks.captureWebSnapshotScreenshotWithWarnings.mockRejectedValueOnce(
     new Error('window is not defined')
   );
 
-  const result = await buildCurrentPageWebSnapshot({
-    allowAnonymousCrossOriginAssets: false,
-    allowAuthenticatedSameOriginAssets: false,
-    requestId: 'req-web',
-  });
-
-  expect(mocks.buildWebSnapshotPackage).toHaveBeenCalledWith(
-    expect.objectContaining({
-      screenshotBlob: expect.objectContaining({ type: 'image/png' }),
-      warningStats: expect.objectContaining({
-        failedAssetCount: 1,
-        networkWarningCount: 1,
-        sanitizerWarningCount: 1,
-        warningCount: 4,
-      }),
-      warnings: expect.arrayContaining([
-        'Full-page web snapshot screenshot failed: window is not defined',
-      ]),
+  await expect(
+    buildCurrentPageWebSnapshot({
+      allowAnonymousCrossOriginAssets: false,
+      allowAuthenticatedSameOriginAssets: false,
+      requestId: 'req-web',
     })
-  );
-  expect(result.warnings).toEqual(
-    expect.arrayContaining(['Full-page web snapshot screenshot failed: window is not defined'])
-  );
-  const fallbackScreenshot = mocks.buildWebSnapshotPackage.mock.calls[0]?.[0]?.screenshotBlob;
-  expect(fallbackScreenshot).toBeInstanceOf(Blob);
-  if (!fallbackScreenshot) {
-    throw new Error('Fallback screenshot blob was not passed to the package builder.');
-  }
-  await expect(blobToDataUrl(fallbackScreenshot)).resolves.toBe(
-    CHROMIUM_DECODABLE_FALLBACK_SCREENSHOT_DATA_URL
-  );
+  ).rejects.toThrow('window is not defined');
+  expect(mocks.collectWebSnapshotAssets).not.toHaveBeenCalled();
+  expect(mocks.buildWebSnapshotPackage).not.toHaveBeenCalled();
+  expect(mocks.serializePreparedSnapshotDocument).not.toHaveBeenCalled();
 });

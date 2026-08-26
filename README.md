@@ -84,7 +84,8 @@ The architecture and approximate target feature set have largely stabilized. The
 | Screenshot capture, page preparation, structured export, Media Hub, and image editing | Alpha                                                                                                       |
 | Browser recording and video editing                                                   | Alpha; advanced automation, codec paths, and effect workflows remain experimental                           |
 | Scenario, step-guide, and presentation authoring                                      | Experimental                                                                                                |
-| Saved web snapshots and diagnostic capture                                            | Experimental                                                                                                |
+| Saved web snapshots                                                                  | Production-ready local save/viewer path; optional network-assisted asset capture remains policy-controlled  |
+| Diagnostic capture                                                                   | Experimental                                                                                                |
 | Native desktop companion                                                              | Separate project and experimental integration surface                                                       |
 | Backward compatibility and migrations                                                 | Not promised during the alpha-preview phase                                                                 |
 | Cloud sync, hosted collaboration, and team sharing                                    | Not implemented; the design and privacy trade-offs remain undecided                                         |
@@ -150,11 +151,13 @@ This is intended for documentation, research, support, QA, handoff, and AI-ready
 
 ### Save a local, read-only web snapshot
 
-The experimental web-snapshot workflow can save a local package containing a screenshot, sanitized markup and styles, source metadata, warnings, and safe diagnostics. Saved snapshots appear in the Gallery and open in a dedicated read-only viewer.
+The web-snapshot workflow saves a local package containing an authoritative full-page screenshot, sanitized markup and styles, source metadata, warnings, and safe diagnostics. A save succeeds only when the screenshot and validated package are both retained. Saved snapshots appear in the Gallery with a derived thumbnail and full screenshot preview, and open in a dedicated read-only viewer.
+
+The viewer opens in **Visual** mode, which displays the retained capture raster at the captured CSS viewport width. This is the fidelity-preserving view for canvas state, generated content, loaded images, sticky layouts, and other pixels visible during capture. **Static document** mode is an explicit alternative for inspecting the sanitized document structure; it is not expected to reproduce every captured pixel.
 
 Scripts, event handlers, cookies, authentication state, browser storage, page IndexedDB, API bodies, and live JavaScript state are excluded. Additional asset capture is not performed by default. Authenticated same-origin assets or anonymous external public assets can be enabled through explicit disclosure and acknowledgement, with security and fidelity limitations.
 
-A snapshot is therefore a sanitized local reference, not a fully faithful virtual browser session and not a substitute for a standards-compliant archival crawler.
+A snapshot is therefore a visually faithful capture of the page at save time plus a sanitized local reference document. It is not a live browser session and not a substitute for a standards-compliant archival crawler.
 
 ### Edit screenshots and other images
 

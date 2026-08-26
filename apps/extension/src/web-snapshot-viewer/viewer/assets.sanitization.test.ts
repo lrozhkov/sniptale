@@ -13,11 +13,19 @@ const NativeURL = URL;
 
 const mocks = vi.hoisted(() => ({
   getWebSnapshotRecord: vi.fn(),
+  getWebSnapshotScreenshotFile: vi.fn(),
+  validateRetainedWebSnapshotScreenshot: vi.fn(),
+}));
+
+vi.mock('../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/web-snapshot/screenshot-validation')>()),
+  validateRetainedWebSnapshotScreenshot: mocks.validateRetainedWebSnapshotScreenshot,
 }));
 
 vi.mock('../../composition/persistence/web-snapshots', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/web-snapshots')>()),
   getWebSnapshotRecord: mocks.getWebSnapshotRecord,
+  getWebSnapshotScreenshotFile: mocks.getWebSnapshotScreenshotFile,
 }));
 
 import { loadWebSnapshotPackage } from './assets';
@@ -78,6 +86,10 @@ function readBlobText(blob: Blob): Promise<string> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getWebSnapshotScreenshotFile.mockResolvedValue(
+    new File(['png'], 'snapshot.png', { type: 'image/png' })
+  );
+  mocks.validateRetainedWebSnapshotScreenshot.mockResolvedValue({ height: 720, width: 1280 });
   stubObjectUrlStatics();
 });
 

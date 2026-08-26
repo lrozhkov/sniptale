@@ -9,11 +9,11 @@ import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manif
 const mocks = vi.hoisted(() => ({
   createJournal: vi.fn(),
   discardPreparedAsset: vi.fn(),
-  measureImageBlob: vi.fn(async () => ({ height: 200, width: 300 })),
   publishJournal: vi.fn(),
   publishWithRetry: vi.fn(),
   recover: vi.fn(),
   writeBlobToAsset: vi.fn(),
+  validateScreenshot: vi.fn(),
 }));
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -30,9 +30,11 @@ vi.mock('./publication', async (importOriginal) => ({
   recoverWebSnapshotPublications: mocks.recover,
 }));
 
-vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/media/image-dimensions')>()),
-  measureImageBlob: mocks.measureImageBlob,
+vi.mock('../../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../features/web-snapshot/screenshot-validation')
+  >()),
+  validateWebSnapshotScreenshotBlob: mocks.validateScreenshot,
 }));
 
 beforeEach(() => {
@@ -40,7 +42,7 @@ beforeEach(() => {
   vi.stubGlobal('crypto', { randomUUID: () => 'snapshot-1' });
   mocks.recover.mockResolvedValue(0);
   mocks.discardPreparedAsset.mockResolvedValue(undefined);
-  mocks.measureImageBlob.mockResolvedValue({ height: 200, width: 300 });
+  mocks.validateScreenshot.mockResolvedValue({ height: 200, width: 300 });
   mocks.createJournal.mockImplementation(async (input) => ({
     ...input,
     createdAt: 1,
@@ -83,6 +85,27 @@ it('stages package and screenshot objects and publishes metadata without embedde
     expect.objectContaining({ journalId: 'journal-1' }),
     mocks.publishJournal
   );
+});
+
+it.each([
+  'Web snapshot screenshot is invalid.',
+  'Web snapshot screenshot dimensions exceed safe limits.',
+])('rejects unsafe screenshots before recovery or object writes: %s', async (message) => {
+  const { saveWebSnapshotMediaAsset } = await import('./records');
+  mocks.validateScreenshot.mockRejectedValue(new Error(message));
+
+  await expect(
+    saveWebSnapshotMediaAsset({
+      filename: 'snapshot.zip',
+      manifest: createManifest(),
+      packageBlob: await createPackageBlob(createManifest()),
+      screenshotBlob: new Blob(['unsafe'], { type: 'image/png' }),
+    })
+  ).rejects.toThrow(message);
+
+  expect(mocks.recover).not.toHaveBeenCalled();
+  expect(mocks.writeBlobToAsset).not.toHaveBeenCalled();
+  expect(mocks.createJournal).not.toHaveBeenCalled();
 });
 
 it('removes the successfully staged sibling when the other object write fails', async () => {

@@ -7,7 +7,9 @@ import {
 import type { MediaThumbnailEntry } from '../../../composition/persistence/media-library/contracts';
 import { listRecentScenarioSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
+import { getWebSnapshotScreenshotFile } from '../../../composition/persistence/web-snapshots';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
+import { validateWebSnapshotScreenshotBlob } from '../../../features/web-snapshot/screenshot-validation';
 import {
   createVideoThumbnailBlob,
   VIDEO_THUMBNAIL_GENERATOR_VERSION,
@@ -28,6 +30,33 @@ function usesVideoThumbnailRenderer(item: GalleryItem): boolean {
   );
 }
 
+async function readMediaThumbnailSource(
+  item: Extract<GalleryItem, { type?: 'media' }>
+): Promise<Blob | null> {
+  const assetId = item.entityId ?? item.id;
+  if (item.kind !== 'web-archive') return (await getMediaAssetBlob(assetId)) ?? null;
+  const screenshot = await getWebSnapshotScreenshotFile(assetId);
+  if (!screenshot) return null;
+  try {
+    await validateWebSnapshotScreenshotBlob(screenshot);
+    return screenshot;
+  } catch {
+    return null;
+  }
+}
+
+function usesImageThumbnailRenderer(
+  item: Extract<GalleryItem, { type?: 'media' }>,
+  source: Blob
+): boolean {
+  return (
+    item.kind === 'screenshot' ||
+    item.kind === 'image' ||
+    item.kind === 'web-archive' ||
+    source.type.startsWith('image/')
+  );
+}
+
 async function render(item: GalleryItem): Promise<Blob | null> {
   if (item.type === 'scenario-export') {
     const previewStep = (await listRecentScenarioSteps(item.project.id))[0];
@@ -35,10 +64,15 @@ async function render(item: GalleryItem): Promise<Blob | null> {
     return createImageThumbnailBlob(await dataUrlToBlob(previewStep.previewDataUrl), WIDTH, HEIGHT);
   }
   if (item.type !== 'media') return null;
-  const source = await getMediaAssetBlob(item.entityId ?? item.id);
+  const source = await readMediaThumbnailSource(item);
   if (!source) return null;
-  if (item.kind === 'screenshot' || item.kind === 'image' || source.type.startsWith('image/')) {
-    return createImageThumbnailBlob(source, WIDTH, HEIGHT);
+  if (usesImageThumbnailRenderer(item, source)) {
+    return createImageThumbnailBlob(
+      source,
+      WIDTH,
+      HEIGHT,
+      item.kind === 'web-archive' ? { verticalAnchor: 'top' } : undefined
+    );
   }
   if (
     item.kind === 'recording' ||

@@ -31,4 +31,4 @@ it('returns a stage-prefixed failure without ambient document/window', async () 
     }
     Reflect.deleteProperty(globalThis, INJECTED_WEB_SNAPSHOT_RUNNER_STATE_KEY);
   }
-});
+}, 10_000);

@@ -14,6 +14,7 @@ import {
   assertZipEntryCanInflate,
   assertZipPackageInflationProfile,
 } from '@sniptale/platform/data/zip-profile';
+import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
 
 const MAX_WEB_SNAPSHOT_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES = 25 * 1024 * 1024;
@@ -118,6 +119,23 @@ async function assertPackageManifest(zip: JSZip, payloadManifest: WebSnapshotMan
   });
 }
 
+async function assertRetainedScreenshotMatchesPackage(
+  zip: JSZip,
+  screenshotBlob: Blob
+): Promise<void> {
+  const packageScreenshot = zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot);
+  if (!packageScreenshot) {
+    throw new Error('Web snapshot package is missing a required entry');
+  }
+  assertZipEntryCanInflate(
+    packageScreenshot,
+    MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES,
+    () => new Error('Web snapshot screenshot is too large')
+  );
+  const packageBytes = await packageScreenshot.async('uint8array');
+  await validateRetainedWebSnapshotScreenshot({ packageBytes, screenshotBlob });
+}
+
 export async function validateWebSnapshotPackage(args: {
   packageBlob: Blob;
   payload: WebSnapshotSaveToGalleryPayload;
@@ -126,5 +144,8 @@ export async function validateWebSnapshotPackage(args: {
   assertPayloadBasics(args.payload);
   assertPayloadTransferSizes(args);
   const zip = await loadWebSnapshotPackageZip(args.packageBlob);
-  await assertPackageManifest(zip, args.payload.manifest);
+  await Promise.all([
+    assertPackageManifest(zip, args.payload.manifest),
+    assertRetainedScreenshotMatchesPackage(zip, args.screenshotBlob),
+  ]);
 }

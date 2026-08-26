@@ -169,14 +169,14 @@ it('derives offscreen sender restriction from policy metadata without an explici
   ).toBe(true);
 });
 
-it('preserves the explicit legacy-unreachable route ceiling', () => {
+it('keeps full-page export capture reachable through the background runtime boundary', () => {
   const descriptor = backgroundIngressContracts.find(
     (entry) => entry.type === MessageType.EXPORT_CAPTURE_FULL_PAGE
   );
   expect(descriptor).toEqual(
-    expect.objectContaining({ boundary: 'legacy-unreachable', classification: 'routed' })
+    expect.objectContaining({ boundary: 'background-runtime', classification: 'routed' })
   );
-  expect(backgroundRuntimeTypes.has(MessageType.EXPORT_CAPTURE_FULL_PAGE)).toBe(false);
+  expect(backgroundRuntimeTypes.has(MessageType.EXPORT_CAPTURE_FULL_PAGE)).toBe(true);
 });
 
 it('keeps the contracts-owned descriptor free of background runtime imports', () => {

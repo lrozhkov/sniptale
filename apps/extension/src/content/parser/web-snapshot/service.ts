@@ -1,7 +1,6 @@
 import { collectWebSnapshotAssets } from './assets';
 import { captureWebSnapshotScreenshotWithWarnings } from './capture';
 import { buildWebSnapshotPackage } from './package';
-import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../contracts/full-page-capture';
 import {
@@ -13,13 +12,6 @@ import type {
   WebSnapshotPageSource,
   WebSnapshotWarningStats,
 } from './types';
-
-const FALLBACK_SCREENSHOT_BYTES = Uint8Array.from([
-  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0,
-  0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 1, 98, 98, 96, 96, 96, 0, 0, 0, 0, 255,
-  255, 93, 23, 41, 205, 0, 0, 0, 6, 73, 68, 65, 84, 3, 0, 0, 15, 0, 3, 36, 55, 125, 233, 0, 0, 0, 0,
-  73, 69, 78, 68, 174, 66, 96, 130,
-]);
 
 function throwIfWebSnapshotBuildAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -108,7 +100,7 @@ function resolveCurrentPageViewport(
   };
 }
 
-async function captureWebSnapshotScreenshotOrFallback(
+async function captureRequiredWebSnapshotScreenshot(
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
   captureIdentity?: FullPageExportCaptureIdentity | undefined,
   abortSignal?: AbortSignal | undefined
@@ -117,25 +109,15 @@ async function captureWebSnapshotScreenshotOrFallback(
   warnings: string[];
 }> {
   throwIfWebSnapshotBuildAborted(abortSignal);
-  try {
-    const screenshot = await captureWebSnapshotScreenshotWithWarnings(
-      contentIntentSource,
-      captureIdentity
-    );
-    throwIfWebSnapshotBuildAborted(abortSignal);
-    return {
-      screenshotBlob: screenshot.blob,
-      warnings: screenshot.warnings,
-    };
-  } catch (error) {
-    throwIfWebSnapshotBuildAborted(abortSignal);
-    const message =
-      error instanceof Error ? sanitizeDiagnosticMessage(error.message) : 'unknown error';
-    return {
-      screenshotBlob: new Blob([FALLBACK_SCREENSHOT_BYTES], { type: 'image/png' }),
-      warnings: [`Full-page web snapshot screenshot failed: ${message}`],
-    };
-  }
+  const screenshot = await captureWebSnapshotScreenshotWithWarnings(
+    contentIntentSource,
+    captureIdentity
+  );
+  throwIfWebSnapshotBuildAborted(abortSignal);
+  return {
+    screenshotBlob: screenshot.blob,
+    warnings: screenshot.warnings,
+  };
 }
 
 export async function buildCurrentPageWebSnapshot(args: {
@@ -153,20 +135,18 @@ export async function buildCurrentPageWebSnapshot(args: {
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const snapshotDocument = preparedSnapshot.document;
-  const [assetResult, screenshotResult] = await Promise.all([
-    collectWebSnapshotAssets(snapshotDocument, {
-      allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
-      allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
-      requestId: args.requestId,
-      sourceUrl: source.url,
-      ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
-    }),
-    captureWebSnapshotScreenshotOrFallback(
-      args.contentIntentSource,
-      args.fullPageCaptureIdentity,
-      args.abortSignal
-    ),
-  ]);
+  const screenshotResult = await captureRequiredWebSnapshotScreenshot(
+    args.contentIntentSource,
+    args.fullPageCaptureIdentity,
+    args.abortSignal
+  );
+  const assetResult = await collectWebSnapshotAssets(snapshotDocument, {
+    allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
+    allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+    requestId: args.requestId,
+    sourceUrl: source.url,
+    ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
+  });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const { assets, privacyWarnings, snapshotSessionId, warnings } = assetResult;
   const warningSummary = createNormalizedWarningSummary({

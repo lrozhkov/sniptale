@@ -103,10 +103,14 @@ function createLoadedPackage(args: {
     html: args.html ?? '<p>Snapshot</p>',
     manifest: createViewerManifest(args.manifest ?? {}),
     objectUrls: args.objectUrls ?? [],
+    screenshotUrl: 'blob:snapshot-screenshot',
   };
 }
 
 async function loadSnapshotIframe(): Promise<HTMLIFrameElement> {
+  act(() => {
+    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
+  });
   const iframe = container?.querySelector('iframe');
   if (!iframe) {
     throw new Error('Expected snapshot iframe.');
@@ -166,7 +170,7 @@ it('revokes object URLs from a snapshot load that resolves after unmount', async
   expect(mocks.revokeWebSnapshotObjectUrls).toHaveBeenCalledWith(['blob:late']);
 });
 
-it('hides the snapshot title bar until the viewer page is refreshed', async () => {
+it('hides snapshot metadata while keeping the mode control available', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
 
   await act(async () => {
@@ -189,6 +193,29 @@ it('hides the snapshot title bar until the viewer page is refreshed', async () =
   expect(container?.textContent).not.toContain('Page title');
   expect(container?.textContent).not.toContain('https://example.com/page');
   expect(document.title).toBe('Page title - Sniptale Web Snapshot');
+
+  await loadSnapshotIframe();
+  expect(container?.querySelector('iframe')).not.toBeNull();
+});
+
+it('opens with the retained visual copy and switches explicitly to the static document', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ manifest: { viewport: { height: 900, width: 1440 } } })
+  );
+
+  await act(async () => {
+    root?.render(<WebSnapshotViewerApp />);
+  });
+
+  const image = container?.querySelector<HTMLImageElement>('[data-testid="snapshot-visual-image"]');
+  expect(image?.src).toBe('blob:snapshot-screenshot');
+  expect(image?.style.width).toBe('1440px');
+  expect(container?.querySelector('iframe')).toBeNull();
+
+  await loadSnapshotIframe();
+
+  expect(container?.querySelector('[data-testid="snapshot-visual-image"]')).toBeNull();
+  expect(container?.querySelector('iframe')).not.toBeNull();
 });
 
 it('mounts preparation only after the current snapshot iframe load event', async () => {
@@ -264,6 +291,7 @@ it('uses localized fallback for missing source titles and keeps source URL visib
   expect(document.documentElement.lang).toBe('ru');
   expect(container?.textContent).toContain('Sniptale Веб-снимок');
   expect(container?.textContent).toContain('https://example.com/page');
+  await loadSnapshotIframe();
   expect(container?.querySelector('iframe')?.getAttribute('title')).toBe('Веб-снимок');
 });
 

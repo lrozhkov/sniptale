@@ -46,11 +46,19 @@ function createManifest(): WebSnapshotManifest {
   };
 }
 
+function createPngBytes(): Uint8Array {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes[19] = 1;
+  bytes[23] = 1;
+  return bytes;
+}
+
 async function createPackageBase64(manifest: WebSnapshotManifest): Promise<string> {
   const zip = new JSZip();
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(manifest));
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, '<!doctype html><main>Snapshot</main>');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, 'png');
+  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, createPngBytes());
   const buffer = await zip.generateAsync({ type: 'nodebuffer' });
   return buffer.toString('base64');
 }
@@ -70,6 +78,10 @@ beforeEach(() => {
   resetWebSnapshotStagedBlobsForTests();
   mocks.ensureHeadroom.mockReset();
   mocks.saveWebSnapshot.mockReset();
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn().mockResolvedValue({ close: vi.fn(), height: 1, width: 1 })
+  );
   vi.stubGlobal('atob', (value: string) => Buffer.from(value, 'base64').toString('binary'));
 });
 
@@ -88,13 +100,13 @@ it('persists staged web snapshot blobs through the media hub safe API', async ()
     totalChunks: 1,
   });
   stageWebSnapshotBlobChunk({
-    base64: Buffer.from('png').toString('base64'),
+    base64: Buffer.from(createPngBytes()).toString('base64'),
     chunkIndex: 0,
     kind: 'screenshot',
     snapshotSessionId: 'snapshot-session-1',
     stagedBlobId: 'screenshot-stage-1',
     tabId: 42,
-    totalBytes: 3,
+    totalBytes: createPngBytes().byteLength,
     totalChunks: 1,
   });
 
