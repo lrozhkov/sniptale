@@ -6,6 +6,7 @@ export const PageAccessOperation = {
   GRANT_ALL_SITES: 'grant-all-sites',
   GRANT_SITE: 'grant-site',
   REGISTER_GRANTED_ALL_SITES: 'register-granted-all-sites',
+  REGISTER_GRANTED_FILE_SCHEME: 'register-granted-file-scheme',
   REGISTER_GRANTED_SITE: 'register-granted-site',
   READ_STATUS: 'read-status',
   REVOKE_SITE: 'revoke-site',
@@ -16,6 +17,7 @@ export type PageAccessOperation = (typeof PageAccessOperation)[keyof typeof Page
 export const PAGE_ACCESS_ALL_SITES_ORIGIN_PATTERNS = ['<all_urls>'] as const;
 export const PAGE_ACCESS_ALL_SITES_CONTENT_SCRIPT_MATCHES = ['http://*/*', 'https://*/*'] as const;
 export const PAGE_ACCESS_LEGACY_ALL_SITES_ORIGIN_PATTERNS = ['http://*/*', 'https://*/*'] as const;
+export const PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN = 'file:///' as const;
 
 type PageAccessResult =
   | 'activated'

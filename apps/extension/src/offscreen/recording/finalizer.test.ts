@@ -83,6 +83,22 @@ describe('recording finalizer', () => {
         artifacts: [primary, webcam],
         discard: false,
         primaryRecordingId: primary.artifactId,
+        recordingGroups: {
+          [primary.artifactId]: {
+            dimensions: { height: 1080, width: 1920 },
+            groupId: primary.artifactId,
+            order: 0,
+            role: 'display',
+            sourceLabel: 'Design review',
+          },
+          [webcam.artifactId]: {
+            dimensions: { height: 720, width: 1280 },
+            groupId: primary.artifactId,
+            order: 1,
+            role: 'webcam',
+            sourceLabel: 'HD Camera',
+          },
+        },
         staging,
       })
     ).resolves.toEqual({ filename: primary.filename, recordingId: primary.artifactId });
@@ -93,12 +109,22 @@ describe('recording finalizer', () => {
           preparedAsset: primary.asset,
           filename: primary.filename,
           id: primary.artifactId,
+          recordingGroup: expect.objectContaining({
+            dimensions: { height: 1080, width: 1920 },
+            role: 'display',
+            sourceLabel: 'Design review',
+          }),
           storageClass: 'temporary',
         },
         {
           preparedAsset: webcam.asset,
           filename: webcam.filename,
           id: webcam.artifactId,
+          recordingGroup: expect.objectContaining({
+            dimensions: { height: 720, width: 1280 },
+            role: 'webcam',
+            sourceLabel: 'HD Camera',
+          }),
           storageClass: 'temporary',
         },
       ],

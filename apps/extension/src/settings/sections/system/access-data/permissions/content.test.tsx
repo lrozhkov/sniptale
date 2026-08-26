@@ -21,7 +21,7 @@ function createPermission(id: string, state: PermissionInfo['state']): Permissio
     id,
     icon: Circle,
     state,
-    type: id === 'origins' ? 'origin' : 'web',
+    type: id === 'origins' ? 'origin' : id === 'localFiles' ? 'file' : 'web',
   };
 }
 
@@ -34,23 +34,26 @@ async function renderContent() {
 
   const onRefresh = vi.fn();
   const onRequestPermission = vi.fn();
+  const onRevokePermission = vi.fn();
 
   await act(async () => {
     root?.render(
       <PermissionsSectionContent
         permissions={[
           createPermission('origins', 'prompt'),
+          createPermission('localFiles', 'granted'),
           createPermission('microphone', 'granted'),
           createPermission('downloads', 'denied'),
           createPermission('clipboard', 'error'),
         ]}
         onRefresh={onRefresh}
         onRequestPermission={onRequestPermission}
+        onRevokePermission={onRevokePermission}
       />
     );
   });
 
-  return { onRefresh, onRequestPermission };
+  return { onRefresh, onRequestPermission, onRevokePermission };
 }
 
 beforeEach(() => {
@@ -68,7 +71,7 @@ afterEach(() => {
 });
 
 it('renders all permission states and wires refresh/request handlers', async () => {
-  const { onRefresh, onRequestPermission } = await renderContent();
+  const { onRefresh, onRequestPermission, onRevokePermission } = await renderContent();
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
 
   expect(container?.textContent).toContain('settings.permissions.requiredGrantsTitle');
@@ -89,12 +92,17 @@ it('renders all permission states and wires refresh/request handlers', async () 
   const refreshButton = buttons.find(
     (button) => button.textContent === 'settings.permissions.refreshButton'
   );
+  const revokeButton = buttons.find(
+    (button) => button.textContent === 'settings.permissions.revokeButton'
+  );
 
   act(() => {
     allSitesButton?.click();
+    revokeButton?.click();
     refreshButton?.click();
   });
 
   expect(onRequestPermission).toHaveBeenCalledWith('origins');
+  expect(onRevokePermission).toHaveBeenCalledWith('localFiles');
   expect(onRefresh).toHaveBeenCalledTimes(1);
 });

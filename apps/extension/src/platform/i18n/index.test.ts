@@ -78,6 +78,30 @@ describe('Web Snapshot i18n naming', () => {
   });
 });
 
+describe('Library i18n naming', () => {
+  it('uses user-facing backup terminology in both locales', () => {
+    expect(translate('gallery.backupExportModal.title', 'ru')).toBe('Создать резервную копию');
+    expect(translate('gallery.backupExportModal.title', 'en')).toBe('Create a backup');
+    expect(translate('gallery.importModal.title', 'ru')).toBe('Восстановить резервную копию');
+    expect(translate('gallery.importModal.title', 'en')).toBe('Restore from a backup');
+    expect(translate('gallery.app.openLibrary', 'ru')).toBe('Открыть Библиотеку');
+    expect(translate('gallery.app.openLibrary', 'en')).toBe('Open Library');
+
+    const russianModalCopy = [
+      translate('gallery.backupExportModal.description', 'ru'),
+      translate('gallery.backupExportModal.classMedia', 'ru'),
+      translate('gallery.backupExportModal.classProjects', 'ru'),
+      translate('gallery.backupExportModal.classTelemetry', 'ru'),
+      translate('gallery.importModal.description', 'ru'),
+      translate('gallery.importModal.replaceDescription', 'ru'),
+    ].join(' ');
+
+    expect(russianModalCopy).not.toMatch(
+      /\b(?:assets?|backup|blobs?|scope|telemetry|thumbnails?)\b/i
+    );
+  });
+});
+
 describe('Video annotation recovery i18n', () => {
   it('keeps built-in template copy user-facing in Russian', () => {
     const russianCopy = [

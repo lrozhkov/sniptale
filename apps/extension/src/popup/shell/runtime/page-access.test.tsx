@@ -174,6 +174,30 @@ it('requests current-site permission during the popup gesture before registratio
   });
 });
 
+it('requests the explicit file origin before registering local-file page access', async () => {
+  const fileStatus = { ...inactiveStatus, currentTabOrigin: 'file:///' };
+  runtimeSendMessageMock
+    .mockResolvedValueOnce({ status: fileStatus, success: true })
+    .mockResolvedValueOnce({
+      status: { ...fileStatus, currentTabActive: true, siteGranted: true },
+      success: true,
+    });
+
+  await renderHarness();
+  await flushAsync();
+
+  await act(async () => {
+    await latestRuntime?.handleRequest('grant-site');
+  });
+
+  expect(browserPermissionsRequestMock).toHaveBeenCalledWith({ origins: ['file:///'] });
+  expect(runtimeSendMessageMock).toHaveBeenLastCalledWith({
+    operation: 'register-granted-site',
+    tabId: 7,
+    type: 'PAGE_ACCESS',
+  });
+});
+
 it('rejects stale site grants before requesting an origin permission', async () => {
   runtimeSendMessageMock.mockResolvedValueOnce({ status: inactiveStatus, success: true });
 

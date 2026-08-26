@@ -13,15 +13,24 @@ import { subscribeToPermissionChanges } from './subscriptions';
 const {
   containsMock,
   downloadsAvailableMock,
+  fileAccessOptInMock,
+  isFileSchemeAccessAllowedMock,
   requestMock,
   subscribeToAddedMock,
   subscribeToRemovedMock,
 } = vi.hoisted(() => ({
   containsMock: vi.fn(),
   downloadsAvailableMock: vi.fn(),
+  fileAccessOptInMock: vi.fn(),
+  isFileSchemeAccessAllowedMock: vi.fn(),
   requestMock: vi.fn(),
   subscribeToAddedMock: vi.fn(),
   subscribeToRemovedMock: vi.fn(),
+}));
+
+vi.mock('../../../../../../composition/persistence/settings/file-scheme-consent', () => ({
+  hasLocalFileAccessOptIn: fileAccessOptInMock,
+  setLocalFileAccessOptIn: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/downloads', (_importOriginal) => ({
@@ -33,6 +42,7 @@ vi.mock('@sniptale/platform/browser/downloads', (_importOriginal) => ({
 vi.mock('@sniptale/platform/browser/permissions', (_importOriginal) => ({
   browserPermissions: {
     contains: containsMock,
+    isFileSchemeAccessAllowed: isFileSchemeAccessAllowedMock,
     request: requestMock,
     subscribeToAdded: subscribeToAddedMock,
     subscribeToRemoved: subscribeToRemovedMock,
@@ -66,6 +76,8 @@ beforeEach(() => {
   containsMock.mockReset();
   downloadsAvailableMock.mockReset();
   requestMock.mockReset();
+  isFileSchemeAccessAllowedMock.mockReset().mockResolvedValue(false);
+  fileAccessOptInMock.mockReset().mockResolvedValue(false);
   subscribeToAddedMock.mockReset();
   subscribeToRemovedMock.mockReset();
 
@@ -127,6 +139,7 @@ it('reads permission snapshot across microphone, origin, and camera states', asy
     { id: 'origins', state: 'prompt' },
     { id: 'microphone', state: 'granted' },
     { id: 'camera', state: 'granted' },
+    { id: 'localFiles', state: 'prompt' },
   ]);
 });
 

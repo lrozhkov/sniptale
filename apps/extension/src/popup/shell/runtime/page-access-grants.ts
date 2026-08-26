@@ -8,6 +8,7 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import {
   PAGE_ACCESS_ALL_SITES_ORIGIN_PATTERNS,
+  PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN,
   PageAccessOperation as PageAccessOperationValue,
 } from '@sniptale/runtime-contracts/messaging/page-access';
 
@@ -23,6 +24,9 @@ function createOriginPattern(origin: string | null): string | null {
 
   try {
     const url = new URL(origin);
+    if (url.protocol === 'file:') {
+      return PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN;
+    }
     return url.protocol === 'http:' || url.protocol === 'https:' ? `${url.origin}/*` : null;
   } catch {
     return null;

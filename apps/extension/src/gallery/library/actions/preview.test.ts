@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createClosePreviewAction, createSaveMetadataAction, resetPreviewChanges } from './preview';
+import { createNavigatePreviewAction } from './preview-navigation';
 import {
   createController,
   createMediaItem,
@@ -48,6 +49,7 @@ async function verifyPreviewMetadataCloseFlow() {
   const { controller, getState } = createController({
     filenameDraft: ' renamed.png ',
     previewItem,
+    previewInspectorCollapsed: true,
     tagDrafts: ['alpha', 'beta'],
   });
 
@@ -125,6 +127,43 @@ async function verifyPreviewMetadataSaveFlow() {
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 }
 
+async function verifyPreviewNavigationFlow() {
+  const currentItem = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const nextItem = createMediaItem({ filename: 'next.png', id: 'asset-2' });
+  const { controller, getState } = createController({
+    filenameDraft: 'renamed.png',
+    previewInspectorCollapsed: true,
+    previewItem: currentItem,
+  });
+
+  await createNavigatePreviewAction(controller)(nextItem, runBusyAction);
+
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenCalledWith('asset-1', {
+    filename: 'renamed.png',
+  });
+  expect(getState().preview.session).toMatchObject({
+    inspectorCollapsed: true,
+    item: nextItem,
+    url: null,
+  });
+}
+
+async function verifyFailedPreviewNavigationKeepsCurrentItem() {
+  const currentItem = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const nextItem = createMediaItem({ filename: 'next.png', id: 'asset-2' });
+  const { controller, getState } = createController({
+    filenameDraft: 'renamed.png',
+    previewItem: currentItem,
+  });
+  updateMediaLibraryEntrySafelyMock.mockRejectedValueOnce(new Error('write failed'));
+
+  await expect(createNavigatePreviewAction(controller)(nextItem, runBusyAction)).rejects.toThrow(
+    'write failed'
+  );
+
+  expect(getState().preview.session.item).toEqual(currentItem);
+}
+
 async function verifyMissingPreviewMetadataNoop() {
   const { controller } = createController();
 
@@ -144,6 +183,14 @@ describe('gallery app preview and shared actions', () => {
   it(
     'saves normalized preview metadata through the media-library owner',
     verifyPreviewMetadataSaveFlow
+  );
+  it(
+    'persists metadata before navigating and preserves inspector state',
+    verifyPreviewNavigationFlow
+  );
+  it(
+    'keeps the current preview when navigation persistence fails',
+    verifyFailedPreviewNavigationKeepsCurrentItem
   );
   it('skips metadata persistence without a preview item', verifyMissingPreviewMetadataNoop);
 });

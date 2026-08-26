@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { setLocalFileAccessOptIn } from '../../../../../../../composition/persistence/settings/file-scheme-consent';
 
 import {
   applyPermissionState,
@@ -7,6 +8,7 @@ import {
 } from '../../permissions-lib';
 import { findPermissionById } from './find';
 import type { PermissionSetter } from '../types';
+import { registerEffectiveFileSchemeAccess } from './request-actions/request-origin';
 
 export function usePermissionRevokes(
   permissions: PermissionInfo[],
@@ -15,18 +17,47 @@ export function usePermissionRevokes(
   return useCallback(
     async (permissionId: string): Promise<boolean> => {
       const permission = findPermissionById(permissions, permissionId);
-      if (!permission?.originPatterns?.length) {
+      const originPatterns = permission?.originPatterns?.length
+        ? permission.originPatterns
+        : permission?.originPattern
+          ? [permission.originPattern]
+          : [];
+      if (!permission || originPatterns.length === 0) {
         return false;
       }
 
-      const removed = await removeOriginPermissions(permission.originPatterns);
-      if (removed) {
+      if (permission.type === 'file') {
+        await setLocalFileAccessOptIn(false);
+      }
+      let removed = false;
+      let removalError: unknown;
+      try {
+        removed = await removeOriginPermissions(originPatterns);
+      } catch (error) {
+        removalError = error;
+      }
+      const effectiveRemoval = permission.type === 'file' ? true : removed;
+      let reconciliationError: unknown;
+      if (permission.type === 'file') {
+        try {
+          await registerEffectiveFileSchemeAccess();
+        } catch (error) {
+          reconciliationError = error;
+        }
+      }
+      if (removalError) {
+        throw removalError;
+      }
+      if (reconciliationError) {
+        throw reconciliationError;
+      }
+      if (effectiveRemoval) {
         setPermissions((currentPermissions) =>
           applyPermissionState(currentPermissions, (item) => item.id === permission.id, 'prompt')
         );
       }
 
-      return removed;
+      return effectiveRemoval;
     },
     [permissions, setPermissions]
   );

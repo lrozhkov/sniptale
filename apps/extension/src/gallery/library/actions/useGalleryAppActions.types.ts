@@ -3,8 +3,8 @@ import type {
   MediaHubImportConflictStrategy,
   MediaHubLocalBackupSummary,
 } from '../../../workflows/media-hub-backup/index';
-import type { StorageCleanupGroup } from '../../../features/media-hub/types';
 import type { GalleryItem } from '../items';
+import type { MediaFileImportConflictStrategy } from '../import-types';
 
 export interface UseGalleryAppActionsResult {
   backup: {
@@ -16,15 +16,19 @@ export interface UseGalleryAppActionsResult {
   importing: {
     cancelActiveImport: () => void;
     closePendingImport: () => void;
+    closePendingMediaImport: () => void;
+    confirmMediaFileImport: (strategy: MediaFileImportConflictStrategy) => Promise<void>;
     dismissActiveImport: () => void;
     importBackup: (strategy: MediaHubImportConflictStrategy) => Promise<void>;
     importSelectedFile: (file: File | null) => Promise<void>;
+    importMediaFiles: (files: File[]) => Promise<void>;
   };
   preview: {
     close: () => Promise<void>;
     copy: () => void;
     download: () => void;
     downloadOriginal: () => void;
+    navigate: (target: GalleryItem) => Promise<void>;
     openInEditor: (item: GalleryItem) => void;
     openSnapshotScreenshotInEditor: () => void;
     resetChanges: () => void;
@@ -33,11 +37,9 @@ export interface UseGalleryAppActionsResult {
     saveMetadata: () => Promise<void>;
   };
   selection: {
-    applyTag: () => Promise<void>;
+    applyTag: (tag?: string) => Promise<void>;
     deleteMany: (targets: GalleryItem[]) => Promise<void>;
+    downloadBackup: () => Promise<void>;
     downloadZip: () => Promise<void>;
-  };
-  storage: {
-    cleanup: (group: StorageCleanupGroup) => Promise<void>;
   };
 }

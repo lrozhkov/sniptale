@@ -67,23 +67,16 @@ function buildVideoEditorProjectUrl(
 
 function buildGalleryPageUrl(options: {
   folder?: string | null;
-  openStorageManager?: boolean;
   recordingId?: string | null;
   scope?: 'library' | 'temporary';
 }) {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/gallery/index.html'));
-  if (options.folder) {
-    url.searchParams.set('folder', options.folder);
-  }
   if (options.recordingId) {
-    url.searchParams.set('folder', 'recording');
     url.searchParams.set('recordingId', options.recordingId);
+  } else {
+    if (options.folder) url.searchParams.set('folder', options.folder);
+    if (options.scope) url.searchParams.set('scope', options.scope);
   }
-  if (options.openStorageManager) {
-    url.searchParams.set('storageManager', '1');
-  }
-  if (options.scope) url.searchParams.set('scope', options.scope);
-
   return url.toString();
 }
 
@@ -132,6 +125,11 @@ export async function openExtensionShortcutsPage(): Promise<void> {
   await browserTabs.create({ url: 'chrome://extensions/shortcuts' });
 }
 
+export async function openExtensionDetailsPage(): Promise<void> {
+  const extensionId = new URL(runtimeInfo.getURL('')).host;
+  await browserTabs.create({ url: `chrome://extensions/?id=${encodeURIComponent(extensionId)}` });
+}
+
 export async function openLegacySettingsPage(section: LegacySettingsSection): Promise<void> {
   await openSettingsUrl(buildLegacySettingsPageUrl(section));
 }
@@ -163,7 +161,6 @@ export async function openCameraRecorderPage(params: {
 export async function openGalleryPage(
   options: {
     folder?: 'screenshot' | 'recording';
-    openStorageManager?: boolean;
     recordingId?: string | null;
     scope?: 'library' | 'temporary';
   } = {}

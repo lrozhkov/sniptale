@@ -10,10 +10,23 @@ import {
   requestOriginPermission,
 } from './request';
 
-const { containsMock, downloadsAvailableMock, requestMock } = vi.hoisted(() => ({
+const {
+  containsMock,
+  downloadsAvailableMock,
+  fileAccessOptInMock,
+  isFileSchemeAccessAllowedMock,
+  requestMock,
+} = vi.hoisted(() => ({
   containsMock: vi.fn(),
   downloadsAvailableMock: vi.fn(),
+  fileAccessOptInMock: vi.fn(),
+  isFileSchemeAccessAllowedMock: vi.fn(),
   requestMock: vi.fn(),
+}));
+
+vi.mock('../../../../../../composition/persistence/settings/file-scheme-consent', () => ({
+  hasLocalFileAccessOptIn: fileAccessOptInMock,
+  setLocalFileAccessOptIn: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/downloads', (_importOriginal) => ({
@@ -25,6 +38,7 @@ vi.mock('@sniptale/platform/browser/downloads', (_importOriginal) => ({
 vi.mock('@sniptale/platform/browser/permissions', (_importOriginal) => ({
   browserPermissions: {
     contains: containsMock,
+    isFileSchemeAccessAllowed: isFileSchemeAccessAllowedMock,
     request: requestMock,
   },
 }));
@@ -44,6 +58,8 @@ beforeEach(() => {
   containsMock.mockReset();
   downloadsAvailableMock.mockReset();
   requestMock.mockReset();
+  isFileSchemeAccessAllowedMock.mockReset().mockResolvedValue(false);
+  fileAccessOptInMock.mockReset().mockResolvedValue(false);
 
   defineNavigatorValue('clipboard', {
     write: vi.fn(),
@@ -90,6 +106,7 @@ it('reads permission snapshot across microphone, origin, and camera states', asy
     { id: 'origins', state: 'prompt' },
     { id: 'microphone', state: 'granted' },
     { id: 'camera', state: 'granted' },
+    { id: 'localFiles', state: 'prompt' },
   ]);
 });
 

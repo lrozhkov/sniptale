@@ -4,14 +4,15 @@ import type { GalleryItem } from '../../items';
 export type GalleryStateOverride = Partial<GalleryAppState> & {
   activeImport?: GalleryAppState['storage']['activeImport'];
   allTags?: GalleryAppState['derived']['allTags'];
-  cleanupReport?: GalleryAppState['storage']['cleanupReport'];
   confirmDialog?: GalleryAppState['storage']['confirmDialog'];
   counts?: GalleryAppState['derived']['counts'];
   filteredItems?: GalleryAppState['derived']['filteredItems'];
+  facets?: GalleryAppState['derived']['facets'];
   filenameDraft?: string;
   folderFilter?: GalleryAppState['filters']['folderFilter'];
   pendingExport?: GalleryAppState['storage']['pendingExport'];
   pendingImport?: GalleryAppState['storage']['pendingImport'];
+  pendingMediaImport?: GalleryAppState['storage']['pendingMediaImport'];
   previewDraft?: GalleryAppState['preview']['draft'];
   previewInspectorCollapsed?: boolean;
   previewItem?: GalleryItem | null;
@@ -20,7 +21,6 @@ export type GalleryStateOverride = Partial<GalleryAppState> & {
   selectedItems?: GalleryAppState['selection']['selectedItems'];
   search?: GalleryAppState['filters']['search'];
   selectionTagDraft?: GalleryAppState['selection']['selectionTagDraft'];
-  showStorageManager?: GalleryAppState['storage']['showStorageManager'];
   sortMode?: GalleryAppState['filters']['sortMode'];
   storageInfo?: GalleryAppState['storage']['storageInfo'];
   tagDraft?: string;
@@ -66,8 +66,10 @@ function haveLegacyDraftsChanged(overrides: GalleryStateOverride) {
 function createGalleryDerivedState(overrides: GalleryStateOverride): GalleryAppState['derived'] {
   return {
     activeStorageBarClass: '',
+    allItems: overrides.filteredItems ?? [],
     allTags: overrides.allTags ?? [],
     counts: overrides.counts ?? { all: 0, screenshot: 0, recording: 0, export: 0, scenario: 0 },
+    facets: overrides.facets ?? [],
     filteredItems: overrides.filteredItems ?? [],
     gridMetrics: { columnCount: 1, startRow: 0, totalRows: 0 },
     gridWidth: 1200,
@@ -94,9 +96,18 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
     derived: createGalleryDerivedState(overrides),
     filters: {
       activeTags: [],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
       folderFilter: overrides.folderFilter ?? 'all',
       search: overrides.search ?? '',
-      scope: overrides.filters?.scope ?? 'library',
+      scope: overrides.filters?.scope ?? 'all',
       sortMode: overrides.sortMode ?? 'newest',
       ...overrides.filters,
     },
@@ -111,13 +122,12 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
     storage: {
       activeImport: overrides.activeImport ?? null,
       banner: null,
-      cleanupReport: overrides.cleanupReport ?? null,
       confirmDialog: overrides.confirmDialog ?? null,
       isBusy: false,
       isLoading: false,
       pendingExport: overrides.pendingExport ?? null,
       pendingImport: overrides.pendingImport ?? null,
-      showStorageManager: overrides.showStorageManager ?? false,
+      pendingMediaImport: overrides.pendingMediaImport ?? null,
       storageInfo: overrides.storageInfo ?? null,
       ...overrides.storage,
     },

@@ -13,12 +13,20 @@ it('accepts only a window capture surface on recording start', () => {
     settings: DEFAULT_VIDEO_SETTINGS,
     streamId: 'stream-1',
     streamInstanceId: 'instance-1',
+    sourceContext: {
+      favicon: 'https://example.com/favicon.ico',
+      title: 'Example page',
+      url: 'https://example.com/article',
+    },
     surface: { height: 720, presetId: 'window-hd', target: 'window', width: 1280 },
     type: VideoMessageType.OFFSCREEN_START_RECORDING,
   } as const;
   expect(contract.parseRequest(message)).toEqual(message);
   expect(() =>
     contract.parseRequest({ ...message, surface: { ...message.surface, target: 'viewport' } })
+  ).toThrow(/OFFSCREEN_START_RECORDING/);
+  expect(() =>
+    contract.parseRequest({ ...message, sourceContext: { ...message.sourceContext, url: 42 } })
   ).toThrow(/OFFSCREEN_START_RECORDING/);
 });
 

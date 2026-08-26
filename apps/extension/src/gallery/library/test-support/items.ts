@@ -27,6 +27,9 @@ export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): Gall
     sourceFavicon: overrides.sourceFavicon ?? null,
     tags: overrides.tags ?? [],
     hasThumbnail: overrides.hasThumbnail ?? false,
+    ...(overrides.imageContentState === undefined
+      ? {}
+      : { imageContentState: overrides.imageContentState }),
     ...(overrides.lifecycle ? { lifecycle: overrides.lifecycle } : {}),
     ...(overrides.presentationRevision !== undefined
       ? { presentationRevision: overrides.presentationRevision }
@@ -34,6 +37,8 @@ export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): Gall
     ...(overrides.workspaceRevision !== undefined
       ? { workspaceRevision: overrides.workspaceRevision }
       : {}),
+    ...(overrides.recordingGroup ? { recordingGroup: overrides.recordingGroup } : {}),
+    ...(overrides.recordingGroupView ? { recordingGroupView: overrides.recordingGroupView } : {}),
     type: overrides.type ?? 'media',
   };
 }
@@ -137,6 +142,7 @@ export function createVideoProjectItem(
       overrides.project?.thumbnailId ?? `video-project:${overrides.entityId ?? 'video-project-1'}`,
     thumbnailSourceMediaId: overrides.thumbnailSourceMediaId ?? 'project-asset:asset-1',
     retentionKind: overrides.project?.retentionKind ?? 'ordinary',
+    recordingIds: overrides.project?.recordingIds ?? [],
     trackCount: overrides.project?.trackCount ?? 1,
     updatedAt: overrides.updatedAt ?? 2,
     width: overrides.width ?? 1280,

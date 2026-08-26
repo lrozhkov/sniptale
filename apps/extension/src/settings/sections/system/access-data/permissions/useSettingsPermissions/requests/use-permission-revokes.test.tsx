@@ -5,9 +5,26 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { LucideIcon } from 'lucide-react';
 
-const { applyPermissionStateMock, removeOriginPermissionsMock } = vi.hoisted(() => ({
+const {
+  applyPermissionStateMock,
+  registerEffectiveFileSchemeAccessMock,
+  removeOriginPermissionsMock,
+  setLocalFileAccessOptInMock,
+} = vi.hoisted(() => ({
   applyPermissionStateMock: vi.fn(),
+  registerEffectiveFileSchemeAccessMock: vi.fn(),
   removeOriginPermissionsMock: vi.fn(),
+  setLocalFileAccessOptInMock: vi.fn(),
+}));
+
+vi.mock('../../../../../../../composition/persistence/settings/file-scheme-consent', () => ({
+  hasLocalFileAccessOptIn: vi.fn(),
+  setLocalFileAccessOptIn: setLocalFileAccessOptInMock,
+}));
+
+vi.mock('./request-actions/request-origin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./request-actions/request-origin')>()),
+  registerEffectiveFileSchemeAccess: registerEffectiveFileSchemeAccessMock,
 }));
 
 vi.mock('../../permissions-lib', async (importOriginal) => ({
@@ -61,6 +78,61 @@ beforeEach(() => {
   );
   removeOriginPermissionsMock.mockReset();
   removeOriginPermissionsMock.mockResolvedValue(true);
+  registerEffectiveFileSchemeAccessMock.mockReset().mockResolvedValue(false);
+  setLocalFileAccessOptInMock.mockReset().mockResolvedValue(undefined);
+});
+
+it('revokes local-file access through its explicit origin grant', async () => {
+  const filePermission: PermissionInfo = {
+    icon: PermissionFixtureIcon,
+    id: 'localFiles',
+    originPattern: 'file:///',
+    state: 'granted',
+    type: 'file',
+  };
+  await renderHarness([filePermission]);
+
+  await expect(latestRevokePermission?.('localFiles')).resolves.toBe(true);
+
+  expect(removeOriginPermissionsMock).toHaveBeenCalledWith(['file:///']);
+  expect(setLocalFileAccessOptInMock).toHaveBeenCalledWith(false);
+  expect(registerEffectiveFileSchemeAccessMock).toHaveBeenCalledOnce();
+  expect(currentPermissions[0]?.state).toBe('prompt');
+});
+
+it('revokes product local-file access even when broader browser authority remains', async () => {
+  const filePermission: PermissionInfo = {
+    icon: PermissionFixtureIcon,
+    id: 'localFiles',
+    originPattern: 'file:///',
+    state: 'granted',
+    type: 'file',
+  };
+  removeOriginPermissionsMock.mockResolvedValue(false);
+  await renderHarness([filePermission]);
+
+  await expect(latestRevokePermission?.('localFiles')).resolves.toBe(true);
+
+  expect(setLocalFileAccessOptInMock).toHaveBeenCalledWith(false);
+  expect(registerEffectiveFileSchemeAccessMock).toHaveBeenCalledOnce();
+  expect(currentPermissions[0]?.state).toBe('prompt');
+});
+
+it('still reconciles the file shim and preserves an origin-removal error', async () => {
+  const filePermission: PermissionInfo = {
+    icon: PermissionFixtureIcon,
+    id: 'localFiles',
+    originPattern: 'file:///',
+    state: 'granted',
+    type: 'file',
+  };
+  removeOriginPermissionsMock.mockRejectedValue(new Error('origin removal failed'));
+  await renderHarness([filePermission]);
+
+  await expect(latestRevokePermission?.('localFiles')).rejects.toThrow('origin removal failed');
+
+  expect(setLocalFileAccessOptInMock).toHaveBeenCalledWith(false);
+  expect(registerEffectiveFileSchemeAccessMock).toHaveBeenCalledOnce();
 });
 
 afterEach(() => {

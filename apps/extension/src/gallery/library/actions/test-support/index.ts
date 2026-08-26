@@ -1,5 +1,4 @@
 export { createController } from './controller';
-export { createCleanupGroup } from './fixtures';
 export {
   createMediaItem,
   createScenarioExportItem,

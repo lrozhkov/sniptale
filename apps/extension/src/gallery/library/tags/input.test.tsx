@@ -47,7 +47,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('submits tags through change, Enter, and add-button interactions', () => {
+it('submits a tag through Enter without rendering a duplicate add button', () => {
   const onChange = vi.fn();
   const onSubmit = vi.fn();
 
@@ -64,22 +64,35 @@ it('submits tags through change, Enter, and add-button interactions', () => {
   });
 
   const input = container?.querySelector('input');
-  const addButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-    button.textContent?.includes('common.actions.add')
-  );
-
-  if (!(input instanceof HTMLInputElement) || !(addButton instanceof HTMLButtonElement)) {
-    throw new Error('Expected gallery tag input controls');
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error('Expected gallery tag input');
   }
+
+  expect(container?.textContent).not.toContain('common.actions.add');
 
   setInputValue(input, 'alpha');
   act(() => {
-    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    addButton.click();
+    root?.render(
+      <GalleryTagInput
+        allTags={['alpha', 'beta']}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        placeholder="Search tags"
+        value="alpha"
+      />
+    );
+  });
+  const updatedInput = container?.querySelector('input');
+  if (!(updatedInput instanceof HTMLInputElement)) {
+    throw new Error('Expected updated gallery tag input');
+  }
+  act(() => {
+    updatedInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
   });
 
   expect(onChange).toHaveBeenCalledWith('alpha');
-  expect(onSubmit).toHaveBeenCalledTimes(2);
+  expect(onSubmit).toHaveBeenCalledOnce();
+  expect(onSubmit).toHaveBeenCalledWith('alpha');
 });
 
 it('shows filtered suggestions and submits the clicked suggestion', () => {
@@ -107,9 +120,7 @@ it('shows filtered suggestions and submits the clicked suggestion', () => {
     input.focus();
   });
 
-  const suggestionButtons = Array.from(container?.querySelectorAll('button') ?? []).filter(
-    (button) => button.textContent?.includes('gallery.preview.suggestionLabel')
-  );
+  const suggestionButtons = Array.from(container?.querySelectorAll('[role="option"]') ?? []);
   const alphaButton = suggestionButtons.find((button) => button.textContent?.includes('alpha'));
 
   if (!(alphaButton instanceof HTMLButtonElement)) {
@@ -118,12 +129,97 @@ it('shows filtered suggestions and submits the clicked suggestion', () => {
 
   expect(container?.textContent).toContain('beta');
   expect(container?.textContent).not.toContain('gamma');
+  expect(container?.textContent).not.toContain('gallery.preview.suggestionLabel');
+  expect(alphaButton.parentElement?.className).toContain('max-h-48');
+  expect(alphaButton.parentElement?.className).toContain('overflow-y-auto');
+  expect(alphaButton.parentElement?.parentElement?.className).toContain('z-50');
 
   act(() => {
     alphaButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     input.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
     vi.runAllTimers();
   });
+
+  expect(onSubmit).toHaveBeenCalledWith('alpha');
+});
+
+it('offers one explicit create action for a new filtered tag', () => {
+  const onSubmit = vi.fn();
+
+  act(() => {
+    root?.render(
+      <GalleryTagInput
+        allTags={['alpha', 'beta']}
+        onChange={vi.fn()}
+        onSubmit={onSubmit}
+        placeholder="Search tags"
+        value="release"
+      />
+    );
+  });
+
+  const input = container?.querySelector('input');
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error('Expected gallery tag input');
+  }
+
+  act(() => input.focus());
+
+  const createButton = Array.from(container?.querySelectorAll('[role="option"]') ?? []).find(
+    (option) => option.textContent?.includes('gallery.app.createTag')
+  );
+  if (!(createButton instanceof HTMLButtonElement)) {
+    throw new Error('Expected create-tag option');
+  }
+
+  expect(container?.textContent?.match(/gallery\.app\.createTag/g)).toHaveLength(1);
+
+  act(() => {
+    createButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+
+  expect(onSubmit).toHaveBeenCalledWith('release');
+});
+
+it('keeps suggestion selection as a draft until the explicit apply action', () => {
+  const onChange = vi.fn();
+  const onSubmit = vi.fn();
+
+  const render = (value: string) => {
+    act(() => {
+      root?.render(
+        <GalleryTagInput
+          allTags={['alpha', 'beta']}
+          explicitSubmit
+          onChange={onChange}
+          onSubmit={onSubmit}
+          placeholder="Enter tag"
+          value={value}
+        />
+      );
+    });
+  };
+
+  render('a');
+  const input = container?.querySelector('input');
+  if (!(input instanceof HTMLInputElement)) throw new Error('Expected gallery tag input');
+  act(() => input.focus());
+  const alphaButton = Array.from(container?.querySelectorAll('[role="option"]') ?? []).find(
+    (option) => option.textContent === 'alpha'
+  );
+  if (!(alphaButton instanceof HTMLButtonElement)) throw new Error('Expected alpha suggestion');
+
+  act(() => alphaButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+
+  expect(onChange).toHaveBeenCalledWith('alpha');
+  expect(onSubmit).not.toHaveBeenCalled();
+
+  render('alpha');
+  const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === 'gallery.app.apply'
+  );
+  if (!(applyButton instanceof HTMLButtonElement)) throw new Error('Expected apply action');
+  act(() => applyButton.click());
 
   expect(onSubmit).toHaveBeenCalledWith('alpha');
 });

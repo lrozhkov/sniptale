@@ -10,6 +10,7 @@ This document explains high-impact grants and manifest topology. `tooling/config
 | --- | --- | --- | --- |
 | Current-tab capture and page tooling | `activeTab`, `scripting` | capture editor, page-access service, browser scripting adapter | Current-tab authority only; inject the full content runtime through page access. |
 | Persistent page tooling and visible capture | optional `<all_urls>` plus dynamic HTTP/HTTPS registration | page-access service, visible capture | User-approved optional access; compact shim registration only, full runtime remains lazy. |
+| Local-file page tooling | dedicated Settings opt-in, optional `file:///`, and Chrome's separate file-URL access setting | page-access service, Settings permissions | The browser switch is enabled before the runtime request; separate dynamic file registration is removed when the product opt-in is revoked. |
 | Extension pages | no host permission | extension page entrypoints | Settings, gallery, editors, popup, and snapshot viewer remain usable without host access. |
 | Browser-window size presets | `system.display` | display adapter and capture-surface owner | Read display bounds and work areas only; presets that do not fit are disabled, and display settings are never changed. |
 | Tab recording | `tabCapture` | tab-capture adapter, capture mode | Required for tab and tab-crop recording modes. |
@@ -29,9 +30,11 @@ This document explains high-impact grants and manifest topology. `tooling/config
 
 1. Do not reintroduce required `<all_urls>` or a static all-frame source content script.
 2. Dynamic registration follows optional host state; denial prevents registration and revocation removes owner-created registrations.
-3. Capability gates live at the owning browser/runtime seam before any permission becomes optional.
-4. Optionalize `downloads` only after all sinks have request and failure behavior; then evaluate `desktopCapture` and `tabCapture` independently.
-5. Keep web-accessible resources exact. Never use `assets/*`, `fonts/*`, or expose injected runtime bundles.
+3. Local-file access additionally follows `extension.isAllowedFileSchemeAccess()`; an optional origin grant alone is not effective authority.
+4. Capability gates live at the owning browser/runtime seam before any permission becomes optional.
+5. Optionalize `downloads` only after all sinks have request and failure behavior; then evaluate `desktopCapture` and `tabCapture` independently.
+6. Keep web-accessible resources exact. Never use `assets/*`, `fonts/*`, or expose injected runtime bundles.
+7. Keep the local-file permission scope as Chrome's special `file:///` grant, but use the origin-only `file:///*` match required by `web_accessible_resources`.
 
 ## Review rule
 

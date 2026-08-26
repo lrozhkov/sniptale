@@ -39,6 +39,7 @@ function createProps(overrides: Partial<Parameters<typeof GallerySelectionBar>[0
     onClearSelection: vi.fn(),
     onDeleteMany: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
+    onSelectionBackup: vi.fn(),
     onSelectionZip: vi.fn(),
     selectedItems: [],
     selectedSize: 0,
@@ -88,29 +89,60 @@ it('renders selected-state actions and forwards callbacks', () => {
 
   const input = container?.querySelector('input');
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-  const applyButton = buttons.find((button) => button.textContent?.includes('common.actions.add'));
-  const zipButton = buttons.find((button) => button.textContent?.includes('ZIP'));
-  const deleteButton = buttons.find((button) =>
-    button.textContent?.includes('common.actions.delete')
+  const backupButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.selectionBackup'
   );
-  const clearButton = buttons.find((button) =>
-    button.textContent?.includes('gallery.app.clearSelection')
+  const zipButton = buttons.find((button) => button.getAttribute('aria-label') === 'ZIP');
+  const deleteButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'common.actions.delete'
+  );
+  const clearButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.clearSelection'
   );
 
-  if (!input || !applyButton || !zipButton || !deleteButton || !clearButton) {
+  if (!input || !backupButton || !zipButton || !deleteButton || !clearButton) {
     throw new Error('Expected selection bar controls');
   }
 
+  const selectionBar = input.closest('.flex-nowrap');
+  expect(selectionBar?.className).toContain('flex-nowrap');
+  expect(backupButton.className).toContain('!h-8');
+  expect(backupButton.className).toContain('!min-h-8');
+  expect(backupButton.className).toContain('!rounded-[8px]');
+  expect(Array.from(selectionBar?.children ?? []).indexOf(clearButton)).toBeLessThan(
+    Array.from(selectionBar?.children ?? []).indexOf(backupButton)
+  );
+
+  act(() => updateInputValue(input, 'updated-tag'));
+  renderSelectionBar({ ...props, selectionTagDraft: 'updated-tag' });
+
+  const updatedInput = container?.querySelector('input');
+  if (!(updatedInput instanceof HTMLInputElement)) {
+    throw new Error('Expected updated selection tag input');
+  }
+  const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === 'gallery.app.apply'
+  );
+  if (!(applyButton instanceof HTMLButtonElement)) {
+    throw new Error('Expected explicit apply-tag action');
+  }
+
   act(() => {
-    updateInputValue(input, 'updated-tag');
-    applyButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    updatedInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+  });
+  expect(props.onApplySelectionTag).not.toHaveBeenCalled();
+
+  act(() => {
+    applyButton.click();
+    backupButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     zipButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     clearButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 
   expect(props.onSelectionTagDraftChange).toHaveBeenCalled();
-  expect(props.onApplySelectionTag).toHaveBeenCalledTimes(1);
+  expect(props.onApplySelectionTag).toHaveBeenCalledWith('updated-tag');
+  expect(props.onSelectionBackup).toHaveBeenCalledTimes(1);
   expect(props.onSelectionZip).toHaveBeenCalledTimes(1);
   expect(props.onDeleteMany).toHaveBeenCalledWith(selectedItems);
   expect(props.onClearSelection).toHaveBeenCalledTimes(1);

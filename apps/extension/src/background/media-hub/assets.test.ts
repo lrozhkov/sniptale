@@ -48,7 +48,7 @@ function setupScreenshotBridgeTest() {
     const translations: Record<string, string> = {
       'shared.storage.lowSpaceMiddle': 'available.',
       'shared.storage.lowSpacePrefix': 'Not enough storage:',
-      'shared.storage.lowSpaceSuffix': 'Free up space and try again.',
+      'shared.storage.lowSpaceSuffix': 'Delete unneeded items in Library and try again.',
     };
 
     return translations[key] ?? key;
@@ -110,7 +110,7 @@ async function verifiesLocalizedLowHeadroomCopy() {
   });
 
   await expect(saveScreenshotToMediaHubFromDataUrl('data', 'shot.png')).rejects.toThrow(
-    'Not enough storage: 20B available. Free up space and try again.'
+    'Not enough storage: 20B available. Delete unneeded items in Library and try again.'
   );
   expect(mocks.saveAssetMock).not.toHaveBeenCalled();
 }

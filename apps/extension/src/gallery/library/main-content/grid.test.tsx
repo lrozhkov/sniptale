@@ -73,6 +73,9 @@ afterEach(() => {
 it('renders loading and empty states for gallery content', () => {
   renderGrid(createProps({ isLoading: true }));
   expect(container?.textContent).toContain('gallery.app.loading');
+  expect(container?.querySelector('[data-ui="gallery.content.surface"]')?.className).toContain(
+    'rounded-[var(--sniptale-radius-lg)]'
+  );
 
   renderGrid(createProps());
   expect(container?.textContent).toContain('gallery.app.emptyTitle');
@@ -98,7 +101,9 @@ it('renders visible items and wires preview and selection actions', () => {
 
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
   const selectionButton = buttons.find((button) => button.className.includes('h-8 w-8'));
-  const previewButton = buttons.find((button) => button.textContent?.includes('capture.png'));
+  const previewButton = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="capture.png"]'
+  );
 
   if (!selectionButton || !previewButton) {
     throw new Error('Expected gallery grid item buttons');

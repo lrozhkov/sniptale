@@ -8,6 +8,9 @@ function installChromePermissionsStub() {
   const onAdded = { addListener: vi.fn(), removeListener: vi.fn() };
   const onRemoved = { addListener: vi.fn(), removeListener: vi.fn() };
   const chromeStub = {
+    extension: {
+      isAllowedFileSchemeAccess: vi.fn((callback) => callback(true)),
+    },
     permissions: {
       contains: vi.fn((_permissions, callback) => callback(true)),
       getAll: vi.fn((callback) => callback({ origins: ['https://example.test/*'] })),
@@ -44,6 +47,7 @@ it('checks, requests, and subscribes to permission events', async () => {
   });
   await expect(browserPermissions.request(permissions)).resolves.toBe(false);
   await expect(browserPermissions.remove(permissions)).resolves.toBe(true);
+  await expect(browserPermissions.isFileSchemeAccessAllowed()).resolves.toBe(true);
 
   const unsubscribeAdded = browserPermissions.subscribeToAdded(addedListener);
   const unsubscribeRemoved = browserPermissions.subscribeToRemoved(removedListener);
@@ -52,6 +56,7 @@ it('checks, requests, and subscribes to permission events', async () => {
   expect(chromeStub.permissions.getAll).toHaveBeenCalledWith(expect.any(Function));
   expect(chromeStub.permissions.request).toHaveBeenCalledWith(permissions, expect.any(Function));
   expect(chromeStub.permissions.remove).toHaveBeenCalledWith(permissions, expect.any(Function));
+  expect(chromeStub.extension.isAllowedFileSchemeAccess).toHaveBeenCalledWith(expect.any(Function));
   expect(onAdded.addListener).toHaveBeenCalledWith(addedListener);
   expect(onRemoved.addListener).toHaveBeenCalledWith(removedListener);
 
@@ -72,6 +77,9 @@ it('rejects permission operations when chrome.permissions is unavailable', async
   await expect(browserPermissions.getAll()).rejects.toThrow('chrome.permissions is unavailable');
   await expect(browserPermissions.remove(permissions)).rejects.toThrow(
     'chrome.permissions is unavailable'
+  );
+  await expect(browserPermissions.isFileSchemeAccessAllowed()).rejects.toThrow(
+    'chrome.extension.isAllowedFileSchemeAccess is unavailable'
   );
 });
 

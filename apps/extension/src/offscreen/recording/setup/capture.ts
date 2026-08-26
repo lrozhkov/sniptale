@@ -44,6 +44,7 @@ async function acquireDesktopStream(settings: VideoRecordingSettings) {
     return {
       stream: cached.stream,
       cursorCaptureMode: resolveCursorCaptureMode(cached.stream, settings, CaptureMode.SCREEN),
+      sourceLabel: cached.label,
     };
   }
 
@@ -76,6 +77,7 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
   return {
     stream,
     cursorCaptureMode: null,
+    sourceLabel: stream.getVideoTracks()[0]?.label || null,
   };
 }
 
@@ -193,6 +195,7 @@ async function acquireTabStream({
   return {
     stream,
     cursorCaptureMode,
+    sourceLabel: stream.getVideoTracks()[0]?.label || null,
   };
 }
 

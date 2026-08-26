@@ -8,7 +8,7 @@ import type { SaveEditorRenderedImageOptions } from '../../document/file-actions
 
 interface SidebarSaveUtilityArgs {
   controller: Pick<ImageEditorController, 'exportDocument' | 'renderToDataUrl'>;
-  confirmOpenStorageManager: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
+  confirmOpenLibrary: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
   defaultImagePresetId: string | null;
   hasImage: boolean;
   savePresets: SavePreset[];
@@ -26,7 +26,7 @@ export function buildSidebarSaveActions(args: SidebarSaveUtilityArgs) {
       await saveEditorRenderedImage(args.controller, options);
     } catch (error) {
       await maybeHandleEditorSaveFailure({
-        confirmOpenStorageManager: args.confirmOpenStorageManager,
+        confirmOpenLibrary: args.confirmOpenLibrary,
         error,
       });
       throw error;

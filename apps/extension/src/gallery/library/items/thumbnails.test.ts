@@ -78,6 +78,7 @@ it('returns existing thumbnails without rebuilding them', async () => {
     assetId: 'asset-1',
     blob: new Blob(['thumb'], { type: 'image/png' }),
     createdAt: 1,
+    generatorVersion: 2,
     updatedAt: 2,
     width: 320,
     height: 180,
@@ -91,6 +92,36 @@ it('returns existing thumbnails without rebuilding them', async () => {
   ).resolves.toEqual(existingThumbnail);
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
   expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
+});
+
+it('rebuilds legacy video thumbnails with the current renderer revision', async () => {
+  const legacyThumbnail = {
+    assetId: 'asset-1',
+    blob: new Blob(['blue-frame'], { type: 'image/webp' }),
+    createdAt: 1,
+    updatedAt: 2,
+    width: 320,
+    height: 180,
+  };
+  const videoBlob = new Blob(['video'], { type: 'video/webm' });
+  const rebuiltBlob = new Blob(['content-frame'], { type: 'image/webp' });
+  getMediaThumbnailMock.mockResolvedValue(legacyThumbnail);
+  getMediaAssetBlobMock.mockResolvedValue(videoBlob);
+  createVideoThumbnailBlobMock.mockResolvedValue(rebuiltBlob);
+
+  const result = await ensureGalleryItemThumbnail(
+    createMediaItem({ id: 'asset-1', kind: 'recording', mimeType: 'video/webm' })
+  );
+
+  expect(createVideoThumbnailBlobMock).toHaveBeenCalledWith(videoBlob, 320, 180);
+  expect(saveMediaThumbnailMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      assetId: 'asset-1',
+      blob: rebuiltBlob,
+      generatorVersion: 2,
+    })
+  );
+  expect(result?.generatorVersion).toBe(2);
 });
 
 it('deduplicates media thumbnail generation and persists the generated entry', async () => {
@@ -116,6 +147,7 @@ it('deduplicates media thumbnail generation and persists the generated entry', a
   expect(first).toEqual(second);
   expect(first).toMatchObject({
     assetId: 'asset-1',
+    generatorVersion: 2,
     width: 320,
     height: 180,
   });

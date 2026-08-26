@@ -32,7 +32,6 @@ export function GalleryApp() {
         controller={controller}
         actions={actions}
         messaging={galleryRuntimeMessaging}
-        onRefreshAll={handleRefreshAll}
         setViewMode={setViewMode}
         viewMode={viewMode}
       />

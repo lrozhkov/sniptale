@@ -12,6 +12,10 @@ import {
 } from '../assets';
 import type { StoredRecordingEntry } from './contracts';
 import {
+  parseRecordingGroupMember,
+  type RecordingGroupMember,
+} from '../../../features/media-hub/recording-groups';
+import {
   publishRecordingAssetJournal,
   RECORDING_ASSET_PUBLICATION_DOMAIN,
   recoverRecordingAssetPublications,
@@ -25,7 +29,9 @@ export interface SaveRecordingBatchInput {
   id: string;
   mimeType?: string;
   preparedAsset?: PreparedAssetObject;
+  recordingGroup?: RecordingGroupMember;
   storageClass?: LibraryStorageClass;
+  mediaMetadata?: StoredRecordingEntry['mediaMetadata'];
 }
 
 function validateInputs(inputs: readonly SaveRecordingBatchInput[]): void {
@@ -37,6 +43,24 @@ function validateInputs(inputs: readonly SaveRecordingBatchInput[]): void {
     if (ids.has(input.id)) throw new Error(`Duplicate recording ID in batch: ${input.id}.`);
     if ((input.blob ? 1 : 0) + (input.preparedAsset ? 1 : 0) !== 1) {
       throw new Error('Recording input must provide exactly one binary source.');
+    }
+    if (
+      input.recordingGroup !== undefined &&
+      parseRecordingGroupMember(input.recordingGroup) === null
+    ) {
+      throw new Error('Recording group member metadata is invalid.');
+    }
+    if (
+      input.mediaMetadata !== undefined &&
+      (input.mediaMetadata.kind !== 'video' ||
+        !Number.isFinite(input.mediaMetadata.width) ||
+        !Number.isFinite(input.mediaMetadata.height) ||
+        !Number.isFinite(input.mediaMetadata.duration) ||
+        input.mediaMetadata.width <= 0 ||
+        input.mediaMetadata.height <= 0 ||
+        input.mediaMetadata.duration < 0)
+    ) {
+      throw new Error('Recording media metadata is invalid.');
     }
     ids.add(input.id);
   }
@@ -81,6 +105,8 @@ function createEntries(
       id: input.id,
       lifecycle: createLibraryLifecycle(input.storageClass ?? 'library', createdAt),
       mimeType: prepared.ref.mimeType,
+      ...(input.recordingGroup ? { recordingGroup: input.recordingGroup } : {}),
+      ...(input.mediaMetadata ? { mediaMetadata: input.mediaMetadata } : {}),
       size: prepared.ref.size,
     };
   });

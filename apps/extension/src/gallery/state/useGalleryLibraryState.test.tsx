@@ -4,12 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const {
-  getStorageCleanupReportMock,
-  loadGalleryLibrarySnapshotMock,
-  subscribeToMediaHubEventsMock,
-} = vi.hoisted(() => ({
-  getStorageCleanupReportMock: vi.fn(),
+const { loadGalleryLibrarySnapshotMock, subscribeToMediaHubEventsMock } = vi.hoisted(() => ({
   loadGalleryLibrarySnapshotMock: vi.fn(),
   subscribeToMediaHubEventsMock: vi.fn(),
 }));
@@ -17,11 +12,6 @@ const {
 vi.mock('../../features/media-hub/events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../features/media-hub/events')>()),
   subscribeToMediaHubEvents: subscribeToMediaHubEventsMock,
-}));
-
-vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../workflows/media-hub/store')>()),
-  getStorageCleanupReport: getStorageCleanupReportMock,
 }));
 
 vi.mock('./use-gallery-library-snapshot', () => ({
@@ -43,7 +33,6 @@ beforeEach(() => {
     estimate: { usage: 10, quota: 20 },
     nextItems: [{ id: 'asset-1' }],
   });
-  getStorageCleanupReportMock.mockResolvedValue({ groups: [] });
   subscribeToMediaHubEventsMock.mockImplementation((handler) => {
     (subscribeToMediaHubEventsMock as unknown as { handler?: typeof handler }).handler = handler;
     return () => undefined;
@@ -66,7 +55,6 @@ function renderConnectedProbe(
     onBanner: (message: string) => void;
     onPreviewItemRefresh: (items: Array<{ id: string }>) => void;
     onSelectionRefresh: (items: Array<{ id: string }>) => void;
-    onStorageManagerOpen: () => void;
   }
 ) {
   function ConnectedProbe() {
@@ -75,7 +63,6 @@ function renderConnectedProbe(
         onBanner: handlers.onBanner,
         onPreviewItemRefresh: handlers.onPreviewItemRefresh,
         onSelectionRefresh: handlers.onSelectionRefresh,
-        onStorageManagerOpen: handlers.onStorageManagerOpen,
       })
     );
     return null;
@@ -104,26 +91,16 @@ function createSnapshotDeferred(nextItems: Array<{ id: string }>) {
   return { promise, resolve };
 }
 
-function createCleanupReportDeferred(potentialBytes: number) {
-  let resolve: () => void = () => undefined;
-  const promise = new Promise<{ groups: []; potentialBytes: number }>((promiseResolve) => {
-    resolve = () => promiseResolve({ groups: [], potentialBytes });
-  });
-  return { promise, resolve };
-}
-
 it('loads library state and reacts to media-hub events', async () => {
   const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
   const onBanner = vi.fn<(message: string) => void>();
   const onPreviewItemRefresh = vi.fn<(items: Array<{ id: string }>) => void>();
   const onSelectionRefresh = vi.fn<(items: Array<{ id: string }>) => void>();
-  const onStorageManagerOpen = vi.fn<() => void>();
 
   renderConnectedProbe(values, {
     onBanner,
     onPreviewItemRefresh,
     onSelectionRefresh,
-    onStorageManagerOpen,
   });
   await flushLibraryState();
 
@@ -144,27 +121,6 @@ it('loads library state and reacts to media-hub events', async () => {
   await flushLibraryState();
 
   expect(onBanner).toHaveBeenCalledWith('warning');
-  expect(onStorageManagerOpen).toHaveBeenCalled();
-});
-
-it('tolerates cleanup-report failures', async () => {
-  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
-  renderConnectedProbe(values, {
-    onBanner: vi.fn(),
-    onPreviewItemRefresh: vi.fn(),
-    onSelectionRefresh: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
-  });
-  await flushLibraryState();
-
-  getStorageCleanupReportMock.mockRejectedValueOnce(new Error('fail'));
-  renderConnectedProbe(values, {
-    onBanner: vi.fn(),
-    onPreviewItemRefresh: vi.fn(),
-    onSelectionRefresh: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
-  });
-  await flushLibraryState();
 });
 
 it('reports library refresh failures through the gallery banner without throwing', async () => {
@@ -177,7 +133,6 @@ it('reports library refresh failures through the gallery banner without throwing
     onBanner,
     onPreviewItemRefresh: vi.fn(),
     onSelectionRefresh: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
   });
   await flushLibraryState();
 
@@ -195,7 +150,6 @@ it('ignores stale refresh results that complete after a newer library snapshot',
     onBanner: vi.fn(),
     onPreviewItemRefresh: vi.fn(),
     onSelectionRefresh: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
   });
   await flushLibraryState();
 
@@ -224,7 +178,6 @@ it('keeps gallery items stable when a background refresh returns an equivalent s
     onBanner: vi.fn(),
     onPreviewItemRefresh,
     onSelectionRefresh,
-    onStorageManagerOpen: vi.fn(),
   });
   await flushLibraryState();
 
@@ -241,35 +194,4 @@ it('keeps gallery items stable when a background refresh returns an equivalent s
   expect(values.at(-1)?.items).toBe(initialItems);
   expect(onPreviewItemRefresh).toHaveBeenCalledTimes(1);
   expect(onSelectionRefresh).toHaveBeenCalledTimes(1);
-});
-
-it('ignores stale cleanup-report results that complete after a newer report', async () => {
-  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
-  const staleReport = createCleanupReportDeferred(1);
-  const freshReport = createCleanupReportDeferred(2);
-
-  renderConnectedProbe(values, {
-    onBanner: vi.fn(),
-    onPreviewItemRefresh: vi.fn(),
-    onSelectionRefresh: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
-  });
-  await flushLibraryState();
-
-  getStorageCleanupReportMock
-    .mockReturnValueOnce(staleReport.promise)
-    .mockReturnValueOnce(freshReport.promise);
-
-  await act(async () => {
-    await values.at(-1)?.refresh();
-  });
-  await act(async () => {
-    await values.at(-1)?.refresh();
-  });
-
-  await act(async () => freshReport.resolve());
-  expect(values.at(-1)?.cleanupReport?.potentialBytes).toBe(2);
-
-  await act(async () => staleReport.resolve());
-  expect(values.at(-1)?.cleanupReport?.potentialBytes).toBe(2);
 });

@@ -101,6 +101,7 @@ function root(revision: number) {
     filename: 'capture.png',
     height: 80,
     id: 'image-1',
+    imageContentState: revision === 0 ? ('original' as const) : ('edited' as const),
     kind: 'image' as const,
     lifecycle: createLibraryLifecycle('temporary', 2),
     mimeType: 'image/png',
@@ -244,7 +245,11 @@ it('commits a workspace with integer CAS while preserving the immutable original
     })
   );
   expect(puts.media).toHaveBeenCalledWith(
-    expect.objectContaining({ blob: media.blob, workspaceRevision: 3 })
+    expect.objectContaining({
+      blob: media.blob,
+      imageContentState: 'edited',
+      workspaceRevision: 3,
+    })
   );
 });
 
@@ -470,7 +475,12 @@ it('restores the immutable original as a new current workspace revision', async 
     })
   );
   expect(puts.media).toHaveBeenCalledWith(
-    expect.objectContaining({ id: media.id, workspaceRevision: 3, blob: media.blob })
+    expect.objectContaining({
+      blob: media.blob,
+      id: media.id,
+      imageContentState: 'original',
+      workspaceRevision: 3,
+    })
   );
 });
 
@@ -535,6 +545,7 @@ it('saves a complete library copy under a new aggregate id', async () => {
     expect.objectContaining({
       blob: expect.any(Blob),
       id: 'image-copy',
+      imageContentState: 'edited',
       lifecycle: expect.objectContaining({ storageClass: 'library' }),
       workspaceRevision: 1,
     })
@@ -578,6 +589,9 @@ it('copies an original-only aggregate by synthesizing its first workspace', asyn
       document: expect.any(Object),
       revision: 1,
     })
+  );
+  expect(puts.media).toHaveBeenCalledWith(
+    expect.objectContaining({ id: 'image-copy', imageContentState: 'original' })
   );
 });
 
@@ -705,6 +719,7 @@ it('atomically saves unsaved editor state as a revision-one library copy', async
   expect(puts.media).toHaveBeenCalledWith(
     expect.objectContaining({
       id: 'stale-tab-copy',
+      imageContentState: 'edited',
       lifecycle: expect.objectContaining({ storageClass: 'library' }),
       sourceUrl: 'https://example.test/private',
       workspaceRevision: 1,

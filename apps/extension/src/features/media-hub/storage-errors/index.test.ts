@@ -87,12 +87,12 @@ beforeEach(() => {
   translateMock.mockReset();
   translateMock.mockImplementation((key: string) => {
     const translations: Record<string, string> = {
-      'gallery.storageManager.freeSpaceHint': 'Освободите место и повторите попытку.',
-      'gallery.storageManager.retryLaterHint': 'Повторите попытку через несколько секунд.',
-      'gallery.storageManager.writeDatabaseErrorBody': 'база медиа сейчас недоступна.',
-      'gallery.storageManager.writeDiskErrorBody': 'Chrome не смог записать данные на диск.',
-      'gallery.storageManager.writeQuotaErrorBody': 'локальное хранилище переполнено.',
-      'gallery.storageManager.writeQuotaErrorPrefix': 'Не удалось завершить операцию',
+      'gallery.storageErrors.reviewLibraryHint': 'Удалите ненужные материалы и повторите попытку.',
+      'gallery.storageErrors.retryLaterHint': 'Повторите попытку через несколько секунд.',
+      'gallery.storageErrors.databaseErrorBody': 'база медиа сейчас недоступна.',
+      'gallery.storageErrors.diskErrorBody': 'Chrome не смог записать данные на диск.',
+      'gallery.storageErrors.quotaErrorBody': 'локальное хранилище переполнено.',
+      'gallery.storageErrors.writeFailurePrefix': 'Не удалось завершить операцию',
       'shared.storage.lowSpaceMiddle': 'свободно.',
       'shared.storage.lowSpacePrefix': 'Недостаточно места:',
       'shared.storage.lowSpaceSuffix': 'Освободите место и повторите попытку.',
@@ -150,7 +150,7 @@ describe('storage-errors write guard', () => {
       'save capture',
       expect.stringContaining('локальное хранилище переполнено')
     );
-    expect(translateMock).toHaveBeenCalledWith('gallery.storageManager.writeQuotaErrorPrefix');
+    expect(translateMock).toHaveBeenCalledWith('gallery.storageErrors.writeFailurePrefix');
   });
 });
 

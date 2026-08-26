@@ -48,6 +48,10 @@ export function openInEditor(item: GalleryItem) {
   }
 
   if (!isGalleryMediaItem(item) || !isImageKind(item.kind)) {
+    if (isGalleryMediaItem(item) && item.recordingGroupView?.projectId) {
+      void openVideoEditorPage(item.recordingGroupView.projectId, null);
+      return;
+    }
     if (isGalleryMediaItem(item) && item.kind === 'web-archive') {
       void openWebSnapshotViewerPage(item.entityId ?? item.id);
     }
@@ -108,11 +112,16 @@ function getPreviewImageAggregate(controller: GalleryPreviewController) {
     : null;
 }
 
+function getEditedPreviewImageAggregate(controller: GalleryPreviewController) {
+  const item = getPreviewImageAggregate(controller);
+  return item?.imageContentState === 'edited' ? item : null;
+}
+
 export function downloadOriginalPreviewItem(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction
 ): Promise<void> {
-  const item = getPreviewImageAggregate(controller);
+  const item = getEditedPreviewImageAggregate(controller);
   if (!item) return Promise.resolve();
   return withBusy(async () => {
     const blob = await getMediaAssetBlob(item.entityId ?? item.id);
@@ -126,7 +135,7 @@ export function createRestoreOriginalAction(
   withBusy: GalleryBusyAction
 ) {
   return () => {
-    const item = getPreviewImageAggregate(controller);
+    const item = getEditedPreviewImageAggregate(controller);
     if (!item) return;
     openGalleryConfirmDialog(controller, {
       title: translate('gallery.preview.restoreOriginalTitle'),
@@ -143,6 +152,7 @@ export function createRestoreOriginalAction(
             item: current.item
               ? {
                   ...current.item,
+                  imageContentState: 'original',
                   presentationRevision: result.revision,
                   updatedAt: result.updatedAt,
                   workspaceRevision: result.revision,

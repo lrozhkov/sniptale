@@ -1,15 +1,12 @@
 import {
   addMediaLibraryEntryTagsSafely,
   deleteMediaLibraryAssetsBatchSafely,
-  deleteStorageCleanupCandidatesSafely,
 } from '../../../workflows/media-hub/store';
-import type { StorageCleanupGroup } from '../../../features/media-hub/types';
 import { translate } from '../../../platform/i18n';
 import {
   deleteScenarioProjectRecord,
   updateScenarioProjectRecordMetadata,
 } from '../../../composition/persistence/scenario/store/public';
-import { formatBytes } from '../../../platform/i18n/format-bytes';
 import type { GallerySelectionController } from './controller-types';
 import {
   isGalleryMediaItem,
@@ -20,7 +17,6 @@ import {
 } from '../items';
 import { deletePersistedVideoProject } from '../../../workflows/media-hub/video-projects';
 import { type GalleryBusyAction, openGalleryConfirmDialog } from './shared';
-import { exportMediaHubBackup } from '../../../workflows/media-hub-backup';
 
 function splitSelectableTargets(targets: GalleryItem[]) {
   return {
@@ -38,9 +34,8 @@ export function createDeleteManyAction(controller: GallerySelectionController) {
     }
 
     openGalleryConfirmDialog(controller, {
-      message:
-        `${translate('gallery.app.deleteManyPrefix')} ` +
-        `${selectableTargets.length} ${translate('gallery.app.deleteManySuffix')}`,
+      title: translate('gallery.app.deleteConfirmTitle'),
+      message: translate('gallery.app.deleteSelectedConfirm'),
       onConfirm: async () => {
         await withBusy(async () => {
           const { media, scenarios, videoProjects } = splitSelectableTargets(selectableTargets);
@@ -66,53 +61,6 @@ export function createDeleteManyAction(controller: GallerySelectionController) {
   };
 }
 
-export function createStorageCleanupAction(controller: GallerySelectionController) {
-  return async (group: StorageCleanupGroup, withBusy: GalleryBusyAction) => {
-    if (group.items.length === 0) {
-      return;
-    }
-
-    openGalleryConfirmDialog(controller, {
-      message:
-        `${group.title}: ${translate('gallery.app.storageCleanupDeletePrefix')} ` +
-        `${group.items.length} ${translate('gallery.app.storageCleanupDeleteMiddle')} ` +
-        `${formatBytes(group.potentialBytes, 2)}${translate('gallery.app.storageCleanupDeleteSuffix')} ` +
-        `${group.irreversibleLabel}.`,
-      onConfirm: async () => {
-        await withBusy(async () => {
-          await deleteStorageCleanupCandidatesSafely(group.items);
-          await controller.actions.storage.refresh();
-        });
-      },
-    });
-  };
-}
-
-export function createSelectionZipAction(controller: GallerySelectionController) {
-  return async (withBusy: GalleryBusyAction) => {
-    const mediaItems = controller.state.selection.selectedItems.filter(isGalleryMediaItem);
-    if (mediaItems.length === 0) {
-      return;
-    }
-    await withBusy(async () => {
-      await exportMediaHubBackup(
-        {
-          includeSourceMetadata: true,
-          includeTelemetry: true,
-          includeWebSnapshots: true,
-          scope: 'selected',
-          selected: {
-            mediaAssetIds: mediaItems.map((item) => item.entityId ?? item.id),
-            scenarioProjectIds: [],
-            videoProjectIds: [],
-          },
-        },
-        { filename: `media-hub-selection-${Date.now()}.zip` }
-      );
-    });
-  };
-}
-
 function getItemsMissingSelectionTag(
   controller: GallerySelectionController,
   normalizedTag: string
@@ -126,8 +74,8 @@ function getItemsMissingSelectionTag(
 }
 
 export function createApplySelectionTagAction(controller: GallerySelectionController) {
-  return async (withBusy: GalleryBusyAction) => {
-    const normalizedTag = controller.state.selection.selectionTagDraft.trim();
+  return async (withBusy: GalleryBusyAction, tag?: string) => {
+    const normalizedTag = (tag ?? controller.state.selection.selectionTagDraft).trim();
     const targets = getItemsMissingSelectionTag(controller, normalizedTag);
     if (!normalizedTag || targets.length === 0) {
       return;

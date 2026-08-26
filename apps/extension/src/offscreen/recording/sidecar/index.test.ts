@@ -22,6 +22,7 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import {
   cleanupActiveSidecarRecorders,
+  getActiveSidecarRecordingMetadata,
   getActiveSidecarVideoProfiles,
   getActiveSidecarWebcamSettings,
   hasActiveSidecarSession,
@@ -57,6 +58,7 @@ function createSidecar(): RecordingSidecarRecorder {
     recorder,
     release: vi.fn(() => stream.getTracks().forEach((track) => track.stop())),
     recordingId: 'rec-webcam',
+    sourceLabel: null,
     stream,
     trackSettings: { frameRate: 30, height: 720, width: 1280 },
   };
@@ -124,6 +126,7 @@ describe('recording sidecar lifecycle', () => {
 
   it('returns one stop promise and exposes actual encoder dimensions', async () => {
     const sidecar = createSidecar();
+    sidecar.sourceLabel = 'Desk camera';
     createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
     await initializeSidecarRecorders({
       baseRecordingId: 'rec',
@@ -133,6 +136,14 @@ describe('recording sidecar lifecycle', () => {
 
     expect(getActiveSidecarVideoProfiles()).toEqual([
       { dimensions: { height: 720, width: 1280 }, frameRate: 30 },
+    ]);
+    expect(getActiveSidecarRecordingMetadata()).toEqual([
+      {
+        dimensions: { height: 720, width: 1280 },
+        recordingId: 'rec-webcam',
+        role: 'webcam',
+        sourceLabel: 'Desk camera',
+      },
     ]);
     expect(stopActiveSidecarRecordersWithFlush()).toBe(stopActiveSidecarRecordersWithFlush());
   });

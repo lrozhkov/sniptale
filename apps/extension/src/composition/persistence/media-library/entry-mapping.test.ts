@@ -65,6 +65,36 @@ it('classifies recording media entries from the recorded blob MIME', () => {
   );
 });
 
+it('projects recording group membership into the media library entry', () => {
+  const recordingGroup = {
+    dimensions: { height: 1080, width: 1920 },
+    groupId: 'capture-1',
+    order: 1,
+    role: 'webcam' as const,
+    sourceFavicon: 'https://user:secret@example.com/favicon.ico?token=secret',
+    sourceLabel: 'Example page',
+    sourceUrl: 'https://user:secret@example.com/article?token=secret',
+  };
+  expect(buildRecordingMediaEntry({ ...createRecording('video/webm'), recordingGroup })).toEqual(
+    expect.objectContaining({
+      height: 1080,
+      recordingGroup,
+      sourceFavicon: 'https://example.com/favicon.ico',
+      sourceTitle: 'Example page',
+      sourceUrl: 'https://example.com/article',
+      width: 1920,
+    })
+  );
+});
+
+it('projects imported video metadata into a standalone video library entry', () => {
+  const mediaMetadata = { duration: 12.5, height: 1080, kind: 'video' as const, width: 1920 };
+
+  expect(buildRecordingMediaEntry({ ...createRecording('video/mp4'), mediaMetadata })).toEqual(
+    expect.objectContaining({ duration: 12.5, height: 1080, kind: 'video', width: 1920 })
+  );
+});
+
 it('classifies project assets by MIME family', () => {
   expect(buildProjectAssetMediaEntry(createProjectAsset('audio/webm')).kind).toBe('audio');
   expect(buildProjectAssetMediaEntry(createProjectAsset('image/png')).kind).toBe('image');

@@ -2,6 +2,7 @@ import type { StoredRecordingEntry } from './contracts';
 import type { ParsedStoredEntriesValue } from '../infrastructure/indexed-db/guards/entries';
 import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseLibraryLifecycle } from '../library-lifecycle/parser';
+import { parseRecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 type ParsedRecordingEntriesValue = ParsedStoredEntriesValue<StoredRecordingEntry>;
 
@@ -30,6 +31,34 @@ function parseRecordingEntryValue(value: unknown): StoredRecordingEntry | null {
     updatedAt: value['createdAt'],
   });
   if (lifecycle === null) return null;
+  const recordingGroup =
+    value['recordingGroup'] === undefined
+      ? undefined
+      : parseRecordingGroupMember(value['recordingGroup']);
+  if (recordingGroup === null) return null;
+  const rawMediaMetadata = value['mediaMetadata'];
+  const mediaMetadata =
+    rawMediaMetadata === undefined
+      ? undefined
+      : isRecord(rawMediaMetadata) &&
+          rawMediaMetadata['kind'] === 'video' &&
+          isNumber(rawMediaMetadata['width']) &&
+          isNumber(rawMediaMetadata['height']) &&
+          isNumber(rawMediaMetadata['duration']) &&
+          Number.isFinite(rawMediaMetadata['width']) &&
+          Number.isFinite(rawMediaMetadata['height']) &&
+          Number.isFinite(rawMediaMetadata['duration']) &&
+          rawMediaMetadata['width'] > 0 &&
+          rawMediaMetadata['height'] > 0 &&
+          rawMediaMetadata['duration'] >= 0
+        ? {
+            duration: rawMediaMetadata['duration'],
+            height: rawMediaMetadata['height'],
+            kind: 'video' as const,
+            width: rawMediaMetadata['width'],
+          }
+        : null;
+  if (mediaMetadata === null) return null;
   return {
     assetId: value['assetId'],
     createdAt: value['createdAt'],
@@ -37,6 +66,8 @@ function parseRecordingEntryValue(value: unknown): StoredRecordingEntry | null {
     id: value['id'],
     mimeType: value['mimeType'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
+    ...(recordingGroup === undefined ? {} : { recordingGroup }),
+    ...(mediaMetadata === undefined ? {} : { mediaMetadata }),
     size: value['size'],
   };
 }

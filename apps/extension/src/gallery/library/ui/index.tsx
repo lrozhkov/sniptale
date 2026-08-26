@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { formatDateTime, getCurrentLocale, translate } from '../../../platform/i18n';
 import type { FolderFilter } from '../types';
+import type { RecordingGroupMemberRole } from '../../../features/media-hub/recording-groups';
 import { ensureGalleryItemThumbnail, type GalleryItem, type GalleryItemKind } from '../items';
 import { createMediaThumbFallbackItem } from './fallback-items';
 
@@ -55,7 +56,7 @@ export function getGalleryItemKindLabel(kind: GalleryItemKind): string {
     case 'recording':
       return translate('gallery.preview.folderRecording');
     case 'export':
-      return translate('gallery.preview.folderExport');
+      return translate('gallery.preview.kindVideo');
     case 'audio':
       return translate('gallery.preview.kindAudio');
     case 'image':
@@ -70,6 +71,17 @@ export function getGalleryItemKindLabel(kind: GalleryItemKind): string {
       return translate('gallery.preview.kindScenarioExport');
     case 'web-archive':
       return translate('gallery.preview.kindWebSnapshot');
+  }
+}
+
+export function getRecordingGroupRoleLabel(role: RecordingGroupMemberRole): string {
+  switch (role) {
+    case 'display':
+      return translate('gallery.preview.recordingRoleDisplay');
+    case 'webcam':
+      return translate('gallery.preview.recordingRoleWebcam');
+    case 'microphone':
+      return translate('gallery.preview.recordingRoleMicrophone');
   }
 }
 

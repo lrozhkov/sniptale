@@ -143,6 +143,33 @@ export function getActiveSidecarVideoProfiles(): Array<{
   });
 }
 
+export function getActiveSidecarRecordingMetadata(): Array<{
+  dimensions: { height: number; width: number };
+  recordingId: string;
+  role: 'webcam';
+  sourceLabel: string | null;
+}> {
+  return (getActiveSidecarSession()?.recorders ?? []).map((sidecar) => {
+    const { height, width } = sidecar.trackSettings;
+    if (
+      typeof width !== 'number' ||
+      typeof height !== 'number' ||
+      !Number.isSafeInteger(width) ||
+      !Number.isSafeInteger(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      throw new Error(`Webcam recording dimensions are unavailable for ${sidecar.recordingId}.`);
+    }
+    return {
+      dimensions: { height, width },
+      recordingId: sidecar.recordingId,
+      role: sidecar.kind,
+      sourceLabel: sidecar.sourceLabel,
+    };
+  });
+}
+
 async function createSidecarStopPromise(
   session: RecordingSidecarSession
 ): Promise<FinalizedRecordingStagingArtifact[]> {

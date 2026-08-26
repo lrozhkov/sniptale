@@ -9,6 +9,7 @@ const {
   cleanupResourcesMock,
   createLiveRecordingArtifactSessionMock,
   finalizeRecordingMock,
+  getSidecarRecordingMetadataMock,
   getWebcamSettingsMock,
   sendRuntimeMessageMock,
   startSidecarsMock,
@@ -17,6 +18,7 @@ const {
   cleanupResourcesMock: vi.fn(),
   createLiveRecordingArtifactSessionMock: vi.fn(),
   finalizeRecordingMock: vi.fn(),
+  getSidecarRecordingMetadataMock: vi.fn(),
   getWebcamSettingsMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   startSidecarsMock: vi.fn(),
@@ -35,6 +37,7 @@ vi.mock('../finalizer', async (importOriginal) => ({
 vi.mock('../sidecar', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../sidecar')>()),
   getActiveSidecarVideoProfiles: vi.fn(() => []),
+  getActiveSidecarRecordingMetadata: getSidecarRecordingMetadataMock,
   getActiveSidecarWebcamSettings: getWebcamSettingsMock,
   startActiveSidecarRecorders: startSidecarsMock,
   stopActiveSidecarRecordersWithFlush: stopSidecarsMock,
@@ -150,6 +153,8 @@ async function bootstrapControllable(
     cursorCaptureMode?: 'embedded-fallback' | 'separate' | null;
     displaySurface?: string;
     omitSourceStream?: boolean;
+    sourceLabel?: string;
+    sourceContext?: { favicon: string | null; title: string | null; url: string | null };
     transformFailure?: Promise<never>;
     webcamSettings?: { frameRate: number; height: number; width: number };
   } = {}
@@ -169,6 +174,8 @@ async function bootstrapControllable(
     durationTracker: recordingContext.durationTracker,
     resolvedRecordingId: 'recording-lifecycle',
     settings: DEFAULT_VIDEO_SETTINGS,
+    sourceContext: params.sourceContext ?? null,
+    sourceLabel: params.sourceLabel ?? null,
     trackSettings: {
       frameRate: 30,
       height: 720,
@@ -207,6 +214,7 @@ beforeEach(() => {
     recordingId: 'recording-lifecycle',
   });
   stopSidecarsMock.mockResolvedValue([]);
+  getSidecarRecordingMetadataMock.mockReturnValue([]);
   getWebcamSettingsMock.mockReturnValue(null);
 });
 
@@ -399,6 +407,87 @@ describe('primary recording artifact lifecycle', () => {
 });
 
 describe('primary recording stop finalization', () => {
+  it('persists source and dimensions for a recording without sidecars', async () => {
+    const fixture = await bootstrapControllable({
+      sourceContext: {
+        favicon: 'https://example.com/favicon.ico',
+        title: 'Design review',
+        url: 'https://example.com/review',
+      },
+      sourceLabel: 'Design review',
+    });
+    fixture.getCallbacks().onStart?.();
+    recordingContext.beginStopRequest({ reject: vi.fn(), resolve: vi.fn() });
+
+    await fixture.getCallbacks().onStop?.(fixture.artifact);
+
+    expect(finalizeRecordingMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifacts: [fixture.artifact],
+        recordingGroups: {
+          'recording-lifecycle': {
+            dimensions: { height: 720, width: 1280 },
+            groupId: 'recording-lifecycle',
+            order: 0,
+            role: 'display',
+            sourceFavicon: 'https://example.com/favicon.ico',
+            sourceLabel: 'Design review',
+            sourceUrl: 'https://example.com/review',
+          },
+        },
+      })
+    );
+  });
+
+  it('persists a screen and separate webcam as one raw recording group', async () => {
+    const fixture = await bootstrapControllable({
+      sourceContext: {
+        favicon: 'https://example.com/favicon.ico',
+        title: 'Design review',
+        url: 'https://example.com/review',
+      },
+      sourceLabel: 'Design review',
+    });
+    const webcam = { ...fixture.artifact, artifactId: 'recording-lifecycle-webcam' };
+    getSidecarRecordingMetadataMock.mockReturnValueOnce([
+      {
+        dimensions: { height: 1080, width: 1920 },
+        recordingId: webcam.artifactId,
+        role: 'webcam',
+        sourceLabel: 'HD Camera',
+      },
+    ]);
+    stopSidecarsMock.mockResolvedValueOnce([webcam]);
+    fixture.getCallbacks().onStart?.();
+    recordingContext.beginStopRequest({ reject: vi.fn(), resolve: vi.fn() });
+
+    await fixture.getCallbacks().onStop?.(fixture.artifact);
+
+    expect(finalizeRecordingMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifacts: [fixture.artifact, webcam],
+        recordingGroups: {
+          'recording-lifecycle': {
+            dimensions: { height: 720, width: 1280 },
+            groupId: 'recording-lifecycle',
+            order: 0,
+            role: 'display',
+            sourceFavicon: 'https://example.com/favicon.ico',
+            sourceLabel: 'Design review',
+            sourceUrl: 'https://example.com/review',
+          },
+          'recording-lifecycle-webcam': {
+            dimensions: { height: 1080, width: 1920 },
+            groupId: 'recording-lifecycle',
+            order: 1,
+            role: 'webcam',
+            sourceLabel: 'HD Camera',
+          },
+        },
+      })
+    );
+  });
+
   it('turns an active source end into one saved terminal artifact', async () => {
     const fixture = await bootstrapControllable();
     fixture.getCallbacks().onStart?.();

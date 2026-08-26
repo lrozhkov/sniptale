@@ -52,7 +52,13 @@ it('forwards the exact surface contract without preset-derived constraints', asy
   await sendOffscreenStartRecording(
     {
       captureMode: CaptureMode.TAB,
-      captureSource: { mode: CaptureMode.TAB, streamId: 'stream-id' },
+      captureSource: {
+        mode: CaptureMode.TAB,
+        streamId: 'stream-id',
+        tabFavicon: 'https://user:secret@example.com/favicon.ico?token=secret',
+        tabTitle: 'Example page',
+        tabUrl: 'https://user:secret@example.com/article?token=secret#fragment',
+      },
       generation: 4,
       recordingId: 'recording-1',
       streamInstanceId: 'stream-instance-1',
@@ -70,6 +76,11 @@ it('forwards the exact surface contract without preset-derived constraints', asy
       generation: 4,
       recordingId: 'recording-1',
       tabId: 321,
+      sourceContext: {
+        favicon: 'https://example.com/favicon.ico',
+        title: 'Example page',
+        url: 'https://example.com/article',
+      },
       surface: { presetId: 'wide', target: 'window', width: 1920, height: 1080 },
     })
   );
@@ -121,6 +132,7 @@ it('omits optional tab, viewport, crop, and surface fields for a natural window 
   expect(transport.runtimeRequests[0]).not.toHaveProperty('viewport');
   expect(transport.runtimeRequests[0]).not.toHaveProperty('cropRegion');
   expect(transport.runtimeRequests[0]).not.toHaveProperty('surface');
+  expect(transport.runtimeRequests[0]).not.toHaveProperty('sourceContext');
 });
 
 it('surfaces explicit and fallback source-preparation rejection messages', async () => {

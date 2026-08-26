@@ -1,5 +1,7 @@
 import { translate } from '../i18n';
 
+export const VIDEO_THUMBNAIL_GENERATOR_VERSION = 2;
+
 function drawCoverFrame(
   context: CanvasRenderingContext2D,
   sourceWidth: number,
@@ -47,13 +49,26 @@ async function waitForVideoEvent(
   });
 }
 
+async function seekVideo(video: HTMLVideoElement, time: number): Promise<void> {
+  const seeked = waitForVideoEvent(video, 'seeked');
+  video.currentTime = time;
+  await seeked;
+}
+
 async function seekVideoToThumbnailFrame(video: HTMLVideoElement): Promise<void> {
   await waitForVideoEvent(video, 'loadeddata');
 
-  if (Number.isFinite(video.duration) && video.duration > 0.12) {
-    video.currentTime = Math.min(0.12, video.duration / 4);
-    await waitForVideoEvent(video, 'seeked');
+  if (!Number.isFinite(video.duration) || video.duration <= 0) {
+    await seekVideo(video, Number.MAX_SAFE_INTEGER);
   }
+
+  const resolvedDuration = Number.isFinite(video.duration) ? video.duration : video.currentTime;
+  if (!Number.isFinite(resolvedDuration) || resolvedDuration <= 0.25) {
+    return;
+  }
+
+  const thumbnailTime = Math.min(3, Math.max(0.5, resolvedDuration * 0.1));
+  await seekVideo(video, thumbnailTime);
 }
 
 function drawVideoThumbnailFrame(video: HTMLVideoElement, width: number, height: number) {

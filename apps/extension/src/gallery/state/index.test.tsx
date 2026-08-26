@@ -27,11 +27,13 @@ const {
 }));
 
 vi.mock('./selectors', () => ({
+  collapseGalleryRecordingGroups: vi.fn((items: unknown[]) => items),
   getActiveStorageBarClass: getActiveStorageBarClassMock,
   getAllGalleryTags: getAllGalleryTagsMock,
   getFilteredScenarioProjects: vi.fn(() => []),
   getFilteredGalleryItems: getFilteredGalleryItemsMock,
   getGalleryCounts: getGalleryCountsMock,
+  getGalleryFacets: vi.fn(() => []),
   getGalleryGridMetrics: getGalleryGridMetricsMock,
 }));
 vi.mock('./useGalleryFilterState', () => ({
@@ -84,8 +86,10 @@ function createSelectedIdsSetter() {
 function configureFilterHookMock() {
   useGalleryFilterStateMock.mockImplementation(() => ({
     actions: {
+      resetFilters: vi.fn(),
       setActiveTags: vi.fn(),
       setFolderFilter: galleryActionMocks.setFolderFilter,
+      setFacetFilter: vi.fn(),
       setSearch: vi.fn(),
       setScope: vi.fn(),
       setSelectedIds: createSelectedIdsSetter(),
@@ -94,6 +98,15 @@ function configureFilterHookMock() {
     },
     state: {
       activeTags: ['alpha'],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
       folderFilter: 'all',
       search: 'needle',
       scope: 'temporary',
@@ -130,7 +143,9 @@ function configurePreviewHookMock() {
   }));
 }
 
-function configureStorageWorkflowMock() {
+function configureStorageWorkflowMock(
+  items = [createItem(), createItem({ id: 'asset-2', size: 50, tags: [] })]
+) {
   useGalleryStorageWorkflowMock.mockReturnValue({
     actions: {
       refresh: vi.fn(),
@@ -139,12 +154,11 @@ function configureStorageWorkflowMock() {
       setIsBusy: vi.fn(),
       setPendingExport: vi.fn(),
       setPendingImport: vi.fn(),
-      setShowStorageManager: vi.fn(),
+      setPendingMediaImport: vi.fn(),
     },
     library: {
-      cleanupReport: { removed: 0 },
       isLoading: false,
-      items: [createItem(), createItem({ id: 'asset-2', size: 50, tags: [] })],
+      items,
       refresh: vi.fn(),
       storageInfo: {
         isPersistent: true,
@@ -157,13 +171,12 @@ function configureStorageWorkflowMock() {
     },
     state: {
       banner: { kind: 'info' },
-      cleanupReport: { removed: 0 },
       confirmDialog: null,
       isBusy: false,
       isLoading: false,
       pendingExport: null,
       pendingImport: null,
-      showStorageManager: false,
+      pendingMediaImport: null,
       storageInfo: {
         isPersistent: true,
         pressure: 'healthy',
@@ -181,6 +194,9 @@ function configureViewportMock() {
     gridViewportRef: { current: null },
     gridWidth: 1024,
     importInputRef: { current: null },
+    importTriggerRef: { current: null },
+    mediaImportInputRef: { current: null },
+    mediaImportTriggerRef: { current: null },
     scrollTop: 24,
     setGridWidth: vi.fn(),
     setScrollTop: vi.fn(),
@@ -294,13 +310,15 @@ it('opens the requested recording once when gallery is entered from a recording 
     source: { kind: 'recording', recordingId: 'recording-1' },
   });
   getFilteredGalleryItemsMock.mockReturnValue([recording]);
+  configureStorageWorkflowMock([recording, createItem({ id: 'other' })]);
 
   renderHook();
 
-  expect(galleryActionMocks.setFolderFilter).toHaveBeenCalledWith('recording');
+  expect(galleryActionMocks.setFolderFilter).not.toHaveBeenCalled();
   expect(galleryActionMocks.setPreview).toHaveBeenCalledWith({
     inspectorCollapsed: false,
     item: recording,
     url: null,
   });
+  expect(window.location.search).toBe('');
 });

@@ -76,8 +76,10 @@ function createControllerActions(
 ): GalleryAppStateController['actions'] {
   return {
     filters: {
+      resetFilters: () => undefined,
       setActiveTags: () => undefined,
       setFolderFilter: () => undefined,
+      setFacetFilter: () => undefined,
       setSearch: () => undefined,
       setScope: () => undefined,
       setSortMode: () => undefined,
@@ -107,7 +109,11 @@ function createControllerActions(
       setIsBusy: () => undefined,
       setPendingExport: createNestedSetter({ area: 'storage', key: 'pendingExport', stateRef }),
       setPendingImport: createNestedSetter({ area: 'storage', key: 'pendingImport', stateRef }),
-      setShowStorageManager: () => undefined,
+      setPendingMediaImport: createNestedSetter({
+        area: 'storage',
+        key: 'pendingMediaImport',
+        stateRef,
+      }),
     },
   };
 }
@@ -121,6 +127,8 @@ export function createController(overrides: GalleryStateOverride = {}) {
       gridViewportRef: { current: null },
       importInputRef: { current: document.createElement('input') },
       importTriggerRef: { current: document.createElement('button') },
+      mediaImportInputRef: { current: document.createElement('input') },
+      mediaImportTriggerRef: { current: document.createElement('button') },
     },
     get state() {
       return stateRef.getState();

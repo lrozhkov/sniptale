@@ -172,6 +172,7 @@ function buildStartRecordingArgs(
     ...(message.cropRegion === undefined ? {} : { cropRegion: message.cropRegion }),
     generation: message.generation,
     streamInstanceId: message.streamInstanceId,
+    ...(message.sourceContext === undefined ? {} : { sourceContext: message.sourceContext }),
     ...(message.surface === undefined ? {} : { surface: message.surface }),
   };
 }

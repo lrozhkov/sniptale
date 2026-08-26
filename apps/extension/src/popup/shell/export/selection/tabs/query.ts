@@ -2,7 +2,11 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { useEffect } from 'react';
 
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
-import type { PageAccessStatus } from '@sniptale/runtime-contracts/messaging/page-access';
+import { hasLocalFileAccessOptIn } from '../../../../../composition/persistence/settings/file-scheme-consent';
+import {
+  PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN,
+  type PageAccessStatus,
+} from '@sniptale/runtime-contracts/messaging/page-access';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { isOwnedSnapshotViewerPage } from '../../../../../features/tab-capabilities/url';
@@ -101,6 +105,9 @@ function createOriginPattern(url: string | undefined): string | null {
 
   try {
     const parsedUrl = new URL(url);
+    if (parsedUrl.protocol === 'file:') {
+      return PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN;
+    }
     return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:'
       ? `${parsedUrl.origin}/*`
       : null;
@@ -132,7 +139,24 @@ async function canExportTab(args: {
     return false;
   }
 
-  return browserPermissions.contains({ origins: [originPattern] });
+  return hasEffectiveOriginAccess(originPattern);
+}
+
+async function hasEffectiveOriginAccess(originPattern: string): Promise<boolean> {
+  const originGranted = await browserPermissions.contains({ origins: [originPattern] });
+  if (!originGranted) {
+    return false;
+  }
+
+  if (originPattern !== PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN) {
+    return true;
+  }
+
+  const [optedIn, browserAccessAllowed] = await Promise.all([
+    hasLocalFileAccessOptIn(),
+    browserPermissions.isFileSchemeAccessAllowed(),
+  ]);
+  return optedIn && browserAccessAllowed;
 }
 
 async function filterGrantedTabs(args: {

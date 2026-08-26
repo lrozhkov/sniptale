@@ -2,32 +2,32 @@ import { defineMessageSource } from '../source';
 
 export const galleryBackupExportModalMessages = defineMessageSource({
   badge: {
-    ru: 'Backup',
+    ru: 'Резервная копия',
     en: 'Backup',
   },
   title: {
-    ru: 'Экспорт backup',
-    en: 'Backup export',
+    ru: 'Создать резервную копию',
+    en: 'Create a backup',
   },
   description: {
-    ru: 'Архив может содержать скриншоты, записи, проекты, исходные URL, telemetry и черновики редактора.',
-    en: 'The archive can contain screenshots, recordings, projects, source URLs, telemetry, and editor drafts.',
+    ru: 'Выберите, какие данные из Библиотеки сохранить в резервной копии.',
+    en: 'Choose which Library data to include in the backup.',
   },
   assets: {
-    ru: 'Assets',
-    en: 'Assets',
+    ru: 'Медиафайлы',
+    en: 'Media files',
   },
   projects: {
     ru: 'Проекты',
     en: 'Projects',
   },
   approximateSize: {
-    ru: 'Около',
-    en: 'Approx.',
+    ru: 'Примерный размер',
+    en: 'Estimated size',
   },
   scope: {
-    ru: 'Scope',
-    en: 'Scope',
+    ru: 'Состав',
+    en: 'Contents',
   },
   scopeAll: {
     ru: 'Вся библиотека',
@@ -42,79 +42,79 @@ export const galleryBackupExportModalMessages = defineMessageSource({
     en: 'Drafts',
   },
   dataClassesTitle: {
-    ru: 'Что может попасть в архив',
-    en: 'Data classes in this archive',
+    ru: 'Содержимое резервной копии',
+    en: 'Backup contents',
   },
   classMedia: {
-    ru: 'Скриншоты, записи, thumbnails и media blobs',
-    en: 'Screenshots, recordings, thumbnails, and media blobs',
+    ru: 'Изображения, видео, аудио и превью',
+    en: 'Images, video, audio, and previews',
   },
   classProjects: {
-    ru: 'Видео- и scenario-проекты с asset-ами',
-    en: 'Video and scenario projects with assets',
+    ru: 'Видео и сценарии вместе с файлами проектов',
+    en: 'Video and scenario projects with their files',
   },
   classDrafts: {
-    ru: 'Temporary media и проекты, если опция включена',
-    en: 'Temporary media and projects when enabled',
+    ru: 'Незавершённые материалы и проекты',
+    en: 'Unfinished media and projects',
   },
   classSourceMetadata: {
-    ru: 'Source URL/title/favicon metadata, если опция включена',
-    en: 'Source URL/title/favicon metadata when enabled',
+    ru: 'Адреса и названия исходных страниц',
+    en: 'Source page addresses and titles',
   },
   classTelemetry: {
-    ru: 'Recording telemetry, если опция включена',
-    en: 'Recording telemetry when enabled',
+    ru: 'Данные курсора и действий во время записи',
+    en: 'Cursor and action data captured during recording',
   },
   classWebSnapshots: {
-    ru: 'Web snapshot packages, если опция включена',
-    en: 'Web snapshot packages when enabled',
+    ru: 'Сохранённые копии веб-страниц',
+    en: 'Saved copies of web pages',
   },
   includeTelemetry: {
-    ru: 'Включить recording telemetry',
-    en: 'Include recording telemetry',
+    ru: 'Данные действий во время записи',
+    en: 'Recording activity data',
   },
   includeDrafts: {
-    ru: 'Включить черновики',
-    en: 'Include drafts',
+    ru: 'Черновики',
+    en: 'Drafts',
   },
   includeDraftsDescription: {
-    ru: 'Экспортирует temporary media, видео-проекты и scenario-проекты и возвращает их в Черновики при импорте.',
-    en: 'Exports temporary media, video projects, and scenario projects and restores them to Drafts.',
+    ru: 'Сохраняет незавершённые материалы и проекты. После восстановления они появятся в Черновиках.',
+    en: 'Includes unfinished media and projects. They will return to Drafts when restored.',
   },
   includeTelemetryDescription: {
-    ru: 'Cursor/action/viewport события помогают восстановить записи, но могут раскрывать поведение пользователя.',
-    en: 'Cursor/action/viewport events help restore recordings but can expose user behavior.',
+    ru: 'Сохраняет движения курсора, действия и размер экрана. Эти данные могут содержать сведения о вашей работе.',
+    en: 'Includes cursor movement, actions, and viewport size. This may reveal details about your activity.',
   },
   includeSourceMetadata: {
-    ru: 'Включить source URL и заголовки',
-    en: 'Include source URLs and titles',
+    ru: 'Адреса и названия исходных страниц',
+    en: 'Source page addresses and titles',
   },
   includeSourceMetadataDescription: {
-    ru: 'Сохраняет provenance metadata для поиска и восстановления контекста.',
-    en: 'Keeps provenance metadata for search and context restoration.',
+    ru: 'Помогает находить материалы и возвращаться к страницам, на которых они были созданы.',
+    en: 'Helps you find media and return to the pages where it was created.',
   },
   includeWebSnapshots: {
-    ru: 'Включить web snapshots',
-    en: 'Include web snapshots',
+    ru: 'Сохранённые копии веб-страниц',
+    en: 'Saved web pages',
   },
   includeWebSnapshotsDescription: {
-    ru: 'Web snapshots содержат сохранённые HTML/CSS package assets.',
-    en: 'Web snapshots include saved HTML/CSS package assets.',
+    ru: 'Добавляет страницы, сохранённые для просмотра без подключения к интернету.',
+    en: 'Includes pages saved for offline viewing.',
   },
   supportBundle: {
-    ru: 'Support bundle',
-    en: 'Support bundle',
+    ru: 'Только основные данные',
+    en: 'Core data only',
   },
   export: {
-    ru: 'Создать ZIP',
-    en: 'Create ZIP',
+    ru: 'Создать копию',
+    en: 'Create backup',
   },
   archiveDescription: {
     ru: 'Резервная копия медиабиблиотеки Sniptale',
     en: 'Sniptale media library backup',
   },
   cleanupFailed: {
-    ru: 'Не удалось удалить временный backup-файл. Перезапустите расширение или удалите локальные данные, чтобы повторить очистку.',
+    ru: 'Не удалось удалить временный файл резервной копии. Перезапустите расширение или очистите локальные данные и повторите попытку.',
     en: 'The temporary backup file could not be removed. Restart the extension or erase local data to retry cleanup.',
   },
 });

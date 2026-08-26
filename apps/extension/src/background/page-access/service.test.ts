@@ -3,6 +3,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { PageAccessOperation } from '@sniptale/runtime-contracts/messaging/page-access';
 import {
   browserPermissionsContainsMock,
+  browserPermissionsIsFileSchemeAccessAllowedMock,
   browserPermissionsRemoveMock,
   browserScriptingExecuteScriptMock,
   browserStorageSessionSetMock,
@@ -32,6 +33,42 @@ it('rejects unsupported tab URLs without injecting page runtime', async () => {
 
   expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
   expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
+});
+
+it('requires explicit persistent permission instead of retaining temporary local-file paths', async () => {
+  const { handlePageAccessMessage } = await import('./service');
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: 'file:///Users/example/private.html' });
+
+  await expect(
+    handlePageAccessMessage(createMessage(PageAccessOperation.ACTIVATE_CURRENT_TAB))
+  ).resolves.toEqual(expect.objectContaining({ result: 'permission-denied', success: false }));
+
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
+  expect(JSON.stringify(sessionStorageState)).not.toContain('private.html');
+});
+
+it('never treats a matching legacy local-file activation as page or capture authority', async () => {
+  const { ensureNativeVisibleCaptureAuthority, handlePageAccessMessage, hasActivePageAccess } =
+    await import('./service');
+  const localUrl = 'file:///Users/example/private.html';
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: localUrl });
+  setSessionStorageState({
+    [TEMPORARY_ACTIVE_TABS_STORAGE_KEY]: [{ tabId: 7, url: localUrl }],
+  });
+
+  await expect(
+    handlePageAccessMessage(createMessage(PageAccessOperation.READ_STATUS))
+  ).resolves.toEqual(
+    expect.objectContaining({
+      status: expect.objectContaining({ currentTabActive: false, siteGranted: false }),
+      success: true,
+    })
+  );
+  await expect(hasActivePageAccess(7)).resolves.toBe(false);
+  await expect(ensureNativeVisibleCaptureAuthority(7)).rejects.toThrow(
+    'Visible capture requires all-sites access or active tab activation.'
+  );
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
 });
 
 it('reports active status when all-sites permission already covers the current tab', async () => {
@@ -78,6 +115,40 @@ it('does not report legacy split all-sites grants as active capture authority', 
   );
 
   expect(browserPermissionsContainsMock).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
+});
+
+it('keeps web all-sites authority separate from effective local-file access', async () => {
+  const { handlePageAccessMessage } = await import('./service');
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: 'file:///Users/example/report.html' });
+  browserPermissionsContainsMock.mockResolvedValue(true);
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(false);
+
+  await expect(
+    handlePageAccessMessage(createMessage(PageAccessOperation.READ_STATUS))
+  ).resolves.toEqual(
+    expect.objectContaining({
+      status: expect.objectContaining({
+        allSitesGranted: true,
+        currentTabActive: false,
+        currentTabOrigin: 'file:///',
+        siteGranted: false,
+        supported: true,
+      }),
+      success: true,
+    })
+  );
+});
+
+it('uses effective local-file access as page and visible-capture authority', async () => {
+  const { ensureNativeVisibleCaptureAuthority, hasActivePageAccess } = await import('./service');
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: 'file:///Users/example/report.html' });
+  browserPermissionsContainsMock.mockImplementation(
+    async (query: { origins?: string[] }) => query.origins?.[0] === 'file:///'
+  );
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(true);
+
+  await expect(hasActivePageAccess(7)).resolves.toBe(true);
+  await expect(ensureNativeVisibleCaptureAuthority(7)).resolves.toBeUndefined();
 });
 
 it('does not allow site-only persistent access as native visible capture authority', async () => {

@@ -17,6 +17,7 @@ export interface VideoProjectListItem extends Pick<
   unavailableReason?: 'invalid' | 'unsupported-engine1';
   lifecycle?: LibraryLifecycle;
   retentionKind: 'ordinary' | 'video';
+  recordingIds?: string[];
   workspaceRevision?: number;
 }
 
@@ -33,6 +34,7 @@ export function createInvalidVideoProjectListItem(id: string): VideoProjectListI
     trackCount: 0,
     unavailableReason: 'invalid',
     retentionKind: 'ordinary',
+    recordingIds: [],
     updatedAt: 0,
     width: 0,
     workspaceRevision: 0,
@@ -56,6 +58,7 @@ export function createUnsupportedVideoProjectListItem(metadata: {
     trackCount: 0,
     unavailableReason: 'unsupported-engine1',
     retentionKind: 'ordinary',
+    recordingIds: [],
     workspaceRevision: 0,
   };
 }
@@ -99,6 +102,12 @@ function resolveProjectThumbnailSourceMediaId(project: VideoProject): string | n
   return null;
 }
 
+function resolveProjectRecordingIds(project: VideoProject): string[] {
+  return project.assets.flatMap((asset) =>
+    asset.source.kind === 'recording' ? [asset.source.recordingId] : []
+  );
+}
+
 export function createVideoProjectListItem(
   project: VideoProject,
   lifecycle?: LibraryLifecycle,
@@ -117,6 +126,7 @@ export function createVideoProjectListItem(
     thumbnailId: createProjectThumbnailId(project.id),
     thumbnailSourceMediaId: resolveProjectThumbnailSourceMediaId(project),
     retentionKind: resolveVideoProjectRetentionKind(project),
+    recordingIds: resolveProjectRecordingIds(project),
     workspaceRevision,
     ...(lifecycle ? { lifecycle } : {}),
   };

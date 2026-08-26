@@ -5,9 +5,23 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { readPermissionsSnapshot } from './state-resolution';
 import { initialPermissions } from '../types';
 
-const { containsMock, downloadsAvailableMock } = vi.hoisted(() => ({
-  containsMock: vi.fn(),
-  downloadsAvailableMock: vi.fn(),
+const { containsMock, downloadsAvailableMock, fileAccessOptInMock, fileSchemeAccessAllowedMock } =
+  vi.hoisted(() => ({
+    containsMock: vi.fn(),
+    downloadsAvailableMock: vi.fn(),
+    fileAccessOptInMock: vi.fn(),
+    fileSchemeAccessAllowedMock: vi.fn(),
+  }));
+
+vi.mock('../../../../../../../composition/persistence/settings/file-scheme-consent', () => ({
+  hasLocalFileAccessOptIn: fileAccessOptInMock,
+  setLocalFileAccessOptIn: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: {
+    isFileSchemeAccessAllowed: fileSchemeAccessAllowedMock,
+  },
 }));
 
 vi.mock('@sniptale/platform/browser/downloads', (_importOriginal) => ({
@@ -26,6 +40,8 @@ beforeEach(() => {
   containsMock.mockReset();
   downloadsAvailableMock.mockReset();
   downloadsAvailableMock.mockReturnValue(true);
+  fileSchemeAccessAllowedMock.mockResolvedValue(false);
+  fileAccessOptInMock.mockResolvedValue(false);
 
   Object.defineProperty(globalThis.navigator, 'clipboard', {
     configurable: true,
@@ -56,7 +72,28 @@ it('reads permission snapshot across microphone, origin, and camera states', asy
     { id: 'origins', state: 'prompt' },
     { id: 'microphone', state: 'granted' },
     { id: 'camera', state: 'granted' },
+    { id: 'localFiles', state: 'prompt' },
   ]);
+});
+
+it('reports local files as granted only when the origin and Chrome setting are enabled', async () => {
+  containsMock.mockResolvedValue(true);
+  fileAccessOptInMock.mockResolvedValue(true);
+  fileSchemeAccessAllowedMock.mockResolvedValue(true);
+
+  const snapshot = await readPermissionsSnapshot();
+
+  expect(snapshot.find(({ id }) => id === 'localFiles')?.state).toBe('granted');
+  expect(containsMock).toHaveBeenCalledWith('file:///');
+});
+
+it('does not infer local-file consent from broader browser authority', async () => {
+  containsMock.mockResolvedValue(true);
+  fileSchemeAccessAllowedMock.mockResolvedValue(true);
+
+  const snapshot = await readPermissionsSnapshot();
+
+  expect(snapshot.find(({ id }) => id === 'localFiles')?.state).toBe('prompt');
 });
 
 it('reports permission query failures as explicit error states', async () => {

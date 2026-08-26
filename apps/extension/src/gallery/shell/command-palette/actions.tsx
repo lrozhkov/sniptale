@@ -1,4 +1,5 @@
 import {
+  Archive,
   Boxes,
   Download,
   Eye,
@@ -8,7 +9,6 @@ import {
   Images,
   RefreshCw,
   Search,
-  ShieldAlert,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -29,7 +29,9 @@ import { isGalleryMediaItem } from '../../library/items';
 const sortModeIcons: Record<SortMode, typeof Search> = {
   newest: Search,
   oldest: Search,
-  size: Boxes,
+  'name-asc': Search,
+  'name-desc': Search,
+  'size-desc': Boxes,
 };
 
 function buildGalleryFolderFilterActions(
@@ -61,18 +63,23 @@ function buildGalleryFolderIcon(folder: Exclude<(typeof SIDEBAR_FOLDERS)[number]
 function buildGallerySortActions(
   controller: GalleryCommandPaletteController
 ): CommandPaletteAction[] {
-  const sortModes: SortMode[] = ['newest', 'oldest', 'size'];
+  const sortModes: SortMode[] = [
+    'newest',
+    'oldest',
+    'name-asc',
+    'name-desc',
+    ...(controller.state.filters.folderFilter === 'scenario' ? [] : (['size-desc'] as const)),
+  ];
 
   return sortModes.map((sortMode) => {
     const Icon = sortModeIcons[sortMode];
-    const title =
-      sortMode === 'newest'
-        ? translate('gallery.app.sortNewest')
-        : sortMode === 'oldest'
-          ? translate('gallery.app.sortOldest')
-          : controller.state.filters.folderFilter === 'scenario'
-            ? translate('gallery.app.sortName')
-            : translate('gallery.app.sortSize');
+    const title = {
+      newest: translate('gallery.app.sortNewest'),
+      oldest: translate('gallery.app.sortOldest'),
+      'name-asc': translate('gallery.app.sortNameAsc'),
+      'name-desc': translate('gallery.app.sortNameDesc'),
+      'size-desc': translate('gallery.app.sortSizeDesc'),
+    }[sortMode];
 
     return createCommandPaletteToggleAction({
       id: `gallery-filter-sort-${sortMode}`,
@@ -104,13 +111,6 @@ function buildGalleryPrimaryActions(
 
         void controller.actions.storage.refresh();
       },
-    }),
-    createCommandPaletteRunAction({
-      id: 'gallery-open-storage-manager',
-      title: translate('gallery.app.openStorageManager'),
-      section: translate('shared.ui.commandPaletteActionsSection'),
-      icon: commandPaletteIcon(ShieldAlert),
-      onSelect: () => controller.actions.surface.setShowStorageManager(true),
     }),
     createCommandPaletteRunAction({
       id: 'gallery-export-backup',
@@ -156,6 +156,15 @@ function buildGallerySelectionActions(
       onSelect: () => actions.selection.downloadZip(),
     }),
     createCommandPaletteRunAction({
+      id: 'gallery-selection-download-backup',
+      title: translate('gallery.app.selectionBackup'),
+      section: translate('shared.ui.commandPaletteActionsSection'),
+      icon: commandPaletteIcon(Archive),
+      disabled: !hasSelection,
+      disabledReason: !hasSelection ? disabledReason : undefined,
+      onSelect: () => actions.selection.downloadBackup(),
+    }),
+    createCommandPaletteRunAction({
       id: 'gallery-selection-delete',
       title: translate('common.actions.delete'),
       section: translate('shared.ui.commandPaletteActionsSection'),
@@ -180,9 +189,16 @@ function buildGalleryPreviewActions(
     isGalleryMediaItem(previewItem) &&
     isImageKind(previewItem.kind) &&
     previewItem.source.kind === 'screenshot';
+  const hasEditedImageContent = imageAggregate && previewItem.imageContentState === 'edited';
 
   return [
-    ...buildGalleryPreviewMediaActions({ actions, disabledReason, imageAggregate, previewItem }),
+    ...buildGalleryPreviewMediaActions({
+      actions,
+      disabledReason,
+      hasEditedImageContent,
+      imageAggregate,
+      previewItem,
+    }),
     ...buildGalleryPreviewNavigationActions({
       actions,
       disabledReason,
@@ -196,6 +212,7 @@ type GalleryPreviewActionContext = {
   actions: UseGalleryAppActionsResult;
   disabledReason: string;
   imageAggregate: boolean;
+  hasEditedImageContent: boolean;
   previewItem: GalleryCommandPaletteController['state']['preview']['session']['item'];
 };
 
@@ -203,6 +220,7 @@ function buildGalleryPreviewMediaActions({
   actions,
   disabledReason,
   imageAggregate,
+  hasEditedImageContent,
   previewItem,
 }: GalleryPreviewActionContext): CommandPaletteAction[] {
   return [
@@ -220,8 +238,8 @@ function buildGalleryPreviewMediaActions({
       title: translate('gallery.preview.downloadOriginal'),
       section: translate('shared.ui.commandPaletteActionsSection'),
       icon: commandPaletteIcon(Download),
-      disabled: !imageAggregate,
-      disabledReason: !imageAggregate ? disabledReason : undefined,
+      disabled: !hasEditedImageContent,
+      disabledReason: !hasEditedImageContent ? disabledReason : undefined,
       onSelect: () => actions.preview.downloadOriginal(),
     }),
     createCommandPaletteRunAction({
@@ -247,8 +265,8 @@ function buildGalleryPreviewMediaActions({
       title: translate('gallery.preview.restoreOriginal'),
       section: translate('shared.ui.commandPaletteActionsSection'),
       icon: commandPaletteIcon(RefreshCw),
-      disabled: !imageAggregate,
-      disabledReason: !imageAggregate ? disabledReason : undefined,
+      disabled: !hasEditedImageContent,
+      disabledReason: !hasEditedImageContent ? disabledReason : undefined,
       onSelect: () => actions.preview.restoreOriginal(),
     }),
   ];
@@ -259,7 +277,7 @@ function buildGalleryPreviewNavigationActions({
   disabledReason,
   previewItem,
   projectUnavailable,
-}: Omit<GalleryPreviewActionContext, 'imageAggregate'> & {
+}: Omit<GalleryPreviewActionContext, 'hasEditedImageContent' | 'imageAggregate'> & {
   projectUnavailable: boolean;
 }): CommandPaletteAction[] {
   return [

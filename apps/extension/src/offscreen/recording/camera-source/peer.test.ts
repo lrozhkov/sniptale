@@ -205,7 +205,12 @@ it('accepts a source switch while the matching preview peer is still acquiring i
 
   await expect(owner.switchInput('pending-preview', null)).resolves.toBeUndefined();
   expect(switchInput).toHaveBeenCalledWith(null);
-  resolveLease({ release: vi.fn(), stream: createTrackedStream(), trackSettings: {} });
+  resolveLease({
+    release: vi.fn(),
+    sourceLabel: 'Desk camera',
+    stream: createTrackedStream(),
+    trackSettings: {},
+  });
   await answer;
   owner.closeAll();
 });

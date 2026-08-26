@@ -11,6 +11,7 @@ import {
   grantSiteAccess,
   registerPinnedToolbarAllSitesAccess as registerPinnedToolbarAllSitesAccessAction,
   registerGrantedAllSitesAccess,
+  registerGrantedFileSchemeAccess,
   registerGrantedSiteAccess,
   revokeSiteAccess,
   type PageAccessServiceContext,
@@ -75,6 +76,8 @@ async function handlePageAccessMessageWithContext(
         { injectCurrentTab: typeof message.tabId === 'number' },
         serviceContext.statusReader
       );
+    case PageAccessOperation.REGISTER_GRANTED_FILE_SCHEME:
+      return registerGrantedFileSchemeAccess(context, serviceContext.statusReader);
     case PageAccessOperation.REVOKE_SITE:
       return revokeSiteAccess(context, serviceContext);
     default:
@@ -118,6 +121,9 @@ async function hasNativeVisibleCaptureAuthorityWithContext(
   }
 
   const status = await serviceContext.statusReader.readFromContext(context);
+  if (context.target.url.protocol === 'file:') {
+    return status.currentTabActive;
+  }
   return (
     status.allSitesGranted || (await serviceContext.temporaryTabActivationStore.has(context.target))
   );

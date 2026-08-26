@@ -1,8 +1,11 @@
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import type { MediaAssetKind } from '../../../features/media-hub/media-types';
 import type { LibraryLifecycle, LibraryStorageClass } from '../library-lifecycle/contracts';
+import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 export type { MediaAssetKind } from '../../../features/media-hub/media-types';
+
+export type ImageContentState = 'edited' | 'original';
 
 export type MediaAssetSource =
   | { kind: 'screenshot' }
@@ -33,9 +36,12 @@ export interface MediaLibraryEntry {
   sourceFavicon: string | null;
   tags: string[];
   lifecycle?: LibraryLifecycle;
+  recordingGroup?: RecordingGroupMember;
   /** Monotonic editable-workspace revision. Original-only media remains at revision zero. */
   /** Missing only on pre-v24 persisted rows; readers normalize it to revision 0. */
   workspaceRevision?: number;
+  /** Whether the current editable image content differs from its immutable source blob. */
+  imageContentState?: ImageContentState;
   blob?: Blob;
 }
 
@@ -43,6 +49,8 @@ export interface MediaThumbnailEntry {
   assetId: string;
   blob: Blob;
   createdAt: number;
+  /** Derived renderer revision. Missing on legacy thumbnails. */
+  generatorVersion?: number;
   updatedAt: number;
   width: number;
   height: number;
@@ -62,6 +70,7 @@ export interface SaveScreenshotMediaAssetInput {
   sourceFavicon?: string | null;
   tags?: string[];
   storageClass?: LibraryStorageClass;
+  kind?: 'image' | 'screenshot';
 }
 
 export interface SaveWebSnapshotMediaAssetInput {

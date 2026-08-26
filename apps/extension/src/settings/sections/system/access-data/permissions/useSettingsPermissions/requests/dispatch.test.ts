@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest';
+import { FolderOpen } from 'lucide-react';
 
 import { requestTypedPermission } from './dispatch';
+import type { PermissionInfo } from '../../permissions-lib';
 
 type RequestCase = {
   expected: boolean;
@@ -8,34 +10,49 @@ type RequestCase = {
 };
 
 const requestCases: RequestCase[] = [
-  { expected: true, permission: { id: 'microphone', type: 'web' } as never },
-  { expected: true, permission: { id: 'camera', type: 'web' } as never },
+  { expected: true, permission: createPermission({ id: 'microphone', type: 'web' }) },
+  { expected: true, permission: createPermission({ id: 'camera', type: 'web' }) },
   {
     expected: true,
-    permission: { chromePermission: 'downloads', id: 'downloads', type: 'chrome' } as never,
+    permission: createPermission({
+      chromePermission: 'downloads',
+      id: 'downloads',
+      type: 'chrome',
+    }),
   },
   {
     expected: true,
-    permission: { id: 'origins', originPattern: '<all_urls>', type: 'origin' } as never,
+    permission: createPermission({ id: 'origins', originPattern: '<all_urls>', type: 'origin' }),
   },
-  { expected: false, permission: { id: 'other', type: 'chrome' } as never },
+  {
+    expected: true,
+    permission: createPermission({ id: 'localFiles', originPattern: 'file:///', type: 'file' }),
+  },
+  { expected: false, permission: createPermission({ id: 'other', type: 'chrome' }) },
 ];
+
+function createPermission(
+  overrides: Partial<PermissionInfo> & Pick<PermissionInfo, 'id' | 'type'>
+): PermissionInfo {
+  return { icon: FolderOpen, state: 'prompt', ...overrides };
+}
 
 it('dispatches typed permissions to the matching request handler', async () => {
   const requestMicrophone = vi.fn(async () => true);
   const requestCamera = vi.fn(async () => true);
   const requestChrome = vi.fn(async () => true);
   const requestOrigin = vi.fn(async () => true);
+  const requestFileScheme = vi.fn(async () => true);
 
   for (const testCase of requestCases) {
     await expect(
-      requestTypedPermission(
-        testCase.permission,
-        requestMicrophone,
+      requestTypedPermission(testCase.permission, {
         requestCamera,
         requestChrome,
-        requestOrigin
-      )
+        requestFileScheme,
+        requestMicrophone,
+        requestOrigin,
+      })
     ).resolves.toBe(testCase.expected);
   }
 
@@ -43,4 +60,5 @@ it('dispatches typed permissions to the matching request handler', async () => {
   expect(requestCamera).toHaveBeenCalledTimes(1);
   expect(requestChrome).toHaveBeenCalledTimes(1);
   expect(requestOrigin).toHaveBeenCalledTimes(1);
+  expect(requestFileScheme).toHaveBeenCalledTimes(1);
 });

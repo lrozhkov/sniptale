@@ -13,6 +13,7 @@ import type {
   FinalizedRecordingStagingArtifact,
   RecordingStagingCoordinator,
 } from '../../composition/persistence/recordings/staging';
+import type { RecordingGroupMember } from '../../features/media-hub/recording-groups';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingFinalize' });
 
@@ -31,6 +32,7 @@ interface FinalizeRecordingInput {
   discard: boolean;
   options?: FinalizeRecordingOptions;
   primaryRecordingId: string;
+  recordingGroups?: Readonly<Record<string, RecordingGroupMember>>;
   staging: RecordingStagingCoordinator | null;
 }
 
@@ -149,6 +151,9 @@ export async function finalizeRecording(
           filename: artifact.filename,
           id: artifact.artifactId,
           preparedAsset: artifact.asset,
+          ...(input.recordingGroups?.[artifact.artifactId]
+            ? { recordingGroup: input.recordingGroups[artifact.artifactId] }
+            : {}),
           storageClass:
             settings?.localStoragePolicy.defaultDestination ??
             DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,

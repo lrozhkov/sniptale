@@ -3,7 +3,6 @@ import {
   deleteSavedRecordingTracks,
   loadSavedRecordingTrackBlobs,
 } from '../../composition/persistence/recordings/tracks';
-import { getRecording } from '../../composition/persistence/recordings';
 import { openGalleryPage, openVideoEditorPage } from '../../platform/navigation/extension-pages';
 import { deletePersistedVideoProject } from './video-projects';
 
@@ -28,12 +27,7 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export async function openLatestRecordingInGallery(primaryRecordingId: string): Promise<void> {
-  const recording = await getRecording(primaryRecordingId);
-  const scope = recording?.lifecycle?.storageClass;
-  await openGalleryPage({
-    recordingId: primaryRecordingId,
-    ...(scope ? { scope } : {}),
-  });
+  await openGalleryPage({ recordingId: primaryRecordingId });
 }
 
 export async function openSavedRecordingInVideoEditor(

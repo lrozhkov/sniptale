@@ -6,6 +6,7 @@ import { useGalleryPreviewState } from '../library/preview/useGalleryPreviewStat
 import { useGalleryViewportState } from './useGalleryViewportState';
 import { useGalleryDerivedState } from './derived';
 import { useGalleryStorageWorkflow } from './storage-workflow';
+import { clearGalleryRecordingPreviewUrlParams } from '../platform/browser-driver';
 
 type GalleryFiltersState = ReturnType<typeof useGalleryFilterState>;
 type GalleryPreviewState = ReturnType<typeof useGalleryPreviewState>;
@@ -65,6 +66,7 @@ function buildGalleryAppState(props: {
 function buildGalleryFilterViewState(filters: GalleryFiltersState) {
   return {
     activeTags: filters.state.activeTags,
+    facetFilters: filters.state.facetFilters,
     folderFilter: filters.state.folderFilter,
     search: filters.state.search,
     scope: filters.state.scope,
@@ -102,8 +104,10 @@ function buildGalleryDerivedViewState(
 ) {
   return {
     activeStorageBarClass: derived.activeStorageBarClass,
+    allItems: derived.allItems,
     allTags: derived.allTags,
     counts: derived.counts,
+    facets: derived.facets,
     filteredItems: derived.filteredItems,
     gridMetrics: {
       columnCount: derived.gridMetrics.columnCount,
@@ -124,8 +128,10 @@ function buildGalleryAppActions(args: {
 }): GalleryAppStateController['actions'] {
   return {
     filters: {
+      resetFilters: args.filters.actions.resetFilters,
       setActiveTags: args.filters.actions.setActiveTags,
       setFolderFilter: args.filters.actions.setFolderFilter,
+      setFacetFilter: args.filters.actions.setFacetFilter,
       setSearch: args.filters.actions.setSearch,
       setScope: args.filters.actions.setScope,
       setSortMode: args.filters.actions.setSortMode,
@@ -158,7 +164,7 @@ function buildGalleryAppActions(args: {
       setIsBusy: args.storage.setIsBusy,
       setPendingExport: args.storage.setPendingExport,
       setPendingImport: args.storage.setPendingImport,
-      setShowStorageManager: args.storage.setShowStorageManager,
+      setPendingMediaImport: args.storage.setPendingMediaImport,
     },
   };
 }
@@ -180,12 +186,10 @@ function findRecordingPreviewItem(items: GalleryItem[], recordingId: string): Ga
 }
 
 function useInitialRecordingPreview({
-  filteredItems,
-  setFolderFilter,
+  allItems,
   setPreview,
 }: {
-  filteredItems: GalleryItem[];
-  setFolderFilter: GalleryFiltersState['actions']['setFolderFilter'];
+  allItems: GalleryItem[];
   setPreview: GalleryPreviewState['actions']['setPreview'];
 }) {
   const initialRecordingIdRef = useRef(getInitialRecordingPreviewId());
@@ -197,19 +201,19 @@ function useInitialRecordingPreview({
       return;
     }
 
-    const item = findRecordingPreviewItem(filteredItems, recordingId);
+    const item = findRecordingPreviewItem(allItems, recordingId);
     if (!item) {
       return;
     }
 
     appliedRef.current = true;
-    setFolderFilter('recording');
+    clearGalleryRecordingPreviewUrlParams();
     setPreview({
       inspectorCollapsed: false,
       item,
       url: null,
     });
-  }, [filteredItems, setFolderFilter, setPreview]);
+  }, [allItems, setPreview]);
 }
 
 export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateController {
@@ -228,8 +232,7 @@ export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateCo
   });
   const selectionAnchorRef = useRef<string | null>(null);
   useInitialRecordingPreview({
-    filteredItems: derived.filteredItems,
-    setFolderFilter: filters.actions.setFolderFilter,
+    allItems: derived.allItems,
     setPreview: preview.actions.setPreview,
   });
   const state = buildGalleryAppState({
@@ -253,6 +256,8 @@ export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateCo
       gridViewportRef: viewport.gridViewportRef,
       importInputRef: viewport.importInputRef,
       importTriggerRef: viewport.importTriggerRef,
+      mediaImportInputRef: viewport.mediaImportInputRef,
+      mediaImportTriggerRef: viewport.mediaImportTriggerRef,
     },
     state,
   };

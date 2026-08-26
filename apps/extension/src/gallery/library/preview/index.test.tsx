@@ -43,6 +43,7 @@ vi.mock('./sidebar-sections', () => ({
   PreviewTagEditor: (props: Pick<PreviewPanelProps, 'tagDraft'>) => (
     <div data-ui="preview.tags">{props.tagDraft}</div>
   ),
+  PreviewPromotionAction: () => <div data-ui="preview.promotion" />,
 }));
 
 let container: HTMLDivElement | null = null;
@@ -95,6 +96,14 @@ function render(props: PreviewPanelProps) {
   });
 }
 
+it('uses the shared large-surface radius for the preview workspace', () => {
+  render(createProps());
+
+  expect(container?.querySelector('[data-ui="gallery.preview.surface"]')?.className).toContain(
+    'rounded-[var(--sniptale-radius-lg)]'
+  );
+});
+
 function setInputValue(input: HTMLInputElement, value: string) {
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
@@ -135,6 +144,7 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
   expect(container?.textContent).toContain('gallery.preview.inspector');
   expect(container?.textContent).toContain('Screenshot');
   expect(container?.textContent).toContain('31 Mar 2026');
+  expect(container?.querySelector('[data-ui="preview.promotion"]')).not.toBeNull();
 
   const input = container?.querySelector('input');
   const closeButton = container?.querySelector('[data-ui="preview.close"]');
@@ -240,4 +250,33 @@ it('hides the inspector sidebar when collapsed and closes on Escape', () => {
   });
 
   expect(props.onClose).toHaveBeenCalledTimes(1);
+});
+
+it('navigates adjacent media with arrow keys but preserves arrow editing inside fields', () => {
+  const onPrevious = vi.fn();
+  const onNext = vi.fn();
+  const props = createProps({
+    navigation: {
+      current: 2,
+      total: 3,
+      hasPrevious: true,
+      hasNext: true,
+      onPrevious,
+      onNext,
+    },
+  });
+
+  render(props);
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+  });
+  expect(onPrevious).toHaveBeenCalledOnce();
+  expect(onNext).toHaveBeenCalledOnce();
+
+  const input = container?.querySelector('input');
+  act(() => {
+    input?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+  });
+  expect(onNext).toHaveBeenCalledOnce();
 });

@@ -135,7 +135,6 @@ function createRunBusy(setBanner = vi.fn(), setIsBusy = vi.fn()) {
         setConfirmDialog: vi.fn(),
         setIsBusy,
         setPendingExport: vi.fn(),
-        setShowStorageManager: vi.fn(),
       },
     },
   });
@@ -183,6 +182,7 @@ async function verifyOriginalAndCopyActions() {
     previewItem: createMediaItem({
       id: 'image-1',
       filename: 'edited.png',
+      imageContentState: 'edited',
       originalFilename: 'original.png',
       workspaceRevision: 4,
     }),
@@ -205,13 +205,44 @@ async function verifyOriginalAndCopyActions() {
     targetAggregateId: 'session-1',
   });
   expect(getState().preview.session.item).toEqual(
-    expect.objectContaining({ presentationRevision: 5, workspaceRevision: 5 })
+    expect.objectContaining({
+      imageContentState: 'original',
+      presentationRevision: 5,
+      workspaceRevision: 5,
+    })
   );
+}
+
+async function verifyOriginalActionsIgnorePristineImages() {
+  const { controller, getState } = createController({
+    previewItem: createMediaItem({ imageContentState: 'original', workspaceRevision: 0 }),
+  });
+
+  await downloadOriginalPreviewItem(controller, createRunBusy());
+  createRestoreOriginalAction(controller, createRunBusy())();
+
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+  expect(getState().storage.confirmDialog).toBeNull();
+  expect(restoreImageAggregateOriginalMock).not.toHaveBeenCalled();
 }
 
 function verifyOpenInEditorFlow() {
   openInEditor(createMediaItem({ id: 'asset-1', kind: 'image' }));
   openInEditor(createMediaItem({ id: 'asset-2', kind: 'recording' }));
+  openInEditor(
+    createMediaItem({
+      id: 'asset-grouped',
+      kind: 'recording',
+      recordingGroupView: {
+        groupId: 'capture-1',
+        memberCount: 2,
+        order: 0,
+        projectId: 'group-project-1',
+        role: 'display',
+        sourceLabel: null,
+      },
+    })
+  );
   openInEditor(createScenarioItem({ entityId: 'project-1', id: 'scenario:project-1' }));
   openInEditor(createVideoProjectItem({ entityId: 'video-project-1' }));
   openInEditor(
@@ -224,6 +255,7 @@ function verifyOpenInEditorFlow() {
   );
   expect(openScenarioEditorPageMock).toHaveBeenCalledWith('project-1');
   expect(openVideoEditorPageMock).toHaveBeenCalledWith('video-project-1', null);
+  expect(openVideoEditorPageMock).toHaveBeenCalledWith('group-project-1', null);
   expect(openVideoEditorPageMock).not.toHaveBeenCalledWith('invalid-project', null);
 }
 
@@ -256,6 +288,10 @@ describe('gallery preview shared actions', () => {
   it(
     'downloads the immutable original, restores it in place, and saves copies with a new id',
     verifyOriginalAndCopyActions
+  );
+  it(
+    'ignores original-only actions while the current image is pristine',
+    verifyOriginalActionsIgnorePristineImages
   );
   it(
     'surfaces busy-action failures without leaving the busy flag enabled',

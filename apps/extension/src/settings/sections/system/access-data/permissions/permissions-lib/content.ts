@@ -17,6 +17,11 @@ function getPermissionDetails(id: PermissionInfo['id']) {
         name: t('settings.permissions.microphoneName'),
         description: t('settings.permissions.microphoneDescription'),
       };
+    case 'localFiles':
+      return {
+        name: t('settings.permissions.localFilesName'),
+        description: t('settings.permissions.localFilesDescription'),
+      };
     case 'camera':
       return {
         name: t('settings.permissions.cameraName'),

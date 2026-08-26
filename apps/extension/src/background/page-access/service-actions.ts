@@ -10,6 +10,9 @@ import {
   ensureContentScriptRegistration,
   getMissingOriginPermissions,
   hasAllSitesPermission,
+  hasFileSchemePermission,
+  hasSitePermission,
+  reconcileFileSchemeContentScriptRegistration,
   unregisterSiteContentScript,
 } from './registration';
 import { injectContentRuntimeAndAwaitReady } from './readiness';
@@ -32,6 +35,13 @@ export async function activateCurrentTab(
       result: 'unsupported-url',
       status: await serviceContext.statusReader.readFromContext(context),
     };
+  }
+
+  if (context.target.url.protocol === 'file:') {
+    const status = await serviceContext.statusReader.readFromContext(context);
+    return status.siteGranted
+      ? { success: true, result: 'already-active', status }
+      : { success: false, result: 'permission-denied', status };
   }
 
   if (await serviceContext.temporaryTabActivationStore.has(context.target)) {
@@ -75,6 +85,14 @@ export async function grantSiteAccess(
     };
   }
 
+  if (context.target.url.protocol === 'file:' && !(await hasFileSchemePermission())) {
+    return {
+      success: false,
+      result: 'permission-denied',
+      status: await statusReader.readFromContext(context),
+    };
+  }
+
   try {
     await ensureContentScriptRegistration({
       id: createSiteScriptId(context.target.url),
@@ -110,7 +128,7 @@ export async function grantAllSitesAccess(
       id: PAGE_ACCESS_ALL_SITES_SCRIPT_ID,
       matches: [...ALL_SITES_CONTENT_SCRIPT_MATCHES],
     });
-    if (context.kind === 'supported') {
+    if (context.kind === 'supported' && context.target.url.protocol !== 'file:') {
       await injectContentRuntimeAndAwaitReady(context.target, { allFrames: true });
     }
   } catch (error) {
@@ -162,7 +180,7 @@ export async function registerGrantedSiteAccess(
   }
 
   const originPattern = createOriginPattern(context.target.url);
-  const granted = await browserPermissions.contains({ origins: [originPattern] });
+  const granted = await hasSitePermission(context.target.url, false);
   if (!granted) {
     return {
       success: false,
@@ -176,6 +194,25 @@ export async function registerGrantedSiteAccess(
     matches: [originPattern],
   });
   await injectContentRuntimeAndAwaitReady(context.target, { allFrames: true });
+  return {
+    success: true,
+    result: 'registered',
+    status: await statusReader.readFromContext(context),
+  };
+}
+
+export async function registerGrantedFileSchemeAccess(
+  context: PageAccessStatusContext,
+  statusReader: PageAccessStatusReader
+): Promise<PageAccessResponse> {
+  if (!(await reconcileFileSchemeContentScriptRegistration())) {
+    return {
+      success: false,
+      result: 'permission-denied',
+      status: await statusReader.readFromContext(context),
+    };
+  }
+
   return {
     success: true,
     result: 'registered',
@@ -200,7 +237,11 @@ export async function registerGrantedAllSitesAccess(
     id: PAGE_ACCESS_ALL_SITES_SCRIPT_ID,
     matches: [...ALL_SITES_CONTENT_SCRIPT_MATCHES],
   });
-  if (options.injectCurrentTab && context.kind === 'supported') {
+  if (
+    options.injectCurrentTab &&
+    context.kind === 'supported' &&
+    context.target.url.protocol !== 'file:'
+  ) {
     await injectContentRuntimeAndAwaitReady(context.target, { allFrames: true });
   }
   return {

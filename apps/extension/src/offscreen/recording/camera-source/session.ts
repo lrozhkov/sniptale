@@ -9,6 +9,7 @@ import { createSourceVideo, waitForSourceMetadata } from '../stream/video-source
 
 export type CameraSourceLease = {
   release: () => void;
+  sourceLabel: string | null;
   stream: MediaStream;
   trackSettings: MediaTrackSettings;
 };
@@ -22,6 +23,7 @@ type CameraSourceSession = {
   output: MediaStream | null;
   profileKey: string;
   raw: MediaStream;
+  sourceLabel: string | null;
   requestedDeviceId: string | null;
   qualityConstraints: MediaTrackConstraints;
   video: HTMLVideoElement;
@@ -204,6 +206,7 @@ async function initializeCameraSourceSession(args: {
       qualityConstraints,
       raw,
       requestedDeviceId: args.settings.webcamDeviceId ?? null,
+      sourceLabel: sourceTrack.label || null,
       video,
     };
     target.output = createNormalizedCameraOutput(target, args.settings);
@@ -252,6 +255,7 @@ async function acquireCameraSourceLease(args: {
       target.leases = Math.max(0, target.leases - 1);
       if (target.leases === 0) args.closeSession(target);
     },
+    sourceLabel: target.sourceLabel,
     stream,
     trackSettings: {
       ...target.dimensions,

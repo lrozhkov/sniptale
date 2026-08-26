@@ -125,6 +125,7 @@ it('parses media library entries across supported source kinds', async () => {
   expect(sourceEntries.map(parseMediaLibraryEntry)).toEqual(
     sourceEntries.map((entry) => ({
       ...entry,
+      ...(entry.source.kind === 'screenshot' ? { imageContentState: 'original' as const } : {}),
       lifecycle: { savedAt: entry.updatedAt, storageClass: 'library', updatedAt: entry.updatedAt },
       workspaceRevision: 0,
     }))

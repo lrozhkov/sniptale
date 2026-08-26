@@ -8,6 +8,7 @@ import type {
 import type { GalleryItem } from '../items';
 import type { GalleryPreviewSessionState } from '../types';
 import type { ActiveImportState } from '../import-types';
+import type { PendingMediaFileImportState } from '../import-types';
 
 interface PendingImportState {
   file: File;
@@ -54,9 +55,13 @@ interface GalleryPreviewActionState {
 }
 
 interface GalleryImportActionState {
+  derived: {
+    allItems: GalleryItem[];
+  };
   storage: {
     activeImport: ActiveImportState | null;
     pendingImport: PendingImportState | null;
+    pendingMediaImport: PendingMediaFileImportState | null;
   };
 }
 
@@ -107,6 +112,7 @@ interface GalleryImportControllerActions {
   surface: {
     setActiveImport: Dispatch<SetStateAction<ActiveImportState | null>>;
     setPendingImport: Dispatch<SetStateAction<PendingImportState | null>>;
+    setPendingMediaImport: Dispatch<SetStateAction<PendingMediaFileImportState | null>>;
   };
 }
 
@@ -135,6 +141,8 @@ export interface GalleryImportController {
   refs: {
     importInputRef: RefObject<HTMLInputElement | null>;
     importTriggerRef: RefObject<HTMLButtonElement | null>;
+    mediaImportInputRef: RefObject<HTMLInputElement | null>;
+    mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
   };
   state: GalleryImportActionState;
 }
@@ -151,7 +159,6 @@ export interface GallerySurfaceController {
       setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
       setIsBusy: Dispatch<SetStateAction<boolean>>;
       setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
-      setShowStorageManager: Dispatch<SetStateAction<boolean>>;
     };
   };
 }

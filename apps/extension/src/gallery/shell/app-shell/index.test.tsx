@@ -94,7 +94,6 @@ describe('GalleryApp', () => {
       expect.objectContaining({
         controller: expect.objectContaining({ id: 'controller' }),
         actions: { id: 'actions' },
-        onRefreshAll: expect.any(Function),
         setViewMode: expect.any(Function),
         viewMode: 'compact-grid',
       })

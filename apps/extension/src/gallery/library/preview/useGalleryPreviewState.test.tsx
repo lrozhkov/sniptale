@@ -177,6 +177,23 @@ it('clears preview url when no item is selected and tolerates null or failed blo
   expect(latest()?.state.session.url).toBeNull();
 });
 
+it('remembers the last inspector position after the preview item closes', async () => {
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  act(() => {
+    root?.render(<HookProbe onValue={(value) => values.push(value)} />);
+  });
+
+  const latest = () => values.at(-1);
+  act(() => {
+    latest()?.actions.setPreview({ inspectorCollapsed: true, item: createItem(), url: null });
+  });
+  act(() => {
+    latest()?.actions.setPreview({ inspectorCollapsed: false, item: null, url: null });
+  });
+
+  expect(latest()?.state.session.inspectorCollapsed).toBe(true);
+});
+
 it('revokes the previous object url when the selected item changes or the hook unmounts', async () => {
   const firstBlob = new Blob(['first'], { type: 'image/png' });
   const secondBlob = new Blob(['second'], { type: 'image/png' });

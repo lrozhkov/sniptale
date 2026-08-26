@@ -26,10 +26,6 @@ vi.mock('../../library/modals/import-conflict-content', () => ({
   ImportConflictModalContent: () => null,
 }));
 
-vi.mock('../../library/modals/storage-manager-content', () => ({
-  StorageManagerModalContent: () => null,
-}));
-
 vi.mock('../../library/preview', () => ({
   PreviewPanel: () => null,
 }));
@@ -55,9 +51,13 @@ function createCallbackProps() {
     onFolderFilterChange: vi.fn(),
     onImport: vi.fn(),
     onImportBackupClick: vi.fn(),
+    onImportMediaClick: vi.fn(),
     onImportFileChange: vi.fn(),
+    onMediaImportFileChange: vi.fn(),
     onPendingExportClose: vi.fn(),
     onPendingImportClose: vi.fn(),
+    onPendingMediaImportClose: vi.fn(),
+    onMediaImportConfirm: vi.fn(),
     onPreviewClose: vi.fn(),
     onPreviewCopy: vi.fn(),
     onPreviewDelete: vi.fn(),
@@ -66,20 +66,19 @@ function createCallbackProps() {
     onPreviewEdit: vi.fn(),
     onPreviewInspectorToggle: vi.fn(),
     onPreviewOpen: vi.fn(),
+    onPreviewNavigate: vi.fn(),
     onPreviewOpenSnapshotScreenshot: vi.fn(),
     onPreviewResetChanges: vi.fn(),
     onPreviewRestoreOriginal: vi.fn(),
     onPreviewSaveCopy: vi.fn(),
-    onRefresh: vi.fn(),
     onRemoveTag: vi.fn(),
+    onResetFilters: vi.fn(),
     onSearchChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
+    onSelectionBackup: vi.fn(),
     onSelectionZip: vi.fn(),
     onSortModeChange: vi.fn(),
     onViewModeChange: vi.fn(),
-    onStorageCleanup: vi.fn(),
-    onStorageManagerClose: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
   };
@@ -125,6 +124,8 @@ function createLayoutProps() {
     gridViewportRef: { current: null },
     importInputRef: { current: null },
     importTriggerRef: { current: null },
+    mediaImportInputRef: { current: null },
+    mediaImportTriggerRef: { current: null },
     ...createCallbackProps(),
     state: createGalleryState({ pendingExport: createPendingExportState() }),
     viewMode: 'compact-grid' as const,

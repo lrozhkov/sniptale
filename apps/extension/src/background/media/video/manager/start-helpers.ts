@@ -1,11 +1,12 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
+import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import type {
+import {
   CaptureMode,
-  CaptureSource,
-  VideoRecordingSettings,
-  ViewportInfo,
+  type CaptureSource,
+  type VideoRecordingSettings,
+  type ViewportInfo,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { RuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
 import type { AppliedCaptureSurface } from '../../../capture-surface';
@@ -39,6 +40,15 @@ export function sendOffscreenStartRecording(
         recordingId: args.recordingId,
         generation: args.generation,
         streamInstanceId: args.streamInstanceId,
+        ...(args.captureMode === CaptureMode.TAB || args.captureMode === CaptureMode.TAB_CROP
+          ? {
+              sourceContext: {
+                favicon: sanitizeProvenanceUrl(args.captureSource.tabFavicon),
+                title: args.captureSource.tabTitle ?? null,
+                url: sanitizeProvenanceUrl(args.captureSource.tabUrl),
+              },
+            }
+          : {}),
         ...(args.recordingTabId === null ? {} : { tabId: args.recordingTabId }),
         ...((args.captureSource.captureViewport ?? args.viewport) === undefined
           ? {}

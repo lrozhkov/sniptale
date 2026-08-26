@@ -26,8 +26,8 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 type TestLayoutProps = {
-  onAddTag: () => void;
-  onApplySelectionTag: () => void;
+  onAddTag: (tag?: string) => void;
+  onApplySelectionTag: (tag?: string) => void;
   onBackupExportConfirm: (options: unknown) => void;
   onBackupExportInspect: (options: unknown) => Promise<unknown>;
   onBannerDismiss: () => void;
@@ -38,21 +38,24 @@ type TestLayoutProps = {
   onImport: (strategy: unknown) => void;
   onImportBackupClick: () => void;
   onImportFileChange: (file: File | null) => void;
+  onMediaImportFileChange: (files: File[]) => void;
+  onImportMediaClick: () => void;
   onPendingExportClose: () => void;
   onPendingImportClose: () => void;
+  onPendingMediaImportClose: () => void;
+  onMediaImportConfirm: (strategy: 'skip' | 'duplicate') => void;
   onPreviewClose: () => void;
   onPreviewInspectorToggle: () => void;
   onPreviewDelete: (item: unknown) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewOpen: (item: unknown, options?: { inspectorCollapsed?: boolean }) => void;
+  onPreviewNavigate: (item: unknown) => void;
   onPreviewPromote: (item: unknown) => Promise<void>;
   onPreviewResetChanges: () => void;
-  onRefresh: () => void;
   onRemoveTag: (tag: string) => void;
+  onResetFilters: () => void;
+  onSelectionBackup: () => void;
   onSelectionZip: () => void;
-  onStorageCleanup: (group: unknown) => void;
-  onStorageManagerClose: () => void;
-  onStorageManagerOpen: () => void;
   onViewModeChange: (mode: string) => void;
   viewMode: string;
 };
@@ -86,15 +89,19 @@ function createActions(): UseGalleryAppActionsResult {
     importing: {
       cancelActiveImport: vi.fn(),
       closePendingImport: vi.fn(),
+      closePendingMediaImport: vi.fn(),
+      confirmMediaFileImport: vi.fn(async () => undefined),
       dismissActiveImport: vi.fn(),
       importBackup: vi.fn(async () => undefined),
       importSelectedFile: vi.fn(async () => undefined),
+      importMediaFiles: vi.fn(async () => undefined),
     },
     preview: {
       close: vi.fn(async () => undefined),
       copy: vi.fn(),
       download: vi.fn(),
       downloadOriginal: vi.fn(),
+      navigate: vi.fn(async () => undefined),
       openInEditor: vi.fn(),
       openSnapshotScreenshotInEditor: vi.fn(),
       resetChanges: vi.fn(),
@@ -105,10 +112,8 @@ function createActions(): UseGalleryAppActionsResult {
     selection: {
       applyTag: vi.fn(async () => undefined),
       deleteMany: vi.fn(),
+      downloadBackup: vi.fn(async () => undefined),
       downloadZip: vi.fn(async () => undefined),
-    },
-    storage: {
-      cleanup: vi.fn(async () => undefined),
     },
   };
 }
@@ -124,8 +129,12 @@ function createControllerState() {
     current: { click: ReturnType<typeof vi.fn> } | null;
   };
   importInputRef.current = { click: vi.fn() };
+  const mediaImportInputRef = state.controller.refs.mediaImportInputRef as {
+    current: { click: ReturnType<typeof vi.fn> } | null;
+  };
+  mediaImportInputRef.current = { click: vi.fn() };
 
-  return { ...state, importInputRef };
+  return { ...state, importInputRef, mediaImportInputRef };
 }
 
 function renderBindings() {
@@ -137,15 +146,12 @@ function renderBindings() {
       viewMode = typeof next === 'function' ? next(viewMode) : next;
     }
   );
-  const onRefreshAll = vi.fn();
-
   act(() => {
     root?.render(
       <GalleryAppBindings
         actions={actions}
         controller={controllerState.controller}
         messaging={{ sendRuntimeMessage: sendRuntimeMessageMock }}
-        onRefreshAll={onRefreshAll}
         setViewMode={setViewMode}
         viewMode={viewMode}
       />
@@ -157,37 +163,38 @@ function renderBindings() {
     ...controllerState,
     importInputRef: controllerState.importInputRef,
     layoutProps: layoutPropsMock.mock.lastCall?.[0] as TestLayoutProps,
-    onRefreshAll,
     readViewMode: () => viewMode,
   };
 }
 
 it('maps gallery actions into layout props and handles primary callbacks', () => {
-  const { actions, getState, importInputRef, layoutProps, onRefreshAll, readViewMode } =
+  const { actions, getState, importInputRef, layoutProps, mediaImportInputRef, readViewMode } =
     renderBindings();
 
   act(() => {
     layoutProps.onImportFileChange(null);
-    layoutProps.onStorageManagerOpen();
-    layoutProps.onStorageManagerClose();
+    layoutProps.onMediaImportFileChange([]);
     layoutProps.onConfirmDialogClose();
-    layoutProps.onStorageCleanup({ id: 'cleanup' });
     layoutProps.onPendingExportClose();
     layoutProps.onBackupExportConfirm({ scope: 'all' });
     void layoutProps.onBackupExportInspect({ scope: 'all' });
     layoutProps.onPendingImportClose();
+    layoutProps.onPendingMediaImportClose();
+    layoutProps.onMediaImportConfirm('skip');
     layoutProps.onImport('replace');
     layoutProps.onPreviewInspectorToggle();
     layoutProps.onPreviewClose();
     layoutProps.onRemoveTag('alpha');
+    layoutProps.onResetFilters();
     layoutProps.onPreviewResetChanges();
     layoutProps.onPreviewDelete({ id: 'asset-1' });
     layoutProps.onPreviewOpenSnapshotScreenshot();
     layoutProps.onExportBackup();
     layoutProps.onImportBackupClick();
-    layoutProps.onRefresh();
+    layoutProps.onImportMediaClick();
     layoutProps.onBannerDismiss();
     layoutProps.onApplySelectionTag();
+    layoutProps.onSelectionBackup();
     layoutProps.onSelectionZip();
     layoutProps.onDeleteMany([{ id: 'asset-2' }]);
     layoutProps.onClearSelection();
@@ -207,7 +214,12 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
   expect(getState().preview.session.item).toEqual({ id: 'asset-3' });
   expect(readViewMode()).toBe('list');
   expect(importInputRef.current?.click).toHaveBeenCalledTimes(1);
-  expect(onRefreshAll).toHaveBeenCalledTimes(1);
+  expect(mediaImportInputRef.current?.click).toHaveBeenCalledTimes(1);
+  expect(actions.importing.importMediaFiles).toHaveBeenCalledWith([]);
+  expect(actions.importing.closePendingMediaImport).toHaveBeenCalledTimes(1);
+  expect(actions.importing.confirmMediaFileImport).toHaveBeenCalledWith('skip');
+  expect(actions.selection.downloadBackup).toHaveBeenCalledTimes(1);
+  expect(actions.selection.downloadZip).toHaveBeenCalledTimes(1);
 });
 
 it('deduplicates tags when the add-tag action runs repeatedly', () => {
@@ -226,6 +238,40 @@ it('deduplicates tags when the add-tag action runs repeatedly', () => {
   });
 
   expect(getState().preview.draft.tags).toEqual(['beta']);
+});
+
+it('adds the exact tag chosen from the suggestion list', () => {
+  const { getState, layoutProps } = renderBindings();
+
+  act(() => {
+    layoutProps.onAddTag('suggested-tag');
+  });
+
+  expect(getState().preview.draft.tags).toContain('suggested-tag');
+});
+
+it('reuses the last inspector position when opening another preview item', () => {
+  const { getState, layoutProps } = renderBindings();
+
+  act(() => {
+    layoutProps.onPreviewInspectorToggle();
+    layoutProps.onPreviewOpen(createMediaItem({ id: 'asset-next' }));
+  });
+
+  expect(getState().preview.session.item?.id).toBe('asset-next');
+  expect(getState().preview.session.inspectorCollapsed).toBe(true);
+});
+
+it('persists metadata before navigating to an adjacent preview item', async () => {
+  const { actions, layoutProps } = renderBindings();
+  const nextItem = createMediaItem({ id: 'asset-next' });
+
+  await act(async () => {
+    layoutProps.onPreviewNavigate(nextItem);
+    await Promise.resolve();
+  });
+
+  expect(actions.preview.navigate).toHaveBeenCalledWith(nextItem);
 });
 
 it('promotes each supported gallery owner and refreshes the active scope', async () => {

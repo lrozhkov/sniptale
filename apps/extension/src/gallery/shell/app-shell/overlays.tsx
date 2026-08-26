@@ -1,26 +1,26 @@
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { BackupExportModalContent } from '../../library/modals/backup-export-content';
 import { ImportConflictModalContent } from '../../library/modals/import-conflict-content';
-import { StorageManagerModalContent } from '../../library/modals/storage-manager-content';
+import { MediaImportConflictModalContent } from '../../library/modals/media-import-conflict-content';
 import { PreviewPanel } from '../../library/preview';
+import { isGalleryMediaItem } from '../../library/items';
 import type { GalleryAppLayoutProps } from './types';
-import { GalleryImportProgressCard } from '../../library/import-progress-card';
 
-function GalleryStorageOverlay(
-  props: Pick<GalleryAppLayoutProps, 'onStorageCleanup' | 'onStorageManagerClose' | 'state'>
-) {
-  if (!props.state.storage.showStorageManager) {
-    return null;
-  }
-
-  return (
-    <StorageManagerModalContent
-      report={props.state.storage.cleanupReport}
-      onClose={props.onStorageManagerClose}
-      onRun={async (group) => props.onStorageCleanup(group)}
-    />
-  );
-}
+const galleryConfirmDialogClassName = [
+  '!w-[min(400px,calc(100vw-32px))] !max-w-none !rounded-[12px]',
+  '!bg-[var(--sniptale-color-surface-panel)] !p-0 !font-[inherit]',
+  '[&_.sniptale-modal-header-sm]:!border-b-0 [&_.sniptale-modal-header-sm]:!bg-transparent',
+  '[&_.sniptale-modal-header-sm]:!px-4 [&_.sniptale-modal-header-sm]:!pb-1 [&_.sniptale-modal-header-sm]:!pt-4',
+  '[&_.sniptale-confirm-title]:!m-0',
+  '[&_.sniptale-modal-body-sm]:!gap-0 [&_.sniptale-modal-body-sm]:!bg-transparent',
+  '[&_.sniptale-modal-body-sm]:!px-4 [&_.sniptale-modal-body-sm]:!py-2',
+  '[&_.sniptale-confirm-message]:!m-0 [&_.sniptale-confirm-message]:!text-[var(--sniptale-color-text-secondary)]',
+  '[&_.sniptale-modal-footer-sm]:!gap-2 [&_.sniptale-modal-footer-sm]:!border-t-0',
+  '[&_.sniptale-modal-footer-sm]:!bg-transparent [&_.sniptale-modal-footer-sm]:!px-4',
+  '[&_.sniptale-modal-footer-sm]:!pb-4 [&_.sniptale-modal-footer-sm]:!pt-3',
+  '[&_.sniptale-modal-footer-sm_button]:!h-9 [&_.sniptale-modal-footer-sm_button]:!min-h-9',
+  '[&_.sniptale-modal-footer-sm_button]:!rounded-[8px] [&_.sniptale-modal-footer-sm_button]:!px-3.5',
+].join(' ');
 
 function GalleryImportOverlay(
   props: Pick<GalleryAppLayoutProps, 'onImport' | 'onPendingImportClose' | 'state'>
@@ -41,15 +41,18 @@ function GalleryImportOverlay(
   );
 }
 
-function GalleryImportProgressOverlay(
-  props: Pick<GalleryAppLayoutProps, 'onActiveImportCancel' | 'onActiveImportDismiss' | 'state'>
+function GalleryMediaImportOverlay(
+  props: Pick<GalleryAppLayoutProps, 'onMediaImportConfirm' | 'onPendingMediaImportClose' | 'state'>
 ) {
-  if (!props.state.storage.activeImport) return null;
+  const pending = props.state.storage.pendingMediaImport;
+  if (!pending) return null;
+
   return (
-    <GalleryImportProgressCard
-      state={props.state.storage.activeImport}
-      onCancel={props.onActiveImportCancel}
-      onDismiss={props.onActiveImportDismiss}
+    <MediaImportConflictModalContent
+      conflicts={pending.conflicts}
+      fileCount={pending.files.length}
+      onClose={props.onPendingMediaImportClose}
+      onImport={props.onMediaImportConfirm}
     />
   );
 }
@@ -88,6 +91,7 @@ function GalleryConfirmOverlay(
       message={props.state.storage.confirmDialog.message}
       confirmText={props.state.storage.confirmDialog.confirmText}
       cancelText={props.state.storage.confirmDialog.cancelText}
+      dialogClassName={galleryConfirmDialogClassName}
       onCancel={props.onConfirmDialogClose}
       onConfirm={props.state.storage.confirmDialog.onConfirm}
     />
@@ -100,6 +104,7 @@ type GalleryPreviewOverlayProps = Pick<
   | 'onFilenameChange'
   | 'onPreviewClose'
   | 'onPreviewInspectorToggle'
+  | 'onPreviewNavigate'
   | 'onPreviewCopy'
   | 'onPreviewDelete'
   | 'onPreviewDownload'
@@ -125,6 +130,38 @@ function buildPreviewResetProps(props: GalleryPreviewOverlayProps) {
     : { onResetChanges: props.onPreviewResetChanges };
 }
 
+function buildPreviewNavigationProps(
+  props: GalleryPreviewOverlayProps,
+  previewItem: NonNullable<GalleryPreviewOverlayProps['state']['preview']['session']['item']>
+) {
+  if (!isGalleryMediaItem(previewItem)) {
+    return {};
+  }
+
+  const items = props.state.derived.filteredItems.filter(isGalleryMediaItem);
+  const index = items.findIndex((item) => item.id === previewItem.id);
+  if (index < 0 || items.length < 2) {
+    return {};
+  }
+
+  const previousItem = items[index - 1] ?? null;
+  const nextItem = items[index + 1] ?? null;
+  return {
+    navigation: {
+      current: index + 1,
+      total: items.length,
+      hasPrevious: previousItem !== null,
+      hasNext: nextItem !== null,
+      onPrevious: () => {
+        if (previousItem) props.onPreviewNavigate(previousItem);
+      },
+      onNext: () => {
+        if (nextItem) props.onPreviewNavigate(nextItem);
+      },
+    },
+  };
+}
+
 function renderPreviewOverlayPanel(
   props: GalleryPreviewOverlayProps,
   previewItem: NonNullable<GalleryPreviewOverlayProps['state']['preview']['session']['item']>
@@ -133,6 +170,7 @@ function renderPreviewOverlayPanel(
     <PreviewPanel
       {...buildPreviewTagProps(props)}
       {...(props.state.preview.draft.hasChanges ? { hasChanges: true } : {})}
+      {...buildPreviewNavigationProps(props, previewItem)}
       item={previewItem}
       previewUrl={props.state.preview.session.url}
       inspectorCollapsed={props.state.preview.session.inspectorCollapsed}
@@ -171,9 +209,8 @@ export function GalleryOverlays(props: GalleryAppLayoutProps) {
     <>
       <GalleryConfirmOverlay {...props} />
       <GalleryBackupExportOverlay {...props} />
-      <GalleryStorageOverlay {...props} />
       <GalleryImportOverlay {...props} />
-      <GalleryImportProgressOverlay {...props} />
+      <GalleryMediaImportOverlay {...props} />
       <GalleryPreviewOverlay {...props} />
     </>
   );

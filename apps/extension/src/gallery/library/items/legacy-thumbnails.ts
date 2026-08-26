@@ -8,12 +8,25 @@ import type { MediaThumbnailEntry } from '../../../composition/persistence/media
 import { listRecentScenarioSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
-import { createVideoThumbnailBlob } from '../../../platform/media-utils/video-thumbnails';
+import {
+  createVideoThumbnailBlob,
+  VIDEO_THUMBNAIL_GENERATOR_VERSION,
+} from '../../../platform/media-utils/video-thumbnails';
 import type { GalleryItem } from './types';
 
 const WIDTH = 320;
 const HEIGHT = 180;
 const pending = new Map<string, Promise<MediaThumbnailEntry | undefined>>();
+
+function usesVideoThumbnailRenderer(item: GalleryItem): boolean {
+  return (
+    item.type === 'media' &&
+    (item.kind === 'recording' ||
+      item.kind === 'video' ||
+      item.kind === 'export' ||
+      item.mimeType.startsWith('video/'))
+  );
+}
 
 async function render(item: GalleryItem): Promise<Blob | null> {
   if (item.type === 'scenario-export') {
@@ -42,7 +55,13 @@ export async function ensureLegacyGalleryThumbnail(
   item: GalleryItem
 ): Promise<MediaThumbnailEntry | undefined> {
   const existing = await getMediaThumbnail(item.id);
-  if (existing) return existing;
+  const usesVideoRenderer = usesVideoThumbnailRenderer(item);
+  if (
+    existing &&
+    (!usesVideoRenderer || existing.generatorVersion === VIDEO_THUMBNAIL_GENERATOR_VERSION)
+  ) {
+    return existing;
+  }
   const current = pending.get(item.id);
   if (current) return current;
   const next = render(item)
@@ -52,6 +71,7 @@ export async function ensureLegacyGalleryThumbnail(
         assetId: item.id,
         blob,
         createdAt: item.createdAt,
+        ...(usesVideoRenderer ? { generatorVersion: VIDEO_THUMBNAIL_GENERATOR_VERSION } : {}),
         height: HEIGHT,
         updatedAt: Date.now(),
         width: WIDTH,

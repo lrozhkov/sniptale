@@ -5,14 +5,17 @@ import type {
   MediaHubLocalBackupSummary,
 } from '../../workflows/media-hub-backup/index';
 import type { MediaHubImportConflictStrategy } from '../../workflows/media-hub-backup/index';
-import type { StorageCleanupReport } from '../../features/media-hub/types';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
 import type { GalleryItem } from '../library/items';
 import type { ActiveImportState } from '../library/import-types';
+import type { PendingMediaFileImportState } from '../library/import-types';
 import type {
   FolderFilter,
   GalleryFolderCounts,
   GalleryGridMetrics,
+  GalleryFacetDefinition,
+  GalleryFacetFilterId,
+  GalleryFacetFilters,
   GalleryScope,
   GalleryPreviewSessionState,
   SortMode,
@@ -25,6 +28,9 @@ export type {
   GalleryPreviewSessionState,
   GalleryViewMode,
   GalleryScope,
+  GalleryFacetDefinition,
+  GalleryFacetFilterId,
+  GalleryFacetFilters,
   SortMode,
 } from '../library/types';
 
@@ -63,6 +69,7 @@ interface GalleryAppFilterState {
   search: string;
   scope: GalleryScope;
   activeTags: string[];
+  facetFilters: GalleryFacetFilters;
 }
 
 interface GalleryAppSelectionState {
@@ -80,9 +87,8 @@ interface GalleryAppPreviewState {
 interface GalleryAppStorageState {
   activeImport: ActiveImportState | null;
   storageInfo: StorageEstimateInfo | null;
-  cleanupReport: StorageCleanupReport | null;
-  showStorageManager: boolean;
   pendingImport: PendingImportState | null;
+  pendingMediaImport: PendingMediaFileImportState | null;
   pendingExport: PendingExportState | null;
   confirmDialog: GalleryConfirmDialogState | null;
   banner: string | null;
@@ -91,8 +97,10 @@ interface GalleryAppStorageState {
 }
 
 interface GalleryAppDerivedState {
+  allItems: GalleryItem[];
   allTags: string[];
   counts: GalleryFolderCounts;
+  facets: GalleryFacetDefinition[];
   filteredItems: GalleryItem[];
   activeStorageBarClass: string;
   visibleItems: GalleryItem[];
@@ -112,6 +120,8 @@ interface GalleryAppRefs {
   gridViewportRef: RefObject<HTMLDivElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;
   importTriggerRef: RefObject<HTMLButtonElement | null>;
+  mediaImportInputRef: RefObject<HTMLInputElement | null>;
+  mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
 }
 
 interface GalleryAppStorageActions {
@@ -119,11 +129,13 @@ interface GalleryAppStorageActions {
 }
 
 interface GalleryAppFilterActions {
+  resetFilters: () => void;
   setFolderFilter: Dispatch<SetStateAction<FolderFilter>>;
   setSortMode: Dispatch<SetStateAction<SortMode>>;
   setSearch: Dispatch<SetStateAction<string>>;
   setScope: Dispatch<SetStateAction<GalleryScope>>;
   setActiveTags: Dispatch<SetStateAction<string[]>>;
+  setFacetFilter: (id: GalleryFacetFilterId, values: string[]) => void;
 }
 
 interface GalleryAppSelectionActions {
@@ -141,8 +153,8 @@ interface GalleryAppPreviewActions {
 
 interface GalleryAppSurfaceActions {
   setActiveImport: Dispatch<SetStateAction<ActiveImportState | null>>;
-  setShowStorageManager: Dispatch<SetStateAction<boolean>>;
   setPendingImport: Dispatch<SetStateAction<PendingImportState | null>>;
+  setPendingMediaImport: Dispatch<SetStateAction<PendingMediaFileImportState | null>>;
   setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
   setBanner: Dispatch<SetStateAction<string | null>>;

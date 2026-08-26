@@ -49,15 +49,19 @@ function createActions(): UseGalleryAppActionsResult {
     importing: {
       cancelActiveImport: vi.fn(),
       closePendingImport: vi.fn(),
+      closePendingMediaImport: vi.fn(),
+      confirmMediaFileImport: vi.fn(async () => undefined),
       dismissActiveImport: vi.fn(),
       importBackup: vi.fn(async () => undefined),
       importSelectedFile: vi.fn(async () => undefined),
+      importMediaFiles: vi.fn(async () => undefined),
     },
     preview: {
       close: vi.fn(async () => undefined),
       copy: vi.fn(),
       download: vi.fn(),
       downloadOriginal: vi.fn(),
+      navigate: vi.fn(async () => undefined),
       openInEditor: vi.fn(),
       openSnapshotScreenshotInEditor: vi.fn(),
       resetChanges: vi.fn(),
@@ -68,10 +72,8 @@ function createActions(): UseGalleryAppActionsResult {
     selection: {
       applyTag: vi.fn(async () => undefined),
       deleteMany: vi.fn(async () => undefined),
+      downloadBackup: vi.fn(async () => undefined),
       downloadZip: vi.fn(async () => undefined),
-    },
-    storage: {
-      cleanup: vi.fn(async () => undefined),
     },
   };
 }

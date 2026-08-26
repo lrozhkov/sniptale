@@ -53,7 +53,7 @@ export function buildSidebarUtilityActions(args: {
     ImageEditorController,
     'exportDocument' | 'renderToDataUrl' | 'withHistoryMuted'
   >;
-  confirmOpenStorageManager: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
+  confirmOpenLibrary: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
   defaultImagePresetId: string | null;
   hasImage: boolean;
   rememberRecentColor: (color: string) => Promise<void>;

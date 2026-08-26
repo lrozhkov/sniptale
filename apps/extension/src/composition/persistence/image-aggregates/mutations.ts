@@ -13,7 +13,7 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import type { MediaLibraryEntry } from '../media-library/contracts';
+import type { ImageContentState, MediaLibraryEntry } from '../media-library/contracts';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
@@ -66,6 +66,7 @@ export interface CommitImageWorkspaceInput {
   aggregateId: string;
   document: EditorDocument;
   expectedRevision: number;
+  imageContentState?: ImageContentState;
   sourceTitle?: string | null;
   sourceUrl?: string | null;
   sourceFavicon?: string | null;
@@ -100,6 +101,7 @@ function createNewImageAggregateRoot(
     filename,
     height: input.document.sourceHeight,
     id: input.aggregateId,
+    imageContentState: 'original',
     kind: 'image',
     lifecycle: createLibraryLifecycle('temporary', now),
     mimeType: prepared.originalBlob.type || 'image/png',
@@ -274,6 +276,7 @@ async function commitImageWorkspaceMutation(
   });
   await mediaStore.put({
     ...media,
+    imageContentState: input.imageContentState ?? 'edited',
     updatedAt: now,
     workspaceRevision: revision,
     lifecycle: media.lifecycle ? { ...media.lifecycle, updatedAt: now } : media.lifecycle,
@@ -355,6 +358,13 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
     if (field !== undefined && field !== null && !isString(field)) return null;
   }
   if (
+    value['imageContentState'] !== undefined &&
+    value['imageContentState'] !== 'edited' &&
+    value['imageContentState'] !== 'original'
+  ) {
+    return null;
+  }
+  if (
     value['requireMissingRoot'] !== undefined &&
     typeof value['requireMissingRoot'] !== 'boolean'
   ) {
@@ -384,6 +394,9 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
     document,
     expectedRevision: value['expectedRevision'],
     refs: refs as AssetRef[],
+    ...(value['imageContentState'] === undefined
+      ? {}
+      : { imageContentState: value['imageContentState'] as ImageContentState }),
     ...(sourceGuard
       ? {
           sourceGuard: sourceGuard as NonNullable<CommitImageWorkspaceInput['sourceGuard']>,
@@ -612,6 +625,7 @@ export async function restoreImageAggregateOriginal(
     aggregateId,
     document,
     expectedRevision: expectedWorkspaceRevision,
+    imageContentState: 'original',
     sourceFavicon: source.sourceFavicon,
     sourceTitle: source.sourceTitle,
     sourceUrl: source.sourceUrl,
@@ -649,6 +663,9 @@ export async function copyImageAggregate(input: {
   try {
     return await saveImageAggregateCopyFromDocument({
       document,
+      ...(sourceMedia.imageContentState === undefined
+        ? {}
+        : { imageContentState: sourceMedia.imageContentState }),
       previewBlob: sourcePresentation.previewBlob ?? sourceMedia.blob,
       sourceFavicon: sourceMedia.sourceFavicon,
       sourceTitle: sourceWorkspace?.sourceTitle ?? sourceMedia.sourceTitle,
@@ -668,6 +685,7 @@ export async function copyImageAggregate(input: {
 
 export interface SaveImageAggregateCopyFromDocumentInput {
   document: EditorDocument;
+  imageContentState?: ImageContentState;
   previewBlob: Blob;
   sourceFavicon?: string | null;
   sourceTitle?: string | null;
@@ -684,6 +702,9 @@ export async function saveImageAggregateCopyFromDocument(
     aggregateId: input.targetAggregateId,
     document: input.document,
     expectedRevision: 0,
+    ...(input.imageContentState === undefined
+      ? {}
+      : { imageContentState: input.imageContentState }),
     requireMissingRoot: true,
     ...(input.sourceFavicon === undefined ? {} : { sourceFavicon: input.sourceFavicon }),
     ...(input.sourceTitle === undefined ? {} : { sourceTitle: input.sourceTitle }),

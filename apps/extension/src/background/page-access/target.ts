@@ -1,5 +1,9 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { PAGE_ACCESS_SITE_SCRIPT_PREFIX } from './constants';
+import {
+  FILE_SCHEME_ORIGIN_PATTERN,
+  PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID,
+  PAGE_ACCESS_SITE_SCRIPT_PREFIX,
+} from './constants';
 
 export type SupportedPageTarget = {
   tab: chrome.tabs.Tab;
@@ -13,7 +17,14 @@ export type PageAccessStatusContext =
   | { kind: 'unsupported-url'; tabId: number | null };
 
 export function createOriginPattern(url: URL): string {
+  if (url.protocol === 'file:') {
+    return FILE_SCHEME_ORIGIN_PATTERN;
+  }
   return `${url.origin}/*`;
+}
+
+export function createPermissionScope(url: URL): string {
+  return url.protocol === 'file:' ? FILE_SCHEME_ORIGIN_PATTERN : url.origin;
 }
 
 function encodeScriptIdSegment(value: string): string {
@@ -21,6 +32,9 @@ function encodeScriptIdSegment(value: string): string {
 }
 
 export function createSiteScriptId(url: URL): string {
+  if (url.protocol === 'file:') {
+    return PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID;
+  }
   return `${PAGE_ACCESS_SITE_SCRIPT_PREFIX}-${encodeScriptIdSegment(url.origin)}`;
 }
 
@@ -31,7 +45,7 @@ export function isSupportedUrl(value: string | undefined): value is string {
 
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'file:';
   } catch {
     return false;
   }

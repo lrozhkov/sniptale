@@ -168,15 +168,26 @@
       "justification": "Shim-restored hotkeys and scenario captures run outside Chrome activeTab user-invocation events, and Chrome tabs.captureVisibleTab checks for literal <all_urls> or activeTab. The all-sites permission therefore has to be the optional literal grant rather than split HTTP/HTTPS origins.",
       "reviewNote": "Keep optional host access usage centralized in apps/extension/src/background/page-access and capture routes; do not add required host_permissions or source manifest content_scripts.",
       "userFacingDisclosure": "settings.permissions.sitesDescription"
+    },
+    {
+      "name": "file:///",
+      "owner": "apps/extension/src/background/page-access/service.ts",
+      "feature": "Optional Sniptale page tooling on user-opened local files",
+      "runtimeRoute": "PAGE_ACCESS background-owned route with a separate dynamic top-frame file-scheme content runtime shim registration and lazy full-runtime injection",
+      "capabilityPolicy": "Local-file access requires a dedicated Settings opt-in, browser host authority, and Chrome's user-controlled Allow access to file URLs setting; it never inherits authority from the HTTP/HTTPS all-sites choice alone.",
+      "failureBehavior": "Denied, incomplete, or revoked file access removes the file-scheme registration and leaves local-file tooling inactive without affecting website access.",
+      "justification": "Allows users to run Sniptale tools on local HTML and other browser-rendered files only after a dedicated Settings action and Chrome's separate file-access confirmation.",
+      "reviewNote": "Keep the dedicated boolean opt-in in the page-access persistence owner, verify effective access with chrome.extension.isAllowedFileSchemeAccess, and never persist local file paths as permission state.",
+      "userFacingDisclosure": "settings.permissions.localFilesDescription"
     }
   ],
   "contentScripts": [],
   "webAccessibleResources": [
     {
-      "name": "web_accessible_resources:{\"resources\":[\"fonts/manrope-cyrillic-wght-normal.woff2\",\"fonts/manrope-latin-ext-wght-normal.woff2\",\"fonts/manrope-latin-wght-normal.woff2\",\"fonts/marck-script-cyrillic-400-normal.woff2\",\"fonts/marck-script-latin-400-normal.woff2\"],\"matches\":[\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
+      "name": "web_accessible_resources:{\"resources\":[\"fonts/manrope-cyrillic-wght-normal.woff2\",\"fonts/manrope-latin-ext-wght-normal.woff2\",\"fonts/manrope-latin-wght-normal.woff2\",\"fonts/marck-script-cyrillic-400-normal.woff2\",\"fonts/marck-script-latin-400-normal.woff2\"],\"matches\":[\"file:///*\",\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
       "owner": "apps/extension/src/content/public/preparation-surface/styles.ts",
       "feature": "Content runtime UI and frame-annotation font rendering on HTTP and HTTPS pages",
-      "runtimeRoute": "content runtime shadow-DOM CSS loaded through chrome.runtime.getURL font URLs",
+      "runtimeRoute": "content runtime shadow-DOM CSS loaded through chrome.runtime.getURL font URLs on granted HTTP, HTTPS, or local-file pages",
       "capabilityPolicy": "Expose only the exact Manrope and Marck Script font files required by extension-owned content UI; injected JavaScript bundles remain non-web-accessible.",
       "failureBehavior": "Missing font assets fall back to system fonts without expanding web-accessible JavaScript exposure.",
       "justification": "Allows the injected content runtime to render the extension UI consistently after host-page injection.",

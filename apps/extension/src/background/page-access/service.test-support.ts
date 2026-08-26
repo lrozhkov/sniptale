@@ -8,6 +8,7 @@ import { installBackgroundRuntimeMessagingMock } from '../routing-contracts/runt
 const mocks = vi.hoisted(() => ({
   browserPermissionsContainsMock: vi.fn<(query: { origins?: string[] }) => Promise<boolean>>(),
   browserPermissionsGetAllMock: vi.fn(),
+  browserPermissionsIsFileSchemeAccessAllowedMock: vi.fn(),
   browserPermissionsRemoveMock: vi.fn(),
   browserPermissionsRequestMock: vi.fn(),
   browserScriptingExecuteScriptMock: vi.fn(),
@@ -19,12 +20,14 @@ const mocks = vi.hoisted(() => ({
   browserStorageSessionSetMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   browserTabsQueryMock: vi.fn(),
+  localFileAccessOptInMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
 }));
 
 export const {
   browserPermissionsContainsMock,
   browserPermissionsGetAllMock,
+  browserPermissionsIsFileSchemeAccessAllowedMock,
   browserPermissionsRemoveMock,
   browserPermissionsRequestMock,
   browserScriptingExecuteScriptMock,
@@ -33,6 +36,7 @@ export const {
   browserScriptingUnregisterContentScriptsMock,
   browserStorageSessionSetMock,
   browserTabsGetMock,
+  localFileAccessOptInMock,
   sendTabMessageMock,
 } = mocks;
 
@@ -57,6 +61,7 @@ vi.mock('@sniptale/platform/browser/permissions', async (importOriginal) => ({
   browserPermissions: {
     contains: browserPermissionsContainsMock,
     getAll: browserPermissionsGetAllMock,
+    isFileSchemeAccessAllowed: browserPermissionsIsFileSchemeAccessAllowedMock,
     remove: browserPermissionsRemoveMock,
     request: browserPermissionsRequestMock,
     subscribeToAdded: vi.fn(),
@@ -72,6 +77,11 @@ vi.mock('@sniptale/platform/browser/scripting', async (importOriginal) => ({
     registerContentScripts: browserScriptingRegisterContentScriptsMock,
     unregisterContentScripts: browserScriptingUnregisterContentScriptsMock,
   },
+}));
+
+vi.mock('../../composition/persistence/settings/file-scheme-consent', () => ({
+  hasLocalFileAccessOptIn: mocks.localFileAccessOptInMock,
+  setLocalFileAccessOptIn: vi.fn(),
 }));
 
 vi.mock('../../composition/persistence/infrastructure/browser-storage', () => ({
@@ -129,6 +139,8 @@ beforeEach(async () => {
   await clearPageAccessTabActivation(9);
   browserPermissionsContainsMock.mockResolvedValue(false);
   browserPermissionsGetAllMock.mockResolvedValue({ origins: [] });
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(false);
+  mocks.localFileAccessOptInMock.mockResolvedValue(true);
   browserPermissionsRemoveMock.mockResolvedValue(true);
   browserPermissionsRequestMock.mockResolvedValue(true);
   browserScriptingExecuteScriptMock.mockResolvedValue([]);

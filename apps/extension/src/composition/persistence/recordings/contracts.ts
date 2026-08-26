@@ -9,6 +9,7 @@ import type {
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
+import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 export interface StoredRecordingEntry {
   assetId: string;
@@ -18,6 +19,13 @@ export interface StoredRecordingEntry {
   mimeType: string;
   size: number;
   lifecycle?: LibraryLifecycle;
+  recordingGroup?: RecordingGroupMember;
+  mediaMetadata?: {
+    duration: number;
+    height: number;
+    kind: 'video';
+    width: number;
+  };
 }
 
 export interface RecordingEntry extends StoredRecordingEntry {

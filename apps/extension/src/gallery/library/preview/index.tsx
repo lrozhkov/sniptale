@@ -9,7 +9,12 @@ import {
 } from '../items';
 import type { PreviewPanelProps } from './types';
 import { PreviewMedia } from './media';
-import { PreviewActions, PreviewMetadataCards, PreviewTagEditor } from './sidebar-sections';
+import {
+  PreviewActions,
+  PreviewMetadataCards,
+  PreviewPromotionAction,
+  PreviewTagEditor,
+} from './sidebar-sections';
 import { formatDate, getGalleryItemKindLabel } from '../ui';
 
 function isMetadataEditable(item: PreviewPanelProps['item']) {
@@ -25,7 +30,7 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
   return (
     <div
       role="alert"
-      className="rounded-[16px] border border-[var(--sniptale-color-danger)] p-3 text-xs"
+      className="rounded-[8px] border border-[var(--sniptale-color-danger)] p-3 text-xs"
     >
       <p>{translate(reasonKey)}</p>
       <p className="mt-1 text-[var(--sniptale-color-text-muted)]">
@@ -45,7 +50,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
         >
           {translate('gallery.preview.inspector')}
         </div>
-        <h2 className="mt-2 text-2xl font-semibold">{getGalleryItemKindLabel(props.item.kind)}</h2>
+        <h2 className="mt-1 text-base font-semibold">{getGalleryItemKindLabel(props.item.kind)}</h2>
         <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
           {formatDate(props.item.createdAt)}
         </div>
@@ -73,7 +78,7 @@ function PreviewFilenameField(
         value={props.filenameDraft}
         onChange={(event) => props.onFilenameChange(event.target.value)}
         readOnly={!editable}
-        className="w-full rounded-[16px] border border-[var(--sniptale-color-border-soft)]
+        className="w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)]
           bg-[var(--sniptale-color-surface-panel)] px-3 py-2.5 text-sm
           text-[var(--sniptale-color-text-primary)] outline-none transition
           focus:border-[var(--sniptale-color-border-accent-strong)] read-only:cursor-default"
@@ -97,7 +102,7 @@ function PreviewSourceField(props: Pick<PreviewPanelProps, 'item'>) {
         {translate('gallery.preview.source')}
       </label>
       <div
-        className="rounded-[16px] border border-[var(--sniptale-color-border-soft)]
+        className="rounded-[8px] border border-[var(--sniptale-color-border-soft)]
           bg-[var(--sniptale-color-surface-panel)] px-3 py-2.5 text-xs
           text-[var(--sniptale-color-text-secondary)]"
       >
@@ -121,16 +126,15 @@ function PreviewSourceField(props: Pick<PreviewPanelProps, 'item'>) {
 function PreviewPanelSidebar(props: PreviewPanelProps) {
   return (
     <aside
-      className="w-[360px] shrink-0 border-l border-[var(--sniptale-color-border-soft)]
-        bg-[linear-gradient(
-          180deg,
-          color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)_0%,
-          color-mix(in_srgb,var(--sniptale-color-surface-canvas)_82%,transparent)_100%
-        )]
-        p-5 text-[var(--sniptale-color-text-primary)]"
+      className="min-h-0 w-full overflow-y-auto border-l border-[var(--sniptale-color-border-soft)]
+        bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]"
     >
       <PreviewPanelHeader item={props.item} />
-      <div className="mt-6 space-y-4">
+      <PreviewPromotionAction
+        item={props.item}
+        {...(props.onPromote ? { onPromote: props.onPromote } : {})}
+      />
+      <div className="mt-4 space-y-4">
         <PreviewFilenameField
           filenameDraft={props.filenameDraft}
           item={props.item}
@@ -154,19 +158,48 @@ function PreviewPanelSidebar(props: PreviewPanelProps) {
   );
 }
 
+function isPreviewEditingTarget(target: EventTarget | null) {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
+function handlePreviewKeyDown(
+  event: KeyboardEvent,
+  navigation: PreviewPanelProps['navigation'],
+  onClose: PreviewPanelProps['onClose']
+) {
+  if (event.key === 'Escape') {
+    onClose();
+    return;
+  }
+  if (isPreviewEditingTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey) {
+    return;
+  }
+  if (event.key === 'ArrowLeft' && navigation?.hasPrevious) {
+    event.preventDefault();
+    navigation.onPrevious();
+  } else if (event.key === 'ArrowRight' && navigation?.hasNext) {
+    event.preventDefault();
+    navigation.onNext();
+  }
+}
+
 export function PreviewPanel(props: PreviewPanelProps) {
   const { item, previewUrl } = props;
+  const navigation = props.navigation;
+  const onClose = props.onClose;
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        props.onClose();
-      }
-    };
+    const handleKeyDown = (event: KeyboardEvent) =>
+      handlePreviewKeyDown(event, navigation, onClose);
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [props]);
+  }, [navigation, onClose]);
 
   return (
     <div
@@ -179,15 +212,19 @@ export function PreviewPanel(props: PreviewPanelProps) {
     >
       <div className="flex min-h-0 flex-1 px-4 py-4">
         <div
-          className="flex h-full w-full overflow-hidden rounded-[20px]
+          data-ui="gallery.preview.surface"
+          className={`grid h-full w-full min-w-0 overflow-hidden
+            rounded-[var(--sniptale-radius-lg)]
             border border-[var(--sniptale-color-border-soft)]
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)]
-            text-[var(--sniptale-color-text-primary)] shadow-sm"
+            text-[var(--sniptale-color-text-primary)] shadow-sm
+            ${props.inspectorCollapsed ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_360px]'}`}
         >
           <PreviewMedia
             item={item}
             previewUrl={previewUrl}
             inspectorCollapsed={props.inspectorCollapsed}
+            {...(props.navigation ? { navigation: props.navigation } : {})}
             onInspectorToggle={props.onInspectorToggle}
             onClose={props.onClose}
           />

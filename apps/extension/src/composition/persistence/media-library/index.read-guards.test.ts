@@ -50,6 +50,7 @@ import {
   listMediaLibrary,
   updateMediaLibraryEntry,
 } from './index.library.ts';
+import { parseMediaLibraryEntry } from './read-guards';
 
 function createMediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibraryEntry {
   return {
@@ -93,8 +94,16 @@ beforeEach(() => {
 
 it('fails closed for malformed persisted media and thumbnail rows', async () => {
   mocks.getAll.mockResolvedValueOnce([
-    createMediaEntry(),
+    createMediaEntry({
+      recordingGroup: {
+        groupId: 'capture-1',
+        order: 0,
+        role: 'display',
+        sourceLabel: 'Window 1',
+      },
+    }),
     { id: 'recording:broken', filename: 'broken.webm' },
+    { ...createMediaEntry({ id: 'recording:invalid-group' }), recordingGroup: { role: 'camera' } },
   ]);
   mocks.getAllKeys.mockResolvedValue([]);
   mocks.get
@@ -109,7 +118,10 @@ it('fails closed for malformed persisted media and thumbnail rows', async () => 
     });
 
   await expect(listMediaLibrary()).resolves.toEqual([
-    expect.objectContaining({ id: 'recording:valid' }),
+    expect.objectContaining({
+      id: 'recording:valid',
+      recordingGroup: expect.objectContaining({ groupId: 'capture-1' }),
+    }),
   ]);
   await expect(getMediaLibraryEntry('recording:broken')).resolves.toBeUndefined();
   await expect(getMediaThumbnail('recording:broken')).resolves.toBeUndefined();
@@ -135,4 +147,30 @@ it('does not route source cleanup from malformed media records', async () => {
   expect(mocks.deleteRecording).not.toHaveBeenCalled();
   expect(mocks.deleteProjectAsset).not.toHaveBeenCalled();
   expect(mocks.txDelete).not.toHaveBeenCalled();
+});
+
+it('normalizes legacy editable image content state and rejects invalid state', () => {
+  const image = createMediaEntry({
+    blob: new Blob(['image'], { type: 'image/png' }),
+    height: 100,
+    id: 'image-1',
+    kind: 'image',
+    mimeType: 'image/png',
+    source: { kind: 'screenshot' },
+    width: 100,
+  });
+
+  expect(parseMediaLibraryEntry({ ...image, workspaceRevision: 0 })?.imageContentState).toBe(
+    'original'
+  );
+  expect(parseMediaLibraryEntry({ ...image, workspaceRevision: 3 })?.imageContentState).toBe(
+    'edited'
+  );
+  expect(
+    parseMediaLibraryEntry({ ...image, imageContentState: 'original', workspaceRevision: 3 })
+      ?.imageContentState
+  ).toBe('original');
+  expect(
+    parseMediaLibraryEntry({ ...image, imageContentState: 'unknown', workspaceRevision: 3 })
+  ).toBeNull();
 });

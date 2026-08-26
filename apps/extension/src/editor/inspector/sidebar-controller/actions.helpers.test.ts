@@ -37,7 +37,7 @@ it('builds static choices and applies uniform padding through the frame draft ow
   const options = createStaticSidebarOptions();
   const actions = buildSidebarUtilityActions({
     controller,
-    confirmOpenStorageManager: vi.fn(),
+    confirmOpenLibrary: vi.fn(),
     defaultImagePresetId: null,
     hasImage: true,
     rememberRecentColor: vi.fn(),

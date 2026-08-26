@@ -75,7 +75,11 @@ function serializeTemporaryActiveTabs(
 
 function hasSameOrigin(left: string, right: URL): boolean {
   try {
-    return new URL(left).origin === right.origin;
+    const leftUrl = new URL(left);
+    if (leftUrl.protocol === 'file:' || right.protocol === 'file:') {
+      return leftUrl.href === right.href;
+    }
+    return leftUrl.origin === right.origin;
   } catch {
     return false;
   }

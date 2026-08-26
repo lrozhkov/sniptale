@@ -1,5 +1,6 @@
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
+import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 import type { StoredImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
 import type { PersistedEditorDocumentV3 } from '../../../composition/persistence/document-assets';
 import type { ScenarioProjectEntry } from '../../../composition/persistence/scenario/contracts';
@@ -15,12 +16,29 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { MediaHubBackupExportOptions } from './contracts';
 
+export function projectRecordingGroupMemberPrivacy(
+  member: RecordingGroupMember,
+  options: MediaHubBackupExportOptions
+): RecordingGroupMember {
+  return {
+    ...member,
+    sourceFavicon: options.includeSourceMetadata
+      ? sanitizeProvenanceUrl(member.sourceFavicon)
+      : null,
+    sourceLabel: options.includeSourceMetadata ? member.sourceLabel : null,
+    sourceUrl: options.includeSourceMetadata ? sanitizeProvenanceUrl(member.sourceUrl) : null,
+  };
+}
+
 export function projectMediaEntryPrivacy(
   entry: Omit<MediaLibraryEntry, 'blob'>,
   options: MediaHubBackupExportOptions
 ): Omit<MediaLibraryEntry, 'blob'> {
   return {
     ...entry,
+    ...(entry.recordingGroup
+      ? { recordingGroup: projectRecordingGroupMemberPrivacy(entry.recordingGroup, options) }
+      : {}),
     sourceFavicon: options.includeSourceMetadata
       ? sanitizeProvenanceUrl(entry.sourceFavicon)
       : null,

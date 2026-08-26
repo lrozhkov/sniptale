@@ -32,6 +32,15 @@ export const runtimeVideoOffscreenViewportMessageContracts = {
           viewport: isViewportInfo,
           captureMode: isCaptureMode,
           cropRegion: isViewportRegion,
+          sourceContext: (value) =>
+            typeof value === 'object' &&
+            value !== null &&
+            (typeof (value as Record<string, unknown>)['favicon'] === 'string' ||
+              (value as Record<string, unknown>)['favicon'] === null) &&
+            (typeof (value as Record<string, unknown>)['title'] === 'string' ||
+              (value as Record<string, unknown>)['title'] === null) &&
+            (typeof (value as Record<string, unknown>)['url'] === 'string' ||
+              (value as Record<string, unknown>)['url'] === null),
           surface: (value) =>
             typeof value === 'object' &&
             value !== null &&

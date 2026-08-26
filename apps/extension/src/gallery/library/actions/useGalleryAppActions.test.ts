@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createCleanupGroup,
-  createController,
-  createMediaItem,
-  runBusyAction,
-} from './test-support/index';
+import { createController, createMediaItem, runBusyAction } from './test-support/index';
 import { useGalleryAppActions } from './useGalleryAppActions';
 
 const actionMocks = vi.hoisted(() => ({
@@ -23,12 +18,15 @@ const actionMocks = vi.hoisted(() => ({
   createExportBackupActionMock: vi.fn(),
   createInspectExportBackupActionMock: vi.fn(),
   createImportActionMock: vi.fn(),
+  createImportMediaFilesActionMock: vi.fn(),
   createImportSelectedFileActionMock: vi.fn(),
+  createNavigatePreviewActionMock: vi.fn(),
   createSaveMetadataActionMock: vi.fn(),
   createRestoreOriginalActionMock: vi.fn(),
   createSaveImageCopyActionMock: vi.fn(),
+  createSelectionBackupActionMock: vi.fn(),
+  createSelectedBackupExportOptionsMock: vi.fn(),
   createSelectionZipActionMock: vi.fn(),
-  createStorageCleanupActionMock: vi.fn(),
   downloadPreviewItemMock: vi.fn(async () => undefined),
   downloadOriginalPreviewItemMock: vi.fn(async () => undefined),
   openInEditorMock: vi.fn(),
@@ -36,7 +34,8 @@ const actionMocks = vi.hoisted(() => ({
   resetPreviewChangesMock: vi.fn(),
 }));
 
-vi.mock('./backup', () => ({
+vi.mock('./backup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./backup')>()),
   createCancelActiveImportAction: actionMocks.createCancelActiveImportActionMock,
   createClosePendingImportAction: actionMocks.createClosePendingImportActionMock,
   createClosePendingExportAction: actionMocks.createClosePendingExportActionMock,
@@ -45,6 +44,7 @@ vi.mock('./backup', () => ({
   createImportAction: actionMocks.createImportActionMock,
   createImportSelectedFileAction: actionMocks.createImportSelectedFileActionMock,
   createInspectExportBackupAction: actionMocks.createInspectExportBackupActionMock,
+  createSelectedBackupExportOptions: actionMocks.createSelectedBackupExportOptionsMock,
   createDismissActiveImportAction: actionMocks.createDismissActiveImportActionMock,
 }));
 
@@ -60,11 +60,22 @@ vi.mock('./preview', () => ({
   resetPreviewChanges: actionMocks.resetPreviewChangesMock,
 }));
 
+vi.mock('./preview-navigation', () => ({
+  createNavigatePreviewAction: actionMocks.createNavigatePreviewActionMock,
+}));
+
+vi.mock('./media-file-import', () => ({
+  createImportMediaFilesAction: actionMocks.createImportMediaFilesActionMock,
+}));
+
 vi.mock('./selection', () => ({
   createApplySelectionTagAction: actionMocks.createApplySelectionTagActionMock,
   createDeleteManyAction: actionMocks.createDeleteManyActionMock,
+}));
+
+vi.mock('./selection-export', () => ({
+  createSelectionBackupAction: actionMocks.createSelectionBackupActionMock,
   createSelectionZipAction: actionMocks.createSelectionZipActionMock,
-  createStorageCleanupAction: actionMocks.createStorageCleanupActionMock,
 }));
 
 vi.mock('./shared', async (importOriginal) => ({
@@ -79,7 +90,6 @@ vi.mock('./snapshot-screenshot', () => ({
 function prepareActionFactoryMocks() {
   actionMocks.createBusyActionRunnerMock.mockReturnValue(runBusyAction);
   actionMocks.createDeleteManyActionMock.mockReturnValue(vi.fn(async () => undefined));
-  actionMocks.createStorageCleanupActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createClosePendingExportActionMock.mockReturnValue(vi.fn());
   actionMocks.createClosePendingImportActionMock.mockReturnValue(vi.fn());
   actionMocks.createCancelActiveImportActionMock.mockReturnValue(vi.fn());
@@ -88,8 +98,11 @@ function prepareActionFactoryMocks() {
   actionMocks.createExportBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createInspectExportBackupActionMock.mockReturnValue(vi.fn(async () => ({})));
   actionMocks.createImportSelectedFileActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createImportMediaFilesActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createImportActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createClosePreviewActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createNavigatePreviewActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createSelectionBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createSelectionZipActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createSaveMetadataActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createApplySelectionTagActionMock.mockReturnValue(vi.fn(async () => undefined));
@@ -101,7 +114,7 @@ describe('useGalleryAppActions', () => {
   it('wires gallery action factories through the shared busy runner and preview helpers', async () => {
     vi.clearAllMocks();
     prepareActionFactoryMocks();
-    const { controller } = createController({
+    const { controller, getState } = createController({
       previewItem: createMediaItem({ id: 'asset-1' }),
     });
     const actions = useGalleryAppActions(controller);
@@ -114,17 +127,21 @@ describe('useGalleryAppActions', () => {
     };
 
     await actions.selection.deleteMany([createMediaItem({ id: 'asset-2' })]);
-    await actions.storage.cleanup(createCleanupGroup({ items: [] }));
     await actions.backup.exportBackup();
     await actions.backup.confirmExport(backupOptions);
     await actions.backup.inspectExport(backupOptions);
     await actions.importing.importSelectedFile(null);
     await actions.importing.importBackup('replace');
     actions.importing.closePendingImport();
+    actions.importing.closePendingMediaImport();
+    await actions.importing.importMediaFiles([]);
+    await actions.importing.confirmMediaFileImport('skip');
     actions.importing.cancelActiveImport();
     actions.importing.dismissActiveImport();
+    await actions.selection.downloadBackup();
     await actions.selection.downloadZip();
     await actions.preview.saveMetadata();
+    await actions.preview.navigate(createMediaItem({ id: 'asset-next' }));
     await actions.selection.applyTag();
     actions.preview.copy();
     actions.preview.download();
@@ -135,7 +152,9 @@ describe('useGalleryAppActions', () => {
     actions.preview.openInEditor(createMediaItem({ id: 'asset-3' }));
 
     expect(actionMocks.createBusyActionRunnerMock).toHaveBeenCalledWith(controller);
+    expect(getState().storage.pendingMediaImport).toBeNull();
     expect(actionMocks.createInspectExportBackupActionMock).toHaveBeenCalledTimes(1);
+    expect(actionMocks.createNavigatePreviewActionMock).toHaveBeenCalledWith(controller);
     expect(actionMocks.copyPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
     expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
     expect(actionMocks.downloadOriginalPreviewItemMock).toHaveBeenCalledWith(
@@ -157,5 +176,21 @@ describe('useGalleryAppActions', () => {
     expect(actionMocks.openInEditorMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'asset-3' })
     );
+  });
+
+  it('confirms a pending media import with the selected conflict strategy', async () => {
+    vi.clearAllMocks();
+    prepareActionFactoryMocks();
+    const pendingFiles = [new File(['image'], 'photo.png', { type: 'image/png' })];
+    const { controller } = createController({
+      pendingMediaImport: { conflicts: [], files: pendingFiles },
+    });
+    const importMediaFiles = vi.fn(async () => undefined);
+    actionMocks.createImportMediaFilesActionMock.mockReturnValue(importMediaFiles);
+
+    const actions = useGalleryAppActions(controller);
+    await actions.importing.confirmMediaFileImport('duplicate');
+
+    expect(importMediaFiles).toHaveBeenCalledWith(pendingFiles, 'duplicate');
   });
 });

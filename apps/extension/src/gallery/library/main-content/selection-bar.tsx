@@ -1,9 +1,6 @@
-import { FolderArchive, Trash2 } from 'lucide-react';
+import { Archive, FolderArchive, Trash2, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import {
-  getControlSecondaryButtonClassName,
-  getFormPanelSurfaceClassName,
-} from '@sniptale/ui/control-language';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { GalleryTagInput } from '../tags/input';
 import type { GalleryMainContentProps } from './types';
@@ -14,6 +11,7 @@ type GallerySelectionBarProps = Pick<
   | 'onApplySelectionTag'
   | 'onClearSelection'
   | 'onDeleteMany'
+  | 'onSelectionBackup'
   | 'onSelectionTagDraftChange'
   | 'onSelectionZip'
   | 'selectedItems'
@@ -22,8 +20,13 @@ type GallerySelectionBarProps = Pick<
 >;
 
 const galleryDangerSelectionActionClassName = [
-  getControlSecondaryButtonClassName({ density: 'compact', shape: 'pill', tone: 'danger' }),
-  'uppercase tracking-[0.12em]',
+  getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' }),
+  '!h-8 !min-h-8 !rounded-[8px] !px-2.5',
+].join(' ');
+
+const gallerySelectionActionClassName = [
+  getControlSecondaryButtonClassName({ density: 'compact' }),
+  '!h-8 !min-h-8 !rounded-[8px] !px-2.5',
 ].join(' ');
 
 function GallerySelectionTagInput(
@@ -33,12 +36,13 @@ function GallerySelectionTagInput(
   >
 ) {
   return (
-    <div className="min-w-[240px]">
+    <div className="w-56 min-w-0 shrink-0">
       <GalleryTagInput
         allTags={props.allTags ?? []}
         compact
+        explicitSubmit
         onChange={props.onSelectionTagDraftChange}
-        onSubmit={() => props.onApplySelectionTag()}
+        onSubmit={props.onApplySelectionTag}
         placeholder={translate('gallery.app.selectionTagPlaceholder')}
         value={props.selectionTagDraft}
       />
@@ -49,39 +53,40 @@ function GallerySelectionTagInput(
 function GallerySelectionActions(
   props: Pick<
     GallerySelectionBarProps,
-    'onClearSelection' | 'onDeleteMany' | 'onSelectionZip' | 'selectedItems'
+    'onDeleteMany' | 'onSelectionBackup' | 'onSelectionZip' | 'selectedItems'
   >
 ) {
   return (
     <>
       <button
         type="button"
-        onClick={props.onSelectionZip}
-        className={[
-          getControlSecondaryButtonClassName({ density: 'compact', shape: 'pill' }),
-          'uppercase tracking-[0.12em]',
-        ].join(' ')}
+        aria-label={translate('gallery.app.selectionBackup')}
+        title={translate('gallery.app.selectionBackup')}
+        onClick={props.onSelectionBackup}
+        className={gallerySelectionActionClassName}
       >
-        <FolderArchive className="h-3.5 w-3.5" />
-        ZIP
+        <Archive className="h-3.5 w-3.5" />
+        <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
       </button>
       <button
         type="button"
+        aria-label="ZIP"
+        title="ZIP"
+        onClick={props.onSelectionZip}
+        className={gallerySelectionActionClassName}
+      >
+        <FolderArchive className="h-3.5 w-3.5" />
+        <span className="hidden 2xl:inline">ZIP</span>
+      </button>
+      <button
+        type="button"
+        aria-label={translate('common.actions.delete')}
+        title={translate('common.actions.delete')}
         onClick={() => props.onDeleteMany(props.selectedItems)}
         className={galleryDangerSelectionActionClassName}
       >
         <Trash2 className="h-3.5 w-3.5" />
-        {translate('common.actions.delete')}
-      </button>
-      <button
-        type="button"
-        onClick={props.onClearSelection}
-        className={[
-          getControlSecondaryButtonClassName({ density: 'compact', shape: 'pill' }),
-          'uppercase tracking-[0.12em]',
-        ].join(' ')}
-      >
-        {translate('gallery.app.clearSelection')}
+        <span className="hidden 2xl:inline">{translate('common.actions.delete')}</span>
       </button>
     </>
   );
@@ -93,6 +98,7 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
     onApplySelectionTag,
     onClearSelection,
     onDeleteMany,
+    onSelectionBackup,
     onSelectionTagDraftChange,
     onSelectionZip,
     selectedItems,
@@ -104,19 +110,24 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
     return null;
   }
 
-  const selectionBarClassName = [
-    'mt-4 flex flex-wrap items-center gap-3 px-4 py-3',
-    getFormPanelSurfaceClassName({ compact: true }),
-  ].join(' ');
-
   return (
-    <div className={selectionBarClassName}>
-      <span className="text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+    <div className="flex h-8 min-w-0 flex-nowrap items-center justify-start gap-1.5">
+      <span className="shrink-0 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
         {translate('gallery.app.selectedPrefix')} {selectedItems.length}
       </span>
-      <span className="text-sm text-[var(--sniptale-color-text-secondary)]">
+      <span className="hidden shrink-0 text-xs text-[var(--sniptale-color-text-secondary)] 2xl:inline">
         {translate('gallery.app.sizePrefix')} {formatBytes(selectedSize, 2)}
       </span>
+      <button
+        type="button"
+        aria-label={translate('gallery.app.clearSelection')}
+        title={translate('gallery.app.clearSelection')}
+        onClick={onClearSelection}
+        className={gallerySelectionActionClassName}
+      >
+        <X className="h-3.5 w-3.5" />
+        <span className="hidden 2xl:inline">{translate('gallery.app.clearSelection')}</span>
+      </button>
       <GallerySelectionTagInput
         {...(allTags === undefined ? {} : { allTags })}
         onApplySelectionTag={onApplySelectionTag}
@@ -124,8 +135,8 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
         selectionTagDraft={selectionTagDraft}
       />
       <GallerySelectionActions
-        onClearSelection={onClearSelection}
         onDeleteMany={onDeleteMany}
+        onSelectionBackup={onSelectionBackup}
         onSelectionZip={onSelectionZip}
         selectedItems={selectedItems}
       />

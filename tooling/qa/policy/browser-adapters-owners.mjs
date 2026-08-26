@@ -9,6 +9,7 @@ export const LOCAL_STORAGE_OWNER_FILES = new Set([
 export const HISTORY_OWNER_FILES = new Set([
   'apps/extension/src/camera-recorder/platform/browser-driver/index.ts',
   'apps/extension/src/editor/document/page-session/index.ts',
+  'apps/extension/src/gallery/platform/browser-driver/index.ts',
   'apps/extension/src/scenario-editor/platform/browser-driver/index.ts',
   'tooling/test/support/content/dom-tree-parser/iframe/context.helpers.ts',
   'apps/extension/src/video-editor/runtime/browser-driver/index.ts',

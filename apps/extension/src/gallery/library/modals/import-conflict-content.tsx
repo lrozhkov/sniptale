@@ -1,160 +1,123 @@
-import { FolderArchive } from 'lucide-react';
+import { ArchiveRestore } from 'lucide-react';
+import { useState } from 'react';
+import {
+  getControlPrimaryButtonClassName,
+  getControlSecondaryButtonClassName,
+} from '@sniptale/ui/control-language';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { MediaHubImportConflictStrategy } from '../../../workflows/media-hub-backup/index';
-import { translate } from '../../../platform/i18n';
+import { formatDateTime, getCurrentLocale, translate } from '../../../platform/i18n';
 import { GalleryModalFrame } from './frame';
 import type { ImportConflictModalProps } from './types';
 
-const importManifestClassName =
-  'mt-5 rounded-[16px] border ' +
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_36%,var(--sniptale-color-border-soft)_64%)] ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_88%,var(--sniptale-color-surface-panel)_12%)] ' +
-  'px-4 py-4 text-sm text-[var(--sniptale-color-text-primary)]';
+const importSummaryClassName =
+  'mt-4 divide-y divide-[var(--sniptale-color-border-soft)] rounded-[8px] border ' +
+  'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] px-3';
 
-const replaceStrategyClassName =
-  'rounded-[16px] border ' +
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_34%,var(--sniptale-color-border-soft)_66%)] ' +
-  [
-    'bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_66%,var(--sniptale-color-surface-panel)_34%)]',
-    'px-4 py-4 text-left text-sm transition ',
-  ].join('') +
-  'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_48%,var(--sniptale-color-border-soft)_52%)]';
+const importSummaryRowClassName = 'flex min-h-10 items-center justify-between gap-4 py-2 text-sm';
 
-const skipStrategyClassName =
-  'rounded-[16px] border border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] ' +
-  'px-4 py-4 text-left text-sm transition hover:border-[var(--sniptale-color-border-strong)] ' +
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_76%,transparent)]';
+const importSecondaryButtonClassName = getControlSecondaryButtonClassName({ density: 'compact' });
 
-const duplicateStrategyClassName =
-  'rounded-[16px] border ' +
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-info)_30%,var(--sniptale-color-border-soft)_70%)] ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-info)_10%,transparent)] ' +
-  'px-4 py-4 text-left text-sm transition ' +
-  'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-info)_48%,var(--sniptale-color-border-soft)_52%)]';
+const importPrimaryButtonClassName = getControlPrimaryButtonClassName({ density: 'compact' });
 
-const importBadgeClassName =
-  'border border-[color:color-mix(in_srgb,var(--sniptale-color-info)_30%,var(--sniptale-color-border-soft)_70%)] ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-info)_10%,transparent)] text-[var(--sniptale-color-info)]';
+const STRATEGIES: MediaHubImportConflictStrategy[] = ['skip', 'duplicate', 'replace'];
 
-const importSummaryStatClassName =
-  'rounded-[16px] border border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] ' +
-  'px-4 py-4';
+function getStrategyTitle(strategy: MediaHubImportConflictStrategy): string {
+  switch (strategy) {
+    case 'skip':
+      return translate('gallery.importModal.skipTitle');
+    case 'duplicate':
+      return translate('gallery.importModal.duplicateTitle');
+    case 'replace':
+      return translate('gallery.importModal.replaceTitle');
+  }
+}
 
-const replaceDescriptionClassName =
-  'text-[color:color-mix(in_srgb,var(--sniptale-color-danger)_78%,var(--sniptale-color-text-secondary)_22%)]';
+function getStrategyDescription(strategy: MediaHubImportConflictStrategy): string {
+  switch (strategy) {
+    case 'skip':
+      return translate('gallery.importModal.skipDescription');
+    case 'duplicate':
+      return translate('gallery.importModal.duplicateDescription');
+    case 'replace':
+      return translate('gallery.importModal.replaceDescription');
+  }
+}
 
-const duplicateDescriptionClassName =
-  'text-[color:color-mix(in_srgb,var(--sniptale-color-info)_80%,var(--sniptale-color-text-secondary)_20%)]';
-
-function ImportSummaryStat({ label, value }: { label: string; value: number }) {
+function ImportSummaryRow(props: { label: string; value: string | number }) {
   return (
-    <div className={importSummaryStatClassName}>
-      <div className="text-xs uppercase tracking-[0.14em] text-[var(--sniptale-color-text-muted)]">
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold text-[var(--sniptale-color-text-primary)]">
-        {value}
-      </div>
+    <div className={importSummaryRowClassName}>
+      <span className="text-[var(--sniptale-color-text-secondary)]">{props.label}</span>
+      <span className="font-medium text-[var(--sniptale-color-text-primary)]">{props.value}</span>
     </div>
   );
 }
 
-function ImportSummaryStats({ summary }: Pick<ImportConflictModalProps, 'summary'>) {
+function ImportSummary({ summary }: Pick<ImportConflictModalProps, 'summary'>) {
+  const exportedAt = formatDateTime(
+    new Date(summary.manifest.exportedAt),
+    { dateStyle: 'medium', timeStyle: 'short' },
+    getCurrentLocale()
+  );
+
   return (
-    <div className="mt-5 grid gap-3 md:grid-cols-3">
-      <ImportSummaryStat
+    <div className={importSummaryClassName}>
+      <ImportSummaryRow
         label={translate('gallery.importModal.assets')}
         value={summary.assetCount}
       />
-      <ImportSummaryStat
+      <ImportSummaryRow
         label={translate('gallery.importModal.thumbnails')}
         value={summary.thumbnailCount}
       />
-      <ImportSummaryStat
-        label={translate('gallery.importModal.conflicts')}
-        value={summary.conflicts.length}
-      />
+      {summary.conflicts.length > 0 ? (
+        <ImportSummaryRow
+          label={translate('gallery.importModal.conflicts')}
+          value={summary.conflicts.length}
+        />
+      ) : null}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 py-2 text-xs text-[var(--sniptale-color-text-muted)]">
+        <span>
+          {translate('gallery.importModal.exportedAtPrefix')} {exportedAt}
+        </span>
+        <span>
+          {translate('gallery.importModal.formatVersionPrefix')} {summary.manifest.version}
+        </span>
+      </div>
     </div>
   );
 }
 
-function ImportManifestBanner({ summary }: Pick<ImportConflictModalProps, 'summary'>) {
-  return (
-    <div className={importManifestClassName}>
-      {translate('gallery.importModal.formatVersionPrefix')} {summary.manifest.version}.{' '}
-      {translate('gallery.importModal.exportedAtPrefix')}{' '}
-      {new Date(summary.manifest.exportedAt).toLocaleString('ru-RU')}.
-    </div>
-  );
-}
-
-function ImportStrategyCard({
-  strategy,
-  title,
-  description,
-  titleClassName,
-  className,
-  descriptionClassName,
-  disabled,
-  onImport,
-}: {
-  strategy: MediaHubImportConflictStrategy;
-  title: string;
-  description: string;
-  titleClassName: string;
-  className: string;
-  descriptionClassName: string;
+function ImportStrategySelect(props: {
   disabled: boolean;
-  onImport: ImportConflictModalProps['onImport'];
+  onChange: (strategy: MediaHubImportConflictStrategy) => void;
+  strategy: MediaHubImportConflictStrategy;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => void onImport(strategy)}
-      className={`${className} disabled:cursor-not-allowed disabled:opacity-45`}
-    >
-      <div className={`font-semibold ${titleClassName}`}>{title}</div>
-      <div className={`mt-1 ${descriptionClassName}`}>{description}</div>
-    </button>
-  );
-}
-
-function ImportStrategyGrid({
-  fixedStrategy,
-  onImport,
-}: Pick<ImportConflictModalProps, 'fixedStrategy' | 'onImport'>) {
-  return (
-    <div className="mt-5 grid gap-3 md:grid-cols-3">
-      <ImportStrategyCard
-        strategy="replace"
-        disabled={fixedStrategy !== undefined && fixedStrategy !== 'replace'}
-        title={translate('gallery.importModal.replaceTitle')}
-        description={translate('gallery.importModal.replaceDescription')}
-        titleClassName="text-[var(--sniptale-color-danger)]"
-        className={replaceStrategyClassName}
-        descriptionClassName={replaceDescriptionClassName}
-        onImport={onImport}
+    <div className="mt-4">
+      <label
+        htmlFor="gallery-import-conflict-strategy"
+        className="mb-1.5 block text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
+      >
+        {translate('gallery.importModal.conflictActionLabel')}
+      </label>
+      <ProductSelect<MediaHubImportConflictStrategy>
+        id="gallery-import-conflict-strategy"
+        aria-label={translate('gallery.importModal.conflictActionLabel')}
+        value={props.strategy}
+        disabled={props.disabled}
+        controlSize="md"
+        containerClassName="w-full"
+        className="w-full"
+        options={STRATEGIES.map((strategy) => ({
+          value: strategy,
+          label: getStrategyTitle(strategy),
+        }))}
+        onChange={props.onChange}
       />
-      <ImportStrategyCard
-        strategy="skip"
-        disabled={fixedStrategy !== undefined && fixedStrategy !== 'skip'}
-        title={translate('gallery.importModal.skipTitle')}
-        description={translate('gallery.importModal.skipDescription')}
-        titleClassName="text-[var(--sniptale-color-text-primary)]"
-        className={skipStrategyClassName}
-        descriptionClassName="text-[var(--sniptale-color-text-secondary)]"
-        onImport={onImport}
-      />
-      <ImportStrategyCard
-        strategy="duplicate"
-        disabled={fixedStrategy !== undefined && fixedStrategy !== 'duplicate'}
-        title={translate('gallery.importModal.duplicateTitle')}
-        description={translate('gallery.importModal.duplicateDescription')}
-        titleClassName="text-[var(--sniptale-color-info)]"
-        className={duplicateStrategyClassName}
-        descriptionClassName={duplicateDescriptionClassName}
-        onImport={onImport}
-      />
+      <p className="mt-1.5 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
+        {getStrategyDescription(props.strategy)}
+      </p>
     </div>
   );
 }
@@ -165,21 +128,44 @@ export function ImportConflictModalContent({
   onClose,
   onImport,
 }: ImportConflictModalProps) {
+  const hasConflicts = summary.conflicts.length > 0;
+  const [selectedStrategy, setSelectedStrategy] = useState<MediaHubImportConflictStrategy>(
+    fixedStrategy ?? 'skip'
+  );
+  const strategy = fixedStrategy ?? selectedStrategy;
+
   return (
     <GalleryModalFrame
-      badgeIcon={FolderArchive}
-      badgeLabel={translate('gallery.importModal.badge')}
-      badgeClassName={importBadgeClassName}
       title={translate('gallery.importModal.title')}
-      description={translate('gallery.importModal.description')}
-      maxWidthClassName="max-w-2xl"
-      panelClassName="rounded-[16px]"
-      titleClassName="text-2xl"
+      description={translate(
+        hasConflicts
+          ? 'gallery.importModal.description'
+          : 'gallery.importModal.noConflictsDescription'
+      )}
+      maxWidthClassName="max-w-lg"
       onClose={onClose}
     >
-      <ImportSummaryStats summary={summary} />
-      <ImportManifestBanner summary={summary} />
-      <ImportStrategyGrid {...(fixedStrategy ? { fixedStrategy } : {})} onImport={onImport} />
+      <ImportSummary summary={summary} />
+      {hasConflicts ? (
+        <ImportStrategySelect
+          disabled={fixedStrategy !== undefined}
+          strategy={strategy}
+          onChange={setSelectedStrategy}
+        />
+      ) : null}
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={importSecondaryButtonClassName}>
+          {translate('common.actions.cancel')}
+        </button>
+        <button
+          type="button"
+          onClick={() => void onImport(strategy)}
+          className={importPrimaryButtonClassName}
+        >
+          <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
+          {translate('gallery.importModal.restore')}
+        </button>
+      </div>
     </GalleryModalFrame>
   );
 }

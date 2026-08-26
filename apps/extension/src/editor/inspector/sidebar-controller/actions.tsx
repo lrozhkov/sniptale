@@ -54,7 +54,7 @@ export function useEditorInspectorSidebarActions(args: SidebarActionArgs, hasIma
   };
   const utility = buildSidebarUtilityActions({
     controller,
-    confirmOpenStorageManager: args.confirmOpenStorageManager,
+    confirmOpenLibrary: args.confirmOpenLibrary,
     defaultImagePresetId: args.defaultImagePresetId,
     hasImage,
     rememberRecentColor,

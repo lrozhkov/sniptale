@@ -1,27 +1,23 @@
 import { useEffect } from 'react';
 
-import {
-  readPermissionsSnapshot,
-  subscribeToPermissionChanges,
-  syncWebPermissionStatus,
-} from '../permissions-lib';
+import { subscribeToPermissionChanges, syncWebPermissionStatus } from '../permissions-lib';
+import type { usePermissionRefresh } from './refresh';
 
 import type { PermissionSetter } from './types';
 
-export function usePermissionListeners(setPermissions: PermissionSetter) {
+export function usePermissionListeners(
+  refreshPermissions: ReturnType<typeof usePermissionRefresh>,
+  setPermissions: PermissionSetter
+) {
   useEffect(() => {
     let mounted = true;
     let micPermissionStatus: PermissionStatus | null = null;
     let cameraPermissionStatus: PermissionStatus | null = null;
 
-    const refreshPermissions = () => {
-      void readPermissionsSnapshot().then(setPermissions);
-    };
-
-    refreshPermissions();
+    void refreshPermissions();
 
     const handlePermissionChange = () => {
-      refreshPermissions();
+      void refreshPermissions();
     };
 
     void setupWebPermissionListener(
@@ -41,14 +37,16 @@ export function usePermissionListeners(setPermissions: PermissionSetter) {
       setPermissions
     );
     const unsubscribePermissionChanges = subscribeToPermissionChanges(handlePermissionChange);
+    window.addEventListener('focus', handlePermissionChange);
 
     return () => {
       mounted = false;
       unsubscribePermissionChanges();
+      window.removeEventListener('focus', handlePermissionChange);
       clearWebPermissionStatus(micPermissionStatus);
       clearWebPermissionStatus(cameraPermissionStatus);
     };
-  }, [setPermissions]);
+  }, [refreshPermissions, setPermissions]);
 }
 
 async function setupWebPermissionListener(

@@ -4,14 +4,6 @@ import type {
   MediaHubBackupSummary,
   MediaHubImportConflictStrategy,
 } from '../../../workflows/media-hub-backup/index';
-import type { StorageCleanupGroup, StorageCleanupReport } from '../../../features/media-hub/types';
-
-export interface StorageManagerModalProps {
-  report: StorageCleanupReport | null;
-  onClose: () => void;
-  onRun: (group: StorageCleanupGroup) => Promise<void>;
-}
-
 export interface ImportConflictModalProps {
   fixedStrategy?: MediaHubImportConflictStrategy;
   summary: MediaHubBackupSummary;

@@ -16,6 +16,8 @@ export function useGalleryViewportState() {
   const gridViewportRef = useRef<HTMLDivElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const importTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const mediaImportInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaImportTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const viewport = gridViewportRef.current;
@@ -45,6 +47,8 @@ export function useGalleryViewportState() {
     gridWidth,
     importInputRef,
     importTriggerRef,
+    mediaImportInputRef,
+    mediaImportTriggerRef,
     scrollTop,
     viewportHeight,
   };

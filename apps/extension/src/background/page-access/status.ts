@@ -1,6 +1,10 @@
 import type { PageAccessStatus } from '@sniptale/runtime-contracts/messaging/page-access';
 import type { TemporaryTabActivationStore } from './tab-activation';
-import { resolveStatusContext, type PageAccessStatusContext } from './target';
+import {
+  createPermissionScope,
+  resolveStatusContext,
+  type PageAccessStatusContext,
+} from './target';
 import { hasAllSitesPermission, hasSitePermission } from './registration';
 
 export type PageAccessStatusReader = {
@@ -37,11 +41,13 @@ export function createPageAccessStatusReader({
     }
 
     const siteGranted = await hasSitePermission(context.target.url, allSitesGranted);
+    const temporarilyActive = await temporaryTabActivationStore.has(context.target);
     return {
       allSitesGranted,
-      currentTabActive: (await temporaryTabActivationStore.has(context.target)) || siteGranted,
+      currentTabActive:
+        context.target.url.protocol === 'file:' ? siteGranted : temporarilyActive || siteGranted,
       currentTabId: context.target.tabId,
-      currentTabOrigin: context.target.url.origin,
+      currentTabOrigin: createPermissionScope(context.target.url),
       siteGranted,
       supported: true,
     };

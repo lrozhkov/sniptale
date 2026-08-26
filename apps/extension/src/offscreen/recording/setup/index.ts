@@ -46,6 +46,7 @@ export type RecordingSetupResult = {
   rawTrackSettings: MediaTrackSettings;
   rawVideoHeight: number;
   rawVideoWidth: number;
+  sourceLabel: string | null;
   tabOutputGeometry: TabOutputGeometry | null;
   trackSettings: MediaTrackSettings;
   transformFailure: Promise<never> | null;
@@ -376,7 +377,11 @@ function resolveRecordingContentHint(
 export async function prepareRecordingStream(
   params: RecordingSetupParams
 ): Promise<RecordingSetupResult> {
-  const { stream: sourceStream, cursorCaptureMode } = await acquireRecordingSourceStream({
+  const {
+    stream: sourceStream,
+    cursorCaptureMode,
+    sourceLabel,
+  } = await acquireRecordingSourceStream({
     streamId: params.streamId,
     settings: params.settings,
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
@@ -410,6 +415,7 @@ export async function prepareRecordingStream(
     rawTrackSettings: raw.trackSettings,
     rawVideoHeight: raw.height,
     rawVideoWidth: raw.width,
+    sourceLabel,
     tabOutputGeometry: output.tabOutputGeometry,
     trackSettings: {
       ...outputTrackSettings,
