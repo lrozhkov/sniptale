@@ -3,6 +3,7 @@ import { setLocalFileAccessOptIn } from '../../../../../../../composition/persis
 
 import {
   applyPermissionState,
+  removeChromePermission,
   removeOriginPermissions,
   type PermissionInfo,
 } from '../../permissions-lib';
@@ -22,7 +23,8 @@ export function usePermissionRevokes(
         : permission?.originPattern
           ? [permission.originPattern]
           : [];
-      if (!permission || originPatterns.length === 0) {
+      const chromePermission = permission?.chromePermission;
+      if (!permission || (originPatterns.length === 0 && !chromePermission)) {
         return false;
       }
 
@@ -32,7 +34,9 @@ export function usePermissionRevokes(
       let removed = false;
       let removalError: unknown;
       try {
-        removed = await removeOriginPermissions(originPatterns);
+        removed = chromePermission
+          ? await removeChromePermission(chromePermission)
+          : await removeOriginPermissions(originPatterns);
       } catch (error) {
         removalError = error;
       }

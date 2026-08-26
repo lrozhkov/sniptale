@@ -19,6 +19,7 @@ import type {
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { createNativeAppRuntimeClient } from '../../../runtime/native-app-client';
 import { settingsRuntimeMessagingTransport } from '../../../runtime/messaging';
+import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import type {
   NativeAppRuntimeResponse,
   NativeAppRuntimeStatus,
@@ -29,6 +30,7 @@ import { normalizeNativeAppError } from './connection/error-copy';
 type NativeAppSectionState = {
   error: string | null;
   loading: boolean;
+  permissionGranted: boolean | null;
   settings: VideoRecordingSettings;
   status: NativeAppRuntimeStatus | null;
 };
@@ -50,6 +52,7 @@ function createInitialState(): NativeAppSectionState {
   return {
     error: null,
     loading: true,
+    permissionGranted: null,
     settings: defaultSettings,
     status: null,
   };
@@ -75,18 +78,66 @@ function applyRuntimeResponse(
 }
 
 async function loadSectionState(): Promise<NativeAppSectionState> {
-  const [settings, runtime] = await Promise.all([
+  const [settings, permissionGranted] = await Promise.all([
     loadVideoSettings(),
-    nativeAppRuntimeClient.query(),
+    browserPermissions.contains({ permissions: ['nativeMessaging'] }),
   ]);
+  if (!permissionGranted) {
+    return {
+      error: null,
+      loading: false,
+      permissionGranted: false,
+      settings,
+      status: null,
+    };
+  }
+  const runtime = await nativeAppRuntimeClient.query();
   return {
     error: runtime.success
       ? null
       : normalizeNativeAppError(runtime.error ?? null, 'settings.nativeApp.loadError'),
     loading: false,
+    permissionGranted: true,
     settings,
     status: runtime.status ?? null,
   };
+}
+
+async function requestNativeAppPermission(args: {
+  guard: RequestGuard;
+  setState: SetNativeAppSectionState;
+}): Promise<void> {
+  args.setState((current) => ({ ...current, error: null, loading: true }));
+  try {
+    const granted = await browserPermissions.request({ permissions: ['nativeMessaging'] });
+    if (!args.guard.isCurrent()) return;
+    if (!granted) {
+      args.setState((current) => ({
+        ...current,
+        error: translatePermissionError(),
+        loading: false,
+        permissionGranted: false,
+      }));
+      return;
+    }
+    const response = await nativeAppRuntimeClient.mutate('reconnect');
+    if (!args.guard.isCurrent()) return;
+    args.setState((current) =>
+      applyRuntimeResponse({ ...current, permissionGranted: true }, response)
+    );
+  } catch (error) {
+    if (!args.guard.isCurrent()) return;
+    args.setState((current) => ({
+      ...current,
+      error: getErrorMessage(error, 'settings.nativeApp.permissionRequestError'),
+      loading: false,
+      permissionGranted: false,
+    }));
+  }
+}
+
+function translatePermissionError(): string {
+  return getErrorMessage(null, 'settings.nativeApp.permissionDenied');
 }
 
 async function refreshSectionState(args: {
@@ -206,12 +257,30 @@ export function useNativeAppSectionController() {
     void refreshSectionState({ guard: createRequestGuard(), setState });
   }, [createRequestGuard]);
 
+  useEffect(() => {
+    const refreshOnNativePermissionChange = (permissions: chrome.permissions.Permissions) => {
+      if (permissions.permissions?.includes('nativeMessaging')) {
+        void refreshSectionState({ guard: createRequestGuard(), setState });
+      }
+    };
+    const unsubscribeAdded = browserPermissions.subscribeToAdded(refreshOnNativePermissionChange);
+    const unsubscribeRemoved = browserPermissions.subscribeToRemoved(
+      refreshOnNativePermissionChange
+    );
+    return () => {
+      unsubscribeAdded();
+      unsubscribeRemoved();
+    };
+  }, [createRequestGuard]);
+
   return {
     error: state.error,
     handleRuntimeAction: (operation: NativeRuntimeOperation) =>
       runRuntimeAction({ guard: createRequestGuard(), operation, setState }),
     loading: state.loading,
     nativeSettings: getNativeSettings(state.settings),
+    permissionGranted: state.permissionGranted,
+    requestPermission: () => requestNativeAppPermission({ guard: createRequestGuard(), setState }),
     status: state.status,
     updateNativeSettings: (native: NativeCaptureSettings) =>
       updateNativeSettings({

@@ -21,11 +21,19 @@ function createPermission(id: string, state: PermissionInfo['state']): Permissio
     id,
     icon: Circle,
     state,
-    type: id === 'origins' ? 'origin' : id === 'localFiles' ? 'file' : 'web',
+    type:
+      id === 'origins'
+        ? 'origin'
+        : id === 'localFiles'
+          ? 'file'
+          : id === 'nativeApp'
+            ? 'chrome'
+            : 'web',
+    ...(id === 'nativeApp' ? { chromePermission: 'nativeMessaging' as const } : {}),
   };
 }
 
-async function renderContent() {
+async function renderContent(view: 'optional' | 'required' = 'optional') {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -42,6 +50,7 @@ async function renderContent() {
         permissions={[
           createPermission('origins', 'prompt'),
           createPermission('localFiles', 'granted'),
+          createPermission('nativeApp', 'prompt'),
           createPermission('microphone', 'granted'),
           createPermission('downloads', 'denied'),
           createPermission('clipboard', 'error'),
@@ -49,6 +58,7 @@ async function renderContent() {
         onRefresh={onRefresh}
         onRequestPermission={onRequestPermission}
         onRevokePermission={onRevokePermission}
+        view={view}
       />
     );
   });
@@ -75,7 +85,7 @@ it('renders all permission states and wires refresh/request handlers', async () 
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
 
   expect(container?.textContent).toContain('settings.permissions.requiredGrantsTitle');
-  expect(container?.textContent).toContain('settings.permissions.requiredTabCaptureName');
+  expect(container?.textContent).not.toContain('settings.permissions.requiredTabCaptureName');
   expect(container?.textContent).toContain('settings.permissions.statusChecksTitle');
   expect(container?.textContent).toContain('settings.permissions.statusGranted');
   expect(container?.textContent).toContain('settings.permissions.statusDenied');
@@ -89,20 +99,40 @@ it('renders all permission states and wires refresh/request handlers', async () 
   const allSitesButton = buttons.find(
     (button) => button.textContent === 'settings.permissions.siteAccessAllSitesMode'
   );
+  const askButton = buttons.find(
+    (button) => button.textContent === 'settings.permissions.siteAccessAskMode'
+  );
   const refreshButton = buttons.find(
     (button) => button.textContent === 'settings.permissions.refreshButton'
   );
   const revokeButton = buttons.find(
     (button) => button.textContent === 'settings.permissions.revokeButton'
   );
+  const nativeRequestButton = buttons.find(
+    (button) =>
+      button.textContent === 'settings.permissions.allowButton' &&
+      button
+        .closest('.flex-shrink-0')
+        ?.parentElement?.textContent?.includes('settings.permissions.nativeAppName')
+  );
+
+  expect(askButton?.getAttribute('aria-pressed')).toBe('true');
+  expect(allSitesButton?.getAttribute('aria-pressed')).toBe('false');
 
   act(() => {
     allSitesButton?.click();
+    nativeRequestButton?.click();
     revokeButton?.click();
     refreshButton?.click();
   });
 
   expect(onRequestPermission).toHaveBeenCalledWith('origins');
+  expect(onRequestPermission).toHaveBeenCalledWith('nativeApp');
   expect(onRevokePermission).toHaveBeenCalledWith('localFiles');
   expect(onRefresh).toHaveBeenCalledTimes(1);
+
+  await renderContent('required');
+  expect(container?.textContent).toContain('settings.permissions.requiredTabCaptureName');
+  expect(container?.textContent).toContain('settings.permissions.requiredCategoryCapture');
+  expect(container?.textContent).not.toContain('settings.permissions.nativeAppName');
 });

@@ -26,6 +26,12 @@ export function removeOriginPermissions(originPatterns: string[]): Promise<boole
   return permissionsApi.remove({ origins: originPatterns });
 }
 
+export function removeChromePermission(
+  chromePermission: chrome.runtime.ManifestPermissions
+): Promise<boolean> {
+  return permissionsApi.remove({ permissions: [chromePermission] });
+}
+
 export function containsChromePermission(
   chromePermission: chrome.runtime.ManifestPermissions
 ): Promise<boolean> {

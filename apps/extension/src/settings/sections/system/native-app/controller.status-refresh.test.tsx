@@ -8,9 +8,19 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import type { NativeAppRuntimeStatus } from '../../../../contracts/native-app/runtime';
 
 const mocks = vi.hoisted(() => ({
+  containsPermission: vi.fn(),
   loadVideoSettings: vi.fn(),
   mutateVideoSettings: vi.fn(),
   sendRuntimeMessage: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: {
+    contains: mocks.containsPermission,
+    request: vi.fn(),
+    subscribeToAdded: () => vi.fn(),
+    subscribeToRemoved: () => vi.fn(),
+  },
 }));
 
 function createDeferred<T>() {
@@ -43,6 +53,7 @@ let root: Root | null = null;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
+  mocks.containsPermission.mockResolvedValue(true);
   mocks.mutateVideoSettings.mockImplementation(async (mutation) =>
     mutation(DEFAULT_VIDEO_SETTINGS)
   );
@@ -162,69 +173,43 @@ it('does not let an older reconnect poll overwrite a newer action result', async
   expect(hasExactText('span', 'Подключено')).toBe(false);
 });
 
-it('does not let the initial load overwrite a newer action result', async () => {
+it('keeps native actions hidden while initial permission and settings state are unresolved', async () => {
   const initialLoad = createDeferred<typeof DEFAULT_VIDEO_SETTINGS>();
   mocks.loadVideoSettings.mockReturnValueOnce(initialLoad.promise);
-  mocks.sendRuntimeMessage
-    .mockResolvedValueOnce({
-      settings: DEFAULT_VIDEO_SETTINGS.native,
-      status: createStatus('connected'),
-      success: true,
-    })
-    .mockResolvedValueOnce({
-      settings: DEFAULT_VIDEO_SETTINGS.native,
-      status: createStatus('missing-host'),
-      success: true,
-    });
+  mocks.sendRuntimeMessage.mockResolvedValueOnce({
+    settings: DEFAULT_VIDEO_SETTINGS.native,
+    status: createStatus('connected'),
+    success: true,
+  });
 
   await renderSection();
-  const sync = findStatusButton('Применить настройки');
-  await act(async () => {
-    sync?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await Promise.resolve();
-  });
+  expect(findStatusButton('Применить настройки')).toBeUndefined();
+  expect(container?.textContent).toContain('Проверка доступа…');
+
   await act(async () => {
     initialLoad.resolve(DEFAULT_VIDEO_SETTINGS);
     await Promise.resolve();
   });
 
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalledWith(
     expect.objectContaining({ operation: 'sync-settings' })
   );
-  expect(hasExactText('span', 'Нет подключения')).toBe(true);
-  expect(hasExactText('span', 'Подключено')).toBe(false);
+  expect(hasExactText('span', 'Подключено')).toBe(true);
 });
 
-it('does not let an initial load failure overwrite a newer action result', async () => {
+it('keeps actions unavailable when the initial state load fails', async () => {
   const initialLoad = createDeferred<typeof DEFAULT_VIDEO_SETTINGS>();
   mocks.loadVideoSettings.mockReturnValueOnce(initialLoad.promise);
-  mocks.sendRuntimeMessage
-    .mockResolvedValueOnce({
-      settings: DEFAULT_VIDEO_SETTINGS.native,
-      status: createStatus('connected'),
-      success: true,
-    })
-    .mockResolvedValueOnce({
-      settings: DEFAULT_VIDEO_SETTINGS.native,
-      status: createStatus('missing-host'),
-      success: true,
-    });
 
   await renderSection();
-  const sync = findStatusButton('Применить настройки');
-  await act(async () => {
-    sync?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await Promise.resolve();
-  });
+  expect(findStatusButton('Применить настройки')).toBeUndefined();
   await act(async () => {
     initialLoad.reject(new Error('load failed'));
     await Promise.resolve();
   });
 
-  expect(hasExactText('span', 'Нет подключения')).toBe(true);
-  expect(container?.textContent).not.toContain(
-    'Не удалось загрузить состояние приложения Sniptale.'
-  );
+  expect(container?.textContent).toContain('Не удалось загрузить состояние приложения Sniptale.');
+  expect(findStatusButton('Применить настройки')).toBeUndefined();
 });
 
 it('shows the translated initial load error when the current load fails', async () => {

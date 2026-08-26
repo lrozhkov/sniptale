@@ -73,6 +73,10 @@ class Controller implements NativeAppRuntimeService {
     return this.status;
   }
 
+  disconnectForPermissionRevocation(): void {
+    this.disconnect('not-connected');
+  }
+
   reconnect(): void {
     this.port?.disconnect();
     this.port = null;
@@ -80,14 +84,7 @@ class Controller implements NativeAppRuntimeService {
   }
 
   quiesceForPrivacyErasure(): void {
-    const activePort = this.port;
-    this.port = null;
-    try {
-      activePort?.disconnect();
-    } catch {
-      logger.warn('Failed to disconnect native app during local data erasure');
-    }
-    this.clearAuthority('not-connected');
+    this.disconnect('not-connected');
   }
 
   syncSettings = async (): Promise<void> => {
@@ -118,6 +115,17 @@ class Controller implements NativeAppRuntimeService {
       },
     });
     this.heartbeat.start();
+  }
+
+  private disconnect(nextState: Parameters<typeof clearNativeAuthorityStatus>[1]): void {
+    const activePort = this.port;
+    this.port = null;
+    try {
+      activePort?.disconnect();
+    } catch {
+      logger.warn('Failed to disconnect native app');
+    }
+    this.clearAuthority(nextState);
   }
 
   private handleDisconnect(disconnectedPort: chrome.runtime.Port | null): void {

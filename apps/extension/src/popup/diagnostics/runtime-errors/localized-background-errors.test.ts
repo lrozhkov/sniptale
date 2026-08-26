@@ -22,4 +22,13 @@ describe('localized background popup runtime errors', () => {
       )
     ).toBe('t:popup.video.startRecordingTimeout');
   });
+
+  it('normalizes background page-access failures through the popup locale', () => {
+    expect(
+      getPopupRuntimeErrorMessage('Page access is required.', 'popup.home.triggerQuickActionError')
+    ).toBe('t:popup.home.pageAccessRequired');
+    expect(
+      getPopupRuntimeErrorMessage('Page access is required for export.', 'popup.home.captureError')
+    ).toBe('t:popup.home.pageAccessRequired');
+  });
 });

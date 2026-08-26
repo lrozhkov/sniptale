@@ -134,17 +134,6 @@
       "userFacingDisclosure": "settings.permissions.requiredDesktopCaptureDescription"
     },
     {
-      "name": "nativeMessaging",
-      "owner": "packages/platform/src/browser/native-messaging.ts",
-      "feature": "Native tray-agent connection for extension-owned screenshot, recording, settings sync, tray actions, and safe telemetry transfer",
-      "runtimeRoute": "background native-app runtime owner under apps/extension/src/background/runtime/native-app with settings-page query/mutation routes",
-      "capabilityPolicy": "Only the background native-app owner calls connectNative with a channel-scoped host name; popup/content/settings surfaces do not connect directly. Unsupported protocol/settings/schema/install states fail closed before operational commands.",
-      "failureBehavior": "Missing, policy-denied, incompatible, repair-required, or other-profile controller states surface as typed native status while browser-only capture and recording remain available.",
-      "justification": "Allows the extension to communicate with the browser-launched Native Messaging host used by the Sniptale native tray agent.",
-      "reviewNote": "Keep Native Messaging access behind packages/platform/src/browser/native-messaging.ts and apps/extension/src/background/runtime/native-app; production builds must not connect to dev host names.",
-      "userFacingDisclosure": "settings.permissions.requiredNativeMessagingDescription"
-    },
-    {
       "name": "clipboardWrite",
       "owner": "packages/platform/src/browser/clipboard.ts",
       "feature": "Copy exported content and generated assets",
@@ -154,6 +143,19 @@
       "justification": "Copies exported content and generated assets to the clipboard from popup, content, and scenario-editor flows.",
       "reviewNote": "Prefer shared clipboard adapters or narrow runtime helpers; avoid ad hoc clipboard writes.",
       "userFacingDisclosure": "settings.permissions.requiredClipboardWriteDescription"
+    }
+  ],
+  "optionalPermissions": [
+    {
+      "name": "nativeMessaging",
+      "owner": "packages/platform/src/browser/native-messaging.ts",
+      "feature": "Optional native tray-agent connection for extension-owned screenshot, recording, settings sync, tray actions, and safe telemetry transfer",
+      "runtimeRoute": "background native-app permission lifecycle and runtime owner with settings-page grant, query, and mutation flows",
+      "capabilityPolicy": "Only the background native-app owner calls connectNative after chrome.permissions confirms nativeMessaging; permission removal disconnects the active port and all native operations fail closed until a new user grant.",
+      "failureBehavior": "Missing permission hides native controls and prevents connection attempts while browser-only capture and recording remain available; host, policy, protocol, repair, and controller failures retain their typed status after grant.",
+      "justification": "Lets users enable communication with the installed Sniptale native tray agent only when they choose native features.",
+      "reviewNote": "Keep grant and revoke in visible Settings UI, Native Messaging access behind packages/platform/src/browser/native-messaging.ts and background runtime owners, and production builds off dev host names.",
+      "userFacingDisclosure": "settings.permissions.nativeAppDescription"
     }
   ],
   "hostPermissions": [],

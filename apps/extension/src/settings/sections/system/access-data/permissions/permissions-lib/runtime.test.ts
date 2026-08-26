@@ -140,6 +140,7 @@ it('reads permission snapshot across microphone, origin, and camera states', asy
     { id: 'microphone', state: 'granted' },
     { id: 'camera', state: 'granted' },
     { id: 'localFiles', state: 'prompt' },
+    { id: 'nativeApp', state: 'prompt' },
   ]);
 });
 

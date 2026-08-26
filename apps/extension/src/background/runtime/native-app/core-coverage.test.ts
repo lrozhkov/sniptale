@@ -10,9 +10,15 @@ const mocks = vi.hoisted(() => ({
   getManifest: vi.fn(),
   getStatus: vi.fn(),
   loadVideoSettings: vi.fn(),
+  hasNativeMessagingPermission: vi.fn(),
   reconnect: vi.fn(),
   syncSettings: vi.fn(),
   takeController: vi.fn(),
+}));
+
+vi.mock('./permission-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./permission-lifecycle')>()),
+  hasNativeMessagingPermission: mocks.hasNativeMessagingPermission,
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -45,6 +51,7 @@ beforeEach(() => {
     version_name: '0.1.0',
   });
   mocks.getStatus.mockResolvedValue(createStatus());
+  mocks.hasNativeMessagingPermission.mockResolvedValue(true);
   mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
 });
 
@@ -128,6 +135,7 @@ it('routes native settings queries and mutations through the runtime service', a
       sendResponse
     )
   ).toBe(true);
+  await flushAsync();
   expect(mocks.reconnect).toHaveBeenCalledTimes(1);
 
   routeNativeAppRuntimeMessage(
@@ -140,9 +148,31 @@ it('routes native settings queries and mutations through the runtime service', a
     {},
     sendResponse
   );
+  await flushAsync();
   expect(mocks.takeController).toHaveBeenCalledTimes(1);
   expect(mocks.syncSettings).toHaveBeenCalledTimes(1);
   expect(routeNativeAppRuntimeMessage({ type: 'other' }, {}, sendResponse)).toBe(false);
+});
+
+it('rejects native mutations while native app access is not granted', async () => {
+  mocks.hasNativeMessagingPermission.mockResolvedValue(false);
+  const sendResponse = vi.fn();
+  const { routeNativeAppRuntimeMessage } = await import('./route');
+
+  expect(
+    routeNativeAppRuntimeMessage(
+      { operation: 'reconnect', type: MessageType.NATIVE_APP_MUTATION },
+      {},
+      sendResponse
+    )
+  ).toBe(true);
+  await flushAsync();
+
+  expect(mocks.reconnect).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: 'Native app access is required.',
+    success: false,
+  });
 });
 
 it('applies compatibility and native hello authority transitions', async () => {

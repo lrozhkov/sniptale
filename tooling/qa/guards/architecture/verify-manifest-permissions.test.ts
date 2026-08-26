@@ -53,6 +53,32 @@ it('requires optional host permissions to be recorded in policy', () => {
   );
 });
 
+it('requires optional named permissions to be recorded in policy', () => {
+  const root = createTempRoot('verify-manifest-optional-permission-missing-');
+  writeFixture(root, {
+    optionalPermissions: ['nativeMessaging'],
+    policyOptionalPermissions: [],
+  });
+
+  expect(collectManifestPermissionViolations({ rootDir: root })).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'manifest-permissions-missing-policy',
+        message: expect.stringContaining('nativeMessaging'),
+      }),
+    ])
+  );
+});
+
+it('passes when optional named permission policy matches the manifest', () => {
+  const root = createTempRoot('verify-manifest-optional-permission-pass-');
+  writeFixture(root, {
+    optionalPermissions: ['nativeMessaging'],
+  });
+
+  expect(collectManifestPermissionViolations({ rootDir: root })).toEqual([]);
+});
+
 it('passes when optional host permission policy matches the manifest', () => {
   const root = createTempRoot('verify-manifest-optional-host-pass-');
   writeFixture(root, {

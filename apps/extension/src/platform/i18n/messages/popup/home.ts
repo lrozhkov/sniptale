@@ -173,6 +173,14 @@ export const popupHomeMessages = defineMessageSource({
     ru: 'Всегда включать на всех сайтах',
     en: 'Always enable on all sites',
   },
+  enableLocalFiles: {
+    ru: 'Включить доступ к локальным файлам',
+    en: 'Enable local file access',
+  },
+  localFileChromeAccessRequired: {
+    ru: 'Включите «Разрешить доступ к URL файлов» в настройках расширения Chrome.',
+    en: 'Turn on “Allow access to file URLs” in Chrome extension settings.',
+  },
   pageAccessChecking: {
     ru: 'Проверяется доступ к странице',
     en: 'Checking page access',

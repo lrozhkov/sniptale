@@ -1975,6 +1975,7 @@
         "apps/extension/src/background/runtime/native-app/host.ts",
         "apps/extension/src/background/runtime/native-app/ids.ts",
         "apps/extension/src/background/runtime/native-app/outbound.ts",
+        "apps/extension/src/background/runtime/native-app/permission-lifecycle.ts",
         "apps/extension/src/background/runtime/native-app/privacy-erasure.ts",
         "apps/extension/src/background/runtime/native-app/response-posting.ts",
         "apps/extension/src/background/runtime/native-app/revision.ts",
@@ -2583,6 +2584,7 @@
         "apps/extension/src/background/runtime/native-app/host.ts",
         "apps/extension/src/background/runtime/native-app/ids.ts",
         "apps/extension/src/background/runtime/native-app/outbound.ts",
+        "apps/extension/src/background/runtime/native-app/permission-lifecycle.ts",
         "apps/extension/src/background/runtime/native-app/privacy-erasure.ts",
         "apps/extension/src/background/runtime/native-app/response-posting.ts",
         "apps/extension/src/background/runtime/native-app/revision.ts",
@@ -17054,7 +17056,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/documentation-facts.mjs",
-        "contentHash": "29bd21e10e96e27730aba26f32239dd33336b6e7c7a139731b2b1d9b38cf556c"
+        "contentHash": "e35079beeea0b93d0d28a02d53af9a68d803390b4ba84dc372a497d3956d6f9f"
       },
       "consumers": [
         "tooling/ci/derive-fast-proof.mjs",
@@ -23321,7 +23323,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/architecture/verify-manifest-permissions.mjs",
-        "contentHash": "ad06fcffa8ef6ac0aff07a98c4f077ea3bcf0df4a53222ccf10f37c159a15815"
+        "contentHash": "d3a23e327fd319a83622c8903e05815c573f0bf8dc5bfc2a127ea3dc00be3a67"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",

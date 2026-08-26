@@ -8,11 +8,13 @@ import type { LucideIcon } from 'lucide-react';
 const {
   applyPermissionStateMock,
   registerEffectiveFileSchemeAccessMock,
+  removeChromePermissionMock,
   removeOriginPermissionsMock,
   setLocalFileAccessOptInMock,
 } = vi.hoisted(() => ({
   applyPermissionStateMock: vi.fn(),
   registerEffectiveFileSchemeAccessMock: vi.fn(),
+  removeChromePermissionMock: vi.fn(),
   removeOriginPermissionsMock: vi.fn(),
   setLocalFileAccessOptInMock: vi.fn(),
 }));
@@ -30,6 +32,7 @@ vi.mock('./request-actions/request-origin', async (importOriginal) => ({
 vi.mock('../../permissions-lib', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../permissions-lib')>()),
   applyPermissionState: (...args: unknown[]) => applyPermissionStateMock(...args),
+  removeChromePermission: (...args: unknown[]) => removeChromePermissionMock(...args),
   removeOriginPermissions: (...args: unknown[]) => removeOriginPermissionsMock(...args),
 }));
 
@@ -78,6 +81,7 @@ beforeEach(() => {
   );
   removeOriginPermissionsMock.mockReset();
   removeOriginPermissionsMock.mockResolvedValue(true);
+  removeChromePermissionMock.mockReset().mockResolvedValue(true);
   registerEffectiveFileSchemeAccessMock.mockReset().mockResolvedValue(false);
   setLocalFileAccessOptInMock.mockReset().mockResolvedValue(undefined);
 });
@@ -153,6 +157,23 @@ it('revokes grouped origin permissions and marks the row prompt', async () => {
   await expect(latestRevokePermission?.('origins')).resolves.toBe(true);
 
   expect(removeOriginPermissionsMock).toHaveBeenCalledWith(['<all_urls>']);
+  expect(currentPermissions[0]?.state).toBe('prompt');
+});
+
+it('revokes optional native app access through its named Chrome permission', async () => {
+  const nativePermission: PermissionInfo = {
+    chromePermission: 'nativeMessaging',
+    icon: PermissionFixtureIcon,
+    id: 'nativeApp',
+    state: 'granted',
+    type: 'chrome',
+  };
+  await renderHarness([nativePermission]);
+
+  await expect(latestRevokePermission?.('nativeApp')).resolves.toBe(true);
+
+  expect(removeChromePermissionMock).toHaveBeenCalledWith('nativeMessaging');
+  expect(removeOriginPermissionsMock).not.toHaveBeenCalled();
   expect(currentPermissions[0]?.state).toBe('prompt');
 });
 

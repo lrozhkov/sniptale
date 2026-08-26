@@ -1,21 +1,19 @@
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Check } from 'lucide-react';
+import {
+  getControlPrimaryButtonClassName,
+  getControlSecondaryButtonClassName,
+} from '@sniptale/ui/control-language';
 
 import { translate } from '../../../../../platform/i18n';
-import { settingsSectionClassName } from '../../../../section-surface';
+import { settingsSectionClassName, SettingsSubpageTabs } from '../../../../section-surface';
 import { getPermissionContent, type PermissionInfo, type PermissionState } from './permissions-lib';
 import { RequiredManifestPermissionDisclosureList } from './required-disclosure-list';
 import { DISABLED_PERMISSION_BORDER_CLASS_NAME } from './content.constants.ts';
 
 const requestButtonClassName = [
-  'rounded-[14px] border px-4 py-2 text-sm font-medium transition-colors',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-success)_42%,var(--sniptale-color-border-soft)_58%)]',
-  'bg-transparent text-[var(--sniptale-color-success)]',
-  'hover:border-[var(--sniptale-color-success)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-success)_10%,transparent)]',
-  'hover:text-[var(--sniptale-color-text-primary)]',
-  'disabled:cursor-not-allowed disabled:opacity-50',
+  getControlPrimaryButtonClassName({ density: 'compact' }),
+  'min-w-[104px]',
   DISABLED_PERMISSION_BORDER_CLASS_NAME,
-  'disabled:hover:bg-transparent disabled:hover:text-[var(--sniptale-color-success)]',
 ].join(' ');
 
 const permissionCardClassName = [
@@ -24,9 +22,8 @@ const permissionCardClassName = [
 ].join(' ');
 
 const revokeButtonClassName = [
-  'rounded-[14px] border px-4 py-2 text-sm font-medium transition-colors',
-  'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
-  'hover:border-[var(--sniptale-color-danger)] hover:text-[var(--sniptale-color-danger)]',
+  getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' }),
+  'min-w-[104px]',
 ].join(' ');
 
 const permissionIconClassName = [
@@ -75,24 +72,28 @@ function SiteAccessModeSelector(props: {
   return (
     <div
       className={[
-        'grid grid-cols-2 overflow-hidden rounded-[14px] border p-0.5 text-xs font-medium',
-        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-muted)]',
+        'grid grid-cols-2 gap-1 overflow-hidden rounded-[12px] border p-1 text-xs',
+        'border-[var(--sniptale-color-border-strong)] bg-[var(--sniptale-color-surface-input)]',
       ].join(' ')}
+      aria-label={translate('settings.permissions.siteAccessModeLabel')}
+      role="group"
     >
       <button
         type="button"
-        disabled={askSelected}
         onClick={() => props.onRevokePermission(props.permission.id)}
+        aria-pressed={askSelected}
         className={getSiteAccessModeButtonClassName(askSelected)}
       >
+        {askSelected ? <Check size={13} aria-hidden="true" /> : null}
         {translate('settings.permissions.siteAccessAskMode')}
       </button>
       <button
         type="button"
-        disabled={allSitesGranted}
         onClick={() => props.onRequestPermission(props.permission.id)}
+        aria-pressed={allSitesGranted}
         className={getSiteAccessModeButtonClassName(allSitesGranted)}
       >
+        {allSitesGranted ? <Check size={13} aria-hidden="true" /> : null}
         {translate('settings.permissions.siteAccessAllSitesMode')}
       </button>
     </div>
@@ -101,10 +102,17 @@ function SiteAccessModeSelector(props: {
 
 function getSiteAccessModeButtonClassName(selected: boolean): string {
   return [
-    'min-h-8 px-3 transition-colors disabled:cursor-default',
+    'flex min-h-9 items-center justify-center gap-1.5 rounded-[8px] px-3 font-semibold transition-colors',
     selected
-      ? 'rounded-[12px] bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)] shadow-sm'
-      : 'text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]',
+      ? [
+          'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_16%,var(--sniptale-color-surface-panel)_84%)]',
+          'text-[var(--sniptale-color-text-primary-strong)]',
+          'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_58%,transparent)]',
+        ].join(' ')
+      : [
+          'text-[var(--sniptale-color-text-muted-strong)]',
+          'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
+        ].join(' '),
   ].join(' ');
 }
 
@@ -117,7 +125,7 @@ function PermissionStateText({ content }: { content: ReturnType<typeof getPermis
   );
 }
 
-function FileSchemeAccessControl(props: {
+function OptionalPermissionControl(props: {
   content: ReturnType<typeof getPermissionContent>;
   onRequest: () => void;
   onRevoke: () => void;
@@ -166,8 +174,8 @@ function PermissionCard(props: {
       </div>
 
       <div className="flex-shrink-0">
-        {props.permission.type === 'file' ? (
-          <FileSchemeAccessControl
+        {props.permission.type === 'file' || props.permission.type === 'chrome' ? (
+          <OptionalPermissionControl
             content={content}
             state={props.permission.state}
             onRequest={() => props.onRequestPermission(props.permission.id)}
@@ -198,14 +206,9 @@ function PermissionStatusChecks(props: {
 }) {
   return (
     <section className="space-y-3" aria-label={translate('settings.permissions.statusChecksTitle')}>
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-          {translate('settings.permissions.statusChecksTitle')}
-        </h2>
-        <p className="mt-1 text-sm text-[var(--sniptale-color-text-secondary)]">
-          {translate('settings.permissions.statusChecksDescription')}
-        </p>
-      </div>
+      <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
+        {translate('settings.permissions.statusChecksDescription')}
+      </p>
       <div className="overflow-hidden rounded-[12px] border border-[var(--sniptale-color-border-soft)]">
         {props.permissions.map((permission) => (
           <PermissionCard
@@ -241,18 +244,33 @@ export function PermissionsSectionContent(props: {
   onRequestPermission: (id: string) => void;
   onRevokePermission?: (id: string) => void;
   permissions: PermissionInfo[];
+  view?: 'optional' | 'required';
+  onViewChange?: (view: 'optional' | 'required') => void;
 }) {
+  const view = props.view ?? 'optional';
   return (
     <div className={settingsSectionClassName}>
-      <PermissionStatusChecks
-        permissions={props.permissions}
-        onRequestPermission={props.onRequestPermission}
-        onRevokePermission={props.onRevokePermission ?? (() => undefined)}
+      <SettingsSubpageTabs
+        activeId={view}
+        ariaLabel={translate('settings.permissions.permissionKindTabsLabel')}
+        items={[
+          { id: 'optional', label: translate('settings.permissions.statusChecksTitle') },
+          { id: 'required', label: translate('settings.permissions.requiredGrantsTitle') },
+        ]}
+        onChange={(nextView) => props.onViewChange?.(nextView as 'optional' | 'required')}
       />
-
-      <RefreshPermissionStatusesButton onRefresh={props.onRefresh} />
-
-      <RequiredManifestPermissionDisclosureList />
+      {view === 'optional' ? (
+        <>
+          <PermissionStatusChecks
+            permissions={props.permissions}
+            onRequestPermission={props.onRequestPermission}
+            onRevokePermission={props.onRevokePermission ?? (() => undefined)}
+          />
+          <RefreshPermissionStatusesButton onRefresh={props.onRefresh} />
+        </>
+      ) : (
+        <RequiredManifestPermissionDisclosureList />
+      )}
     </div>
   );
 }

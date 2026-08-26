@@ -141,6 +141,7 @@ export function collectDocumentationFacts(root = repoRoot) {
     productVersion: packageJson.version,
     minimumChromeVersion: manifest.minimum_chrome_version,
     permissions: permissions.permissions.map(({ name }) => name),
+    optionalPermissions: (permissions.optionalPermissions ?? []).map(({ name }) => name),
     optionalHostPermissions: permissions.optionalHostPermissions.map(({ name }) => name),
     securityReporting: githubPolicy.security.privateVulnerabilityReporting
       ? '.github/SECURITY.md and GitHub private vulnerability reporting'
@@ -213,6 +214,10 @@ export function renderDocumentationFacts(root = repoRoot) {
     'Required permissions:',
     '',
     bullets(facts.permissions),
+    '',
+    'Optional permissions:',
+    '',
+    bullets(facts.optionalPermissions),
     '',
     'Optional host permissions:',
     '',

@@ -4,22 +4,26 @@ export function writeFixture(
   root: string,
   {
     permissions = ['storage', 'downloads'],
+    optionalPermissions = [],
     hostPermissions = [],
     optionalHostPermissions = ['http://*/*', 'https://*/*'],
     contentScripts = [],
     webAccessibleResources = [],
     policyPermissions = permissions,
+    policyOptionalPermissions = optionalPermissions,
     policyHostPermissions = hostPermissions,
     policyOptionalHostPermissions = optionalHostPermissions,
     policyContentScripts = [],
     policyWebAccessibleResources = [],
   }: {
     permissions?: string[];
+    optionalPermissions?: string[];
     hostPermissions?: string[];
     optionalHostPermissions?: string[];
     contentScripts?: Array<Record<string, unknown>>;
     webAccessibleResources?: Array<Record<string, unknown>>;
     policyPermissions?: string[];
+    policyOptionalPermissions?: string[];
     policyHostPermissions?: string[];
     policyOptionalHostPermissions?: string[];
     policyContentScripts?: string[];
@@ -28,6 +32,7 @@ export function writeFixture(
 ) {
   writeJson(root, 'apps/extension/manifest.json', {
     permissions,
+    optional_permissions: optionalPermissions,
     host_permissions: hostPermissions,
     optional_host_permissions: optionalHostPermissions,
     content_scripts: contentScripts,
@@ -35,6 +40,9 @@ export function writeFixture(
   });
   const policy = {
     permissions: policyPermissions.map((name) => createPolicyEntry(name, `src/shared/${name}.ts`)),
+    optionalPermissions: policyOptionalPermissions.map((name) =>
+      createPolicyEntry(name, 'packages/platform/src/browser/native-messaging.ts')
+    ),
     hostPermissions: policyHostPermissions.map((name) =>
       createPolicyEntry(name, 'apps/extension/src/content/index.tsx')
     ),
@@ -144,6 +152,7 @@ export function writePolicyWithMissingCapability(root: string) {
         reviewNote: 'storage note',
       },
     ],
+    optionalPermissions: [],
     hostPermissions: [],
     optionalHostPermissions: [
       createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),
@@ -163,6 +172,7 @@ export function writePolicyWithMissingDisclosure(root: string) {
   });
   writePolicy(root, {
     permissions: [storageEntry],
+    optionalPermissions: [],
     hostPermissions: [],
     optionalHostPermissions: [
       createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),
@@ -182,6 +192,7 @@ export function writePolicyWithMissingOwnerPath(root: string) {
     root,
     {
       permissions: [createPolicyEntry('storage', missingOwner)],
+      optionalPermissions: [],
       hostPermissions: [],
       optionalHostPermissions: [
         createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),
@@ -205,6 +216,7 @@ export function writePolicyWithStaleEntryAndMissingMetadata(root: string) {
       },
       createPolicyEntry('downloads', 'src/shared/downloads.ts'),
     ],
+    optionalPermissions: [],
     hostPermissions: [],
     optionalHostPermissions: [
       createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),

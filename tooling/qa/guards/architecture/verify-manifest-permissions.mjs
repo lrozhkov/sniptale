@@ -167,6 +167,13 @@ export function collectManifestPermissionViolations({
     }),
     ...collectSetViolations({
       rootDir,
+      manifestEntries: manifest.optional_permissions ?? [],
+      policyEntries: policy.optionalPermissions ?? [],
+      file: manifestPath,
+      kind: 'optional permission',
+    }),
+    ...collectSetViolations({
+      rootDir,
       manifestEntries: manifest.optional_host_permissions ?? [],
       policyEntries: policy.optionalHostPermissions ?? [],
       file: manifestPath,

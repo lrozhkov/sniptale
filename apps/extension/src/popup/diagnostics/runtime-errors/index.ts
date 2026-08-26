@@ -12,6 +12,12 @@ const STALE_PAGE_RUNTIME_PATTERNS = [
   'The message port closed before a response was received',
 ];
 
+const PAGE_ACCESS_REQUIRED_PATTERNS = [
+  'Page access is required.',
+  'Page access is required for export.',
+  'Page access is required for tab recording.',
+];
+
 const LOCALIZED_RUNTIME_ERROR_MESSAGES: ReadonlyArray<{
   sourceKey: TranslationKey;
   key: TranslationKey;
@@ -45,6 +51,10 @@ export function getPopupRuntimeErrorMessage(error: unknown, fallbackKey: Transla
 
   if (message && isStalePageRuntimeErrorMessage(message)) {
     return translate('popup.common.stalePageRuntimeHint');
+  }
+
+  if (PAGE_ACCESS_REQUIRED_PATTERNS.includes(message)) {
+    return translate('popup.home.pageAccessRequired');
   }
 
   const localizedError = LOCALIZED_RUNTIME_ERROR_MESSAGES.find((entry) =>

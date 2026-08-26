@@ -13,6 +13,7 @@ const {
   registerVoiceInputPorts,
   registerVoiceInputTelemetryPorts,
   registerSecurityE2EControl,
+  initializeNativeAppPermissionLifecycle,
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
@@ -26,6 +27,11 @@ const {
   registerVoiceInputPorts: vi.fn(),
   registerVoiceInputTelemetryPorts: vi.fn(),
   registerSecurityE2EControl: vi.fn(),
+  initializeNativeAppPermissionLifecycle: vi.fn(),
+}));
+vi.mock('../../native-app/permission-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../native-app/permission-lifecycle')>()),
+  initializeNativeAppPermissionLifecycle,
 }));
 vi.mock('../../../../platform/security-e2e-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/security-e2e-control')>()),
@@ -84,6 +90,10 @@ import { initializeBackgroundRuntime } from './initialize';
 
 it('registers all background listeners through the runtime-wiring owner', () => {
   const state = createModeState();
+  initializeNativeAppPermissionLifecycle.mockImplementation((service: { connect: () => void }) => {
+    service.connect();
+    return vi.fn();
+  });
 
   initializeBackgroundRuntime(state);
 

@@ -7,14 +7,22 @@ import { createVideoCapabilities } from '@sniptale/runtime-contracts/tab-capabil
 import { usePopupPageAccessRuntime, type PopupPageAccessRuntime } from './page-access';
 const {
   browserPermissionsContainsMock,
+  browserFileAccessAllowedMock,
   browserPermissionsRemoveMock,
   browserPermissionsRequestMock,
+  hasLocalFileAccessOptInMock,
+  openExtensionDetailsPageMock,
   runtimeSendMessageMock,
+  setLocalFileAccessOptInMock,
 } = vi.hoisted(() => ({
   browserPermissionsContainsMock: vi.fn(),
+  browserFileAccessAllowedMock: vi.fn(),
   browserPermissionsRemoveMock: vi.fn(),
   browserPermissionsRequestMock: vi.fn(),
+  hasLocalFileAccessOptInMock: vi.fn(),
+  openExtensionDetailsPageMock: vi.fn(),
   runtimeSendMessageMock: vi.fn(),
+  setLocalFileAccessOptInMock: vi.fn(),
 }));
 vi.mock('@sniptale/platform/browser/permissions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/permissions')>()),
@@ -29,9 +37,20 @@ vi.mock('@sniptale/platform/browser/permissions', async (importOriginal) => ({
   },
   browserPermissions: {
     contains: (...args: unknown[]) => browserPermissionsContainsMock(...args),
+    isFileSchemeAccessAllowed: (...args: unknown[]) => browserFileAccessAllowedMock(...args),
     remove: (...args: unknown[]) => browserPermissionsRemoveMock(...args),
     request: (...args: unknown[]) => browserPermissionsRequestMock(...args),
   },
+}));
+
+vi.mock('../../../composition/persistence/settings/file-scheme-consent', () => ({
+  hasLocalFileAccessOptIn: (...args: unknown[]) => hasLocalFileAccessOptInMock(...args),
+  setLocalFileAccessOptIn: (...args: unknown[]) => setLocalFileAccessOptInMock(...args),
+}));
+
+vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/navigation/extension-pages')>()),
+  openExtensionDetailsPage: (...args: unknown[]) => openExtensionDetailsPageMock(...args),
 }));
 
 vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
@@ -97,8 +116,12 @@ async function flushAsync(): Promise<void> {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   browserPermissionsContainsMock.mockReset().mockResolvedValue(false);
+  browserFileAccessAllowedMock.mockReset().mockResolvedValue(true);
   browserPermissionsRemoveMock.mockReset().mockResolvedValue(true);
   browserPermissionsRequestMock.mockReset().mockResolvedValue(true);
+  hasLocalFileAccessOptInMock.mockReset().mockResolvedValue(false);
+  openExtensionDetailsPageMock.mockReset().mockResolvedValue(undefined);
+  setLocalFileAccessOptInMock.mockReset().mockResolvedValue(undefined);
   runtimeSendMessageMock.mockReset();
   runtimeSendMessageMock.mockResolvedValue({ status: inactiveStatus, success: true });
 });
@@ -191,11 +214,29 @@ it('requests the explicit file origin before registering local-file page access'
   });
 
   expect(browserPermissionsRequestMock).toHaveBeenCalledWith({ origins: ['file:///'] });
+  expect(setLocalFileAccessOptInMock).toHaveBeenCalledWith(true);
   expect(runtimeSendMessageMock).toHaveBeenLastCalledWith({
     operation: 'register-granted-site',
     tabId: 7,
     type: 'PAGE_ACCESS',
   });
+});
+
+it('opens Chrome extension settings instead of offering website grants for local files', async () => {
+  const fileStatus = { ...inactiveStatus, currentTabOrigin: 'file:///' };
+  browserFileAccessAllowedMock.mockResolvedValue(false);
+  runtimeSendMessageMock.mockResolvedValueOnce({ status: fileStatus, success: true });
+
+  await renderHarness();
+  await flushAsync();
+
+  await act(async () => {
+    await latestRuntime?.handleRequest('grant-site');
+  });
+
+  expect(openExtensionDetailsPageMock).toHaveBeenCalledOnce();
+  expect(browserPermissionsRequestMock).not.toHaveBeenCalled();
+  expect(latestRuntime?.error).toBe('popup.home.localFileChromeAccessRequired');
 });
 
 it('rejects stale site grants before requesting an origin permission', async () => {
@@ -272,7 +313,7 @@ it('rolls back a just-granted site permission when background registration fails
   expect(browserPermissionsRemoveMock).toHaveBeenCalledWith({
     origins: ['https://example.test/*'],
   });
-  expect(latestRuntime?.error).toBe('registration failed');
+  expect(latestRuntime?.error).toBe('popup.home.pageAccessFailed');
 });
 
 it('rolls back a just-granted site permission when background registration rejects', async () => {
@@ -290,7 +331,7 @@ it('rolls back a just-granted site permission when background registration rejec
   expect(browserPermissionsRemoveMock).toHaveBeenCalledWith({
     origins: ['https://example.test/*'],
   });
-  expect(latestRuntime?.error).toBe('registration rejected');
+  expect(latestRuntime?.error).toBe('popup.home.pageAccessFailed');
 });
 
 it('rolls back a just-granted all-sites permission when background registration fails', async () => {
@@ -312,7 +353,7 @@ it('rolls back a just-granted all-sites permission when background registration 
   expect(browserPermissionsRemoveMock).toHaveBeenCalledWith({
     origins: ['<all_urls>'],
   });
-  expect(latestRuntime?.error).toBe('all-sites registration failed');
+  expect(latestRuntime?.error).toBe('popup.home.pageAccessFailed');
 });
 
 it('does not roll back pre-existing all-sites permission after registration failure', async () => {
@@ -353,5 +394,5 @@ it('rolls back a just-granted all-sites permission when background registration 
   expect(browserPermissionsRemoveMock).toHaveBeenCalledWith({
     origins: ['<all_urls>'],
   });
-  expect(latestRuntime?.error).toBe('all-sites registration rejected');
+  expect(latestRuntime?.error).toBe('popup.home.pageAccessFailed');
 });

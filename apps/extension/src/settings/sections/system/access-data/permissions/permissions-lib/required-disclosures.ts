@@ -1,5 +1,4 @@
 import {
-  Cable,
   Clipboard,
   Code2,
   Database,
@@ -16,8 +15,10 @@ import type { LucideIcon } from 'lucide-react';
 import type { TranslationKey } from '../../../../../../platform/i18n';
 
 type RequiredManifestGrantKind = 'content-script' | 'host' | 'permission';
+export type RequiredPermissionCategory = 'capture' | 'core' | 'page';
 
 export interface RequiredManifestPermissionDisclosure {
+  category: RequiredPermissionCategory;
   descriptionKey: TranslationKey;
   icon: LucideIcon;
   id: string;
@@ -27,6 +28,7 @@ export interface RequiredManifestPermissionDisclosure {
 
 export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDisclosure[] = [
   {
+    category: 'core',
     descriptionKey: 'settings.permissions.requiredStorageDescription',
     icon: Database,
     id: 'storage',
@@ -34,6 +36,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredStorageName',
   },
   {
+    category: 'page',
     descriptionKey: 'settings.permissions.requiredContextMenusDescription',
     icon: MousePointerClick,
     id: 'contextMenus',
@@ -41,6 +44,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredContextMenusName',
   },
   {
+    category: 'core',
     descriptionKey: 'settings.permissions.requiredUnlimitedStorageDescription',
     icon: HardDrive,
     id: 'unlimitedStorage',
@@ -48,6 +52,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredUnlimitedStorageName',
   },
   {
+    category: 'core',
     descriptionKey: 'settings.permissions.requiredTabsDescription',
     icon: PanelTop,
     id: 'tabs',
@@ -55,6 +60,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredTabsName',
   },
   {
+    category: 'core',
     descriptionKey: 'settings.permissions.requiredWebNavigationDescription',
     icon: Navigation,
     id: 'webNavigation',
@@ -62,6 +68,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredWebNavigationName',
   },
   {
+    category: 'page',
     descriptionKey: 'settings.permissions.requiredSystemDisplayDescription',
     icon: MonitorUp,
     id: 'system.display',
@@ -69,6 +76,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredSystemDisplayName',
   },
   {
+    category: 'page',
     descriptionKey: 'settings.permissions.requiredActiveTabDescription',
     icon: MousePointerClick,
     id: 'activeTab',
@@ -76,6 +84,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredActiveTabName',
   },
   {
+    category: 'page',
     descriptionKey: 'settings.permissions.requiredScriptingDescription',
     icon: Code2,
     id: 'scripting',
@@ -83,6 +92,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredScriptingName',
   },
   {
+    category: 'capture',
     descriptionKey: 'settings.permissions.requiredDownloadsDescription',
     icon: Download,
     id: 'downloads',
@@ -90,6 +100,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredDownloadsName',
   },
   {
+    category: 'capture',
     descriptionKey: 'settings.permissions.requiredOffscreenDescription',
     icon: Puzzle,
     id: 'offscreen',
@@ -97,6 +108,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredOffscreenName',
   },
   {
+    category: 'capture',
     descriptionKey: 'settings.permissions.requiredTabCaptureDescription',
     icon: Video,
     id: 'tabCapture',
@@ -104,6 +116,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredTabCaptureName',
   },
   {
+    category: 'capture',
     descriptionKey: 'settings.permissions.requiredDesktopCaptureDescription',
     icon: MonitorUp,
     id: 'desktopCapture',
@@ -111,13 +124,7 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredDesktopCaptureName',
   },
   {
-    descriptionKey: 'settings.permissions.requiredNativeMessagingDescription',
-    icon: Cable,
-    id: 'nativeMessaging',
-    kind: 'permission',
-    nameKey: 'settings.permissions.requiredNativeMessagingName',
-  },
-  {
+    category: 'capture',
     descriptionKey: 'settings.permissions.requiredClipboardWriteDescription',
     icon: Clipboard,
     id: 'clipboardWrite',

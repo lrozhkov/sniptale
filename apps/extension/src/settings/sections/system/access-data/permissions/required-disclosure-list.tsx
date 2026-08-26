@@ -1,8 +1,21 @@
 import { translate } from '../../../../../platform/i18n';
 import {
   requiredManifestPermissionDisclosures,
+  type RequiredPermissionCategory,
   type RequiredManifestPermissionDisclosure,
 } from './permissions-lib/required-disclosures';
+
+const categoryOrder: RequiredPermissionCategory[] = ['core', 'page', 'capture'];
+const categoryHeadingClassName = [
+  'text-xs font-semibold uppercase tracking-[0.08em]',
+  'text-[var(--sniptale-color-text-muted-strong)]',
+].join(' ');
+
+const categoryTitleKeys = {
+  capture: 'settings.permissions.requiredCategoryCapture',
+  core: 'settings.permissions.requiredCategoryCore',
+  page: 'settings.permissions.requiredCategoryPage',
+} as const;
 
 const requiredGrantCardClassName = [
   'grid gap-3 border-b px-4 py-3 last:border-b-0 md:border-b-0 md:border-r',
@@ -39,28 +52,29 @@ function RequiredManifestGrantCard(props: { disclosure: RequiredManifestPermissi
 export function RequiredManifestPermissionDisclosureList() {
   return (
     <section
-      className="mt-6 grid gap-3"
+      className="grid gap-5"
       aria-label={translate('settings.permissions.requiredGrantsTitle')}
     >
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-          {translate('settings.permissions.requiredGrantsTitle')}
-        </h2>
-        <p className="mt-1 text-sm text-[var(--sniptale-color-text-secondary)]">
-          {translate('settings.permissions.requiredGrantsDescription')}
-        </p>
-      </div>
-
-      <div
-        className={[
-          'grid overflow-hidden rounded-[12px] border md:grid-cols-2',
-          'border-[var(--sniptale-color-border-soft)]',
-        ].join(' ')}
-      >
-        {requiredManifestPermissionDisclosures.map((disclosure) => (
-          <RequiredManifestGrantCard key={disclosure.id} disclosure={disclosure} />
-        ))}
-      </div>
+      <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
+        {translate('settings.permissions.requiredGrantsDescription')}
+      </p>
+      {categoryOrder.map((category) => (
+        <div key={category} className="grid gap-2.5">
+          <h2 className={categoryHeadingClassName}>{translate(categoryTitleKeys[category])}</h2>
+          <div
+            className={[
+              'grid overflow-hidden rounded-[12px] border md:grid-cols-2',
+              'border-[var(--sniptale-color-border-soft)]',
+            ].join(' ')}
+          >
+            {requiredManifestPermissionDisclosures
+              .filter((disclosure) => disclosure.category === category)
+              .map((disclosure) => (
+                <RequiredManifestGrantCard key={disclosure.id} disclosure={disclosure} />
+              ))}
+          </div>
+        </div>
+      ))}
     </section>
   );
 }

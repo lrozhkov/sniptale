@@ -69,6 +69,9 @@ it('forwards permissions state and actions into the permissions content shell', 
     permissions: sectionState.permissions,
     onRefresh: sectionState.refreshPermissions,
     onRequestPermission: sectionState.requestPermission,
+    onRevokePermission: undefined,
+    onViewChange: expect.any(Function),
+    view: 'optional',
   });
   expect(container?.querySelector('[data-testid="permissions-section-content"]')).not.toBeNull();
 });

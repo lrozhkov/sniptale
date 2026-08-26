@@ -14,7 +14,7 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/manifest.json",
-      "sha256": "5a33cd93195c5629769d22782e13a21d3b231d173ad6627194570da53ca6cf86"
+      "sha256": "e6d177f64a7f4079155c1a040cb87ea48e5b0a10f1cfd0970f0dac2c47451f40"
     },
     {
       "category": "bundled-font",
@@ -54,7 +54,7 @@
     {
       "category": "bundled-font",
       "path": "tooling/configs/qa/manifest-permissions.data.json",
-      "sha256": "c64035ab450d0d983960e89edbbff69b328c5f26f00c13e9092aafd0b9802f20"
+      "sha256": "5a61c7e83725b4bb8fab06201aeb0ed2973258f5022158b17655696062904858"
     },
     {
       "category": "archive-integration",

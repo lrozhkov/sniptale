@@ -29,8 +29,11 @@ Required permissions:
 - `offscreen`
 - `tabCapture`
 - `desktopCapture`
-- `nativeMessaging`
 - `clipboardWrite`
+
+Optional permissions:
+
+- `nativeMessaging`
 
 Optional host permissions:
 

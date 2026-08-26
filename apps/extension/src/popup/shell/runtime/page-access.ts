@@ -9,13 +9,10 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { PageAccessOperation as PageAccessOperationValue } from '@sniptale/runtime-contracts/messaging/page-access';
 import { translate } from '../../../platform/i18n/popup';
+import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 import {
-  createRuntimeMessagingTransport,
-  getErrorMessage,
-} from '../../../platform/runtime-messaging';
-import {
-  resolveBackgroundOperationAfterUiGrant,
-  rollbackOriginGrant,
+  applyUiPageAccessGrant,
+  rollbackUiGrant,
   type UiGrantResolution,
 } from './page-access-grants';
 
@@ -96,11 +93,11 @@ function startPageAccessStatusLoad(args: PageAccessStatusLoadEffectArgs): () => 
         return;
       }
       args.setStatus(response.status ?? null);
-      args.setError(response.success === false ? (response.error ?? null) : null);
+      args.setError(response.success === false ? translate('popup.home.pageAccessFailed') : null);
     })
-    .catch((error: unknown) => {
+    .catch(() => {
       if (!disposed) {
-        args.setError(getErrorMessage(error, translate('popup.home.pageAccessFailed')));
+        args.setError(translate('popup.home.pageAccessFailed'));
       }
     })
     .finally(() => {
@@ -164,7 +161,7 @@ function usePageAccessRequest(args: {
       args.setError(null);
       let grantResolution: UiGrantResolution | null = null;
       try {
-        grantResolution = await resolveBackgroundOperationAfterUiGrant({
+        grantResolution = await applyUiPageAccessGrant({
           activeTabId: args.activeTabCapabilities.tabId,
           operation,
           status: args.status,
@@ -173,20 +170,22 @@ function usePageAccessRequest(args: {
           args.setError(translate('popup.home.pageAccessFailed'));
           return;
         }
+        if (grantResolution.kind === 'external-file-setting-required') {
+          args.setError(translate('popup.home.localFileChromeAccessRequired'));
+          return;
+        }
 
         const response = await args.runtimeTransport.sendRuntimeMessage(
           createPageAccessMessage(grantResolution.operation, args.activeTabCapabilities.tabId)
         );
         args.setStatus(response.status ?? null);
         if (response.success === false) {
-          await rollbackOriginGrant(grantResolution.rollbackOrigins);
-          args.setError(response.error ?? translate('popup.home.pageAccessFailed'));
+          await rollbackUiGrant(grantResolution);
+          args.setError(translate('popup.home.pageAccessFailed'));
         }
-      } catch (error) {
-        if (grantResolution) {
-          await rollbackOriginGrant(grantResolution.rollbackOrigins);
-        }
-        args.setError(getErrorMessage(error, translate('popup.home.pageAccessFailed')));
+      } catch {
+        await rollbackUiGrant(grantResolution);
+        args.setError(translate('popup.home.pageAccessFailed'));
       } finally {
         args.setPendingOperation(null);
       }
