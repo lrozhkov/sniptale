@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   discard: vi.fn(),
   publishJournal: vi.fn(),
   readSession: vi.fn(),
+  restoreGalleryViews: vi.fn(),
   stage: vi.fn(),
   verify: vi.fn(),
 }));
@@ -33,6 +34,12 @@ vi.mock('./restore-session', async (importOriginal) => ({
 vi.mock('./staging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./staging')>()),
   stageArchiveRootObjects: mocks.stage,
+}));
+vi.mock('../../../composition/persistence/gallery-saved-views', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/gallery-saved-views')
+  >()),
+  restoreGallerySavedViews: mocks.restoreGalleryViews,
 }));
 
 import { createArchiveWriter } from '../../../composition/archive-transfer';
@@ -143,9 +150,32 @@ beforeEach(() => {
   mocks.discard.mockResolvedValue(undefined);
   mocks.deleteJournal.mockResolvedValue(undefined);
   mocks.abortSession.mockResolvedValue(undefined);
+  mocks.restoreGalleryViews.mockResolvedValue([]);
 });
 
 describe('media backup v6 restore orchestration', () => {
+  it('restores portable Gallery views with the archive conflict policy before completion', async () => {
+    currentSession = { ...currentSession, strategy: 'skip' };
+    const galleryViews = [{ id: 'view-1' }];
+    mocks.verify.mockResolvedValue({
+      inspection: {
+        manifest: { archiveId: 'archive-1', catalogs: [], galleryViews },
+      },
+      session: currentSession,
+    });
+
+    await restoreMediaHubBackupV6({
+      file: await archive(),
+      operationId: 'restore-1',
+      publishers: [],
+    });
+
+    expect(mocks.restoreGalleryViews).toHaveBeenCalledWith(galleryViews, 'skip', 'archive-1');
+    expect(mocks.restoreGalleryViews.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.completeSession.mock.invocationCallOrder[0]!
+    );
+  });
+
   it('publishes one root and completes only after the atomic session checkpoint', async () => {
     const publisher = {
       profile: 'media:library-item',

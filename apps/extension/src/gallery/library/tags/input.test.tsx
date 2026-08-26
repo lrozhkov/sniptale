@@ -215,6 +215,10 @@ it('keeps suggestion selection as a draft until the explicit apply action', () =
   expect(onSubmit).not.toHaveBeenCalled();
 
   render('alpha');
+  const updatedInput = container?.querySelector('input');
+  if (!(updatedInput instanceof HTMLInputElement)) throw new Error('Expected updated tag input');
+  act(() => updatedInput.focus());
+  expect(container?.querySelector('[role="listbox"]')).not.toBeNull();
   const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
     (button) => button.textContent === 'gallery.app.apply'
   );

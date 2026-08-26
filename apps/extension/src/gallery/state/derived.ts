@@ -91,10 +91,18 @@ function useGalleryFilterDerivedState(props: {
   const facets = useMemo(
     () =>
       getGalleryFacets(library.items, {
+        activeTags: filters.state.activeTags,
+        facetFilters: filters.state.facetFilters,
         folderFilter: filters.state.folderFilter,
         scope: filters.state.scope,
       }),
-    [filters.state.folderFilter, filters.state.scope, library.items]
+    [
+      filters.state.activeTags,
+      filters.state.facetFilters,
+      filters.state.folderFilter,
+      filters.state.scope,
+      library.items,
+    ]
   );
   const filteredItems = useMemo(
     () =>

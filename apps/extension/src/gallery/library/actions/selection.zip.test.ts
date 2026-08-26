@@ -12,13 +12,17 @@ import {
 } from './test-support/index';
 import { createSelectionBackupAction, createSelectionZipAction } from './selection-export';
 
-const { createDirectFileSinkMock, exportMediaHubBackupMock, getMediaAssetBlobMock } = vi.hoisted(
-  () => ({
-    createDirectFileSinkMock: vi.fn(),
-    exportMediaHubBackupMock: vi.fn(),
-    getMediaAssetBlobMock: vi.fn(),
-  })
-);
+const {
+  createDirectFileSinkMock,
+  downloadBlobMock,
+  exportMediaHubBackupMock,
+  getMediaAssetBlobMock,
+} = vi.hoisted(() => ({
+  createDirectFileSinkMock: vi.fn(),
+  downloadBlobMock: vi.fn(),
+  exportMediaHubBackupMock: vi.fn(),
+  getMediaAssetBlobMock: vi.fn(),
+}));
 
 vi.mock('../../../composition/archive-transfer', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/archive-transfer')>()),
@@ -40,8 +44,14 @@ vi.mock('../../../workflows/media-hub-backup', async (importOriginal) => ({
   exportMediaHubBackup: exportMediaHubBackupMock,
 }));
 
+vi.mock('./shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./shared')>()),
+  downloadBlob: downloadBlobMock,
+}));
+
 beforeEach(() => {
   createDirectFileSinkMock.mockReset();
+  downloadBlobMock.mockReset();
   exportMediaHubBackupMock.mockReset();
   getMediaAssetBlobMock.mockReset();
   exportMediaHubBackupMock.mockResolvedValue(undefined);
@@ -165,6 +175,26 @@ describe('gallery selected export modes', () => {
     );
   });
 
+  it('downloads the original file directly when one media item is selected', async () => {
+    const blob = createReadableBlob('original', 'image/png');
+    getMediaAssetBlobMock.mockResolvedValue(blob);
+    const { controller } = createController({
+      selectedItems: [
+        createMediaItem({
+          entityId: 'asset-1',
+          filename: 'edited.png',
+          originalFilename: 'capture.png',
+        }),
+      ],
+    });
+
+    await createSelectionZipAction(controller)(runBusyAction);
+
+    expect(getMediaAssetBlobMock).toHaveBeenCalledWith('asset-1');
+    expect(downloadBlobMock).toHaveBeenCalledWith(blob, 'capture.png');
+    expect(createDirectFileSinkMock).not.toHaveBeenCalled();
+  });
+
   it('aborts the raw archive and surfaces missing original assets', async () => {
     const output = createArchiveMemorySink();
     const abort = vi.spyOn(output.sink, 'abort');
@@ -176,6 +206,11 @@ describe('gallery selected export modes', () => {
           entityId: 'missing',
           filename: 'missing.png',
           originalFilename: 'missing.png',
+        }),
+        createMediaItem({
+          entityId: 'asset-2',
+          filename: 'available.png',
+          originalFilename: 'available.png',
         }),
       ],
     });

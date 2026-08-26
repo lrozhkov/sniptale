@@ -407,6 +407,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/gallery-saved-views",
+      "ownerId": "persistence.gallery-saved-views",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/infrastructure",
       "ownerId": "persistence.infrastructure",
       "ownerClass": "persistence"
@@ -522,6 +527,11 @@
       "id": "frame-annotation-raster-jobs",
       "path": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
       "stateKind": "authoritative-staging"
+    },
+    {
+      "id": "gallery-saved-views",
+      "path": "apps/extension/src/composition/persistence/gallery-saved-views",
+      "stateKind": "authoritative-durable"
     },
     {
       "id": "indexed-db-core",

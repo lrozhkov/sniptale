@@ -7,6 +7,7 @@ import type {
 import type { MediaHubImportConflictStrategy } from '../../workflows/media-hub-backup/index';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
 import type { GalleryItem } from '../library/items';
+import type { GallerySavedView } from '../../composition/persistence/gallery-saved-views';
 import type { ActiveImportState } from '../library/import-types';
 import type { PendingMediaFileImportState } from '../library/import-types';
 import type {
@@ -64,12 +65,17 @@ interface GalleryPreviewDraftState {
 }
 
 interface GalleryAppFilterState {
+  activeSavedView: GallerySavedView | null;
   folderFilter: FolderFilter;
   sortMode: SortMode;
   search: string;
   scope: GalleryScope;
   activeTags: string[];
   facetFilters: GalleryFacetFilters;
+  isSavedViewDirty: boolean;
+  savedViews: GallerySavedView[];
+  savedViewsLoadFailed: boolean;
+  savedViewsLoaded: boolean;
 }
 
 interface GalleryAppSelectionState {
@@ -129,13 +135,19 @@ interface GalleryAppStorageActions {
 }
 
 interface GalleryAppFilterActions {
+  createSavedView: (name: string) => Promise<GallerySavedView>;
+  deleteSavedView: (id: string) => Promise<void>;
+  moveSavedView: (id: string, direction: 'down' | 'up') => Promise<void>;
+  reloadSavedViews: () => Promise<void>;
   resetFilters: () => void;
+  selectSavedView: (id: string) => void;
   setFolderFilter: Dispatch<SetStateAction<FolderFilter>>;
   setSortMode: Dispatch<SetStateAction<SortMode>>;
   setSearch: Dispatch<SetStateAction<string>>;
   setScope: Dispatch<SetStateAction<GalleryScope>>;
   setActiveTags: Dispatch<SetStateAction<string[]>>;
   setFacetFilter: (id: GalleryFacetFilterId, values: string[]) => void;
+  updateSavedView: () => Promise<void>;
 }
 
 interface GalleryAppSelectionActions {

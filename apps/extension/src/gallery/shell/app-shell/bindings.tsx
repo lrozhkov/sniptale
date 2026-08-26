@@ -10,8 +10,12 @@ import {
   isGalleryMediaItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
+  isGallerySelectableItem,
   isGalleryVideoProjectItem,
 } from '../../library/items';
+import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
+import { translate } from '../../../platform/i18n';
+import { openGalleryConfirmDialog } from '../../library/actions/shared';
 
 function resolvePromotionTarget(item: GalleryItem) {
   if (isGalleryMediaItem(item)) return { kind: 'image' as const, id: item.entityId ?? item.id };
@@ -119,6 +123,14 @@ function buildGallerySelectionHandlers(
     onDeleteMany: (items: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0]) =>
       void actions.selection.deleteMany(items),
     onClearSelection: () => controller.actions.selection.setSelectedIds(new Set()),
+    onSelectAllFiltered: () =>
+      controller.actions.selection.setSelectedIds(
+        new Set(
+          controller.state.derived.filteredItems
+            .filter(isGallerySelectableItem)
+            .map((item) => item.id)
+        )
+      ),
     onToggleSelection: controller.actions.selection.toggleSelection,
   };
 }
@@ -165,7 +177,27 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onScopeChange: controller.actions.filters.setScope,
     onActiveTagsChange: controller.actions.filters.setActiveTags,
     onFacetFilterChange: controller.actions.filters.setFacetFilter,
+    onCreateSavedView: controller.actions.filters.createSavedView,
+    onDeleteSavedView: (view: GallerySavedView) =>
+      openGalleryConfirmDialog(controller, {
+        title: translate('gallery.app.savedViewDeleteTitle'),
+        message: translate('gallery.app.savedViewDeleteMessage').replace('{name}', view.name),
+        onConfirm: async () => {
+          try {
+            await controller.actions.filters.deleteSavedView(view.id);
+          } catch (error) {
+            controller.actions.surface.setBanner(translate('gallery.app.savedViewDeleteFailed'));
+            throw error;
+          }
+        },
+      }),
+    onMoveSavedView: (id: string, direction: 'down' | 'up') =>
+      void controller.actions.filters.moveSavedView(id, direction).catch(() => {
+        controller.actions.surface.setBanner(translate('gallery.app.savedViewReorderFailed'));
+      }),
     onResetFilters: controller.actions.filters.resetFilters,
+    onSavedViewSelect: controller.actions.filters.selectSavedView,
+    onUpdateSavedView: controller.actions.filters.updateSavedView,
     onSearchChange: controller.actions.filters.setSearch,
     onSortModeChange: controller.actions.filters.setSortMode,
     onViewModeChange: props.setViewMode,

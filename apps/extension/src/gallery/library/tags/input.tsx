@@ -1,4 +1,12 @@
-import { useId, useMemo, useState, type KeyboardEventHandler } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEventHandler,
+  type RefObject,
+} from 'react';
 import { Plus, Tag } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
@@ -9,6 +17,7 @@ function cx(...values: Array<string | false | null | undefined>) {
 
 interface GalleryTagInputProps {
   allTags: string[];
+  autoFocus?: boolean;
   compact?: boolean;
   excludeTags?: string[];
   explicitSubmit?: boolean;
@@ -19,7 +28,9 @@ interface GalleryTagInputProps {
 }
 
 function GalleryTagInputField(props: {
+  autoFocus: boolean;
   compact: boolean;
+  inputRef: RefObject<HTMLInputElement | null>;
   listId: string;
   onBlur: () => void;
   onChange: (value: string) => void;
@@ -48,6 +59,8 @@ function GalleryTagInputField(props: {
         )}
       />
       <input
+        autoFocus={props.autoFocus}
+        ref={props.inputRef}
         aria-autocomplete="list"
         aria-controls={props.listId}
         aria-expanded={props.showOptions}
@@ -151,6 +164,7 @@ function GalleryTagOptions(props: {
 
 export function GalleryTagInput({
   allTags,
+  autoFocus = false,
   compact = false,
   excludeTags = [],
   explicitSubmit = false,
@@ -160,6 +174,8 @@ export function GalleryTagInput({
   value,
 }: GalleryTagInputProps) {
   const listId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimeoutRef = useRef<number | null>(null);
   const [focused, setFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const normalizedValue = value.trim().toLowerCase();
@@ -175,12 +191,24 @@ export function GalleryTagInput({
   const optionCount = suggestions.length + (canCreate ? 1 : 0);
   const showOptions = focused && optionCount > 0;
 
+  useEffect(
+    () => () => {
+      if (blurTimeoutRef.current !== null) window.clearTimeout(blurTimeoutRef.current);
+    },
+    []
+  );
+
+  const closeOptions = () => {
+    inputRef.current?.blur();
+    setFocused(false);
+    setActiveIndex(-1);
+  };
+
   const submit = (tag: string) => {
     const nextTag = tag.trim();
     if (!nextTag) return;
     onSubmit(nextTag);
-    setFocused(false);
-    setActiveIndex(-1);
+    closeOptions();
   };
 
   const select = (tag: string) => {
@@ -188,8 +216,7 @@ export function GalleryTagInput({
     if (!nextTag) return;
     if (explicitSubmit) {
       onChange(nextTag);
-      setFocused(false);
-      setActiveIndex(-1);
+      closeOptions();
       return;
     }
     submit(nextTag);
@@ -206,14 +233,22 @@ export function GalleryTagInput({
   return (
     <div className="relative min-w-0">
       <GalleryTagInputField
+        autoFocus={autoFocus}
         compact={compact}
+        inputRef={inputRef}
         listId={listId}
-        onBlur={() => window.setTimeout(() => setFocused(false), 120)}
+        onBlur={() => {
+          blurTimeoutRef.current = window.setTimeout(() => setFocused(false), 120);
+        }}
         onChange={(nextValue) => {
           setActiveIndex(-1);
           onChange(nextValue);
         }}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          if (blurTimeoutRef.current !== null) window.clearTimeout(blurTimeoutRef.current);
+          blurTimeoutRef.current = null;
+          setFocused(true);
+        }}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' && optionCount > 0) {
             event.preventDefault();

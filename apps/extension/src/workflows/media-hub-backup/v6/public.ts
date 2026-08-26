@@ -28,6 +28,7 @@ import { effectBundleRootPublisher } from './root-publication/effect-bundle';
 import { mediaLibraryRootPublisher } from './root-publication/media';
 import { scenarioProjectRootPublisher } from './root-publication/scenario-project';
 import { videoProjectRootPublisher } from './root-publication/video-project';
+import { listGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 
 export type MediaHubImportConflictStrategy = ArchiveRestoreStrategy;
 
@@ -82,6 +83,7 @@ export async function inspectLocalMediaHubBackup(
     }
   );
   const { rootsByProfile } = plan.manifest.totals;
+  const savedViewCount = plan.manifest.galleryViews?.length ?? 0;
   return {
     approximateSizeBytes: plan.manifest.totals.bytes,
     assetCount: rootsByProfile.libraryItems,
@@ -90,6 +92,7 @@ export async function inspectLocalMediaHubBackup(
       drafts: summary.draftCount > 0,
       mediaAssets: rootsByProfile.libraryItems > 0,
       recordings: summary.recordingCount > 0,
+      savedViews: savedViewCount > 0,
       scenarioProjects: rootsByProfile.scenarioProjects > 0,
       sourceMetadata: options.includeSourceMetadata && summary.sourceMetadataCount > 0,
       telemetry: options.includeTelemetry && summary.telemetryCount > 0,
@@ -98,6 +101,7 @@ export async function inspectLocalMediaHubBackup(
       webSnapshots: options.includeWebSnapshots && summary.webSnapshotCount > 0,
     },
     recordingCount: summary.recordingCount,
+    savedViewCount,
     scenarioProjectCount: rootsByProfile.scenarioProjects,
     selectedCount:
       options.scope === 'selected'
@@ -206,6 +210,22 @@ export async function inspectMediaHubBackup(file: Blob): Promise<MediaHubBackupS
             ? VIDEO_PROJECTS_STORE
             : SCENARIO_PROJECTS_STORE;
     if (await db.get(store, id)) conflicts.push(key);
+  }
+  if (inspection.manifest.galleryViews?.length) {
+    const currentViews = await listGallerySavedViews();
+    for (const importedView of inspection.manifest.galleryViews) {
+      const importedName = importedView.name.toLocaleLowerCase('en-US');
+      if (
+        currentViews.some(
+          (view) =>
+            view.id === importedView.id ||
+            (view.folderFilter === importedView.folderFilter &&
+              view.name.toLocaleLowerCase('en-US') === importedName)
+        )
+      ) {
+        conflicts.push(`gallery-view:${importedView.id}`);
+      }
+    }
   }
   return {
     archiveFingerprint: inspection.fingerprint,

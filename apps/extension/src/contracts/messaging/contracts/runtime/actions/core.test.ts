@@ -380,22 +380,24 @@ it('parses bounded frame-annotation raster references and authoritative results'
   ).toThrow();
 });
 
-it('requires a bounded correlation identity for frame-annotation raster preparation', () => {
-  expect(
-    frameAnnotationRasterContract.parseRequest({
-      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
-      operation: 'prepare',
-      leaseId: 'lease-1',
-    })
-  ).toMatchObject({ leaseId: 'lease-1' });
-  for (const leaseId of [undefined, '', 'x'.repeat(129)]) {
-    expect(() =>
+it('requires a bounded correlation identity for frame-annotation raster lease operations', () => {
+  for (const operation of ['prepare', 'confirm'] as const) {
+    expect(
       frameAnnotationRasterContract.parseRequest({
         type: MessageType.FRAME_ANNOTATION_RASTERIZE,
-        operation: 'prepare',
-        leaseId,
+        operation,
+        leaseId: 'lease-1',
       })
-    ).toThrow();
+    ).toMatchObject({ leaseId: 'lease-1', operation });
+    for (const leaseId of [undefined, '', 'x'.repeat(129)]) {
+      expect(() =>
+        frameAnnotationRasterContract.parseRequest({
+          type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+          operation,
+          leaseId,
+        })
+      ).toThrow();
+    }
   }
 });
 

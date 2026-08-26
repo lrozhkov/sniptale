@@ -5,6 +5,8 @@ import type { GallerySurfaceController } from './controller-types';
 
 export type GalleryBusyAction = (action: () => Promise<void>) => Promise<void>;
 
+class GalleryUserFacingActionError extends Error {}
+
 type GalleryConfirmDialogController = {
   actions: {
     surface: Pick<GallerySurfaceController['actions']['surface'], 'setConfirmDialog'>;
@@ -39,11 +41,22 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
     try {
       await action();
     } catch (error) {
-      actions.surface.setBanner(error instanceof Error ? error.message : String(error));
+      if (isUserCancellation(error)) return;
+      actions.surface.setBanner(
+        error instanceof GalleryUserFacingActionError
+          ? error.message
+          : translate('gallery.app.actionFailed')
+      );
     } finally {
       actions.surface.setIsBusy(false);
     }
   };
+}
+
+function isUserCancellation(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : error instanceof Error && error.name === 'AbortError';
 }
 
 export function downloadBlob(
@@ -110,5 +123,7 @@ export async function copyImageBlob(blob: Blob): Promise<void> {
 }
 
 export function createMissingBlobError(filename: string): Error {
-  return new Error(`${translate('gallery.app.missingBlobPrefix')} ${filename}.`);
+  return new GalleryUserFacingActionError(
+    `${translate('gallery.app.missingBlobPrefix')} ${filename}.`
+  );
 }

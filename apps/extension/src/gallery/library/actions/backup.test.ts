@@ -79,6 +79,7 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
       drafts: false,
       mediaAssets: true,
       recordings: true,
+      savedViews: true,
       scenarioProjects: true,
       sourceMetadata: true,
       telemetry: true,
@@ -87,6 +88,7 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
       webSnapshots: true,
     },
     recordingCount: 1,
+    savedViewCount: 2,
     scenarioProjectCount: 0,
     selectedCount: 0,
     sourceMetadataCount: 2,
@@ -377,6 +379,7 @@ async function verifyBackupImportFlow() {
     expect.objectContaining({ signal: expect.any(AbortSignal) })
   );
   expect(getState().storage.pendingImport).toBeNull();
+  expect(controller.actions.filters.reloadSavedViews).toHaveBeenCalledTimes(1);
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 }
 
@@ -417,6 +420,7 @@ async function verifyResumableBackupImportFlow() {
   });
   expect(importMediaHubBackupMock).not.toHaveBeenCalled();
   expect(getState().storage.pendingImport).toBeNull();
+  expect(controller.actions.filters.reloadSavedViews).toHaveBeenCalledTimes(1);
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 }
 

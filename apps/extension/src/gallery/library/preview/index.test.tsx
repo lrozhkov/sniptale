@@ -194,6 +194,24 @@ it('renders unsafe source urls as inert text instead of links', () => {
   expect(container?.querySelector('a[href]')).toBeNull();
 });
 
+it('shows the draft deletion date below the creation date in the inspector header', () => {
+  const baseProps = createProps();
+
+  render(
+    createProps({
+      item: {
+        ...baseProps.item,
+        expiresAt: 99,
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
+      },
+    })
+  );
+
+  expect(formatDateMock).toHaveBeenCalledWith(1);
+  expect(formatDateMock).toHaveBeenCalledWith(99);
+  expect(container?.textContent).toContain('gallery.app.draftExpires 31 Mar 2026');
+});
+
 it('uses project name as the source fallback for scenario export items and keeps filename read-only', () => {
   render(
     createProps({

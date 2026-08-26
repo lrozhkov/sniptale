@@ -34,6 +34,12 @@
   ],
   "sensitiveRetentionOwners": [
     {
+      "file": "apps/extension/src/composition/persistence/gallery-saved-views/index.ts",
+      "owner": "gallery-saved-views",
+      "justification": "The saved Gallery view owner retains bounded user-selected facet identifiers, including tag and source values, as reusable local navigation preferences.",
+      "reviewNote": "Records may contain only a bounded name, category, status, tag labels, and canonical facet identifiers; they are local-only, included in explicit full-library backup, excluded from selected-item packages, sync, diagnostics, and logs, and removed by factory reset."
+    },
+    {
       "file": "apps/extension/src/composition/persistence/content-pin-session/annotation-fork.ts",
       "owner": "annotation-fork-session",
       "justification": "The annotation fork session owner retains unsaved visual template adjustments across reloads for one browser tab.",

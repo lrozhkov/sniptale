@@ -160,7 +160,10 @@ it('wires compact search, sort, and centered view-mode controls without manual r
   expect(controls?.className).toContain('shrink-0');
   expect(workspace?.className).toContain('flex-nowrap');
   expect(container?.querySelector('[aria-label="gallery.app.refresh"]')).toBeNull();
-  expect(input.parentElement?.className).not.toContain('focus-within:w-');
+  expect(input.parentElement?.className).toContain('focus-within:w-48');
+  expect(input.parentElement?.className).toContain(
+    'transition-[width,border-color,background-color]'
+  );
   expect(input.parentElement?.className).toContain('w-36');
   expect(listModeButton.className).toContain('h-full');
   expect(listModeButton.querySelector('svg')?.classList.contains('block')).toBe(true);

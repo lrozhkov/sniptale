@@ -65,9 +65,14 @@ function buildGalleryAppState(props: {
 
 function buildGalleryFilterViewState(filters: GalleryFiltersState) {
   return {
+    activeSavedView: filters.state.activeSavedView,
     activeTags: filters.state.activeTags,
     facetFilters: filters.state.facetFilters,
     folderFilter: filters.state.folderFilter,
+    isSavedViewDirty: filters.state.isSavedViewDirty,
+    savedViews: filters.state.savedViews,
+    savedViewsLoadFailed: filters.state.savedViewsLoadFailed,
+    savedViewsLoaded: filters.state.savedViewsLoaded,
     search: filters.state.search,
     scope: filters.state.scope,
     sortMode: filters.state.sortMode,
@@ -128,13 +133,19 @@ function buildGalleryAppActions(args: {
 }): GalleryAppStateController['actions'] {
   return {
     filters: {
+      createSavedView: args.filters.actions.createSavedView,
+      deleteSavedView: args.filters.actions.deleteSavedView,
+      moveSavedView: args.filters.actions.moveSavedView,
+      reloadSavedViews: args.filters.actions.reloadSavedViews,
       resetFilters: args.filters.actions.resetFilters,
+      selectSavedView: args.filters.actions.selectSavedView,
       setActiveTags: args.filters.actions.setActiveTags,
       setFolderFilter: args.filters.actions.setFolderFilter,
       setFacetFilter: args.filters.actions.setFacetFilter,
       setSearch: args.filters.actions.setSearch,
       setScope: args.filters.actions.setScope,
       setSortMode: args.filters.actions.setSortMode,
+      updateSavedView: args.filters.actions.updateSavedView,
     },
     preview: {
       setFilenameDraft: args.preview.actions.setFilenameDraft,

@@ -84,6 +84,8 @@ it('keeps the complete extension-page localStorage writer inventory behind the s
   expect(localStorageMutationFiles).toEqual([
     pageLocalStorageErasureFile,
     'apps/extension/src/editor/inspector/presets/view-mode.ts',
+    'apps/extension/src/gallery/library/sidebar/disclosure-preferences.ts',
+    'apps/extension/src/gallery/state/filter-preferences.ts',
     'apps/extension/src/platform/i18n/locale/state.ts',
     'apps/extension/src/ui/theme/preference-service.ts',
   ]);

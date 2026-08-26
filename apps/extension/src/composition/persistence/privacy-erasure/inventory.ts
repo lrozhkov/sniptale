@@ -30,6 +30,8 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale.popup.trace',
   'sniptale.popup.perf',
   'sniptale:trace:namespaces',
+  'sniptale.gallery.filters',
+  'sniptale.gallery.facet-disclosures',
 ] as const;
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [
@@ -56,6 +58,7 @@ const localPreferenceKeys = [
   'sniptale_drawing_palette',
   'sniptale_quick_actions',
   'sniptale_quick_actions_display_mode',
+  'sniptale_gallery_saved_views',
 ] as const;
 
 const syncPreferenceKeys = [

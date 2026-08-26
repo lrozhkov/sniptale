@@ -12,7 +12,8 @@ import { deleteFrameAnnotationRasterJob } from '../../composition/persistence/fr
 import { acquireMediaMutationPermit } from '../mutation-exclusion/media-activity';
 
 const LEASE_TIMEOUT_MS = 2 * 60 * 1_000;
-const PREPARE_TIMEOUT_MS = 10_000;
+// This outer lease deadline must remain above the background-owned 30 s cold-start budget.
+const PREPARE_TIMEOUT_MS = 35_000;
 const RASTER_TIMEOUT_MS = 55_000;
 type RasterLease = {
   cancelled: boolean;
@@ -42,6 +43,14 @@ export function routeFrameAnnotationRasterMessage(
     );
     return true;
   }
+  if (message.operation === 'confirm' && isLeaseId(message.leaseId)) {
+    try {
+      sendResponse({ success: true, result: confirmFrameAnnotationRasterLease(message.leaseId) });
+    } catch (error) {
+      sendResponse({ success: false, error: toErrorMessage(error) });
+    }
+    return true;
+  }
   if (message.operation === 'cancel' && isLeaseId(message.leaseId)) {
     const leaseId = message.leaseId;
     void cancelFrameAnnotationRasterLease(leaseId).then(
@@ -65,6 +74,19 @@ export function routeFrameAnnotationRasterMessage(
       })
   );
   return true;
+}
+
+function confirmFrameAnnotationRasterLease(id: string): string {
+  if (
+    !activeLease ||
+    activeLease.id !== id ||
+    activeLease.phase !== 'prepared' ||
+    activeLease.cancelled ||
+    activeLease.released
+  ) {
+    throw new Error('Frame annotation raster lease is no longer active');
+  }
+  return id;
 }
 
 async function runFrameAnnotationRaster(
@@ -106,7 +128,7 @@ async function runOffscreenFrameAnnotationRaster(
 ) {
   await ensureOffscreenDocument('Render frame annotations for image export');
   assertRunningFrameAnnotationRasterLease(lease);
-  await waitForOffscreenReady();
+  await waitForOffscreenReady(30_000);
   assertRunningFrameAnnotationRasterLease(lease);
   return getBackgroundRuntimeMessaging().sendRuntimeMessage(
     attachOffscreenCommandCapability({
@@ -159,7 +181,7 @@ async function acquireFrameAnnotationRasterLease(id: string): Promise<string> {
 async function initializeFrameAnnotationRasterLease(id: string): Promise<void> {
   await ensureOffscreenDocument('Prepare frame annotation image export');
   assertPreparationIsCurrent(id);
-  await waitForOffscreenReady();
+  await waitForOffscreenReady(30_000);
   assertPreparationIsCurrent(id);
 }
 

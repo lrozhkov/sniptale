@@ -54,6 +54,7 @@ type TestLayoutProps = {
   onPreviewResetChanges: () => void;
   onRemoveTag: (tag: string) => void;
   onResetFilters: () => void;
+  onSelectAllFiltered: () => void;
   onSelectionBackup: () => void;
   onSelectionZip: () => void;
   onViewModeChange: (mode: string) => void;
@@ -119,8 +120,10 @@ function createActions(): UseGalleryAppActionsResult {
 }
 
 function createControllerState() {
+  const selectableItem = createMediaItem({ id: 'asset-1' });
   const state = createController({
-    previewItem: createMediaItem({ id: 'asset-1' }),
+    filteredItems: [selectableItem],
+    previewItem: selectableItem,
     previewInspectorCollapsed: false,
     tagDraft: 'beta',
     tagDrafts: ['alpha'],
@@ -198,6 +201,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
     layoutProps.onSelectionZip();
     layoutProps.onDeleteMany([{ id: 'asset-2' }]);
     layoutProps.onClearSelection();
+    layoutProps.onSelectAllFiltered();
     layoutProps.onPreviewOpen({ id: 'asset-3' }, { inspectorCollapsed: true });
     layoutProps.onViewModeChange('list');
   });
@@ -220,6 +224,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
   expect(actions.importing.confirmMediaFileImport).toHaveBeenCalledWith('skip');
   expect(actions.selection.downloadBackup).toHaveBeenCalledTimes(1);
   expect(actions.selection.downloadZip).toHaveBeenCalledTimes(1);
+  expect(Array.from(getState().selection.selectedIds)).toEqual(['asset-1']);
 });
 
 it('deduplicates tags when the add-tag action runs repeatedly', () => {

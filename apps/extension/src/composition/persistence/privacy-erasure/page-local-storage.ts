@@ -11,6 +11,8 @@ interface ExtensionPageLocalStorageErasureOptions {
 const preservedPreferenceKeys = new Set([
   'sniptale-theme-preference',
   'sniptale-locale-preference',
+  'sniptale.gallery.filters',
+  'sniptale.gallery.facet-disclosures',
 ]);
 
 function shouldRemoveKey(key: string, options: ExtensionPageLocalStorageErasureOptions): boolean {

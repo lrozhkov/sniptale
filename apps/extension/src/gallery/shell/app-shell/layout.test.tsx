@@ -95,6 +95,7 @@ function createLayoutProps() {
     onPreviewSaveCopy: vi.fn(),
     onRemoveTag: vi.fn(),
     onResetFilters: vi.fn(),
+    onSelectAllFiltered: vi.fn(),
     onSearchChange: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
@@ -194,6 +195,12 @@ it('passes all selected local media files to the dedicated import action', () =>
 });
 
 function expectLayoutSections(withStorage: ReturnType<typeof createLayoutProps>): void {
+  const pageRoot = container?.querySelector<HTMLElement>('[data-ui="gallery.page.root"]');
+  expect(pageRoot?.className).toContain('h-full');
+  expect(pageRoot?.className).toContain('min-h-0');
+  expect(pageRoot?.className).toContain('overflow-hidden');
+  expect(pageRoot?.className).not.toContain('fixed inset-0');
+  expect(pageRoot?.className).not.toContain('h-screen');
   expect(sidebarPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       counts: expect.objectContaining({ scenario: 1 }),

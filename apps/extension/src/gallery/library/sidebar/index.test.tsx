@@ -42,12 +42,14 @@ function createProps(): GallerySidebarProps {
       updated: [],
     },
     facets: [],
+    filteredItemCount: 2,
     folderFilter: 'all',
     scope: 'all',
     onActiveTagsChange: vi.fn(),
     onFacetFilterChange: vi.fn(),
     onFolderFilterChange: vi.fn(),
     onResetFilters: vi.fn(),
+    onSelectAll: vi.fn(),
     onScopeChange: vi.fn(),
   };
 }
@@ -82,6 +84,15 @@ it('composes folder and tag sections inside the shared shell', () => {
   );
   expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
     'rounded-[var(--sniptale-radius-lg)]'
+  );
+  expect(container?.querySelector('[data-ui="gallery.sidebar.shell"]')?.className).toContain(
+    'overflow-hidden'
+  );
+  expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
+    'overflow-y-auto'
+  );
+  expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
+    'overscroll-contain'
   );
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));

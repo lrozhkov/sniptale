@@ -106,6 +106,9 @@ interface GalleryPreviewControllerActions {
 }
 
 interface GalleryImportControllerActions {
+  filters: {
+    reloadSavedViews: () => Promise<void>;
+  };
   storage: {
     refresh: () => Promise<void>;
   };

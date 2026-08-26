@@ -68,6 +68,18 @@ it('imports supported images independently and reports skipped files', async () 
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 });
 
+it('preserves the original file date when importing an image', async () => {
+  const { controller } = createController();
+  const action = createImportMediaFilesAction(controller, async (run) => run());
+  const createdAt = Date.UTC(2020, 2, 4, 12, 30);
+
+  await action([new File(['image'], 'photo.png', { lastModified: createdAt, type: 'image/png' })]);
+
+  expect(mocks.saveScreenshot).toHaveBeenCalledWith(
+    expect.objectContaining({ createdAt, filename: 'photo.png', kind: 'image' })
+  );
+});
+
 it('pauses before importing exact filename, size, and content matches', async () => {
   const file = createImage('photo.png');
   const existing = createMediaItem({ filename: file.name, size: file.size });
@@ -175,10 +187,12 @@ it('stores decoded dimensions and duration for an imported video', async () => {
   });
   const action = createImportMediaFilesAction(controller, async (run) => run());
 
-  await action([new File(['video'], 'clip.mp4', { type: 'video/mp4' })]);
+  const createdAt = Date.UTC(2020, 2, 4, 12, 30);
+  await action([new File(['video'], 'clip.mp4', { lastModified: createdAt, type: 'video/mp4' })]);
 
   expect(mocks.saveRecordings).toHaveBeenCalledWith([
     expect.objectContaining({
+      createdAt,
       filename: 'clip.mp4',
       mediaMetadata: { duration: 14.5, height: 1080, kind: 'video', width: 1920 },
       mimeType: 'video/mp4',

@@ -14,6 +14,13 @@ const IMPORT_MEDIA_MIME_TYPES = Object.values(IMPORT_MIME_BY_EXTENSION);
 
 export const GALLERY_MEDIA_IMPORT_ACCEPT = Array.from(IMPORT_MEDIA_MIME_TYPES).join(',');
 
+export function resolveGalleryMediaImportCreatedAt(file: File, now = Date.now()): number {
+  const lastModified = file.lastModified;
+  return Number.isSafeInteger(lastModified) && lastModified > 0 && lastModified <= now
+    ? lastModified
+    : now;
+}
+
 export function resolveGalleryMediaImportMimeType(file: File): string | null {
   const declared = file.type.toLowerCase().split(';', 1)[0]?.trim() ?? '';
   if (IMPORT_MEDIA_MIME_TYPES.includes(declared)) return declared;

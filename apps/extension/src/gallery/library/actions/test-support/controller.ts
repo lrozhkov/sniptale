@@ -76,13 +76,19 @@ function createControllerActions(
 ): GalleryAppStateController['actions'] {
   return {
     filters: {
+      createSavedView: async () => Promise.reject(new Error('Not implemented in test controller.')),
+      deleteSavedView: async () => undefined,
+      moveSavedView: async () => undefined,
+      reloadSavedViews: vi.fn(async () => undefined),
       resetFilters: () => undefined,
+      selectSavedView: () => undefined,
       setActiveTags: () => undefined,
       setFolderFilter: () => undefined,
       setFacetFilter: () => undefined,
       setSearch: () => undefined,
       setScope: () => undefined,
       setSortMode: () => undefined,
+      updateSavedView: async () => Promise.reject(new Error('Not implemented in test controller.')),
     },
     preview: {
       setFilenameDraft: createPreviewDraftSetter(stateRef, 'filename'),

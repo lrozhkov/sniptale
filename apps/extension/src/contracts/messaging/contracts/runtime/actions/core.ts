@@ -325,6 +325,11 @@ export const runtimeActionCoreMessageContracts = {
           }
         | {
             type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
+            operation: 'confirm';
+            leaseId: string;
+          }
+        | {
+            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
             operation: 'cancel';
             leaseId: string;
           }
@@ -335,7 +340,8 @@ export const runtimeActionCoreMessageContracts = {
           } =>
         isRecord(value) &&
         value['type'] === MessageType.FRAME_ANNOTATION_RASTERIZE &&
-        ((value['operation'] === 'prepare' && isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
+        (((value['operation'] === 'prepare' || value['operation'] === 'confirm') &&
+          isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
           (value['operation'] === 'cancel' && isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
           (value['operation'] === 'rasterize' &&
             isFrameAnnotationRasterReference(value['reference'])))

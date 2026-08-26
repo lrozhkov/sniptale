@@ -15,6 +15,7 @@ import type {
 } from '../../state/types';
 import type { GalleryItem } from '../../library/items';
 import type { MediaFileImportConflictStrategy } from '../../library/import-types';
+import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export interface GalleryAppLayoutProps {
   gridViewportRef: RefObject<HTMLDivElement | null>;
@@ -63,7 +64,13 @@ export interface GalleryAppLayoutProps {
   onScopeChange?: Dispatch<SetStateAction<GalleryScope>>;
   onActiveTagsChange: Dispatch<SetStateAction<string[]>>;
   onFacetFilterChange?: (id: GalleryFacetFilterId, values: string[]) => void;
+  onCreateSavedView?: (name: string) => Promise<GallerySavedView>;
+  onDeleteSavedView?: (view: GallerySavedView) => void;
+  onMoveSavedView?: (id: string, direction: 'down' | 'up') => void;
   onResetFilters: () => void;
+  onSavedViewSelect?: (id: string) => void;
+  onUpdateSavedView?: () => Promise<void>;
+  onSelectAllFiltered: () => void;
   onExportBackup: () => void;
   onImportBackupClick: () => void;
   onImportMediaClick: () => void;

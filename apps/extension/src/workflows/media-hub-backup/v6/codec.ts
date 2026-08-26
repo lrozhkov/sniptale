@@ -16,6 +16,7 @@ import {
   type MediaHubBackupRootEnvelope,
 } from './contracts';
 import { assertV6CatalogPath, assertV6ObjectPath, MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import { parsePortableGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 
 const PORTABLE_URL_PATTERN = /^(?:data|blob):/i;
 const BINARY_BASE64_SIGNATURE_PATTERN =
@@ -227,16 +228,11 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
   ) {
     throw new Error('Unsupported media backup v6 layout. Create a new backup with this version.');
   }
-  assertExactKeys(value, [
-    'archiveId',
-    'catalogs',
-    'exportedAt',
-    'format',
-    'layout',
-    'privacy',
-    'totals',
-    'version',
-  ]);
+  assertExactKeys(
+    value,
+    ['archiveId', 'catalogs', 'exportedAt', 'format', 'layout', 'privacy', 'totals', 'version'],
+    ['galleryViews']
+  );
   if (
     value['format'] !== MEDIA_HUB_BACKUP_FORMAT ||
     value['version'] !== MEDIA_HUB_BACKUP_VERSION ||
@@ -271,6 +267,9 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
     catalogs,
     exportedAt: parseNonEmptyString(value['exportedAt'], 'export date'),
     format: MEDIA_HUB_BACKUP_FORMAT,
+    ...(value['galleryViews'] === undefined
+      ? {}
+      : { galleryViews: parsePortableGallerySavedViews(value['galleryViews']) }),
     layout: MEDIA_HUB_BACKUP_LAYOUT,
     privacy: parsePrivacyFlags(value['privacy']),
     totals: {

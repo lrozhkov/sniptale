@@ -220,6 +220,15 @@ export async function restoreMediaHubBackupV6(args: {
           });
         }
       }
+      if (inspection.manifest.galleryViews) {
+        const { restoreGallerySavedViews } =
+          await import('../../../composition/persistence/gallery-saved-views');
+        await restoreGallerySavedViews(
+          inspection.manifest.galleryViews,
+          session.strategy,
+          inspection.manifest.archiveId
+        );
+      }
       return completeArchiveRestoreSession(session.operationId);
     } finally {
       await reader.close();

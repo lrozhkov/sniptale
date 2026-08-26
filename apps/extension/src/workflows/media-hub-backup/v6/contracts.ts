@@ -3,6 +3,7 @@ import type {
   ArchiveRootDescriptor,
 } from '../../../composition/archive-transfer';
 import type { MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export const MEDIA_HUB_BACKUP_FORMAT = 'sniptale-media-hub-backup';
 export const MEDIA_HUB_BACKUP_VERSION = 6;
@@ -23,6 +24,7 @@ export interface MediaHubBackupDataClassFlags {
   drafts: boolean;
   mediaAssets: boolean;
   recordings: boolean;
+  savedViews: boolean;
   scenarioProjects: boolean;
   sourceMetadata: boolean;
   telemetry: boolean;
@@ -37,6 +39,7 @@ export interface MediaHubLocalBackupSummary {
   draftCount: number;
   dataClasses: MediaHubBackupDataClassFlags;
   recordingCount: number;
+  savedViewCount: number;
   scenarioProjectCount: number;
   selectedCount: number;
   sourceMetadataCount: number;
@@ -71,6 +74,7 @@ export interface MediaHubBackupManifestV6 {
   catalogs: MediaHubBackupCatalogShard[];
   exportedAt: string;
   format: typeof MEDIA_HUB_BACKUP_FORMAT;
+  galleryViews?: GallerySavedView[];
   layout: typeof MEDIA_HUB_BACKUP_LAYOUT;
   privacy: MediaHubBackupPrivacyFlags;
   totals: {

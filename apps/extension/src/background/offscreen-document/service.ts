@@ -21,6 +21,7 @@ import { getBackgroundRuntimeMessaging } from '../routing-contracts/runtime-mess
 
 const logger = createLogger({ namespace: 'BackgroundOffscreenDocument' });
 const OFFSCREEN_READINESS_PROBE_TIMEOUT_MS = 5000;
+const OFFSCREEN_READY_TIMEOUT_MS = 5000;
 
 function resetClosedOffscreenState(state: OffscreenDocumentState): void {
   state.offscreenCreated = false;
@@ -236,7 +237,7 @@ export function createOffscreenDocumentService() {
     return ensureOffscreenDocumentForState(state, justification);
   }
 
-  function waitForOffscreenReady(timeoutMs = 5000): Promise<void> {
+  function waitForOffscreenReady(timeoutMs = OFFSCREEN_READY_TIMEOUT_MS): Promise<void> {
     return waitForOffscreenReadyForState(state, timeoutMs);
   }
 
@@ -275,7 +276,7 @@ export function ensureOffscreenDocument(
   return defaultOffscreenDocumentService.getOwner().ensureOffscreenDocument(justification);
 }
 
-export function waitForOffscreenReady(timeoutMs = 5000): Promise<void> {
+export function waitForOffscreenReady(timeoutMs = OFFSCREEN_READY_TIMEOUT_MS): Promise<void> {
   return defaultOffscreenDocumentService.getOwner().waitForOffscreenReady(timeoutMs);
 }
 

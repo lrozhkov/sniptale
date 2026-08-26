@@ -95,6 +95,7 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
   return {
     derived: createGalleryDerivedState(overrides),
     filters: {
+      activeSavedView: null,
       activeTags: [],
       facetFilters: {
         created: [],
@@ -106,6 +107,10 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
         updated: [],
       },
       folderFilter: overrides.folderFilter ?? 'all',
+      isSavedViewDirty: false,
+      savedViews: [],
+      savedViewsLoadFailed: false,
+      savedViewsLoaded: true,
       search: overrides.search ?? '',
       scope: overrides.filters?.scope ?? 'all',
       sortMode: overrides.sortMode ?? 'newest',

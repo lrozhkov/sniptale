@@ -137,6 +137,33 @@ async function verifyReadyTimeoutFailure() {
   expect(manager.hasOffscreenDocument()).toBe(true);
   vi.clearAllTimers();
 }
+async function verifyExplicitWaitAllowsColdBootstrap() {
+  vi.useFakeTimers();
+  const manager = await loadOffscreenManager();
+  await manager.ensureOffscreenDocument('Render an edited draft');
+  const subscription = createMessageSubscription();
+  let outcome: 'failed' | 'pending' | 'ready' = 'pending';
+  const waitPromise = manager.waitForOffscreenReady(30_000).then(
+    () => {
+      outcome = 'ready';
+    },
+    () => {
+      outcome = 'failed';
+    }
+  );
+
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(outcome).toBe('pending');
+  subscription.emit({
+    type: VideoMessageType.OFFSCREEN_READY,
+    offscreenStartupId: 'startup-1',
+  });
+  await waitPromise;
+
+  expect(outcome).toBe('ready');
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  vi.clearAllTimers();
+}
 async function verifyRuntimeStartupFailure() {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
@@ -227,6 +254,10 @@ describe('offscreen-manager waitForOffscreenReady', () => {
     verifyWaitForReadySignal
   );
   it('rejects after timeout when the ready signal never arrives', verifyReadyTimeoutFailure);
+  it(
+    'keeps a cold offscreen bootstrap alive beyond five seconds',
+    verifyExplicitWaitAllowsColdBootstrap
+  );
   it(
     'rejects when the offscreen document reports a runtime startup failure',
     verifyRuntimeStartupFailure

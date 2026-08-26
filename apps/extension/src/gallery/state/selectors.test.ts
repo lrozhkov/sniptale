@@ -440,6 +440,24 @@ it('rebuilds facet values for the selected category and status without hiding ot
     expect.objectContaining({ count: 1, value: 'library' }),
     expect.objectContaining({ count: 0, value: 'temporary' }),
   ]);
+
+  const recordingFacets = getGalleryFacets([savedShot, draftRecording], {
+    facetFilters: {
+      created: [],
+      duration: [],
+      format: [],
+      resolution: [],
+      size: [],
+      source: ['shots.example'],
+      updated: [],
+    },
+    folderFilter: 'recording',
+    scope: 'all',
+  });
+  expect(recordingFacets.find((facet) => facet.id === 'source')?.options).toEqual([
+    expect.objectContaining({ count: 0, label: 'shots.example', value: 'shots.example' }),
+    expect.objectContaining({ count: 1, label: 'video.example', value: 'video.example' }),
+  ]);
 });
 
 it('computes visible grid rows and resolves storage pressure classes', () => {

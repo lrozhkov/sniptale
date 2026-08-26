@@ -211,6 +211,7 @@ export function createImportAction(controller: GalleryImportController) {
         controller.actions.surface.setActiveImport((current) =>
           current?.id === runId ? { ...current, result, status: 'completed' } : current
         );
+        await controller.actions.filters.reloadSavedViews();
         await controller.actions.storage.refresh();
       } catch {
         let partialResult:

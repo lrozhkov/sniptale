@@ -3338,6 +3338,22 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/gallery-saved-views",
+      "disposition": "rollout",
+      "reason": "The bounded saved-view authority has owner-local parser, mutation, conflict, retry, and factory-reset proof in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/gallery-saved-views/contract.ts",
+        "apps/extension/src/composition/persistence/gallery-saved-views/index.ts",
+        "apps/extension/src/composition/persistence/gallery-saved-views/replace-restore-plan.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/gallery-saved-views/contract.ts",
+        "apps/extension/src/composition/persistence/gallery-saved-views/index.ts",
+        "apps/extension/src/composition/persistence/gallery-saved-views/replace-restore-plan.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/gradient-presets",
       "disposition": "rollout",
       "reason": "The revisioned gradient preset authority has owner-local parser, mutation, concurrency, and failure proof in the deterministic coverage rollout.",
@@ -9396,10 +9412,13 @@
         "apps/extension/src/gallery/library/preview/useGalleryPreviewState.ts",
         "apps/extension/src/gallery/library/preview/usePreviewImageZoom.ts",
         "apps/extension/src/gallery/library/preview/usePreviewMediaTransition.ts",
+        "apps/extension/src/gallery/library/sidebar/disclosure-preferences.ts",
         "apps/extension/src/gallery/library/sidebar/index.tsx",
+        "apps/extension/src/gallery/library/sidebar/saved-views.tsx",
         "apps/extension/src/gallery/library/sidebar/scenario-projects.tsx",
         "apps/extension/src/gallery/library/sidebar/sections.tsx",
         "apps/extension/src/gallery/library/sidebar/types.ts",
+        "apps/extension/src/gallery/library/tags/disclosure.tsx",
         "apps/extension/src/gallery/library/tags/input.tsx",
         "apps/extension/src/gallery/library/test-support/items.ts",
         "apps/extension/src/gallery/library/types.ts",
@@ -9416,6 +9435,7 @@
         "apps/extension/src/gallery/shell/command-palette/index.tsx",
         "apps/extension/src/gallery/state/date-facets.ts",
         "apps/extension/src/gallery/state/derived.ts",
+        "apps/extension/src/gallery/state/filter-preferences.ts",
         "apps/extension/src/gallery/state/index.ts",
         "apps/extension/src/gallery/state/selectors.ts",
         "apps/extension/src/gallery/state/storage-workflow.ts",
@@ -9423,6 +9443,7 @@
         "apps/extension/src/gallery/state/use-gallery-library-snapshot.ts",
         "apps/extension/src/gallery/state/useGalleryFilterState.ts",
         "apps/extension/src/gallery/state/useGalleryLibraryState.ts",
+        "apps/extension/src/gallery/state/useGallerySavedViewState.ts",
         "apps/extension/src/gallery/state/useGalleryScenarioProjectsState.ts",
         "apps/extension/src/gallery/state/useGallerySurfaceState.ts",
         "apps/extension/src/gallery/state/useGalleryViewportState.ts",
@@ -9478,10 +9499,13 @@
         "apps/extension/src/gallery/library/preview/useGalleryPreviewState.ts",
         "apps/extension/src/gallery/library/preview/usePreviewImageZoom.ts",
         "apps/extension/src/gallery/library/preview/usePreviewMediaTransition.ts",
+        "apps/extension/src/gallery/library/sidebar/disclosure-preferences.ts",
         "apps/extension/src/gallery/library/sidebar/index.tsx",
+        "apps/extension/src/gallery/library/sidebar/saved-views.tsx",
         "apps/extension/src/gallery/library/sidebar/scenario-projects.tsx",
         "apps/extension/src/gallery/library/sidebar/sections.tsx",
         "apps/extension/src/gallery/library/sidebar/types.ts",
+        "apps/extension/src/gallery/library/tags/disclosure.tsx",
         "apps/extension/src/gallery/library/tags/input.tsx",
         "apps/extension/src/gallery/library/test-support/items.ts",
         "apps/extension/src/gallery/library/types.ts",
@@ -9498,6 +9522,7 @@
         "apps/extension/src/gallery/shell/command-palette/index.tsx",
         "apps/extension/src/gallery/state/date-facets.ts",
         "apps/extension/src/gallery/state/derived.ts",
+        "apps/extension/src/gallery/state/filter-preferences.ts",
         "apps/extension/src/gallery/state/index.ts",
         "apps/extension/src/gallery/state/selectors.ts",
         "apps/extension/src/gallery/state/storage-workflow.ts",
@@ -9505,6 +9530,7 @@
         "apps/extension/src/gallery/state/use-gallery-library-snapshot.ts",
         "apps/extension/src/gallery/state/useGalleryFilterState.ts",
         "apps/extension/src/gallery/state/useGalleryLibraryState.ts",
+        "apps/extension/src/gallery/state/useGallerySavedViewState.ts",
         "apps/extension/src/gallery/state/useGalleryScenarioProjectsState.ts",
         "apps/extension/src/gallery/state/useGallerySurfaceState.ts",
         "apps/extension/src/gallery/state/useGalleryViewportState.ts",
@@ -13777,7 +13803,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "8418739190dbe5d6fe2b31c45013c41f8922f4d4dbb4d91fa653ce1ad94d724f"
+        "contentHash": "ec5757c95f8e832e17406edb48151fb6ba51d0ec32d63f22c5f5d3e73025edce"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -14622,7 +14648,7 @@
       "remediation": "Keep secret, retention, and sanitizer owners exact and security-reviewed.",
       "exactSource": {
         "path": "tooling/configs/qa/security-storage-ownership.data.json",
-        "contentHash": "9aa69f7c99c39f2d0ef6e2c94bb122b7d863b6ad7a0c785d2d218c5ea139991a"
+        "contentHash": "b9c919eef66d932374faf59d30707b50544002588eb393e0f40e8f42f80eb894"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",

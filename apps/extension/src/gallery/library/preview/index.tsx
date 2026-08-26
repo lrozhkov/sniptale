@@ -41,6 +41,8 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
 }
 
 function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
+  const isDraft = props.item.lifecycle?.storageClass === 'temporary';
+
   return (
     <div>
       <div>
@@ -54,6 +56,13 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
         <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
           {formatDate(props.item.createdAt)}
         </div>
+        {isDraft ? (
+          <div className="mt-1 text-xs font-medium text-[var(--sniptale-color-warning)]">
+            {props.item.expiresAt
+              ? `${translate('gallery.app.draftExpires')} ${formatDate(props.item.expiresAt)}`
+              : translate('gallery.app.draftNoExpiration')}
+          </div>
+        ) : null}
       </div>
     </div>
   );
