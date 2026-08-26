@@ -15,7 +15,7 @@ export function usePermissionRequests(
   permissions: PermissionInfo[],
   setPermissions: PermissionSetter
 ) {
-  const { requestMicrophone, requestCamera, requestChrome, requestOrigin } =
+  const { requestMicrophone, requestCamera, requestChrome, requestOrigin, requestFileScheme } =
     usePermissionRequestActions(setPermissions);
 
   return useCallback(
@@ -27,19 +27,19 @@ export function usePermissionRequests(
       }
 
       try {
-        return await requestTypedPermission(
-          permission,
-          requestMicrophone,
+        return await requestTypedPermission(permission, {
           requestCamera,
           requestChrome,
-          requestOrigin
-        );
+          requestFileScheme,
+          requestMicrophone,
+          requestOrigin,
+        });
       } catch (error) {
         logger.error('Failed to request settings permission', error);
       }
 
       return false;
     },
-    [permissions, requestCamera, requestChrome, requestMicrophone, requestOrigin]
+    [permissions, requestCamera, requestChrome, requestFileScheme, requestMicrophone, requestOrigin]
   );
 }

@@ -95,7 +95,7 @@ describe('video control quota presentation', () => {
       const translations: Record<string, string> = {
         'shared.storage.lowSpaceMiddle': 'available.',
         'shared.storage.lowSpacePrefix': 'Not enough storage:',
-        'shared.storage.lowSpaceSuffix': 'Free up space and try again.',
+        'shared.storage.lowSpaceSuffix': 'Delete unneeded items in Library and try again.',
       };
 
       return translations[key] ?? key;
@@ -117,7 +117,7 @@ describe('video control quota presentation', () => {
 
     expect(mocks.startRecording).not.toHaveBeenCalled();
     expect(sendResponse).toHaveBeenCalledWith({
-      error: 'Not enough storage: 20B available. Free up space and try again.',
+      error: 'Not enough storage: 20B available. Delete unneeded items in Library and try again.',
       success: false,
     });
   });

@@ -5,10 +5,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createMediaItem } from '../actions/test-support/index';
 
-const { bannerPropsMock, gridPropsMock, selectionBarPropsMock } = vi.hoisted(() => ({
+const { bannerPropsMock, gridPropsMock } = vi.hoisted(() => ({
   bannerPropsMock: vi.fn(),
   gridPropsMock: vi.fn(),
-  selectionBarPropsMock: vi.fn(),
 }));
 
 vi.mock('./header', async (importOriginal) => ({
@@ -16,13 +15,6 @@ vi.mock('./header', async (importOriginal) => ({
   GalleryHeaderBanner: (props: unknown) => {
     bannerPropsMock(props);
     return <div data-ui="test.banner" />;
-  },
-}));
-
-vi.mock('./selection-bar', () => ({
-  GallerySelectionBar: (props: unknown) => {
-    selectionBarPropsMock(props);
-    return <div data-ui="test.selection-bar" />;
   },
 }));
 
@@ -50,6 +42,7 @@ function createProps(overrides: Partial<Parameters<typeof GalleryMainContent>[0]
     gridViewportRef: { current: null },
     isLoading: false,
     search: '',
+    scope: 'all' as const,
     selectedIds: new Set<string>(),
     selectedItems: [createMediaItem()],
     selectedSize: 256,
@@ -63,12 +56,12 @@ function createProps(overrides: Partial<Parameters<typeof GalleryMainContent>[0]
     onDeleteMany: vi.fn(),
     onPreviewOpen: vi.fn(),
     onScenarioPreviewOpen: vi.fn(),
-    onRefresh: vi.fn(),
     onSearchChange: vi.fn(),
+    onScopeChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
+    onSelectionBackup: vi.fn(),
     onSelectionZip: vi.fn(),
     onSortModeChange: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
     onToggleSelection: vi.fn(),
     onViewModeChange: vi.fn(),
     ...overrides,
@@ -93,7 +86,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('composes the banner, children, selection bar, and grid inside the main content shell', () => {
+it('composes the banner, children, and grid inside the main content shell', () => {
   const props = createProps();
 
   act(() => {
@@ -101,25 +94,20 @@ it('composes the banner, children, selection bar, and grid inside the main conte
   });
 
   expect(bannerPropsMock).toHaveBeenCalledWith(expect.objectContaining({ banner: 'warning' }));
-  expect(selectionBarPropsMock).toHaveBeenCalledWith(
-    expect.objectContaining({ selectedItems: props.selectedItems })
-  );
   expect(gridPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({ visibleItems: props.visibleItems })
   );
   expect(container?.querySelector('[data-ui="test.children"]')?.textContent).toBe('child');
 });
 
-it('keeps the shared selection bar active for the scenario folder', () => {
+it('keeps the grid active for the scenario folder', () => {
   const props = createProps({ folderFilter: 'scenario' });
 
   act(() => {
     root?.render(<GalleryMainContent {...props} />);
   });
 
-  expect(selectionBarPropsMock).toHaveBeenCalledWith(
-    expect.objectContaining({ selectedItems: props.selectedItems })
-  );
+  expect(gridPropsMock).toHaveBeenCalledWith(expect.objectContaining({ folderFilter: 'scenario' }));
 });
 
 it('skips the banner row when no warning copy is present', () => {

@@ -135,6 +135,7 @@ function expectBasicScreenshotEntry(result: MediaLibraryEntry, blob: Blob): void
       createdAt: 500,
       filename: 'capture.jpg',
       id: 'generated-id',
+      imageContentState: 'original',
       kind: 'screenshot',
       mimeType: 'image/jpeg',
       originalFilename: 'capture.jpg',
@@ -160,6 +161,17 @@ function expectBasicScreenshotThumbnail(): void {
 }
 
 describe('media-library-db.screenshots save metadata', () => {
+  it('stores a user-imported image with image semantics', async () => {
+    const { saveScreenshotMediaAsset } = await import('./index.screenshots.ts');
+    const result = await saveScreenshotMediaAsset({
+      blob: new Blob(['image'], { type: 'image/png' }),
+      filename: 'photo.png',
+      kind: 'image',
+    });
+
+    expect(result.kind).toBe('image');
+  });
+
   it('respects provided ids and createdAt and falls back to png mime type', async () => {
     const { saveScreenshotMediaAsset } = await import('./index.screenshots.ts');
     const blob = new Blob(['image']);

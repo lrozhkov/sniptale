@@ -61,6 +61,17 @@ it('expires stale activation when the tab changes origin', async () => {
   expect(sessionStorageState[TEMPORARY_ACTIVE_TABS_STORAGE_KEY]).toEqual([]);
 });
 
+it('expires local-file activation when the tab navigates to a different file', async () => {
+  const store = createStore();
+  await store.grant(createTarget(7, 'file:///Users/example/first.html'));
+
+  await expect(store.has(createTarget(7, 'file:///Users/example/second.html'))).resolves.toBe(
+    false
+  );
+
+  expect(sessionStorageState[TEMPORARY_ACTIVE_TABS_STORAGE_KEY]).toEqual([]);
+});
+
 it('does not resurrect activation after a cross-origin round trip without an intermediate read', async () => {
   const store = createStore();
   await store.grant(createTarget(7));

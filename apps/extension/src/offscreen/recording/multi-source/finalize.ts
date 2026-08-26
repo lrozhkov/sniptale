@@ -14,6 +14,7 @@ import { notifyMultiSourceSaved, notifyMultiSourceStopped } from './messages';
 import type { MultiSourceRecorder, MultiSourceSession } from './state';
 import { createWebcamProjectInput } from './webcam';
 import { requireRecordingDimensions } from './dimensions';
+import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 const logger = createLogger({ namespace: 'OffscreenMultiSourceFinalize' });
 
@@ -96,12 +97,75 @@ function buildMicrophoneProjectInput(
   };
 }
 
+function buildRecordingGroupMember(
+  session: MultiSourceSession,
+  order: number,
+  role: RecordingGroupMember['role'],
+  sourceLabel: string | null,
+  dimensions?: { height: number; width: number }
+): RecordingGroupMember {
+  return {
+    ...(dimensions ? { dimensions } : {}),
+    groupId: session.recordingId,
+    order,
+    role,
+    sourceLabel,
+  };
+}
+
+function buildRecordingBatchInputs(
+  session: MultiSourceSession,
+  storageClass: 'temporary' | 'library'
+) {
+  const sourceInputs = session.recorders.map((source, order) => ({
+    source,
+    recordingGroup: buildRecordingGroupMember(
+      session,
+      order,
+      'display',
+      source.label,
+      requireSourceDimensions(source)
+    ),
+  }));
+  const microphoneInput = session.audioRecorder
+    ? {
+        source: session.audioRecorder,
+        recordingGroup: buildRecordingGroupMember(session, sourceInputs.length, 'microphone', null),
+      }
+    : null;
+  const webcamInput = session.webcamRecorder
+    ? {
+        source: session.webcamRecorder,
+        recordingGroup: buildRecordingGroupMember(
+          session,
+          sourceInputs.length + (microphoneInput ? 1 : 0),
+          'webcam',
+          session.webcamRecorder.sourceLabel,
+          requireRecordingDimensions(
+            session.webcamRecorder,
+            'Webcam recording dimensions are unavailable.'
+          )
+        ),
+      }
+    : null;
+
+  return [...sourceInputs, microphoneInput, webcamInput]
+    .filter((input): input is NonNullable<typeof input> => input !== null)
+    .map(({ recordingGroup, source }) => {
+      const artifact = source.artifact!;
+      return {
+        filename: artifact.filename,
+        id: source.recordingId,
+        preparedAsset: artifact.asset,
+        recordingGroup,
+        storageClass,
+      };
+    });
+}
+
 export async function finalizeSession(session: MultiSourceSession): Promise<void> {
   validateSessionForFinalization(session);
   const duration = Math.max(0.1, (Date.now() - session.startedAt) / 1000);
-  const sources = [...session.recorders, session.audioRecorder, session.webcamRecorder].filter(
-    (source): source is NonNullable<typeof source> => source !== null
-  );
   const primaryRecordingId = session.recorders[0]?.recordingId;
   if (!primaryRecordingId) throw new Error('Multi-source recording has no saved video source.');
   const completion = {
@@ -114,15 +178,7 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
     settings?.localStoragePolicy.defaultDestination ??
     DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination;
   await saveRecordingsBatchWithCompletionSafely(
-    sources.map((source) => {
-      const artifact = source.artifact!;
-      return {
-        filename: artifact.filename,
-        id: source.recordingId,
-        preparedAsset: artifact.asset,
-        storageClass,
-      };
-    }),
+    buildRecordingBatchInputs(session, storageClass),
     completion
   );
   await session.staging.delete().catch((error) => {

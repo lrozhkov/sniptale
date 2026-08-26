@@ -13,11 +13,13 @@ const selectorMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./selectors', () => ({
+  collapseGalleryRecordingGroups: vi.fn((items: unknown[]) => items),
   getActiveStorageBarClass: selectorMocks.getActiveStorageBarClass,
   getAllGalleryTags: selectorMocks.getAllGalleryTags,
   getFilteredScenarioProjects: vi.fn(() => []),
   getFilteredGalleryItems: selectorMocks.getFilteredGalleryItems,
   getGalleryCounts: selectorMocks.getGalleryCounts,
+  getGalleryFacets: vi.fn(() => []),
   getGalleryGridMetrics: selectorMocks.getGalleryGridMetrics,
 }));
 
@@ -58,8 +60,10 @@ function createProbeProps(
   return {
     filters: {
       actions: {
+        resetFilters: vi.fn(),
         setActiveTags: vi.fn(),
         setFolderFilter: vi.fn(),
+        setFacetFilter: vi.fn(),
         setSearch: vi.fn(),
         setScope: vi.fn(),
         setSelectedIds: vi.fn(),
@@ -68,6 +72,15 @@ function createProbeProps(
       },
       state: {
         activeTags: ['alpha'],
+        facetFilters: {
+          created: [],
+          duration: [],
+          format: [],
+          resolution: [],
+          size: [],
+          source: [],
+          updated: [],
+        },
         folderFilter: 'all',
         search: 'capture',
         scope: 'library',
@@ -77,7 +90,6 @@ function createProbeProps(
       },
     },
     library: {
-      cleanupReport: null,
       isLoading: false,
       items: [item],
       refresh: vi.fn(),
@@ -99,6 +111,8 @@ function createProbeProps(
       gridWidth: 800,
       importInputRef: { current: null },
       importTriggerRef: { current: null },
+      mediaImportInputRef: { current: null },
+      mediaImportTriggerRef: { current: null },
       scrollTop: 12,
       viewportHeight: 600,
     },

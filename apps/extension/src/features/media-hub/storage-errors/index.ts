@@ -69,25 +69,25 @@ function isDiskLikeError(name: string, message: string): boolean {
 }
 
 function buildUserMessage(kind: MediaHubStorageFailureKind, operation: string): string {
-  const prefix = translate('gallery.storageManager.writeQuotaErrorPrefix');
+  const prefix = translate('gallery.storageErrors.writeFailurePrefix');
 
   if (kind === 'quota') {
     return [
-      `${prefix} "${operation}" ${translate('gallery.storageManager.writeQuotaErrorBody')}`,
-      translate('gallery.storageManager.freeSpaceHint'),
+      `${prefix} "${operation}" ${translate('gallery.storageErrors.quotaErrorBody')}`,
+      translate('gallery.storageErrors.reviewLibraryHint'),
     ].join(' ');
   }
 
   if (kind === 'database') {
     return [
-      `${prefix} "${operation}" ${translate('gallery.storageManager.writeDatabaseErrorBody')}`,
-      translate('gallery.storageManager.retryLaterHint'),
+      `${prefix} "${operation}" ${translate('gallery.storageErrors.databaseErrorBody')}`,
+      translate('gallery.storageErrors.retryLaterHint'),
     ].join(' ');
   }
 
   return [
-    `${prefix} "${operation}" ${translate('gallery.storageManager.writeDiskErrorBody')}`,
-    translate('gallery.storageManager.freeSpaceHint'),
+    `${prefix} "${operation}" ${translate('gallery.storageErrors.diskErrorBody')}`,
+    translate('gallery.storageErrors.reviewLibraryHint'),
   ].join(' ');
 }
 

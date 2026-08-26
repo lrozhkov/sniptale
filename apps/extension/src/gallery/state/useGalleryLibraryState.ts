@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
-import { getStorageCleanupReport } from '../../workflows/media-hub/store';
-import type { StorageCleanupReport } from '../../features/media-hub/types';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
 import { translate } from '../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -11,7 +9,6 @@ import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
 interface UseGalleryLibraryStateOptions {
   onBanner: (message: string) => void;
   onRefresh?: () => void;
-  onStorageManagerOpen: () => void;
   onPreviewItemRefresh: (items: GalleryItem[]) => void;
   onSelectionRefresh: (items: GalleryItem[]) => void;
 }
@@ -22,7 +19,6 @@ type GalleryRefreshActionArgs = {
   onPreviewItemRefresh: (items: GalleryItem[]) => void;
   onRefresh?: (() => void) | undefined;
   onSelectionRefresh: (items: GalleryItem[]) => void;
-  refreshCleanupReport: () => Promise<void>;
   refreshEpochRef: React.MutableRefObject<number>;
   setIsLoading: (isLoading: boolean) => void;
   setItems: (items: GalleryItem[]) => void;
@@ -34,7 +30,6 @@ const logger = createLogger({ namespace: 'GalleryLibraryState' });
 
 function createMediaHubEventHandler(
   onBanner: (message: string) => void,
-  onStorageManagerOpen: () => void,
   refresh: () => Promise<void>
 ) {
   return (
@@ -48,7 +43,6 @@ function createMediaHubEventHandler(
     }
 
     onBanner(event.message);
-    onStorageManagerOpen();
     void refresh();
   };
 }
@@ -109,40 +103,11 @@ function areGalleryItemsEquivalent(left: GalleryItem[], right: GalleryItem[]): b
   return left.every((item, index) => JSON.stringify(item) === JSON.stringify(right[index]));
 }
 
-function useGalleryCleanupReportState() {
-  const [cleanupReport, setCleanupReport] = useState<StorageCleanupReport | null>(null);
-  const cleanupReportEpochRef = useRef(0);
-
-  const refreshCleanupReport = useCallback(async () => {
-    const cleanupReportEpoch = cleanupReportEpochRef.current + 1;
-    cleanupReportEpochRef.current = cleanupReportEpoch;
-    try {
-      const report = await getStorageCleanupReport();
-      if (cleanupReportEpochRef.current !== cleanupReportEpoch) {
-        return;
-      }
-      setCleanupReport(report);
-    } catch {
-      if (cleanupReportEpochRef.current !== cleanupReportEpoch) {
-        return;
-      }
-      setCleanupReport(null);
-    }
-  }, []);
-
-  return {
-    cleanupReport,
-    refreshCleanupReport,
-  };
-}
-
 function useGalleryLibrarySubscriptions({
   onBanner,
-  onStorageManagerOpen,
   refresh,
 }: {
   onBanner: (message: string) => void;
-  onStorageManagerOpen: () => void;
   refresh: () => Promise<void>;
 }) {
   useEffect(() => {
@@ -150,11 +115,8 @@ function useGalleryLibrarySubscriptions({
   }, [refresh]);
 
   useEffect(
-    () =>
-      subscribeToMediaHubEvents(
-        createMediaHubEventHandler(onBanner, onStorageManagerOpen, refresh)
-      ),
-    [onBanner, onStorageManagerOpen, refresh]
+    () => subscribeToMediaHubEvents(createMediaHubEventHandler(onBanner, refresh)),
+    [onBanner, refresh]
   );
 }
 
@@ -193,8 +155,6 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
       storageInfoRef: args.storageInfoRef,
     });
     args.onRefresh?.();
-    // Cleanup suggestions are secondary UI; they should not block the first library render.
-    void args.refreshCleanupReport();
   } catch (error) {
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
       return;
@@ -215,7 +175,6 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
     onPreviewItemRefresh,
     onRefresh,
     onSelectionRefresh,
-    refreshCleanupReport,
     refreshEpochRef,
     setIsLoading,
     setItems,
@@ -231,7 +190,6 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
         onPreviewItemRefresh,
         onRefresh,
         onSelectionRefresh,
-        refreshCleanupReport,
         refreshEpochRef,
         setIsLoading,
         setItems,
@@ -244,7 +202,6 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
       onPreviewItemRefresh,
       onRefresh,
       onSelectionRefresh,
-      refreshCleanupReport,
       refreshEpochRef,
       setIsLoading,
       setItems,
@@ -259,7 +216,6 @@ export function useGalleryLibraryState({
   onRefresh,
   onPreviewItemRefresh,
   onSelectionRefresh,
-  onStorageManagerOpen,
 }: UseGalleryLibraryStateOptions) {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [storageInfo, setStorageInfo] = useState<StorageEstimateInfo | null>(null);
@@ -267,14 +223,12 @@ export function useGalleryLibraryState({
   const itemsRef = useRef<GalleryItem[]>([]);
   const refreshEpochRef = useRef(0);
   const storageInfoRef = useRef<StorageEstimateInfo | null>(null);
-  const { cleanupReport, refreshCleanupReport } = useGalleryCleanupReportState();
   const refresh = useGalleryRefreshAction({
     itemsRef,
     onBanner,
     onPreviewItemRefresh,
     onRefresh,
     onSelectionRefresh,
-    refreshCleanupReport,
     refreshEpochRef,
     setIsLoading,
     setItems,
@@ -282,10 +236,9 @@ export function useGalleryLibraryState({
     storageInfoRef,
   });
 
-  useGalleryLibrarySubscriptions({ onBanner, onStorageManagerOpen, refresh });
+  useGalleryLibrarySubscriptions({ onBanner, refresh });
 
   return {
-    cleanupReport,
     isLoading,
     items,
     refresh,

@@ -35,6 +35,7 @@ Required permissions:
 Optional host permissions:
 
 - `<all_urls>`
+- `file:///`
 
 The ownership, justification, failure behavior, disclosure key, web-accessible resources, and content-script inventory remain in `tooling/configs/qa/manifest-permissions.data.json`.
 

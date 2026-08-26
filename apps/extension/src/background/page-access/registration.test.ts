@@ -3,9 +3,11 @@ import { expect, it } from 'vitest';
 import {
   browserPermissionsContainsMock,
   browserPermissionsGetAllMock,
+  browserPermissionsIsFileSchemeAccessAllowedMock,
   browserScriptingGetRegisteredContentScriptsMock,
   browserScriptingRegisterContentScriptsMock,
   browserScriptingUnregisterContentScriptsMock,
+  localFileAccessOptInMock,
 } from './service.test-support';
 
 const staleRegistration: chrome.scripting.RegisteredContentScript = {
@@ -54,6 +56,7 @@ it('unregisters all-sites and supported site content scripts for removed permiss
     '<all_urls>',
     'https://example.test/*',
     'chrome://extensions/*',
+    'file:///',
     'https://example.test/path',
   ]);
 
@@ -63,8 +66,83 @@ it('unregisters all-sites and supported site content scripts for removed permiss
   expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledWith({
     ids: ['sniptale-page-access-site-aHR0cHM6Ly9leGFtcGxlLnRlc3Q'],
   });
-  expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledTimes(2);
+  expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledWith({
+    ids: ['sniptale-page-access-file-scheme'],
+  });
+  expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledTimes(3);
 });
+
+it('reconciles a separate local-file shim only when effective browser access is enabled', async () => {
+  const { reconcilePersistentContentScriptRegistrations } = await import('./registration');
+  browserPermissionsGetAllMock.mockResolvedValue({ origins: ['file:///'] });
+  browserPermissionsContainsMock.mockImplementation(
+    async (query: { origins?: string[] }) => query.origins?.[0] === 'file:///'
+  );
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(true);
+
+  await reconcilePersistentContentScriptRegistrations();
+
+  expect(browserScriptingRegisterContentScriptsMock).toHaveBeenCalledWith([
+    expect.objectContaining({
+      allFrames: false,
+      id: 'sniptale-page-access-file-scheme',
+      matches: ['file:///'],
+    }),
+  ]);
+});
+
+it('does not infer local-file opt-in from all-sites access and the Chrome switch', async () => {
+  const { reconcilePersistentContentScriptRegistrations } = await import('./registration');
+  browserPermissionsGetAllMock.mockResolvedValue({ origins: ['<all_urls>'] });
+  browserPermissionsContainsMock.mockResolvedValue(true);
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(true);
+  localFileAccessOptInMock.mockResolvedValue(false);
+
+  await reconcilePersistentContentScriptRegistrations();
+
+  expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalledWith([
+    expect.objectContaining({ id: 'sniptale-page-access-file-scheme' }),
+  ]);
+});
+
+it('serializes authority reads so the latest file reconciliation owns final registration', async () => {
+  const { reconcileFileSchemeContentScriptRegistration } = await import('./registration');
+  const firstOptIn = createDeferred<boolean>();
+  localFileAccessOptInMock.mockReturnValueOnce(firstOptIn.promise).mockResolvedValueOnce(true);
+  browserPermissionsContainsMock.mockResolvedValue(true);
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(true);
+  browserScriptingGetRegisteredContentScriptsMock
+    .mockResolvedValueOnce([{ id: 'sniptale-page-access-file-scheme' }])
+    .mockResolvedValueOnce([]);
+
+  const disable = reconcileFileSchemeContentScriptRegistration();
+  const enable = reconcileFileSchemeContentScriptRegistration();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(localFileAccessOptInMock).toHaveBeenCalledOnce();
+
+  firstOptIn.resolve(false);
+  await Promise.all([disable, enable]);
+
+  expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledWith({
+    ids: ['sniptale-page-access-file-scheme'],
+  });
+  expect(browserScriptingRegisterContentScriptsMock).toHaveBeenCalledWith([
+    expect.objectContaining({ id: 'sniptale-page-access-file-scheme' }),
+  ]);
+  expect(browserScriptingUnregisterContentScriptsMock.mock.invocationCallOrder[0]).toBeLessThan(
+    browserScriptingRegisterContentScriptsMock.mock.invocationCallOrder[0]!
+  );
+});
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
 
 it('reconciles persistent shim registrations from existing host permissions', async () => {
   const { reconcilePersistentContentScriptRegistrations } = await import('./registration');

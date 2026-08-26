@@ -8,13 +8,12 @@ type GalleryStorageWorkflowState = Pick<
   GalleryAppState['storage'],
   | 'activeImport'
   | 'banner'
-  | 'cleanupReport'
   | 'confirmDialog'
   | 'isBusy'
   | 'isLoading'
   | 'pendingExport'
   | 'pendingImport'
-  | 'showStorageManager'
+  | 'pendingMediaImport'
   | 'storageInfo'
 >;
 
@@ -27,7 +26,7 @@ type GalleryStorageWorkflowActions = Pick<
   | 'setIsBusy'
   | 'setPendingExport'
   | 'setPendingImport'
-  | 'setShowStorageManager'
+  | 'setPendingMediaImport'
 >;
 
 interface UseGalleryStorageWorkflowOptions {
@@ -42,13 +41,12 @@ function buildGalleryStorageWorkflowState(
   return {
     activeImport: surface.state.activeImport,
     banner: surface.state.banner,
-    cleanupReport: library.cleanupReport,
     confirmDialog: surface.state.confirmDialog,
     isBusy: surface.state.isBusy,
     isLoading: library.isLoading,
     pendingExport: surface.state.pendingExport,
     pendingImport: surface.state.pendingImport,
-    showStorageManager: surface.state.showStorageManager,
+    pendingMediaImport: surface.state.pendingMediaImport,
     storageInfo: library.storageInfo,
   };
 }
@@ -65,7 +63,7 @@ function buildGalleryStorageWorkflowActions(
     setIsBusy: surface.actions.setIsBusy,
     setPendingExport: surface.actions.setPendingExport,
     setPendingImport: surface.actions.setPendingImport,
-    setShowStorageManager: surface.actions.setShowStorageManager,
+    setPendingMediaImport: surface.actions.setPendingMediaImport,
   };
 }
 
@@ -74,7 +72,7 @@ export function useGalleryStorageWorkflow({
   setSelectedIds,
 }: UseGalleryStorageWorkflowOptions) {
   const surface = useGallerySurfaceState();
-  const { setBanner, setShowStorageManager } = surface.actions;
+  const { setBanner } = surface.actions;
   const previewRefreshHandler = useCallback(
     (items: GalleryItem[]) => {
       setPreview((previous) => {
@@ -99,15 +97,10 @@ export function useGalleryStorageWorkflow({
     },
     [setSelectedIds]
   );
-  const storageManagerOpenHandler = useCallback(
-    () => setShowStorageManager(true),
-    [setShowStorageManager]
-  );
   const library = useGalleryLibraryState({
     onBanner: setBanner,
     onPreviewItemRefresh: previewRefreshHandler,
     onSelectionRefresh: selectionRefreshHandler,
-    onStorageManagerOpen: storageManagerOpenHandler,
   });
 
   return {

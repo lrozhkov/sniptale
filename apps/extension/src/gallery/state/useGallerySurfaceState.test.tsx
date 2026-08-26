@@ -49,23 +49,19 @@ afterEach(() => {
 it('starts with closed app-shell surface state by default', () => {
   const value = renderHook();
 
-  expect(value.state.showStorageManager).toBe(false);
   expect(value.state.pendingImport).toBeNull();
+  expect(value.state.pendingMediaImport).toBeNull();
   expect(value.state.confirmDialog).toBeNull();
   expect(value.state.banner).toBeNull();
   expect(value.state.isBusy).toBe(false);
 });
 
-it('opens the storage manager from the query flag and updates the remaining surface setters', () => {
-  window.history.replaceState({}, '', '/gallery?storageManager=1');
+it('updates app-shell surface state without URL-driven modal state', () => {
   const value = renderHook();
-
-  expect(value.state.showStorageManager).toBe(true);
 
   act(() => {
     value.actions.setBanner('warning');
     value.actions.setIsBusy(true);
-    value.actions.setShowStorageManager(false);
     value.actions.setPendingImport({
       file: new File(['backup'], 'backup.zip', { type: 'application/zip' }),
       summary: {
@@ -85,6 +81,10 @@ it('opens the storage manager from the query flag and updates the remaining surf
         totalBytes: 512,
       },
     });
+    value.actions.setPendingMediaImport({
+      conflicts: [{ filename: 'capture.png', size: 5 }],
+      files: [new File(['image'], 'capture.png', { type: 'image/png' })],
+    });
     value.actions.setConfirmDialog({
       cancelText: 'Cancel',
       confirmText: 'Delete',
@@ -97,7 +97,7 @@ it('opens the storage manager from the query flag and updates the remaining surf
   const next = latestValue;
   expect(next?.state.banner).toBe('warning');
   expect(next?.state.isBusy).toBe(true);
-  expect(next?.state.showStorageManager).toBe(false);
   expect(next?.state.pendingImport?.file.name).toBe('backup.zip');
+  expect(next?.state.pendingMediaImport?.conflicts).toHaveLength(1);
   expect(next?.state.confirmDialog?.title).toBe('Delete item');
 });

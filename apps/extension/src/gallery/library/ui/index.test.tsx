@@ -128,6 +128,7 @@ async function verifyGalleryHelpersAndLoadedThumb() {
   expect(getGalleryItemKindLabel('audio')).toBeTruthy();
   expect(getGalleryItemKindLabel('web-archive')).toBe('gallery.preview.kindWebSnapshot');
   expect(getGalleryItemKindLabel('video-project')).toBe('gallery.preview.kindVideoProject');
+  expect(getGalleryItemKindLabel('export')).toBe('gallery.preview.kindVideo');
   expect(getKindIcon('recording')).toBeTruthy();
   expect(getKindIcon('video-project')).toBeTruthy();
   expect(isImageKind('image')).toBe(true);

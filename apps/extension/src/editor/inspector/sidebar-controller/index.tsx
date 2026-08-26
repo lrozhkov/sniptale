@@ -99,7 +99,7 @@ function useSidebarActions(
     {
       activeTool: store.activeTool,
       browserFrame: store.browserFrame,
-      confirmOpenStorageManager: (dialog) => localState.requestConfirm(dialog),
+      confirmOpenLibrary: (dialog) => localState.requestConfirm(dialog),
       defaultImagePresetId: localState.defaultImagePresetId,
       frameDraft: localState.frameDraft,
       savePresets: localState.savePresets,

@@ -23,6 +23,7 @@ type StartRecordingParams = {
   cropRegion?: { x: number; y: number; width: number; height: number };
   generation: number;
   streamInstanceId: string;
+  sourceContext?: { favicon: string | null; title: string | null; url: string | null };
   surface?: { presetId: string; target: 'window'; width: number; height: number };
 };
 
@@ -137,6 +138,8 @@ async function startRecordingInternal(
     settings: params.settings,
     cursorCaptureMode: prepared.cursorCaptureMode,
     encoderFrameTransform: prepared.encoderFrameTransform,
+    sourceContext: params.sourceContext ?? null,
+    sourceLabel: params.sourceContext?.title ?? prepared.sourceLabel,
     trackSettings: prepared.trackSettings,
     durationTracker: recordingContext.durationTracker,
     sourceBinding: {

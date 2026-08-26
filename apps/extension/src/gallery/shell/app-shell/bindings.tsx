@@ -30,7 +30,6 @@ interface GalleryAppBindingsProps {
   controller: GalleryAppStateController;
   messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>;
   filteredScenarioProjects?: ScenarioProjectSummary[];
-  onRefreshAll: () => void;
   scenarioPreviewProject?: ScenarioProjectSummary | null;
   scenarioProjects?: ScenarioProjectSummary[];
   setScenarioPreviewProject?: Dispatch<SetStateAction<ScenarioProjectSummary | null>>;
@@ -58,7 +57,8 @@ function openPreview(
   options?: { inspectorCollapsed?: boolean }
 ) {
   controller.actions.preview.setPreview({
-    inspectorCollapsed: Boolean(options?.inspectorCollapsed),
+    inspectorCollapsed:
+      options?.inspectorCollapsed ?? controller.state.preview.session.inspectorCollapsed,
     item,
     url: null,
   });
@@ -81,6 +81,7 @@ function buildGalleryPreviewHandlers(
     onPreviewDownloadOriginal: actions.preview.downloadOriginal,
     onPreviewCopy: actions.preview.copy,
     onPreviewEdit: actions.preview.openInEditor,
+    onRecordingGroupOpen: actions.preview.openInEditor,
     onPreviewOpenSnapshotScreenshot: actions.preview.openSnapshotScreenshotInEditor,
     onPreviewRestoreOriginal: actions.preview.restoreOriginal,
     onPreviewSaveCopy: actions.preview.saveCopy,
@@ -100,6 +101,9 @@ function buildGalleryPreviewHandlers(
     },
     onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) =>
       openPreview(controller, item, options),
+    onPreviewNavigate: (item: GalleryItem) => {
+      void actions.preview.navigate(item);
+    },
   };
 }
 
@@ -109,7 +113,8 @@ function buildGallerySelectionHandlers(
 ) {
   return {
     onSelectionTagDraftChange: controller.actions.selection.setSelectionTagDraft,
-    onApplySelectionTag: () => void actions.selection.applyTag(),
+    onApplySelectionTag: (tag?: string) => void actions.selection.applyTag(tag),
+    onSelectionBackup: () => void actions.selection.downloadBackup(),
     onSelectionZip: () => void actions.selection.downloadZip(),
     onDeleteMany: (items: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0]) =>
       void actions.selection.deleteMany(items),
@@ -125,17 +130,20 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     gridViewportRef: controller.refs.gridViewportRef,
     importInputRef: controller.refs.importInputRef,
     importTriggerRef: controller.refs.importTriggerRef,
+    mediaImportInputRef: controller.refs.mediaImportInputRef,
+    mediaImportTriggerRef: controller.refs.mediaImportTriggerRef,
     state: controller.state,
     viewMode: props.viewMode,
     onImportFileChange: (file: File | null) => void actions.importing.importSelectedFile(file),
+    onMediaImportFileChange: (files: File[]) => void actions.importing.importMediaFiles(files),
     onActiveImportCancel: actions.importing.cancelActiveImport,
     onActiveImportDismiss: actions.importing.dismissActiveImport,
-    onStorageManagerOpen: () => controller.actions.surface.setShowStorageManager(true),
-    onStorageManagerClose: () => controller.actions.surface.setShowStorageManager(false),
     onConfirmDialogClose: () => controller.actions.surface.setConfirmDialog(null),
-    onStorageCleanup: (group: Parameters<UseGalleryAppActionsResult['storage']['cleanup']>[0]) =>
-      void actions.storage.cleanup(group),
     onPendingImportClose: actions.importing.closePendingImport,
+    onPendingMediaImportClose: actions.importing.closePendingMediaImport,
+    onMediaImportConfirm: (
+      strategy: Parameters<UseGalleryAppActionsResult['importing']['confirmMediaFileImport']>[0]
+    ) => void actions.importing.confirmMediaFileImport(strategy),
     onPendingExportClose: actions.backup.closePendingExport,
     onBackupExportConfirm: (
       options: Parameters<UseGalleryAppActionsResult['backup']['confirmExport']>[0]
@@ -147,15 +155,17 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
       void actions.importing.importBackup(strategy),
     onExportBackup: () => void actions.backup.exportBackup(),
     onImportBackupClick: () => controller.refs.importInputRef.current?.click(),
-    onRefresh: props.onRefreshAll,
+    onImportMediaClick: () => controller.refs.mediaImportInputRef.current?.click(),
     onBannerDismiss: () => controller.actions.surface.setBanner(null),
     onFilenameChange: controller.actions.preview.setFilenameDraft,
     onTagDraftChange: controller.actions.preview.setTagDraft,
     onRemoveTag: (tag: string) => removeTag(controller, tag),
-    onAddTag: () => addTag(controller),
+    onAddTag: (tag?: string) => addTag(controller, tag ?? null),
     onFolderFilterChange: controller.actions.filters.setFolderFilter,
     onScopeChange: controller.actions.filters.setScope,
     onActiveTagsChange: controller.actions.filters.setActiveTags,
+    onFacetFilterChange: controller.actions.filters.setFacetFilter,
+    onResetFilters: controller.actions.filters.resetFilters,
     onSearchChange: controller.actions.filters.setSearch,
     onSortModeChange: controller.actions.filters.setSortMode,
     onViewModeChange: props.setViewMode,

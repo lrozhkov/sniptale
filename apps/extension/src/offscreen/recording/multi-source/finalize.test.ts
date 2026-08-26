@@ -136,8 +136,26 @@ describe('multi-source finalization', () => {
     expect(saveBatchMock).toHaveBeenCalledOnce();
     expect(saveBatchMock.mock.calls[0]?.[0]).toHaveLength(2);
     expect(saveBatchMock.mock.calls[0]?.[0]).toEqual([
-      expect.objectContaining({ storageClass: 'temporary' }),
-      expect.objectContaining({ storageClass: 'temporary' }),
+      expect.objectContaining({
+        recordingGroup: {
+          dimensions: { height: 720, width: 1280 },
+          groupId: 'multi-batch',
+          order: 0,
+          role: 'display',
+          sourceLabel: 'Source 1',
+        },
+        storageClass: 'temporary',
+      }),
+      expect.objectContaining({
+        recordingGroup: {
+          dimensions: { height: 720, width: 1280 },
+          groupId: 'multi-batch',
+          order: 1,
+          role: 'display',
+          sourceLabel: 'Source 2',
+        },
+        storageClass: 'temporary',
+      }),
     ]);
     expect(saveBatchMock.mock.calls[0]?.[1]).toEqual({
       primaryRecordingId: 'multi-batch-window-1',
@@ -177,6 +195,34 @@ describe('multi-source finalization', () => {
       recordingId: 'multi-project-failure',
     });
     expect(updateOutboxMock).not.toHaveBeenCalled();
+  });
+
+  it('marks display, microphone, and webcam members with stable group roles and order', async () => {
+    const session = createSession('multi-role');
+    session.audioRecorder = createRecorder('multi-role-microphone', 2);
+    const webcam = createRecorder('multi-role-webcam', 3);
+    session.webcamRecorder = {
+      artifact: webcam.artifact,
+      artifactSession: webcam.artifactSession,
+      filenameSuffix: '-webcam',
+      kind: 'webcam',
+      recorder: webcam.recorder,
+      recordingId: webcam.recordingId,
+      release: vi.fn(),
+      sourceLabel: 'Desk camera',
+      stream: webcam.stream,
+      trackSettings: webcam.trackSettings,
+    };
+
+    await finalizeSession(session);
+
+    const inputs = saveBatchMock.mock.calls[0]?.[0] ?? [];
+    expect(inputs.map((input: { recordingGroup?: unknown }) => input.recordingGroup)).toEqual([
+      expect.objectContaining({ order: 0, role: 'display' }),
+      expect.objectContaining({ order: 1, role: 'display' }),
+      expect.objectContaining({ order: 2, role: 'microphone' }),
+      expect.objectContaining({ order: 3, role: 'webcam', sourceLabel: 'Desk camera' }),
+    ]);
   });
 
   it('does not create a project or delete staging when the atomic media batch fails', async () => {

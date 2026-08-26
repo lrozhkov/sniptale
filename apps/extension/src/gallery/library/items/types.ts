@@ -1,4 +1,5 @@
 import type {
+  ImageContentState,
   MediaAssetKind,
   MediaAssetSource,
   MediaLibraryItem,
@@ -8,6 +9,7 @@ import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type { LibraryLifecycle } from '../../../contracts/settings/library-lifecycle';
+import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 export type GalleryItemKind = MediaAssetKind | 'scenario' | 'scenario-export' | 'video-project';
 
@@ -17,6 +19,7 @@ interface GalleryItemBase {
   filename: string;
   hasThumbnail: boolean;
   id: string;
+  imageContentState?: ImageContentState;
   kind: GalleryItemKind;
   lifecycle?: LibraryLifecycle;
   originalFilename?: string;
@@ -39,6 +42,12 @@ export interface GalleryMediaItem extends GalleryItemBase {
   type?: 'media';
   width: number | null;
   source: MediaAssetSource;
+  recordingGroup?: RecordingGroupMember;
+  recordingGroupView?: RecordingGroupMember & {
+    memberCount: number;
+    projectId: string | null;
+    projectName?: string | null;
+  };
 }
 
 export interface GalleryScenarioItem extends GalleryItemBase {

@@ -23,6 +23,12 @@ const permissionCardClassName = [
   'border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
+const revokeButtonClassName = [
+  'rounded-[14px] border px-4 py-2 text-sm font-medium transition-colors',
+  'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
+  'hover:border-[var(--sniptale-color-danger)] hover:text-[var(--sniptale-color-danger)]',
+].join(' ');
+
 const permissionIconClassName = [
   'flex h-8 w-8 flex-shrink-0 items-center justify-center',
   'text-[var(--sniptale-color-success)]',
@@ -102,6 +108,39 @@ function getSiteAccessModeButtonClassName(selected: boolean): string {
   ].join(' ');
 }
 
+function PermissionStateText({ content }: { content: ReturnType<typeof getPermissionContent> }) {
+  return (
+    <div className={`flex items-center gap-1.5 text-sm ${content.badgeTone}`}>
+      {content.badgeIcon ? <content.badgeIcon size={14} /> : null}
+      <span>{content.badgeText}</span>
+    </div>
+  );
+}
+
+function FileSchemeAccessControl(props: {
+  content: ReturnType<typeof getPermissionContent>;
+  onRequest: () => void;
+  onRevoke: () => void;
+  state: PermissionState;
+}) {
+  if (props.state === 'granted') {
+    return (
+      <div className="flex items-center gap-2">
+        <StatusBadge state={props.state} />
+        <button type="button" className={revokeButtonClassName} onClick={props.onRevoke}>
+          {translate('settings.permissions.revokeButton')}
+        </button>
+      </div>
+    );
+  }
+
+  return props.state === 'prompt' ? (
+    <RequestButton onClick={props.onRequest} />
+  ) : (
+    <PermissionStateText content={props.content} />
+  );
+}
+
 function PermissionCard(props: {
   onRequestPermission: (id: string) => void;
   onRevokePermission: (id: string) => void;
@@ -127,7 +166,14 @@ function PermissionCard(props: {
       </div>
 
       <div className="flex-shrink-0">
-        {props.permission.type === 'origin' ? (
+        {props.permission.type === 'file' ? (
+          <FileSchemeAccessControl
+            content={content}
+            state={props.permission.state}
+            onRequest={() => props.onRequestPermission(props.permission.id)}
+            onRevoke={() => props.onRevokePermission(props.permission.id)}
+          />
+        ) : props.permission.type === 'origin' ? (
           <SiteAccessModeSelector
             permission={props.permission}
             onRequestPermission={props.onRequestPermission}
@@ -138,10 +184,7 @@ function PermissionCard(props: {
         ) : props.permission.state === 'prompt' ? (
           <RequestButton onClick={() => props.onRequestPermission(props.permission.id)} />
         ) : (
-          <div className={`flex items-center gap-1.5 text-sm ${content.badgeTone}`}>
-            {content.badgeIcon ? <content.badgeIcon size={14} /> : null}
-            <span>{content.badgeText}</span>
-          </div>
+          <PermissionStateText content={content} />
         )}
       </div>
     </div>

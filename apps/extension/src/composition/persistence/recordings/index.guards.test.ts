@@ -25,8 +25,38 @@ describe('recording entry guards', () => {
     const entry = createRecordingEntry();
 
     expect(parseRecordingEntry(entry)).toEqual(withLegacyLifecycle(entry));
+    expect(
+      parseRecordingEntry({
+        ...entry,
+        recordingGroup: {
+          groupId: 'capture-1',
+          order: 0,
+          role: 'webcam',
+          sourceLabel: null,
+        },
+      })
+    ).toEqual(
+      expect.objectContaining({ recordingGroup: expect.objectContaining({ role: 'webcam' }) })
+    );
     expect(parseRecordingEntry({ ...entry, size: '5' })).toBeNull();
     expect(parseRecordingEntry({ ...entry, assetId: '' })).toBeNull();
+    expect(parseRecordingEntry({ ...entry, recordingGroup: { role: 'camera' } })).toBeNull();
+    expect(
+      parseRecordingEntry({
+        ...entry,
+        mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
+      })
+    ).toEqual(
+      expect.objectContaining({
+        mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
+      })
+    );
+    expect(
+      parseRecordingEntry({
+        ...entry,
+        mediaMetadata: { duration: -1, height: 1080, kind: 'video', width: 1920 },
+      })
+    ).toBeNull();
   });
 
   it('filters invalid entries from stored lists and reports invalid roots', () => {

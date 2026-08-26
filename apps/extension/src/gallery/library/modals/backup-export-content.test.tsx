@@ -172,6 +172,15 @@ it('renders backup disclosure counts and requires an explicit export click', asy
 
   expect(container?.textContent).toContain('1 shared.bytes.kb');
   expect(container?.textContent).toContain('0');
+  expect(container?.textContent).not.toContain('gallery.backupExportModal.supportBundle');
+
+  await act(async () => {
+    const draftsToggle = container?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    draftsToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+  });
+
+  expect(container?.textContent).toContain('gallery.backupExportModal.supportBundle');
 
   await act(async () => {
     findButton('gallery.backupExportModal.export').dispatchEvent(
@@ -198,6 +207,16 @@ it('updates individual privacy toggles and closes through the modal frame', asyn
   });
 
   expect(container?.textContent).toContain('gallery.backupExportModal.scopeSelected');
+  expect(
+    Array.from(container?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []).every(
+      (checkbox) => checkbox.classList.contains('sniptale-checkbox')
+    )
+  ).toBe(true);
+  expect(
+    Array.from(container?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []).every(
+      (checkbox) => checkbox.closest('label')?.classList.contains('cursor-pointer')
+    )
+  ).toBe(true);
 
   await act(async () => {
     const telemetryToggle = container?.querySelectorAll('input[type="checkbox"]')[1];

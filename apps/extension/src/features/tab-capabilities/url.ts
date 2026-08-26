@@ -14,7 +14,7 @@ const RESTRICTED_URL_PREFIXES = [
 ] as const;
 
 export function describeRestrictedPage(url: string | null | undefined): string | null {
-  if (!url) {
+  if (!url || !isRestrictedBrowserPage(url)) {
     return null;
   }
 
@@ -35,10 +35,10 @@ function describeUnsupportedPageProtocol(url: string): string | null {
   }
 }
 
-function isHttpPageUrl(url: string): boolean {
+function isSupportedPageUrl(url: string): boolean {
   try {
     const protocol = new URL(url).protocol;
-    return protocol === 'http:' || protocol === 'https:';
+    return protocol === 'http:' || protocol === 'https:' || protocol === 'file:';
   } catch {
     return false;
   }
@@ -49,7 +49,9 @@ export function isRestrictedBrowserPage(url: string | null | undefined): boolean
     return false;
   }
 
-  return RESTRICTED_URL_PREFIXES.some((prefix) => url.startsWith(prefix)) || !isHttpPageUrl(url);
+  return (
+    RESTRICTED_URL_PREFIXES.some((prefix) => url.startsWith(prefix)) || !isSupportedPageUrl(url)
+  );
 }
 
 export function isOwnedSnapshotViewerPage(url: string | null | undefined): boolean {

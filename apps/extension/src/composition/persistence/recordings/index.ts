@@ -123,7 +123,17 @@ export async function listRecordings(): Promise<
   }
 
   return parsedEntries.entries.map(
-    ({ id, assetId, filename, createdAt, size, mimeType, lifecycle }) => ({
+    ({
+      id,
+      assetId,
+      filename,
+      createdAt,
+      size,
+      mimeType,
+      lifecycle,
+      recordingGroup,
+      mediaMetadata,
+    }) => ({
       assetId,
       id,
       filename,
@@ -131,10 +141,11 @@ export async function listRecordings(): Promise<
       size,
       mimeType,
       ...(lifecycle ? { lifecycle } : {}),
-      duration: null,
-      height: null,
+      ...(recordingGroup ? { recordingGroup } : {}),
+      duration: mediaMetadata?.duration ?? null,
+      height: mediaMetadata?.height ?? null,
       thumbnailId: createRecordingMediaId(id),
-      width: null,
+      width: mediaMetadata?.width ?? null,
     })
   );
 }

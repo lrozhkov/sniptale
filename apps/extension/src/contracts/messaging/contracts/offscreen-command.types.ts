@@ -31,6 +31,11 @@ export type RuntimeOffscreenStartRecordingMessage = RuntimeOffscreenCommandCapab
   cropRegion?: ViewportRegionPayload;
   generation: number;
   streamInstanceId: string;
+  sourceContext?: {
+    favicon: string | null;
+    title: string | null;
+    url: string | null;
+  };
   surface?: {
     presetId: string;
     target: 'window';

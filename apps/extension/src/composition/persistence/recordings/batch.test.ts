@@ -64,7 +64,12 @@ describe('recording asset publication', () => {
   it('admits aggregate bytes, writes immutable objects, and publishes one atomic batch', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700);
     const entries = await saveRecordingsBatch([
-      { id: 'video-1', blob: new Blob(['video'], { type: 'video/webm' }), filename: '1.webm' },
+      {
+        id: 'video-1',
+        blob: new Blob(['video'], { type: 'video/webm' }),
+        filename: '1.webm',
+        mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
+      },
       {
         id: 'audio-1',
         blob: new Blob(['audio'], { type: 'audio/webm' }),
@@ -78,7 +83,12 @@ describe('recording asset publication', () => {
     expect(mocks.assertAdmission).toHaveBeenCalledWith(10);
     expect(mocks.writeBlob).toHaveBeenCalledTimes(2);
     expect(entries).toEqual([
-      expect.objectContaining({ assetId: 'asset-video', id: 'video-1', size: 5 }),
+      expect.objectContaining({
+        assetId: 'asset-video',
+        id: 'video-1',
+        mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
+        size: 5,
+      }),
       expect.objectContaining({ assetId: 'asset-audio', id: 'audio-1', mimeType: 'audio/webm' }),
     ]);
     expect(mocks.preparePublication).toHaveBeenCalledWith({
@@ -101,7 +111,19 @@ describe('recording asset publication', () => {
     };
 
     await saveRecordingsBatchWithCompletion(
-      [{ id: 'video-1', filename: '1.webm', preparedAsset }],
+      [
+        {
+          id: 'video-1',
+          filename: '1.webm',
+          preparedAsset,
+          recordingGroup: {
+            groupId: 'session-1',
+            order: 0,
+            role: 'display',
+            sourceLabel: 'Window 1',
+          },
+        },
+      ],
       completion
     );
 
@@ -109,7 +131,16 @@ describe('recording asset publication', () => {
     expect(mocks.writeBlob).not.toHaveBeenCalled();
     expect(mocks.recover).not.toHaveBeenCalled();
     expect(mocks.preparePublication).toHaveBeenCalledWith(
-      expect.objectContaining({ payload: expect.objectContaining({ completion }) })
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          completion,
+          entries: [
+            expect.objectContaining({
+              recordingGroup: expect.objectContaining({ groupId: 'session-1', role: 'display' }),
+            }),
+          ],
+        }),
+      })
     );
   });
 
@@ -144,6 +175,31 @@ describe('recording asset publication', () => {
     await expect(
       saveRecordingsBatch([{ id: 'missing', filename: 'missing.webm' }])
     ).rejects.toThrow('exactly one binary source');
+    await expect(
+      saveRecordingsBatch([
+        {
+          id: 'invalid-group',
+          blob,
+          filename: 'invalid.webm',
+          recordingGroup: {
+            groupId: 'session-1',
+            order: -1,
+            role: 'display',
+            sourceLabel: null,
+          },
+        },
+      ])
+    ).rejects.toThrow('group member metadata is invalid');
+    await expect(
+      saveRecordingsBatch([
+        {
+          id: 'invalid-metadata',
+          blob,
+          filename: 'invalid.webm',
+          mediaMetadata: { duration: -1, height: 1080, kind: 'video', width: 1920 },
+        },
+      ])
+    ).rejects.toThrow('media metadata is invalid');
     expect(mocks.recover).not.toHaveBeenCalled();
   });
 });

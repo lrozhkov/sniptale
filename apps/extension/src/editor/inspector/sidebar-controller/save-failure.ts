@@ -3,29 +3,29 @@ import { translate } from '../../../platform/i18n';
 import { isEditorStoragePromptError } from '../../document/file-actions';
 import type { EditorInspectorConfirmDialogState } from '../content/types';
 
-function buildStorageManagerDialog(message: string): EditorInspectorConfirmDialogState {
+function buildOpenLibraryDialog(message: string): EditorInspectorConfirmDialogState {
   return {
-    title: translate('gallery.app.openStorageManager'),
-    message: `${message}\n\n${translate('gallery.app.openStorageManager')}?`,
-    confirmText: translate('gallery.app.openStorageManager'),
+    title: translate('gallery.app.openLibrary'),
+    message,
+    confirmText: translate('gallery.app.openLibrary'),
     cancelText: translate('common.actions.cancel'),
   };
 }
 
 export async function maybeHandleEditorSaveFailure(args: {
-  confirmOpenStorageManager: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
+  confirmOpenLibrary: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
   error: unknown;
-  openStorageManager?: () => Promise<void>;
+  openLibrary?: () => Promise<void>;
 }): Promise<boolean> {
   if (!isEditorStoragePromptError(args.error)) {
     return false;
   }
 
-  const shouldOpenStorageManager = await args.confirmOpenStorageManager(
-    buildStorageManagerDialog(args.error.message)
+  const shouldOpenLibrary = await args.confirmOpenLibrary(
+    buildOpenLibraryDialog(args.error.message)
   );
-  if (shouldOpenStorageManager) {
-    await (args.openStorageManager?.() ?? openGalleryPage({ openStorageManager: true }));
+  if (shouldOpenLibrary) {
+    await (args.openLibrary?.() ?? openGalleryPage());
   }
 
   return true;

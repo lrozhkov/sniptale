@@ -30,7 +30,7 @@ describe('editor sidebar save failure handling', () => {
 
     await expect(
       maybeHandleEditorSaveFailure({
-        confirmOpenStorageManager: vi.fn(),
+        confirmOpenLibrary: vi.fn(),
         error: new Error('plain failure'),
       })
     ).resolves.toBe(false);
@@ -38,42 +38,42 @@ describe('editor sidebar save failure handling', () => {
 });
 
 describe('editor sidebar storage prompt save failure handling', () => {
-  it('opens the gallery storage manager after user confirmation', async () => {
+  it('opens the library after user confirmation', async () => {
     isEditorStoragePromptErrorMock.mockReturnValue(true);
-    const confirmOpenStorageManager = vi.fn().mockResolvedValue(true);
+    const confirmOpenLibrary = vi.fn().mockResolvedValue(true);
 
     await expect(
       maybeHandleEditorSaveFailure({
-        confirmOpenStorageManager,
+        confirmOpenLibrary,
         error: new Error('storage is full'),
       })
     ).resolves.toBe(true);
 
-    expect(confirmOpenStorageManager).toHaveBeenCalledWith(
+    expect(confirmOpenLibrary).toHaveBeenCalledWith(
       expect.objectContaining({
-        confirmText: 'gallery.app.openStorageManager',
-        message: 'storage is full\n\ngallery.app.openStorageManager?',
+        confirmText: 'gallery.app.openLibrary',
+        message: 'storage is full',
       })
     );
-    expect(openGalleryPageMock).toHaveBeenCalledWith({ openStorageManager: true });
+    expect(openGalleryPageMock).toHaveBeenCalledWith();
   });
 
   it('uses the injected opener and skips navigation when the dialog is cancelled', async () => {
     isEditorStoragePromptErrorMock.mockReturnValue(true);
-    const openStorageManager = vi.fn().mockResolvedValue(undefined);
+    const openLibrary = vi.fn().mockResolvedValue(undefined);
 
     await maybeHandleEditorSaveFailure({
-      confirmOpenStorageManager: vi.fn().mockResolvedValue(false),
+      confirmOpenLibrary: vi.fn().mockResolvedValue(false),
       error: new Error('storage is full'),
-      openStorageManager,
+      openLibrary,
     });
     await maybeHandleEditorSaveFailure({
-      confirmOpenStorageManager: vi.fn().mockResolvedValue(true),
+      confirmOpenLibrary: vi.fn().mockResolvedValue(true),
       error: new Error('storage is full'),
-      openStorageManager,
+      openLibrary,
     });
 
     expect(openGalleryPageMock).toHaveBeenCalledTimes(0);
-    expect(openStorageManager).toHaveBeenCalledOnce();
+    expect(openLibrary).toHaveBeenCalledOnce();
   });
 });

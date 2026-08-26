@@ -4,8 +4,17 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { modalFramePropsMock, translateMock } = vi.hoisted(() => ({
+const {
+  formatDateTimeMock,
+  getCurrentLocaleMock,
+  modalFramePropsMock,
+  productSelectPropsMock,
+  translateMock,
+} = vi.hoisted(() => ({
+  formatDateTimeMock: vi.fn(() => 'localized-date'),
+  getCurrentLocaleMock: vi.fn(() => 'en' as const),
   modalFramePropsMock: vi.fn(),
+  productSelectPropsMock: vi.fn(),
   translateMock: vi.fn((key: string) => key),
 }));
 
@@ -13,6 +22,8 @@ vi.mock('../../../platform/i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../platform/i18n')>();
   return {
     ...actual,
+    formatDateTime: formatDateTimeMock,
+    getCurrentLocale: getCurrentLocaleMock,
     translate: translateMock,
   };
 });
@@ -32,16 +43,37 @@ vi.mock('./frame', () => ({
   },
 }));
 
+vi.mock('@sniptale/ui/product-form-controls', () => ({
+  ProductSelect: (props: {
+    disabled?: boolean;
+    onChange: (value: 'duplicate') => void;
+    options: Array<{ value: string }>;
+    value: string;
+  }) => {
+    productSelectPropsMock(props);
+    return (
+      <button
+        type="button"
+        data-ui="test.conflict-select"
+        disabled={props.disabled}
+        onClick={() => props.onChange('duplicate')}
+      >
+        {props.value}
+      </button>
+    );
+  },
+}));
+
 import { ImportConflictModalContent } from './import-conflict-content';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function createImportSummary() {
+function createImportSummary(conflicts = ['asset-1', 'asset-2']) {
   return {
     archiveFingerprint: 'a'.repeat(64),
     assetCount: 3,
-    conflicts: ['asset-1', 'asset-2'],
+    conflicts,
     manifest: {
       assetCount: 3,
       effectBundleCount: 0,
@@ -56,24 +88,10 @@ function createImportSummary() {
   };
 }
 
-function getImportActionButtons() {
-  const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-  const closeButton = buttons.find((button) => button.textContent === 'close');
-  const replaceButton = buttons.find((button) =>
-    button.textContent?.includes('gallery.importModal.replaceTitle')
+function findButton(label: string) {
+  return Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes(label)
   );
-  const skipButton = buttons.find((button) =>
-    button.textContent?.includes('gallery.importModal.skipTitle')
-  );
-  const duplicateButton = buttons.find((button) =>
-    button.textContent?.includes('gallery.importModal.duplicateTitle')
-  );
-
-  if (!closeButton || !replaceButton || !skipButton || !duplicateButton) {
-    throw new Error('Expected import modal controls');
-  }
-
-  return { closeButton, duplicateButton, replaceButton, skipButton };
 }
 
 beforeEach(() => {
@@ -94,7 +112,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders import summary, manifest banner, and strategy actions', async () => {
+it('uses one conflict dropdown and confirms the selected strategy', async () => {
   const onClose = vi.fn();
   const onImport = vi.fn(async () => undefined);
 
@@ -108,13 +126,36 @@ it('renders import summary, manifest banner, and strategy actions', async () => 
     );
   });
 
-  const { closeButton, duplicateButton, replaceButton, skipButton } = getImportActionButtons();
+  const select = container?.querySelector<HTMLButtonElement>('[data-ui="test.conflict-select"]');
+  const restoreButton = findButton('gallery.importModal.restore');
+  const closeButton = findButton('close');
+  if (!select || !restoreButton || !closeButton) {
+    throw new Error('Expected import confirmation controls');
+  }
+
+  expect(select.textContent).toBe('skip');
+  expect(restoreButton.className).toContain('cursor-pointer');
+  expect(productSelectPropsMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      controlSize: 'md',
+      options: expect.arrayContaining([
+        expect.objectContaining({ value: 'skip' }),
+        expect.objectContaining({ value: 'duplicate' }),
+        expect.objectContaining({ value: 'replace' }),
+      ]),
+      value: 'skip',
+    })
+  );
+  expect(container?.textContent).toContain('gallery.importModal.skipDescription');
+
+  await act(async () => {
+    select.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  expect(container?.textContent).toContain('gallery.importModal.duplicateDescription');
 
   await act(async () => {
     closeButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    replaceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    skipButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    duplicateButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    restoreButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await Promise.resolve();
   });
 
@@ -124,11 +165,16 @@ it('renders import summary, manifest banner, and strategy actions', async () => 
   expect(container?.textContent).toContain('gallery.importModal.assets');
   expect(container?.textContent).toContain('gallery.importModal.thumbnails');
   expect(container?.textContent).toContain('gallery.importModal.conflicts');
-  expect(container?.textContent).toContain('gallery.importModal.formatVersionPrefix 1.');
+  expect(container?.textContent).toContain('gallery.importModal.formatVersionPrefix 1');
+  expect(container?.textContent).toContain('gallery.importModal.exportedAtPrefix localized-date');
+  expect(formatDateTimeMock).toHaveBeenCalledWith(
+    new Date('2026-03-31T00:00:00.000Z'),
+    { dateStyle: 'medium', timeStyle: 'short' },
+    'en'
+  );
   expect(onClose).toHaveBeenCalledTimes(1);
-  expect(onImport).toHaveBeenNthCalledWith(1, 'replace');
-  expect(onImport).toHaveBeenNthCalledWith(2, 'skip');
-  expect(onImport).toHaveBeenNthCalledWith(3, 'duplicate');
+  expect(onImport).toHaveBeenCalledOnce();
+  expect(onImport).toHaveBeenCalledWith('duplicate');
 });
 
 it('locks a resumed restore to its persisted conflict strategy', async () => {
@@ -144,17 +190,45 @@ it('locks a resumed restore to its persisted conflict strategy', async () => {
     );
   });
 
-  const { duplicateButton, replaceButton, skipButton } = getImportActionButtons();
-  expect(replaceButton.disabled).toBe(true);
-  expect(skipButton.disabled).toBe(false);
-  expect(duplicateButton.disabled).toBe(true);
+  const select = container?.querySelector<HTMLButtonElement>('[data-ui="test.conflict-select"]');
+  const restoreButton = findButton('gallery.importModal.restore');
+  if (!select || !restoreButton) {
+    throw new Error('Expected locked restore controls');
+  }
+  expect(select.disabled).toBe(true);
+  expect(select.textContent).toBe('skip');
 
   await act(async () => {
-    replaceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    skipButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    duplicateButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    restoreButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await Promise.resolve();
   });
   expect(onImport).toHaveBeenCalledOnce();
+  expect(onImport).toHaveBeenCalledWith('skip');
+});
+
+it('asks only for confirmation when the backup has no matching items', async () => {
+  const onImport = vi.fn(async () => undefined);
+  act(() => {
+    root?.render(
+      <ImportConflictModalContent
+        summary={createImportSummary([])}
+        onClose={vi.fn()}
+        onImport={onImport}
+      />
+    );
+  });
+
+  expect(container?.querySelector('[data-ui="test.conflict-select"]')).toBeNull();
+  expect(container?.textContent).not.toContain('gallery.importModal.conflicts');
+  expect(modalFramePropsMock).toHaveBeenCalledWith(
+    expect.objectContaining({ description: 'gallery.importModal.noConflictsDescription' })
+  );
+
+  await act(async () => {
+    findButton('gallery.importModal.restore')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true })
+    );
+    await Promise.resolve();
+  });
   expect(onImport).toHaveBeenCalledWith('skip');
 });

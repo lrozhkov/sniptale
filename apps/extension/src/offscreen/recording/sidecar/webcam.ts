@@ -52,6 +52,7 @@ async function createWebcamMediaRecorder(params: {
       recorder,
       release: params.source.release,
       recordingId,
+      sourceLabel: params.source.sourceLabel,
       stream: params.source.stream,
       trackSettings,
     };

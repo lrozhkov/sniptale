@@ -124,6 +124,11 @@ function emitValidatedRecordingMessages(
     viewport: { width: 1440, height: 900, devicePixelRatio: 2 },
     recordingId: 'recording-1',
     streamInstanceId: 'stream-instance-1',
+    sourceContext: {
+      favicon: 'https://example.com/favicon.ico',
+      title: 'Example page',
+      url: 'https://example.com/article',
+    },
     captureMode: CaptureMode.TAB,
     cropRegion: { x: 1, y: 2, width: 3, height: 4 },
   });
@@ -156,6 +161,11 @@ function expectValidatedRecordingRoutes(settings: ReturnType<typeof createExport
     cropRegion: { x: 1, y: 2, width: 3, height: 4 },
     generation: 1,
     streamInstanceId: 'stream-instance-1',
+    sourceContext: {
+      favicon: 'https://example.com/favicon.ico',
+      title: 'Example page',
+      url: 'https://example.com/article',
+    },
   });
   expect(stopRecordingMock).toHaveBeenCalledOnce();
   expect(pauseRecordingMock).toHaveBeenCalledOnce();

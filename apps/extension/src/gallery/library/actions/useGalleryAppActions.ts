@@ -2,7 +2,6 @@ import type {
   MediaHubBackupExportOptions,
   MediaHubImportConflictStrategy,
 } from '../../../workflows/media-hub-backup/index';
-import type { StorageCleanupGroup } from '../../../features/media-hub/types';
 import type {
   GalleryImportController,
   GalleryBackupExportController,
@@ -33,15 +32,14 @@ import {
   openInEditor,
   resetPreviewChanges,
 } from './preview';
-import {
-  createApplySelectionTagAction,
-  createDeleteManyAction,
-  createSelectionZipAction,
-  createStorageCleanupAction,
-} from './selection';
+import { createNavigatePreviewAction } from './preview-navigation';
+import { createApplySelectionTagAction, createDeleteManyAction } from './selection';
+import { createSelectionBackupAction, createSelectionZipAction } from './selection-export';
 import { createBusyActionRunner } from './shared';
 import { openSnapshotScreenshotInEditor } from './snapshot-screenshot';
 import type { UseGalleryAppActionsResult } from './useGalleryAppActions.types';
+import { createImportMediaFilesAction } from './media-file-import';
+import type { MediaFileImportConflictStrategy } from '../import-types';
 
 function createGalleryBackupActions(
   controller: GalleryBackupExportController,
@@ -66,13 +64,15 @@ function buildGalleryAppActionsResult(args: {
   backupActions: ReturnType<typeof createGalleryBackupActions>;
   controller: GalleryAppActionsController;
   deleteMany: (targets: GalleryItem[]) => Promise<void>;
-  handleApplySelectionTag: () => Promise<void>;
+  handleApplySelectionTag: (tag?: string) => Promise<void>;
   handleImport: (strategy: MediaHubImportConflictStrategy) => Promise<void>;
   handleImportSelectedFile: (file: File | null) => Promise<void>;
+  handleImportMediaFiles: (files: File[]) => Promise<void>;
+  handleConfirmMediaFileImport: (strategy: MediaFileImportConflictStrategy) => Promise<void>;
   handlePreviewClose: () => Promise<void>;
   handleSaveMetadata: () => Promise<void>;
+  handleSelectionBackup: () => Promise<void>;
   handleSelectionZip: () => Promise<void>;
-  handleStorageCleanup: (group: StorageCleanupGroup) => Promise<void>;
   withBusy: ReturnType<typeof createBusyActionRunner>;
 }): UseGalleryAppActionsResult {
   const { controller, withBusy } = args;
@@ -82,15 +82,19 @@ function buildGalleryAppActionsResult(args: {
     importing: {
       cancelActiveImport: createCancelActiveImportAction(controller),
       closePendingImport: createClosePendingImportAction(controller),
+      closePendingMediaImport: () => controller.actions.surface.setPendingMediaImport(null),
+      confirmMediaFileImport: args.handleConfirmMediaFileImport,
       dismissActiveImport: createDismissActiveImportAction(controller),
       importBackup: args.handleImport,
       importSelectedFile: args.handleImportSelectedFile,
+      importMediaFiles: args.handleImportMediaFiles,
     },
     preview: {
       close: args.handlePreviewClose,
       copy: () => void copyPreviewItem(controller, withBusy),
       download: () => void downloadPreviewItem(controller, withBusy),
       downloadOriginal: () => void downloadOriginalPreviewItem(controller, withBusy),
+      navigate: (target: GalleryItem) => createNavigatePreviewAction(controller)(target, withBusy),
       openInEditor,
       openSnapshotScreenshotInEditor: () =>
         void openSnapshotScreenshotInEditor(controller, withBusy),
@@ -100,12 +104,10 @@ function buildGalleryAppActionsResult(args: {
       saveMetadata: args.handleSaveMetadata,
     },
     selection: {
-      applyTag: args.handleApplySelectionTag,
+      applyTag: (tag?: string) => args.handleApplySelectionTag(tag),
       deleteMany: args.deleteMany,
+      downloadBackup: args.handleSelectionBackup,
       downloadZip: args.handleSelectionZip,
-    },
-    storage: {
-      cleanup: args.handleStorageCleanup,
     },
   };
 }
@@ -114,16 +116,21 @@ export function useGalleryAppActions({ ...controller }: GalleryAppActionsControl
   const withBusy = createBusyActionRunner(controller);
   const deleteMany = (targets: GalleryItem[]) =>
     createDeleteManyAction(controller)(targets, withBusy);
-  const handleStorageCleanup = (group: StorageCleanupGroup) =>
-    createStorageCleanupAction(controller)(group, withBusy);
   const backupActions = createGalleryBackupActions(controller, withBusy);
   const handleImportSelectedFile = (file: File | null) =>
     createImportSelectedFileAction(controller)(file, withBusy);
+  const handleImportMediaFiles = createImportMediaFilesAction(controller, withBusy);
+  const handleConfirmMediaFileImport = (strategy: MediaFileImportConflictStrategy) => {
+    const pending = controller.state.storage.pendingMediaImport;
+    return pending ? handleImportMediaFiles(pending.files, strategy) : Promise.resolve();
+  };
   const handleImport = (strategy: MediaHubImportConflictStrategy) =>
     createImportAction(controller)(strategy, withBusy);
   const handleSelectionZip = () => createSelectionZipAction(controller)(withBusy);
+  const handleSelectionBackup = () => createSelectionBackupAction(controller)(withBusy);
   const handleSaveMetadata = () => createSaveMetadataAction(controller)(withBusy);
-  const handleApplySelectionTag = () => createApplySelectionTagAction(controller)(withBusy);
+  const handleApplySelectionTag = (tag?: string) =>
+    createApplySelectionTagAction(controller)(withBusy, tag);
   const handlePreviewClose = () => createClosePreviewAction(controller)(withBusy);
 
   return buildGalleryAppActionsResult({
@@ -133,10 +140,12 @@ export function useGalleryAppActions({ ...controller }: GalleryAppActionsControl
     handleApplySelectionTag,
     handleImport,
     handleImportSelectedFile,
+    handleImportMediaFiles,
+    handleConfirmMediaFileImport,
     handlePreviewClose,
     handleSaveMetadata,
+    handleSelectionBackup,
     handleSelectionZip,
-    handleStorageCleanup,
     withBusy,
   });
 }

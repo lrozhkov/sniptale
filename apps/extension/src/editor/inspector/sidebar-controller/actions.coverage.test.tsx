@@ -64,7 +64,7 @@ import { useEditorInspectorSidebarActions } from './actions';
 
 function createArgs(selectedObjectType: string | null, hasSelection = true) {
   return {
-    confirmOpenStorageManager: vi.fn(),
+    confirmOpenLibrary: vi.fn(),
     defaultImagePresetId: null,
     frameDraft: { paddingTop: 1 },
     savePresets: [],

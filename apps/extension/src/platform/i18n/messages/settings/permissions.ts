@@ -21,6 +21,14 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Включает инструменты Sniptale на сайтах, которым вы разрешили доступ.',
     en: 'Enables Sniptale tools on websites you allow.',
   },
+  localFilesName: {
+    ru: 'Локальные файлы',
+    en: 'Local files',
+  },
+  localFilesDescription: {
+    ru: 'Разрешает использовать инструменты Sniptale на локальных файлах. Сначала включите доступ к URL файлов в Chrome, затем подтвердите его здесь.',
+    en: 'Allows Sniptale tools on local files. First enable file URL access in Chrome, then confirm it here.',
+  },
   microphoneName: {
     ru: 'Микрофон',
     en: 'Microphone',
@@ -218,6 +226,10 @@ export const settingsPermissionsMessages = defineMessageSource({
   allowButton: {
     ru: 'Разрешить',
     en: 'Allow',
+  },
+  revokeButton: {
+    ru: 'Отозвать',
+    en: 'Revoke',
   },
   siteAccessAskMode: {
     ru: 'Спрашивать',

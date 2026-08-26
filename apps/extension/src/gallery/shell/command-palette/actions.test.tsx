@@ -26,15 +26,19 @@ function createActions(): UseGalleryAppActionsResult {
     importing: {
       cancelActiveImport: vi.fn(),
       closePendingImport: vi.fn(),
+      closePendingMediaImport: vi.fn(),
+      confirmMediaFileImport: vi.fn(),
       dismissActiveImport: vi.fn(),
       importBackup: vi.fn(),
       importSelectedFile: vi.fn(),
+      importMediaFiles: vi.fn(),
     },
     preview: {
       close: vi.fn(),
       copy: vi.fn(),
       download: vi.fn(),
       downloadOriginal: vi.fn(),
+      navigate: vi.fn(),
       openInEditor: vi.fn(),
       openSnapshotScreenshotInEditor: vi.fn(),
       resetChanges: vi.fn(),
@@ -45,10 +49,8 @@ function createActions(): UseGalleryAppActionsResult {
     selection: {
       applyTag: vi.fn(),
       deleteMany: vi.fn(),
+      downloadBackup: vi.fn(),
       downloadZip: vi.fn(),
-    },
-    storage: {
-      cleanup: vi.fn(),
     },
   };
 }
@@ -58,7 +60,6 @@ function findAction(actionId: string, overrides: Parameters<typeof createControl
   controller.actions.storage.refresh = vi.fn(async () => undefined);
   controller.actions.filters.setFolderFilter = vi.fn();
   controller.actions.filters.setSortMode = vi.fn();
-  controller.actions.surface.setShowStorageManager = vi.fn();
   const actions = createActions();
   const action = buildGalleryCommandPaletteActions(controller, actions).find(
     ({ id }) => id === actionId
@@ -72,15 +73,26 @@ function findAction(actionId: string, overrides: Parameters<typeof createControl
 }
 
 it('builds scenario-aware sort labels and folder toggles', () => {
-  const { action: scenarioSortAction } = findAction('gallery-filter-sort-size', {
+  const { action: scenarioSortAction } = findAction('gallery-filter-sort-name-asc', {
     folderFilter: 'scenario',
   });
-  const { action: mediaSortAction } = findAction('gallery-filter-sort-size');
+  const { action: mediaSortAction } = findAction('gallery-filter-sort-size-desc');
+  const { controller: scenarioController } = createController({ folderFilter: 'scenario' });
   const { action: scenarioFolderAction, controller } = findAction('gallery-filter-folder-scenario');
   const { action: webSnapshotFolderAction } = findAction('gallery-filter-folder-web-snapshot');
 
-  expect(scenarioSortAction.title).toBe('gallery.app.sortName');
-  expect(mediaSortAction.title).toBe('gallery.app.sortSize');
+  expect(scenarioSortAction.title).toBe('gallery.app.sortNameAsc');
+  expect(mediaSortAction.title).toBe('gallery.app.sortSizeDesc');
+  expect(
+    buildGalleryCommandPaletteActions(scenarioController, createActions()).some(
+      ({ id }) => id === 'gallery-filter-sort-size-desc'
+    )
+  ).toBe(false);
+  expect(
+    buildGalleryCommandPaletteActions(scenarioController, createActions()).some(
+      ({ id }) => id === 'gallery-filter-folder-export'
+    )
+  ).toBe(false);
   expect(webSnapshotFolderAction.icon).toBeTruthy();
 
   scenarioFolderAction.onSelect?.();
@@ -133,13 +145,16 @@ it('disables selection and preview actions without context and enables them when
   expect(unavailable.action.disabled).toBe(true);
 
   const originalDownload = findAction('gallery-preview-download-original', {
-    previewItem: createMediaItem({ id: 'image-original' }),
+    previewItem: createMediaItem({ id: 'image-original', imageContentState: 'edited' }),
   });
   const saveCopy = findAction('gallery-preview-save-copy', {
     previewItem: createMediaItem({ id: 'image-copy' }),
   });
   const restoreOriginal = findAction('gallery-preview-restore-original', {
-    previewItem: createMediaItem({ id: 'image-restore' }),
+    previewItem: createMediaItem({ id: 'image-restore', imageContentState: 'edited' }),
+  });
+  const pristineOriginalDownload = findAction('gallery-preview-download-original', {
+    previewItem: createMediaItem({ id: 'image-pristine', imageContentState: 'original' }),
   });
   originalDownload.action.onSelect?.();
   saveCopy.action.onSelect?.();
@@ -147,6 +162,22 @@ it('disables selection and preview actions without context and enables them when
   expect(originalDownload.actions.preview.downloadOriginal).toHaveBeenCalledOnce();
   expect(saveCopy.actions.preview.saveCopy).toHaveBeenCalledOnce();
   expect(restoreOriginal.actions.preview.restoreOriginal).toHaveBeenCalledOnce();
+  expect(pristineOriginalDownload.action.disabled).toBe(true);
+});
+
+it('keeps selected backup and original-only ZIP as separate commands', () => {
+  const backup = findAction('gallery-selection-download-backup', {
+    selectedItems: [createMediaItem()],
+  });
+  const zip = findAction('gallery-selection-download-zip', {
+    selectedItems: [createMediaItem()],
+  });
+
+  backup.action.onSelect?.();
+  zip.action.onSelect?.();
+
+  expect(backup.actions.selection.downloadBackup).toHaveBeenCalledTimes(1);
+  expect(zip.actions.selection.downloadZip).toHaveBeenCalledTimes(1);
 });
 
 it('marks active filters as current context and keeps disabled reasons on guarded actions', () => {

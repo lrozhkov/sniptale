@@ -39,6 +39,9 @@ class FakeVideoElement {
   }
 
   set currentTime(value: number) {
+    if (value === Number.MAX_SAFE_INTEGER && !Number.isFinite(this.duration)) {
+      this.duration = 20;
+    }
     this._currentTime = value;
     queueMicrotask(() => this.emit('seeked'));
   }
@@ -108,17 +111,20 @@ let createElementSpy: ReturnType<typeof vi.spyOn>;
 let createObjectURLSpy: ReturnType<typeof vi.spyOn>;
 let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>;
 let latestVideo: FakeVideoElement | null = null;
+let nextVideoDuration = 1;
 let originalCreateElement: typeof document.createElement;
 
 beforeEach(() => {
   FakeCanvasElement.reset();
   latestVideo = null;
+  nextVideoDuration = 1;
   originalCreateElement = document.createElement.bind(document);
   createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:video');
   revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
   createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
     if (tagName === 'video') {
       latestVideo = new FakeVideoElement();
+      latestVideo.duration = nextVideoDuration;
       return latestVideo as unknown as HTMLVideoElement;
     }
 
@@ -154,6 +160,16 @@ it('creates a video thumbnail blob and seeks into longer videos', async () => {
   );
   expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:video');
   expect(latestVideo?.src).toBe('');
+});
+
+it('probes WebM duration and captures a meaningful frame instead of the blank first frame', async () => {
+  const { createVideoThumbnailBlob } = await import('./video-thumbnails');
+  nextVideoDuration = Number.POSITIVE_INFINITY;
+
+  await createVideoThumbnailBlob(new Blob(['video'], { type: 'video/webm' }));
+
+  expect(latestVideo?.currentTime).toBe(2);
+  expect(FakeCanvasElement.lastContext?.drawImage).toHaveBeenCalledOnce();
 });
 
 it('skips seeking for very short videos', async () => {

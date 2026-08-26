@@ -109,9 +109,9 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Теги ещё не заданы.',
     en: 'No tags yet.',
   },
-  addTagPlaceholderSuffix: {
-    ru: ' тег',
-    en: ' tag',
+  tagInputPlaceholder: {
+    ru: 'Найти или создать тег',
+    en: 'Find or create tag',
   },
   zoomIn: {
     ru: 'Увеличить',
@@ -124,6 +124,50 @@ export const galleryPreviewMessages = defineMessageSource({
   resetZoom: {
     ru: 'Сбросить масштаб',
     en: 'Reset zoom',
+  },
+  previous: {
+    ru: 'Предыдущее',
+    en: 'Previous',
+  },
+  next: {
+    ru: 'Следующее',
+    en: 'Next',
+  },
+  videoLoading: {
+    ru: 'Подготовка видео…',
+    en: 'Preparing video…',
+  },
+  recordingRoleDisplay: {
+    ru: 'Экран или окно',
+    en: 'Screen or window',
+  },
+  recordingRoleWebcam: {
+    ru: 'Веб-камера',
+    en: 'Webcam',
+  },
+  recordingRoleMicrophone: {
+    ru: 'Микрофон',
+    en: 'Microphone',
+  },
+  recordingTrack: {
+    ru: 'Роль дорожки',
+    en: 'Track role',
+  },
+  recordingGroup: {
+    ru: 'Дорожек в группе:',
+    en: 'Tracks in group:',
+  },
+  multiTrackRecording: {
+    ru: 'Запись из нескольких источников',
+    en: 'Multi-track recording',
+  },
+  openRecordingGroup: {
+    ru: 'Открыть группу в видеоредакторе',
+    en: 'Open group in video editor',
+  },
+  openRecordingGroupShort: {
+    ru: 'Открыть в редакторе',
+    en: 'Open in editor',
   },
   openInEditor: {
     ru: 'Открыть в редакторе',
@@ -146,12 +190,12 @@ export const galleryPreviewMessages = defineMessageSource({
     en: 'This project is invalid and cannot be opened or rendered.',
   },
   unavailableProjectRecovery: {
-    ru: 'Можно удалить запись или включить её в экспорт backup для диагностики.',
-    en: 'You can delete the record or include it in a backup export for diagnostics.',
+    ru: 'Можно удалить этот материал или добавить его в резервную копию для диагностики.',
+    en: 'You can delete this item or include it in a backup for diagnostics.',
   },
   unavailableUnsupportedProject: {
-    ru: 'Legacy Engine1 проект не поддерживается и не может быть открыт или отрендерен.',
-    en: 'This legacy Engine1 project is unsupported and cannot be opened or rendered.',
+    ru: 'Проект создан в устаревшей версии редактора и больше не поддерживается.',
+    en: 'This project was created in an older editor version and is no longer supported.',
   },
   openSnapshot: {
     ru: `Открыть ${sharedWebSnapshotSingularNameMessage.ru}`,
@@ -164,6 +208,18 @@ export const galleryPreviewMessages = defineMessageSource({
   resetChanges: {
     ru: 'Отменить изменения',
     en: 'Reset changes',
+  },
+  actions: {
+    ru: 'Действия',
+    en: 'Actions',
+  },
+  fileActions: {
+    ru: 'Файл и копии',
+    en: 'File and copies',
+  },
+  changeActions: {
+    ru: 'Изменения',
+    en: 'Changes',
   },
   download: {
     ru: 'Скачать',
@@ -202,11 +258,7 @@ export const galleryPreviewMessages = defineMessageSource({
     en: 'Copy',
   },
   thumbnailAlt: {
-    ru: 'thumbnail',
-    en: 'thumbnail',
-  },
-  suggestionLabel: {
-    ru: 'совпадение',
-    en: 'match',
+    ru: 'Превью',
+    en: 'Preview',
   },
 });

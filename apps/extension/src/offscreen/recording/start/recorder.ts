@@ -14,6 +14,7 @@ import { buildRecordingFilename, finalizeRecording } from '../finalizer';
 import {
   getActiveSidecarVideoProfiles,
   getActiveSidecarWebcamSettings,
+  getActiveSidecarRecordingMetadata,
   startActiveSidecarRecorders,
   stopActiveSidecarRecordersWithFlush,
 } from '../sidecar';
@@ -27,6 +28,7 @@ import {
 } from '../encoding/live-artifact-session';
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
+import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 type RecordingSourceBinding = {
   generation: number;
@@ -136,6 +138,8 @@ export async function finalizeRecordingBootstrap(params: {
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
   sourceBinding?: RecordingSourceBinding;
+  sourceContext?: { favicon: string | null; title: string | null; url: string | null } | null;
+  sourceLabel?: string | null;
   transformFailure?: Promise<never> | null;
 }) {
   const videoStream = requireRecordingVideoStream();
@@ -188,6 +192,11 @@ export async function finalizeRecordingBootstrap(params: {
     displaySurface,
     durationTracker: params.durationTracker,
     recordingId: params.resolvedRecordingId,
+    recordingMetadata: {
+      dimensions: { height, width },
+      sourceContext: params.sourceContext ?? null,
+      sourceLabel: params.sourceLabel ?? null,
+    },
     videoStream,
     webcamSettings,
     transformFailure: params.transformFailure ?? null,
@@ -242,13 +251,55 @@ function attachOwnedVideoTrackEndedHandlers(
   return () => tracks.forEach((track) => track.removeEventListener('ended', onEnded));
 }
 
+function buildRecordingGroups(
+  recordingId: string,
+  recordingMetadata: {
+    dimensions: { height: number; width: number };
+    sourceContext: { favicon: string | null; title: string | null; url: string | null } | null;
+    sourceLabel: string | null;
+  },
+  sidecarMetadata: ReturnType<typeof getActiveSidecarRecordingMetadata>
+): Record<string, RecordingGroupMember> {
+  const groups: Record<string, RecordingGroupMember> = {
+    [recordingId]: {
+      dimensions: recordingMetadata.dimensions,
+      groupId: recordingId,
+      order: 0,
+      role: 'display',
+      ...(recordingMetadata.sourceContext
+        ? {
+            sourceFavicon: recordingMetadata.sourceContext.favicon,
+            sourceUrl: recordingMetadata.sourceContext.url,
+          }
+        : {}),
+      sourceLabel: recordingMetadata.sourceLabel,
+    },
+  };
+  sidecarMetadata.forEach((metadata, index) => {
+    groups[metadata.recordingId] = {
+      dimensions: metadata.dimensions,
+      groupId: recordingId,
+      order: index + 1,
+      role: metadata.role,
+      sourceLabel: metadata.sourceLabel,
+    };
+  });
+  return groups;
+}
+
 async function finalizeStoppedRecorder(
   recordingId: string,
-  primaryArtifact: FinalizedRecordingStagingArtifact
+  primaryArtifact: FinalizedRecordingStagingArtifact,
+  recordingMetadata: {
+    dimensions: { height: number; width: number };
+    sourceContext: { favicon: string | null; title: string | null; url: string | null } | null;
+    sourceLabel: string | null;
+  }
 ) {
   const resolveStop = recordingContext.stopRecordingResolve;
   const rejectStop = recordingContext.stopRecordingReject;
   try {
+    const sidecarMetadata = getActiveSidecarRecordingMetadata();
     const sidecarArtifacts = await stopActiveSidecarRecordersWithFlush();
     const staging = recordingContext.stagingCoordinator;
     if (!staging) throw new Error('Recording staging is unavailable during stop.');
@@ -256,6 +307,7 @@ async function finalizeStoppedRecorder(
       artifacts: [primaryArtifact, ...sidecarArtifacts],
       discard: recordingContext.discardOnStop,
       primaryRecordingId: recordingId,
+      recordingGroups: buildRecordingGroups(recordingId, recordingMetadata, sidecarMetadata),
       staging,
     });
     recordingContext.artifactSession = null;
@@ -286,6 +338,11 @@ function attachRecorderLifecycle(params: {
   displaySurface: (typeof VideoDisplaySurface)[keyof typeof VideoDisplaySurface] | null;
   durationTracker: typeof recordingContext.durationTracker;
   recordingId: string;
+  recordingMetadata: {
+    dimensions: { height: number; width: number };
+    sourceContext: { favicon: string | null; title: string | null; url: string | null } | null;
+    sourceLabel: string | null;
+  };
   videoStream: MediaStream;
   webcamSettings: ReturnType<typeof getActiveSidecarWebcamSettings>;
   transformFailure: Promise<never> | null;
@@ -367,7 +424,7 @@ function attachRecorderLifecycle(params: {
         return;
       }
       if (beginTerminalHandling()) {
-        await finalizeStoppedRecorder(recordingId, artifact);
+        await finalizeStoppedRecorder(recordingId, artifact, params.recordingMetadata);
       }
     },
   });

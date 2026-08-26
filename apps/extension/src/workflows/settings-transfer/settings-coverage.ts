@@ -223,6 +223,16 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     ['access.capture-assets']
   ),
   excluded(
+    'system/access-data/permissions/useSettingsPermissions/requests/request-actions/request-origin.ts',
+    ['setLocalFileAccessOptIn'],
+    'action/status'
+  ),
+  excluded(
+    'system/access-data/permissions/useSettingsPermissions/requests/use-permission-revokes.ts',
+    ['setLocalFileAccessOptIn'],
+    'action/status'
+  ),
+  excluded(
     'system/access-data/privacy/index.tsx',
     ['requestLocalExtensionDataErasure'],
     'action/status'

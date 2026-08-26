@@ -14,7 +14,7 @@ import type { EditorInspectorConfirmDialogState } from '../content/types';
 export interface SidebarActionArgs {
   activeTool: EditorTool;
   browserFrame: BrowserFrameState;
-  confirmOpenStorageManager: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
+  confirmOpenLibrary: (dialog: EditorInspectorConfirmDialogState) => Promise<boolean>;
   defaultImagePresetId: string | null;
   frameDraft: EditorFrameSettings;
   savePresets: SavePreset[];

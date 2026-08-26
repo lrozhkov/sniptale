@@ -1,12 +1,32 @@
 import { GRID_GAP, GRID_ROW_HEIGHT_BY_MODE } from '../constants';
-import { isGallerySelectableItem, type GalleryItem } from '../items';
-import { getKindIcon, MediaThumb } from '../ui';
+import { isGalleryMediaItem, isGallerySelectableItem, type GalleryItem } from '../items';
+import {
+  formatDate,
+  getGalleryItemKindLabel,
+  getKindIcon,
+  getRecordingGroupRoleLabel,
+  MediaThumb,
+} from '../ui';
 import { GalleryGridDetails, GalleryListDetails } from './grid-card-details';
 import type { GalleryMainContentProps } from './types';
+import { translate } from '../../../platform/i18n';
+import { Image as ImageIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
+
+const GALLERY_LIST_LAYOUT_STYLE = {
+  gridTemplateColumns: '32px 32px 48px minmax(240px, 2.2fr) minmax(100px, 1fr) 132px 88px',
+} satisfies CSSProperties;
+
+const GALLERY_LIST_ROW_CLASS_NAME = [
+  'grid min-w-[860px] items-center gap-3 px-3 py-2.5',
+  'border-b border-[var(--sniptale-color-border-soft)] last:border-b-0',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
+].join(' ');
 
 type GalleryPreviewOpenHandler = (
   item: GalleryItem,
@@ -22,19 +42,64 @@ type GalleryGridCardProps = {
   viewMode: GalleryMainContentProps['viewMode'];
 };
 
+type GalleryListUnit =
+  | { kind: 'item'; item: GalleryItem }
+  | { groupId: string; items: GalleryItem[]; kind: 'recording-group'; memberCount: number };
+
+function buildGalleryListUnits(items: GalleryItem[]): GalleryListUnit[] {
+  const groupedItems = new Map<string, GalleryItem[]>();
+  items.forEach((item) => {
+    if (!isGalleryMediaItem(item) || !item.recordingGroupView) return;
+    const members = groupedItems.get(item.recordingGroupView.groupId) ?? [];
+    members.push(item);
+    groupedItems.set(item.recordingGroupView.groupId, members);
+  });
+  groupedItems.forEach((members) => {
+    members.sort((left, right) => {
+      if (!isGalleryMediaItem(left) || !isGalleryMediaItem(right)) return 0;
+      return (left.recordingGroupView?.order ?? 0) - (right.recordingGroupView?.order ?? 0);
+    });
+  });
+
+  const emittedGroups = new Set<string>();
+  return items.flatMap((item): GalleryListUnit[] => {
+    if (!isGalleryMediaItem(item) || !item.recordingGroupView) {
+      return [{ item, kind: 'item' }];
+    }
+    const { groupId, memberCount } = item.recordingGroupView;
+    if (emittedGroups.has(groupId)) return [];
+    emittedGroups.add(groupId);
+    return [
+      {
+        groupId,
+        items: groupedItems.get(groupId) ?? [item],
+        kind: 'recording-group',
+        memberCount,
+      },
+    ];
+  });
+}
+
 function getGalleryGridCardClassName(
   selected: boolean,
   viewMode: GalleryMainContentProps['viewMode']
 ) {
   return cx(
-    'group overflow-hidden rounded-[16px] border',
-    'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
-    'color-mix(in_srgb,var(--sniptale-color-surface-canvas)_84%,transparent))]',
-    'shadow-sm transition',
+    'group overflow-hidden transition',
+    viewMode === 'list'
+      ? GALLERY_LIST_ROW_CLASS_NAME
+      : [
+          'rounded-[var(--sniptale-radius-lg)] border',
+          'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
+          'color-mix(in_srgb,var(--sniptale-color-surface-canvas)_84%,transparent))]',
+          'shadow-sm',
+        ].join(' '),
     selected
-      ? 'border-[var(--sniptale-color-border-accent-strong)]'
-      : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]',
-    viewMode === 'list' && 'px-4 py-3'
+      ? viewMode === 'list'
+        ? 'bg-[var(--sniptale-color-accent-soft)]'
+        : 'border-[var(--sniptale-color-border-accent-strong)]'
+      : viewMode !== 'list' &&
+          'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]'
   );
 }
 
@@ -70,13 +135,14 @@ function GalleryGridCardMedia(
       className={cx(
         'relative overflow-hidden bg-[var(--sniptale-color-surface-canvas)]',
         isList
-          ? 'h-12 w-12 shrink-0 rounded-[12px] border border-[var(--sniptale-color-border-soft)]'
+          ? 'h-12 w-12 shrink-0 rounded-[var(--sniptale-radius-md)] border border-[var(--sniptale-color-border-soft)]'
           : 'aspect-[16/10]'
       )}
+      role={isList ? 'cell' : undefined}
     >
       <button
         type="button"
-        onClick={() => props.onPreviewOpen(props.item, { inspectorCollapsed: true })}
+        onClick={() => props.onPreviewOpen(props.item)}
         className="absolute inset-0 z-0 cursor-pointer"
         aria-label={props.item.filename}
         title={props.item.filename}
@@ -89,7 +155,7 @@ function GalleryGridCardMedia(
         onToggleSelection={props.onToggleSelection}
         selected={props.selected}
       />
-      <GalleryGridCardKindBadge isList={isList} kind={props.item.kind} />
+      {!isList ? <GalleryGridCardKindBadge kind={props.item.kind} /> : null}
     </div>
   );
 }
@@ -109,6 +175,8 @@ function GalleryGridCardSelectionControl(props: {
     <div className="absolute left-3 top-3 z-10">
       <button
         type="button"
+        aria-label={translate('gallery.app.selectItem')}
+        aria-pressed={props.selected}
         onClick={(event) =>
           props.onToggleSelection(props.itemId, {
             shiftKey: event.shiftKey,
@@ -122,7 +190,7 @@ function GalleryGridCardSelectionControl(props: {
   );
 }
 
-function GalleryGridCardKindBadge(props: { isList: boolean; kind: GalleryItem['kind'] }) {
+function GalleryGridCardKindBadge(props: { kind: GalleryItem['kind'] }) {
   const Icon = getKindIcon(props.kind);
 
   return (
@@ -132,10 +200,26 @@ function GalleryGridCardKindBadge(props: { isList: boolean; kind: GalleryItem['k
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]',
         'text-[var(--sniptale-color-text-secondary)]',
-        props.isList ? 'right-2 top-2 h-6 w-6' : 'right-3 top-3 h-8 w-8'
+        'right-3 top-3 h-8 w-8'
       )}
     >
-      <Icon className={props.isList ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+      <Icon className="h-4 w-4" />
+    </div>
+  );
+}
+
+function GalleryListKindCell({ item }: { item: GalleryItem }) {
+  const Icon = getKindIcon(item.kind);
+  const label = getGalleryItemKindLabel(item.kind);
+
+  return (
+    <div
+      className="flex h-8 w-8 items-center justify-center text-[var(--sniptale-color-text-secondary)]"
+      title={label}
+      aria-label={label}
+      role="cell"
+    >
+      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
     </div>
   );
 }
@@ -145,26 +229,39 @@ function GalleryGridCard(props: GalleryGridCardProps) {
 
   return (
     <article
-      style={props.style ? { position: 'absolute', ...props.style } : undefined}
+      style={
+        isList
+          ? { ...GALLERY_LIST_LAYOUT_STYLE, ...props.style }
+          : props.style
+            ? { position: 'absolute', ...props.style }
+            : undefined
+      }
       className={getGalleryGridCardClassName(props.selected, props.viewMode)}
+      role={isList ? 'row' : undefined}
+      data-ui={isList ? 'gallery.list.row' : undefined}
     >
       {isList ? (
-        <div className="flex items-center gap-3">
-          {isGallerySelectableItem(props.item) ? (
-            <button
-              type="button"
-              onClick={(event) =>
-                props.onToggleSelection(props.item.id, {
-                  shiftKey: event.shiftKey,
-                })
-              }
-              className={getGallerySelectionButtonClassName(props.selected, true)}
-            >
-              {props.selected ? '✓' : ''}
-            </button>
-          ) : (
-            <div className="h-8 w-8 shrink-0" />
-          )}
+        <>
+          <div className="flex items-center justify-center" role="cell">
+            {isGallerySelectableItem(props.item) ? (
+              <button
+                type="button"
+                aria-label={translate('gallery.app.selectItem')}
+                aria-pressed={props.selected}
+                onClick={(event) =>
+                  props.onToggleSelection(props.item.id, {
+                    shiftKey: event.shiftKey,
+                  })
+                }
+                className={getGallerySelectionButtonClassName(props.selected, true)}
+              >
+                {props.selected ? '✓' : ''}
+              </button>
+            ) : (
+              <div className="h-8 w-8 shrink-0" />
+            )}
+          </div>
+          <GalleryListKindCell item={props.item} />
           <GalleryGridCardMedia
             item={props.item}
             onPreviewOpen={props.onPreviewOpen}
@@ -173,7 +270,7 @@ function GalleryGridCard(props: GalleryGridCardProps) {
             viewMode={props.viewMode}
           />
           <GalleryListDetails item={props.item} onPreviewOpen={props.onPreviewOpen} />
-        </div>
+        </>
       ) : (
         <>
           <GalleryGridCardMedia
@@ -183,9 +280,159 @@ function GalleryGridCard(props: GalleryGridCardProps) {
             selected={props.selected}
             viewMode={props.viewMode}
           />
-          <GalleryGridDetails item={props.item} onPreviewOpen={props.onPreviewOpen} />
+          <GalleryGridDetails
+            compact={props.viewMode === 'compact-grid'}
+            item={props.item}
+            onPreviewOpen={props.onPreviewOpen}
+          />
         </>
       )}
+    </article>
+  );
+}
+
+function getRecordingGroupItems(items: GalleryItem[], representative: GalleryItem) {
+  if (!isGalleryMediaItem(representative) || !representative.recordingGroupView) {
+    return [];
+  }
+  const groupId = representative.recordingGroupView.groupId;
+
+  return items
+    .filter(isGalleryMediaItem)
+    .filter((item) => item.recordingGroupView?.groupId === groupId)
+    .sort(
+      (left, right) =>
+        (left.recordingGroupView?.order ?? 0) - (right.recordingGroupView?.order ?? 0)
+    );
+}
+
+function GalleryRecordingGroupGridCard(props: {
+  items: GalleryItem[];
+  onPreviewOpen: GalleryPreviewOpenHandler;
+  onRecordingGroupOpen?: (item: GalleryItem) => void;
+  onToggleSelection: GalleryGridCardProps['onToggleSelection'];
+  selectedIds: Set<string>;
+  style: GalleryGridCardProps['style'];
+  viewMode: GalleryGridCardProps['viewMode'];
+}) {
+  const selectableItems = props.items.filter(isGallerySelectableItem);
+  const allSelected =
+    selectableItems.length > 0 && selectableItems.every((item) => props.selectedIds.has(item.id));
+  const editorItem = props.items.find(
+    (item) => isGalleryMediaItem(item) && Boolean(item.recordingGroupView?.projectId)
+  );
+  const totalSize = props.items.reduce((total, item) => total + item.size, 0);
+  const firstItem = props.items[0];
+  const projectName = props.items.find(isGalleryMediaItem)?.recordingGroupView?.projectName;
+
+  if (!firstItem) return null;
+
+  return (
+    <article
+      style={props.style ? { position: 'absolute', ...props.style } : undefined}
+      data-ui="gallery.recording-group.card"
+      className={cx(
+        'group overflow-hidden rounded-[var(--sniptale-radius-lg)] border shadow-sm transition',
+        'border-[var(--sniptale-color-border-accent-soft)]',
+        'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-accent-soft)_34%,transparent),',
+        'color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent))]',
+        allSelected && 'border-[var(--sniptale-color-border-accent-strong)]'
+      )}
+    >
+      <div
+        className="relative grid aspect-[16/10] overflow-hidden bg-[var(--sniptale-color-surface-canvas)]"
+        style={{
+          gridTemplateColumns: `repeat(${Math.min(3, Math.max(1, props.items.length))}, minmax(0, 1fr))`,
+        }}
+      >
+        {props.items.map((item) => {
+          const role = isGalleryMediaItem(item)
+            ? getRecordingGroupRoleLabel(item.recordingGroupView?.role ?? 'display')
+            : getGalleryItemKindLabel(item.kind);
+          const sourceLabel = isGalleryMediaItem(item)
+            ? item.recordingGroupView?.sourceLabel
+            : null;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => props.onPreviewOpen(item)}
+              aria-label={`${role}: ${sourceLabel ?? item.filename}`}
+              className="relative min-h-0 min-w-0 cursor-pointer overflow-hidden border-r
+                border-[var(--sniptale-color-border-soft)] last:border-r-0"
+            >
+              <MediaThumb item={item} />
+              <span
+                className="absolute inset-x-1.5 bottom-1.5 rounded-[6px]
+                  bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_82%,transparent)]
+                  px-2 py-1 text-left text-[10px] leading-tight text-[var(--sniptale-color-text-primary)]"
+              >
+                <span className="block truncate font-semibold">{role}</span>
+                {sourceLabel ? (
+                  <span className="mt-0.5 block truncate text-[var(--sniptale-color-text-muted)]">
+                    {sourceLabel}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
+        <div className="absolute left-3 top-3 z-10">
+          <button
+            type="button"
+            aria-label={translate('gallery.app.selectRecordingGroup')}
+            aria-pressed={allSelected}
+            onClick={() => {
+              selectableItems.forEach((item) => {
+                if (allSelected || !props.selectedIds.has(item.id)) {
+                  props.onToggleSelection(item.id);
+                }
+              });
+            }}
+            className={getGallerySelectionButtonClassName(allSelected)}
+          >
+            {allSelected ? '✓' : ''}
+          </button>
+        </div>
+      </div>
+      <div className="px-4 py-3.5">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+              {projectName ?? translate('gallery.preview.multiTrackRecording')}
+            </div>
+            <div className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
+              {translate('gallery.preview.multiTrackRecording')} ·{' '}
+              {translate('gallery.preview.recordingGroup')} {props.items.length}
+            </div>
+          </div>
+          {props.onRecordingGroupOpen && editorItem ? (
+            <button
+              type="button"
+              onClick={() => props.onRecordingGroupOpen?.(editorItem)}
+              className="shrink-0 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
+                px-2.5 py-1.5 text-xs font-semibold text-[var(--sniptale-color-accent-emphasis)]
+                hover:border-[var(--sniptale-color-border-strong)]"
+            >
+              {translate('gallery.preview.openRecordingGroupShort')}
+            </button>
+          ) : null}
+        </div>
+        <div
+          className="mt-2 flex items-center justify-between gap-2 whitespace-nowrap text-xs
+            text-[var(--sniptale-color-text-muted)]"
+        >
+          <span className="shrink-0">{formatDate(firstItem.createdAt)}</span>
+          <span className="shrink-0">
+            {totalSize > 0
+              ? props.viewMode === 'compact-grid'
+                ? formatCompactBytes(totalSize)
+                : formatBytes(totalSize)
+              : '—'}
+          </span>
+        </div>
+      </div>
     </article>
   );
 }
@@ -193,21 +440,118 @@ function GalleryGridCard(props: GalleryGridCardProps) {
 export function GalleryMediaList(
   props: Pick<
     GalleryMainContentProps,
-    'filteredItems' | 'onPreviewOpen' | 'onToggleSelection' | 'selectedIds'
+    'filteredItems' | 'onPreviewOpen' | 'onRecordingGroupOpen' | 'onToggleSelection' | 'selectedIds'
   >
 ) {
+  const units = buildGalleryListUnits(props.filteredItems);
+
   return (
-    <div className="grid gap-2">
-      {props.filteredItems.map((item) => (
-        <GalleryGridCard
-          key={item.id}
-          item={item}
-          onPreviewOpen={props.onPreviewOpen}
-          onToggleSelection={props.onToggleSelection}
-          selected={props.selectedIds.has(item.id)}
-          viewMode="list"
-        />
-      ))}
+    <div className="min-w-[860px]" role="table">
+      <div
+        data-ui="gallery.list.header"
+        style={GALLERY_LIST_LAYOUT_STYLE}
+        className={cx(
+          'sticky top-0 z-10 grid items-center gap-3',
+          'border-b border-[var(--sniptale-color-border-strong)]',
+          'bg-[var(--sniptale-color-surface-panel)] px-3 pb-2 pt-1',
+          'text-[11px] font-semibold uppercase tracking-wide',
+          'text-[var(--sniptale-color-text-muted)]'
+        )}
+        role="row"
+      >
+        <span className="min-w-0" role="columnheader">
+          <span className="sr-only">{translate('gallery.app.listColumnSelection')}</span>
+        </span>
+        <span className="min-w-0 truncate text-center" role="columnheader">
+          {translate('gallery.app.listColumnType')}
+        </span>
+        <span className="flex min-w-0 items-center justify-center" role="columnheader">
+          <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">{translate('gallery.app.listColumnPreview')}</span>
+        </span>
+        <span className="min-w-0 truncate" role="columnheader">
+          {translate('gallery.app.listColumnName')}
+        </span>
+        <span className="min-w-0 truncate" role="columnheader">
+          {translate('gallery.app.listColumnTags')}
+        </span>
+        <span className="min-w-0 truncate" role="columnheader">
+          {translate('gallery.app.listColumnCreated')}
+        </span>
+        <span className="min-w-0 truncate text-right" role="columnheader">
+          {translate('gallery.app.listColumnSize')}
+        </span>
+      </div>
+      {units.map((unit) => {
+        if (unit.kind === 'item') {
+          return (
+            <GalleryGridCard
+              key={unit.item.id}
+              item={unit.item}
+              onPreviewOpen={props.onPreviewOpen}
+              onToggleSelection={props.onToggleSelection}
+              selected={props.selectedIds.has(unit.item.id)}
+              viewMode="list"
+            />
+          );
+        }
+        const editorItem = unit.items.find(
+          (item) => isGalleryMediaItem(item) && Boolean(item.recordingGroupView?.projectId)
+        );
+        const projectName = unit.items.find(isGalleryMediaItem)?.recordingGroupView?.projectName;
+
+        return (
+          <div
+            key={unit.groupId}
+            className="my-2 overflow-hidden rounded-[8px] border
+              border-[var(--sniptale-color-border-accent-soft)]
+              bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_28%,transparent)]"
+            role="rowgroup"
+          >
+            <div
+              style={GALLERY_LIST_LAYOUT_STYLE}
+              className={cx('grid min-w-[860px] items-center gap-3 px-3 py-2')}
+              role="row"
+            >
+              <div
+                className="col-span-full flex items-center justify-between gap-3 text-xs"
+                role="cell"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-semibold text-[var(--sniptale-color-text-primary)]">
+                    {projectName ?? translate('gallery.preview.multiTrackRecording')}
+                  </span>
+                  <span className="shrink-0 text-[var(--sniptale-color-text-muted)]">
+                    {translate('gallery.preview.multiTrackRecording')} ·{' '}
+                    {translate('gallery.preview.recordingGroup')} {unit.memberCount}
+                  </span>
+                </div>
+                {props.onRecordingGroupOpen && editorItem ? (
+                  <button
+                    type="button"
+                    className="shrink-0 font-semibold text-[var(--sniptale-color-accent-emphasis)]
+                      hover:underline focus-visible:outline-none focus-visible:ring-2
+                      focus-visible:ring-[var(--sniptale-color-focus-ring)]"
+                    onClick={() => props.onRecordingGroupOpen?.(editorItem)}
+                  >
+                    {translate('gallery.preview.openRecordingGroupShort')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {unit.items.map((item) => (
+              <GalleryGridCard
+                key={item.id}
+                item={item}
+                onPreviewOpen={props.onPreviewOpen}
+                onToggleSelection={props.onToggleSelection}
+                selected={props.selectedIds.has(item.id)}
+                viewMode="list"
+              />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -247,9 +591,11 @@ function resolveGalleryGridCardStyle(args: {
 export function GalleryGridCanvas(
   props: Pick<
     GalleryMainContentProps,
+    | 'filteredItems'
     | 'gridMetrics'
     | 'gridWidth'
     | 'onPreviewOpen'
+    | 'onRecordingGroupOpen'
     | 'onToggleSelection'
     | 'selectedIds'
     | 'viewMode'
@@ -272,6 +618,30 @@ export function GalleryGridCanvas(
     >
       {props.visibleItems.map((item, index) => {
         const absoluteIndex = gridMetrics.startRow * gridMetrics.columnCount + index;
+        const groupItems = getRecordingGroupItems(props.filteredItems, item);
+        const style = resolveGalleryGridCardStyle({
+          absoluteIndex,
+          cardWidth,
+          columnCount: gridMetrics.columnCount,
+          rowHeight,
+        });
+
+        if (groupItems.length > 0) {
+          return (
+            <GalleryRecordingGroupGridCard
+              key={`recording-group:${isGalleryMediaItem(item) ? item.recordingGroupView?.groupId : item.id}`}
+              items={groupItems}
+              onPreviewOpen={onPreviewOpen}
+              {...(props.onRecordingGroupOpen
+                ? { onRecordingGroupOpen: props.onRecordingGroupOpen }
+                : {})}
+              onToggleSelection={onToggleSelection}
+              selectedIds={selectedIds}
+              style={style}
+              viewMode={viewMode}
+            />
+          );
+        }
 
         return (
           <GalleryGridCard
@@ -280,12 +650,7 @@ export function GalleryGridCanvas(
             onPreviewOpen={onPreviewOpen}
             onToggleSelection={onToggleSelection}
             selected={selectedIds.has(item.id)}
-            style={resolveGalleryGridCardStyle({
-              absoluteIndex,
-              cardWidth,
-              columnCount: gridMetrics.columnCount,
-              rowHeight,
-            })}
+            style={style}
             viewMode={viewMode}
           />
         );

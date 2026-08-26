@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { initialPermissions, type PermissionInfo } from '../permissions-lib';
 
@@ -12,11 +12,15 @@ import { usePermissionRequests } from './requests/use-permission-requests';
  */
 export function useSettingsPermissions() {
   const [permissions, setPermissions] = useState<PermissionInfo[]>(initialPermissions);
-  const refreshPermissions = usePermissionRefresh(permissions, setPermissions);
+  const runPermissionRefresh = usePermissionRefresh(setPermissions);
+  const refreshPermissions = useCallback(
+    () => runPermissionRefresh(permissions),
+    [permissions, runPermissionRefresh]
+  );
   const requestPermission = usePermissionRequests(permissions, setPermissions);
   const revokePermission = usePermissionRevokes(permissions, setPermissions);
 
-  usePermissionListeners(setPermissions);
+  usePermissionListeners(runPermissionRefresh, setPermissions);
 
   return { permissions, refreshPermissions, requestPermission, revokePermission };
 }

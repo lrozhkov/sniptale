@@ -103,6 +103,7 @@ it('releases only the recording-owned webcam lease during normal stop', async ()
     recorder: {} as MediaRecorder,
     recordingId: webcamArtifact.artifactId,
     release: webcamRelease,
+    sourceLabel: 'Desk camera',
     stream: createTrackedStream(),
     trackSettings: { height: 720, width: 1280 },
   };

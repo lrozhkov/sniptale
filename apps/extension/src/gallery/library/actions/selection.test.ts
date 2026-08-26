@@ -2,26 +2,21 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  createCleanupGroup,
   createController,
   createMediaItem,
   createScenarioItem,
   createVideoProjectItem,
   runBusyAction,
 } from './test-support/index';
-import {
-  createApplySelectionTagAction,
-  createDeleteManyAction,
-  createSelectionZipAction,
-  createStorageCleanupAction,
-} from './selection';
+import { createApplySelectionTagAction, createDeleteManyAction } from './selection';
+import { createSelectionBackupAction, createSelectionZipAction } from './selection-export';
+import { translate } from '../../../platform/i18n';
 
 const {
   addMediaLibraryEntryTagsSafelyMock,
   deleteMediaLibraryAssetsBatchSafelyMock,
   deletePersistedVideoProjectMock,
   deleteScenarioProjectRecordMock,
-  deleteStorageCleanupCandidatesSafelyMock,
   getMediaAssetBlobMock,
   updateScenarioProjectRecordMetadataMock,
 } = vi.hoisted(() => ({
@@ -29,7 +24,6 @@ const {
   deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
   deletePersistedVideoProjectMock: vi.fn(),
   deleteScenarioProjectRecordMock: vi.fn(),
-  deleteStorageCleanupCandidatesSafelyMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
   updateScenarioProjectRecordMetadataMock: vi.fn(),
 }));
@@ -38,7 +32,6 @@ vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../workflows/media-hub/store')>()),
   addMediaLibraryEntryTagsSafely: addMediaLibraryEntryTagsSafelyMock,
   deleteMediaLibraryAssetsBatchSafely: deleteMediaLibraryAssetsBatchSafelyMock,
-  deleteStorageCleanupCandidatesSafely: deleteStorageCleanupCandidatesSafelyMock,
 }));
 
 vi.mock('../../../workflows/media-hub/video-projects', () => ({
@@ -70,15 +63,13 @@ describe('gallery app action no-op branches', () => {
     vi.restoreAllMocks();
   });
 
-  it('skips confirm dialogs and storage work when delete or cleanup targets are empty', async () => {
+  it('skips confirm dialogs and storage work when delete targets are empty', async () => {
     const { controller, getConfirmDialog } = createController();
 
     await createDeleteManyAction(controller)([], runBusyAction);
-    await createStorageCleanupAction(controller)(createCleanupGroup({ items: [] }), runBusyAction);
 
     expect(getConfirmDialog()).toBeNull();
     expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
-    expect(deleteStorageCleanupCandidatesSafelyMock).not.toHaveBeenCalled();
   });
 
   it('skips zip and tag updates when selection state is missing', async () => {
@@ -87,6 +78,7 @@ describe('gallery app action no-op branches', () => {
       selectionTagDraft: 'existing',
     });
 
+    await createSelectionBackupAction(controller)(runBusyAction);
     await createSelectionZipAction(controller)(runBusyAction);
     await createApplySelectionTagAction(controller)(runBusyAction);
 
@@ -95,7 +87,7 @@ describe('gallery app action no-op branches', () => {
   });
 });
 
-describe('gallery app selection cleanup and delete flows', () => {
+describe('gallery app selection delete flows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -115,35 +107,19 @@ describe('gallery app selection cleanup and delete flows', () => {
     });
 
     await createDeleteManyAction(controller)(selectedItems, runBusyAction);
-    await getConfirmDialog()?.onConfirm();
+    const confirmDialog = getConfirmDialog();
+    expect(confirmDialog).toMatchObject({
+      message: translate('gallery.app.deleteSelectedConfirm'),
+      title: translate('gallery.app.deleteConfirmTitle'),
+    });
+    expect(confirmDialog?.message).not.toMatch(/\d+\s+элемент/);
+    await confirmDialog?.onConfirm();
 
     expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(['asset-1']);
     expect(deleteScenarioProjectRecordMock).toHaveBeenCalledWith('scenario-1');
     expect(deletePersistedVideoProjectMock).toHaveBeenCalledWith('video-project-1');
     expect(getState().selection.selectedIds.size).toBe(0);
     expect(getState().preview.session.item).toBeNull();
-    expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('passes typed cleanup candidates to the storage cleanup lifecycle owner', async () => {
-    const { controller, getConfirmDialog } = createController();
-    const group = createCleanupGroup({
-      items: [
-        {
-          createdAt: 1,
-          filename: 'orphan.bin',
-          id: 'orphan-1',
-          kind: 'recording',
-          size: 10,
-          target: 'recording',
-        },
-      ],
-    });
-
-    await createStorageCleanupAction(controller)(group, runBusyAction);
-    await getConfirmDialog()?.onConfirm();
-
-    expect(deleteStorageCleanupCandidatesSafelyMock).toHaveBeenCalledWith(group.items);
     expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
   });
 });
@@ -172,6 +148,17 @@ describe('gallery app selection metadata and archive flows', () => {
     });
     expect(getState().selection.selectionTagDraft).toBe('');
     expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the tag selected from suggestions instead of the stale input draft', async () => {
+    const { controller } = createController({
+      selectedItems: [createMediaItem({ entityId: 'asset-1', tags: [] })],
+      selectionTagDraft: 'stale draft',
+    });
+
+    await createApplySelectionTagAction(controller)(runBusyAction, 'existing-tag');
+
+    expect(addMediaLibraryEntryTagsSafelyMock).toHaveBeenCalledWith('asset-1', ['existing-tag']);
   });
 
   it('starts independent selection tag updates before either update completes', async () => {

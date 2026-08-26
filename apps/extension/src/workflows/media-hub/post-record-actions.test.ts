@@ -22,23 +22,16 @@ beforeEach(() => {
   mocks.openGalleryPage.mockReset();
 });
 
-it('opens a draft recording in the temporary gallery scope', async () => {
-  mocks.getRecording.mockResolvedValue({
-    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
-  });
-
+it('opens a draft recording without narrowing the visible gallery scope', async () => {
   await openLatestRecordingInGallery('recording-draft');
 
-  expect(mocks.openGalleryPage).toHaveBeenCalledWith({
-    recordingId: 'recording-draft',
-    scope: 'temporary',
-  });
+  expect(mocks.openGalleryPage).toHaveBeenCalledWith({ recordingId: 'recording-draft' });
+  expect(mocks.getRecording).not.toHaveBeenCalled();
 });
 
-it('keeps the default gallery scope when lifecycle metadata is unavailable', async () => {
-  mocks.getRecording.mockResolvedValue(undefined);
-
+it('keeps the default gallery scope without loading recording metadata', async () => {
   await openLatestRecordingInGallery('recording-saved');
 
   expect(mocks.openGalleryPage).toHaveBeenCalledWith({ recordingId: 'recording-saved' });
+  expect(mocks.getRecording).not.toHaveBeenCalled();
 });

@@ -27,11 +27,13 @@ const {
 }));
 
 vi.mock('./selectors', () => ({
+  collapseGalleryRecordingGroups: vi.fn((items: unknown[]) => items),
   getActiveStorageBarClass: getActiveStorageBarClassMock,
   getAllGalleryTags: getAllGalleryTagsMock,
   getFilteredGalleryItems: getFilteredGalleryItemsMock,
   getFilteredScenarioProjects: vi.fn(() => []),
   getGalleryCounts: getGalleryCountsMock,
+  getGalleryFacets: vi.fn(() => []),
   getGalleryGridMetrics: getGalleryGridMetricsMock,
 }));
 vi.mock('./useGalleryFilterState', () => ({ useGalleryFilterState: useGalleryFilterStateMock }));
@@ -96,46 +98,48 @@ it('opens the requested recording preview from the recordingId route parameter',
     kind: 'video',
     source: { kind: 'recording', recordingId: 'rec-7' },
   });
-  getFilteredGalleryItemsMock.mockReturnValue([recordingItem]);
+  configureGalleryOwnerMocks('library', [recordingItem, createItem({ id: 'other' })]);
 
   renderHook();
 
-  expect(galleryActionMocks.setFolderFilter).toHaveBeenCalledWith('recording');
+  expect(galleryActionMocks.setFolderFilter).not.toHaveBeenCalled();
   expect(galleryActionMocks.setPreview).toHaveBeenCalledWith({
     inspectorCollapsed: false,
     item: recordingItem,
     url: null,
   });
+  expect(window.location.search).toBe('');
 });
 
-it('opens the requested draft recording after filtering the temporary scope', () => {
+it('opens a requested draft from the complete catalog without retaining route filters', () => {
   window.history.replaceState(
     null,
     '',
     '/gallery.html?folder=recording&recordingId=rec-draft&scope=temporary'
   );
-  configureGalleryOwnerMocks('temporary');
   const recordingItem = createItem({
     id: 'recording:rec-draft',
     kind: 'video',
     lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
     source: { kind: 'recording', recordingId: 'rec-draft' },
   });
-  getFilteredGalleryItemsMock.mockReturnValue([recordingItem]);
+  configureGalleryOwnerMocks('library', [createItem({ id: 'saved' }), recordingItem]);
 
   renderHook();
 
-  expect(getFilteredGalleryItemsMock).toHaveBeenCalledWith(
-    expect.objectContaining({ scope: 'temporary' })
-  );
+  expect(galleryActionMocks.setFolderFilter).not.toHaveBeenCalled();
   expect(galleryActionMocks.setPreview).toHaveBeenCalledWith({
     inspectorCollapsed: false,
     item: recordingItem,
     url: null,
   });
+  expect(window.location.search).toBe('');
 });
 
-function configureGalleryOwnerMocks(scope: 'library' | 'temporary' = 'library'): void {
+function configureGalleryOwnerMocks(
+  scope: 'library' | 'temporary' = 'library',
+  items = [createItem()]
+): void {
   useGalleryFilterStateMock.mockReturnValue({
     actions: { setFolderFilter: galleryActionMocks.setFolderFilter },
     state: {
@@ -164,13 +168,16 @@ function configureGalleryOwnerMocks(scope: 'library' | 'temporary' = 'library'):
   });
   useGalleryStorageWorkflowMock.mockReturnValue({
     actions: {},
-    library: { items: [createItem()], refresh: vi.fn() },
+    library: { items, refresh: vi.fn() },
     state: { isBusy: false, isLoading: false },
   });
   useGalleryViewportStateMock.mockReturnValue({
     gridViewportRef: { current: null },
     gridWidth: 1024,
     importInputRef: { current: null },
+    importTriggerRef: { current: null },
+    mediaImportInputRef: { current: null },
+    mediaImportTriggerRef: { current: null },
     scrollTop: 0,
     setGridWidth: vi.fn(),
     setScrollTop: vi.fn(),

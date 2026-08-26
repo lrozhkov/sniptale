@@ -222,6 +222,28 @@ function verifiesWildcardResourceViolation() {
   ]);
 }
 
+function verifiesWebAccessibleResourceMatchPathViolation() {
+  const root = createTempRoot();
+  const manifest = createBaseManifest();
+  manifest.web_accessible_resources = [
+    {
+      resources: ['fonts/content-font.woff2'],
+      matches: ['file:///'],
+    },
+  ];
+  writeManifest(root, manifest);
+  writeStandardManifestFiles(root);
+  writeFile(root, 'apps/extension/public/fonts/content-font.woff2', 'font');
+
+  expect(collectManifestIntegrityViolations({ rootDir: root })).toEqual([
+    expect.objectContaining({
+      rule: 'manifest-integrity',
+      file: 'apps/extension/manifest.json',
+      message: expect.stringContaining('origin-only path ending in /*'),
+    }),
+  ]);
+}
+
 function verifiesActionTitleViolation() {
   const root = createTempRoot();
   const manifest = createBaseManifest();
@@ -288,6 +310,10 @@ describe('collectManifestIntegrityViolations', () => {
     verifiesFontDynamicUrlViolation
   );
   it('flags wildcard web-accessible resources', verifiesWildcardResourceViolation);
+  it(
+    'flags web-accessible resource matches without an origin-only wildcard path',
+    verifiesWebAccessibleResourceMatchPathViolation
+  );
   it('flags action title drift', verifiesActionTitleViolation);
   it('flags extension CSP drift', verifiesExtensionCspViolation);
   it('flags offscreen reason drift', verifiesOffscreenReasonViolation);

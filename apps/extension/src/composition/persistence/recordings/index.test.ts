@@ -94,13 +94,21 @@ describe('recordings catalog', () => {
   });
 
   it('lists metadata without reading OPFS objects', async () => {
-    mocks.dbGetAll.mockResolvedValue([stored]);
+    const recordingGroup = {
+      dimensions: { height: 720, width: 1280 },
+      groupId: 'capture-1',
+      order: 0,
+      role: 'display',
+      sourceLabel: 'Design review',
+    };
+    mocks.dbGetAll.mockResolvedValue([{ ...stored, recordingGroup }]);
 
     await expect(listRecordings()).resolves.toEqual([
       expect.objectContaining({
         assetId: 'asset-1',
         id: 'recording-1',
         mimeType: 'video/webm',
+        recordingGroup,
         thumbnailId: 'recording:recording-1',
       }),
     ]);

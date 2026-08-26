@@ -7,29 +7,18 @@ import { INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS } from '@sniptale/ui/inspector-she
 import type { GallerySidebarProps } from './types';
 
 const sectionMocks = vi.hoisted(() => ({
-  backupActions: vi.fn(),
+  facetFilters: vi.fn(),
   folderList: vi.fn(),
-  storageCard: vi.fn(),
-  tagsCard: vi.fn(),
 }));
 
 vi.mock('./sections', () => ({
-  GalleryBackupActions: (props: unknown) => {
-    sectionMocks.backupActions(props);
-    return <div data-ui="test.backup-actions" />;
-  },
   GalleryFolderList: (props: unknown) => {
     sectionMocks.folderList(props);
     return <div data-ui="test.folder-list" />;
   },
-  GalleryScopePicker: () => <div data-ui="test.scope-picker" />,
-  GalleryStorageCard: (props: unknown) => {
-    sectionMocks.storageCard(props);
-    return <div data-ui="test.storage-card" />;
-  },
-  GalleryTagsCard: (props: unknown) => {
-    sectionMocks.tagsCard(props);
-    return <div data-ui="test.tags-card" />;
+  GalleryFacetFilters: (props: unknown) => {
+    sectionMocks.facetFilters(props);
+    return <div data-ui="test.facet-filters" />;
   },
 }));
 
@@ -40,19 +29,26 @@ let root: Root | null = null;
 
 function createProps(): GallerySidebarProps {
   return {
-    activeStorageBarClass: 'storage-normal',
     activeTags: ['alpha'],
     allTags: ['alpha', 'beta'],
     counts: { all: 2, export: 0, recording: 0, scenario: 1, screenshot: 2 },
+    facetFilters: {
+      created: [],
+      duration: [],
+      format: [],
+      resolution: [],
+      size: [],
+      source: [],
+      updated: [],
+    },
+    facets: [],
     folderFilter: 'all',
-    isBusy: false,
-    importTriggerRef: { current: null },
+    scope: 'all',
     onActiveTagsChange: vi.fn(),
-    onExportBackup: vi.fn(),
+    onFacetFilterChange: vi.fn(),
     onFolderFilterChange: vi.fn(),
-    onImportBackupClick: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
-    storageInfo: { usage: 10 },
+    onResetFilters: vi.fn(),
+    onScopeChange: vi.fn(),
   };
 }
 
@@ -74,7 +70,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('composes folder list, storage card, tags card, and backup actions inside the shared shell', () => {
+it('composes folder and tag sections inside the shared shell', () => {
   const props = createProps();
 
   act(() => {
@@ -84,8 +80,9 @@ it('composes folder list, storage card, tags card, and backup actions inside the
   expect(container?.querySelector('aside')?.className).toContain(
     INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS
   );
+  expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
+    'rounded-[var(--sniptale-radius-lg)]'
+  );
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
-  expect(sectionMocks.storageCard).toHaveBeenCalledWith(expect.objectContaining(props));
-  expect(sectionMocks.tagsCard).toHaveBeenCalledWith(expect.objectContaining(props));
-  expect(sectionMocks.backupActions).toHaveBeenCalledWith(expect.objectContaining(props));
+  expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
 });

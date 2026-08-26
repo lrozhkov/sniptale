@@ -29,7 +29,11 @@ import {
   encodePortableThumbnail,
   type PortableMediaMetadata,
 } from '../root-codecs/media';
-import { projectImageWorkspacePrivacy, projectMediaEntryPrivacy } from '../privacy';
+import {
+  projectImageWorkspacePrivacy,
+  projectMediaEntryPrivacy,
+  projectRecordingGroupMemberPrivacy,
+} from '../privacy';
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { ArchiveRootObjectSource, MediaHubBackupRootInventoryItem } from '../export';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
@@ -168,7 +172,15 @@ async function buildRecordingSource(args: {
     stored.mimeType,
     mediaObjectDirectory(args.entry, args.options)
   );
-  const { assetId: _assetId, ...portableRecording } = stored;
+  const { assetId: _assetId, ...portableRecordingBase } = stored;
+  const portableRecording = {
+    ...portableRecordingBase,
+    ...(stored.recordingGroup
+      ? {
+          recordingGroup: projectRecordingGroupMemberPrivacy(stored.recordingGroup, args.options),
+        }
+      : {}),
+  };
   const telemetry = args.options.includeTelemetry
     ? parseRecordingTelemetryEntry(await args.db.get(RECORDING_TELEMETRY_STORE, stored.id))
     : null;

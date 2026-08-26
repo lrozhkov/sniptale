@@ -13,6 +13,7 @@ interface BrowserPermissionsAdapter {
   contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
   getAll(): Promise<chrome.permissions.Permissions>;
   isAvailable(): boolean;
+  isFileSchemeAccessAllowed(): Promise<boolean>;
   remove(permissions: chrome.permissions.Permissions): Promise<boolean>;
   request(permissions: chrome.permissions.Permissions): Promise<boolean>;
   subscribeToAdded(listener: BrowserPermissionListener): () => void;
@@ -44,6 +45,17 @@ export const browserPermissions: BrowserPermissionsAdapter = {
 
   isAvailable() {
     return typeof chrome !== 'undefined' && Boolean(chrome.permissions);
+  },
+
+  isFileSchemeAccessAllowed() {
+    if (typeof chrome === 'undefined' || !chrome.extension?.isAllowedFileSchemeAccess) {
+      return Promise.reject(new Error('chrome.extension.isAllowedFileSchemeAccess is unavailable'));
+    }
+
+    return runChromeCallback<boolean>(
+      (callback) => chrome.extension.isAllowedFileSchemeAccess(callback),
+      'chrome.extension.isAllowedFileSchemeAccess is unavailable'
+    );
   },
 
   remove(permissions) {

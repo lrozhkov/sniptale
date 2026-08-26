@@ -90,6 +90,7 @@ it('shares one stable normalized output while leases own independent clones', as
 
 it('preserves requested camera dimensions for a separate recording track', async () => {
   const raw = createTrackedStream({ frameRate: 60, height: 1080, width: 1920 });
+  Object.defineProperty(raw.track, 'label', { configurable: true, value: 'Desk camera' });
   createCanvasVideoOutputMock.mockReturnValue(
     createCanvasOutput(createTrackedStream({ frameRate: 60, height: 1080, width: 1920 }))
   );
@@ -121,6 +122,7 @@ it('preserves requested camera dimensions for a separate recording track', async
     }),
   });
   expect(lease.trackSettings).toMatchObject({ height: 1080, width: 1920 });
+  expect(lease.sourceLabel).toBe('Desk camera');
   lease.release();
 });
 

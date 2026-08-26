@@ -9,13 +9,13 @@ import { createLocalBackupSummary } from './backup-export.test-support';
 const {
   confirmDialogPropsMock,
   importConflictPropsMock,
+  mediaImportConflictPropsMock,
   previewPanelPropsMock,
-  storageManagerPropsMock,
 } = vi.hoisted(() => ({
   confirmDialogPropsMock: vi.fn(),
   importConflictPropsMock: vi.fn(),
+  mediaImportConflictPropsMock: vi.fn(),
   previewPanelPropsMock: vi.fn(),
-  storageManagerPropsMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/ui/product-feedback/confirm-dialog', async (importOriginal) => ({
@@ -37,10 +37,10 @@ vi.mock('../../library/modals/import-conflict-content', () => ({
   },
 }));
 
-vi.mock('../../library/modals/storage-manager-content', () => ({
-  StorageManagerModalContent: (props: unknown) => {
-    storageManagerPropsMock(props);
-    return <div data-ui="test.storage-modal" />;
+vi.mock('../../library/modals/media-import-conflict-content', () => ({
+  MediaImportConflictModalContent: (props: unknown) => {
+    mediaImportConflictPropsMock(props);
+    return <div data-ui="test.media-import-modal" />;
   },
 }));
 
@@ -61,6 +61,8 @@ function createLayoutProps() {
     gridViewportRef: { current: null },
     importInputRef: { current: null },
     importTriggerRef: { current: null },
+    mediaImportInputRef: { current: null },
+    mediaImportTriggerRef: { current: null },
     onActiveTagsChange: vi.fn(),
     onActiveImportCancel: vi.fn(),
     onActiveImportDismiss: vi.fn(),
@@ -77,9 +79,13 @@ function createLayoutProps() {
     onFolderFilterChange: vi.fn(),
     onImport: vi.fn(),
     onImportBackupClick: vi.fn(),
+    onImportMediaClick: vi.fn(),
     onImportFileChange: vi.fn(),
+    onMediaImportFileChange: vi.fn(),
     onPendingExportClose: vi.fn(),
     onPendingImportClose: vi.fn(),
+    onPendingMediaImportClose: vi.fn(),
+    onMediaImportConfirm: vi.fn(),
     onPreviewClose: vi.fn(),
     onPreviewInspectorToggle: vi.fn(),
     onPreviewCopy: vi.fn(),
@@ -88,20 +94,19 @@ function createLayoutProps() {
     onPreviewDownloadOriginal: vi.fn(),
     onPreviewEdit: vi.fn(),
     onPreviewOpen: vi.fn(),
+    onPreviewNavigate: vi.fn(),
     onPreviewOpenSnapshotScreenshot: vi.fn(),
     onPreviewResetChanges: vi.fn(),
     onPreviewRestoreOriginal: vi.fn(),
     onPreviewSaveCopy: vi.fn(),
-    onRefresh: vi.fn(),
     onRemoveTag: vi.fn(),
+    onResetFilters: vi.fn(),
     onSearchChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
+    onSelectionBackup: vi.fn(),
     onSelectionZip: vi.fn(),
     onSortModeChange: vi.fn(),
     onViewModeChange: vi.fn(),
-    onStorageCleanup: vi.fn(),
-    onStorageManagerClose: vi.fn(),
-    onStorageManagerOpen: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
     state: createGalleryState(),
@@ -112,7 +117,6 @@ function createLayoutProps() {
 function createOpenOverlayProps(onConfirm = vi.fn()) {
   const props = createLayoutProps();
   props.state = createGalleryState({
-    cleanupReport: { groups: [], potentialBytes: 12 },
     confirmDialog: {
       cancelText: 'Cancel',
       confirmText: 'Delete',
@@ -148,7 +152,6 @@ function createOpenOverlayProps(onConfirm = vi.fn()) {
       tagInput: 'draft',
       tags: ['alpha'],
     },
-    showStorageManager: true,
   });
 
   return props;
@@ -156,6 +159,14 @@ function createOpenOverlayProps(onConfirm = vi.fn()) {
 
 type PreviewOverlayProps = {
   item: { id: string };
+  navigation?: {
+    current: number;
+    total: number;
+    hasPrevious: boolean;
+    hasNext: boolean;
+    onPrevious: () => void;
+    onNext: () => void;
+  };
   onAddTag: () => void;
   onClose: () => void;
   onCopy: () => Promise<void>;
@@ -213,13 +224,12 @@ it('renders no overlay surfaces when the app-shell state is closed', () => {
   });
 
   expect(container?.textContent).toBe('');
-  expect(storageManagerPropsMock).not.toHaveBeenCalled();
   expect(importConflictPropsMock).not.toHaveBeenCalled();
   expect(confirmDialogPropsMock).not.toHaveBeenCalled();
   expect(previewPanelPropsMock).not.toHaveBeenCalled();
 });
 
-it('wires storage, import, and confirm overlays to parent callbacks', async () => {
+it('wires import and confirm overlays to parent callbacks', async () => {
   const onConfirm = vi.fn();
   const props = createOpenOverlayProps(onConfirm);
 
@@ -227,36 +237,55 @@ it('wires storage, import, and confirm overlays to parent callbacks', async () =
     root?.render(<GalleryOverlays {...props} />);
   });
 
-  const storageModalProps = storageManagerPropsMock.mock.lastCall?.[0] as {
-    onClose: () => void;
-    onRun: (group: unknown) => Promise<void>;
-    report: unknown;
-  };
   const importModalProps = importConflictPropsMock.mock.lastCall?.[0] as {
     onClose: () => void;
     onImport: (strategy: unknown) => Promise<void>;
     summary: unknown;
   };
   const confirmModalProps = confirmDialogPropsMock.mock.lastCall?.[0] as {
+    dialogClassName: string;
     onCancel: () => void;
     onConfirm: () => void;
   };
 
-  await storageModalProps.onRun({ id: 'cleanup' });
-  storageModalProps.onClose();
   await importModalProps.onImport('replace');
   importModalProps.onClose();
   confirmModalProps.onCancel();
   confirmModalProps.onConfirm();
 
-  expect(storageModalProps.report).toEqual(props.state.storage.cleanupReport);
   expect(importModalProps.summary).toEqual(props.state.storage.pendingImport?.summary);
-  expect(props.onStorageCleanup).toHaveBeenCalledWith({ id: 'cleanup' });
-  expect(props.onStorageManagerClose).toHaveBeenCalledTimes(1);
+  expect(confirmModalProps.dialogClassName).toContain('!p-0');
+  expect(confirmModalProps.dialogClassName).toContain('[&_.sniptale-modal-footer-sm]:!border-t-0');
+  expect(confirmModalProps.dialogClassName).toContain(
+    '[&_.sniptale-modal-footer-sm_button]:!rounded-[8px]'
+  );
   expect(props.onImport).toHaveBeenCalledWith('replace');
   expect(props.onPendingImportClose).toHaveBeenCalledTimes(1);
   expect(props.onConfirmDialogClose).toHaveBeenCalledTimes(1);
   expect(onConfirm).toHaveBeenCalledTimes(1);
+});
+
+it('wires local media conflict decisions through the dedicated overlay', () => {
+  const props = createLayoutProps();
+  props.state = createGalleryState({
+    pendingMediaImport: {
+      conflicts: [{ filename: 'capture.png', size: 1024 }],
+      files: [new File(['image'], 'capture.png', { type: 'image/png' })],
+    },
+  });
+
+  act(() => root?.render(<GalleryOverlays {...props} />));
+
+  const modalProps = mediaImportConflictPropsMock.mock.lastCall?.[0] as {
+    fileCount: number;
+    onClose: () => void;
+    onImport: (strategy: 'duplicate') => void;
+  };
+  expect(modalProps.fileCount).toBe(1);
+  modalProps.onImport('duplicate');
+  modalProps.onClose();
+  expect(props.onMediaImportConfirm).toHaveBeenCalledWith('duplicate');
+  expect(props.onPendingMediaImportClose).toHaveBeenCalledTimes(1);
 });
 
 it('wires preview overlay callbacks to the parent app-shell actions', async () => {
@@ -311,4 +340,36 @@ it('omits optional preview props when the preview draft has no reset state or ta
   expect(previewProps['allTags']).toBeUndefined();
   expect(previewProps['hasChanges']).toBeUndefined();
   expect(previewProps['onResetChanges']).toBeUndefined();
+});
+
+it('builds bounded previous and next navigation from the filtered media list', () => {
+  const props = createLayoutProps();
+  const items = [
+    createMediaItem({ id: 'asset-1' }),
+    createMediaItem({ id: 'asset-2' }),
+    createMediaItem({ id: 'asset-3' }),
+  ];
+  props.state = createGalleryState({
+    filteredItems: items,
+    previewItem: items[1] ?? null,
+    previewUrl: 'blob:preview',
+  });
+
+  act(() => {
+    root?.render(<GalleryOverlays {...props} />);
+  });
+
+  const previewProps = previewPanelPropsMock.mock.lastCall?.[0] as PreviewOverlayProps;
+  expect(previewProps.navigation).toMatchObject({
+    current: 2,
+    total: 3,
+    hasPrevious: true,
+    hasNext: true,
+  });
+  act(() => {
+    previewProps.navigation?.onPrevious();
+    previewProps.navigation?.onNext();
+  });
+  expect(props.onPreviewNavigate).toHaveBeenNthCalledWith(1, items[0]);
+  expect(props.onPreviewNavigate).toHaveBeenNthCalledWith(2, items[2]);
 });

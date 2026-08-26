@@ -48,14 +48,23 @@ function normalizePreviewSelectionChange(
   current: GalleryPreviewSessionState,
   next: GalleryPreviewSessionState
 ): GalleryPreviewSessionState {
+  const nextWithRememberedInspector = next.item
+    ? next
+    : { ...next, inspectorCollapsed: current.inspectorCollapsed };
   const currentItemId = current.item?.id ?? null;
-  const nextItemId = next.item?.id ?? null;
+  const nextItemId = nextWithRememberedInspector.item?.id ?? null;
 
-  if (currentItemId !== nextItemId || !next.item || !isGalleryMediaItem(next.item)) {
-    return next.url === null ? next : { ...next, url: null };
+  if (
+    currentItemId !== nextItemId ||
+    !nextWithRememberedInspector.item ||
+    !isGalleryMediaItem(nextWithRememberedInspector.item)
+  ) {
+    return nextWithRememberedInspector.url === null
+      ? nextWithRememberedInspector
+      : { ...nextWithRememberedInspector, url: null };
   }
 
-  return next;
+  return nextWithRememberedInspector;
 }
 
 async function loadPreviewBlob(

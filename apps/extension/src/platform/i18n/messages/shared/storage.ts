@@ -10,7 +10,7 @@ export const sharedStorageMessages = defineMessageSource({
     en: '.',
   },
   lowSpaceSuffix: {
-    ru: 'Откройте Библиотеку и освободите место.',
-    en: 'Open Library and free up space.',
+    ru: 'Удалите ненужные материалы в Библиотеке и повторите попытку.',
+    en: 'Delete unneeded items in Library and try again.',
   },
 });

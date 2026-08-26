@@ -118,7 +118,15 @@ export function createGalleryItems(args: {
       entry,
     ])
   );
-  const mediaItems = args.mediaItems
+  const recordingProjects = new Map<string, { id: string; name: string }>();
+  args.videoProjects.forEach((project) => {
+    (project.recordingIds ?? []).forEach((recordingId) => {
+      if (!recordingProjects.has(recordingId)) {
+        recordingProjects.set(recordingId, { id: project.id, name: project.name });
+      }
+    });
+  });
+  const rawMediaItems = args.mediaItems
     .filter((media) => media.source.kind !== 'project-asset')
     .map((media) => {
       const item = createGalleryMediaItem(media);
@@ -133,6 +141,29 @@ export function createGalleryItems(args: {
         workspaceRevision: media.workspaceRevision ?? 0,
       };
     });
+  const recordingGroupCounts = new Map<string, number>();
+  rawMediaItems.forEach((item) => {
+    if (!item.recordingGroup) return;
+    recordingGroupCounts.set(
+      item.recordingGroup.groupId,
+      (recordingGroupCounts.get(item.recordingGroup.groupId) ?? 0) + 1
+    );
+  });
+  const mediaItems = rawMediaItems.map((item) => {
+    if (!item.recordingGroup || item.source.kind !== 'recording') return item;
+    const memberCount = recordingGroupCounts.get(item.recordingGroup.groupId) ?? 1;
+    if (memberCount < 2) return item;
+    const project = recordingProjects.get(item.source.recordingId);
+    return {
+      ...item,
+      recordingGroupView: {
+        ...item.recordingGroup,
+        memberCount,
+        projectId: project?.id ?? null,
+        projectName: project?.name ?? null,
+      },
+    };
+  });
   const videoProjectItems = args.videoProjects.map((project) => {
     const item = createVideoProjectGalleryItem(project);
     const presentation = presentations.get(

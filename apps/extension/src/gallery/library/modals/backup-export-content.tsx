@@ -1,4 +1,4 @@
-import { Download, FolderArchive, ShieldCheck } from 'lucide-react';
+import { Download, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   SUPPORT_MEDIA_HUB_BACKUP_EXPORT_OPTIONS,
@@ -10,16 +10,12 @@ import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { GalleryModalFrame } from './frame';
 import type { BackupExportModalProps } from './types';
 
-const exportBadgeClassName =
-  'border border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_34%,var(--sniptale-color-border-soft)_66%)] ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_12%,transparent)] text-[var(--sniptale-color-warning)]';
-
 const statClassName =
-  'rounded-[12px] border border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] px-3 py-3';
+  'border-r border-[var(--sniptale-color-border-soft)] px-3 py-1 last:border-r-0';
 
 const toggleClassName =
-  'flex items-start gap-3 rounded-[12px] border border-[var(--sniptale-color-border-soft)] ' +
-  'bg-[var(--sniptale-color-surface-panel)] px-3 py-3 text-left text-sm';
+  'flex cursor-pointer items-start gap-3 rounded-[8px] border border-[var(--sniptale-color-border-soft)] ' +
+  'bg-[var(--sniptale-color-surface-input)] px-3 py-2.5 text-left text-sm';
 
 function SummaryStat(props: { label: string; value: string | number }) {
   return (
@@ -57,7 +53,7 @@ function PrivacyToggle(props: {
         type="checkbox"
         checked={props.checked}
         onChange={(event) => props.onChange(event.currentTarget.checked)}
-        className="mt-0.5 h-4 w-4"
+        className="sniptale-checkbox mt-0.5"
       />
       <span>
         <span className="block font-semibold text-[var(--sniptale-color-text-primary)]">
@@ -88,7 +84,7 @@ function BackupExportSummaryGrid(props: {
       : translate('gallery.backupExportModal.scopeAll');
 
   return (
-    <div className="mt-5 grid gap-3 md:grid-cols-5">
+    <div className="mt-4 grid rounded-[8px] border border-[var(--sniptale-color-border-soft)] py-2 md:grid-cols-5">
       <SummaryStat
         label={translate('gallery.backupExportModal.assets')}
         value={props.summary.assetCount}
@@ -112,7 +108,7 @@ function BackupExportSummaryGrid(props: {
 
 function BackupDataClassesPanel({ summary }: Pick<BackupExportModalProps, 'summary'>) {
   return (
-    <div className="mt-5 rounded-[12px] border border-[var(--sniptale-color-border-soft)] p-4">
+    <section className="mt-4 border-t border-[var(--sniptale-color-border-soft)] pt-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
         <ShieldCheck className="h-4 w-4 text-[var(--sniptale-color-success)]" />
         {translate('gallery.backupExportModal.dataClassesTitle')}
@@ -143,7 +139,7 @@ function BackupDataClassesPanel({ summary }: Pick<BackupExportModalProps, 'summa
           label={translate('gallery.backupExportModal.classWebSnapshots')}
         />
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -152,7 +148,7 @@ function BackupPrivacyOptionsGrid(props: {
   onChange: (patch: Partial<MediaHubBackupExportOptions>) => void;
 }) {
   return (
-    <div className="mt-5 grid gap-3 md:grid-cols-2">
+    <div className="mt-4 grid gap-2 md:grid-cols-2">
       <PrivacyToggle
         checked={props.options.includeDrafts}
         label={translate('gallery.backupExportModal.includeDrafts')}
@@ -187,28 +183,38 @@ function BackupExportActions(props: {
   onExport: (options: MediaHubBackupExportOptions) => void;
   onOptionsChange: (options: MediaHubBackupExportOptions) => void;
 }) {
+  const hasOptionalData =
+    props.options.includeDrafts ||
+    props.options.includeTelemetry ||
+    props.options.includeSourceMetadata ||
+    props.options.includeWebSnapshots;
+
   return (
     <div className="mt-5 flex flex-wrap justify-end gap-2">
-      <button
-        type="button"
-        onClick={() =>
-          props.onOptionsChange(
-            createMediaHubBackupExportOptions({
-              ...SUPPORT_MEDIA_HUB_BACKUP_EXPORT_OPTIONS,
-              scope: props.options.scope,
-              ...(props.options.selected === undefined ? {} : { selected: props.options.selected }),
-            })
-          )
-        }
-        className="rounded-[12px] border border-[var(--sniptale-color-border-soft)] px-4 py-2 text-sm
-          text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]"
-      >
-        {translate('gallery.backupExportModal.supportBundle')}
-      </button>
+      {hasOptionalData ? (
+        <button
+          type="button"
+          onClick={() =>
+            props.onOptionsChange(
+              createMediaHubBackupExportOptions({
+                ...SUPPORT_MEDIA_HUB_BACKUP_EXPORT_OPTIONS,
+                scope: props.options.scope,
+                ...(props.options.selected === undefined
+                  ? {}
+                  : { selected: props.options.selected }),
+              })
+            )
+          }
+          className="rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-4 py-2 text-sm
+            text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]"
+        >
+          {translate('gallery.backupExportModal.supportBundle')}
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={props.onClose}
-        className="rounded-[12px] border border-[var(--sniptale-color-border-soft)] px-4 py-2 text-sm
+        className="rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-4 py-2 text-sm
           text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]"
       >
         {translate('common.actions.cancel')}
@@ -216,7 +222,7 @@ function BackupExportActions(props: {
       <button
         type="button"
         onClick={() => props.onExport(props.options)}
-        className="inline-flex items-center gap-2 rounded-[12px] border border-[var(--sniptale-color-accent)]
+        className="inline-flex items-center gap-2 rounded-[8px] border border-[var(--sniptale-color-accent)]
           bg-[var(--sniptale-color-accent-soft)] px-4 py-2 text-sm font-semibold
           text-[var(--sniptale-color-text-primary)]"
       >
@@ -274,14 +280,9 @@ export function BackupExportModalContent({
 
   return (
     <GalleryModalFrame
-      badgeIcon={FolderArchive}
-      badgeLabel={translate('gallery.backupExportModal.badge')}
-      badgeClassName={exportBadgeClassName}
       title={translate('gallery.backupExportModal.title')}
       description={translate('gallery.backupExportModal.description')}
       maxWidthClassName="max-w-3xl"
-      panelClassName="rounded-[16px]"
-      titleClassName="text-2xl"
       onClose={onClose}
     >
       <BackupExportSummaryGrid options={draftOptions} summary={currentSummary} />

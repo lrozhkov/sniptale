@@ -50,12 +50,12 @@ export const galleryRecoveryMessages = defineMessageSource({
     en: 'Available',
   },
   backupTitle: {
-    ru: 'Перед обновлением требуется backup',
+    ru: 'Перед обновлением нужна резервная копия',
     en: 'A backup is required before updating',
   },
   backupBody: {
-    ru: 'Автоматическое преобразование отключено, пока исходная версия не предоставит полный подтверждённый экспорт.',
-    en: 'Automatic transformation is disabled until the source version provides a complete confirmed export.',
+    ru: 'Сначала создайте полную резервную копию в текущей версии Sniptale, затем повторите обновление.',
+    en: 'Create a complete backup in your current Sniptale version, then try the update again.',
   },
   retry: {
     ru: 'Проверить снова',
@@ -70,8 +70,8 @@ export const galleryRecoveryMessages = defineMessageSource({
     en: 'Reset the local library?',
   },
   resetBody: {
-    ru: 'Проекты, медиа, snapshots, diagnostics и связанные локальные файлы будут удалены без возможности восстановления. Настройки сохранятся.',
-    en: 'Projects, media, snapshots, diagnostics, and related local files will be permanently removed. Settings will be kept.',
+    ru: 'Проекты, медиафайлы, сохранённые страницы и данные диагностики будут удалены без возможности восстановления. Настройки сохранятся.',
+    en: 'Projects, media files, saved pages, and diagnostic data will be permanently removed. Settings will be kept.',
   },
   resetFailed: {
     ru: 'Сброс не завершён. Часть данных могла быть удалена. Повторите сброс, чтобы безопасно завершить очистку.',

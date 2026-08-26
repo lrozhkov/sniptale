@@ -14,6 +14,7 @@ function renderGalleryGridContent(
     | 'gridWidth'
     | 'isLoading'
     | 'onPreviewOpen'
+    | 'onRecordingGroupOpen'
     | 'onScenarioPreviewOpen'
     | 'onToggleSelection'
     | 'selectedIds'
@@ -56,6 +57,7 @@ export function GalleryGrid(
     | 'gridViewportRef'
     | 'isLoading'
     | 'onPreviewOpen'
+    | 'onRecordingGroupOpen'
     | 'onScenarioPreviewOpen'
     | 'onToggleSelection'
     | 'selectedIds'
@@ -66,7 +68,8 @@ export function GalleryGrid(
   return (
     <div
       ref={props.gridViewportRef as Ref<HTMLDivElement>}
-      className="mt-4 min-h-0 flex-1 overflow-auto rounded-[16px]
+      data-ui="gallery.content.surface"
+      className="min-h-0 flex-1 overflow-auto rounded-[var(--sniptale-radius-lg)]
         border border-[var(--sniptale-color-border-soft)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,transparent)]
         p-4 shadow-sm"

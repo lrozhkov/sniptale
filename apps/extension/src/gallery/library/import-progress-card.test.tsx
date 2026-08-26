@@ -72,6 +72,9 @@ it('shows terminal result and dismisses without a cancel action', () => {
     )
   );
   expect(container.textContent).toContain('2');
+  expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe(
+    '100'
+  );
   const button = container.querySelector('button');
   act(() => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   expect(onDismiss).toHaveBeenCalledOnce();
@@ -110,4 +113,27 @@ it('reports failed and root-based cancelled progress as terminal states', () => 
     )
   );
   expect(container.querySelector('[data-ui="gallery.import-progress"]')).not.toBeNull();
+});
+
+it('shows failed filenames for a partial local media import', () => {
+  act(() =>
+    root.render(
+      <GalleryImportProgressCard
+        state={state({
+          failedFilenames: ['broken.mp4', 'vector.svg', 'photo.avif', 'clip.mov'],
+          kind: 'media-files',
+          result: { conflictsResolved: 0, imported: 1, operationId: 'media-1', skipped: 2 },
+          status: 'completed',
+        })}
+        onCancel={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    )
+  );
+
+  expect(container.textContent).toContain('broken.mp4');
+  expect(container.textContent).toContain('vector.svg');
+  expect(container.textContent).toContain('photo.avif');
+  expect(container.textContent).toContain('clip.mov');
+  expect(container.querySelectorAll('[role="list"] li')).toHaveLength(4);
 });

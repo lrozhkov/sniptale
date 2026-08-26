@@ -10,9 +10,12 @@ import {
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   PAGE_ACCESS_ALL_SITES_ORIGIN_PATTERNS,
+  PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN,
   PageAccessOperation,
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { createRuntimeMessagingTransport } from '../../../../../../../../platform/runtime-messaging';
+import { openExtensionDetailsPage } from '../../../../../../../../platform/navigation/extension-pages';
+import { setLocalFileAccessOptIn } from '../../../../../../../../composition/persistence/settings/file-scheme-consent';
 
 import { createMarkPermissionGranted } from './grant-permission';
 import type { PermissionSetter } from '../../types';
@@ -75,5 +78,48 @@ export function createRequestOriginAction(setPermissions: PermissionSetter) {
       );
     }
     return granted;
+  };
+}
+
+export async function registerEffectiveFileSchemeAccess(): Promise<boolean> {
+  const response = await createRuntimeMessagingTransport().sendRuntimeMessage({
+    operation: PageAccessOperation.REGISTER_GRANTED_FILE_SCHEME,
+    type: MessageType.PAGE_ACCESS,
+  });
+  return response.success === true;
+}
+
+export function createRequestFileSchemeAction(setPermissions: PermissionSetter) {
+  const markPermissionGranted = createMarkPermissionGranted(setPermissions);
+
+  return async function requestFileScheme(permission: PermissionInfo): Promise<boolean> {
+    const originPattern = permission.originPattern ?? PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN;
+    if (!(await browserPermissions.isFileSchemeAccessAllowed())) {
+      await openExtensionDetailsPage();
+      return false;
+    }
+
+    const alreadyGranted = await browserPermissions.contains({ origins: [originPattern] });
+    const granted = alreadyGranted || (await requestOriginPermission(originPattern));
+    if (!granted) {
+      return false;
+    }
+
+    try {
+      await setLocalFileAccessOptIn(true);
+      if (!(await registerEffectiveFileSchemeAccess())) {
+        throw new Error('Failed to register granted local-file access.');
+      }
+    } catch (error) {
+      await setLocalFileAccessOptIn(false).catch(() => undefined);
+      if (!alreadyGranted) {
+        await browserPermissions.remove({ origins: [originPattern] }).catch(() => undefined);
+      }
+      await registerEffectiveFileSchemeAccess().catch(() => undefined);
+      throw error;
+    }
+
+    markPermissionGranted((item) => item.id === permission.id);
+    return true;
   };
 }

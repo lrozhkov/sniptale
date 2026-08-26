@@ -27,6 +27,7 @@ function createWebcamRecorder(
     recorder: {} as MediaRecorder,
     release: vi.fn(),
     recordingId: 'rec-webcam',
+    sourceLabel: null,
     stream: {} as MediaStream,
     trackSettings: { height: 720, width: 1280 },
     ...overrides,

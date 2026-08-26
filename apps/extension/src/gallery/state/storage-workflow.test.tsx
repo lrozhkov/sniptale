@@ -33,7 +33,6 @@ let libraryCallbacks: {
   onBanner: (message: string) => void;
   onPreviewItemRefresh: (items: ReturnType<typeof createItem>[]) => void;
   onSelectionRefresh: (items: ReturnType<typeof createItem>[]) => void;
-  onStorageManagerOpen: () => void;
 } | null = null;
 
 function HookProbe() {
@@ -72,7 +71,7 @@ function configureSurfaceStateMock() {
       setIsBusy: vi.fn(),
       setPendingExport: vi.fn(),
       setPendingImport: vi.fn(),
-      setShowStorageManager: vi.fn(),
+      setPendingMediaImport: vi.fn(),
     },
     state: {
       banner: { kind: 'info' },
@@ -80,7 +79,7 @@ function configureSurfaceStateMock() {
       isBusy: false,
       pendingExport: null,
       pendingImport: null,
-      showStorageManager: false,
+      pendingMediaImport: null,
     },
   });
 }
@@ -89,7 +88,6 @@ function configureLibraryStateMock() {
   useGalleryLibraryStateMock.mockImplementation((callbacks) => {
     libraryCallbacks = callbacks;
     return {
-      cleanupReport: { removed: 0 },
       isLoading: false,
       items: [createItem(), createItem({ id: 'asset-2', size: 50, tags: [] })],
       refresh: vi.fn(),
@@ -137,7 +135,6 @@ it('exposes storage workflow state and actions from the owner seam', () => {
   const workflow = renderHook();
 
   expect(workflow.state.storageInfo?.usage).toBe(150);
-  expect(workflow.state.cleanupReport).toEqual({ removed: 0 });
   expect(workflow.state.banner).toEqual({ kind: 'info' });
   expect(workflow.actions.refresh).toBeTypeOf('function');
   expect(workflow.actions.setBanner).toBe(
@@ -145,7 +142,7 @@ it('exposes storage workflow state and actions from the owner seam', () => {
   );
 });
 
-it('wires storage callbacks for preview refresh, selection pruning, and storage manager open', () => {
+it('wires storage callbacks for preview refresh and selection pruning', () => {
   renderHook();
 
   libraryCallbacks?.onPreviewItemRefresh([createItem({ id: 'asset-9' })]);
@@ -161,8 +158,4 @@ it('wires storage callbacks for preview refresh, selection pruning, and storage 
 
   libraryCallbacks?.onSelectionRefresh([createItem({ id: 'asset-2' })]);
   expect(Array.from(currentSelectedIds)).toEqual(['asset-2']);
-
-  const surfaceState = useGallerySurfaceStateMock.mock.results[0]?.value;
-  libraryCallbacks?.onStorageManagerOpen();
-  expect(surfaceState.actions.setShowStorageManager).toHaveBeenCalledWith(true);
 });

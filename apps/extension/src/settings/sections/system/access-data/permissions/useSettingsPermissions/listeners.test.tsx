@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, useCallback } from 'react';
 import { Mic } from 'lucide-react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -20,7 +20,6 @@ const {
 }));
 
 vi.mock('../permissions-lib', (_importOriginal) => ({
-  readPermissionsSnapshot: readPermissionsSnapshotMock,
   subscribeToPermissionChanges: subscribeToPermissionChangesMock,
   syncWebPermissionStatus: syncWebPermissionStatusMock,
 }));
@@ -43,7 +42,10 @@ function createMicrophoneSnapshot(state: 'prompt' | 'granted'): PermissionInfo[]
 }
 
 function Harness({ setPermissions }: { setPermissions: PermissionSetter }) {
-  usePermissionListeners(setPermissions);
+  const refreshPermissions = useCallback(async () => {
+    setPermissions(await readPermissionsSnapshotMock());
+  }, [setPermissions]);
+  usePermissionListeners(refreshPermissions, setPermissions);
 
   return null;
 }
@@ -99,6 +101,7 @@ it('subscribes to permission changes and clears microphone listeners on cleanup'
   const updatedSnapshot = createMicrophoneSnapshot('granted');
   readPermissionsSnapshotMock
     .mockResolvedValueOnce(snapshot)
+    .mockResolvedValueOnce(updatedSnapshot)
     .mockResolvedValueOnce(updatedSnapshot);
 
   await renderHarness(setPermissions);
@@ -125,6 +128,13 @@ it('subscribes to permission changes and clears microphone listeners on cleanup'
   expect(readPermissionsSnapshotMock).toHaveBeenCalledTimes(2);
   expect(setPermissions).toHaveBeenLastCalledWith(updatedSnapshot);
   expect(syncWebPermissionStatusMock).toHaveBeenCalledWith('camera', cameraStatus, setPermissions);
+
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'));
+    await Promise.resolve();
+  });
+
+  expect(readPermissionsSnapshotMock).toHaveBeenCalledTimes(3);
 
   await act(async () => {
     root?.unmount();

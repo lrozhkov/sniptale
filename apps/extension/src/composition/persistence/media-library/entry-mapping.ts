@@ -7,6 +7,7 @@ import {
   createRecordingMediaId,
 } from '../../../features/media-hub/media-id';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 
 type RecordingMediaEntryInput = StoredRecordingEntry;
 
@@ -56,7 +57,7 @@ export function buildRecordingMediaEntry(entry: RecordingMediaEntryInput): Media
   const mimeType = entry.mimeType;
   return {
     id: createRecordingMediaId(entry.id),
-    kind: resolveRecordingAssetKind(mimeType),
+    kind: entry.mediaMetadata?.kind ?? resolveRecordingAssetKind(mimeType),
     source: {
       kind: 'recording',
       recordingId: entry.id,
@@ -67,14 +68,15 @@ export function buildRecordingMediaEntry(entry: RecordingMediaEntryInput): Media
     updatedAt: entry.createdAt,
     size: entry.size,
     mimeType,
-    width: null,
-    height: null,
-    duration: null,
-    sourceUrl: null,
-    sourceTitle: null,
-    sourceFavicon: null,
+    width: entry.mediaMetadata?.width ?? entry.recordingGroup?.dimensions?.width ?? null,
+    height: entry.mediaMetadata?.height ?? entry.recordingGroup?.dimensions?.height ?? null,
+    duration: entry.mediaMetadata?.duration ?? null,
+    sourceUrl: sanitizeProvenanceUrl(entry.recordingGroup?.sourceUrl),
+    sourceTitle: entry.recordingGroup?.sourceLabel ?? null,
+    sourceFavicon: sanitizeProvenanceUrl(entry.recordingGroup?.sourceFavicon),
     tags: [],
     lifecycle: entry.lifecycle ?? createLibraryLifecycle('library', entry.createdAt),
+    ...(entry.recordingGroup ? { recordingGroup: entry.recordingGroup } : {}),
   };
 }
 

@@ -1,11 +1,14 @@
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 export { getMissingOriginPermissions } from '@sniptale/platform/browser/permissions';
 import { browserScripting } from '@sniptale/platform/browser/scripting';
+import { hasLocalFileAccessOptIn } from '../../composition/persistence/settings/file-scheme-consent';
 import {
   ALL_SITES_CONTENT_SCRIPT_MATCHES,
   ALL_SITES_ORIGIN_PATTERNS,
   LEGACY_ALL_SITES_ORIGIN_PATTERNS,
   PAGE_ACCESS_ALL_SITES_SCRIPT_ID,
+  FILE_SCHEME_ORIGIN_PATTERN,
+  PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID,
 } from './constants';
 import {
   createOriginPattern,
@@ -31,7 +34,20 @@ export async function hasAllSitesPermission(): Promise<boolean> {
   return browserPermissions.contains({ origins: [...ALL_SITES_ORIGIN_PATTERNS] });
 }
 
+export async function hasFileSchemePermission(): Promise<boolean> {
+  const [optedIn, originGranted, browserAccessAllowed] = await Promise.all([
+    hasLocalFileAccessOptIn(),
+    browserPermissions.contains({ origins: [FILE_SCHEME_ORIGIN_PATTERN] }),
+    browserPermissions.isFileSchemeAccessAllowed(),
+  ]);
+  return optedIn && originGranted && browserAccessAllowed;
+}
+
 export async function hasSitePermission(url: URL, allSitesGranted: boolean): Promise<boolean> {
+  if (url.protocol === 'file:') {
+    return hasFileSchemePermission();
+  }
+
   if (allSitesGranted) {
     return true;
   }
@@ -119,6 +135,26 @@ export async function ensureContentScriptRegistration(args: {
   });
 }
 
+export async function reconcileFileSchemeContentScriptRegistration(): Promise<boolean> {
+  return runContentScriptRegistrationOperation(PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID, async () => {
+    if (await hasFileSchemePermission()) {
+      await applyContentScriptRegistration({
+        id: PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID,
+        matches: [FILE_SCHEME_ORIGIN_PATTERN],
+      });
+      return true;
+    }
+
+    const registered = await browserScripting.getRegisteredContentScripts({
+      ids: [PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID],
+    });
+    if (registered.length > 0) {
+      await browserScripting.unregisterContentScripts({ ids: [PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID] });
+    }
+    return false;
+  });
+}
+
 export async function commitContentScriptRegistration(args: {
   commit: () => Promise<boolean>;
   id: string;
@@ -176,6 +212,8 @@ export async function reconcilePersistentContentScriptRegistrations(): Promise<v
     });
   }
 
+  await reconcileFileSchemeContentScriptRegistration();
+
   await Promise.all(
     origins
       .filter((origin) => !isAllSitesOrigin(origin))
@@ -203,6 +241,10 @@ export async function unregisterSiteContentScript(id: string): Promise<void> {
 export async function unregisterRemovedContentScripts(origins: string[]): Promise<void> {
   if (origins.some(isAllSitesOrigin)) {
     await unregisterAllSitesContentScript();
+  }
+
+  if (origins.includes(FILE_SCHEME_ORIGIN_PATTERN)) {
+    await unregisterSiteContentScript(PAGE_ACCESS_FILE_SCHEME_SCRIPT_ID);
   }
 
   await Promise.all(

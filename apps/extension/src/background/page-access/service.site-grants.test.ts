@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import { PageAccessOperation } from '@sniptale/runtime-contracts/messaging/page-access';
 import {
   browserPermissionsContainsMock,
+  browserPermissionsIsFileSchemeAccessAllowedMock,
   browserPermissionsRemoveMock,
   browserPermissionsRequestMock,
   browserScriptingExecuteScriptMock,
@@ -10,6 +11,7 @@ import {
   browserScriptingRegisterContentScriptsMock,
   browserScriptingUnregisterContentScriptsMock,
   createMessage,
+  browserTabsGetMock,
 } from './service.test-support';
 
 it('does not register content scripts when an optional site grant is denied', async () => {
@@ -134,4 +136,62 @@ it('registers already-granted site access without requesting permissions again',
       matches: ['https://example.test/*'],
     }),
   ]);
+});
+
+it('registers local-file access only after both optional and browser-managed grants', async () => {
+  const { handlePageAccessMessage } = await import('./service');
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: 'file:///Users/example/report.html' });
+  browserPermissionsContainsMock.mockImplementation(
+    async (query: { origins?: string[] }) => query.origins?.[0] === 'file:///'
+  );
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(true);
+
+  await expect(
+    handlePageAccessMessage(createMessage(PageAccessOperation.REGISTER_GRANTED_FILE_SCHEME))
+  ).resolves.toEqual(expect.objectContaining({ result: 'registered', success: true }));
+
+  expect(browserScriptingRegisterContentScriptsMock).toHaveBeenCalledWith([
+    expect.objectContaining({
+      id: 'sniptale-page-access-file-scheme',
+      matches: ['file:///'],
+    }),
+  ]);
+});
+
+it('refuses local-file registration while Chrome file access remains disabled', async () => {
+  const { handlePageAccessMessage } = await import('./service');
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: 'file:///Users/example/report.html' });
+  browserPermissionsContainsMock.mockResolvedValue(true);
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(false);
+
+  await expect(
+    handlePageAccessMessage(createMessage(PageAccessOperation.REGISTER_GRANTED_FILE_SCHEME))
+  ).resolves.toEqual(expect.objectContaining({ result: 'permission-denied', success: false }));
+
+  expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
+});
+
+it('removes only the local-file registration when Chrome file access is disabled', async () => {
+  const { handlePageAccessMessage } = await import('./service');
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: 'file:///Users/example/report.html' });
+  browserPermissionsContainsMock.mockResolvedValue(true);
+  browserPermissionsIsFileSchemeAccessAllowedMock.mockResolvedValue(false);
+  browserScriptingGetRegisteredContentScriptsMock.mockResolvedValue([
+    {
+      id: 'sniptale-page-access-file-scheme',
+      js: ['assets/contentRuntimeShim.js'],
+      matches: ['file:///'],
+    },
+  ]);
+
+  await expect(
+    handlePageAccessMessage(createMessage(PageAccessOperation.REGISTER_GRANTED_FILE_SCHEME))
+  ).resolves.toEqual(expect.objectContaining({ result: 'permission-denied', success: false }));
+
+  expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledWith({
+    ids: ['sniptale-page-access-file-scheme'],
+  });
+  expect(browserScriptingUnregisterContentScriptsMock).not.toHaveBeenCalledWith({
+    ids: ['sniptale-page-access-all-sites'],
+  });
 });

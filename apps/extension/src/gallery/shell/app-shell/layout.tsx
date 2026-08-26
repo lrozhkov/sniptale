@@ -3,7 +3,9 @@ import { GalleryHeader } from '../../library/main-content/header';
 import { GalleryMainContent } from '../../library/main-content';
 import { GalleryOverlays } from './overlays';
 import { GallerySidebar } from '../../library/sidebar';
+import { GalleryImportProgressCard } from '../../library/import-progress-card';
 import type { GalleryAppLayoutProps } from './types';
+import { GALLERY_MEDIA_IMPORT_ACCEPT } from '../../library/media-import-profile';
 
 function GalleryImportInput(props: GalleryAppLayoutProps) {
   return (
@@ -17,41 +19,36 @@ function GalleryImportInput(props: GalleryAppLayoutProps) {
   );
 }
 
+function GalleryMediaImportInput(props: GalleryAppLayoutProps) {
+  return (
+    <input
+      ref={props.mediaImportInputRef as Ref<HTMLInputElement>}
+      type="file"
+      accept={GALLERY_MEDIA_IMPORT_ACCEPT}
+      multiple
+      className="hidden"
+      onChange={(event) => props.onMediaImportFileChange(Array.from(event.target.files ?? []))}
+    />
+  );
+}
+
 function GallerySidebarSection(props: GalleryAppLayoutProps) {
   const { state } = props;
 
   return (
     <GallerySidebar
-      activeStorageBarClass={state.derived.activeStorageBarClass}
       activeTags={state.filters.activeTags}
       allTags={state.derived.allTags}
       counts={state.derived.counts}
+      facetFilters={state.filters.facetFilters}
+      facets={state.derived.facets}
       folderFilter={state.filters.folderFilter}
       scope={state.filters.scope}
-      isBusy={state.storage.isBusy}
-      importTriggerRef={props.importTriggerRef}
       onActiveTagsChange={props.onActiveTagsChange}
-      onExportBackup={props.onExportBackup}
+      onFacetFilterChange={props.onFacetFilterChange ?? (() => undefined)}
       onFolderFilterChange={props.onFolderFilterChange}
+      onResetFilters={props.onResetFilters}
       onScopeChange={props.onScopeChange ?? (() => undefined)}
-      onImportBackupClick={props.onImportBackupClick}
-      onStorageManagerOpen={props.onStorageManagerOpen}
-      storageInfo={
-        state.storage.storageInfo
-          ? {
-              usage: state.storage.storageInfo.usage,
-              ...(typeof state.storage.storageInfo.quota === 'undefined'
-                ? {}
-                : { quota: state.storage.storageInfo.quota }),
-              ...(typeof state.storage.storageInfo.usageRatio === 'undefined'
-                ? {}
-                : { usageRatio: state.storage.storageInfo.usageRatio }),
-              ...(state.storage.storageInfo.isPersistent == null
-                ? {}
-                : { isPersistent: state.storage.storageInfo.isPersistent }),
-            }
-          : null
-      }
     />
   );
 }
@@ -70,6 +67,7 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       gridViewportRef={gridViewportRef}
       isLoading={state.storage.isLoading}
       search={state.filters.search}
+      scope={state.filters.scope}
       selectedIds={state.selection.selectedIds}
       selectedItems={state.selection.selectedItems}
       selectedSize={state.selection.selectedSize}
@@ -82,12 +80,13 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       onClearSelection={props.onClearSelection}
       onDeleteMany={props.onDeleteMany}
       onPreviewOpen={props.onPreviewOpen}
-      onRefresh={props.onRefresh}
+      {...(props.onRecordingGroupOpen ? { onRecordingGroupOpen: props.onRecordingGroupOpen } : {})}
       onSearchChange={props.onSearchChange}
+      onScopeChange={props.onScopeChange ?? (() => undefined)}
       onSelectionTagDraftChange={props.onSelectionTagDraftChange}
+      onSelectionBackup={props.onSelectionBackup}
       onSelectionZip={props.onSelectionZip}
       onSortModeChange={props.onSortModeChange}
-      onStorageManagerOpen={props.onStorageManagerOpen}
       onToggleSelection={props.onToggleSelection}
       onViewModeChange={props.onViewModeChange}
     />
@@ -99,25 +98,50 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
     <div
       data-ui="gallery.page.root"
       className={
-        'sniptale-extension-surface flex h-screen overflow-hidden bg-[var(--sniptale-color-surface-canvas)] ' +
+        'sniptale-extension-surface flex h-screen overflow-hidden bg-[var(--sniptale-color-surface-canvas)] p-4 ' +
         'text-[var(--sniptale-color-text-primary)]'
       }
     >
       <GalleryImportInput {...props} />
+      <GalleryMediaImportInput {...props} />
       <GalleryOverlays {...props} />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {props.state.storage.activeImport ? (
+        <GalleryImportProgressCard
+          state={props.state.storage.activeImport}
+          onCancel={props.onActiveImportCancel}
+          onDismiss={props.onActiveImportDismiss}
+        />
+      ) : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
         <GalleryHeader
+          activeStorageBarClass={props.state.derived.activeStorageBarClass}
+          allTags={props.state.derived.allTags}
           folderFilter={props.state.filters.folderFilter}
-          isLoading={props.state.storage.isLoading}
-          onRefresh={props.onRefresh}
+          isBusy={props.state.storage.isBusy}
+          importTriggerRef={props.importTriggerRef}
+          mediaImportTriggerRef={props.mediaImportTriggerRef}
+          onApplySelectionTag={props.onApplySelectionTag}
+          onClearSelection={props.onClearSelection}
+          onDeleteMany={props.onDeleteMany}
+          onDeleteAll={() => props.onDeleteMany(props.state.derived.allItems)}
+          onExportBackup={props.onExportBackup}
           onSearchChange={props.onSearchChange}
+          onImportBackupClick={props.onImportBackupClick}
+          onImportMediaClick={props.onImportMediaClick}
+          onSelectionTagDraftChange={props.onSelectionTagDraftChange}
+          onSelectionBackup={props.onSelectionBackup}
+          onSelectionZip={props.onSelectionZip}
           onSortModeChange={props.onSortModeChange}
           onViewModeChange={props.onViewModeChange}
           search={props.state.filters.search}
+          selectedItems={props.state.selection.selectedItems}
+          selectedSize={props.state.selection.selectedSize}
+          selectionTagDraft={props.state.selection.selectionTagDraft}
           sortMode={props.state.filters.sortMode}
+          storageInfo={props.state.storage.storageInfo}
           viewMode={props.viewMode}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden">
           <GallerySidebarSection {...props} />
           <GalleryMainSection {...props} />
         </div>

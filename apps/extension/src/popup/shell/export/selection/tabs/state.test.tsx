@@ -10,10 +10,17 @@ import { usePopupExportTabSelection } from './state';
 
 const mocks = vi.hoisted(() => ({
   browserPermissionsContains: vi.fn(),
+  browserPermissionsFileAccess: vi.fn(),
   browserTabsQuery: vi.fn(),
   browserStorageSessionGet: vi.fn(),
   browserStorageSessionSet: vi.fn(),
   getTabCapabilities: vi.fn(),
+  localFileAccessOptIn: vi.fn(),
+}));
+
+vi.mock('../../../../../composition/persistence/settings/file-scheme-consent', () => ({
+  hasLocalFileAccessOptIn: () => mocks.localFileAccessOptIn(),
+  setLocalFileAccessOptIn: vi.fn(),
 }));
 
 vi.mock('../../../../../composition/persistence/infrastructure/browser-storage', () => ({
@@ -35,6 +42,7 @@ vi.mock('@sniptale/platform/browser/permissions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/permissions')>()),
   browserPermissions: {
     contains: (...args: unknown[]) => mocks.browserPermissionsContains(...args),
+    isFileSchemeAccessAllowed: () => mocks.browserPermissionsFileAccess(),
   },
 }));
 
@@ -118,12 +126,16 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.browserTabsQuery.mockReset();
   mocks.browserPermissionsContains.mockReset();
+  mocks.browserPermissionsFileAccess.mockReset();
   mocks.browserStorageSessionGet.mockReset();
   mocks.browserStorageSessionSet.mockReset();
   mocks.getTabCapabilities.mockReset();
+  mocks.localFileAccessOptIn.mockReset();
   mocks.browserStorageSessionGet.mockResolvedValue({});
   mocks.browserStorageSessionSet.mockResolvedValue(undefined);
   mocks.browserPermissionsContains.mockResolvedValue(true);
+  mocks.browserPermissionsFileAccess.mockResolvedValue(true);
+  mocks.localFileAccessOptIn.mockResolvedValue(true);
   mocks.getTabCapabilities.mockImplementation((tab: { id?: number }) => ({
     export: {
       reason: tab.id === 8 ? 'blocked' : null,
@@ -184,6 +196,45 @@ it('includes web snapshot viewer tabs and excludes restricted extension pages', 
     [7, 'Current tab'],
     [11, 'Source page - Sniptale Web Snapshot'],
   ]);
+});
+
+it('includes granted local-file tabs through the explicit file origin scope', async () => {
+  mocks.browserTabsQuery.mockResolvedValue([
+    { id: 7, title: 'Current tab', url: 'https://example.test/current' },
+    { id: 9, title: 'Local report', url: 'file:///Users/example/report.html' },
+  ]);
+
+  await renderHarness();
+  await flushEffects();
+
+  expect(mocks.browserPermissionsContains).toHaveBeenCalledWith({ origins: ['file:///'] });
+  expect(latestValue?.filteredTabs.map((tab) => tab.tabId)).toEqual([7, 9]);
+});
+
+it('excludes local-file tabs when Chrome file access is disabled', async () => {
+  mocks.browserTabsQuery.mockResolvedValue([
+    { id: 7, title: 'Current tab', url: 'https://example.test/current' },
+    { id: 9, title: 'Local report', url: 'file:///Users/example/report.html' },
+  ]);
+  mocks.browserPermissionsFileAccess.mockResolvedValue(false);
+
+  await renderHarness();
+  await flushEffects();
+
+  expect(latestValue?.filteredTabs.map((tab) => tab.tabId)).toEqual([7]);
+});
+
+it('excludes local-file tabs without the dedicated product opt-in', async () => {
+  mocks.browserTabsQuery.mockResolvedValue([
+    { id: 7, title: 'Current tab', url: 'https://example.test/current' },
+    { id: 9, title: 'Local report', url: 'file:///Users/example/report.html' },
+  ]);
+  mocks.localFileAccessOptIn.mockResolvedValue(false);
+
+  await renderHarness();
+  await flushEffects();
+
+  expect(latestValue?.filteredTabs.map((tab) => tab.tabId)).toEqual([7]);
 });
 
 it('does not query tabs while the export screen is inactive', async () => {

@@ -14,6 +14,7 @@ it('renders the scenario-specific empty copy inside the shared empty shell', () 
   expect(markup).toContain('gallery.app.emptyScenarioTitle');
   expect(markup).toContain('gallery.app.emptyScenarioDescription');
   expect(markup).toContain('min-h-[420px]');
+  expect(markup).toContain('rounded-[var(--sniptale-radius-lg)]');
 });
 
 it('renders the default media empty copy for non-scenario folders', () => {

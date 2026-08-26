@@ -1,9 +1,12 @@
-import { Camera, Globe, Mic } from 'lucide-react';
+import { Camera, FolderOpen, Globe, Mic } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { PAGE_ACCESS_ALL_SITES_ORIGIN_PATTERNS } from '@sniptale/runtime-contracts/messaging/page-access';
+import {
+  PAGE_ACCESS_ALL_SITES_ORIGIN_PATTERNS,
+  PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN,
+} from '@sniptale/runtime-contracts/messaging/page-access';
 
 export type PermissionState = 'error' | 'granted' | 'denied' | 'prompt' | 'unknown';
-type PermissionType = 'web' | 'chrome' | 'origin';
+type PermissionType = 'web' | 'chrome' | 'origin' | 'file';
 
 export interface PermissionInfo {
   id: string;
@@ -42,5 +45,12 @@ export const initialPermissions: PermissionInfo[] = [
     icon: Camera,
     state: 'unknown',
     type: 'web',
+  },
+  {
+    id: 'localFiles',
+    icon: FolderOpen,
+    originPattern: PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN,
+    state: 'unknown',
+    type: 'file',
   },
 ];

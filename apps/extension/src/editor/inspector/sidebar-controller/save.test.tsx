@@ -22,7 +22,7 @@ function createSaveActions(hasImage: boolean) {
       exportDocument: vi.fn(),
       renderToDataUrl: vi.fn(),
     },
-    confirmOpenStorageManager: vi.fn(async () => false),
+    confirmOpenLibrary: vi.fn(async () => false),
     defaultImagePresetId: 'preset-default',
     hasImage,
     savePresets: [{ enabled: true, id: 'preset-default', name: 'Default', order: 0, path: 'out' }],
@@ -69,7 +69,7 @@ describe('buildSidebarSaveActions', () => {
     await expect(actions.onSaveImage()).rejects.toThrow('Disk full');
 
     expect(maybeHandleEditorSaveFailureMock).toHaveBeenCalledWith({
-      confirmOpenStorageManager: expect.any(Function),
+      confirmOpenLibrary: expect.any(Function),
       error,
     });
   });

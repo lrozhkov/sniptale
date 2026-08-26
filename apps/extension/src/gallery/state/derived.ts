@@ -3,6 +3,7 @@ import {
   getActiveStorageBarClass,
   getAllGalleryTags,
   getFilteredGalleryItems,
+  getGalleryFacets,
   getGalleryCounts,
   getGalleryGridMetrics,
 } from './selectors';
@@ -36,6 +37,7 @@ function getSelectedGallerySize(items: GalleryLibraryState['items']) {
 
 function getDerivedFilteredGalleryItems(args: {
   activeTags: GalleryFiltersState['state']['activeTags'];
+  facetFilters: GalleryFiltersState['state']['facetFilters'];
   folderFilter: GalleryFiltersState['state']['folderFilter'];
   items: GalleryLibraryState['items'];
   search: GalleryFiltersState['state']['search'];
@@ -45,6 +47,7 @@ function getDerivedFilteredGalleryItems(args: {
   return getFilteredGalleryItems({
     items: args.items,
     activeTags: args.activeTags,
+    facetFilters: args.facetFilters,
     folderFilter: args.folderFilter,
     search: args.search,
     scope: args.scope,
@@ -77,16 +80,27 @@ function useGalleryFilterDerivedState(props: {
   const scopedItems = useMemo(
     () =>
       library.items.filter(
-        (item) => (item.lifecycle?.storageClass ?? 'library') === (filters.state.scope ?? 'library')
+        (item) =>
+          filters.state.scope === 'all' ||
+          (item.lifecycle?.storageClass ?? 'library') === filters.state.scope
       ),
     [filters.state.scope, library.items]
   );
   const counts = useMemo(() => getGalleryCounts(scopedItems), [scopedItems]);
   const allTags = useMemo(() => getAllGalleryTags(scopedItems), [scopedItems]);
+  const facets = useMemo(
+    () =>
+      getGalleryFacets(library.items, {
+        folderFilter: filters.state.folderFilter,
+        scope: filters.state.scope,
+      }),
+    [filters.state.folderFilter, filters.state.scope, library.items]
+  );
   const filteredItems = useMemo(
     () =>
       getDerivedFilteredGalleryItems({
         activeTags: filters.state.activeTags,
+        facetFilters: filters.state.facetFilters,
         folderFilter: filters.state.folderFilter,
         items: library.items,
         search: filters.state.search,
@@ -95,6 +109,7 @@ function useGalleryFilterDerivedState(props: {
       }),
     [
       filters.state.activeTags,
+      filters.state.facetFilters,
       filters.state.folderFilter,
       filters.state.search,
       filters.state.scope,
@@ -107,6 +122,7 @@ function useGalleryFilterDerivedState(props: {
     allTags,
     counts,
     filteredItems,
+    facets,
   };
 }
 
@@ -157,15 +173,23 @@ export function useGalleryDerivedState(props: {
 
   return {
     activeStorageBarClass: getGalleryStoragePressureClass(library.storageInfo),
+    allItems: library.items,
     allTags: filterState.allTags,
     counts: filterState.counts,
+    facets: filterState.facets,
     filteredItems: filterState.filteredItems,
     gridMetrics,
     selectedItems: selectionState.selectedItems,
     selectedSize: selectionState.selectedSize,
   } satisfies Pick<
     GalleryAppState['derived'],
-    'activeStorageBarClass' | 'allTags' | 'counts' | 'filteredItems' | 'gridMetrics'
+    | 'activeStorageBarClass'
+    | 'allItems'
+    | 'allTags'
+    | 'counts'
+    | 'facets'
+    | 'filteredItems'
+    | 'gridMetrics'
   > &
     Pick<GalleryAppState['selection'], 'selectedItems' | 'selectedSize'> & {
       gridMetrics: GalleryAppState['derived']['gridMetrics'] & { visibleItems: GalleryItem[] };

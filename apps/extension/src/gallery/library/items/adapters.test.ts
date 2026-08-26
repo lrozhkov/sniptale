@@ -2,8 +2,9 @@ import { expect, it } from 'vitest';
 import { createGalleryItems } from './adapters';
 import { isGalleryMediaItem, isGallerySelectableItem, isGalleryVideoProjectItem } from './types';
 import { createLibraryLifecycle } from '../../../composition/persistence/library-lifecycle';
+import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 
-function createMediaLibraryItem() {
+function createMediaLibraryItem(overrides: Partial<MediaLibraryItem> = {}): MediaLibraryItem {
   return {
     id: 'asset-1',
     kind: 'image' as const,
@@ -22,6 +23,7 @@ function createMediaLibraryItem() {
     sourceFavicon: null,
     tags: ['media'],
     hasThumbnail: false,
+    ...overrides,
   };
 }
 
@@ -160,4 +162,104 @@ it('creates video project gallery items with stable project thumbnails', () => {
   expect(isGalleryVideoProjectItem(items[0]!)).toBe(true);
   expect(isGallerySelectableItem(items[0]!)).toBe(true);
   expect(isGalleryMediaItem(items[0]!)).toBe(false);
+});
+
+it('links recording group members to their shared video project', () => {
+  const recordingGroup = {
+    groupId: 'capture-1',
+    order: 0,
+    role: 'display' as const,
+    sourceLabel: 'Window 1',
+  };
+  const mediaItems = [
+    createMediaLibraryItem({
+      id: 'recording:window-1',
+      kind: 'recording',
+      recordingGroup,
+      source: { kind: 'recording', recordingId: 'window-1' },
+    }),
+    createMediaLibraryItem({
+      id: 'recording:webcam',
+      kind: 'recording',
+      recordingGroup: { ...recordingGroup, order: 1, role: 'webcam', sourceLabel: null },
+      source: { kind: 'recording', recordingId: 'webcam' },
+    }),
+  ];
+  const items = createGalleryItems({
+    mediaItems,
+    scenarioExportsByProjectId: new Map(),
+    scenarioProjects: [],
+    thumbnailIds: new Set(),
+    videoProjects: [
+      {
+        clipCount: 2,
+        createdAt: 10,
+        duration: 30,
+        height: 720,
+        id: 'project-1',
+        name: 'Grouped capture',
+        recordingIds: ['window-1', 'webcam'],
+        retentionKind: 'video',
+        thumbnailId: 'video-project:project-1',
+        thumbnailSourceMediaId: 'recording:window-1',
+        trackCount: 2,
+        updatedAt: 10,
+        width: 1280,
+      },
+    ],
+  });
+
+  expect(items.filter(isGalleryMediaItem)).toEqual([
+    expect.objectContaining({
+      recordingGroupView: expect.objectContaining({
+        memberCount: 2,
+        projectId: 'project-1',
+        projectName: 'Grouped capture',
+        role: 'display',
+      }),
+    }),
+    expect.objectContaining({
+      recordingGroupView: expect.objectContaining({
+        memberCount: 2,
+        projectId: 'project-1',
+        projectName: 'Grouped capture',
+        role: 'webcam',
+      }),
+    }),
+  ]);
+});
+
+it('keeps single recording metadata without presenting it as a recording group', () => {
+  const items = createGalleryItems({
+    mediaItems: [
+      createMediaLibraryItem({
+        id: 'recording:single',
+        kind: 'recording',
+        recordingGroup: {
+          dimensions: { height: 1080, width: 1920 },
+          groupId: 'single',
+          order: 0,
+          role: 'display',
+          sourceLabel: 'Design review',
+          sourceUrl: 'https://example.com/review',
+        },
+        source: { kind: 'recording', recordingId: 'single' },
+      }),
+    ],
+    scenarioExportsByProjectId: new Map(),
+    scenarioProjects: [],
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+
+  expect(items).toEqual([
+    expect.objectContaining({
+      recordingGroup: expect.objectContaining({
+        dimensions: { height: 1080, width: 1920 },
+        sourceLabel: 'Design review',
+      }),
+      source: { kind: 'recording', recordingId: 'single' },
+    }),
+  ]);
+  expect(items[0]).not.toHaveProperty('recordingGroupView');
 });

@@ -26,6 +26,17 @@ it('creates stable origin patterns and site script ids', async () => {
   );
 });
 
+it('uses one explicit permission scope and registration id for local files', async () => {
+  const { createOriginPattern, createPermissionScope, createSiteScriptId, isSupportedUrl } =
+    await import('./target');
+  const url = new URL('file:///Users/example/report.html');
+
+  expect(isSupportedUrl(url.href)).toBe(true);
+  expect(createOriginPattern(url)).toBe('file:///');
+  expect(createPermissionScope(url)).toBe('file:///');
+  expect(createSiteScriptId(url)).toBe('sniptale-page-access-file-scheme');
+});
+
 it('creates collision-resistant script ids for similar origins', async () => {
   const { createSiteScriptId } = await import('./target');
 

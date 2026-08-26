@@ -125,11 +125,38 @@ function collectManifestTopologyViolations(manifest, manifestFile, rootDir) {
   return [
     ...collectStaticContentScriptViolations(manifest, manifestFile),
     ...collectFontWebAccessibleResourceViolations(manifest, manifestFile),
+    ...collectWebAccessibleResourceMatchViolations(manifest, manifestFile),
     ...collectActionTitleViolations(manifest, manifestFile),
     ...collectExtensionCspViolations(manifest, manifestFile),
     ...collectEffectRuntimeSandboxViolations(manifest, manifestFile, createViolation),
     ...collectOffscreenReasonViolations(rootDir, manifestFile),
   ];
+}
+
+function hasWebAccessibleResourceOriginPath(match) {
+  if (match === '<all_urls>') return true;
+  if (typeof match !== 'string') return false;
+  const schemeSeparator = match.indexOf('://');
+  if (schemeSeparator < 0) return false;
+  const pathStart = match.indexOf('/', schemeSeparator + 3);
+  return pathStart >= 0 && match.slice(pathStart) === '/*';
+}
+
+function collectWebAccessibleResourceMatchViolations(manifest, manifestFile) {
+  const violations = [];
+  for (const [entryIndex, entry] of (manifest.web_accessible_resources ?? []).entries()) {
+    for (const match of entry.matches ?? []) {
+      if (hasWebAccessibleResourceOriginPath(match)) continue;
+      violations.push(
+        createViolation(
+          manifestFile,
+          `web_accessible_resources[${entryIndex}].matches must use an origin-only path ending in /*: ` +
+            `${JSON.stringify(match)}.`
+        )
+      );
+    }
+  }
+  return violations;
 }
 
 function collectStaticContentScriptViolations(manifest, manifestFile) {

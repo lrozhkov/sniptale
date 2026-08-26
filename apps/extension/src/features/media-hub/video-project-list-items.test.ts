@@ -71,7 +71,9 @@ it('uses the first visual source media id for project thumbnail generation', () 
     ],
   });
 
-  expect(createVideoProjectListItem(project).thumbnailSourceMediaId).toBe('recording:recording-1');
+  const item = createVideoProjectListItem(project);
+  expect(item.thumbnailSourceMediaId).toBe('recording:recording-1');
+  expect(item.recordingIds).toEqual(['recording-1']);
 });
 
 it('supports project-owned visual assets and ignores unsupported visual sources', () => {

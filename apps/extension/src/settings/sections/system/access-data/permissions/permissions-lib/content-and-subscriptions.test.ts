@@ -91,6 +91,15 @@ it('builds translated permission content for granted, denied, error, unknown, an
   );
 
   expect(
+    getPermissionContent(createPermissionInfo({ id: 'localFiles', state: 'prompt', type: 'file' }))
+  ).toEqual(
+    expect.objectContaining({
+      name: 'settings.permissions.localFilesName',
+      description: 'settings.permissions.localFilesDescription',
+    })
+  );
+
+  expect(
     getPermissionContent(
       createPermissionInfo({
         id: 'clipboard',

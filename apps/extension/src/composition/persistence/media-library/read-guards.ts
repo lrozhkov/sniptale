@@ -1,10 +1,12 @@
 import type {
   MediaAssetKind,
   MediaAssetSource,
+  ImageContentState,
   MediaLibraryEntry,
   MediaThumbnailEntry,
 } from './contracts';
 import { parseLibraryLifecycle } from '../library-lifecycle/parser';
+import { parseRecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 type MediaLibraryEntryFields = Omit<MediaLibraryEntry, 'kind' | 'source'>;
 
@@ -49,6 +51,19 @@ function isOptionalBlob(value: unknown): value is Blob | undefined {
 function parseWorkspaceRevision(value: unknown): number | null {
   if (value === undefined) return 0;
   return Number.isInteger(value) && typeof value === 'number' && value >= 0 ? value : null;
+}
+
+function parseImageContentState(
+  value: unknown,
+  kind: MediaAssetKind,
+  source: MediaAssetSource,
+  workspaceRevision: number
+): ImageContentState | null | undefined {
+  const isEditableImage =
+    (kind === 'image' || kind === 'screenshot') && source.kind === 'screenshot';
+  if (!isEditableImage) return value === undefined ? undefined : null;
+  if (value === undefined) return workspaceRevision === 0 ? 'original' : 'edited';
+  return value === 'edited' || value === 'original' ? value : null;
 }
 
 function parseMediaAssetKind(value: unknown): MediaAssetKind | null {
@@ -132,6 +147,13 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
   if (!kind || !MEDIA_ASSET_KINDS.has(kind) || !source || workspaceRevision === null) {
     return null;
   }
+  const imageContentState = parseImageContentState(
+    value['imageContentState'],
+    kind,
+    source,
+    workspaceRevision
+  );
+  if (imageContentState === null) return null;
 
   if (!hasMediaLibraryEntryFields(value)) {
     return null;
@@ -141,6 +163,11 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     updatedAt: value['updatedAt'],
   });
   if (lifecycle === null) return null;
+  const recordingGroup =
+    value['recordingGroup'] === undefined
+      ? undefined
+      : parseRecordingGroupMember(value['recordingGroup']);
+  if (recordingGroup === null) return null;
 
   return {
     createdAt: value['createdAt'],
@@ -148,6 +175,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     filename: value['filename'],
     height: value['height'],
     id: value['id'],
+    ...(imageContentState === undefined ? {} : { imageContentState }),
     kind,
     mimeType: value['mimeType'],
     originalFilename: value['originalFilename'],
@@ -158,6 +186,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     sourceUrl: value['sourceUrl'],
     tags: value['tags'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
+    ...(recordingGroup === undefined ? {} : { recordingGroup }),
     updatedAt: value['updatedAt'],
     width: value['width'],
     workspaceRevision,
@@ -171,6 +200,7 @@ export function parseMediaThumbnailEntry(value: unknown): MediaThumbnailEntry | 
     !isString(value['assetId']) ||
     !(value['blob'] instanceof Blob) ||
     !isNumber(value['createdAt']) ||
+    (value['generatorVersion'] !== undefined && !isNumber(value['generatorVersion'])) ||
     !isNumber(value['updatedAt']) ||
     !isNumber(value['width']) ||
     !isNumber(value['height'])
@@ -181,6 +211,9 @@ export function parseMediaThumbnailEntry(value: unknown): MediaThumbnailEntry | 
     assetId: value['assetId'],
     blob: value['blob'],
     createdAt: value['createdAt'],
+    ...(value['generatorVersion'] === undefined
+      ? {}
+      : { generatorVersion: value['generatorVersion'] }),
     height: value['height'],
     updatedAt: value['updatedAt'],
     width: value['width'],

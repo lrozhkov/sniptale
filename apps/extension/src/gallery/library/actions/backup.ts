@@ -19,7 +19,7 @@ const activeBackupExportAbortControllers = new WeakMap<
   GalleryBackupExportController,
   AbortController
 >();
-const activeBackupImportAbortControllers = new Map<string, AbortController>();
+const activeImportAbortControllers = new Map<string, AbortController>();
 let importRunSequence = 0;
 
 function buildSelectedBackupScope(
@@ -43,21 +43,26 @@ function hasSelectedBackupScope(
   );
 }
 
-function createInitialBackupExportOptions(
-  controller: GalleryBackupExportController
-): MediaHubBackupExportOptions {
-  const selected = buildSelectedBackupScope(controller.state.selection.selectedItems);
-  if (!hasSelectedBackupScope(selected)) {
-    return createMediaHubBackupExportOptions();
-  }
+export function createSelectedBackupExportOptions(
+  items: GalleryItem[]
+): MediaHubBackupExportOptions | null {
+  const selected = buildSelectedBackupScope(items);
+  if (!hasSelectedBackupScope(selected)) return null;
 
   return createMediaHubBackupExportOptions({
-    includeDrafts: controller.state.selection.selectedItems.some(
-      (item) => item.lifecycle?.storageClass === 'temporary'
-    ),
+    includeDrafts: items.some((item) => item.lifecycle?.storageClass === 'temporary'),
     scope: 'selected',
     selected,
   });
+}
+
+function createInitialBackupExportOptions(
+  controller: GalleryBackupExportController
+): MediaHubBackupExportOptions {
+  return (
+    createSelectedBackupExportOptions(controller.state.selection.selectedItems) ??
+    createMediaHubBackupExportOptions()
+  );
 }
 
 export function createExportBackupAction(
@@ -159,6 +164,7 @@ export function createImportAction(controller: GalleryImportController) {
     controller.actions.surface.setActiveImport({
       file: pendingImport.file,
       id: runId,
+      kind: 'backup',
       progress: { bytesRead: 0, bytesWritten: 0, currentFilename: null, rootsComplete: 0 },
       status: 'running',
       strategy,
@@ -170,7 +176,7 @@ export function createImportAction(controller: GalleryImportController) {
     await withBusy(async () => {
       const abortController = new AbortController();
       let operationId = pendingImport.resumeOperationId ?? null;
-      activeBackupImportAbortControllers.set(runId, abortController);
+      activeImportAbortControllers.set(runId, abortController);
       try {
         const onProgress = (progress: {
           bytesRead: number;
@@ -236,8 +242,8 @@ export function createImportAction(controller: GalleryImportController) {
             : current
         );
       } finally {
-        if (activeBackupImportAbortControllers.get(runId) === abortController) {
-          activeBackupImportAbortControllers.delete(runId);
+        if (activeImportAbortControllers.get(runId) === abortController) {
+          activeImportAbortControllers.delete(runId);
         }
       }
     });
@@ -255,7 +261,19 @@ export function createCancelActiveImportAction(controller: GalleryImportControll
     const active = controller.state.storage.activeImport;
     if (!active || active.status !== 'running') return;
     controller.actions.surface.setActiveImport({ ...active, status: 'cancelling' });
-    activeBackupImportAbortControllers.get(active.id)?.abort();
+    activeImportAbortControllers.get(active.id)?.abort();
+  };
+}
+
+export function registerGalleryImportAbortController(
+  runId: string,
+  abortController: AbortController
+): () => void {
+  activeImportAbortControllers.set(runId, abortController);
+  return () => {
+    if (activeImportAbortControllers.get(runId) === abortController) {
+      activeImportAbortControllers.delete(runId);
+    }
   };
 }
 

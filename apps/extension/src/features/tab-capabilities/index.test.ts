@@ -14,7 +14,7 @@ import {
 } from './capabilities';
 import { classifyTabRuntimeCapability } from './runtime';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import { isOwnedSnapshotViewerPage, isRestrictedBrowserPage } from './url';
+import { describeRestrictedPage, isOwnedSnapshotViewerPage, isRestrictedBrowserPage } from './url';
 
 const EXTENSION_SOURCE_ROOT = 'apps/extension/src';
 const SNAPSHOT_VIEWER_ROOT_URL = `chrome-extension://test/${EXTENSION_SOURCE_ROOT}/web-snapshot-viewer`;
@@ -157,8 +157,11 @@ function expectRestrictedPages() {
   expect(isRestrictedBrowserPage(undefined)).toBe(false);
   expect(isRestrictedBrowserPage(null)).toBe(false);
   expect(isRestrictedBrowserPage('https://example.com')).toBe(false);
-  expect(isRestrictedBrowserPage('file:///tmp/report.html')).toBe(true);
+  expect(describeRestrictedPage('https://example.com')).toBeNull();
+  expect(isRestrictedBrowserPage('file:///tmp/report.html')).toBe(false);
+  expect(describeRestrictedPage('file:///tmp/report.html')).toBeNull();
   expect(isRestrictedBrowserPage('data:text/html,hello')).toBe(true);
+  expect(describeRestrictedPage('not a url')).toBeNull();
   expect(isRestrictedBrowserPage('chrome://settings')).toBe(true);
   expect(isRestrictedBrowserPage('about:blank')).toBe(true);
   expect(isRestrictedBrowserPage('view-source:https://example.com')).toBe(true);
@@ -247,10 +250,7 @@ describe('tab-capabilities restricted-page reasons', () => {
       supported: false,
       reason: 't:popup.export.unavailablePrefix chrome-search://. t:popup.common.openRegularSite',
     });
-    expect(getQuickActionCapability(fileTab)).toEqual({
-      supported: false,
-      reason: 't:popup.home.quickActionsUnavailablePrefix file://. t:popup.common.openRegularSite',
-    });
+    expect(getQuickActionCapability(fileTab)).toEqual({ supported: true, reason: null });
     expect(getVideoCaptureModeCapability(CaptureMode.TAB_CROP, extensionTab)).toEqual({
       supported: false,
       reason: createRestrictedVideoReason('popup.labels.captureModeArea', 'chrome-extension://'),

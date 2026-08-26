@@ -23,7 +23,7 @@ export async function saveScreenshotMediaAsset(
 
     const entry: MediaLibraryEntry = {
       id: assetId,
-      kind: 'screenshot',
+      kind: input.kind ?? 'screenshot',
       source: { kind: 'screenshot' },
       filename: input.filename,
       originalFilename: input.filename,
@@ -33,6 +33,7 @@ export async function saveScreenshotMediaAsset(
       mimeType: input.blob.type || 'image/png',
       width: dimensions.width,
       height: dimensions.height,
+      imageContentState: 'original',
       duration: null,
       sourceUrl: sanitizeProvenanceUrl(input.sourceUrl),
       sourceTitle: input.sourceTitle ?? null,

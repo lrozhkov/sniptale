@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { createRequestChromeAction } from './request-chrome';
 import { createRequestCameraAction } from './request-camera';
 import { createRequestMicrophoneAction } from './request-microphone';
-import { createRequestOriginAction } from './request-origin';
+import { createRequestFileSchemeAction, createRequestOriginAction } from './request-origin';
 import type { PermissionSetter } from '../../types';
 
 export function usePermissionRequestActions(setPermissions: PermissionSetter) {
@@ -13,6 +13,7 @@ export function usePermissionRequestActions(setPermissions: PermissionSetter) {
       requestCamera: createRequestCameraAction(setPermissions),
       requestChrome: createRequestChromeAction(setPermissions),
       requestOrigin: createRequestOriginAction(setPermissions),
+      requestFileScheme: createRequestFileSchemeAction(setPermissions),
     }),
     [setPermissions]
   );

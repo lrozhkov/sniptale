@@ -9,6 +9,7 @@ export type RecordingSidecarRecorder = {
   recorder: MediaRecorder;
   release: () => void;
   recordingId: string;
+  sourceLabel: string | null;
   stream: MediaStream;
   trackSettings: MediaTrackSettings;
 };
