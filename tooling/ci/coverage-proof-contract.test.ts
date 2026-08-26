@@ -30,9 +30,10 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   expect(quality).toContain('SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof');
   expect(release).toContain('Download exact published release proof');
   expect(release).toContain('verify-main-proof.mjs release');
-  expect(release).toContain('override_branch: main');
-  expect(release).toContain('override_commit:');
-  expect(release).toContain('use_oidc: true');
+  expect(release).toContain('coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329');
+  expect(release).toContain('github-token: ${{ secrets.GITHUB_TOKEN }}');
+  expect(release).toContain('git-branch: main');
+  expect(release).toContain('git-commit: ${{ needs.publish.outputs.release-sha }}');
   expect(container).toContain("'SNIPTALE_COVERAGE_PROOF_AUTHORITY=external-only'");
   expect(container).toContain('/opt/sniptale-coverage-proof.json:ro');
   expect(container).toContain('/opt/sniptale-coverage-reports:ro');

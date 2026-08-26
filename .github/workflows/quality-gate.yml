@@ -5,8 +5,6 @@ on:
   pull_request_target:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main]
   schedule:
     - cron: '17 3 * * *'
     - cron: '23 4 * * 1'
@@ -795,8 +793,8 @@ jobs:
     needs: [trusted-admission, cleanup, qa-image]
     if: >-
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' ||
-        (github.event_name == 'workflow_dispatch' && inputs.gate == 'fast')) &&
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.gate == 'fast' || inputs.gate == 'release-provenance') &&
       needs.trusted-admission.result == 'success' &&
       needs.cleanup.result == 'success'
     runs-on: ubuntu-24.04
@@ -951,7 +949,7 @@ jobs:
   fast-gate:
     name: Fast PR Gate
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
-    if: always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.gate == 'fast'))
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.gate == 'fast'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
