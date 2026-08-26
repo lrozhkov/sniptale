@@ -100,14 +100,14 @@ it('keeps credential-bearing environments restricted to main', () => {
   expect(release).toContain("if: github.ref == 'refs/heads/main'");
 });
 
-it('documents the no-run bootstrap graph for both PR and main push events', () => {
+it('documents the no-run bootstrap graph and forbids automatic main gates', () => {
   const quality = fs.readFileSync(QUALITY, 'utf8');
   const guide = fs.readFileSync('docs/tooling/ci-cd.md', 'utf8');
   expect(quality).toContain('github.event.pull_request.draft == false');
   expect(quality).toContain("'ci-local-proof-bypass'");
   expect(guide).toContain('apply the trusted `ci-local-proof-bypass` label');
-  expect(guide).toContain('with `[skip ci]` in the resulting `main` commit subject');
-  expect(guide).toContain('verify the skipped Actions run');
+  expect(guide).toContain('The workflow has no `push main` trigger');
+  expect(quality).not.toContain('\n  push:\n');
 });
 
 it('uses one external workflow for commit gates and the bounded infrastructure smoke', () => {
@@ -342,16 +342,16 @@ it('reuses immutable images when image inputs are unchanged and records sanitize
   );
 });
 
-it('makes immutable main image publication retry-safe only for the exact digest', () => {
+it('makes immutable main image publication retry-safe after an explicit admitted main gate', () => {
   const workflow = fs.readFileSync(QUALITY, 'utf8');
   const publisher = workflow.slice(
     workflow.indexOf('  publish-qa-image:'),
     workflow.indexOf('\n  scheduled-sweeper:')
   );
   expect(publisher).toContain("github.ref == 'refs/heads/main'");
-  expect(publisher).toContain("github.event_name == 'push'");
-  expect(publisher).toContain("github.event_name == 'workflow_dispatch' && inputs.gate == 'fast'");
-  expect(publisher).not.toContain("inputs.gate == 'release-provenance'");
+  expect(publisher).toContain("github.event_name == 'workflow_dispatch'");
+  expect(publisher).toContain("inputs.gate == 'fast'");
+  expect(publisher).toContain("inputs.gate == 'release-provenance'");
   expect(publisher).toContain('expected=${binding#*|}');
   expect(publisher).toContain('node tooling/ci/immutable-image-tag.mjs "$image" "$expected"');
   expect(publisher).toContain('Immutable image tag admission: $image ($disposition)');

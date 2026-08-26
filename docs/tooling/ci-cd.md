@@ -16,7 +16,7 @@ The single Continuous Integration workflow has five modes:
 - Selectel infrastructure smoke provisions one disposable runner, verifies the machine-owned host-command closure and locked image runtime, skips QA, and proves cleanup.
 - Selectel recovery deletes resources for one exact historical run and attempt without building a QA image or provisioning a runner.
 
-Ready pull requests and `main` use the Fast gate. Manual and scheduled provenance use the Release gate. Fast execution reads `SELECTEL_QA_PROFILES`; provenance reads identically shaped `SELECTEL_RELEASE_PROFILES`. Both variables have one authority in the `selectel-runner-controller` environment; repository-scoped resource tables and lane minima are forbidden. The controller validates the document shape and safe lifecycle, then checks the requested zone, flavor, volume type and capacity against live Selectel APIs.
+Ready pull requests use the Fast gate. Merging a green PR does not run the same gate again for the squash commit; `main` receives canonical external proof only through manual or scheduled Release provenance. Fast execution reads `SELECTEL_QA_PROFILES`; provenance reads identically shaped `SELECTEL_RELEASE_PROFILES`. Both variables have one authority in the `selectel-runner-controller` environment; repository-scoped resource tables and lane minima are forbidden. The controller validates the document shape and safe lifecycle, then checks the requested zone, flavor, volume type and capacity against live Selectel APIs.
 
 ## Candidate admission
 
@@ -58,4 +58,4 @@ Publication consumes the verified extension archive and canonical evidence, crea
 
 The local PR bypass requires a clean exact candidate, container proof, and an operator reason. It posts the proof identity but never merges. It is an incident mechanism, not the normal route for QA evolution.
 
-For a no-run bootstrap, open a draft PR, apply the trusted `ci-local-proof-bypass` label, then mark it ready. Merge with `[skip ci]` in the resulting `main` commit subject and verify the skipped Actions run before removing the label. This prevents both PR and push events from reserving a runner or provisioning Selectel.
+For a no-run bootstrap, open a draft PR, apply the trusted `ci-local-proof-bypass` label, then mark it ready and verify that the PR graph has no executing jobs before merge. The workflow has no `push main` trigger, so the merge cannot reserve another runner or provision Selectel.
