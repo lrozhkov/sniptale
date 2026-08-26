@@ -30,17 +30,17 @@ export const POPUP_RECORDING_OWNER_MAPPINGS = [
   },
   {
     owner: 'popup-video-route',
-    productionFile: 'apps/extension/src/popup/recording/video/route.tsx',
+    productionFile: 'apps/extension/src/popup/shell/video/route.tsx',
     exclusive: true,
     reason: 'Video route bootstrap and coherent recording snapshot adoption have adjacent proof.',
-    testFiles: ['apps/extension/src/popup/recording/video/route.test.tsx'],
+    testFiles: ['apps/extension/src/popup/shell/video/route.test.tsx'],
   },
   {
     owner: 'popup-video-route-runtime',
-    productionFile: 'apps/extension/src/popup/recording/video/runtime.ts',
+    productionFile: 'apps/extension/src/popup/shell/video/runtime.ts',
     exclusive: true,
     reason: 'Video-only state ownership and deferred device work have adjacent hook proof.',
-    testFiles: ['apps/extension/src/popup/recording/video/runtime.test.tsx'],
+    testFiles: ['apps/extension/src/popup/shell/video/runtime.test.tsx'],
   },
   {
     owner: 'popup-video-persistence-effects',

@@ -15,8 +15,7 @@ const pending = new Map<PopupPage, Promise<PopupRoute>>();
 function loader(page: PopupPage): Promise<PopupRoute> {
   if (page === 'screenshots')
     return import('../home/route').then((module) => module.ScreenshotsRoute);
-  if (page === 'video')
-    return import('../../recording/video/route').then((module) => module.VideoRoute);
+  if (page === 'video') return import('../video/route').then((module) => module.VideoRoute);
   if (page === 'menu') return import('../menu/route').then((module) => module.MenuRoute);
   if (page === 'tools') return import('../tools/route').then((module) => module.ToolsRoute);
   return import('../export/route').then((module) => module.ExportRoute);

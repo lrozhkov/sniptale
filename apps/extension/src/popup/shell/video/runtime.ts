@@ -5,14 +5,14 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { StoragePressureLevel } from '../../../features/media-hub/storage-capacity';
 import type { ViewportPreset } from '../../../contracts/settings';
-import type { MicrophoneOption } from '../microphone';
-import type { WebcamOption } from '../webcam';
-import type { PopupVideoRuntimeStateSlice } from '../../shell/runtime/types/internal-state';
-import type { RecordingControlCapability } from '../../shell/runtime/recording-control-capability';
-import { usePopupRuntimeActions } from '../../shell/runtime/actions';
-import { usePopupMediaDeviceEffects } from '../../shell/runtime/media-device-effects';
-import { usePopupVideoPersistenceEffects } from '../../shell/runtime/video-persistence-effects';
-import { IDLE_RECORDING_STATE } from './copy';
+import type { MicrophoneOption } from '../../recording/microphone';
+import type { WebcamOption } from '../../recording/webcam';
+import type { PopupVideoRuntimeStateSlice } from '../runtime/types/internal-state';
+import type { RecordingControlCapability } from '../runtime/recording-control-capability';
+import { usePopupRuntimeActions } from '../runtime/actions';
+import { usePopupMediaDeviceEffects } from '../runtime/media-device-effects';
+import { usePopupVideoPersistenceEffects } from '../runtime/video-persistence-effects';
+import { IDLE_RECORDING_STATE } from '../../recording/video/copy';
 
 export function useVideoRouteRuntime(options: {
   capabilities: ActiveTabCapabilities;

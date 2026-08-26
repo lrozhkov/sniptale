@@ -39,34 +39,34 @@ const state = {
 };
 
 vi.mock('./runtime', () => ({ useVideoRouteRuntime: () => state }));
-vi.mock('../../shell/runtime/handlers', () => ({ usePopupRuntimeHandlers: () => ({}) }));
-vi.mock('../../shell/runtime/assembly', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../shell/runtime/assembly')>()),
+vi.mock('../runtime/handlers', () => ({ usePopupRuntimeHandlers: () => ({}) }));
+vi.mock('../runtime/assembly', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/assembly')>()),
   assemblePopupVideoRuntimeState: () => ({}),
 }));
-vi.mock('../../shell/runtime/page-access', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../shell/runtime/page-access')>()),
+vi.mock('../runtime/page-access', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/page-access')>()),
   usePopupPageAccessRuntime: () => ({}),
 }));
-vi.mock('../../shell/tab-access/capabilities', () => ({
+vi.mock('../tab-access/capabilities', () => ({
   useActiveTabCapabilities: () => ({ tabId: 5 }),
 }));
-vi.mock('../../shell/app-shell/video-setup/props', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../shell/app-shell/video-setup/props')>()),
+vi.mock('../app-shell/video-setup/props', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../app-shell/video-setup/props')>()),
   getPopupVideoSetupProps: () => ({ marker: true }),
 }));
-vi.mock('./setup', () => ({
+vi.mock('../../recording/video/setup', () => ({
   default: (props: unknown) => {
     mocks.setup(props);
     return <div data-testid="video-setup" />;
   },
 }));
-vi.mock('../../shell/bootstrap/video', () => ({
+vi.mock('../bootstrap/video', () => ({
   createPopupVideoBootstrapPromises: () => ({}),
   loadPopupBootstrapVideoData: mocks.loadVideo,
 }));
-vi.mock('../../shell/bootstrap/runtime', () => ({ popupBootstrapTransport: {} }));
-vi.mock('../../shell/bootstrap/recording-state', () => ({
+vi.mock('../bootstrap/runtime', () => ({ popupBootstrapTransport: {} }));
+vi.mock('../bootstrap/recording-state', () => ({
   loadRecordingStateResponseWithFallback: mocks.loadRecording,
   resolvePopupBootstrapRecordingState: (response: { state: unknown }) => ({
     recordingState: response.state,

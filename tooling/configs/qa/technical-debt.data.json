@@ -1298,28 +1298,6 @@
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
     },
     {
-      "id": "accepted.scc.popup-shell-recording-route-composition",
-      "classification": "accepted-architecture",
-      "owner": "popup-runtime-architecture",
-      "risk": "An unreviewed edge can broaden the popup shell and recording owner cycle.",
-      "reason": "The reviewed Video route composition is intentionally limited to the popup shell and recording owners.",
-      "removalCondition": "Remove when Video route composition no longer imports shell-owned bootstrap and runtime state.",
-      "reviewBy": "2027-08-14",
-      "source": {
-        "kind": "scc",
-        "key": "popup-shell-recording-route-composition"
-      },
-      "scope": {
-        "edgeDigest": "47b66d39971198c7714a896b608ddab6591fce43b1c611e8a4bd6addb76f36f5",
-        "id": "popup-shell-recording-route-composition",
-        "owners": [
-          "apps/extension/src/popup/recording",
-          "apps/extension/src/popup/shell"
-        ]
-      },
-      "targetAction": "Keep the exact two-owner composition cycle stable and reject additional edges or owners."
-    },
-    {
       "id": "accepted.jscpd.media-hub-backup-v6.88b2b0ce8a93",
       "classification": "accepted-architecture",
       "owner": "media-hub-backup-v6",
@@ -10106,8 +10084,6 @@
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
         "apps/extension/src/popup/recording/video/post-record/saving.tsx",
-        "apps/extension/src/popup/recording/video/route.tsx",
-        "apps/extension/src/popup/recording/video/runtime.ts",
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
@@ -10286,7 +10262,9 @@
         "apps/extension/src/popup/shell/tab-access/capabilities.ts",
         "apps/extension/src/popup/shell/tab-access/index.ts",
         "apps/extension/src/popup/shell/tools/panel.tsx",
-        "apps/extension/src/popup/shell/tools/route.tsx"
+        "apps/extension/src/popup/shell/tools/route.tsx",
+        "apps/extension/src/popup/shell/video/route.tsx",
+        "apps/extension/src/popup/shell/video/runtime.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/popup/diagnostics/performance/index.ts",
@@ -10322,8 +10300,6 @@
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
         "apps/extension/src/popup/recording/video/post-record/saving.tsx",
-        "apps/extension/src/popup/recording/video/route.tsx",
-        "apps/extension/src/popup/recording/video/runtime.ts",
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
@@ -10502,7 +10478,9 @@
         "apps/extension/src/popup/shell/tab-access/capabilities.ts",
         "apps/extension/src/popup/shell/tab-access/index.ts",
         "apps/extension/src/popup/shell/tools/panel.tsx",
-        "apps/extension/src/popup/shell/tools/route.tsx"
+        "apps/extension/src/popup/shell/tools/route.tsx",
+        "apps/extension/src/popup/shell/video/route.tsx",
+        "apps/extension/src/popup/shell/video/runtime.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -19476,7 +19454,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
-        "contentHash": "dc040c1ee55e6b5d12d724ca9d599f09c11dbd7e2a6e0f8867883830d82a0697"
+        "contentHash": "3d8e630d3ff2b88f01212604b2b12712e2ca67e8748c24ce17e0c6ef80c381b2"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",

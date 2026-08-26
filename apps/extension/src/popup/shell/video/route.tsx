@@ -4,31 +4,22 @@ import '@sniptale/ui/styles/toolbar';
 import { useEffect, useRef } from 'react';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../platform/i18n/popup';
-import type {
-  PopupRecordingSnapshot,
-  PopupStartupDescriptor,
-} from '../../shell/startup/descriptor';
-import {
-  createPopupVideoBootstrapPromises,
-  loadPopupBootstrapVideoData,
-} from '../../shell/bootstrap/video';
-import { popupBootstrapTransport } from '../../shell/bootstrap/runtime';
+import type { PopupRecordingSnapshot, PopupStartupDescriptor } from '../startup/descriptor';
+import { createPopupVideoBootstrapPromises, loadPopupBootstrapVideoData } from '../bootstrap/video';
+import { popupBootstrapTransport } from '../bootstrap/runtime';
 import {
   loadRecordingStateResponseWithFallback,
   resolvePopupBootstrapRecordingState,
-} from '../../shell/bootstrap/recording-state';
-import { usePopupRuntimeHandlers } from '../../shell/runtime/handlers';
-import { assemblePopupVideoRuntimeState } from '../../shell/runtime/assembly';
-import type { PopupVideoRuntimeStateSlice } from '../../shell/runtime/types/internal-state';
-import {
-  usePopupPageAccessRuntime,
-  type PopupPageAccessRuntime,
-} from '../../shell/runtime/page-access';
-import { PageAccessControls } from '../../shell/page-access/controls';
-import { useActiveTabCapabilities } from '../../shell/tab-access/capabilities';
-import { getPopupVideoSetupProps } from '../../shell/app-shell/video-setup/props';
-import VideoSetupPage from './setup';
-import type { VideoSetupPageProps } from './setup/types';
+} from '../bootstrap/recording-state';
+import { usePopupRuntimeHandlers } from '../runtime/handlers';
+import { assemblePopupVideoRuntimeState } from '../runtime/assembly';
+import type { PopupVideoRuntimeStateSlice } from '../runtime/types/internal-state';
+import { usePopupPageAccessRuntime, type PopupPageAccessRuntime } from '../runtime/page-access';
+import { PageAccessControls } from '../page-access/controls';
+import { useActiveTabCapabilities } from '../tab-access/capabilities';
+import { getPopupVideoSetupProps } from '../app-shell/video-setup/props';
+import VideoSetupPage from '../../recording/video/setup';
+import type { VideoSetupPageProps } from '../../recording/video/setup/types';
 import { useVideoRouteRuntime } from './runtime';
 
 export function VideoRoute({ startup }: { startup: PopupStartupDescriptor }) {

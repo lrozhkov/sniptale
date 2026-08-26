@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ screenshots: vi.fn(), video: vi.fn(), export: 
 vi.mock('../home/route', () => ({ ScreenshotsRoute: mocks.screenshots }));
 vi.mock('../menu/route', () => ({ MenuRoute: vi.fn() }));
 vi.mock('../tools/route', () => ({ ToolsRoute: vi.fn() }));
-vi.mock('../../recording/video/route', () => ({ VideoRoute: mocks.video }));
+vi.mock('../video/route', () => ({ VideoRoute: mocks.video }));
 vi.mock('../export/route', () => ({ ExportRoute: mocks.export }));
 
 beforeEach(() => vi.resetModules());

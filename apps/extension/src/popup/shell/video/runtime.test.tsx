@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   refreshGalleryStatus: vi.fn(),
 }));
 
-vi.mock('../../shell/runtime/actions', () => ({
+vi.mock('../runtime/actions', () => ({
   usePopupRuntimeActions: () => ({
     refreshActiveTabCapabilities: vi.fn(),
     refreshGalleryStatus: mocks.refreshGalleryStatus,
@@ -20,10 +20,10 @@ vi.mock('../../shell/runtime/actions', () => ({
     refreshWebcams: vi.fn(),
   }),
 }));
-vi.mock('../../shell/runtime/media-device-effects', () => ({
+vi.mock('../runtime/media-device-effects', () => ({
   usePopupMediaDeviceEffects: mocks.mediaEffects,
 }));
-vi.mock('../../shell/runtime/video-persistence-effects', () => ({
+vi.mock('../runtime/video-persistence-effects', () => ({
   usePopupVideoPersistenceEffects: mocks.persistenceEffects,
 }));
 
