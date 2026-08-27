@@ -48,6 +48,7 @@ type WebSnapshotSaveRouteArgs = Omit<TabRouteArgs, 'message'> & {
     PopupExportViewerMessage,
     { type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT }
   >;
+  settings: Awaited<ReturnType<typeof loadSettings>>;
 };
 type WebSnapshotRouteResponse = {
   error?: string;
@@ -152,17 +153,14 @@ async function routeWebSnapshotSave(
     );
   }
 
-  const settings = await runWebSnapshotRouteStage('load web snapshot settings', () =>
-    loadSettings()
-  );
   authorizeWebSnapshotCaptureRequest(args.resolvedTabId, args.message.requestId, {
-    allowAnonymousCrossOriginAssets: settings.anonymousCrossOriginSnapshotAssetsEnabled,
+    allowAnonymousCrossOriginAssets: args.settings.anonymousCrossOriginSnapshotAssetsEnabled,
   });
   const response = toWebSnapshotRouteResponse(
     await runWebSnapshotRouteStage('execute injected web snapshot content export', () =>
       executeInjectedWebSnapshotContentExport({
-        allowAnonymousCrossOriginAssets: settings.anonymousCrossOriginSnapshotAssetsEnabled,
-        allowAuthenticatedSameOriginAssets: settings.authenticatedSnapshotAssetsEnabled,
+        allowAnonymousCrossOriginAssets: args.settings.anonymousCrossOriginSnapshotAssetsEnabled,
+        allowAuthenticatedSameOriginAssets: args.settings.authenticatedSnapshotAssetsEnabled,
         contentIntentGrant: issueFullPageExportContentIntentGrant(
           args.resolvedTabId,
           MessageType.EXPORT_CAPTURE_FULL_PAGE
@@ -232,11 +230,18 @@ async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<
     if (forwardingFailure) throw forwardingFailure;
     return forwardingResult;
   }
-  const target = await resolvePopupExportTarget(args.resolvedTabId);
   if (args.message.type === MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT) {
-    return routeWebSnapshotSave({ ...args, message: args.message, target });
+    const settings = await runWebSnapshotRouteStage('load web snapshot settings', () =>
+      loadSettings()
+    );
+    if (!settings.webSnapshotEnabled) {
+      throw new Error('Web Snapshots are disabled in settings.');
+    }
+    const target = await resolvePopupExportTarget(args.resolvedTabId);
+    return routeWebSnapshotSave({ ...args, message: args.message, settings, target });
   }
 
+  const target = await resolvePopupExportTarget(args.resolvedTabId);
   const nonSaveArgs: NonSavePopupExportRouteArgs = { ...args, message: args.message };
   return target.isOwnedSnapshotViewer
     ? sendPopupExportToViewer(nonSaveArgs)

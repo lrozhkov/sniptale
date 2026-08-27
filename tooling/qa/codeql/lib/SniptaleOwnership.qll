@@ -17,6 +17,7 @@ predicate isAllowedSensitiveRetentionOwner(File file) {
     [
       "apps/extension/src/composition/persistence/content-pin-session/annotation-fork.ts",
       "apps/extension/src/composition/persistence/frame-annotation-raster-jobs/index.ts",
+      "apps/extension/src/composition/persistence/gallery-saved-views/index.ts",
       "apps/extension/src/composition/persistence/video-preview-cache/mutations.ts"
     ]
 }

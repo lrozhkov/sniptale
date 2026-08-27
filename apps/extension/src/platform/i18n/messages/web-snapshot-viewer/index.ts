@@ -53,13 +53,41 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Другие файлы',
       en: 'Other files',
     },
+    downloadAsset: {
+      ru: 'Скачать оригинал',
+      en: 'Download original',
+    },
     visualAlt: {
       ru: 'Сохранённый скриншот веб-страницы',
       en: 'Saved screenshot of the web page',
     },
-    hideHeader: {
-      ru: 'Скрыть заголовок снимка',
-      en: 'Hide snapshot header',
+    collapseToolbar: {
+      ru: 'Свернуть панель',
+      en: 'Collapse toolbar',
+    },
+    expandToolbar: {
+      ru: 'Развернуть панель',
+      en: 'Expand toolbar',
+    },
+    zoomControls: {
+      ru: 'Масштаб снимка',
+      en: 'Snapshot zoom',
+    },
+    zoomIn: {
+      ru: 'Увеличить',
+      en: 'Zoom in',
+    },
+    zoomOut: {
+      ru: 'Уменьшить',
+      en: 'Zoom out',
+    },
+    actualSize: {
+      ru: 'Масштаб 100%',
+      en: 'Actual size (100%)',
+    },
+    fitToWidth: {
+      ru: 'По ширине окна',
+      en: 'Fit to window width',
     },
     pngDprHint: {
       ru: 'PNG сохраняется с естественной плотностью пикселей экрана (DPR) без подгонки размера.',

@@ -149,6 +149,57 @@ it('uses the saved capture viewport as the default snapshot iframe surface', asy
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('2560px');
   expect(viewport?.style.height).toBe('1440px');
+  const scaledViewport = container?.querySelector<HTMLElement>(
+    '[data-testid="snapshot-frame-scaled-viewport"]'
+  );
+  expect(scaledViewport?.style.width).toBe('1024px');
+  expect(viewport?.style.transform).toBe('scale(0.4)');
+});
+
+it('keeps captured layout dimensions while switching between fit and manual zoom', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { height: 1440, width: 2560 } })
+  );
+
+  await renderViewer();
+
+  const scaledViewport = () =>
+    container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-scaled-viewport"]');
+  const viewport = () =>
+    container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
+  expect(scaledViewport()?.style.width).toBe('1024px');
+  expect(viewport()?.style.width).toBe('2560px');
+
+  const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === '40%'
+  );
+  act(() => {
+    percentButton?.click();
+  });
+  expect(scaledViewport()?.style.width).toBe('2560px');
+  expect(viewport()?.style.transform).toBe('scale(1)');
+  expect(container?.querySelector('[data-testid="snapshot-viewer-surface"]')?.className).toContain(
+    'overflow-auto'
+  );
+
+  const zoomButtons = percentButton?.parentElement?.querySelectorAll('button');
+  act(() => {
+    zoomButtons?.item(2).click();
+  });
+  expect(scaledViewport()?.style.width).toBe('2816px');
+  expect(percentButton?.textContent).toBe('110%');
+
+  act(() => {
+    zoomButtons?.item(0).click();
+  });
+  expect(scaledViewport()?.style.width).toBe('2560px');
+  expect(percentButton?.textContent).toBe('100%');
+
+  act(() => {
+    zoomButtons?.item(zoomButtons.length - 1).click();
+  });
+  expect(scaledViewport()?.style.width).toBe('1024px');
+  expect(viewport()?.style.transform).toBe('scale(0.4)');
 });
 
 it('keeps the fluid viewer surface for legacy snapshots without viewport metadata', async () => {

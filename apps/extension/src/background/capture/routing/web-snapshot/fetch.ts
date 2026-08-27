@@ -1,21 +1,9 @@
 import { isPrivateNetworkHost } from '@sniptale/platform/security/private-network-host';
-import { resolveAllowedWebSnapshotAssetMimeType } from '../../../../features/web-snapshot/public';
+import { resolveWebSnapshotCaptureAssetMimeType } from '../../../../features/web-snapshot/public';
 import { authorizeWebSnapshotAssetFetch } from './session';
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_ASSET_BYTES = 10 * 1024 * 1024;
-const ALLOWED_ASSET_MIME_TYPES = new Set([
-  'font/woff',
-  'font/woff2',
-  'image/avif',
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/svg+xml',
-  'image/webp',
-  'text/css',
-]);
-
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -115,10 +103,7 @@ async function readStreamingResponseWithLimit(
 }
 
 function resolveAllowedMimeType(response: Response): string {
-  return resolveAllowedWebSnapshotAssetMimeType(
-    response.headers.get('content-type'),
-    ALLOWED_ASSET_MIME_TYPES
-  );
+  return resolveWebSnapshotCaptureAssetMimeType(response.headers.get('content-type'));
 }
 
 export async function fetchWebSnapshotAssetForSession(args: {

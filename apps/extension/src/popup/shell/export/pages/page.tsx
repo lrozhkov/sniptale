@@ -1,15 +1,17 @@
+import { useState } from 'react';
 import { translate } from '../../../../platform/i18n/popup';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { PopupPageAccessRuntime } from '../../runtime/page-access';
 import {
   openGalleryWebSnapshotsPage,
+  openSettingsPage,
   openWebSnapshotViewerPage,
 } from '../../../../platform/navigation/extension-pages';
 import { ExportFooterActions } from '../footer/actions';
 import { ExportPageContent } from './content';
 import { type PopupExportController, usePopupExportController } from '../controller';
-import { WebSnapshotConfirmationDialog, type WebSnapshotDisclosure } from './snapshot-confirmation';
-import { useWebSnapshotConfirmationState } from './snapshot-confirmation-state';
+import { WebSnapshotSetupDialog } from './snapshot-setup-dialog';
+import { useWebSnapshotAvailability } from './snapshot-availability';
 
 type ExportController = PopupExportController;
 type ExportFooterActionsProps = Parameters<typeof ExportFooterActions>[0];
@@ -41,8 +43,7 @@ function getWebSnapshotResultAction(controller: ExportController) {
 
 function getExportFooterCallbacks(args: {
   controller: ExportController;
-  webSnapshotDisclosure: WebSnapshotDisclosure;
-  onRequestWebSnapshotConfirmation: () => void;
+  onRequestWebSnapshotSave: () => void;
 }) {
   return {
     onCancelExport: () => {
@@ -59,11 +60,7 @@ function getExportFooterCallbacks(args: {
       void args.controller.actions.handleResetExportView();
     },
     onSaveWebSnapshot: () => {
-      if (args.webSnapshotDisclosure.requiresConfirmation) {
-        args.onRequestWebSnapshotConfirmation();
-        return;
-      }
-      void args.controller.actions.handleSaveWebSnapshot();
+      args.onRequestWebSnapshotSave();
     },
     onStartExport: () => {
       void args.controller.actions.handleStartExport();
@@ -76,8 +73,7 @@ function getExportFooterProps(args: {
   pageAccess: PopupPageAccessRuntime;
   controller: ExportController;
   exportDisabledTitle: string | null;
-  onRequestWebSnapshotConfirmation: () => void;
-  webSnapshotDisclosure: WebSnapshotDisclosure;
+  onRequestWebSnapshotSave: () => void;
 }) {
   const { derived, session } = args.controller.state;
   const isResultReady =
@@ -101,8 +97,7 @@ function getExportFooterProps(args: {
     isResultReady,
     ...getExportFooterCallbacks({
       controller: args.controller,
-      onRequestWebSnapshotConfirmation: args.onRequestWebSnapshotConfirmation,
-      webSnapshotDisclosure: args.webSnapshotDisclosure,
+      onRequestWebSnapshotSave: args.onRequestWebSnapshotSave,
     }),
     saveWebSnapshotTitle: translate('popup.export.saveWebSnapshotTitle'),
     ...(derived.canExport || args.exportDisabledTitle === null
@@ -124,23 +119,17 @@ const exportPageContentSectionClassName = [
 function ExportPageLayout({
   controller,
   footerProps,
-  onCancelWebSnapshotConfirmation,
-  onConfirmWebSnapshotConfirmation,
-  onRememberWebSnapshotChoiceChange,
-  preferenceError,
-  rememberWebSnapshotChoice,
-  savingPreference,
-  webSnapshotConfirmation,
+  onCloseWebSnapshotSetup,
+  onOpenWebSnapshotSettings,
+  webSnapshotSetupOpen,
+  webSnapshotStatus,
 }: {
   controller: ExportController;
   footerProps: ExportFooterActionsProps;
-  onCancelWebSnapshotConfirmation: () => void;
-  onConfirmWebSnapshotConfirmation: () => void;
-  onRememberWebSnapshotChoiceChange: (rememberChoice: boolean) => void;
-  preferenceError: string | null;
-  rememberWebSnapshotChoice: boolean;
-  savingPreference: boolean;
-  webSnapshotConfirmation: WebSnapshotDisclosure | null;
+  onCloseWebSnapshotSetup: () => void;
+  onOpenWebSnapshotSettings: () => void;
+  webSnapshotSetupOpen: boolean;
+  webSnapshotStatus: 'error' | 'loaded' | 'loading';
 }) {
   return (
     <div className="flex h-full flex-col gap-3">
@@ -150,15 +139,11 @@ function ExportPageLayout({
           <ExportFooterActions {...footerProps} />
         </div>
       </section>
-      {webSnapshotConfirmation ? (
-        <WebSnapshotConfirmationDialog
-          disclosure={webSnapshotConfirmation}
-          isSavingPreference={savingPreference}
-          onCancel={onCancelWebSnapshotConfirmation}
-          onConfirm={onConfirmWebSnapshotConfirmation}
-          onRememberChoiceChange={onRememberWebSnapshotChoiceChange}
-          preferenceError={preferenceError}
-          rememberChoice={rememberWebSnapshotChoice}
+      {webSnapshotSetupOpen ? (
+        <WebSnapshotSetupDialog
+          onClose={onCloseWebSnapshotSetup}
+          onOpenSettings={onOpenWebSnapshotSettings}
+          status={webSnapshotStatus}
         />
       ) : null}
     </div>
@@ -179,7 +164,8 @@ export function ExportPage({
     isActive,
     pageAccess,
   });
-  const webSnapshotConfirmation = useWebSnapshotConfirmationState(controller);
+  const webSnapshotAvailability = useWebSnapshotAvailability();
+  const [webSnapshotSetupOpen, setWebSnapshotSetupOpen] = useState(false);
   const restrictedPageFeaturesTitle = activeTabCapabilities.isRestrictedPage
     ? translate('popup.common.restrictedPageFeatures')
     : null;
@@ -191,21 +177,25 @@ export function ExportPage({
     pageAccess,
     controller,
     exportDisabledTitle,
-    onRequestWebSnapshotConfirmation: webSnapshotConfirmation.requestConfirmation,
-    webSnapshotDisclosure: webSnapshotConfirmation.disclosure,
+    onRequestWebSnapshotSave: () => {
+      if (webSnapshotAvailability.enabled) {
+        void controller.actions.handleSaveWebSnapshot();
+        return;
+      }
+      setWebSnapshotSetupOpen(true);
+    },
   });
 
   return (
     <ExportPageLayout
       controller={controller}
       footerProps={footerProps}
-      onCancelWebSnapshotConfirmation={webSnapshotConfirmation.cancelConfirmation}
-      onConfirmWebSnapshotConfirmation={webSnapshotConfirmation.confirm}
-      onRememberWebSnapshotChoiceChange={webSnapshotConfirmation.setRememberChoice}
-      preferenceError={webSnapshotConfirmation.preferenceError}
-      rememberWebSnapshotChoice={webSnapshotConfirmation.rememberChoice}
-      savingPreference={webSnapshotConfirmation.preferenceSaving}
-      webSnapshotConfirmation={webSnapshotConfirmation.confirmation}
+      onCloseWebSnapshotSetup={() => setWebSnapshotSetupOpen(false)}
+      onOpenWebSnapshotSettings={() => {
+        void openSettingsPage({ route: { section: 'web-snapshots' } });
+      }}
+      webSnapshotSetupOpen={webSnapshotSetupOpen}
+      webSnapshotStatus={webSnapshotAvailability.status}
     />
   );
 }

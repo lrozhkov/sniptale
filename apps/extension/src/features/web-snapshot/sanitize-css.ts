@@ -34,10 +34,59 @@ interface ParsedCssString {
 
 function skipCssImport(value: string, index: number): number {
   let cursor = index;
-  while (cursor < value.length && value[cursor] !== ';') {
+  let inBlockComment = false;
+  let parenthesisDepth = 0;
+  let quote: '"' | "'" | null = null;
+
+  while (cursor < value.length) {
+    const char = value[cursor] ?? '';
+    const nextChar = value[cursor + 1] ?? '';
+    if (inBlockComment) {
+      if (char === '*' && nextChar === '/') {
+        inBlockComment = false;
+        cursor += 2;
+        continue;
+      }
+      cursor += 1;
+      continue;
+    }
+    if (quote) {
+      if (char === '\\') {
+        cursor += 2;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      cursor += 1;
+      continue;
+    }
+    if (char === '/' && nextChar === '*') {
+      inBlockComment = true;
+      cursor += 2;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      cursor += 1;
+      continue;
+    }
+    if (char === '(') {
+      parenthesisDepth += 1;
+      cursor += 1;
+      continue;
+    }
+    if (char === ')') {
+      parenthesisDepth = Math.max(0, parenthesisDepth - 1);
+      cursor += 1;
+      continue;
+    }
+    if (char === ';' && parenthesisDepth === 0) {
+      return cursor + 1;
+    }
     cursor += 1;
   }
-  return cursor < value.length ? cursor + 1 : cursor;
+  return cursor;
 }
 
 function skipCssUrlFunction(value: string, index: number): number {

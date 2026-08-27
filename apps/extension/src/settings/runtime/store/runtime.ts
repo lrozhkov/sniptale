@@ -1,4 +1,4 @@
-import type { Settings, SettingsPatch } from '../../../contracts/settings';
+import type { NormalizedSettings, SettingsPatch } from '../../../contracts/settings';
 import {
   loadSettings,
   patchSettings,
@@ -7,14 +7,16 @@ import {
 
 export { DEFAULT_SETTINGS } from '../../../composition/persistence/settings';
 
-export async function loadSettingsRuntimeState(): Promise<Settings> {
+export async function loadSettingsRuntimeState(): Promise<NormalizedSettings> {
   return loadSettings();
 }
 
-export async function updateSettingsRuntimeState(nextPatch: SettingsPatch): Promise<Settings> {
+export async function updateSettingsRuntimeState(
+  nextPatch: SettingsPatch
+): Promise<NormalizedSettings> {
   return patchSettings(nextPatch);
 }
 
-export async function resetSettingsRuntimeState(): Promise<Settings> {
+export async function resetSettingsRuntimeState(): Promise<NormalizedSettings> {
   return resetSettingsToDefaults();
 }

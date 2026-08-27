@@ -50,6 +50,9 @@ vi.mock('../../sections/capture/screen-sizes', () => {
 vi.mock('../../sections/capture/saving', () => {
   return { SavePresetsSection: markerComponent('saves-section') };
 });
+vi.mock('../../sections/capture/web-snapshots', () => {
+  return { WebSnapshotsSection: markerComponent('web-snapshots-section') };
+});
 vi.mock('../../sections/ai/prompts', () => {
   return { AIPromptsSection: markerComponent('templates-section') };
 });
@@ -89,6 +92,7 @@ vi.mock('../navigation/sidebar', () => ({
           'ai-connections',
           'screen-sizes',
           'saving',
+          'web-snapshots',
           'annotations',
           'media-quality',
           'ai-prompts',
@@ -257,6 +261,7 @@ describe('SettingsPage navigation', () => {
       ['ai-connections', 'ai-section'],
       ['screen-sizes', 'presets-section'],
       ['saving', 'saves-section'],
+      ['web-snapshots', 'web-snapshots-section'],
       ['annotations', 'highlighter-section'],
       ['media-quality', 'image-section'],
       ['ai-prompts', 'templates-section'],

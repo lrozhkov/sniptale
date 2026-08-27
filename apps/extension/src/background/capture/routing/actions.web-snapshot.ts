@@ -21,6 +21,7 @@ import {
 import { resolveWebSnapshotPayloadBlobs } from './web-snapshot/payload-blobs';
 import { hasActivePageAccess } from '../../page-access/service';
 import { securityE2ECheckpoint } from '../../../platform/security-e2e-control';
+import { loadSettings } from '../../../composition/persistence/settings';
 
 function resolveWebSnapshotPayloadBlobsForSave(
   payload: WebSnapshotSaveToGalleryPayload,
@@ -149,7 +150,17 @@ export function handleSaveWebSnapshotToGallery(
       if (!(await hasActivePageAccess(resolvedTabId))) {
         throw new Error('Page access was revoked before web snapshot commit');
       }
+      const settings = await loadSettings();
+      if (!settings.webSnapshotEnabled) {
+        throw new Error('Web Snapshots were disabled before web snapshot commit');
+      }
       return saveWebSnapshotToMediaHub({
+        assertPersistenceAllowed: async () => {
+          const currentSettings = await loadSettings();
+          if (!currentSettings.webSnapshotEnabled) {
+            throw new Error('Web Snapshots were disabled before web snapshot commit');
+          }
+        },
         ...blobs,
         payload,
       });

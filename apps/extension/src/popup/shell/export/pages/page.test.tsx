@@ -113,8 +113,7 @@ beforeEach(() => {
   mocks.loadSettings.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: true,
-    webSnapshotSaveDisclosureVersion: 1,
+    webSnapshotEnabled: true,
   });
   mocks.usePopupExportControllerMock.mockReset();
 });

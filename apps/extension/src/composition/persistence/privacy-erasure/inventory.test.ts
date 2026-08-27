@@ -18,6 +18,7 @@ import {
   getIndexedDbStoresForLocalExtensionDataErasure,
   LOCAL_EXTENSION_PAGE_STORAGE_KEYS,
 } from './inventory';
+import { WEB_SNAPSHOT_CONSENT_STORAGE_KEY } from '../settings/web-snapshot-consent';
 
 it('uses the canonical IndexedDB store inventory for local data erasure', () => {
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toEqual(EXPECTED_STORES);
@@ -33,6 +34,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   });
 
   expect(plan.local).not.toContain('sniptale-theme-preference');
+  expect(plan.local).not.toContain(WEB_SNAPSHOT_CONSENT_STORAGE_KEY);
   expect(plan.local).not.toContain('sniptale_ai_modal_spoiler_open');
   expect(plan.local).not.toContain('sniptale_editor_file_menu_save_to_folder_open');
   expect(plan.local).not.toContain('sniptale_popup_export_preferences');
@@ -75,6 +77,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   });
 
   expect(plan.local).toContain('sniptale-theme-preference');
+  expect(plan.local).toContain(WEB_SNAPSHOT_CONSENT_STORAGE_KEY);
   expect(plan.local).toContain('sniptale_ai_modal_spoiler_open');
   expect(plan.local).toContain('sniptale_export_json_spoiler_open');
   expect(plan.local).toContain('sniptale_export_md_spoiler_open');

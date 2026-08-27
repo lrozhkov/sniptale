@@ -1,4 +1,19 @@
 const WEB_SNAPSHOT_MIME_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/iu;
+const WEB_SNAPSHOT_ALLOWED_ASSET_MIME_TYPES = new Set([
+  'font/woff',
+  'font/woff2',
+  'image/avif',
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/svg+xml',
+  'image/webp',
+  'text/css',
+]);
+
+export function isAllowedWebSnapshotAssetMimeType(value: string): boolean {
+  return WEB_SNAPSHOT_ALLOWED_ASSET_MIME_TYPES.has(value);
+}
 
 export function isWebSnapshotAssetMimeType(value: unknown): value is string {
   return typeof value === 'string' && WEB_SNAPSHOT_MIME_TYPE_PATTERN.test(value);
@@ -9,12 +24,9 @@ export function normalizeWebSnapshotAssetMimeType(value: string | null | undefin
   return isWebSnapshotAssetMimeType(normalized) ? normalized : 'application/octet-stream';
 }
 
-export function resolveAllowedWebSnapshotAssetMimeType(
-  contentType: string | null,
-  allowedMimeTypes: ReadonlySet<string>
-): string {
+export function resolveWebSnapshotCaptureAssetMimeType(contentType: string | null): string {
   const mimeType = contentType?.split(';')[0]?.trim().toLowerCase();
-  if (!mimeType || !allowedMimeTypes.has(mimeType)) {
+  if (!mimeType || !isAllowedWebSnapshotAssetMimeType(mimeType)) {
     throw new Error('unsupported web snapshot asset MIME type');
   }
 

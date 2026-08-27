@@ -19,6 +19,11 @@ import {
   createSystemViewportPresetCatalog,
 } from '../../../features/viewport-presets/catalog';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
+import {
+  clearWebSnapshotConsent,
+  loadWebSnapshotConsent,
+  saveWebSnapshotConsent,
+} from './web-snapshot-consent';
 
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
@@ -65,10 +70,9 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
-  authenticatedSnapshotAssetsEnabled: false,
-  anonymousCrossOriginSnapshotAssetsEnabled: false,
-  skipWebSnapshotSaveDisclosure: false,
-  webSnapshotSaveDisclosureVersion: 0,
+  webSnapshotEnabled: false,
+  authenticatedSnapshotAssetsEnabled: true,
+  anonymousCrossOriginSnapshotAssetsEnabled: true,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
   voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
 };
@@ -119,13 +123,34 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
 }
 
 /**
- * Settings storage authority lives in this owner and persists the whole normalized record.
- * Callers that change one field should use patchSettings so queued read-modify-write merges
- * against the latest persisted payload.
+ * Settings storage authority lives in this owner. Transferable preferences are synchronized,
+ * while the Web Snapshot opt-in is committed through its profile-local consent owner. Callers
+ * that change one field should use patchSettings so queued read-modify-write merges against the
+ * latest persisted payload.
  */
 export async function saveSettings(settings: Settings): Promise<void> {
-  await browserStorage.sync.set({ [STORAGE_KEY]: settings });
+  const syncedSettings = createSynchronizedSettingsPayload(settings);
+  const { webSnapshotEnabled } = settings;
+  const consentEnabled = webSnapshotEnabled === true;
+
+  if (!consentEnabled) {
+    await saveWebSnapshotConsent(false);
+  }
+
+  await browserStorage.sync.set({ [STORAGE_KEY]: syncedSettings });
+
+  if (consentEnabled) {
+    await saveWebSnapshotConsent(true);
+  }
+
   logger.debug('Saved settings payload');
+}
+
+export function createSynchronizedSettingsPayload(
+  settings: Settings
+): Omit<Settings, 'webSnapshotEnabled'> {
+  const { webSnapshotEnabled: _localConsent, ...syncedSettings } = settings;
+  return syncedSettings;
 }
 
 function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSettings {
@@ -196,7 +221,10 @@ function normalizeLocalStoragePolicy(parsedValue: Partial<Settings>): LocalStora
  */
 export async function loadSettings(): Promise<NormalizedSettings> {
   const getSyncStorageValue = browserStorage.sync.get.bind(browserStorage.sync);
-  const result = await getSyncStorageValue([STORAGE_KEY]);
+  const [result, webSnapshotEnabled] = await Promise.all([
+    getSyncStorageValue([STORAGE_KEY]),
+    loadWebSnapshotConsent(),
+  ]);
   const parsedSettings = parseStoredSettings(result[STORAGE_KEY]);
 
   if (parsedSettings.hasInvalidRoot) {
@@ -209,10 +237,14 @@ export async function loadSettings(): Promise<NormalizedSettings> {
     });
   }
 
-  return normalizeLoadedSettings(parsedSettings.value);
+  return {
+    ...normalizeLoadedSettings(parsedSettings.value),
+    webSnapshotEnabled,
+  };
 }
 
 export async function clearSettings(): Promise<void> {
+  await clearWebSnapshotConsent();
   await browserStorage.sync.remove([STORAGE_KEY]);
   logger.debug('Cleared settings payload');
 }
@@ -280,18 +312,25 @@ export async function resetSettingsToDefaults(): Promise<NormalizedSettings> {
   });
 }
 
-/** Removes only the retired diagnostics field while preserving every other stored property. */
-export async function removeRetiredDiagnosticsSetting(): Promise<void> {
+/** Removes retired synchronized fields while preserving every current stored property. */
+export async function removeRetiredSynchronizedSettings(): Promise<void> {
   await queueSettingsMutation(async () => {
     const stored = await browserStorage.sync.get([STORAGE_KEY]);
     const raw = stored[STORAGE_KEY];
     const retiredField = ['raw', 'Diagnostics', 'Enabled'].join('');
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !(retiredField in raw)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return loadSettings();
     }
 
     const nextRaw = { ...(raw as Record<string, unknown>) };
+    const removedDiagnostics = retiredField in nextRaw;
+    const removedLegacyWebSnapshotConsent = 'webSnapshotEnabled' in nextRaw;
+    if (!removedDiagnostics && !removedLegacyWebSnapshotConsent) {
+      return loadSettings();
+    }
+
     delete nextRaw[retiredField];
+    delete nextRaw['webSnapshotEnabled'];
     await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw });
     return loadSettings();
   });

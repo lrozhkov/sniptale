@@ -53,7 +53,6 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     imageQuality: 100,
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: false,
     presets: [createPreset('preset-image')],
     viewportPresets: [],
     saveCapturesToGallery: true,

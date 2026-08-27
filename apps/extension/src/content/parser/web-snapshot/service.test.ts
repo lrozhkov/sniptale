@@ -144,6 +144,9 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
     contextLabel: 'web-snapshot',
     preserveAssetUrls: true,
   });
+  expect(mocks.captureWebSnapshotScreenshotWithWarnings.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.buildPreparedSnapshotDocument.mock.invocationCallOrder[0] ?? 0
+  );
   expect(mocks.collectWebSnapshotAssets).toHaveBeenCalledWith(
     (await snapshotDocument).document as Document,
     {
@@ -209,6 +212,7 @@ it('fails before packaging when the required full-page screenshot capture fails'
       requestId: 'req-web',
     })
   ).rejects.toThrow('window is not defined');
+  expect(mocks.buildPreparedSnapshotDocument).not.toHaveBeenCalled();
   expect(mocks.collectWebSnapshotAssets).not.toHaveBeenCalled();
   expect(mocks.buildWebSnapshotPackage).not.toHaveBeenCalled();
   expect(mocks.serializePreparedSnapshotDocument).not.toHaveBeenCalled();

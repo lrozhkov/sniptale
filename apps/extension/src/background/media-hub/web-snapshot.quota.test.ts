@@ -60,6 +60,7 @@ function setupWebSnapshotQuotaTest() {
 
 function createSavePayload() {
   return {
+    assertPersistenceAllowed: vi.fn().mockResolvedValue(undefined),
     packageBlob: new Blob(['package']),
     payload: {
       manifest: {
@@ -139,7 +140,8 @@ describe('web snapshot media hub quota boundary', () => {
     await saveWebSnapshotToMediaHub(input);
 
     expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
-      expect.objectContaining({ filename: 'httpsexample.comdocs.sniptale-web-snapshot.zip' })
+      expect.objectContaining({ filename: 'httpsexample.comdocs.sniptale-web-snapshot.zip' }),
+      expect.any(Function)
     );
   });
 

@@ -70,6 +70,7 @@ async function createPayload() {
   const packageBase64 = await createPackageBase64(manifest);
   const screenshotBase64 = Buffer.from(createPngBytes()).toString('base64');
   return {
+    assertPersistenceAllowed: vi.fn().mockResolvedValue(undefined),
     packageBlob: new Blob([Buffer.from(packageBase64, 'base64')], {
       type: 'application/x-sniptale-web-snapshot+zip',
     }),
@@ -101,6 +102,7 @@ it('accepts legacy stylesheet diagnostic entries while saving old web snapshot p
 
   expect(mocks.ensureHeadroom).toHaveBeenCalledOnce();
   expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
-    expect.objectContaining({ filename: 'Legacy_Snapshot.sniptale-web-snapshot.zip' })
+    expect.objectContaining({ filename: 'Legacy_Snapshot.sniptale-web-snapshot.zip' }),
+    expect.any(Function)
   );
 });

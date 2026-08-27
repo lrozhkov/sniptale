@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const settingsFixture = {
   captureAction: 'download_default' as const,
+  localStoragePolicy: {
+    cleanupEnabled: true,
+    defaultDestination: 'temporary' as const,
+    draftRetentionDays: 30,
+    videoDraftRetentionDays: 7,
+  },
   contextMenu: {
     enabled: true,
     showScreenshots: true,
@@ -23,9 +29,9 @@ const settingsFixture = {
   defaultExportPresetId: null,
   imageFormat: 'png' as const,
   imageQuality: 100,
+  webSnapshotEnabled: false,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
-  skipWebSnapshotSaveDisclosure: false,
 };
 
 const {

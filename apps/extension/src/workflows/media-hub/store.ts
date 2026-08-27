@@ -58,12 +58,16 @@ export async function saveScreenshotMediaAssetSafely(
 }
 
 export async function saveWebSnapshotMediaAssetSafely(
-  input: SaveWebSnapshotMediaAssetInput
+  input: SaveWebSnapshotMediaAssetInput,
+  assertPersistenceAllowed: () => Promise<void>
 ): Promise<{ assetId: string }> {
   assertSafeMediaFilename(input.filename);
   const result = await withMediaHubWriteGuard(
     translate('shared.mediaHub.saveWebSnapshotAction'),
-    () => saveWebSnapshotMediaAsset(input)
+    async () => {
+      await assertPersistenceAllowed();
+      return saveWebSnapshotMediaAsset(input);
+    }
   );
   publishMediaHubLibraryChanged('create', [result.assetId]);
   return { assetId: result.assetId };

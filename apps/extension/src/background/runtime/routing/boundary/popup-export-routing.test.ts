@@ -111,6 +111,7 @@ beforeEach(() => {
   loadSettingsMock.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
+    webSnapshotEnabled: true,
   });
   browserScriptingExecuteScriptMock.mockResolvedValue([
     { frameId: 0, result: { assetId: 'snapshot-1', success: true, warnings: [] } },
@@ -301,6 +302,7 @@ it('honors existing authenticated same-origin asset opt-ins from stored settings
   loadSettingsMock.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: true,
+    webSnapshotEnabled: true,
   });
 
   routePopupExportMessage({
@@ -322,6 +324,33 @@ it('honors existing authenticated same-origin asset opt-ins from stored settings
     })
   );
   expect(sendTabMessageMock).not.toHaveBeenCalled();
+});
+
+it('denies web snapshot capture before authorization when the global opt-in is disabled', async () => {
+  const sendResponse = vi.fn();
+  loadSettingsMock.mockResolvedValueOnce({
+    anonymousCrossOriginSnapshotAssetsEnabled: true,
+    authenticatedSnapshotAssetsEnabled: true,
+    webSnapshotEnabled: false,
+  });
+
+  routePopupExportMessage({
+    deps: createBackgroundRuntimeState(),
+    message: createSaveMessage(),
+    resolvedTabId: 62,
+    sendResponse,
+    sender: undefined,
+  });
+  await flushRouteWork();
+
+  expect(browserTabsGetMock).not.toHaveBeenCalled();
+  expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
+  expect(authorizeWebSnapshotCaptureRequestMock).not.toHaveBeenCalled();
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: 'Web Snapshots are disabled in settings.',
+    success: false,
+  });
 });
 
 it('surfaces injected content export failures with the route stage', async () => {

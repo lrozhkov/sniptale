@@ -11,6 +11,11 @@ const { browserStorageSyncGetMock, browserStorageSyncSetMock, loggerDebugMock, l
 vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
   ...(await importOriginal()),
   browserStorage: {
+    local: {
+      get: vi.fn().mockResolvedValue({}),
+      remove: vi.fn(),
+      set: vi.fn(),
+    },
     sync: {
       get: browserStorageSyncGetMock,
       remove: vi.fn(),
@@ -51,6 +56,11 @@ async function flushMicrotasks(turns = 5) {
   }
 }
 
+function withoutWebSnapshotConsent(settings: typeof DEFAULT_SETTINGS) {
+  const { webSnapshotEnabled: _webSnapshotEnabled, ...syncedSettings } = settings;
+  return syncedSettings;
+}
+
 describe('settings patch persistence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,31 +93,10 @@ describe('settings patch persistence', () => {
     await expect(firstPatch).resolves.toEqual(firstCommittedSettings);
     await expect(secondPatch).resolves.toEqual(secondCommittedSettings);
     expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(1, {
-      sniptale_settings: firstCommittedSettings,
+      sniptale_settings: withoutWebSnapshotConsent(firstCommittedSettings),
     });
     expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(2, {
-      sniptale_settings: secondCommittedSettings,
-    });
-  });
-});
-
-describe('web snapshot disclosure settings patch', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    browserStorageSyncGetMock.mockResolvedValue({});
-    browserStorageSyncSetMock.mockResolvedValue(undefined);
-  });
-
-  it('persists skip preference through the settings patch seam', async () => {
-    const committedSettings = { ...DEFAULT_SETTINGS, skipWebSnapshotSaveDisclosure: true };
-
-    browserStorageSyncGetMock.mockResolvedValueOnce({ sniptale_settings: DEFAULT_SETTINGS });
-
-    await expect(patchSettings({ skipWebSnapshotSaveDisclosure: true })).resolves.toEqual(
-      committedSettings
-    );
-    expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-      sniptale_settings: committedSettings,
+      sniptale_settings: withoutWebSnapshotConsent(secondCommittedSettings),
     });
   });
 });
@@ -129,7 +118,7 @@ describe('settings reset persistence', () => {
     await expect(resetSettingsToDefaults()).resolves.toEqual(createDefaultSettings());
 
     expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith({
-      sniptale_settings: createDefaultSettings(),
+      sniptale_settings: withoutWebSnapshotConsent(createDefaultSettings()),
     });
   });
 });

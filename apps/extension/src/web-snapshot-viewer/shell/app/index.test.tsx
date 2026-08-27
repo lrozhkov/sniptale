@@ -185,7 +185,7 @@ it('revokes object URLs from a snapshot load that resolves after unmount', async
   expect(mocks.revokeWebSnapshotObjectUrls).toHaveBeenCalledWith(['blob:late']);
 });
 
-it('hides snapshot metadata while keeping the mode control available', async () => {
+it('collapses the whole toolbar and restores it from a compact overlay control', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
 
   await act(async () => {
@@ -196,18 +196,30 @@ it('hides snapshot metadata while keeping the mode control available', async () 
   expect(container?.textContent).toContain('Page title');
   expect(container?.textContent).toContain('https://example.com/page');
 
-  const closeButton = container?.querySelector(
-    `button[aria-label="${translate('webSnapshotViewer.app.hideHeader', 'en')}"]`
+  const collapseButton = container?.querySelector(
+    `button[aria-label="${translate('webSnapshotViewer.app.collapseToolbar', 'en')}"]`
   ) as HTMLButtonElement | null;
-  expect(closeButton).toBeTruthy();
+  expect(collapseButton).toBeTruthy();
 
   act(() => {
-    closeButton?.click();
+    collapseButton?.click();
   });
 
   expect(container?.textContent).not.toContain('Page title');
   expect(container?.textContent).not.toContain('https://example.com/page');
   expect(document.title).toBe('Page title - Sniptale Web Snapshot');
+  expect(container?.querySelector('header')).toBeNull();
+  expect(
+    container?.querySelector(`[aria-label="${translate('webSnapshotViewer.app.modeLabel', 'en')}"]`)
+  ).toBeNull();
+  const expandButton = container?.querySelector(
+    `button[aria-label="${translate('webSnapshotViewer.app.expandToolbar', 'en')}"]`
+  ) as HTMLButtonElement | null;
+  expect(expandButton).toBeTruthy();
+
+  act(() => expandButton?.click());
+  expect(container?.textContent).toContain('Page title');
+  expect(container?.textContent).toContain('https://example.com/page');
 
   await loadSnapshotIframe();
   expect(container?.querySelector('iframe')).not.toBeNull();
@@ -235,8 +247,11 @@ it('opens with the static document and switches explicitly to the screenshot', a
 
   const image = container?.querySelector<HTMLImageElement>('[data-testid="snapshot-visual-image"]');
   expect(image?.src).toBe('blob:snapshot-screenshot');
-  expect(image?.style.width).toBe('');
-  expect(image?.style.maxWidth).toBe('1440px');
+  expect(image?.style.width).toBe('1024px');
+  expect(image?.style.maxWidth).toBe('');
+  Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 1000 });
+  act(() => image?.dispatchEvent(new Event('load')));
+  expect(image?.style.width).toBe('711.1111111111111px');
   expect(container?.querySelector('iframe')).toBeNull();
 });
 
@@ -245,12 +260,14 @@ it('shows verified nested assets without replacing the static-document default',
     createLoadedPackage({
       assets: [
         {
+          downloadUrl: 'blob:image-download',
           mimeType: 'image/png',
           path: 'assets/1.png',
           size: 2048,
           url: 'blob:image',
         },
         {
+          downloadUrl: 'blob:style-download',
           mimeType: 'text/css',
           path: 'assets/2.css',
           size: 512,

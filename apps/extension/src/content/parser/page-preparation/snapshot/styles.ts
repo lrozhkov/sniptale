@@ -42,6 +42,70 @@ function readStyleSheetRules(sheet: CSSStyleSheet, documentBaseUrl: string): str
   }
 }
 
+function sanitizeCapturedCssText(cssText: string, stylesheetBaseUrl: string): string {
+  return sanitizeWebSnapshotCssText(cssText, (url) =>
+    rewriteCapturedCssUrl(url, stylesheetBaseUrl)
+  );
+}
+
+function readAuthoredInlineStyleRules(owner: Element): string[] | null {
+  const authoredCssText = owner.textContent?.trim() ?? '';
+  if (owner.tagName.toLowerCase() !== 'style' || !authoredCssText) return null;
+  const parserDocument = owner.ownerDocument.implementation.createHTMLDocument(
+    'web-snapshot-inline-style-parser'
+  );
+  const parserStyle = parserDocument.createElement('style');
+  parserStyle.textContent = authoredCssText;
+  parserDocument.head.appendChild(parserStyle);
+  const parserSheet = parserStyle.sheet;
+  if (!parserSheet) return null;
+  return Array.from(parserSheet.cssRules, (rule) => rule.cssText);
+}
+
+function readLosslessInlineStyleSheet(
+  sheet: CSSStyleSheet,
+  owner: Element | undefined,
+  documentBaseUrl: string
+): string | null {
+  if (!owner || owner.tagName.toLowerCase() !== 'style') return null;
+  const authoredCssText = owner.textContent?.trim() ?? '';
+  const authoredRules = readAuthoredInlineStyleRules(owner);
+  if (!authoredCssText || !authoredRules) return null;
+  try {
+    const liveRules = Array.from(sheet.cssRules, (rule) => rule.cssText);
+    const authoredRulesRemainPrefix = authoredRules.every(
+      (rule, index) => liveRules[index] === rule
+    );
+    const authoredRulesRemainSuffix = authoredRules.every(
+      (rule, index) => liveRules[liveRules.length - authoredRules.length + index] === rule
+    );
+    const stylesheetBaseUrl = sheet.href ?? documentBaseUrl;
+    const sanitizedAuthoredCss = sanitizeCapturedCssText(authoredCssText, stylesheetBaseUrl);
+    if (liveRules.length === authoredRules.length && authoredRulesRemainPrefix) {
+      return sanitizedAuthoredCss;
+    }
+    if (liveRules.length > authoredRules.length && authoredRulesRemainPrefix) {
+      const appendedCss = liveRules
+        .slice(authoredRules.length)
+        .map((rule) => sanitizeCapturedCssText(rule, stylesheetBaseUrl))
+        .filter(Boolean)
+        .join('\n');
+      return [sanitizedAuthoredCss, appendedCss].filter(Boolean).join('\n');
+    }
+    if (liveRules.length > authoredRules.length && authoredRulesRemainSuffix) {
+      const prependedCss = liveRules
+        .slice(0, liveRules.length - authoredRules.length)
+        .map((rule) => sanitizeCapturedCssText(rule, stylesheetBaseUrl))
+        .filter(Boolean)
+        .join('\n');
+      return [prependedCss, sanitizedAuthoredCss].filter(Boolean).join('\n');
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function appendMaterializedStyle(
   snapshot: Document,
   sheet: CSSStyleSheet,
@@ -114,10 +178,13 @@ export function materializePreparedSnapshotStyles(
     if (sheet.disabled) continue;
     const fallbackOwner = sourceOwners[index];
     // Preserve authored linked CSS bytes. Chromium's CSSOM serialization can expand shorthands
-    // containing var() into empty longhands (for example Wikipedia's figure border), which changes
+    // containing var() into empty longhands, which changes
     // box geometry when reparsed. The asset pipeline captures and sanitizes this link recursively.
     if (preserveSourceStylesheetLink(snapshot, sheet, fallbackOwner)) continue;
-    const cssText = readStyleSheetRules(sheet, sourceDocument.baseURI);
+    const owner = sheet.ownerNode instanceof Element ? sheet.ownerNode : fallbackOwner;
+    const cssText =
+      readLosslessInlineStyleSheet(sheet, owner, sourceDocument.baseURI) ??
+      readStyleSheetRules(sheet, sourceDocument.baseURI);
     if (cssText === null) {
       appendRestrictedStylesheetLink(snapshot, sheet, fallbackOwner);
       continue;

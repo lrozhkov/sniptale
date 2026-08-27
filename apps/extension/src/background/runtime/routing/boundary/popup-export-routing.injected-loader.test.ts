@@ -106,6 +106,7 @@ beforeEach(() => {
   loadSettingsMock.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
+    webSnapshotEnabled: true,
   });
   browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);

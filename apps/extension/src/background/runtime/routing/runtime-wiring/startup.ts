@@ -2,7 +2,7 @@ import { ensurePersistentStorage } from '../../../../composition/persistence/inf
 import { cleanupDrafts } from '../../../../composition/persistence/library-lifecycle';
 import {
   loadSettings,
-  removeRetiredDiagnosticsSetting,
+  removeRetiredSynchronizedSettings,
 } from '../../../../composition/persistence/settings';
 import { initializeAiStorageAccess } from '../../../../composition/persistence/ai-settings/init';
 import { migrateHighlighterSystemPresetCatalog } from '../../../../composition/persistence/highlighter';
@@ -38,8 +38,8 @@ export function runStartupMaintenance(
       logger.warn('Retired diagnostics state cleanup failed (non-critical)', error);
     }
   );
-  removeRetiredDiagnosticsSetting().catch((error) => {
-    logger.warn('Retired diagnostics setting cleanup failed (non-critical)', error);
+  removeRetiredSynchronizedSettings().catch((error) => {
+    logger.warn('Retired synchronized settings cleanup failed (non-critical)', error);
   });
   interruptStoredPopupExportJob().catch((error) => {
     logger.warn('Popup export restart reconciliation failed (non-critical)', error);

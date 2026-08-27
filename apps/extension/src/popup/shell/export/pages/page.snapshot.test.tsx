@@ -7,17 +7,16 @@ import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capa
 import { createVideoCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/test-support';
 import type { ExportFooterActions } from '../footer/actions';
 
-type ExportFooterActionsProps = Parameters<typeof ExportFooterActions>[0];
-
+type FooterProps = Parameters<typeof ExportFooterActions>[0];
 const mocks = vi.hoisted(() => ({
-  exportFooterActions: vi.fn<(props: ExportFooterActionsProps) => void>(),
+  exportFooterActions: vi.fn<(props: FooterProps) => void>(),
   loadSettings: vi.fn(),
-  patchSettings: vi.fn(),
+  openSettingsPage: vi.fn(),
   usePopupExportController: vi.fn(),
 }));
 
 vi.mock('../footer/actions', () => ({
-  ExportFooterActions: (props: ExportFooterActionsProps) => {
+  ExportFooterActions: (props: FooterProps) => {
     mocks.exportFooterActions(props);
     return <div />;
   },
@@ -30,18 +29,20 @@ vi.mock('../controller', async (importOriginal) => ({
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
   loadSettings: mocks.loadSettings,
-  patchSettings: mocks.patchSettings,
+}));
+vi.mock('../../../../platform/navigation/extension-pages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/navigation/extension-pages')>()),
+  openSettingsPage: mocks.openSettingsPage,
 }));
 
 import { ExportPage } from './page';
 import { createPopupExportControllerFixture } from './controller.test-support';
 
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
+let container: HTMLDivElement;
+let root: Root;
 
-function createActiveTabCapabilities(): ActiveTabCapabilities {
+function capabilities(): ActiveTabCapabilities {
   const supported = { reason: null, supported: true };
-
   return {
     export: supported,
     isRestrictedPage: false,
@@ -55,13 +56,13 @@ function createActiveTabCapabilities(): ActiveTabCapabilities {
   };
 }
 
-async function renderExportPage() {
-  await act(async () => {
-    root?.render(<ExportPage isActive activeTabCapabilities={createActiveTabCapabilities()} />);
-  });
+async function renderPage() {
+  await act(async () =>
+    root.render(<ExportPage isActive activeTabCapabilities={capabilities()} />)
+  );
 }
 
-async function settleLastSettingsLoad() {
+async function settleSettings() {
   await act(async () => {
     try {
       await mocks.loadSettings.mock.results.at(-1)?.value;
@@ -71,24 +72,14 @@ async function settleLastSettingsLoad() {
   });
 }
 
-function getLatestFooterProps(): ExportFooterActionsProps {
+function footer(): FooterProps {
   return mocks.exportFooterActions.mock.calls.at(-1)![0];
 }
 
-function getButtonByText(text: string): HTMLButtonElement | null {
-  return (
-    Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-      button.textContent?.includes(text)
-    ) ?? null
+function button(text: string): HTMLButtonElement | undefined {
+  return Array.from(container.querySelectorAll('button')).find((item) =>
+    item.textContent?.includes(text)
   );
-}
-
-async function flushMicrotasks(turns = 5) {
-  for (let turn = 0; turn < turns; turn += 1) {
-    await act(async () => {
-      await Promise.resolve();
-    });
-  }
 }
 
 beforeEach(() => {
@@ -97,203 +88,92 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   mocks.exportFooterActions.mockReset();
-  mocks.loadSettings.mockResolvedValue({
-    anonymousCrossOriginSnapshotAssetsEnabled: false,
-    authenticatedSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: false,
-  });
-  mocks.patchSettings.mockReset();
-  mocks.patchSettings.mockResolvedValue({
-    anonymousCrossOriginSnapshotAssetsEnabled: false,
-    authenticatedSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: true,
-  });
-  mocks.usePopupExportController.mockReturnValue(
-    createPopupExportControllerFixture({
-      derived: { isExporting: true },
-      session: {
-        progress: {
-          activeStepKey: null,
-          current: 0,
-          errors: [],
-          message: 'Сохраняем веб-снимок...',
-          phase: 'scanning',
-          total: 0,
-        },
-      },
-    })
-  );
+  mocks.loadSettings.mockReset().mockResolvedValue({ webSnapshotEnabled: false });
+  mocks.openSettingsPage.mockReset().mockResolvedValue(undefined);
+  mocks.usePopupExportController.mockReset().mockReturnValue(createPopupExportControllerFixture());
 });
 
 afterEach(() => {
-  act(() => root?.unmount());
-  container?.remove();
+  act(() => root.unmount());
+  container.remove();
   vi.unstubAllGlobals();
 });
 
-it('marks the snapshot footer action while snapshot saving is active', async () => {
-  await renderExportPage();
-
-  expect(mocks.exportFooterActions).toHaveBeenCalledWith(
-    expect.objectContaining({
-      canSaveWebSnapshot: false,
-      isSavingWebSnapshot: true,
-    })
+it('keeps the website action enabled and opens compact setup guidance while disabled', async () => {
+  const handleSaveWebSnapshot = vi.fn();
+  mocks.usePopupExportController.mockReturnValue(
+    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
   );
+  await renderPage();
+  await settleSettings();
+
+  expect(footer().canSaveWebSnapshot).toBe(true);
+  act(() => footer().onSaveWebSnapshot?.());
+  expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(container.textContent).toContain('Веб-снимки выключены');
+  expect(container.textContent).toContain('текстом, оформлением, изображениями');
+
+  act(() => button('Открыть настройки')?.click());
+  expect(mocks.openSettingsPage).toHaveBeenCalledWith({ route: { section: 'web-snapshots' } });
 });
 
-it('opens the snapshot confirmation while web snapshot asset settings are still loading', async () => {
+it('saves directly after the persisted opt-in is loaded', async () => {
+  const handleSaveWebSnapshot = vi.fn();
+  mocks.loadSettings.mockResolvedValueOnce({ webSnapshotEnabled: true });
+  mocks.usePopupExportController.mockReturnValue(
+    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
+  );
+  await renderPage();
+  await settleSettings();
+
+  act(() => footer().onSaveWebSnapshot?.());
+  expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('fails closed with setup guidance while settings are loading or unavailable', async () => {
   const handleSaveWebSnapshot = vi.fn();
   mocks.loadSettings.mockReturnValueOnce(new Promise(() => undefined));
   mocks.usePopupExportController.mockReturnValue(
     createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
   );
+  await renderPage();
+  act(() => footer().onSaveWebSnapshot?.());
+  expect(container.textContent).toContain('Веб-снимки выключены');
+  act(() => button('Закрыть')?.click());
 
-  await renderExportPage();
-
-  const footerProps = getLatestFooterProps();
-  expect(footerProps.canSaveWebSnapshot).toBe(true);
-
-  await act(async () => {
-    footerProps.onSaveWebSnapshot?.();
-  });
-  expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain('Сохранить веб-снимок?');
-  expect(container?.textContent).toContain('Проверяем настройки ресурсов');
-  expect(container?.textContent).toContain('могут попасть в локальную копию');
-});
-
-it('opens the snapshot confirmation when web snapshot asset settings cannot be loaded', async () => {
-  const handleSaveWebSnapshot = vi.fn();
-  mocks.loadSettings.mockRejectedValueOnce(new Error('settings unavailable'));
-  mocks.usePopupExportController.mockReturnValue(
-    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
-  );
-
-  await renderExportPage();
-  await settleLastSettingsLoad();
-
-  const footerProps = getLatestFooterProps();
-  await act(async () => {
-    footerProps.onSaveWebSnapshot?.();
-  });
-  expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain('Не удалось проверить настройки ресурсов');
-  expect(container?.textContent).toContain('если они включены');
-});
-
-it('confirms snapshot saving and stores skip preference only after confirmation', async () => {
-  const handleSaveWebSnapshot = vi.fn();
-  mocks.loadSettings.mockResolvedValueOnce({
-    anonymousCrossOriginSnapshotAssetsEnabled: true,
-    authenticatedSnapshotAssetsEnabled: true,
-    skipWebSnapshotSaveDisclosure: false,
-  });
-  mocks.usePopupExportController.mockReturnValue(
-    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
-  );
-
-  await renderExportPage();
-  await settleLastSettingsLoad();
-
-  const footerProps = getLatestFooterProps();
-  await act(async () => {
-    footerProps.onSaveWebSnapshot?.();
-  });
-  expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain('с учётом активного входа');
-  expect(container?.textContent).toContain('внешние HTTPS-ресурсы — анонимно');
-  expect(container?.textContent).toContain('Приватные изображения или стили');
-
-  await act(async () => {
-    container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
-    getButtonByText('Отмена')?.click();
-  });
-  expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
-  expect(mocks.patchSettings).not.toHaveBeenCalled();
-  expect(container?.textContent).not.toContain('Сохранить веб-снимок?');
-
-  await act(async () => {
-    getLatestFooterProps().onSaveWebSnapshot?.();
-  });
-  await act(async () => {
-    container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
-    getButtonByText('Сохранить локально')?.click();
-  });
-  await flushMicrotasks();
-
-  expect(mocks.patchSettings).toHaveBeenCalledWith({
-    skipWebSnapshotSaveDisclosure: true,
-    webSnapshotSaveDisclosureVersion: 1,
-  });
-  expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
-
-  await act(async () => {
-    getLatestFooterProps().onSaveWebSnapshot?.();
-  });
-  expect(container?.textContent).not.toContain('Сохранить веб-снимок?');
-  expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(2);
-});
-
-it('saves snapshots directly when disclosure skip preference is already stored', async () => {
-  const handleSaveWebSnapshot = vi.fn();
-  mocks.loadSettings.mockResolvedValueOnce({
-    anonymousCrossOriginSnapshotAssetsEnabled: true,
-    authenticatedSnapshotAssetsEnabled: true,
-    skipWebSnapshotSaveDisclosure: true,
-    webSnapshotSaveDisclosureVersion: 1,
-  });
-  mocks.usePopupExportController.mockReturnValue(
-    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
-  );
-
-  await renderExportPage();
-  await settleLastSettingsLoad();
-
-  getLatestFooterProps().onSaveWebSnapshot?.();
-
-  expect(container?.textContent).not.toContain('Сохранить веб-снимок?');
-  expect(mocks.patchSettings).not.toHaveBeenCalled();
-  expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
-});
-
-it('requires the revised disclosure when only the legacy skip preference is stored', async () => {
-  const handleSaveWebSnapshot = vi.fn();
-  mocks.loadSettings.mockResolvedValueOnce({
-    anonymousCrossOriginSnapshotAssetsEnabled: false,
-    authenticatedSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: true,
-  });
-  mocks.usePopupExportController.mockReturnValue(
-    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
-  );
-
-  await renderExportPage();
-  await settleLastSettingsLoad();
-  await act(async () => {
-    getLatestFooterProps().onSaveWebSnapshot?.();
-  });
-
-  expect(container?.textContent).toContain('Сохранить веб-снимок?');
+  act(() => root.unmount());
+  root = createRoot(container);
+  mocks.loadSettings.mockRejectedValueOnce(new Error('unavailable'));
+  await renderPage();
+  await settleSettings();
+  act(() => footer().onSaveWebSnapshot?.());
+  expect(container.textContent).toContain('Не удалось проверить настройку');
   expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
 });
 
-it('confirms snapshot saving without storing skip preference when the checkbox is clear', async () => {
-  const handleSaveWebSnapshot = vi.fn();
+it('marks the footer action while snapshot saving is active', async () => {
   mocks.usePopupExportController.mockReturnValue(
-    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
+    createPopupExportControllerFixture({
+      derived: { isExporting: true },
+      session: {
+        progress: {
+          activeStepKey: 'webSnapshotDom',
+          current: 1,
+          errors: [],
+          message: 'Статический документ',
+          phase: 'scanning',
+          total: 4,
+        },
+      },
+    })
   );
-
-  await renderExportPage();
-  await settleLastSettingsLoad();
-
-  await act(async () => {
-    getLatestFooterProps().onSaveWebSnapshot?.();
-  });
-  await act(async () => {
-    getButtonByText('Сохранить локально')?.click();
-  });
-
-  expect(mocks.patchSettings).not.toHaveBeenCalled();
-  expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
+  await renderPage();
+  expect(footer()).toEqual(
+    expect.objectContaining({
+      canSaveWebSnapshot: false,
+      isSavingWebSnapshot: true,
+    })
+  );
 });

@@ -9,30 +9,6 @@ const APPEARANCE_DESCRIPTION_EN = [
   'Controls the shared extension UI theme, active language, and Sniptale browser context menu integration.',
   'Changes apply immediately in the current window and other open extension pages.',
 ].join(' ');
-const AUTHENTICATED_SNAPSHOT_ASSETS_DESCRIPTION_RU = [
-  'Опционально сохранять изображения и стили с того же сайта с учётом текущего входа.',
-  'По умолчанию такие ресурсы пропускаются при сохранении веб-снимка.',
-].join(' ');
-const AUTHENTICATED_SNAPSHOT_ASSETS_DESCRIPTION_EN = [
-  'Optionally save same-site images and styles using the current signed-in session.',
-  'By default, those assets are skipped while saving a web snapshot.',
-].join(' ');
-const AUTHENTICATED_SNAPSHOT_ASSETS_WARNING_RU = [
-  'Включение может добавить в сохранённый файл приватные ресурсы текущего сайта.',
-  'Используйте только для снимков, которые не будут переданы третьим лицам.',
-].join(' ');
-const AUTHENTICATED_SNAPSHOT_ASSETS_WARNING_EN = [
-  'Enabling this can embed private resources from the current site into the saved file.',
-  'Use it only for snapshots that will not be shared externally.',
-].join(' ');
-const ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_RU = [
-  'Анонимно загружать HTTPS-ресурсы с других сайтов через фон расширения.',
-  'Если выключено, внешние ресурсы пропускаются; это снижает риск private-network и DNS-rebinding утечек.',
-].join(' ');
-const ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_EN = [
-  'Anonymously load HTTPS assets from other sites through the extension background.',
-  'When disabled, external assets are skipped; this reduces private-network and DNS-rebinding leak risk.',
-].join(' ');
 
 export const settingsAppearanceMessages = defineMessageSource({
   badge: {
@@ -133,30 +109,6 @@ export const settingsAppearanceMessages = defineMessageSource({
   followSystemCompactHint: {
     ru: 'Автоматически подстраивать тему под настройки устройства.',
     en: 'Automatically match the device appearance setting.',
-  },
-  capturePrivacyTitle: {
-    ru: 'Веб-снимки',
-    en: 'Web snapshots',
-  },
-  authenticatedSnapshotAssetsLabel: {
-    ru: 'Загружать ресурсы текущего сайта',
-    en: 'Load current-site assets',
-  },
-  authenticatedSnapshotAssetsDescription: {
-    ru: AUTHENTICATED_SNAPSHOT_ASSETS_DESCRIPTION_RU,
-    en: AUTHENTICATED_SNAPSHOT_ASSETS_DESCRIPTION_EN,
-  },
-  authenticatedSnapshotAssetsWarning: {
-    ru: AUTHENTICATED_SNAPSHOT_ASSETS_WARNING_RU,
-    en: AUTHENTICATED_SNAPSHOT_ASSETS_WARNING_EN,
-  },
-  anonymousCrossOriginSnapshotAssetsLabel: {
-    ru: 'Загружать внешние ресурсы',
-    en: 'Load external assets',
-  },
-  anonymousCrossOriginSnapshotAssetsDescription: {
-    ru: ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_RU,
-    en: ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_EN,
   },
   contextMenuTitle: {
     ru: 'Контекстное меню браузера',

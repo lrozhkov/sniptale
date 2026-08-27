@@ -1,5 +1,5 @@
 import { create, type StateCreator } from 'zustand';
-import type { Settings, SettingsPatch } from '../../../contracts/settings';
+import type { NormalizedSettings, SettingsPatch } from '../../../contracts/settings';
 import {
   DEFAULT_SETTINGS,
   loadSettingsRuntimeState,
@@ -8,7 +8,7 @@ import {
 } from './runtime';
 
 interface SettingsStore {
-  settings: Settings;
+  settings: NormalizedSettings;
   isLoading: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
@@ -18,7 +18,7 @@ interface SettingsStore {
 
 type SettingsWriteState = {
   pendingWriteCount: number;
-  writeQueue: Promise<Settings>;
+  writeQueue: Promise<NormalizedSettings>;
   writeVersion: number;
 };
 
@@ -32,7 +32,7 @@ function createSettingsWriteState(): SettingsWriteState {
   };
 }
 
-function syncSettingsWriteQueue(state: SettingsWriteState, settings: Settings) {
+function syncSettingsWriteQueue(state: SettingsWriteState, settings: NormalizedSettings) {
   state.writeQueue = Promise.resolve(settings);
 }
 
@@ -135,7 +135,7 @@ function createSettingsStoreState(): StateCreator<SettingsStore> {
   const writeState = createSettingsWriteState();
 
   return (set, get) => ({
-    settings: DEFAULT_SETTINGS as Settings,
+    settings: DEFAULT_SETTINGS,
     isLoading: false,
     error: null,
 

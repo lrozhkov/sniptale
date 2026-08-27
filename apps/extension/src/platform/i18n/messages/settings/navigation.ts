@@ -39,6 +39,10 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Изображения и видео',
     en: 'Images and video',
   },
+  webSnapshots: {
+    ru: 'Веб-снимки',
+    en: 'Web snapshots',
+  },
   saving: {
     ru: 'Файлы и хранилище',
     en: 'Files and storage',
@@ -87,6 +91,10 @@ export const settingsNavigationMessages = defineMessageSource({
     mediaQuality: {
       ru: 'Настройте параметры изображений и профили качества видео.',
       en: 'Configure image settings and video quality profiles.',
+    },
+    webSnapshots: {
+      ru: 'Сохраняйте автономные копии веб-страниц и управляйте загрузкой их ресурсов.',
+      en: 'Save self-contained copies of web pages and control how their resources are loaded.',
     },
     saving: {
       ru: 'Настройте скачивание, рабочие материалы, библиотеку и черновики.',

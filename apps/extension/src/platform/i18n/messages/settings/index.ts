@@ -13,6 +13,7 @@ import { settingsVoiceInputMessages } from './voice-input';
 import { settingsCollectionMessages } from './collection';
 import { settingsStorageDraftsMessages } from './storage-drafts';
 import { settingsTransferMessages } from './transfer';
+import { settingsWebSnapshotMessages } from './web-snapshots';
 
 export const settingsMessages = defineMessageSource({
   collection: settingsCollectionMessages,
@@ -29,4 +30,5 @@ export const settingsMessages = defineMessageSource({
   voiceInput: settingsVoiceInputMessages,
   storageDrafts: settingsStorageDraftsMessages,
   settingsTransfer: settingsTransferMessages,
+  webSnapshots: settingsWebSnapshotMessages,
 });

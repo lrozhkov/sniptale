@@ -12,6 +12,7 @@ const {
   consumeWebSnapshotStagedBlobMock,
   deleteMediaLibraryAssetsBatchSafelyMock,
   hasActivePageAccessMock,
+  loadSettingsMock,
   releaseWebSnapshotStagedBlobsMock,
   releaseWebSnapshotStagedBlobsForSessionMock,
   releaseWebSnapshotSaveMock,
@@ -26,6 +27,7 @@ const {
   consumeWebSnapshotStagedBlobMock: vi.fn(),
   deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
   hasActivePageAccessMock: vi.fn(),
+  loadSettingsMock: vi.fn(),
   releaseWebSnapshotStagedBlobsMock: vi.fn(),
   releaseWebSnapshotStagedBlobsForSessionMock: vi.fn(),
   releaseWebSnapshotSaveMock: vi.fn(),
@@ -37,6 +39,11 @@ const {
 vi.mock('../../page-access/service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../page-access/service')>()),
   hasActivePageAccess: hasActivePageAccessMock,
+}));
+
+vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
+  loadSettings: loadSettingsMock,
 }));
 
 vi.mock('../../media-hub/assets', async (importOriginal) => ({
@@ -123,6 +130,7 @@ async function flushPromises(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   hasActivePageAccessMock.mockResolvedValue(true);
+  loadSettingsMock.mockResolvedValue({ webSnapshotEnabled: true });
   consumeWebSnapshotStagedBlobMock.mockImplementation(
     ({ expectedKind }: { expectedKind: 'package' | 'screenshot' }) =>
       new Blob([expectedKind], {

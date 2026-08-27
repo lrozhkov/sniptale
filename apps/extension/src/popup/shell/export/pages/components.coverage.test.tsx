@@ -12,7 +12,7 @@ vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
 }));
 
 import { ExportPagesDrawerList, ExportPagesHeader } from './drawer';
-import { WebSnapshotConfirmationDialog } from './snapshot-confirmation';
+import { WebSnapshotSetupDialog } from './snapshot-setup-dialog';
 import { ExportPagesSummary } from './summary';
 
 let container: HTMLDivElement | null = null;
@@ -150,67 +150,29 @@ describe('export pages owner components', () => {
     expect(toggleTabSelection).toHaveBeenCalledWith(9);
   });
 
-  it('renders confirmation states and routes dialog actions', async () => {
-    const onCancel = vi.fn();
-    const onConfirm = vi.fn();
-    const onRememberChoiceChange = vi.fn();
-    const disclosure = {
-      assetPolicy: 'strict' as const,
-      body: 'Body',
-      requiresConfirmation: true,
-      title: 'Confirm snapshot',
-      warning: 'Warning',
-    };
-
+  it('renders setup states and routes dialog actions', async () => {
+    const onClose = vi.fn();
+    const onOpenSettings = vi.fn();
     await renderNode(
-      <WebSnapshotConfirmationDialog
-        disclosure={disclosure}
-        isSavingPreference
-        preferenceError="Could not save"
-        rememberChoice
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-        onRememberChoiceChange={onRememberChoiceChange}
-      />
+      <WebSnapshotSetupDialog onClose={onClose} onOpenSettings={onOpenSettings} status="error" />
     );
 
     const dialog = container?.querySelector('[role="dialog"]');
-    expect(dialog?.classList.contains('sniptale-modal-scroll')).toBe(true);
     expect((dialog as HTMLElement | null)?.style.maxHeight).toBe('calc(100vh - 24px)');
-    expect(dialog?.querySelector('.sniptale-modal-body-sm')?.className).toContain(
-      'overflow-y-auto'
-    );
-    await act(async () => {
-      dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-      dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-    });
-
-    expect(container?.textContent).toContain('Could not save');
-    expect(onCancel).not.toHaveBeenCalled();
+    expect(container?.textContent).toContain('popup.export.webSnapshotSetupUnavailableTitle');
 
     await renderNode(
-      <WebSnapshotConfirmationDialog
-        disclosure={disclosure}
-        isSavingPreference={false}
-        preferenceError={null}
-        rememberChoice={false}
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-        onRememberChoiceChange={onRememberChoiceChange}
-      />
+      <WebSnapshotSetupDialog onClose={onClose} onOpenSettings={onOpenSettings} status="loaded" />
     );
 
-    const checkbox = container?.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    await click(checkbox);
     const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
     await click(buttons[0]);
     await click(buttons[1]);
     await click(buttons[2]);
 
-    expect(onRememberChoiceChange).toHaveBeenCalledWith(true);
-    expect(onCancel).toHaveBeenCalledTimes(2);
-    expect(onConfirm).toHaveBeenCalledOnce();
-    expect(container?.textContent).not.toContain('Could not save');
+    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onOpenSettings).toHaveBeenCalledOnce();
+    expect(container?.textContent).toContain('popup.export.webSnapshotSetupTitle');
   });
 
   it('renders empty and populated summaries and ignores fallback removal', async () => {

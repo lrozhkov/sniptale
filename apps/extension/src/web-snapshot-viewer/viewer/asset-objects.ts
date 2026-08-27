@@ -3,6 +3,7 @@ import {
   normalizeWebSnapshotAssetMimeType,
 } from '../../features/web-snapshot/asset-manifest';
 import {
+  isAllowedWebSnapshotAssetMimeType,
   sanitizeWebSnapshotStylesheetText,
   sanitizeWebSnapshotSvgText,
 } from '../../features/web-snapshot/public';
@@ -14,11 +15,18 @@ import type {
 const MAX_VIEWER_TOTAL_ASSET_BYTES = 250 * 1024 * 1024;
 
 export type LoadedWebSnapshotAsset = {
+  downloadUrl: string | null;
   mimeType: string;
   path: string;
   size: number;
   url: string;
 };
+
+function createOriginalAssetBlob(bytes: Uint8Array, mimeType: string): Blob {
+  const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+  copy.set(bytes);
+  return new Blob([copy], { type: mimeType });
+}
 
 function assertSafeManifestAssetPath(path: string): void {
   if (
@@ -113,6 +121,7 @@ export async function createViewerAssetObjectUrls(
   urlsByPath: Map<string, string>;
 }> {
   const objectUrls: string[] = [];
+  const downloadUrlsByPath = new Map<string, string>();
   const urlsByPath = new Map<string, string>();
   let assets: LoadedWebSnapshotAsset[] = [];
   const manifestAssetsByPath = createAssetManifestByPath(packageManifest);
@@ -149,6 +158,18 @@ export async function createViewerAssetObjectUrls(
     const cssEntriesByPath = new Map(
       validatedEntries.filter(isCssEntry).map((entry) => [entry.path, entry])
     );
+    for (const entry of validatedEntries) {
+      const mimeType = entry.manifestEntry?.mimeType ?? 'application/octet-stream';
+      const downloadEligible =
+        entry.manifestEntry !== undefined && isAllowedWebSnapshotAssetMimeType(mimeType);
+      if (!downloadEligible) continue;
+      const needsSeparateDownloadUrl =
+        isCssEntry(entry) || entry.manifestEntry?.mimeType === 'image/svg+xml';
+      if (!needsSeparateDownloadUrl) continue;
+      const downloadUrl = URL.createObjectURL(createOriginalAssetBlob(entry.bytes, mimeType));
+      objectUrls.push(downloadUrl);
+      downloadUrlsByPath.set(entry.path, downloadUrl);
+    }
     for (const entry of validatedEntries.filter((candidate) => !isCssEntry(candidate))) {
       const blob = createViewerAssetBlob(
         entry.path,
@@ -159,6 +180,13 @@ export async function createViewerAssetObjectUrls(
       const objectUrl = URL.createObjectURL(blob);
       objectUrls.push(objectUrl);
       urlsByPath.set(entry.path, objectUrl);
+      if (
+        entry.manifestEntry !== undefined &&
+        isAllowedWebSnapshotAssetMimeType(entry.manifestEntry.mimeType) &&
+        !downloadUrlsByPath.has(entry.path)
+      ) {
+        downloadUrlsByPath.set(entry.path, objectUrl);
+      }
     }
 
     const creatingCssPaths = new Set<string>();
@@ -190,6 +218,7 @@ export async function createViewerAssetObjectUrls(
       createCssObjectUrl(path);
     }
     assets = validatedEntries.map((entry) => ({
+      downloadUrl: downloadUrlsByPath.get(entry.path) ?? null,
       mimeType: entry.manifestEntry?.mimeType ?? 'application/octet-stream',
       path: entry.path,
       size: entry.bytes.byteLength,

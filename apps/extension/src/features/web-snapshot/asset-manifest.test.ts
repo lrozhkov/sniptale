@@ -5,12 +5,20 @@ import {
   hashWebSnapshotAssetBlob,
   hashWebSnapshotAssetBytes,
   isWebSnapshotAssetMimeType,
+  isAllowedWebSnapshotAssetMimeType,
   normalizeWebSnapshotAssetMimeType,
-  resolveAllowedWebSnapshotAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeType,
 } from './asset-manifest';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+it('recognizes only the bounded capture MIME profile for raw attachment downloads', () => {
+  expect(isAllowedWebSnapshotAssetMimeType('image/svg+xml')).toBe(true);
+  expect(isAllowedWebSnapshotAssetMimeType('text/css')).toBe(true);
+  expect(isAllowedWebSnapshotAssetMimeType('image/bmp')).toBe(false);
+  expect(isAllowedWebSnapshotAssetMimeType('application/javascript')).toBe(false);
 });
 
 it('normalizes and validates web snapshot asset MIME types', () => {
@@ -22,16 +30,13 @@ it('normalizes and validates web snapshot asset MIME types', () => {
   expect(normalizeWebSnapshotAssetMimeType(' IMAGE/PNG ')).toBe('image/png');
 });
 
-it('resolves allowed HTTP content types without widening the owner allow-list', () => {
-  const allowedMimeTypes = new Set(['image/png', 'text/css']);
-
-  expect(
-    resolveAllowedWebSnapshotAssetMimeType(' IMAGE/PNG; charset=binary ', allowedMimeTypes)
-  ).toBe('image/png');
-  expect(() => resolveAllowedWebSnapshotAssetMimeType('image/gif', allowedMimeTypes)).toThrow(
+it('resolves HTTP content types through the canonical capture MIME profile', () => {
+  expect(resolveWebSnapshotCaptureAssetMimeType(' IMAGE/PNG; charset=binary ')).toBe('image/png');
+  expect(resolveWebSnapshotCaptureAssetMimeType('image/gif')).toBe('image/gif');
+  expect(() => resolveWebSnapshotCaptureAssetMimeType('image/bmp')).toThrow(
     'unsupported web snapshot asset MIME type'
   );
-  expect(() => resolveAllowedWebSnapshotAssetMimeType(null, allowedMimeTypes)).toThrow(
+  expect(() => resolveWebSnapshotCaptureAssetMimeType(null)).toThrow(
     'unsupported web snapshot asset MIME type'
   );
 });

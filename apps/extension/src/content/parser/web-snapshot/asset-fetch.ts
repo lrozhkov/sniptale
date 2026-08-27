@@ -2,7 +2,8 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import { getContentRuntimeServices } from '../../platform/runtime-services/services';
 import {
   isSafeWebSnapshotUrl,
-  resolveAllowedWebSnapshotAssetMimeType,
+  isAllowedWebSnapshotAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeType,
   sanitizeWebSnapshotFilename,
   sanitizeWebSnapshotSvgText,
 } from '../../../features/web-snapshot/public';
@@ -20,7 +21,6 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
   'image/webp': 'webp',
   'text/css': 'css',
 };
-const ALLOWED_ASSET_MIME_TYPES = new Set(Object.keys(EXTENSION_BY_TYPE));
 
 function readBlobText(blob: Blob): Promise<string> {
   if (typeof blob.text === 'function') return blob.text();
@@ -53,7 +53,7 @@ async function sanitizeAssetBlob(blob: Blob): Promise<Blob> {
 }
 
 function assertAllowedAssetBlobType(blob: Blob): void {
-  if (!ALLOWED_ASSET_MIME_TYPES.has(blob.type)) {
+  if (!isAllowedWebSnapshotAssetMimeType(blob.type)) {
     throw new Error('unsupported web snapshot asset MIME type');
   }
 }
@@ -80,10 +80,7 @@ function readContentLength(response: Response): number | null {
 }
 
 function resolveAllowedAssetMimeType(response: Response): string {
-  return resolveAllowedWebSnapshotAssetMimeType(
-    response.headers.get('content-type'),
-    ALLOWED_ASSET_MIME_TYPES
-  );
+  return resolveWebSnapshotCaptureAssetMimeType(response.headers.get('content-type'));
 }
 
 async function readStreamingResponseWithLimit(

@@ -69,6 +69,10 @@ vi.mock('../../sections/capture/saving', () => {
   settingsPageDelayMocks.loadedSectionModules.push('saving');
   return { SavePresetsSection: markerComponent('saves-section') };
 });
+vi.mock('../../sections/capture/web-snapshots', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('web-snapshots');
+  return { WebSnapshotsSection: markerComponent('web-snapshots-section') };
+});
 vi.mock('../../sections/capture/storage-drafts', () => {
   settingsPageDelayMocks.loadedSectionModules.push('storage-drafts');
   return { StorageDraftsSection: markerComponent('storage-drafts-section') };
@@ -202,6 +206,7 @@ describe('SettingsPage delayed loading', () => {
         'ai-connections',
         'screen-sizes',
         'saving',
+        'web-snapshots',
         'annotations',
         'editor-resources',
         'media-quality',

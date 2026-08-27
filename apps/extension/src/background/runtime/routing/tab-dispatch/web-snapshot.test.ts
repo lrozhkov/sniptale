@@ -66,6 +66,7 @@ it('routes web snapshot saves through content tabs and authorizes asset sessions
   loadSettingsMock.mockResolvedValueOnce({
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
+    webSnapshotEnabled: true,
   });
   browserScriptingExecuteScriptMock.mockResolvedValue([
     {
@@ -118,6 +119,7 @@ it('binds anonymous external asset authorization to the persisted setting', asyn
   loadSettingsMock.mockResolvedValueOnce({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: true,
+    webSnapshotEnabled: true,
   });
   browserScriptingExecuteScriptMock.mockResolvedValue([
     {

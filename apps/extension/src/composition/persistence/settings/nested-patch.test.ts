@@ -8,6 +8,11 @@ const { browserStorageSyncGetMock, browserStorageSyncSetMock } = vi.hoisted(() =
 vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/browser-storage')>()),
   browserStorage: {
+    local: {
+      get: vi.fn().mockResolvedValue({}),
+      remove: vi.fn(),
+      set: vi.fn(),
+    },
     sync: {
       get: browserStorageSyncGetMock,
       remove: vi.fn(),

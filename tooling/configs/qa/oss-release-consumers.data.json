@@ -34,12 +34,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "f04768b451e61789e3848bbf1afecf40c5e8a761470df0019d135eda988ec094"
+      "sha256": "b7ac10b51462768652565c2194ae824114f1cdde731b18f17173ff733c03e9cb"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "f04768b451e61789e3848bbf1afecf40c5e8a761470df0019d135eda988ec094"
+      "sha256": "b7ac10b51462768652565c2194ae824114f1cdde731b18f17173ff733c03e9cb"
     },
     {
       "category": "bundled-font",
@@ -59,12 +59,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "7413bf27c985e0b3fe4bc655d89d8b6147acc792f1bfb90389e9dbcab5495d91"
+      "sha256": "967d0bb342852e1ec2d67633391681c585ddc154a7062d07c9acb1a3406d6279"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "7413bf27c985e0b3fe4bc655d89d8b6147acc792f1bfb90389e9dbcab5495d91"
+      "sha256": "967d0bb342852e1ec2d67633391681c585ddc154a7062d07c9acb1a3406d6279"
     },
     {
       "category": "validator-integration",

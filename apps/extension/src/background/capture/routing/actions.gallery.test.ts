@@ -15,6 +15,7 @@ const {
   releaseWebSnapshotSaveMock,
   registerWebSnapshotAssetSessionMock,
   hasActivePageAccessMock,
+  loadSettingsMock,
   saveScreenshotToMediaHubFromDataUrlMock,
   saveWebSnapshotToMediaHubMock,
   stageWebSnapshotBlobChunkMock,
@@ -29,6 +30,7 @@ const {
   releaseWebSnapshotSaveMock: vi.fn(),
   registerWebSnapshotAssetSessionMock: vi.fn(),
   hasActivePageAccessMock: vi.fn(),
+  loadSettingsMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
   saveWebSnapshotToMediaHubMock: vi.fn(),
   stageWebSnapshotBlobChunkMock: vi.fn(),
@@ -37,6 +39,11 @@ const {
 vi.mock('../../page-access/service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../page-access/service')>()),
   hasActivePageAccess: hasActivePageAccessMock,
+}));
+
+vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
+  loadSettings: loadSettingsMock,
 }));
 
 vi.mock('../../media-hub/assets', async (importOriginal) => ({
@@ -117,6 +124,7 @@ function createWebSnapshotSavePayload(): WebSnapshotSaveToGalleryPayload {
 beforeEach(() => {
   vi.clearAllMocks();
   hasActivePageAccessMock.mockResolvedValue(true);
+  loadSettingsMock.mockResolvedValue({ webSnapshotEnabled: true });
   consumeWebSnapshotStagedBlobMock.mockImplementation(
     ({ expectedKind }: { expectedKind: 'package' | 'screenshot' }) =>
       new Blob([expectedKind], {
@@ -199,6 +207,7 @@ it('saves web snapshot packages into the gallery', async () => {
     tabId: 42,
   });
   expect(saveWebSnapshotToMediaHubMock).toHaveBeenCalledWith({
+    assertPersistenceAllowed: expect.any(Function),
     packageBlob: expect.any(Blob),
     payload,
     screenshotBlob: expect.any(Blob),
@@ -339,6 +348,51 @@ it('rejects a web snapshot commit after page access is revoked', async () => {
   expect(saveWebSnapshotToMediaHubMock).not.toHaveBeenCalled();
   expect(response).toHaveBeenCalledWith({
     error: 'Page access was revoked before web snapshot commit',
+    success: false,
+  });
+});
+
+it('rejects an in-flight web snapshot at the sink after the feature is disabled', async () => {
+  const response = vi.fn();
+  loadSettingsMock
+    .mockResolvedValueOnce({ webSnapshotEnabled: true })
+    .mockResolvedValueOnce({ webSnapshotEnabled: false });
+  saveWebSnapshotToMediaHubMock.mockImplementationOnce(
+    async (input: { assertPersistenceAllowed: () => Promise<void> }) => {
+      await input.assertPersistenceAllowed();
+      return 'asset-web';
+    }
+  );
+
+  expect(handleSaveWebSnapshotToGallery(createWebSnapshotSavePayload(), 42, response)).toBe(true);
+  await flushPromises();
+
+  expect(saveWebSnapshotToMediaHubMock).toHaveBeenCalledOnce();
+  expect(commitWebSnapshotSaveMock).not.toHaveBeenCalled();
+  expect(releaseWebSnapshotStagedBlobsMock).toHaveBeenCalledWith({
+    ...createWebSnapshotSavePayload(),
+    tabId: 42,
+  });
+  expect(releaseWebSnapshotSaveMock).toHaveBeenCalledWith({
+    sessionId: 'snapshot-session-1',
+    tabId: 42,
+  });
+  expect(response).toHaveBeenCalledWith({
+    error: 'Web Snapshots were disabled before web snapshot commit',
+    success: false,
+  });
+});
+
+it('rejects a web snapshot before media hub preparation when the feature is disabled', async () => {
+  const response = vi.fn();
+  loadSettingsMock.mockResolvedValueOnce({ webSnapshotEnabled: false });
+
+  expect(handleSaveWebSnapshotToGallery(createWebSnapshotSavePayload(), 42, response)).toBe(true);
+  await flushPromises();
+
+  expect(saveWebSnapshotToMediaHubMock).not.toHaveBeenCalled();
+  expect(response).toHaveBeenCalledWith({
+    error: 'Web Snapshots were disabled before web snapshot commit',
     success: false,
   });
 });

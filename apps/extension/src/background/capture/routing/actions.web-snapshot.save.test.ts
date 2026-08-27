@@ -113,6 +113,7 @@ it('persists staged web snapshot blobs through the media hub safe API', async ()
   const payload = createStagedPayload(manifest);
   await expect(
     saveWebSnapshotToMediaHub({
+      assertPersistenceAllowed: vi.fn().mockResolvedValue(undefined),
       ...resolveWebSnapshotPayloadBlobs(payload, 42),
       payload,
     })
@@ -120,7 +121,8 @@ it('persists staged web snapshot blobs through the media hub safe API', async ()
 
   expect(mocks.ensureHeadroom).toHaveBeenCalledOnce();
   expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
-    expect.objectContaining({ filename: 'Example_Page.sniptale-web-snapshot.zip' })
+    expect.objectContaining({ filename: 'Example_Page.sniptale-web-snapshot.zip' }),
+    expect.any(Function)
   );
 });
 

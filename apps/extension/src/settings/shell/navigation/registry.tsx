@@ -1,6 +1,7 @@
 import {
   Bot,
   FolderOpen,
+  FileArchive,
   Image,
   MessageSquare,
   Mic,
@@ -65,6 +66,12 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         description: 'settings.navigation.descriptions.mediaQuality',
         label: 'settings.navigation.mediaQuality',
         icon: Image,
+      },
+      {
+        id: 'web-snapshots',
+        description: 'settings.navigation.descriptions.webSnapshots',
+        label: 'settings.navigation.webSnapshots',
+        icon: FileArchive,
       },
       {
         id: 'saving',
@@ -171,6 +178,10 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   'media-quality': {
     load: () => import('../../sections/capture/media-quality'),
     exportName: 'MediaQualitySection',
+  },
+  'web-snapshots': {
+    load: () => import('../../sections/capture/web-snapshots'),
+    exportName: 'WebSnapshotsSection',
   },
   saving: {
     load: () => import('../../sections/capture/saving'),

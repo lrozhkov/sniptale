@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { WebSnapshotViewport } from '@sniptale/runtime-contracts/web-snapshot';
 import { translate, type AppLocale } from '../../../platform/i18n';
 
@@ -58,21 +59,39 @@ export function WebSnapshotVisualSurface(props: {
   screenshotUrl: string;
   sourceTitle: string | null;
   viewport?: WebSnapshotViewport | undefined;
+  zoom: number;
 }) {
-  const width = props.viewport?.width;
-  const style = width === undefined ? undefined : { maxWidth: `${width}px` };
+  const [decodedScreenshot, setDecodedScreenshot] = useState<{
+    naturalWidth: number;
+    url: string;
+  } | null>(null);
+  const capturedWidth = props.viewport?.width;
+  const naturalWidth =
+    decodedScreenshot?.url === props.screenshotUrl ? decodedScreenshot.naturalWidth : null;
+  const logicalWidth =
+    capturedWidth === undefined || naturalWidth === null
+      ? capturedWidth
+      : Math.min(capturedWidth, naturalWidth);
+  const style =
+    logicalWidth === undefined ? undefined : { width: `${logicalWidth * props.zoom}px` };
   const sourceTitle = props.sourceTitle?.trim();
   const alt = sourceTitle
     ? `${translate('webSnapshotViewer.app.visualAlt', props.locale)}: ${sourceTitle}`
     : translate('webSnapshotViewer.app.visualAlt', props.locale);
 
   return (
-    <div className="h-full overflow-auto bg-[var(--sniptale-color-surface-canvas)]">
+    <div className="min-h-full min-w-max bg-[var(--sniptale-color-surface-canvas)]">
       <img
         alt={alt}
         className="mx-auto block h-auto max-w-none bg-white"
         data-testid="snapshot-visual-image"
         draggable={false}
+        onLoad={(event) =>
+          setDecodedScreenshot({
+            naturalWidth: event.currentTarget.naturalWidth,
+            url: props.screenshotUrl,
+          })
+        }
         src={props.screenshotUrl}
         style={style}
       />

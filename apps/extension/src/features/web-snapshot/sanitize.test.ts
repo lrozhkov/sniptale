@@ -117,6 +117,20 @@ it('preserves only rewritten URL and string-form stylesheet imports', () => {
   ).toBe('');
 });
 
+it('removes an import whose quoted URL contains semicolons without corrupting following CSS', () => {
+  const css = sanitizeWebSnapshotCssText(
+    [
+      "@import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700&display=swap');",
+      'body { color: rgb(12, 34, 56); }',
+    ].join('\n')
+  );
+
+  expect(css).not.toContain('@import');
+  expect(css).not.toContain('600;700');
+  expect(css).not.toContain('fonts.googleapis.com');
+  expect(css).toContain('body { color: rgb(12, 34, 56); }');
+});
+
 it('parses whitespace and escapes in rewritten CSS URL functions', () => {
   const rewritten = sanitizeWebSnapshotCssText(
     '.hero { background: url  (  "https://cdn.example/im\\age.png"  ); }',

@@ -23,6 +23,7 @@ import type {
   BrowserStorageErasurePlan,
   LocalExtensionDataErasureOptions,
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
+import { WEB_SNAPSHOT_CONSENT_STORAGE_KEY } from '../settings/web-snapshot-consent';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale-theme-preference',
@@ -39,6 +40,7 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [
 ] as const;
 
 const localPreferenceKeys = [
+  WEB_SNAPSHOT_CONSENT_STORAGE_KEY,
   'sniptale-theme-preference',
   'sniptale-locale-preference',
   'sniptale_ai_modal_spoiler_open',

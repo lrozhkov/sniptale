@@ -14,7 +14,7 @@ import { serializeSurfaceStylePresetCatalog } from '../surface-style-presets/par
 import type { SurfaceStylePresetCatalog } from '../surface-style-presets/contracts';
 import { browserStorage } from '../infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
-import { loadSettings } from '../settings';
+import { createSynchronizedSettingsPayload, loadSettings } from '../settings';
 
 const SYNC_KEYS = [
   'sniptale_settings',
@@ -198,13 +198,22 @@ function applySettingsWrites(context: WriteBuildContext): void {
       microphoneDeviceId: null,
     };
   }
-  const access = data('access.capture-assets');
-  if (access?.['authenticated'] !== undefined)
-    nextSettings.authenticatedSnapshotAssetsEnabled = access['authenticated'] as boolean;
-  if (access?.['anonymous'] !== undefined)
-    nextSettings.anonymousCrossOriginSnapshotAssetsEnabled = access['anonymous'] as boolean;
-  if (preferences || viewports || image || afterCapture || saving || retention || voice || access)
-    syncWrites['sniptale_settings'] = nextSettings;
+  const webSnapshots = data('access.capture-assets');
+  if (webSnapshots?.['authenticated'] !== undefined)
+    nextSettings.authenticatedSnapshotAssetsEnabled = webSnapshots['authenticated'] as boolean;
+  if (webSnapshots?.['anonymous'] !== undefined)
+    nextSettings.anonymousCrossOriginSnapshotAssetsEnabled = webSnapshots['anonymous'] as boolean;
+  if (
+    preferences ||
+    viewports ||
+    image ||
+    afterCapture ||
+    saving ||
+    retention ||
+    voice ||
+    webSnapshots
+  )
+    syncWrites['sniptale_settings'] = createSynchronizedSettingsPayload(nextSettings);
 }
 
 function applyVideoWrites(context: WriteBuildContext): void {

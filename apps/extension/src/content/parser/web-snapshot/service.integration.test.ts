@@ -261,3 +261,38 @@ it('keeps selected picture source candidates through prepared snapshot cloning',
     ])
   );
 });
+
+it('clones the live DOM after full-page capture reveals lazy page sections', async () => {
+  document.body.innerHTML = [
+    '<section class="visible">First</section>',
+    '<section>Second</section>',
+    '<section>Third</section>',
+  ].join('');
+  captureWebSnapshotScreenshotWithWarningsMock.mockImplementationOnce(async () => {
+    document.querySelectorAll('section').forEach((section) => section.classList.add('visible'));
+    return {
+      blob: new Blob(['png'], { type: 'image/png' }),
+      captureGeometry: {
+        devicePixelRatio: 1,
+        extentHeight: 768,
+        extentWidth: 1024,
+        outputHeight: 768,
+        outputWidth: 1024,
+        rootKind: 'viewport',
+        rootViewport: { height: 768, width: 1024, x: 0, y: 0 },
+        viewportHeight: 768,
+        viewportWidth: 1024,
+      },
+      warnings: [],
+    };
+  });
+
+  const result = await buildCurrentPageWebSnapshot({
+    allowAnonymousCrossOriginAssets: false,
+    allowAuthenticatedSameOriginAssets: true,
+    requestId: 'req-web',
+  });
+  const packageEntries = await readSnapshotPackage(result.packageBlob);
+
+  expect(packageEntries.html.match(/class="visible"/gu)).toHaveLength(3);
+});

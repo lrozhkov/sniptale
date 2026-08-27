@@ -67,7 +67,6 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
     imageFormat: 'png',
     imageQuality: 90,
     saveCapturesToGallery: false,
-    skipWebSnapshotSaveDisclosure: false,
     viewportPresets,
   };
 }

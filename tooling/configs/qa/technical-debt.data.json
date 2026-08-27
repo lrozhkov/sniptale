@@ -3894,14 +3894,16 @@
         "apps/extension/src/composition/persistence/settings/context-menu.guards.ts",
         "apps/extension/src/composition/persistence/settings/file-scheme-consent.ts",
         "apps/extension/src/composition/persistence/settings/guards.ts",
-        "apps/extension/src/composition/persistence/settings/index.ts"
+        "apps/extension/src/composition/persistence/settings/index.ts",
+        "apps/extension/src/composition/persistence/settings/web-snapshot-consent.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/settings/array.guards.ts",
         "apps/extension/src/composition/persistence/settings/context-menu.guards.ts",
         "apps/extension/src/composition/persistence/settings/file-scheme-consent.ts",
         "apps/extension/src/composition/persistence/settings/guards.ts",
-        "apps/extension/src/composition/persistence/settings/index.ts"
+        "apps/extension/src/composition/persistence/settings/index.ts",
+        "apps/extension/src/composition/persistence/settings/web-snapshot-consent.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -4677,9 +4679,12 @@
         "apps/extension/src/content/parser/page-preparation/local-save/types.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/builder.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/index.ts",
+        "apps/extension/src/content/parser/page-preparation/snapshot/inert-virtual-dom.ts",
+        "apps/extension/src/content/parser/page-preparation/snapshot/live-state.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/overlays.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/responsive-assets.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/sanitizer.ts",
+        "apps/extension/src/content/parser/page-preparation/snapshot/styles.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/types.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/warnings.ts",
         "apps/extension/src/content/parser/page-preparation/target/index.ts",
@@ -4789,12 +4794,15 @@
         "apps/extension/src/content/parser/web-snapshot/asset-warnings.ts",
         "apps/extension/src/content/parser/web-snapshot/assets.ts",
         "apps/extension/src/content/parser/web-snapshot/capture.ts",
+        "apps/extension/src/content/parser/web-snapshot/iframe-raster.ts",
         "apps/extension/src/content/parser/web-snapshot/injected-runner.ts",
         "apps/extension/src/content/parser/web-snapshot/limits.ts",
         "apps/extension/src/content/parser/web-snapshot/package.ts",
+        "apps/extension/src/content/parser/web-snapshot/progress.ts",
         "apps/extension/src/content/parser/web-snapshot/save.ts",
         "apps/extension/src/content/parser/web-snapshot/service.ts",
         "apps/extension/src/content/parser/web-snapshot/staged-transfer.ts",
+        "apps/extension/src/content/parser/web-snapshot/stylesheet-assets.ts",
         "apps/extension/src/content/parser/web-snapshot/types.ts",
         "apps/extension/src/content/platform/dom-host/index.ts",
         "apps/extension/src/content/platform/dom-host/isolated.ts",
@@ -9323,7 +9331,9 @@
         "apps/extension/src/features/web-snapshot/provenance.ts",
         "apps/extension/src/features/web-snapshot/public.ts",
         "apps/extension/src/features/web-snapshot/sanitize-css.ts",
-        "apps/extension/src/features/web-snapshot/sanitize.ts"
+        "apps/extension/src/features/web-snapshot/sanitize-svg.ts",
+        "apps/extension/src/features/web-snapshot/sanitize.ts",
+        "apps/extension/src/features/web-snapshot/screenshot-validation.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/features/web-snapshot/asset-manifest.ts",
@@ -9332,7 +9342,9 @@
         "apps/extension/src/features/web-snapshot/provenance.ts",
         "apps/extension/src/features/web-snapshot/public.ts",
         "apps/extension/src/features/web-snapshot/sanitize-css.ts",
-        "apps/extension/src/features/web-snapshot/sanitize.ts"
+        "apps/extension/src/features/web-snapshot/sanitize-svg.ts",
+        "apps/extension/src/features/web-snapshot/sanitize.ts",
+        "apps/extension/src/features/web-snapshot/screenshot-validation.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -10151,9 +10163,8 @@
         "apps/extension/src/popup/shell/export/pages/helpers.ts",
         "apps/extension/src/popup/shell/export/pages/page.tsx",
         "apps/extension/src/popup/shell/export/pages/section.tsx",
-        "apps/extension/src/popup/shell/export/pages/snapshot-confirmation-state.ts",
-        "apps/extension/src/popup/shell/export/pages/snapshot-confirmation.tsx",
-        "apps/extension/src/popup/shell/export/pages/snapshot-disclosure.ts",
+        "apps/extension/src/popup/shell/export/pages/snapshot-availability.ts",
+        "apps/extension/src/popup/shell/export/pages/snapshot-setup-dialog.tsx",
         "apps/extension/src/popup/shell/export/pages/summary-row.tsx",
         "apps/extension/src/popup/shell/export/pages/summary.tsx",
         "apps/extension/src/popup/shell/export/progress/index.ts",
@@ -10367,9 +10378,8 @@
         "apps/extension/src/popup/shell/export/pages/helpers.ts",
         "apps/extension/src/popup/shell/export/pages/page.tsx",
         "apps/extension/src/popup/shell/export/pages/section.tsx",
-        "apps/extension/src/popup/shell/export/pages/snapshot-confirmation-state.ts",
-        "apps/extension/src/popup/shell/export/pages/snapshot-confirmation.tsx",
-        "apps/extension/src/popup/shell/export/pages/snapshot-disclosure.ts",
+        "apps/extension/src/popup/shell/export/pages/snapshot-availability.ts",
+        "apps/extension/src/popup/shell/export/pages/snapshot-setup-dialog.tsx",
         "apps/extension/src/popup/shell/export/pages/summary-row.tsx",
         "apps/extension/src/popup/shell/export/pages/summary.tsx",
         "apps/extension/src/popup/shell/export/progress/index.ts",
@@ -11414,6 +11424,9 @@
         "apps/extension/src/settings/sections/capture/storage-drafts/dialogs.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
+        "apps/extension/src/settings/sections/capture/web-snapshots/content.tsx",
+        "apps/extension/src/settings/sections/capture/web-snapshots/controller.ts",
+        "apps/extension/src/settings/sections/capture/web-snapshots/index.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
@@ -11472,9 +11485,6 @@
         "apps/extension/src/settings/sections/styles/editor-resources/tools/model.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/types.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/view.tsx",
-        "apps/extension/src/settings/sections/system/access-data/capture-resources/content.tsx",
-        "apps/extension/src/settings/sections/system/access-data/capture-resources/controller.ts",
-        "apps/extension/src/settings/sections/system/access-data/capture-resources/index.tsx",
         "apps/extension/src/settings/sections/system/access-data/index.tsx",
         "apps/extension/src/settings/sections/system/access-data/permissions/content.tsx",
         "apps/extension/src/settings/sections/system/access-data/permissions/index.tsx",
@@ -11742,6 +11752,9 @@
         "apps/extension/src/settings/sections/capture/storage-drafts/dialogs.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
+        "apps/extension/src/settings/sections/capture/web-snapshots/content.tsx",
+        "apps/extension/src/settings/sections/capture/web-snapshots/controller.ts",
+        "apps/extension/src/settings/sections/capture/web-snapshots/index.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
@@ -11800,9 +11813,6 @@
         "apps/extension/src/settings/sections/styles/editor-resources/tools/model.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/types.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/view.tsx",
-        "apps/extension/src/settings/sections/system/access-data/capture-resources/content.tsx",
-        "apps/extension/src/settings/sections/system/access-data/capture-resources/controller.ts",
-        "apps/extension/src/settings/sections/system/access-data/capture-resources/index.tsx",
         "apps/extension/src/settings/sections/system/access-data/index.tsx",
         "apps/extension/src/settings/sections/system/access-data/permissions/content.tsx",
         "apps/extension/src/settings/sections/system/access-data/permissions/index.tsx",
@@ -12868,10 +12878,15 @@
         "apps/extension/src/web-snapshot-viewer/preparation/scenario/descriptors.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/scenario/listeners.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/surface/controller.ts",
+        "apps/extension/src/web-snapshot-viewer/shell/app/asset-catalog.tsx",
         "apps/extension/src/web-snapshot-viewer/shell/app/index.tsx",
         "apps/extension/src/web-snapshot-viewer/shell/app/route.ts",
+        "apps/extension/src/web-snapshot-viewer/shell/app/view-mode.tsx",
+        "apps/extension/src/web-snapshot-viewer/shell/app/viewport-zoom.tsx",
         "apps/extension/src/web-snapshot-viewer/viewer/asset-objects.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/assets.ts",
+        "apps/extension/src/web-snapshot-viewer/viewer/declarative-shadow.ts",
+        "apps/extension/src/web-snapshot-viewer/viewer/document-policy.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/frame-navigation.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/iframe.tsx"
       ],
@@ -19422,6 +19437,30 @@
       ]
     },
     {
+      "id": "policy.source.popup-driver-mjs.bd493c7340",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/popup-driver.mjs",
+        "contentHash": "42395c12bdd1a855dc09d4c8a99fb324dc1f0d8595fd6af4355dda357140effe"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/case-verification.mjs",
+        "tooling/web-snapshot-smoke/popup-driver.mjs",
+        "tooling/web-snapshot-smoke/source-capture.mjs"
+      ],
+      "surfaces": [
+        "property:enableForTab/anonymous-7/__sniptaleRuntimeFreshness",
+        "property:enableWebSnapshotsForSmoke/anonymous-149/sniptale_settings",
+        "property:saveSnapshot/anonymous-23/withFreshness/__sniptaleRuntimeFreshness",
+        "property:saveSnapshotThroughPopup/popupProof",
+        "property:saveSnapshotThroughPopup/warnings"
+      ]
+    },
+    {
       "id": "policy.source.popup-page-access-mjs.40432926f2",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -20272,6 +20311,31 @@
       ],
       "surfaces": [
         "property:emptySummary/problemIds"
+      ]
+    },
+    {
+      "id": "policy.source.runner-mjs.b85c72ad04",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/runner.mjs",
+        "contentHash": "0318b1f2096de6539fa4b9524ffaa40bf4ae0208b93e8c72ecabf13d36dec5c2"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/runner.mjs"
+      ],
+      "surfaces": [
+        "binding:cases",
+        "binding:failures",
+        "binding:fixtureResources",
+        "binding:report",
+        "property:args",
+        "property:cases",
+        "property:ignoreDefaultArgs",
+        "property:viewport"
       ]
     },
     {

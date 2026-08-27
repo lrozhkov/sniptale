@@ -48,7 +48,7 @@ beforeEach(() => {
 });
 
 describe('settings transfer AI owner transaction', () => {
-  it('applies visible settings across storage owners and preserves matching AI secrets', async () => {
+  it('applies transferable settings while preserving local consent and matching AI secrets', async () => {
     const summary = emptySummary();
     mocks.localGet.mockResolvedValue({
       sniptale_ai_providers: [
@@ -79,6 +79,8 @@ describe('settings transfer AI owner transaction', () => {
       expect.objectContaining({
         sniptale_settings: expect.objectContaining({
           imageFormat: 'webp',
+          authenticatedSnapshotAssetsEnabled: true,
+          anonymousCrossOriginSnapshotAssetsEnabled: true,
           voiceInput: expect.objectContaining({ microphoneDeviceId: null }),
         }),
         sniptale_callout_presets: expect.any(Object),
@@ -86,6 +88,9 @@ describe('settings transfer AI owner transaction', () => {
         sniptale_surface_style_presets: expect.any(Object),
       }),
       undefined
+    );
+    expect(mocks.syncSet.mock.calls[0]?.[0]?.sniptale_settings).not.toHaveProperty(
+      'webSnapshotEnabled'
     );
     expect(mocks.localSet).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -427,7 +432,7 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
     'system.voice': { schemaVersion: 1, data: { language: 'en-US', mode: 'browser' } },
     'access.capture-assets': {
       schemaVersion: 1,
-      data: { authenticated: true, anonymous: true },
+      data: { enabled: true, authenticated: true, anonymous: true },
     },
     'capture.video': {
       schemaVersion: 1,
@@ -514,8 +519,8 @@ function settingsFixture(): NormalizedSettings {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    webSnapshotEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: false,
   };
 }

@@ -100,6 +100,7 @@ async function createPayload(
   const packageBase64 = overrides.packageChunkBase64 ?? (await createPackageBase64(manifest));
   const screenshotBase64 = Buffer.from(createPngBytes()).toString('base64');
   return {
+    assertPersistenceAllowed: vi.fn().mockResolvedValue(undefined),
     packageBlob: new Blob([Buffer.from(packageBase64, 'base64')], {
       type: 'application/x-sniptale-web-snapshot+zip',
     }),
@@ -184,8 +185,45 @@ it('persists a web snapshot package through the media hub safe API', async () =>
       filename: 'Example_Page.sniptale-web-snapshot.zip',
       sourceTitle: 'Example Page',
       sourceUrl: 'https://example.com/page',
-    })
+    }),
+    expect.any(Function)
   );
+});
+
+it('rechecks persistence permission after deferred preparation and before the guarded write', async () => {
+  let releaseHeadroom: () => void = () => undefined;
+  let persistenceEnabled = true;
+  const durableSave = vi.fn().mockResolvedValue({ assetId: 'asset-race' });
+  mocks.ensureHeadroom.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseHeadroom = resolve;
+      })
+  );
+  mocks.saveWebSnapshot.mockImplementationOnce(
+    async (
+      input: unknown,
+      assertPersistenceAllowed: () => Promise<void>
+    ): Promise<{ assetId: string }> => {
+      await assertPersistenceAllowed();
+      return durableSave(input);
+    }
+  );
+  const input = await createPayload();
+  input.assertPersistenceAllowed = vi.fn(async () => {
+    if (!persistenceEnabled) {
+      throw new Error('Web Snapshots were disabled before web snapshot commit');
+    }
+  });
+
+  const save = saveWebSnapshotToMediaHub(input);
+  await vi.waitFor(() => expect(mocks.ensureHeadroom).toHaveBeenCalledOnce());
+  persistenceEnabled = false;
+  releaseHeadroom();
+
+  await expect(save).rejects.toThrow('Web Snapshots were disabled before web snapshot commit');
+  expect(input.assertPersistenceAllowed).toHaveBeenCalledOnce();
+  expect(durableSave).not.toHaveBeenCalled();
 });
 
 it('sanitizes source provenance in saved web snapshot metadata and package manifest', async () => {
@@ -236,7 +274,8 @@ it('falls back to safe snapshot filenames when source title is unavailable', asy
       sourceFavicon: null,
       sourceTitle: null,
       sourceUrl: null,
-    })
+    }),
+    expect.any(Function)
   );
 });
 

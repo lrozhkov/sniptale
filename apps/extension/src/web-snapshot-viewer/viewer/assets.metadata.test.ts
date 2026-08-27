@@ -163,19 +163,26 @@ it('uses verified manifest MIME metadata for viewer asset blobs', async () => {
   expect(loaded.html).toContain('src="blob:image"');
   expect(loaded.assets).toEqual([
     {
+      downloadUrl: 'blob:image',
       mimeType: 'image/png',
       path: 'assets/image.bin',
       size: 3,
       url: 'blob:image',
     },
     {
+      downloadUrl: 'blob:style',
       mimeType: 'text/css',
       path: 'assets/style.bin',
       size: 20,
       url: 'blob:style',
     },
   ]);
-  expect(createdBlobs.map((blob) => blob.type)).toEqual(['image/png', 'text/css', 'image/png']);
+  expect(createdBlobs.map((blob) => blob.type)).toEqual([
+    'text/css',
+    'image/png',
+    'text/css',
+    'image/png',
+  ]);
 });
 
 it('rejects asset packages when manifest hashes do not match content', async () => {
@@ -198,6 +205,46 @@ it('rejects asset packages when manifest hashes do not match content', async () 
   expect(URL.createObjectURL).not.toHaveBeenCalled();
 });
 
+it('keeps legacy assets previewable without exposing unverified original downloads', async () => {
+  const manifest = createManifest({
+    stats: { assetCount: 1, failedAssetCount: 0, packageSize: 10 },
+  });
+  await stubWebSnapshotRecord({
+    extras: { 'assets/legacy.png': 'png' },
+    html: '<img src="../assets/legacy.png">',
+    manifest,
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.assets).toEqual([
+    expect.objectContaining({
+      downloadUrl: null,
+      path: 'assets/legacy.png',
+      url: 'blob:snapshot-asset',
+    }),
+  ]);
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+});
+
+it('does not expose original downloads for manifest MIME types outside the capture profile', async () => {
+  const manifest = createManifest({
+    assets: [await createAssetMetadata('assets/unsupported.bmp', 'bmp', 'image/bmp')],
+  });
+  await stubWebSnapshotRecord({
+    extras: { 'assets/unsupported.bmp': 'bmp' },
+    html: '<img src="../assets/unsupported.bmp">',
+    manifest,
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.assets[0]).toEqual(
+    expect.objectContaining({ downloadUrl: null, mimeType: 'image/bmp' })
+  );
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+});
+
 it('sanitizes SVG assets again before creating viewer object URLs', async () => {
   const manifest = createManifest({
     assets: [
@@ -216,14 +263,28 @@ it('sanitizes SVG assets again before creating viewer object URLs', async () => 
     html: '<img src="../assets/unsafe.svg">',
     manifest,
   });
+  const createdBlobs: Blob[] = [];
+  stubObjectUrlStatics((blob) => {
+    createdBlobs.push(blob);
+    return `blob:snapshot-asset-${createdBlobs.length}`;
+  });
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
-  const svgBlob = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0];
+  const originalSvgBlob = createdBlobs[0];
+  const previewSvgBlob = createdBlobs[1];
 
-  expect(loaded.html).toContain('src="blob:snapshot-asset"');
-  expect(svgBlob).toBeInstanceOf(Blob);
-  await expect(readTestBlobText(svgBlob as Blob)).resolves.not.toContain('onload');
-  await expect(readTestBlobText(svgBlob as Blob)).resolves.not.toContain('foreignObject');
+  expect(loaded.html).toContain('src="blob:snapshot-asset-2"');
+  expect(loaded.assets[0]).toEqual(
+    expect.objectContaining({
+      downloadUrl: 'blob:snapshot-asset-1',
+      url: 'blob:snapshot-asset-2',
+    })
+  );
+  await expect(readTestBlobText(originalSvgBlob ?? new Blob())).resolves.toContain('onload');
+  await expect(readTestBlobText(previewSvgBlob ?? new Blob())).resolves.not.toContain('onload');
+  await expect(readTestBlobText(previewSvgBlob ?? new Blob())).resolves.not.toContain(
+    'foreignObject'
+  );
 });
 
 it('rewrites resources nested in captured CSS assets before offline rendering', async () => {
@@ -246,11 +307,11 @@ it('rewrites resources nested in captured CSS assets before offline rendering', 
   });
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
-  const capturedCss = await readTestBlobText(createdBlobs[1] ?? new Blob());
+  const capturedCss = await readTestBlobText(createdBlobs[2] ?? new Blob());
 
-  expect(capturedCss).toContain('url("blob:snapshot-asset-1")');
+  expect(capturedCss).toContain('url("blob:snapshot-asset-2")');
   expect(capturedCss).not.toContain('../assets/hero.png');
-  expect(loaded.html).toContain('href="blob:snapshot-asset-2"');
+  expect(loaded.html).toContain('href="blob:snapshot-asset-3"');
 });
 
 it('creates imported CSS dependencies before their parent stylesheet', async () => {
@@ -280,12 +341,12 @@ it('creates imported CSS dependencies before their parent stylesheet', async () 
   });
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
-  const importedCss = await readTestBlobText(createdBlobs[1] ?? new Blob());
-  const rootCapturedCss = await readTestBlobText(createdBlobs[2] ?? new Blob());
+  const importedCss = await readTestBlobText(createdBlobs[3] ?? new Blob());
+  const rootCapturedCss = await readTestBlobText(createdBlobs[4] ?? new Blob());
 
-  expect(importedCss).toContain('url("blob:snapshot-asset-1")');
-  expect(rootCapturedCss).toContain('@import url("blob:snapshot-asset-2") screen;');
-  expect(loaded.html).toContain('href="blob:snapshot-asset-3"');
+  expect(importedCss).toContain('url("blob:snapshot-asset-3")');
+  expect(rootCapturedCss).toContain('@import url("blob:snapshot-asset-4") screen;');
+  expect(loaded.html).toContain('href="blob:snapshot-asset-5"');
 });
 
 it('revokes already created object URLs when later asset URL creation fails', async () => {

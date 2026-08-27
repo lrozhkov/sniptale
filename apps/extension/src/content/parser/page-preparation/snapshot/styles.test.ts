@@ -31,6 +31,41 @@ it('materializes CSSOM rules that are absent from cloned style text', () => {
   expect(captured?.textContent).toContain('rgb(1, 2, 3)');
 });
 
+it('preserves authored inline shorthand bytes that CSSOM serializes lossily', () => {
+  const sourceStyle = document.createElement('style');
+  sourceStyle.setAttribute('data-test-snapshot-style', 'true');
+  sourceStyle.textContent = [
+    ':root { --border: #ddd; }',
+    '.card { border: 1px solid var(--border); border-left: 4px solid red; }',
+  ].join('\n');
+  document.head.appendChild(sourceStyle);
+  const snapshot = document.implementation.createHTMLDocument('snapshot');
+
+  materializePreparedSnapshotStyles(document, snapshot);
+
+  const captured = snapshot.querySelector('style[data-sniptale-captured-stylesheet="true"]');
+  expect(captured?.textContent).toContain('border: 1px solid var(--border)');
+  expect(captured?.textContent).not.toContain('border-top-color: ;');
+});
+
+it('keeps appended runtime CSSOM rules after lossless authored inline CSS', () => {
+  const sourceStyle = document.createElement('style');
+  sourceStyle.setAttribute('data-test-snapshot-style', 'true');
+  sourceStyle.textContent = '.card { border: 1px solid var(--border); }';
+  document.head.appendChild(sourceStyle);
+  sourceStyle.sheet?.insertRule(
+    '.runtime-rule { color: rgb(1, 2, 3); }',
+    sourceStyle.sheet.cssRules.length
+  );
+  const snapshot = document.implementation.createHTMLDocument('snapshot');
+
+  materializePreparedSnapshotStyles(document, snapshot);
+
+  const captured = snapshot.querySelector('style[data-sniptale-captured-stylesheet="true"]');
+  expect(captured?.textContent).toContain('border: 1px solid var(--border)');
+  expect(captured?.textContent).toContain('.runtime-rule');
+});
+
 it('preserves linked stylesheet bytes instead of lossy CSSOM shorthand serialization', () => {
   const source = document.implementation.createHTMLDocument('source');
   const link = source.createElement('link');

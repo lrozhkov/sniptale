@@ -13,6 +13,7 @@ import type {
 import { validateWebSnapshotPackage } from './web-snapshot-validation';
 
 interface SaveWebSnapshotToMediaHubInput {
+  assertPersistenceAllowed: () => Promise<void>;
   packageBlob: Blob;
   payload: WebSnapshotSaveToGalleryPayload;
   screenshotBlob: Blob;
@@ -61,15 +62,18 @@ export async function saveWebSnapshotToMediaHub(
     ensureWebSnapshotStorageHeadroom(sanitizedPackage.size + screenshotBlob.size)
   );
   const result = await runWebSnapshotMediaHubStage('save web snapshot media asset', () =>
-    saveWebSnapshotMediaAssetSafely({
-      filename: createSnapshotFilename(sanitizedPackage.manifest),
-      manifest: sanitizedPackage.manifest,
-      packageBlob: sanitizedPackage.packageBlob,
-      screenshotBlob,
-      sourceFavicon: sanitizedPackage.manifest.source.faviconUrl,
-      sourceTitle: sanitizedPackage.manifest.source.title,
-      sourceUrl: sanitizedPackage.manifest.source.url,
-    })
+    saveWebSnapshotMediaAssetSafely(
+      {
+        filename: createSnapshotFilename(sanitizedPackage.manifest),
+        manifest: sanitizedPackage.manifest,
+        packageBlob: sanitizedPackage.packageBlob,
+        screenshotBlob,
+        sourceFavicon: sanitizedPackage.manifest.source.faviconUrl,
+        sourceTitle: sanitizedPackage.manifest.source.title,
+        sourceUrl: sanitizedPackage.manifest.source.url,
+      },
+      input.assertPersistenceAllowed
+    )
   );
 
   return result.assetId;

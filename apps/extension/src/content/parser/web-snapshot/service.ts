@@ -139,12 +139,6 @@ export async function buildCurrentPageWebSnapshot(args: {
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   args.onProgress?.({ activeStepKey: 'webSnapshotDom', current: 0, total: 4 });
   const source = resolveCurrentPageSource();
-  const preparedSnapshot = await buildPreparedSnapshotDocument({
-    contextLabel: 'web-snapshot',
-    preserveAssetUrls: true,
-  });
-  throwIfWebSnapshotBuildAborted(args.abortSignal);
-  const snapshotDocument = preparedSnapshot.document;
   args.onProgress?.({
     activeStepKey: 'webSnapshotPreview',
     current: 1,
@@ -155,6 +149,12 @@ export async function buildCurrentPageWebSnapshot(args: {
     args.fullPageCaptureIdentity,
     args.abortSignal
   );
+  const preparedSnapshot = await buildPreparedSnapshotDocument({
+    contextLabel: 'web-snapshot',
+    preserveAssetUrls: true,
+  });
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
+  const snapshotDocument = preparedSnapshot.document;
   args.onProgress?.({
     activeStepKey: 'webSnapshotStyles',
     current: 2,

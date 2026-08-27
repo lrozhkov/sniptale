@@ -74,7 +74,6 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
     imageQuality: 90,
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: false,
     viewportPresets,
   };
 }

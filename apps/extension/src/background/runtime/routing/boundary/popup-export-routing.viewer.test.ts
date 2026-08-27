@@ -88,6 +88,7 @@ beforeEach(() => {
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);
   browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+  loadSettingsMock.mockResolvedValue({ webSnapshotEnabled: true });
 });
 
 it('routes viewer-owned popup export messages without content asset authorization', async () => {
@@ -114,7 +115,7 @@ it('routes viewer-owned popup export messages without content asset authorizatio
   });
   await flushRouteWork();
 
-  expect(loadSettingsMock).not.toHaveBeenCalled();
+  expect(loadSettingsMock).toHaveBeenCalledTimes(1);
   expect(authorizeWebSnapshotCaptureRequestMock).not.toHaveBeenCalled();
   expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
   expect(sendTabMessageMock).not.toHaveBeenCalled();
@@ -123,6 +124,68 @@ it('routes viewer-owned popup export messages without content asset authorizatio
     type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   });
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
+});
+
+it('denies viewer-owned web snapshot saves while the global feature is disabled', async () => {
+  const sendResponse = vi.fn();
+  isOwnedSnapshotViewerPageMock.mockReturnValue(true);
+  loadSettingsMock.mockResolvedValue({ webSnapshotEnabled: false });
+  browserTabsGetMock.mockResolvedValue({
+    id: 62,
+    url: 'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html',
+  });
+
+  routePopupExportMessage({
+    deps: createBackgroundRuntimeState(),
+    message: {
+      requestId: 'req-disabled',
+      tabId: 62,
+      tabRouteCapabilityToken: 'cap-1',
+      tabRouteRequestId: 'req-disabled',
+      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
+    },
+    resolvedTabId: 62,
+    sendResponse,
+    sender: undefined,
+  });
+  await flushRouteWork();
+
+  expect(sendViewerPopupExportMessageMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: expect.stringContaining('Web Snapshots are disabled in settings.'),
+    success: false,
+  });
+});
+
+it('fails closed when viewer-owned web snapshot settings cannot be loaded', async () => {
+  const sendResponse = vi.fn();
+  isOwnedSnapshotViewerPageMock.mockReturnValue(true);
+  loadSettingsMock.mockRejectedValue(new Error('storage unavailable'));
+  browserTabsGetMock.mockResolvedValue({
+    id: 62,
+    url: 'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html',
+  });
+
+  routePopupExportMessage({
+    deps: createBackgroundRuntimeState(),
+    message: {
+      requestId: 'req-load-error',
+      tabId: 62,
+      tabRouteCapabilityToken: 'cap-1',
+      tabRouteRequestId: 'req-load-error',
+      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
+    },
+    resolvedTabId: 62,
+    sendResponse,
+    sender: undefined,
+  });
+  await flushRouteWork();
+
+  expect(sendViewerPopupExportMessageMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: expect.stringContaining('storage unavailable'),
+    success: false,
+  });
 });
 
 it('routes non-save popup export messages directly to the viewer port', async () => {
