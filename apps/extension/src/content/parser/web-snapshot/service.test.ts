@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   buildWebSnapshotPackage: vi.fn(),
   captureWebSnapshotScreenshotWithWarnings: vi.fn(),
   collectWebSnapshotAssets: vi.fn(),
+  materializeUnreadableIframeRasters: vi.fn(),
   serializePreparedSnapshotDocument: vi.fn(),
 }));
 
@@ -29,7 +30,23 @@ vi.mock('./package', () => ({
   buildWebSnapshotPackage: mocks.buildWebSnapshotPackage,
 }));
 
+vi.mock('./iframe-raster', () => ({
+  materializeUnreadableIframeRasters: mocks.materializeUnreadableIframeRasters,
+}));
+
 import { buildCurrentPageWebSnapshot } from './service';
+
+const captureGeometry = {
+  devicePixelRatio: 1,
+  extentHeight: 768,
+  extentWidth: 1024,
+  outputHeight: 768,
+  outputWidth: 1024,
+  rootKind: 'viewport' as const,
+  rootViewport: { height: 768, width: 1024, x: 0, y: 0 },
+  viewportHeight: 768,
+  viewportWidth: 1024,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -53,7 +70,12 @@ beforeEach(() => {
   });
   mocks.captureWebSnapshotScreenshotWithWarnings.mockResolvedValue({
     blob: new Blob(['shot'], { type: 'image/png' }),
+    captureGeometry,
     warnings: [],
+  });
+  mocks.materializeUnreadableIframeRasters.mockResolvedValue({
+    assets: [],
+    rasterizedTargets: [],
   });
   mocks.serializePreparedSnapshotDocument.mockReturnValue('<!doctype html><html>rewritten</html>');
   mocks.buildWebSnapshotPackage.mockResolvedValue({
@@ -64,6 +86,48 @@ beforeEach(() => {
     screenshotBlob: new Blob(['shot'], { type: 'image/png' }),
     screenshotMimeType: 'image/png',
   });
+});
+
+it('reports a successfully preserved unreadable iframe as a static image', async () => {
+  mocks.buildPreparedSnapshotDocument.mockResolvedValueOnce({
+    document: document.implementation.createHTMLDocument('prepared'),
+    html: '<!doctype html><html></html>',
+    warnings: [
+      {
+        kind: 'iframe-unreadable',
+        message: 'Iframe content was not readable and was saved as a static placeholder: #demo',
+        target: '#demo',
+      },
+    ],
+  });
+  mocks.materializeUnreadableIframeRasters.mockResolvedValueOnce({
+    assets: [
+      {
+        blob: new Blob(['png'], { type: 'image/png' }),
+        localPath: 'assets/sniptale-iframe-raster-1.png',
+        originalUrl: 'sniptale-iframe-raster:1',
+      },
+    ],
+    rasterizedTargets: ['#demo'],
+  });
+
+  const result = await buildCurrentPageWebSnapshot({
+    allowAnonymousCrossOriginAssets: false,
+    allowAuthenticatedSameOriginAssets: false,
+    requestId: 'req-web',
+  });
+
+  expect(result.warnings).toContain('Iframe content was preserved as a static image: #demo');
+  expect(result.warnings).not.toContain(
+    'Iframe content was not readable and was saved as a static placeholder: #demo'
+  );
+  expect(mocks.buildWebSnapshotPackage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      assets: expect.arrayContaining([
+        expect.objectContaining({ localPath: 'assets/sniptale-iframe-raster-1.png' }),
+      ]),
+    })
+  );
 });
 
 it('packages the canonical prepared snapshot document after asset rewriting', async () => {
@@ -90,7 +154,13 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
     }
   );
   expect(mocks.serializePreparedSnapshotDocument).toHaveBeenCalledWith(
-    (await snapshotDocument).document as Document
+    (await snapshotDocument).document as Document,
+    { preferParseStableHtml: true }
+  );
+  expect(mocks.materializeUnreadableIframeRasters).toHaveBeenCalledWith(
+    (await snapshotDocument).document as Document,
+    expect.any(Blob),
+    captureGeometry
   );
   expect(mocks.buildWebSnapshotPackage).toHaveBeenCalledWith(
     expect.objectContaining({

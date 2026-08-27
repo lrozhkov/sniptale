@@ -21,6 +21,18 @@ import type { PageAccessPort } from '../../routing-contracts/page-access-port';
 import { cancelFullPageCaptureByExportRunId } from '../full-page/cancellation';
 import { handleExportCaptureFullPage } from './actions.export';
 
+const captureGeometry = {
+  devicePixelRatio: 1,
+  extentHeight: 1200,
+  extentWidth: 800,
+  outputHeight: 1200,
+  outputWidth: 800,
+  rootKind: 'document' as const,
+  rootViewport: { height: 600, width: 800, x: 0, y: 0 },
+  viewportHeight: 600,
+  viewportWidth: 800,
+};
+
 function createPageAccessPort(): PageAccessPort {
   return {
     ensureActivePageAccessRuntime: vi.fn().mockResolvedValue(undefined),
@@ -49,7 +61,7 @@ it('captures through native visible authority and returns archive metadata', asy
   const pageAccessPort = createPageAccessPort();
   captureFullPageForArchiveMock.mockResolvedValue({
     dataUrl: 'data:image/png;base64,7',
-    metadata: { downscaled: true, frozenExtentWarning: false },
+    metadata: { captureGeometry, downscaled: true, frozenExtentWarning: false },
   });
 
   expect(handleExportCaptureFullPage(createMessage(), 42, sendResponse, pageAccessPort)).toBe(true);
@@ -65,6 +77,7 @@ it('captures through native visible authority and returns archive metadata', asy
   });
   expect(sendResponse).toHaveBeenCalledWith({
     success: true,
+    captureGeometry,
     dataUrl: 'data:image/png;base64,7',
     downscaled: true,
     frozenExtentWarning: false,

@@ -31,6 +31,31 @@ it('materializes CSSOM rules that are absent from cloned style text', () => {
   expect(captured?.textContent).toContain('rgb(1, 2, 3)');
 });
 
+it('preserves linked stylesheet bytes instead of lossy CSSOM shorthand serialization', () => {
+  const source = document.implementation.createHTMLDocument('source');
+  const link = source.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://example.test/theme.css';
+  source.head.appendChild(link);
+  Object.defineProperty(source, 'styleSheets', {
+    configurable: true,
+    value: [
+      {
+        disabled: false,
+        href: link.href,
+        ownerNode: link,
+      },
+    ],
+  });
+  const snapshot = document.implementation.createHTMLDocument('snapshot');
+
+  materializePreparedSnapshotStyles(source, snapshot);
+
+  const preserved = snapshot.querySelector('link[rel~="stylesheet"]');
+  expect(preserved?.getAttribute('href')).toBe('https://example.test/theme.css');
+  expect(snapshot.querySelector('style[data-sniptale-captured-stylesheet]')).toBeNull();
+});
+
 it('preserves stylesheet order and media conditions', () => {
   for (const cssText of ['.first { color: red; }', '.second { color: blue; }']) {
     const style = document.createElement('style');

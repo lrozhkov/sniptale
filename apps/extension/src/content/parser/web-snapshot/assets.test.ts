@@ -369,12 +369,18 @@ it('removes hidden and offscreen DOM assets before credentialed fetch', async ()
   document.body.innerHTML = [
     '<img id="hidden" hidden src="/hidden.png">',
     '<img id="offscreen" style="position:absolute;left:-9999px" src="/offscreen.png">',
+    '<img id="decorative" aria-hidden="true" src="/decorative.png">',
     '<img id="visible" src="/visible.png">',
   ].join('');
 
   const result = await collectAssets({ allowAuthenticatedSameOriginAssets: true });
 
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(fetch).toHaveBeenCalledWith('http://localhost:3000/decorative.png', {
+    credentials: 'include',
+    redirect: 'manual',
+    signal: expect.any(AbortSignal),
+  });
   expect(fetch).toHaveBeenCalledWith('http://localhost:3000/visible.png', {
     credentials: 'include',
     redirect: 'manual',
@@ -382,8 +388,9 @@ it('removes hidden and offscreen DOM assets before credentialed fetch', async ()
   });
   expect(document.querySelector('#hidden')?.hasAttribute('src')).toBe(false);
   expect(document.querySelector('#offscreen')?.hasAttribute('src')).toBe(false);
-  expect(document.querySelector('#visible')?.getAttribute('src')).toMatch(/^\.\.\/assets\/1-/);
-  expect(result.assets).toHaveLength(1);
+  expect(document.querySelector('#decorative')?.getAttribute('src')).toMatch(/^\.\.\/assets\/1-/);
+  expect(document.querySelector('#visible')?.getAttribute('src')).toMatch(/^\.\.\/assets\/2-/);
+  expect(result.assets).toHaveLength(2);
   expect(result.privacyWarnings).toEqual([
     expect.stringContaining('Authenticated same-site assets were enabled'),
     'Asset skipped: http://localhost:3000/hidden.png (web snapshot asset is hidden or offscreen)',

@@ -195,6 +195,34 @@ it('keeps large benign CSS without suffix allocations in the fetch scanner', () 
   expect(sanitizeWebSnapshotCssText(css)).toBe(css);
 });
 
+it('freezes defined selectors for custom and native elements without rewriting strings', () => {
+  const css = sanitizeWebSnapshotCssText(
+    [
+      'snapshot-card:defined { display: block; }',
+      'snapshot-card:not(:defined) { display: none; }',
+      'button:defined { opacity: 1; }',
+      'snapshot-card:DEFINED { color: green; }',
+      'snapshot-card:de\\66 ined { visibility: visible; }',
+      'snapshot-card:/* capture-state */defined { position: relative; }',
+      '.label::before { content: ":defined"; }',
+    ].join('\n')
+  );
+
+  expect(css).toContain('snapshot-card:not([data-sniptale-custom-element-undefined])');
+  expect(css).toContain('snapshot-card:not(:not([data-sniptale-custom-element-undefined]))');
+  expect(css).toContain('button:not([data-sniptale-custom-element-undefined])');
+  expect(css).toContain(
+    'snapshot-card:not([data-sniptale-custom-element-undefined]) { color: green; }'
+  );
+  expect(css).toContain(
+    'snapshot-card:not([data-sniptale-custom-element-undefined]) { visibility: visible; }'
+  );
+  expect(css).toContain(
+    'snapshot-card:not([data-sniptale-custom-element-undefined]) { position: relative; }'
+  );
+  expect(css).toContain('content: ":defined"');
+});
+
 it('fails closed for malformed CSS escapes without throwing', () => {
   expect(() => sanitizeWebSnapshotCssText('.x { color: "\\110000"; }')).not.toThrow();
   expect(() => sanitizeWebSnapshotCssText('.x { color: "\\"; }')).not.toThrow();

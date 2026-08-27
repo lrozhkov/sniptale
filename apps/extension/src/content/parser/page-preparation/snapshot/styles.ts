@@ -67,6 +67,17 @@ function appendRestrictedStylesheetLink(
   snapshot.head.appendChild(snapshot.importNode(owner, true));
 }
 
+function preserveSourceStylesheetLink(
+  snapshot: Document,
+  sheet: CSSStyleSheet,
+  fallbackOwner: Element | undefined
+): boolean {
+  const owner = sheet.ownerNode ?? fallbackOwner;
+  if (!(owner instanceof Element) || owner.tagName.toLowerCase() !== 'link') return false;
+  appendRestrictedStylesheetLink(snapshot, sheet, fallbackOwner);
+  return true;
+}
+
 function appendCapturedRenderingEnvironmentStyle(
   sourceDocument: Document,
   snapshot: Document
@@ -102,6 +113,10 @@ export function materializePreparedSnapshotStyles(
   for (const [index, sheet] of Array.from(sourceDocument.styleSheets).entries()) {
     if (sheet.disabled) continue;
     const fallbackOwner = sourceOwners[index];
+    // Preserve authored linked CSS bytes. Chromium's CSSOM serialization can expand shorthands
+    // containing var() into empty longhands (for example Wikipedia's figure border), which changes
+    // box geometry when reparsed. The asset pipeline captures and sanitizes this link recursively.
+    if (preserveSourceStylesheetLink(snapshot, sheet, fallbackOwner)) continue;
     const cssText = readStyleSheetRules(sheet, sourceDocument.baseURI);
     if (cssText === null) {
       appendRestrictedStylesheetLink(snapshot, sheet, fallbackOwner);

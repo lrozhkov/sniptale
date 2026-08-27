@@ -51,6 +51,9 @@ export function handleExportCaptureFullPage(
       throwIfFullPageCaptureAborted(abortSignal);
       sendResponse({
         success: true,
+        ...(capture.metadata.captureGeometry === undefined
+          ? {}
+          : { captureGeometry: capture.metadata.captureGeometry }),
         dataUrl: capture.dataUrl,
         downscaled: capture.metadata.downscaled,
         frozenExtentWarning: capture.metadata.frozenExtentWarning,

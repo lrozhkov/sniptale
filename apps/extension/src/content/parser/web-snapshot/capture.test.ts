@@ -10,6 +10,17 @@ import { captureWebSnapshotScreenshotWithWarnings } from './capture';
 
 const sendRuntimeMessage = vi.fn();
 const MASK_ATTRIBUTE = 'data-sniptale-sensitive-screenshot-mask';
+const captureGeometry = {
+  devicePixelRatio: 1,
+  extentHeight: 768,
+  extentWidth: 1024,
+  outputHeight: 768,
+  outputWidth: 1024,
+  rootKind: 'viewport' as const,
+  rootViewport: { height: 768, width: 1024, x: 0, y: 0 },
+  viewportHeight: 768,
+  viewportWidth: 1024,
+};
 
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -68,7 +79,7 @@ it('masks sensitive controls in light DOM and open shadow roots only while captu
     expect(lateControl.style.getPropertyValue('opacity')).toBe('0');
     expect(lateControl.style.getPropertyValue('transition')).toBe('none');
     expect(lateRoot.querySelector('textarea')?.getAttribute(MASK_ATTRIBUTE)).toBeTruthy();
-    return { dataUrl: 'data:image/png;base64,cG5n', success: true };
+    return { captureGeometry, dataUrl: 'data:image/png;base64,cG5n', success: true };
   });
 
   await captureWebSnapshotScreenshotWithWarnings(undefined, {
@@ -104,4 +115,18 @@ it('restores sensitive control markers without changing page styles when capture
   expect(sensitive.style.getPropertyValue('opacity')).toBe('0.6');
   expect(sensitive.style.getPropertyPriority('opacity')).toBe('');
   expect(sensitive.hasAttribute(MASK_ATTRIBUTE)).toBe(false);
+});
+
+it('rejects a screenshot response without canonical capture geometry', async () => {
+  sendRuntimeMessage.mockResolvedValue({
+    dataUrl: 'data:image/png;base64,cG5n',
+    success: true,
+  });
+
+  await expect(
+    captureWebSnapshotScreenshotWithWarnings(undefined, {
+      action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      exportRunId: 'missing-geometry',
+    })
+  ).rejects.toThrow();
 });

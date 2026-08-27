@@ -19,6 +19,9 @@ interface CopiedCssQuotedCharacter {
 
 type WebSnapshotCssUrlRewriter = (url: string) => string | null;
 
+export const WEB_SNAPSHOT_UNDEFINED_CUSTOM_ELEMENT_ATTRIBUTE =
+  'data-sniptale-custom-element-undefined';
+
 interface ParsedCssUrlFunction {
   nextIndex: number;
   url: string;
@@ -236,6 +239,80 @@ function rewriteCssResourceAt(
   return rewriteCssImportAt(value, index, rewriteUrl) ?? rewriteCssUrlAt(value, index, rewriteUrl);
 }
 
+interface CssIdentifierScan {
+  decoded: string;
+  nextIndex: number;
+}
+
+function normalizeCssEscapeCodePoint(codePoint: number): string {
+  if (codePoint === 0 || codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
+    return '\uFFFD';
+  }
+  return String.fromCodePoint(codePoint);
+}
+
+function consumeEscapedCssIdentifierCharacter(
+  value: string,
+  index: number
+): { decoded: string; nextIndex: number } | null {
+  const escaped = value[index + 1];
+  if (!escaped || escaped === '\n' || escaped === '\r' || escaped === '\f') return null;
+  let nextIndex = index + 1;
+  let hex = '';
+  while (hex.length < 6 && /[0-9a-f]/iu.test(value[nextIndex] ?? '')) {
+    hex += value[nextIndex];
+    nextIndex += 1;
+  }
+  if (hex) {
+    if (value[nextIndex] === '\r' && value[nextIndex + 1] === '\n') nextIndex += 2;
+    else if (/[\t\n\f\r ]/u.test(value[nextIndex] ?? '')) nextIndex += 1;
+    return { decoded: normalizeCssEscapeCodePoint(Number.parseInt(hex, 16)), nextIndex };
+  }
+  const codePoint = escaped.codePointAt(0);
+  if (codePoint === undefined) return null;
+  return { decoded: escaped, nextIndex: index + 1 + escaped.length };
+}
+
+function scanCssIdentifier(value: string, index: number): CssIdentifierScan | null {
+  let decoded = '';
+  let nextIndex = index;
+  while (nextIndex < value.length) {
+    if (value[nextIndex] === '\\') {
+      const escaped = consumeEscapedCssIdentifierCharacter(value, nextIndex);
+      if (!escaped) break;
+      decoded += escaped.decoded;
+      nextIndex = escaped.nextIndex;
+      continue;
+    }
+    const codePoint = value.codePointAt(nextIndex);
+    if (codePoint === undefined) break;
+    const character = String.fromCodePoint(codePoint);
+    if (!/[a-z0-9_-]/iu.test(character) && codePoint < 0x80) break;
+    decoded += character;
+    nextIndex += character.length;
+  }
+  return decoded ? { decoded, nextIndex } : null;
+}
+
+function rewriteDefinedPseudoClassAt(
+  value: string,
+  index: number
+): { replacement: string; nextIndex: number } | null {
+  if (value[index] !== ':') return null;
+  let identifierIndex = index + 1;
+  while (value.startsWith('/*', identifierIndex)) {
+    const commentEnd = value.indexOf('*/', identifierIndex + 2);
+    if (commentEnd === -1) return null;
+    identifierIndex = commentEnd + 2;
+  }
+  const identifier = scanCssIdentifier(value, identifierIndex);
+  if (!identifier || identifier.decoded.toLowerCase() !== 'defined') return null;
+  return {
+    replacement: `:not([${WEB_SNAPSHOT_UNDEFINED_CUSTOM_ELEMENT_ATTRIBUTE}])`,
+    nextIndex: identifier.nextIndex,
+  };
+}
+
 function stripOrRewriteLiteralCssFetchSyntax(
   value: string,
   rewriteUrl?: WebSnapshotCssUrlRewriter
@@ -282,6 +359,14 @@ function stripOrRewriteLiteralCssFetchSyntax(
       sanitized += resource.sanitized;
       safetyProjection += resource.safetyProjection;
       index = resource.nextIndex;
+      continue;
+    }
+
+    const definedState = rewriteDefinedPseudoClassAt(value, index);
+    if (definedState) {
+      sanitized += definedState.replacement;
+      safetyProjection += definedState.replacement;
+      index = definedState.nextIndex;
       continue;
     }
 

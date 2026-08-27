@@ -147,6 +147,15 @@ function stubObjectUrlStatics(
   return { createObjectURL, revokeObjectURL };
 }
 
+function readTestBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(blob);
+  });
+}
+
 function mockLargeViewerZip(
   manifest: WebSnapshotManifest,
   readLargeEntry: ReturnType<typeof vi.fn>
@@ -221,6 +230,36 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   expect(loaded.html).not.toContain('href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
   expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
+});
+
+it('loads XHTML through a typed document blob without HTML tree normalization', async () => {
+  const createdBlobs: Blob[] = [];
+  const createObjectURL = vi.fn((blob: Blob) => {
+    createdBlobs.push(blob);
+    return `blob:snapshot-${createdBlobs.length}`;
+  });
+  stubObjectUrlStatics({ createObjectURL });
+  await stubWebSnapshotRecord({
+    extras: { 'assets/image.png': 'png' },
+    html: [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<html xmlns="http://www.w3.org/1999/xhtml"><head><style>p&gt;div{display:block}</style></head>',
+      '<body><p><div><img src="../assets/image.png" /></div></p>',
+      '<table><tr><td>Cell</td></tr></table><pre>first&#13;second</pre></body></html>',
+    ].join(''),
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.documentUrl).toBe('blob:snapshot-2');
+  const documentBlob = createdBlobs[1];
+  expect(documentBlob?.type).toBe('application/xhtml+xml');
+  const documentText = await readTestBlobText(documentBlob!);
+  expect(documentText).toContain('<p><div><img src="blob:snapshot-1" /></div></p>');
+  expect(documentText).toContain('<table><tr><td>Cell</td></tr></table>');
+  expect(documentText).toContain('first&#13;second');
+  expect(documentText).toContain('Content-Security-Policy');
+  expect(documentText).toContain('data-sniptale-viewer-baseline="true"');
 });
 
 it('rewrites packaged CSS resources to verified object URLs without network references', async () => {

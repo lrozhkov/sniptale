@@ -51,13 +51,40 @@ function getArchiveAssetByteLength(asset: ArchiveAsset): number {
   return typeof asset.content === 'string' ? getTextByteLength(asset.content) : asset.content.size;
 }
 
+interface DomDiagnosticSnapshots {
+  domSnapshot: string;
+  virtualDomSnapshot: string;
+}
+
+function createDomDiagnosticSnapshots(args: {
+  cssDiagnostics: ArchiveAsset[];
+  html: string;
+  warnings: string[];
+}): DomDiagnosticSnapshots {
+  const supportingDiagnosticsBytes =
+    getWarningsByteLength(args.warnings) +
+    args.cssDiagnostics.reduce((total, asset) => total + getArchiveAssetByteLength(asset), 0);
+  const htmlBytes = getTextByteLength(args.html);
+
+  if (supportingDiagnosticsBytes + htmlBytes * 2 <= MAX_WEB_SNAPSHOT_DIAGNOSTICS_BYTES) {
+    return { domSnapshot: args.html, virtualDomSnapshot: args.html };
+  }
+
+  const reference = [
+    '<!-- Sniptale DOM diagnostic omitted to keep the package within its diagnostics budget. -->',
+    `<!-- Canonical static document: ${WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml}; bytes=${htmlBytes}. -->`,
+  ].join('\n');
+  return { domSnapshot: reference, virtualDomSnapshot: reference };
+}
+
 function getDiagnosticsByteLength(
-  html: string,
+  domDiagnostics: DomDiagnosticSnapshots,
   warnings: string[],
   cssDiagnostics: ArchiveAsset[]
 ) {
   return (
-    getTextByteLength(html) * 2 +
+    getTextByteLength(domDiagnostics.domSnapshot) +
+    getTextByteLength(domDiagnostics.virtualDomSnapshot) +
     getWarningsByteLength(warnings) +
     cssDiagnostics.reduce((total, asset) => total + getArchiveAssetByteLength(asset), 0)
   );
@@ -66,6 +93,7 @@ function getDiagnosticsByteLength(
 function assertPackageInputsWithinBudget(args: {
   assets: WebSnapshotAssetEntry[];
   cssDiagnostics: ArchiveAsset[];
+  domDiagnostics: DomDiagnosticSnapshots;
   html: string;
   screenshotBlob: Blob;
   warnings: string[];
@@ -73,7 +101,11 @@ function assertPackageInputsWithinBudget(args: {
   const htmlBytes = getTextByteLength(args.html);
   const warningsBytes = getWarningsByteLength(args.warnings);
   const assetsBytes = getAssetsByteLength(args.assets);
-  const diagnosticsBytes = getDiagnosticsByteLength(args.html, args.warnings, args.cssDiagnostics);
+  const diagnosticsBytes = getDiagnosticsByteLength(
+    args.domDiagnostics,
+    args.warnings,
+    args.cssDiagnostics
+  );
   assertWithinByteLimit('Web snapshot HTML', htmlBytes, MAX_WEB_SNAPSHOT_HTML_BYTES);
   assertWithinByteLimit('Web snapshot warnings', warningsBytes, MAX_WEB_SNAPSHOT_WARNINGS_BYTES);
   assertWithinByteLimit(
@@ -102,12 +134,12 @@ function assertPackageInputsWithinBudget(args: {
 
 function writeDiagnostics(
   zip: JSZip,
-  html: string,
+  domDiagnostics: DomDiagnosticSnapshots,
   warnings: string[],
   cssDiagnostics: ArchiveAsset[]
 ): void {
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot, html);
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.virtualDomSnapshot, html);
+  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot, domDiagnostics.domSnapshot);
+  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.virtualDomSnapshot, domDiagnostics.virtualDomSnapshot);
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.errors, warnings.join('\n'));
 
   for (const asset of cssDiagnostics) {
@@ -124,6 +156,7 @@ function writePackageEntries(
   args: {
     assets: WebSnapshotAssetEntry[];
     cssDiagnostics: ArchiveAsset[];
+    domDiagnostics: DomDiagnosticSnapshots;
     html: string;
     screenshotBlob: Blob;
     warnings: string[];
@@ -131,7 +164,7 @@ function writePackageEntries(
 ): void {
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, args.html);
   zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, args.screenshotBlob);
-  writeDiagnostics(zip, args.html, args.warnings, args.cssDiagnostics);
+  writeDiagnostics(zip, args.domDiagnostics, args.warnings, args.cssDiagnostics);
 
   for (const asset of args.assets) {
     zip.file(asset.localPath, asset.blob);
@@ -192,10 +225,15 @@ export async function buildWebSnapshotPackage(args: {
   screenshotMimeType: string;
 }> {
   const cssDiagnostics = buildCssDiagnosticAssets(args.diagnosticsSource);
-  assertPackageInputsWithinBudget({ ...args, cssDiagnostics });
+  const domDiagnostics = createDomDiagnosticSnapshots({
+    cssDiagnostics,
+    html: args.html,
+    warnings: args.warnings,
+  });
+  assertPackageInputsWithinBudget({ ...args, cssDiagnostics, domDiagnostics });
   const { default: JSZipCtor } = await import('jszip');
   const zip = new JSZipCtor();
-  writePackageEntries(zip, { ...args, cssDiagnostics });
+  writePackageEntries(zip, { ...args, cssDiagnostics, domDiagnostics });
   const manifest = await createPackageManifest(args);
   writeManifest(zip, manifest);
   const outputBlob = await zip.generateAsync({ type: 'blob' });

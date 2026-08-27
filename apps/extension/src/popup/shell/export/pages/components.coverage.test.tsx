@@ -175,6 +175,11 @@ describe('export pages owner components', () => {
     );
 
     const dialog = container?.querySelector('[role="dialog"]');
+    expect(dialog?.classList.contains('sniptale-modal-scroll')).toBe(true);
+    expect((dialog as HTMLElement | null)?.style.maxHeight).toBe('calc(100vh - 24px)');
+    expect(dialog?.querySelector('.sniptale-modal-body-sm')?.className).toContain(
+      'overflow-y-auto'
+    );
     await act(async () => {
       dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
       dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));

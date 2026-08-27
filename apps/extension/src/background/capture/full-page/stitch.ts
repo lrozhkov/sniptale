@@ -391,6 +391,7 @@ export async function createStreamingFullPageStitcher(args: {
       });
       throwIfStitchFinalizationAborted(abortSignal);
       const metadata: FullPageCaptureMetadata = {
+        captureGeometry: args.geometry,
         cssHeight: args.geometry.outputHeight,
         cssWidth: args.geometry.outputWidth,
         downscaled: finalized.output.outputScale < nativeScale,

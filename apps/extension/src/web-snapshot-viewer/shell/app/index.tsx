@@ -4,6 +4,7 @@ import { translate, useAppLocale, type AppLocale } from '../../../platform/i18n'
 import { readSnapshotIdFromLocation } from './route';
 import { SnapshotPreparationHost } from '../../preparation/host';
 import { blockSnapshotFrameNavigation } from '../../viewer/frame-navigation';
+import { hydrateSnapshotDeclarativeShadowDom } from '../../viewer/declarative-shadow';
 import { loadWebSnapshotPackage, revokeWebSnapshotObjectUrls } from '../../viewer/assets';
 import { WebSnapshotFrame } from '../../viewer/iframe';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
@@ -135,6 +136,7 @@ function SnapshotFrameSurface(props: {
     [iframeRef, onIframeElementChange]
   );
   const handleIframeLoad = useCallback(() => {
+    hydrateSnapshotDeclarativeShadowDom(iframeRef.current?.contentDocument ?? null);
     blockSnapshotFrameNavigation(iframeRef.current);
     if (iframeRef.current) {
       onIframeLoaded(iframeRef.current);
@@ -156,6 +158,7 @@ function SnapshotFrameSurface(props: {
       <WebSnapshotFrame
         iframeRef={handleIframeRef}
         onLoad={handleIframeLoad}
+        documentUrl={props.loaded.documentUrl}
         srcDoc={props.loaded.html}
         title={translate('webSnapshotViewer.app.frameTitle', props.locale)}
       />

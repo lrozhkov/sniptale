@@ -6,8 +6,11 @@ import {
 } from '../../features/web-snapshot/manifest';
 import {
   collectWebSnapshotQueryRoots,
+  isWebSnapshotXhtml,
   sanitizeWebSnapshotCssText,
   sanitizeWebSnapshotHtml,
+  sanitizeWebSnapshotXhtml,
+  serializeWebSnapshotXhtmlDocument,
 } from '../../features/web-snapshot/public';
 import {
   getWebSnapshotRecord,
@@ -18,9 +21,11 @@ import { assertZipPackageInflationProfile } from '@sniptale/platform/data/zip-pr
 import { createViewerAssetObjectUrls } from './asset-objects';
 import type { LoadedWebSnapshotAsset } from './asset-objects';
 import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
+import { withOfflineSnapshotPolicy } from './document-policy';
 
 export interface LoadedWebSnapshotPackage {
   assets: LoadedWebSnapshotAsset[];
+  documentUrl: string | null;
   html: string;
   manifest: WebSnapshotManifest;
   objectUrls: string[];
@@ -90,8 +95,18 @@ function rewriteDocumentStyleAssetReferences(
   }
 }
 
-function rewriteAssetReferences(html: string, urlsByPath: Map<string, string>): string {
-  const document = new DOMParser().parseFromString(html, 'text/html');
+function rewriteAssetReferences(
+  source: string,
+  urlsByPath: Map<string, string>,
+  xhtml: boolean
+): string {
+  const document = new DOMParser().parseFromString(
+    source,
+    xhtml ? 'application/xhtml+xml' : 'text/html'
+  );
+  if (xhtml && document.querySelector('parsererror')) {
+    throw new Error('Web snapshot XHTML is invalid.');
+  }
   for (const root of collectWebSnapshotQueryRoots(document)) {
     for (const element of root.querySelectorAll('[src], [srcset], [href], [poster]')) {
       rewriteElementUrlAttributes(element, urlsByPath);
@@ -99,7 +114,9 @@ function rewriteAssetReferences(html: string, urlsByPath: Map<string, string>): 
   }
   rewriteDocumentStyleAssetReferences(document, urlsByPath);
 
-  return `<!doctype html>${document.documentElement.outerHTML}`;
+  return xhtml
+    ? serializeWebSnapshotXhtmlDocument(document)
+    : `<!doctype html>${document.documentElement.outerHTML}`;
 }
 
 function rewriteCssAssetReferences(cssText: string, urlsByPath: Map<string, string>): string {
@@ -249,15 +266,31 @@ export async function loadWebSnapshotPackage(
   );
 
   try {
-    const rewrittenHtml = rewriteAssetReferences(html, urlsByPath);
+    const xhtml = isWebSnapshotXhtml(html);
+    const rewrittenHtml = rewriteAssetReferences(html, urlsByPath, xhtml);
+    const sanitizedDocument = xhtml
+      ? sanitizeWebSnapshotXhtml(rewrittenHtml, record.manifest.source.url, {
+          allowedObjectUrls: objectUrls,
+          offlineOnly: true,
+        })
+      : sanitizeWebSnapshotHtml(rewrittenHtml, record.manifest.source.url, {
+          allowedObjectUrls: objectUrls,
+          offlineOnly: true,
+        });
+    const documentUrl = xhtml
+      ? URL.createObjectURL(
+          new Blob([withOfflineSnapshotPolicy(sanitizedDocument, true)], {
+            type: 'application/xhtml+xml',
+          })
+        )
+      : null;
+    if (documentUrl) objectUrls.push(documentUrl);
     const screenshotUrl = URL.createObjectURL(screenshot);
     objectUrls.push(screenshotUrl);
     return {
       assets,
-      html: sanitizeWebSnapshotHtml(rewrittenHtml, record.manifest.source.url, {
-        allowedObjectUrls: objectUrls,
-        offlineOnly: true,
-      }),
+      documentUrl,
+      html: sanitizedDocument,
       manifest: record.manifest,
       objectUrls,
       screenshotUrl,

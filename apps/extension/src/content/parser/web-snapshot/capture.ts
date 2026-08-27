@@ -5,6 +5,7 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import { translate } from '../../../platform/i18n';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../contracts/full-page-capture';
+import type { FullPageCaptureGeometry } from '../../../contracts/full-page-capture';
 import { shouldExcludeWebSnapshotFormControlValue } from '../../../features/web-snapshot/public';
 import { collectOpenShadowQueryRoots } from '../dom-tree-parser/traversal/virtual-dom.helpers';
 
@@ -128,7 +129,7 @@ export async function captureWebSnapshotScreenshotWithWarnings(
     action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
     exportRunId: crypto.randomUUID(),
   }
-): Promise<{ blob: Blob; warnings: string[] }> {
+): Promise<{ blob: Blob; captureGeometry: FullPageCaptureGeometry; warnings: string[] }> {
   const services = getContentRuntimeServices();
   const restoreSensitiveControls = maskSensitiveControlsForScreenshot();
   let response;
@@ -146,7 +147,7 @@ export async function captureWebSnapshotScreenshotWithWarnings(
   } finally {
     restoreSensitiveControls();
   }
-  if (!response.success || !response.dataUrl) {
+  if (!response.success || !response.dataUrl || !response.captureGeometry) {
     const message = sanitizeDiagnosticMessage(
       response.error ?? translate('content.runtime.captureFullPageScreenshotFailed')
     );
@@ -154,6 +155,7 @@ export async function captureWebSnapshotScreenshotWithWarnings(
   }
   return {
     blob: await dataUrlToBlob(response.dataUrl),
+    captureGeometry: response.captureGeometry,
     warnings: [
       ...(response.downscaled
         ? [translate('content.runtime.captureFullPageDownscaledWarning')]

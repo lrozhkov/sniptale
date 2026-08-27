@@ -649,6 +649,31 @@ it('requires an explicit export identity for native full-page capture', () => {
   ).toThrow();
 });
 
+it('validates the canonical full-page geometry returned for snapshot raster projection', () => {
+  const response = {
+    captureGeometry: {
+      devicePixelRatio: 1,
+      extentHeight: 1200,
+      extentWidth: 800,
+      outputHeight: 1200,
+      outputWidth: 800,
+      rootKind: 'document',
+      rootViewport: { height: 600, width: 800, x: 0, y: 0 },
+      viewportHeight: 600,
+      viewportWidth: 800,
+    },
+    dataUrl: 'data:image/png;base64,cG5n',
+    success: true,
+  };
+  expect(nativeFullPageContract.parseResponse(response)).toEqual(response);
+  expect(() =>
+    nativeFullPageContract.parseResponse({
+      ...response,
+      captureGeometry: { ...response.captureGeometry, outputHeight: Number.NaN },
+    })
+  ).toThrow();
+});
+
 it('requires activation proof and operation binding for runtime-token requests', () => {
   expect(
     runtimeTokenContract.parseRequest({

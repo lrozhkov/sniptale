@@ -1,16 +1,21 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { initializeContentUiRoots } from '../../../platform/dom-host';
 import { buildPreparedSnapshotDocument } from './builder';
+import { IFRAME_RASTER_RECT_ATTRIBUTES } from './sanitizer';
 import { SELECTED_SRCSET_CANDIDATE_ATTRIBUTE } from './responsive-assets';
 import { PreparedSnapshotWarningKind } from './types';
+import { CONTENT_RUNTIME_MARKER_ATTRIBUTE } from '../../../runtime/entrypoint/markers';
+import { materializeUnreadableIframeRasters } from '../../web-snapshot/iframe-raster';
+import type { FullPageCaptureGeometry } from '../../../../contracts/full-page-capture';
 
 function resetPreparedSnapshotDom(): void {
   document.head.replaceChildren();
   document.body.replaceChildren();
   document.title = '';
+  vi.restoreAllMocks();
 }
 
 function attachIframeDocument(iframe: HTMLIFrameElement, iframeDocument: Document): void {
@@ -45,6 +50,7 @@ function createUnreadableIframe(): HTMLIFrameElement {
       throw new Error('Cross-origin');
     },
   });
+  iframe.getBoundingClientRect = () => new DOMRect(120, 240, 640, 360);
   return iframe;
 }
 
@@ -164,6 +170,11 @@ function registerIframeSnapshotTests(): void {
     const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
 
     expect(result.html).toContain('data-iframe-unreadable="true"');
+    expect(result.html).toContain('data-sniptale-iframe-raster-x="120"');
+    expect(result.html).toContain('data-sniptale-iframe-raster-y="240"');
+    expect(result.html).toContain('data-sniptale-iframe-raster-coordinate-space="viewport"');
+    expect(result.html).toContain('data-sniptale-iframe-raster-width="640"');
+    expect(result.html).toContain('data-sniptale-iframe-raster-height="360"');
     expect(result.html).not.toContain('<iframe');
     expect(result.html).not.toContain('token=secret');
     expect(result.warnings).toEqual(
@@ -171,6 +182,192 @@ function registerIframeSnapshotTests(): void {
         expect.objectContaining({ kind: PreparedSnapshotWarningKind.IframeUnreadable }),
       ])
     );
+  });
+
+  it('records iframe coordinates in the dominant internal scroller content space', async () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(800);
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(600);
+    const scroller = document.createElement('main');
+    scroller.style.overflowY = 'auto';
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 400 },
+      clientLeft: { configurable: true, value: 2 },
+      clientTop: { configurable: true, value: 2 },
+      clientWidth: { configurable: true, value: 700 },
+      scrollHeight: { configurable: true, value: 1600 },
+      scrollLeft: { configurable: true, value: 0 },
+      scrollTop: { configurable: true, value: 500 },
+      scrollWidth: { configurable: true, value: 700 },
+    });
+    scroller.getBoundingClientRect = () => new DOMRect(48, 98, 704, 404);
+    scroller.append(createUnreadableIframe());
+    document.body.append(scroller);
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(result.html).toContain('data-sniptale-iframe-raster-coordinate-space="root-content"');
+    expect(result.html).toContain('data-sniptale-iframe-raster-x="70"');
+    expect(result.html).toContain('data-sniptale-iframe-raster-y="640"');
+  });
+
+  it('projects an unreadable nested iframe through its readable parent and internal scroll root', async () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(800);
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(600);
+    const scroller = document.createElement('main');
+    scroller.style.overflowY = 'auto';
+    Object.defineProperties(scroller, {
+      clientHeight: { configurable: true, value: 400 },
+      clientLeft: { configurable: true, value: 2 },
+      clientTop: { configurable: true, value: 2 },
+      clientWidth: { configurable: true, value: 700 },
+      scrollHeight: { configurable: true, value: 1600 },
+      scrollLeft: { configurable: true, value: 0 },
+      scrollTop: { configurable: true, value: 500 },
+      scrollWidth: { configurable: true, value: 700 },
+    });
+    scroller.getBoundingClientRect = () => new DOMRect(48, 98, 704, 404);
+    const readableParent = document.createElement('iframe');
+    readableParent.id = 'readable-parent';
+    readableParent.getBoundingClientRect = () => new DOMRect(100, 200, 500, 300);
+    Object.defineProperties(readableParent, {
+      clientLeft: { configurable: true, value: 2 },
+      clientTop: { configurable: true, value: 2 },
+      offsetHeight: { configurable: true, value: 300 },
+      offsetWidth: { configurable: true, value: 500 },
+    });
+    scroller.append(readableParent);
+    document.body.append(scroller);
+    const childDocument = readableParent.contentDocument;
+    const childWindow = readableParent.contentWindow;
+    if (!childDocument || !childWindow) throw new Error('Expected readable parent iframe');
+    Object.defineProperty(childWindow, 'frameElement', {
+      configurable: true,
+      value: readableParent,
+    });
+    const unreadableChild = childDocument.createElement('iframe');
+    unreadableChild.src = 'https://external.example/nested';
+    unreadableChild.getBoundingClientRect = () => new DOMRect(10, 20, 300, 200);
+    Object.defineProperty(unreadableChild, 'contentDocument', {
+      configurable: true,
+      get: () => {
+        throw new Error('Cross-origin');
+      },
+    });
+    childDocument.body.append(unreadableChild);
+
+    const prepared = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+    const cropIframeRaster = vi.fn(async () => new Blob(['png'], { type: 'image/png' }));
+    const captureGeometry: FullPageCaptureGeometry = {
+      devicePixelRatio: 1,
+      extentHeight: 1600,
+      extentWidth: 700,
+      outputHeight: 1800,
+      outputWidth: 800,
+      rootKind: 'element',
+      rootViewport: { height: 400, width: 700, x: 50, y: 100 },
+      viewportHeight: 600,
+      viewportWidth: 800,
+    };
+    const rasterized = await materializeUnreadableIframeRasters(
+      prepared.document,
+      new Blob(['full-page'], { type: 'image/png' }),
+      captureGeometry,
+      { cropIframeRaster }
+    );
+
+    expect(cropIframeRaster).toHaveBeenCalledWith({
+      height: 200,
+      width: 300,
+      x: 112,
+      y: 722,
+    });
+    expect(rasterized.assets).toHaveLength(1);
+  });
+
+  it('drops forged iframe geometry when top-document ancestry exceeds the supported depth', async () => {
+    let ownerDocument = document;
+    for (let depth = 0; depth < 11; depth += 1) {
+      const readableFrame = ownerDocument.createElement('iframe');
+      readableFrame.id = `readable-depth-${depth}`;
+      readableFrame.getBoundingClientRect = () => new DOMRect(0, 0, 640, 480);
+      Object.defineProperties(readableFrame, {
+        offsetHeight: { configurable: true, value: 480 },
+        offsetWidth: { configurable: true, value: 640 },
+      });
+      ownerDocument.body.append(readableFrame);
+      const childDocument = readableFrame.contentDocument;
+      const childWindow = readableFrame.contentWindow;
+      if (!childDocument || !childWindow) throw new Error('Expected readable iframe chain');
+      Object.defineProperty(childWindow, 'frameElement', {
+        configurable: true,
+        value: readableFrame,
+      });
+      ownerDocument = childDocument;
+    }
+    const unreadableChild = ownerDocument.createElement('iframe');
+    unreadableChild.src = 'https://external.example/deeply-nested';
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.coordinateSpace, 'viewport');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.x, '999');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.y, '999');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.width, '500');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.height, '500');
+    Object.defineProperty(unreadableChild, 'contentDocument', {
+      configurable: true,
+      get: () => {
+        throw new Error('Cross-origin');
+      },
+    });
+    ownerDocument.body.append(unreadableChild);
+
+    const prepared = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+    const cropIframeRaster = vi.fn(async () => new Blob(['png'], { type: 'image/png' }));
+    const rasterized = await materializeUnreadableIframeRasters(
+      prepared.document,
+      new Blob(['full-page'], { type: 'image/png' }),
+      {
+        devicePixelRatio: 1,
+        extentHeight: 600,
+        extentWidth: 800,
+        outputHeight: 600,
+        outputWidth: 800,
+        rootKind: 'viewport',
+        rootViewport: { height: 600, width: 800, x: 0, y: 0 },
+        viewportHeight: 600,
+        viewportWidth: 800,
+      },
+      { cropIframeRaster }
+    );
+
+    expect(prepared.html).not.toContain('data-sniptale-iframe-raster-x="999"');
+    expect(cropIframeRaster).not.toHaveBeenCalled();
+    expect(rasterized.assets).toEqual([]);
+  });
+
+  it('drops forged iframe geometry inside inert declarative shadow template content', async () => {
+    const boundary = document.createElement('template');
+    boundary.setAttribute('shadowrootmode', 'open');
+    const unreadableChild = document.createElement('iframe');
+    unreadableChild.src = 'https://external.example/declarative-shadow';
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.coordinateSpace, 'document');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.x, '999');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.y, '999');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.width, '999');
+    unreadableChild.setAttribute(IFRAME_RASTER_RECT_ATTRIBUTES.height, '999');
+    unreadableChild.getBoundingClientRect = () => new DOMRect(10, 20, 300, 200);
+    Object.defineProperty(unreadableChild, 'contentDocument', {
+      configurable: true,
+      get: () => {
+        throw new Error('Cross-origin');
+      },
+    });
+    boundary.content.append(unreadableChild);
+    document.body.append(boundary);
+
+    const prepared = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(prepared.html).toContain('data-sniptale-iframe-raster-x="0"');
+    expect(prepared.html).toContain('data-sniptale-iframe-raster-width="0"');
+    expect(prepared.html).not.toContain('data-sniptale-iframe-raster-x="999"');
   });
 }
 
@@ -195,6 +392,41 @@ function registerOverlaySnapshotTests(): void {
     expect(result.html).not.toContain('Runtime callout settings');
     expect(result.html).not.toContain('Runtime step badge controls');
     expect(result.html).not.toContain('Runtime free-frame draft');
+  });
+}
+
+function registerRuntimeHostSnapshotTests(): void {
+  it('removes a marked runtime host when snapshotting runs in a separate module realm', async () => {
+    const pageLookalike = document.createElement('section');
+    pageLookalike.id = CONTENT_ROOT_ID;
+    pageLookalike.textContent = 'Page-owned lookalike';
+    const runtimeHost = document.createElement('div');
+    runtimeHost.id = CONTENT_ROOT_ID;
+    runtimeHost.setAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE, 'dynamic-smoke-build');
+    runtimeHost.attachShadow({ mode: 'open' }).textContent = 'Extension runtime chrome';
+    document.body.append(pageLookalike, runtimeHost);
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(result.html).toContain('Page-owned lookalike');
+    expect(result.html).not.toContain('Extension runtime chrome');
+    expect(result.html).not.toContain(CONTENT_RUNTIME_MARKER_ATTRIBUTE);
+  });
+}
+
+function registerScrollStateSnapshotTests(): void {
+  it('retains frozen internal scroll state through sanitization and serialization', async () => {
+    document.body.innerHTML = '<aside id="scrolled"><nav>Captured navigation</nav></aside>';
+    const source = document.querySelector<HTMLElement>('#scrolled');
+    if (!source) throw new Error('Expected scroll container');
+    Object.defineProperty(source, 'scrollTop', { configurable: true, value: 1259 });
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(result.html).toContain('data-sniptale-scroll-state="scroll-1"');
+    expect(result.html).toContain('data-sniptale-captured-scroll-state="true"');
+    expect(result.html).toContain('translate:0px -1259px!important');
+    expect(result.html).not.toContain('<script');
   });
 }
 
@@ -364,6 +596,24 @@ function registerSanitizerSnapshotTests(): void {
       ])
     );
   });
+
+  it('freezes defined custom-element CSS state in the serialized document', async () => {
+    const elementName = `snapshot-defined-${crypto.randomUUID()}`;
+    customElements.define(elementName, class extends HTMLElement {});
+    document.head.innerHTML = `<style>${elementName}:defined { display: block; }</style>`;
+    document.body.innerHTML = [
+      `<${elementName} data-sniptale-custom-element-undefined>Defined content</${elementName}>`,
+      '<button data-sniptale-custom-element-undefined>Native control</button>',
+    ].join('');
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(result.html).toContain(`<${elementName}>Defined content</${elementName}>`);
+    expect(result.html).toContain(
+      `${elementName}:not([data-sniptale-custom-element-undefined]) {display: block;}`
+    );
+    expect(result.html).not.toContain('<button data-sniptale-custom-element-undefined');
+  });
 }
 
 function registerResponsiveAssetSnapshotTests(): void {
@@ -390,6 +640,8 @@ describe('buildPreparedSnapshotDocument', () => {
 
   registerIframeSnapshotTests();
   registerOverlaySnapshotTests();
+  registerRuntimeHostSnapshotTests();
+  registerScrollStateSnapshotTests();
   registerSanitizerSnapshotTests();
   registerResponsiveAssetSnapshotTests();
 });

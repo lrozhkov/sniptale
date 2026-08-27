@@ -26,6 +26,8 @@ interface WebSnapshotHtmlSanitizeOptions {
   offlineOnly?: boolean;
 }
 
+const WEB_SNAPSHOT_XHTML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
+
 export function collectWebSnapshotQueryRoots(root: ParentNode): ParentNode[] {
   const roots: ParentNode[] = [root];
   for (let index = 0; index < roots.length; index += 1) {
@@ -292,12 +294,11 @@ export function removeWebSnapshotSensitiveControlState(root: ParentNode): void {
   }
 }
 
-export function sanitizeWebSnapshotHtml(
-  html: string,
+function sanitizeWebSnapshotDocument(
+  document: Document,
   baseUrl: string | null,
   options: WebSnapshotHtmlSanitizeOptions = {}
-): string {
-  const document = new DOMParser().parseFromString(html, 'text/html');
+): void {
   for (const root of collectWebSnapshotQueryRoots(document)) {
     for (const element of root.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
       element.remove();
@@ -309,8 +310,39 @@ export function sanitizeWebSnapshotHtml(
       sanitizeElementAttributes(element, baseUrl, options);
     }
   }
+}
+
+export function sanitizeWebSnapshotHtml(
+  html: string,
+  baseUrl: string | null,
+  options: WebSnapshotHtmlSanitizeOptions = {}
+): string {
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  sanitizeWebSnapshotDocument(document, baseUrl, options);
 
   return `<!doctype html>${document.documentElement.outerHTML}`;
+}
+
+export function isWebSnapshotXhtml(value: string): boolean {
+  return value.trimStart().startsWith('<?xml');
+}
+
+export function serializeWebSnapshotXhtmlDocument(document: Document): string {
+  const serialized = new XMLSerializer().serializeToString(document.documentElement);
+  return `${WEB_SNAPSHOT_XHTML_DECLARATION}${serialized.replaceAll('\r', '&#13;')}`;
+}
+
+export function sanitizeWebSnapshotXhtml(
+  xhtml: string,
+  baseUrl: string | null,
+  options: WebSnapshotHtmlSanitizeOptions = {}
+): string {
+  const document = new DOMParser().parseFromString(xhtml, 'application/xhtml+xml');
+  if (document.querySelector('parsererror')) {
+    throw new Error('Web snapshot XHTML is invalid.');
+  }
+  sanitizeWebSnapshotDocument(document, baseUrl, options);
+  return serializeWebSnapshotXhtmlDocument(document);
 }
 
 export function sanitizeWebSnapshotFilename(value: string, fallback = 'web-snapshot'): string {

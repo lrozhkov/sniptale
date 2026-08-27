@@ -215,9 +215,21 @@ export function preparePageMutations(session: FullPageAgentSession): void {
   style.textContent = `
     .${SCROLLBAR_CLASS}, .${SCROLLBAR_CLASS} * {
       caret-color: transparent !important;
-      scrollbar-width: none !important;
+      scrollbar-color: transparent transparent !important;
     }
-    .${SCROLLBAR_CLASS}::-webkit-scrollbar, .${SCROLLBAR_CLASS} *::-webkit-scrollbar { display: none !important; }
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-track,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-track,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-thumb,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-thumb,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-button,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-button,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-corner,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-corner {
+      background: transparent !important;
+      border-color: transparent !important;
+    }
     ${
       session.preferences.freezeMotion
         ? `

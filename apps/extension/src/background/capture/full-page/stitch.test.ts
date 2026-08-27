@@ -141,6 +141,7 @@ it('draws and releases each decoded tile before encoding one final image', async
   expect(result.dataUrl).toBe('data:image/png;base64,stitched');
   expect(result.metadata).toEqual(
     expect.objectContaining({
+      captureGeometry: documentGeometry,
       cssHeight: 1_100,
       cssWidth: 800,
       frozenExtentWarning: true,

@@ -82,6 +82,7 @@ function createLoadedPackage(
 ): LoadedWebSnapshotPackage {
   return {
     assets: [],
+    documentUrl: null,
     html: '<p>Snapshot</p>',
     manifest: createViewerManifest(manifest),
     objectUrls: [],

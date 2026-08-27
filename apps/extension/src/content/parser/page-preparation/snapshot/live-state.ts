@@ -1,20 +1,55 @@
 import type { PreparedSnapshotWarning } from './types';
 import { PreparedSnapshotWarningKind } from './types';
-import { shouldExcludeWebSnapshotFormControlValue } from '../../../../features/web-snapshot/public';
-import { collectOpenShadowQueryRoots } from '../../dom-tree-parser/traversal/virtual-dom.helpers';
+import {
+  collectWebSnapshotQueryRoots,
+  shouldExcludeWebSnapshotFormControlValue,
+  WEB_SNAPSHOT_UNDEFINED_CUSTOM_ELEMENT_ATTRIBUTE,
+} from '../../../../features/web-snapshot/public';
+import type { VirtualDomOriginalElementResolver } from '../../dom-tree-parser/traversal';
 
-const LIVE_STATE_MARKER_ATTRIBUTE = 'data-sniptale-live-state-id';
-const LIVE_STATE_SELECTOR = 'canvas, details, dialog, input, option, select, textarea';
-
-interface MarkedLiveStateElement {
-  element: Element;
-  id: string;
-  previousMarker: string | null;
+interface PreparedSnapshotLiveStateSource {
+  clientHeight: number;
+  clientWidth: number;
+  scrollLeft: number;
+  scrollTop: number;
+  source: Element | null;
+  tagName: string;
 }
 
-interface PreparedSnapshotLiveStateMarks {
-  cleanup(): void;
-  materialize(snapshot: Document): PreparedSnapshotWarning[];
+interface PreparedSnapshotLiveState {
+  materialize(snapshotRoot: ParentNode): PreparedSnapshotWarning[];
+}
+
+const SCROLL_STATE_ATTRIBUTE = 'data-sniptale-scroll-state';
+const SCROLL_STATE_STYLE_ATTRIBUTE = 'data-sniptale-captured-scroll-state';
+
+function isPotentialCustomElement(element: Element): boolean {
+  const tagName = element.tagName.toLowerCase();
+  const definitionName = element.getAttribute('is') ?? tagName;
+  return definitionName.includes('-');
+}
+
+function isDefinedCustomElement(element: Element): boolean {
+  if (!isPotentialCustomElement(element)) return false;
+  try {
+    return element.matches(':defined');
+  } catch {
+    return false;
+  }
+}
+
+function removeSnapshotAttribute(snapshotRoot: ParentNode, attribute: string): void {
+  for (const root of collectWebSnapshotQueryRoots(snapshotRoot)) {
+    for (const element of root.querySelectorAll(`[${attribute}]`)) {
+      element.removeAttribute(attribute);
+    }
+  }
+}
+
+function collectSnapshotElements(snapshotRoot: ParentNode): Element[] {
+  return collectWebSnapshotQueryRoots(snapshotRoot).flatMap((root) =>
+    Array.from(root.querySelectorAll('*'))
+  );
 }
 
 function setBooleanAttribute(element: Element, name: string, enabled: boolean): void {
@@ -93,38 +128,87 @@ function materializeCanvasState(
   }
 }
 
-export function markPreparedSnapshotLiveState(
-  sourceDocument: Document
-): PreparedSnapshotLiveStateMarks {
-  const sourceElements = collectOpenShadowQueryRoots(sourceDocument).flatMap((root) =>
-    Array.from(root.querySelectorAll(LIVE_STATE_SELECTOR))
+function materializeScrollState(
+  target: Element,
+  clientWidth: number,
+  clientHeight: number,
+  scrollLeft: number,
+  scrollTop: number,
+  rules: string[]
+): void {
+  if (scrollLeft === 0 && scrollTop === 0) return;
+  const id = `scroll-${rules.length + 1}`;
+  target.setAttribute(SCROLL_STATE_ATTRIBUTE, id);
+  const selector = `[${SCROLL_STATE_ATTRIBUTE}="${id}"]`;
+  rules.push(
+    `${selector}{box-sizing:border-box!important;width:${clientWidth}px!important;height:${clientHeight}px!important;overflow:hidden!important;scrollbar-width:none!important}`,
+    `${selector}::-webkit-scrollbar{display:none!important}`,
+    `${selector}>*{translate:${-scrollLeft}px ${-scrollTop}px!important}`
   );
-  const marked = sourceElements.map((element, index): MarkedLiveStateElement => {
-    const previousMarker = element.getAttribute(LIVE_STATE_MARKER_ATTRIBUTE);
-    const id = `sniptale-live-${index + 1}`;
-    element.setAttribute(LIVE_STATE_MARKER_ATTRIBUTE, id);
-    return { element, id, previousMarker };
-  });
+}
+
+function appendScrollStateStyle(snapshotRoot: ParentNode, rules: string[]): void {
+  if (rules.length === 0) return;
+  const ownerDocument = snapshotRoot.ownerDocument ?? (snapshotRoot as Document);
+  const style = ownerDocument.createElement('style');
+  style.setAttribute(SCROLL_STATE_STYLE_ATTRIBUTE, 'true');
+  style.textContent = rules.join('\n');
+  ownerDocument.head.appendChild(style);
+}
+
+export function capturePreparedSnapshotLiveState(
+  virtualRoot: HTMLElement,
+  resolveOriginalElement: VirtualDomOriginalElementResolver
+): PreparedSnapshotLiveState {
+  const sources: PreparedSnapshotLiveStateSource[] = collectSnapshotElements(virtualRoot).map(
+    (virtualElement) => {
+      const source = resolveOriginalElement(virtualElement);
+      return {
+        clientHeight: source instanceof HTMLElement ? source.clientHeight : 0,
+        clientWidth: source instanceof HTMLElement ? source.clientWidth : 0,
+        scrollLeft: source instanceof HTMLElement ? source.scrollLeft : 0,
+        scrollTop: source instanceof HTMLElement ? source.scrollTop : 0,
+        source: source?.nodeType === Node.ELEMENT_NODE ? (source as Element) : null,
+        tagName: virtualElement.tagName,
+      };
+    }
+  );
 
   return {
-    cleanup() {
-      for (const item of marked) {
-        if (item.previousMarker === null) item.element.removeAttribute(LIVE_STATE_MARKER_ATTRIBUTE);
-        else item.element.setAttribute(LIVE_STATE_MARKER_ATTRIBUTE, item.previousMarker);
+    materialize(snapshotRoot) {
+      const targets = collectSnapshotElements(snapshotRoot);
+      if (
+        targets.length !== sources.length ||
+        targets.some((target, index) => target.tagName !== sources[index]?.tagName)
+      ) {
+        throw new Error('Prepared snapshot live-state structure changed during inert import.');
       }
-    },
-    materialize(snapshot) {
+
       const warnings: PreparedSnapshotWarning[] = [];
-      for (const item of marked) {
-        const target = snapshot.querySelector(`[${LIVE_STATE_MARKER_ATTRIBUTE}="${item.id}"]`);
-        if (!target) continue;
-        copyFormState(item.element, target);
-        if (item.element.tagName.toLowerCase() === 'canvas') {
-          const warning = materializeCanvasState(item.element as HTMLCanvasElement, target);
+      const scrollStateRules: string[] = [];
+      removeSnapshotAttribute(snapshotRoot, WEB_SNAPSHOT_UNDEFINED_CUSTOM_ELEMENT_ATTRIBUTE);
+      removeSnapshotAttribute(snapshotRoot, SCROLL_STATE_ATTRIBUTE);
+      for (const [index, item] of sources.entries()) {
+        const target = targets[index];
+        if (!target || !item.source) continue;
+        copyFormState(item.source, target);
+        if (isPotentialCustomElement(item.source) && !isDefinedCustomElement(item.source)) {
+          target.setAttribute(WEB_SNAPSHOT_UNDEFINED_CUSTOM_ELEMENT_ATTRIBUTE, '');
+        }
+        if (item.source.tagName.toLowerCase() === 'canvas') {
+          const warning = materializeCanvasState(item.source as HTMLCanvasElement, target);
           if (warning) warnings.push(warning);
         }
-        target.removeAttribute(LIVE_STATE_MARKER_ATTRIBUTE);
+        materializeScrollState(
+          target,
+          item.clientWidth,
+          item.clientHeight,
+          item.scrollLeft,
+          item.scrollTop,
+          scrollStateRules
+        );
       }
+      appendScrollStateStyle(snapshotRoot, scrollStateRules);
       return warnings;
     },
   };

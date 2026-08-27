@@ -58,7 +58,6 @@ export function isHiddenAssetElement(element: Element, root: ParentNode): boolea
   while (current) {
     if (
       current.hasAttribute('hidden') ||
-      current.getAttribute('aria-hidden') === 'true' ||
       hasZeroDimensionAttribute(current) ||
       hasHiddenInlineStyle(current)
     ) {

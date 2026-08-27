@@ -225,6 +225,25 @@ it('rejects oversized package inputs before generating a zip archive', async () 
   expect(generateAsyncSpy).not.toHaveBeenCalled();
 });
 
+it('keeps a large valid static document when duplicate DOM diagnostics exceed their budget', async () => {
+  const preparedHtml = `<!doctype html><html><body>${'x'.repeat(4 * 1024 * 1024)}</body></html>`;
+
+  const result = await buildWebSnapshotPackage({
+    assets: [],
+    html: preparedHtml,
+    screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    source: createSource(),
+    warnings: [],
+  });
+  const entries = await readPackageEntries(result.packageBlob);
+
+  expect(entries.snapshotHtml).toBe(preparedHtml);
+  expect(entries.domSnapshot).toContain('snapshot/index.html');
+  expect(entries.virtualDomSnapshot).toContain('snapshot/index.html');
+  expect(entries.domSnapshot.length).toBeLessThan(1024);
+  expect(entries.virtualDomSnapshot.length).toBeLessThan(1024);
+});
+
 it('generates the snapshot package once instead of rebuilding it for package-size metadata', async () => {
   const generateAsyncSpy = vi.spyOn(JSZip.prototype, 'generateAsync');
 

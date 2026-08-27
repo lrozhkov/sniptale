@@ -64,6 +64,25 @@ it('keeps srcdoc snapshots no-scripts so about:srcdoc script blocking is expecte
   expect(iframeElement?.getAttribute('title')).toBe('Web Snapshot');
 });
 
+it('loads XHTML snapshots from their typed blob URL without srcdoc reparsing', () => {
+  act(() => {
+    root?.render(
+      <WebSnapshotFrame
+        documentUrl="blob:snapshot-document"
+        iframeRef={() => undefined}
+        onLoad={() => undefined}
+        srcDoc="legacy fallback"
+        title="Web Snapshot"
+      />
+    );
+  });
+
+  const iframeElement = container?.querySelector('iframe');
+  expect(iframeElement?.getAttribute('src')).toBe('blob:snapshot-document');
+  expect(iframeElement?.hasAttribute('srcdoc')).toBe(false);
+  expect(iframeElement?.getAttribute('sandbox')).toBe('allow-same-origin');
+});
+
 it('places the extension-environment baseline before captured page styles', () => {
   act(() => {
     root?.render(

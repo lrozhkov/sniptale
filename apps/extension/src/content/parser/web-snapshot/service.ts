@@ -13,6 +13,8 @@ import type {
   WebSnapshotWarningStats,
 } from './types';
 import type { WebSnapshotSaveProgressUpdate } from './progress';
+import { materializeUnreadableIframeRasters } from './iframe-raster';
+import { PreparedSnapshotWarningKind } from '../page-preparation/snapshot';
 
 function throwIfWebSnapshotBuildAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -106,6 +108,9 @@ async function captureRequiredWebSnapshotScreenshot(
   captureIdentity?: FullPageExportCaptureIdentity | undefined,
   abortSignal?: AbortSignal | undefined
 ): Promise<{
+  captureGeometry: Awaited<
+    ReturnType<typeof captureWebSnapshotScreenshotWithWarnings>
+  >['captureGeometry'];
   screenshotBlob: Blob;
   warnings: string[];
 }> {
@@ -116,6 +121,7 @@ async function captureRequiredWebSnapshotScreenshot(
   );
   throwIfWebSnapshotBuildAborted(abortSignal);
   return {
+    captureGeometry: screenshot.captureGeometry,
     screenshotBlob: screenshot.blob,
     warnings: screenshot.warnings,
   };
@@ -163,13 +169,33 @@ export async function buildCurrentPageWebSnapshot(args: {
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const { assets, privacyWarnings, snapshotSessionId, warnings } = assetResult;
+  const iframeRasters = await materializeUnreadableIframeRasters(
+    snapshotDocument,
+    screenshotResult.screenshotBlob,
+    screenshotResult.captureGeometry
+  );
+  assets.push(...iframeRasters.assets);
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
+  const rasterizedIframeTargets = new Set(iframeRasters.rasterizedTargets);
+  const preparedWarnings = preparedSnapshot.warnings.map((warning) =>
+    warning.kind === PreparedSnapshotWarningKind.IframeUnreadable &&
+    warning.target &&
+    rasterizedIframeTargets.has(warning.target)
+      ? {
+          ...warning,
+          message: `Iframe content was preserved as a static image: ${warning.target}`,
+        }
+      : warning
+  );
   const warningSummary = createNormalizedWarningSummary({
     networkWarnings: warnings,
-    preparedWarnings: preparedSnapshot.warnings,
+    preparedWarnings,
     privacyWarnings,
     screenshotWarnings: screenshotResult.warnings,
   });
-  const html = serializePreparedSnapshotDocument(snapshotDocument);
+  const html = serializePreparedSnapshotDocument(snapshotDocument, {
+    preferParseStableHtml: true,
+  });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   args.onProgress?.({
     activeStepKey: 'webSnapshotAssets',

@@ -104,6 +104,7 @@ function createLoadedPackage(args: {
 }): LoadedWebSnapshotPackage {
   return {
     assets: args.assets ?? [],
+    documentUrl: null,
     html: args.html ?? '<p>Snapshot</p>',
     manifest: createViewerManifest(args.manifest ?? {}),
     objectUrls: args.objectUrls ?? [],
@@ -234,7 +235,8 @@ it('opens with the static document and switches explicitly to the screenshot', a
 
   const image = container?.querySelector<HTMLImageElement>('[data-testid="snapshot-visual-image"]');
   expect(image?.src).toBe('blob:snapshot-screenshot');
-  expect(image?.style.width).toBe('1440px');
+  expect(image?.style.width).toBe('');
+  expect(image?.style.maxWidth).toBe('1440px');
   expect(container?.querySelector('iframe')).toBeNull();
 });
 

@@ -52,6 +52,7 @@ export type ScreenshotModeStatusResponse = RuntimeMessageResponse<{
 export type CaptureResponse = RuntimeMessageResponse<{
   dataUrl?: string;
   action?: CaptureActionType;
+  captureGeometry?: import('../../full-page-capture').FullPageCaptureGeometry;
   downscaled?: boolean;
   frozenExtentWarning?: boolean;
 }>;

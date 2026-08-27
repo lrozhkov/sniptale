@@ -129,6 +129,17 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/snapshot');
   captureWebSnapshotScreenshotWithWarningsMock.mockResolvedValue({
     blob: new Blob(['png'], { type: 'image/png' }),
+    captureGeometry: {
+      devicePixelRatio: 1,
+      extentHeight: 768,
+      extentWidth: 1024,
+      outputHeight: 768,
+      outputWidth: 1024,
+      rootKind: 'viewport',
+      rootViewport: { height: 768, width: 1024, x: 0, y: 0 },
+      viewportHeight: 768,
+      viewportWidth: 1024,
+    },
     warnings: [],
   });
   vi.stubGlobal(

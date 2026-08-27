@@ -60,7 +60,7 @@ export function WebSnapshotVisualSurface(props: {
   viewport?: WebSnapshotViewport | undefined;
 }) {
   const width = props.viewport?.width;
-  const style = width === undefined ? undefined : { width: `${width}px` };
+  const style = width === undefined ? undefined : { maxWidth: `${width}px` };
   const sourceTitle = props.sourceTitle?.trim();
   const alt = sourceTitle
     ? `${translate('webSnapshotViewer.app.visualAlt', props.locale)}: ${sourceTitle}`

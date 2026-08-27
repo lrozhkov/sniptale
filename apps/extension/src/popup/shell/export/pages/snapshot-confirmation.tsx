@@ -71,7 +71,10 @@ type WebSnapshotConfirmationDialogProps = {
 
 function WebSnapshotConfirmationBody(props: WebSnapshotConfirmationDialogProps) {
   return (
-    <ProductModalBody compact className="gap-3 text-[12px] leading-snug">
+    <ProductModalBody
+      compact
+      className="min-h-0 flex-1 gap-3 overflow-y-auto text-[12px] leading-snug"
+    >
       <p className="text-[var(--sniptale-color-text-secondary)]">{props.disclosure.body}</p>
       <div className="grid gap-2">
         <SnapshotFeature
@@ -170,10 +173,12 @@ export function WebSnapshotConfirmationDialog({
     <ProductModal
       closeOnBackdrop={!isSavingPreference}
       labelledBy="web-snapshot-confirmation-title"
+      maxHeight="calc(100vh - 24px)"
       maxWidth="calc(100vw - 24px)"
       onClose={handleCancel}
       onKeyDown={handleKeyDown}
       role="dialog"
+      scrollable
       width="380px"
     >
       <ProductModalHeader
