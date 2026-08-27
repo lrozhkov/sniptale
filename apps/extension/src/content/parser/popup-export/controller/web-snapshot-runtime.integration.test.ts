@@ -35,6 +35,12 @@ function expectStagedSaveMessages(manifest: unknown): void {
   expect(sentMessages).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
+        current: 4,
+        requestId: 'req-web',
+        total: 4,
+        type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
+      }),
+      expect.objectContaining({
         blobKind: 'package',
         snapshotSessionId: 'snapshot-session-1',
         type: MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
@@ -56,7 +62,7 @@ function expectStagedSaveMessages(manifest: unknown): void {
     snapshotSessionId: 'snapshot-session-1',
     type: MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
   });
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledTimes(3);
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledTimes(4);
 }
 
 it('builds and persists the current page web snapshot', async () => {
@@ -71,6 +77,7 @@ it('builds and persists the current page web snapshot', async () => {
     warnings: ['missing asset'],
   });
   mocks.sendRuntimeMessage
+    .mockResolvedValueOnce({ success: true })
     .mockResolvedValueOnce({ success: true, complete: true, stagedBlobId: 'package-stage' })
     .mockResolvedValueOnce({ success: true, complete: true, stagedBlobId: 'screenshot-stage' })
     .mockResolvedValueOnce({ success: true, assetId: 'asset-1' });
@@ -81,6 +88,7 @@ it('builds and persists the current page web snapshot', async () => {
   expect(mocks.buildCurrentPageWebSnapshot).toHaveBeenCalledWith({
     allowAnonymousCrossOriginAssets: false,
     allowAuthenticatedSameOriginAssets: true,
+    onProgress: expect.any(Function),
     requestId: 'req-web',
   });
   expectStagedSaveMessages(manifest);
@@ -102,9 +110,11 @@ it('returns clear failures when the background persistence route rejects', async
     warnings: [],
   });
   mocks.sendRuntimeMessage
+    .mockResolvedValueOnce({ success: true })
     .mockResolvedValueOnce({ success: true, complete: true, stagedBlobId: 'package-stage' })
     .mockResolvedValueOnce({ success: true, complete: true, stagedBlobId: 'screenshot-stage' })
-    .mockResolvedValueOnce({ success: false, error: 'denied' });
+    .mockResolvedValueOnce({ success: false, error: 'denied' })
+    .mockResolvedValueOnce({ success: true });
 
   handlePopupWebSnapshotRuntime(sendResponse, 'req-web', true, false);
   await flushPromises();

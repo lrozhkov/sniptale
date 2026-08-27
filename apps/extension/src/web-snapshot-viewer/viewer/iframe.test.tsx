@@ -56,7 +56,30 @@ it('keeps srcdoc snapshots no-scripts so about:srcdoc script blocking is expecte
   expect(iframeElement?.getAttribute('srcdoc')).toContain('<script>');
   expect(iframeElement?.getAttribute('srcdoc')).toContain("form-action 'none'");
   expect(iframeElement?.getAttribute('srcdoc')).toContain("navigate-to 'none'");
+  expect(iframeElement?.getAttribute('srcdoc')).toContain(
+    '<style data-sniptale-viewer-baseline>@layer sniptale-viewer-baseline{body{font-size:initial}}</style>'
+  );
   expect(iframeElement?.getAttribute('sandbox')).toBe('allow-same-origin');
   expect(iframeElement?.getAttribute('sandbox')).not.toContain('allow-scripts');
   expect(iframeElement?.getAttribute('title')).toBe('Web Snapshot');
+});
+
+it('places the extension-environment baseline before captured page styles', () => {
+  act(() => {
+    root?.render(
+      <WebSnapshotFrame
+        iframeRef={() => undefined}
+        onLoad={() => undefined}
+        srcDoc={
+          '<!doctype html><html><head data-source="page"><style>body{font-size:20px}</style></head><body></body></html>'
+        }
+        title="Web Snapshot"
+      />
+    );
+  });
+
+  const srcDoc = container?.querySelector('iframe')?.getAttribute('srcdoc') ?? '';
+  expect(srcDoc.indexOf('data-sniptale-viewer-baseline')).toBeLessThan(
+    srcDoc.indexOf('body{font-size:20px}')
+  );
 });

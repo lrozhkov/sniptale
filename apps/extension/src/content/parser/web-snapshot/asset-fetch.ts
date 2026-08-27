@@ -3,19 +3,34 @@ import { getContentRuntimeServices } from '../../platform/runtime-services/servi
 import {
   isSafeWebSnapshotUrl,
   resolveAllowedWebSnapshotAssetMimeType,
-  sanitizeWebSnapshotCssText,
   sanitizeWebSnapshotFilename,
+  sanitizeWebSnapshotSvgText,
 } from '../../../features/web-snapshot/public';
 import { MAX_WEB_SNAPSHOT_ASSET_BYTES } from './limits';
 import type { WebSnapshotAssetEntry } from './types';
 
 const EXTENSION_BY_TYPE: Record<string, string> = {
+  'font/woff': 'woff',
+  'font/woff2': 'woff2',
+  'image/avif': 'avif',
+  'image/gif': 'gif',
   'image/jpeg': 'jpg',
   'image/png': 'png',
+  'image/svg+xml': 'svg',
   'image/webp': 'webp',
   'text/css': 'css',
 };
 const ALLOWED_ASSET_MIME_TYPES = new Set(Object.keys(EXTENSION_BY_TYPE));
+
+function readBlobText(blob: Blob): Promise<string> {
+  if (typeof blob.text === 'function') return blob.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read web snapshot asset.'));
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(blob);
+  });
+}
 
 function getExtension(blob: Blob, url: string): string {
   const byType = EXTENSION_BY_TYPE[blob.type];
@@ -28,13 +43,13 @@ function getExtension(blob: Blob, url: string): string {
   return match?.[1]?.toLowerCase() ?? 'bin';
 }
 
-async function sanitizeCssAssetBlob(blob: Blob): Promise<Blob> {
-  if (blob.type !== 'text/css') {
-    return blob;
+async function sanitizeAssetBlob(blob: Blob): Promise<Blob> {
+  if (blob.type === 'image/svg+xml') {
+    return new Blob([sanitizeWebSnapshotSvgText(await readBlobText(blob))], {
+      type: 'image/svg+xml',
+    });
   }
-
-  const css = await blob.text();
-  return new Blob([sanitizeWebSnapshotCssText(css)], { type: 'text/css' });
+  return blob;
 }
 
 function assertAllowedAssetBlobType(blob: Blob): void {
@@ -140,6 +155,9 @@ async function fetchAssetBlob(args: {
   resolved: URL;
   snapshotSessionId: string;
 }): Promise<Blob> {
+  if (args.resolved.protocol === 'data:') {
+    return readSameOriginAssetBlob(await fetch(args.resolved.href));
+  }
   if (args.resolved.origin === args.pageOrigin) {
     return args.fetchSameOriginAssetBlob(args.resolved);
   }
@@ -182,7 +200,7 @@ export async function fetchAssetUrl(args: {
     snapshotSessionId: args.snapshotSessionId,
   });
   assertAllowedAssetBlobType(fetchedBlob);
-  const blob = await sanitizeCssAssetBlob(fetchedBlob);
+  const blob = await sanitizeAssetBlob(fetchedBlob);
   const basename = sanitizeWebSnapshotFilename(
     new URL(resolvedUrl).pathname.split('/').pop() ?? '',
     `asset-${args.index}`

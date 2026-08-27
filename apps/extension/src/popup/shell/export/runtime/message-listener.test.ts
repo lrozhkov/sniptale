@@ -18,7 +18,13 @@ const status = {
   orderedTabs: [{ tabId: 7, title: 'Page' }],
   originalActiveTabs: [{ tabId: 6, windowId: 1 }],
   phase: 'running' as const,
-  progress: { current: 1, errors: [], message: 'Capturing', phase: 'scanning' as const, total: 2 },
+  progress: {
+    current: 1,
+    errors: [],
+    message: 'Capturing',
+    phase: 'scanning' as const,
+    total: 2,
+  },
   revision: 2,
   warnings: ['warning'],
 };
@@ -26,7 +32,55 @@ const status = {
 it('parses only revisioned popup-export job status updates', () => {
   const message = { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED };
   expect(parsePopupExportRuntimeMessage(message)).toEqual(message);
-  expect(parsePopupExportRuntimeMessage({ type: MessageType.ENABLE_SCREENSHOT_MODE })).toBeNull();
+  expect(
+    parsePopupExportRuntimeMessage({
+      type: MessageType.ENABLE_SCREENSHOT_MODE,
+    })
+  ).toBeNull();
+});
+
+it('applies only matching live web snapshot progress', () => {
+  const setProgress = vi.fn();
+  const message = {
+    activeStepKey: 'webSnapshotPreview' as const,
+    current: 2,
+    requestId: 'job-1',
+    total: 7,
+    type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
+  };
+
+  expect(parsePopupExportRuntimeMessage(message)).toEqual(message);
+  expect(
+    applyPopupExportRuntimeMessage({
+      clearRequestId: vi.fn(),
+      latestStatus: null,
+      message,
+      requestId: 'job-1',
+      setLatestStatus: vi.fn(),
+      setProgress,
+      setResult: vi.fn(),
+    })
+  ).toBe(true);
+  expect(setProgress).toHaveBeenCalledWith({
+    activeStepKey: 'webSnapshotPreview',
+    current: 2,
+    errors: [],
+    message: 'Полноразмерный скриншот',
+    phase: 'scanning',
+    total: 7,
+  });
+
+  expect(
+    applyPopupExportRuntimeMessage({
+      clearRequestId: vi.fn(),
+      latestStatus: null,
+      message,
+      requestId: 'job-2',
+      setLatestStatus: vi.fn(),
+      setProgress,
+      setResult: vi.fn(),
+    })
+  ).toBe(false);
 });
 
 it('applies a matching job status and merges warnings into progress errors', () => {

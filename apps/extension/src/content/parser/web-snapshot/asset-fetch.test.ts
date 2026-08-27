@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fetchAssetUrl, readSameOriginAssetBlob } from './asset-fetch';
 import { MAX_WEB_SNAPSHOT_ASSET_BYTES } from './limits';
@@ -23,6 +25,15 @@ function createChunkStream(
   });
 }
 
+function readTestBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(blob);
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal('document', { baseURI: 'https://example.com/page' });
   vi.stubGlobal('location', { origin: 'https://example.com' });
@@ -33,7 +44,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('sanitizes obfuscated CSS resource fetches before storing snapshot assets', async () => {
+it('returns CSS bytes for the recursive stylesheet packaging owner', async () => {
   const asset = await fetchAssetUrl({
     allowAnonymousCrossOriginAssets: false,
     baseUrl: 'https://example.com/page',
@@ -49,22 +60,25 @@ it('sanitizes obfuscated CSS resource fetches before storing snapshot assets', a
 
   expect(asset.localPath).toBe('assets/1-styles.css.css');
   expect(asset.blob.type).toBe('text/css');
-  await expect(asset.blob.text()).resolves.toBe('');
+  await expect(readTestBlobText(asset.blob)).resolves.toContain('u\\72l');
 });
 
-it('rejects same-origin SVG assets before packaging', async () => {
-  await expect(
-    fetchAssetUrl({
-      allowAnonymousCrossOriginAssets: false,
-      baseUrl: 'https://example.com/page',
-      fetchSameOriginAssetBlob: async () =>
-        new Blob(['<svg onload="alert(1)"></svg>'], { type: 'image/svg+xml' }),
-      index: 1,
-      pageOrigin: 'https://example.com',
-      snapshotSessionId: 'snapshot-session',
-      url: '/unsafe.svg',
-    })
-  ).rejects.toThrow('unsupported web snapshot asset MIME type');
+it('sanitizes same-origin SVG assets before packaging', async () => {
+  const asset = await fetchAssetUrl({
+    allowAnonymousCrossOriginAssets: false,
+    baseUrl: 'https://example.com/page',
+    fetchSameOriginAssetBlob: async () =>
+      new Blob(['<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><path /></svg>'], {
+        type: 'image/svg+xml',
+      }),
+    index: 1,
+    pageOrigin: 'https://example.com',
+    snapshotSessionId: 'snapshot-session',
+    url: '/unsafe.svg',
+  });
+
+  expect(asset.blob.type).toBe('image/svg+xml');
+  await expect(readTestBlobText(asset.blob)).resolves.not.toContain('onload');
 });
 
 it('streams same-origin asset responses into bounded blobs', async () => {
@@ -75,7 +89,7 @@ it('streams same-origin asset responses into bounded blobs', async () => {
   );
 
   expect(blob.type).toBe('image/png');
-  await expect(blob.text()).resolves.toBe('png');
+  await expect(readTestBlobText(blob)).resolves.toBe('png');
 });
 
 it('rejects oversized same-origin assets from content-length before reading the body', async () => {

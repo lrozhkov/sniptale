@@ -7,7 +7,28 @@ import {
   sanitizeWebSnapshotAttribute,
   sanitizeWebSnapshotFilename,
   sanitizeWebSnapshotHtml,
+  shouldExcludeWebSnapshotFormControlValue,
 } from './sanitize';
+
+it.each([
+  'cc-name',
+  'cc-given-name',
+  'cc-additional-name',
+  'cc-family-name',
+  'cc-number',
+  'cc-exp',
+  'cc-exp-month',
+  'cc-exp-year',
+  'cc-csc',
+  'cc-type',
+  'transaction-amount',
+  'transaction-currency',
+])('classifies the recognized payment autocomplete token %s as sensitive', (autocomplete) => {
+  const control = document.createElement('input');
+  control.setAttribute('autocomplete', autocomplete);
+
+  expect(shouldExcludeWebSnapshotFormControlValue(control)).toBe(true);
+});
 
 it('sanitizes executable attributes and unsafe URLs for web snapshots', () => {
   expect(sanitizeWebSnapshotAttribute('onclick', 'alert(1)', 'https://example.com')).toBeNull();
@@ -53,6 +74,83 @@ it('strips resource-bearing snapshot attributes and CSS fetch vectors', () => {
   expect(css).not.toContain('@import');
   expect(css).not.toContain('tracker.example');
   expect(css).toContain('color: red');
+});
+
+it('preserves only CSS resource URLs approved by the offline asset rewriter', () => {
+  const css = sanitizeWebSnapshotCssText(
+    [
+      '@import url("https://tracker.example/import.css");',
+      '.hero { background: url("https://cdn.example/hero.png"); }',
+      '.icon { mask: url("javascript:alert(1)"); }',
+    ].join('\n'),
+    (url) => (url === 'https://cdn.example/hero.png' ? '../assets/hero.png' : null)
+  );
+
+  expect(css).toContain('url("../assets/hero.png")');
+  expect(css).not.toContain('@import');
+  expect(css).not.toContain('tracker.example');
+  expect(css).not.toContain('javascript');
+});
+
+it('preserves only rewritten URL and string-form stylesheet imports', () => {
+  expect(
+    sanitizeWebSnapshotCssText(
+      '@import url("https://cdn.example/theme.css") screen; .card { color: red; }',
+      (url) => (url === 'https://cdn.example/theme.css' ? '../assets/theme.css' : null)
+    )
+  ).toContain('@import url("../assets/theme.css") screen;');
+  expect(
+    sanitizeWebSnapshotCssText('@import url("https://cdn.example/theme.css");', () => null)
+  ).toBe('');
+  expect(
+    sanitizeWebSnapshotCssText('@import "./theme.css" print;', (url) =>
+      url === './theme.css' ? '../assets/theme.css' : null
+    )
+  ).toContain('@import url("../assets/theme.css") print;');
+  expect(sanitizeWebSnapshotCssText('@import "./theme.css";', () => null)).toBe('');
+  expect(sanitizeWebSnapshotCssText('@import "./theme.css;', () => '../assets/theme.css')).toBe('');
+  expect(
+    sanitizeWebSnapshotCssText(
+      '@im/* hidden */port url("https://cdn.example/theme.css");',
+      () => '../assets/theme.css'
+    )
+  ).toBe('');
+});
+
+it('parses whitespace and escapes in rewritten CSS URL functions', () => {
+  const rewritten = sanitizeWebSnapshotCssText(
+    '.hero { background: url  (  "https://cdn.example/im\\age.png"  ); }',
+    (url) => (url === 'https://cdn.example/im\\age.png' ? '../assets/image.png' : null)
+  );
+
+  expect(rewritten).toContain('url("../assets/image.png")');
+});
+
+it('fails closed for malformed URL functions and preserves benign block comments', () => {
+  const malformed = sanitizeWebSnapshotCssText(
+    '.bad { background: url("https://cdn.example/image.png" trailing); color: red; }',
+    () => '../assets/image.png'
+  );
+  const unterminated = sanitizeWebSnapshotCssText(
+    '.bad { background: url("https://cdn.example/image.png); color: red; }',
+    () => '../assets/image.png'
+  );
+  const commented = sanitizeWebSnapshotCssText('.ok { /* note */ color: green; }');
+
+  expect(malformed).not.toContain('cdn.example');
+  expect(unterminated).not.toContain('cdn.example');
+  expect(commented).toContain('color: green');
+});
+
+it('preserves literal CSS variables only after their resource values pass rewriting', () => {
+  const css = sanitizeWebSnapshotCssText(
+    ':root { --hero: url("https://cdn.example/hero.png"); } .hero { background: var(--hero); }',
+    (url) => (url.startsWith('https://cdn.example/') ? '../assets/hero.png' : null)
+  );
+
+  expect(css).toContain('--hero: url("../assets/hero.png")');
+  expect(css).toContain('var(--hero)');
+  expect(sanitizeWebSnapshotCssText('.hero { background: var(--hero); }')).toBe('');
 });
 
 it('drops obfuscated CSS fetch vectors without stripping benign string content', () => {
@@ -115,6 +213,16 @@ it('sanitizes restored web snapshot HTML before viewer rendering', () => {
       '<meta http-equiv="refresh" content="0; url=https://tracker.example">',
       '<iframe srcdoc="<script>alert(1)</script>"></iframe>',
       '<form action="https://tracker.example/post" method="post">',
+      '<input type="password" value="stored-secret">',
+      '<input autocomplete="section-login one-time-code webauthn" value="123456">',
+      '<input type="hidden" value="csrf-secret">',
+      '<input autocomplete="billing cc-number" value="4111111111111111">',
+      '<input type="checkbox" autocomplete="one-time-code" checked>',
+      '<textarea autocomplete="one-time-code" value="textarea-attribute-code">',
+      'textarea-code</textarea>',
+      '<select autocomplete="cc-type" value="select-card">',
+      '<option label="restored-card-label" value="4111-restored-option" selected>',
+      'restored-card-number</option></select>',
       '<button formaction="https://tracker.example/post">Send</button>',
       '</form>',
       '<svg><a xlink:href="javascript:alert(1)">bad</a></svg>',
@@ -129,11 +237,58 @@ it('sanitizes restored web snapshot HTML before viewer rendering', () => {
   expect(html).not.toContain('http-equiv="refresh"');
   expect(html).not.toContain('<iframe');
   expect(html).not.toContain('formaction');
+  expect(html).not.toContain('stored-secret');
+  expect(html).not.toContain('123456');
+  expect(html).not.toContain('csrf-secret');
+  expect(html).not.toContain('4111111111111111');
+  expect(html).not.toContain('textarea-code');
+  expect(html).not.toContain('textarea-attribute-code');
+  expect(html).not.toContain('select-card');
+  expect(html).not.toContain('4111-restored-option');
+  expect(html).not.toContain('restored-card-number');
+  expect(html).not.toContain('restored-card-label');
+  expect(html).not.toContain('<option selected');
+  expect(html).not.toContain('type="checkbox" autocomplete="one-time-code" checked');
   expect(html).not.toContain('xlink:href');
   expect(html).not.toContain('data:text/html');
   expect(html).not.toContain('onerror');
   expect(html).not.toContain('tracker.example');
   expect(html).toContain('data-sniptale-disabled-form="true"');
+});
+
+it('sanitizes active content and credentials inside declarative shadow roots', () => {
+  const html = sanitizeWebSnapshotHtml(
+    [
+      '<section><template shadowrootmode="open">',
+      '<script>window.shadowEvil = true</script>',
+      '<input type="hidden" value="shadow-token">',
+      '<input type="checkbox" autocomplete="one-time-code" checked>',
+      '<template shadowrootmode="open">',
+      '<textarea autocomplete="one-time-code" value="nested-text-attribute-code">',
+      'nested-text-code</textarea>',
+      '<select autocomplete="cc-name" value="nested-select-card">',
+      '<option label="nested-card-label" value="nested-option-card" selected>nested-card-number</option></select>',
+      '</template>',
+      '<img src="https://tracker.example/shadow.png" onerror="alert(1)">',
+      '</template></section>',
+    ].join(''),
+    'https://example.com/page',
+    { offlineOnly: true }
+  );
+
+  expect(html).toContain('shadowrootmode="open"');
+  expect(html).not.toContain('shadowEvil');
+  expect(html).not.toContain('shadow-token');
+  expect(html).not.toContain('nested-text-code');
+  expect(html).not.toContain('nested-text-attribute-code');
+  expect(html).not.toContain('nested-select-card');
+  expect(html).not.toContain('nested-option-card');
+  expect(html).not.toContain('nested-card-number');
+  expect(html).not.toContain('nested-card-label');
+  expect(html).not.toContain('type="checkbox" autocomplete="one-time-code" checked');
+  expect(html).not.toContain('<option selected');
+  expect(html).not.toContain('tracker.example');
+  expect(html).not.toContain('onerror');
 });
 
 it('removes all navigation targets and external resource URLs from offline viewer HTML', () => {

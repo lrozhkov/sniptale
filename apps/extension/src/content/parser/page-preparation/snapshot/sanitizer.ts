@@ -1,6 +1,10 @@
 import {
+  isSafeWebSnapshotUrl,
+  collectWebSnapshotQueryRoots,
   sanitizeWebSnapshotAttribute,
   sanitizeWebSnapshotCssText,
+  sanitizeWebSnapshotStylesheetText,
+  removeWebSnapshotSensitiveControlState,
 } from '../../../../features/web-snapshot/public';
 import type { PreparedSnapshotWarning } from './types';
 import {
@@ -15,32 +19,6 @@ const EXECUTABLE_SELECTORS = [
   'object',
   'embed',
   'meta[http-equiv="refresh" i]',
-];
-
-const SNIPTALE_RUNTIME_SELECTORS = [
-  '#sniptale-extension-root',
-  '#sniptale-content-app-root',
-  '#sniptale-resize-handles-portal',
-  '.sniptale-app',
-  '.sniptale-toolbar-portal-wrapper',
-  '.sniptale-frame-toolbar-trigger',
-  '.sniptale-frame-toolbar-bridge',
-  '.sniptale-frame-quick-action',
-  '.sniptale-action-toolbar',
-  '.sniptale-content-size-tooltip',
-  '.sniptale-resize-handle',
-  '.sniptale-callout-drag-handle',
-  '.sniptale-callout-adjacent-controls',
-  '.sniptale-callout-tail-handle',
-  '.sniptale-callout-settings-handle',
-  '.sniptale-step-badge-controls',
-  '.sniptale-frame-settings-popover',
-  '.sniptale-step-badge-popover',
-  '.sniptale-callout-settings-popover',
-  '.sniptale-callout-format-toolbar',
-  '.sniptale-glass-popover',
-  '.sniptale-blocking-overlay',
-  '.sniptale-editing-blocking-overlay',
 ];
 
 function removeElements(
@@ -83,9 +61,18 @@ function replaceExecutableIframes(
 function sanitizeElementAttributes(
   element: Element,
   baseUrl: string,
-  warnings: PreparedSnapshotWarning[]
+  warnings: PreparedSnapshotWarning[],
+  preserveAssetUrls: boolean
 ): void {
   for (const attribute of Array.from(element.attributes)) {
+    if (attribute.name.toLowerCase() === 'style') {
+      const sanitizedStyle = sanitizeWebSnapshotCssText(
+        attribute.value,
+        preserveAssetUrls ? (url) => resolvePreparedCssUrl(url, baseUrl) : () => null
+      );
+      element.setAttribute(attribute.name, sanitizedStyle);
+      continue;
+    }
     const sanitized = sanitizeWebSnapshotAttribute(attribute.name, attribute.value, baseUrl);
 
     if (sanitized === null) {
@@ -108,25 +95,47 @@ function disableUnsafeFormBehavior(root: ParentNode): void {
   }
 }
 
-function sanitizeStyleElements(root: ParentNode): void {
+function resolvePreparedCssUrl(value: string, baseUrl: string): string | null {
+  const trimmedValue = value.trim();
+  if (trimmedValue.startsWith('#')) return trimmedValue;
+  if (!isSafeWebSnapshotUrl(trimmedValue, baseUrl)) return null;
+  try {
+    const url = new URL(trimmedValue, baseUrl);
+    return ['data:', 'http:', 'https:'].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeStyleElements(
+  root: ParentNode,
+  baseUrl: string,
+  preserveAssetUrls: boolean
+): void {
   for (const styleElement of root.querySelectorAll('style')) {
-    styleElement.textContent = sanitizeWebSnapshotCssText(styleElement.textContent ?? '');
+    styleElement.textContent = sanitizeWebSnapshotStylesheetText(
+      styleElement.textContent ?? '',
+      preserveAssetUrls ? (url) => resolvePreparedCssUrl(url, baseUrl) : () => null
+    );
   }
 }
 
 export function sanitizePreparedSnapshotDocument(
   snapshot: Document,
-  baseUrl: string
+  baseUrl: string,
+  options: { preserveAssetUrls?: boolean } = {}
 ): PreparedSnapshotWarning[] {
   const warnings: PreparedSnapshotWarning[] = [];
-  removeElements(snapshot, EXECUTABLE_SELECTORS, warnings);
-  replaceExecutableIframes(snapshot, baseUrl, warnings);
-  disableUnsafeFormBehavior(snapshot);
-  sanitizeStyleElements(snapshot);
-  removeElements(snapshot, SNIPTALE_RUNTIME_SELECTORS, warnings);
-
-  for (const element of snapshot.querySelectorAll('*')) {
-    sanitizeElementAttributes(element, baseUrl, warnings);
+  const preserveAssetUrls = options.preserveAssetUrls === true;
+  for (const root of collectWebSnapshotQueryRoots(snapshot)) {
+    removeElements(root, EXECUTABLE_SELECTORS, warnings);
+    replaceExecutableIframes(root, baseUrl, warnings);
+    disableUnsafeFormBehavior(root);
+    removeWebSnapshotSensitiveControlState(root);
+    sanitizeStyleElements(root, baseUrl, preserveAssetUrls);
+    for (const element of root.querySelectorAll('*')) {
+      sanitizeElementAttributes(element, baseUrl, warnings, preserveAssetUrls);
+    }
   }
 
   return warnings;

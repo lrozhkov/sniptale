@@ -114,6 +114,7 @@ beforeEach(() => {
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: true,
+    webSnapshotSaveDisclosureVersion: 1,
   });
   mocks.usePopupExportControllerMock.mockReset();
 });

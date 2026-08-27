@@ -43,6 +43,12 @@ function parseOptionalNumber(value: unknown): ParsedFieldValue<number> {
   return isNumber(value) ? value : INVALID_FIELD;
 }
 
+function parseOptionalNonNegativeInteger(value: unknown): ParsedFieldValue<number> {
+  const parsed = parseOptionalNumber(value);
+  if (parsed === undefined || parsed === INVALID_FIELD) return parsed;
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : INVALID_FIELD;
+}
+
 function parseOptionalNullableString(value: unknown): ParsedFieldValue<string | null> {
   if (value === undefined) {
     return undefined;
@@ -239,6 +245,11 @@ function parsePrivacySettingsFields(
     nextValue,
     'skipWebSnapshotSaveDisclosure',
     parseOptionalBoolean(value['skipWebSnapshotSaveDisclosure'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'webSnapshotSaveDisclosureVersion',
+    parseOptionalNonNegativeInteger(value['webSnapshotSaveDisclosureVersion'])
   );
   return invalidFieldCount;
 }

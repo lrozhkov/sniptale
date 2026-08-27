@@ -15,15 +15,59 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
   },
   webSnapshotDisclosureBody: {
     ru: [
-      'Sniptale сохранит локальную копию страницы в Библиотеке:',
-      'изображение, очищенную разметку и стили, адрес, название страницы, предупреждения',
-      'и безопасные диагностические данные. Скрипты, cookies и данные входа не сохраняются.',
+      'Локальная копия содержит адрес и заголовок страницы, предупреждения и безопасную',
+      'техническую диагностику. Распознанные поля паролей, кодов входа и платёжных данных',
+      'исключаются из документа и скрываются на скриншоте.',
     ].join(' '),
     en: [
-      'Sniptale will save a local page copy in Library: image, cleaned markup and styles,',
-      'page address, title, warnings, and safe diagnostics. Scripts, cookies,',
-      'and sign-in data are not saved.',
+      'The local copy includes the page address and title, warnings, and safe technical',
+      'diagnostics. Recognized password, sign-in code, and payment fields are excluded',
+      'from the document and hidden in the screenshot.',
     ].join(' '),
+  },
+  webSnapshotStaticDocumentTitle: {
+    ru: 'Статический документ',
+    en: 'Static document',
+  },
+  webSnapshotStaticDocumentDescription: {
+    ru: [
+      'Очищенная разметка и текущее состояние обычных полей формы, стили, шрифты и',
+      'доступные изображения с сохранённой геометрией страницы.',
+    ].join(' '),
+    en: [
+      'Sanitized markup and current ordinary form state, styles, fonts, and available',
+      'images with the captured page geometry.',
+    ].join(' '),
+  },
+  webSnapshotScreenshotTitle: {
+    ru: 'Полноразмерный скриншот',
+    en: 'Full-page screenshot',
+  },
+  webSnapshotScreenshotDescription: {
+    ru: [
+      'PNG исходного масштаба остаётся резервным визуальным представлением. Другая видимая',
+      'приватная информация, включая текст в изображениях, canvas, video или закрытом Shadow DOM, может сохраниться.',
+    ].join(' '),
+    en: [
+      'A native-scale PNG remains available as the visual fallback. Other visible private',
+      'content, including text in images, canvas, video, or closed Shadow DOM, may still be retained.',
+    ].join(' '),
+  },
+  webSnapshotOfflineTitle: {
+    ru: 'Автономный просмотр',
+    en: 'Offline viewing',
+  },
+  webSnapshotOfflineDescription: {
+    ru: 'Скрипты отключены; Viewer не обращается к исходному сайту при открытии снимка.',
+    en: 'Scripts are disabled; Viewer does not contact the source site when opening the snapshot.',
+  },
+  webSnapshotResourcePolicyTitle: {
+    ru: 'Доступ к ресурсам при сохранении',
+    en: 'Resource access while saving',
+  },
+  webSnapshotResourcePolicySettingsHint: {
+    ru: 'Политику можно изменить в настройках Web Snapshots.',
+    en: 'You can change this policy in Web Snapshot settings.',
   },
   webSnapshotDisclosureAssetsDefault: {
     ru: 'Дополнительные ресурсы страницы не загружаются без вашего разрешения.',
@@ -51,12 +95,12 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
   },
   webSnapshotDisclosureAssetsAuthenticated: {
     ru: [
-      'В настройках включено сохранение ресурсов с этого сайта.',
-      'Некоторые изображения или стили могут попасть в локальную копию.',
+      'Ресурсы текущего сайта загружаются с учётом вашего активного входа.',
+      'Приватные изображения или стили могут попасть в локальную копию; не передавайте её третьим лицам.',
     ].join(' '),
     en: [
-      'Saving resources from this site is enabled.',
-      'Some images or styles may be included in the local copy.',
+      'Current-site assets are loaded using your active signed-in session.',
+      'Private images or styles may enter the local copy; do not share it with others.',
     ].join(' '),
   },
   webSnapshotDisclosureAssetsExternal: {
@@ -71,12 +115,12 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
   },
   webSnapshotDisclosureAssetsBoth: {
     ru: [
-      'В настройках включены ресурсы с этого сайта и внешние ресурсы.',
-      'Некоторые изображения, стили или доступные публичные файлы могут попасть в локальную копию.',
+      'Ресурсы текущего сайта загружаются с учётом активного входа, а внешние HTTPS-ресурсы — анонимно.',
+      'Приватные изображения или стили могут попасть в локальную копию; не передавайте её третьим лицам.',
     ].join(' '),
     en: [
-      'Resources from this site and external resources are enabled.',
-      'Some images, styles, or available public files may be included in the local copy.',
+      'Current-site assets use your active signed-in session; external HTTPS assets load anonymously.',
+      'Private images or styles may enter the local copy; do not share it with others.',
     ].join(' '),
   },
   webSnapshotDisclosureCancel: {
@@ -84,8 +128,8 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
     en: 'Cancel',
   },
   webSnapshotDisclosureConfirm: {
-    ru: 'Подтвердить',
-    en: 'Confirm',
+    ru: 'Сохранить локально',
+    en: 'Save locally',
   },
   webSnapshotDisclosureSkipNextTime: {
     ru: 'Больше не спрашивать',
@@ -128,23 +172,23 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
     en: 'Web snapshot saved without an asset id',
   },
   webSnapshotPreviewStep: {
-    ru: 'Preview screenshot',
-    en: 'Preview screenshot',
+    ru: 'Полноразмерный скриншот',
+    en: 'Full-page screenshot',
   },
   webSnapshotDomStep: {
-    ru: 'DOM',
-    en: 'DOM',
+    ru: 'Статический документ',
+    en: 'Static document',
   },
   webSnapshotStylesStep: {
-    ru: 'Styles',
-    en: 'Styles',
+    ru: 'Стили и шрифты',
+    en: 'Styles and fonts',
   },
   webSnapshotAssetsStep: {
-    ru: 'Assets',
-    en: 'Assets',
+    ru: 'Ассеты и сохранение',
+    en: 'Assets and saving',
   },
   webSnapshotWarningsStep: {
-    ru: 'Warnings',
+    ru: 'Предупреждения',
     en: 'Warnings',
   },
 });

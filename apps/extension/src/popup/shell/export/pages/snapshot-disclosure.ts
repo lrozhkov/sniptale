@@ -11,6 +11,8 @@ type WebSnapshotDisclosureState = {
   status: 'error' | 'loaded' | 'loading';
 };
 
+export const WEB_SNAPSHOT_SAVE_DISCLOSURE_VERSION = 1;
+
 export function useWebSnapshotDisclosureState(): [
   WebSnapshotDisclosureState,
   (skip: boolean) => void,
@@ -34,7 +36,10 @@ export function useWebSnapshotDisclosureState(): [
         setState((current) => ({
           anonymousCrossOriginAssetsEnabled: settings.anonymousCrossOriginSnapshotAssetsEnabled,
           authenticatedSnapshotAssetsEnabled: settings.authenticatedSnapshotAssetsEnabled,
-          skipDisclosure: current.skipDisclosure || settings.skipWebSnapshotSaveDisclosure,
+          skipDisclosure:
+            current.skipDisclosure ||
+            (settings.skipWebSnapshotSaveDisclosure &&
+              settings.webSnapshotSaveDisclosureVersion === WEB_SNAPSHOT_SAVE_DISCLOSURE_VERSION),
           status: 'loaded',
         }));
       })
@@ -85,12 +90,25 @@ function getWebSnapshotAssetDisclosureText(state: WebSnapshotDisclosureState): s
   return translate('popup.export.webSnapshotDisclosureAssetsDefault');
 }
 
+function getWebSnapshotAssetPolicy(
+  state: WebSnapshotDisclosureState
+): WebSnapshotDisclosure['assetPolicy'] {
+  if (state.status !== 'loaded') return state.status;
+  if (state.authenticatedSnapshotAssetsEnabled && state.anonymousCrossOriginAssetsEnabled) {
+    return 'both';
+  }
+  if (state.authenticatedSnapshotAssetsEnabled) return 'authenticated';
+  if (state.anonymousCrossOriginAssetsEnabled) return 'external';
+  return 'strict';
+}
+
 export function createWebSnapshotDisclosure(
   state: WebSnapshotDisclosureState
 ): WebSnapshotDisclosure {
   const requiresConfirmation = state.status !== 'loaded' || !state.skipDisclosure;
 
   return {
+    assetPolicy: getWebSnapshotAssetPolicy(state),
     body: translate('popup.export.webSnapshotDisclosureBody'),
     requiresConfirmation,
     title: translate('popup.export.webSnapshotDisclosureTitle'),

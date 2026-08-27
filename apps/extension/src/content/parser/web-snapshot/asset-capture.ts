@@ -1,5 +1,6 @@
 import { formatWebSnapshotWarningUrl } from './asset-session';
 import { fetchAssetUrl } from './asset-fetch';
+import { sanitizeWebSnapshotCssText } from '../../../features/web-snapshot/public';
 import { MAX_WEB_SNAPSHOT_ASSET_BYTES, MAX_WEB_SNAPSHOT_ASSETS_BYTES } from './limits';
 import { parseSrcset, serializeSrcset, type AssetTarget } from './asset-targets';
 import type { WebSnapshotAssetEntry } from './types';
@@ -7,6 +8,8 @@ import type { WebSnapshotAssetEntry } from './types';
 interface AssetByteBudget {
   totalBytes: number;
 }
+
+export type CapturedAssetCache = Map<string, WebSnapshotAssetEntry | null>;
 
 export type WebSnapshotAssetContext = {
   baseUrl: string;
@@ -149,7 +152,23 @@ async function captureSrcsetAssets(args: {
   return { assets, nextIndex: args.startIndex + candidates.length };
 }
 
+function rewriteCssAssetReference(target: AssetTarget, replacement: string | null): void {
+  const isStyleElement = target.element.tagName.toLowerCase() === 'style';
+  const cssText = isStyleElement
+    ? (target.element.textContent ?? '')
+    : (target.element.getAttribute('style') ?? '');
+  const rewritten = sanitizeWebSnapshotCssText(cssText, (url) =>
+    url === target.url ? replacement : url
+  );
+  if (isStyleElement) target.element.textContent = rewritten;
+  else target.element.setAttribute('style', rewritten);
+}
+
 function removeFailedAssetReference(target: AssetTarget): void {
+  if (target.attribute === 'css-url') {
+    rewriteCssAssetReference(target, null);
+    return;
+  }
   const linkConstructor = target.element.ownerDocument.defaultView?.HTMLLinkElement;
   const isLinkElement = linkConstructor
     ? target.element instanceof linkConstructor
@@ -163,6 +182,24 @@ function removeFailedAssetReference(target: AssetTarget): void {
   target.element.removeAttribute(target.attribute);
 }
 
+function applyCapturedAssetReference(target: AssetTarget, asset: WebSnapshotAssetEntry): void {
+  if (target.attribute === 'css-url') {
+    rewriteCssAssetReference(target, `../${asset.localPath}`);
+  } else {
+    target.element.setAttribute(target.attribute, `../${asset.localPath}`);
+  }
+}
+
+function applyRejectedAsset(args: {
+  capturedAssetsByUrl: CapturedAssetCache;
+  resolvedUrl: string;
+  target: AssetTarget;
+}): null {
+  args.capturedAssetsByUrl.set(args.resolvedUrl, null);
+  removeFailedAssetReference(args.target);
+  return null;
+}
+
 async function captureSingleAsset(args: {
   allowAnonymousCrossOriginAssets: boolean;
   assetIndex: number;
@@ -173,21 +210,43 @@ async function captureSingleAsset(args: {
   target: AssetTarget;
   warnings: string[];
   abortSignal?: AbortSignal | undefined;
+  capturedAssetsByUrl: CapturedAssetCache;
 }): Promise<WebSnapshotAssetEntry | null> {
   throwIfAssetCaptureAborted(args.abortSignal);
+  const resolvedUrl = new URL(args.target.url, args.context.baseUrl).href;
+  if (args.capturedAssetsByUrl.has(resolvedUrl)) {
+    const cachedAsset = args.capturedAssetsByUrl.get(resolvedUrl) ?? null;
+    if (cachedAsset) {
+      applyCapturedAssetReference(args.target, cachedAsset);
+    } else {
+      applyRejectedAsset({
+        capturedAssetsByUrl: args.capturedAssetsByUrl,
+        resolvedUrl,
+        target: args.target,
+      });
+    }
+    return null;
+  }
   try {
     const asset = await fetchSnapshotAsset({ ...args, url: args.target.url });
     if (!acceptAssetWithinBudget(asset, args.budget, args.warnings)) {
-      removeFailedAssetReference(args.target);
-      return null;
+      return applyRejectedAsset({
+        capturedAssetsByUrl: args.capturedAssetsByUrl,
+        resolvedUrl,
+        target: args.target,
+      });
     }
-    args.target.element.setAttribute(args.target.attribute, `../${asset.localPath}`);
+    args.capturedAssetsByUrl.set(resolvedUrl, asset);
+    applyCapturedAssetReference(args.target, asset);
     return asset;
   } catch (error) {
     throwIfAssetCaptureAborted(args.abortSignal);
-    removeFailedAssetReference(args.target);
     pushAssetCaptureWarning(args.warnings, args.target.url, args.context.baseUrl, error);
-    return null;
+    return applyRejectedAsset({
+      capturedAssetsByUrl: args.capturedAssetsByUrl,
+      resolvedUrl,
+      target: args.target,
+    });
   }
 }
 
@@ -202,6 +261,7 @@ export async function captureAssetTarget(args: {
   target: AssetTarget;
   warnings: string[];
   abortSignal?: AbortSignal | undefined;
+  capturedAssetsByUrl: CapturedAssetCache;
 }): Promise<number> {
   throwIfAssetCaptureAborted(args.abortSignal);
   if (args.target.attribute === 'srcset') {
@@ -218,7 +278,10 @@ export async function captureAssetTarget(args: {
     return args.nextAssetIndex + 1;
   }
 
-  const asset = await captureSingleAsset({ ...args, assetIndex: args.nextAssetIndex });
+  const asset = await captureSingleAsset({
+    ...args,
+    assetIndex: args.nextAssetIndex,
+  });
   if (asset) {
     args.assets.push(asset);
   }

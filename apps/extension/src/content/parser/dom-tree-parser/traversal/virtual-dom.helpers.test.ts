@@ -35,7 +35,7 @@ it('maps aligned virtual and original children recursively', () => {
   expect(virtualToOriginalMap.get(virtualFirstSpan as Node)).toBe(originalFirstSpan);
 });
 
-it('flattens open shadow roots into mapped virtual hosts and skips extension roots', () => {
+it('flattens open shadow roots without trusting a page-owned extension-like id', () => {
   const host = document.createElement('div');
   const shadowRoot = host.attachShadow({ mode: 'open' });
   const shadowChild = document.createElement('span');
@@ -43,15 +43,21 @@ it('flattens open shadow roots into mapped virtual hosts and skips extension roo
   shadowRoot.append(shadowChild);
   document.body.append(host);
 
-  const skippedHost = document.createElement('div');
-  skippedHost.id = 'sniptale-extension-root';
-  const skippedShadowRoot = skippedHost.attachShadow({ mode: 'open' });
-  skippedShadowRoot.append(document.createElement('span'));
-  document.body.append(skippedHost);
+  const lookalikeHost = document.createElement('div');
+  lookalikeHost.id = 'sniptale-extension-root';
+  const lookalikeShadowRoot = lookalikeHost.attachShadow({ mode: 'open' });
+  const lookalikeChild = document.createElement('span');
+  lookalikeChild.textContent = 'page-owned lookalike shadow';
+  lookalikeShadowRoot.append(lookalikeChild);
+  document.body.append(lookalikeHost);
 
   const virtualHost = document.createElement('div');
+  const virtualLookalikeHost = document.createElement('div');
   const virtualToOriginalMap = new Map<Node, Node>();
-  const originalToVirtualMap = new Map<Node, Node>([[host, virtualHost]]);
+  const originalToVirtualMap = new Map<Node, Node>([
+    [host, virtualHost],
+    [lookalikeHost, virtualLookalikeHost],
+  ]);
 
   flattenOpenShadowRoots({
     originalToVirtualMap,
@@ -61,6 +67,33 @@ it('flattens open shadow roots into mapped virtual hosts and skips extension roo
 
   expect(virtualHost.textContent).toContain('shadow child');
   expect(virtualToOriginalMap.get(virtualHost.firstChild as Node)).toBe(shadowChild);
+  expect(virtualLookalikeHost.textContent).toContain('page-owned lookalike shadow');
+  expect(virtualToOriginalMap.get(virtualLookalikeHost.firstChild as Node)).toBe(lookalikeChild);
+});
+
+it('flattens nested open shadow roots through one composed-tree discovery', () => {
+  const outerHost = document.createElement('section');
+  const outerRoot = outerHost.attachShadow({ mode: 'open' });
+  const innerHost = document.createElement('article');
+  const innerRoot = innerHost.attachShadow({ mode: 'open' });
+  const nestedContent = document.createElement('strong');
+  nestedContent.textContent = 'nested shadow content';
+  innerRoot.append(nestedContent);
+  outerRoot.append(innerHost);
+  document.body.append(outerHost);
+  const virtualHost = document.createElement('section');
+  const virtualToOriginalMap = new Map<Node, Node>();
+  const originalToVirtualMap = new Map<Node, Node>([[outerHost, virtualHost]]);
+
+  flattenOpenShadowRoots({
+    originalToVirtualMap,
+    root: document,
+    virtualToOriginalMap,
+  });
+
+  expect(virtualHost.textContent).toContain('nested shadow content');
+  const virtualNestedContent = virtualHost.querySelector('strong');
+  expect(virtualToOriginalMap.get(virtualNestedContent as Node)).toBe(nestedContent);
 });
 
 it('resolves streamed template content and ignores empty streamed placeholders', () => {

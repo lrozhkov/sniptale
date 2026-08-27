@@ -1,6 +1,7 @@
 import type { MessageType } from '../../message-types';
 import type {
   ExportOptions,
+  ExportProgressStepKey,
   PopupExportPackageResponse,
   PopupExportPreviewResponse,
   PopupExportJobStatus,
@@ -44,6 +45,16 @@ export type RuntimePopupExportRequestByType = {
     type: typeof MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
     status: PopupExportJobStatus;
   };
+  [MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED]: {
+    type: typeof MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED;
+    requestId: string;
+    activeStepKey: Extract<
+      ExportProgressStepKey,
+      'webSnapshotPreview' | 'webSnapshotDom' | 'webSnapshotStyles' | 'webSnapshotAssets'
+    >;
+    current: number;
+    total: number;
+  };
   [MessageType.EXPORT_POPUP_PREVIEW]: {
     type: typeof MessageType.EXPORT_POPUP_PREVIEW;
     tabId: number;
@@ -84,6 +95,7 @@ export type RuntimePopupExportResponseByType = {
     status: PopupExportJobStatus | null;
   }>;
   [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: import('../response').RuntimeAckResponse;
+  [MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED]: import('../response').RuntimeAckResponse;
   [MessageType.EXPORT_POPUP_PREVIEW]: PopupExportPreviewResponse;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: PopupExportPackageResponse;
   [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: WebSnapshotSaveResult;

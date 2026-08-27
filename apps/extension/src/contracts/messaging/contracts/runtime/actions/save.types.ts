@@ -15,6 +15,7 @@ type RegisterWebSnapshotAssetsMessage = {
   type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS;
   assetUrls: string[];
   requestId: string;
+  snapshotSessionId?: string;
 };
 
 type FetchWebSnapshotAssetMessage = {

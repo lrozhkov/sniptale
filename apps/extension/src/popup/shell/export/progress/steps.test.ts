@@ -86,7 +86,10 @@ function verifyTerminalFailedExportSteps() {
 
 function verifyWarningExportSteps() {
   const steps = buildPopupExportProgressSteps({
-    progress: createProgress({ phase: 'done', errors: ['Unknown message type'] }),
+    progress: createProgress({
+      phase: 'done',
+      errors: ['Unknown message type'],
+    }),
     result: {
       success: false,
       filename: 'export.zip',
@@ -189,8 +192,8 @@ function verifyWebSnapshotSteps() {
   });
 
   expect(steps.map((step) => [step.key, step.status])).toEqual([
-    ['webSnapshotPreview', 'done'],
     ['webSnapshotDom', 'done'],
+    ['webSnapshotPreview', 'done'],
     ['webSnapshotStyles', 'done'],
     ['webSnapshotAssets', 'done'],
     ['webSnapshotWarnings', 'done'],
@@ -200,7 +203,10 @@ function verifyWebSnapshotSteps() {
 describe('buildPopupExportProgressSteps', () => {
   it('shows annotation preparation as the active selected step', () => {
     const steps = buildPopupExportProgressSteps({
-      progress: createProgress({ activeStepKey: 'annotations', phase: 'scanning' }),
+      progress: createProgress({
+        activeStepKey: 'annotations',
+        phase: 'scanning',
+      }),
       result: null,
       selection: { ...selection, includeAnnotations: true },
     });
@@ -254,4 +260,22 @@ describe('buildPopupExportProgressSteps', () => {
     'shows web snapshot package parts instead of selected archive sections',
     verifyWebSnapshotSteps
   );
+
+  it('shows real web snapshot phases before a result exists', () => {
+    const steps = buildPopupExportProgressSteps({
+      progress: createProgress({
+        activeStepKey: 'webSnapshotStyles',
+        phase: 'scanning',
+      }),
+      result: null,
+      selection,
+    });
+
+    expect(steps.map((step) => [step.key, step.status])).toEqual([
+      ['webSnapshotDom', 'done'],
+      ['webSnapshotPreview', 'done'],
+      ['webSnapshotStyles', 'active'],
+      ['webSnapshotAssets', 'pending'],
+    ]);
+  });
 });

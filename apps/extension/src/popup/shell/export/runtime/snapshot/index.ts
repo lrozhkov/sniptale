@@ -23,7 +23,7 @@ function setSnapshotBatchProgress(
   errors: string[] = []
 ) {
   state.setProgress({
-    activeStepKey: null,
+    activeStepKey: phase === 'scanning' ? 'webSnapshotDom' : null,
     current,
     errors,
     message,
@@ -108,7 +108,13 @@ async function collectWebSnapshotBatch(args: {
       sendSaveWebSnapshotMessage,
       tabId,
     });
-    appendSnapshotBatchItemResult({ response, snapshotIds, state: args.state, tabId, warnings });
+    appendSnapshotBatchItemResult({
+      response,
+      snapshotIds,
+      state: args.state,
+      tabId,
+      warnings,
+    });
   }
 
   return { snapshotIds, warnings };
@@ -152,7 +158,10 @@ function initializeWebSnapshotBatch(
   tabIds: number[]
 ) {
   state.requestIdRef.current = requestId;
-  state.cancelRetryRef.current = { exportRunId: requestId, tabIds: [...tabIds] };
+  state.cancelRetryRef.current = {
+    exportRunId: requestId,
+    tabIds: [...tabIds],
+  };
   state.setResult(null);
   setSnapshotBatchProgress(
     state,

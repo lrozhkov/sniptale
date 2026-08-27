@@ -3,7 +3,7 @@ import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensi
 
 const MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES = 25 * 1024 * 1024;
 const MAX_WEB_SNAPSHOT_SCREENSHOT_SIDE_PX = 32_768;
-const MAX_WEB_SNAPSHOT_SCREENSHOT_AREA_PX = 32_000_000;
+const MAX_WEB_SNAPSHOT_SCREENSHOT_AREA_PX = 64_000_000;
 
 const MAX_IMAGE_HEADER_BYTES = 65_536;
 const WEB_SNAPSHOT_SCREENSHOT_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);

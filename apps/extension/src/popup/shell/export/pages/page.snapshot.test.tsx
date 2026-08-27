@@ -201,7 +201,9 @@ it('confirms snapshot saving and stores skip preference only after confirmation'
     footerProps.onSaveWebSnapshot?.();
   });
   expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain('ресурсы с этого сайта и внешние ресурсы');
+  expect(container?.textContent).toContain('с учётом активного входа');
+  expect(container?.textContent).toContain('внешние HTTPS-ресурсы — анонимно');
+  expect(container?.textContent).toContain('Приватные изображения или стили');
 
   await act(async () => {
     container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
@@ -216,11 +218,14 @@ it('confirms snapshot saving and stores skip preference only after confirmation'
   });
   await act(async () => {
     container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
-    getButtonByText('Подтвердить')?.click();
+    getButtonByText('Сохранить локально')?.click();
   });
   await flushMicrotasks();
 
-  expect(mocks.patchSettings).toHaveBeenCalledWith({ skipWebSnapshotSaveDisclosure: true });
+  expect(mocks.patchSettings).toHaveBeenCalledWith({
+    skipWebSnapshotSaveDisclosure: true,
+    webSnapshotSaveDisclosureVersion: 1,
+  });
   expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
 
   await act(async () => {
@@ -236,6 +241,7 @@ it('saves snapshots directly when disclosure skip preference is already stored',
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: true,
     skipWebSnapshotSaveDisclosure: true,
+    webSnapshotSaveDisclosureVersion: 1,
   });
   mocks.usePopupExportController.mockReturnValue(
     createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
@@ -251,6 +257,27 @@ it('saves snapshots directly when disclosure skip preference is already stored',
   expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
 });
 
+it('requires the revised disclosure when only the legacy skip preference is stored', async () => {
+  const handleSaveWebSnapshot = vi.fn();
+  mocks.loadSettings.mockResolvedValueOnce({
+    anonymousCrossOriginSnapshotAssetsEnabled: false,
+    authenticatedSnapshotAssetsEnabled: false,
+    skipWebSnapshotSaveDisclosure: true,
+  });
+  mocks.usePopupExportController.mockReturnValue(
+    createPopupExportControllerFixture({ actions: { handleSaveWebSnapshot } })
+  );
+
+  await renderExportPage();
+  await settleLastSettingsLoad();
+  await act(async () => {
+    getLatestFooterProps().onSaveWebSnapshot?.();
+  });
+
+  expect(container?.textContent).toContain('Сохранить веб-снимок?');
+  expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
+});
+
 it('confirms snapshot saving without storing skip preference when the checkbox is clear', async () => {
   const handleSaveWebSnapshot = vi.fn();
   mocks.usePopupExportController.mockReturnValue(
@@ -264,7 +291,7 @@ it('confirms snapshot saving without storing skip preference when the checkbox i
     getLatestFooterProps().onSaveWebSnapshot?.();
   });
   await act(async () => {
-    getButtonByText('Подтвердить')?.click();
+    getButtonByText('Сохранить локально')?.click();
   });
 
   expect(mocks.patchSettings).not.toHaveBeenCalled();

@@ -58,7 +58,9 @@ export const runtimeActionExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime START_POPUP_EXPORT_JOB response',
-      createRuntimeResponseGuard({ optional: { status: isPopupExportJobStatus } })
+      createRuntimeResponseGuard({
+        optional: { status: isPopupExportJobStatus },
+      })
     ),
   },
   [MessageType.GET_POPUP_EXPORT_JOB_STATUS]: {
@@ -86,7 +88,9 @@ export const runtimeActionExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime CANCEL_POPUP_EXPORT_JOB response',
-      createRuntimeResponseGuard({ optional: { status: isPopupExportJobStatus } })
+      createRuntimeResponseGuard({
+        optional: { status: isPopupExportJobStatus },
+      })
     ),
   },
   [MessageType.ACK_POPUP_EXPORT_JOB_STATUS]: {
@@ -117,6 +121,28 @@ export const runtimeActionExportMessageContracts = {
       createRuntimeResponseGuard({ allowUndefined: true })
     ),
   },
+  [MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED]: {
+    parseRequest: createGuardParser(
+      'runtime WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED message',
+      createMessageGuard({
+        type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
+        required: {
+          requestId: isString,
+          activeStepKey: (value) =>
+            value === 'webSnapshotPreview' ||
+            value === 'webSnapshotDom' ||
+            value === 'webSnapshotStyles' ||
+            value === 'webSnapshotAssets',
+          current: (value) => isNumber(value) && Number.isSafeInteger(value) && value >= 0,
+          total: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED response',
+      createRuntimeResponseGuard({ allowUndefined: true })
+    ),
+  },
   [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: {
     parseRequest: createGuardParser(
       'runtime CONSUME_POPUP_EXPORT_LAUNCH_INTENT message',
@@ -127,7 +153,9 @@ export const runtimeActionExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime CONSUME_POPUP_EXPORT_LAUNCH_INTENT response',
-      createRuntimeResponseGuard({ required: { page: isNullable(isPopupExportLaunchPage) } })
+      createRuntimeResponseGuard({
+        required: { page: isNullable(isPopupExportLaunchPage) },
+      })
     ),
   },
   [MessageType.EXPORT_POPUP_PREVIEW]: {
@@ -176,7 +204,11 @@ export const runtimeActionExportMessageContracts = {
     parseResponse: createGuardParser(
       'runtime EXPORT_POPUP_SAVE_WEB_SNAPSHOT response',
       createRuntimeResponseGuard({
-        optional: { assetId: isString, manifest: isWebSnapshotManifest, warnings: isStringArray },
+        optional: {
+          assetId: isString,
+          manifest: isWebSnapshotManifest,
+          warnings: isStringArray,
+        },
       })
     ),
   },

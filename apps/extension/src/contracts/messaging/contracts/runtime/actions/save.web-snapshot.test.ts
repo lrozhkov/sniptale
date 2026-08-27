@@ -132,6 +132,20 @@ it('parses registered web snapshot asset fetch messages and responses', () => {
     runtimeActionWebSnapshotSaveMessageContracts[MessageType.REGISTER_WEB_SNAPSHOT_ASSETS];
 
   expect(
+    registerContract.parseRequest({
+      assetUrls: ['https://fonts.example.com/demo.woff2'],
+      requestId: 'req-web',
+      snapshotSessionId: 'snapshot-session-1',
+      type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
+    })
+  ).toEqual({
+    assetUrls: ['https://fonts.example.com/demo.woff2'],
+    requestId: 'req-web',
+    snapshotSessionId: 'snapshot-session-1',
+    type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
+  });
+
+  expect(
     fetchContract.parseRequest({
       snapshotSessionId: 'snapshot-session-1',
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,

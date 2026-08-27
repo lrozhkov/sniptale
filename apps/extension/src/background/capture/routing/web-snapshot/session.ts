@@ -5,6 +5,7 @@ const SNAPSHOT_SESSION_TTL_MS = 5 * 60 * 1000;
 const MAX_SESSION_ASSET_URLS = 500;
 
 type SnapshotSession = {
+  allowAnonymousCrossOriginAssets: boolean;
   assetId: string | null;
   allowedUrls: Set<string>;
   cancelRequested: boolean;
@@ -103,6 +104,7 @@ export function registerWebSnapshotAssetSession(
 
   const sessionId = createSnapshotSessionId();
   sessions.set(sessionId, {
+    allowAnonymousCrossOriginAssets: request.allowAnonymousCrossOriginAssets,
     assetId: null,
     allowedUrls,
     cancelRequested: false,
@@ -112,6 +114,27 @@ export function registerWebSnapshotAssetSession(
     tabId,
   });
   return sessionId;
+}
+
+export function extendWebSnapshotAssetSession(args: {
+  assetUrls: string[];
+  sessionId: string;
+  tabId: number;
+}): void {
+  const session = getAuthorizedSession(args.sessionId, args.tabId);
+  assertSessionNotCancelled(session);
+  if (session.saveState !== 'open') {
+    throw new Error('Web snapshot session is not open');
+  }
+  if (!session.allowAnonymousCrossOriginAssets && args.assetUrls.length > 0) {
+    throw new Error('anonymous cross-origin asset fetch is disabled');
+  }
+  const normalizedUrls = args.assetUrls.map(normalizeAssetUrl);
+  const nextUrlCount = new Set([...session.allowedUrls, ...normalizedUrls]).size;
+  if (nextUrlCount > MAX_SESSION_ASSET_URLS) {
+    throw new Error('Too many web snapshot assets');
+  }
+  for (const url of normalizedUrls) session.allowedUrls.add(url);
 }
 
 function getAuthorizedSession(sessionId: string, tabId: number): SnapshotSession {

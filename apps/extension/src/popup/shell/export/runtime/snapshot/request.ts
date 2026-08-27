@@ -79,7 +79,6 @@ export async function requestSaveWebSnapshot(
 }
 
 async function sendSaveWebSnapshotRequest(
-  state: PopupExportRuntimeContract,
   tabId: number,
   deps: PopupExportRuntimeDeps,
   requestId: string
@@ -88,15 +87,10 @@ async function sendSaveWebSnapshotRequest(
     throw new Error(translate('popup.export.startExportError'));
   }
 
-  return deps
-    .sendSaveWebSnapshotMessage(tabId, {
-      requestId,
-      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    })
-    .catch((error: unknown) => {
-      setWebSnapshotError(state, error);
-      throw error;
-    });
+  return deps.sendSaveWebSnapshotMessage(tabId, {
+    requestId,
+    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
+  });
 }
 
 function applySaveWebSnapshotResult(
@@ -130,29 +124,40 @@ async function runSaveWebSnapshotRequest(
   const requestId = deps.createRequestId();
   state.requestIdRef.current = requestId;
   state.cancelRetryRef.current = { exportRunId: requestId, tabIds: [tabId] };
+  state.setResult(null);
+  state.setProgress({
+    activeStepKey: 'webSnapshotDom',
+    current: 0,
+    errors: [],
+    message: translate('popup.export.webSnapshotDomStep'),
+    phase: 'scanning',
+    total: 4,
+  });
 
-  const response = await sendSaveWebSnapshotRequest(state, tabId, deps, requestId);
+  try {
+    const response = await sendSaveWebSnapshotRequest(tabId, deps, requestId);
+    if (!response?.success) {
+      throw new Error(
+        getPopupExportTransportErrorMessage(response?.error, 'popup.export.startExportError')
+      );
+    }
+    if (state.requestIdRef.current !== requestId) {
+      return { snapshotIds: [], warnings: [] };
+    }
 
-  if (!response?.success) {
-    const error = new Error(
-      getPopupExportTransportErrorMessage(response?.error, 'popup.export.startExportError')
-    );
-    setWebSnapshotError(state, error);
+    const result = readSnapshotResponseAsset(response);
+    applySaveWebSnapshotResult(state, result);
     state.requestIdRef.current = null;
     state.cancelRetryRef.current = null;
+    return result;
+  } catch (error) {
+    if (state.requestIdRef.current === requestId) {
+      setWebSnapshotError(state, error);
+      state.requestIdRef.current = null;
+      state.cancelRetryRef.current = null;
+    }
     throw error;
   }
-
-  if (state.requestIdRef.current !== requestId) {
-    return { snapshotIds: [], warnings: [] };
-  }
-
-  const result = readSnapshotResponseAsset(response);
-
-  applySaveWebSnapshotResult(state, result);
-  state.requestIdRef.current = null;
-  state.cancelRetryRef.current = null;
-  return result;
 }
 
 export { createSnapshotResult };

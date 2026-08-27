@@ -155,6 +155,7 @@ describe('export pages owner components', () => {
     const onConfirm = vi.fn();
     const onRememberChoiceChange = vi.fn();
     const disclosure = {
+      assetPolicy: 'strict' as const,
       body: 'Body',
       requiresConfirmation: true,
       title: 'Confirm snapshot',
@@ -173,7 +174,7 @@ describe('export pages owner components', () => {
       />
     );
 
-    const dialog = container?.querySelector('[role="alertdialog"]');
+    const dialog = container?.querySelector('[role="dialog"]');
     await act(async () => {
       dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
       dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));

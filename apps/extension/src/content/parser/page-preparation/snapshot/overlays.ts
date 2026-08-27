@@ -11,6 +11,28 @@ const STATIC_OVERLAY_SELECTORS = [
 ];
 
 const STATIC_OVERLAY_STYLE_ID = 'sniptale-prepared-snapshot-overlay-style';
+const TRANSIENT_OVERLAY_SELECTORS = [
+  '.sniptale-app',
+  '.sniptale-toolbar-portal-wrapper',
+  '.sniptale-frame-toolbar-trigger',
+  '.sniptale-frame-toolbar-bridge',
+  '.sniptale-frame-quick-action',
+  '.sniptale-action-toolbar',
+  '.sniptale-content-size-tooltip',
+  '.sniptale-resize-handle',
+  '.sniptale-callout-drag-handle',
+  '.sniptale-callout-adjacent-controls',
+  '.sniptale-callout-tail-handle',
+  '.sniptale-callout-settings-handle',
+  '.sniptale-step-badge-controls',
+  '.sniptale-frame-settings-popover',
+  '.sniptale-step-badge-popover',
+  '.sniptale-callout-settings-popover',
+  '.sniptale-callout-format-toolbar',
+  '.sniptale-glass-popover',
+  '.sniptale-blocking-overlay',
+  '.sniptale-editing-blocking-overlay',
+];
 
 const STATIC_OVERLAY_STYLE = `
   :root {
@@ -47,7 +69,13 @@ function appendStaticOverlayStyle(snapshot: Document): void {
 function cloneStaticOverlayNodes(sourceRoot: HTMLElement, snapshot: Document): Node[] {
   return Array.from(sourceRoot.children)
     .filter((child) => child.matches(STATIC_OVERLAY_SELECTORS.join(',')))
-    .map((child) => snapshot.importNode(child, true));
+    .map((child) => {
+      const clone = snapshot.importNode(child, true);
+      for (const transient of clone.querySelectorAll(TRANSIENT_OVERLAY_SELECTORS.join(','))) {
+        transient.remove();
+      }
+      return clone;
+    });
 }
 
 export function appendStaticPagePreparationOverlays(snapshot: Document): void {

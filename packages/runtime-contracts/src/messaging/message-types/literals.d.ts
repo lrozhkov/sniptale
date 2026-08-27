@@ -45,6 +45,8 @@ declare module './' {
     type ACK_POPUP_EXPORT_JOB_STATUS = typeof import('./').MessageType.ACK_POPUP_EXPORT_JOB_STATUS;
     type POPUP_EXPORT_JOB_STATUS_UPDATED =
       typeof import('./').MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
+    type WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED =
+      typeof import('./').MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED;
     type EXPORT_POPUP_CANCEL = typeof import('./').MessageType.EXPORT_POPUP_CANCEL;
     type RELEASE_WEB_SNAPSHOT_STAGED_BLOBS =
       typeof import('./').MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS;

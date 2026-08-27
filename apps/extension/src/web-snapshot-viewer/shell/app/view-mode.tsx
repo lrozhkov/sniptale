@@ -1,7 +1,7 @@
 import type { WebSnapshotViewport } from '@sniptale/runtime-contracts/web-snapshot';
 import { translate, type AppLocale } from '../../../platform/i18n';
 
-export type WebSnapshotViewerMode = 'static-document' | 'visual';
+export type WebSnapshotViewerMode = 'assets' | 'static-document' | 'visual';
 
 export function WebSnapshotViewerModeSwitch(props: {
   locale: AppLocale;
@@ -16,14 +16,19 @@ export function WebSnapshotViewerModeSwitch(props: {
         bg-[var(--sniptale-color-surface-muted)] p-0.5"
     >
       <ModeButton
-        active={props.mode === 'visual'}
-        label={translate('webSnapshotViewer.app.visualMode', props.locale)}
-        onClick={() => props.onModeChange('visual')}
-      />
-      <ModeButton
         active={props.mode === 'static-document'}
         label={translate('webSnapshotViewer.app.staticDocumentMode', props.locale)}
         onClick={() => props.onModeChange('static-document')}
+      />
+      <ModeButton
+        active={props.mode === 'assets'}
+        label={translate('webSnapshotViewer.app.assetsMode', props.locale)}
+        onClick={() => props.onModeChange('assets')}
+      />
+      <ModeButton
+        active={props.mode === 'visual'}
+        label={translate('webSnapshotViewer.app.visualMode', props.locale)}
+        onClick={() => props.onModeChange('visual')}
       />
     </div>
   );

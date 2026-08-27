@@ -45,8 +45,20 @@ beforeEach(() => {
 it('saves each selected page as a separate snapshot', async () => {
   const state = createState({
     availableTabs: [
-      { disabledReason: null, isCurrent: true, tabId: 7, title: 'One', url: 'https://one.test' },
-      { disabledReason: null, isCurrent: false, tabId: 9, title: 'Two', url: 'https://two.test' },
+      {
+        disabledReason: null,
+        isCurrent: true,
+        tabId: 7,
+        title: 'One',
+        url: 'https://one.test',
+      },
+      {
+        disabledReason: null,
+        isCurrent: false,
+        tabId: 9,
+        title: 'Two',
+        url: 'https://two.test',
+      },
     ],
     selectedTabIds: [7, 9],
     selectedTabIdsInOrder: [7, 9],
@@ -54,8 +66,16 @@ it('saves each selected page as a separate snapshot', async () => {
   const deps = createDeps({
     sendSaveWebSnapshotMessage: vi
       .fn()
-      .mockResolvedValueOnce({ assetId: 'snapshot-1', success: true, warnings: [] })
-      .mockResolvedValueOnce({ assetId: 'snapshot-2', success: true, warnings: ['missing'] }),
+      .mockResolvedValueOnce({
+        assetId: 'snapshot-1',
+        success: true,
+        warnings: [],
+      })
+      .mockResolvedValueOnce({
+        assetId: 'snapshot-2',
+        success: true,
+        warnings: ['missing'],
+      }),
   });
 
   await saveWebSnapshotFromPopup(state, deps);
@@ -83,8 +103,20 @@ it('saves each selected page as a separate snapshot', async () => {
 it('keeps saved batch snapshots visible when another selected page fails', async () => {
   const state = createState({
     availableTabs: [
-      { disabledReason: null, isCurrent: true, tabId: 7, title: 'One', url: 'https://one.test' },
-      { disabledReason: null, isCurrent: false, tabId: 9, title: 'Two', url: 'https://two.test' },
+      {
+        disabledReason: null,
+        isCurrent: true,
+        tabId: 7,
+        title: 'One',
+        url: 'https://one.test',
+      },
+      {
+        disabledReason: null,
+        isCurrent: false,
+        tabId: 9,
+        title: 'Two',
+        url: 'https://two.test',
+      },
     ],
     selectedTabIds: [7, 9],
     selectedTabIdsInOrder: [7, 9],
@@ -92,7 +124,11 @@ it('keeps saved batch snapshots visible when another selected page fails', async
   const deps = createDeps({
     sendSaveWebSnapshotMessage: vi
       .fn()
-      .mockResolvedValueOnce({ assetId: 'snapshot-1', success: true, warnings: [] })
+      .mockResolvedValueOnce({
+        assetId: 'snapshot-1',
+        success: true,
+        warnings: [],
+      })
       .mockRejectedValueOnce(new Error('listener missing')),
   });
 
@@ -113,7 +149,13 @@ it('keeps saved batch snapshots visible when another selected page fails', async
 it('reports a failed batch when none of the selected pages can be saved', async () => {
   const state = createState({
     availableTabs: [
-      { disabledReason: null, isCurrent: true, tabId: 7, title: 'One', url: 'https://one.test' },
+      {
+        disabledReason: null,
+        isCurrent: true,
+        tabId: 7,
+        title: 'One',
+        url: 'https://one.test',
+      },
     ],
     selectedTabIds: [7, 9],
     selectedTabIdsInOrder: [7, 9],
@@ -141,13 +183,22 @@ it('reports a failed batch when none of the selected pages can be saved', async 
 it('treats batch responses without asset ids as failed snapshot saves', async () => {
   const state = createState({
     availableTabs: [
-      { disabledReason: null, isCurrent: true, tabId: 7, title: 'One', url: 'https://one.test' },
+      {
+        disabledReason: null,
+        isCurrent: true,
+        tabId: 7,
+        title: 'One',
+        url: 'https://one.test',
+      },
     ],
     selectedTabIds: [7, 9],
     selectedTabIdsInOrder: [7, 9],
   } as Partial<PopupExportRuntimeContract>);
   const deps = createDeps({
-    sendSaveWebSnapshotMessage: vi.fn(async () => ({ success: true, warnings: [] })),
+    sendSaveWebSnapshotMessage: vi.fn(async () => ({
+      success: true,
+      warnings: [],
+    })),
   });
 
   await saveWebSnapshotFromPopup(state, deps);
@@ -208,6 +259,8 @@ it('does not overwrite request errors that already updated progress', async () =
 
   await saveWebSnapshotFromPopup(state, deps);
 
-  expect(state.setProgress).toHaveBeenCalledTimes(1);
-  expect(state.setProgress).toHaveBeenCalledWith(expect.objectContaining({ message: 'denied' }));
+  expect(state.setProgress).toHaveBeenCalledTimes(2);
+  expect(state.setProgress).toHaveBeenLastCalledWith(
+    expect.objectContaining({ message: 'denied' })
+  );
 });

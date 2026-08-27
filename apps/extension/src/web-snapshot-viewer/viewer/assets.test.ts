@@ -223,6 +223,45 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
 });
 
+it('rewrites packaged CSS resources to verified object URLs without network references', async () => {
+  await stubWebSnapshotRecord({
+    extras: { 'assets/hero.png': 'png' },
+    html: [
+      '<style>.hero { background-image: url("../assets/hero.png"); }</style>',
+      '<main class="hero" style="mask-image: url(https://tracker.example/mask.png)">Page</main>',
+    ].join(''),
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.html).toContain('background-image: url("blob:snapshot-asset")');
+  expect(loaded.html).not.toContain('tracker.example');
+  expect(loaded.html).not.toContain('../assets/hero.png');
+});
+
+it('rewrites packaged image and CSS assets inside nested declarative shadow roots', async () => {
+  await stubWebSnapshotRecord({
+    extras: { 'assets/shadow.png': 'png' },
+    html: [
+      '<section><template shadowrootmode="open">',
+      '<style>.shadow { background:url("../assets/shadow.png"); }</style>',
+      '<article><template shadowrootmode="open">',
+      '<img class="shadow" src="../assets/shadow.png">',
+      '<img src="https://tracker.example/escape.png">',
+      '</template></article>',
+      '</template></section>',
+    ].join(''),
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.html.match(/shadowrootmode="open"/g)).toHaveLength(2);
+  expect(loaded.html).toContain('background:url("blob:snapshot-asset")');
+  expect(loaded.html).toContain('src="blob:snapshot-asset"');
+  expect(loaded.html).not.toContain('../assets/shadow.png');
+  expect(loaded.html).not.toContain('tracker.example');
+});
+
 it('rejects a missing retained screenshot before creating package asset URLs', async () => {
   await stubWebSnapshotRecord({ extras: { 'assets/image.png': 'png' } });
   mocks.getWebSnapshotScreenshotFile.mockResolvedValue(undefined);

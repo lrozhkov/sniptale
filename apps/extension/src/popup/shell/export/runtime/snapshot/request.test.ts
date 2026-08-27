@@ -77,9 +77,22 @@ beforeEach(() => {
 
 it('saves a web snapshot and ignores stale results', async () => {
   const state = createState();
-  const deps = createDeps({ assetId: 'snapshot-1', success: true, warnings: ['missing asset'] });
+  const deps = createDeps({
+    assetId: 'snapshot-1',
+    success: true,
+    warnings: ['missing asset'],
+  });
 
   await requestSaveWebSnapshot(state, 5, deps);
+
+  expect(state.setProgress).toHaveBeenNthCalledWith(1, {
+    activeStepKey: 'webSnapshotDom',
+    current: 0,
+    errors: [],
+    message: 'Статический документ',
+    phase: 'scanning',
+    total: 4,
+  });
 
   expect(deps.sendSaveWebSnapshotMessage).toHaveBeenCalledWith(5, {
     requestId: 'req-1',
@@ -92,6 +105,28 @@ it('saves a web snapshot and ignores stale results', async () => {
       warnings: ['missing asset'],
     })
   );
+});
+
+it('publishes capture progress before the save request resolves', async () => {
+  const state = createState();
+  let resolveResponse!: (value: { assetId: string; success: true; warnings: string[] }) => void;
+  const deps = createDeps(undefined);
+  deps.sendSaveWebSnapshotMessage = vi.fn(
+    () =>
+      new Promise<{ assetId: string; success: true; warnings: string[] }>((resolve) => {
+        resolveResponse = resolve;
+      })
+  );
+
+  const pending = requestSaveWebSnapshot(state, 5, deps);
+  expect(state.setProgress).toHaveBeenCalledWith(
+    expect.objectContaining({
+      activeStepKey: 'webSnapshotDom',
+      phase: 'scanning',
+    })
+  );
+  resolveResponse({ assetId: 'snapshot-1', success: true, warnings: [] });
+  await pending;
 });
 
 it('surfaces snapshot save failures symmetrically', async () => {
@@ -109,5 +144,11 @@ it('rejects successful snapshot responses without an asset id', async () => {
   await expect(requestSaveWebSnapshot(state, 5, deps)).rejects.toThrow(
     'Веб-снимок сохранён без идентификатора'
   );
-  expect(state.setResult).not.toHaveBeenCalled();
+  expect(state.setResult).toHaveBeenCalledTimes(2);
+  expect(state.setResult).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      errors: ['Веб-снимок сохранён без идентификатора'],
+      success: false,
+    })
+  );
 });

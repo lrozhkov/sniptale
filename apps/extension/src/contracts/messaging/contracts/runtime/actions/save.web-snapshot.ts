@@ -39,6 +39,7 @@ export const runtimeActionWebSnapshotSaveMessageContracts = {
       createMessageGuard({
         type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
         required: { assetUrls: isWebSnapshotAssetUrlArray, requestId: isString },
+        optional: { snapshotSessionId: isWebSnapshotSessionId },
       })
     ),
     parseResponse: createGuardParser(

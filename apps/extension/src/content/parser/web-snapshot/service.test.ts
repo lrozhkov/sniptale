@@ -40,7 +40,13 @@ beforeEach(() => {
     warnings: [{ kind: 'iframe-unreadable', message: 'Iframe skipped' }],
   });
   mocks.collectWebSnapshotAssets.mockResolvedValue({
-    assets: [{ blob: new Blob(['asset']), localPath: 'assets/1.png', originalUrl: '/asset.png' }],
+    assets: [
+      {
+        blob: new Blob(['asset']),
+        localPath: 'assets/1.png',
+        originalUrl: '/asset.png',
+      },
+    ],
     privacyWarnings: ['Authenticated same-site assets were enabled'],
     snapshotSessionId: 'snapshot-session-1',
     warnings: ['Asset skipped'],
@@ -52,22 +58,27 @@ beforeEach(() => {
   mocks.serializePreparedSnapshotDocument.mockReturnValue('<!doctype html><html>rewritten</html>');
   mocks.buildWebSnapshotPackage.mockResolvedValue({
     manifest: { assets: [], createdAt: 'now', title: 'prepared', version: 1 },
-    packageBlob: new Blob(['package'], { type: 'application/x-sniptale-web-snapshot+zip' }),
+    packageBlob: new Blob(['package'], {
+      type: 'application/x-sniptale-web-snapshot+zip',
+    }),
     screenshotBlob: new Blob(['shot'], { type: 'image/png' }),
     screenshotMimeType: 'image/png',
   });
 });
 
 it('packages the canonical prepared snapshot document after asset rewriting', async () => {
+  const onProgress = vi.fn();
   const result = await buildCurrentPageWebSnapshot({
     allowAnonymousCrossOriginAssets: false,
     allowAuthenticatedSameOriginAssets: false,
     requestId: 'req-web',
+    onProgress,
   });
   const snapshotDocument = mocks.buildPreparedSnapshotDocument.mock.results[0]?.value;
 
   expect(mocks.buildPreparedSnapshotDocument).toHaveBeenCalledWith({
     contextLabel: 'web-snapshot',
+    preserveAssetUrls: true,
   });
   expect(mocks.collectWebSnapshotAssets).toHaveBeenCalledWith(
     (await snapshotDocument).document as Document,
@@ -107,6 +118,13 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
     'Asset skipped',
   ]);
   expect(result.snapshotSessionId).toBe('snapshot-session-1');
+  expect(onProgress.mock.calls.map(([update]) => update)).toEqual([
+    { activeStepKey: 'webSnapshotDom', current: 0, total: 4 },
+    { activeStepKey: 'webSnapshotPreview', current: 1, total: 4 },
+    { activeStepKey: 'webSnapshotStyles', current: 2, total: 4 },
+    { activeStepKey: 'webSnapshotAssets', current: 3, total: 4 },
+    { activeStepKey: 'webSnapshotAssets', current: 4, total: 4 },
+  ]);
 });
 
 it('fails before packaging when the required full-page screenshot capture fails', async () => {

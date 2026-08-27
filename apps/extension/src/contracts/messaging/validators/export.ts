@@ -22,6 +22,11 @@ const exportProgressStepKeys = new Set<ExportProgressStepKey>([
   'images',
   'json',
   'markdown',
+  'webSnapshotPreview',
+  'webSnapshotDom',
+  'webSnapshotStyles',
+  'webSnapshotAssets',
+  'webSnapshotWarnings',
 ]);
 
 const exportProgressPhases = new Set<ExportProgress['phase']>([

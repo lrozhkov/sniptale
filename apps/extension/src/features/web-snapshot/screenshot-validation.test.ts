@@ -5,7 +5,7 @@ import {
 } from './screenshot-validation';
 
 const MAX_SCREENSHOT_BYTES = 25 * 1024 * 1024;
-const MAX_SCREENSHOT_AREA_PX = 32_000_000;
+const MAX_SCREENSHOT_AREA_PX = 64_000_000;
 
 function writeUint32BigEndian(bytes: Uint8Array, offset: number, value: number): void {
   bytes[offset] = (value >>> 24) & 0xff;
@@ -158,7 +158,7 @@ it('normalizes browser decoder failures into the bounded screenshot error', asyn
 });
 
 it('rejects decoded dimensions that exceed the profile even when the header is bounded', async () => {
-  const decoded = stubDecodedImage(8000, 4001);
+  const decoded = stubDecodedImage(8000, 8001);
 
   await expect(validateWebSnapshotScreenshotBlob(createPng(100, 100))).rejects.toThrow(
     'Web snapshot screenshot dimensions exceed safe limits.'

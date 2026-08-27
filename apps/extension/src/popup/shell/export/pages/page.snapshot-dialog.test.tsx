@@ -76,7 +76,7 @@ function getButtonByText(text: string): HTMLButtonElement | null {
 }
 
 function getSnapshotDialog(): HTMLElement | null {
-  return container?.querySelector<HTMLElement>('[role="alertdialog"]') ?? null;
+  return container?.querySelector<HTMLElement>('[role="dialog"]') ?? null;
 }
 
 async function flushMicrotasks(turns = 5) {
@@ -99,7 +99,9 @@ beforeEach(() => {
     skipWebSnapshotSaveDisclosure: false,
   });
   mocks.patchSettings.mockReset();
-  mocks.patchSettings.mockResolvedValue({ skipWebSnapshotSaveDisclosure: true });
+  mocks.patchSettings.mockResolvedValue({
+    skipWebSnapshotSaveDisclosure: true,
+  });
   mocks.usePopupExportController.mockReturnValue(createPopupExportControllerFixture());
 });
 
@@ -124,11 +126,14 @@ it('keeps confirmation open when storing skip preference fails', async () => {
   });
   await act(async () => {
     container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
-    getButtonByText('Подтвердить')?.click();
+    getButtonByText('Сохранить локально')?.click();
   });
   await flushMicrotasks();
 
-  expect(mocks.patchSettings).toHaveBeenCalledWith({ skipWebSnapshotSaveDisclosure: true });
+  expect(mocks.patchSettings).toHaveBeenCalledWith({
+    skipWebSnapshotSaveDisclosure: true,
+    webSnapshotSaveDisclosureVersion: 1,
+  });
   expect(handleSaveWebSnapshot).not.toHaveBeenCalled();
   expect(container?.textContent).toContain('Не удалось сохранить выбор');
   expect(getSnapshotDialog()).not.toBeNull();

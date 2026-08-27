@@ -1,4 +1,4 @@
-import { requestWebSnapshotAssetSession } from './asset-session';
+import { extendWebSnapshotAssetSession, requestWebSnapshotAssetSession } from './asset-session';
 import type { WebSnapshotAssetEntry } from './types';
 import { readSameOriginAssetBlob } from './asset-fetch';
 import { createPrivacyWarnings } from './asset-warnings';
@@ -6,8 +6,10 @@ import { collectAssetTargets, collectBackgroundFetchUrls } from './asset-targets
 import {
   captureAssetTarget,
   createAssetBudget,
+  type CapturedAssetCache,
   type WebSnapshotAssetContext,
 } from './asset-capture';
+import { prepareStylesheetAsset } from './stylesheet-assets';
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -94,12 +96,14 @@ async function captureCollectedAssetTargets(args: {
   targets: ReturnType<typeof collectAssetTargets>['targets'];
   warnings: string[];
   abortSignal?: AbortSignal | undefined;
+  state: {
+    capturedAssetsByUrl: CapturedAssetCache;
+    nextAssetIndex: number;
+  };
 }): Promise<void> {
-  let nextAssetIndex = 1;
-
   for (const target of args.targets) {
     throwIfAssetCollectionAborted(args.abortSignal);
-    nextAssetIndex = await captureAssetTarget({
+    args.state.nextAssetIndex = await captureAssetTarget({
       allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
       assets: args.assets,
       budget: args.budget,
@@ -110,13 +114,54 @@ async function captureCollectedAssetTargets(args: {
           abortSignal: args.abortSignal,
           resolved,
         }),
-      nextAssetIndex,
+      nextAssetIndex: args.state.nextAssetIndex,
       snapshotSessionId: args.snapshotSessionId,
       target,
       warnings: args.warnings,
+      capturedAssetsByUrl: args.state.capturedAssetsByUrl,
       abortSignal: args.abortSignal,
     });
     throwIfAssetCollectionAborted(args.abortSignal);
+  }
+}
+
+async function captureNestedStylesheetAssets(args: {
+  allowAnonymousCrossOriginAssets: boolean;
+  allowAuthenticatedSameOriginAssets: boolean;
+  assets: WebSnapshotAssetEntry[];
+  budget: ReturnType<typeof createAssetBudget>;
+  context: WebSnapshotAssetContext;
+  requestId: string;
+  snapshotSessionId: string;
+  state: {
+    capturedAssetsByUrl: CapturedAssetCache;
+    nextAssetIndex: number;
+  };
+  warnings: string[];
+  abortSignal?: AbortSignal | undefined;
+}): Promise<void> {
+  const preparedStylesheetUrls = new Set<string>();
+  for (let assetIndex = 0; assetIndex < args.assets.length; assetIndex += 1) {
+    const stylesheetAsset = args.assets[assetIndex];
+    if (
+      !stylesheetAsset ||
+      stylesheetAsset.blob.type !== 'text/css' ||
+      preparedStylesheetUrls.has(stylesheetAsset.originalUrl)
+    ) {
+      continue;
+    }
+    preparedStylesheetUrls.add(stylesheetAsset.originalUrl);
+    throwIfAssetCollectionAborted(args.abortSignal);
+    const prepared = await prepareStylesheetAsset(stylesheetAsset);
+    const crossOriginUrls = collectBackgroundFetchUrls(prepared.targets, args.context);
+    if (args.allowAnonymousCrossOriginAssets) {
+      await extendWebSnapshotAssetSession(crossOriginUrls, args.requestId, args.snapshotSessionId);
+    }
+    await captureCollectedAssetTargets({
+      ...args,
+      targets: prepared.targets,
+    });
+    prepared.finish();
   }
 }
 
@@ -147,6 +192,10 @@ export async function collectWebSnapshotAssets(
     context.baseUrl
   );
   const budget = createAssetBudget();
+  const state = {
+    capturedAssetsByUrl: new Map<string, WebSnapshotAssetEntry | null>(),
+    nextAssetIndex: 1,
+  };
   const snapshotSessionId = await registerAssetSession({
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
     context,
@@ -163,6 +212,20 @@ export async function collectWebSnapshotAssets(
     context,
     snapshotSessionId,
     targets,
+    warnings,
+    abortSignal: args.abortSignal,
+    state,
+  });
+
+  await captureNestedStylesheetAssets({
+    allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
+    allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+    assets,
+    budget,
+    context,
+    requestId: args.requestId,
+    snapshotSessionId,
+    state,
     warnings,
     abortSignal: args.abortSignal,
   });

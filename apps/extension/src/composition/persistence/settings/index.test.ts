@@ -59,6 +59,7 @@ const PRIVACY_DEFAULTS = {
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   authenticatedSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
+  webSnapshotSaveDisclosureVersion: 0,
 };
 const DEFAULT_FULL_PAGE_CAPTURE = {
   floatingElements: 'once' as const,
@@ -208,6 +209,7 @@ async function verifyStoredSettings() {
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: true,
+    webSnapshotSaveDisclosureVersion: 1,
     voiceInput: {
       language: 'en-US' as const,
       microphoneDeviceId: null,

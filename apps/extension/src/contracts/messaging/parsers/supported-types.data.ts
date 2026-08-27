@@ -12,6 +12,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>(
 
 export const popupRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED,
+  MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
   VideoMessageType.RECORDING_STATE_SYNC,
   VideoMessageType.RECORDING_START_FAILED,
 ]);

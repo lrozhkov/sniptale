@@ -96,6 +96,7 @@ function getExportFooterProps(args: {
     copyMarkdownTitle: translate('popup.export.copyMarkdownCurrentTabTitle'),
     isExporting: derived.isExporting,
     isSavingWebSnapshot:
+      session.transfer.progress.activeStepKey?.startsWith('webSnapshot') === true ||
       session.transfer.progress.message === translate('popup.export.webSnapshotSaving'),
     isResultReady,
     ...getExportFooterCallbacks({

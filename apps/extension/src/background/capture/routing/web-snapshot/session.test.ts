@@ -7,6 +7,7 @@ import {
   beginWebSnapshotSave,
   cancelWebSnapshotCaptureRequest,
   commitWebSnapshotSave,
+  extendWebSnapshotAssetSession,
   releaseWebSnapshotSave,
   registerWebSnapshotAssetSession,
   resetWebSnapshotAssetSessionsForTests,
@@ -60,6 +61,27 @@ it('binds registered asset URLs to the issuing tab session', () => {
       sessionId,
       tabId: 42,
       url: 'https://cdn.example.com/image.png',
+    })
+  ).not.toThrow();
+});
+
+it('extends an open authorized session for resources discovered inside stylesheets', () => {
+  authorizeWebSnapshotCaptureRequest(42, 'req-1', { allowAnonymousCrossOriginAssets: true });
+  const sessionId = registerWebSnapshotAssetSession(42, 'req-1', [
+    'https://cdn.example.com/styles.css',
+  ]);
+
+  extendWebSnapshotAssetSession({
+    assetUrls: ['https://fonts.example.com/demo.woff2'],
+    sessionId,
+    tabId: 42,
+  });
+
+  expect(() =>
+    authorizeWebSnapshotAssetFetch({
+      sessionId,
+      tabId: 42,
+      url: 'https://fonts.example.com/demo.woff2',
     })
   ).not.toThrow();
 });

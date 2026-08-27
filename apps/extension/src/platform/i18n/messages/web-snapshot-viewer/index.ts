@@ -14,16 +14,48 @@ export const webSnapshotViewerMessages = defineMessageSource({
       en: 'Web snapshot view mode',
     },
     visualMode: {
-      ru: 'Визуальная копия',
-      en: 'Visual copy',
+      ru: 'Скриншот',
+      en: 'Screenshot',
     },
     staticDocumentMode: {
       ru: 'Статический документ',
       en: 'Static document',
     },
+    assetsMode: {
+      ru: 'Ассеты',
+      en: 'Assets',
+    },
+    assetsTitle: {
+      ru: 'Вложения снимка',
+      en: 'Snapshot attachments',
+    },
+    assetsDescription: {
+      ru: 'Проверенные локальные файлы, которые использует статический документ.',
+      en: 'Verified local files used by the static document.',
+    },
+    assetsEmpty: {
+      ru: 'В этом снимке нет сохранённых вложений.',
+      en: 'This snapshot has no saved attachments.',
+    },
+    assetImages: {
+      ru: 'Изображения',
+      en: 'Images',
+    },
+    assetFonts: {
+      ru: 'Шрифты',
+      en: 'Fonts',
+    },
+    assetStyles: {
+      ru: 'Стили',
+      en: 'Styles',
+    },
+    assetOther: {
+      ru: 'Другие файлы',
+      en: 'Other files',
+    },
     visualAlt: {
-      ru: 'Сохранённая визуальная копия веб-страницы',
-      en: 'Saved visual copy of the web page',
+      ru: 'Сохранённый скриншот веб-страницы',
+      en: 'Saved screenshot of the web page',
     },
     hideHeader: {
       ru: 'Скрыть заголовок снимка',

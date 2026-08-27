@@ -13,9 +13,11 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
 
   useEffect(() => {
     let latestStatus: { jobId: string; revision: number } | null = null;
-    const applyJobStatus = (status: PopupExportJobStatus) => {
-      const applied = applyPopupExportRuntimeMessage({
-        message: { type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED, status },
+    const applyMessage = (
+      message: Parameters<typeof applyPopupExportRuntimeMessage>[0]['message']
+    ) =>
+      applyPopupExportRuntimeMessage({
+        message,
         requestId: requestIdRef.current,
         setProgress,
         setResult,
@@ -31,6 +33,11 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
           requestIdRef.current = null;
         },
       });
+    const applyJobStatus = (status: PopupExportJobStatus) => {
+      const applied = applyMessage({
+        type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED,
+        status,
+      });
       if (applied && (status.phase === 'running' || status.phase === 'cancelling')) {
         cancelRetryRef.current = {
           exportRunId: status.jobId,
@@ -45,7 +52,11 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
         return;
       }
 
-      applyJobStatus(typedMessage.status);
+      if (typedMessage.type === MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED) {
+        applyJobStatus(typedMessage.status);
+      } else {
+        applyMessage(typedMessage);
+      }
     };
 
     const unsubscribe = browserRuntime.subscribeToMessages(handleMessage);

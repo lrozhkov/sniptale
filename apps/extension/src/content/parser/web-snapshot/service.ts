@@ -12,6 +12,7 @@ import type {
   WebSnapshotPageSource,
   WebSnapshotWarningStats,
 } from './types';
+import type { WebSnapshotSaveProgressUpdate } from './progress';
 
 function throwIfWebSnapshotBuildAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -127,19 +128,32 @@ export async function buildCurrentPageWebSnapshot(args: {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   requestId: string;
+  onProgress?: ((update: WebSnapshotSaveProgressUpdate) => void) | undefined;
 }): Promise<WebSnapshotBuildResult> {
   throwIfWebSnapshotBuildAborted(args.abortSignal);
+  args.onProgress?.({ activeStepKey: 'webSnapshotDom', current: 0, total: 4 });
   const source = resolveCurrentPageSource();
   const preparedSnapshot = await buildPreparedSnapshotDocument({
     contextLabel: 'web-snapshot',
+    preserveAssetUrls: true,
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const snapshotDocument = preparedSnapshot.document;
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotPreview',
+    current: 1,
+    total: 4,
+  });
   const screenshotResult = await captureRequiredWebSnapshotScreenshot(
     args.contentIntentSource,
     args.fullPageCaptureIdentity,
     args.abortSignal
   );
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotStyles',
+    current: 2,
+    total: 4,
+  });
   const assetResult = await collectWebSnapshotAssets(snapshotDocument, {
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
     allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
@@ -157,6 +171,11 @@ export async function buildCurrentPageWebSnapshot(args: {
   });
   const html = serializePreparedSnapshotDocument(snapshotDocument);
   throwIfWebSnapshotBuildAborted(args.abortSignal);
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotAssets',
+    current: 3,
+    total: 4,
+  });
   const packaged = await buildWebSnapshotPackage({
     assets,
     diagnosticsSource: {
@@ -171,6 +190,11 @@ export async function buildCurrentPageWebSnapshot(args: {
     warningStats: warningSummary.warningStats,
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotAssets',
+    current: 4,
+    total: 4,
+  });
 
   return {
     ...packaged,

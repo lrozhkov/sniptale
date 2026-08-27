@@ -1,11 +1,16 @@
-import { isSafeWebSnapshotUrl } from '../../../features/web-snapshot/public';
+import {
+  isSafeWebSnapshotUrl,
+  collectWebSnapshotQueryRoots,
+  sanitizeWebSnapshotCssText,
+} from '../../../features/web-snapshot/public';
 import { SELECTED_SRCSET_CANDIDATE_ATTRIBUTE } from '../page-preparation/snapshot/responsive-assets';
 import { isHiddenAssetElement, removeAssetReference } from './asset-dom';
 
 const DOCUMENT_NODE_TYPE = 9;
+const DOCUMENT_FRAGMENT_NODE_TYPE = 11;
 
 export type AssetTarget = {
-  attribute: 'href' | 'poster' | 'src' | 'srcset';
+  attribute: 'css-url' | 'href' | 'poster' | 'src' | 'srcset';
   element: Element;
   url: string;
 };
@@ -29,6 +34,12 @@ type SrcsetCandidate = {
   descriptor: string;
   url: string;
 };
+
+function queryAssetElements(root: ParentNode, selector: string): Element[] {
+  return collectWebSnapshotQueryRoots(root).flatMap((queryRoot) =>
+    Array.from(queryRoot.querySelectorAll(selector))
+  );
+}
 
 export function parseSrcset(value: string): SrcsetCandidate[] {
   return value
@@ -104,13 +115,45 @@ function pushVisibleAssetTarget(
   targets: AssetTarget[],
   target: AssetTarget
 ): void {
-  if (target.attribute !== 'href' && isHiddenAssetElement(target.element, root)) {
+  const isDeclarativeShadowContent =
+    target.element.getRootNode().nodeType === DOCUMENT_FRAGMENT_NODE_TYPE;
+  if (
+    !isDeclarativeShadowContent &&
+    target.attribute !== 'css-url' &&
+    target.attribute !== 'href' &&
+    isHiddenAssetElement(target.element, root)
+  ) {
     removeAssetReference(target.element, target.attribute);
     warnings.push(createSkippedWarning(target.url, 'web snapshot asset is hidden or offscreen'));
     return;
   }
 
   targets.push(target);
+}
+
+function collectCssAssetTargets(
+  element: Element,
+  cssText: string,
+  baseUrl: string,
+  targets: AssetTarget[]
+): void {
+  const collectedUrls = new Set<string>();
+  sanitizeWebSnapshotCssText(cssText, (value) => {
+    const trimmedValue = value.trim();
+    if (trimmedValue.startsWith('#')) return trimmedValue;
+    if (!isSafeWebSnapshotUrl(trimmedValue, baseUrl)) return null;
+    try {
+      const resolved = new URL(trimmedValue, baseUrl);
+      if (!['data:', 'http:', 'https:'].includes(resolved.protocol)) return null;
+      if (!collectedUrls.has(resolved.href)) {
+        collectedUrls.add(resolved.href);
+        targets.push({ attribute: 'css-url', element, url: resolved.href });
+      }
+      return resolved.href;
+    } catch {
+      return null;
+    }
+  });
 }
 
 function isElementOfType(
@@ -173,7 +216,7 @@ export function collectAssetTargets(
   const selectedSrcsetElements = new WeakSet<Element>();
   const baseUrl = options.baseUrl ?? resolveRootDocument(root).baseURI;
 
-  for (const element of root.querySelectorAll('img[srcset], source[srcset]')) {
+  for (const element of queryAssetElements(root, 'img[srcset], source[srcset]')) {
     const url = element.getAttribute('srcset');
     if (url) {
       const selectedTarget = createSelectedSrcsetTarget(element, url, warnings, baseUrl);
@@ -184,7 +227,7 @@ export function collectAssetTargets(
     }
   }
 
-  for (const element of root.querySelectorAll('img[src], source[src], video[poster]')) {
+  for (const element of queryAssetElements(root, 'img[src], source[src], video[poster]')) {
     const attribute = element.hasAttribute('poster') ? 'poster' : 'src';
     const url = element.getAttribute(attribute);
     if (url) {
@@ -197,11 +240,18 @@ export function collectAssetTargets(
     }
   }
 
-  for (const element of root.querySelectorAll('link[rel~="stylesheet"][href]')) {
+  for (const element of queryAssetElements(root, 'link[rel~="stylesheet"][href]')) {
     const url = element.getAttribute('href');
     if (url) {
       targets.push({ attribute: 'href', element, url });
     }
+  }
+
+  for (const element of queryAssetElements(root, 'style')) {
+    collectCssAssetTargets(element, element.textContent ?? '', baseUrl, targets);
+  }
+  for (const element of queryAssetElements(root, '[style]')) {
+    collectCssAssetTargets(element, element.getAttribute('style') ?? '', baseUrl, targets);
   }
 
   return { targets, warnings };
@@ -233,7 +283,11 @@ export function collectBackgroundFetchUrls(
 
     for (const value of values) {
       const resolvedUrl = resolveSafeAssetUrl(value, context.baseUrl);
-      if (resolvedUrl && new URL(resolvedUrl).origin !== context.pageOrigin) {
+      if (
+        resolvedUrl &&
+        ['http:', 'https:'].includes(new URL(resolvedUrl).protocol) &&
+        new URL(resolvedUrl).origin !== context.pageOrigin
+      ) {
         urls.add(resolvedUrl);
       }
     }

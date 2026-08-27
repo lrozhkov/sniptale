@@ -38,7 +38,11 @@ function createManifest(overrides: Partial<WebSnapshotManifest> = {}): WebSnapsh
     id: 'snapshot-1',
     paths: WEB_SNAPSHOT_PACKAGE_PATHS,
     schemaVersion: 1,
-    source: { faviconUrl: null, title: 'Example Page', url: 'https://example.com/page' },
+    source: {
+      faviconUrl: null,
+      title: 'Example Page',
+      url: 'https://example.com/page',
+    },
     stats: { assetCount: 1, failedAssetCount: 0, packageSize: 10 },
     warnings: [],
     ...overrides,
@@ -47,7 +51,12 @@ function createManifest(overrides: Partial<WebSnapshotManifest> = {}): WebSnapsh
 
 async function createAssetMetadata(path: string, content: string, mimeType: string) {
   const bytes = new TextEncoder().encode(content);
-  return { mimeType, path, sha256: await hashWebSnapshotAssetBytes(bytes), size: bytes.byteLength };
+  return {
+    mimeType,
+    path,
+    sha256: await hashWebSnapshotAssetBytes(bytes),
+    size: bytes.byteLength,
+  };
 }
 
 async function createPackageBlob(args: {
@@ -79,7 +88,9 @@ async function stubWebSnapshotRecord(args: {
     createdAt: 1,
     id: 'snapshot-1',
     manifest: args.manifest,
-    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
+    packageFile: new File([packageBlob], 'snapshot.zip', {
+      type: packageBlob.type,
+    }),
     size: packageBlob.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -96,12 +107,24 @@ function stubObjectUrlStatics(
   vi.stubGlobal('URL', MockURL);
 }
 
+function readTestBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(blob);
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getWebSnapshotScreenshotFile.mockResolvedValue(
     new File(['png'], 'snapshot.png', { type: 'image/png' })
   );
-  mocks.validateRetainedWebSnapshotScreenshot.mockResolvedValue({ height: 720, width: 1280 });
+  mocks.validateRetainedWebSnapshotScreenshot.mockResolvedValue({
+    height: 720,
+    width: 1280,
+  });
   stubObjectUrlStatics();
 });
 
@@ -126,7 +149,10 @@ it('uses verified manifest MIME metadata for viewer asset blobs', async () => {
   });
 
   await stubWebSnapshotRecord({
-    extras: { 'assets/image.bin': 'png', 'assets/style.bin': 'body { color: red; }' },
+    extras: {
+      'assets/image.bin': 'png',
+      'assets/style.bin': 'body { color: red; }',
+    },
     html: '<link rel="stylesheet" href="../assets/style.bin"><img src="../assets/image.bin">',
     manifest,
   });
@@ -135,6 +161,20 @@ it('uses verified manifest MIME metadata for viewer asset blobs', async () => {
 
   expect(loaded.html).toContain('href="blob:style"');
   expect(loaded.html).toContain('src="blob:image"');
+  expect(loaded.assets).toEqual([
+    {
+      mimeType: 'image/png',
+      path: 'assets/image.bin',
+      size: 3,
+      url: 'blob:image',
+    },
+    {
+      mimeType: 'text/css',
+      path: 'assets/style.bin',
+      size: 20,
+      url: 'blob:style',
+    },
+  ]);
   expect(createdBlobs.map((blob) => blob.type)).toEqual(['image/png', 'text/css', 'image/png']);
 });
 
@@ -147,7 +187,10 @@ it('rejects asset packages when manifest hashes do not match content', async () 
       },
     ],
   });
-  await stubWebSnapshotRecord({ extras: { 'assets/image.png': 'png' }, manifest });
+  await stubWebSnapshotRecord({
+    extras: { 'assets/image.png': 'png' },
+    manifest,
+  });
 
   await expect(loadWebSnapshotPackage('snapshot-1')).rejects.toThrow(
     'Web snapshot package asset metadata does not match package content.'
@@ -155,26 +198,94 @@ it('rejects asset packages when manifest hashes do not match content', async () 
   expect(URL.createObjectURL).not.toHaveBeenCalled();
 });
 
-it('rejects SVG assets before creating viewer object URLs', async () => {
+it('sanitizes SVG assets again before creating viewer object URLs', async () => {
   const manifest = createManifest({
     assets: [
       await createAssetMetadata(
         'assets/unsafe.svg',
-        '<svg onload="alert(1)"><foreignObject /></svg>',
+        '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><foreignObject /><path /></svg>',
         'image/svg+xml'
       ),
     ],
   });
   await stubWebSnapshotRecord({
-    extras: { 'assets/unsafe.svg': '<svg onload="alert(1)"><foreignObject /></svg>' },
+    extras: {
+      'assets/unsafe.svg':
+        '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><foreignObject /><path /></svg>',
+    },
     html: '<img src="../assets/unsafe.svg">',
     manifest,
   });
 
-  await expect(loadWebSnapshotPackage('snapshot-1')).rejects.toThrow(
-    'Web snapshot package SVG assets are not supported.'
-  );
-  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const svgBlob = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0];
+
+  expect(loaded.html).toContain('src="blob:snapshot-asset"');
+  expect(svgBlob).toBeInstanceOf(Blob);
+  await expect(readTestBlobText(svgBlob as Blob)).resolves.not.toContain('onload');
+  await expect(readTestBlobText(svgBlob as Blob)).resolves.not.toContain('foreignObject');
+});
+
+it('rewrites resources nested in captured CSS assets before offline rendering', async () => {
+  const css = '.hero { background-image: url("../assets/hero.png"); }';
+  const manifest = createManifest({
+    assets: [
+      await createAssetMetadata('assets/styles.css', css, 'text/css'),
+      await createAssetMetadata('assets/hero.png', 'png', 'image/png'),
+    ],
+  });
+  await stubWebSnapshotRecord({
+    extras: { 'assets/hero.png': 'png', 'assets/styles.css': css },
+    html: '<link rel="stylesheet" href="../assets/styles.css"><main class="hero">Page</main>',
+    manifest,
+  });
+  const createdBlobs: Blob[] = [];
+  stubObjectUrlStatics((blob) => {
+    createdBlobs.push(blob);
+    return `blob:snapshot-asset-${createdBlobs.length}`;
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const capturedCss = await readTestBlobText(createdBlobs[1] ?? new Blob());
+
+  expect(capturedCss).toContain('url("blob:snapshot-asset-1")');
+  expect(capturedCss).not.toContain('../assets/hero.png');
+  expect(loaded.html).toContain('href="blob:snapshot-asset-2"');
+});
+
+it('creates imported CSS dependencies before their parent stylesheet', async () => {
+  const rootCss = '@import url("../assets/theme.css") screen;';
+  const themeCss = '.hero { background: url("../assets/hero.png"); }';
+  const manifest = createManifest({
+    assets: [
+      await createAssetMetadata('assets/root.css', rootCss, 'text/css'),
+      await createAssetMetadata('assets/theme.css', themeCss, 'text/css'),
+      await createAssetMetadata('assets/hero.png', 'png', 'image/png'),
+    ],
+    stats: { assetCount: 3, failedAssetCount: 0, packageSize: 10 },
+  });
+  await stubWebSnapshotRecord({
+    extras: {
+      'assets/hero.png': 'png',
+      'assets/root.css': rootCss,
+      'assets/theme.css': themeCss,
+    },
+    html: '<link rel="stylesheet" href="../assets/root.css"><main class="hero">Page</main>',
+    manifest,
+  });
+  const createdBlobs: Blob[] = [];
+  stubObjectUrlStatics((blob) => {
+    createdBlobs.push(blob);
+    return `blob:snapshot-asset-${createdBlobs.length}`;
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const importedCss = await readTestBlobText(createdBlobs[1] ?? new Blob());
+  const rootCapturedCss = await readTestBlobText(createdBlobs[2] ?? new Blob());
+
+  expect(importedCss).toContain('url("blob:snapshot-asset-1")');
+  expect(rootCapturedCss).toContain('@import url("blob:snapshot-asset-2") screen;');
+  expect(loaded.html).toContain('href="blob:snapshot-asset-3"');
 });
 
 it('revokes already created object URLs when later asset URL creation fails', async () => {
@@ -191,7 +302,9 @@ it('revokes already created object URLs when later asset URL creation fails', as
       'assets/second.png': 'png',
     },
     html: '<img src="../assets/first.png"><img src="../assets/second.png">',
-    manifest: createManifest({ stats: { assetCount: 2, failedAssetCount: 0, packageSize: 10 } }),
+    manifest: createManifest({
+      stats: { assetCount: 2, failedAssetCount: 0, packageSize: 10 },
+    }),
   });
 
   await expect(loadWebSnapshotPackage('snapshot-1')).rejects.toThrow('Object URL failed');

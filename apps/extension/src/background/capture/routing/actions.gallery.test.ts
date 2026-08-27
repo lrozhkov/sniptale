@@ -60,6 +60,7 @@ vi.mock('./web-snapshot/session', () => ({
   beginWebSnapshotSave: beginWebSnapshotSaveMock,
   cancelWebSnapshotCaptureRequest: vi.fn(),
   commitWebSnapshotSave: commitWebSnapshotSaveMock,
+  extendWebSnapshotAssetSession: vi.fn(),
   releaseWebSnapshotSave: releaseWebSnapshotSaveMock,
   registerWebSnapshotAssetSession: registerWebSnapshotAssetSessionMock,
   resetWebSnapshotAssetSessionsForTests: vi.fn(),

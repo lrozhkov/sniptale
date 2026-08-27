@@ -54,14 +54,26 @@ const EXPORT_STEP_DEFINITIONS: ExportStepDefinition[] = [
   { key: 'files', labelKey: 'popup.export.includeFilesLabel' },
   { key: 'images', labelKey: 'popup.export.includeImagesLabel' },
   { key: 'basicLogs', labelKey: 'popup.export.includeBasicLogsLabel' },
-  { key: 'pageDiagnostics', labelKey: 'popup.export.includePageDiagnosticsLabel' },
-  { key: 'cssDiagnostics', labelKey: 'popup.export.includeCssDiagnosticsLabel' },
-  { key: 'fullPageScreenshot', labelKey: 'popup.export.includeFullPageScreenshotLabel' },
+  {
+    key: 'pageDiagnostics',
+    labelKey: 'popup.export.includePageDiagnosticsLabel',
+  },
+  {
+    key: 'cssDiagnostics',
+    labelKey: 'popup.export.includeCssDiagnosticsLabel',
+  },
+  {
+    key: 'fullPageScreenshot',
+    labelKey: 'popup.export.includeFullPageScreenshotLabel',
+  },
 ];
 
 const WEB_SNAPSHOT_STEP_DEFINITIONS: ExportStepDefinition[] = [
-  { key: 'webSnapshotPreview', labelKey: 'popup.export.webSnapshotPreviewStep' },
   { key: 'webSnapshotDom', labelKey: 'popup.export.webSnapshotDomStep' },
+  {
+    key: 'webSnapshotPreview',
+    labelKey: 'popup.export.webSnapshotPreviewStep',
+  },
   { key: 'webSnapshotStyles', labelKey: 'popup.export.webSnapshotStylesStep' },
   { key: 'webSnapshotAssets', labelKey: 'popup.export.webSnapshotAssetsStep' },
 ];
@@ -193,19 +205,37 @@ function hasCompletedArchiveResult(result: PopupExportResult | null): boolean {
   return Boolean(result?.success || result?.filename);
 }
 
-function buildWebSnapshotProgressSteps(result: PopupExportResult): PopupExportProgressStep[] {
+function isWebSnapshotStepKey(key: ExportStepKey | null | undefined): boolean {
+  return WEB_SNAPSHOT_STEP_DEFINITIONS.some((definition) => definition.key === key);
+}
+
+function buildWebSnapshotProgressSteps(args: {
+  progress: ExportProgress;
+  result: PopupExportResult | null;
+}): PopupExportProgressStep[] {
   const definitions =
-    result.warnings && result.warnings.length > 0
+    args.result?.warnings && args.result.warnings.length > 0
       ? [...WEB_SNAPSHOT_STEP_DEFINITIONS, WEB_SNAPSHOT_WARNING_STEP_DEFINITION]
       : WEB_SNAPSHOT_STEP_DEFINITIONS;
-  const status: ExportStepStatus = result.success ? 'done' : 'error';
+  const activeIndex = definitions.findIndex(
+    (definition) => definition.key === args.progress.activeStepKey
+  );
 
-  return definitions.map(({ key, labelKey }) => ({
-    key,
-    label: translate(labelKey),
-    status,
-    statusLabel: getStepStatusLabel(status),
-  }));
+  return definitions.map(({ key, labelKey }, index) => {
+    let status: ExportStepStatus = 'pending';
+    if (args.result) status = args.result.success ? 'done' : 'error';
+    else if (args.progress.phase === 'error' && index === Math.max(activeIndex, 0))
+      status = 'error';
+    else if (index < activeIndex) status = 'done';
+    else if (index === activeIndex) status = 'active';
+
+    return {
+      key,
+      label: translate(labelKey),
+      status,
+      statusLabel: getStepStatusLabel(status),
+    };
+  });
 }
 
 export function buildPopupExportProgressSteps(args: {
@@ -213,8 +243,11 @@ export function buildPopupExportProgressSteps(args: {
   result: PopupExportResult | null;
   selection: ExportStepSelection;
 }): PopupExportProgressStep[] {
-  if (args.result?.kind === 'webSnapshot') {
-    return buildWebSnapshotProgressSteps(args.result);
+  if (args.result?.kind === 'webSnapshot' || isWebSnapshotStepKey(args.progress.activeStepKey)) {
+    return buildWebSnapshotProgressSteps({
+      progress: args.progress,
+      result: args.result,
+    });
   }
 
   const selectedDefinitions = EXPORT_STEP_DEFINITIONS.filter(({ key }) =>

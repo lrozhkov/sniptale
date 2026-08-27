@@ -152,6 +152,36 @@ it('draws and releases each decoded tile before encoding one final image', async
   expect(mocks.drawImage).toHaveBeenCalledTimes(2);
 });
 
+it('keeps a long 1280px page at native scale within the production memory budget', async () => {
+  const longPageGeometry: FullPageCaptureGeometry = {
+    ...documentGeometry,
+    extentHeight: 26_878,
+    extentWidth: 1_280,
+    outputHeight: 26_878,
+    outputWidth: 1_280,
+    rootViewport: { height: 800, width: 1_280, x: 0, y: 0 },
+    viewportHeight: 800,
+    viewportWidth: 1_280,
+  };
+  enqueueBitmap(1_280, 800);
+  const stitcher = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-long-page',
+    frozenExtentWarning: false,
+    geometry: longPageGeometry,
+    warnings: [],
+  });
+  await stitcher.drawFrame('tile-long-page', tilePlan(), tileState(longPageGeometry));
+
+  const result = await stitcher.finish({ format: 'png' });
+
+  expect(result.metadata).toMatchObject({
+    downscaled: false,
+    outputHeight: 26_878,
+    outputScale: 1,
+    outputWidth: 1_280,
+  });
+});
+
 it('draws the outer shell once and replaces only the internal scroller viewport', async () => {
   const internalGeometry: FullPageCaptureGeometry = {
     devicePixelRatio: 1,

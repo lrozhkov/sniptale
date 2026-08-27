@@ -1,4 +1,4 @@
-import { sanitizeWebSnapshotCssText } from './sanitize-css';
+import { sanitizeWebSnapshotCssText, sanitizeWebSnapshotStylesheetText } from './sanitize-css';
 
 const SAFE_WEB_SNAPSHOT_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const SAFE_WEB_SNAPSHOT_DATA_MIME_TYPES = new Set([
@@ -26,6 +26,38 @@ interface WebSnapshotHtmlSanitizeOptions {
   offlineOnly?: boolean;
 }
 
+export function collectWebSnapshotQueryRoots(root: ParentNode): ParentNode[] {
+  const roots: ParentNode[] = [root];
+  for (let index = 0; index < roots.length; index += 1) {
+    const current = roots[index];
+    if (!current) continue;
+    for (const template of current.querySelectorAll<HTMLTemplateElement>(
+      'template[shadowrootmode]'
+    )) {
+      roots.push(template.content);
+    }
+  }
+  return roots;
+}
+
+function createOfflineCssUrlRewriter(
+  options: WebSnapshotHtmlSanitizeOptions
+): ((url: string) => string | null) | undefined {
+  if (!options.offlineOnly) return undefined;
+  const allowedObjectUrls = new Set(options.allowedObjectUrls ?? []);
+  return (value) => {
+    const trimmedValue = value.trim();
+    if (trimmedValue.startsWith('#') || allowedObjectUrls.has(trimmedValue)) {
+      return trimmedValue;
+    }
+    try {
+      return isSafeWebSnapshotDataUrl(new URL(trimmedValue)) ? trimmedValue : null;
+    } catch {
+      return null;
+    }
+  };
+}
+
 function isSafeWebSnapshotDataUrl(url: URL): boolean {
   if (url.protocol !== 'data:') {
     return false;
@@ -47,6 +79,31 @@ export function isSafeWebSnapshotUrl(value: string, baseUrl: string | null): boo
   } catch {
     return false;
   }
+}
+
+const SENSITIVE_AUTOCOMPLETE_FIELD_TOKENS = new Set([
+  'current-password',
+  'new-password',
+  'one-time-code',
+  'transaction-amount',
+  'transaction-currency',
+]);
+
+export function shouldExcludeWebSnapshotFormControlValue(element: Element): boolean {
+  if (element.tagName.toLowerCase() === 'input') {
+    const type = element.getAttribute('type')?.trim().toLowerCase() ?? 'text';
+    if (type === 'file' || type === 'hidden' || type === 'password') return true;
+  }
+  const autocompleteTokens =
+    element
+      .getAttribute('autocomplete')
+      ?.trim()
+      .toLowerCase()
+      .split(/[\t\n\f\r ]+/u)
+      .filter(Boolean) ?? [];
+  return autocompleteTokens.some(
+    (token) => token.startsWith('cc-') || SENSITIVE_AUTOCOMPLETE_FIELD_TOKENS.has(token)
+  );
 }
 
 function isSafeWebSnapshotSrcset(value: string, baseUrl: string | null): boolean {
@@ -100,6 +157,7 @@ function sanitizeElementAttributes(
   options: WebSnapshotHtmlSanitizeOptions
 ): void {
   const allowedObjectUrls = new Set(options.allowedObjectUrls ?? []);
+  const rewriteCssUrl = createOfflineCssUrlRewriter(options);
 
   for (const attribute of Array.from(element.attributes)) {
     const normalizedName = attribute.name.toLowerCase();
@@ -120,7 +178,10 @@ function sanitizeElementAttributes(
     }
 
     if (normalizedName === 'style') {
-      element.setAttribute(attribute.name, sanitizeWebSnapshotCssText(attribute.value));
+      element.setAttribute(
+        attribute.name,
+        sanitizeWebSnapshotCssText(attribute.value, rewriteCssUrl)
+      );
       continue;
     }
 
@@ -196,17 +257,37 @@ function isSafeOfflineWebSnapshotUrl(value: string, allowedObjectUrls: Set<strin
   }
 }
 
-function sanitizeStyleElements(document: Document): void {
-  for (const styleElement of document.querySelectorAll('style')) {
-    styleElement.textContent = sanitizeWebSnapshotCssText(styleElement.textContent ?? '');
+function sanitizeStyleElements(root: ParentNode, options: WebSnapshotHtmlSanitizeOptions): void {
+  const rewriteCssUrl = createOfflineCssUrlRewriter(options);
+  for (const styleElement of root.querySelectorAll('style')) {
+    styleElement.textContent = sanitizeWebSnapshotStylesheetText(
+      styleElement.textContent ?? '',
+      rewriteCssUrl
+    );
   }
 }
 
-function disableFormSubmissions(document: Document): void {
-  for (const form of document.querySelectorAll('form')) {
+function disableFormSubmissions(root: ParentNode): void {
+  for (const form of root.querySelectorAll('form')) {
     form.setAttribute('data-sniptale-disabled-form', 'true');
     for (const attribute of FORM_ATTRIBUTE_NAMES) {
       form.removeAttribute(attribute);
+    }
+  }
+}
+
+export function removeWebSnapshotSensitiveControlState(root: ParentNode): void {
+  for (const control of root.querySelectorAll('input, select, textarea')) {
+    if (!shouldExcludeWebSnapshotFormControlValue(control)) continue;
+    if (control.tagName.toLowerCase() === 'input') {
+      control.removeAttribute('checked');
+      control.removeAttribute('value');
+    } else if (control.tagName.toLowerCase() === 'textarea') {
+      control.removeAttribute('value');
+      control.textContent = '';
+    } else {
+      control.removeAttribute('value');
+      control.replaceChildren();
     }
   }
 }
@@ -217,16 +298,16 @@ export function sanitizeWebSnapshotHtml(
   options: WebSnapshotHtmlSanitizeOptions = {}
 ): string {
   const document = new DOMParser().parseFromString(html, 'text/html');
-
-  for (const element of document.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
-    element.remove();
-  }
-
-  disableFormSubmissions(document);
-  sanitizeStyleElements(document);
-
-  for (const element of document.querySelectorAll('*')) {
-    sanitizeElementAttributes(element, baseUrl, options);
+  for (const root of collectWebSnapshotQueryRoots(document)) {
+    for (const element of root.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
+      element.remove();
+    }
+    disableFormSubmissions(root);
+    removeWebSnapshotSensitiveControlState(root);
+    sanitizeStyleElements(root, options);
+    for (const element of root.querySelectorAll('*')) {
+      sanitizeElementAttributes(element, baseUrl, options);
+    }
   }
 
   return `<!doctype html>${document.documentElement.outerHTML}`;

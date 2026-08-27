@@ -68,6 +68,7 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   authenticatedSnapshotAssetsEnabled: false,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
+  webSnapshotSaveDisclosureVersion: 0,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
   voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
 };

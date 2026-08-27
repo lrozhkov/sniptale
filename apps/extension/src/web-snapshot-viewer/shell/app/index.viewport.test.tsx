@@ -25,8 +25,12 @@ const mocks = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock('./route', () => ({ readSnapshotIdFromLocation: mocks.readSnapshotIdFromLocation }));
-vi.mock('../../viewer/frame-navigation', () => ({ blockSnapshotFrameNavigation: vi.fn() }));
+vi.mock('./route', () => ({
+  readSnapshotIdFromLocation: mocks.readSnapshotIdFromLocation,
+}));
+vi.mock('../../viewer/frame-navigation', () => ({
+  blockSnapshotFrameNavigation: vi.fn(),
+}));
 vi.mock('../../preparation/host', () => ({
   SnapshotPreparationHost: mocks.SnapshotPreparationHost,
 }));
@@ -61,7 +65,12 @@ function createViewerManifest(overrides: Partial<WebSnapshotManifest> = {}): Web
     id: 'snapshot-1',
     paths: WEB_SNAPSHOT_PACKAGE_PATHS,
     schemaVersion: 1,
-    source: { faviconUrl: null, title: 'Page title', url: 'https://example.com/page', ...source },
+    source: {
+      faviconUrl: null,
+      title: 'Page title',
+      url: 'https://example.com/page',
+      ...source,
+    },
     stats: { assetCount: 0, failedAssetCount: 0, packageSize: 0, ...stats },
     warnings: [],
     ...rootOverrides,
@@ -72,6 +81,7 @@ function createLoadedPackage(
   manifest: Partial<WebSnapshotManifest> = {}
 ): LoadedWebSnapshotPackage {
   return {
+    assets: [],
     html: '<p>Snapshot</p>',
     manifest: createViewerManifest(manifest),
     objectUrls: [],
@@ -86,9 +96,11 @@ async function renderViewer(): Promise<void> {
 }
 
 async function loadSnapshotIframe(): Promise<void> {
-  act(() => {
-    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
-  });
+  if (!container?.querySelector('iframe')) {
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
+    });
+  }
   await act(async () => {
     mocks.latestFrameLoad?.();
   });
@@ -132,9 +144,6 @@ it('uses the saved capture viewport as the default snapshot iframe surface', asy
   );
 
   await renderViewer();
-  act(() => {
-    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
-  });
 
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('2560px');
@@ -145,9 +154,6 @@ it('keeps the fluid viewer surface for legacy snapshots without viewport metadat
   mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage());
 
   await renderViewer();
-  act(() => {
-    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
-  });
 
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('');

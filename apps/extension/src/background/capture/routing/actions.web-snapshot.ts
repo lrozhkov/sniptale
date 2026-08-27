@@ -9,6 +9,7 @@ import {
   assertWebSnapshotSessionOwner,
   beginWebSnapshotSave,
   commitWebSnapshotSave,
+  extendWebSnapshotAssetSession,
   releaseWebSnapshotSave,
   registerWebSnapshotAssetSession,
 } from './web-snapshot/session';
@@ -49,14 +50,22 @@ export function handleFetchWebSnapshotAsset(
 }
 
 export function handleRegisterWebSnapshotAssets(
-  payload: { assetUrls: string[]; requestId: string },
+  payload: { assetUrls: string[]; requestId: string; snapshotSessionId?: string },
   resolvedTabId: number,
   sendResponse: SendResponse
 ): boolean {
   Promise.resolve()
-    .then(() =>
-      registerWebSnapshotAssetSession(resolvedTabId, payload.requestId, payload.assetUrls)
-    )
+    .then(() => {
+      if (payload.snapshotSessionId) {
+        extendWebSnapshotAssetSession({
+          assetUrls: payload.assetUrls,
+          sessionId: payload.snapshotSessionId,
+          tabId: resolvedTabId,
+        });
+        return payload.snapshotSessionId;
+      }
+      return registerWebSnapshotAssetSession(resolvedTabId, payload.requestId, payload.assetUrls);
+    })
     .then((snapshotSessionId) => sendResponse({ success: true, snapshotSessionId }))
     .catch((error) => sendResponse(createRouteErrorResponse(error)));
   return true;

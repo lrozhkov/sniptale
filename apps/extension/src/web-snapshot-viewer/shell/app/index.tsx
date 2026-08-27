@@ -12,6 +12,7 @@ import {
   WebSnapshotVisualSurface,
   type WebSnapshotViewerMode,
 } from './view-mode';
+import { WebSnapshotAssetCatalog } from './asset-catalog';
 
 const viewerHeaderClassName = [
   'flex min-h-[52px] items-center justify-between border-b',
@@ -83,9 +84,11 @@ function SnapshotViewerHeader(props: {
           <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]">
             {props.loaded.manifest.source.url}
           </div>
-          <div className="truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
-            {translate('webSnapshotViewer.app.pngDprHint', props.locale)}
-          </div>
+          {props.mode === 'visual' ? (
+            <div className="truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
+              {translate('webSnapshotViewer.app.pngDprHint', props.locale)}
+            </div>
+          ) : null}
         </div>
       ) : null}
       <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -161,7 +164,10 @@ function SnapshotFrameSurface(props: {
 }
 
 function useLoadedSnapshotKey(loaded: LoadedWebSnapshotPackage): string {
-  const loadedKeyRef = useRef<{ key: string; loaded: LoadedWebSnapshotPackage } | null>(null);
+  const loadedKeyRef = useRef<{
+    key: string;
+    loaded: LoadedWebSnapshotPackage;
+  } | null>(null);
   if (loadedKeyRef.current?.loaded !== loaded) {
     loadedPackageRevisionSeed += 1;
     loadedKeyRef.current = {
@@ -197,13 +203,18 @@ function useSnapshotPreparationFrame(loaded: LoadedWebSnapshotPackage) {
     [loadedKey]
   );
 
-  return { handleIframeElementChange, handleIframeLoaded, iframeRef, preparationIframe };
+  return {
+    handleIframeElementChange,
+    handleIframeLoaded,
+    iframeRef,
+    preparationIframe,
+  };
 }
 
 function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; locale: AppLocale }) {
   const [headerVisible, setHeaderVisible] = useState(true);
   const [currentViewport, setCurrentViewport] = useState<ViewerViewport>(null);
-  const [mode, setMode] = useState<WebSnapshotViewerMode>('visual');
+  const [mode, setMode] = useState<WebSnapshotViewerMode>('static-document');
   const { handleIframeElementChange, handleIframeLoaded, iframeRef, preparationIframe } =
     useSnapshotPreparationFrame(props.loaded);
 
@@ -218,7 +229,9 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
         onModeChange={setMode}
       />
       <section className="relative min-h-0 flex-1 overflow-auto">
-        {mode === 'visual' ? (
+        {mode === 'assets' ? (
+          <WebSnapshotAssetCatalog assets={props.loaded.assets} locale={props.locale} />
+        ) : mode === 'visual' ? (
           <WebSnapshotVisualSurface
             locale={props.locale}
             screenshotUrl={props.loaded.screenshotUrl}

@@ -34,7 +34,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./route', () => ({
   readSnapshotIdFromLocation: mocks.readSnapshotIdFromLocation,
 }));
-vi.mock('../../viewer/frame-navigation', () => ({ blockSnapshotFrameNavigation: vi.fn() }));
+vi.mock('../../viewer/frame-navigation', () => ({
+  blockSnapshotFrameNavigation: vi.fn(),
+}));
 vi.mock('../../preparation/host', () => ({
   SnapshotPreparationHost: mocks.SnapshotPreparationHost,
 }));
@@ -95,11 +97,13 @@ function createViewerManifest(overrides: Partial<WebSnapshotManifest> = {}): Web
 }
 
 function createLoadedPackage(args: {
+  assets?: LoadedWebSnapshotPackage['assets'];
   html?: string;
   manifest?: Partial<WebSnapshotManifest>;
   objectUrls?: string[];
 }): LoadedWebSnapshotPackage {
   return {
+    assets: args.assets ?? [],
     html: args.html ?? '<p>Snapshot</p>',
     manifest: createViewerManifest(args.manifest ?? {}),
     objectUrls: args.objectUrls ?? [],
@@ -108,10 +112,14 @@ function createLoadedPackage(args: {
 }
 
 async function loadSnapshotIframe(): Promise<HTMLIFrameElement> {
-  act(() => {
-    container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
-  });
-  const iframe = container?.querySelector('iframe');
+  let iframe = container?.querySelector('iframe');
+  if (!iframe) {
+    const staticButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === translate('webSnapshotViewer.app.staticDocumentMode', 'en')
+    );
+    act(() => staticButton?.click());
+    iframe = container?.querySelector('iframe');
+  }
   if (!iframe) {
     throw new Error('Expected snapshot iframe.');
   }
@@ -160,7 +168,13 @@ it('revokes object URLs from a snapshot load that resolves after unmount', async
   await act(async () => {
     resolveLoad(
       createLoadedPackage({
-        manifest: { source: { faviconUrl: null, title: 'Page', url: 'https://example.com' } },
+        manifest: {
+          source: {
+            faviconUrl: null,
+            title: 'Page',
+            url: 'https://example.com',
+          },
+        },
         objectUrls: ['blob:late'],
       })
     );
@@ -198,24 +212,68 @@ it('hides snapshot metadata while keeping the mode control available', async () 
   expect(container?.querySelector('iframe')).not.toBeNull();
 });
 
-it('opens with the retained visual copy and switches explicitly to the static document', async () => {
+it('opens with the static document and switches explicitly to the screenshot', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
-    createLoadedPackage({ manifest: { viewport: { height: 900, width: 1440 } } })
+    createLoadedPackage({
+      manifest: { viewport: { height: 900, width: 1440 } },
+    })
   );
 
   await act(async () => {
     root?.render(<WebSnapshotViewerApp />);
   });
 
+  await loadSnapshotIframe();
+  expect(container?.querySelector('[data-testid="snapshot-visual-image"]')).toBeNull();
+  expect(container?.querySelector('iframe')).not.toBeNull();
+
+  const screenshotButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === translate('webSnapshotViewer.app.visualMode', 'en')
+  );
+  act(() => screenshotButton?.click());
+
   const image = container?.querySelector<HTMLImageElement>('[data-testid="snapshot-visual-image"]');
   expect(image?.src).toBe('blob:snapshot-screenshot');
   expect(image?.style.width).toBe('1440px');
   expect(container?.querySelector('iframe')).toBeNull();
+});
 
-  await loadSnapshotIframe();
+it('shows verified nested assets without replacing the static-document default', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({
+      assets: [
+        {
+          mimeType: 'image/png',
+          path: 'assets/1.png',
+          size: 2048,
+          url: 'blob:image',
+        },
+        {
+          mimeType: 'text/css',
+          path: 'assets/2.css',
+          size: 512,
+          url: 'blob:style',
+        },
+      ],
+    })
+  );
 
-  expect(container?.querySelector('[data-testid="snapshot-visual-image"]')).toBeNull();
+  await act(async () => {
+    root?.render(<WebSnapshotViewerApp />);
+  });
   expect(container?.querySelector('iframe')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="snapshot-asset-catalog"]')).toBeNull();
+
+  const assetsButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === translate('webSnapshotViewer.app.assetsMode', 'en')
+  );
+  act(() => assetsButton?.click());
+
+  expect(container?.querySelector('[data-testid="snapshot-asset-catalog"]')).not.toBeNull();
+  expect(container?.querySelector<HTMLImageElement>('img[src="blob:image"]')).not.toBeNull();
+  expect(container?.textContent).toContain('1.png');
+  expect(container?.textContent).toContain('2.css');
+  expect(container?.querySelector('iframe')).toBeNull();
 });
 
 it('mounts preparation only after the current snapshot iframe load event', async () => {
@@ -263,7 +321,13 @@ it('invalidates viewer preparation readiness across viewer remounts', async () =
 it('sets document title from source title plus localized suffix', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({
-      manifest: { source: { faviconUrl: null, title: 'Example', url: 'https://example.com/page' } },
+      manifest: {
+        source: {
+          faviconUrl: null,
+          title: 'Example',
+          url: 'https://example.com/page',
+        },
+      },
     })
   );
 
@@ -279,7 +343,13 @@ it('uses localized fallback for missing source titles and keeps source URL visib
   mocks.useAppLocale.mockReturnValue('ru');
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({
-      manifest: { source: { faviconUrl: null, title: '', url: 'https://example.com/page' } },
+      manifest: {
+        source: {
+          faviconUrl: null,
+          title: '',
+          url: 'https://example.com/page',
+        },
+      },
     })
   );
 
@@ -299,7 +369,13 @@ it('sets Russian document title from source title plus localized product suffix'
   mocks.useAppLocale.mockReturnValue('ru');
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({
-      manifest: { source: { faviconUrl: null, title: 'Пример', url: 'https://example.com/page' } },
+      manifest: {
+        source: {
+          faviconUrl: null,
+          title: 'Пример',
+          url: 'https://example.com/page',
+        },
+      },
     })
   );
 

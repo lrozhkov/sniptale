@@ -42,7 +42,9 @@ function createBodyStream(chunks: string[]): ReadableStream<Uint8Array> {
 }
 
 function registerSession(urls: string[] = ['https://cdn.example.com/image.png']): string {
-  authorizeWebSnapshotCaptureRequest(42, 'req-1', { allowAnonymousCrossOriginAssets: true });
+  authorizeWebSnapshotCaptureRequest(42, 'req-1', {
+    allowAnonymousCrossOriginAssets: true,
+  });
   return registerWebSnapshotAssetSession(42, 'req-1', urls);
 }
 
@@ -163,7 +165,7 @@ it('rejects unsupported MIME types and HTTP failures', async () => {
   ).rejects.toThrow('HTTP 404');
 });
 
-it('rejects SVG assets before returning anonymous fetch bytes', async () => {
+it('returns registered SVG bytes for mandatory content-side sanitization', async () => {
   const sessionId = registerSession(['https://cdn.example.com/unsafe.svg']);
   vi.mocked(fetch).mockResolvedValueOnce(
     createResponse({
@@ -178,7 +180,10 @@ it('rejects SVG assets before returning anonymous fetch bytes', async () => {
       tabId: 42,
       url: 'https://cdn.example.com/unsafe.svg',
     })
-  ).rejects.toThrow('unsupported web snapshot asset MIME type');
+  ).resolves.toEqual({
+    base64: 'PHN2ZyBvbmxvYWQ9ImFsZXJ0KDEpIj48Zm9yZWlnbk9iamVjdCAvPjwvc3ZnPg==',
+    mimeType: 'image/svg+xml',
+  });
 });
 
 it('rejects oversized assets from content-length before reading the body', async () => {

@@ -4,7 +4,11 @@ import {
   isWebSnapshotManifest,
   WEB_SNAPSHOT_PACKAGE_PATHS,
 } from '../../features/web-snapshot/manifest';
-import { sanitizeWebSnapshotHtml } from '../../features/web-snapshot/public';
+import {
+  collectWebSnapshotQueryRoots,
+  sanitizeWebSnapshotCssText,
+  sanitizeWebSnapshotHtml,
+} from '../../features/web-snapshot/public';
 import {
   getWebSnapshotRecord,
   getWebSnapshotScreenshotFile,
@@ -12,9 +16,11 @@ import {
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import { assertZipPackageInflationProfile } from '@sniptale/platform/data/zip-profile';
 import { createViewerAssetObjectUrls } from './asset-objects';
+import type { LoadedWebSnapshotAsset } from './asset-objects';
 import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
 
 export interface LoadedWebSnapshotPackage {
+  assets: LoadedWebSnapshotAsset[];
   html: string;
   manifest: WebSnapshotManifest;
   objectUrls: string[];
@@ -50,31 +56,58 @@ function rewriteSrcset(value: string, urlsByPath: Map<string, string>): string {
     .join(', ');
 }
 
-function rewriteAssetReferences(html: string, urlsByPath: Map<string, string>): string {
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  for (const element of Array.from(
-    document.querySelectorAll('[src], [srcset], [href], [poster]')
-  )) {
-    for (const attribute of URL_ATTRIBUTES) {
-      const value = element.getAttribute(attribute);
-      const objectUrl = value ? urlsByPath.get(normalizeSnapshotAssetPath(value)) : undefined;
-      if (objectUrl) {
-        element.setAttribute(attribute, objectUrl);
-      }
-    }
-
-    const srcset = element.getAttribute('srcset');
-    if (srcset) {
-      const rewritten = rewriteSrcset(srcset, urlsByPath);
-      if (rewritten) {
-        element.setAttribute('srcset', rewritten);
-      } else {
-        element.removeAttribute('srcset');
-      }
-    }
+function rewriteElementUrlAttributes(element: Element, urlsByPath: Map<string, string>): void {
+  for (const attribute of URL_ATTRIBUTES) {
+    const value = element.getAttribute(attribute);
+    const objectUrl = value ? urlsByPath.get(normalizeSnapshotAssetPath(value)) : undefined;
+    if (objectUrl) element.setAttribute(attribute, objectUrl);
   }
 
+  const srcset = element.getAttribute('srcset');
+  if (!srcset) return;
+  const rewritten = rewriteSrcset(srcset, urlsByPath);
+  if (rewritten) element.setAttribute('srcset', rewritten);
+  else element.removeAttribute('srcset');
+}
+
+function rewriteDocumentStyleAssetReferences(
+  document: Document,
+  urlsByPath: Map<string, string>
+): void {
+  for (const root of collectWebSnapshotQueryRoots(document)) {
+    for (const styleElement of root.querySelectorAll('style')) {
+      styleElement.textContent = rewriteCssAssetReferences(
+        styleElement.textContent ?? '',
+        urlsByPath
+      );
+    }
+    for (const element of root.querySelectorAll('[style]')) {
+      element.setAttribute(
+        'style',
+        rewriteCssAssetReferences(element.getAttribute('style') ?? '', urlsByPath)
+      );
+    }
+  }
+}
+
+function rewriteAssetReferences(html: string, urlsByPath: Map<string, string>): string {
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  for (const root of collectWebSnapshotQueryRoots(document)) {
+    for (const element of root.querySelectorAll('[src], [srcset], [href], [poster]')) {
+      rewriteElementUrlAttributes(element, urlsByPath);
+    }
+  }
+  rewriteDocumentStyleAssetReferences(document, urlsByPath);
+
   return `<!doctype html>${document.documentElement.outerHTML}`;
+}
+
+function rewriteCssAssetReferences(cssText: string, urlsByPath: Map<string, string>): string {
+  return sanitizeWebSnapshotCssText(cssText, (url) => {
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.startsWith('#') || trimmedUrl.startsWith('data:')) return trimmedUrl;
+    return urlsByPath.get(normalizeSnapshotAssetPath(trimmedUrl)) ?? null;
+  });
 }
 
 function getViewerEntryPath(file: JSZip.JSZipObject): string {
@@ -197,7 +230,10 @@ export async function loadWebSnapshotPackage(
   const zip = await JSZip.loadAsync(record.packageFile);
   const bytesByPath = await readViewerPackageEntries(zip);
   const packageManifest = readViewerPackageManifest(bytesByPath);
-  assertManifestMatchesRecord({ packageManifest, recordManifest: record.manifest });
+  assertManifestMatchesRecord({
+    packageManifest,
+    recordManifest: record.manifest,
+  });
   const screenshot = await readViewerScreenshot(snapshotId);
   await validateRetainedWebSnapshotScreenshot({
     packageBytes: readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.screenshot),
@@ -207,17 +243,17 @@ export async function loadWebSnapshotPackage(
   const assetEntries = Array.from(bytesByPath).filter(([path]) => path.startsWith('assets/'));
   const htmlBytes = readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml);
   const html = new TextDecoder().decode(htmlBytes);
-  const { objectUrls, urlsByPath } = await createViewerAssetObjectUrls(
+  const { assets, objectUrls, urlsByPath } = await createViewerAssetObjectUrls(
     assetEntries,
     packageManifest
   );
 
   try {
-    const sanitizedHtml = sanitizeWebSnapshotHtml(html, record.manifest.source.url);
-    const rewrittenHtml = rewriteAssetReferences(sanitizedHtml, urlsByPath);
+    const rewrittenHtml = rewriteAssetReferences(html, urlsByPath);
     const screenshotUrl = URL.createObjectURL(screenshot);
     objectUrls.push(screenshotUrl);
     return {
+      assets,
       html: sanitizeWebSnapshotHtml(rewrittenHtml, record.manifest.source.url, {
         allowedObjectUrls: objectUrls,
         offlineOnly: true,

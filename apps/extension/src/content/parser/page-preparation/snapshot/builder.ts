@@ -13,6 +13,24 @@ import type {
   PreparedSnapshotWarning,
 } from './types';
 import { createIframeTimeoutWarning } from './warnings';
+import { markPreparedSnapshotShadowStyles, materializePreparedSnapshotStyles } from './styles';
+import { markPreparedSnapshotLiveState } from './live-state';
+import { resolveContentShadowRoot } from '../../../platform/dom-host';
+import type { VirtualDomOriginalElementResolver } from '../../dom-tree-parser/traversal';
+
+function removeContentRuntimeHost(
+  virtualRoot: HTMLElement,
+  resolveOriginalElement: VirtualDomOriginalElementResolver
+): void {
+  const contentHost = resolveContentShadowRoot()?.host;
+  if (!contentHost) return;
+  for (const element of [virtualRoot, ...virtualRoot.querySelectorAll('*')]) {
+    if (resolveOriginalElement(element) === contentHost) {
+      element.remove();
+      return;
+    }
+  }
+}
 
 function copyElementAttributes(target: Element, source: Element): void {
   for (const attribute of Array.from(target.attributes)) {
@@ -84,20 +102,32 @@ export async function buildPreparedSnapshotDocument(
     ...(options.iframeTimeoutMs === undefined ? {} : { timeoutMs: options.iframeTimeoutMs }),
   };
   const markedElements = markSelectedResponsiveCandidates(rootDocument);
+  const liveStateMarks = markPreparedSnapshotLiveState(rootDocument);
+  const shadowStyleMarks = markPreparedSnapshotShadowStyles(rootDocument);
   try {
     const iframeReadiness = await waitForAccessibleIframeReady(waitOptions);
     const virtualDomSnapshot = buildVirtualDomSnapshot({ documentRoot: rootDocument, root });
+    removeContentRuntimeHost(virtualDomSnapshot.root, virtualDomSnapshot.resolveOriginalElement);
     const snapshot = createSnapshotDocument(rootDocument, virtualDomSnapshot.root);
+    materializePreparedSnapshotStyles(rootDocument, snapshot);
+    shadowStyleMarks.materialize(snapshot);
+    const liveStateWarnings = liveStateMarks.materialize(snapshot);
     appendStaticPagePreparationOverlays(snapshot);
 
     const warnings = [
       ...createIframeReadinessWarnings(options, iframeReadiness.pendingIframes),
-      ...sanitizePreparedSnapshotDocument(snapshot, rootDocument.baseURI),
+      ...liveStateWarnings,
+      ...sanitizePreparedSnapshotDocument(snapshot, rootDocument.baseURI, {
+        preserveAssetUrls: options.preserveAssetUrls === true,
+      }),
     ];
+    shadowStyleMarks.encapsulate(snapshot);
     const html = serializePreparedSnapshotHtml(snapshot);
 
     return { document: snapshot, html, warnings };
   } finally {
+    shadowStyleMarks.cleanup();
+    liveStateMarks.cleanup();
     clearSelectedResponsiveCandidateMarks(markedElements);
   }
 }

@@ -3,7 +3,11 @@ import { useCallback, useMemo, useState } from 'react';
 import { translate } from '../../../../platform/i18n/popup';
 import { patchSettings } from '../../../../composition/persistence/settings';
 import type { PopupExportController } from '../controller';
-import { createWebSnapshotDisclosure, useWebSnapshotDisclosureState } from './snapshot-disclosure';
+import {
+  createWebSnapshotDisclosure,
+  useWebSnapshotDisclosureState,
+  WEB_SNAPSHOT_SAVE_DISCLOSURE_VERSION,
+} from './snapshot-disclosure';
 
 function useWebSnapshotConfirmationLocals() {
   const [disclosureState, setDisclosureSkipped] = useWebSnapshotDisclosureState();
@@ -47,7 +51,10 @@ function useWebSnapshotConfirmationActions(
   const confirmWithRemember = useCallback(() => {
     locals.setPreferenceSaving(true);
     locals.setPreferenceError(null);
-    void patchSettings({ skipWebSnapshotSaveDisclosure: true })
+    void patchSettings({
+      skipWebSnapshotSaveDisclosure: true,
+      webSnapshotSaveDisclosureVersion: WEB_SNAPSHOT_SAVE_DISCLOSURE_VERSION,
+    })
       .then(() => {
         locals.setDisclosureSkipped(true);
         locals.setConfirmationOpen(false);

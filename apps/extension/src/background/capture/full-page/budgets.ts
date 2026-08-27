@@ -1,7 +1,7 @@
 import type { FullPageCaptureGeometry } from '../../../contracts/full-page-capture';
 
 export const MAX_RASTER_SIDE_PX = 32_768;
-export const MAX_RASTER_AREA_PX = 32_000_000;
+export const MAX_RASTER_AREA_PX = 64_000_000;
 export const MAX_WORKING_SET_BYTES = 384 * 1024 * 1024;
 export const MIN_OUTPUT_SCALE = 0.5;
 export const BYTES_PER_PIXEL = 4;

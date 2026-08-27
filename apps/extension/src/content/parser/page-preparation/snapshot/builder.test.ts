@@ -199,6 +199,117 @@ function registerOverlaySnapshotTests(): void {
 }
 
 function registerSanitizerSnapshotTests(): void {
+  it('preserves ordinary and adopted styles from flattened open shadow roots', async () => {
+    const host = document.createElement('section');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = '.ordinary-shadow { color: rgb(1, 2, 3); }';
+    const content = document.createElement('p');
+    content.className = 'ordinary-shadow adopted-shadow';
+    content.textContent = 'Styled shadow content';
+    shadowRoot.append(style, content);
+    const adoptedStyleSheet = new CSSStyleSheet();
+    adoptedStyleSheet.insertRule('.adopted-shadow { background: rgb(4, 5, 6); }');
+    Object.defineProperty(shadowRoot, 'adoptedStyleSheets', {
+      configurable: true,
+      value: [adoptedStyleSheet],
+    });
+    document.body.append(host);
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(result.html).toContain('Styled shadow content');
+    expect(result.html).toContain('.ordinary-shadow');
+    expect(result.html).toContain('.adopted-shadow');
+    expect(result.html).toContain('rgb(4, 5, 6)');
+    expect(result.html).toContain('<template shadowrootmode="open">');
+    expect(result.html).not.toContain('data-sniptale-shadow-style-host');
+    expect(result.html).not.toContain('data-sniptale-shadow-boundary');
+    expect(host.hasAttribute('data-sniptale-shadow-style-host')).toBe(false);
+  });
+
+  it('preserves nested accessible shadow content as nested declarative roots', async () => {
+    const outerHost = document.createElement('section');
+    outerHost.id = CONTENT_ROOT_ID;
+    const outerRoot = outerHost.attachShadow({ mode: 'open' });
+    const innerHost = document.createElement('article');
+    const innerRoot = innerHost.attachShadow({ mode: 'open' });
+    outerRoot.innerHTML = '<style>:host { display: block; }</style>';
+    innerRoot.innerHTML = [
+      '<style>:host { color: rgb(7, 8, 9); }</style>',
+      '<strong>Nested declarative shadow content</strong>',
+      '<input value="stale shadow value">',
+      '<img srcset="/small-shadow.png 1x, /large-shadow.png 2x">',
+    ].join('');
+    const shadowInput = innerRoot.querySelector('input');
+    const shadowImage = innerRoot.querySelector('img');
+    if (!shadowInput || !shadowImage) throw new Error('Expected nested shadow state');
+    shadowInput.value = 'current shadow value';
+    setCurrentSrc(shadowImage, `${window.location.origin}/large-shadow.png`);
+    outerRoot.append(innerHost);
+    const pageLookalike = document.createElement('div');
+    pageLookalike.className = 'sniptale-action-toolbar';
+    pageLookalike.textContent = 'Page-owned lookalike content';
+    document.body.append(outerHost, pageLookalike);
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(result.html.match(/<template shadowrootmode="open">/g)).toHaveLength(2);
+    expect(result.html).toContain('Nested declarative shadow content');
+    expect(result.html).toContain('Page-owned lookalike content');
+    expect(result.html).toContain('rgb(7, 8, 9)');
+    expect(result.html).toContain('value="current shadow value"');
+    expect(result.html).not.toContain(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE);
+    const outerTemplate = result.document.querySelector<HTMLTemplateElement>(
+      'template[shadowrootmode="open"]'
+    );
+    const innerTemplate = outerTemplate?.content.querySelector<HTMLTemplateElement>(
+      'template[shadowrootmode="open"]'
+    );
+    expect(
+      innerTemplate?.content.querySelector('img')?.getAttribute(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE)
+    ).toBe(`${window.location.origin}/large-shadow.png`);
+  });
+
+  it('sanitizes credentials and active content inside pre-existing declarative templates', async () => {
+    document.body.innerHTML = [
+      '<section><template shadowrootmode="open">',
+      '<script>window.retained = true</script>',
+      '<input type="hidden" value="template-token">',
+      '<textarea autocomplete="one-time-code" value="template-text-attribute-code">template-text-code</textarea>',
+      '<input type="checkbox" autocomplete="one-time-code" checked>',
+      '<select autocomplete="cc-number" value="template-select-card">',
+      '<option label="template-card-label" value="4111111111111111" selected>',
+      'template-card-number</option></select>',
+      '<img src="javascript:alert(1)" onerror="alert(1)">',
+      '<template shadowrootmode="open"><input autocomplete="section-login one-time-code" value="654321"></template>',
+      '</template></section>',
+    ].join('');
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    expect(result.html).toContain('shadowrootmode="open"');
+    expect(result.html).not.toContain('window.retained');
+    expect(result.html).not.toContain('template-token');
+    expect(result.html).not.toContain('template-text-code');
+    expect(result.html).not.toContain('template-text-attribute-code');
+    expect(result.html).not.toContain('template-select-card');
+    expect(result.html).not.toContain('template-card-number');
+    expect(result.html).not.toContain('template-card-label');
+    expect(result.html).not.toContain('4111111111111111');
+    expect(result.html).not.toContain('654321');
+    expect(result.html).not.toContain('javascript:');
+    expect(result.html).not.toContain('onerror');
+    const template = result.document.querySelector<HTMLTemplateElement>(
+      'template[shadowrootmode="open"]'
+    );
+    expect(template?.content.querySelector('textarea')?.textContent).toBe('');
+    expect(template?.content.querySelector('select option')).toBeNull();
+    expect(template?.content.querySelector('input[type="checkbox"]')?.hasAttribute('checked')).toBe(
+      false
+    );
+  });
+
   it('keeps static annotation markup and strips executable snapshot content', async () => {
     const refresh = document.createElement('meta');
     refresh.setAttribute('http-equiv', 'refresh');
@@ -209,12 +320,25 @@ function registerSanitizerSnapshotTests(): void {
       <a href="javascript:alert(1)" onclick="alert(1)">bad link</a>
       <button formaction="https://tracker.example/post">submit</button>
       <svg><use xlink:href="javascript:alert(1)"></use></svg>
-      <style>@import url("https://tracker.example/style.css"); body{color:red}</style>
+      <style>
+        @import url("https://tracker.example/style.css");
+        :root { --snapshot-color: red; }
+        body { color: var(--snapshot-color); }
+        .unsafe-rule { width: expression(alert(1)); }
+      </style>
       <section style="background:url(https://tracker.example/pixel.png); color: blue">styled</section>
       <img src="data:text/html,<script>alert(1)</script>">
       <iframe srcdoc="<script>window.bad = true</script>"></iframe>
       <script>window.bad = true</script>
     `;
+    document.body.insertAdjacentHTML(
+      'afterbegin',
+      [
+        '<input type="hidden" value="prepared-csrf-secret">',
+        '<input autocomplete="section-login current-password webauthn" value="prepared-password">',
+        '<input autocomplete="billing cc-number" value="4111111111111111">',
+      ].join('')
+    );
 
     const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
 
@@ -224,10 +348,14 @@ function registerSanitizerSnapshotTests(): void {
     expect(result.html).not.toContain('onclick=');
     expect(result.html).not.toContain('javascript:alert');
     expect(result.html).not.toContain('formaction=');
+    expect(result.html).not.toContain('prepared-csrf-secret');
+    expect(result.html).not.toContain('prepared-password');
+    expect(result.html).not.toContain('4111111111111111');
     expect(result.html).not.toContain('tracker.example');
     expect(result.html).not.toContain('data:text/html');
     expect(result.html).not.toContain('srcdoc=');
-    expect(result.html).toContain('color:red');
+    expect(result.html).toContain('var(--snapshot-color)');
+    expect(result.html).not.toContain('expression');
     expect(result.html).toContain('color: blue');
     expect(result.document.querySelector('meta[http-equiv="refresh"]')).toBeNull();
     expect(result.warnings).toEqual(

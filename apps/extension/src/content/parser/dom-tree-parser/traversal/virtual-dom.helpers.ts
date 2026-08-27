@@ -2,6 +2,8 @@
  * Helpers for building a normalized virtual DOM without mutating the live page.
  */
 
+import { isContentOwnedElement } from '../../../platform/dom-host';
+
 export function buildVirtualNodeMappings(props: {
   virtualToOriginalMap: Map<Node, Node>;
   originalToVirtualMap: Map<Node, Node>;
@@ -32,15 +34,39 @@ export function buildVirtualNodeMappings(props: {
   }
 }
 
+function collectOpenShadowTree(root: ParentNode): {
+  hosts: HTMLElement[];
+  roots: ParentNode[];
+} {
+  const hosts: HTMLElement[] = [];
+  const roots: ParentNode[] = [root];
+  for (let index = 0; index < roots.length; index += 1) {
+    const current = roots[index];
+    if (!current) continue;
+    for (const host of current.querySelectorAll<HTMLElement>('*')) {
+      if (!host.shadowRoot || isContentOwnedElement(host)) continue;
+      hosts.push(host);
+      roots.push(host.shadowRoot);
+    }
+  }
+  return { hosts, roots };
+}
+
+export function collectOpenShadowHosts(root: ParentNode): HTMLElement[] {
+  return collectOpenShadowTree(root).hosts;
+}
+
+export function collectOpenShadowQueryRoots(root: ParentNode): ParentNode[] {
+  return collectOpenShadowTree(root).roots;
+}
+
 export function flattenOpenShadowRoots(props: {
   root: ParentNode;
   virtualToOriginalMap: Map<Node, Node>;
   originalToVirtualMap: Map<Node, Node>;
 }): void {
-  Array.from(props.root.querySelectorAll<HTMLElement>('*')).forEach((host) => {
-    if (!host.shadowRoot || host.closest('#sniptale-extension-root')) {
-      return;
-    }
+  collectOpenShadowHosts(props.root).forEach((host) => {
+    if (!host.shadowRoot) return;
 
     const virtualHost = props.originalToVirtualMap.get(host);
     if (!(virtualHost instanceof HTMLElement)) {

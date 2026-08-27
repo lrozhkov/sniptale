@@ -67,12 +67,15 @@ it('returns saved asset id and build warnings after staged gallery save', async 
 });
 
 it('preserves gallery save failures with a stage-prefixed error', async () => {
-  mocks.sendRuntimeMessage
-    .mockResolvedValueOnce({
-      error: 'window is not defined',
-      success: false,
-    })
-    .mockResolvedValueOnce({ success: true });
+  mocks.sendRuntimeMessage.mockImplementation(async (message: { type: string }) => {
+    if (message.type === MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY) {
+      return {
+        error: 'window is not defined',
+        success: false,
+      };
+    }
+    return { success: true };
+  });
 
   await expect(
     saveCurrentPageWebSnapshot({
@@ -128,12 +131,15 @@ it('aborts and awaits a late staging sibling before releasing owner records', as
   await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 
   expect(packageSignal?.aborted).toBe(true);
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+    })
+  );
 
   resolvePackageStage('late-package-stage');
   await expect(saving).rejects.toThrow('stage web snapshot screenshot: screenshot staging failed');
 
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledOnce();
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith({
     snapshotSessionId: 'snapshot-session-1',
     type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,

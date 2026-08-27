@@ -5,6 +5,7 @@ import { createBackgroundAutoStartContentActionIntentSource } from '../../platfo
 import { buildCurrentPageWebSnapshot } from './service';
 import { stageWebSnapshotBlobForGallery } from './staged-transfer';
 import type { WebSnapshotBuildResult } from './types';
+import { publishWebSnapshotSaveProgress } from './progress';
 
 export type ContentWebSnapshotSaveRequest = InjectedWebSnapshotSaveRequest;
 
@@ -151,7 +152,9 @@ async function saveStagedWebSnapshot(
 }
 
 export async function saveCurrentPageWebSnapshot(
-  request: ContentWebSnapshotSaveRequest & { abortSignal?: AbortSignal | undefined }
+  request: ContentWebSnapshotSaveRequest & {
+    abortSignal?: AbortSignal | undefined;
+  }
 ): Promise<ContentWebSnapshotSaveResponse> {
   const contentIntentSource = request.contentIntentGrant
     ? createBackgroundAutoStartContentActionIntentSource(request.contentIntentGrant.grantToken)
@@ -171,10 +174,16 @@ export async function saveCurrentPageWebSnapshot(
               },
             }),
         ...(request.abortSignal === undefined ? {} : { abortSignal: request.abortSignal }),
+        onProgress: (update) => publishWebSnapshotSaveProgress(request.requestId, update),
       }),
     request.abortSignal
   );
   throwIfWebSnapshotSaveAborted(request.abortSignal);
+  publishWebSnapshotSaveProgress(request.requestId, {
+    activeStepKey: 'webSnapshotAssets',
+    current: 4,
+    total: 4,
+  });
   const response = await saveStagedWebSnapshot(snapshot, request.abortSignal);
   throwIfWebSnapshotSaveAborted(request.abortSignal);
 

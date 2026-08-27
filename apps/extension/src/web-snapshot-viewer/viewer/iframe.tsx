@@ -12,7 +12,17 @@ function withOfflineSnapshotCsp(srcDoc: string): string {
     'media-src blob: data:',
   ].join('; ');
   const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
-  return srcDoc.includes('<head>') ? srcDoc.replace('<head>', `<head>${meta}`) : `${meta}${srcDoc}`;
+  // Chromium applies an extension-page stylesheet to about:srcdoc and otherwise shrinks an
+  // unstyled body to 75%. Keep this baseline before captured page styles so the site's own body
+  // rule remains authoritative while the browser's extension-only default is neutralized.
+  const baseline =
+    '<style data-sniptale-viewer-baseline>@layer sniptale-viewer-baseline{body{font-size:initial}}</style>';
+  const lower = srcDoc.toLowerCase();
+  const headIndex = lower.indexOf('<head');
+  const suffix = headIndex < 0 ? '' : (lower[headIndex + 5] ?? '');
+  const headEnd = suffix === '>' || suffix.trim() === '' ? lower.indexOf('>', headIndex + 5) : -1;
+  if (headIndex < 0 || headEnd < 0) return `${meta}${baseline}${srcDoc}`;
+  return `${srcDoc.slice(0, headEnd + 1)}${meta}${baseline}${srcDoc.slice(headEnd + 1)}`;
 }
 
 export function WebSnapshotFrame(props: {
