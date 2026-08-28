@@ -24,6 +24,10 @@ import type { LoadedWebSnapshotAsset } from './asset-objects';
 import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
 import { withOfflineSnapshotPolicy } from './document-policy';
 import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
+import {
+  resolveWebSnapshotEntryByteLimit,
+  WEB_SNAPSHOT_PACKAGE_POLICY,
+} from '../../features/web-snapshot/package-policy';
 
 export interface LoadedWebSnapshotPackage {
   assets: LoadedWebSnapshotAsset[];
@@ -35,10 +39,6 @@ export interface LoadedWebSnapshotPackage {
 }
 
 const MAX_VIEWER_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
-const MAX_VIEWER_COMPRESSED_PACKAGE_BYTES = 100 * 1024 * 1024;
-const MAX_VIEWER_TOTAL_INFLATED_BYTES = 250 * 1024 * 1024;
-const MAX_VIEWER_ASSET_BYTES = 25 * 1024 * 1024;
-const MAX_VIEWER_TEXT_ENTRY_BYTES = 10 * 1024 * 1024;
 const URL_ATTRIBUTES = ['href', 'poster', 'src'] as const;
 const REQUIRED_VIEWER_PACKAGE_PATHS = new Set([
   WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
@@ -139,11 +139,7 @@ function getViewerEntryPath(file: JSZip.JSZipObject): string {
 }
 
 function resolveViewerEntryByteLimit(path: string): number {
-  return path === WEB_SNAPSHOT_PACKAGE_PATHS.manifest ||
-    path === WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml ||
-    path.startsWith('diagnostics/')
-    ? MAX_VIEWER_TEXT_ENTRY_BYTES
-    : MAX_VIEWER_ASSET_BYTES;
+  return resolveWebSnapshotEntryByteLimit(path);
 }
 
 function inspectViewerPackageEntries(zip: JSZip): Map<string, JSZip.JSZipObject> {
@@ -154,7 +150,7 @@ function inspectViewerPackageEntries(zip: JSZip): Map<string, JSZip.JSZipObject>
     createFileCountError: () => new Error('Web snapshot package contains too many files.'),
     createTotalError: () => new Error('Web snapshot package inflated content is too large.'),
     maxFileCount: MAX_VIEWER_FILE_COUNT,
-    maxTotalBytes: MAX_VIEWER_TOTAL_INFLATED_BYTES,
+    maxTotalBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxTotalInflatedBytes,
     resolveEntryMaxBytes: resolveViewerEntryByteLimit,
   });
 
@@ -231,7 +227,7 @@ function readRequiredViewerEntry(bytesByPath: Map<string, Uint8Array>, path: str
 }
 
 function assertCompressedViewerPackageSize(packageBlob: Blob): void {
-  if (packageBlob.size > MAX_VIEWER_COMPRESSED_PACKAGE_BYTES) {
+  if (packageBlob.size > WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes) {
     throw new Error('Web snapshot package archive is too large.');
   }
 }

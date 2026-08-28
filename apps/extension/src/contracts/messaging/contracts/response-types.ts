@@ -55,6 +55,7 @@ export type CaptureResponse = RuntimeMessageResponse<{
   captureGeometry?: import('../../full-page-capture').FullPageCaptureGeometry;
   downscaled?: boolean;
   frozenExtentWarning?: boolean;
+  viewportFallback?: boolean;
 }>;
 
 export type SaveAssetResponse = RuntimeMessageResponse<{

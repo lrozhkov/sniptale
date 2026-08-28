@@ -1,5 +1,98 @@
 export type FullPageFloatingElementsMode = 'hide' | 'once' | 'repeat';
 
+export type FullPageQualityProfile = 'safe' | 'high-quality' | 'custom';
+
+export interface FullPageQualityPolicy {
+  maxFileSizeMiB: number;
+  maxMegapixels: number;
+  minScalePercent: number;
+  profile: FullPageQualityProfile;
+}
+
+export const FULL_PAGE_QUALITY_ABSOLUTE_LIMITS = {
+  maxFileSizeMiB: 128,
+  maxMegapixels: 80,
+  maxRasterSidePx: 32_768,
+  maxWorkingSetBytes: 384 * 1024 * 1024,
+  minFileSizeMiB: 8,
+  minMegapixels: 8,
+  minScalePercent: 10,
+} as const;
+
+export const FULL_PAGE_QUALITY_PROFILES = {
+  safe: {
+    maxFileSizeMiB: 64,
+    maxMegapixels: 64,
+    minScalePercent: 50,
+    profile: 'safe',
+  },
+  'high-quality': {
+    maxFileSizeMiB: 96,
+    maxMegapixels: 80,
+    minScalePercent: 75,
+    profile: 'high-quality',
+  },
+} as const satisfies Record<Exclude<FullPageQualityProfile, 'custom'>, FullPageQualityPolicy>;
+
+export const DEFAULT_FULL_PAGE_QUALITY_POLICY: FullPageQualityPolicy =
+  FULL_PAGE_QUALITY_PROFILES.safe;
+
+function isFiniteIntegerInRange(value: unknown, min: number, max: number): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    Number.isFinite(value) &&
+    value >= min &&
+    value <= max
+  );
+}
+
+export function parseFullPageQualityPolicy(value: unknown): FullPageQualityPolicy | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    Object.keys(record).some(
+      (key) =>
+        key !== 'profile' &&
+        key !== 'maxMegapixels' &&
+        key !== 'minScalePercent' &&
+        key !== 'maxFileSizeMiB'
+    )
+  ) {
+    return null;
+  }
+  const profile = record['profile'];
+  if (profile === 'safe' || profile === 'high-quality') {
+    const expected = FULL_PAGE_QUALITY_PROFILES[profile];
+    return record['maxMegapixels'] === expected.maxMegapixels &&
+      record['minScalePercent'] === expected.minScalePercent &&
+      record['maxFileSizeMiB'] === expected.maxFileSizeMiB
+      ? { ...expected }
+      : null;
+  }
+  const limits = FULL_PAGE_QUALITY_ABSOLUTE_LIMITS;
+  if (
+    profile !== 'custom' ||
+    !isFiniteIntegerInRange(record['maxMegapixels'], limits.minMegapixels, limits.maxMegapixels) ||
+    !isFiniteIntegerInRange(record['minScalePercent'], limits.minScalePercent, 100) ||
+    !isFiniteIntegerInRange(record['maxFileSizeMiB'], limits.minFileSizeMiB, limits.maxFileSizeMiB)
+  ) {
+    return null;
+  }
+  return {
+    maxFileSizeMiB: record['maxFileSizeMiB'],
+    maxMegapixels: record['maxMegapixels'],
+    minScalePercent: record['minScalePercent'],
+    profile,
+  };
+}
+
+export function resolveFullPageQualityProfile(
+  profile: Exclude<FullPageQualityProfile, 'custom'>
+): FullPageQualityPolicy {
+  return { ...FULL_PAGE_QUALITY_PROFILES[profile] };
+}
+
 export interface FullPageCapturePreferences {
   floatingElements: FullPageFloatingElementsMode;
   freezeMotion: boolean;
@@ -168,6 +261,7 @@ export interface FullPageCaptureMetadata {
   outputHeight: number;
   outputScale: number;
   outputWidth: number;
+  viewportFallback?: boolean;
   warnings: string[];
 }
 

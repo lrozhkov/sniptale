@@ -1,10 +1,46 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  FULL_PAGE_QUALITY_PROFILES,
   isFullPageCaptureGeometry,
+  parseFullPageQualityPolicy,
   projectFullPageCaptureRasterRegion,
   type FullPageCaptureGeometry,
   type FullPageCaptureRasterRegion,
 } from './index';
+
+describe('full-page quality policy boundary', () => {
+  it('keeps factory defaults canonical and parses exact built-in and custom profiles', () => {
+    expect(DEFAULT_FULL_PAGE_QUALITY_POLICY).toBe(FULL_PAGE_QUALITY_PROFILES.safe);
+    expect(parseFullPageQualityPolicy(FULL_PAGE_QUALITY_PROFILES['high-quality'])).toEqual(
+      FULL_PAGE_QUALITY_PROFILES['high-quality']
+    );
+    expect(
+      parseFullPageQualityPolicy({
+        maxFileSizeMiB: 72,
+        maxMegapixels: 70,
+        minScalePercent: 40,
+        profile: 'custom',
+      })
+    ).toEqual({
+      maxFileSizeMiB: 72,
+      maxMegapixels: 70,
+      minScalePercent: 40,
+      profile: 'custom',
+    });
+  });
+
+  it.each([
+    { maxFileSizeMiB: 0, maxMegapixels: 64, minScalePercent: 50, profile: 'custom' },
+    { maxFileSizeMiB: 64, maxMegapixels: -1, minScalePercent: 50, profile: 'custom' },
+    { maxFileSizeMiB: 64, maxMegapixels: 64, minScalePercent: Number.NaN, profile: 'custom' },
+    { maxFileSizeMiB: Infinity, maxMegapixels: 64, minScalePercent: 50, profile: 'custom' },
+    { maxFileSizeMiB: 129, maxMegapixels: 64, minScalePercent: 50, profile: 'custom' },
+    { ...FULL_PAGE_QUALITY_PROFILES.safe, maxMegapixels: 65 },
+  ])('rejects unsafe or non-canonical policy %#', (policy) => {
+    expect(parseFullPageQualityPolicy(policy)).toBeNull();
+  });
+});
 
 const documentGeometry: FullPageCaptureGeometry = {
   devicePixelRatio: 1,

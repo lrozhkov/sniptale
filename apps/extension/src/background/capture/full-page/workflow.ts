@@ -1,6 +1,9 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadSettings } from '../../../composition/persistence/settings';
-import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../contracts/full-page-capture';
+import {
+  DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+  DEFAULT_FULL_PAGE_QUALITY_POLICY,
+} from '../../../contracts/full-page-capture';
 import type {
   FullPageCapturePreferences,
   FullPageCaptureSessionIdentity,
@@ -26,6 +29,8 @@ import type { FullPageCaptureOptions, FullPageCaptureTransaction } from './types
 import { registerFullPageExportRun, throwIfFullPageCaptureAborted } from './cancellation';
 import { startFullPageCaptureHeartbeat } from './heartbeat';
 import { cleanupStoredFullPageCaptureLease } from './lifecycle';
+import { FULL_PAGE_FILE_BUDGET_ERROR, FULL_PAGE_RASTER_BUDGET_ERROR } from './budgets';
+import { assertFullPageViewportFallbackWithinPolicy } from './fallback-admission';
 
 const logger = createLogger({ namespace: 'BackgroundFullPageCapture' });
 // Content-side preparation can legitimately spend up to ~24 s on fonts, bounded lazy-content
@@ -37,6 +42,18 @@ const VIEWPORT_FALLBACK_WARNING = [
   'Full-page coverage was unavailable because the page kept changing during capture;',
   'a visible viewport image was retained instead.',
 ].join(' ');
+const QUALITY_FALLBACK_WARNING = [
+  'The page exceeded the configured full-page image limits;',
+  'a visible viewport image was retained instead.',
+].join(' ');
+
+function isFullPageQualityBudgetError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    (error.message === FULL_PAGE_RASTER_BUDGET_ERROR ||
+      error.message === FULL_PAGE_FILE_BUDGET_ERROR)
+  );
+}
 
 type PagePreparationOutcome =
   | { kind: 'aborted'; reason: unknown }
@@ -135,6 +152,7 @@ async function runFullPageCapture(args: {
   const preferences = args.options.exportRunId
     ? { ...configuredPreferences, preloadLazyContent: true }
     : configuredPreferences;
+  const options = { ...args.options, qualityPolicy: settings.fullPageQuality };
   const agent = createFullPagePageAgentTransport({ documentId, tabId: args.tabId });
   let result: Omit<FullPageCaptureTransaction, 'jobId'> | null = null;
   let failure: unknown = null;
@@ -160,7 +178,7 @@ async function runFullPageCapture(args: {
           agent,
           identity,
           onProgress: args.onProgress,
-          options: args.options,
+          options,
           preferences,
           raster,
           renewLease: () => renewFullPageCaptureLease(ownerToken),
@@ -197,6 +215,12 @@ async function runPreparedPageCaptureWithViewportRetry(
   try {
     return await runPreparedPageCapture({ ...args, onProgress });
   } catch (error) {
+    if (!args.abortSignal?.aborted && isFullPageQualityBudgetError(error)) {
+      logger.warn(
+        `Using visible viewport fallback after full-page quality limit: ${error.message}`
+      );
+      return runPreparedViewportFallback(args, QUALITY_FALLBACK_WARNING);
+    }
     if (
       args.abortSignal?.aborted ||
       !(error instanceof Error) ||
@@ -213,6 +237,12 @@ async function runPreparedPageCaptureWithViewportRetry(
         restartOnExtentGrowth: false,
       });
     } catch (retryError) {
+      if (!args.abortSignal?.aborted && isFullPageQualityBudgetError(retryError)) {
+        logger.warn(
+          `Using visible viewport fallback after full-page quality limit: ${retryError.message}`
+        );
+        return runPreparedViewportFallback(args, QUALITY_FALLBACK_WARNING);
+      }
       if (
         args.abortSignal?.aborted ||
         !(retryError instanceof Error) ||
@@ -224,13 +254,14 @@ async function runPreparedPageCaptureWithViewportRetry(
       logger.warn(
         `Using visible viewport fallback after persistent page geometry changes: ${retryError.message}`
       );
-      return runPreparedViewportFallback(args);
+      return runPreparedViewportFallback(args, VIEWPORT_FALLBACK_WARNING);
     }
   }
 }
 
 async function runPreparedViewportFallback(
-  args: Parameters<typeof runPreparedPageCapture>[0]
+  args: Parameters<typeof runPreparedPageCapture>[0],
+  warning: string
 ): Promise<Omit<FullPageCaptureTransaction, 'jobId'>> {
   let prepared = false;
   try {
@@ -246,7 +277,13 @@ async function runPreparedViewportFallback(
     throwIfFullPageCaptureAborted(args.abortSignal);
     const dataUrl = await args.raster.captureFrame(args.abortSignal);
     throwIfFullPageCaptureAborted(args.abortSignal);
-    const { devicePixelRatio, viewportHeight, viewportWidth } = page.geometry;
+    const fallbackDimensions = await assertFullPageViewportFallbackWithinPolicy({
+      dataUrl,
+      policy: args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY,
+      ...(args.abortSignal === undefined ? {} : { signal: args.abortSignal }),
+    });
+    throwIfFullPageCaptureAborted(args.abortSignal);
+    const { viewportHeight, viewportWidth } = page.geometry;
     return {
       dataUrl,
       metadata: {
@@ -255,10 +292,11 @@ async function runPreparedViewportFallback(
         cssWidth: viewportWidth,
         downscaled: false,
         frozenExtentWarning: false,
-        outputHeight: Math.max(1, Math.round(viewportHeight * devicePixelRatio)),
-        outputScale: devicePixelRatio,
-        outputWidth: Math.max(1, Math.round(viewportWidth * devicePixelRatio)),
-        warnings: [...page.warnings, VIEWPORT_FALLBACK_WARNING],
+        outputHeight: fallbackDimensions.height,
+        outputScale: fallbackDimensions.width / viewportWidth,
+        outputWidth: fallbackDimensions.width,
+        viewportFallback: true,
+        warnings: [...page.warnings, warning],
       },
     };
   } finally {
@@ -314,7 +352,7 @@ async function runPreparedPageCapture(args: {
       layoutGeneration: page.layoutGeneration,
       onProgress: args.onProgress,
       options: args.options,
-      plans: createFullPageTilePlan(page.geometry),
+      plans: createFullPageTilePlan(page.geometry, args.options.qualityPolicy),
       raster: args.raster,
       restartOnExtentGrowth: args.restartOnExtentGrowth,
       renewLease: args.renewLease,

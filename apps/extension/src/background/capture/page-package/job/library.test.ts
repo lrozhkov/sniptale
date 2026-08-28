@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../../../features/web-snapshot/package-policy';
 
 const mocks = vi.hoisted(() => ({
   begin: vi.fn(),
@@ -281,7 +282,10 @@ it('rejects an oversized screenshot before allocating or publishing it', async (
     pagePackage: { manifest: { intent: 'save' } },
     reader: {
       close: mocks.close,
-      entry: () => ({ ...screenshotSource(), size: 25 * 1024 * 1024 + 1 }),
+      entry: () => ({
+        ...screenshotSource(),
+        size: WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes + 1,
+      }),
     },
   });
 

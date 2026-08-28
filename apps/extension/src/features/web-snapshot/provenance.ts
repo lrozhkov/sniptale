@@ -21,12 +21,10 @@ import {
 } from './manifest';
 import { assertSafeArchivePath } from '../../composition/archive-transfer/path';
 import { hashWebSnapshotAssetBlob } from './asset-manifest';
+import { resolveWebSnapshotEntryByteLimit, WEB_SNAPSHOT_PACKAGE_POLICY } from './package-policy';
 
-const MAX_WEB_SNAPSHOT_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_WEB_SNAPSHOT_PACKAGE_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
-const MAX_WEB_SNAPSHOT_PACKAGE_INFLATED_BYTES = 250 * 1024 * 1024;
-const MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES = 25 * 1024 * 1024;
-const MAX_WEB_SNAPSHOT_MANIFEST_BYTES = 1024 * 1024;
+const MAX_WEB_SNAPSHOT_PACKAGE_INFLATED_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxTotalInflatedBytes;
 
 interface SanitizedWebSnapshotPackage {
   changed: boolean;
@@ -91,7 +89,7 @@ export async function sanitizeWebSnapshotPackageProvenance(
   manifestOverride?: WebSnapshotManifest,
   options: WebSnapshotPackageProvenanceOptions = {}
 ): Promise<SanitizedWebSnapshotPackage> {
-  const maxPackageBytes = options.maxPackageBytes ?? MAX_WEB_SNAPSHOT_PACKAGE_BYTES;
+  const maxPackageBytes = options.maxPackageBytes ?? WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes;
   const opened = await openWebSnapshotPackage(packageBlob, maxPackageBytes);
   try {
     const packageManifest = await readWebSnapshotPackageManifest(opened.entries);
@@ -142,7 +140,10 @@ export async function sanitizeWebSnapshotPackageProvenance(
 export async function readWebSnapshotPackageScreenshotBytes(
   packageBlob: Blob
 ): Promise<Uint8Array> {
-  const opened = await openWebSnapshotPackage(packageBlob, MAX_WEB_SNAPSHOT_PACKAGE_BYTES);
+  const opened = await openWebSnapshotPackage(
+    packageBlob,
+    WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes
+  );
   try {
     const screenshot = opened.entries.find(
       (entry) => !entry.directory && entry.filename === WEB_SNAPSHOT_PACKAGE_PATHS.screenshot
@@ -172,9 +173,7 @@ function applyProvenanceOverride(
 }
 
 function entryMaxBytes(entryPath: string): number {
-  return entryPath === WEB_SNAPSHOT_PACKAGE_PATHS.manifest
-    ? MAX_WEB_SNAPSHOT_MANIFEST_BYTES
-    : MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES;
+  return resolveWebSnapshotEntryByteLimit(entryPath);
 }
 
 async function openWebSnapshotPackage(

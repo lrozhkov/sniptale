@@ -114,6 +114,9 @@ export async function captureAndStitchFullPageTiles(args: {
         firstFrameDataUrl: frame,
         frozenExtentWarning: verified.frozenExtentWarning,
         geometry: verified.geometry,
+        ...(args.options.qualityPolicy === undefined
+          ? {}
+          : { qualityPolicy: args.options.qualityPolicy }),
         warnings: args.warnings,
       });
       await stitcher.drawFrame(frame, plan, verified);

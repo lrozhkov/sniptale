@@ -3,9 +3,11 @@ import {
   validateRetainedWebSnapshotScreenshot,
   validateWebSnapshotScreenshotBlob,
 } from './screenshot-validation';
+import { WEB_SNAPSHOT_PACKAGE_POLICY } from './package-policy';
+import { FULL_PAGE_QUALITY_ABSOLUTE_LIMITS } from '../../contracts/full-page-capture';
 
-const MAX_SCREENSHOT_BYTES = 25 * 1024 * 1024;
-const MAX_SCREENSHOT_AREA_PX = 64_000_000;
+const MAX_SCREENSHOT_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes;
+const MAX_SCREENSHOT_AREA_PX = FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxMegapixels * 1_000_000;
 
 function writeUint32BigEndian(bytes: Uint8Array, offset: number, value: number): void {
   bytes[offset] = (value >>> 24) & 0xff;
@@ -119,9 +121,7 @@ it('rejects MIME-correct corrupt bytes before browser image decode', async () =>
 
 it('rejects oversized screenshot bytes before browser image decode', async () => {
   const decoded = stubDecodedImage(1, 1);
-  const oversized = new Blob([new Uint8Array(MAX_SCREENSHOT_BYTES + 1)], {
-    type: 'image/png',
-  });
+  const oversized = { size: MAX_SCREENSHOT_BYTES + 1, type: 'image/png' } as Blob;
 
   await expect(validateWebSnapshotScreenshotBlob(oversized)).rejects.toThrow(
     'Web snapshot screenshot is too large.'
@@ -158,7 +158,7 @@ it('normalizes browser decoder failures into the bounded screenshot error', asyn
 });
 
 it('rejects decoded dimensions that exceed the profile even when the header is bounded', async () => {
-  const decoded = stubDecodedImage(8000, 8001);
+  const decoded = stubDecodedImage(10_000, 8_001);
 
   await expect(validateWebSnapshotScreenshotBlob(createPng(100, 100))).rejects.toThrow(
     'Web snapshot screenshot dimensions exceed safe limits.'

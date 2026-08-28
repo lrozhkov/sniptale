@@ -9,7 +9,11 @@ import type {
   ViewportPreset,
 } from '../../../contracts/settings';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
-import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../contracts/full-page-capture';
+import {
+  DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+  DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  parseFullPageQualityPolicy,
+} from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -65,6 +69,7 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
+  fullPageQuality: DEFAULT_FULL_PAGE_QUALITY_POLICY,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: true,
   externalSnapshotLinksEnabled: false,
@@ -102,6 +107,7 @@ export function createDefaultSettings(): NormalizedSettings {
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
     localStoragePolicy: { ...DEFAULT_LOCAL_STORAGE_POLICY },
     fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
+    fullPageQuality: { ...DEFAULT_FULL_PAGE_QUALITY_POLICY },
     voiceInput: { ...DEFAULT_VOICE_INPUT_SETTINGS },
     presets: [],
     viewportPresets: cloneViewportPresets(DEFAULT_VIEWPORT_PRESETS),
@@ -123,6 +129,12 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
  * against the latest persisted payload.
  */
 export async function saveSettings(settings: Settings): Promise<void> {
+  if (
+    settings.fullPageQuality !== undefined &&
+    !parseFullPageQualityPolicy(settings.fullPageQuality)
+  ) {
+    throw new Error('Full-page screenshot quality settings are invalid');
+  }
   await browserStorage.sync.set({ [STORAGE_KEY]: settings });
 
   logger.debug('Saved settings payload');
@@ -153,6 +165,7 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSett
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
       ...parsedValue.fullPageCapture,
     },
+    fullPageQuality: { ...(parsedValue.fullPageQuality ?? DEFAULT_FULL_PAGE_QUALITY_POLICY) },
     voiceInput: {
       ...DEFAULT_VOICE_INPUT_SETTINGS,
       ...parsedValue.voiceInput,
@@ -246,6 +259,7 @@ function applySettingsPatch(
       ...currentSettings.fullPageCapture,
       ...settingsPatch.fullPageCapture,
     },
+    fullPageQuality: settingsPatch.fullPageQuality ?? currentSettings.fullPageQuality,
     localStoragePolicy: {
       ...currentSettings.localStoragePolicy,
       ...settingsPatch.localStoragePolicy,

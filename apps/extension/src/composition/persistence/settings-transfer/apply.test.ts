@@ -217,6 +217,39 @@ describe('settings transfer storage transaction', () => {
     expect(mocks.localSet).not.toHaveBeenCalled();
   });
 
+  it('applies the parsed full-page quality policy through the canonical settings payload', async () => {
+    await applySettingsTransferDomains({
+      domains: {
+        'capture.image': {
+          schemaVersion: 1,
+          data: {
+            fullPageQuality: {
+              maxFileSizeMiB: 72,
+              maxMegapixels: 70,
+              minScalePercent: 40,
+              profile: 'custom',
+            },
+          },
+        },
+      },
+      summary: emptySummary(),
+    });
+
+    expect(mocks.syncSet).toHaveBeenCalledWith(
+      {
+        sniptale_settings: expect.objectContaining({
+          fullPageQuality: {
+            maxFileSizeMiB: 72,
+            maxMegapixels: 70,
+            minScalePercent: 40,
+            profile: 'custom',
+          },
+        }),
+      },
+      undefined
+    );
+  });
+
   it('rejects an oversized sync item before any write', async () => {
     await expect(
       applySettingsTransferDomains({
@@ -512,6 +545,12 @@ function settingsFixture(): NormalizedSettings {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    fullPageQuality: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     externalSnapshotLinksEnabled: false,

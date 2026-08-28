@@ -98,7 +98,11 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('capture.viewport-presets', 'items', { kind: 'collection', dynamicItems: true }),
     field('capture.viewport-presets', 'default'),
   ]),
-  ...domain('capture.image', [field('capture.image', 'format'), field('capture.image', 'quality')]),
+  ...domain('capture.image', [
+    field('capture.image', 'format'),
+    field('capture.image', 'quality'),
+    field('capture.image', 'fullPageQuality'),
+  ]),
   ...domain('capture.video', [
     field('capture.video', 'profiles', { kind: 'collection', dynamicItems: true }),
     field('capture.video', 'selection'),

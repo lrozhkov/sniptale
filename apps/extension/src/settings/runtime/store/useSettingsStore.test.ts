@@ -29,6 +29,12 @@ const settingsFixture = {
   defaultExportPresetId: null,
   imageFormat: 'png' as const,
   imageQuality: 100,
+  fullPageQuality: {
+    maxFileSizeMiB: 64,
+    maxMegapixels: 64,
+    minScalePercent: 50,
+    profile: 'safe' as const,
+  },
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   externalSnapshotLinksEnabled: false,

@@ -94,7 +94,11 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
       items: settings.viewportPresets,
       defaultId: settings.defaultViewportPresetId,
     }),
-    'capture.image': payload({ format: settings.imageFormat, quality: settings.imageQuality }),
+    'capture.image': payload({
+      format: settings.imageFormat,
+      quality: settings.imageQuality,
+      fullPageQuality: settings.fullPageQuality,
+    }),
     'capture.video': payload({
       profiles: video.qualityProfiles,
       qualityProfileId: video.qualityProfileId,

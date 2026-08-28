@@ -170,6 +170,11 @@ function applySettingsWrites(context: WriteBuildContext): void {
   if (image?.['format'] !== undefined)
     nextSettings.imageFormat = image['format'] as NormalizedSettings['imageFormat'];
   if (image?.['quality'] !== undefined) nextSettings.imageQuality = image['quality'] as number;
+  if (image?.['fullPageQuality'] !== undefined) {
+    nextSettings.fullPageQuality = image[
+      'fullPageQuality'
+    ] as NormalizedSettings['fullPageQuality'];
+  }
   const afterCapture = data('capture.after-capture');
   if (afterCapture?.['action'] !== undefined)
     nextSettings.captureAction = afterCapture['action'] as NormalizedSettings['captureAction'];

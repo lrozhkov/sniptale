@@ -13,14 +13,13 @@ import { openArchiveReader } from '../../composition/archive-transfer/reader';
 import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
 import { sanitizeWebSnapshotManifestProvenance } from '../../features/web-snapshot/provenance';
 import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
+import {
+  resolveWebSnapshotEntryByteLimit,
+  WEB_SNAPSHOT_PACKAGE_POLICY,
+} from '../../features/web-snapshot/package-policy';
 
-const MAX_WEB_SNAPSHOT_PACKAGE_BYTES = 100 * 1024 * 1024;
-const MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES = 25 * 1024 * 1024;
 const MAX_PACKAGE_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
-const MAX_PACKAGE_TOTAL_INFLATED_BYTES = 250 * 1024 * 1024;
-const MAX_PACKAGE_ENTRY_BYTES = 25 * 1024 * 1024;
-const MAX_PACKAGE_TEXT_ENTRY_BYTES = 10 * 1024 * 1024;
-const MAX_PACKAGE_MANIFEST_BYTES = 1024 * 1024;
+const MAX_PACKAGE_MANIFEST_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxManifestBytes;
 
 function parseRequiredManifest(value: unknown): PagePackageManifest {
   const manifest = parsePagePackageManifest(value);
@@ -40,7 +39,7 @@ function assertPayloadBasics(args: {
   if (
     args.packageBlob.type !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE ||
     args.packageBlob.size <= 0 ||
-    args.packageBlob.size > MAX_WEB_SNAPSHOT_PACKAGE_BYTES
+    args.packageBlob.size > WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes
   ) {
     throw new Error('Page Package archive is invalid or too large.');
   }
@@ -48,7 +47,7 @@ function assertPayloadBasics(args: {
     args.payload.screenshotMimeType !== 'image/png' ||
     args.screenshotBlob.type !== 'image/png' ||
     args.screenshotBlob.size <= 0 ||
-    args.screenshotBlob.size > MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES
+    args.screenshotBlob.size > WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes
   ) {
     throw new Error('Page Package screenshot is invalid or too large.');
   }
@@ -69,9 +68,7 @@ function assertPayloadBasics(args: {
 }
 
 function entryByteLimit(entry: PagePackageEntry): number {
-  return entry.mimeType.startsWith('text/') || entry.mimeType === 'application/json'
-    ? MAX_PACKAGE_TEXT_ENTRY_BYTES
-    : MAX_PACKAGE_ENTRY_BYTES;
+  return resolveWebSnapshotEntryByteLimit(entry.path, entry.mimeType);
 }
 
 async function readEntryBytes(entry: ArchiveEntrySource, maxBytes: number): Promise<Uint8Array> {
@@ -117,7 +114,7 @@ function assertExactArchiveInventory(args: {
   let totalBytes = 0;
   for (const archiveEntry of args.archiveEntries) {
     totalBytes += archiveEntry.size;
-    if (totalBytes > MAX_PACKAGE_TOTAL_INFLATED_BYTES) {
+    if (totalBytes > WEB_SNAPSHOT_PACKAGE_POLICY.maxTotalInflatedBytes) {
       throw new Error('Page Package inflated content is too large.');
     }
     if (archiveEntry.path === PAGE_PACKAGE_ARCHIVE_PATHS.manifest) continue;

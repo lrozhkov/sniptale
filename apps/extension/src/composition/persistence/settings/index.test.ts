@@ -81,6 +81,12 @@ const DEFAULT_FULL_PAGE_CAPTURE = {
   freezeMotion: true,
   preloadLazyContent: true,
 };
+const DEFAULT_FULL_PAGE_QUALITY = {
+  maxFileSizeMiB: 64,
+  maxMegapixels: 64,
+  minScalePercent: 50,
+  profile: 'safe' as const,
+};
 const DEFAULT_VOICE_INPUT = {
   language: 'ru-RU' as const,
   microphoneDeviceId: null,
@@ -198,6 +204,7 @@ async function verifyLoadMigration() {
     imageQuality: 75,
     localStoragePolicy: LIBRARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });
@@ -248,6 +255,7 @@ async function verifyStoredSettings() {
     imageQuality: 100,
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
     externalSnapshotLinksEnabled: false,
@@ -340,6 +348,7 @@ const expectedInvalidStoredSettingsResult = {
   imageQuality: 100,
   localStoragePolicy: LIBRARY_STORAGE_POLICY,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+  fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
   voiceInput: DEFAULT_VOICE_INPUT,
   ...PRIVACY_DEFAULTS,
 };
@@ -375,6 +384,7 @@ async function verifyInvalidRootFallback() {
     imageQuality: 100,
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });
@@ -397,6 +407,27 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toMatchObject({
       defaultViewportPresetId: null,
       imageFormat: 'png',
+    });
+  });
+
+  it('drops an excessive or non-finite full-page policy from storage without repairing it', async () => {
+    browserStorageSyncGetMock.mockResolvedValueOnce({
+      sniptale_settings: {
+        fullPageQuality: {
+          maxFileSizeMiB: Infinity,
+          maxMegapixels: 81,
+          minScalePercent: 0,
+          profile: 'custom',
+        },
+      },
+    });
+
+    await expect(loadSettings()).resolves.toMatchObject({
+      fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    });
+    expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith('Dropped invalid settings fields from storage', {
+      invalidFieldCount: 1,
     });
   });
 

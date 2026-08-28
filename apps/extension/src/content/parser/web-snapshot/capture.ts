@@ -222,6 +222,9 @@ export async function captureWebSnapshotScreenshotWithWarnings(
       ...(response.frozenExtentWarning
         ? [translate('content.runtime.captureFullPageFrozenExtentWarning')]
         : []),
+      ...(response.viewportFallback
+        ? [translate('content.runtime.captureFullPageViewportFallbackWarning')]
+        : []),
     ],
   };
 }

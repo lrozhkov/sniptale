@@ -6,17 +6,16 @@ import {
 } from '@sniptale/runtime-contracts/page-package';
 import { openArchiveReader } from '../../composition/archive-transfer/reader';
 import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
+import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../features/web-snapshot/package-policy';
 
-const MAX_PREVIEW_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_PREVIEW_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
-const MAX_PREVIEW_SCREENSHOT_BYTES = 25 * 1024 * 1024;
-const MAX_PREVIEW_MANIFEST_BYTES = 1024 * 1024;
+const MAX_PREVIEW_MANIFEST_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxManifestBytes;
 
 export async function loadWebSnapshotScreenshotBlob(packageBlob: Blob): Promise<Blob> {
   if (
     packageBlob.type !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE ||
     packageBlob.size <= 0 ||
-    packageBlob.size > MAX_PREVIEW_PACKAGE_BYTES
+    packageBlob.size > WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes
   ) {
     throw new Error('Page Package is invalid or too large.');
   }
@@ -55,7 +54,7 @@ export async function loadWebSnapshotScreenshotBlob(packageBlob: Blob): Promise<
       !screenshotMetadata ||
       !screenshotSource ||
       screenshotSource.size <= 0 ||
-      screenshotSource.size > MAX_PREVIEW_SCREENSHOT_BYTES
+      screenshotSource.size > WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes
     ) {
       throw new Error('Page Package screenshot is missing or too large.');
     }

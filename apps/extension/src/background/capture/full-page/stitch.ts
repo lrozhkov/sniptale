@@ -1,4 +1,8 @@
 import { loadSettings } from '../../../composition/persistence/settings';
+import {
+  DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  type FullPageQualityPolicy,
+} from '../../../contracts/full-page-capture';
 import type {
   FullPageCaptureGeometry,
   FullPageCaptureMetadata,
@@ -8,17 +12,15 @@ import { blobToDataURL } from '../download';
 import {
   assertFullPageGeometryBudget,
   BYTES_PER_PIXEL,
-  MAX_RASTER_AREA_PX,
+  FULL_PAGE_FILE_BUDGET_ERROR,
+  FULL_PAGE_RASTER_BUDGET_ERROR,
   MAX_RASTER_SIDE_PX,
   MAX_WORKING_SET_BYTES,
-  MIN_OUTPUT_SCALE,
+  resolveFullPageRasterBudget,
 } from './budgets';
 import { resolveCaptureBlobOptions } from './helpers';
 import type { FullPageTilePlan } from './planner';
 import type { FullPageCaptureOptions } from './types';
-
-const MAX_ENCODED_BYTES = 64 * 1024 * 1024;
-const RETRY_TARGET_BYTES = 60 * 1024 * 1024;
 
 type OutputCanvas = {
   canvas: OffscreenCanvas;
@@ -61,17 +63,20 @@ function throwIfStitchFinalizationAborted(signal?: AbortSignal | undefined): voi
 function resolveOutputScale(args: {
   geometry: FullPageCaptureGeometry;
   nativeScale: number;
+  qualityPolicy?: FullPageQualityPolicy;
   tileWidth: number;
   tileHeight: number;
 }): number {
   const { geometry } = args;
-  assertFullPageGeometryBudget(geometry);
+  const policy = args.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY;
+  assertFullPageGeometryBudget(geometry, policy);
+  const budget = resolveFullPageRasterBudget(policy);
   const dimensionScale = Math.min(
     MAX_RASTER_SIDE_PX / geometry.outputWidth,
     MAX_RASTER_SIDE_PX / geometry.outputHeight
   );
   const areaScale = Math.sqrt(
-    MAX_RASTER_AREA_PX / Math.max(1, geometry.outputWidth * geometry.outputHeight)
+    budget.maxRasterAreaPx / Math.max(1, geometry.outputWidth * geometry.outputHeight)
   );
   const tileBytes = args.tileWidth * args.tileHeight * BYTES_PER_PIXEL;
   const availableCanvasBytes = MAX_WORKING_SET_BYTES - tileBytes;
@@ -80,8 +85,8 @@ function resolveOutputScale(args: {
       Math.max(1, geometry.outputWidth * geometry.outputHeight * BYTES_PER_PIXEL)
   );
   const scale = Math.min(args.nativeScale, dimensionScale, areaScale, workingScale);
-  if (!Number.isFinite(scale) || scale < MIN_OUTPUT_SCALE) {
-    throw new Error('Full-page screenshot exceeds raster memory or dimension limits');
+  if (!Number.isFinite(scale) || scale < budget.minOutputScale) {
+    throw new Error(FULL_PAGE_RASTER_BUDGET_ERROR);
   }
   return scale;
 }
@@ -275,11 +280,14 @@ async function downscaleOversizedEncoding(args: {
   abortSignal?: AbortSignal | undefined;
 }): Promise<{ blob: Blob; output: OutputCanvas }> {
   throwIfStitchFinalizationAborted(args.abortSignal);
-  if (args.blob.size <= MAX_ENCODED_BYTES) return { blob: args.blob, output: args.output };
-  const requestedRatio = Math.min(0.9, Math.sqrt(RETRY_TARGET_BYTES / args.blob.size));
-  const nextScale = Math.max(MIN_OUTPUT_SCALE, args.output.outputScale * requestedRatio);
+  const policy = args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY;
+  const budget = resolveFullPageRasterBudget(policy);
+  if (args.blob.size <= budget.maxEncodedBytes) return { blob: args.blob, output: args.output };
+  const retryTargetBytes = Math.floor(budget.maxEncodedBytes * 0.94);
+  const requestedRatio = Math.min(0.9, Math.sqrt(retryTargetBytes / args.blob.size));
+  const nextScale = Math.max(budget.minOutputScale, args.output.outputScale * requestedRatio);
   if (nextScale >= args.output.outputScale) {
-    throw new Error('Encoded full-page screenshot exceeds the 64 MiB limit');
+    throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
   }
   const ratio = nextScale / args.output.outputScale;
   const oldCanvasBytes = args.output.canvas.width * args.output.canvas.height * BYTES_PER_PIXEL;
@@ -288,7 +296,7 @@ async function downscaleOversizedEncoding(args: {
     Math.floor(args.output.canvas.height * ratio) *
     BYTES_PER_PIXEL;
   if (oldCanvasBytes + nextCanvasBytes > MAX_WORKING_SET_BYTES) {
-    throw new Error('Full-page screenshot downscale exceeds the working-set limit');
+    throw new Error(FULL_PAGE_RASTER_BUDGET_ERROR);
   }
   const nextCanvas = new OffscreenCanvas(
     Math.max(1, Math.floor(args.output.canvas.width * ratio)),
@@ -310,8 +318,8 @@ async function downscaleOversizedEncoding(args: {
   const nextOutput = { canvas: nextCanvas, context: nextContext, outputScale: nextScale };
   const encoded = await encodeCanvas(nextOutput, args.options, args.abortSignal);
   throwIfStitchFinalizationAborted(args.abortSignal);
-  if (encoded.blob.size > MAX_ENCODED_BYTES) {
-    throw new Error('Encoded full-page screenshot exceeds the 64 MiB limit');
+  if (encoded.blob.size > budget.maxEncodedBytes) {
+    throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
   }
   return { blob: encoded.blob, output: nextOutput };
 }
@@ -319,6 +327,7 @@ async function downscaleOversizedEncoding(args: {
 export async function createStreamingFullPageStitcher(args: {
   firstFrameDataUrl: string;
   geometry: FullPageCaptureGeometry;
+  qualityPolicy?: FullPageQualityPolicy;
   frozenExtentWarning: boolean;
   warnings: string[];
 }): Promise<StreamingFullPageStitcher> {
@@ -347,6 +356,7 @@ export async function createStreamingFullPageStitcher(args: {
       resolveOutputScale({
         geometry: args.geometry,
         nativeScale,
+        ...(args.qualityPolicy === undefined ? {} : { qualityPolicy: args.qualityPolicy }),
         tileHeight: firstBitmap.height,
         tileWidth: firstBitmap.width,
       })

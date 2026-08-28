@@ -183,6 +183,54 @@ it('keeps a long 1280px page at native scale within the production memory budget
   });
 });
 
+it('changes the output dimensions when the selected full-page profile changes', async () => {
+  const geometry: FullPageCaptureGeometry = {
+    ...documentGeometry,
+    extentHeight: 20_000,
+    extentWidth: 4_000,
+    outputHeight: 20_000,
+    outputWidth: 4_000,
+    rootViewport: { height: 600, width: 4_000, x: 0, y: 0 },
+    viewportHeight: 600,
+    viewportWidth: 4_000,
+  };
+  enqueueBitmap(4_000, 600);
+  const safe = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-safe',
+    frozenExtentWarning: false,
+    geometry,
+    qualityPolicy: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
+    warnings: [],
+  });
+  await safe.drawFrame('tile-safe', tilePlan(), tileState(geometry));
+  const safeResult = await safe.finish({ format: 'png' });
+
+  enqueueBitmap(4_000, 600);
+  const high = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-high',
+    frozenExtentWarning: false,
+    geometry,
+    qualityPolicy: {
+      maxFileSizeMiB: 96,
+      maxMegapixels: 80,
+      minScalePercent: 75,
+      profile: 'high-quality',
+    },
+    warnings: [],
+  });
+  await high.drawFrame('tile-high', tilePlan(), tileState(geometry));
+  const highResult = await high.finish({ format: 'png' });
+
+  expect(safeResult.metadata.outputWidth).toBeLessThan(highResult.metadata.outputWidth);
+  expect(safeResult.metadata.outputHeight).toBeLessThan(highResult.metadata.outputHeight);
+  expect(highResult.metadata).toMatchObject({ outputHeight: 20_000, outputWidth: 4_000 });
+});
+
 it('draws the outer shell once and replaces only the internal scroller viewport', async () => {
   const internalGeometry: FullPageCaptureGeometry = {
     devicePixelRatio: 1,
@@ -243,8 +291,34 @@ it('rejects a raster whose minimum safe output scale would exceed budgets', asyn
       geometry: oversizedGeometry,
       warnings: [],
     })
-  ).rejects.toThrow('raster memory or dimension limits');
+  ).rejects.toThrow('configured quality limits');
   expect(bitmap.close).toHaveBeenCalledOnce();
+});
+
+it('classifies an over-budget downscale working set as a quality-limit failure', async () => {
+  const geometry: FullPageCaptureGeometry = {
+    ...documentGeometry,
+    extentHeight: 8_000,
+    extentWidth: 8_000,
+    outputHeight: 8_000,
+    outputWidth: 8_000,
+  };
+  enqueueBitmap();
+  const stitcher = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-working-set',
+    frozenExtentWarning: false,
+    geometry,
+    warnings: [],
+  });
+  await stitcher.drawFrame('tile-working-set', tilePlan(), tileState(geometry));
+  class OversizedEncoding extends Blob {
+    override get size(): number {
+      return 65 * 1024 * 1024;
+    }
+  }
+  mocks.convertToBlob.mockResolvedValueOnce(new OversizedEncoding([], { type: 'image/png' }));
+
+  await expect(stitcher.finish({ format: 'png' })).rejects.toThrow('configured quality limits');
 });
 
 it('fails closed when a tile cannot be decoded or an output context cannot be created', async () => {

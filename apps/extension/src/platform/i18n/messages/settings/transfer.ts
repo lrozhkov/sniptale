@@ -113,6 +113,7 @@ export const settingsTransferMessages = defineMessageSource({
     default: message('По умолчанию', 'Default'),
     format: message('Формат', 'Format'),
     quality: message('Качество', 'Quality'),
+    fullPageQuality: message('Пределы полноразмерных снимков', 'Full-page screenshot limits'),
     profiles: message('Профили', 'Profiles'),
     selection: message('Выбор профиля', 'Profile selection'),
     output: message('Выходной формат', 'Output format'),

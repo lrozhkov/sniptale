@@ -1,10 +1,12 @@
 import type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../features/viewport-presets/contracts';
-import type { FullPageCapturePreferences } from '../full-page-capture';
+import type { FullPageCapturePreferences, FullPageQualityPolicy } from '../full-page-capture';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 export type {
   FullPageCapturePreferences,
   FullPageFloatingElementsMode,
+  FullPageQualityPolicy,
+  FullPageQualityProfile,
 } from '../full-page-capture';
 export type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
 export type {
@@ -79,6 +81,7 @@ export interface Settings {
   defaultExportPresetId?: string | null;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;
+  fullPageQuality?: FullPageQualityPolicy;
   authenticatedSnapshotAssetsEnabled: boolean;
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
   externalSnapshotLinksEnabled?: boolean;
@@ -88,9 +91,10 @@ export interface Settings {
 
 export type NormalizedSettings = Omit<
   Settings,
-  'externalSnapshotLinksEnabled' | 'localStoragePolicy'
+  'externalSnapshotLinksEnabled' | 'fullPageQuality' | 'localStoragePolicy'
 > & {
   externalSnapshotLinksEnabled: boolean;
+  fullPageQuality: FullPageQualityPolicy;
   localStoragePolicy: LocalStoragePolicy;
 };
 
@@ -100,6 +104,7 @@ export type SettingsPatch = Omit<
   | 'contextMenu'
   | 'defaultViewportPresetId'
   | 'fullPageCapture'
+  | 'fullPageQuality'
   | 'localStoragePolicy'
   | 'saveCapturesToGallery'
   | 'voiceInput'
@@ -107,6 +112,7 @@ export type SettingsPatch = Omit<
   contentToolbar?: Partial<ContentToolbarPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
   fullPageCapture?: Partial<FullPageCapturePreferences>;
+  fullPageQuality?: FullPageQualityPolicy;
   localStoragePolicy?: Partial<LocalStoragePolicy>;
   voiceInput?: Partial<VoiceInputPreferences>;
 };

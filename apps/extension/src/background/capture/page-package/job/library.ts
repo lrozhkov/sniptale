@@ -24,15 +24,14 @@ import {
   readPagePackageJobRecoveryState,
   recordPagePackageLibraryCleanupAsset,
 } from './storage';
-
-const MAX_LIBRARY_SCREENSHOT_BYTES = 25 * 1024 * 1024;
+import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../../../features/web-snapshot/package-policy';
 
 async function readScreenshotBlob(
   source: ArchiveEntrySource | null,
   signal: AbortSignal
 ): Promise<Blob> {
   signal.throwIfAborted();
-  if (!source || source.size <= 0 || source.size > MAX_LIBRARY_SCREENSHOT_BYTES) {
+  if (!source || source.size <= 0 || source.size > WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes) {
     throw new Error('Saved Page Package screenshot is invalid or too large.');
   }
   const bytes = new Uint8Array(source.size);

@@ -167,6 +167,14 @@ it('reads every visible domain while removing secret and device-bound state', as
     ],
   });
   expect(snapshot.domains['system.voice']?.data).not.toHaveProperty('microphoneDeviceId');
+  expect(snapshot.domains['capture.image']?.data).toMatchObject({
+    fullPageQuality: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
+  });
   expect(snapshot.domains).not.toHaveProperty('access.capture-assets');
   expect(JSON.stringify(snapshot.domains['ai.models']?.data)).not.toContain('authorization');
   expect(snapshot.dynamicItems).toEqual(
@@ -358,6 +366,12 @@ function settingsFixture() {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    fullPageQuality: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     voiceInput: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: 'device-secret' },

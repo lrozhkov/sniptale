@@ -45,7 +45,7 @@ class OversizedWebSnapshotPackageFile extends File {
   }
 
   override get size(): number {
-    return 101 * 1024 * 1024;
+    return 250 * 1024 * 1024 + 1;
   }
 }
 
@@ -162,7 +162,7 @@ function stubOversizedWebSnapshotRecord(): void {
     id: 'snapshot-1',
     manifest: createManifest(),
     packageFile: new OversizedWebSnapshotPackageFile(['zip']),
-    size: 101 * 1024 * 1024,
+    size: 250 * 1024 * 1024 + 1,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
 }
@@ -447,6 +447,47 @@ it('rejects oversized entry metadata before inflating viewer package entries', a
       'Web snapshot package entry is too large.'
     );
     expect(readLargeEntry).not.toHaveBeenCalled();
+  } finally {
+    loadAsyncSpy.mockRestore();
+  }
+});
+
+it('rejects aggregate inflated metadata above 250 MiB before inflating viewer entries', async () => {
+  const readEntry = vi.fn(() => {
+    throw new Error('Rejected ZIP entry was inflated.');
+  });
+  const entries = Object.fromEntries(
+    Array.from({ length: 11 }, (_, index) => {
+      const path = `assets/chunk-${index}.bin`;
+      return [
+        path,
+        {
+          _data: { compressedSize: 32 * 1024, uncompressedSize: 24 * 1024 * 1024 },
+          async: readEntry,
+          dir: false,
+          name: path,
+          unsafeOriginalName: path,
+        },
+      ];
+    })
+  );
+  mocks.getWebSnapshotRecord.mockResolvedValue({
+    createdAt: 1,
+    id: 'snapshot-1',
+    manifest: createManifest(),
+    packageFile: new File(['zip'], 'snapshot.sniptale-page-package.zip'),
+    size: 1,
+    updatedAt: 1,
+  } satisfies WebSnapshotRecord);
+  const loadAsyncSpy = vi
+    .spyOn(JSZip, 'loadAsync')
+    .mockResolvedValue(Object.assign(new JSZip(), { files: entries }));
+
+  try {
+    await expect(loadWebSnapshotPackage('snapshot-1')).rejects.toThrow(
+      'Web snapshot package inflated content is too large.'
+    );
+    expect(readEntry).not.toHaveBeenCalled();
   } finally {
     loadAsyncSpy.mockRestore();
   }

@@ -1,9 +1,12 @@
 // policyStateIds: [] - image MIME and decoder limits are static validation policy, not mutable authority.
 import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensions';
+import { FULL_PAGE_QUALITY_ABSOLUTE_LIMITS } from '../../contracts/full-page-capture';
+import { WEB_SNAPSHOT_PACKAGE_POLICY } from './package-policy';
 
-const MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES = 25 * 1024 * 1024;
-const MAX_WEB_SNAPSHOT_SCREENSHOT_SIDE_PX = 32_768;
-const MAX_WEB_SNAPSHOT_SCREENSHOT_AREA_PX = 64_000_000;
+const MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes;
+const MAX_WEB_SNAPSHOT_SCREENSHOT_SIDE_PX = FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxRasterSidePx;
+const MAX_WEB_SNAPSHOT_SCREENSHOT_AREA_PX =
+  FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxMegapixels * 1_000_000;
 
 const MAX_IMAGE_HEADER_BYTES = 65_536;
 const WEB_SNAPSHOT_SCREENSHOT_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);

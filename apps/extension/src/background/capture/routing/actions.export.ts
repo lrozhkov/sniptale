@@ -57,6 +57,7 @@ export function handleExportCaptureFullPage(
         dataUrl: capture.dataUrl,
         downscaled: capture.metadata.downscaled,
         frozenExtentWarning: capture.metadata.frozenExtentWarning,
+        ...(capture.metadata.viewportFallback ? { viewportFallback: true } : {}),
       });
     })
     .catch((error) => sendResponse(createRouteErrorResponse(error)))

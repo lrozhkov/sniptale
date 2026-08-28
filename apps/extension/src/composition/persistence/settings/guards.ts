@@ -3,9 +3,11 @@ import type {
   ContentToolbarDisplayMode,
   ContentToolbarPreferences,
   FullPageCapturePreferences,
+  FullPageQualityPolicy,
   LocalStoragePolicy,
   Settings,
 } from '../../../contracts/settings';
+import { parseFullPageQualityPolicy } from '../../../contracts/full-page-capture';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { parseVoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
@@ -145,6 +147,11 @@ function parseOptionalFullPageCapture(
   };
 }
 
+function parseOptionalFullPageQuality(value: unknown): ParsedFieldValue<FullPageQualityPolicy> {
+  if (value === undefined) return undefined;
+  return parseFullPageQualityPolicy(value) ?? INVALID_FIELD;
+}
+
 function parseOptionalVoiceInput(value: unknown): ParsedFieldValue<VoiceInputPreferences> {
   if (value === undefined) {
     return undefined;
@@ -263,6 +270,11 @@ function parseScalarSettingsFields(
     nextValue,
     'fullPageCapture',
     parseOptionalFullPageCapture(value['fullPageCapture'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'fullPageQuality',
+    parseOptionalFullPageQuality(value['fullPageQuality'])
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,

@@ -3,6 +3,7 @@ import type {
   FullPageCaptureMetadata,
   FullPageCapturePreferences,
 } from '../../../contracts/full-page-capture';
+import type { FullPageQualityPolicy } from '../../../contracts/full-page-capture';
 
 export type FullPageCaptureOptions = {
   abortSignal?: AbortSignal;
@@ -11,6 +12,7 @@ export type FullPageCaptureOptions = {
   exportRunId?: string;
   format?: 'png' | 'jpeg' | 'webp';
   preferences?: FullPageCapturePreferences;
+  qualityPolicy?: FullPageQualityPolicy;
   quality?: number;
 };
 

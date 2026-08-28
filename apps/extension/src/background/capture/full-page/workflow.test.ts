@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createAgent: vi.fn(),
   createJob: vi.fn(),
   createNative: vi.fn(),
+  admitFallback: vi.fn(),
   cleanupStoredLease: vi.fn(),
   loadSettings: vi.fn(),
   releaseLease: vi.fn(),
@@ -40,6 +41,9 @@ vi.mock('./lifecycle', async (importOriginal) => ({
   cleanupStoredFullPageCaptureLease: mocks.cleanupStoredLease,
 }));
 vi.mock('./native-backend', () => ({ createNativeFullPageRasterBackend: mocks.createNative }));
+vi.mock('./fallback-admission', () => ({
+  assertFullPageViewportFallbackWithinPolicy: mocks.admitFallback,
+}));
 vi.mock('./page-agent-transport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./page-agent-transport')>()),
   createFullPagePageAgentTransport: mocks.createAgent,
@@ -88,6 +92,7 @@ beforeEach(() => {
     captureFrame: vi.fn(),
     release: vi.fn().mockResolvedValue(undefined),
   });
+  mocks.admitFallback.mockResolvedValue({ height: 500, width: 800 });
   mocks.releaseLease.mockResolvedValue(undefined);
   mocks.renewLease.mockResolvedValue(undefined);
 });
@@ -248,6 +253,40 @@ it('falls back to a visible viewport after persistent viewport changes', async (
   expect(agent.prepare).toHaveBeenCalledTimes(3);
   expect(agent.restore).toHaveBeenCalledTimes(3);
   expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+  expect(raster.captureFrame).toHaveBeenCalledOnce();
+});
+
+it('returns an explicit visible-area fallback when the configured single-image budget is exceeded', async () => {
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  const raster = {
+    captureFrame: vi.fn().mockResolvedValue('data:image/png;base64,limited'),
+    release: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.createNative.mockResolvedValue(raster);
+  mocks.captureTiles.mockRejectedValueOnce(
+    new Error('Full-page screenshot exceeds the configured quality limits')
+  );
+
+  await expect(
+    captureFullPageTransaction(154, undefined, {
+      backendKind: 'native',
+      documentId: 'document-154',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,limited',
+      metadata: expect.objectContaining({
+        viewportFallback: true,
+        warnings: expect.arrayContaining([expect.stringContaining('configured full-page')]),
+      }),
+    })
+  );
+  expect(mocks.captureTiles).toHaveBeenCalledOnce();
   expect(raster.captureFrame).toHaveBeenCalledOnce();
 });
 

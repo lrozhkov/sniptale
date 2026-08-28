@@ -105,6 +105,10 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Размер страницы изменился после прогрева; снимок использует зафиксированную область',
     en: 'The page grew after warm-up; the screenshot uses the frozen capture extent',
   },
+  captureFullPageViewportFallbackWarning: {
+    ru: 'Страница превышает выбранные пределы. Сохранена видимая область; измените профиль качества и повторите захват.',
+    en: 'The page exceeds the selected limits. The visible area was saved; adjust the quality profile and capture again.',
+  },
   screenshotCaptureTimedOut: {
     ru: 'Скриншот не был завершён. Попробуйте снова.',
     en: 'Screenshot did not finish. Try again.',

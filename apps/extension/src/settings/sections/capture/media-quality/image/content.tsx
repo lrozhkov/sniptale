@@ -5,6 +5,7 @@ import {
 import { ImageSettingsSectionFormat } from './format';
 import { ImageSettingsSectionQuality } from './quality';
 import type { useImageSettingsSection } from './controller';
+import { FullPageQualitySettings } from './full-page-quality';
 
 export function ImageSettingsSectionContent({
   state,
@@ -15,6 +16,7 @@ export function ImageSettingsSectionContent({
     <div className={`${settingsSectionClassName} ${settingsCompactWorkbenchClassName} !space-y-1`}>
       <ImageSettingsSectionFormat state={state} />
       <ImageSettingsSectionQuality state={state} />
+      <FullPageQualitySettings state={state} />
     </div>
   );
 }

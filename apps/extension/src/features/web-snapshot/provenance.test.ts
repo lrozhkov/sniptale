@@ -8,7 +8,10 @@ import {
   readPagePackageTestBlobBytes,
 } from './package.test-support';
 import { createPagePackageManifestFixture } from './manifest.test-support';
-import { sanitizeWebSnapshotPackageProvenance } from './provenance';
+import {
+  readWebSnapshotPackageScreenshotBytes,
+  sanitizeWebSnapshotPackageProvenance,
+} from './provenance';
 
 describe('Page Package provenance sanitizer', () => {
   it('preserves the exact archive when provenance is already safe', async () => {
@@ -20,6 +23,17 @@ describe('Page Package provenance sanitizer', () => {
     expect(result.packageBlob).toBe(fixture.packageBlob);
     expect(result.manifest).toEqual(fixture.manifest);
     expect(result.size).toBe(fixture.packageBlob.size);
+  });
+
+  it('reads the canonical screenshot entry under the shared package policy', async () => {
+    const fixture = await createPagePackageArchiveFixture();
+    const expected = await JSZip.loadAsync(
+      await readPagePackageTestBlobBytes(fixture.packageBlob)
+    ).then((zip) => zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot)?.async('uint8array'));
+
+    await expect(readWebSnapshotPackageScreenshotBytes(fixture.packageBlob)).resolves.toEqual(
+      expected
+    );
   });
 
   it('rewrites only source provenance while preserving entries, stats, and warnings', async () => {

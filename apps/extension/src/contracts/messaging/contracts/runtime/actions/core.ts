@@ -586,6 +586,7 @@ export const runtimeActionCoreMessageContracts = {
           dataUrl: isString,
           downscaled: isBoolean,
           frozenExtentWarning: isBoolean,
+          viewportFallback: isBoolean,
         },
       })
     ),

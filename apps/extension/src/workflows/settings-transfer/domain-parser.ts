@@ -277,7 +277,11 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
     case 'capture.viewport-presets':
       return { viewportPresets: value['items'], defaultViewportPresetId: value['defaultId'] };
     case 'capture.image':
-      return { imageFormat: value['format'], imageQuality: value['quality'] };
+      return {
+        imageFormat: value['format'],
+        imageQuality: value['quality'],
+        fullPageQuality: value['fullPageQuality'],
+      };
     case 'capture.after-capture':
       return { captureAction: value['action'] };
     case 'capture.saving':
@@ -313,6 +317,9 @@ function coreSettingsTransferData(
       return {
         ...(source['format'] === undefined ? {} : { format: parsed.imageFormat }),
         ...(source['quality'] === undefined ? {} : { quality: parsed.imageQuality }),
+        ...(source['fullPageQuality'] === undefined
+          ? {}
+          : { fullPageQuality: parsed.fullPageQuality }),
       };
     case 'capture.after-capture':
       return source['action'] === undefined ? {} : { action: parsed.captureAction };
