@@ -9,6 +9,7 @@ import type { GalleryItem } from '../items';
 import type { GalleryPreviewSessionState } from '../types';
 import type { ActiveImportState } from '../import-types';
 import type { PendingMediaFileImportState } from '../import-types';
+import type { PendingWebSnapshotImportState } from '../import-types';
 
 interface PendingImportState {
   file: File;
@@ -62,6 +63,7 @@ interface GalleryImportActionState {
     activeImport: ActiveImportState | null;
     pendingImport: PendingImportState | null;
     pendingMediaImport: PendingMediaFileImportState | null;
+    pendingWebSnapshotImport: PendingWebSnapshotImportState | null;
   };
 }
 
@@ -114,8 +116,10 @@ interface GalleryImportControllerActions {
   };
   surface: {
     setActiveImport: Dispatch<SetStateAction<ActiveImportState | null>>;
+    setBanner: Dispatch<SetStateAction<string | null>>;
     setPendingImport: Dispatch<SetStateAction<PendingImportState | null>>;
     setPendingMediaImport: Dispatch<SetStateAction<PendingMediaFileImportState | null>>;
+    setPendingWebSnapshotImport: Dispatch<SetStateAction<PendingWebSnapshotImportState | null>>;
   };
 }
 
@@ -146,6 +150,8 @@ export interface GalleryImportController {
     importTriggerRef: RefObject<HTMLButtonElement | null>;
     mediaImportInputRef: RefObject<HTMLInputElement | null>;
     mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
+    webSnapshotImportInputRef: RefObject<HTMLInputElement | null>;
+    webSnapshotImportTriggerRef: RefObject<HTMLButtonElement | null>;
   };
   state: GalleryImportActionState;
 }

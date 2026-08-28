@@ -9,7 +9,10 @@ import type { StorageEstimateInfo } from '../../features/media-hub/storage-capac
 import type { GalleryItem } from '../library/items';
 import type { GallerySavedView } from '../../composition/persistence/gallery-saved-views';
 import type { ActiveImportState } from '../library/import-types';
-import type { PendingMediaFileImportState } from '../library/import-types';
+import type {
+  PendingMediaFileImportState,
+  PendingWebSnapshotImportState,
+} from '../library/import-types';
 import type {
   FolderFilter,
   GalleryFolderCounts,
@@ -95,6 +98,7 @@ interface GalleryAppStorageState {
   storageInfo: StorageEstimateInfo | null;
   pendingImport: PendingImportState | null;
   pendingMediaImport: PendingMediaFileImportState | null;
+  pendingWebSnapshotImport: PendingWebSnapshotImportState | null;
   pendingExport: PendingExportState | null;
   confirmDialog: GalleryConfirmDialogState | null;
   banner: string | null;
@@ -128,6 +132,8 @@ interface GalleryAppRefs {
   importTriggerRef: RefObject<HTMLButtonElement | null>;
   mediaImportInputRef: RefObject<HTMLInputElement | null>;
   mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
+  webSnapshotImportInputRef: RefObject<HTMLInputElement | null>;
+  webSnapshotImportTriggerRef: RefObject<HTMLButtonElement | null>;
 }
 
 interface GalleryAppStorageActions {
@@ -167,6 +173,7 @@ interface GalleryAppSurfaceActions {
   setActiveImport: Dispatch<SetStateAction<ActiveImportState | null>>;
   setPendingImport: Dispatch<SetStateAction<PendingImportState | null>>;
   setPendingMediaImport: Dispatch<SetStateAction<PendingMediaFileImportState | null>>;
+  setPendingWebSnapshotImport: Dispatch<SetStateAction<PendingWebSnapshotImportState | null>>;
   setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
   setBanner: Dispatch<SetStateAction<string | null>>;

@@ -23,6 +23,13 @@ export function createPagePackagePngBytes(): Uint8Array {
   ]);
 }
 
+function createPagePackageWebpBytes(): Uint8Array {
+  const bytes = new Uint8Array(30);
+  bytes.set(new TextEncoder().encode('RIFF'), 0);
+  bytes.set(new TextEncoder().encode('WEBPVP8X'), 8);
+  return bytes;
+}
+
 export function createPagePackageTestBlobFromBytes(bytes: Uint8Array, type: string): Blob {
   const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
   copy.set(bytes);
@@ -58,7 +65,7 @@ function defaultEntries(): PagePackageFixtureEntry[] {
       path: PAGE_PACKAGE_ARCHIVE_PATHS.screenshot,
     },
     {
-      blob: new Blob(['webp'], { type: 'image/webp' }),
+      blob: createPagePackageTestBlobFromBytes(createPagePackageWebpBytes(), 'image/webp'),
       component: 'webCopy',
       path: PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail,
     },

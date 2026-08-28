@@ -19,7 +19,7 @@ import {
 } from '../../../workflows/page-package/composer';
 import { createDiagnosticContributions } from '../../../workflows/page-package/contributions/diagnostics';
 import { createSafeWebCopyContributions } from '../../../workflows/page-package/contributions/web-copy';
-import { addPagePackageReadme } from '../../page-package/readme';
+import { addPagePackageReadme } from '../../../workflows/page-package/readme';
 import {
   MAX_WEB_SNAPSHOT_ASSET_BYTES,
   MAX_WEB_SNAPSHOT_ASSETS_BYTES,

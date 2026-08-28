@@ -110,6 +110,25 @@ function createLayoutProps() {
   };
 }
 
+it('keeps a distinct Page Package picker separate from backup ZIP restore', () => {
+  const props = {
+    ...createLayoutProps(),
+    webSnapshotImportInputRef: { current: null },
+    webSnapshotImportTriggerRef: { current: null },
+    onWebSnapshotImportFileChange: vi.fn(),
+    onPendingWebSnapshotImportClose: vi.fn(),
+    onWebSnapshotImportConfirm: vi.fn(async () => undefined),
+    onImportWebSnapshotClick: vi.fn(),
+  };
+  act(() => {
+    root?.render(<GalleryAppLayout {...props} />);
+  });
+  const inputs = Array.from(container?.querySelectorAll('input[type="file"]') ?? []);
+  expect(inputs).toHaveLength(3);
+  expect(inputs[0]?.getAttribute('accept')).toBe('.zip,application/zip');
+  expect(inputs[2]?.getAttribute('accept')).toBe('.sniptale-page-package.zip,application/zip');
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

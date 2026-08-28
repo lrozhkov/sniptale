@@ -124,6 +124,10 @@ function createProbeProps(
       importTriggerRef: { current: null },
       mediaImportInputRef: { current: null },
       mediaImportTriggerRef: { current: null },
+      webSnapshotImport: {
+        inputRef: { current: null },
+        triggerRef: { current: null },
+      },
       scrollTop: 12,
       viewportHeight: 600,
     },

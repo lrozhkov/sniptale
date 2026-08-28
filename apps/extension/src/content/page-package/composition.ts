@@ -15,7 +15,7 @@ import {
 import { createExportContributions } from '../../workflows/page-package/contributions/export';
 import { createDiagnosticContributions } from '../../workflows/page-package/contributions/diagnostics';
 import { sanitizeWebSnapshotSourceUrl } from '../../features/web-snapshot/public';
-import { addPagePackageReadme } from './readme';
+import { addPagePackageReadme } from '../../workflows/page-package/readme';
 
 export interface PagePackageArchiveArtifact {
   entries: readonly {

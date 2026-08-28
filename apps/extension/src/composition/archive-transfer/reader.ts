@@ -1,5 +1,5 @@
 import { Reader, TextWriter, ZipReader, type Entry } from '@zip.js/zip.js';
-import type { ArchiveEntrySource, ArchiveReader } from './contracts';
+import type { ArchiveEntrySource, ArchiveReader, ArchiveResourceProfile } from './contracts';
 import { MAX_MEDIA_ARCHIVE_CENTRAL_DIRECTORY_BYTES } from './contracts';
 import { assertSafeArchivePath } from './path';
 import {
@@ -7,6 +7,7 @@ import {
   assertArchiveFileSize,
   assertArchiveTextSize,
   createArchiveBudget,
+  normalizeArchiveResourceProfile,
 } from './profile';
 
 class BoundedArchiveBlobReader extends Reader<Blob> {
@@ -70,8 +71,12 @@ function createEntrySource(entry: Entry): ArchiveEntrySource {
   };
 }
 
-export async function openArchiveReader(file: Blob): Promise<ArchiveReader> {
-  assertArchiveFileSize(file.size);
+export async function openArchiveReader(
+  file: Blob,
+  options: { resourceProfile?: ArchiveResourceProfile } = {}
+): Promise<ArchiveReader> {
+  const resourceProfile = normalizeArchiveResourceProfile(options.resourceProfile);
+  assertArchiveFileSize(file.size, resourceProfile);
   const zip = new ZipReader(createBoundedArchiveBlobReader(file), {
     checkAmbiguity: true,
     checkCrc32: true,
@@ -91,7 +96,7 @@ export async function openArchiveReader(file: Blob): Promise<ArchiveReader> {
       if (entries.has(rawEntry.filename) || canonicalPaths.has(canonicalPath)) {
         throw new Error(`Duplicate media archive path: ${rawEntry.filename}.`);
       }
-      admitArchiveEntry(budget, rawEntry.uncompressedSize);
+      admitArchiveEntry(budget, rawEntry.uncompressedSize, resourceProfile);
       canonicalPaths.add(canonicalPath);
       entries.set(rawEntry.filename, createEntrySource(rawEntry));
     }

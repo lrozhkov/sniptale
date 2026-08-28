@@ -1,4 +1,8 @@
-import type { ArchiveWriter, ExportSink } from '../../composition/archive-transfer/contracts';
+import type {
+  ArchiveResourceProfile,
+  ArchiveWriter,
+  ExportSink,
+} from '../../composition/archive-transfer/contracts';
 import { createArchiveWriter } from '../../composition/archive-transfer/writer';
 import type { ComposedPagePackage } from './composer';
 
@@ -42,10 +46,13 @@ async function abortArchive(writer: ArchiveWriter, error: unknown): Promise<neve
 export async function writePagePackageArchive(args: {
   onProgress?: ((progress: PagePackageArchiveProgress) => void) | undefined;
   package: ComposedPagePackage<Blob>;
+  resourceProfile?: ArchiveResourceProfile | undefined;
   signal?: AbortSignal | undefined;
   sink: ExportSink;
 }): Promise<void> {
-  const writer = createArchiveWriter(args.sink);
+  const writer = createArchiveWriter(args.sink, {
+    ...(args.resourceProfile ? { resourceProfile: args.resourceProfile } : {}),
+  });
   const entriesTotal = args.package.entries.length + 1;
   let bytesComplete = 0;
   let entriesComplete = 0;

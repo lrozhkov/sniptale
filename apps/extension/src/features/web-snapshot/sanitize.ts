@@ -26,6 +26,7 @@ export const WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE = 'data-sniptale-external-href
 interface WebSnapshotHtmlSanitizeOptions {
   allowedObjectUrls?: readonly string[];
   offlineOnly?: boolean;
+  removeForms?: boolean;
 }
 
 const WEB_SNAPSHOT_XHTML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
@@ -317,6 +318,12 @@ function disableFormSubmissions(root: ParentNode): void {
   }
 }
 
+function removeFormElements(root: ParentNode): void {
+  for (const form of root.querySelectorAll('form')) {
+    form.replaceWith(...Array.from(form.childNodes));
+  }
+}
+
 export function removeWebSnapshotSensitiveControlState(root: ParentNode): void {
   for (const control of root.querySelectorAll('input, select, textarea')) {
     if (!shouldExcludeWebSnapshotFormControlValue(control)) continue;
@@ -342,7 +349,8 @@ function sanitizeWebSnapshotDocument(
     for (const element of root.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
       element.remove();
     }
-    disableFormSubmissions(root);
+    if (options.removeForms) removeFormElements(root);
+    else disableFormSubmissions(root);
     removeWebSnapshotSensitiveControlState(root);
     sanitizeStyleElements(root, options);
     for (const element of root.querySelectorAll('*')) {

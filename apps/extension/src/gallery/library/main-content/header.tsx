@@ -3,6 +3,7 @@ import {
   AlignJustify,
   Download,
   Grid2X2,
+  Globe2,
   HardDrive,
   Images,
   LayoutGrid,
@@ -38,11 +39,13 @@ interface GalleryHeaderStorageProps {
   activeStorageBarClass: string;
   importTriggerRef: RefObject<HTMLButtonElement | null>;
   mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
+  webSnapshotImportTriggerRef?: RefObject<HTMLButtonElement | null>;
   isBusy: boolean;
   onDeleteAll: () => void;
   onExportBackup: () => void;
   onImportBackupClick: () => void;
   onImportMediaClick: () => void;
+  onImportWebSnapshotClick?: () => void;
   storageInfo: StorageEstimateInfo | null;
 }
 
@@ -181,6 +184,12 @@ function GalleryStorageMenu(
           label={translate('gallery.app.exportBackup')}
           onClick={() => props.closeAndRun(props.onExportBackup)}
         />
+        <div
+          className="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.1em]
+          text-[var(--sniptale-color-text-muted)]"
+        >
+          {translate('gallery.app.importSection')}
+        </div>
         <GalleryStorageMenuAction
           buttonRef={props.mediaImportTriggerRef}
           disabled={props.isBusy}
@@ -188,6 +197,17 @@ function GalleryStorageMenu(
           label={translate('gallery.app.importMediaFiles')}
           onClick={() => props.closeAndRun(props.onImportMediaClick)}
         />
+        {props.onImportWebSnapshotClick ? (
+          <GalleryStorageMenuAction
+            {...(props.webSnapshotImportTriggerRef
+              ? { buttonRef: props.webSnapshotImportTriggerRef }
+              : {})}
+            disabled={props.isBusy}
+            icon={Globe2}
+            label={translate('gallery.app.importWebSnapshot')}
+            onClick={() => props.closeAndRun(() => props.onImportWebSnapshotClick?.())}
+          />
+        ) : null}
         <GalleryStorageMenuAction
           buttonRef={props.importTriggerRef}
           disabled={props.isBusy}

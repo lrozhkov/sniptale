@@ -60,6 +60,13 @@ export interface ArchiveReader {
   close(): Promise<void>;
 }
 
+export interface ArchiveResourceProfile {
+  maxArchiveBytes: number;
+  maxEntries: number;
+  maxEntryBytes: number;
+  maxInflatedBytes: number;
+}
+
 export interface ArchiveWriter {
   addBlob(
     path: string,

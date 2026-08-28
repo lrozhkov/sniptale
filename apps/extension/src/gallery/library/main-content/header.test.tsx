@@ -247,6 +247,25 @@ it('opens compact storage actions without a separate cleanup workflow', () => {
   expect(container?.querySelector('[data-ui="gallery.header.storage-menu"]')).toBeNull();
 });
 
+it('exposes Web Snapshot as a distinct action in the Library import section', () => {
+  const onImportWebSnapshotClick = vi.fn();
+  renderHeader({
+    onImportWebSnapshotClick,
+    webSnapshotImportTriggerRef: { current: null },
+  });
+  clickButton(
+    container?.querySelector<HTMLButtonElement>('[data-ui="gallery.header.storage"] > button')
+  );
+  const menu = container?.querySelector('[data-ui="gallery.header.storage-menu"]');
+  const action = Array.from(menu?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('gallery.app.importWebSnapshot')
+  );
+  expect(menu?.textContent).toContain('gallery.app.importSection');
+  expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(5);
+  clickButton(action);
+  expect(onImportWebSnapshotClick).toHaveBeenCalledOnce();
+});
+
 it('removes low-usage storage progress from layout and centers the usage label', () => {
   renderHeader({
     storageInfo: {

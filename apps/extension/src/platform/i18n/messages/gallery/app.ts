@@ -267,6 +267,14 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Импортировать фото и видео',
     en: 'Import images and videos',
   },
+  importSection: {
+    ru: 'Импортировать',
+    en: 'Import',
+  },
+  importWebSnapshot: {
+    ru: 'Web Snapshot',
+    en: 'Web Snapshot',
+  },
   searchPlaceholder: {
     ru: 'Поиск',
     en: 'Search',

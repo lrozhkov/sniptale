@@ -32,6 +32,18 @@ function GalleryMediaImportInput(props: GalleryAppLayoutProps) {
   );
 }
 
+function GalleryWebSnapshotImportInput(props: GalleryAppLayoutProps) {
+  return (
+    <input
+      ref={props.webSnapshotImportInputRef as Ref<HTMLInputElement> | undefined}
+      type="file"
+      accept=".sniptale-page-package.zip,application/zip"
+      className="hidden"
+      onChange={(event) => props.onWebSnapshotImportFileChange?.(event.target.files?.[0] ?? null)}
+    />
+  );
+}
+
 function GallerySidebarSection(props: GalleryAppLayoutProps) {
   const { state } = props;
 
@@ -117,6 +129,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
     >
       <GalleryImportInput {...props} />
       <GalleryMediaImportInput {...props} />
+      <GalleryWebSnapshotImportInput {...props} />
       <GalleryOverlays {...props} />
       {props.state.storage.activeImport ? (
         <GalleryImportProgressCard
@@ -133,6 +146,9 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           isBusy={props.state.storage.isBusy}
           importTriggerRef={props.importTriggerRef}
           mediaImportTriggerRef={props.mediaImportTriggerRef}
+          {...(props.webSnapshotImportTriggerRef
+            ? { webSnapshotImportTriggerRef: props.webSnapshotImportTriggerRef }
+            : {})}
           onApplySelectionTag={props.onApplySelectionTag}
           onClearSelection={props.onClearSelection}
           onDeleteMany={props.onDeleteMany}
@@ -141,6 +157,9 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onSearchChange={props.onSearchChange}
           onImportBackupClick={props.onImportBackupClick}
           onImportMediaClick={props.onImportMediaClick}
+          {...(props.onImportWebSnapshotClick
+            ? { onImportWebSnapshotClick: props.onImportWebSnapshotClick }
+            : {})}
           onSelectionTagDraftChange={props.onSelectionTagDraftChange}
           onSelectionBackup={props.onSelectionBackup}
           onSelectionZip={props.onSelectionZip}

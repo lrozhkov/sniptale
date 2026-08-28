@@ -13,6 +13,7 @@ export type GalleryStateOverride = Partial<GalleryAppState> & {
   pendingExport?: GalleryAppState['storage']['pendingExport'];
   pendingImport?: GalleryAppState['storage']['pendingImport'];
   pendingMediaImport?: GalleryAppState['storage']['pendingMediaImport'];
+  pendingWebSnapshotImport?: GalleryAppState['storage']['pendingWebSnapshotImport'];
   previewDraft?: GalleryAppState['preview']['draft'];
   previewInspectorCollapsed?: boolean;
   previewItem?: GalleryItem | null;
@@ -133,6 +134,7 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
       pendingExport: overrides.pendingExport ?? null,
       pendingImport: overrides.pendingImport ?? null,
       pendingMediaImport: overrides.pendingMediaImport ?? null,
+      pendingWebSnapshotImport: overrides.pendingWebSnapshotImport ?? null,
       storageInfo: overrides.storageInfo ?? null,
       ...overrides.storage,
     },

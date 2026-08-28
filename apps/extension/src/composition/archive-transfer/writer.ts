@@ -1,7 +1,17 @@
 import { BlobReader, TextReader, ZipWriter } from '@zip.js/zip.js';
-import type { ArchiveEntrySource, ArchiveWriter, ExportSink } from './contracts';
+import type {
+  ArchiveEntrySource,
+  ArchiveResourceProfile,
+  ArchiveWriter,
+  ExportSink,
+} from './contracts';
 import { assertSafeArchivePath } from './path';
-import { admitArchiveEntry, createArchiveBudget, assertArchiveTextSize } from './profile';
+import {
+  admitArchiveEntry,
+  createArchiveBudget,
+  assertArchiveTextSize,
+  normalizeArchiveResourceProfile,
+} from './profile';
 import { createArchiveOutputBoundary } from './output';
 
 function assertNotAborted(signal: AbortSignal | undefined): void {
@@ -57,9 +67,17 @@ function createSourceTransfer(
 
 export function createArchiveWriter(
   sink: ExportSink,
-  options: { onBytesWritten?: (bytesWritten: number) => void } = {}
+  options: {
+    onBytesWritten?: (bytesWritten: number) => void;
+    resourceProfile?: ArchiveResourceProfile;
+  } = {}
 ): ArchiveWriter {
-  const output = createArchiveOutputBoundary(sink.writable, undefined, options.onBytesWritten);
+  const resourceProfile = normalizeArchiveResourceProfile(options.resourceProfile);
+  const output = createArchiveOutputBoundary(
+    sink.writable,
+    resourceProfile.maxArchiveBytes,
+    options.onBytesWritten
+  );
   const zip = new ZipWriter(output.writable, {
     bufferedWrite: false,
     preventClose: true,
@@ -78,7 +96,7 @@ export function createArchiveWriter(
     if (paths.has(path) || canonicalPaths.has(canonicalPath)) {
       throw new Error(`Duplicate media archive path: ${path}.`);
     }
-    admitArchiveEntry(budget, size);
+    admitArchiveEntry(budget, size, resourceProfile);
     paths.add(path);
     canonicalPaths.add(canonicalPath);
   };

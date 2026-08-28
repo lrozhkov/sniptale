@@ -23,6 +23,8 @@ export interface GalleryAppLayoutProps {
   importTriggerRef: RefObject<HTMLButtonElement | null>;
   mediaImportInputRef: RefObject<HTMLInputElement | null>;
   mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
+  webSnapshotImportInputRef?: RefObject<HTMLInputElement | null>;
+  webSnapshotImportTriggerRef?: RefObject<HTMLButtonElement | null>;
   filteredScenarioProjects?: ScenarioProjectSummary[];
   scenarioPreviewProject?: ScenarioProjectSummary | null;
   scenarioProjects?: ScenarioProjectSummary[];
@@ -30,11 +32,14 @@ export interface GalleryAppLayoutProps {
   viewMode: GalleryViewMode;
   onImportFileChange: (file: File | null) => void;
   onMediaImportFileChange: (files: File[]) => void;
+  onWebSnapshotImportFileChange?: (file: File | null) => void;
   onActiveImportCancel: () => void;
   onActiveImportDismiss: () => void;
   onConfirmDialogClose: () => void;
   onPendingImportClose: () => void;
   onPendingMediaImportClose: () => void;
+  onPendingWebSnapshotImportClose?: () => void;
+  onWebSnapshotImportConfirm?: () => Promise<void>;
   onMediaImportConfirm: (strategy: MediaFileImportConflictStrategy) => void;
   onPendingExportClose: () => void;
   onBackupExportConfirm: (options: MediaHubBackupExportOptions) => void;
@@ -74,6 +79,7 @@ export interface GalleryAppLayoutProps {
   onExportBackup: () => void;
   onImportBackupClick: () => void;
   onImportMediaClick: () => void;
+  onImportWebSnapshotClick?: () => void;
   onSearchChange: Dispatch<SetStateAction<string>>;
   onSortModeChange: Dispatch<SetStateAction<SortMode>>;
   onViewModeChange: Dispatch<SetStateAction<GalleryViewMode>>;

@@ -6,8 +6,8 @@ import {
   type PagePackageSource,
 } from '@sniptale/runtime-contracts/page-package';
 import { hashWebSnapshotAssetBlob } from '../../features/web-snapshot/asset-manifest';
-import { createBlobContribution } from '../../workflows/page-package/contributions/blob';
-import type { PagePackageContribution } from '../../workflows/page-package/paths';
+import { createBlobContribution } from './contributions/blob';
+import type { PagePackageContribution } from './paths';
 
 type ReadmeInput = {
   contributions: readonly PagePackageContribution<Blob>[];

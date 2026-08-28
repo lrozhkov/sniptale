@@ -17,11 +17,14 @@ export interface UseGalleryAppActionsResult {
     cancelActiveImport: () => void;
     closePendingImport: () => void;
     closePendingMediaImport: () => void;
+    closePendingWebSnapshotImport: () => void;
+    confirmWebSnapshotImport: () => Promise<void>;
     confirmMediaFileImport: (strategy: MediaFileImportConflictStrategy) => Promise<void>;
     dismissActiveImport: () => void;
     importBackup: (strategy: MediaHubImportConflictStrategy) => Promise<void>;
     importSelectedFile: (file: File | null) => Promise<void>;
     importMediaFiles: (files: File[]) => Promise<void>;
+    inspectWebSnapshot: (file: File | null) => Promise<void>;
   };
   preview: {
     close: () => Promise<void>;

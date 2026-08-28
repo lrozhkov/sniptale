@@ -7,6 +7,10 @@ export type GalleryBusyAction = (action: () => Promise<void>) => Promise<void>;
 
 class GalleryUserFacingActionError extends Error {}
 
+export function createGalleryUserFacingActionError(message: string): Error {
+  return new GalleryUserFacingActionError(message);
+}
+
 type GalleryConfirmDialogController = {
   actions: {
     surface: Pick<GallerySurfaceController['actions']['surface'], 'setConfirmDialog'>;

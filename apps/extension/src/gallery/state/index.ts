@@ -176,6 +176,7 @@ function buildGalleryAppActions(args: {
       setPendingExport: args.storage.setPendingExport,
       setPendingImport: args.storage.setPendingImport,
       setPendingMediaImport: args.storage.setPendingMediaImport,
+      setPendingWebSnapshotImport: args.storage.setPendingWebSnapshotImport,
     },
   };
 }
@@ -269,6 +270,8 @@ export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateCo
       importTriggerRef: viewport.importTriggerRef,
       mediaImportInputRef: viewport.mediaImportInputRef,
       mediaImportTriggerRef: viewport.mediaImportTriggerRef,
+      webSnapshotImportInputRef: viewport.webSnapshotImport.inputRef,
+      webSnapshotImportTriggerRef: viewport.webSnapshotImport.triggerRef,
     },
     state,
   };

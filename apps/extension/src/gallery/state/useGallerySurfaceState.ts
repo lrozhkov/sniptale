@@ -5,7 +5,10 @@ import type {
   PendingExportState,
   PendingImportState,
 } from './types';
-import type { PendingMediaFileImportState } from '../library/import-types';
+import type {
+  PendingMediaFileImportState,
+  PendingWebSnapshotImportState,
+} from '../library/import-types';
 
 export function useGallerySurfaceState() {
   const [activeImport, setActiveImport] = useState<ActiveImportState | null>(null);
@@ -14,6 +17,8 @@ export function useGallerySurfaceState() {
     null
   );
   const [pendingExport, setPendingExport] = useState<PendingExportState | null>(null);
+  const [pendingWebSnapshotImport, setPendingWebSnapshotImport] =
+    useState<PendingWebSnapshotImportState | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<GalleryConfirmDialogState | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -27,6 +32,7 @@ export function useGallerySurfaceState() {
       setPendingExport,
       setPendingImport,
       setPendingMediaImport,
+      setPendingWebSnapshotImport,
     },
     state: {
       activeImport,
@@ -36,6 +42,7 @@ export function useGallerySurfaceState() {
       pendingExport,
       pendingImport,
       pendingMediaImport,
+      pendingWebSnapshotImport,
     },
   };
 }

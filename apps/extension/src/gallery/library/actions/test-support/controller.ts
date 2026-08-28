@@ -110,7 +110,7 @@ function createControllerActions(
     },
     surface: {
       setActiveImport: createNestedSetter({ area: 'storage', key: 'activeImport', stateRef }),
-      setBanner: () => undefined,
+      setBanner: createNestedSetter({ area: 'storage', key: 'banner', stateRef }),
       setConfirmDialog: createNestedSetter({ area: 'storage', key: 'confirmDialog', stateRef }),
       setIsBusy: () => undefined,
       setPendingExport: createNestedSetter({ area: 'storage', key: 'pendingExport', stateRef }),
@@ -118,6 +118,11 @@ function createControllerActions(
       setPendingMediaImport: createNestedSetter({
         area: 'storage',
         key: 'pendingMediaImport',
+        stateRef,
+      }),
+      setPendingWebSnapshotImport: createNestedSetter({
+        area: 'storage',
+        key: 'pendingWebSnapshotImport',
         stateRef,
       }),
     },
@@ -135,6 +140,8 @@ export function createController(overrides: GalleryStateOverride = {}) {
       importTriggerRef: { current: document.createElement('button') },
       mediaImportInputRef: { current: document.createElement('input') },
       mediaImportTriggerRef: { current: document.createElement('button') },
+      webSnapshotImportInputRef: { current: document.createElement('input') },
+      webSnapshotImportTriggerRef: { current: document.createElement('button') },
     },
     get state() {
       return stateRef.getState();

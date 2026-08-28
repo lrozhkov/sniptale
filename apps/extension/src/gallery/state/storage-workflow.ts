@@ -14,6 +14,7 @@ type GalleryStorageWorkflowState = Pick<
   | 'pendingExport'
   | 'pendingImport'
   | 'pendingMediaImport'
+  | 'pendingWebSnapshotImport'
   | 'storageInfo'
 >;
 
@@ -27,6 +28,7 @@ type GalleryStorageWorkflowActions = Pick<
   | 'setPendingExport'
   | 'setPendingImport'
   | 'setPendingMediaImport'
+  | 'setPendingWebSnapshotImport'
 >;
 
 interface UseGalleryStorageWorkflowOptions {
@@ -47,6 +49,7 @@ function buildGalleryStorageWorkflowState(
     pendingExport: surface.state.pendingExport,
     pendingImport: surface.state.pendingImport,
     pendingMediaImport: surface.state.pendingMediaImport,
+    pendingWebSnapshotImport: surface.state.pendingWebSnapshotImport,
     storageInfo: library.storageInfo,
   };
 }
@@ -64,6 +67,7 @@ function buildGalleryStorageWorkflowActions(
     setPendingExport: surface.actions.setPendingExport,
     setPendingImport: surface.actions.setPendingImport,
     setPendingMediaImport: surface.actions.setPendingMediaImport,
+    setPendingWebSnapshotImport: surface.actions.setPendingWebSnapshotImport,
   };
 }
 

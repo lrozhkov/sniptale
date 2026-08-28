@@ -1,4 +1,6 @@
 import { FULL_PAGE_QUALITY_ABSOLUTE_LIMITS } from '../../contracts/full-page-capture';
+import type { ArchiveResourceProfile } from '../../composition/archive-transfer';
+import { MAX_PAGE_PACKAGE_ENTRIES } from '@sniptale/runtime-contracts/page-package';
 
 const MEBIBYTE = 1024 * 1024;
 
@@ -11,6 +13,13 @@ export const WEB_SNAPSHOT_PACKAGE_POLICY = {
   maxTextEntryBytes: 10 * MEBIBYTE,
   maxTotalInflatedBytes: 250 * MEBIBYTE,
 } as const;
+
+export const WEB_SNAPSHOT_ARCHIVE_RESOURCE_PROFILE: ArchiveResourceProfile = {
+  maxArchiveBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes,
+  maxEntries: MAX_PAGE_PACKAGE_ENTRIES + 1,
+  maxEntryBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes,
+  maxInflatedBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxTotalInflatedBytes,
+};
 
 export function resolveWebSnapshotEntryByteLimit(path: string, mimeType?: string): number {
   if (path === 'manifest.json') return WEB_SNAPSHOT_PACKAGE_POLICY.maxManifestBytes;
