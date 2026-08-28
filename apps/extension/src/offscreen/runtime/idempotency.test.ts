@@ -13,6 +13,9 @@ const handledCommandTypes = [
   MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
+  MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE,
+  MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE,
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,
@@ -27,6 +30,7 @@ const handledCommandTypes = [
 it('declares idempotency policy for every offscreen side-effect route', () => {
   expect(OFFSCREEN_COMMAND_CORRELATION_KEYS).toEqual([
     'jobId',
+    'downloadOperationId',
     'recordingId',
     'desktopMediaRequestId',
     'requestId',

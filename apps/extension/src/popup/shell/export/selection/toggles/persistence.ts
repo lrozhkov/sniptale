@@ -1,14 +1,13 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 
-import { translate } from '../../../../../platform/i18n/popup';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
-import { savePopupExportPreferences } from '../../../../../composition/persistence/popup-export-preferences';
-import type {
-  PopupExportPreferenceActions,
-  PopupExportPreferenceValues,
-  PopupExportSelection,
-} from '../../session/types';
+import { translate } from '../../../../../platform/i18n/popup';
+import {
+  savePopupPagePackagePreferences,
+  type PopupPagePackagePreferences,
+} from '../../../../../composition/persistence/popup-export-preferences';
+import type { PopupPagePackagePreferenceState } from '../../session/types';
 import {
   applyPopupExportSelection,
   arePopupExportSelectionsEqual,
@@ -17,95 +16,99 @@ import {
 
 const logger = createLogger({ namespace: 'PopupExportToggles' });
 
-export async function persistPopupExportPreferences(params: {
-  committedPreferencesRef: MutableRefObject<PopupExportSelection | null>;
+function arePreferenceSetsEqual(
+  left: PopupPagePackagePreferences,
+  right: PopupPagePackagePreferences
+) {
+  return (
+    arePopupExportSelectionsEqual(left.export, right.export) &&
+    left.export.includeWebCopy === right.export.includeWebCopy &&
+    arePopupExportSelectionsEqual(left.save, right.save) &&
+    left.save.includeWebCopy === right.save.includeWebCopy
+  );
+}
+
+export async function persistPopupPagePackagePreferences(params: {
+  committedPreferencesRef: MutableRefObject<PopupPagePackagePreferences | null>;
   hasLoadedPreferencesRef: MutableRefObject<boolean>;
   log?: Pick<typeof logger, 'debug'>;
   onPersistError?: () => void;
-  preferenceActions: PopupExportPreferenceActions;
-  preferences: PopupExportPreferenceValues;
+  shouldApplyFailure?: () => boolean;
+  preferences: {
+    export: PopupPagePackagePreferenceState;
+    save: PopupPagePackagePreferenceState;
+  };
   restoringPreferencesRef: MutableRefObject<boolean>;
-  savePreferences?: typeof savePopupExportPreferences;
+  savePreferences?: typeof savePopupPagePackagePreferences;
 }) {
-  const savePreferences = params.savePreferences ?? savePopupExportPreferences;
-  const log = params.log ?? logger;
-
-  if (!params.hasLoadedPreferencesRef.current) {
-    return;
-  }
-
+  if (!params.hasLoadedPreferencesRef.current) return;
   if (params.restoringPreferencesRef.current) {
     params.restoringPreferencesRef.current = false;
     return;
   }
 
-  const nextSelection = toPopupExportSelection(params.preferences);
-  if (!params.committedPreferencesRef.current) {
-    params.committedPreferencesRef.current = nextSelection;
+  const next = {
+    export: {
+      ...toPopupExportSelection(params.preferences.export.values),
+      includeWebCopy: params.preferences.export.includeWebCopy,
+    },
+    save: {
+      ...toPopupExportSelection(params.preferences.save.values),
+      includeWebCopy: params.preferences.save.includeWebCopy,
+    },
+  };
+  const committed = params.committedPreferencesRef.current;
+  if (!committed) {
+    params.committedPreferencesRef.current = next;
     return;
   }
-
-  if (arePopupExportSelectionsEqual(nextSelection, params.committedPreferencesRef.current)) {
-    return;
-  }
+  if (arePreferenceSetsEqual(next, committed)) return;
 
   try {
-    await savePreferences(nextSelection);
-    params.committedPreferencesRef.current = nextSelection;
+    await (params.savePreferences ?? savePopupPagePackagePreferences)(next);
+    params.committedPreferencesRef.current = next;
   } catch (error) {
-    log.debug('Failed to persist export preferences', error);
+    (params.log ?? logger).debug('Failed to persist page-package preferences', error);
+    if (params.shouldApplyFailure?.() === false) return;
     params.restoringPreferencesRef.current = true;
-    applyPopupExportSelection(params.committedPreferencesRef.current, params.preferenceActions);
+    applyPopupExportSelection(committed.export, params.preferences.export.actions);
+    applyPopupExportSelection(committed.save, params.preferences.save.actions);
+    params.preferences.export.setIncludeWebCopy(committed.export.includeWebCopy);
+    params.preferences.save.setIncludeWebCopy(committed.save.includeWebCopy);
     params.onPersistError?.();
   }
 }
 
-export function usePopupExportPersistence(
-  committedPreferencesRef: MutableRefObject<PopupExportSelection | null>,
-  hasLoadedPreferencesRef: MutableRefObject<boolean>,
-  preferences: PopupExportPreferenceValues,
-  preferenceActions: PopupExportPreferenceActions,
-  restoringPreferencesRef: MutableRefObject<boolean>
-) {
-  const {
-    includeAnnotations,
-    includeBasicLogs,
-    includeCssDiagnostics,
-    includeFiles,
-    includeFullPageScreenshot,
-    includePageDiagnostics,
-    includeImages,
-    includeJson,
-    includeMarkdown,
-  } = preferences;
-
-  useEffect(
-    () =>
-      void persistPopupExportPreferences({
-        committedPreferencesRef,
-        hasLoadedPreferencesRef,
-        onPersistError: () => {
-          toast.error(translate('common.states.error'));
-        },
-        preferenceActions,
-        preferences,
-        restoringPreferencesRef,
-      }),
-    [
-      committedPreferencesRef,
-      hasLoadedPreferencesRef,
-      includeAnnotations,
-      includeBasicLogs,
-      includeCssDiagnostics,
-      includeFiles,
-      includeFullPageScreenshot,
-      includePageDiagnostics,
-      includeImages,
-      includeJson,
-      includeMarkdown,
-      preferenceActions,
-      preferences,
-      restoringPreferencesRef,
-    ]
-  );
+export function usePopupExportPersistence(params: {
+  committedPreferencesRef: MutableRefObject<PopupPagePackagePreferences | null>;
+  hasLoadedPreferencesRef: MutableRefObject<boolean>;
+  preferences: {
+    export: PopupPagePackagePreferenceState;
+    save: PopupPagePackagePreferenceState;
+  };
+  restoringPreferencesRef: MutableRefObject<boolean>;
+}) {
+  const exportPreferences = params.preferences.export;
+  const savePreferences = params.preferences.save;
+  const latestAttemptRef = useRef(0);
+  const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    const attempt = ++latestAttemptRef.current;
+    const persist = () =>
+      persistPopupPagePackagePreferences({
+        committedPreferencesRef: params.committedPreferencesRef,
+        hasLoadedPreferencesRef: params.hasLoadedPreferencesRef,
+        onPersistError: () => toast.error(translate('common.states.error')),
+        preferences: { export: exportPreferences, save: savePreferences },
+        restoringPreferencesRef: params.restoringPreferencesRef,
+        shouldApplyFailure: () => latestAttemptRef.current === attempt,
+      });
+    persistenceQueueRef.current = persistenceQueueRef.current.then(persist, persist);
+  }, [
+    params.committedPreferencesRef,
+    params.hasLoadedPreferencesRef,
+    exportPreferences,
+    savePreferences,
+    params.restoringPreferencesRef,
+  ]);
 }

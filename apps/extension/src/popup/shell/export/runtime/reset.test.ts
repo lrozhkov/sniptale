@@ -33,7 +33,7 @@ it('acknowledges terminal job metadata before clearing the local result view', a
   await resetPopupExportView(state, deps);
 
   expect(deps.sendAckJobStatusMessage).toHaveBeenCalledWith({
-    type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
+    type: MessageType.ACK_PAGE_PACKAGE_JOB_STATUS,
   });
   expect(state.setProgress).toHaveBeenCalledWith({
     activeStepKey: null,

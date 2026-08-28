@@ -6,6 +6,7 @@ import type {
   SaveWebSnapshotMediaAssetInput,
 } from '../media-library/contracts';
 import type { StoredWebSnapshotRecord } from './contracts';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 
 export async function createWebSnapshotThumbnailEntry(args: {
   assetId: string;
@@ -43,7 +44,7 @@ export async function createWebSnapshotMediaEntry(args: {
     createdAt: args.snapshot.createdAt,
     updatedAt: args.now,
     size: args.snapshot.size,
-    mimeType: 'application/x-sniptale-web-snapshot+zip',
+    mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
     width: args.screenshotDimensions.width,
     height: args.screenshotDimensions.height,
     duration: null,

@@ -5,7 +5,7 @@ import { applyPopupExportRuntimeMessage } from './apply';
 import { parsePopupExportRuntimeMessage } from './parse';
 import type { PopupExportRuntimeContract } from '../types';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { PopupExportJobStatus } from '@sniptale/runtime-contracts/export';
+import type { PagePackageJobStatusV1 } from '@sniptale/runtime-contracts/page-package';
 import { getDefaultPopupExportRuntimeDeps } from '../default-deps';
 
 export function usePopupExportMessageListener(state: PopupExportRuntimeContract) {
@@ -33,14 +33,15 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
           requestIdRef.current = null;
         },
       });
-    const applyJobStatus = (status: PopupExportJobStatus) => {
+    const applyJobStatus = (status: PagePackageJobStatusV1) => {
       const applied = applyMessage({
-        type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED,
+        type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
         status,
       });
       if (applied && (status.phase === 'running' || status.phase === 'cancelling')) {
         cancelRetryRef.current = {
           exportRunId: status.jobId,
+          owner: 'job',
           tabIds: status.orderedTabs.map((tab) => tab.tabId),
         };
       }
@@ -52,7 +53,7 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
         return;
       }
 
-      if (typedMessage.type === MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED) {
+      if (typedMessage.type === MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED) {
         applyJobStatus(typedMessage.status);
       } else {
         applyMessage(typedMessage);
@@ -62,7 +63,7 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
     const unsubscribe = browserRuntime.subscribeToMessages(handleMessage);
     const getJobStatus = getDefaultPopupExportRuntimeDeps().sendGetJobStatusMessage;
     if (getJobStatus) {
-      void getJobStatus({ type: MessageType.GET_POPUP_EXPORT_JOB_STATUS })
+      void getJobStatus({ type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS })
         .then((response) => {
           if (response?.success && response.status) applyJobStatus(response.status);
         })

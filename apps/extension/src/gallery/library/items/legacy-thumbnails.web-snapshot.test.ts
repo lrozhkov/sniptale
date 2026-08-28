@@ -59,10 +59,10 @@ beforeEach(() => {
 it('rebuilds a missing web snapshot thumbnail from its retained screenshot, not its ZIP', async () => {
   const item = createMediaItem({
     entityId: 'snapshot-1',
-    filename: 'snapshot.zip',
+    filename: 'snapshot.sniptale-page-package.zip',
     id: 'snapshot-1',
     kind: 'web-archive',
-    mimeType: 'application/x-sniptale-web-snapshot+zip',
+    mimeType: 'application/x-sniptale-page-package+zip',
     source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
   });
 

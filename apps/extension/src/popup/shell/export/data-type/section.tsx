@@ -15,12 +15,22 @@ import {
 } from './options/data';
 import { ExportSelectionSectionShell } from '../selection/section-shell';
 import { cx } from '../selection/utils';
+import type { PopupPagePackagePreferenceState } from '../session/types';
+import {
+  PackagePresetControls,
+  WebCopyPackageCard,
+  type PopupPackageDestination,
+} from './package-controls';
 
 type DataTypeSectionProps = ExportOptionToggleProps & {
+  destination: PopupPackageDestination;
   isExpanded: boolean;
   isOpen: boolean;
   onClose: () => void;
   onOpen: () => void;
+  onRequestWebCopySetup: () => void;
+  packagePreferences: PopupPagePackagePreferenceState;
+  webSnapshotEnabled: boolean;
 };
 
 const rowClassName = [
@@ -168,12 +178,16 @@ function applyVisibleOptionSelection(args: {
 }
 
 function renderDataTypeBody(args: {
+  destination: PopupPackageDestination;
   disabled: boolean;
   filterQuery: string;
   setFilterQuery: (value: string) => void;
   shouldShowClearAll: boolean;
   toggleProps: ExportOptionToggleProps;
   visibleOptions: ExportOptionConfig[];
+  onRequestWebCopySetup: () => void;
+  packagePreferences: PopupPagePackagePreferenceState;
+  webSnapshotEnabled: boolean;
 }) {
   if (!args.visibleOptions.length && args.filterQuery.trim().length > 0) {
     return (
@@ -185,6 +199,20 @@ function renderDataTypeBody(args: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <PackagePresetControls
+        destination={args.destination}
+        disabled={args.disabled}
+        onRequestSetup={args.onRequestWebCopySetup}
+        preferences={args.packagePreferences}
+        webSnapshotEnabled={args.webSnapshotEnabled}
+      />
+      <WebCopyPackageCard
+        destination={args.destination}
+        disabled={args.disabled}
+        onRequestSetup={args.onRequestWebCopySetup}
+        preferences={args.packagePreferences}
+        webSnapshotEnabled={args.webSnapshotEnabled}
+      />
       <DataTypeFilterBar
         filterQuery={args.filterQuery}
         onToggleAll={() =>
@@ -216,7 +244,15 @@ function renderDataTypeBody(args: {
 export function ExportDataTypeSection(props: DataTypeSectionProps) {
   const [filterQuery, setFilterQuery] = useState('');
   const toggleProps = createSelectionProps(props);
-  const options = getExportOptionConfigs();
+  const options = useMemo(
+    () =>
+      getExportOptionConfigs().filter(
+        (option) =>
+          props.destination === 'export' ||
+          (option.key !== 'fullPageScreenshot' && option.key !== 'pageDiagnostics')
+      ),
+    [props.destination]
+  );
   const visibleOptions = useMemo(() => filterOptions(options, filterQuery), [filterQuery, options]);
   const selectedItems = options.filter((option) => getExportOptionActive(option.key, toggleProps));
   const visibleKeys = visibleOptions.map((option) => option.key);
@@ -234,16 +270,44 @@ export function ExportDataTypeSection(props: DataTypeSectionProps) {
         props.isOpen ? 'flex min-h-0 flex-1 flex-col pt-1' : 'max-h-[140px] overflow-hidden pt-1'
       )}
     >
-      {props.isOpen
-        ? renderDataTypeBody({
-            disabled: props.disabled,
-            filterQuery,
-            setFilterQuery,
-            shouldShowClearAll,
-            toggleProps,
-            visibleOptions,
-          })
-        : renderDataTypeSummaryItems(selectedItems, toggleProps)}
+      {props.destination === 'export' && props.includePageDiagnostics ? (
+        <div
+          role="status"
+          className={[
+            'mb-2 rounded-[9px] border px-2.5 py-2 text-[10px] leading-4',
+            'border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_42%,transparent)]',
+            'bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_9%,transparent)]',
+            'text-[var(--sniptale-color-text-secondary)]',
+          ].join(' ')}
+        >
+          {translate('popup.export.includePageDiagnosticsDisclosure')}
+        </div>
+      ) : null}
+      {props.isOpen ? (
+        renderDataTypeBody({
+          destination: props.destination,
+          disabled: props.disabled,
+          filterQuery,
+          setFilterQuery,
+          shouldShowClearAll,
+          toggleProps,
+          visibleOptions,
+          onRequestWebCopySetup: props.onRequestWebCopySetup,
+          packagePreferences: props.packagePreferences,
+          webSnapshotEnabled: props.webSnapshotEnabled,
+        })
+      ) : (
+        <>
+          <WebCopyPackageCard
+            destination={props.destination}
+            disabled={props.disabled}
+            onRequestSetup={props.onRequestWebCopySetup}
+            preferences={props.packagePreferences}
+            webSnapshotEnabled={props.webSnapshotEnabled}
+          />
+          {renderDataTypeSummaryItems(selectedItems, toggleProps)}
+        </>
+      )}
     </ExportSelectionSectionShell>
   );
 }

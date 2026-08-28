@@ -2,14 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { runProvenanceUrlMaintenance } from './provenance';
 
 describe('db provenance URL maintenance', () => {
-  it('sanitizes persisted provenance URLs in owned readwrite transactions', async () => {
-    const { mediaCursor, snapshotCursor, workspaceCursor } = createProvenanceCursors();
+  it('sanitizes persisted media and workspace provenance URLs in owned transactions', async () => {
+    const { mediaCursor, workspaceCursor } = createProvenanceCursors();
 
     await runProvenanceUrlMaintenance(
       createMaintenanceDb({
         image_workspaces: [workspaceCursor],
         media_library: [mediaCursor],
-        web_snapshots: [snapshotCursor],
       })
     );
 
@@ -22,16 +21,6 @@ describe('db provenance URL maintenance', () => {
     expect(workspaceCursor.put).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceUrl: 'https://example.com/docs/readme',
-      })
-    );
-    expect(snapshotCursor.put).toHaveBeenCalledWith(
-      expect.objectContaining({
-        manifest: expect.objectContaining({
-          source: {
-            faviconUrl: 'https://example.com/favicon.ico',
-            url: 'https://example.com/',
-          },
-        }),
       })
     );
   });

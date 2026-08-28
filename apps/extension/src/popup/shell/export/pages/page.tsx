@@ -43,6 +43,7 @@ function getWebSnapshotResultAction(controller: ExportController) {
 
 function getExportFooterCallbacks(args: {
   controller: ExportController;
+  onRequestExport: () => void;
   onRequestWebSnapshotSave: () => void;
 }) {
   return {
@@ -63,7 +64,7 @@ function getExportFooterCallbacks(args: {
       args.onRequestWebSnapshotSave();
     },
     onStartExport: () => {
-      void args.controller.actions.handleStartExport();
+      args.onRequestExport();
     },
   };
 }
@@ -73,6 +74,7 @@ function getExportFooterProps(args: {
   pageAccess: PopupPageAccessRuntime;
   controller: ExportController;
   exportDisabledTitle: string | null;
+  onRequestExport: () => void;
   onRequestWebSnapshotSave: () => void;
 }) {
   const { derived, session } = args.controller.state;
@@ -84,6 +86,7 @@ function getExportFooterProps(args: {
     canCopyJson: derived.canCopyJson,
     canCopyMarkdown: derived.canCopyMarkdown,
     canSaveWebSnapshot:
+      args.controller.state.preferences.hasLoadedPreferences &&
       !args.activeTabCapabilities.export.reason &&
       !args.pageAccess.disabledReason &&
       !derived.isExporting,
@@ -97,6 +100,7 @@ function getExportFooterProps(args: {
     isResultReady,
     ...getExportFooterCallbacks({
       controller: args.controller,
+      onRequestExport: args.onRequestExport,
       onRequestWebSnapshotSave: args.onRequestWebSnapshotSave,
     }),
     saveWebSnapshotTitle: translate('popup.export.saveWebSnapshotTitle'),
@@ -123,6 +127,8 @@ function ExportPageLayout({
   onOpenWebSnapshotSettings,
   webSnapshotSetupOpen,
   webSnapshotStatus,
+  webSnapshotEnabled,
+  onRequestWebSnapshotSetup,
 }: {
   controller: ExportController;
   footerProps: ExportFooterActionsProps;
@@ -130,11 +136,17 @@ function ExportPageLayout({
   onOpenWebSnapshotSettings: () => void;
   webSnapshotSetupOpen: boolean;
   webSnapshotStatus: 'error' | 'loaded' | 'loading';
+  webSnapshotEnabled: boolean;
+  onRequestWebSnapshotSetup: () => void;
 }) {
   return (
     <div className="flex h-full flex-col gap-3">
       <section className={exportPageContentSectionClassName}>
-        <ExportPageContent controller={controller} />
+        <ExportPageContent
+          controller={controller}
+          onRequestWebCopySetup={onRequestWebSnapshotSetup}
+          webSnapshotEnabled={webSnapshotEnabled}
+        />
         <div className="mt-auto shrink-0 pt-3" data-ui="popup.export.actions">
           <ExportFooterActions {...footerProps} />
         </div>
@@ -177,6 +189,13 @@ export function ExportPage({
     pageAccess,
     controller,
     exportDisabledTitle,
+    onRequestExport: () => {
+      if (controller.state.preferences.includeWebCopy && !webSnapshotAvailability.enabled) {
+        setWebSnapshotSetupOpen(true);
+        return;
+      }
+      void controller.actions.handleStartExport();
+    },
     onRequestWebSnapshotSave: () => {
       if (webSnapshotAvailability.enabled) {
         void controller.actions.handleSaveWebSnapshot();
@@ -194,6 +213,8 @@ export function ExportPage({
       onOpenWebSnapshotSettings={() => {
         void openSettingsPage({ route: { section: 'web-snapshots' } });
       }}
+      onRequestWebSnapshotSetup={() => setWebSnapshotSetupOpen(true)}
+      webSnapshotEnabled={webSnapshotAvailability.enabled}
       webSnapshotSetupOpen={webSnapshotSetupOpen}
       webSnapshotStatus={webSnapshotAvailability.status}
     />

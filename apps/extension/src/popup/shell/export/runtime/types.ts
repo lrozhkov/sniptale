@@ -1,20 +1,15 @@
-import type { PopupExportPreview, PopupExportJobStatus } from '@sniptale/runtime-contracts/export';
+import type { PopupExportPreview } from '@sniptale/runtime-contracts/export';
+import type { PagePackageJobStatusV1 } from '@sniptale/runtime-contracts/page-package';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { getActiveTabId } from '../../tab-access';
 import type {
   RuntimeRequestByType,
   RuntimeResponseByType,
 } from '../../../../contracts/messaging/contracts/runtime-message';
-import type { TabResponseByType } from '../../../../contracts/messaging/tab';
 
 type PopupExportPreviewErrorKey =
   | 'popup.export.prepareExportError'
   | 'popup.export.startExportError';
-type PopupExportSaveWebSnapshotMessage = Omit<
-  RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT],
-  'tabId' | 'tabRouteCapabilityToken' | 'tabRouteRequestId'
->;
-
 export type PopupExportRuntimeDeps = {
   clearTimeout: (timeoutId: number) => void;
   createRequestId: () => string;
@@ -24,23 +19,19 @@ export type PopupExportRuntimeDeps = {
     fallbackKey: PopupExportPreviewErrorKey
   ) => Promise<PopupExportPreview>;
   scheduleTimeout: (callback: () => void, delayMs: number) => number;
-  sendSaveWebSnapshotMessage?: (
-    tabId: number,
-    message: PopupExportSaveWebSnapshotMessage
-  ) => Promise<TabResponseByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]>;
   requestAllUrlsPermission?: () => Promise<boolean>;
   sendStartJobMessage?: (
-    message: RuntimeRequestByType[typeof MessageType.START_POPUP_EXPORT_JOB]
-  ) => Promise<RuntimeResponseByType[typeof MessageType.START_POPUP_EXPORT_JOB]>;
+    message: RuntimeRequestByType[typeof MessageType.START_PAGE_PACKAGE_JOB]
+  ) => Promise<RuntimeResponseByType[typeof MessageType.START_PAGE_PACKAGE_JOB]>;
   sendGetJobStatusMessage?: (
-    message: RuntimeRequestByType[typeof MessageType.GET_POPUP_EXPORT_JOB_STATUS]
-  ) => Promise<RuntimeResponseByType[typeof MessageType.GET_POPUP_EXPORT_JOB_STATUS]>;
+    message: RuntimeRequestByType[typeof MessageType.GET_PAGE_PACKAGE_JOB_STATUS]
+  ) => Promise<RuntimeResponseByType[typeof MessageType.GET_PAGE_PACKAGE_JOB_STATUS]>;
   sendCancelJobMessage?: (
-    message: RuntimeRequestByType[typeof MessageType.CANCEL_POPUP_EXPORT_JOB]
-  ) => Promise<RuntimeResponseByType[typeof MessageType.CANCEL_POPUP_EXPORT_JOB]>;
+    message: RuntimeRequestByType[typeof MessageType.CANCEL_PAGE_PACKAGE_JOB]
+  ) => Promise<RuntimeResponseByType[typeof MessageType.CANCEL_PAGE_PACKAGE_JOB]>;
   sendAckJobStatusMessage?: (
-    message: RuntimeRequestByType[typeof MessageType.ACK_POPUP_EXPORT_JOB_STATUS]
-  ) => Promise<RuntimeResponseByType[typeof MessageType.ACK_POPUP_EXPORT_JOB_STATUS]>;
+    message: RuntimeRequestByType[typeof MessageType.ACK_PAGE_PACKAGE_JOB_STATUS]
+  ) => Promise<RuntimeResponseByType[typeof MessageType.ACK_PAGE_PACKAGE_JOB_STATUS]>;
   writeClipboardText: (text: string) => Promise<void>;
 };
 
@@ -48,7 +39,7 @@ export type { PopupExportRuntimeContract } from './state';
 
 export type PopupExportRuntimeMessage =
   | {
-      type: typeof MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
-      status: PopupExportJobStatus;
+      type: typeof MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED;
+      status: PagePackageJobStatusV1;
     }
   | RuntimeRequestByType[typeof MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED];

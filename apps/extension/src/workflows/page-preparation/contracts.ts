@@ -1,4 +1,3 @@
-import type { RuntimeRequestByType } from '../../contracts/messaging/contracts/runtime-message';
 import type { TabRequestByType, TabResponseByType } from '../../contracts/messaging/tab';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -16,10 +15,6 @@ export const PREPARATION_SURFACE_RESIZE = 'PREPARATION_SURFACE_RESIZE' as const;
 export type ViewerPopupExportMessage =
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
-  | Omit<
-      RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT],
-      'tabId' | 'tabRouteCapabilityToken' | 'tabRouteRequestId'
-    >
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL];
 
 export type ViewerExportPortRequest = {

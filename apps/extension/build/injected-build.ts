@@ -12,17 +12,12 @@ import {
 } from './content-runtime-build-id';
 import {
   assertBundleHasNoImports,
-  assertInjectedBundlesAreNotWebAccessible,
-  collectWebAccessibleResources,
   createInlineCssTextPlugin,
   createReleaseSafeDependencyAliasPlugin,
   getReleaseDrop,
   resolveOutDir,
 } from './injected-build-support';
 
-const WEB_SNAPSHOT_INJECTED_RUNNER_ENTRY =
-  'apps/extension/src/content/parser/web-snapshot/injected-runner.ts';
-const WEB_SNAPSHOT_INJECTED_RUNNER_OUTPUT = 'assets/webSnapshotInjectedRunner.js';
 const CONTENT_RUNTIME_ENTRY = 'apps/extension/src/content/index.tsx';
 const CONTENT_RUNTIME_OUTPUT = 'assets/contentRuntime.js';
 const CONTENT_RUNTIME_SHIM_ENTRY = 'apps/extension/src/content/runtime/shim/index.ts';
@@ -140,53 +135,6 @@ export function buildContentRuntimeShim(mode: string): Plugin {
       assertBundleHasNoImports('Injected content runtime shim', imports);
       assertContentRuntimeShimInputsAreCompact(result.metafile.inputs);
       assertContentRuntimeShimOutputIsCompact(await readFile(shimOutputPath, 'utf8'));
-    },
-  };
-}
-
-export function buildWebSnapshotInjectedRunner(mode: string): Plugin {
-  let appRoot = process.cwd();
-  let repositoryRoot = resolvePath(appRoot, '../..');
-  let outDir = resolveOutDir(appRoot, 'dist');
-
-  return {
-    apply: 'build',
-    name: 'sniptale:web-snapshot-injected-runner',
-    configResolved(config) {
-      appRoot = config.root;
-      repositoryRoot = resolvePath(appRoot, '../..');
-      outDir = resolveOutDir(config.root, config.build.outDir);
-    },
-    async writeBundle() {
-      const runnerOutputPath = join(outDir, WEB_SNAPSHOT_INJECTED_RUNNER_OUTPUT);
-      const result = await buildEsbuild({
-        absWorkingDir: appRoot,
-        bundle: true,
-        define: {
-          __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
-          __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
-          __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
-          __TRACE_MESSAGES__: JSON.stringify(isTraceMessagesEnabledForMode(mode)),
-          'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),
-        },
-        drop: getReleaseDrop(mode),
-        entryPoints: [join(repositoryRoot, WEB_SNAPSHOT_INJECTED_RUNNER_ENTRY)],
-        format: 'iife',
-        legalComments: 'eof',
-        logLevel: 'silent',
-        metafile: true,
-        minify: mode === 'release',
-        outfile: runnerOutputPath,
-        platform: 'browser',
-        plugins: [createReleaseSafeDependencyAliasPlugin(repositoryRoot)],
-        sourcemap: mode !== 'release',
-        target: ['chrome140'],
-      });
-      const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports);
-      assertBundleHasNoImports('Injected web snapshot runner', imports);
-
-      const builtManifest = JSON.parse(await readFile(join(outDir, 'manifest.json'), 'utf8'));
-      assertInjectedBundlesAreNotWebAccessible(collectWebAccessibleResources(builtManifest));
     },
   };
 }

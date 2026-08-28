@@ -38,6 +38,32 @@ function createDefaultDerivedState(): PopupExportController['state']['derived'] 
 }
 
 function createDefaultPreferencesState(): PopupExportController['state']['preferences'] {
+  const save = {
+    actions: {
+      setIncludeAnnotations: vi.fn(),
+      setIncludeBasicLogs: vi.fn(),
+      setIncludeCssDiagnostics: vi.fn(),
+      setIncludeFiles: vi.fn(),
+      setIncludeFullPageScreenshot: vi.fn(),
+      setIncludePageDiagnostics: vi.fn(),
+      setIncludeImages: vi.fn(),
+      setIncludeJson: vi.fn(),
+      setIncludeMarkdown: vi.fn(),
+    },
+    includeWebCopy: true,
+    setIncludeWebCopy: vi.fn(),
+    values: {
+      includeAnnotations: false,
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: false,
+      includePageDiagnostics: false,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+    },
+  };
   return {
     actions: {
       setIncludeAnnotations: vi.fn(),
@@ -51,6 +77,9 @@ function createDefaultPreferencesState(): PopupExportController['state']['prefer
       setIncludeMarkdown: vi.fn(),
     },
     hasLoadedPreferences: true,
+    includeWebCopy: false,
+    save,
+    setIncludeWebCopy: vi.fn(),
     values: {
       includeAnnotations: false,
       includeBasicLogs: false,
@@ -72,6 +101,7 @@ function createDefaultSessionState(): PopupExportController['state']['session'] 
       setCopyingFormat: vi.fn(),
       setProgress: vi.fn(),
       setResult: vi.fn(),
+      setLaunchedPlan: vi.fn(),
     },
     copy: {
       copiedFormat: null,
@@ -84,6 +114,7 @@ function createDefaultSessionState(): PopupExportController['state']['session'] 
       requestIdRef: { current: null },
     },
     transfer: {
+      launchedPlan: null,
       progress: {
         activeStepKey: null,
         current: 0,
@@ -185,6 +216,9 @@ function createPreferencesState(
   const state: PopupExportController['state']['preferences'] = {
     actions: { ...defaults.actions, ...overrides?.actions },
     hasLoadedPreferences: overrides?.hasLoadedPreferences ?? defaults.hasLoadedPreferences,
+    includeWebCopy: overrides?.includeWebCopy ?? defaults.includeWebCopy,
+    save: overrides?.save ?? defaults.save,
+    setIncludeWebCopy: overrides?.setIncludeWebCopy ?? defaults.setIncludeWebCopy,
     values: { ...defaults.values, ...overrides?.values },
   };
 

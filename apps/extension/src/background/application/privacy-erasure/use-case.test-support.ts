@@ -8,7 +8,7 @@ import { createBackgroundRuntimeState } from '../runtime-state';
 import { reserveDiagnosticsErasureExclusion } from '../../diagnostics/lifecycle-gate';
 import { reserveMediaErasureExclusion } from '../../mutation-exclusion/media-activity';
 import { reserveNativeIngestionErasureExclusion } from '../../capture/native-app/lifecycle-gate';
-import { reservePopupExportErasureExclusion } from '../../capture/popup-export/job/lifecycle-gate';
+import { reservePopupExportErasureExclusion } from '../../capture/page-package/job/lifecycle-gate';
 import type { PrivacyErasurePorts } from './ports';
 
 export function verified(id: string): ErasureParticipantResult {
@@ -68,6 +68,9 @@ export function createPorts(order: string[] = []): PrivacyErasurePorts {
       reserveErasureExclusion: reserveNativeIngestionErasureExclusion,
     },
     popupExport: {
+      cancelActiveJob: vi.fn(async () => {
+        order.push('page-package-cancel');
+      }),
       reserveErasureExclusion: reservePopupExportErasureExclusion,
     },
     runtime: {

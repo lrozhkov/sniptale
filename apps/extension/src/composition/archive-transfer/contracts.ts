@@ -66,6 +66,11 @@ export interface ArchiveWriter {
     blob: Blob,
     options?: { compress?: boolean; signal?: AbortSignal }
   ): Promise<void>;
+  addSource(
+    path: string,
+    source: ArchiveEntrySource,
+    options?: { compress?: boolean; signal?: AbortSignal }
+  ): Promise<void>;
   addText(path: string, text: string, options?: { signal?: AbortSignal }): Promise<void>;
   close(): Promise<void>;
   abort(reason?: unknown): Promise<void>;

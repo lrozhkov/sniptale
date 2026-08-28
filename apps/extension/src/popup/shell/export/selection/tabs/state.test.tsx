@@ -336,6 +336,24 @@ it('toggles every exportable tab on and off when the list is unfiltered', async 
   expect(latestValue?.selectedTabIds).toEqual([]);
 });
 
+it('caps select-all and individual additions at the export job tab maximum', async () => {
+  mocks.browserTabsQuery.mockResolvedValue(
+    Array.from({ length: 260 }, (_, index) => ({
+      id: index + 100,
+      title: `Tab ${index + 1}`,
+      url: `https://example.test/${index + 1}`,
+    }))
+  );
+
+  await renderHarness();
+  await flushEffects();
+  await act(async () => latestValue?.toggleSelectAllTabs());
+  expect(latestValue?.selectedTabIds).toHaveLength(256);
+
+  await act(async () => latestValue?.toggleTabSelection(359));
+  expect(latestValue?.selectedTabIds).toHaveLength(256);
+});
+
 it('replaces selection with filtered exportable tabs when bulk-selecting a filtered list', async () => {
   mocks.browserTabsQuery.mockResolvedValue([
     { id: 7, title: 'Current tab', url: 'https://example.test/current' },

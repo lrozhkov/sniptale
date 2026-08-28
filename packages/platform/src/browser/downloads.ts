@@ -5,6 +5,7 @@ import { runChromeCallback, subscribeToChromeEvent } from './callback';
  */
 interface BrowserDownloadsAdapter {
   isAvailable(): boolean;
+  cancel(downloadId: number): Promise<void>;
   download(options: chrome.downloads.DownloadOptions): Promise<number | undefined>;
   search(query: chrome.downloads.DownloadQuery): Promise<chrome.downloads.DownloadItem[]>;
   subscribeToCreated(
@@ -25,6 +26,17 @@ export const browserDownloads: BrowserDownloadsAdapter = {
       typeof chrome !== 'undefined' &&
       typeof chrome.downloads?.download === 'function' &&
       Boolean(chrome.downloads.onChanged && chrome.downloads.onCreated)
+    );
+  },
+
+  cancel(downloadId) {
+    if (!chrome.downloads) {
+      return Promise.reject(new Error('chrome.downloads is unavailable'));
+    }
+
+    return runChromeCallback<void>(
+      (callback) => chrome.downloads.cancel(downloadId, callback),
+      'chrome.downloads is unavailable'
     );
   },
 

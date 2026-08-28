@@ -17,7 +17,7 @@ import {
 import { recoverInterruptedSessions } from '../../../diagnostics/lifecycle';
 import { clearRetiredFullPageCaptureLease } from '../../../storage/full-page-capture';
 import { clearRetiredDiagnosticSnapshots } from '../../../storage/diagnostics/active-sessions';
-import { interruptStoredPopupExportJob } from '../../../capture/popup-export/job/storage';
+import { recoverInterruptedPagePackageJob } from '../../../capture/page-package/job/recovery';
 import { reconcileBackgroundRuntimeStartupState } from '../../../application/runtime-state';
 import {
   recoverVideoCaptureSurfaceOnStartup,
@@ -41,8 +41,8 @@ export function runStartupMaintenance(
   removeRetiredSynchronizedSettings().catch((error) => {
     logger.warn('Retired synchronized settings cleanup failed (non-critical)', error);
   });
-  interruptStoredPopupExportJob().catch((error) => {
-    logger.warn('Popup export restart reconciliation failed (non-critical)', error);
+  recoverInterruptedPagePackageJob().catch((error) => {
+    logger.warn('Page Package restart reconciliation failed (non-critical)', error);
   });
 
   ensurePersistentStorage().catch((error) => {

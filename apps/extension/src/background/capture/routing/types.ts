@@ -85,9 +85,6 @@ export type RouteCaptureMessage =
       storageClass?: 'temporary' | 'library';
       contentIntent?: ContentPrivilegedActionCapability;
     }
-  | ({
-      type: 'SAVE_WEB_SNAPSHOT_TO_GALLERY';
-    } & import('@sniptale/runtime-contracts/web-snapshot').WebSnapshotSaveToGalleryPayload)
   | {
       type: 'REGISTER_WEB_SNAPSHOT_ASSETS';
       assetUrls: string[];
@@ -98,12 +95,14 @@ export type RouteCaptureMessage =
       snapshotSessionId: string;
       url: string;
     }
-  | ({
-      type: 'STAGE_WEB_SNAPSHOT_BLOB_CHUNK';
-    } & import('@sniptale/runtime-contracts/web-snapshot').WebSnapshotStageBlobChunkPayload)
   | {
-      type: 'RELEASE_WEB_SNAPSHOT_STAGED_BLOBS';
-      snapshotSessionId: string;
+      base64: string;
+      final: boolean;
+      jobId: string;
+      ordinal: number;
+      sequence: number;
+      stagedBlobId: string;
+      type: 'STAGE_PAGE_PACKAGE_JOB_CHUNK';
     }
   | {
       type: 'TRIGGER_QUICK_ACTION';

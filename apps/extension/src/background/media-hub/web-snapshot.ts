@@ -1,10 +1,7 @@
 import { saveWebSnapshotMediaAssetSafely } from '../../workflows/media-hub/store';
 import { createMediaHubStorageHeadroomError } from '../../features/media-hub/storage-errors';
 import { sanitizeWebSnapshotFilename } from '../../features/web-snapshot/public';
-import {
-  sanitizeWebSnapshotManifestProvenance,
-  sanitizeWebSnapshotPackageProvenance,
-} from '../../features/web-snapshot/provenance';
+import { sanitizeWebSnapshotManifestProvenance } from '../../features/web-snapshot/provenance';
 import { ensureMediaHubStorageHeadroom } from '../../features/media-hub/storage-capacity';
 import type {
   WebSnapshotManifest,
@@ -13,6 +10,7 @@ import type {
 import { validateWebSnapshotPackage } from './web-snapshot-validation';
 
 interface SaveWebSnapshotToMediaHubInput {
+  assetId?: string;
   assertPersistenceAllowed: () => Promise<void>;
   packageBlob: Blob;
   payload: WebSnapshotSaveToGalleryPayload;
@@ -21,7 +19,7 @@ interface SaveWebSnapshotToMediaHubInput {
 
 function createSnapshotFilename(manifest: WebSnapshotManifest): string {
   const sourceTitle = manifest.source.title ?? manifest.source.url ?? 'web-snapshot';
-  return `${sanitizeWebSnapshotFilename(sourceTitle, 'web-snapshot')}.sniptale-web-snapshot.zip`;
+  return `${sanitizeWebSnapshotFilename(sourceTitle, 'web-snapshot')}.sniptale-page-package.zip`;
 }
 
 function createWebSnapshotMediaHubStageError(stage: string, error: unknown): Error {
@@ -53,24 +51,21 @@ export async function saveWebSnapshotToMediaHub(
     validateWebSnapshotPackage({ packageBlob, payload, screenshotBlob })
   );
   const sanitizedManifest = sanitizeWebSnapshotManifestProvenance(payload.manifest);
-  const sanitizedPackage = await runWebSnapshotMediaHubStage(
-    'sanitize web snapshot provenance',
-    () => sanitizeWebSnapshotPackageProvenance(packageBlob, sanitizedManifest)
-  );
 
   await runWebSnapshotMediaHubStage('ensure web snapshot storage headroom', () =>
-    ensureWebSnapshotStorageHeadroom(sanitizedPackage.size + screenshotBlob.size)
+    ensureWebSnapshotStorageHeadroom(packageBlob.size + screenshotBlob.size)
   );
   const result = await runWebSnapshotMediaHubStage('save web snapshot media asset', () =>
     saveWebSnapshotMediaAssetSafely(
       {
-        filename: createSnapshotFilename(sanitizedPackage.manifest),
-        manifest: sanitizedPackage.manifest,
-        packageBlob: sanitizedPackage.packageBlob,
+        ...(input.assetId ? { id: input.assetId } : {}),
+        filename: createSnapshotFilename(sanitizedManifest),
+        manifest: sanitizedManifest,
+        packageBlob,
         screenshotBlob,
-        sourceFavicon: sanitizedPackage.manifest.source.faviconUrl,
-        sourceTitle: sanitizedPackage.manifest.source.title,
-        sourceUrl: sanitizedPackage.manifest.source.url,
+        sourceFavicon: sanitizedManifest.source.faviconUrl,
+        sourceTitle: sanitizedManifest.source.title,
+        sourceUrl: sanitizedManifest.source.url,
       },
       input.assertPersistenceAllowed
     )

@@ -12,16 +12,16 @@ describe('background runtime message preflight classifier', () => {
     expect(classifyRuntimeMessageRoute({ type: MessageType.PROCESS_WITH_LLM })).toEqual({
       kind: 'background-owned',
     });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.START_POPUP_EXPORT_JOB })).toEqual({
+    expect(classifyRuntimeMessageRoute({ type: MessageType.START_PAGE_PACKAGE_JOB })).toEqual({
       kind: 'background-owned',
     });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.GET_POPUP_EXPORT_JOB_STATUS })).toEqual({
+    expect(classifyRuntimeMessageRoute({ type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS })).toEqual({
       kind: 'background-owned',
     });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.CANCEL_POPUP_EXPORT_JOB })).toEqual({
+    expect(classifyRuntimeMessageRoute({ type: MessageType.CANCEL_PAGE_PACKAGE_JOB })).toEqual({
       kind: 'background-owned',
     });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS })).toEqual({
+    expect(classifyRuntimeMessageRoute({ type: MessageType.ACK_PAGE_PACKAGE_JOB_STATUS })).toEqual({
       kind: 'background-owned',
     });
     expect(classifyRuntimeMessageRoute({ type: VideoMessageType.GET_RECORDING_STATE })).toEqual({

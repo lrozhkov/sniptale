@@ -72,7 +72,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/application/privacy-erasure/route.ts`
 - `apps/extension/src/background/application/settings-transfer/route.ts`
 - `apps/extension/src/background/capture/annotation-export/route.ts`
-- `apps/extension/src/background/capture/popup-export/job/route.ts`
+- `apps/extension/src/background/capture/page-package/job/route.ts`
 - `apps/extension/src/background/capture/routing/actions.download.ts`
 - `apps/extension/src/background/capture/routing/actions.export.ts`
 - `apps/extension/src/background/capture/routing/actions.gallery-update.ts`

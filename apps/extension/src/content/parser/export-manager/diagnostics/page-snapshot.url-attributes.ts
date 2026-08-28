@@ -28,6 +28,7 @@ const REMOVED_CONTENT_ATTRIBUTES = ['srcdoc', 'style'] as const;
 const URL_ATTRIBUTE_NAME_SET = new Set<string>(URL_ATTRIBUTE_NAMES);
 const SRCSET_ATTRIBUTE_NAME_SET = new Set<string>(SRCSET_ATTRIBUTE_NAMES);
 const DATA_SRCSET_ATTRIBUTE_NAMES = new Set(['data-image-srcset']);
+type DiagnosticAttributeUrlSanitizer = (url: string | undefined) => string | undefined;
 
 function normalizeAttributeName(attributeName: string): string {
   return attributeName.toLowerCase().replace(/_/g, '-');
@@ -47,45 +48,68 @@ export function isRetainedUrlAttributeName(attributeName: string): boolean {
   return isUrlAttributeName(attributeName) || isSrcsetAttributeName(attributeName);
 }
 
+export function sanitizeDiagnosticUrlAttributeValue(
+  attributeName: string,
+  value: string,
+  sanitizeUrl: DiagnosticAttributeUrlSanitizer = sanitizeDiagnosticUrl
+): string | null {
+  if (isSrcsetAttributeName(attributeName)) {
+    return sanitizeDiagnosticSrcsetAttribute(value, sanitizeUrl);
+  }
+  if (!isUrlAttributeName(attributeName)) return null;
+  return normalizeAttributeName(attributeName) === 'ping'
+    ? sanitizeDiagnosticUrlListAttribute(value, sanitizeUrl)
+    : (sanitizeUrl(value) ?? '');
+}
+
 export function sanitizeUrlAttributes(element: HTMLElement): void {
   for (const attributeName of REMOVED_CONTENT_ATTRIBUTES) {
     element.removeAttribute(attributeName);
   }
   for (const attribute of Array.from(element.attributes)) {
-    if (isSrcsetAttributeName(attribute.name)) {
-      element.setAttribute(attribute.name, sanitizeSrcsetAttribute(attribute.value));
-      continue;
-    }
-
-    if (isUrlAttributeName(attribute.name)) {
-      const sanitizedValue = sanitizeDiagnosticUrl(attribute.value);
-      element.setAttribute(attribute.name, sanitizedValue ?? '');
-    }
+    const sanitizedValue = sanitizeDiagnosticUrlAttributeValue(attribute.name, attribute.value);
+    if (sanitizedValue !== null) element.setAttribute(attribute.name, sanitizedValue);
   }
 }
 
-function sanitizeSrcsetAttribute(value: string): string {
+function sanitizeDiagnosticSrcsetAttribute(
+  value: string,
+  sanitizeUrl: DiagnosticAttributeUrlSanitizer = sanitizeDiagnosticUrl
+): string {
   return splitSrcsetCandidates(value)
-    .map((candidate) => sanitizeSrcsetCandidate(candidate.trim()))
+    .map((candidate) => sanitizeSrcsetCandidate(candidate.trim(), sanitizeUrl))
     .filter((candidate) => candidate.length > 0)
     .join(', ');
+}
+
+function sanitizeDiagnosticUrlListAttribute(
+  value: string,
+  sanitizeUrl: DiagnosticAttributeUrlSanitizer = sanitizeDiagnosticUrl
+): string {
+  return splitByWhitespace(value)
+    .map((url) => sanitizeUrl(url) ?? '')
+    .filter(Boolean)
+    .join(' ');
 }
 
 function splitSrcsetCandidates(value: string): string[] {
   const candidates: string[] = [];
   let current = '';
+  let dataUrlCandidate = false;
   let inDataUrlPayload = false;
 
   for (const char of value) {
     if (char === ',' && !inDataUrlPayload) {
       candidates.push(current);
       current = '';
+      dataUrlCandidate = false;
       continue;
     }
 
     current += char;
-    if (!inDataUrlPayload && current.trimStart().toLowerCase().startsWith('data:')) {
-      inDataUrlPayload = char !== ',';
+    if (!dataUrlCandidate && current.trimStart().toLowerCase().startsWith('data:')) {
+      dataUrlCandidate = true;
+      inDataUrlPayload = true;
       continue;
     }
     if (inDataUrlPayload && isWhitespaceChar(char)) {
@@ -97,9 +121,12 @@ function splitSrcsetCandidates(value: string): string[] {
   return candidates;
 }
 
-function sanitizeSrcsetCandidate(candidate: string): string {
+function sanitizeSrcsetCandidate(
+  candidate: string,
+  sanitizeUrl: DiagnosticAttributeUrlSanitizer
+): string {
   const [url = '', ...descriptorParts] = splitByWhitespace(candidate);
-  const sanitizedUrl = sanitizeDiagnosticUrl(url) ?? '';
+  const sanitizedUrl = sanitizeUrl(url) ?? '';
   const descriptor = sanitizeSrcsetDescriptor(descriptorParts);
   return descriptor ? `${sanitizedUrl} ${descriptor}` : sanitizedUrl;
 }

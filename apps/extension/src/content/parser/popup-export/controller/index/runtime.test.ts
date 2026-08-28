@@ -5,6 +5,7 @@ import { createPopupExportControllerRuntime } from './runtime';
 function createRuntime() {
   return createPopupExportControllerRuntime({
     exportRunner: {
+      buildBlobPackage: vi.fn(),
       buildPackage: vi.fn(),
       cancel: vi.fn(),
     },

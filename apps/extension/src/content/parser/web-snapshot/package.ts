@@ -1,23 +1,29 @@
-import type JSZip from 'jszip';
 import type { ArchiveAsset } from '../export-manager/archive';
+import { normalizePopupExportTabTitle } from '@sniptale/runtime-contracts/export';
+import {
+  normalizePagePackageOptionalUrl,
+  normalizePagePackageWarnings,
+} from '@sniptale/runtime-contracts/page-package';
 import { buildCssDiagnosticAssets } from '../export-manager/diagnostics/css';
+import {
+  buildDomSnapshotHtml,
+  buildVirtualDomSnapshotHtml,
+} from '../export-manager/diagnostics/snapshot';
 import type { ExportDiagnosticsSource } from '../export-manager/diagnostics/source';
-import {
-  hashWebSnapshotAssetBlob,
-  normalizeWebSnapshotAssetMimeType,
-} from '../../../features/web-snapshot/asset-manifest';
-import {
-  createWebSnapshotManifest,
-  WEB_SNAPSHOT_PACKAGE_PATHS,
-} from '../../../features/web-snapshot/manifest';
+import { hashWebSnapshotAssetBlob } from '../../../features/web-snapshot/asset-manifest';
 import { sanitizeWebSnapshotSourceUrl } from '../../../features/web-snapshot/public';
-import type { WebSnapshotAssetManifestEntry } from '@sniptale/runtime-contracts/web-snapshot';
+import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
+import {
+  composePagePackage,
+  type ComposedPagePackage,
+} from '../../../workflows/page-package/composer';
+import { createDiagnosticContributions } from '../../../workflows/page-package/contributions/diagnostics';
+import { createSafeWebCopyContributions } from '../../../workflows/page-package/contributions/web-copy';
 import {
   MAX_WEB_SNAPSHOT_ASSET_BYTES,
   MAX_WEB_SNAPSHOT_ASSETS_BYTES,
   MAX_WEB_SNAPSHOT_DIAGNOSTICS_BYTES,
   MAX_WEB_SNAPSHOT_HTML_BYTES,
-  MAX_WEB_SNAPSHOT_PACKAGE_BLOB_BYTES,
   MAX_WEB_SNAPSHOT_PACKAGE_INPUT_BYTES,
   MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES,
   MAX_WEB_SNAPSHOT_WARNINGS,
@@ -29,21 +35,22 @@ import type {
   WebSnapshotWarningStats,
 } from './types';
 
+const THUMBNAIL_WIDTH = 320;
+const THUMBNAIL_HEIGHT = 180;
+
 function getTextByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
 
 function assertWithinByteLimit(label: string, size: number, maxSize: number): void {
-  if (size > maxSize) {
-    throw new Error(`${label} is too large.`);
-  }
+  if (size > maxSize) throw new Error(`${label} is too large.`);
 }
 
-function getWarningsByteLength(warnings: string[]): number {
+function getWarningsByteLength(warnings: readonly string[]): number {
   return warnings.reduce((total, warning) => total + getTextByteLength(warning), 0);
 }
 
-function getAssetsByteLength(assets: WebSnapshotAssetEntry[]): number {
+function getAssetsByteLength(assets: readonly WebSnapshotAssetEntry[]): number {
   return assets.reduce((total, asset) => total + asset.blob.size, 0);
 }
 
@@ -57,55 +64,62 @@ interface DomDiagnosticSnapshots {
 }
 
 function createDomDiagnosticSnapshots(args: {
-  cssDiagnostics: ArchiveAsset[];
-  html: string;
-  warnings: string[];
+  cssDiagnostics: readonly ArchiveAsset[];
+  diagnosticsSource?: ExportDiagnosticsSource | undefined;
+  warnings: readonly string[];
 }): DomDiagnosticSnapshots {
+  const domSnapshot = buildDomSnapshotHtml(args.diagnosticsSource);
+  const virtualDomSnapshot = buildVirtualDomSnapshotHtml(args.diagnosticsSource);
   const supportingDiagnosticsBytes =
     getWarningsByteLength(args.warnings) +
     args.cssDiagnostics.reduce((total, asset) => total + getArchiveAssetByteLength(asset), 0);
-  const htmlBytes = getTextByteLength(args.html);
-
-  if (supportingDiagnosticsBytes + htmlBytes * 2 <= MAX_WEB_SNAPSHOT_DIAGNOSTICS_BYTES) {
-    return { domSnapshot: args.html, virtualDomSnapshot: args.html };
+  const diagnosticsBytes = getTextByteLength(domSnapshot) + getTextByteLength(virtualDomSnapshot);
+  if (supportingDiagnosticsBytes + diagnosticsBytes <= MAX_WEB_SNAPSHOT_DIAGNOSTICS_BYTES) {
+    return { domSnapshot, virtualDomSnapshot };
   }
-
   const reference = [
-    '<!-- Sniptale DOM diagnostic omitted to keep the package within its diagnostics budget. -->',
-    `<!-- Canonical static document: ${WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml}; bytes=${htmlBytes}. -->`,
+    '<!-- DOM diagnostic omitted to keep the Page Package within its diagnostics budget. -->',
+    '<!-- Canonical static document: snapshot/index.html. -->',
   ].join('\n');
   return { domSnapshot: reference, virtualDomSnapshot: reference };
 }
 
-function getDiagnosticsByteLength(
-  domDiagnostics: DomDiagnosticSnapshots,
-  warnings: string[],
-  cssDiagnostics: ArchiveAsset[]
-) {
-  return (
-    getTextByteLength(domDiagnostics.domSnapshot) +
-    getTextByteLength(domDiagnostics.virtualDomSnapshot) +
-    getWarningsByteLength(warnings) +
-    cssDiagnostics.reduce((total, asset) => total + getArchiveAssetByteLength(asset), 0)
-  );
+function createStandardDiagnostics(args: {
+  cssDiagnostics: readonly ArchiveAsset[];
+  domDiagnostics: DomDiagnosticSnapshots;
+  warnings: readonly string[];
+}): Array<{ content: string; path: string }> {
+  const diagnostics = [
+    { content: args.domDiagnostics.domSnapshot, path: 'dom.html' },
+    { content: args.domDiagnostics.virtualDomSnapshot, path: 'virtual-dom.html' },
+    { content: args.warnings.join('\n'), path: 'errors.log' },
+  ];
+  for (const asset of args.cssDiagnostics) {
+    if (typeof asset.content !== 'string') {
+      throw new Error(`Page Package diagnostic must contain text: ${asset.path}.`);
+    }
+    diagnostics.push({ content: asset.content, path: asset.path });
+  }
+  return diagnostics;
 }
 
 function assertPackageInputsWithinBudget(args: {
-  assets: WebSnapshotAssetEntry[];
-  cssDiagnostics: ArchiveAsset[];
+  assets: readonly WebSnapshotAssetEntry[];
+  cssDiagnostics: readonly ArchiveAsset[];
   domDiagnostics: DomDiagnosticSnapshots;
   html: string;
   screenshotBlob: Blob;
-  warnings: string[];
+  thumbnailBlob: Blob;
+  warnings: readonly string[];
 }): void {
   const htmlBytes = getTextByteLength(args.html);
   const warningsBytes = getWarningsByteLength(args.warnings);
   const assetsBytes = getAssetsByteLength(args.assets);
-  const diagnosticsBytes = getDiagnosticsByteLength(
-    args.domDiagnostics,
-    args.warnings,
-    args.cssDiagnostics
-  );
+  const diagnosticsBytes =
+    getTextByteLength(args.domDiagnostics.domSnapshot) +
+    getTextByteLength(args.domDiagnostics.virtualDomSnapshot) +
+    warningsBytes +
+    args.cssDiagnostics.reduce((total, asset) => total + getArchiveAssetByteLength(asset), 0);
   assertWithinByteLimit('Web snapshot HTML', htmlBytes, MAX_WEB_SNAPSHOT_HTML_BYTES);
   assertWithinByteLimit('Web snapshot warnings', warningsBytes, MAX_WEB_SNAPSHOT_WARNINGS_BYTES);
   assertWithinByteLimit(
@@ -127,87 +141,9 @@ function assertPackageInputsWithinBudget(args: {
   }
   assertWithinByteLimit(
     'Web snapshot package input',
-    htmlBytes + diagnosticsBytes + assetsBytes + args.screenshotBlob.size,
+    htmlBytes + diagnosticsBytes + assetsBytes + args.screenshotBlob.size + args.thumbnailBlob.size,
     MAX_WEB_SNAPSHOT_PACKAGE_INPUT_BYTES
   );
-}
-
-function writeDiagnostics(
-  zip: JSZip,
-  domDiagnostics: DomDiagnosticSnapshots,
-  warnings: string[],
-  cssDiagnostics: ArchiveAsset[]
-): void {
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot, domDiagnostics.domSnapshot);
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.virtualDomSnapshot, domDiagnostics.virtualDomSnapshot);
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.errors, warnings.join('\n'));
-
-  for (const asset of cssDiagnostics) {
-    zip.file(asset.path, asset.content);
-  }
-}
-
-function writeManifest(zip: JSZip, manifest: ReturnType<typeof createWebSnapshotManifest>): void {
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(manifest, null, 2));
-}
-
-function writePackageEntries(
-  zip: JSZip,
-  args: {
-    assets: WebSnapshotAssetEntry[];
-    cssDiagnostics: ArchiveAsset[];
-    domDiagnostics: DomDiagnosticSnapshots;
-    html: string;
-    screenshotBlob: Blob;
-    warnings: string[];
-  }
-): void {
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, args.html);
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, args.screenshotBlob);
-  writeDiagnostics(zip, args.domDiagnostics, args.warnings, args.cssDiagnostics);
-
-  for (const asset of args.assets) {
-    zip.file(asset.localPath, asset.blob);
-  }
-}
-
-async function createAssetManifestEntries(
-  assets: WebSnapshotAssetEntry[]
-): Promise<WebSnapshotAssetManifestEntry[]> {
-  return Promise.all(
-    assets.map(async (asset) => ({
-      mimeType: normalizeWebSnapshotAssetMimeType(asset.blob.type),
-      path: asset.localPath,
-      sha256: await hashWebSnapshotAssetBlob(asset.blob),
-      size: asset.blob.size,
-    }))
-  );
-}
-
-async function createPackageManifest(args: {
-  assets: WebSnapshotAssetEntry[];
-  source: WebSnapshotPageSource;
-  warnings: string[];
-  warningStats?: WebSnapshotWarningStats;
-}) {
-  return createWebSnapshotManifest({
-    assets: await createAssetManifestEntries(args.assets),
-    id: crypto.randomUUID(),
-    source: {
-      faviconUrl: null,
-      title: args.source.title,
-      url: sanitizeWebSnapshotSourceUrl(args.source.url),
-    },
-    stats: {
-      assetCount: args.assets.length,
-      failedAssetCount: args.warningStats?.failedAssetCount ?? 0,
-      networkWarningCount: args.warningStats?.networkWarningCount ?? 0,
-      sanitizerWarningCount: args.warningStats?.sanitizerWarningCount ?? 0,
-      warningCount: args.warningStats?.warningCount ?? args.warnings.length,
-    },
-    ...(args.source.viewport === undefined ? {} : { viewport: args.source.viewport }),
-    warnings: args.warnings,
-  });
 }
 
 export async function buildWebSnapshotPackage(args: {
@@ -217,40 +153,88 @@ export async function buildWebSnapshotPackage(args: {
   screenshotBlob: Blob;
   source: WebSnapshotPageSource;
   warnings: string[];
-  warningStats?: WebSnapshotWarningStats;
+  warningStats?: WebSnapshotWarningStats | undefined;
 }): Promise<{
-  manifest: ReturnType<typeof createWebSnapshotManifest>;
-  packageBlob: Blob;
+  manifest: ComposedPagePackage<Blob>['manifest'];
+  pagePackage: ComposedPagePackage<Blob>;
   screenshotBlob: Blob;
-  screenshotMimeType: string;
+  screenshotMimeType: 'image/png';
 }> {
+  if (args.screenshotBlob.type !== 'image/png') {
+    throw new Error('Page Package screenshot must use image/png.');
+  }
+  const warnings = normalizePagePackageWarnings(args.warnings);
   const cssDiagnostics = buildCssDiagnosticAssets(args.diagnosticsSource);
   const domDiagnostics = createDomDiagnosticSnapshots({
     cssDiagnostics,
-    html: args.html,
-    warnings: args.warnings,
+    diagnosticsSource: args.diagnosticsSource,
+    warnings,
   });
-  assertPackageInputsWithinBudget({ ...args, cssDiagnostics, domDiagnostics });
-  const { default: JSZipCtor } = await import('jszip');
-  const zip = new JSZipCtor();
-  writePackageEntries(zip, { ...args, cssDiagnostics, domDiagnostics });
-  const manifest = await createPackageManifest(args);
-  writeManifest(zip, manifest);
-  const outputBlob = await zip.generateAsync({ type: 'blob' });
-  assertWithinByteLimit(
-    'Web snapshot package archive',
-    outputBlob.size,
-    MAX_WEB_SNAPSHOT_PACKAGE_BLOB_BYTES
+  const thumbnailBlob = await createImageThumbnailBlob(
+    args.screenshotBlob,
+    THUMBNAIL_WIDTH,
+    THUMBNAIL_HEIGHT,
+    { verticalAnchor: 'top' }
   );
-  const persistedManifest = {
-    ...manifest,
-    stats: { ...manifest.stats, packageSize: outputBlob.size },
-  };
-
+  assertPackageInputsWithinBudget({
+    ...args,
+    cssDiagnostics,
+    domDiagnostics,
+    thumbnailBlob,
+    warnings,
+  });
+  const [webCopy, diagnostics] = await Promise.all([
+    createSafeWebCopyContributions(
+      {
+        assets: args.assets,
+        html: args.html,
+        screenshotBlob: args.screenshotBlob,
+        thumbnailBlob,
+      },
+      hashWebSnapshotAssetBlob
+    ),
+    createDiagnosticContributions({
+      digest: hashWebSnapshotAssetBlob,
+      intent: 'save',
+      level: 'standard',
+      standardAssets: createStandardDiagnostics({
+        cssDiagnostics,
+        domDiagnostics,
+        warnings,
+      }),
+    }),
+  ]);
+  const failedResourceCount = args.warningStats?.failedAssetCount ?? 0;
+  const pagePackage = await composePagePackage(
+    {
+      capturedAt: new Date().toISOString(),
+      componentStatuses: {
+        diagnostics: 'complete',
+        webCopy: failedResourceCount > 0 ? 'partial' : 'complete',
+      },
+      contributions: [...webCopy, ...diagnostics],
+      diagnosticsLevel: 'standard',
+      failedResourceCount,
+      id: crypto.randomUUID(),
+      intent: 'save',
+      source: {
+        faviconUrl: null,
+        title: args.source.title ? normalizePopupExportTabTitle(args.source.title) : null,
+        url: normalizePagePackageOptionalUrl(sanitizeWebSnapshotSourceUrl(args.source.url)),
+      },
+      viewport: args.source.viewport ?? null,
+      warnings,
+    },
+    (bytes) => {
+      const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+      copy.set(bytes);
+      return hashWebSnapshotAssetBlob(new Blob([copy]));
+    }
+  );
   return {
-    manifest: persistedManifest,
-    packageBlob: outputBlob,
+    manifest: pagePackage.manifest,
+    pagePackage,
     screenshotBlob: args.screenshotBlob,
-    screenshotMimeType: args.screenshotBlob.type || 'image/png',
+    screenshotMimeType: 'image/png',
   };
 }

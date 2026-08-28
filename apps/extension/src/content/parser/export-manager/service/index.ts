@@ -24,6 +24,7 @@ import {
   createBrowserAnnotationsPagePackage,
   hasOnlyBrowserAnnotations,
 } from './annotations';
+import { createArchiveArtifact, type ArchiveArtifact } from '../archive';
 
 type ExportManagerRunContext = {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
@@ -35,6 +36,10 @@ interface ExportManagerService {
     options: ExportOptions,
     context?: ExportManagerRunContext
   ) => Promise<ExportPagePackage>;
+  buildBlobPackage: (
+    options: ExportOptions,
+    context?: ExportManagerRunContext
+  ) => Promise<ArchiveArtifact>;
   cancel: () => void;
   export: (options: ExportOptions, context?: ExportManagerRunContext) => Promise<ExportResult>;
   onProgress: (callback: (progress: ExportProgress) => void) => void;
@@ -145,7 +150,18 @@ function finishAnnotationsOnlyExport(state: ReturnType<typeof createExportManage
 
 function createBuildPackageRunner(
   state: ReturnType<typeof createExportManagerState>,
-  deps: ExportManagerServiceDeps
+  deps: ExportManagerServiceDeps,
+  binaryMode: 'blob'
+): (options: ExportOptions, context?: ExportManagerRunContext) => Promise<ArchiveArtifact>;
+function createBuildPackageRunner(
+  state: ReturnType<typeof createExportManagerState>,
+  deps: ExportManagerServiceDeps,
+  binaryMode?: 'base64'
+): (options: ExportOptions, context?: ExportManagerRunContext) => Promise<ExportPagePackage>;
+function createBuildPackageRunner(
+  state: ReturnType<typeof createExportManagerState>,
+  deps: ExportManagerServiceDeps,
+  binaryMode: 'base64' | 'blob' = 'base64'
 ) {
   return async function buildPackage(
     options: ExportOptions,
@@ -173,9 +189,10 @@ function createBuildPackageRunner(
           resolveAnnotationsArchiveBaseName(deps)
         );
         finishAnnotationsOnlyExport(state);
-        return pagePackage;
+        return binaryMode === 'blob' ? createArchiveArtifact(pagePackage) : pagePackage;
       }
       const result = await runExportManagerPackagePipeline(state, options, warnings, {
+        binaryMode,
         contentIntentSource: context.contentIntentSource,
         fullPageCaptureIdentity: context.fullPageCaptureIdentity,
         prepareAnnotationsText: resolvePrepareAnnotationsText(deps),
@@ -199,6 +216,7 @@ export function createExportManagerService(
 
   return {
     buildPackage: createBuildPackageRunner(state, deps),
+    buildBlobPackage: createBuildPackageRunner(state, deps, 'blob'),
     cancel: () => {
       cancelExportManagerRun(state);
     },

@@ -27,7 +27,8 @@ it('keeps the popup-export controller facade stable and working', async () => {
 it('cancels running exports on dispose and resets the state', () => {
   const exportRunner = {
     cancel: vi.fn(),
-    buildPackage: vi.fn(() => new Promise(() => undefined)),
+    buildBlobPackage: vi.fn(() => new Promise(() => undefined)),
+    buildPackage: vi.fn(),
   };
   const controller = createPopupExportController({
     exportRunner: exportRunner as never,
@@ -48,6 +49,9 @@ it('cancels running exports on dispose and resets the state', () => {
           includeMarkdown: false,
         },
         batchRequestId: 'request-1',
+        includeWebCopy: false,
+        intent: 'export',
+        ordinal: 0,
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
       },
       vi.fn()

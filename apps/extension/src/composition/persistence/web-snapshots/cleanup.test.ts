@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createWebSnapshotManifest } from '../../../features/web-snapshot/manifest';
+import { createPagePackageManifestFixture as createWebSnapshotManifest } from '../../../features/web-snapshot/manifest.test-support';
 
 const mocks = vi.hoisted(() => ({
   buildDelete: vi.fn(),
@@ -156,7 +156,7 @@ function createMediaEntry() {
     height: null,
     id: 'asset-1',
     kind: 'web-archive',
-    mimeType: 'application/x-sniptale-web-snapshot+zip',
+    mimeType: 'application/x-sniptale-page-package+zip',
     originalFilename: 'snapshot.zip',
     size: 5,
     source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },

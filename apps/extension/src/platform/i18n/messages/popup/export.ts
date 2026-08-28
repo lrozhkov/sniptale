@@ -59,8 +59,56 @@ export const popupExportMessages = defineMessageSource({
     en: 'Export finished with errors',
   },
   dataTypesSectionLabel: {
-    ru: 'Состав экспорта',
-    en: 'Export contents',
+    ru: 'Состав пакета',
+    en: 'Package contents',
+  },
+  packageDestinationLabel: {
+    ru: 'Настройки действия',
+    en: 'Action settings',
+  },
+  packageDestinationDownload: {
+    ru: 'Скачать',
+    en: 'Download',
+  },
+  packageDestinationLibrary: {
+    ru: 'В библиотеку',
+    en: 'To Library',
+  },
+  packagePresetLabel: {
+    ru: 'Быстрый выбор',
+    en: 'Quick selection',
+  },
+  packagePresetCustom: {
+    ru: 'Свой состав',
+    en: 'Custom',
+  },
+  packagePresetWebCopy: {
+    ru: 'Веб-копия',
+    en: 'Web copy',
+  },
+  packagePresetMaterials: {
+    ru: 'Данные и файлы',
+    en: 'Data and files',
+  },
+  packagePresetFull: {
+    ru: 'Всё',
+    en: 'Everything',
+  },
+  packageWebCopyLabel: {
+    ru: 'Веб-копия страницы',
+    en: 'Page Web copy',
+  },
+  packageWebCopyRequired: {
+    ru: 'обязательно',
+    en: 'required',
+  },
+  packageWebCopyDescription: {
+    ru: 'Статический документ, скриншот, стили, изображения и другие ресурсы.',
+    en: 'Static document, screenshot, styles, images, and other resources.',
+  },
+  packageWebCopyDisabledDescription: {
+    ru: 'Функция выключена. Откройте настройки, чтобы добавить безопасную автономную копию.',
+    en: 'The feature is off. Open Settings to add a safe self-contained copy.',
   },
   contentGroupLabel: {
     ru: 'Содержимое',
@@ -191,12 +239,16 @@ export const popupExportMessages = defineMessageSource({
     en: 'Page details, collection notes, and export warnings',
   },
   includePageDiagnosticsLabel: {
-    ru: 'Данные страницы для анализа',
-    en: 'Page analysis data',
+    ru: 'Расширенные данные страницы',
+    en: 'Extended page data',
   },
   includePageDiagnosticsDescription: {
-    ru: 'Структура страницы, элементы интерфейса и сведения о загрузке ресурсов',
-    en: 'Page structure, interface elements, and resource loading details',
+    ru: 'Для скачиваемого пакета: видимый текст, структура, исходные ссылки и метаданные скриптов',
+    en: 'For downloaded packages: visible text, structure, original links, and script metadata',
+  },
+  includePageDiagnosticsDisclosure: {
+    ru: 'Может содержать личные данные с открытой страницы. Сохраняется только в скачиваемый пакет и никогда не запускается.',
+    en: 'May contain private data from the open page. It is stored only in the downloaded package and is never executed.',
   },
   includeCssDiagnosticsLabel: {
     ru: 'Оформление и стили',

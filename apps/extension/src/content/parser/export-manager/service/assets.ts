@@ -9,6 +9,10 @@ import type { ArchiveAsset } from '../archive';
 import type { ExportDiagnosticsSource } from '../diagnostics/source';
 import { getExportCompletedMessage } from './source';
 import { updateExportManagerProgress, type ExportManagerState } from './state';
+import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
+import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
+import { captureWebSnapshotScreenshotWithWarnings } from '../../web-snapshot/capture';
+import { translate } from '../../../../platform/i18n';
 
 export function finishExportSuccess(
   state: ExportManagerState,
@@ -33,9 +37,31 @@ export async function collectExportExtraAssets(args: {
   fileCandidatesCount: number;
   diagnosticsSource?: ExportDiagnosticsSource | undefined;
   throwIfCancelled: () => void;
+  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
 }): Promise<ArchiveAsset[]> {
   args.throwIfCancelled();
   const extraAssets: ArchiveAsset[] = [];
+  if (args.options.includeFullPageScreenshot) {
+    updateExportManagerProgress(args.state, {
+      activeStepKey: 'fullPageScreenshot',
+      current: 0,
+      errors: args.warnings,
+      message: translate('content.runtime.captureFullPageScreenshot'),
+      phase: 'scanning',
+      total: 1,
+    });
+    try {
+      const screenshot = await captureWebSnapshotScreenshotWithWarnings(
+        args.contentIntentSource,
+        args.fullPageCaptureIdentity
+      );
+      extraAssets.push({ content: screenshot.blob, path: 'page-screenshot.png' });
+      args.warnings.push(...screenshot.warnings);
+    } catch {
+      args.warnings.push(translate('content.runtime.captureFullPageScreenshotFailed'));
+    }
+  }
   args.throwIfCancelled();
 
   extraAssets.push(

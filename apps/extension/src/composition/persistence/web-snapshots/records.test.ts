@@ -1,10 +1,8 @@
 import JSZip from 'jszip';
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manifest';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 
 const mocks = vi.hoisted(() => ({
   createJournal: vi.fn(),
@@ -222,14 +220,5 @@ async function createPackageBlob(manifest: WebSnapshotManifest): Promise<Blob> {
 }
 
 function createManifest(): WebSnapshotManifest {
-  return {
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    capturedAt: '2026-05-12T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: WEB_SNAPSHOT_PACKAGE_PATHS,
-    schemaVersion: 1,
-    source: { faviconUrl: null, title: 'Page', url: 'https://example.com' },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 3 },
-    warnings: [],
-  };
+  return createPagePackageManifestFixture();
 }

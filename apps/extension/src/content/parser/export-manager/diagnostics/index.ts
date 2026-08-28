@@ -17,6 +17,11 @@ export {
   buildVirtualDomSnapshotHtml,
 } from './snapshot';
 export { collectCoreLogAssets };
+export {
+  buildExtendedDiagnosticArtifacts,
+  type ExtendedDiagnosticArtifact,
+  type ExtendedDiagnosticTextDigest,
+} from './extended-evidence';
 
 function stringifyDiagnosticExportPayload(value: unknown): string {
   return JSON.stringify(sanitizeDiagnosticExportData(value), null, 2);

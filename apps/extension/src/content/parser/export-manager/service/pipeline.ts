@@ -213,12 +213,14 @@ async function collectPackagePipelineInputs(
   const fileCandidatesCount = collectedFiles?.files.length ?? 0;
   const downloadedFilesCount = downloadResult?.files.size ?? 0;
   const extraAssets = await collectExportExtraAssets({
+    contentIntentSource: pipelineOptions.contentIntentSource,
     downloadedFilesCount,
     options,
     snapshot,
     state,
     warnings,
     fileCandidatesCount,
+    fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
     diagnosticsSource,
     throwIfCancelled: () => throwIfExportCancelled(state),
   });

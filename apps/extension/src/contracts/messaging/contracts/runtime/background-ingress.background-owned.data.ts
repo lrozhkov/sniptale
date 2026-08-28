@@ -293,7 +293,7 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
     freshnessReplayPolicy: 'job id and monotonic status revisions reject stale updates',
     handlerId: 'popup-export-job',
     keepChannelBehaviorSource: 'background-owned-route-handler',
-    ownerModule: 'apps/extension/src/background/capture/popup-export/job/route.ts',
+    ownerModule: 'apps/extension/src/background/capture/page-package/job/route.ts',
     policyAuthorityFamily: 'popup-export-job',
     policyStateIds: ['popup-export-jobs'],
     requiredAuthority: 'popup export job owner policy',
@@ -302,10 +302,10 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
     sideEffects: 'page package collection, visible native capture, archive creation, and download',
     transitiveStateOwner: 'background popup-export job owner',
     messageTypes: [
-      'START_POPUP_EXPORT_JOB',
-      'GET_POPUP_EXPORT_JOB_STATUS',
-      'CANCEL_POPUP_EXPORT_JOB',
-      'ACK_POPUP_EXPORT_JOB_STATUS',
+      'START_PAGE_PACKAGE_JOB',
+      'GET_PAGE_PACKAGE_JOB_STATUS',
+      'CANCEL_PAGE_PACKAGE_JOB',
+      'ACK_PAGE_PACKAGE_JOB_STATUS',
     ],
   },
   {

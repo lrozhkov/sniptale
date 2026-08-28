@@ -31,6 +31,7 @@ interface RuntimeCleanupPort {
 }
 
 interface PopupExportExclusionPort {
+  cancelActiveJob(): Promise<void>;
   reserveErasureExclusion(): ErasureExclusion;
 }
 

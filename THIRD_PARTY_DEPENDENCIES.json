@@ -73,6 +73,19 @@
       "version": "2.0.0"
     },
     {
+      "archivePath": "LICENSES/dependencies/@noble__hashes-2.4.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/@noble/hashes/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@noble/hashes",
+      "packagePath": "node_modules/@noble/hashes",
+      "selectedLicense": "MIT",
+      "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec",
+      "sourceUrl": "https://github.com/paulmillr/noble-hashes.git",
+      "version": "2.4.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt",
       "licenseExpression": "BSD-3-Clause",
       "licenseSource": "node_modules/@webav/mp4box.js/LICENSE",

@@ -18,6 +18,7 @@ let root: Root | null = null;
 
 function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
   return {
+    destination: 'export',
     disabled: false,
     includeAnnotations: false,
     includeBasicLogs: false,
@@ -32,6 +33,33 @@ function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
     isOpen: true,
     onClose: vi.fn(),
     onOpen: vi.fn(),
+    onRequestWebCopySetup: vi.fn(),
+    packagePreferences: {
+      actions: {
+        setIncludeAnnotations: vi.fn(),
+        setIncludeBasicLogs: vi.fn(),
+        setIncludeCssDiagnostics: vi.fn(),
+        setIncludeFiles: vi.fn(),
+        setIncludeFullPageScreenshot: vi.fn(),
+        setIncludePageDiagnostics: vi.fn(),
+        setIncludeImages: vi.fn(),
+        setIncludeJson: vi.fn(),
+        setIncludeMarkdown: vi.fn(),
+      },
+      includeWebCopy: false,
+      setIncludeWebCopy: vi.fn(),
+      values: {
+        includeAnnotations: false,
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includePageDiagnostics: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+      },
+    },
     setIncludeBasicLogs: vi.fn(),
     setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
@@ -41,6 +69,7 @@ function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
+    webSnapshotEnabled: true,
     ...overrides,
   };
 }
@@ -177,4 +206,30 @@ it('clears selected options and forwards row toggles in disabled presentation', 
   setIncludeJson.mockClear();
   checkboxes[0]?.dispatchEvent(new Event('change', { bubbles: true }));
   expect(setIncludeJson).not.toHaveBeenCalled();
+});
+
+it('keeps the mandatory Library screenshot inside Web copy instead of offering a toggle', async () => {
+  await renderSection({
+    destination: 'save',
+    includeFullPageScreenshot: true,
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+      values: {
+        ...createProps().packagePreferences.values,
+        includeFullPageScreenshot: true,
+      },
+    },
+  });
+
+  expect(container?.textContent).toContain('t:popup.export.packageWebCopyDescription');
+  expect(container?.textContent).not.toContain('t:popup.export.includeFullPageScreenshotLabel');
+  expect(container?.textContent).not.toContain('t:popup.export.includePageDiagnosticsLabel');
+});
+
+it('keeps the extended-data disclosure visible at the direct Export action point', async () => {
+  await renderSection({ includePageDiagnostics: true, isOpen: false });
+
+  expect(container?.textContent).toContain('t:popup.export.includePageDiagnosticsDisclosure');
+  expect(container?.querySelector('[role="status"]')).not.toBeNull();
 });

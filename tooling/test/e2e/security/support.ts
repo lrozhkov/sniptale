@@ -97,19 +97,65 @@ export async function saveWebSnapshotThroughPopup(args: {
   requestId: string;
   tabId: number;
 }): Promise<unknown> {
-  const capabilityToken = await issuePopupTabRouteCapability({
-    operation: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-    popup: args.popup,
-    requestId: args.requestId,
-    tabId: args.tabId,
+  await args.popup.evaluate(async () => {
+    await chrome.storage.local.set({ sniptale_web_snapshot_local_consent: true });
   });
+  const started = (await startPagePackageSave(args)) as { error?: string; success?: boolean };
+  if (started.success !== true) return started;
+  return waitForPagePackageSave(args.popup, args.requestId);
+}
+
+export function startPagePackageSave(args: {
+  popup: Page;
+  requestId: string;
+  tabId: number;
+}): Promise<unknown> {
   return sendRuntimeMessage(args.popup, {
-    requestId: args.requestId,
-    tabId: args.tabId,
-    tabRouteCapabilityToken: capabilityToken,
-    tabRouteRequestId: args.requestId,
-    type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    includeWebCopy: true,
+    intent: 'save',
+    jobId: args.requestId,
+    orderedTabs: [{ tabId: args.tabId, title: 'Security fixture' }],
+    options: { ...EMPTY_EXPORT_OPTIONS, includeFullPageScreenshot: true },
+    type: 'START_PAGE_PACKAGE_JOB',
+    warnings: [],
   });
+}
+
+export async function waitForPagePackageSave(popup: Page, jobId: string): Promise<unknown> {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const response = (await sendRuntimeMessage(popup, {
+      jobId,
+      type: 'GET_PAGE_PACKAGE_JOB_STATUS',
+    })) as {
+      error?: string;
+      status?: {
+        phase?: string;
+        result?: { errors?: string[]; snapshotIds?: string[]; warnings?: string[] };
+        warnings?: string[];
+      };
+      success?: boolean;
+    };
+    if (response.success !== true) return response;
+    if (response.status?.phase === 'completed') {
+      return {
+        assetId: response.status.result?.snapshotIds?.[0],
+        success: true,
+        warnings: response.status.result?.warnings ?? response.status.warnings ?? [],
+      };
+    }
+    if (
+      response.status?.phase &&
+      ['cancelled', 'failed', 'interrupted'].includes(response.status.phase)
+    ) {
+      return {
+        error: response.status.result?.errors?.join('; ') || `Snapshot ${response.status.phase}`,
+        success: false,
+      };
+    }
+    await popup.waitForTimeout(50);
+  }
+  return { error: 'Snapshot save timed out', success: false };
 }
 
 export const SETTINGS_PATH = 'apps/extension/src/settings/index.html';

@@ -1,7 +1,5 @@
-import type {
-  WebSnapshotManifest,
-  WebSnapshotViewport,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { PagePackageViewport } from '@sniptale/runtime-contracts/page-package';
+import type { ComposedPagePackage } from '../../../workflows/page-package/composer';
 
 export interface WebSnapshotAssetEntry {
   blob: Blob;
@@ -12,7 +10,7 @@ export interface WebSnapshotAssetEntry {
 export interface WebSnapshotPageSource {
   title: string | null;
   url: string;
-  viewport?: WebSnapshotViewport;
+  viewport?: PagePackageViewport;
 }
 
 export interface WebSnapshotWarningStats {
@@ -23,10 +21,10 @@ export interface WebSnapshotWarningStats {
 }
 
 export interface WebSnapshotBuildResult {
-  manifest: WebSnapshotManifest;
-  packageBlob: Blob;
+  manifest: ComposedPagePackage<Blob>['manifest'];
+  pagePackage: ComposedPagePackage<Blob>;
   screenshotBlob: Blob;
-  screenshotMimeType: string;
+  screenshotMimeType: 'image/png';
   snapshotSessionId: string;
   warnings: string[];
 }

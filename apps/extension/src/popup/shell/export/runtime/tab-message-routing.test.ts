@@ -61,9 +61,14 @@ function createViewerExportMessages() {
   const options = createExportOptions();
   return [
     { type: MessageType.EXPORT_POPUP_PREVIEW },
-    { batchRequestId: 'batch-1', type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, options },
-    { type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT, requestId: 'req-web' },
-    { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
+    {
+      batchRequestId: 'batch-1',
+      includeWebCopy: false,
+      intent: 'export',
+      ordinal: 0,
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+      options,
+    },
     { type: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT },
   ] as const;
 }
@@ -90,30 +95,6 @@ it.each(createViewerExportMessages())(
     expect(mocks.sendTabMessage).not.toHaveBeenCalled();
   }
 );
-
-it('routes invalid web snapshot viewer URLs through background runtime authorization', async () => {
-  mockRuntimeCapabilityResponses({ success: false });
-  const message = {
-    exportRunId: 'export-run-1',
-    type: MessageType.EXPORT_POPUP_CANCEL,
-  } as const;
-
-  await sendPopupExportTabMessage(7, message);
-
-  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(1, {
-    operation: MessageType.EXPORT_POPUP_CANCEL,
-    requestId: expect.any(String),
-    tabId: 7,
-    type: MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY,
-  });
-  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
-    ...message,
-    tabId: 7,
-    tabRouteCapabilityToken: 'cap-1',
-    tabRouteRequestId: expect.any(String),
-  });
-  expect(mocks.sendTabMessage).not.toHaveBeenCalled();
-});
 
 it('routes normal web tab export messages through background runtime authorization', async () => {
   mockRuntimeCapabilityResponses({
@@ -142,33 +123,6 @@ it('routes normal web tab export messages through background runtime authorizati
     tabId: 8,
     tabRouteCapabilityToken: 'cap-1',
     tabRouteRequestId: expect.any(String),
-  });
-  expect(mocks.sendTabMessage).not.toHaveBeenCalled();
-});
-
-it('routes normal web tab snapshot saves through background runtime authorization', async () => {
-  mockRuntimeCapabilityResponses({ success: true, assetId: 'snapshot-1' });
-  const message = {
-    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    requestId: 'req-web',
-  } as const;
-
-  await expect(sendPopupExportTabMessage(8, message)).resolves.toEqual({
-    success: true,
-    assetId: 'snapshot-1',
-  });
-
-  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(1, {
-    operation: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    requestId: 'req-web',
-    tabId: 8,
-    type: MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY,
-  });
-  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
-    ...message,
-    tabId: 8,
-    tabRouteCapabilityToken: 'cap-1',
-    tabRouteRequestId: 'req-web',
   });
   expect(mocks.sendTabMessage).not.toHaveBeenCalled();
 });

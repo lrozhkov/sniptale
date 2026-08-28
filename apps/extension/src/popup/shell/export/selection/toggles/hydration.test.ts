@@ -1,170 +1,64 @@
-import type { MutableRefObject } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import { DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES } from '../../../../../composition/persistence/popup-export-preferences';
+import { hydratePopupPagePackagePreferences } from './hydration';
 
-import { hydratePopupExportPreferences } from './hydration';
-import type { PopupExportPreferences } from '../../../../../composition/persistence/popup-export-preferences';
-import type { PopupExportPreferenceSetters, PopupExportSelection } from '../../session/types';
-import {
-  resetPopupExportLaunchSelectionForTests,
-  stagePopupExportLaunchSelection,
-} from '../launch-selection';
-
-afterEach(() => {
-  resetPopupExportLaunchSelectionForTests();
-});
-
-function createSetters(): PopupExportPreferenceSetters {
+function createPreferenceState() {
   return {
-    setIncludeAnnotations: vi.fn(),
-    setIncludeBasicLogs: vi.fn(),
-    setIncludeCssDiagnostics: vi.fn(),
-    setIncludeFiles: vi.fn(),
-    setIncludeFullPageScreenshot: vi.fn(),
-    setIncludePageDiagnostics: vi.fn(),
-    setIncludeImages: vi.fn(),
-    setIncludeJson: vi.fn(),
-    setIncludeMarkdown: vi.fn(),
+    actions: {
+      setIncludeAnnotations: vi.fn(),
+      setIncludeBasicLogs: vi.fn(),
+      setIncludeCssDiagnostics: vi.fn(),
+      setIncludeFiles: vi.fn(),
+      setIncludeFullPageScreenshot: vi.fn(),
+      setIncludePageDiagnostics: vi.fn(),
+      setIncludeImages: vi.fn(),
+      setIncludeJson: vi.fn(),
+      setIncludeMarkdown: vi.fn(),
+    },
+    includeWebCopy: false,
+    setIncludeWebCopy: vi.fn(),
+    values: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export },
   };
 }
 
-async function verifyLoadedPreferences() {
-  const loadPreferences = vi.fn().mockResolvedValue({
-    includeAnnotations: true,
-    includeBasicLogs: true,
-    includeCssDiagnostics: false,
-    includeFiles: true,
-    includeFullPageScreenshot: false,
-    includePageDiagnostics: false,
-    includeImages: true,
-    includeJson: false,
-    includeMarkdown: true,
+it('hydrates both destinations independently', async () => {
+  const exportState = createPreferenceState();
+  const saveState = createPreferenceState();
+  const committed = { current: null };
+  const loaded = { current: false };
+  const preferences = {
+    export: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export, includeJson: false },
+    save: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save, includeJson: true },
+  };
+
+  hydratePopupPagePackagePreferences({
+    committedPreferencesRef: committed,
+    hasLoadedPreferencesRef: loaded,
+    loadPreferences: vi.fn(async () => preferences),
+    setters: { export: exportState, save: saveState },
   });
-  const setters = createSetters();
-  const committedPreferencesRef = {
-    current: null,
-  } as MutableRefObject<PopupExportSelection | null>;
-  const loadedRef = { current: false } as MutableRefObject<boolean>;
+  await vi.waitFor(() => expect(loaded.current).toBe(true));
 
-  const cleanup = hydratePopupExportPreferences({
-    committedPreferencesRef,
-    hasLoadedPreferencesRef: loadedRef,
-    loadPreferences,
-    preferences: setters,
-  });
-  await Promise.resolve();
+  expect(exportState.actions.setIncludeJson).toHaveBeenCalledWith(false);
+  expect(saveState.actions.setIncludeJson).toHaveBeenCalledWith(true);
+  expect(saveState.setIncludeWebCopy).toHaveBeenCalledWith(true);
+  expect(committed.current).toEqual(preferences);
+});
 
-  expect(setters.setIncludeBasicLogs).toHaveBeenCalledWith(true);
-  expect(setters.setIncludeAnnotations).toHaveBeenCalledWith(true);
-  expect(setters.setIncludeJson).toHaveBeenCalledWith(false);
-  expect(loadPreferences).toHaveBeenCalledTimes(1);
-  expect(loadedRef.current).toBe(true);
-  expect(committedPreferencesRef.current).toEqual({
-    includeAnnotations: true,
-    includeBasicLogs: true,
-    includeCssDiagnostics: false,
-    includeFiles: true,
-    includeFullPageScreenshot: false,
-    includePageDiagnostics: false,
-    includeImages: true,
-    includeJson: false,
-    includeMarkdown: true,
-  });
-
-  cleanup();
-}
-
-function verifySkipWhenLoaded() {
-  const setters = createSetters();
-  const committedPreferencesRef = {
-    current: null,
-  } as MutableRefObject<PopupExportSelection | null>;
-  const loadedRef = { current: true } as MutableRefObject<boolean>;
-
-  const loadPreferences = vi.fn();
-  const cleanup = hydratePopupExportPreferences({
-    committedPreferencesRef,
-    hasLoadedPreferencesRef: loadedRef,
-    loadPreferences,
-    preferences: setters,
-  });
-
-  expect(loadPreferences).not.toHaveBeenCalled();
-  expect(cleanup).toEqual(expect.any(Function));
-}
-
-async function verifyRejectedHydrationDoesNotMutateAfterCleanup() {
-  let rejectPreferences: (error: unknown) => void = () => undefined;
-  const loadPreferences = vi.fn(
-    () =>
-      new Promise<PopupExportPreferences>((_resolve, reject) => {
-        rejectPreferences = reject;
-      })
-  );
-  const setters = createSetters();
-  const committedPreferencesRef = {
-    current: null,
-  } as MutableRefObject<PopupExportSelection | null>;
-  const loadedRef = { current: false } as MutableRefObject<boolean>;
-  const onHydrated = vi.fn();
-
-  const cleanup = hydratePopupExportPreferences({
-    committedPreferencesRef,
-    hasLoadedPreferencesRef: loadedRef,
-    loadPreferences,
-    onHydrated,
-    preferences: setters,
+it('does not apply an async result after cleanup', async () => {
+  let resolve!: (value: typeof DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES) => void;
+  const cleanup = hydratePopupPagePackagePreferences({
+    committedPreferencesRef: { current: null },
+    hasLoadedPreferencesRef: { current: false },
+    loadPreferences: vi.fn(
+      () =>
+        new Promise<typeof DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES>((next) => {
+          resolve = next;
+        })
+    ),
+    setters: { export: createPreferenceState(), save: createPreferenceState() },
   });
   cleanup();
-  rejectPreferences(new Error('storage failed'));
+  resolve(DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES);
   await Promise.resolve();
-
-  expect(loadedRef.current).toBe(false);
-  expect(committedPreferencesRef.current).toBeNull();
-  expect(onHydrated).not.toHaveBeenCalled();
-  expect(setters.setIncludeJson).not.toHaveBeenCalled();
-}
-
-describe('usePopupExportToggles hydration', () => {
-  it('applies loaded preferences once and marks hydration complete', async () => {
-    await verifyLoadedPreferences();
-  });
-
-  it('does not hydrate when already loaded', () => {
-    verifySkipWhenLoaded();
-  });
-
-  it('applies the one-time Design Review annotations selection over stored preferences', async () => {
-    stagePopupExportLaunchSelection({ includeAnnotations: true });
-    const setters = createSetters();
-    const committedPreferencesRef = {
-      current: null,
-    } as MutableRefObject<PopupExportSelection | null>;
-    const loadedRef = { current: false } as MutableRefObject<boolean>;
-
-    hydratePopupExportPreferences({
-      committedPreferencesRef,
-      hasLoadedPreferencesRef: loadedRef,
-      loadPreferences: vi.fn().mockResolvedValue({
-        includeAnnotations: false,
-        includeBasicLogs: false,
-        includeCssDiagnostics: false,
-        includeFiles: true,
-        includeFullPageScreenshot: false,
-        includePageDiagnostics: false,
-        includeImages: true,
-        includeJson: true,
-        includeMarkdown: true,
-      }),
-      preferences: setters,
-    });
-    await Promise.resolve();
-
-    expect(setters.setIncludeAnnotations).toHaveBeenCalledWith(true);
-    expect(committedPreferencesRef.current?.includeAnnotations).toBe(true);
-  });
-
-  it(
-    'does not mutate preference state when rejected hydration settles after cleanup',
-    verifyRejectedHydrationDoesNotMutateAfterCleanup
-  );
 });

@@ -35,37 +35,6 @@ export function resolveOutDir(root: string, outDir: string): string {
   return resolvePath(root, outDir);
 }
 
-export function collectWebAccessibleResources(value: unknown): string[] {
-  if (typeof value !== 'object' || value === null || !('web_accessible_resources' in value)) {
-    return [];
-  }
-  const entries = (value as { web_accessible_resources?: Array<{ resources?: unknown }> })
-    .web_accessible_resources;
-  if (!Array.isArray(entries)) return [];
-  return entries.flatMap((entry) =>
-    Array.isArray(entry.resources)
-      ? entry.resources.filter((resource): resource is string => typeof resource === 'string')
-      : []
-  );
-}
-
-export function assertInjectedBundlesAreNotWebAccessible(resources: string[]): void {
-  const forbiddenResources = resources.filter(
-    (resource) =>
-      resource.includes('contentRuntime') ||
-      resource.includes('contentRuntimeShim') ||
-      resource.includes('webSnapshotInjectedRunner') ||
-      resource.includes('webSnapshotInjectedLoader')
-  );
-  if (forbiddenResources.length > 0) {
-    throw new Error(
-      `Injected runtime bundles must stay out of web_accessible_resources: ${forbiddenResources.join(
-        ', '
-      )}`
-    );
-  }
-}
-
 export function assertBundleHasNoImports(label: string, imports: Array<{ path: string }>): void {
   if (imports.length === 0) return;
   throw new Error(

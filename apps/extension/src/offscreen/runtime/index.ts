@@ -159,6 +159,26 @@ function buildOffscreenCommandSuccessResponse(result: unknown) {
   if (
     typeof result === 'object' &&
     result !== null &&
+    'result' in result &&
+    result.result === 'leased' &&
+    'leaseId' in result &&
+    typeof result.leaseId === 'string' &&
+    'url' in result &&
+    typeof result.url === 'string'
+  ) {
+    return { success: true, result: 'leased', leaseId: result.leaseId, url: result.url };
+  }
+  if (
+    typeof result === 'object' &&
+    result !== null &&
+    'result' in result &&
+    (result.result === 'confirmed' || result.result === 'released' || result.result === 'stale')
+  ) {
+    return { success: true, result: result.result };
+  }
+  if (
+    typeof result === 'object' &&
+    result !== null &&
     'challenge' in result &&
     typeof result.challenge === 'string' &&
     'offscreenStartupId' in result &&

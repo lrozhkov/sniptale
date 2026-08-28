@@ -45,7 +45,7 @@ export function applyPopupExportRuntimeMessage(args: PopupExportMessageListenerA
     return true;
   }
 
-  if (args.message.type === MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED) {
+  if (args.message.type === MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED) {
     const { status } = args.message;
     if (args.requestId !== null && status.jobId !== args.requestId) return false;
     if (

@@ -132,6 +132,11 @@ describe('viewer export correlated response parser', () => {
       parseViewerExportPortRequest({
         request: {
           batchRequestId: 'batch-1',
+          contentIntentGrant: { grantToken: 'grant-1' },
+          fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+          includeWebCopy: false,
+          intent: 'export',
+          ordinal: 0,
           options: EXPORT_OPTIONS,
           type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         },
@@ -143,6 +148,11 @@ describe('viewer export correlated response parser', () => {
       request: {
         options: EXPORT_OPTIONS,
         batchRequestId: 'batch-1',
+        contentIntentGrant: { grantToken: 'grant-1' },
+        fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+        includeWebCopy: false,
+        intent: 'export',
+        ordinal: 0,
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
       },
       requestId: 'port-1',
@@ -168,25 +178,14 @@ describe('viewer export correlated response parser', () => {
 });
 
 describe('viewer export package request parser', () => {
-  it('parses web snapshot save and package export request variants', () => {
-    expect(
-      parseViewerExportPortRequest({
-        request: {
-          requestId: 'save-1',
-          type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-        },
-        requestId: 'port-save',
-        type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
-        viewerPortGeneration: 'viewer-generation-1',
-      })?.request
-    ).toEqual({
-      requestId: 'save-1',
-      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    });
+  it('parses the package export request variant', () => {
     expect(
       parseViewerExportPortRequest({
         request: {
           batchRequestId: 'batch-1',
+          includeWebCopy: false,
+          intent: 'export',
+          ordinal: 0,
           options: EXPORT_OPTIONS,
           type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         },
@@ -196,6 +195,9 @@ describe('viewer export package request parser', () => {
       })?.request
     ).toEqual({
       batchRequestId: 'batch-1',
+      includeWebCopy: false,
+      intent: 'export',
+      ordinal: 0,
       options: EXPORT_OPTIONS,
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     });
@@ -212,6 +214,34 @@ describe('viewer export port parser rejection cases', () => {
         viewerPortGeneration: 'viewer-generation-1',
       })
     ).toBeNull();
+    for (const request of [
+      {
+        batchRequestId: 'copy-without-policy',
+        includeWebCopy: true,
+        intent: 'export',
+        ordinal: 0,
+        options: EXPORT_OPTIONS,
+        type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+      },
+      {
+        allowAnonymousCrossOriginAssets: false,
+        batchRequestId: 'export-with-policy',
+        includeWebCopy: false,
+        intent: 'export',
+        ordinal: 0,
+        options: EXPORT_OPTIONS,
+        type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+      },
+    ]) {
+      expect(
+        parseViewerExportPortRequest({
+          request,
+          requestId: 'port-policy',
+          type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
+          viewerPortGeneration: 'viewer-generation-1',
+        })
+      ).toBeNull();
+    }
     expect(
       parseViewerExportPortRequest({
         request: { type: MessageType.EXPORT_POPUP_CANCEL },

@@ -277,7 +277,7 @@ function SnapshotModeContent(props: {
         locale={props.locale}
         screenshotUrl={props.loaded.screenshotUrl}
         sourceTitle={props.loaded.manifest.source.title}
-        viewport={props.loaded.manifest.viewport}
+        viewport={props.loaded.manifest.viewport ?? undefined}
         zoom={props.zoom}
       />
     );

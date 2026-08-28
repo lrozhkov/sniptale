@@ -15,7 +15,7 @@ const {
   openVideoEditorPageMock,
   sendTabMessageMock,
   startRecordingMock,
-  startPopupExportJobMock,
+  startPagePackageJobMock,
   browserPermissionsRequestMock,
   browserTabsGetMock,
   runtimeGetUrlMock,
@@ -32,7 +32,7 @@ const {
   openVideoEditorPageMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   startRecordingMock: vi.fn(),
-  startPopupExportJobMock: vi.fn(),
+  startPagePackageJobMock: vi.fn(),
   browserPermissionsRequestMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
@@ -97,9 +97,9 @@ vi.mock('../../media/lifecycle', async (importOriginal) => ({
   startRecording: startRecordingMock,
 }));
 
-vi.mock('../../capture/popup-export/job', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../capture/popup-export/job')>()),
-  startPopupExportJob: startPopupExportJobMock,
+vi.mock('../../capture/page-package/job', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/page-package/job')>()),
+  startPagePackageJob: startPagePackageJobMock,
 }));
 
 vi.mock('@sniptale/platform/browser/permissions', () => ({
@@ -153,7 +153,7 @@ function resetContextMenuActionHelperMocks(): void {
   sendTabMessageMock.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   startRecordingMock.mockResolvedValue(undefined);
-  startPopupExportJobMock.mockResolvedValue({ phase: 'running' });
+  startPagePackageJobMock.mockResolvedValue({ phase: 'running' });
   browserPermissionsRequestMock.mockResolvedValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 15, title: 'Example tab' });
 }
@@ -276,18 +276,20 @@ it('blocks an unavailable context-menu preset before recording starts', async ()
 });
 
 it('fails export start when the background job owner rejects', async () => {
-  startPopupExportJobMock.mockRejectedValue(new Error('export-failed'));
+  startPagePackageJobMock.mockRejectedValue(new Error('export-failed'));
   await expect(startContextMenuExport(15)).rejects.toThrow('export-failed');
 });
 
 it('starts export with the full persisted popup export selection', async () => {
   await startContextMenuExport(15);
 
-  expect(startPopupExportJobMock).toHaveBeenCalledWith({
+  expect(startPagePackageJobMock).toHaveBeenCalledWith({
     contentPort: expect.objectContaining({
       cancelPagePackage: expect.any(Function),
       requestPagePackage: expect.any(Function),
     }),
+    includeWebCopy: false,
+    intent: 'export',
     jobId: expect.any(String),
     orderedTabs: [{ tabId: 15, title: 'Example tab' }],
     options: {
@@ -302,6 +304,32 @@ it('starts export with the full persisted popup export selection', async () => {
     },
     warnings: [],
   });
+});
+
+it('never acquires extended page evidence from context-menu Export', async () => {
+  loadPopupExportPreferencesMock.mockResolvedValueOnce({
+    ...contextMenuPopupExportPreferencesFixture,
+    includePageDiagnostics: true,
+  });
+
+  await startContextMenuExport(15);
+
+  expect(startPagePackageJobMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      options: expect.objectContaining({ includePageDiagnostics: false }),
+    })
+  );
+});
+
+it('normalizes an oversized browser title before direct job admission', async () => {
+  browserTabsGetMock.mockResolvedValueOnce({ id: 15, title: '\ud83d\ude00'.repeat(2_000) });
+
+  await startContextMenuExport(15);
+
+  const args = startPagePackageJobMock.mock.calls[0]![0];
+  expect(new TextEncoder().encode(args.orderedTabs[0]!.title).byteLength).toBeLessThanOrEqual(
+    2 * 1024
+  );
 });
 
 it('copies markdown preview text and shows success feedback', async () => {

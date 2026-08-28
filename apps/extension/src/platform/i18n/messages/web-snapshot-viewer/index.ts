@@ -22,8 +22,8 @@ export const webSnapshotViewerMessages = defineMessageSource({
       en: 'Static document',
     },
     assetsMode: {
-      ru: 'Ассеты',
-      en: 'Assets',
+      ru: 'Вложения',
+      en: 'Attachments',
     },
     assetsTitle: {
       ru: 'Вложения снимка',
@@ -90,8 +90,8 @@ export const webSnapshotViewerMessages = defineMessageSource({
       en: 'Fit to window width',
     },
     pngDprHint: {
-      ru: 'PNG сохраняется с естественной плотностью пикселей экрана (DPR) без подгонки размера.',
-      en: 'PNG export keeps the display’s natural pixel density (DPR) without resizing.',
+      ru: 'Скриншот показан в исходном качестве. Масштаб меняет только размер просмотра.',
+      en: 'The screenshot is shown at its original quality. Zoom only changes the viewing size.',
     },
     loading: {
       ru: 'Загрузка снимка...',

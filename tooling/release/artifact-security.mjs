@@ -67,7 +67,7 @@ const FORBIDDEN_WAR_PATTERNS = [
   /\.js$/u,
   /\.html?$/u,
   /^assets\//u,
-  /contentRuntime|webSnapshotInjectedRunner/iu,
+  /contentRuntime/iu,
 ];
 function normalizeRelativePath(relativePath) {
   return relativePath.replaceAll(path.sep, '/');

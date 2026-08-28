@@ -36,13 +36,6 @@ describe('runtime-message-listener shared ownership routing', () => {
     expect(isUiRuntimeBridgeMessage({ type: MessageType.SHOW_TOOLBAR })).toBe(true);
     expect(isTopLevelContentRuntimeMessage({ type: MessageType.SHOW_TOOLBAR })).toBe(false);
   });
-
-  it('routes web snapshot export through the UI bridge only', () => {
-    const message = { type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT };
-
-    expect(isUiRuntimeBridgeMessage(message)).toBe(true);
-    expect(isTopLevelContentRuntimeMessage(message)).toBe(false);
-  });
 });
 
 describe('runtime-message-listener specialized routing', () => {

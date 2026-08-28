@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createWebSnapshotManifest } from '../../../features/web-snapshot/manifest';
+import { createPagePackageManifestFixture as createWebSnapshotManifest } from '../../../features/web-snapshot/manifest.test-support';
 
 const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
@@ -185,6 +185,30 @@ it('deletes only objects with no ref, ready journal, or writing marker', async (
 
   expect(mocks.deleteObject).toHaveBeenCalledOnce();
   expect(mocks.deleteObject).toHaveBeenCalledWith('orphan');
+});
+
+it('protects a prepared Page Package output while its job journal is ready', async () => {
+  mocks.objects.mockResolvedValue(['page-package-output']);
+  mocks.writing.mockResolvedValue([]);
+  mocks.journals.mockResolvedValue([
+    {
+      assetRefs: [createRef('page-package-output')],
+      createdAt: 1,
+      domain: 'page-package-job-temp',
+      journalId: 'page-package-output-journal',
+      payload: {
+        downloadOperationId: 'download-operation',
+        filename: 'page-package.zip',
+        jobId: 'job',
+        kind: 'download-output',
+      },
+    },
+  ]);
+  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+
+  await collectOrphanAssetObjects();
+
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
 });
 
 it('revalidates IDB authority after acquiring the object lock', async () => {

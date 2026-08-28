@@ -57,23 +57,6 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
         'apps/extension/src/composition/persistence/infrastructure/indexed-db',
         'maintenance/provenance.test.ts',
       ].join('/'),
-      [
-        'apps/extension/src/composition/persistence/web-snapshots',
-        'maintenance/provenance.test.ts',
-      ].join('/'),
-    ],
-  },
-  {
-    owner: 'shared-db-web-snapshot-provenance-state',
-    productionFile: 'apps/extension/src/composition/persistence/web-snapshots/provenance-state.ts',
-    reason:
-      'Web snapshot provenance maintenance markers are covered by save, restore, and maintenance suites.',
-    testFiles: [
-      [
-        'apps/extension/src/composition/persistence/web-snapshots',
-        'maintenance/provenance.test.ts',
-      ].join('/'),
-      'apps/extension/src/composition/persistence/web-snapshots/records.test.ts',
     ],
   },
   {

@@ -8,7 +8,7 @@ import { readCaptureSurfaceJournal } from '../../storage/capture-surface';
 import { getCaptureSurfaceService } from '../../capture-surface';
 import { getScreenshotSurfaceSessionTabIds } from '../../capture-surface/screenshot-session';
 import { getQuickActionSurfaceTransactionTabIds } from '../../capture/quick-actions/flow/surface';
-import { erasePopupExportJobState } from '../../capture/popup-export/job';
+import { erasePopupExportJobState } from '../../capture/page-package/job';
 
 export type BackgroundRuntimeScreenshotCleanupPort = {
   disableScreenshotMode(tabId: number, state: BackgroundRuntimeState): Promise<void>;

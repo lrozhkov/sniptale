@@ -3,8 +3,7 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
     owner: 'web-snapshot-runtime-transfer-contract',
     productionPrefix:
       'apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot',
-    reason:
-      'Web snapshot staged transfer runtime contracts are covered by focused save contract tests.',
+    reason: 'Web-copy asset session contracts are covered by focused save contract tests.',
     testFiles: [
       'apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.test.ts',
     ],
@@ -21,11 +20,10 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
   {
     owner: 'web-snapshot-message-boundary',
     productionPrefix: 'apps/extension/src/contracts/messaging/parsers/',
-    reason:
-      'Web snapshot staged transfer boundary parsing is covered by focused parser boundary tests.',
+    reason: 'Web-copy asset session parsing is covered by focused parser boundary tests.',
     testFiles: [
       'apps/extension/src/contracts/messaging/parsers/boundary.test.ts',
-      'apps/extension/src/contracts/messaging/parsers/boundary.web-snapshot.test.ts',
+      'apps/extension/src/contracts/messaging/parsers/supported-types.data.test.ts',
     ],
   },
   {
@@ -35,13 +33,13 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
       'Web snapshot message type surfaces are covered by focused contract and boundary tests.',
     testFiles: [
       'apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.test.ts',
-      'apps/extension/src/contracts/messaging/parsers/boundary.web-snapshot.test.ts',
+      'apps/extension/src/contracts/messaging/parsers/supported-types.data.test.ts',
     ],
   },
   {
     owner: 'web-snapshot-message-boundary',
     productionFile: 'packages/runtime-contracts/src/web-snapshot/index.ts',
-    reason: 'Web snapshot staged payload types are covered by focused contract tests.',
+    reason: 'Web-copy asset session types are covered by focused contract tests.',
     testFiles: [
       'apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.test.ts',
     ],
@@ -49,8 +47,7 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
   {
     owner: 'web-snapshot-content-transfer',
     productionPrefix: 'apps/extension/src/content/parser/web-snapshot/',
-    reason:
-      'Content web snapshot packaging and staged transfer are covered by focused service suites.',
+    reason: 'Content Web-copy production and packaging are covered by focused service suites.',
     testFiles: [
       'apps/extension/src/content/parser/web-snapshot/package.test.ts',
       'apps/extension/src/content/parser/web-snapshot/service.test.ts',
@@ -58,38 +55,21 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'web-snapshot-popup-transfer',
-    productionFile:
-      'apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts',
-    reason: 'Popup web snapshot staged handoff is covered by focused controller tests.',
-    testFiles: [
-      'apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.integration.test.ts',
-      'apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.test.ts',
-    ],
-  },
-  {
     owner: 'web-snapshot-background-transfer',
     productionPrefix: 'apps/extension/src/background/capture/routing/web-snapshot/',
-    reason: 'Background web snapshot sessions and staged blobs are covered by focused owner tests.',
-    testFiles: [
-      'apps/extension/src/background/capture/routing/web-snapshot/session.test.ts',
-      'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.test.ts',
-    ],
+    reason: 'Background Web-copy asset sessions are covered by their focused owner tests.',
+    testFiles: ['apps/extension/src/background/capture/routing/web-snapshot/session.test.ts'],
   },
   {
     owner: 'web-snapshot-background-transfer',
-    productionFile: 'apps/extension/src/background/capture/routing/actions.gallery.ts',
-    reason:
-      'Gallery web snapshot save and staged chunk handlers are covered by focused action tests.',
-    testFiles: [
-      'apps/extension/src/background/capture/routing/actions.gallery.test.ts',
-      'apps/extension/src/background/capture/routing/actions.gallery.staged.test.ts',
-    ],
+    productionFile: 'apps/extension/src/background/capture/routing/actions.web-snapshot.ts',
+    reason: 'Web-copy resource registration and fetch routes are covered by focused route tests.',
+    testFiles: ['apps/extension/src/background/capture/routing/web-snapshot-asset-route.test.ts'],
   },
   {
     owner: 'web-snapshot-background-transfer',
     productionFile: 'apps/extension/src/background/capture/routing/types.ts',
-    reason: 'Capture route staged web snapshot typing is covered by focused route tests.',
+    reason: 'Capture route Web-copy asset typing is covered by focused route tests.',
     testFiles: [
       'apps/extension/src/background/capture/routing/route/dispatcher.test.ts',
       'apps/extension/src/background/capture/routing/web-snapshot-asset-route.test.ts',
@@ -98,16 +78,16 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
   {
     owner: 'web-snapshot-runtime-routing',
     productionFile: 'apps/extension/src/background/runtime/routing/message-guards/guards/tab.ts',
-    reason: 'Runtime tab guard staged web snapshot authorization is covered by guard tests.',
+    reason: 'Runtime tab guard Web-copy asset authorization is covered by guard tests.',
     testFiles: ['apps/extension/src/background/runtime/routing/message-guards/guards/tab.test.ts'],
   },
   {
     owner: 'web-snapshot-runtime-routing',
     productionFile: 'apps/extension/src/background/runtime/routing/boundary/sender-policy.ts',
-    reason:
-      'Runtime sender policy staged web snapshot authorization is covered by preflight tests.',
+    reason: 'Runtime sender policy Web-copy authorization is covered by focused policy tests.',
     testFiles: [
-      'apps/extension/src/background/runtime/routing/boundary/preflight.web-snapshot-boundary.test.ts',
+      'apps/extension/src/background/runtime/routing/boundary/preflight.classifier.test.ts',
+      'apps/extension/src/background/runtime/routing/boundary/sender-policy.test.ts',
     ],
   },
   {
@@ -119,7 +99,6 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.branches.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.content-intent.test.ts',
-      'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.injected-loader.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.launch-intent.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.viewer.test.ts',
@@ -128,11 +107,10 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
   {
     owner: 'web-snapshot-media-hub-transfer',
     productionPrefix: 'apps/extension/src/background/media-hub/web-snapshot',
-    reason:
-      'Media hub web snapshot staged and legacy payload persistence are covered by focused save tests.',
+    reason: 'Media hub Page Package persistence and validation are covered by focused owner tests.',
     testFiles: [
       'apps/extension/src/background/media-hub/web-snapshot.test.ts',
-      'apps/extension/src/background/capture/routing/actions.web-snapshot.save.test.ts',
+      'apps/extension/src/background/media-hub/web-snapshot-validation.test.ts',
     ],
   },
   {

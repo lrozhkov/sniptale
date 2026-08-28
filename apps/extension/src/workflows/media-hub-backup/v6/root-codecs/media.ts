@@ -100,5 +100,20 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
   ) {
     throw new Error('Portable web snapshot metadata is invalid.');
   }
+  const entry = metadata.entry as { kind?: unknown; source?: { kind?: unknown } };
+  const hasWebSnapshotMarker =
+    entry.kind === 'web-archive' ||
+    entry.source?.kind === 'web-snapshot' ||
+    metadata.webSnapshot !== undefined;
+  if (
+    hasWebSnapshotMarker &&
+    !(
+      entry.kind === 'web-archive' &&
+      entry.source?.kind === 'web-snapshot' &&
+      metadata.webSnapshot !== undefined
+    )
+  ) {
+    throw new Error('Portable web snapshot role association is invalid.');
+  }
   return metadata as PortableMediaMetadata;
 }

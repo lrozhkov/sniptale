@@ -37,6 +37,7 @@ import {
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { ArchiveRootObjectSource, MediaHubBackupRootInventoryItem } from '../export';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 
 interface MediaInventoryDatabase {
   get(store: string, key: unknown): Promise<unknown>;
@@ -207,7 +208,7 @@ async function buildWebSnapshotSource(args: {
     throw new Error(`Web snapshot backup metadata is missing: ${args.snapshotId}.`);
   }
   const [packageFile, screenshotFile] = await Promise.all([
-    readRefFile(args.db, stored.packageAssetId, `${stored.id}.sniptale-web-snapshot.zip`),
+    readRefFile(args.db, stored.packageAssetId, `${stored.id}.sniptale-page-package.zip`),
     readRefFile(args.db, stored.screenshotAssetId, `${stored.id}-screenshot`),
   ]);
   const sanitized = await sanitizeWebSnapshotPackageProvenance(packageFile, stored.manifest, {
@@ -215,8 +216,8 @@ async function buildWebSnapshotSource(args: {
   });
   const packageObjectId = args.collector.add(
     sanitized.packageBlob,
-    `${stored.id}.sniptale-web-snapshot.zip`,
-    'application/zip',
+    `${stored.id}.sniptale-page-package.zip`,
+    PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
     mediaObjectDirectory(args.entry, args.options)
   );
   const screenshotObjectId = args.collector.add(
@@ -229,7 +230,7 @@ async function buildWebSnapshotSource(args: {
   );
   const { packageAssetId: _package, screenshotAssetId: _screenshot, ...portable } = stored;
   return {
-    originalObjectId: screenshotObjectId,
+    originalObjectId: packageObjectId,
     webSnapshot: {
       entry: {
         ...portable,
@@ -403,8 +404,8 @@ async function buildMediaRoot(args: {
     entry.source.kind === 'web-snapshot' && !args.options.includeSourceMetadata
       ? {
           ...entryWithoutBlob,
-          filename: 'snapshot.sniptale-web-snapshot.zip',
-          originalFilename: 'snapshot.sniptale-web-snapshot.zip',
+          filename: 'snapshot.sniptale-page-package.zip',
+          originalFilename: 'snapshot.sniptale-page-package.zip',
         }
       : entryWithoutBlob;
   const metadata: PortableMediaMetadata = {

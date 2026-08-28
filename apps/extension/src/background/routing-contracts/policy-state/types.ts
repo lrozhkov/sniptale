@@ -18,6 +18,7 @@ export type PolicyStateId =
   | 'llm-session-tokens'
   | 'native-ingestion-erasure-exclusion'
   | 'offscreen-command-capability-generations'
+  | 'page-package-download-leases'
   | 'offscreen-media-activity-lease'
   | 'page-access-tab-activation'
   | 'persistent-data-erasure-lease'
@@ -32,8 +33,7 @@ export type PolicyStateId =
   | 'video-post-record-results'
   | 'video-recording-control-lease'
   | 'video-recording-surface-lease'
-  | 'voice-input-port-session-authority'
-  | 'web-snapshot-staged-blobs';
+  | 'voice-input-port-session-authority';
 
 export type PolicyStateClass =
   | 'capability'

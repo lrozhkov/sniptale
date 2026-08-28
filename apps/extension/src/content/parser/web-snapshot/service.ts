@@ -15,6 +15,8 @@ import type {
 import type { WebSnapshotSaveProgressUpdate } from './progress';
 import { materializeUnreadableIframeRasters } from './iframe-raster';
 import { PreparedSnapshotWarningKind } from '../page-preparation/snapshot';
+import { normalizePopupExportTabTitle } from '@sniptale/runtime-contracts/export';
+import { normalizePagePackageWarnings } from '@sniptale/runtime-contracts/page-package';
 
 function throwIfWebSnapshotBuildAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -42,10 +44,12 @@ function createWarningStats(args: {
 }
 
 function normalizeWebSnapshotWarnings(warnings: unknown[]): string[] {
-  return warnings
-    .map((warning) => (typeof warning === 'string' ? warning : String(warning ?? '')))
-    .map((warning) => warning.trim())
-    .filter(Boolean);
+  return normalizePagePackageWarnings(
+    warnings
+      .map((warning) => (typeof warning === 'string' ? warning : String(warning ?? '')))
+      .map((warning) => warning.trim())
+      .filter(Boolean)
+  );
 }
 
 function createNormalizedWarningSummary(args: {
@@ -80,7 +84,7 @@ function resolveCurrentPageSource(): WebSnapshotPageSource {
   const viewport = resolveCurrentPageViewport(document);
 
   return {
-    title: document.title || null,
+    title: document.title ? normalizePopupExportTabTitle(document.title) : null,
     url: document.location.href,
     ...(viewport === undefined ? {} : { viewport }),
   };
@@ -98,6 +102,10 @@ function resolveCurrentPageViewport(
   }
 
   return {
+    deviceScaleFactor:
+      Number.isFinite(view?.devicePixelRatio) && (view?.devicePixelRatio ?? 0) > 0
+        ? view!.devicePixelRatio
+        : 1,
     height: Math.round(height),
     width: Math.round(width),
   };

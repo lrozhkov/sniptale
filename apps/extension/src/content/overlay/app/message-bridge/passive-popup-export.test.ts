@@ -13,7 +13,6 @@ describe('runtime-message-bridge-passive-popup-export', () => {
 
     expect(isPopupExportMessage(MessageType.EXPORT_POPUP_PREVIEW)).toBe(true);
     expect(isPopupExportMessage(MessageType.EXPORT_POPUP_BUILD_PACKAGE)).toBe(true);
-    expect(isPopupExportMessage(MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT)).toBe(true);
     expect(isPopupExportMessage(MessageType.EXPORT_POPUP_CANCEL)).toBe(true);
     expect(isPopupExportMessage(MessageType.COPY_TEXT_TO_CLIPBOARD)).toBe(false);
   });

@@ -1,34 +1,16 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import { PREPARATION_SURFACE_RESIZE } from '../../../workflows/page-preparation';
 import { waitForViewerSurfaceCommit } from './controller';
 
 function createManifest(): WebSnapshotManifest {
-  return {
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    capturedAt: '2026-08-27T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: {
-      computedStyles: 'computed.json',
-      domSnapshot: 'dom.html',
-      errors: 'errors.log',
-      manifest: 'manifest.json',
-      screenshot: 'screenshot.png',
-      snapshotHtml: 'index.html',
-      stylesheets: 'stylesheets.json',
-      virtualDomSnapshot: 'virtual.html',
-    },
-    schemaVersion: 1,
+  return createPagePackageManifestFixture({
     source: { faviconUrl: null, title: 'Wide page', url: 'https://example.test' },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 1 },
-    viewport: { height: 1440, width: 2560 },
-    warnings: [],
-  };
+    viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 },
+  });
 }
 
 function setLayoutSize(element: HTMLElement, width: number, height: number): void {

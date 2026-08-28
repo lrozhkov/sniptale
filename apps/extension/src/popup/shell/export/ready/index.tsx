@@ -5,6 +5,11 @@ import { translate } from '../../../../platform/i18n/popup';
 import { ExportDataTypeSection } from '../data-type/section';
 import { ExportPagesSection } from '../pages/section';
 import type { PopupExportTabItem } from '../selection/tabs/types';
+import type { PopupPagePackagePreferenceState } from '../session/types';
+import {
+  PackageDestinationSwitch,
+  type PopupPackageDestination,
+} from '../data-type/package-controls';
 
 type ExportReadySectionProps = {
   availableTabs: PopupExportTabItem[];
@@ -21,6 +26,7 @@ type ExportReadySectionProps = {
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;
+  includeWebCopy: boolean;
   isFilterActive: boolean;
   selectedCount: number;
   selectedTabIds: number[];
@@ -34,6 +40,10 @@ type ExportReadySectionProps = {
   setIncludeImages: Dispatch<SetStateAction<boolean>>;
   setIncludeJson: Dispatch<SetStateAction<boolean>>;
   setIncludeMarkdown: Dispatch<SetStateAction<boolean>>;
+  setIncludeWebCopy: Dispatch<SetStateAction<boolean>>;
+  savePreferences: PopupPagePackagePreferenceState;
+  onRequestWebCopySetup: () => void;
+  webSnapshotEnabled: boolean;
   toggleSelectAllTabs: () => void;
   toggleTabSelection: (tabId: number) => void;
 };
@@ -54,6 +64,8 @@ function renderReadyHint(
 
 function renderDataTypeSection(
   props: ExportReadySectionProps,
+  destination: PopupPackageDestination,
+  packagePreferences: PopupPagePackagePreferenceState,
   isEditingDataTypes: boolean,
   onClose: () => void,
   onOpen: () => void
@@ -61,6 +73,7 @@ function renderDataTypeSection(
   return (
     <ExportDataTypeSection
       disabled={props.disabled}
+      destination={destination}
       includeAnnotations={props.includeAnnotations}
       includeBasicLogs={props.includeBasicLogs}
       includeCssDiagnostics={props.includeCssDiagnostics}
@@ -74,6 +87,8 @@ function renderDataTypeSection(
       isOpen={isEditingDataTypes}
       onClose={onClose}
       onOpen={onOpen}
+      onRequestWebCopySetup={props.onRequestWebCopySetup}
+      packagePreferences={packagePreferences}
       setIncludeAnnotations={props.setIncludeAnnotations}
       setIncludeBasicLogs={props.setIncludeBasicLogs}
       setIncludeCssDiagnostics={props.setIncludeCssDiagnostics}
@@ -83,6 +98,7 @@ function renderDataTypeSection(
       setIncludeImages={props.setIncludeImages}
       setIncludeJson={props.setIncludeJson}
       setIncludeMarkdown={props.setIncludeMarkdown}
+      webSnapshotEnabled={props.webSnapshotEnabled}
     />
   );
 }
@@ -116,6 +132,8 @@ function renderPagesSection(
 
 function renderReadySections(
   props: ExportReadySectionProps,
+  destination: PopupPackageDestination,
+  packagePreferences: PopupPagePackagePreferenceState,
   activeDrawer: 'data-types' | 'pages' | null,
   setActiveDrawer: (nextValue: 'data-types' | 'pages' | null) => void
 ) {
@@ -127,6 +145,8 @@ function renderReadySections(
       {!isEditingPages
         ? renderDataTypeSection(
             props,
+            destination,
+            packagePreferences,
             isEditingDataTypes,
             () => setActiveDrawer(null),
             () => setActiveDrawer('data-types')
@@ -147,10 +167,58 @@ function renderReadySections(
 
 export function ExportReadySection(props: ExportReadySectionProps) {
   const [activeDrawer, setActiveDrawer] = useState<'data-types' | 'pages' | null>(null);
+  const [destination, setDestination] = useState<PopupPackageDestination>('export');
+  const exportPreferences: PopupPagePackagePreferenceState = {
+    actions: {
+      setIncludeAnnotations: props.setIncludeAnnotations,
+      setIncludeBasicLogs: props.setIncludeBasicLogs,
+      setIncludeCssDiagnostics: props.setIncludeCssDiagnostics,
+      setIncludeFiles: props.setIncludeFiles,
+      setIncludeFullPageScreenshot: props.setIncludeFullPageScreenshot,
+      setIncludePageDiagnostics: props.setIncludePageDiagnostics,
+      setIncludeImages: props.setIncludeImages,
+      setIncludeJson: props.setIncludeJson,
+      setIncludeMarkdown: props.setIncludeMarkdown,
+    },
+    includeWebCopy: props.includeWebCopy,
+    setIncludeWebCopy: props.setIncludeWebCopy,
+    values: {
+      includeAnnotations: props.includeAnnotations,
+      includeBasicLogs: props.includeBasicLogs,
+      includeCssDiagnostics: props.includeCssDiagnostics,
+      includeFiles: props.includeFiles,
+      includeFullPageScreenshot: props.includeFullPageScreenshot,
+      includePageDiagnostics: props.includePageDiagnostics,
+      includeImages: props.includeImages,
+      includeJson: props.includeJson,
+      includeMarkdown: props.includeMarkdown,
+    },
+  };
+  const packagePreferences = destination === 'export' ? exportPreferences : props.savePreferences;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-      {renderReadySections(props, activeDrawer, setActiveDrawer)}
+      <PackageDestinationSwitch
+        destination={destination}
+        disabled={props.disabled}
+        onChange={(nextDestination) => {
+          setDestination(nextDestination);
+          setActiveDrawer(null);
+        }}
+      />
+      {renderReadySections(
+        {
+          ...props,
+          ...packagePreferences.values,
+          ...packagePreferences.actions,
+          includeWebCopy: packagePreferences.includeWebCopy,
+          setIncludeWebCopy: packagePreferences.setIncludeWebCopy,
+        },
+        destination,
+        packagePreferences,
+        activeDrawer,
+        setActiveDrawer
+      )}
       {renderReadyHint(props)}
     </div>
   );

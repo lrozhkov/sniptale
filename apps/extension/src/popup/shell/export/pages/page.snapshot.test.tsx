@@ -118,6 +118,16 @@ it('keeps the website action enabled and opens compact setup guidance while disa
   expect(mocks.openSettingsPage).toHaveBeenCalledWith({ route: { section: 'web-snapshots' } });
 });
 
+it('keeps Library save unavailable until package preferences hydrate', async () => {
+  mocks.usePopupExportController.mockReturnValue(
+    createPopupExportControllerFixture({ preferences: { hasLoadedPreferences: false } })
+  );
+
+  await renderPage();
+
+  expect(footer().canSaveWebSnapshot).toBe(false);
+});
+
 it('saves directly after the persisted opt-in is loaded', async () => {
   const handleSaveWebSnapshot = vi.fn();
   mocks.loadSettings.mockResolvedValueOnce({ webSnapshotEnabled: true });
@@ -130,6 +140,23 @@ it('saves directly after the persisted opt-in is loaded', async () => {
   act(() => footer().onSaveWebSnapshot?.());
   expect(handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
   expect(container.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('keeps combined download visible but requires existing Web Snapshot setup before launch', async () => {
+  const handleStartExport = vi.fn();
+  mocks.usePopupExportController.mockReturnValue(
+    createPopupExportControllerFixture({
+      actions: { handleStartExport },
+      preferences: { includeWebCopy: true },
+    })
+  );
+  await renderPage();
+  await settleSettings();
+
+  act(() => footer().onStartExport());
+
+  expect(handleStartExport).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="dialog"]')).not.toBeNull();
 });
 
 it('fails closed with setup guidance while settings are loading or unavailable', async () => {

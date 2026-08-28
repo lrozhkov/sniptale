@@ -2,66 +2,64 @@ import { useEffect, type MutableRefObject } from 'react';
 
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
-  DEFAULT_POPUP_EXPORT_PREFERENCES,
-  loadPopupExportPreferences,
+  DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES,
+  loadPopupPagePackagePreferences,
+  type PopupPagePackagePreferences,
 } from '../../../../../composition/persistence/popup-export-preferences';
-import type { PopupExportPreferenceSetters, PopupExportSelection } from '../../session/types';
-import { applyPopupExportSelection, toPopupExportSelection } from './selection';
+import type { PopupPagePackagePreferenceState } from '../../session/types';
+import { applyPopupExportSelection } from './selection';
 import { consumePopupExportLaunchSelection } from '../launch-selection';
 
 const logger = createLogger({ namespace: 'PopupExportToggles' });
 
-type PopupExportHydrationApplyParams = {
-  committedPreferencesRef: MutableRefObject<PopupExportSelection | null>;
-  hasLoadedPreferencesRef: MutableRefObject<boolean>;
-  onHydrated?: (() => void) | undefined;
-  preferences: PopupExportPreferenceSetters;
+type PopupPackagePreferenceSetters = {
+  export: PopupPagePackagePreferenceState;
+  save: PopupPagePackagePreferenceState;
 };
 
-function applyHydratedPopupExportPreferences(
-  storedPreferences: PopupExportSelection,
-  params: PopupExportHydrationApplyParams
-): void {
-  const preferences = {
-    ...storedPreferences,
-    ...consumePopupExportLaunchSelection(),
+function applyHydratedPreferences(
+  stored: PopupPagePackagePreferences,
+  setters: PopupPackagePreferenceSetters
+): PopupPagePackagePreferences {
+  const hydrated = {
+    export: {
+      ...stored.export,
+      ...consumePopupExportLaunchSelection(),
+    },
+    save: stored.save,
   };
-  applyPopupExportSelection(preferences, params.preferences);
-  params.committedPreferencesRef.current = toPopupExportSelection(preferences);
-  params.hasLoadedPreferencesRef.current = true;
-  params.onHydrated?.();
+  applyPopupExportSelection(hydrated.export, setters.export.actions);
+  applyPopupExportSelection(hydrated.save, setters.save.actions);
+  setters.export.setIncludeWebCopy(hydrated.export.includeWebCopy);
+  setters.save.setIncludeWebCopy(hydrated.save.includeWebCopy);
+  return hydrated;
 }
 
-export function hydratePopupExportPreferences(params: {
-  committedPreferencesRef: MutableRefObject<PopupExportSelection | null>;
+export function hydratePopupPagePackagePreferences(params: {
+  committedPreferencesRef: MutableRefObject<PopupPagePackagePreferences | null>;
   hasLoadedPreferencesRef: MutableRefObject<boolean>;
-  onHydrated?: () => void;
+  loadPreferences?: typeof loadPopupPagePackagePreferences;
   log?: Pick<typeof logger, 'debug'>;
-  loadPreferences?: typeof loadPopupExportPreferences;
-  preferences: PopupExportPreferenceSetters;
+  onHydrated?: () => void;
+  setters: PopupPackagePreferenceSetters;
 }) {
-  const loadPreferences = params.loadPreferences ?? loadPopupExportPreferences;
+  if (params.hasLoadedPreferencesRef.current) return () => {};
+
+  const loadPreferences = params.loadPreferences ?? loadPopupPagePackagePreferences;
   const log = params.log ?? logger;
-
-  if (params.hasLoadedPreferencesRef.current) {
-    return () => {};
-  }
-
   let cancelled = false;
 
   void loadPreferences()
-    .then((storedPreferences) => {
-      if (!cancelled) {
-        applyHydratedPopupExportPreferences(storedPreferences, params);
-      }
-    })
     .catch((error) => {
-      if (cancelled) {
-        return;
-      }
-
-      log.debug('Failed to hydrate export preferences', error);
-      applyHydratedPopupExportPreferences(DEFAULT_POPUP_EXPORT_PREFERENCES, params);
+      log.debug('Failed to hydrate page-package preferences', error);
+      return DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES;
+    })
+    .then((stored) => {
+      if (cancelled) return;
+      const hydrated = applyHydratedPreferences(stored, params.setters);
+      params.committedPreferencesRef.current = hydrated;
+      params.hasLoadedPreferencesRef.current = true;
+      params.onHydrated?.();
     });
 
   return () => {
@@ -69,20 +67,25 @@ export function hydratePopupExportPreferences(params: {
   };
 }
 
-export function usePopupExportHydration(
-  committedPreferencesRef: MutableRefObject<PopupExportSelection | null>,
-  hasLoadedPreferencesRef: MutableRefObject<boolean>,
-  onHydrated: () => void,
-  preferences: PopupExportPreferenceSetters
-) {
+export function usePopupExportHydration(params: {
+  committedPreferencesRef: MutableRefObject<PopupPagePackagePreferences | null>;
+  hasLoadedPreferencesRef: MutableRefObject<boolean>;
+  onHydrated: () => void;
+  setters: PopupPackagePreferenceSetters;
+}) {
   useEffect(
     () =>
-      hydratePopupExportPreferences({
-        committedPreferencesRef,
-        hasLoadedPreferencesRef,
-        onHydrated,
-        preferences,
+      hydratePopupPagePackagePreferences({
+        committedPreferencesRef: params.committedPreferencesRef,
+        hasLoadedPreferencesRef: params.hasLoadedPreferencesRef,
+        onHydrated: params.onHydrated,
+        setters: params.setters,
       }),
-    [committedPreferencesRef, hasLoadedPreferencesRef, onHydrated, preferences]
+    [
+      params.committedPreferencesRef,
+      params.hasLoadedPreferencesRef,
+      params.onHydrated,
+      params.setters,
+    ]
   );
 }

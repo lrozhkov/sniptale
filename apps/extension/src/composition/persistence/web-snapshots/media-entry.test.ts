@@ -1,8 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import type { SaveWebSnapshotMediaAssetInput } from '../media-library/contracts';
 import type { StoredWebSnapshotRecord } from './contracts';
 
@@ -56,29 +54,13 @@ it('creates Web Snapshot thumbnails from the top of the retained page raster', a
 });
 
 function createManifest(): WebSnapshotManifest {
-  return {
-    capturedAt: '2026-06-10T00:00:00.000Z',
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    id: 'snapshot-1',
-    paths: {
-      computedStyles: 'computed.css',
-      domSnapshot: 'dom.json',
-      errors: 'errors.json',
-      manifest: 'manifest.json',
-      screenshot: 'screenshot.png',
-      snapshotHtml: 'index.html',
-      stylesheets: 'styles.css',
-      virtualDomSnapshot: 'virtual.json',
-    },
-    schemaVersion: 1,
+  return createPagePackageManifestFixture({
     source: {
       faviconUrl: 'https://user:pass@example.com/favicon.ico?token=secret#hash',
       title: 'Sensitive page',
       url: 'https://user:pass@example.com/invite/abc?token=secret#access_token=abc',
     },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 1 },
-    warnings: [],
-  };
+  });
 }
 
 it('sanitizes web snapshot provenance before creating the media entry', async () => {

@@ -104,8 +104,6 @@ export const backgroundIngressTabRouteGroups = [
     messageTypes: [
       'EXPORT_POPUP_PREVIEW',
       'EXPORT_POPUP_BUILD_PACKAGE',
-      'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-      'EXPORT_POPUP_CANCEL',
       'CONSUME_POPUP_EXPORT_LAUNCH_INTENT',
     ],
   },
@@ -305,11 +303,9 @@ export const backgroundIngressTabRouteGroups = [
       'screenshot capture, editor open, annotation or staged download, popup launch, gallery, or web snapshot',
     transitiveStateOwner: 'capture routing and media-hub storage owners',
     messageTypes: [
-      'SAVE_WEB_SNAPSHOT_TO_GALLERY',
       'REGISTER_WEB_SNAPSHOT_ASSETS',
       'FETCH_WEB_SNAPSHOT_ASSET',
-      'STAGE_WEB_SNAPSHOT_BLOB_CHUNK',
-      'RELEASE_WEB_SNAPSHOT_STAGED_BLOBS',
+      'STAGE_PAGE_PACKAGE_JOB_CHUNK',
     ],
   },
   {

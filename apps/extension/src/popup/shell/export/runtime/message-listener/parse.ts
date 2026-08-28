@@ -6,7 +6,7 @@ export function parsePopupExportRuntimeMessage(message: unknown): PopupExportRun
   try {
     const parsedMessage = parsePopupRuntimeMessage(message);
     if (
-      parsedMessage.type === MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED ||
+      parsedMessage.type === MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED ||
       parsedMessage.type === MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED
     ) {
       return parsedMessage;

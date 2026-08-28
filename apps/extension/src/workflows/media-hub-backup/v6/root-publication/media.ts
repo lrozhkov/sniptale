@@ -58,6 +58,7 @@ import type { StagedArchiveObject } from '../staging';
 import type { MediaHubBackupRootEnvelope } from '../contracts';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import { validateRetainedWebSnapshotScreenshot } from '../../../../features/web-snapshot/screenshot-validation';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 
 type MutableStore = {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -205,11 +206,41 @@ function remapMediaIdentity(
 
 type PortableMedia = ReturnType<typeof parsePortableMediaMetadata>;
 
-const WEB_SNAPSHOT_SCREENSHOT_MIME_TYPES: readonly string[] = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-];
+const PAGE_PACKAGE_FILENAME_SUFFIX = '.sniptale-page-package.zip';
+
+function assertRestoredWebSnapshotMediaProfile(args: {
+  metadata: PortableMedia;
+  packageObject: StagedArchiveObject;
+  screenshotObject: StagedArchiveObject;
+}): void {
+  const snapshot = args.metadata.webSnapshot;
+  if (!snapshot) return;
+  const entry = args.metadata.entry;
+  if (
+    entry.id !== snapshot.entry.id ||
+    entry.kind !== 'web-archive' ||
+    entry.mimeType !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE ||
+    entry.source.kind !== 'web-snapshot' ||
+    entry.source.snapshotId !== snapshot.entry.id ||
+    args.metadata.originalObjectId !== snapshot.packageObjectId ||
+    entry.filename.length <= PAGE_PACKAGE_FILENAME_SUFFIX.length ||
+    !entry.filename.endsWith(PAGE_PACKAGE_FILENAME_SUFFIX) ||
+    entry.originalFilename !== entry.filename ||
+    entry.size !== args.packageObject.ref.size ||
+    snapshot.entry.size !== args.packageObject.ref.size ||
+    snapshot.entry.screenshotMimeType !== 'image/png' ||
+    snapshot.entry.screenshotSize !== args.screenshotObject.ref.size
+  ) {
+    throw new Error('Restored Page Package Library metadata is invalid.');
+  }
+  if (args.packageObject.ref.mimeType !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE) {
+    throw new Error('Restored web snapshot package MIME type is invalid.');
+  }
+  if (args.screenshotObject.ref.mimeType !== 'image/png') {
+    throw new Error('Restored web snapshot screenshot MIME type is invalid.');
+  }
+}
+
 async function validateRestoredWebSnapshotScreenshot(args: {
   packageBlob: Blob;
   screenshotBlob: Blob;
@@ -229,15 +260,16 @@ async function replaceSanitizedSnapshotPackage(args: {
   if (!isWebSnapshotManifest(metadata.webSnapshot.entry.manifest)) {
     throw new Error('Restored web snapshot manifest is invalid.');
   }
+  if (
+    metadata.webSnapshot.entry.manifest.intent !== 'save' ||
+    metadata.webSnapshot.entry.manifest.diagnosticsLevel === 'extended'
+  ) {
+    throw new Error('Restored Page Package uses a non-Library profile.');
+  }
   const objects = objectMap(args.staged);
   const packageObject = requireObject(objects, metadata.webSnapshot.packageObjectId);
   const screenshotObject = requireObject(objects, metadata.webSnapshot.screenshotObjectId);
-  if (packageObject.ref.mimeType.toLowerCase() !== 'application/zip') {
-    throw new Error('Restored web snapshot package MIME type is invalid.');
-  }
-  if (!WEB_SNAPSHOT_SCREENSHOT_MIME_TYPES.includes(screenshotObject.ref.mimeType.toLowerCase())) {
-    throw new Error('Restored web snapshot screenshot MIME type is invalid.');
-  }
+  assertRestoredWebSnapshotMediaProfile({ metadata, packageObject, screenshotObject });
   const packageFile = await readAssetFile(packageObject.ref, `${metadata.entry.id}-snapshot.zip`);
   const sanitized = await sanitizeWebSnapshotPackageProvenance(
     packageFile,
@@ -275,6 +307,7 @@ async function replaceSanitizedSnapshotPackage(args: {
   }
   const nextMetadata = {
     ...metadata,
+    entry: { ...metadata.entry, size: sanitized.size },
     webSnapshot: {
       ...metadata.webSnapshot,
       entry: {

@@ -37,19 +37,15 @@ declare module './' {
       typeof import('./').MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT;
     type EXPORT_POPUP_PREVIEW = typeof import('./').MessageType.EXPORT_POPUP_PREVIEW;
     type EXPORT_POPUP_BUILD_PACKAGE = typeof import('./').MessageType.EXPORT_POPUP_BUILD_PACKAGE;
-    type EXPORT_POPUP_SAVE_WEB_SNAPSHOT =
-      typeof import('./').MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT;
-    type START_POPUP_EXPORT_JOB = typeof import('./').MessageType.START_POPUP_EXPORT_JOB;
-    type GET_POPUP_EXPORT_JOB_STATUS = typeof import('./').MessageType.GET_POPUP_EXPORT_JOB_STATUS;
-    type CANCEL_POPUP_EXPORT_JOB = typeof import('./').MessageType.CANCEL_POPUP_EXPORT_JOB;
-    type ACK_POPUP_EXPORT_JOB_STATUS = typeof import('./').MessageType.ACK_POPUP_EXPORT_JOB_STATUS;
-    type POPUP_EXPORT_JOB_STATUS_UPDATED =
-      typeof import('./').MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
+    type START_PAGE_PACKAGE_JOB = typeof import('./').MessageType.START_PAGE_PACKAGE_JOB;
+    type GET_PAGE_PACKAGE_JOB_STATUS = typeof import('./').MessageType.GET_PAGE_PACKAGE_JOB_STATUS;
+    type CANCEL_PAGE_PACKAGE_JOB = typeof import('./').MessageType.CANCEL_PAGE_PACKAGE_JOB;
+    type ACK_PAGE_PACKAGE_JOB_STATUS = typeof import('./').MessageType.ACK_PAGE_PACKAGE_JOB_STATUS;
+    type PAGE_PACKAGE_JOB_STATUS_UPDATED =
+      typeof import('./').MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED;
     type WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED =
       typeof import('./').MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED;
     type EXPORT_POPUP_CANCEL = typeof import('./').MessageType.EXPORT_POPUP_CANCEL;
-    type RELEASE_WEB_SNAPSHOT_STAGED_BLOBS =
-      typeof import('./').MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS;
     type REQUEST_POPUP_TAB_ROUTE_CAPABILITY =
       typeof import('./').MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY;
     type REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY =
@@ -67,6 +63,12 @@ declare module './' {
       typeof import('./').MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME;
     type OFFSCREEN_CANCEL_DESKTOP_FRAME =
       typeof import('./').MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME;
+    type OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE =
+      typeof import('./').MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE;
+    type OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE =
+      typeof import('./').MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE;
+    type OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE =
+      typeof import('./').MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE;
     type EXPORT_CAPTURE_FULL_PAGE = typeof import('./').MessageType.EXPORT_CAPTURE_FULL_PAGE;
     type PREPARE_FULL_PAGE_CAPTURE = typeof import('./').MessageType.PREPARE_FULL_PAGE_CAPTURE;
     type HEARTBEAT_FULL_PAGE_CAPTURE = typeof import('./').MessageType.HEARTBEAT_FULL_PAGE_CAPTURE;
@@ -76,13 +78,11 @@ declare module './' {
     type OPEN_EDITOR_WITH_IMAGE = typeof import('./').MessageType.OPEN_EDITOR_WITH_IMAGE;
     type IMAGE_DATA_FOR_EDITOR = typeof import('./').MessageType.IMAGE_DATA_FOR_EDITOR;
     type SAVE_SCREENSHOT_TO_GALLERY = typeof import('./').MessageType.SAVE_SCREENSHOT_TO_GALLERY;
-    type SAVE_WEB_SNAPSHOT_TO_GALLERY =
-      typeof import('./').MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY;
     type REGISTER_WEB_SNAPSHOT_ASSETS =
       typeof import('./').MessageType.REGISTER_WEB_SNAPSHOT_ASSETS;
     type FETCH_WEB_SNAPSHOT_ASSET = typeof import('./').MessageType.FETCH_WEB_SNAPSHOT_ASSET;
-    type STAGE_WEB_SNAPSHOT_BLOB_CHUNK =
-      typeof import('./').MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK;
+    type STAGE_PAGE_PACKAGE_JOB_CHUNK =
+      typeof import('./').MessageType.STAGE_PAGE_PACKAGE_JOB_CHUNK;
     type SCENARIO_GET_SESSION = typeof import('./').MessageType.SCENARIO_GET_SESSION;
     type SCENARIO_SET_ENABLED = typeof import('./').MessageType.SCENARIO_SET_ENABLED;
     type SCENARIO_SET_CAPTURE_MODE = typeof import('./').MessageType.SCENARIO_SET_CAPTURE_MODE;

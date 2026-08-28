@@ -49,6 +49,14 @@ import type {
   RuntimeDesktopFrameRequestByType,
   RuntimeDesktopFrameResponseByType,
 } from './desktop-frame.types';
+import type {
+  RuntimePagePackageDownloadLeaseRequestByType,
+  RuntimePagePackageDownloadLeaseResponseByType,
+} from './page-package-download-lease.types';
+import type {
+  RuntimePagePackageStagingRequestByType,
+  RuntimePagePackageStagingResponseByType,
+} from './page-package-staging.types';
 import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { SettingsTransferMessage, SettingsTransferResponse } from '../../../settings-transfer';
 
@@ -58,7 +66,9 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
   RuntimePrivacyErasureRequestByType &
   RuntimeFrameAnnotationRasterRequestByType &
-  RuntimeDesktopFrameRequestByType & {
+  RuntimeDesktopFrameRequestByType &
+  RuntimePagePackageDownloadLeaseRequestByType &
+  RuntimePagePackageStagingRequestByType & {
     [MessageType.SETTINGS_TRANSFER]: SettingsTransferMessage;
     [MessageType.ENABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
@@ -194,7 +204,9 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &
   RuntimePrivacyErasureResponseByType &
   RuntimeFrameAnnotationRasterResponseByType &
-  RuntimeDesktopFrameResponseByType & {
+  RuntimeDesktopFrameResponseByType &
+  RuntimePagePackageDownloadLeaseResponseByType &
+  RuntimePagePackageStagingResponseByType & {
     [MessageType.SETTINGS_TRANSFER]: SettingsTransferResponse;
     [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;

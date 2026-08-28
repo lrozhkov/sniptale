@@ -122,20 +122,24 @@ export const AUDIT_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/features/ai/privacy/index.test.ts'],
   },
   {
-    owner: 'audit-background-popup-export-job',
-    productionPrefix: 'apps/extension/src/background/capture/popup-export/job/',
+    owner: 'audit-background-page-package-job',
+    productionPrefix: 'apps/extension/src/background/capture/page-package/job/',
     exclusive: true,
     allowCrossOwner: true,
-    reason: 'Popup export job authority and recovery are covered by focused owner tests.',
+    reason:
+      'Page Package job, staging, download, and recovery authority are covered by focused owner tests.',
     testFiles: [
-      'apps/extension/src/background/capture/popup-export/job/archive.test.ts',
-      'apps/extension/src/background/capture/popup-export/job/execute.test.ts',
-      'apps/extension/src/background/capture/popup-export/job/index.test.ts',
-      'apps/extension/src/background/capture/popup-export/job/package-boundary.test.ts',
-      'apps/extension/src/background/capture/popup-export/job/package-phase.test.ts',
-      'apps/extension/src/background/capture/popup-export/job/route.test.ts',
-      'apps/extension/src/background/capture/popup-export/job/runtime-state.test.ts',
-      'apps/extension/src/background/capture/popup-export/job/storage.test.ts',
+      'apps/extension/src/background/capture/page-package/job/download.test.ts',
+      'apps/extension/src/background/capture/page-package/job/execute.test.ts',
+      'apps/extension/src/background/capture/page-package/job/index.test.ts',
+      'apps/extension/src/background/capture/page-package/job/page-boundary.test.ts',
+      'apps/extension/src/background/capture/page-package/job/page-phase.test.ts',
+      'apps/extension/src/background/capture/page-package/job/recovery.test.ts',
+      'apps/extension/src/background/capture/page-package/job/route.test.ts',
+      'apps/extension/src/background/capture/page-package/job/runtime-state.test.ts',
+      'apps/extension/src/background/capture/page-package/job/stage-route.test.ts',
+      'apps/extension/src/background/capture/page-package/job/staging.test.ts',
+      'apps/extension/src/background/capture/page-package/job/storage.test.ts',
     ],
   },
   {
@@ -172,6 +176,18 @@ export const AUDIT_OWNER_MAPPINGS = [
       'apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.source.test.ts',
       'apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.test.ts',
       'apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.url-sanitization.test.ts',
+    ],
+  },
+  {
+    owner: 'audit-page-package-extended-diagnostic-evidence',
+    productionPrefix:
+      'apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.',
+    exclusive: true,
+    reason:
+      'Extended live-DOM evidence redaction, metadata and bounds are covered by focused hostile proof.',
+    testFiles: [
+      'apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.dom.test.ts',
+      'apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.test.ts',
     ],
   },
   {

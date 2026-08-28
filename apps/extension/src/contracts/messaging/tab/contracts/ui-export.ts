@@ -12,6 +12,44 @@ import {
   isString,
 } from '../../validators/index';
 import type { TabRequestByType, TabResponseByType } from '../index';
+import { isContentPrivilegedActionAutoStartGrant } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+
+const isPopupExportBuildPackageBase = createMessageGuard<
+  typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+  TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
+>({
+  type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+  required: {
+    batchRequestId: isString,
+    includeWebCopy: (value) => typeof value === 'boolean',
+    intent: (value) => value === 'export' || value === 'save',
+    ordinal: (value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0,
+    options: isExportOptions,
+  },
+  optional: {
+    allowAnonymousCrossOriginAssets: (value) => typeof value === 'boolean',
+    allowAuthenticatedSameOriginAssets: (value) => typeof value === 'boolean',
+    contentIntentGrant: isContentPrivilegedActionAutoStartGrant,
+    fullPageCaptureAction: (value) => value === MessageType.EXPORT_CAPTURE_FULL_PAGE,
+  },
+});
+
+function isPopupExportBuildPackageRequest(
+  value: unknown
+): value is TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE] {
+  if (!isPopupExportBuildPackageBase(value)) return false;
+  const hasAnonymousPolicy = Object.prototype.hasOwnProperty.call(
+    value,
+    'allowAnonymousCrossOriginAssets'
+  );
+  const hasAuthenticatedPolicy = Object.prototype.hasOwnProperty.call(
+    value,
+    'allowAuthenticatedSameOriginAssets'
+  );
+  return value.includeWebCopy
+    ? hasAnonymousPolicy && hasAuthenticatedPolicy
+    : !hasAnonymousPolicy && !hasAuthenticatedPolicy;
+}
 
 export const tabUiExportMessageContracts = {
   [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: {
@@ -49,13 +87,7 @@ export const tabUiExportMessageContracts = {
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
     parseRequest: createGuardParser(
       'tab EXPORT_POPUP_BUILD_PACKAGE message',
-      createMessageGuard<
-        typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-        TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
-      >({
-        type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-        required: { batchRequestId: isString, options: isExportOptions },
-      })
+      isPopupExportBuildPackageRequest
     ),
     parseResponse: createGuardParser(
       'tab EXPORT_POPUP_BUILD_PACKAGE response',

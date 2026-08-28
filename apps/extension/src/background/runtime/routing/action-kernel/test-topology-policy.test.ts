@@ -58,7 +58,6 @@ it('keeps direct router tests named as adapter or owner-local boundary proof', (
     'page-access.test.ts',
     'sender-policy.test.ts',
     'video-control.test.ts',
-    'web-snapshot.test.ts',
   ]);
 });
 

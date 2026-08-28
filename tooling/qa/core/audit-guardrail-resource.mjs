@@ -28,22 +28,22 @@ export function collectResourceBudgetConsistencyViolations(files) {
   const contentLimits = sourceByFile.get(
     'apps/extension/src/content/parser/web-snapshot/limits.ts'
   );
-  const stagedBlobs = sourceByFile.get(
-    'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts'
+  const pagePackageStaging = sourceByFile.get(
+    'apps/extension/src/background/capture/page-package/job/staging.ts'
   );
   const llmLimits = sourceByFile.get('apps/extension/src/background/ai/llm/payload-limits.ts');
   const violations = [];
 
-  if (contentLimits && stagedBlobs) {
-    const blobMatch = contentLimits.match(/MAX_WEB_SNAPSHOT_PACKAGE_BLOB_BYTES\s*=\s*(\d+)/u);
-    const stagedMatch = stagedBlobs.match(/MAX_PACKAGE_BYTES\s*=\s*(\d+)/u);
-    if (blobMatch && stagedMatch && Number(stagedMatch[1]) < Number(blobMatch[1])) {
+  if (contentLimits && pagePackageStaging) {
+    const inputMatch = contentLimits.match(/MAX_WEB_SNAPSHOT_PACKAGE_INPUT_BYTES\s*=\s*(\d+)/u);
+    const stagedMatch = pagePackageStaging.match(/MAX_PAGE_PACKAGE_BYTES\s*=\s*(\d+)/u);
+    if (inputMatch && stagedMatch && Number(stagedMatch[1]) < Number(inputMatch[1])) {
       violations.push(
         createViolation(
           'resource-budget-ordering',
-          'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts',
+          'apps/extension/src/background/capture/page-package/job/staging.ts',
           1,
-          'Runtime staged package budget must be at least the content compressed blob budget envelope.'
+          'Runtime staged package budget must be at least the content package-input budget envelope.'
         )
       );
     }

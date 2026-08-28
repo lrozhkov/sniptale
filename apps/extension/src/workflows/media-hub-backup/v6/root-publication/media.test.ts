@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import type {
   ArchiveRestoreSession,
   AssetReadyJournal,
@@ -45,7 +46,7 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 
 import { mediaLibraryRootPublisher } from './media';
 import { createCleanupWebSnapshotRecord } from '../../../media-hub/cleanup.test-support';
-import { createWebSnapshotManifest } from '../../../../features/web-snapshot/manifest';
+import { createPagePackageManifestFixture as createWebSnapshotManifest } from '../../../../features/web-snapshot/manifest.test-support';
 import { assertPortableJson } from '../codec';
 import type { JsonValue } from '../contracts';
 
@@ -170,6 +171,8 @@ describe('media v6 web snapshot root validation', () => {
       id: 'snapshot',
       source: { faviconUrl: null, title: 'Snapshot', url: 'https://example.com/' },
     });
+    stored.size = 15;
+    stored.screenshotSize = 5;
     const safeManifest = {
       ...stored.manifest,
       source: { faviconUrl: null, title: null, url: null },
@@ -179,7 +182,7 @@ describe('media v6 web snapshot root validation', () => {
     const safePackage = await zip.generateAsync({ type: 'blob' });
     mocks.readFile
       .mockResolvedValueOnce(
-        new File(['hostile-package'], 'snapshot.zip', { type: 'application/zip' })
+        new File(['hostile-package'], 'snapshot.zip', { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE })
       )
       .mockResolvedValueOnce(new File(['png'], 'screenshot.png', { type: 'image/png' }));
     mocks.validateRetainedScreenshot.mockResolvedValue({ height: 720, width: 1280 });
@@ -194,7 +197,7 @@ describe('media v6 web snapshot root validation', () => {
         assetId: 'safe-package',
         createdAt: 2,
         location: { kind: 'opfs', objectKey: 'objects/safe-package' },
-        mimeType: 'application/zip',
+        mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
         sha256: null,
         size: safePackage.size,
       },
@@ -206,7 +209,7 @@ describe('media v6 web snapshot root validation', () => {
         assetId: 'hostile-package',
         createdAt: 1,
         location: { kind: 'opfs' as const, objectKey: 'objects/hostile-package' },
-        mimeType: 'application/zip',
+        mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
         sha256: null,
         size: 15,
       },
@@ -237,13 +240,13 @@ describe('media v6 web snapshot root validation', () => {
           entry: {
             createdAt: 1,
             duration: null,
-            filename: 'snapshot.png',
+            filename: 'snapshot.sniptale-page-package.zip',
             height: 80,
             id: 'snapshot',
-            kind: 'screenshot',
-            mimeType: 'image/png',
-            originalFilename: 'snapshot.png',
-            size: 5,
+            kind: 'web-archive',
+            mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+            originalFilename: 'snapshot.sniptale-page-package.zip',
+            size: 15,
             source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
             sourceFavicon: null,
             sourceTitle: null,
@@ -253,7 +256,7 @@ describe('media v6 web snapshot root validation', () => {
             width: 100,
             workspaceRevision: 0,
           },
-          originalObjectId: 'screenshot-object',
+          originalObjectId: 'package-object',
           webSnapshot: {
             entry: {
               createdAt: stored.createdAt,
@@ -279,6 +282,7 @@ describe('media v6 web snapshot root validation', () => {
     expect(mocks.discard).toHaveBeenCalledWith('hostile-package');
     expect(result.staged[0]?.ref.assetId).toBe('safe-package');
     expect(result.envelope.metadata).toMatchObject({
+      entry: { size: safePackage.size },
       webSnapshot: { entry: { manifest: safeManifest, size: safePackage.size } },
     });
   });
@@ -300,7 +304,9 @@ describe('media v6 web snapshot hostile screenshot rejection', () => {
       zip.file('page-screenshot.png', 'png');
       const packageBlob = await zip.generateAsync({ type: 'blob' });
       mocks.readFile
-        .mockResolvedValueOnce(new File([packageBlob], 'snapshot.zip', { type: 'application/zip' }))
+        .mockResolvedValueOnce(
+          new File([packageBlob], 'snapshot.zip', { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE })
+        )
         .mockResolvedValueOnce(new File(['unsafe'], 'screenshot.png', { type: 'image/png' }));
       mocks.sanitizeSnapshot.mockResolvedValue({
         changed: false,
@@ -325,12 +331,12 @@ describe('media v6 web snapshot hostile screenshot rejection', () => {
               entry: {
                 createdAt: 1,
                 duration: null,
-                filename: 'snapshot.zip',
+                filename: 'snapshot.sniptale-page-package.zip',
                 height: 720,
                 id: 'snapshot',
                 kind: 'web-archive',
-                mimeType: 'application/x-sniptale-web-snapshot+zip',
-                originalFilename: 'snapshot.zip',
+                mimeType: 'application/x-sniptale-page-package+zip',
+                originalFilename: 'snapshot.sniptale-page-package.zip',
                 size: packageBlob.size,
                 source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
                 sourceFavicon: null,
@@ -364,7 +370,7 @@ describe('media v6 web snapshot hostile screenshot rejection', () => {
                 assetId: 'package',
                 createdAt: 1,
                 location: { kind: 'opfs', objectKey: 'objects/package' },
-                mimeType: 'application/zip',
+                mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
                 sha256: null,
                 size: packageBlob.size,
               },
@@ -393,84 +399,94 @@ describe('media v6 web snapshot hostile screenshot rejection', () => {
 });
 
 describe('media v6 web snapshot role validation', () => {
-  it('rejects role-inappropriate nested snapshot MIME types before publication', async () => {
-    const stored = createCleanupWebSnapshotRecord('snapshot');
-    stored.manifest = createWebSnapshotManifest({
-      id: 'snapshot',
-      source: { faviconUrl: null, title: 'Snapshot', url: 'https://example.com/' },
-    });
-    await expect(
-      mediaLibraryRootPublisher.prepareStaged!({
-        envelope: {
-          descriptor: {
-            mediaSubtype: 'library-item',
-            metadataPath: '_sniptale/metadata/media/snapshot.json',
-            objectCount: 2,
-            rootId: 'snapshot',
-            rootKind: 'media',
-            totalBytes: 2,
-          },
-          metadata: portableJson({
-            entry: {
-              createdAt: 1,
-              duration: null,
-              filename: 'snapshot.png',
-              height: 1,
-              id: 'snapshot',
-              kind: 'screenshot',
-              mimeType: 'image/png',
-              originalFilename: 'snapshot.png',
-              size: 1,
-              source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
-              sourceFavicon: null,
-              sourceTitle: null,
-              sourceUrl: null,
-              tags: [],
-              updatedAt: 1,
-              width: 1,
+  it.each([
+    ['text/javascript', 'image/png', 'package MIME type is invalid'],
+    ['APPLICATION/X-SNIPTALE-PAGE-PACKAGE+ZIP', 'image/png', 'package MIME type is invalid'],
+    [PAGE_PACKAGE_ARCHIVE_MIME_TYPE, 'image/webp', 'screenshot MIME type is invalid'],
+    [PAGE_PACKAGE_ARCHIVE_MIME_TYPE, 'IMAGE/PNG', 'screenshot MIME type is invalid'],
+  ])(
+    'rejects role-inappropriate nested MIME types before publication: %s / %s',
+    async (packageMimeType, screenshotMimeType, message) => {
+      const stored = createCleanupWebSnapshotRecord('snapshot');
+      stored.manifest = createWebSnapshotManifest({
+        id: 'snapshot',
+        source: { faviconUrl: null, title: 'Snapshot', url: 'https://example.com/' },
+      });
+      stored.size = 1;
+      stored.screenshotSize = 1;
+      await expect(
+        mediaLibraryRootPublisher.prepareStaged!({
+          envelope: {
+            descriptor: {
+              mediaSubtype: 'library-item',
+              metadataPath: '_sniptale/metadata/media/snapshot.json',
+              objectCount: 2,
+              rootId: 'snapshot',
+              rootKind: 'media',
+              totalBytes: 2,
             },
-            originalObjectId: 'screenshot-object',
-            webSnapshot: {
+            metadata: portableJson({
               entry: {
-                createdAt: stored.createdAt,
-                id: stored.id,
-                manifest: stored.manifest,
-                screenshotMimeType: stored.screenshotMimeType,
-                screenshotSize: stored.screenshotSize,
-                size: stored.size,
-                updatedAt: stored.updatedAt,
+                createdAt: 1,
+                duration: null,
+                filename: 'snapshot.sniptale-page-package.zip',
+                height: 1,
+                id: 'snapshot',
+                kind: 'web-archive',
+                mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+                originalFilename: 'snapshot.sniptale-page-package.zip',
+                size: 1,
+                source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
+                sourceFavicon: null,
+                sourceTitle: null,
+                sourceUrl: null,
+                tags: [],
+                updatedAt: 1,
+                width: 1,
               },
-              packageObjectId: 'package-object',
-              screenshotObjectId: 'screenshot-object',
-            },
-          }),
-          objects: [],
-        },
-        staged: [
-          {
-            objectId: 'package-object',
-            ref: {
-              assetId: 'package',
-              createdAt: 1,
-              location: { kind: 'opfs', objectKey: 'objects/package' },
-              mimeType: 'text/javascript',
-              sha256: null,
-              size: 1,
-            },
+              originalObjectId: 'package-object',
+              webSnapshot: {
+                entry: {
+                  createdAt: stored.createdAt,
+                  id: stored.id,
+                  manifest: stored.manifest,
+                  screenshotMimeType: stored.screenshotMimeType,
+                  screenshotSize: stored.screenshotSize,
+                  size: stored.size,
+                  updatedAt: stored.updatedAt,
+                },
+                packageObjectId: 'package-object',
+                screenshotObjectId: 'screenshot-object',
+              },
+            }),
+            objects: [],
           },
-          {
-            objectId: 'screenshot-object',
-            ref: {
-              assetId: 'screenshot',
-              createdAt: 1,
-              location: { kind: 'opfs', objectKey: 'objects/screenshot' },
-              mimeType: 'video/mp4',
-              sha256: null,
-              size: 1,
+          staged: [
+            {
+              objectId: 'package-object',
+              ref: {
+                assetId: 'package',
+                createdAt: 1,
+                location: { kind: 'opfs', objectKey: 'objects/package' },
+                mimeType: packageMimeType,
+                sha256: null,
+                size: 1,
+              },
             },
-          },
-        ],
-      })
-    ).rejects.toThrow('package MIME type is invalid');
-  });
+            {
+              objectId: 'screenshot-object',
+              ref: {
+                assetId: 'screenshot',
+                createdAt: 1,
+                location: { kind: 'opfs', objectKey: 'objects/screenshot' },
+                mimeType: screenshotMimeType,
+                sha256: null,
+                size: 1,
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow(message);
+    }
+  );
 });

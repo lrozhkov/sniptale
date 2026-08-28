@@ -6,10 +6,11 @@ import type {
   PopupExportSessionState,
   PopupExportToggleState,
 } from './types';
+import type { PopupPagePackageSelection } from '../../../../composition/persistence/popup-export-preferences';
 import type { PopupExportTabSelectionState } from '../selection/tabs/types';
 
 export function getPopupExportSelection(
-  toggles: PopupExportToggleState | PopupExportSelection
+  toggles: { values: PopupExportSelection } | PopupExportSelection
 ): PopupExportSelection {
   const values = 'values' in toggles ? toggles.values : toggles;
 
@@ -23,6 +24,15 @@ export function getPopupExportSelection(
     includeImages: values.includeImages,
     includeJson: values.includeJson,
     includeMarkdown: values.includeMarkdown,
+  };
+}
+
+export function getPopupPagePackageSelection(
+  preferenceState: Pick<PopupExportToggleState, 'includeWebCopy' | 'values'>
+): PopupPagePackageSelection {
+  return {
+    ...getPopupExportSelection(preferenceState),
+    includeWebCopy: preferenceState.includeWebCopy,
   };
 }
 
@@ -41,12 +51,15 @@ export function getPopupExportDerivedState(args: {
   );
   const isExporting = getIsExporting(args.session.transfer.progress, args.session.transfer.result);
   const selection = getPopupExportSelection(args.toggles);
-  const canExport = getCanExport({
-    exportDisabledReason,
-    ...selection,
-    isExporting,
-    selectedCount: args.tabSelection.selectedCount,
-  });
+  const canExport =
+    args.toggles.hasLoadedPreferences &&
+    getCanExport({
+      exportDisabledReason,
+      ...selection,
+      includeWebCopy: args.toggles.includeWebCopy,
+      isExporting,
+      selectedCount: args.tabSelection.selectedCount,
+    });
 
   return {
     canCopyJson: !activeTabExportDisabledReason && !args.session.copy.copyingFormat,
@@ -57,7 +70,10 @@ export function getPopupExportDerivedState(args: {
     progressSteps: buildPopupExportProgressSteps({
       progress: args.session.transfer.progress,
       result: args.session.transfer.result,
-      selection,
+      selection: args.session.transfer.launchedPlan ?? {
+        ...selection,
+        includeWebCopy: args.toggles.includeWebCopy,
+      },
     }),
   };
 }
@@ -73,6 +89,7 @@ export function getCanExport({
   includeImages,
   includeJson,
   includeMarkdown,
+  includeWebCopy,
   isExporting,
   selectedCount,
 }: {
@@ -86,6 +103,7 @@ export function getCanExport({
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;
+  includeWebCopy?: boolean;
   isExporting: boolean;
   selectedCount: number;
 }): boolean {
@@ -98,7 +116,8 @@ export function getCanExport({
     includeBasicLogs ||
     includeCssDiagnostics ||
     includePageDiagnostics ||
-    includeFullPageScreenshot;
+    includeFullPageScreenshot ||
+    includeWebCopy === true;
 
   return !exportDisabledReason && hasSelectedArtifacts && !isExporting && selectedCount > 0;
 }

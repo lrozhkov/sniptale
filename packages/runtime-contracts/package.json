@@ -34,6 +34,7 @@
     "./native-app/status-types": "./src/native-app/status-types.ts",
     "./page-style": "./src/page-style/index.ts",
     "./page-style/limits": "./src/page-style/limits.ts",
+    "./page-package": "./src/page-package/index.ts",
     "./protocol/ai-privacy": "./src/protocol/ai-privacy.ts",
     "./protocol/content-privileged-action": "./src/protocol/content-privileged-action.ts",
     "./protocol/digest": "./src/protocol/digest.ts",

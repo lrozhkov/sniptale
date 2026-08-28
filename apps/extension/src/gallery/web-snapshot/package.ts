@@ -1,66 +1,84 @@
-import JSZip from 'jszip';
 import {
-  assertSafeWebSnapshotPackagePath,
-  WEB_SNAPSHOT_PACKAGE_PATHS,
-} from '../../features/web-snapshot/manifest';
-import {
-  assertZipEntryCanInflate,
-  assertZipPackageInflationProfile,
-} from '@sniptale/platform/data/zip-profile';
+  PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+  PAGE_PACKAGE_ARCHIVE_PATHS,
+  parsePagePackageManifest,
+} from '@sniptale/runtime-contracts/page-package';
+import { openArchiveReader } from '../../composition/archive-transfer/reader';
+import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
 
 const MAX_PREVIEW_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_PREVIEW_FILE_COUNT = 500;
 const MAX_PREVIEW_SCREENSHOT_BYTES = 25 * 1024 * 1024;
-
-function assertPreviewPackageEntries(zip: JSZip): void {
-  assertZipPackageInflationProfile(Object.values(zip.files), {
-    assertPath: assertSafeWebSnapshotPackagePath,
-    createEntryError: (path) =>
-      new Error(
-        path === WEB_SNAPSHOT_PACKAGE_PATHS.screenshot
-          ? 'Web snapshot screenshot is too large.'
-          : 'Web snapshot package is too large.'
-      ),
-    createFileCountError: () => new Error('Web snapshot package contains too many files.'),
-    createTotalError: () => new Error('Web snapshot package is too large.'),
-    maxFileCount: MAX_PREVIEW_FILE_COUNT,
-    maxTotalBytes: MAX_PREVIEW_PACKAGE_BYTES,
-    resolveEntryMaxBytes: (path) =>
-      path === WEB_SNAPSHOT_PACKAGE_PATHS.screenshot
-        ? MAX_PREVIEW_SCREENSHOT_BYTES
-        : MAX_PREVIEW_PACKAGE_BYTES,
-  });
-}
-
-function createScreenshotBlob(bytes: Uint8Array): Blob {
-  const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
-  copy.set(bytes);
-  return new Blob([copy]);
-}
+const MAX_PREVIEW_MANIFEST_BYTES = 1024 * 1024;
 
 export async function loadWebSnapshotScreenshotBlob(packageBlob: Blob): Promise<Blob> {
-  if (packageBlob.size > MAX_PREVIEW_PACKAGE_BYTES) {
-    throw new Error('Web snapshot package is too large.');
+  if (
+    packageBlob.type !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE ||
+    packageBlob.size <= 0 ||
+    packageBlob.size > MAX_PREVIEW_PACKAGE_BYTES
+  ) {
+    throw new Error('Page Package is invalid or too large.');
   }
-
-  const zip = await JSZip.loadAsync(await packageBlob.arrayBuffer());
-  assertPreviewPackageEntries(zip);
-
-  const screenshotFile = zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot);
-
-  if (!screenshotFile) {
-    throw new Error('Web snapshot screenshot is missing.');
+  const reader = await openArchiveReader(packageBlob);
+  try {
+    const archiveEntries = reader.entries();
+    if (archiveEntries.length > MAX_PREVIEW_FILE_COUNT) {
+      throw new Error('Page Package contains too many files.');
+    }
+    const manifestSource = reader.entry(PAGE_PACKAGE_ARCHIVE_PATHS.manifest);
+    if (!manifestSource) throw new Error('Page Package manifest is missing.');
+    const manifest = parsePagePackageManifest(
+      JSON.parse(await manifestSource.text(MAX_PREVIEW_MANIFEST_BYTES)) as unknown
+    );
+    if (!manifest) throw new Error('Page Package manifest is invalid.');
+    const declaredPaths = new Map(manifest.entries.map((entry) => [entry.path, entry]));
+    if (archiveEntries.length !== declaredPaths.size + 1) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
+    }
+    for (const entry of archiveEntries) {
+      if (entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.manifest) continue;
+      const declared = declaredPaths.get(entry.path);
+      if (!declared || declared.size !== entry.size) {
+        throw new Error('Page Package archive inventory does not match its manifest.');
+      }
+      declaredPaths.delete(entry.path);
+    }
+    if (declaredPaths.size > 0) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
+    }
+    const screenshotMetadata = manifest.entries.find(
+      (entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+    );
+    const screenshotSource = reader.entry(PAGE_PACKAGE_ARCHIVE_PATHS.screenshot);
+    if (
+      !screenshotMetadata ||
+      !screenshotSource ||
+      screenshotSource.size <= 0 ||
+      screenshotSource.size > MAX_PREVIEW_SCREENSHOT_BYTES
+    ) {
+      throw new Error('Page Package screenshot is missing or too large.');
+    }
+    const bytes = new Uint8Array(screenshotSource.size);
+    let offset = 0;
+    await screenshotSource.pipeTo(
+      new WritableStream<Uint8Array>({
+        write(chunk) {
+          if (offset + chunk.byteLength > bytes.byteLength) {
+            throw new Error('Page Package screenshot size changed while reading.');
+          }
+          bytes.set(chunk, offset);
+          offset += chunk.byteLength;
+        },
+      })
+    );
+    if (
+      offset !== bytes.byteLength ||
+      (await hashWebSnapshotAssetBytes(bytes)) !== screenshotMetadata.sha256
+    ) {
+      throw new Error('Page Package screenshot metadata does not match its content.');
+    }
+    return new Blob([bytes], { type: 'image/png' });
+  } finally {
+    await reader.close();
   }
-
-  assertZipEntryCanInflate(
-    screenshotFile,
-    MAX_PREVIEW_SCREENSHOT_BYTES,
-    () => new Error('Web snapshot screenshot is too large.')
-  );
-  const screenshotBytes = await screenshotFile.async('uint8array');
-  if (screenshotBytes.byteLength > MAX_PREVIEW_SCREENSHOT_BYTES) {
-    throw new Error('Web snapshot screenshot is too large.');
-  }
-
-  return createScreenshotBlob(screenshotBytes);
 }

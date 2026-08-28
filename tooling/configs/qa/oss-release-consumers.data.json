@@ -4,12 +4,12 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "bea870629ae523bddd51fdc86d4b8c2a0f7e1a9aa2e297a978006e9ebbde9c91"
+      "sha256": "fea2369176acb323c75462fb29a237228d227fa29312a006372c964193001837"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "bea870629ae523bddd51fdc86d4b8c2a0f7e1a9aa2e297a978006e9ebbde9c91"
+      "sha256": "fea2369176acb323c75462fb29a237228d227fa29312a006372c964193001837"
     },
     {
       "category": "bundled-font",
@@ -29,17 +29,17 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/vite.config.ts",
-      "sha256": "732df6746cbae0ce2e294ef049cfea925993a3714433393b54e223c1dd06538e"
+      "sha256": "f989d958df12514cfbc5bd6521c5497b1189824a4d8701ac7a75e8ada82b4903"
     },
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "b7ac10b51462768652565c2194ae824114f1cdde731b18f17173ff733c03e9cb"
+      "sha256": "d141fc9748c5fd390c26dd871014c260cc2eee3f048081d957888100e96b049f"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "b7ac10b51462768652565c2194ae824114f1cdde731b18f17173ff733c03e9cb"
+      "sha256": "d141fc9748c5fd390c26dd871014c260cc2eee3f048081d957888100e96b049f"
     },
     {
       "category": "bundled-font",
@@ -134,7 +134,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/release/artifact-security.mjs",
-      "sha256": "b5ff7b3ea5766f80d8f3646a9ede0cc1edab08b8247d5c4a0aca3f93d3dd5c71"
+      "sha256": "3400460ee0f29d16c0a916a17c447f2cb7add4f184d836162dbfd55f5d219633"
     },
     {
       "category": "bundled-font",

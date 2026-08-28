@@ -5,19 +5,31 @@ import type { FullPageExportCaptureAction } from '../../../../../contracts/full-
 
 type ContentActionGrant = ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
 
+type PopupExportBuildPackageBase = {
+  type: MessageType.EXPORT_POPUP_BUILD_PACKAGE;
+  options: ExportOptions;
+  batchRequestId: string;
+  intent: 'export' | 'save';
+  contentIntentGrant?: ContentActionGrant;
+  fullPageCaptureAction?: FullPageExportCaptureAction;
+  ordinal: number;
+};
+
+export type PopupExportBuildPackageRequest = PopupExportBuildPackageBase &
+  (
+    | {
+        allowAnonymousCrossOriginAssets: boolean;
+        allowAuthenticatedSameOriginAssets: boolean;
+        includeWebCopy: true;
+      }
+    | {
+        allowAnonymousCrossOriginAssets?: never;
+        allowAuthenticatedSameOriginAssets?: never;
+        includeWebCopy: false;
+      }
+  );
+
 export type PopupExportRequest =
   | { type: MessageType.EXPORT_POPUP_PREVIEW }
   | { type: MessageType.EXPORT_POPUP_CANCEL; exportRunId: string }
-  | {
-      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE;
-      options: ExportOptions;
-      batchRequestId: string;
-    }
-  | {
-      type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT';
-      allowAnonymousCrossOriginAssets: boolean;
-      allowAuthenticatedSameOriginAssets: boolean;
-      requestId: string;
-      contentIntentGrant?: ContentActionGrant;
-      fullPageCaptureAction?: FullPageExportCaptureAction;
-    };
+  | PopupExportBuildPackageRequest;

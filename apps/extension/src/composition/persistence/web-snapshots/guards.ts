@@ -16,9 +16,10 @@ export function parseStoredWebSnapshotRecord(value: unknown): StoredWebSnapshotR
     typeof value['screenshotAssetId'] === 'string' &&
     value['screenshotAssetId'].length > 0 &&
     value['packageAssetId'] !== value['screenshotAssetId'] &&
-    typeof value['screenshotMimeType'] === 'string' &&
-    value['screenshotMimeType'].length > 0 &&
+    value['screenshotMimeType'] === 'image/png' &&
     isWebSnapshotManifest(value['manifest']) &&
+    value['manifest'].intent === 'save' &&
+    value['manifest'].diagnosticsLevel !== 'extended' &&
     typeof value['createdAt'] === 'number' &&
     typeof value['updatedAt'] === 'number' &&
     typeof value['size'] === 'number' &&

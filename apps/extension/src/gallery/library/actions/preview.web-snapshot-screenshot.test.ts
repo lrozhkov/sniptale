@@ -62,7 +62,7 @@ it('opens web snapshot screenshots in the image editor', async () => {
   const screenshotBlob = new File(['png'], 'screenshot.png', { type: 'image/png' });
   const previewItem = createMediaItem({
     entityId: 'snapshot-1',
-    filename: 'snapshot.zip',
+    filename: 'snapshot.sniptale-page-package.zip',
     kind: 'web-archive',
     source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
     sourceTitle: 'Snapshot page',

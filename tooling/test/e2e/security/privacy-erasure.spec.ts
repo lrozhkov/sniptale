@@ -235,7 +235,7 @@ test('factory reset cancels an export admitted before its first publication', as
           jobId: 'security-erasure-export',
           options,
           orderedTabs: [{ tabId: selectedTabId, title: 'Security export' }],
-          type: 'START_POPUP_EXPORT_JOB',
+          type: 'START_PAGE_PACKAGE_JOB',
           warnings: [],
         }),
       });
@@ -265,7 +265,7 @@ test('factory reset cancels an export admitted before its first publication', as
   await restartExtensionServiceWorker(context, popup);
   const status = await sendRuntimeMessage(popup, {
     jobId: 'security-erasure-export',
-    type: 'GET_POPUP_EXPORT_JOB_STATUS',
+    type: 'GET_PAGE_PACKAGE_JOB_STATUS',
   });
   expect(status).toMatchObject({ success: true, status: null });
   expect(await collectRetentionText(popup)).not.toContain('security-erasure-export');

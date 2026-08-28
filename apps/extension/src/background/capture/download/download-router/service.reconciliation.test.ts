@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { db, dbRecords, getRegisteredListener, searchMock, subscribeToChangedMock } = vi.hoisted(
-  () => {
+const { cancelMock, db, dbRecords, getRegisteredListener, searchMock, subscribeToChangedMock } =
+  vi.hoisted(() => {
     let listener:
       | ((delta: { id?: number | null; state?: { current?: string } }) => void)
       | undefined;
@@ -9,6 +9,7 @@ const { db, dbRecords, getRegisteredListener, searchMock, subscribeToChangedMock
     const keyFor = (domain: string, key: string) => `${domain}\u0000${key}`;
 
     return {
+      cancelMock: vi.fn(),
       db: {
         delete: vi.fn(async (_store: string, key: [string, string]) => {
           records.delete(keyFor(key[0], key[1]));
@@ -36,8 +37,7 @@ const { db, dbRecords, getRegisteredListener, searchMock, subscribeToChangedMock
         return vi.fn();
       }),
     };
-  }
-);
+  });
 
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', () => ({
   initDB: vi.fn(async () => db),
@@ -46,6 +46,7 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', ()
 vi.mock('@sniptale/platform/browser/downloads', () => ({
   BrowserDownloadsAdapter: undefined,
   browserDownloads: {
+    cancel: cancelMock,
     search: searchMock,
     subscribeToChanged: subscribeToChangedMock,
   },
@@ -107,5 +108,60 @@ describe('download-router service restart reconciliation', () => {
     await expect(readCaptureJob(jobId)).resolves.toEqual(
       expect.objectContaining({ downloadId: 28, state: 'failed', error: 'Download interrupted' })
     );
+  });
+
+  it('finds only the exact persisted lease URL inside the recovery window', async () => {
+    const service = createDownloadRouterService();
+    searchMock.mockResolvedValueOnce([
+      { id: 31, state: 'in_progress', url: 'blob:other' },
+      { id: 32, state: 'complete', finalUrl: 'blob:lease', url: 'blob:redirected' },
+    ]);
+
+    await expect(
+      service.findDownloadsByExactUrl({ requestedAt: 2_000, url: 'blob:lease' })
+    ).resolves.toEqual([{ downloadId: 32, state: 'complete' }]);
+    expect(searchMock).toHaveBeenCalledWith({
+      startedAfter: new Date(1_000).toISOString(),
+      startedBefore: new Date(32_000).toISOString(),
+    });
+  });
+
+  it('cancels through the platform owner and waits for an interrupted terminal state', async () => {
+    const service = createDownloadRouterService();
+    searchMock
+      .mockResolvedValueOnce([{ id: 33, state: 'in_progress' }])
+      .mockResolvedValueOnce([{ id: 33, state: 'in_progress' }])
+      .mockResolvedValueOnce([{ id: 33, state: 'in_progress' }])
+      .mockResolvedValueOnce([{ id: 33, state: 'interrupted' }]);
+    cancelMock.mockResolvedValueOnce(undefined);
+
+    await expect(service.cancelDownloadAndWait(33)).resolves.toBe('interrupted');
+    expect(cancelMock).toHaveBeenCalledWith(33);
+  });
+
+  it('settles a terminal state observed immediately before cancellation without an event', async () => {
+    const service = createDownloadRouterService();
+    searchMock
+      .mockResolvedValueOnce([{ id: 34, state: 'in_progress' }])
+      .mockResolvedValueOnce([{ id: 34, state: 'in_progress' }])
+      .mockResolvedValueOnce([{ id: 34, state: 'complete' }]);
+
+    await expect(service.cancelDownloadAndWait(34)).resolves.toBe('complete');
+    expect(cancelMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects timeout because it is not an authoritative browser terminal state', async () => {
+    vi.useFakeTimers();
+    try {
+      const service = createDownloadRouterService({ terminalTimeoutMs: 1 });
+      searchMock.mockResolvedValue([{ id: 35, state: 'in_progress' }]);
+      cancelMock.mockResolvedValueOnce(undefined);
+      const cancellation = service.cancelDownloadAndWait(35);
+      const assertion = expect(cancellation).rejects.toThrow('did not reach a browser terminal');
+      await vi.advanceTimersByTimeAsync(1);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

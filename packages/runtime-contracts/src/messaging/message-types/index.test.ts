@@ -15,10 +15,13 @@ describe('shared message contracts', () => {
     expect(MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE).toBe(
       'OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE'
     );
-    expect(MessageType.START_POPUP_EXPORT_JOB).toBe('START_POPUP_EXPORT_JOB');
-    expect(MessageType.GET_POPUP_EXPORT_JOB_STATUS).toBe('GET_POPUP_EXPORT_JOB_STATUS');
-    expect(MessageType.CANCEL_POPUP_EXPORT_JOB).toBe('CANCEL_POPUP_EXPORT_JOB');
-    expect(MessageType.ACK_POPUP_EXPORT_JOB_STATUS).toBe('ACK_POPUP_EXPORT_JOB_STATUS');
+    expect(MessageType.START_PAGE_PACKAGE_JOB).toBe('START_PAGE_PACKAGE_JOB');
+    expect(MessageType.GET_PAGE_PACKAGE_JOB_STATUS).toBe('GET_PAGE_PACKAGE_JOB_STATUS');
+    expect(MessageType.CANCEL_PAGE_PACKAGE_JOB).toBe('CANCEL_PAGE_PACKAGE_JOB');
+    expect(MessageType.ACK_PAGE_PACKAGE_JOB_STATUS).toBe('ACK_PAGE_PACKAGE_JOB_STATUS');
+    expect(MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE).toBe(
+      'OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE'
+    );
 
     const messageValues = Object.values(MessageType);
     expect(new Set(messageValues).size).toBe(messageValues.length);

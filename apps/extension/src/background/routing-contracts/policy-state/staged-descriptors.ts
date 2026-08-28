@@ -21,19 +21,4 @@ export const stagedPolicyStateDescriptors = [
     storageClass: 'indexed-db',
     ttlMs: 60 * 60 * 1_000,
   },
-  {
-    authorityFamily: 'web-snapshot-save',
-    failClosedOnRestart: true,
-    id: 'web-snapshot-staged-blobs',
-    oneShot: false,
-    ownerModule: 'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts',
-    proofModules: [
-      'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.test.ts',
-    ],
-    requiresTtl: false,
-    restartBehavior: 'In-flight chunks are transaction-bound; missing staged blobs fail fast.',
-    restartClass: 'transaction-bound',
-    stateClass: 'staged-artifact',
-    storageClass: 'memory-only',
-  },
 ] as const satisfies readonly PolicyStateDescriptor[];

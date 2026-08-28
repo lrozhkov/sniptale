@@ -11,7 +11,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>(
 );
 
 export const popupRuntimeTypes = new Set<RuntimeMessageType>([
-  MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED,
+  MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
   MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
   VideoMessageType.RECORDING_STATE_SYNC,
   VideoMessageType.RECORDING_START_FAILED,
@@ -24,6 +24,9 @@ export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
+  MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE,
+  MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE,
   MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
   MessageType.OFFSCREEN_VOICE_INPUT_START,
   MessageType.OFFSCREEN_VOICE_INPUT_STOP,
@@ -65,7 +68,6 @@ export const contentTabTypes = new Set<TabMessageType>([
   MessageType.DESTROY_UI_TOOLBAR,
   MessageType.EXPORT_POPUP_PREVIEW,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-  MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,
   MessageType.PREPARE_FULL_PAGE_CAPTURE,
   MessageType.HEARTBEAT_FULL_PAGE_CAPTURE,

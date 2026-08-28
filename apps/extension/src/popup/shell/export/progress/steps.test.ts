@@ -201,6 +201,39 @@ function verifyWebSnapshotSteps() {
 }
 
 describe('buildPopupExportProgressSteps', () => {
+  it('shows Web-copy and structured steps immediately for a combined launched plan', () => {
+    const steps = buildPopupExportProgressSteps({
+      progress: {
+        activeStepKey: 'webSnapshotDom',
+        current: 0,
+        errors: [],
+        message: 'Preparing',
+        phase: 'scanning',
+        total: 1,
+      },
+      result: null,
+      selection: {
+        ...selection,
+        includeBasicLogs: false,
+        includeFiles: true,
+        includeImages: false,
+        includeJson: true,
+        includeMarkdown: false,
+        includeWebCopy: true,
+      },
+    });
+
+    expect(steps.map((step) => step.key)).toEqual([
+      'webSnapshotDom',
+      'webSnapshotPreview',
+      'webSnapshotStyles',
+      'webSnapshotAssets',
+      'json',
+      'files',
+    ]);
+    expect(steps[0]?.status).toBe('active');
+    expect(steps.at(-1)?.status).toBe('pending');
+  });
   it('shows annotation preparation as the active selected step', () => {
     const steps = buildPopupExportProgressSteps({
       progress: createProgress({

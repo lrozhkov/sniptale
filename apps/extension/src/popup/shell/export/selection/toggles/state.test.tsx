@@ -5,13 +5,14 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePopupExportPreferenceState } from './state';
+import { DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES } from '../../../../../composition/persistence/popup-export-preferences';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestState: ReturnType<typeof usePopupExportPreferenceState> | null = null;
 
 function StateHarness() {
-  latestState = usePopupExportPreferenceState();
+  latestState = usePopupExportPreferenceState(DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export);
   return null;
 }
 

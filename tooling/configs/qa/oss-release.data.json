@@ -47,6 +47,11 @@
       "source": "LICENSES/dependencies/@iconify__types-2.0.0.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@noble__hashes-2.4.0.txt",
+      "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec",
+      "source": "LICENSES/dependencies/@noble__hashes-2.4.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt",
       "sha256": "ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047",
       "source": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt"
@@ -218,12 +223,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "9396535f2508ab411570e609258b6ed77bbf293ab4c4bcb15fcb4f05f3b71585",
+      "sha256": "aec6df7c20701a70905688bf6c328ae1acf5d47ba1880830c83bdbd3634b41a7",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "4b589f050e6bc8aab0ace10d6fdd8b186f858d26082a9273cbfeacfeb405bbe4",
+      "sha256": "d56f0eadb72e6c06930cd2c873426bd36a063215d2b4cbe0f77f9760da61039e",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

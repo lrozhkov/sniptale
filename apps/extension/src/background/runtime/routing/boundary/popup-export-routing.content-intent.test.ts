@@ -62,6 +62,9 @@ function createExportOptions(includeFullPageScreenshot: boolean) {
 function createExportMessage(includeFullPageScreenshot: boolean): PopupExportViewerMessage {
   return {
     batchRequestId: 'req-export',
+    includeWebCopy: false,
+    intent: 'export',
+    ordinal: 0,
     options: createExportOptions(includeFullPageScreenshot),
     tabId: 62,
     tabRouteCapabilityToken: 'cap-1',

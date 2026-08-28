@@ -5,7 +5,6 @@ import {
 } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import { runtimeMessageContracts } from '../../contracts/runtime';
 import { tabUiExportMessageContracts } from './ui-export';
-import { tabWebSnapshotMessageContracts } from './web-snapshot';
 import type { TabRequestByType, TabResponseByType } from '../index';
 import {
   createMessageGuard,
@@ -181,5 +180,4 @@ export const tabUiMessageContracts = {
     ),
   },
   ...tabUiExportMessageContracts,
-  ...tabWebSnapshotMessageContracts,
 } satisfies PartialTabRegistry;

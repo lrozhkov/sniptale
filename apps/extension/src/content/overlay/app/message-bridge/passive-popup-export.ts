@@ -13,7 +13,6 @@ export function isPopupExportMessage(type?: string): boolean {
   return (
     type === MessageType.EXPORT_POPUP_PREVIEW ||
     type === MessageType.EXPORT_POPUP_BUILD_PACKAGE ||
-    type === MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT ||
     type === MessageType.EXPORT_POPUP_CANCEL
   );
 }

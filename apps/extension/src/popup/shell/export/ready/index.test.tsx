@@ -76,6 +76,7 @@ function createProps(
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
+    includeWebCopy: false,
     isFilterActive: false,
     selectedCount: 1,
     selectedTabIds: [7],
@@ -89,6 +90,35 @@ function createProps(
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
+    setIncludeWebCopy: vi.fn(),
+    savePreferences: {
+      actions: {
+        setIncludeAnnotations: vi.fn(),
+        setIncludeBasicLogs: vi.fn(),
+        setIncludeCssDiagnostics: vi.fn(),
+        setIncludeFiles: vi.fn(),
+        setIncludeFullPageScreenshot: vi.fn(),
+        setIncludePageDiagnostics: vi.fn(),
+        setIncludeImages: vi.fn(),
+        setIncludeJson: vi.fn(),
+        setIncludeMarkdown: vi.fn(),
+      },
+      includeWebCopy: true,
+      setIncludeWebCopy: vi.fn(),
+      values: {
+        includeAnnotations: false,
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includePageDiagnostics: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+      },
+    },
+    onRequestWebCopySetup: vi.fn(),
+    webSnapshotEnabled: true,
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
     ...overrides,
@@ -143,6 +173,27 @@ it('opens and closes each ready-state drawer without rendering the other drawer'
 
   clickDrawer('pages');
   expect(container?.querySelector('[data-ui="data-types"]')).not.toBeNull();
+});
+
+it('switches the common editor between independent download and Library preferences', () => {
+  const props = createProps();
+  renderReady(props);
+
+  expect(mocks.dataTypes).toHaveBeenLastCalledWith(
+    expect.objectContaining({ destination: 'export', includeFiles: true })
+  );
+  const libraryButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
+    button.textContent?.includes('packageDestinationLibrary')
+  );
+  act(() => libraryButton?.click());
+
+  expect(mocks.dataTypes).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      destination: 'save',
+      includeFiles: false,
+      packagePreferences: props.savePreferences,
+    })
+  );
 });
 
 it('shows the no-selectable-tabs hint only after loaded disabled state has no selection', () => {

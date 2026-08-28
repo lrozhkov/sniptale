@@ -15,6 +15,8 @@ function createRuntimeSessionState(): Pick<
   | 'setCopyingFormat'
   | 'setProgress'
   | 'setResult'
+  | 'launchedPlan'
+  | 'setLaunchedPlan'
 > {
   return {
     copiedFormat: null,
@@ -25,10 +27,12 @@ function createRuntimeSessionState(): Pick<
     progress: { activeStepKey: null, current: 0, errors: [], message: '', phase: 'idle', total: 0 },
     requestIdRef: { current: null },
     result: null,
+    launchedPlan: null,
     setCopiedFormat: vi.fn(),
     setCopyingFormat: vi.fn(),
     setProgress: vi.fn(),
     setResult: vi.fn(),
+    setLaunchedPlan: vi.fn(),
   };
 }
 
@@ -44,6 +48,8 @@ function createRuntimeToggleState(): Pick<
   | 'includeImages'
   | 'includeJson'
   | 'includeMarkdown'
+  | 'includeWebCopy'
+  | 'saveSelection'
   | 'setIncludeBasicLogs'
   | 'setIncludeAnnotations'
   | 'setIncludeCssDiagnostics'
@@ -65,6 +71,19 @@ function createRuntimeToggleState(): Pick<
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
+    includeWebCopy: false,
+    saveSelection: {
+      includeAnnotations: false,
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: false,
+      includePageDiagnostics: false,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+      includeWebCopy: true,
+    },
     setIncludeBasicLogs: vi.fn(),
     setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),

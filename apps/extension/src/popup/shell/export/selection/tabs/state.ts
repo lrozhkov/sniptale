@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 
 import type { PageAccessStatus } from '@sniptale/runtime-contracts/messaging/page-access';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import { MAX_POPUP_EXPORT_JOB_TABS } from '@sniptale/runtime-contracts/export';
 import {
   createFallbackTabItem,
   filterTabs,
@@ -45,7 +46,9 @@ function createToggleTabSelectionHandler(args: {
     args.setSelectedTabIds((currentSelected) =>
       currentSelected.includes(tabId)
         ? currentSelected.filter((selectedTabId) => selectedTabId !== tabId)
-        : [...currentSelected, tabId]
+        : currentSelected.length >= MAX_POPUP_EXPORT_JOB_TABS
+          ? currentSelected
+          : [...currentSelected, tabId]
     );
   };
 }

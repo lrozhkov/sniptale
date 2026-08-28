@@ -20,7 +20,7 @@ export async function enableForTab(popup, target, tabId) {
 
 export async function saveSnapshot(popup, tabId) {
   return popup.evaluate(
-    async ({ id, requestId }) => {
+    async ({ id, jobId }) => {
       const withFreshness = (message) => ({
         ...message,
         __sniptaleRuntimeFreshness: {
@@ -28,31 +28,52 @@ export async function saveSnapshot(popup, tabId) {
           nonce: crypto.randomUUID(),
         },
       });
-      const issue = await globalThis.chrome.runtime.sendMessage(
+      const started = await globalThis.chrome.runtime.sendMessage(
         withFreshness({
-          operation: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-          requestId,
-          tabId: id,
-          type: 'REQUEST_POPUP_TAB_ROUTE_CAPABILITY',
+          includeWebCopy: true,
+          intent: 'save',
+          jobId,
+          orderedTabs: [{ tabId: id, title: 'Smoke page' }],
+          options: {
+            includeBasicLogs: false,
+            includeCssDiagnostics: false,
+            includeFiles: false,
+            includeFullPageScreenshot: true,
+            includeImages: false,
+            includeJson: false,
+            includeMarkdown: false,
+            includePageDiagnostics: false,
+          },
+          type: 'START_PAGE_PACKAGE_JOB',
+          warnings: [],
         })
       );
-      if (!issue?.success || !issue.capabilityToken)
-        throw new Error(issue?.error || 'Capability issue failed');
-      const response = await globalThis.chrome.runtime.sendMessage(
-        withFreshness({
-          requestId,
-          tabId: id,
-          tabRouteCapabilityToken: issue.capabilityToken,
-          tabRouteRequestId: requestId,
-          type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-        })
-      );
-      if (!response?.success || !response.assetId) {
-        throw new Error(response?.error || 'Snapshot save failed');
+      if (!started?.success) throw new Error(started?.error || 'Snapshot save did not start');
+
+      const deadline = Date.now() + 60_000;
+      while (Date.now() < deadline) {
+        const response = await globalThis.chrome.runtime.sendMessage(
+          withFreshness({ jobId, type: 'GET_PAGE_PACKAGE_JOB_STATUS' })
+        );
+        if (!response?.success) throw new Error(response?.error || 'Snapshot status failed');
+        const status = response.status;
+        if (status?.phase === 'completed') {
+          const assetId = status.result?.snapshotIds?.[0];
+          if (!assetId) throw new Error('Snapshot save completed without a Library asset');
+          return {
+            assetId,
+            success: true,
+            warnings: status.result?.warnings ?? status.warnings ?? [],
+          };
+        }
+        if (status && ['cancelled', 'failed', 'interrupted'].includes(status.phase)) {
+          throw new Error(status.result?.errors?.join('; ') || `Snapshot ${status.phase}`);
+        }
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 50));
       }
-      return response;
+      throw new Error('Snapshot save timed out');
     },
-    { id: tabId, requestId: crypto.randomUUID() }
+    { id: tabId, jobId: crypto.randomUUID() }
   );
 }
 
@@ -72,6 +93,7 @@ export async function saveSnapshotThroughPopup({
 
   const progressObservations = [];
   const startedAt = Date.now();
+  let lastState = null;
   let resultTitle = '';
   while (Date.now() - startedAt < 60_000) {
     const state = await popup.evaluate(() => {
@@ -84,6 +106,7 @@ export async function saveSnapshotThroughPopup({
         text: globalThis.document.body.innerText,
       };
     });
+    lastState = state;
     const conciseText = state.text.replace(/\s+/g, ' ').trim();
     if (progressObservations.at(-1)?.text !== conciseText) {
       progressObservations.push({ atMs: Date.now() - startedAt, text: conciseText });
@@ -94,7 +117,12 @@ export async function saveSnapshotThroughPopup({
     }
     await popup.waitForTimeout(50);
   }
-  if (!resultTitle) throw new Error('Popup snapshot save did not expose its result action');
+  if (!resultTitle) {
+    await popup.screenshot({ path: join(out, `${specName}-popup-failure.png`) });
+    throw new Error(
+      `Popup snapshot save did not expose its result action: ${JSON.stringify(lastState)}`
+    );
+  }
   await popup.screenshot({ path: join(out, `${specName}-popup-result.png`) });
   const openedPagePromise = context.waitForEvent('page');
   await snapshotAction.click();

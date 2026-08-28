@@ -38,6 +38,7 @@ type ExportStepSelection = {
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;
+  includeWebCopy?: boolean;
 };
 
 export type PopupExportProgressStep = {
@@ -243,13 +244,62 @@ export function buildPopupExportProgressSteps(args: {
   result: PopupExportResult | null;
   selection: ExportStepSelection;
 }): PopupExportProgressStep[] {
-  if (args.result?.kind === 'webSnapshot' || isWebSnapshotStepKey(args.progress.activeStepKey)) {
-    return buildWebSnapshotProgressSteps({
-      progress: args.progress,
-      result: args.result,
-    });
+  const hasWebCopy =
+    args.selection.includeWebCopy ||
+    args.result?.kind === 'webSnapshot' ||
+    isWebSnapshotStepKey(args.progress.activeStepKey);
+  const webCopySteps = hasWebCopy
+    ? buildWebSnapshotProgressSteps({
+        progress:
+          args.progress.phase !== 'idle' && !args.progress.activeStepKey && !args.result
+            ? { ...args.progress, activeStepKey: 'webSnapshotDom' }
+            : args.progress,
+        result: args.result,
+      })
+    : [];
+
+  if (hasWebCopy && args.selection.includeWebCopy !== true) {
+    return webCopySteps;
   }
 
+  if (hasWebCopy && isWebSnapshotStepKey(args.progress.activeStepKey)) {
+    const structuredPending = buildStructuredProgressSteps({
+      ...args,
+      progress: { ...args.progress, activeStepKey: null, phase: 'idle' },
+      result: null,
+    });
+    return [...webCopySteps, ...structuredPending];
+  }
+
+  const structuredSteps = buildStructuredProgressSteps(args);
+  if (!hasWebCopy) return structuredSteps;
+  if (args.result) {
+    const terminalStatus = args.result.success ? 'done' : 'error';
+    return [...webCopySteps, ...structuredSteps].map((step) => ({
+      ...step,
+      status: terminalStatus,
+      statusLabel: getStepStatusLabel(terminalStatus),
+    }));
+  }
+  if (args.progress.activeStepKey && !isWebSnapshotStepKey(args.progress.activeStepKey)) {
+    return [
+      ...webCopySteps.map((step) => ({
+        ...step,
+        status: 'done' as const,
+        statusLabel: getStepStatusLabel('done'),
+      })),
+      ...structuredSteps,
+    ];
+  }
+
+  return [...webCopySteps, ...structuredSteps];
+}
+
+function buildStructuredProgressSteps(args: {
+  progress: ExportProgress;
+  result: PopupExportResult | null;
+  selection: ExportStepSelection;
+}): PopupExportProgressStep[] {
   const selectedDefinitions = EXPORT_STEP_DEFINITIONS.filter(({ key }) =>
     isStepSelected(key, args.selection)
   );

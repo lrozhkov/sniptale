@@ -17,8 +17,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Focused coverage rollout
 
-- Owner disposition: partial=4, rollout=88, unmapped=27.
-- Registry disposition: partial=4, rollout=88, unmapped=27.
+- Owner disposition: partial=4, rollout=88, unmapped=28.
+- Registry disposition: partial=4, rollout=88, unmapped=28.
 - Owners with unowned focused rollout files:
 - `apps/extension/src/editor` — 2 focused rollout file(s) lack an owner; 896/954 production files are in rollout.
 

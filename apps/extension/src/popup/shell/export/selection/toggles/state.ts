@@ -1,17 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
-import type { PopupExportPreferenceActions, PopupExportPreferenceState } from '../../session/types';
+import type { PopupPagePackagePreferenceState } from '../../session/types';
+import type { PopupPagePackageSelection } from '../../../../../composition/persistence/popup-export-preferences';
 
-export function usePopupExportPreferenceState(): PopupExportPreferenceState {
-  const [includeAnnotations, setIncludeAnnotations] = useState(false);
-  const [includeJson, setIncludeJson] = useState(true);
-  const [includeMarkdown, setIncludeMarkdown] = useState(true);
-  const [includeFiles, setIncludeFiles] = useState(true);
-  const [includeImages, setIncludeImages] = useState(true);
-  const [includeBasicLogs, setIncludeBasicLogs] = useState(false);
-  const [includePageDiagnostics, setIncludePageDiagnostics] = useState(false);
-  const [includeCssDiagnostics, setIncludeCssDiagnostics] = useState(false);
-  const [includeFullPageScreenshot, setIncludeFullPageScreenshot] = useState(false);
+export function usePopupExportPreferenceState(
+  initial: PopupPagePackageSelection
+): PopupPagePackagePreferenceState {
+  const [includeAnnotations, setIncludeAnnotations] = useState(initial.includeAnnotations);
+  const [includeJson, setIncludeJson] = useState(initial.includeJson);
+  const [includeMarkdown, setIncludeMarkdown] = useState(initial.includeMarkdown);
+  const [includeFiles, setIncludeFiles] = useState(initial.includeFiles);
+  const [includeImages, setIncludeImages] = useState(initial.includeImages);
+  const [includeBasicLogs, setIncludeBasicLogs] = useState(initial.includeBasicLogs);
+  const [includePageDiagnostics, setIncludePageDiagnostics] = useState(
+    initial.includePageDiagnostics
+  );
+  const [includeCssDiagnostics, setIncludeCssDiagnostics] = useState(initial.includeCssDiagnostics);
+  const [includeFullPageScreenshot, setIncludeFullPageScreenshot] = useState(
+    initial.includeFullPageScreenshot
+  );
+  const [includeWebCopy, setIncludeWebCopy] = useState(initial.includeWebCopy);
 
   return {
     actions: {
@@ -36,46 +44,7 @@ export function usePopupExportPreferenceState(): PopupExportPreferenceState {
       includeJson,
       includeMarkdown,
     },
+    includeWebCopy,
+    setIncludeWebCopy,
   };
-}
-
-export function usePopupExportPreferenceSetters(
-  preferences: PopupExportPreferenceState
-): PopupExportPreferenceActions {
-  const {
-    setIncludeAnnotations,
-    setIncludeBasicLogs,
-    setIncludeCssDiagnostics,
-    setIncludeFiles,
-    setIncludeFullPageScreenshot,
-    setIncludePageDiagnostics,
-    setIncludeImages,
-    setIncludeJson,
-    setIncludeMarkdown,
-  } = preferences.actions;
-
-  return useMemo(
-    () => ({
-      setIncludeAnnotations,
-      setIncludeBasicLogs,
-      setIncludeCssDiagnostics,
-      setIncludeFiles,
-      setIncludeFullPageScreenshot,
-      setIncludePageDiagnostics,
-      setIncludeImages,
-      setIncludeJson,
-      setIncludeMarkdown,
-    }),
-    [
-      setIncludeAnnotations,
-      setIncludeBasicLogs,
-      setIncludeCssDiagnostics,
-      setIncludeFiles,
-      setIncludeFullPageScreenshot,
-      setIncludePageDiagnostics,
-      setIncludeImages,
-      setIncludeJson,
-      setIncludeMarkdown,
-    ]
-  );
 }

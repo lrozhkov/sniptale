@@ -88,8 +88,8 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
     en: 'Styles and fonts',
   },
   webSnapshotAssetsStep: {
-    ru: 'Ассеты и сохранение',
-    en: 'Assets and saving',
+    ru: 'Вложения и сохранение',
+    en: 'Attachments and saving',
   },
   webSnapshotWarningsStep: {
     ru: 'Предупреждения',

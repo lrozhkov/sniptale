@@ -9,9 +9,20 @@ import type {
   PopupExportPreviewResponse,
 } from '@sniptale/runtime-contracts/export';
 import type * as ContentIntentTypes from '@sniptale/runtime-contracts/protocol/content-privileged-action';
-import type { WebSnapshotSaveResult } from '@sniptale/runtime-contracts/web-snapshot';
 import type { ShowToastPayload } from '../contracts/types';
 import type { FullPageExportCaptureAction } from '../../full-page-capture';
+
+type TabPagePackageResourcePolicy =
+  | {
+      allowAnonymousCrossOriginAssets: boolean;
+      allowAuthenticatedSameOriginAssets: boolean;
+      includeWebCopy: true;
+    }
+  | {
+      allowAnonymousCrossOriginAssets?: never;
+      allowAuthenticatedSameOriginAssets?: never;
+      includeWebCopy: false;
+    };
 
 export type TabUiRequestByType = {
   [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeRequestByType[typeof MessageType.ENABLE_SCREENSHOT_MODE];
@@ -53,17 +64,13 @@ export type TabUiRequestByType = {
   [MessageType.EXPORT_POPUP_PREVIEW]: { type: typeof MessageType.EXPORT_POPUP_PREVIEW };
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
     batchRequestId: string;
-    type: typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE;
-    options: ExportOptions;
-  };
-  [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: {
-    type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT;
-    allowAnonymousCrossOriginAssets: boolean;
-    allowAuthenticatedSameOriginAssets: boolean;
-    requestId: string;
     contentIntentGrant?: ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
     fullPageCaptureAction?: FullPageExportCaptureAction;
-  };
+    ordinal: number;
+    intent: 'export' | 'save';
+    type: typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE;
+    options: ExportOptions;
+  } & TabPagePackageResourcePolicy;
   [MessageType.EXPORT_POPUP_CANCEL]: {
     exportRunId: string;
     type: typeof MessageType.EXPORT_POPUP_CANCEL;
@@ -92,7 +99,6 @@ export type TabUiResponseByType = {
   [MessageType.DESTROY_UI_TOOLBAR]: RuntimeMessageResponse<Record<string, never>>;
   [MessageType.EXPORT_POPUP_PREVIEW]: PopupExportPreviewResponse;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: PopupExportPackageResponse;
-  [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: WebSnapshotSaveResult;
   [MessageType.EXPORT_POPUP_CANCEL]: PopupExportStartResponse;
   [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: RuntimeMessageResponse<{
     page: 'export' | null;

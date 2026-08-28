@@ -1,72 +1,8 @@
-export const WebSnapshotCaptureMode = {
-  ReadOnlyNoScripts: 'readOnlyNoScripts',
-} as const;
+import type { PagePackageManifest, PagePackageViewport } from '../page-package';
 
-export type WebSnapshotCaptureMode =
-  (typeof WebSnapshotCaptureMode)[keyof typeof WebSnapshotCaptureMode];
-
-export interface WebSnapshotPackagePaths {
-  computedStyles: string;
-  domSnapshot: string;
-  errors: string;
-  manifest: string;
-  screenshot: string;
-  stylesheets: string;
-  snapshotHtml: string;
-  virtualDomSnapshot: string;
-}
-
-export interface WebSnapshotStats {
-  assetCount: number;
-  failedAssetCount: number;
-  networkWarningCount?: number;
-  packageSize: number;
-  sanitizerWarningCount?: number;
-  warningCount?: number;
-}
-
-export interface WebSnapshotSource {
-  faviconUrl: string | null;
-  title: string | null;
-  url: string | null;
-}
-
-export interface WebSnapshotViewport {
-  height: number;
-  width: number;
-}
-
-export interface WebSnapshotAssetManifestEntry {
-  mimeType: string;
-  path: string;
-  sha256: string;
-  size: number;
-}
-
-export interface WebSnapshotManifest {
-  assets?: WebSnapshotAssetManifestEntry[];
-  captureMode: WebSnapshotCaptureMode;
-  capturedAt: string;
-  id: string;
-  paths: WebSnapshotPackagePaths;
-  schemaVersion: 1;
-  source: WebSnapshotSource;
-  stats: WebSnapshotStats;
-  viewport?: WebSnapshotViewport;
-  warnings: string[];
-}
-
-export interface WebSnapshotPackageEntry {
-  binaryBase64?: string;
-  mimeType?: string;
-  path: string;
-  textContent?: string;
-}
-
-export interface WebSnapshotPackage {
-  entries: WebSnapshotPackageEntry[];
-  manifest: WebSnapshotManifest;
-}
+/** Product-domain alias: every Web Snapshot is persisted as a Page Package. */
+export type WebSnapshotManifest = PagePackageManifest;
+export type WebSnapshotViewport = PagePackageViewport;
 
 export interface WebSnapshotProgress {
   message: string;
@@ -95,9 +31,9 @@ export type WebSnapshotStagedBlobKind = 'package' | 'screenshot';
 export interface WebSnapshotStageBlobChunkPayload {
   base64: string;
   blobKind: WebSnapshotStagedBlobKind;
-  chunkIndex: number;
+  final: boolean;
+  mimeType: string;
+  sequence: number;
   snapshotSessionId: string;
   stagedBlobId: string;
-  totalBytes: number;
-  totalChunks: number;
 }

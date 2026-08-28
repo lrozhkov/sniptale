@@ -277,6 +277,11 @@
       "ownerClass": "workflow"
     },
     {
+      "sourcePrefix": "apps/extension/src/workflows/page-package",
+      "ownerId": "workflow.page-package",
+      "ownerClass": "workflow"
+    },
+    {
       "sourcePrefix": "apps/extension/src/workflows/page-preparation",
       "ownerId": "workflow.page-preparation",
       "ownerClass": "workflow"

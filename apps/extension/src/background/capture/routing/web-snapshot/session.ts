@@ -1,5 +1,4 @@
 import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
-import { releaseWebSnapshotStagedBlobsForSession } from './staged-blobs';
 
 const SNAPSHOT_SESSION_TTL_MS = 5 * 60 * 1000;
 const MAX_SESSION_ASSET_URLS = 500;
@@ -9,7 +8,7 @@ type SnapshotSession = {
   assetId: string | null;
   allowedUrls: Set<string>;
   cancelRequested: boolean;
-  createdAt: number;
+  expiresAt: number;
   requestId: string;
   saveState: 'open' | 'saving' | 'saved';
   tabId: number;
@@ -21,6 +20,7 @@ type PendingCaptureRequest = {
 };
 
 const sessions = new Map<string, SnapshotSession>();
+const sessionExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingCaptureRequests = new Map<string, PendingCaptureRequest>();
 const cancelledCaptureRequests = new Map<string, number>();
 
@@ -28,10 +28,32 @@ function createSnapshotSessionId(): string {
   return createSecureRandomUuid('Secure random values are unavailable for web snapshot sessions');
 }
 
+function clearSessionExpiryTimer(sessionId: string): void {
+  const timer = sessionExpiryTimers.get(sessionId);
+  if (timer !== undefined) clearTimeout(timer);
+  sessionExpiryTimers.delete(sessionId);
+}
+
+function expireSession(sessionId: string, session: SnapshotSession): void {
+  if (sessions.get(sessionId) !== session) return;
+  if (session.saveState === 'saving') return;
+  sessions.delete(sessionId);
+  clearSessionExpiryTimer(sessionId);
+}
+
+function scheduleSessionExpiry(sessionId: string, session: SnapshotSession): void {
+  clearSessionExpiryTimer(sessionId);
+  session.expiresAt = Date.now() + SNAPSHOT_SESSION_TTL_MS;
+  sessionExpiryTimers.set(
+    sessionId,
+    setTimeout(() => expireSession(sessionId, session), SNAPSHOT_SESSION_TTL_MS + 1)
+  );
+}
+
 function purgeExpiredSessions(now = Date.now()): void {
   for (const [sessionId, session] of sessions.entries()) {
-    if (now - session.createdAt > SNAPSHOT_SESSION_TTL_MS) {
-      sessions.delete(sessionId);
+    if (session.saveState !== 'saving' && now > session.expiresAt) {
+      expireSession(sessionId, session);
     }
   }
 
@@ -103,16 +125,18 @@ export function registerWebSnapshotAssetSession(
   const allowedUrls = new Set(assetUrls.map(normalizeAssetUrl));
 
   const sessionId = createSnapshotSessionId();
-  sessions.set(sessionId, {
+  const session: SnapshotSession = {
     allowAnonymousCrossOriginAssets: request.allowAnonymousCrossOriginAssets,
     assetId: null,
     allowedUrls,
     cancelRequested: false,
-    createdAt: Date.now(),
+    expiresAt: 0,
     requestId,
     saveState: 'open',
     tabId,
-  });
+  };
+  sessions.set(sessionId, session);
+  scheduleSessionExpiry(sessionId, session);
   return sessionId;
 }
 
@@ -159,21 +183,12 @@ export function authorizeWebSnapshotAssetFetch(args: {
 }): void {
   const session = getAuthorizedSession(args.sessionId, args.tabId);
   assertSessionNotCancelled(session);
-  if (!session.allowedUrls.has(normalizeAssetUrl(args.url))) {
-    throw new Error('Web snapshot asset was not registered for this session');
-  }
-}
-
-export function assertWebSnapshotSessionOpen(args: { sessionId: string; tabId: number }): void {
-  const session = getAuthorizedSession(args.sessionId, args.tabId);
-  assertSessionNotCancelled(session);
   if (session.saveState !== 'open') {
     throw new Error('Web snapshot session is not open');
   }
-}
-
-export function assertWebSnapshotSessionOwner(args: { sessionId: string; tabId: number }): void {
-  getAuthorizedSession(args.sessionId, args.tabId);
+  if (!session.allowedUrls.has(normalizeAssetUrl(args.url))) {
+    throw new Error('Web snapshot asset was not registered for this session');
+  }
 }
 
 export function beginWebSnapshotSave(args: { sessionId: string; tabId: number }): void {
@@ -185,6 +200,7 @@ export function beginWebSnapshotSave(args: { sessionId: string; tabId: number })
   if (session.saveState === 'saving') {
     throw new Error('Web snapshot session save is already in progress');
   }
+  clearSessionExpiryTimer(args.sessionId);
   session.saveState = 'saving';
 }
 
@@ -197,31 +213,42 @@ export function commitWebSnapshotSave(args: {
   assertSessionNotCancelled(session);
   session.saveState = 'saved';
   session.assetId = args.assetId;
+  scheduleSessionExpiry(args.sessionId, session);
 }
 
-export function releaseWebSnapshotSave(args: { sessionId: string; tabId: number }): void {
+export function retainWebSnapshotSaveAfterCompensationFailure(args: {
+  assetId: string;
+  sessionId: string;
+  tabId: number;
+}): void {
   const session = getAuthorizedSession(args.sessionId, args.tabId);
-  if (session.saveState === 'saving') {
-    session.saveState = 'open';
+  if (session.saveState !== 'saving') {
+    throw new Error('Web snapshot session is not awaiting compensation');
   }
+  session.saveState = 'saved';
+  session.assetId = args.assetId;
+  scheduleSessionExpiry(args.sessionId, session);
 }
 
-export function cancelWebSnapshotCaptureRequest(tabId: number, requestId: string): string[] {
+export function cancelWebSnapshotCaptureRequest(
+  tabId: number,
+  requestId: string
+): { committedAssetIds: string[] } {
   purgeExpiredSessions();
   const requestKey = createCaptureRequestKey(tabId, requestId);
   pendingCaptureRequests.delete(requestKey);
   cancelledCaptureRequests.set(requestKey, Date.now());
   const committedAssetIds: string[] = [];
-  for (const [sessionId, session] of sessions) {
+  for (const session of sessions.values()) {
     if (session.tabId !== tabId || session.requestId !== requestId) continue;
     session.cancelRequested = true;
-    releaseWebSnapshotStagedBlobsForSession({ snapshotSessionId: sessionId, tabId });
     if (session.assetId) committedAssetIds.push(session.assetId);
   }
-  return committedAssetIds;
+  return { committedAssetIds };
 }
 
 export function resetWebSnapshotAssetSessionsForTests(): void {
+  for (const sessionId of sessionExpiryTimers.keys()) clearSessionExpiryTimer(sessionId);
   sessions.clear();
   pendingCaptureRequests.clear();
   cancelledCaptureRequests.clear();

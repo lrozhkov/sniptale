@@ -92,7 +92,7 @@ export async function verifyStaticSurface({
   );
   const fullPagePixel = await compareScreenshots(context, retainedBytes, staticFullScreenshot);
 
-  await viewer.getByRole('button', { name: /^(Assets|Ассеты)$/i }).click();
+  await viewer.getByRole('button', { name: /^(Attachments|Вложения)$/i }).click();
   const assetCatalog = viewer.getByTestId('snapshot-asset-catalog');
   await assetCatalog.waitFor({ state: 'visible', timeout: 30_000 });
   const assetCatalogInfo = {

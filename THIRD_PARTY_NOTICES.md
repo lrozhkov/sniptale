@@ -82,6 +82,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad`
 - Repository/source: https://github.com/iconify/iconify.git
 
+### `@noble/hashes` 2.4.0
+
+- Installed path: `node_modules/@noble/hashes`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@noble/hashes/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@noble__hashes-2.4.0.txt`](LICENSES/dependencies/@noble__hashes-2.4.0.txt)
+- License text SHA-256: `4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec`
+- Repository/source: https://github.com/paulmillr/noble-hashes.git
+
 ### `@webav/mp4box.js` 0.5.7
 
 - Installed path: `node_modules/@webav/mp4box.js`

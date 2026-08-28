@@ -15,6 +15,32 @@ type PopupExportCancellationState = Pick<
 >;
 type PopupExportCancellationDeps = Pick<PopupExportRuntimeDeps, 'sendCancelJobMessage'>;
 
+async function cancelOwnedExport(
+  cancellation: NonNullable<PopupExportCancellationState['cancelRetryRef']['current']>,
+  deps: PopupExportCancellationDeps
+) {
+  if (!deps.sendCancelJobMessage) {
+    throw new Error('Popup export job cancellation transport is unavailable');
+  }
+  return deps.sendCancelJobMessage({
+    type: MessageType.CANCEL_PAGE_PACKAGE_JOB,
+    jobId: cancellation.exportRunId,
+  });
+}
+
+function reportCancellationFailure(state: PopupExportCancellationState, error: unknown): void {
+  logPopupExportCancelFailure(error);
+  const message = translate('content.runtime.exportCancelFailed');
+  state.setProgress({
+    activeStepKey: null,
+    phase: 'error',
+    message,
+    current: 0,
+    total: 0,
+    errors: [message],
+  });
+}
+
 export async function cancelPopupExport(
   state: PopupExportCancellationState,
   deps: PopupExportCancellationDeps = getDefaultPopupExportRuntimeDeps()
@@ -28,31 +54,20 @@ export async function cancelPopupExport(
     const cancellation =
       state.cancelRetryRef.current ??
       (activeExportRunId
-        ? { exportRunId: activeExportRunId, tabIds: [...state.selectedTabIdsInOrder] }
+        ? {
+            exportRunId: activeExportRunId,
+            owner: 'job' as const,
+            tabIds: [...state.selectedTabIdsInOrder],
+          }
         : null);
     if (!cancellation) {
       return;
     }
     state.requestIdRef.current = null;
     state.cancelRetryRef.current = cancellation;
-    if (!deps.sendCancelJobMessage) {
-      throw new Error('Popup export job cancellation transport is unavailable');
-    }
-    const response = await deps.sendCancelJobMessage({
-      type: MessageType.CANCEL_POPUP_EXPORT_JOB,
-      jobId: cancellation.exportRunId,
-    });
+    const response = await cancelOwnedExport(cancellation, deps);
     if (response?.success !== true) {
-      logPopupExportCancelFailure(response?.error || 'Popup export cancellation was rejected');
-      const message = translate('content.runtime.exportCancelFailed');
-      state.setProgress({
-        activeStepKey: null,
-        phase: 'error',
-        message,
-        current: 0,
-        total: 0,
-        errors: [message],
-      });
+      reportCancellationFailure(state, response?.error || 'Popup export cancellation was rejected');
       return;
     }
     state.cancelRetryRef.current = null;
@@ -65,6 +80,6 @@ export async function cancelPopupExport(
       errors: [translate('content.runtime.exportCancelled')],
     });
   } catch (error) {
-    logPopupExportCancelFailure(error);
+    reportCancellationFailure(state, error);
   }
 }

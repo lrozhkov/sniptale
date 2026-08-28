@@ -58,9 +58,37 @@ it('returns CSS bytes for the recursive stylesheet packaging owner', async () =>
     url: '/styles.css',
   });
 
-  expect(asset.localPath).toBe('assets/1-styles.css.css');
+  expect(asset.localPath).toBe('assets/1-styles.css');
   expect(asset.blob.type).toBe('text/css');
   await expect(readTestBlobText(asset.blob)).resolves.toContain('u\\72l');
+});
+
+it('replaces a misleading URL extension with the admitted MIME extension', async () => {
+  const asset = await fetchAssetUrl({
+    allowAnonymousCrossOriginAssets: false,
+    baseUrl: 'https://example.com/page',
+    fetchSameOriginAssetBlob: async () => new Blob(['png'], { type: 'image/png' }),
+    index: 2,
+    pageOrigin: 'https://example.com',
+    snapshotSessionId: 'snapshot-session',
+    url: '/preview.jpeg',
+  });
+
+  expect(asset.localPath).toBe('assets/2-preview.png');
+});
+
+it('adds the admitted MIME extension to extensionless asset names', async () => {
+  const asset = await fetchAssetUrl({
+    allowAnonymousCrossOriginAssets: false,
+    baseUrl: 'https://example.com/page',
+    fetchSameOriginAssetBlob: async () => new Blob(['font'], { type: 'font/woff2' }),
+    index: 3,
+    pageOrigin: 'https://example.com',
+    snapshotSessionId: 'snapshot-session',
+    url: '/body-font',
+  });
+
+  expect(asset.localPath).toBe('assets/3-body-font.woff2');
 });
 
 it('sanitizes same-origin SVG assets before packaging', async () => {

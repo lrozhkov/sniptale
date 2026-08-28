@@ -1,9 +1,9 @@
 import JSZip from 'jszip';
 import {
-  assertSafeWebSnapshotPackagePath,
   isWebSnapshotManifest,
   WEB_SNAPSHOT_PACKAGE_PATHS,
 } from '../../features/web-snapshot/manifest';
+import { assertSafeArchivePath } from '../../composition/archive-transfer/path';
 import {
   collectWebSnapshotQueryRoots,
   isWebSnapshotXhtml,
@@ -22,6 +22,7 @@ import { createViewerAssetObjectUrls } from './asset-objects';
 import type { LoadedWebSnapshotAsset } from './asset-objects';
 import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
 import { withOfflineSnapshotPolicy } from './document-policy';
+import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
 
 export interface LoadedWebSnapshotPackage {
   assets: LoadedWebSnapshotAsset[];
@@ -42,6 +43,7 @@ const REQUIRED_VIEWER_PACKAGE_PATHS = new Set([
   WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
   WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
   WEB_SNAPSHOT_PACKAGE_PATHS.screenshot,
+  WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail,
 ]);
 
 function normalizeSnapshotAssetPath(value: string): string {
@@ -129,15 +131,15 @@ function rewriteCssAssetReferences(cssText: string, urlsByPath: Map<string, stri
 
 function getViewerEntryPath(file: JSZip.JSZipObject): string {
   const originalPath = file.unsafeOriginalName ?? file.name;
-  assertSafeWebSnapshotPackagePath(originalPath);
-  assertSafeWebSnapshotPackagePath(file.name);
+  assertSafeArchivePath(originalPath);
+  assertSafeArchivePath(file.name);
   return file.name;
 }
 
 function resolveViewerEntryByteLimit(path: string): number {
   return path === WEB_SNAPSHOT_PACKAGE_PATHS.manifest ||
     path === WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml ||
-    path.startsWith('logs/')
+    path.startsWith('diagnostics/')
     ? MAX_VIEWER_TEXT_ENTRY_BYTES
     : MAX_VIEWER_ASSET_BYTES;
 }
@@ -145,7 +147,7 @@ function resolveViewerEntryByteLimit(path: string): number {
 async function readViewerPackageEntries(zip: JSZip): Promise<Map<string, Uint8Array>> {
   const files = Object.values(zip.files).filter((file) => !file.dir);
   assertZipPackageInflationProfile(files, {
-    assertPath: assertSafeWebSnapshotPackagePath,
+    assertPath: assertSafeArchivePath,
     createEntryError: () => new Error('Web snapshot package entry is too large.'),
     createFileCountError: () => new Error('Web snapshot package contains too many files.'),
     createTotalError: () => new Error('Web snapshot package inflated content is too large.'),
@@ -226,12 +228,35 @@ function assertManifestMatchesRecord(args: {
   packageManifest: WebSnapshotManifest;
   recordManifest: WebSnapshotManifest;
 }): void {
-  if (
-    args.packageManifest.id !== args.recordManifest.id ||
-    args.packageManifest.schemaVersion !== args.recordManifest.schemaVersion ||
-    args.packageManifest.captureMode !== args.recordManifest.captureMode
-  ) {
+  if (JSON.stringify(args.packageManifest) !== JSON.stringify(args.recordManifest)) {
     throw new Error('Web snapshot package manifest does not match the saved record.');
+  }
+}
+
+async function assertViewerInventoryAndDigests(
+  bytesByPath: Map<string, Uint8Array>,
+  manifest: WebSnapshotManifest
+): Promise<void> {
+  if (bytesByPath.size !== manifest.entries.length + 1) {
+    throw new Error('Page Package archive inventory does not match its manifest.');
+  }
+  for (const entry of manifest.entries) {
+    const bytes = bytesByPath.get(entry.path);
+    if (
+      !bytes ||
+      bytes.byteLength !== entry.size ||
+      (await hashWebSnapshotAssetBytes(bytes)) !== entry.sha256
+    ) {
+      throw new Error(`Page Package entry metadata does not match: ${entry.path}.`);
+    }
+  }
+  for (const path of bytesByPath.keys()) {
+    if (
+      path !== WEB_SNAPSHOT_PACKAGE_PATHS.manifest &&
+      !manifest.entries.some((entry) => entry.path === path)
+    ) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
+    }
   }
 }
 
@@ -247,6 +272,7 @@ export async function loadWebSnapshotPackage(
   const zip = await JSZip.loadAsync(record.packageFile);
   const bytesByPath = await readViewerPackageEntries(zip);
   const packageManifest = readViewerPackageManifest(bytesByPath);
+  await assertViewerInventoryAndDigests(bytesByPath, packageManifest);
   assertManifestMatchesRecord({
     packageManifest,
     recordManifest: record.manifest,

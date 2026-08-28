@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../../platform/i18n';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { type ExportPagePackage } from '@sniptale/runtime-contracts/export';
+import type { ArchiveArtifact } from '../../export-manager/archive';
 import { createPopupExportController } from './index/create';
 
 type DeferredValue<T> = {
@@ -65,9 +65,10 @@ it('returns translated preview failure copy when popup preview parsing rejects w
 });
 
 it('cancels the owned package build when dispose runs mid-flight', () => {
-  const exportDeferred = createDeferred<ExportPagePackage>();
+  const exportDeferred = createDeferred<ArchiveArtifact>();
   const exportRunner = {
-    buildPackage: vi.fn(() => exportDeferred.promise),
+    buildBlobPackage: vi.fn(() => exportDeferred.promise),
+    buildPackage: vi.fn(),
     cancel: vi.fn(),
   };
   const controller = createPopupExportController({ exportRunner });
@@ -76,12 +77,15 @@ it('cancels the owned package build when dispose runs mid-flight', () => {
     {
       options: createExportOptions(),
       batchRequestId: 'req-1',
+      includeWebCopy: false,
+      intent: 'export',
+      ordinal: 0,
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     },
     vi.fn()
   );
   controller.dispose();
-  exportDeferred.resolve({} as ExportPagePackage);
+  exportDeferred.resolve({} as ArchiveArtifact);
 
   expect(exportRunner.cancel).toHaveBeenCalledTimes(1);
 });

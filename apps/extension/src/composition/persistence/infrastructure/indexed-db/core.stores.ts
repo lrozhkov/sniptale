@@ -6,6 +6,8 @@ export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
 export const DATABASE_BACKUP_RECEIPT_KEY = 'sniptale.persistence.backup-receipt.v1';
+export const WEB_SNAPSHOT_PAGE_PACKAGE_CUTOVER_KEY =
+  'sniptale.persistence.web-snapshot-page-package-cutover.v1';
 
 export const STORE_NAME = 'recordings';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';

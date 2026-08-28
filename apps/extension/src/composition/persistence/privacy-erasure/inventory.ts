@@ -3,6 +3,7 @@ import {
   DATABASE_BACKUP_RECEIPT_KEY,
   DATABASE_RESET_JOURNAL_KEY,
   EXPECTED_STORES,
+  WEB_SNAPSHOT_PAGE_PACKAGE_CUTOVER_KEY,
 } from '../infrastructure/indexed-db/core.stores.ts';
 import {
   AI_CHROME_ENABLED_KEY,
@@ -24,6 +25,7 @@ import type {
   LocalExtensionDataErasureOptions,
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
 import { WEB_SNAPSHOT_CONSENT_STORAGE_KEY } from '../settings/web-snapshot-consent';
+import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale-theme-preference',
@@ -47,7 +49,7 @@ const localPreferenceKeys = [
   'sniptale_export_json_spoiler_open',
   'sniptale_export_md_spoiler_open',
   'sniptale_editor_file_menu_save_to_folder_open',
-  'sniptale_popup_export_preferences',
+  POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY,
   'sniptale_popup_startup',
   'sniptale_video_editor_preview_preferences',
   'sniptale_scenario_editor_navigator_collapsed',
@@ -95,6 +97,7 @@ const localSensitiveKeys = [
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
   DATABASE_RESET_JOURNAL_KEY,
+  WEB_SNAPSHOT_PAGE_PACKAGE_CUTOVER_KEY,
   'llm_request_history',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
@@ -122,6 +125,7 @@ const sessionSensitiveKeys = [
   'sniptale_page_access_active_tabs',
   'sniptale_popup_export_tab_selection_session',
   'sniptale_popup_export_job',
+  'sniptale_page_package_job',
   'sniptale_full_page_capture_lease',
   'sniptale_native_full_page_capture_lease',
   'sniptale_project_export_active_job',

@@ -32,6 +32,7 @@ export type {
   ExportArchivePackageEntry,
 } from './types';
 export type { ArchiveArtifact, CaptureArtifact, ExportArtifact } from './artifacts';
+export { createArchiveArtifact } from './artifacts';
 
 export interface CreateArchiveParams {
   treeData: ParsedDOMTree;

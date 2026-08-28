@@ -3,11 +3,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
-import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manifest';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 
 const mocks = vi.hoisted(() => ({
@@ -57,24 +54,14 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 function createViewerManifest(overrides: Partial<WebSnapshotManifest> = {}): WebSnapshotManifest {
-  const { source, stats, ...rootOverrides } = overrides;
-
-  return {
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    capturedAt: '2026-06-14T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: WEB_SNAPSHOT_PACKAGE_PATHS,
-    schemaVersion: 1,
-    source: {
+  return createPagePackageManifestFixture({
+    ...overrides,
+    source: overrides.source ?? {
       faviconUrl: null,
       title: 'Page title',
       url: 'https://example.com/page',
-      ...source,
     },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 0, ...stats },
-    warnings: [],
-    ...rootOverrides,
-  };
+  });
 }
 
 function createLoadedPackage(
@@ -141,7 +128,7 @@ it('resizes the snapshot iframe surface when viewer viewport state changes', asy
 
 it('uses the saved capture viewport as the default snapshot iframe surface', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
-    createLoadedPackage({ viewport: { height: 1440, width: 2560 } })
+    createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
   );
 
   await renderViewer();
@@ -158,7 +145,7 @@ it('uses the saved capture viewport as the default snapshot iframe surface', asy
 
 it('keeps captured layout dimensions while switching between fit and manual zoom', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
-    createLoadedPackage({ viewport: { height: 1440, width: 2560 } })
+    createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
   );
 
   await renderViewer();

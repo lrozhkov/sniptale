@@ -177,7 +177,6 @@
     "manifest.json",
     "assets/contentRuntime.js",
     "assets/contentRuntimeShim.js",
-    "assets/webSnapshotInjectedRunner.js",
     "assets/styles.css",
     "apps/extension/src/popup/index.html",
     "apps/extension/src/editor/index.html",

@@ -3,6 +3,7 @@ import { isExportOptions } from '../../contracts/messaging/validators/export';
 import { isQuickActionOverlay } from '../../contracts/messaging/validators/ui';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { parsePopupExportControlRequest } from '../../contracts/messaging/parsers/popup-export-control';
+import { isContentPrivilegedActionAutoStartGrant } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import {
   PREPARATION_SURFACE_RESIZE,
   WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
@@ -68,13 +69,6 @@ function parsePopupExportRequest(request: unknown): ViewerPopupExportMessage | n
     return controlRequest;
   }
 
-  if (request['type'] === MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT) {
-    const requestId = request['requestId'];
-    return isString(requestId)
-      ? { type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT, requestId }
-      : null;
-  }
-
   const options = request['options'];
   if (!isExportOptions(options)) {
     return null;
@@ -82,9 +76,48 @@ function parsePopupExportRequest(request: unknown): ViewerPopupExportMessage | n
 
   if (request['type'] === MessageType.EXPORT_POPUP_BUILD_PACKAGE) {
     const batchRequestId = request['batchRequestId'];
-    return isString(batchRequestId)
-      ? { type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, batchRequestId, options }
-      : null;
+    const includeWebCopy = request['includeWebCopy'];
+    const intent = request['intent'];
+    const ordinal = request['ordinal'];
+    const hasAnonymousPolicy = hasOwn(request, 'allowAnonymousCrossOriginAssets');
+    const hasAuthenticatedPolicy = hasOwn(request, 'allowAuthenticatedSameOriginAssets');
+    if (
+      !isString(batchRequestId) ||
+      typeof includeWebCopy !== 'boolean' ||
+      (intent !== 'export' && intent !== 'save') ||
+      !Number.isSafeInteger(ordinal) ||
+      (ordinal as number) < 0 ||
+      (includeWebCopy
+        ? typeof request['allowAnonymousCrossOriginAssets'] !== 'boolean' ||
+          typeof request['allowAuthenticatedSameOriginAssets'] !== 'boolean'
+        : hasAnonymousPolicy || hasAuthenticatedPolicy)
+    ) {
+      return null;
+    }
+    const admittedIntent = intent as 'export' | 'save';
+    const common = {
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+      batchRequestId,
+      ...(isContentPrivilegedActionAutoStartGrant(request['contentIntentGrant'])
+        ? { contentIntentGrant: request['contentIntentGrant'] }
+        : {}),
+      ...(request['fullPageCaptureAction'] === MessageType.EXPORT_CAPTURE_FULL_PAGE
+        ? { fullPageCaptureAction: request['fullPageCaptureAction'] }
+        : {}),
+      intent: admittedIntent,
+      ordinal: ordinal as number,
+      options,
+    };
+    return includeWebCopy
+      ? {
+          ...common,
+          allowAnonymousCrossOriginAssets: request['allowAnonymousCrossOriginAssets'] as boolean,
+          allowAuthenticatedSameOriginAssets: request[
+            'allowAuthenticatedSameOriginAssets'
+          ] as boolean,
+          includeWebCopy: true,
+        }
+      : { ...common, includeWebCopy: false };
   }
 
   return null;

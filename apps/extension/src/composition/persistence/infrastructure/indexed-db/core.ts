@@ -20,6 +20,10 @@ import {
 import { handleDatabaseUpgrade } from './upgrade/core.ts';
 import { runProvenanceUrlMaintenance } from './maintenance/provenance';
 import {
+  createWebSnapshotPagePackageCutoverDatabase,
+  runWebSnapshotPagePackageCutover,
+} from './maintenance/web-snapshot-page-package-cutover';
+import {
   DB_NAME,
   DB_VERSION,
   EXPECTED_INDEXES,
@@ -240,6 +244,12 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
     throw error;
   }
 
+  try {
+    await runWebSnapshotPagePackageCutover(createWebSnapshotPagePackageCutoverDatabase(db));
+  } catch (error) {
+    db.close();
+    throw error;
+  }
   await runProvenanceUrlMaintenance(db).catch((error) => {
     logger.warn('Provenance URL maintenance failed', error);
   });

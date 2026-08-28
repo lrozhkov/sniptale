@@ -4,6 +4,17 @@ import { applyPopupExportRuntimeMessage, parsePopupExportRuntimeMessage } from '
 
 const status = {
   activatedTabIds: [7],
+  effectiveComponentPlan: {
+    components: {
+      attachments: false,
+      diagnostics: false,
+      images: false,
+      pageData: true,
+      webCopy: true,
+    },
+    diagnosticsLevel: 'none' as const,
+    includeScreenshot: true,
+  },
   effectiveOptions: {
     includeBasicLogs: false,
     includeCssDiagnostics: false,
@@ -14,9 +25,11 @@ const status = {
     includeJson: true,
     includeMarkdown: false,
   },
+  intent: 'save' as const,
   jobId: 'job-1',
   orderedTabs: [{ tabId: 7, title: 'Page' }],
   originalActiveTabs: [{ tabId: 6, windowId: 1 }],
+  pageOutcomes: [{ ordinal: 0, status: 'pending' as const, tabId: 7 }],
   phase: 'running' as const,
   progress: {
     current: 1,
@@ -30,7 +43,7 @@ const status = {
 };
 
 it('parses only revisioned popup-export job status updates', () => {
-  const message = { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED };
+  const message = { status, type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED };
   expect(parsePopupExportRuntimeMessage(message)).toEqual(message);
   expect(
     parsePopupExportRuntimeMessage({
@@ -91,7 +104,7 @@ it('applies a matching job status and merges warnings into progress errors', () 
   expect(
     applyPopupExportRuntimeMessage({
       clearRequestId: vi.fn(),
-      message: { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED },
+      message: { status, type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED },
       requestId: 'job-1',
       latestStatus: null,
       setLatestStatus,
@@ -108,7 +121,7 @@ it('ignores status updates for another active job', () => {
     applyPopupExportRuntimeMessage({
       clearRequestId: vi.fn(),
       latestStatus: null,
-      message: { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED },
+      message: { status, type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED },
       requestId: 'job-2',
       setLatestStatus: vi.fn(),
       setProgress: vi.fn(),
@@ -124,7 +137,7 @@ it('rejects stale and duplicate revisions for the same job', () => {
     applyPopupExportRuntimeMessage({
       clearRequestId: vi.fn(),
       latestStatus: { jobId: 'job-1', revision: 3 },
-      message: { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED },
+      message: { status, type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED },
       requestId: 'job-1',
       setLatestStatus: vi.fn(),
       setProgress,

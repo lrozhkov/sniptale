@@ -11,7 +11,8 @@ import {
   type BackgroundRuntimeScreenshotCleanupPort,
 } from './runtime-cleanup';
 import { PrivacyErasureUseCase } from './use-case';
-import { reservePopupExportErasureExclusion } from '../../capture/popup-export/job/lifecycle-gate';
+import { reservePopupExportErasureExclusion } from '../../capture/page-package/job/lifecycle-gate';
+import { requestActivePagePackageJobCancellationForPrivacyErasure } from '../../capture/page-package/job';
 
 const unavailableNativeIngestionCleanupPort: NativeIngestionCleanupPort = {
   async cleanup() {
@@ -36,7 +37,10 @@ const privacyErasureUseCase = new PrivacyErasureUseCase({
   diagnostics: diagnosticsPrivacyErasureCleanupAdapter,
   media: mediaPrivacyErasureCleanupAdapter,
   nativeIngestion: nativeIngestionCleanupProxy,
-  popupExport: { reserveErasureExclusion: reservePopupExportErasureExclusion },
+  popupExport: {
+    cancelActiveJob: requestActivePagePackageJobCancellationForPrivacyErasure,
+    reserveErasureExclusion: reservePopupExportErasureExclusion,
+  },
   runtime: backgroundRuntimeCleanupAdapter,
   storage: createPrivacyErasureStorageCleanupAdapter(extensionPageLocalStorageErasureAdapter),
 });

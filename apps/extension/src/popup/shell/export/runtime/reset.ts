@@ -18,10 +18,11 @@ export async function resetPopupExportView(
 ): Promise<void> {
   try {
     await deps.sendAckJobStatusMessage?.({
-      type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
+      type: MessageType.ACK_PAGE_PACKAGE_JOB_STATUS,
     });
   } finally {
     state.setProgress(IDLE_EXPORT_PROGRESS);
     state.setResult(null);
+    state.setLaunchedPlan(null);
   }
 }

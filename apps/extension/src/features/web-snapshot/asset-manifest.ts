@@ -1,18 +1,9 @@
+import { isPagePackageWebCopyAssetMimeType } from '@sniptale/runtime-contracts/page-package';
+
 const WEB_SNAPSHOT_MIME_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/iu;
-const WEB_SNAPSHOT_ALLOWED_ASSET_MIME_TYPES = new Set([
-  'font/woff',
-  'font/woff2',
-  'image/avif',
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/svg+xml',
-  'image/webp',
-  'text/css',
-]);
 
 export function isAllowedWebSnapshotAssetMimeType(value: string): boolean {
-  return WEB_SNAPSHOT_ALLOWED_ASSET_MIME_TYPES.has(value);
+  return isPagePackageWebCopyAssetMimeType(value);
 }
 
 export function isWebSnapshotAssetMimeType(value: unknown): value is string {

@@ -1,10 +1,16 @@
 import { translate } from '../../../../../platform/i18n/popup';
 import { getTabCapabilities } from '../../../../../features/tab-capabilities/capabilities';
 import { type ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import {
+  MAX_POPUP_EXPORT_JOB_TABS,
+  normalizePopupExportTabTitle,
+} from '@sniptale/runtime-contracts/export';
 import type { PopupExportFallbackTab, PopupExportTabItem } from './types';
 
 function buildTabLabel(args: { title: string | null; url: string | null }) {
-  return args.title?.trim() || args.url || translate('popup.common.noActiveTab');
+  return normalizePopupExportTabTitle(
+    args.title?.trim() || args.url || translate('popup.common.noActiveTab')
+  );
 }
 
 function toPopupExportTabItem(
@@ -54,7 +60,8 @@ export function filterTabs(tabs: PopupExportTabItem[], filterQuery: string): Pop
 export function getSelectableTabIds(tabs: PopupExportTabItem[]): number[] {
   return tabs
     .filter((tab) => tab.disabledReason === null && typeof tab.tabId === 'number')
-    .map((tab) => tab.tabId as number);
+    .map((tab) => tab.tabId as number)
+    .slice(0, MAX_POPUP_EXPORT_JOB_TABS);
 }
 
 export function getSelectedTabIdsInOrder(
@@ -68,7 +75,8 @@ export function getSelectedTabIdsInOrder(
         typeof tab.tabId === 'number' &&
         selectedTabIds.includes(tab.tabId)
     )
-    .map((tab) => tab.tabId as number);
+    .map((tab) => tab.tabId as number)
+    .slice(0, MAX_POPUP_EXPORT_JOB_TABS);
 }
 
 export function getTabsForCurrentWindow(

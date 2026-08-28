@@ -9,9 +9,15 @@ import type {
   PopupExportState as PopupExportViewState,
 } from '../session/types';
 export type { PopupExportSelection } from '../session/types';
+import type { PopupPagePackageSelection } from '../../../../composition/persistence/popup-export-preferences';
+import { getPopupPagePackageSelection } from '../session/selectors';
 
 type PopupExportRuntimePreferences = PopupExportPreferenceActions &
-  PopupExportPreferenceValues & { hasLoadedPreferences: boolean };
+  PopupExportPreferenceValues & {
+    hasLoadedPreferences: boolean;
+    includeWebCopy: boolean;
+    saveSelection: PopupPagePackageSelection;
+  };
 type PopupExportRuntimeSession = PopupExportSessionActions &
   PopupExportSessionCopyState &
   PopupExportSessionRefs &
@@ -31,6 +37,8 @@ export function createPopupExportRuntimeState(
     ...state.preferences.actions,
     ...state.preferences.values,
     hasLoadedPreferences: state.preferences.hasLoadedPreferences,
+    includeWebCopy: state.preferences.includeWebCopy,
+    saveSelection: getPopupPagePackageSelection(state.preferences.save),
     ...state.session.actions,
     ...state.session.copy,
     ...state.session.refs,

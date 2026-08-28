@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, expect, it, vi } from 'vitest';
+import { MAX_POPUP_EXPORT_TAB_TITLE_BYTES } from '@sniptale/runtime-contracts/export';
 
 const mocks = vi.hoisted(() => ({
   buildPreparedSnapshotDocument: vi.fn(),
@@ -50,6 +51,7 @@ const captureGeometry = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  document.title = 'Prepared web snapshot';
   const snapshotDocument = document.implementation.createHTMLDocument('prepared');
   mocks.buildPreparedSnapshotDocument.mockResolvedValue({
     document: snapshotDocument,
@@ -81,11 +83,28 @@ beforeEach(() => {
   mocks.buildWebSnapshotPackage.mockResolvedValue({
     manifest: { assets: [], createdAt: 'now', title: 'prepared', version: 1 },
     packageBlob: new Blob(['package'], {
-      type: 'application/x-sniptale-web-snapshot+zip',
+      type: 'application/x-sniptale-page-package+zip',
     }),
     screenshotBlob: new Blob(['shot'], { type: 'image/png' }),
     screenshotMimeType: 'image/png',
   });
+});
+
+it('normalizes the live document title before handing it to package composition', async () => {
+  document.title = 'e\u0301'.repeat(MAX_POPUP_EXPORT_TAB_TITLE_BYTES);
+
+  await buildCurrentPageWebSnapshot({
+    allowAnonymousCrossOriginAssets: false,
+    allowAuthenticatedSameOriginAssets: false,
+    requestId: 'req-title',
+  });
+
+  const title = mocks.buildWebSnapshotPackage.mock.calls[0]?.[0]?.source?.title;
+  expect(typeof title).toBe('string');
+  expect(title).toBe(title.normalize('NFC'));
+  expect(new TextEncoder().encode(title).byteLength).toBeLessThanOrEqual(
+    MAX_POPUP_EXPORT_TAB_TITLE_BYTES
+  );
 });
 
 it('reports a successfully preserved unreadable iframe as a static image', async () => {
@@ -172,6 +191,7 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
         title: document.title || null,
         url: document.location.href,
         viewport: {
+          deviceScaleFactor: window.devicePixelRatio,
           height: window.innerHeight,
           width: window.innerWidth,
         },

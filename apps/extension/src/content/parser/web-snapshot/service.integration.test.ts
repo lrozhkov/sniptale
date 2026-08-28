@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
 
-import JSZip from 'jszip';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { initializeContentUiRoots } from '../../platform/dom-host';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manifest';
+import { readPagePackageTestBlobText } from '../../../features/web-snapshot/package.test-support';
 import { installContentRuntimeMessagingMock } from '../../platform/runtime-services/services.test-support';
+import type { WebSnapshotBuildResult } from './types';
 
-const { captureWebSnapshotScreenshotWithWarningsMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
+const {
+  captureWebSnapshotScreenshotWithWarningsMock,
+  createImageThumbnailBlobMock,
+  sendRuntimeMessageMock,
+} = vi.hoisted(() => ({
   captureWebSnapshotScreenshotWithWarningsMock: vi.fn(),
+  createImageThumbnailBlobMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
 }));
 
@@ -22,27 +28,22 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
 
+vi.mock('../../../platform/media-utils/image-thumbnail', () => ({
+  createImageThumbnailBlob: createImageThumbnailBlobMock,
+}));
+
 import { buildCurrentPageWebSnapshot } from './service';
 
-function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read package blob.'));
-    reader.onload = () => resolve(reader.result as ArrayBuffer);
-    reader.readAsArrayBuffer(blob);
-  });
-}
-
-async function readSnapshotPackage(packageBlob: Blob) {
-  const zip = await JSZip.loadAsync(await blobToArrayBuffer(packageBlob));
-
+async function readSnapshotPackage(result: WebSnapshotBuildResult) {
+  const readText = async (path: string): Promise<string> => {
+    const entry = result.pagePackage.entries.find((candidate) => candidate.path === path);
+    if (!entry) throw new Error(`Missing Page Package entry: ${path}`);
+    return readPagePackageTestBlobText(entry.source);
+  };
   return {
-    domDiagnostics: await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot),
-    html: await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml),
-    manifest: JSON.parse(await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)) as {
-      viewport?: { height: number; width: number };
-      warnings: string[];
-    },
+    domDiagnostics: await readText('diagnostics/standard/dom.html.txt'),
+    html: await readText(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml),
+    manifest: result.manifest,
   };
 }
 
@@ -55,15 +56,6 @@ function setCurrentSrc(element: Element | null, value: string): void {
     configurable: true,
     value,
   });
-}
-
-async function readZipText(zip: JSZip, path: string): Promise<string> {
-  const file = zip.file(path);
-  if (!file) {
-    throw new Error(`Missing zip entry: ${path}`);
-  }
-
-  return file.async('string');
 }
 
 function attachIframeDocument(iframe: HTMLIFrameElement, iframeDocument: Document): void {
@@ -142,6 +134,7 @@ beforeEach(() => {
     },
     warnings: [],
   });
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('asset', { headers: { 'content-type': 'image/png' } }))
@@ -168,7 +161,7 @@ it('packages prepared iframe and overlay markup into viewer HTML and diagnostics
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(packageEntries.html).toContain('data-virtual-iframe="true"');
   expect(packageEntries.html).toContain('Iframe body content');
@@ -177,8 +170,13 @@ it('packages prepared iframe and overlay markup into viewer HTML and diagnostics
   expect(packageEntries.html).toContain('Prepared callout');
   expect(packageEntries.html).not.toContain('<iframe');
   expect(packageEntries.html).not.toContain(CONTENT_ROOT_ID);
-  expect(packageEntries.domDiagnostics).toBe(packageEntries.html);
+  expect(packageEntries.domDiagnostics).not.toBe(packageEntries.html);
+  expect(packageEntries.domDiagnostics).toContain('data-virtual-iframe="true"');
+  expect(packageEntries.domDiagnostics).toContain('[text:19]');
+  expect(packageEntries.domDiagnostics).not.toContain('Iframe body content');
+  expect(packageEntries.domDiagnostics).not.toContain('Prepared callout');
   expect(packageEntries.manifest.viewport).toEqual({
+    deviceScaleFactor: window.devicePixelRatio,
     height: window.innerHeight,
     width: window.innerWidth,
   });
@@ -192,7 +190,7 @@ it('keeps unreadable iframe warnings in the manifest without failing package cre
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(packageEntries.html).toContain('data-iframe-unreadable="true"');
   expect(packageEntries.html).not.toContain('token=secret');
@@ -214,7 +212,7 @@ it('keeps only the selected responsive image candidate through prepared snapshot
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(fetch).toHaveBeenCalledWith(`${window.location.origin}/large.png`, {
     credentials: 'include',
@@ -245,7 +243,7 @@ it('keeps selected picture source candidates through prepared snapshot cloning',
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(fetch).toHaveBeenCalledWith(`${window.location.origin}/wide@2x.png`, {
     credentials: 'include',
@@ -292,7 +290,7 @@ it('clones the live DOM after full-page capture reveals lazy page sections', asy
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(packageEntries.html.match(/class="visible"/gu)).toHaveLength(3);
 });

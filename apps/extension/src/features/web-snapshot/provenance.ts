@@ -9,13 +9,15 @@ import {
   type FileEntry,
 } from '@zip.js/zip.js';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import {
-  assertSafeWebSnapshotPackagePath,
   isWebSnapshotManifest,
   parseWebSnapshotManifestJson,
   WEB_SNAPSHOT_PACKAGE_PATHS,
 } from './manifest';
+import { assertSafeArchivePath } from '../../composition/archive-transfer/path';
+import { hashWebSnapshotAssetBlob } from './asset-manifest';
 
 const MAX_WEB_SNAPSHOT_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_WEB_SNAPSHOT_PACKAGE_FILE_COUNT = 500;
@@ -90,17 +92,12 @@ export async function sanitizeWebSnapshotPackageProvenance(
   const opened = await openWebSnapshotPackage(packageBlob, maxPackageBytes);
   try {
     const packageManifest = await readWebSnapshotPackageManifest(opened.entries);
+    await assertArchiveInventory(opened.entries, packageManifest);
     if (options.requireManifestMatch && manifestOverride) {
-      const normalizedPackage = withPackageSize(
-        sanitizeWebSnapshotManifestProvenance(packageManifest, options),
-        packageBlob.size
-      );
-      const normalizedOverride = withPackageSize(
-        sanitizeWebSnapshotManifestProvenance(manifestOverride, options),
-        packageBlob.size
-      );
+      const normalizedPackage = sanitizeWebSnapshotManifestProvenance(packageManifest, options);
+      const normalizedOverride = sanitizeWebSnapshotManifestProvenance(manifestOverride, options);
       if (JSON.stringify(normalizedPackage) !== JSON.stringify(normalizedOverride)) {
-        throw new Error('Web snapshot package manifest does not match archive metadata.');
+        throw new Error('Page Package manifest does not match archive metadata.');
       }
     }
     const outputManifest = sanitizeWebSnapshotManifestProvenance(
@@ -111,15 +108,13 @@ export async function sanitizeWebSnapshotPackageProvenance(
       applyProvenanceOverride(packageManifest, manifestOverride),
       options
     );
-    const normalizedPackageManifest = withPackageSize(packageOutputManifest, packageBlob.size);
-    const normalizedOutputManifest = withPackageSize(outputManifest, packageBlob.size);
     const manifestChanged =
-      JSON.stringify(packageManifest) !== JSON.stringify(normalizedPackageManifest);
+      JSON.stringify(packageManifest) !== JSON.stringify(packageOutputManifest);
 
     if (!manifestChanged) {
       return {
         changed: false,
-        manifest: normalizedOutputManifest,
+        manifest: outputManifest,
         packageBlob,
         size: packageBlob.size,
       };
@@ -127,12 +122,12 @@ export async function sanitizeWebSnapshotPackageProvenance(
 
     const sanitized = await generatePackageWithManifest(
       opened.entries,
-      normalizedPackageManifest,
+      packageOutputManifest,
       maxPackageBytes
     );
     return {
       changed: true,
-      manifest: withPackageSize(outputManifest, sanitized.packageBlob.size),
+      manifest: outputManifest,
       packageBlob: sanitized.packageBlob,
       size: sanitized.packageBlob.size,
     };
@@ -167,6 +162,7 @@ function applyProvenanceOverride(
     source: {
       ...packageManifest.source,
       faviconUrl: manifestOverride.source.faviconUrl,
+      title: manifestOverride.source.title,
       url: manifestOverride.source.url,
     },
   };
@@ -176,16 +172,6 @@ function entryMaxBytes(entryPath: string): number {
   return entryPath === WEB_SNAPSHOT_PACKAGE_PATHS.manifest
     ? MAX_WEB_SNAPSHOT_MANIFEST_BYTES
     : MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES;
-}
-
-function assertSafeDirectoryPath(path: string): void {
-  if (
-    path.startsWith('/') ||
-    path.includes('\\') ||
-    path.split('/').some((segment) => segment === '..' || segment === '.' || segment === '')
-  ) {
-    throw new Error('Web snapshot package contains an unsafe path.');
-  }
 }
 
 async function openWebSnapshotPackage(
@@ -207,11 +193,8 @@ async function openWebSnapshotPackage(
         throw new Error('Web snapshot package contains an unsupported entry.');
       }
       const validatedPath = entry.directory ? entry.filename.replace(/\/$/u, '') : entry.filename;
-      if (entry.directory) {
-        assertSafeDirectoryPath(validatedPath);
-        continue;
-      }
-      assertSafeWebSnapshotPackagePath(validatedPath);
+      if (entry.directory) throw new Error('Page Package directory entries are not supported.');
+      assertSafeArchivePath(validatedPath);
       const canonicalPath = entry.filename.toLocaleLowerCase('en-US');
       if (paths.has(canonicalPath)) {
         throw new Error(`Web snapshot package contains a duplicate path: ${entry.filename}.`);
@@ -245,17 +228,7 @@ async function generatePackageWithManifest(
   manifest: WebSnapshotManifest,
   maxPackageBytes: number
 ): Promise<{ manifest: WebSnapshotManifest; packageBlob: Blob }> {
-  let nextManifest = manifest;
-  let packageBlob = await writePackage(entries, nextManifest, maxPackageBytes);
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const sizedManifest = withPackageSize(nextManifest, packageBlob.size);
-    if (JSON.stringify(sizedManifest) === JSON.stringify(nextManifest)) {
-      return { manifest: nextManifest, packageBlob };
-    }
-    nextManifest = sizedManifest;
-    packageBlob = await writePackage(entries, nextManifest, maxPackageBytes);
-  }
-  throw new Error('Web snapshot package manifest size did not stabilize.');
+  return { manifest, packageBlob: await writePackage(entries, manifest, maxPackageBytes) };
 }
 
 async function writePackage(
@@ -263,7 +236,7 @@ async function writePackage(
   manifest: WebSnapshotManifest,
   maxPackageBytes: number
 ): Promise<Blob> {
-  const output = new BlobWriter('application/zip');
+  const output = new BlobWriter(PAGE_PACKAGE_ARCHIVE_MIME_TYPE);
   const writer = new ZipWriter(output, { bufferedWrite: false, useWebWorkers: false });
   try {
     for (const entry of entries) {
@@ -291,10 +264,6 @@ async function writePackage(
   }
 }
 
-function withPackageSize(manifest: WebSnapshotManifest, packageSize: number): WebSnapshotManifest {
-  return { ...manifest, stats: { ...manifest.stats, packageSize } };
-}
-
 async function readWebSnapshotPackageManifest(
   entries: readonly Entry[]
 ): Promise<WebSnapshotManifest> {
@@ -311,4 +280,29 @@ async function readWebSnapshotPackageManifest(
   if (!isWebSnapshotManifest(manifest))
     throw new Error('Web snapshot package manifest is invalid.');
   return manifest;
+}
+
+async function assertArchiveInventory(
+  entries: readonly Entry[],
+  manifest: WebSnapshotManifest
+): Promise<void> {
+  const expected = new Map(manifest.entries.map((entry) => [entry.path, entry]));
+  if (entries.length !== expected.size + 1) {
+    throw new Error('Page Package archive inventory does not match its manifest.');
+  }
+  for (const entry of entries) {
+    if (entry.filename === WEB_SNAPSHOT_PACKAGE_PATHS.manifest) continue;
+    const expectedEntry = expected.get(entry.filename);
+    if (!expectedEntry || expectedEntry.size !== entry.uncompressedSize) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
+    }
+    const blob = await readEntryBlob(entry, expectedEntry.mimeType);
+    if ((await hashWebSnapshotAssetBlob(blob)) !== expectedEntry.sha256) {
+      throw new Error(`Page Package entry digest does not match: ${entry.filename}.`);
+    }
+    expected.delete(entry.filename);
+  }
+  if (expected.size > 0) {
+    throw new Error('Page Package archive inventory does not match its manifest.');
+  }
 }

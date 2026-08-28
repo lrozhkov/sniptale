@@ -43,6 +43,11 @@ function getExtension(blob: Blob, url: string): string {
   return match?.[1]?.toLowerCase() ?? 'bin';
 }
 
+function applyCanonicalExtension(filename: string, extension: string): string {
+  const stem = filename.replace(/\.[a-z0-9]{1,8}$/iu, '');
+  return `${stem || filename}.${extension}`;
+}
+
 async function sanitizeAssetBlob(blob: Blob): Promise<Blob> {
   if (blob.type === 'image/svg+xml') {
     return new Blob([sanitizeWebSnapshotSvgText(await readBlobText(blob))], {
@@ -202,9 +207,10 @@ export async function fetchAssetUrl(args: {
     new URL(resolvedUrl).pathname.split('/').pop() ?? '',
     `asset-${args.index}`
   );
+  const filename = applyCanonicalExtension(basename, getExtension(blob, resolvedUrl));
   return {
     blob,
-    localPath: `assets/${args.index}-${basename}.${getExtension(blob, resolvedUrl)}`,
+    localPath: `assets/${args.index}-${filename}`,
     originalUrl: resolvedUrl,
   };
 }

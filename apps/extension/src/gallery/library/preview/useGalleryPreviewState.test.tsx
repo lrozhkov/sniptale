@@ -112,9 +112,10 @@ it('uses the durable screenshot object for web snapshot previews', async () => {
       item: {
         ...createItem(),
         entityId: 'snapshot-1',
+        filename: 'snapshot.sniptale-page-package.zip',
         id: 'asset-web',
         kind: 'web-archive',
-        mimeType: 'application/zip',
+        mimeType: 'application/x-sniptale-page-package+zip',
         source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
       },
       url: null,
@@ -149,9 +150,10 @@ it.each([
       item: {
         ...createItem(),
         entityId: 'snapshot-1',
+        filename: 'snapshot.sniptale-page-package.zip',
         id: 'asset-web',
         kind: 'web-archive',
-        mimeType: 'application/zip',
+        mimeType: 'application/x-sniptale-page-package+zip',
         source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
       },
       url: null,

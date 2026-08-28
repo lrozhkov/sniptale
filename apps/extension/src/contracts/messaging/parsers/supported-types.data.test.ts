@@ -32,17 +32,20 @@ it('limits popup and offscreen boundaries to their dedicated runtime contracts',
     true
   );
   expect(hasBoundaryType(offscreenRuntimeTypes, VideoMessageType.START_RECORDING)).toBe(false);
+  expect(
+    hasBoundaryType(offscreenRuntimeTypes, MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE)
+  ).toBe(true);
 });
 
 it('keeps background runtime ownership for capture command messages', () => {
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.ENABLE_SCREENSHOT_MODE)).toBe(true);
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.EXPORT_CAPTURE_FULL_PAGE)).toBe(true);
-  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.START_POPUP_EXPORT_JOB)).toBe(true);
-  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.GET_POPUP_EXPORT_JOB_STATUS)).toBe(
+  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.START_PAGE_PACKAGE_JOB)).toBe(true);
+  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.GET_PAGE_PACKAGE_JOB_STATUS)).toBe(
     true
   );
-  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.CANCEL_POPUP_EXPORT_JOB)).toBe(true);
-  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.ACK_POPUP_EXPORT_JOB_STATUS)).toBe(
+  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.CANCEL_PAGE_PACKAGE_JOB)).toBe(true);
+  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.ACK_PAGE_PACKAGE_JOB_STATUS)).toBe(
     true
   );
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.AI_SECRET_UNLOCK)).toBe(true);

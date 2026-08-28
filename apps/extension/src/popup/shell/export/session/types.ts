@@ -1,6 +1,9 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { ExportProgress, PopupExportResult } from '@sniptale/runtime-contracts/export';
-import type { PopupExportPreferences } from '../../../../composition/persistence/popup-export-preferences';
+import type {
+  PopupExportPreferences,
+  PopupPagePackageSelection,
+} from '../../../../composition/persistence/popup-export-preferences';
 import type { PopupExportProgressStep } from '../progress/steps';
 import type { PreviewFormat } from '../selection/utils';
 import type { PopupExportTabSelectionState } from '../selection/tabs/types';
@@ -19,15 +22,21 @@ export type PopupExportPreferenceActions = {
   setIncludeMarkdown: Dispatch<SetStateAction<boolean>>;
 };
 
-export type PopupExportPreferenceState = {
+type PopupExportPreferenceState = {
   actions: PopupExportPreferenceActions;
   values: PopupExportPreferenceValues;
 };
 
+export type PopupPagePackagePreferenceState = PopupExportPreferenceState & {
+  includeWebCopy: boolean;
+  setIncludeWebCopy: Dispatch<SetStateAction<boolean>>;
+};
+
 export type PopupExportPreferenceSetters = PopupExportPreferenceActions;
 
-export type PopupExportToggleState = PopupExportPreferenceState & {
+export type PopupExportToggleState = PopupPagePackagePreferenceState & {
   hasLoadedPreferences: boolean;
+  save: PopupPagePackagePreferenceState;
 };
 
 export type PopupExportSessionCopyState = {
@@ -36,6 +45,7 @@ export type PopupExportSessionCopyState = {
 };
 
 export type PopupExportSessionTransferState = {
+  launchedPlan: PopupPagePackageSelection | null;
   progress: ExportProgress;
   result: PopupExportResult | null;
 };
@@ -43,6 +53,7 @@ export type PopupExportSessionTransferState = {
 export type PopupExportSessionRefs = {
   cancelRetryRef: MutableRefObject<{
     exportRunId: string;
+    owner: 'job';
     tabIds: number[];
   } | null>;
   copyResetTimeoutRef: MutableRefObject<number | null>;
@@ -55,6 +66,7 @@ export type PopupExportSessionActions = {
   setCopiedFormat: Dispatch<SetStateAction<PreviewFormat | null>>;
   setProgress: Dispatch<SetStateAction<ExportProgress>>;
   setResult: Dispatch<SetStateAction<PopupExportResult | null>>;
+  setLaunchedPlan: Dispatch<SetStateAction<PopupPagePackageSelection | null>>;
 };
 
 export type PopupExportSessionState = {
@@ -64,17 +76,7 @@ export type PopupExportSessionState = {
   transfer: PopupExportSessionTransferState;
 };
 
-export type PopupExportSelection = {
-  includeAnnotations: boolean;
-  includeBasicLogs: boolean;
-  includeCssDiagnostics: boolean;
-  includeFiles: boolean;
-  includeFullPageScreenshot: boolean;
-  includePageDiagnostics: boolean;
-  includeImages: boolean;
-  includeJson: boolean;
-  includeMarkdown: boolean;
-};
+export type PopupExportSelection = PopupExportPreferences;
 
 export type PopupExportDerivedState = {
   canCopyJson: boolean;

@@ -16,7 +16,3 @@ export function consumePopupExportLaunchSelection(): PopupExportLaunchSelection 
   pendingLaunchSelection = null;
   return selection;
 }
-
-export function resetPopupExportLaunchSelectionForTests(): void {
-  pendingLaunchSelection = null;
-}

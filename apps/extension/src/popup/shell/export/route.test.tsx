@@ -23,8 +23,9 @@ vi.mock('./pages/page', () => ({
   },
 }));
 
-it('owns Export launch selection and route-local capability state', async () => {
-  const { ExportRoute } = await import('./route');
+import { ExportRoute } from './route';
+
+it('owns Export launch selection and route-local capability state', () => {
   const container = document.createElement('div');
   const root = createRoot(container);
   act(() =>

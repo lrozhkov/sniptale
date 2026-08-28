@@ -9,7 +9,6 @@ import manifest from './manifest.json';
 import {
   buildContentRuntime,
   buildContentRuntimeShim,
-  buildWebSnapshotInjectedRunner,
   getTraceWsUrlForMode,
   isTraceMessagesEnabledForMode,
 } from './build/injected-build';
@@ -156,7 +155,6 @@ export default defineConfig(({ mode }) => ({
     crx({ manifest: buildManifestForMode(manifest, mode) }),
     buildContentRuntime(mode),
     buildContentRuntimeShim(mode),
-    buildWebSnapshotInjectedRunner(mode),
   ],
   define: buildDefines(mode),
   build: {

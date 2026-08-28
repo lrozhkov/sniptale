@@ -40,7 +40,13 @@ async function renderContent(controller: ReturnType<typeof createPopupExportCont
   }
 
   await act(async () => {
-    root?.render(<ExportPageContent controller={controller} />);
+    root?.render(
+      <ExportPageContent
+        controller={controller}
+        onRequestWebCopySetup={vi.fn()}
+        webSnapshotEnabled={true}
+      />
+    );
   });
 }
 
@@ -142,6 +148,8 @@ it('renders the ready state with selection props and disabled state', async () =
       hasLoadedPreferences: false,
       selectedCount: 0,
       selectedTabIds: [],
+      includeWebCopy: false,
+      savePreferences: expect.objectContaining({ includeWebCopy: true }),
     })
   );
 });

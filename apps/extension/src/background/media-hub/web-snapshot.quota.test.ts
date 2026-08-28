@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { WebSnapshotCaptureMode } from '@sniptale/runtime-contracts/web-snapshot';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
+import { createPagePackageManifestFixture } from '../../features/web-snapshot/manifest.test-support';
 
 const mocks = vi.hoisted(() => ({
   ensureHeadroom: vi.fn(),
@@ -42,6 +43,8 @@ vi.mock('./web-snapshot-validation', () => ({
   validateWebSnapshotPackage: mocks.validatePackage,
 }));
 
+import { saveWebSnapshotToMediaHub } from './web-snapshot';
+
 function setupWebSnapshotQuotaTest() {
   vi.clearAllMocks();
   mocks.ensureHeadroom.mockReset();
@@ -61,38 +64,21 @@ function setupWebSnapshotQuotaTest() {
 function createSavePayload() {
   return {
     assertPersistenceAllowed: vi.fn().mockResolvedValue(undefined),
-    packageBlob: new Blob(['package']),
+    packageBlob: new Blob(['package'], { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE }),
     payload: {
-      manifest: {
-        captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-        capturedAt: '2026-03-23T05:30:00.000Z',
-        id: 'snapshot-1',
-        paths: {
-          computedStyles: 'computed-styles.json',
-          domSnapshot: 'dom.json',
-          errors: 'errors.json',
-          manifest: 'manifest.json',
-          screenshot: 'screenshot.png',
-          stylesheets: 'stylesheets.json',
-          snapshotHtml: 'snapshot.html',
-          virtualDomSnapshot: 'virtual-dom.json',
-        },
-        schemaVersion: 1 as const,
+      manifest: createPagePackageManifestFixture({
         source: { faviconUrl: null, title: 'Page', url: 'https://example.test' },
-        stats: { assetCount: 0, failedAssetCount: 0, packageSize: 0 },
-        warnings: [],
-      },
+      }),
       packageStagedBlobId: 'package-transfer',
       screenshotMimeType: 'image/png',
       screenshotStagedBlobId: 'screenshot-transfer',
       snapshotSessionId: 'session-1',
     },
-    screenshotBlob: new Blob(['shot']),
+    screenshotBlob: new Blob(['shot'], { type: 'image/png' }),
   };
 }
 
 async function verifiesLocalizedWebSnapshotHeadroomFailure() {
-  const { saveWebSnapshotToMediaHub } = await import('./web-snapshot');
   mocks.ensureHeadroom.mockRejectedValue({
     isStorageQuotaHeadroomError: true,
     payload: {
@@ -115,10 +101,6 @@ async function verifiesLocalizedWebSnapshotHeadroomFailure() {
   expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
 }
 
-async function loadWebSnapshotOwner() {
-  return import('./web-snapshot');
-}
-
 describe('web snapshot media hub quota boundary', () => {
   beforeEach(setupWebSnapshotQuotaTest);
 
@@ -128,7 +110,6 @@ describe('web snapshot media hub quota boundary', () => {
   );
 
   it('uses the source URL for the snapshot filename when the title is unavailable', async () => {
-    const { saveWebSnapshotToMediaHub } = await loadWebSnapshotOwner();
     const input = createSavePayload();
     Object.assign(input.payload.manifest.source, {
       faviconUrl: null,
@@ -140,7 +121,7 @@ describe('web snapshot media hub quota boundary', () => {
     await saveWebSnapshotToMediaHub(input);
 
     expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
-      expect.objectContaining({ filename: 'httpsexample.comdocs.sniptale-web-snapshot.zip' }),
+      expect.objectContaining({ filename: 'httpsexample.comdocs.sniptale-page-package.zip' }),
       expect.any(Function)
     );
   });
@@ -149,7 +130,6 @@ describe('web snapshot media hub quota boundary', () => {
     'Web snapshot screenshot is invalid.',
     'Web snapshot screenshot dimensions exceed safe limits.',
   ])('does not check storage or save when screenshot admission rejects: %s', async (message) => {
-    const { saveWebSnapshotToMediaHub } = await loadWebSnapshotOwner();
     mocks.validatePackage.mockRejectedValue(new Error(message));
 
     await expect(saveWebSnapshotToMediaHub(createSavePayload())).rejects.toThrow(message);
@@ -159,7 +139,6 @@ describe('web snapshot media hub quota boundary', () => {
   });
 
   it('preserves unrecognized failures inside the headroom stage boundary', async () => {
-    const { saveWebSnapshotToMediaHub } = await loadWebSnapshotOwner();
     mocks.ensureHeadroom.mockRejectedValue(new Error('storage backend offline'));
 
     await expect(saveWebSnapshotToMediaHub(createSavePayload())).rejects.toThrow(
@@ -169,7 +148,6 @@ describe('web snapshot media hub quota boundary', () => {
   });
 
   it('normalizes non-Error persistence failures at the save stage boundary', async () => {
-    const { saveWebSnapshotToMediaHub } = await loadWebSnapshotOwner();
     mocks.saveWebSnapshot.mockRejectedValue('write rejected');
 
     await expect(saveWebSnapshotToMediaHub(createSavePayload())).rejects.toThrow(

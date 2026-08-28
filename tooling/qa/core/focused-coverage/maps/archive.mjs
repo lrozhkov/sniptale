@@ -1,5 +1,65 @@
 export const ARCHIVE_PACKAGE_OWNER_MAPPINGS = [
   {
+    owner: 'runtime-contracts-page-package',
+    productionFile: 'packages/runtime-contracts/src/page-package/index.ts',
+    reason: 'Page Package hostile wire parsing and closed schema limits have exact contract proof.',
+    testFiles: ['packages/runtime-contracts/src/page-package/index.test.ts'],
+  },
+  {
+    owner: 'page-package-path-admission',
+    productionFile: 'apps/extension/src/workflows/page-package/paths.ts',
+    reason: 'Page Package contribution paths and collision policy have focused hostile proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/paths.test.ts'],
+  },
+  {
+    owner: 'page-package-composer',
+    productionFile: 'apps/extension/src/workflows/page-package/composer.ts',
+    reason: 'Page Package inventory and canonical manifest bytes have focused composition proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/composer.test.ts'],
+  },
+  {
+    owner: 'page-package-archive-writer',
+    productionFile: 'apps/extension/src/workflows/page-package/archive.ts',
+    reason: 'Page Package streaming archive emission and rollback have focused writer proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/archive.test.ts'],
+  },
+  {
+    owner: 'page-collection-manifest-planner',
+    productionFile: 'apps/extension/src/workflows/page-package/collection/manifest.ts',
+    reason: 'Collection allocation, reports, totals and archive ordering have focused plan proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/collection/manifest.test.ts'],
+  },
+  {
+    owner: 'page-collection-archive-writer',
+    productionFile: 'apps/extension/src/workflows/page-package/collection/archive.ts',
+    reason: 'Flat Collection Package streaming, ordering and rollback have focused writer proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/collection/archive.test.ts'],
+  },
+  {
+    owner: 'page-package-blob-contribution',
+    productionFile: 'apps/extension/src/workflows/page-package/contributions/blob.ts',
+    reason: 'Blob-backed contribution MIME, digest and source admission has exact focused proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/contributions/blob.test.ts'],
+  },
+  {
+    owner: 'page-package-export-contribution',
+    productionFile: 'apps/extension/src/workflows/page-package/contributions/export.ts',
+    reason: 'Export Manager Blob entry classification and allocation has exact focused proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/contributions/export.test.ts'],
+  },
+  {
+    owner: 'page-package-web-copy-contribution',
+    productionFile: 'apps/extension/src/workflows/page-package/contributions/web-copy.ts',
+    reason: 'Safe Web-copy singleton and linked asset contribution admission has exact proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/contributions/web-copy.test.ts'],
+  },
+  {
+    owner: 'page-package-diagnostic-contribution',
+    productionFile: 'apps/extension/src/workflows/page-package/contributions/diagnostics.ts',
+    reason: 'Diagnostic level, intent, inert path and digest admission has exact focused proof.',
+    testFiles: ['apps/extension/src/workflows/page-package/contributions/diagnostics.test.ts'],
+  },
+  {
     owner: 'shared-provenance-url-sanitizer',
     productionFile: 'packages/platform/src/security/provenance-url.ts',
     reason: 'Provenance URL sanitization policy is covered by focused security fixtures.',
@@ -20,7 +80,7 @@ export const ARCHIVE_PACKAGE_OWNER_MAPPINGS = [
   {
     owner: 'db-video-project-read-guards',
     productionFile: 'apps/extension/src/composition/persistence/projects/read-guards.ts',
-    reason: 'Video project read guard behavior is covered by the focused read-guard tests.',
+    reason: 'Video project read guard behavior is covered by focused read-guard tests.',
     testFiles: ['apps/extension/src/composition/persistence/projects/index.read-guards.test.ts'],
   },
   {

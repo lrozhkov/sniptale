@@ -7,22 +7,14 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 type PopupExportMessageType =
   | typeof MessageType.EXPORT_POPUP_PREVIEW
   | typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE
-  | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
-  | typeof MessageType.EXPORT_POPUP_CANCEL
   | typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT;
 
 type PopupExportDirectTabMessage =
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
-  | TabRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL]
   | TabRequestByType[typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT];
 
-type PopupExportSaveWebSnapshotMessage = Omit<
-  RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT],
-  'tabId' | 'tabRouteCapabilityToken' | 'tabRouteRequestId'
->;
-
-type PopupExportTabMessage = PopupExportDirectTabMessage | PopupExportSaveWebSnapshotMessage;
+type PopupExportTabMessage = PopupExportDirectTabMessage;
 
 function createPopupTabRouteRequestId(message: PopupExportTabMessage): string {
   return 'requestId' in message && typeof message.requestId === 'string'

@@ -77,6 +77,7 @@ module.exports = [
     },
     to: {
       dependencyTypes: ['npm-no-pkg', 'npm-unknown'],
+      pathNot: ['^node_modules/@noble/hashes/sha2[.]js$'],
     },
   },
   {

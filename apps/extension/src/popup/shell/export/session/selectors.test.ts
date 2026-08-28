@@ -19,6 +19,34 @@ function createToggleState(
       setIncludeMarkdown: vi.fn(),
     },
     hasLoadedPreferences: true,
+    includeWebCopy: false,
+    setIncludeWebCopy: vi.fn(),
+    save: {
+      actions: {
+        setIncludeAnnotations: vi.fn(),
+        setIncludeBasicLogs: vi.fn(),
+        setIncludeCssDiagnostics: vi.fn(),
+        setIncludeFiles: vi.fn(),
+        setIncludeFullPageScreenshot: vi.fn(),
+        setIncludePageDiagnostics: vi.fn(),
+        setIncludeImages: vi.fn(),
+        setIncludeJson: vi.fn(),
+        setIncludeMarkdown: vi.fn(),
+      },
+      includeWebCopy: true,
+      setIncludeWebCopy: vi.fn(),
+      values: {
+        includeAnnotations: false,
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includePageDiagnostics: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+      },
+    },
     values: {
       includeAnnotations: false,
       includeBasicLogs: false,
@@ -35,6 +63,9 @@ function createToggleState(
   return {
     actions: { ...defaults.actions, ...overrides.actions },
     hasLoadedPreferences: overrides.hasLoadedPreferences ?? defaults.hasLoadedPreferences,
+    includeWebCopy: overrides.includeWebCopy ?? defaults.includeWebCopy,
+    save: overrides.save ?? defaults.save,
+    setIncludeWebCopy: overrides.setIncludeWebCopy ?? defaults.setIncludeWebCopy,
     values: { ...defaults.values, ...overrides.values, ...overrides },
   };
 }
@@ -48,6 +79,7 @@ function createSessionState(
       setCopyingFormat: vi.fn(),
       setProgress: vi.fn(),
       setResult: vi.fn(),
+      setLaunchedPlan: vi.fn(),
     },
     copy: {
       copiedFormat: null,
@@ -60,6 +92,7 @@ function createSessionState(
       requestIdRef: { current: null },
     },
     transfer: {
+      launchedPlan: null,
       progress: {
         current: 0,
         errors: [],
@@ -172,6 +205,14 @@ describe('popup export derived state', () => {
     });
 
     expect(derived.canExport).toBe(true);
+  });
+
+  it('keeps export unavailable until preferences hydrate', () => {
+    const derived = getPopupExportDerivedState({
+      ...createDerivationInput({ toggles: { hasLoadedPreferences: false } }),
+    });
+
+    expect(derived.canExport).toBe(false);
   });
 
   it('derives copy availability from session, toggles, and tab selection', () => {

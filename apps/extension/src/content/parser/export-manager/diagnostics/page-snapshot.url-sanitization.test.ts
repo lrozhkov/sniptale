@@ -123,7 +123,7 @@ function addRemovedContentFixtureElements(): void {
   });
   appendElement(document.body, 'a', {
     href: '/ping-target',
-    ping: '/ping?token=known-secret#frag',
+    ping: '/ping?token=known-secret#frag https://user:pass@collector.test/a?view=full',
   });
   appendElement(document.body, 'table', {
     background: '/table-bg.png?token=known-secret#frag',
@@ -166,7 +166,8 @@ function expectRemovedContentAttributesSanitized(snapshot: string): void {
   expect(snapshot).toContain('data="/object.swf"');
   expect(snapshot).toContain('xlink:href="/vector.svg"');
   expect(snapshot).toContain('cite="/quote"');
-  expect(snapshot).toContain('ping="/ping"');
+  expect(snapshot).toContain('ping="/ping https://collector.test/a"');
+  expect(snapshot).not.toContain('user:pass');
   expect(snapshot).toContain('background="/table-bg.png"');
   expect(snapshot).not.toContain('srcdoc=');
   expect(snapshot).not.toContain('style=');

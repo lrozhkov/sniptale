@@ -1,26 +1,18 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
-  assertWebSnapshotSessionOpen,
   authorizeWebSnapshotAssetFetch,
   authorizeWebSnapshotCaptureRequest,
   beginWebSnapshotSave,
   cancelWebSnapshotCaptureRequest,
   commitWebSnapshotSave,
   extendWebSnapshotAssetSession,
-  releaseWebSnapshotSave,
   registerWebSnapshotAssetSession,
   resetWebSnapshotAssetSessionsForTests,
+  retainWebSnapshotSaveAfterCompensationFailure,
 } from './session';
-import {
-  consumeWebSnapshotStagedBlob,
-  resetWebSnapshotStagedBlobsForTests,
-  stageWebSnapshotBlobChunk,
-} from './staged-blobs';
-
 beforeEach(() => {
   resetWebSnapshotAssetSessionsForTests();
-  resetWebSnapshotStagedBlobsForTests();
   vi.stubGlobal('crypto', {
     randomUUID: vi.fn(() => 'snapshot-session-1'),
   });
@@ -28,7 +20,6 @@ beforeEach(() => {
 
 afterEach(() => {
   resetWebSnapshotAssetSessionsForTests();
-  resetWebSnapshotStagedBlobsForTests();
   vi.unstubAllGlobals();
 });
 
@@ -39,7 +30,8 @@ it('requires a background-authorized capture request before asset registration',
 });
 
 it('retains an early cancellation tombstone so authorization cannot race it', () => {
-  expect(cancelWebSnapshotCaptureRequest(42, 'req-cancelled')).toEqual([]);
+  const cancellation = cancelWebSnapshotCaptureRequest(42, 'req-cancelled');
+  expect(cancellation.committedAssetIds).toEqual([]);
 
   expect(() => authorizeWebSnapshotCaptureRequest(42, 'req-cancelled')).toThrow(
     'Web snapshot save was cancelled'
@@ -133,8 +125,6 @@ it('allows a snapshot save once for the issuing tab', () => {
   expect(() => beginWebSnapshotSave({ sessionId, tabId: 42 })).toThrow(
     'Web snapshot session save is already in progress'
   );
-  expect(() => releaseWebSnapshotSave({ sessionId, tabId: 42 })).not.toThrow();
-  expect(() => beginWebSnapshotSave({ sessionId, tabId: 42 })).not.toThrow();
   expect(() => commitWebSnapshotSave({ assetId: 'asset-1', sessionId, tabId: 42 })).not.toThrow();
   expect(() => beginWebSnapshotSave({ sessionId, tabId: 42 })).toThrow(
     'Web snapshot session was already saved'
@@ -148,7 +138,8 @@ it('blocks a pending commit and identifies an already committed asset for compen
   authorizeWebSnapshotCaptureRequest(42, 'req-saving');
   const savingSessionId = registerWebSnapshotAssetSession(42, 'req-saving', []);
   beginWebSnapshotSave({ sessionId: savingSessionId, tabId: 42 });
-  expect(cancelWebSnapshotCaptureRequest(42, 'req-saving')).toEqual([]);
+  const savingCancellation = cancelWebSnapshotCaptureRequest(42, 'req-saving');
+  expect(savingCancellation.committedAssetIds).toEqual([]);
   expect(() =>
     commitWebSnapshotSave({
       assetId: 'asset-saving',
@@ -162,67 +153,112 @@ it('blocks a pending commit and identifies an already committed asset for compen
   const savedSessionId = registerWebSnapshotAssetSession(42, 'req-saved', []);
   beginWebSnapshotSave({ sessionId: savedSessionId, tabId: 42 });
   commitWebSnapshotSave({ assetId: 'asset-saved', sessionId: savedSessionId, tabId: 42 });
-  expect(cancelWebSnapshotCaptureRequest(42, 'req-saved')).toEqual(['asset-saved']);
+  const savedCancellation = cancelWebSnapshotCaptureRequest(42, 'req-saved');
+  expect(savedCancellation.committedAssetIds).toEqual(['asset-saved']);
 });
 
-it('releases every complete or partial staged blob owned by a cancelled capture session', () => {
-  authorizeWebSnapshotCaptureRequest(42, 'req-staged');
-  const sessionId = registerWebSnapshotAssetSession(42, 'req-staged', []);
-  stageWebSnapshotBlobChunk({
-    base64: 'cG5n',
-    chunkIndex: 0,
-    kind: 'screenshot',
-    snapshotSessionId: sessionId,
-    stagedBlobId: 'complete-stage',
-    tabId: 42,
-    totalBytes: 3,
-    totalChunks: 1,
-  });
-  stageWebSnapshotBlobChunk({
-    base64: 'YQ==',
-    chunkIndex: 0,
-    kind: 'package',
-    snapshotSessionId: sessionId,
-    stagedBlobId: 'partial-stage',
-    tabId: 42,
-    totalBytes: 2,
-    totalChunks: 2,
-  });
-
-  cancelWebSnapshotCaptureRequest(42, 'req-staged');
-
-  expect(() =>
-    consumeWebSnapshotStagedBlob({
-      expectedKind: 'screenshot',
-      snapshotSessionId: sessionId,
-      stagedBlobId: 'complete-stage',
-      tabId: 42,
-      type: 'image/png',
-    })
-  ).toThrow('missing or incomplete');
-  expect(() =>
-    consumeWebSnapshotStagedBlob({
-      expectedKind: 'package',
-      snapshotSessionId: sessionId,
-      stagedBlobId: 'partial-stage',
-      tabId: 42,
-      type: 'application/zip',
-    })
-  ).toThrow('missing or incomplete');
-});
-
-it('exposes an open-session guard for staged snapshot payload allocation', () => {
-  authorizeWebSnapshotCaptureRequest(42, 'req-1');
-  const sessionId = registerWebSnapshotAssetSession(42, 'req-1', []);
-
-  expect(() => assertWebSnapshotSessionOpen({ sessionId, tabId: 42 })).not.toThrow();
-  expect(() => assertWebSnapshotSessionOpen({ sessionId, tabId: 43 })).toThrow(
-    'Invalid web snapshot session'
-  );
+it('retains a published asset as non-retryable authority after compensation fails', () => {
+  authorizeWebSnapshotCaptureRequest(42, 'req-retained');
+  const sessionId = registerWebSnapshotAssetSession(42, 'req-retained', []);
   beginWebSnapshotSave({ sessionId, tabId: 42 });
-  expect(() => assertWebSnapshotSessionOpen({ sessionId, tabId: 42 })).toThrow(
-    'Web snapshot session is not open'
+
+  retainWebSnapshotSaveAfterCompensationFailure({
+    assetId: 'asset-retained',
+    sessionId,
+    tabId: 42,
+  });
+
+  expect(() => beginWebSnapshotSave({ sessionId, tabId: 42 })).toThrow(
+    'Web snapshot session was already saved'
   );
+  expect(cancelWebSnapshotCaptureRequest(42, 'req-retained').committedAssetIds).toEqual([
+    'asset-retained',
+  ]);
+});
+
+it('preserves an in-flight save across the original TTL and leases retained authority', async () => {
+  vi.useFakeTimers();
+  try {
+    const assetUrl = 'https://cdn.example.com/retained.png';
+    authorizeWebSnapshotCaptureRequest(42, 'req-retained-race', {
+      allowAnonymousCrossOriginAssets: true,
+    });
+    const sessionId = registerWebSnapshotAssetSession(42, 'req-retained-race', [assetUrl]);
+    beginWebSnapshotSave({ sessionId, tabId: 42 });
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+
+    expect(() =>
+      retainWebSnapshotSaveAfterCompensationFailure({
+        assetId: 'asset-retained-race',
+        sessionId,
+        tabId: 42,
+      })
+    ).not.toThrow();
+    expect(() => authorizeWebSnapshotAssetFetch({ sessionId, tabId: 42, url: assetUrl })).toThrow(
+      'Web snapshot session is not open'
+    );
+    expect(cancelWebSnapshotCaptureRequest(42, 'req-retained-race').committedAssetIds).toEqual([
+      'asset-retained-race',
+    ]);
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+    expect(() => authorizeWebSnapshotAssetFetch({ sessionId, tabId: 42, url: assetUrl })).toThrow(
+      'Invalid web snapshot session'
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('starts a fresh bounded lease when an in-flight save is committed', async () => {
+  vi.useFakeTimers();
+  try {
+    const assetUrl = 'https://cdn.example.com/committed.png';
+    authorizeWebSnapshotCaptureRequest(42, 'req-committed-race', {
+      allowAnonymousCrossOriginAssets: true,
+    });
+    const sessionId = registerWebSnapshotAssetSession(42, 'req-committed-race', [assetUrl]);
+    beginWebSnapshotSave({ sessionId, tabId: 42 });
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+
+    expect(() =>
+      commitWebSnapshotSave({ assetId: 'asset-committed-race', sessionId, tabId: 42 })
+    ).not.toThrow();
+    expect(() => authorizeWebSnapshotAssetFetch({ sessionId, tabId: 42, url: assetUrl })).toThrow(
+      'Web snapshot session is not open'
+    );
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    expect(cancelWebSnapshotCaptureRequest(42, 'req-committed-race').committedAssetIds).toEqual([
+      'asset-committed-race',
+    ]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(() => authorizeWebSnapshotAssetFetch({ sessionId, tabId: 42, url: assetUrl })).toThrow(
+      'Invalid web snapshot session'
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('expires an abandoned asset-fetch session', async () => {
+  vi.useFakeTimers();
+  try {
+    const assetUrl = 'https://cdn.example.com/expiring.png';
+    authorizeWebSnapshotCaptureRequest(42, 'req-expiring', {
+      allowAnonymousCrossOriginAssets: true,
+    });
+    const sessionId = registerWebSnapshotAssetSession(42, 'req-expiring', [assetUrl]);
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+
+    expect(() => authorizeWebSnapshotAssetFetch({ sessionId, tabId: 42, url: assetUrl })).toThrow(
+      'Invalid web snapshot session'
+    );
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it('rejects oversized asset registration lists', () => {

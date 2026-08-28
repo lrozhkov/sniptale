@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   loadPopupExportPreferences: vi.fn(),
   requestPermission: vi.fn(),
   sendTabMessage: vi.fn(),
-  startPopupExportJob: vi.fn(),
+  startPagePackageJob: vi.fn(),
   tabsGet: vi.fn(),
   translate: vi.fn((key: string) => key),
 }));
@@ -22,9 +22,9 @@ vi.mock('../../../composition/persistence/popup-export-preferences', async (impo
   loadPopupExportPreferences: mocks.loadPopupExportPreferences,
 }));
 
-vi.mock('../../capture/popup-export/job', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../capture/popup-export/job')>()),
-  startPopupExportJob: mocks.startPopupExportJob,
+vi.mock('../../capture/page-package/job', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/page-package/job')>()),
+  startPagePackageJob: mocks.startPagePackageJob,
 }));
 
 vi.mock('@sniptale/platform/browser/permissions', () => ({
@@ -46,7 +46,7 @@ beforeEach(() => {
   });
   mocks.requestPermission.mockResolvedValue(false);
   mocks.sendTabMessage.mockResolvedValue({ success: true });
-  mocks.startPopupExportJob.mockResolvedValue({ phase: 'running' });
+  mocks.startPagePackageJob.mockResolvedValue({ phase: 'running' });
   mocks.tabsGet.mockResolvedValue({ id: 15, title: 'Example tab' });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: mocks.sendTabMessage });
 });
@@ -55,11 +55,13 @@ it('starts a screenshot-free job with one warning when all-sites access is denie
   await startContextMenuExport(15);
 
   expect(mocks.requestPermission).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
-  expect(mocks.startPopupExportJob).toHaveBeenCalledWith({
+  expect(mocks.startPagePackageJob).toHaveBeenCalledWith({
     contentPort: expect.objectContaining({
       cancelPagePackage: expect.any(Function),
       requestPagePackage: expect.any(Function),
     }),
+    includeWebCopy: false,
+    intent: 'export',
     jobId: expect.any(String),
     orderedTabs: [{ tabId: 15, title: 'Example tab' }],
     options: expect.objectContaining({ includeFullPageScreenshot: false }),

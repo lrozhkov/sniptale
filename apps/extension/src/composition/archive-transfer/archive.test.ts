@@ -32,6 +32,74 @@ describe('archive transfer', () => {
     await reader.close();
   });
 
+  it('streams a validated archive entry source into a new archive', async () => {
+    const sourceOutput = createArchiveMemorySink();
+    const sourceWriter = createArchiveWriter(sourceOutput.sink);
+    await sourceWriter.addBlob('source.bin', new Blob(['streamed-source']));
+    await sourceWriter.close();
+    const sourceReader = await openArchiveReader(sourceOutput.blob());
+    const source = sourceReader.entry('source.bin');
+    expect(source).not.toBeNull();
+
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    await writer.addSource('copy/source.bin', source!);
+    await writer.close();
+
+    const reader = await openArchiveReader(output.blob());
+    await expect(reader.entry('copy/source.bin')?.text()).resolves.toBe('streamed-source');
+    await reader.close();
+    await sourceReader.close();
+  });
+
+  it('rejects a streamed source that does not emit its declared size', async () => {
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    const source = {
+      compressedSize: 2,
+      crc32: 0,
+      directory: false,
+      path: 'source.bin',
+      size: 3,
+      pipeTo: (writable: WritableStream<Uint8Array>, signal?: AbortSignal) =>
+        new Blob(['ab']).stream().pipeTo(writable, signal ? { signal } : {}),
+      text: async () => 'ab',
+    };
+
+    await expect(writer.addSource('copy.bin', source)).rejects.toThrow('declared size');
+    await writer.abort();
+    expect(output.aborted).toBe(true);
+  });
+
+  it('cancels an in-flight streamed source through the caller signal', async () => {
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    const controller = new AbortController();
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const source = {
+      compressedSize: 0,
+      crc32: 0,
+      directory: false,
+      path: 'pending.bin',
+      size: 1,
+      pipeTo: (writable: WritableStream<Uint8Array>, signal?: AbortSignal) => {
+        markStarted?.();
+        return new ReadableStream<Uint8Array>().pipeTo(writable, signal ? { signal } : {});
+      },
+      text: async () => '',
+    };
+    const write = writer.addSource('pending.bin', source, { signal: controller.signal });
+    await started;
+    controller.abort(new DOMException('Stopped', 'AbortError'));
+
+    await expect(write).rejects.toMatchObject({ name: 'AbortError' });
+    await writer.abort();
+    expect(output.aborted).toBe(true);
+  });
+
   it('rejects duplicate writer paths', async () => {
     const output = createArchiveMemorySink();
     const writer = createArchiveWriter(output.sink);

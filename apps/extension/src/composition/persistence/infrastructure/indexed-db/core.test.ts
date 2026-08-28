@@ -3,11 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXPECTED_INDEXES, EXPECTED_STORES, STORE_NAME } from './core.stores.ts';
 
 const dbMocks = vi.hoisted(() => ({
+  cutover: vi.fn(),
   openDB: vi.fn(),
 }));
 
 vi.mock('idb', () => ({
   openDB: dbMocks.openDB,
+}));
+
+vi.mock('./maintenance/web-snapshot-page-package-cutover', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./maintenance/web-snapshot-page-package-cutover')>()),
+  runWebSnapshotPagePackageCutover: dbMocks.cutover,
 }));
 
 function createStoreNames(initialStores: readonly string[]) {
@@ -66,14 +72,24 @@ function createMockDb(
       }
       indexes.delete(name);
     }),
+    delete: vi.fn().mockResolvedValue(undefined),
+    get: vi.fn().mockResolvedValue(undefined),
     objectStoreNames: storeNames,
     transaction: vi.fn((storeName: string | string[]) => {
       return {
+        done: Promise.resolve(),
         objectStore: vi.fn((requestedStoreName = storeName) => {
           const name = Array.isArray(requestedStoreName)
             ? requestedStoreName[0]
             : requestedStoreName;
-          return { indexNames: createIndexNames(indexes.get(name) ?? []) };
+          return {
+            delete: vi.fn().mockResolvedValue(undefined),
+            get: vi.fn().mockResolvedValue(undefined),
+            index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
+            indexNames: createIndexNames(indexes.get(name) ?? []),
+            openCursor: vi.fn().mockResolvedValue(null),
+            put: vi.fn().mockResolvedValue(undefined),
+          };
         }),
       };
     }),
@@ -131,6 +147,7 @@ async function verifyTerminationSubscribers() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  dbMocks.cutover.mockResolvedValue(undefined);
   dbMocks.openDB.mockReset();
 });
 
@@ -168,6 +185,34 @@ describe('shared db core persistent storage', () => {
 });
 
 describe('shared db core initDB cache', () => {
+  it('projects cutover mutations through the core-owned database port', async () => {
+    stubPersistentStorage();
+    const completeDb = createCompleteDb();
+    dbMocks.openDB.mockResolvedValueOnce(completeDb);
+    const module = await importDbModule();
+
+    await module.initDB();
+
+    const port = dbMocks.cutover.mock.calls[0]?.[0];
+    await port.get('webSnapshots', 'snapshot-1');
+    await port.delete('assetOperations', 'operation-1');
+    const tx = port.transaction(['webSnapshots', 'assetOperations'], 'readwrite');
+    const store = tx.objectStore('webSnapshots');
+    await store.get('snapshot-1');
+    await store.delete('snapshot-1');
+    await store.index('assetId').count('asset-1');
+    await store.openCursor();
+    await store.put({ id: 'snapshot-1' });
+    await tx.done;
+
+    expect(completeDb.get).toHaveBeenCalledWith('webSnapshots', 'snapshot-1');
+    expect(completeDb.delete).toHaveBeenCalledWith('assetOperations', 'operation-1');
+    expect(completeDb.transaction).toHaveBeenCalledWith(
+      ['webSnapshots', 'assetOperations'],
+      'readwrite'
+    );
+  });
+
   it('never starts preparation from an already-issued mutation permit', async () => {
     stubPersistentStorage();
     const module = await importDbModule();
@@ -258,6 +303,37 @@ describe('shared db core initDB recovery', () => {
     expect(dbMocks.openDB).toHaveBeenCalledOnce();
   });
 
+  it('closes a database that resolves after opening was already blocked', async () => {
+    stubPersistentStorage();
+    const blockedDb = createCompleteDb();
+    dbMocks.openDB.mockImplementation(
+      (_name: string, _version: number, options: { blocked(): void }) => {
+        options.blocked();
+        return Promise.resolve(blockedDb);
+      }
+    );
+
+    const module = await importDbModule();
+
+    await expect(module.initDB()).rejects.toMatchObject({
+      admission: { reason: 'connection-blocked', status: 'blocked' },
+    });
+    await vi.waitFor(() => expect(blockedDb.close).toHaveBeenCalledOnce());
+  });
+
+  it('closes the connection and permits a fresh attempt after mandatory cutover fails', async () => {
+    stubPersistentStorage();
+    const firstDb = createCompleteDb();
+    const secondDb = createCompleteDb();
+    dbMocks.openDB.mockResolvedValueOnce(firstDb).mockResolvedValueOnce(secondDb);
+    dbMocks.cutover.mockRejectedValueOnce(new Error('cutover failed'));
+    const module = await importDbModule();
+
+    await expect(module.prepareDatabaseForRecovery()).rejects.toThrow('cutover failed');
+    expect(firstDb.close).toHaveBeenCalledOnce();
+    await expect(module.initDB()).resolves.toBe(secondDb);
+  });
+
   it('resets the cache after termination and failed initialization', async () => {
     stubPersistentStorage();
     const firstDb = createCompleteDb();
@@ -330,6 +406,24 @@ describe('shared db core privacy erasure', () => {
       'sniptale-db',
       'sniptale-video-db',
     ]);
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(true);
+  });
+
+  it('reports unverifiable storage APIs and detects owned databases without rejecting unnamed rows', async () => {
+    const module = await importDbModule();
+    vi.stubGlobal('indexedDB', undefined);
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(false);
+
+    vi.stubGlobal('indexedDB', {});
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(false);
+
+    vi.stubGlobal('indexedDB', {
+      databases: vi
+        .fn()
+        .mockResolvedValueOnce([{ name: undefined }, { name: 'sniptale-db' }])
+        .mockResolvedValueOnce([{ name: undefined }, { name: 'other-db' }]),
+    });
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(false);
     await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(true);
   });
 });

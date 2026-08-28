@@ -28,7 +28,11 @@ function renderProgressContent(controller: ExportController) {
   );
 }
 
-function renderReadyContent(controller: ExportController) {
+function renderReadyContent(
+  controller: ExportController,
+  onRequestWebCopySetup: () => void,
+  webSnapshotEnabled: boolean
+) {
   const { derived, preferences, tabs } = controller.state;
   return (
     <ExportReadySection
@@ -46,6 +50,7 @@ function renderReadyContent(controller: ExportController) {
       includeImages={preferences.values.includeImages}
       includeJson={preferences.values.includeJson}
       includeMarkdown={preferences.values.includeMarkdown}
+      includeWebCopy={preferences.includeWebCopy}
       isFilterActive={tabs.isFilterActive}
       selectedCount={tabs.selectedCount}
       setIncludeAnnotations={preferences.actions.setIncludeAnnotations}
@@ -58,6 +63,10 @@ function renderReadyContent(controller: ExportController) {
       setIncludeImages={preferences.actions.setIncludeImages}
       setIncludeJson={preferences.actions.setIncludeJson}
       setIncludeMarkdown={preferences.actions.setIncludeMarkdown}
+      setIncludeWebCopy={preferences.setIncludeWebCopy}
+      savePreferences={preferences.save}
+      onRequestWebCopySetup={onRequestWebCopySetup}
+      webSnapshotEnabled={webSnapshotEnabled}
       selectedTabIds={tabs.selectedTabIds}
       toggleSelectAllTabs={tabs.toggleSelectAllTabs}
       toggleTabSelection={tabs.toggleTabSelection}
@@ -65,10 +74,18 @@ function renderReadyContent(controller: ExportController) {
   );
 }
 
-export function ExportPageContent({ controller }: { controller: ExportController }) {
+export function ExportPageContent({
+  controller,
+  onRequestWebCopySetup,
+  webSnapshotEnabled,
+}: {
+  controller: ExportController;
+  onRequestWebCopySetup: () => void;
+  webSnapshotEnabled: boolean;
+}) {
   if (shouldRenderProgressContent(controller)) {
     return renderProgressContent(controller);
   }
 
-  return renderReadyContent(controller);
+  return renderReadyContent(controller, onRequestWebCopySetup, webSnapshotEnabled);
 }

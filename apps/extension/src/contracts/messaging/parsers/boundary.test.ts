@@ -243,29 +243,6 @@ function verifyScreenshotModeStatusCapabilityResponseParsing() {
   });
 }
 
-function verifyWebSnapshotTabAuthorityFieldParsing() {
-  expect(
-    parseTabRequestMessage({
-      allowAnonymousCrossOriginAssets: false,
-      allowAuthenticatedSameOriginAssets: true,
-      requestId: 'req-web',
-      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    })
-  ).toEqual({
-    allowAnonymousCrossOriginAssets: false,
-    allowAuthenticatedSameOriginAssets: true,
-    requestId: 'req-web',
-    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-  });
-
-  expect(() =>
-    parseTabRequestMessage({
-      requestId: 'req-web',
-      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    })
-  ).toThrow(MessageContractError);
-}
-
 function verifyScreenshotEnableAsyncAckParsing() {
   const message = parseTabRequestMessage({ type: MessageType.ENABLE_SCREENSHOT_MODE });
   expect(parseTabResponseForRequest(message, { success: true, result: 'accepted' })).toEqual({
@@ -310,9 +287,5 @@ describe('message boundary parsers', () => {
   it(
     'accepts screenshot mode status capability fields',
     verifyScreenshotModeStatusCapabilityResponseParsing
-  );
-  it(
-    'requires background-owned web snapshot tab authority',
-    verifyWebSnapshotTabAuthorityFieldParsing
   );
 });

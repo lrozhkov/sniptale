@@ -62,12 +62,12 @@ it('reports inconsistent resource budget layers', () => {
   const contentLimits = writeFile(
     root,
     'apps/extension/src/content/parser/web-snapshot/limits.ts',
-    'export const MAX_WEB_SNAPSHOT_PACKAGE_BLOB_BYTES = 1000;\n'
+    'export const MAX_WEB_SNAPSHOT_PACKAGE_INPUT_BYTES = 1000;\n'
   );
   const runtimeLimits = writeFile(
     root,
-    'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts',
-    'const MAX_PACKAGE_BYTES = 10;\n'
+    'apps/extension/src/background/capture/page-package/job/staging.ts',
+    'const MAX_PAGE_PACKAGE_BYTES = 10;\n'
   );
 
   expect(

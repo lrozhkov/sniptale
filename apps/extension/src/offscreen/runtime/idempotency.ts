@@ -24,6 +24,7 @@ type IdempotencyResult =
 
 type OffscreenIdempotencyMessage = {
   desktopMediaRequestId?: unknown;
+  downloadOperationId?: unknown;
   generation?: unknown;
   jobId?: unknown;
   peerId?: unknown;
@@ -51,6 +52,18 @@ const idempotencyPolicyByType = {
   [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
     idempotent: true,
     reason: 'frame annotation rasterization is correlated by the staged immutable job reference',
+  },
+  [MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE]: {
+    idempotent: true,
+    reason: 'lease creation is correlated by the stable download operation identity',
+  },
+  [MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE]: {
+    idempotent: false,
+    reason: 'lease confirmation is a repeatable transition on the lease owner',
+  },
+  [MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE]: {
+    idempotent: false,
+    reason: 'lease release is deliberately repeatable',
   },
   [MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD]: {
     idempotent: true,
@@ -149,6 +162,7 @@ const idempotencyPolicyByType = {
 
 export const OFFSCREEN_COMMAND_CORRELATION_KEYS = [
   'jobId',
+  'downloadOperationId',
   'recordingId',
   'desktopMediaRequestId',
   'requestId',
@@ -174,6 +188,9 @@ function readCorrelationId(message: OffscreenIdempotencyMessage): string {
   }
   if (typeof message.jobId === 'string' && message.jobId.length > 0) {
     return message.jobId;
+  }
+  if (typeof message.downloadOperationId === 'string' && message.downloadOperationId.length > 0) {
+    return message.downloadOperationId;
   }
   if (typeof message.recordingId === 'string' && message.recordingId.length > 0) {
     return message.recordingId;

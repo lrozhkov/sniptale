@@ -3,14 +3,14 @@ import {
   normalizeWebSnapshotAssetMimeType,
 } from '../../features/web-snapshot/asset-manifest';
 import {
-  isAllowedWebSnapshotAssetMimeType,
   sanitizeWebSnapshotStylesheetText,
   sanitizeWebSnapshotSvgText,
 } from '../../features/web-snapshot/public';
-import type {
-  WebSnapshotAssetManifestEntry,
-  WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import {
+  isPagePackageWebCopyAssetMimeType,
+  type PagePackageEntry,
+} from '@sniptale/runtime-contracts/page-package';
 
 const MAX_VIEWER_TOTAL_ASSET_BYTES = 250 * 1024 * 1024;
 
@@ -33,21 +33,17 @@ function assertSafeManifestAssetPath(path: string): void {
     path.startsWith('/') ||
     path.includes('\\') ||
     path.split('/').some((segment) => segment === '..' || segment === '.') ||
-    !/^assets\/[^/]+$/u.test(path)
+    !path.startsWith('assets/')
   ) {
     throw new Error('Web snapshot package manifest asset metadata is invalid.');
   }
 }
 
-function createAssetManifestByPath(
-  manifest: WebSnapshotManifest
-): Map<string, WebSnapshotAssetManifestEntry> | null {
-  if (manifest.assets === undefined) {
-    return null;
-  }
-
-  const entriesByPath = new Map<string, WebSnapshotAssetManifestEntry>();
-  for (const entry of manifest.assets) {
+function createAssetManifestByPath(manifest: WebSnapshotManifest): Map<string, PagePackageEntry> {
+  const entriesByPath = new Map<string, PagePackageEntry>();
+  for (const entry of manifest.entries.filter(
+    (candidate) => candidate.component === 'webCopy' && candidate.path.startsWith('assets/')
+  )) {
     assertSafeManifestAssetPath(entry.path);
     if (entriesByPath.has(entry.path)) {
       throw new Error('Web snapshot package manifest asset metadata is invalid.');
@@ -59,9 +55,13 @@ function createAssetManifestByPath(
 
 async function assertViewerAssetMatchesManifest(
   bytes: Uint8Array,
-  manifestEntry: WebSnapshotAssetManifestEntry | undefined
+  manifestEntry: PagePackageEntry | undefined
 ): Promise<void> {
   if (!manifestEntry) {
+    throw new Error('Web snapshot package manifest asset metadata is invalid.');
+  }
+
+  if (!isPagePackageWebCopyAssetMimeType(manifestEntry.mimeType)) {
     throw new Error('Web snapshot package manifest asset metadata is invalid.');
   }
 
@@ -80,7 +80,7 @@ async function assertViewerAssetMatchesManifest(
 function createViewerAssetBlob(
   path: string,
   bytes: Uint8Array,
-  manifestEntry: WebSnapshotAssetManifestEntry | undefined,
+  manifestEntry: PagePackageEntry | undefined,
   resolveAssetUrl: (path: string) => string | null
 ): Blob {
   const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
@@ -125,7 +125,7 @@ export async function createViewerAssetObjectUrls(
   const urlsByPath = new Map<string, string>();
   let assets: LoadedWebSnapshotAsset[] = [];
   const manifestAssetsByPath = createAssetManifestByPath(packageManifest);
-  if (manifestAssetsByPath && manifestAssetsByPath.size !== assetEntries.length) {
+  if (manifestAssetsByPath.size !== assetEntries.length) {
     throw new Error('Web snapshot package manifest asset metadata is invalid.');
   }
 
@@ -133,14 +133,12 @@ export async function createViewerAssetObjectUrls(
     let totalAssetBytes = 0;
     const validatedEntries: Array<{
       bytes: Uint8Array;
-      manifestEntry?: WebSnapshotAssetManifestEntry;
+      manifestEntry?: PagePackageEntry;
       path: string;
     }> = [];
     for (const [path, bytes] of assetEntries) {
       const manifestEntry = manifestAssetsByPath?.get(path);
-      if (manifestAssetsByPath) {
-        await assertViewerAssetMatchesManifest(bytes, manifestEntry);
-      }
+      await assertViewerAssetMatchesManifest(bytes, manifestEntry);
       totalAssetBytes += bytes.byteLength;
       if (totalAssetBytes > MAX_VIEWER_TOTAL_ASSET_BYTES) {
         throw new Error('Web snapshot package assets are too large.');
@@ -153,15 +151,13 @@ export async function createViewerAssetObjectUrls(
     }
 
     const isCssEntry = (entry: (typeof validatedEntries)[number]) =>
-      entry.manifestEntry?.mimeType === 'text/css' ||
-      (!entry.manifestEntry && entry.path.toLowerCase().endsWith('.css'));
+      entry.manifestEntry?.mimeType === 'text/css';
     const cssEntriesByPath = new Map(
       validatedEntries.filter(isCssEntry).map((entry) => [entry.path, entry])
     );
     for (const entry of validatedEntries) {
       const mimeType = entry.manifestEntry?.mimeType ?? 'application/octet-stream';
-      const downloadEligible =
-        entry.manifestEntry !== undefined && isAllowedWebSnapshotAssetMimeType(mimeType);
+      const downloadEligible = entry.manifestEntry !== undefined;
       if (!downloadEligible) continue;
       const needsSeparateDownloadUrl =
         isCssEntry(entry) || entry.manifestEntry?.mimeType === 'image/svg+xml';
@@ -180,11 +176,7 @@ export async function createViewerAssetObjectUrls(
       const objectUrl = URL.createObjectURL(blob);
       objectUrls.push(objectUrl);
       urlsByPath.set(entry.path, objectUrl);
-      if (
-        entry.manifestEntry !== undefined &&
-        isAllowedWebSnapshotAssetMimeType(entry.manifestEntry.mimeType) &&
-        !downloadUrlsByPath.has(entry.path)
-      ) {
+      if (entry.manifestEntry !== undefined && !downloadUrlsByPath.has(entry.path)) {
         downloadUrlsByPath.set(entry.path, objectUrl);
       }
     }

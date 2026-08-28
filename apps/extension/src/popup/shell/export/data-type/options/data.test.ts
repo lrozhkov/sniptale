@@ -82,8 +82,9 @@ describe('popup export option metadata', () => {
       (option) => option.key === 'pageDiagnostics'
     );
 
-    expect(pageDiagnostics?.label).toBe('Данные страницы для анализа');
-    expect(pageDiagnostics?.description).toContain('сведения о загрузке ресурсов');
+    expect(pageDiagnostics?.label).toBe('Расширенные данные страницы');
+    expect(pageDiagnostics?.description).toContain('видимый текст');
+    expect(pageDiagnostics?.description).toContain('исходные ссылки');
     expect(pageDiagnostics?.description).not.toContain('DOM');
     expect(pageDiagnostics?.description).not.toContain('Resource Timing');
   });

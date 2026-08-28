@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest';
 
-import { EXPECTED_STORES } from '../infrastructure/indexed-db/core.stores.ts';
+import {
+  EXPECTED_STORES,
+  WEB_SNAPSHOT_PAGE_PACKAGE_CUTOVER_KEY,
+} from '../infrastructure/indexed-db/core.stores.ts';
 import {
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
@@ -19,6 +22,7 @@ import {
   LOCAL_EXTENSION_PAGE_STORAGE_KEYS,
 } from './inventory';
 import { WEB_SNAPSHOT_CONSENT_STORAGE_KEY } from '../settings/web-snapshot-consent';
+import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
 
 it('uses the canonical IndexedDB store inventory for local data erasure', () => {
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toEqual(EXPECTED_STORES);
@@ -37,7 +41,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).not.toContain(WEB_SNAPSHOT_CONSENT_STORAGE_KEY);
   expect(plan.local).not.toContain('sniptale_ai_modal_spoiler_open');
   expect(plan.local).not.toContain('sniptale_editor_file_menu_save_to_folder_open');
-  expect(plan.local).not.toContain('sniptale_popup_export_preferences');
+  expect(plan.local).not.toContain(POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY);
   expect(plan.local).not.toContain('sniptale_video_editor_preview_preferences');
   expect(plan.local).not.toContain('sniptale_video_settings');
   expect(plan.local).not.toContain('sniptale_screenshot_setup');
@@ -54,6 +58,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).toContain(ALPHA_RESET_JOURNAL_KEY);
   expect(plan.local).toContain(DATABASE_BACKUP_RECEIPT_KEY);
   expect(plan.local).toContain(DATABASE_RESET_JOURNAL_KEY);
+  expect(plan.local).toContain(WEB_SNAPSHOT_PAGE_PACKAGE_CUTOVER_KEY);
   expect(plan.localPrefixes).toContain('sniptale_video_editor_track_panel_prefs:');
   expect(plan.session).toContain('diagnostics-active-sessions');
   expect(plan.session).toContain('interaction-diagnostics-active-sessions');
@@ -61,6 +66,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.session).toContain('sniptale_page_access_active_tabs');
   expect(plan.session).toContain('sniptale_popup_export_tab_selection_session');
   expect(plan.session).toContain('sniptale_popup_export_job');
+  expect(plan.session).toContain('sniptale_page_package_job');
   expect(plan.session).toContain('sniptale_native_full_page_capture_lease');
   expect(plan.session).toContain(AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY);
   expect(plan.session).toContain(AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY);
@@ -82,7 +88,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   expect(plan.local).toContain('sniptale_export_json_spoiler_open');
   expect(plan.local).toContain('sniptale_export_md_spoiler_open');
   expect(plan.local).toContain('sniptale_editor_file_menu_save_to_folder_open');
-  expect(plan.local).toContain('sniptale_popup_export_preferences');
+  expect(plan.local).toContain(POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY);
   expect(plan.local).toContain('sniptale_video_editor_preview_preferences');
   expect(plan.local).toContain('sniptale_scenario_editor_navigator_collapsed');
   expect(plan.local).toContain('sniptale_video_settings');

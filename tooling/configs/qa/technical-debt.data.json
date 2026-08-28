@@ -1678,20 +1678,30 @@
         "apps/extension/src/background/capture/native-app/sha256.ts",
         "apps/extension/src/background/capture/native-app/telemetry.ts",
         "apps/extension/src/background/capture/native-app/transfer-queue.ts",
+        "apps/extension/src/background/capture/page-package/job/active-job.ts",
+        "apps/extension/src/background/capture/page-package/job/cancellation.ts",
+        "apps/extension/src/background/capture/page-package/job/download-effect.ts",
+        "apps/extension/src/background/capture/page-package/job/download.ts",
+        "apps/extension/src/background/capture/page-package/job/execute.ts",
+        "apps/extension/src/background/capture/page-package/job/index.ts",
+        "apps/extension/src/background/capture/page-package/job/library.ts",
+        "apps/extension/src/background/capture/page-package/job/lifecycle-gate.ts",
+        "apps/extension/src/background/capture/page-package/job/offscreen-download-gateway.ts",
+        "apps/extension/src/background/capture/page-package/job/page-boundary.ts",
+        "apps/extension/src/background/capture/page-package/job/page-phase.ts",
+        "apps/extension/src/background/capture/page-package/job/recovery.ts",
+        "apps/extension/src/background/capture/page-package/job/route.ts",
+        "apps/extension/src/background/capture/page-package/job/runtime-state.ts",
+        "apps/extension/src/background/capture/page-package/job/stage-route.ts",
+        "apps/extension/src/background/capture/page-package/job/staging.ts",
+        "apps/extension/src/background/capture/page-package/job/status.ts",
+        "apps/extension/src/background/capture/page-package/job/storage-record.ts",
+        "apps/extension/src/background/capture/page-package/job/storage.ts",
+        "apps/extension/src/background/capture/page-package/job/visible.ts",
         "apps/extension/src/background/capture/page-preparation/route.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-port-request-lifecycle.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
-        "apps/extension/src/background/capture/popup-export/job/archive.ts",
-        "apps/extension/src/background/capture/popup-export/job/execute.ts",
-        "apps/extension/src/background/capture/popup-export/job/index.ts",
-        "apps/extension/src/background/capture/popup-export/job/lifecycle-gate.ts",
-        "apps/extension/src/background/capture/popup-export/job/package-boundary.ts",
-        "apps/extension/src/background/capture/popup-export/job/package-phase.ts",
-        "apps/extension/src/background/capture/popup-export/job/route.ts",
-        "apps/extension/src/background/capture/popup-export/job/runtime-state.ts",
-        "apps/extension/src/background/capture/popup-export/job/storage.ts",
-        "apps/extension/src/background/capture/popup-export/job/visible.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
         "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
@@ -1730,10 +1740,7 @@
         "apps/extension/src/background/capture/routing/scenario/index.ts",
         "apps/extension/src/background/capture/routing/types.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/fetch.ts",
-        "apps/extension/src/background/capture/routing/web-snapshot/payload-blobs.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/session.ts",
-        "apps/extension/src/background/capture/routing/web-snapshot/staged-blob-limits.ts",
-        "apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts",
         "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
@@ -2014,7 +2021,6 @@
         "apps/extension/src/background/runtime/routing/boundary/freshness.ts",
         "apps/extension/src/background/runtime/routing/boundary/listener.ts",
         "apps/extension/src/background/runtime/routing/boundary/parser.ts",
-        "apps/extension/src/background/runtime/routing/boundary/popup-export-injected-runner.ts",
         "apps/extension/src/background/runtime/routing/boundary/popup-export-routing.ts",
         "apps/extension/src/background/runtime/routing/boundary/preflight.ts",
         "apps/extension/src/background/runtime/routing/boundary/sender-policy.ts",
@@ -2287,20 +2293,30 @@
         "apps/extension/src/background/capture/native-app/sha256.ts",
         "apps/extension/src/background/capture/native-app/telemetry.ts",
         "apps/extension/src/background/capture/native-app/transfer-queue.ts",
+        "apps/extension/src/background/capture/page-package/job/active-job.ts",
+        "apps/extension/src/background/capture/page-package/job/cancellation.ts",
+        "apps/extension/src/background/capture/page-package/job/download-effect.ts",
+        "apps/extension/src/background/capture/page-package/job/download.ts",
+        "apps/extension/src/background/capture/page-package/job/execute.ts",
+        "apps/extension/src/background/capture/page-package/job/index.ts",
+        "apps/extension/src/background/capture/page-package/job/library.ts",
+        "apps/extension/src/background/capture/page-package/job/lifecycle-gate.ts",
+        "apps/extension/src/background/capture/page-package/job/offscreen-download-gateway.ts",
+        "apps/extension/src/background/capture/page-package/job/page-boundary.ts",
+        "apps/extension/src/background/capture/page-package/job/page-phase.ts",
+        "apps/extension/src/background/capture/page-package/job/recovery.ts",
+        "apps/extension/src/background/capture/page-package/job/route.ts",
+        "apps/extension/src/background/capture/page-package/job/runtime-state.ts",
+        "apps/extension/src/background/capture/page-package/job/stage-route.ts",
+        "apps/extension/src/background/capture/page-package/job/staging.ts",
+        "apps/extension/src/background/capture/page-package/job/status.ts",
+        "apps/extension/src/background/capture/page-package/job/storage-record.ts",
+        "apps/extension/src/background/capture/page-package/job/storage.ts",
+        "apps/extension/src/background/capture/page-package/job/visible.ts",
         "apps/extension/src/background/capture/page-preparation/route.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-port-request-lifecycle.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
-        "apps/extension/src/background/capture/popup-export/job/archive.ts",
-        "apps/extension/src/background/capture/popup-export/job/execute.ts",
-        "apps/extension/src/background/capture/popup-export/job/index.ts",
-        "apps/extension/src/background/capture/popup-export/job/lifecycle-gate.ts",
-        "apps/extension/src/background/capture/popup-export/job/package-boundary.ts",
-        "apps/extension/src/background/capture/popup-export/job/package-phase.ts",
-        "apps/extension/src/background/capture/popup-export/job/route.ts",
-        "apps/extension/src/background/capture/popup-export/job/runtime-state.ts",
-        "apps/extension/src/background/capture/popup-export/job/storage.ts",
-        "apps/extension/src/background/capture/popup-export/job/visible.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
         "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
@@ -2339,10 +2355,7 @@
         "apps/extension/src/background/capture/routing/scenario/index.ts",
         "apps/extension/src/background/capture/routing/types.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/fetch.ts",
-        "apps/extension/src/background/capture/routing/web-snapshot/payload-blobs.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/session.ts",
-        "apps/extension/src/background/capture/routing/web-snapshot/staged-blob-limits.ts",
-        "apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts",
         "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
@@ -2623,7 +2636,6 @@
         "apps/extension/src/background/runtime/routing/boundary/freshness.ts",
         "apps/extension/src/background/runtime/routing/boundary/listener.ts",
         "apps/extension/src/background/runtime/routing/boundary/parser.ts",
-        "apps/extension/src/background/runtime/routing/boundary/popup-export-injected-runner.ts",
         "apps/extension/src/background/runtime/routing/boundary/popup-export-routing.ts",
         "apps/extension/src/background/runtime/routing/boundary/preflight.ts",
         "apps/extension/src/background/runtime/routing/boundary/sender-policy.ts",
@@ -3058,6 +3070,7 @@
       "disposition": "rollout",
       "reason": "The generic durable OPFS asset owner has deterministic publication, quota, operation, recovery, and object-store proof.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/assets/archive-sink.ts",
         "apps/extension/src/composition/persistence/assets/contracts.ts",
         "apps/extension/src/composition/persistence/assets/guards.ts",
         "apps/extension/src/composition/persistence/assets/index.ts",
@@ -3068,6 +3081,7 @@
         "apps/extension/src/composition/persistence/assets/recovery.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/assets/archive-sink.ts",
         "apps/extension/src/composition/persistence/assets/contracts.ts",
         "apps/extension/src/composition/persistence/assets/guards.ts",
         "apps/extension/src/composition/persistence/assets/index.ts",
@@ -3440,7 +3454,7 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/contracts.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/record-patch.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-lease.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-page-package-cutover.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/mutation.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/read-primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
@@ -3475,7 +3489,7 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/contracts.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/record-patch.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-lease.ts",
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-page-package-cutover.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/mutation.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/read-primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
@@ -4015,9 +4029,7 @@
         "apps/extension/src/composition/persistence/web-snapshots/contracts.ts",
         "apps/extension/src/composition/persistence/web-snapshots/guards.ts",
         "apps/extension/src/composition/persistence/web-snapshots/index.ts",
-        "apps/extension/src/composition/persistence/web-snapshots/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/web-snapshots/media-entry.ts",
-        "apps/extension/src/composition/persistence/web-snapshots/provenance-state.ts",
         "apps/extension/src/composition/persistence/web-snapshots/publication.ts",
         "apps/extension/src/composition/persistence/web-snapshots/read.ts",
         "apps/extension/src/composition/persistence/web-snapshots/records.ts"
@@ -4028,9 +4040,7 @@
         "apps/extension/src/composition/persistence/web-snapshots/contracts.ts",
         "apps/extension/src/composition/persistence/web-snapshots/guards.ts",
         "apps/extension/src/composition/persistence/web-snapshots/index.ts",
-        "apps/extension/src/composition/persistence/web-snapshots/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/web-snapshots/media-entry.ts",
-        "apps/extension/src/composition/persistence/web-snapshots/provenance-state.ts",
         "apps/extension/src/composition/persistence/web-snapshots/publication.ts",
         "apps/extension/src/composition/persistence/web-snapshots/read.ts",
         "apps/extension/src/composition/persistence/web-snapshots/records.ts"
@@ -4576,6 +4586,9 @@
         "apps/extension/src/content/overlay/viewport-selector/menu.ts",
         "apps/extension/src/content/overlay/viewport-selector/presets.ts",
         "apps/extension/src/content/overlay/viewport-selector/views.tsx",
+        "apps/extension/src/content/page-package/composition.ts",
+        "apps/extension/src/content/page-package/index.ts",
+        "apps/extension/src/content/page-package/staged-transfer.ts",
         "apps/extension/src/content/parser/backends/contracts.ts",
         "apps/extension/src/content/parser/backends/index.ts",
         "apps/extension/src/content/parser/backends/legacy-tree-walker/index.ts",
@@ -4616,6 +4629,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/css.stylesheets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/dom-driver.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.dom.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/index.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.dom.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
@@ -4775,7 +4790,6 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
         "apps/extension/src/content/parser/popup-export/controller/state.ts",
         "apps/extension/src/content/parser/popup-export/controller/types.ts",
-        "apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts",
         "apps/extension/src/content/parser/popup-export/dom-driver.ts",
         "apps/extension/src/content/parser/popup-export/dom-runtime.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
@@ -4795,13 +4809,10 @@
         "apps/extension/src/content/parser/web-snapshot/assets.ts",
         "apps/extension/src/content/parser/web-snapshot/capture.ts",
         "apps/extension/src/content/parser/web-snapshot/iframe-raster.ts",
-        "apps/extension/src/content/parser/web-snapshot/injected-runner.ts",
         "apps/extension/src/content/parser/web-snapshot/limits.ts",
         "apps/extension/src/content/parser/web-snapshot/package.ts",
         "apps/extension/src/content/parser/web-snapshot/progress.ts",
-        "apps/extension/src/content/parser/web-snapshot/save.ts",
         "apps/extension/src/content/parser/web-snapshot/service.ts",
-        "apps/extension/src/content/parser/web-snapshot/staged-transfer.ts",
         "apps/extension/src/content/parser/web-snapshot/stylesheet-assets.ts",
         "apps/extension/src/content/parser/web-snapshot/types.ts",
         "apps/extension/src/content/platform/dom-host/index.ts",
@@ -5302,6 +5313,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/css.stylesheets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/dom-driver.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.dom.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/index.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.dom.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
@@ -5424,7 +5437,6 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
         "apps/extension/src/content/parser/popup-export/controller/state.ts",
         "apps/extension/src/content/parser/popup-export/controller/types.ts",
-        "apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts",
         "apps/extension/src/content/parser/popup-export/dom-driver.ts",
         "apps/extension/src/content/parser/popup-export/dom-runtime.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
@@ -5637,6 +5649,8 @@
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/export.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/index.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/page-access.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/actions/page-package-download-lease.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/actions/page-package-staging.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.validators.ts",
@@ -5681,7 +5695,6 @@
         "apps/extension/src/contracts/messaging/tab/contracts/ui-export.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/ui.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/video.ts",
-        "apps/extension/src/contracts/messaging/tab/contracts/web-snapshot.ts",
         "apps/extension/src/contracts/messaging/tab/full-page-capture.ts",
         "apps/extension/src/contracts/messaging/tab/index.ts",
         "apps/extension/src/contracts/messaging/tab/ui.ts",
@@ -5717,6 +5730,8 @@
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/export.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/index.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/page-access.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/actions/page-package-download-lease.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/actions/page-package-staging.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/actions/save.web-snapshot.validators.ts",
@@ -5761,7 +5776,6 @@
         "apps/extension/src/contracts/messaging/tab/contracts/ui-export.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/ui.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/video.ts",
-        "apps/extension/src/contracts/messaging/tab/contracts/web-snapshot.ts",
         "apps/extension/src/contracts/messaging/tab/full-page-capture.ts",
         "apps/extension/src/contracts/messaging/tab/index.ts",
         "apps/extension/src/contracts/messaging/tab/ui.ts",
@@ -9326,7 +9340,6 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "apps/extension/src/features/web-snapshot/asset-manifest.ts",
-        "apps/extension/src/features/web-snapshot/injected-runner-contract.ts",
         "apps/extension/src/features/web-snapshot/manifest.ts",
         "apps/extension/src/features/web-snapshot/provenance.ts",
         "apps/extension/src/features/web-snapshot/public.ts",
@@ -9337,7 +9350,6 @@
       ],
       "rolloutFiles": [
         "apps/extension/src/features/web-snapshot/asset-manifest.ts",
-        "apps/extension/src/features/web-snapshot/injected-runner-contract.ts",
         "apps/extension/src/features/web-snapshot/manifest.ts",
         "apps/extension/src/features/web-snapshot/provenance.ts",
         "apps/extension/src/features/web-snapshot/public.ts",
@@ -9539,6 +9551,7 @@
         "apps/extension/src/offscreen/media/desktop-frame.ts",
         "apps/extension/src/offscreen/media/desktop-stream.ts",
         "apps/extension/src/offscreen/offscreen.ts",
+        "apps/extension/src/offscreen/page-package-download/lease.ts",
         "apps/extension/src/offscreen/project-export/application/use-case.ts",
         "apps/extension/src/offscreen/project-export/capabilities.ts",
         "apps/extension/src/offscreen/project-export/codecs/bitrate.ts",
@@ -9756,6 +9769,7 @@
         "apps/extension/src/offscreen/media/desktop-frame.ts",
         "apps/extension/src/offscreen/media/desktop-stream.ts",
         "apps/extension/src/offscreen/offscreen.ts",
+        "apps/extension/src/offscreen/page-package-download/lease.ts",
         "apps/extension/src/offscreen/project-export/application/use-case.ts",
         "apps/extension/src/offscreen/project-export/capabilities.ts",
         "apps/extension/src/offscreen/project-export/codecs/bitrate.ts",
@@ -10149,6 +10163,7 @@
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
+        "apps/extension/src/popup/shell/export/data-type/package-controls.tsx",
         "apps/extension/src/popup/shell/export/data-type/section.tsx",
         "apps/extension/src/popup/shell/export/data-type/summary.tsx",
         "apps/extension/src/popup/shell/export/footer/actions.tsx",
@@ -10194,9 +10209,6 @@
         "apps/extension/src/popup/shell/export/runtime/preview-to-copy.ts",
         "apps/extension/src/popup/shell/export/runtime/progress.ts",
         "apps/extension/src/popup/shell/export/runtime/reset.ts",
-        "apps/extension/src/popup/shell/export/runtime/snapshot/index.ts",
-        "apps/extension/src/popup/shell/export/runtime/snapshot/request.ts",
-        "apps/extension/src/popup/shell/export/runtime/snapshot/state.ts",
         "apps/extension/src/popup/shell/export/runtime/start/execute.ts",
         "apps/extension/src/popup/shell/export/runtime/start/failure.ts",
         "apps/extension/src/popup/shell/export/runtime/start/index.ts",
@@ -10364,6 +10376,7 @@
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
+        "apps/extension/src/popup/shell/export/data-type/package-controls.tsx",
         "apps/extension/src/popup/shell/export/data-type/section.tsx",
         "apps/extension/src/popup/shell/export/data-type/summary.tsx",
         "apps/extension/src/popup/shell/export/footer/actions.tsx",
@@ -10409,9 +10422,6 @@
         "apps/extension/src/popup/shell/export/runtime/preview-to-copy.ts",
         "apps/extension/src/popup/shell/export/runtime/progress.ts",
         "apps/extension/src/popup/shell/export/runtime/reset.ts",
-        "apps/extension/src/popup/shell/export/runtime/snapshot/index.ts",
-        "apps/extension/src/popup/shell/export/runtime/snapshot/request.ts",
-        "apps/extension/src/popup/shell/export/runtime/snapshot/state.ts",
         "apps/extension/src/popup/shell/export/runtime/start/execute.ts",
         "apps/extension/src/popup/shell/export/runtime/start/failure.ts",
         "apps/extension/src/popup/shell/export/runtime/start/index.ts",
@@ -12993,6 +13003,24 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/workflows/page-package",
+      "disposition": "unmapped",
+      "reason": "This pure additive workflow is outside the hard line-coverage rollout; its exact owner tests are registered for focused selection.",
+      "productionFiles": [
+        "apps/extension/src/workflows/page-package/archive.ts",
+        "apps/extension/src/workflows/page-package/collection/archive.ts",
+        "apps/extension/src/workflows/page-package/collection/manifest.ts",
+        "apps/extension/src/workflows/page-package/composer.ts",
+        "apps/extension/src/workflows/page-package/contributions/blob.ts",
+        "apps/extension/src/workflows/page-package/contributions/diagnostics.ts",
+        "apps/extension/src/workflows/page-package/contributions/export.ts",
+        "apps/extension/src/workflows/page-package/contributions/web-copy.ts",
+        "apps/extension/src/workflows/page-package/paths.ts"
+      ],
+      "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/workflows/page-preparation",
       "disposition": "unmapped",
       "reason": "This owner family is outside the hard coverage rollout; add owner tests and an explicit rollout target before enabling thresholds.",
@@ -13370,6 +13398,12 @@
         "packages/runtime-contracts/src/native-app/platform-types.ts",
         "packages/runtime-contracts/src/native-app/settings-types.ts",
         "packages/runtime-contracts/src/native-app/status-types.ts",
+        "packages/runtime-contracts/src/page-package/collection-manifest.ts",
+        "packages/runtime-contracts/src/page-package/contracts.ts",
+        "packages/runtime-contracts/src/page-package/entry-policy.ts",
+        "packages/runtime-contracts/src/page-package/index.ts",
+        "packages/runtime-contracts/src/page-package/page-manifest.ts",
+        "packages/runtime-contracts/src/page-package/parser-primitives.ts",
         "packages/runtime-contracts/src/page-style/index.ts",
         "packages/runtime-contracts/src/page-style/limits.ts",
         "packages/runtime-contracts/src/privacy-erasure/types.ts",
@@ -13495,6 +13529,12 @@
         "packages/runtime-contracts/src/native-app/platform-types.ts",
         "packages/runtime-contracts/src/native-app/settings-types.ts",
         "packages/runtime-contracts/src/native-app/status-types.ts",
+        "packages/runtime-contracts/src/page-package/collection-manifest.ts",
+        "packages/runtime-contracts/src/page-package/contracts.ts",
+        "packages/runtime-contracts/src/page-package/entry-policy.ts",
+        "packages/runtime-contracts/src/page-package/index.ts",
+        "packages/runtime-contracts/src/page-package/page-manifest.ts",
+        "packages/runtime-contracts/src/page-package/parser-primitives.ts",
         "packages/runtime-contracts/src/page-style/index.ts",
         "packages/runtime-contracts/src/page-style/limits.ts",
         "packages/runtime-contracts/src/privacy-erasure/types.ts",
@@ -13796,7 +13836,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "ec5757c95f8e832e17406edb48151fb6ba51d0ec32d63f22c5f5d3e73025edce"
+        "contentHash": "46140608dc75e5ba062a5dd13e743859205f79a6be753efaa5051c258941035b"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -14475,7 +14515,7 @@
       "remediation": "Keep prefixes limited to authoritative persistence owners and remove obsolete owner paths.",
       "exactSource": {
         "path": "tooling/qa/core/architecture-guardrails.data.mjs",
-        "contentHash": "4d325f11119d0cc0770518610c59d4d9f155f0c032a682e840b64e60eac7b65c"
+        "contentHash": "d9223d718d00bc8a03792603503ee3c511aa1ada4d68b2e63fe9e44671d29319"
       },
       "consumers": [
         "tooling/qa/core/architecture-guardrails.data.mjs",
@@ -15021,7 +15061,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/archive.mjs",
-        "contentHash": "fa1cdff398a33cee428e196e5411b747e35ee4998080387b793b65c07890c173"
+        "contentHash": "c27e1d798d32f04a2df78458814a6c819c2a0ea6406bd09ef86046f68ef51840"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/archive.mjs",
@@ -15031,11 +15071,21 @@
         "binding:ARCHIVE_PACKAGE_OWNER_MAPPINGS",
         "property:testFiles",
         "property:testFiles[1]",
+        "property:testFiles[10]",
+        "property:testFiles[11]",
+        "property:testFiles[12]",
+        "property:testFiles[13]",
+        "property:testFiles[14]",
+        "property:testFiles[15]",
+        "property:testFiles[16]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
-        "property:testFiles[6]"
+        "property:testFiles[6]",
+        "property:testFiles[7]",
+        "property:testFiles[8]",
+        "property:testFiles[9]"
       ]
     },
     {
@@ -15088,7 +15138,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/artifact-security.mjs",
-        "contentHash": "b5ff7b3ea5766f80d8f3646a9ede0cc1edab08b8247d5c4a0aca3f93d3dd5c71"
+        "contentHash": "3400460ee0f29d16c0a916a17c447f2cb7add4f184d836162dbfd55f5d219633"
       },
       "consumers": [
         "tooling/release/artifact-security-dynamic-sandbox-worker.test.ts",
@@ -15435,7 +15485,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/audit.mjs",
-        "contentHash": "518bfb6e9dcab63e1371edb78f8a1c5a158b05aad93e1b9f8430d98f582db54c"
+        "contentHash": "e7e5fb983e299d6002364786e79446bc857d1566d98f8bd2352aa124403ef7bc"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/audit.mjs",
@@ -15456,6 +15506,7 @@
         "property:testFiles[18]",
         "property:testFiles[19]",
         "property:testFiles[2]",
+        "property:testFiles[20]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
@@ -16700,7 +16751,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/db.mjs",
-        "contentHash": "48945d378c3cc4eddd6aec5cdb171018c2a039d2434aa0c8cef5de58df74d58f"
+        "contentHash": "75e41794d4a0897c06588fdcfb549240fc44904c4a0a297b06a4ff3e4e793209"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/db.mjs",
@@ -16719,7 +16770,6 @@
         "property:testFiles[16]",
         "property:testFiles[17]",
         "property:testFiles[18]",
-        "property:testFiles[19]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
@@ -16824,7 +16874,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/dependency-cruiser-default-rules.cjs",
-        "contentHash": "01de4648cd3e17a5d3bb180e64a7f241c43ec20d8fc058520b314d5d6a4c44c9"
+        "contentHash": "2c9d0312c9b8211d2b6d01c51f052aa8c169caef5398a903ea29b6c6584812f1"
       },
       "consumers": [
         ".dependency-cruiser.cjs",
@@ -16855,6 +16905,7 @@
         "property:pathNot[1]",
         "property:pathNot[2]",
         "property:pathNot[3]",
+        "property:pathNot[4]",
         "property:to",
         "property:to[1]",
         "property:to[10]",
@@ -19445,7 +19496,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/popup-driver.mjs",
-        "contentHash": "42395c12bdd1a855dc09d4c8a99fb324dc1f0d8595fd6af4355dda357140effe"
+        "contentHash": "21d91c0012db7018e09cda8d53ce2782ffec6eb8886451f695ed4cb23457f94b"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/case-verification.mjs",
@@ -19454,7 +19505,10 @@
       ],
       "surfaces": [
         "property:enableForTab/anonymous-7/__sniptaleRuntimeFreshness",
-        "property:enableWebSnapshotsForSmoke/anonymous-149/sniptale_settings",
+        "property:enableWebSnapshotsForSmoke/anonymous-177/sniptale_settings",
+        "property:saveSnapshot/anonymous-23/options",
+        "property:saveSnapshot/anonymous-23/orderedTabs",
+        "property:saveSnapshot/anonymous-23/warnings",
         "property:saveSnapshot/anonymous-23/withFreshness/__sniptaleRuntimeFreshness",
         "property:saveSnapshotThroughPopup/popupProof",
         "property:saveSnapshotThroughPopup/warnings"
@@ -21029,7 +21083,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/security/support.ts",
-        "contentHash": "97dcee5b0300d4f8c266cf2b45bc1f5c75997722cb27b81fefc51d5ec966e9ff"
+        "contentHash": "ee5ccb28e4db20eeb270b8714057cc8d850e0562c263045ec28de2e070deb1f8"
       },
       "consumers": [
         "tooling/test/e2e/security/hostile-page.spec.ts",
@@ -21046,7 +21100,10 @@
         "property:grantAllSitesAccessFromSettings/anonymous-49/origins",
         "property:revokeAllSitesAccessFromSettings/anonymous-67/origins",
         "property:revokeAllSitesAccessFromSettings/anonymous-73/origins",
-        "property:sendRuntimeMessage/anonymous-17/__sniptaleRuntimeFreshness"
+        "property:sendRuntimeMessage/anonymous-17/__sniptaleRuntimeFreshness",
+        "property:startPagePackageSave/options",
+        "property:startPagePackageSave/orderedTabs",
+        "property:startPagePackageSave/warnings"
       ]
     },
     {
@@ -24365,7 +24422,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "apps/extension/vite.config.ts",
-        "contentHash": "732df6746cbae0ce2e294ef049cfea925993a3714433393b54e223c1dd06538e"
+        "contentHash": "f989d958df12514cfbc5bd6521c5497b1189824a4d8701ac7a75e8ada82b4903"
       },
       "consumers": [
         "apps/extension/vite.config.ts",
@@ -24375,14 +24432,14 @@
         "binding:MANROPE_FONT_FILES",
         "binding:RELEASE_OXC_MINIFY_OPTIONS",
         "binding:REQUIRED_APP_HTML_OUTPUTS",
-        "property:anonymous-147/allow",
-        "property:anonymous-147/build",
-        "property:anonymous-147/fs",
-        "property:anonymous-147/headers",
-        "property:anonymous-147/plugins",
-        "property:anonymous-147/resolve",
-        "property:anonymous-147/server",
-        "property:anonymous-147/worker",
+        "property:anonymous-146/allow",
+        "property:anonymous-146/build",
+        "property:anonymous-146/fs",
+        "property:anonymous-146/headers",
+        "property:anonymous-146/plugins",
+        "property:anonymous-146/resolve",
+        "property:anonymous-146/server",
+        "property:anonymous-146/worker",
         "property:compress",
         "property:createRollupOptions/output"
       ]
@@ -24437,7 +24494,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/web-snapshot.mjs",
-        "contentHash": "f2c37bb6ac1e91bb8c06cd9129f72fbbf6733c38faf51ad36e2fcfe1d1a742f8"
+        "contentHash": "fa7c5ef98a6f28d06d6f01525b138ae75a8fb5ee4a4c9c0c580abbb38f2804a1"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
@@ -24452,7 +24509,6 @@
         "property:testFiles[12]",
         "property:testFiles[13]",
         "property:testFiles[14]",
-        "property:testFiles[15]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",

@@ -2,11 +2,20 @@
 
 import JSZip from 'jszip';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+  PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+  PAGE_PACKAGE_ARCHIVE_PATHS,
+} from '@sniptale/runtime-contracts/page-package';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../features/web-snapshot/manifest';
+import { createPagePackageManifestFixture } from '../../features/web-snapshot/manifest.test-support';
+import {
+  createPagePackageArchiveFixture,
+  createPagePackagePngBytes,
+  createPagePackageTestBlobFromBytes,
+  readPagePackageTestBlobBytes,
+  type PagePackageFixtureEntry,
+} from '../../features/web-snapshot/package.test-support';
 import type { WebSnapshotRecord } from '../../composition/persistence/web-snapshots/contracts';
 
 const NativeURL = URL;
@@ -32,7 +41,7 @@ import { loadWebSnapshotPackage } from './assets';
 
 class OversizedWebSnapshotPackageFile extends File {
   constructor(parts: BlobPart[]) {
-    super(parts, 'snapshot.zip');
+    super(parts, 'snapshot.sniptale-page-package.zip');
   }
 
   override get size(): number {
@@ -41,53 +50,72 @@ class OversizedWebSnapshotPackageFile extends File {
 }
 
 function createManifest(overrides: Partial<WebSnapshotManifest> = {}): WebSnapshotManifest {
-  return {
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    capturedAt: '2026-05-12T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: WEB_SNAPSHOT_PACKAGE_PATHS,
-    schemaVersion: 1,
-    source: {
-      faviconUrl: null,
-      title: 'Example Page',
-      url: 'https://example.com/page',
-    },
-    stats: { assetCount: 1, failedAssetCount: 0, packageSize: 10 },
-    warnings: [],
-    ...overrides,
-  };
+  return createPagePackageManifestFixture(overrides);
 }
 async function createPackageBlob(args: {
   extras?: Record<string, string | Uint8Array>;
   html?: string | Uint8Array;
   manifest?: WebSnapshotManifest | string;
-}): Promise<Blob> {
-  const manifest = args.manifest ?? createManifest();
-  const zip = new JSZip();
+}): Promise<{ manifest: WebSnapshotManifest; packageBlob: Blob }> {
+  const html =
+    args.html ??
+    [
+      '<!doctype html>',
+      '<img src="../assets/image.png" srcset="../assets/image.png 1x, ../assets/missing.png 2x">',
+      '<a href="../assets/document.png">Document</a>',
+    ].join('');
+  const toBlob = (content: string | Uint8Array, type: string): Blob => {
+    if (typeof content === 'string') return new Blob([content], { type });
+    const copy = new Uint8Array(new ArrayBuffer(content.byteLength));
+    copy.set(content);
+    return new Blob([copy], { type });
+  };
+  const entries: PagePackageFixtureEntry[] = [
+    {
+      blob: toBlob(html, 'text/html'),
+      component: 'webCopy',
+      path: PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml,
+    },
+    {
+      blob: toBlob(createPagePackagePngBytes(), 'image/png'),
+      component: 'webCopy',
+      path: PAGE_PACKAGE_ARCHIVE_PATHS.screenshot,
+    },
+    {
+      blob: new Blob(['webp'], { type: 'image/webp' }),
+      component: 'webCopy',
+      path: PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail,
+    },
+    ...Object.entries(args.extras ?? {})
+      .filter(([path]) => !path.includes('..'))
+      .map(([path, content]) => ({
+        blob: toBlob(
+          content,
+          path.toLowerCase().endsWith('.css')
+            ? 'text/css'
+            : path.toLowerCase().endsWith('.png')
+              ? 'image/png'
+              : 'image/png'
+        ),
+        component: 'webCopy' as const,
+        path,
+      })),
+  ];
+  const fixture = await createPagePackageArchiveFixture({ entries });
+  const zip = await JSZip.loadAsync(await readPagePackageTestBlobBytes(fixture.packageBlob));
+  for (const [path, content] of Object.entries(args.extras ?? {})) {
+    if (path.includes('..')) zip.file(path, content, { createFolders: false });
+  }
+  const manifest = args.manifest ?? fixture.manifest;
   zip.file(
     WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
     typeof manifest === 'string' ? manifest : JSON.stringify(manifest)
   );
-  zip.file(
-    WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
-    args.html ??
-      [
-        '<!doctype html>',
-        '<img src="../assets/image.png" srcset="../assets/image.png 1x, ../assets/missing.png 2x">',
-        '<a href="../assets/document.txt">Document</a>',
-      ].join('')
-  );
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, 'png');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.computedStyles, '{}');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot, '<main>Snapshot</main>');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.errors, '');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.stylesheets, '[]');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.virtualDomSnapshot, '{}');
-
-  for (const [path, content] of Object.entries(args.extras ?? {})) {
-    zip.file(path, content);
-  }
-  return zip.generateAsync({ type: 'blob' });
+  const raw = await zip.generateAsync({ type: 'uint8array' });
+  return {
+    manifest: typeof manifest === 'string' ? fixture.manifest : manifest,
+    packageBlob: createPagePackageTestBlobFromBytes(raw, PAGE_PACKAGE_ARCHIVE_MIME_TYPE),
+  };
 }
 
 async function stubWebSnapshotRecord(args: {
@@ -96,9 +124,8 @@ async function stubWebSnapshotRecord(args: {
   manifest?: WebSnapshotManifest | string;
   recordManifest?: WebSnapshotManifest;
 }): Promise<void> {
-  const recordManifest = args.recordManifest ?? createManifest();
   const packageArgs: Parameters<typeof createPackageBlob>[0] = {
-    manifest: args.manifest ?? recordManifest,
+    ...(args.manifest === undefined ? {} : { manifest: args.manifest }),
   };
   if (args.extras !== undefined) {
     packageArgs.extras = args.extras;
@@ -107,11 +134,15 @@ async function stubWebSnapshotRecord(args: {
     packageArgs.html = args.html;
   }
 
+  const packaged = await createPackageBlob(packageArgs);
+  const recordManifest = args.recordManifest ?? packaged.manifest;
   mocks.getWebSnapshotRecord.mockResolvedValue({
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageFile: new File([await createPackageBlob(packageArgs)], 'snapshot.zip'),
+    packageFile: new File([packaged.packageBlob], 'snapshot.sniptale-page-package.zip', {
+      type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+    }),
     size: 1,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -212,7 +243,7 @@ afterEach(() => {
 it('loads a valid package and rewrites captured asset references to object URLs', async () => {
   await stubWebSnapshotRecord({
     extras: {
-      'assets/document.txt': 'document',
+      'assets/document.png': 'document',
       'assets/image.png': 'png',
     },
   });
@@ -337,7 +368,7 @@ it('rejects unsafe package paths before creating asset object URLs', async () =>
   });
 
   await expect(loadWebSnapshotPackage('snapshot-1')).rejects.toThrow(
-    'Web snapshot package contains an unsafe path.'
+    'Invalid media archive path: ../escape.png.'
   );
 
   expect(URL.createObjectURL).not.toHaveBeenCalled();
@@ -365,7 +396,7 @@ it('rejects oversized entry metadata before inflating viewer package entries', a
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageFile: new File(['zip'], 'snapshot.zip'),
+    packageFile: new File(['zip'], 'snapshot.sniptale-page-package.zip'),
     size: 1,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
@@ -396,7 +427,6 @@ it('rejects oversized compressed packages before unzip allocation', async () => 
 it('rejects package manifests that do not match the saved record authority', async () => {
   await stubWebSnapshotRecord({
     extras: { 'assets/image.png': 'png' },
-    manifest: createManifest({ id: 'package-snapshot' }),
     recordManifest: createManifest({ id: 'record-snapshot' }),
   });
 

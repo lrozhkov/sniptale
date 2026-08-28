@@ -9,3 +9,12 @@ export interface PopupExportPreferences {
   includeJson: boolean;
   includeMarkdown: boolean;
 }
+
+export interface PopupPagePackageSelection extends PopupExportPreferences {
+  includeWebCopy: boolean;
+}
+
+export interface PopupPagePackagePreferences {
+  export: PopupPagePackageSelection;
+  save: PopupPagePackageSelection;
+}

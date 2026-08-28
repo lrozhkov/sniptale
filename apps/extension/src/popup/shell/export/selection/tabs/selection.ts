@@ -2,6 +2,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
 import type { PopupExportTabSelectionSession } from '../../../../persistence/export-tab-session';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import { MAX_POPUP_EXPORT_JOB_TABS } from '@sniptale/runtime-contracts/export';
 import { createFallbackTabItem } from './items';
 import type { PopupExportTabItem } from './types';
 
@@ -24,9 +25,11 @@ function getInitialSelectedTabIds(args: {
   nextTabs: PopupExportTabItem[];
   persistedSelection: PopupExportTabSelectionSession | null;
 }) {
-  const remainingSelected = args.currentSelected.filter((tabId) =>
-    args.nextTabs.some((tab) => tab.tabId === tabId && tab.disabledReason === null)
-  );
+  const remainingSelected = args.currentSelected
+    .filter((tabId) =>
+      args.nextTabs.some((tab) => tab.tabId === tabId && tab.disabledReason === null)
+    )
+    .slice(0, MAX_POPUP_EXPORT_JOB_TABS);
   const nextFingerprint = createTabsFingerprint(args.nextTabs);
 
   if (args.fingerprintRef.current === nextFingerprint) {
@@ -36,9 +39,11 @@ function getInitialSelectedTabIds(args: {
   if (args.persistedSelection?.tabsFingerprint === nextFingerprint) {
     args.fingerprintRef.current = nextFingerprint;
     args.hasHydratedSelectionRef.current = true;
-    return args.persistedSelection.selectedTabIds.filter((tabId) =>
-      args.nextTabs.some((tab) => tab.tabId === tabId && tab.disabledReason === null)
-    );
+    return args.persistedSelection.selectedTabIds
+      .filter((tabId) =>
+        args.nextTabs.some((tab) => tab.tabId === tabId && tab.disabledReason === null)
+      )
+      .slice(0, MAX_POPUP_EXPORT_JOB_TABS);
   }
 
   args.fingerprintRef.current = nextFingerprint;

@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import {
   buildViewerScenarioPageDescriptor,
   buildViewerScenarioTargetDescriptor,
@@ -12,29 +10,13 @@ import {
 } from './descriptors';
 
 function createManifest(): WebSnapshotManifest {
-  return {
-    capturedAt: '2026-05-13T00:00:00.000Z',
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    id: 'snapshot-1',
-    paths: {
-      computedStyles: 'computed.css',
-      domSnapshot: 'dom.json',
-      errors: 'errors.json',
-      manifest: 'manifest.json',
-      screenshot: 'screenshot.png',
-      snapshotHtml: 'index.html',
-      stylesheets: 'styles.css',
-      virtualDomSnapshot: 'virtual.json',
-    },
-    schemaVersion: 1,
+  return createPagePackageManifestFixture({
     source: {
       faviconUrl: null,
       title: 'Snapshot Source',
       url: 'https://source.example/path',
     },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 1 },
-    warnings: [],
-  };
+  });
 }
 
 function createIframe(): HTMLIFrameElement {

@@ -68,20 +68,22 @@ it('proxies the native popup-export job API and optional host permission', async
   await expect(deps.requestAllUrlsPermission?.()).resolves.toBe(true);
   await deps.sendStartJobMessage?.({
     jobId: 'job-1',
+    includeWebCopy: false,
+    intent: 'export',
     options,
     orderedTabs: [{ tabId: 7, title: 'Page' }],
-    type: MessageType.START_POPUP_EXPORT_JOB,
+    type: MessageType.START_PAGE_PACKAGE_JOB,
     warnings: ['permission denied'],
   });
-  await deps.sendGetJobStatusMessage?.({ type: MessageType.GET_POPUP_EXPORT_JOB_STATUS });
-  await deps.sendCancelJobMessage?.({ jobId: 'job-1', type: MessageType.CANCEL_POPUP_EXPORT_JOB });
-  await deps.sendAckJobStatusMessage?.({ type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS });
+  await deps.sendGetJobStatusMessage?.({ type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS });
+  await deps.sendCancelJobMessage?.({ jobId: 'job-1', type: MessageType.CANCEL_PAGE_PACKAGE_JOB });
+  await deps.sendAckJobStatusMessage?.({ type: MessageType.ACK_PAGE_PACKAGE_JOB_STATUS });
 
   expect(mocks.requestPermission).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledTimes(4);
 });
 
-it('proxies popup-owned tab operations and schedules callbacks', async () => {
+it('proxies popup preview operations and schedules callbacks', async () => {
   vi.useFakeTimers();
   mocks.getActiveTabId.mockResolvedValue(7);
   mocks.requestPreview.mockResolvedValue({ title: 'Page' });
@@ -91,18 +93,11 @@ it('proxies popup-owned tab operations and schedules callbacks', async () => {
 
   await expect(deps.getActiveTabId()).resolves.toBe(7);
   await deps.requestPreview(7, 'popup.export.prepareExportError');
-  await deps.sendSaveWebSnapshotMessage?.(7, {
-    requestId: 'snapshot-1',
-    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-  });
   const timeoutId = deps.scheduleTimeout(callback, 25);
   vi.advanceTimersByTime(25);
 
   expect(mocks.requestPreview).toHaveBeenCalledWith(7, 'popup.export.prepareExportError');
-  expect(mocks.sendPopupExportTabMessage).toHaveBeenCalledWith(7, {
-    requestId: 'snapshot-1',
-    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-  });
+  expect(mocks.sendPopupExportTabMessage).not.toHaveBeenCalled();
   expect(timeoutId).toBeDefined();
   expect(callback).toHaveBeenCalledOnce();
 });
