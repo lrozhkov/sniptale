@@ -4,9 +4,22 @@ import { captureSmokeSource } from './source-capture.mjs';
 import { verifySnapshotViewer } from './viewer-verification.mjs';
 
 export function createSmokeCaseVerifier({ context, out, popupUi }) {
-  const state = { setupDialogGeometry: null };
+  const state = { selectionCurtainGeometry: null };
   async function verifyCase(extensionId, popup, spec) {
     const source = await captureSmokeSource({ context, out, popup, popupUi, spec, state });
+    if (source.saved.downloadProof) {
+      const result = {
+        consoleErrors: source.consoleErrors,
+        downloadProof: source.saved.downloadProof,
+        name: spec.name,
+        sourceInfo: source.sourceInfo,
+        sourceAfterFullScreenshotInfo: source.sourceAfterFullScreenshotInfo,
+        url: source.target.url(),
+        warnings: source.saved.warnings ?? [],
+      };
+      await source.target.close();
+      return result;
+    }
     const viewerProof = await verifySnapshotViewer({
       assetId: source.saved.assetId,
       context,

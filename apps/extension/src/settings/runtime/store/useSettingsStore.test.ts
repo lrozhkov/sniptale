@@ -29,9 +29,9 @@ const settingsFixture = {
   defaultExportPresetId: null,
   imageFormat: 'png' as const,
   imageQuality: 100,
-  webSnapshotEnabled: false,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
+  externalSnapshotLinksEnabled: false,
 };
 
 const {

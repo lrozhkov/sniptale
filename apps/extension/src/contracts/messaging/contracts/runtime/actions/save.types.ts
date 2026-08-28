@@ -13,7 +13,7 @@ type RegisterWebSnapshotAssetsMessage = {
 type FetchWebSnapshotAssetMessage = {
   type: MessageType.FETCH_WEB_SNAPSHOT_ASSET;
   snapshotSessionId: string;
-  url: string;
+  urls: string[];
 };
 
 type RegisterWebSnapshotAssetsResponse = RuntimeMessageResponse<{
@@ -21,8 +21,13 @@ type RegisterWebSnapshotAssetsResponse = RuntimeMessageResponse<{
 }>;
 
 type FetchWebSnapshotAssetResponse = RuntimeMessageResponse<{
-  base64?: string;
-  mimeType?: string;
+  assets?: Array<{
+    base64?: string;
+    error?: string;
+    mimeType?: string;
+    success: boolean;
+    url: string;
+  }>;
 }>;
 
 export type RuntimeActionSaveRequestByType = {

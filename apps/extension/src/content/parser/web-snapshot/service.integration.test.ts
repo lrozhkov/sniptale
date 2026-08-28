@@ -219,7 +219,8 @@ it('keeps only the selected responsive image candidate through prepared snapshot
     redirect: 'manual',
     signal: expect.any(AbortSignal),
   });
-  expect(packageEntries.html).toContain('srcset="../assets/1-');
+  expect(packageEntries.html).toContain('src="../assets/1-large.png"');
+  expect(packageEntries.html).not.toContain('srcset=');
   expect(packageEntries.html).not.toContain('/small.png');
   expect(packageEntries.html).not.toContain('/large.png');
   expect(packageEntries.manifest.warnings).toEqual(
@@ -250,7 +251,8 @@ it('keeps selected picture source candidates through prepared snapshot cloning',
     redirect: 'manual',
     signal: expect.any(AbortSignal),
   });
-  expect(packageEntries.html).toContain('srcset="../assets/1-');
+  expect(packageEntries.html).toContain('src="../assets/1-wide@2x.png"');
+  expect(packageEntries.html).not.toContain('srcset=');
   expect(packageEntries.html).not.toContain('/wide.png');
   expect(packageEntries.html).not.toContain('/wide@2x.png');
   expect(packageEntries.manifest.warnings).toEqual(

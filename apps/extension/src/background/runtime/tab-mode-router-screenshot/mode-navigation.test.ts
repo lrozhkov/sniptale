@@ -3,6 +3,7 @@ import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/r
 
 const mocks = vi.hoisted(() => ({
   getApplied: vi.fn(),
+  loggerDebug: vi.fn(),
   loggerWarn: vi.fn(),
   release: vi.fn(),
   releaseTabOwners: vi.fn(),
@@ -21,7 +22,12 @@ vi.mock('../../capture-surface', async (importOriginal) => ({
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({ debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: mocks.loggerWarn }),
+  createLogger: () => ({
+    debug: mocks.loggerDebug,
+    error: vi.fn(),
+    log: vi.fn(),
+    warn: mocks.loggerWarn,
+  }),
 }));
 
 import {
@@ -104,8 +110,8 @@ describe('screenshot navigation cleanup', () => {
       cleanupScreenshotModeAfterNavigation(5, screenshot, viewport, owner)
     ).rejects.toThrow('restore conflict');
 
-    expect(mocks.loggerWarn).toHaveBeenCalledWith(
-      'Failed to disable preparation after navigation',
+    expect(mocks.loggerDebug).toHaveBeenCalledWith(
+      'Preparation receiver disappeared during navigation',
       expect.any(Error)
     );
     expect(screenshot.get(5)).toBe(true);

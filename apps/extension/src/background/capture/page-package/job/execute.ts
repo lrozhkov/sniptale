@@ -23,6 +23,8 @@ import {
   type ActivePopupExportJob,
 } from './runtime-state';
 import { cleanupPopupExportJobCancellation } from './cancellation';
+import { startPagePackageActionIndicator } from './action-indicator';
+import { preparePagePackageDownloadRuntime } from './offscreen-download-gateway';
 
 function aggregateProducerStats(
   current: ExportResult['stats'],
@@ -67,6 +69,7 @@ async function publishCompletedJob(
       warnings: [...job.status.warnings],
     },
     progress: {
+      activeStepKey: null,
       current: args.pageCount,
       total: job.status.orderedTabs.length,
       errors: args.errors,
@@ -86,29 +89,35 @@ async function publishFailedJob(
     stats: ExportResult['stats'];
   }
 ): Promise<void> {
+  const cancelledCleanly = args.cancelled && !args.cancellationCleanupIncomplete;
   await updatePagePackageJobStatus(job, {
     phase: args.cancellationCleanupIncomplete
       ? 'cancelling'
       : args.cancelled
         ? 'cancelled'
         : 'failed',
-    result: {
-      errors: args.errors,
-      filename: '',
-      stats: args.stats,
-      success: false,
-      warnings: [...job.status.warnings],
-    },
+    ...(cancelledCleanly
+      ? {}
+      : {
+          result: {
+            errors: args.errors,
+            filename: '',
+            stats: args.stats,
+            success: false,
+            warnings: [...job.status.warnings],
+          },
+        }),
     progress: {
+      activeStepKey: null,
       current: args.pageCount,
       total: job.status.orderedTabs.length,
-      errors: args.errors,
+      errors: cancelledCleanly ? [] : args.errors,
       message: args.cancellationCleanupIncomplete
         ? translate('content.runtime.exportCancelFailed')
         : args.cancelled
           ? translate('content.runtime.exportCancelled')
           : translate('popup.export.startExportError'),
-      phase: 'error',
+      phase: cancelledCleanly ? 'cancelled' : 'error',
     },
   });
 }
@@ -339,17 +348,20 @@ export async function executePopupExportJob(
   onFinished: () => void
 ): Promise<void> {
   const state = createPopupExportExecutionState();
+  const finishActionIndicator = startPagePackageActionIndicator(job);
   try {
     subscribeToPopupExportManualActivation(job);
     if (job.status.intent === 'save') {
       await completeSaveJob(job, state);
     } else {
+      await preparePagePackageDownloadRuntime();
       const packages = await collectPagePackages(job, state);
       await completeExportJob(job, state, packages);
     }
   } catch (error) {
     await publishJobFailure(job, state, error);
   } finally {
+    await finishActionIndicator();
     await finalizePopupExportJob(job, state.stagedCleanupComplete, onFinished);
   }
 }

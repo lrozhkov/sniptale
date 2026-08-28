@@ -96,7 +96,8 @@ export const settingsAppearanceMessages = defineMessageSource({
     'video:camera': { ru: 'Видео — Камера', en: 'Video — Camera' },
     'video:screen': { ru: 'Видео — Окно или экран', en: 'Video — Window or screen' },
     tools: { ru: 'Инструменты', en: 'Tools' },
-    export: { ru: 'Экспорт', en: 'Export' },
+    'export:download': { ru: 'Экспорт — Скачать', en: 'Export — Download' },
+    'export:library': { ru: 'Экспорт — В библиотеку', en: 'Export — To Library' },
   },
   themeModeLabel: {
     ru: 'Режим темы',

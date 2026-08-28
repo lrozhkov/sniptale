@@ -93,7 +93,7 @@ export type RouteCaptureMessage =
   | {
       type: 'FETCH_WEB_SNAPSHOT_ASSET';
       snapshotSessionId: string;
-      url: string;
+      urls: string[];
     }
   | {
       base64: string;
@@ -103,6 +103,13 @@ export type RouteCaptureMessage =
       sequence: number;
       stagedBlobId: string;
       type: 'STAGE_PAGE_PACKAGE_JOB_CHUNK';
+    }
+  | {
+      activeStepKey: import('@sniptale/runtime-contracts/export').ExportProgressStepKey;
+      current: number;
+      requestId: string;
+      total: number;
+      type: 'WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED';
     }
   | {
       type: 'TRIGGER_QUICK_ACTION';

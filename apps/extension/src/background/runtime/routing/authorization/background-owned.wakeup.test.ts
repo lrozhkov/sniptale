@@ -70,7 +70,7 @@ it('authorizes content runtime wake-up with typed sender binding', () => {
 it('rejects content runtime wake-up from unauthorized senders', () => {
   expect(authorizeBackgroundOwnedRoute(contentRuntimeWakeupRequest({}, true))).toEqual({
     authorized: false,
-    reason: 'Unauthorized content runtime wake-up sender',
+    reason: 'Unauthorized content runtime wake-up sender: missing-tab-id',
   });
 });
 

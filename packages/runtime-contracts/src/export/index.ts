@@ -37,7 +37,9 @@ export type ExportProgressStepKey =
 
 export interface ExportProgress {
   activeStepKey?: ExportProgressStepKey | null;
-  phase: 'idle' | 'scanning' | 'downloading' | 'zipping' | 'done' | 'error';
+  completedStepKeys?: ExportProgressStepKey[];
+  failedStepKeys?: ExportProgressStepKey[];
+  phase: 'idle' | 'scanning' | 'downloading' | 'zipping' | 'done' | 'cancelled' | 'error';
   message: string;
   current: number; // текущий элемент
   total: number; // всего элементов

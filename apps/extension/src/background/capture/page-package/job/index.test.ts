@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   clearStatus: vi.fn(),
   execute: vi.fn(),
   hasResources: vi.fn(),
-  loadSettings: vi.fn(),
   publish: vi.fn(),
   readDurable: vi.fn(),
   readStatus: vi.fn(),
@@ -35,10 +34,6 @@ vi.mock('./storage', async (importOriginal) => ({
   readPagePackageJobStatus: mocks.readStatus,
 }));
 vi.mock('./recovery', () => ({ recoverInterruptedPagePackageJob: mocks.recover }));
-vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
-  loadSettings: mocks.loadSettings,
-}));
 
 import {
   acknowledgePagePackageJobStatus,
@@ -126,7 +121,6 @@ beforeEach(() => {
   mocks.publish.mockResolvedValue(undefined);
   mocks.readDurable.mockReturnValue(null);
   mocks.hasResources.mockResolvedValue(false);
-  mocks.loadSettings.mockResolvedValue({ webSnapshotEnabled: true });
   mocks.readStatus.mockResolvedValue(null);
   mocks.recover.mockResolvedValue(undefined);
   mocks.update.mockImplementation(async (job: ActivePopupExportJob, patch) => {
@@ -256,52 +250,24 @@ it('rejects duplicate direct tab identities before settings, persistence, or pro
     })
   ).rejects.toThrow('must be unique');
 
-  expect(mocks.loadSettings).not.toHaveBeenCalled();
   expect(mocks.publish).not.toHaveBeenCalled();
   expect(mocks.execute).not.toHaveBeenCalled();
   expect(contentPort.requestPagePackage).not.toHaveBeenCalled();
 });
 
-it('checks Save consent before claiming a job and derives its component plan', async () => {
+it('derives the Save component plan before execution', async () => {
   const contentPort = { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() };
-  mocks.loadSettings.mockResolvedValueOnce({ webSnapshotEnabled: false });
-  await expect(
-    startPagePackageJob({
-      contentPort,
-      includeWebCopy: true,
-      intent: 'save',
-      jobId: 'job-disabled',
-      options: { ...options, includeFullPageScreenshot: true },
-      orderedTabs: tabs,
-      warnings: [],
-    })
-  ).rejects.toThrow('disabled');
-  expect(mocks.execute).not.toHaveBeenCalled();
-
-  await expect(
-    startPagePackageJob({
-      contentPort,
-      includeWebCopy: true,
-      intent: 'save',
-      jobId: 'job-extended-save',
-      options: {
-        ...options,
-        includeFullPageScreenshot: true,
-        includePageDiagnostics: true,
-      },
-      orderedTabs: tabs,
-      warnings: [],
-    })
-  ).rejects.toThrow('only for direct export');
-  expect(mocks.publish).not.toHaveBeenCalled();
-
   const execution = createExecutionControl();
   await startPagePackageJob({
     contentPort,
     includeWebCopy: true,
     intent: 'save',
-    jobId: 'job-save',
-    options: { ...options, includeFullPageScreenshot: true },
+    jobId: 'job-extended-save',
+    options: {
+      ...options,
+      includeFullPageScreenshot: true,
+      includePageDiagnostics: true,
+    },
     orderedTabs: tabs,
     warnings: [],
   });
@@ -309,12 +275,12 @@ it('checks Save consent before claiming a job and derives its component plan', a
     effectiveComponentPlan: {
       components: {
         attachments: true,
-        diagnostics: false,
+        diagnostics: true,
         images: true,
         pageData: true,
         webCopy: true,
       },
-      diagnosticsLevel: 'none',
+      diagnosticsLevel: 'extended',
       includeScreenshot: true,
     },
   });
@@ -322,7 +288,7 @@ it('checks Save consent before claiming a job and derives its component plan', a
   await execution.settled;
 });
 
-it('cancels the active job before asking every selected content runtime to stop', async () => {
+it('acknowledges durable cancellation before selected content runtimes finish stopping', async () => {
   const execution = createExecutionControl();
   const cancelPagePackage = vi.fn().mockResolvedValue(undefined);
   await startPagePackageJob({
@@ -335,14 +301,13 @@ it('cancels the active job before asking every selected content runtime to stop'
     warnings: [],
   });
 
-  const cancellation = cancelPagePackageJob('job-1');
-  await vi.waitFor(() => expect(cancelPagePackage).toHaveBeenCalledTimes(2));
-  execution.finish();
-  const status = await cancellation;
-
+  const status = await cancelPagePackageJob('job-1');
+  expect(status.phase).toBe('cancelling');
   expect(execution.activeJob.cancelled).toBe(true);
   expect(execution.activeJob.abortController.signal.aborted).toBe(true);
-  expect(status.phase).toBe('cancelling');
+  await vi.waitFor(() => expect(cancelPagePackage).toHaveBeenCalledTimes(2));
+  execution.finish();
+
   expect(cancelPagePackage.mock.calls).toEqual([
     [{ exportRunId: 'job-1', tabId: 11 }],
     [{ exportRunId: 'job-1', tabId: 12 }],
@@ -374,10 +339,12 @@ it('keeps failed cancellation cleanup retryable until every tab is clean', async
 
   const status = await cancelPagePackageJob('job-retry-cancel');
 
-  expect(cancelPagePackage).toHaveBeenCalledTimes(2);
-  expect(execution.activeJob.cancellationCleanupError).toBeNull();
-  expect(status.phase).toBe('cancelled');
-  expect(finishCancellation).toHaveBeenCalledOnce();
+  expect(status.phase).toBe('cancelling');
+  await vi.waitFor(() => {
+    expect(cancelPagePackage).toHaveBeenCalledTimes(2);
+    expect(execution.activeJob.cancellationCleanupError).toBeNull();
+    expect(finishCancellation).toHaveBeenCalledOnce();
+  });
   execution.finish();
   await execution.settled;
 });

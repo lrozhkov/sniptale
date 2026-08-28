@@ -9,7 +9,6 @@ import {
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import { isOwnedSnapshotViewerPage } from '../../../../../features/tab-capabilities/url';
 import {
   loadPopupExportTabSelectionSession,
   savePopupExportTabSelectionSession,
@@ -98,7 +97,7 @@ function loadAvailableTabs(args: LoadAvailableTabsArgs) {
     .catch(() => handleFallbackTabs(args, persistedSelectionPromise));
 }
 
-function createOriginPattern(url: string | undefined): string | null {
+function createOriginPattern(url: string | null | undefined): string | null {
   if (!url) {
     return null;
   }
@@ -121,22 +120,17 @@ async function canExportTab(args: {
   pageAccessStatus: PageAccessStatus | null;
   tab: chrome.tabs.Tab;
 }): Promise<boolean> {
-  if (isOwnedSnapshotViewerPage(args.tab.url)) {
-    return true;
-  }
-
   const tabId = args.tab.id;
+  const originPattern = createOriginPattern(args.tab.url);
+  if (!originPattern) {
+    return false;
+  }
   if (
     typeof tabId === 'number' &&
     args.pageAccessStatus?.currentTabActive === true &&
     tabId === args.activeTabCapabilities.tabId
   ) {
     return true;
-  }
-
-  const originPattern = createOriginPattern(args.tab.url);
-  if (!originPattern) {
-    return false;
   }
 
   return hasEffectiveOriginAccess(originPattern);
@@ -178,10 +172,12 @@ function getGrantedFallbackTabs(args: {
   activeTabCapabilities: ActiveTabCapabilities;
   pageAccessStatus: PageAccessStatus | null;
 }): PopupExportTabItem[] {
-  if (isOwnedSnapshotViewerPage(args.activeTabCapabilities.url)) {
-    return createFallbackTabItem(args.activeTabCapabilities);
+  if (
+    args.activeTabCapabilities.isRestrictedPage ||
+    createOriginPattern(args.activeTabCapabilities.url) === null
+  ) {
+    return [];
   }
-
   return args.pageAccessStatus?.currentTabActive === true
     ? createFallbackTabItem(args.activeTabCapabilities)
     : [];

@@ -1,5 +1,6 @@
 // policyStateIds: [] - validation limits are static parser policy, not mutable authority.
 import {
+  MAX_PAGE_PACKAGE_ENTRIES,
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
   PAGE_PACKAGE_ARCHIVE_PATHS,
   parsePagePackageManifest,
@@ -15,7 +16,7 @@ import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapsh
 
 const MAX_WEB_SNAPSHOT_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES = 25 * 1024 * 1024;
-const MAX_PACKAGE_FILE_COUNT = 500;
+const MAX_PACKAGE_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
 const MAX_PACKAGE_TOTAL_INFLATED_BYTES = 250 * 1024 * 1024;
 const MAX_PACKAGE_ENTRY_BYTES = 25 * 1024 * 1024;
 const MAX_PACKAGE_TEXT_ENTRY_BYTES = 10 * 1024 * 1024;
@@ -54,7 +55,6 @@ function assertPayloadBasics(args: {
   const manifest = parseRequiredManifest(args.payload.manifest);
   if (
     manifest.intent !== 'save' ||
-    manifest.diagnosticsLevel === 'extended' ||
     !manifest.components.some((component) => component.id === 'webCopy')
   ) {
     throw new Error('Saved Page Package profile is invalid.');

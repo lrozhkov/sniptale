@@ -159,6 +159,17 @@ function createIframeReadinessWarnings(
   return pendingIframes.map((iframe) => createIframeTimeoutWarning(iframe, rootDocument.baseURI));
 }
 
+function throwIfPreparedSnapshotAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error ? signal.reason : new Error('Prepared snapshot cancelled');
+}
+
+async function yieldPreparedSnapshot(signal?: AbortSignal): Promise<void> {
+  throwIfPreparedSnapshotAborted(signal);
+  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+  throwIfPreparedSnapshotAborted(signal);
+}
+
 /**
  * Builds the canonical static prepared-page snapshot document.
  *
@@ -180,7 +191,9 @@ export async function buildPreparedSnapshotDocument(
   const shadowStyleMarks = markPreparedSnapshotShadowStyles(rootDocument);
   try {
     const iframeReadiness = await waitForAccessibleIframeReady(waitOptions);
+    await yieldPreparedSnapshot(options.abortSignal);
     const virtualDomSnapshot = buildInertPreparedSnapshotVirtualDom(rootDocument, root);
+    await yieldPreparedSnapshot(options.abortSignal);
     clearPreparedSnapshotIframeRasterAttributes(virtualDomSnapshot.document);
     removeContentRuntimeHost(
       virtualDomSnapshot.root,
@@ -196,11 +209,13 @@ export async function buildPreparedSnapshotDocument(
       virtualDomSnapshot.root,
       virtualDomSnapshot.resolveOriginalElement
     );
+    await yieldPreparedSnapshot(options.abortSignal);
     const snapshot = virtualDomSnapshot.document;
     materializePreparedSnapshotStyles(rootDocument, snapshot);
     const liveStateWarnings = liveState.materialize(virtualDomSnapshot.root);
     shadowStyleMarks.materialize(snapshot);
     appendStaticPagePreparationOverlays(snapshot);
+    await yieldPreparedSnapshot(options.abortSignal);
 
     const warnings = [
       ...createIframeReadinessWarnings(options, iframeReadiness.pendingIframes),
@@ -209,8 +224,9 @@ export async function buildPreparedSnapshotDocument(
         preserveAssetUrls: options.preserveAssetUrls === true,
       }),
     ];
+    await yieldPreparedSnapshot(options.abortSignal);
     shadowStyleMarks.encapsulate(snapshot);
-    const html = serializePreparedSnapshotHtml(snapshot);
+    const html = options.serializeHtml === false ? '' : serializePreparedSnapshotHtml(snapshot);
 
     return { document: snapshot, html, warnings };
   } finally {

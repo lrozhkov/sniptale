@@ -1,9 +1,9 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getContentRuntimeServices } from '../../platform/runtime-services/services';
 import {
-  isSafeWebSnapshotUrl,
+  isSafeWebSnapshotCaptureAssetUrl,
   isAllowedWebSnapshotAssetMimeType,
-  resolveWebSnapshotCaptureAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeTypeFromBytes,
   sanitizeWebSnapshotFilename,
   sanitizeWebSnapshotSvgText,
 } from '../../../features/web-snapshot/public';
@@ -29,6 +29,24 @@ function readBlobText(blob: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('Failed to read web snapshot asset.'));
     reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
     reader.readAsText(blob);
+  });
+}
+
+function readBlobBytes(blob: Blob): Promise<Uint8Array> {
+  if (typeof blob.arrayBuffer === 'function') {
+    return blob.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read web snapshot asset.'));
+    reader.onload = () => {
+      if (!(reader.result instanceof ArrayBuffer)) {
+        reject(new Error('Failed to read web snapshot asset.'));
+        return;
+      }
+      resolve(new Uint8Array(reader.result));
+    };
+    reader.readAsArrayBuffer(blob);
   });
 }
 
@@ -84,10 +102,6 @@ function readContentLength(response: Response): number | null {
   return Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
-function resolveAllowedAssetMimeType(response: Response): string {
-  return resolveWebSnapshotCaptureAssetMimeType(response.headers.get('content-type'));
-}
-
 async function readStreamingResponseWithLimit(
   body: ReadableStream<Uint8Array>
 ): Promise<BlobPart[]> {
@@ -136,29 +150,46 @@ async function readBlobFallbackWithLimit(
   return blob;
 }
 
-export async function readSameOriginAssetBlob(response: Response): Promise<Blob> {
-  const mimeType = resolveAllowedAssetMimeType(response);
+export async function readSameOriginAssetBlob(
+  response: Response,
+  sourceUrl?: string
+): Promise<Blob> {
   const contentLength = readContentLength(response);
   if (contentLength !== null && contentLength > MAX_WEB_SNAPSHOT_ASSET_BYTES) {
     throw new Error('web snapshot asset is too large');
   }
 
-  const chunks = response.body
+  const chunks: BlobPart[] = response.body
     ? await readStreamingResponseWithLimit(response.body)
     : [await readBlobFallbackWithLimit(response, contentLength)];
 
-  return new Blob(chunks, { type: mimeType });
+  const bytes = await readBlobBytes(new Blob(chunks));
+  const mimeType = resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+    bytes,
+    contentType: response.headers.get('content-type'),
+    url: sourceUrl ?? response.url,
+  });
+  const ownedBytes = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+  ownedBytes.set(bytes);
+
+  return new Blob([ownedBytes], { type: mimeType });
 }
 
 async function fetchAssetBlob(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: ReadonlyMap<string, Blob | Error>;
   fetchSameOriginAssetBlob: (resolved: URL) => Promise<Blob>;
   pageOrigin: string;
   resolved: URL;
   snapshotSessionId: string;
 }): Promise<Blob> {
+  const prefetched = args.anonymousCrossOriginAssets.get(args.resolved.href);
+  if (prefetched) {
+    if (prefetched instanceof Error) throw prefetched;
+    return prefetched;
+  }
   if (args.resolved.protocol === 'data:') {
-    return readSameOriginAssetBlob(await fetch(args.resolved.href));
+    return readSameOriginAssetBlob(await fetch(args.resolved.href), args.resolved.href);
   }
   if (args.resolved.origin === args.pageOrigin) {
     return args.fetchSameOriginAssetBlob(args.resolved);
@@ -166,21 +197,35 @@ async function fetchAssetBlob(args: {
   if (!args.allowAnonymousCrossOriginAssets) {
     throw new Error('anonymous cross-origin asset fetch is disabled');
   }
+  throw new Error('anonymous asset fetch result is unavailable');
+}
 
+export async function fetchAnonymousCrossOriginAssetBlobs(
+  urls: string[],
+  snapshotSessionId: string
+): Promise<Map<string, Blob | Error>> {
+  if (urls.length === 0) return new Map();
   const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
     type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-    snapshotSessionId: args.snapshotSessionId,
-    url: args.resolved.href,
+    snapshotSessionId,
+    urls,
   });
-  if (!response.success || !response.base64) {
+  if (!response.success || !response.assets) {
     throw new Error(response.error || 'anonymous asset fetch failed');
   }
-
-  return base64ToBlob(response.base64, response.mimeType || 'application/octet-stream');
+  return new Map(
+    response.assets.map((asset) => [
+      asset.url,
+      asset.success && asset.base64
+        ? base64ToBlob(asset.base64, asset.mimeType || 'application/octet-stream')
+        : new Error(asset.error || 'anonymous asset fetch failed'),
+    ])
+  );
 }
 
 export async function fetchAssetUrl(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: ReadonlyMap<string, Blob | Error>;
   baseUrl: string;
   fetchSameOriginAssetBlob: (resolved: URL) => Promise<Blob>;
   index: number;
@@ -188,7 +233,7 @@ export async function fetchAssetUrl(args: {
   snapshotSessionId: string;
   url: string;
 }): Promise<WebSnapshotAssetEntry> {
-  if (!isSafeWebSnapshotUrl(args.url, args.baseUrl)) {
+  if (!isSafeWebSnapshotCaptureAssetUrl(args.url, args.baseUrl)) {
     throw new Error('unsafe URL');
   }
 
@@ -196,6 +241,7 @@ export async function fetchAssetUrl(args: {
   const resolvedUrl = resolved.href;
   const fetchedBlob = await fetchAssetBlob({
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
+    anonymousCrossOriginAssets: args.anonymousCrossOriginAssets,
     fetchSameOriginAssetBlob: args.fetchSameOriginAssetBlob,
     pageOrigin: args.pageOrigin,
     resolved,

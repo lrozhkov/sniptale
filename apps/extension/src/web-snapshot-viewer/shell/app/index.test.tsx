@@ -8,7 +8,10 @@ import { createPagePackageManifestFixture } from '../../../features/web-snapshot
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 
 const mocks = vi.hoisted(() => ({
+  blockSnapshotFrameNavigation: vi.fn(),
+  browserTabsCreate: vi.fn(),
   latestFrameLoad: null as (() => void) | null,
+  loadSettings: vi.fn(),
   loadWebSnapshotPackage: vi.fn(),
   readSnapshotIdFromLocation: vi.fn(),
   revokeWebSnapshotObjectUrls: vi.fn(),
@@ -32,7 +35,13 @@ vi.mock('./route', () => ({
   readSnapshotIdFromLocation: mocks.readSnapshotIdFromLocation,
 }));
 vi.mock('../../viewer/frame-navigation', () => ({
-  blockSnapshotFrameNavigation: vi.fn(),
+  blockSnapshotFrameNavigation: mocks.blockSnapshotFrameNavigation,
+}));
+vi.mock('../../../composition/persistence/settings', () => ({
+  loadSettings: mocks.loadSettings,
+}));
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { create: mocks.browserTabsCreate },
 }));
 vi.mock('../../preparation/host', () => ({
   SnapshotPreparationHost: mocks.SnapshotPreparationHost,
@@ -119,6 +128,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.latestFrameLoad = null;
   mocks.loadWebSnapshotPackage.mockReset();
+  mocks.loadSettings.mockResolvedValue({ externalSnapshotLinksEnabled: false });
+  mocks.browserTabsCreate.mockResolvedValue({});
   document.documentElement.lang = 'en';
   document.title = 'Sniptale Web Snapshot';
   container = document.createElement('div');
@@ -127,6 +138,28 @@ beforeEach(() => {
   mocks.readSnapshotIdFromLocation.mockReturnValue('snapshot-1');
   mocks.useAppLocale.mockReturnValue('en');
   mocks.SnapshotPreparationHost.mockClear();
+});
+
+it('opens a projected snapshot link in a new active tab only when the setting is enabled', async () => {
+  mocks.loadSettings.mockResolvedValue({ externalSnapshotLinksEnabled: true });
+  mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
+
+  await act(async () => {
+    root?.render(<WebSnapshotViewerApp />);
+  });
+  await loadSnapshotIframe();
+
+  const options = mocks.blockSnapshotFrameNavigation.mock.calls.at(-1)?.[1] as
+    | { externalLinksEnabled: boolean; onOpenExternalLink: (href: string) => void }
+    | undefined;
+  expect(options?.externalLinksEnabled).toBe(true);
+  await act(async () => {
+    options?.onOpenExternalLink('https://example.test/next');
+  });
+  expect(mocks.browserTabsCreate).toHaveBeenCalledWith({
+    active: true,
+    url: 'https://example.test/next',
+  });
 });
 
 afterEach(() => {

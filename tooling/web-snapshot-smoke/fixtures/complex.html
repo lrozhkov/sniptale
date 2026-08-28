@@ -44,10 +44,40 @@
         display: flex;
         gap: 12px;
       }
+      .inline-mask-icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: #1d4ed8;
+        -webkit-mask: center / contain no-repeat
+          url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20d%3D%22M8%201a7%207%200%201%201%204.2%2012.6l5.5%205.5-1.4%201.4-5.5-5.5A7%207%200%200%201%208%201m0%202a5%205%200%201%200%200%2010A5%205%200%200%200%208%203%22%2F%3E%3C%2Fsvg%3E');
+        mask: center / contain no-repeat
+          url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20d%3D%22M8%201a7%207%200%201%201%204.2%2012.6l5.5%205.5-1.4%201.4-5.5-5.5A7%207%200%200%201%208%201m0%202a5%205%200%201%200%200%2010A5%205%200%200%200%208%203%22%2F%3E%3C%2Fsvg%3E');
+      }
+      .escaped-mask-icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: #0f766e;
+        -webkit-mask: center / contain no-repeat
+          url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M3 3h14v14H3z"/></svg>');
+        mask: center / contain no-repeat
+          url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M3 3h14v14H3z"/></svg>');
+      }
       nav a {
         color: #1d4ed8;
         text-decoration: none;
         font-weight: 700;
+      }
+      .dynamic-panel {
+        min-height: 36px;
+        padding: 8px 32px;
+        background: #dbeafe;
+        transition: none;
+      }
+      .dynamic-panel[data-expanded='true'] {
+        min-height: 84px;
+        padding-block: 32px;
       }
       main {
         width: min(1180px, calc(100% - 40px));
@@ -201,8 +231,15 @@
   <body>
     <header>
       <h1>Complex capture fixture</h1>
-      <nav><a href="#cards">Cards</a><a href="#data">Data</a></nav>
+      <nav>
+        <span class="inline-mask-icon" aria-label="Round marker"></span
+        ><span class="escaped-mask-icon" aria-label="Square marker"></span><a href="#cards">Cards</a
+        ><a href="#data">Data</a>
+      </nav>
     </header>
+    <aside class="dynamic-panel" aria-label="Dynamic capture panel">
+      This panel changes its layout after repeated viewport traversal.
+    </aside>
     <main>
       <section class="hero">
         <div class="hero-copy">
@@ -330,6 +367,17 @@
       innerRoot.querySelector('input').value = 'current nested value';
       document.getElementById('unsafe-action').addEventListener('click', () => {
         window.__fixtureActionExecuted = true;
+      });
+      const dynamicPanel = document.querySelector('.dynamic-panel');
+      let highViewportVisits = 0;
+      let viewportWasHigh = false;
+      window.addEventListener('scroll', () => {
+        const viewportIsHigh = window.scrollY > 400;
+        if (viewportIsHigh && !viewportWasHigh) {
+          highViewportVisits += 1;
+          if (highViewportVisits === 3) dynamicPanel.dataset.expanded = 'true';
+        }
+        viewportWasHigh = viewportIsHigh;
       });
     </script>
   </body>

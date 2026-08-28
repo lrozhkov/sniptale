@@ -2,8 +2,11 @@ import { createSecureRandomUuid } from '@sniptale/platform/security/secure-rando
 
 const SNAPSHOT_SESSION_TTL_MS = 5 * 60 * 1000;
 const MAX_SESSION_ASSET_URLS = 500;
+const SNAPSHOT_ASSET_COLLECTION_BUDGET_MS = 45_000;
 
 type SnapshotSession = {
+  activeAssetFetchControllers: Set<AbortController>;
+  assetFetchDeadlineAt: number;
   allowAnonymousCrossOriginAssets: boolean;
   assetId: string | null;
   allowedUrls: Set<string>;
@@ -37,8 +40,14 @@ function clearSessionExpiryTimer(sessionId: string): void {
 function expireSession(sessionId: string, session: SnapshotSession): void {
   if (sessions.get(sessionId) !== session) return;
   if (session.saveState === 'saving') return;
+  abortActiveAssetFetches(session, new Error('Web snapshot asset session expired'));
   sessions.delete(sessionId);
   clearSessionExpiryTimer(sessionId);
+}
+
+function abortActiveAssetFetches(session: SnapshotSession, reason: Error): void {
+  for (const controller of session.activeAssetFetchControllers) controller.abort(reason);
+  session.activeAssetFetchControllers.clear();
 }
 
 function scheduleSessionExpiry(sessionId: string, session: SnapshotSession): void {
@@ -126,6 +135,8 @@ export function registerWebSnapshotAssetSession(
 
   const sessionId = createSnapshotSessionId();
   const session: SnapshotSession = {
+    activeAssetFetchControllers: new Set(),
+    assetFetchDeadlineAt: Date.now() + SNAPSHOT_ASSET_COLLECTION_BUDGET_MS,
     allowAnonymousCrossOriginAssets: request.allowAnonymousCrossOriginAssets,
     assetId: null,
     allowedUrls,
@@ -176,11 +187,11 @@ function assertSessionNotCancelled(session: SnapshotSession): void {
   }
 }
 
-export function authorizeWebSnapshotAssetFetch(args: {
+function resolveAuthorizedWebSnapshotAssetFetch(args: {
   sessionId: string;
   tabId: number;
   url: string;
-}): void {
+}): SnapshotSession {
   const session = getAuthorizedSession(args.sessionId, args.tabId);
   assertSessionNotCancelled(session);
   if (session.saveState !== 'open') {
@@ -189,6 +200,31 @@ export function authorizeWebSnapshotAssetFetch(args: {
   if (!session.allowedUrls.has(normalizeAssetUrl(args.url))) {
     throw new Error('Web snapshot asset was not registered for this session');
   }
+  return session;
+}
+
+export function authorizeWebSnapshotAssetFetch(args: {
+  sessionId: string;
+  tabId: number;
+  url: string;
+}): void {
+  resolveAuthorizedWebSnapshotAssetFetch(args);
+}
+
+export function beginWebSnapshotAssetFetch(args: {
+  sessionId: string;
+  tabId: number;
+  url: string;
+}): { abort(reason?: unknown): void; release(): void; signal: AbortSignal; timeoutMs: number } {
+  const session = resolveAuthorizedWebSnapshotAssetFetch(args);
+  const controller = new AbortController();
+  session.activeAssetFetchControllers.add(controller);
+  return {
+    abort: (reason) => controller.abort(reason),
+    release: () => session.activeAssetFetchControllers.delete(controller),
+    signal: controller.signal,
+    timeoutMs: Math.max(0, session.assetFetchDeadlineAt - Date.now()),
+  };
 }
 
 export function beginWebSnapshotSave(args: { sessionId: string; tabId: number }): void {
@@ -242,6 +278,7 @@ export function cancelWebSnapshotCaptureRequest(
   for (const session of sessions.values()) {
     if (session.tabId !== tabId || session.requestId !== requestId) continue;
     session.cancelRequested = true;
+    abortActiveAssetFetches(session, new Error('Web snapshot save was cancelled'));
     if (session.assetId) committedAssetIds.push(session.assetId);
   }
   return { committedAssetIds };
@@ -249,6 +286,9 @@ export function cancelWebSnapshotCaptureRequest(
 
 export function resetWebSnapshotAssetSessionsForTests(): void {
   for (const sessionId of sessionExpiryTimers.keys()) clearSessionExpiryTimer(sessionId);
+  for (const session of sessions.values()) {
+    abortActiveAssetFetches(session, new Error('Web snapshot asset sessions were reset'));
+  }
   sessions.clear();
   pendingCaptureRequests.clear();
   cancelledCaptureRequests.clear();

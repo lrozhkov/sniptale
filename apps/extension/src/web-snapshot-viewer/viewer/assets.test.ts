@@ -53,6 +53,7 @@ function createManifest(overrides: Partial<WebSnapshotManifest> = {}): WebSnapsh
   return createPagePackageManifestFixture(overrides);
 }
 async function createPackageBlob(args: {
+  diagnosticExtras?: Record<string, string | Uint8Array>;
   extras?: Record<string, string | Uint8Array>;
   html?: string | Uint8Array;
   manifest?: WebSnapshotManifest | string;
@@ -100,6 +101,11 @@ async function createPackageBlob(args: {
         component: 'webCopy' as const,
         path,
       })),
+    ...Object.entries(args.diagnosticExtras ?? {}).map(([path, content]) => ({
+      blob: toBlob(content, 'text/plain'),
+      component: 'diagnostics' as const,
+      path,
+    })),
   ];
   const fixture = await createPagePackageArchiveFixture({ entries });
   const zip = await JSZip.loadAsync(await readPagePackageTestBlobBytes(fixture.packageBlob));
@@ -119,12 +125,14 @@ async function createPackageBlob(args: {
 }
 
 async function stubWebSnapshotRecord(args: {
+  diagnosticExtras?: Record<string, string | Uint8Array>;
   extras?: Record<string, string | Uint8Array>;
   html?: string | Uint8Array;
   manifest?: WebSnapshotManifest | string;
   recordManifest?: WebSnapshotManifest;
 }): Promise<void> {
   const packageArgs: Parameters<typeof createPackageBlob>[0] = {
+    ...(args.diagnosticExtras === undefined ? {} : { diagnosticExtras: args.diagnosticExtras }),
     ...(args.manifest === undefined ? {} : { manifest: args.manifest }),
   };
   if (args.extras !== undefined) {
@@ -257,10 +265,42 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   ]);
   expect(loaded.screenshotUrl).toBe('blob:snapshot-asset');
   expect(loaded.html).toContain('src="blob:snapshot-asset"');
-  expect(loaded.html).toContain('<a>Document</a>');
-  expect(loaded.html).not.toContain('href=');
+  expect(loaded.html).toContain(
+    '<a data-sniptale-external-href="https://example.test/assets/document.png">Document</a>'
+  );
+  expect(loaded.html).not.toContain(' href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
   expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
+});
+
+it('loads an asset-rich package beyond the removed legacy viewer file ceiling', async () => {
+  const extras = Object.fromEntries(
+    Array.from({ length: 501 }, (_, index) => [`assets/image-${index}.png`, 'png'])
+  );
+  await stubWebSnapshotRecord({ extras });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.assets).toHaveLength(501);
+});
+
+it('does not inflate diagnostic entries that the passive Viewer does not render', async () => {
+  await stubWebSnapshotRecord({
+    diagnosticExtras: { 'diagnostics/standard/dom.html.txt': 'diagnostic DOM' },
+    extras: { 'assets/image.png': 'png' },
+  });
+  const record = await mocks.getWebSnapshotRecord('snapshot-1');
+  const zip = await JSZip.loadAsync(record!.packageFile);
+  const diagnosticEntry = zip.file('diagnostics/standard/dom.html.txt')!;
+  const diagnosticRead = vi.spyOn(diagnosticEntry, 'async');
+  const loadAsyncSpy = vi.spyOn(JSZip, 'loadAsync').mockResolvedValue(zip);
+
+  try {
+    await loadWebSnapshotPackage('snapshot-1');
+    expect(diagnosticRead).not.toHaveBeenCalled();
+  } finally {
+    loadAsyncSpy.mockRestore();
+  }
 });
 
 it('loads XHTML through a typed document blob without HTML tree normalization', async () => {

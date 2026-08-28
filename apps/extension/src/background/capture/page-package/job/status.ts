@@ -58,6 +58,7 @@ const PROGRESS_PHASES: readonly PagePackageProgressPhaseV1[] = [
   'downloading',
   'zipping',
   'done',
+  'cancelled',
   'error',
 ];
 const PROGRESS_STEPS: readonly PagePackageProgressStepV1[] = [
@@ -163,7 +164,11 @@ function parseEffectiveComponentPlan(value: unknown): PagePackageEffectiveCompon
 
 function parseProgress(value: unknown): PagePackageProgressV1 | null {
   if (
-    !isExactKeys(value, ['current', 'errors', 'message', 'phase', 'total'], ['activeStepKey']) ||
+    !isExactKeys(
+      value,
+      ['current', 'errors', 'message', 'phase', 'total'],
+      ['activeStepKey', 'completedStepKeys', 'failedStepKeys']
+    ) ||
     !isNonNegativeInteger(value['current']) ||
     !isNonNegativeInteger(value['total']) ||
     !Array.isArray(value['errors']) ||
@@ -175,6 +180,13 @@ function parseProgress(value: unknown): PagePackageProgressV1 | null {
       value['activeStepKey'] === undefined ||
       value['activeStepKey'] === null ||
       PROGRESS_STEPS.includes(value['activeStepKey'] as PagePackageProgressStepV1)
+    ) ||
+    ![value['completedStepKeys'], value['failedStepKeys']].every(
+      (keys) =>
+        keys === undefined ||
+        (Array.isArray(keys) &&
+          keys.length <= PROGRESS_STEPS.length &&
+          keys.every((key) => PROGRESS_STEPS.includes(key as PagePackageProgressStepV1)))
     )
   )
     return null;
@@ -306,12 +318,11 @@ export function createEffectiveComponentPlan(
 ): PagePackageEffectiveComponentPlanV1 {
   const diagnosticsEnabled =
     options.includeBasicLogs || options.includeCssDiagnostics || options.includePageDiagnostics;
-  const diagnosticsLevel =
-    intent === 'export' && options.includePageDiagnostics
-      ? 'extended'
-      : diagnosticsEnabled
-        ? 'standard'
-        : 'none';
+  const diagnosticsLevel = options.includePageDiagnostics
+    ? 'extended'
+    : diagnosticsEnabled
+      ? 'standard'
+      : 'none';
   return {
     components: {
       attachments: options.includeFiles,

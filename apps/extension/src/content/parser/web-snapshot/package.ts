@@ -19,6 +19,7 @@ import {
 } from '../../../workflows/page-package/composer';
 import { createDiagnosticContributions } from '../../../workflows/page-package/contributions/diagnostics';
 import { createSafeWebCopyContributions } from '../../../workflows/page-package/contributions/web-copy';
+import { addPagePackageReadme } from '../../page-package/readme';
 import {
   MAX_WEB_SNAPSHOT_ASSET_BYTES,
   MAX_WEB_SNAPSHOT_ASSETS_BYTES,
@@ -205,6 +206,17 @@ export async function buildWebSnapshotPackage(args: {
     }),
   ]);
   const failedResourceCount = args.warningStats?.failedAssetCount ?? 0;
+  const source = {
+    faviconUrl: null,
+    title: args.source.title ? normalizePopupExportTabTitle(args.source.title) : null,
+    url: normalizePagePackageOptionalUrl(sanitizeWebSnapshotSourceUrl(args.source.url)),
+  };
+  const contributions = await addPagePackageReadme({
+    contributions: [...webCopy, ...diagnostics],
+    diagnosticsLevel: 'standard',
+    intent: 'save',
+    source,
+  });
   const pagePackage = await composePagePackage(
     {
       capturedAt: new Date().toISOString(),
@@ -212,16 +224,12 @@ export async function buildWebSnapshotPackage(args: {
         diagnostics: 'complete',
         webCopy: failedResourceCount > 0 ? 'partial' : 'complete',
       },
-      contributions: [...webCopy, ...diagnostics],
+      contributions,
       diagnosticsLevel: 'standard',
       failedResourceCount,
       id: crypto.randomUUID(),
       intent: 'save',
-      source: {
-        faviconUrl: null,
-        title: args.source.title ? normalizePopupExportTabTitle(args.source.title) : null,
-        url: normalizePagePackageOptionalUrl(sanitizeWebSnapshotSourceUrl(args.source.url)),
-      },
+      source,
       viewport: args.source.viewport ?? null,
       warnings,
     },

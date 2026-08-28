@@ -5,7 +5,6 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'quick-actions': ['capture.quick-actions'],
   'screen-sizes': ['capture.viewport-presets'],
   'media-quality': ['capture.image', 'capture.video'],
-  'web-snapshots': ['access.capture-assets', 'local-consent.web-snapshot-enabled'],
   saving: ['capture.after-capture', 'capture.saving', 'capture.retention'],
   annotations: ['styles.borders', 'styles.callouts', 'styles.numbering', 'styles.tags'],
   'editor-resources': [
@@ -18,7 +17,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'ai-prompts': ['ai.prompts', 'ai.prompt-templates'],
   'voice-input': ['system.voice', 'system.voice.microphone'],
   'native-app': ['system.native', 'system.native.connection'],
-  'access-data': ['access.capture-assets.permissions', 'access.capture-assets.reset-actions'],
+  'access-data': ['action/status'],
   'settings-transfer': ['action/status'],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
 
@@ -37,9 +36,7 @@ export const SETTINGS_TRANSFER_VIEW_COVERAGE = {
   },
 } as const;
 
-export const SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE = {
-  'local-consent.web-snapshot-enabled': 'webSnapshotEnabled',
-} as const;
+export const SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE = {} as const;
 
 type SettingsTransferExcludedControlId = keyof typeof SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE;
 
@@ -220,12 +217,6 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
       'updateEditorPresetOrder',
     ],
     ['styles.tool-presets']
-  ),
-  transferable(
-    'capture/web-snapshots/controller.ts',
-    ['updateSettings'],
-    ['access.capture-assets'],
-    ['local-consent.web-snapshot-enabled']
   ),
   excluded(
     'system/access-data/permissions/useSettingsPermissions/requests/request-actions/request-origin.ts',

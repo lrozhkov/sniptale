@@ -2,8 +2,19 @@ import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-
 
 export const footerSurfaceClassName = actionFooterSurfaceClassName;
 
-export const footerActionGridClassName =
-  'grid grid-cols-[minmax(0,1fr)_48px_48px_48px] items-stretch gap-1.5';
+export function footerActionGridClassName(
+  isResultReady: boolean,
+  hasLibraryAction: boolean,
+  isExporting = false
+) {
+  if (isExporting) return 'grid grid-cols-1 items-stretch gap-1.5';
+  if (!isResultReady) {
+    return 'grid grid-cols-[minmax(0,1fr)_48px_48px] items-stretch gap-1.5';
+  }
+  return `grid items-stretch gap-1.5 ${
+    hasLibraryAction ? 'grid-cols-[minmax(88px,0.7fr)_minmax(0,1.3fr)]' : 'grid-cols-1'
+  }`;
+}
 
 export const footerCopyButtonBaseClassName = [
   'group inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]',

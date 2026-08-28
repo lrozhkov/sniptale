@@ -1,5 +1,5 @@
 import {
-  isSafeWebSnapshotUrl,
+  isSafeWebSnapshotCaptureAssetUrl,
   sanitizeWebSnapshotCssText,
 } from '../../../../features/web-snapshot/public';
 import { collectOpenShadowHosts } from '../../dom-tree-parser/traversal/virtual-dom.helpers';
@@ -17,7 +17,7 @@ interface MarkedShadowStyleHost {
 function rewriteCapturedCssUrl(value: string, baseUrl: string): string | null {
   const trimmedValue = value.trim();
   if (trimmedValue.startsWith('#')) return trimmedValue;
-  if (!isSafeWebSnapshotUrl(trimmedValue, baseUrl)) return null;
+  if (!isSafeWebSnapshotCaptureAssetUrl(trimmedValue, baseUrl)) return null;
   try {
     const resolved = new URL(trimmedValue, baseUrl);
     return ['data:', 'http:', 'https:'].includes(resolved.protocol) ? resolved.href : null;

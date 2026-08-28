@@ -108,7 +108,8 @@ it('re-sanitizes restored static HTML before returning Viewer content', async ()
   expect(loaded.html).not.toContain('http-equiv="refresh"');
   expect(loaded.html).not.toContain('<iframe');
   expect(loaded.html).not.toContain('onerror');
-  expect(loaded.html).not.toContain('tracker.example');
+  expect(loaded.html).toContain('data-sniptale-external-href="https://tracker.example/page"');
+  expect(loaded.html).not.toContain('tracker.example/pixel.png');
 });
 
 it('blocks all unresolved navigation and resource links in offline Viewer content', async () => {
@@ -123,8 +124,17 @@ it('blocks all unresolved navigation and resource links in offline Viewer conten
   );
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const restored = new DOMParser().parseFromString(loaded.html, 'text/html');
 
-  expect(loaded.html).not.toContain('https://');
+  expect(restored.querySelector('a')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('a')?.getAttribute('data-sniptale-external-href')).toBe(
+    'https://example.com/details'
+  );
+  expect(restored.querySelector('link')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('area')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('use')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('img')?.getAttribute('src')).toBeNull();
+  expect(loaded.html).not.toContain('tracker.example');
 });
 
 it('sanitizes restored CSS assets before creating preview object URLs', async () => {

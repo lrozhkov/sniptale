@@ -47,6 +47,7 @@ afterEach(() => {
 it('returns CSS bytes for the recursive stylesheet packaging owner', async () => {
   const asset = await fetchAssetUrl({
     allowAnonymousCrossOriginAssets: false,
+    anonymousCrossOriginAssets: new Map(),
     baseUrl: 'https://example.com/page',
     fetchSameOriginAssetBlob: async () =>
       new Blob(['.hero { background: u\\72l("https://tracker.example/pixel.png"); }'], {
@@ -66,6 +67,7 @@ it('returns CSS bytes for the recursive stylesheet packaging owner', async () =>
 it('replaces a misleading URL extension with the admitted MIME extension', async () => {
   const asset = await fetchAssetUrl({
     allowAnonymousCrossOriginAssets: false,
+    anonymousCrossOriginAssets: new Map(),
     baseUrl: 'https://example.com/page',
     fetchSameOriginAssetBlob: async () => new Blob(['png'], { type: 'image/png' }),
     index: 2,
@@ -80,6 +82,7 @@ it('replaces a misleading URL extension with the admitted MIME extension', async
 it('adds the admitted MIME extension to extensionless asset names', async () => {
   const asset = await fetchAssetUrl({
     allowAnonymousCrossOriginAssets: false,
+    anonymousCrossOriginAssets: new Map(),
     baseUrl: 'https://example.com/page',
     fetchSameOriginAssetBlob: async () => new Blob(['font'], { type: 'font/woff2' }),
     index: 3,
@@ -94,6 +97,7 @@ it('adds the admitted MIME extension to extensionless asset names', async () => 
 it('sanitizes same-origin SVG assets before packaging', async () => {
   const asset = await fetchAssetUrl({
     allowAnonymousCrossOriginAssets: false,
+    anonymousCrossOriginAssets: new Map(),
     baseUrl: 'https://example.com/page',
     fetchSameOriginAssetBlob: async () =>
       new Blob(['<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><path /></svg>'], {
@@ -118,6 +122,29 @@ it('streams same-origin asset responses into bounded blobs', async () => {
 
   expect(blob.type).toBe('image/png');
   await expect(readTestBlobText(blob)).resolves.toBe('png');
+});
+
+it('captures a binary-verified same-origin WOFF2 response served as generic bytes', async () => {
+  const blob = await readSameOriginAssetBlob(
+    new Response(createChunkStream([new TextEncoder().encode('wOF2font-data')]), {
+      headers: { 'content-type': 'application/octet-stream' },
+    }),
+    'https://example.com/typeface.woff2'
+  );
+
+  expect(blob.type).toBe('font/woff2');
+  await expect(readTestBlobText(blob)).resolves.toBe('wOF2font-data');
+});
+
+it('rejects generic same-origin bytes that only claim a font extension', async () => {
+  await expect(
+    readSameOriginAssetBlob(
+      new Response(createChunkStream([new TextEncoder().encode('not-font-data')]), {
+        headers: { 'content-type': 'application/octet-stream' },
+      }),
+      'https://example.com/typeface.woff2'
+    )
+  ).rejects.toThrow('unsupported web snapshot asset MIME type');
 });
 
 it('rejects oversized same-origin assets from content-length before reading the body', async () => {

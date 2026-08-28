@@ -94,8 +94,16 @@ const localHtmlUrl = `http://127.0.0.1:${address.port}/local-html`;
 
 const cases = [
   { name: 'fixture', url: fixtureUrl, required: true },
-  { name: 'parser-unstable-fixture', url: parserUnstableFixtureUrl, required: true },
-  { name: 'reveal-import-fixture', url: revealImportFixtureUrl, required: true },
+  {
+    name: 'parser-unstable-fixture',
+    url: parserUnstableFixtureUrl,
+    required: true,
+  },
+  {
+    name: 'reveal-import-fixture',
+    url: revealImportFixtureUrl,
+    required: true,
+  },
   ...(localHtmlBytes ? [{ name: 'local-html', url: localHtmlUrl, required: true }] : []),
   ...(externalUrl ? [{ name: 'external-url', url: externalUrl, required: true }] : []),
 ];
@@ -127,7 +135,56 @@ const context = await chromium.launchPersistentContext(userDataDir, {
   viewport: { width: 392, height: 560 },
 });
 
-const report = { cases: [], generatedAt: new Date().toISOString() };
+const backgroundConsoleWarnings = [];
+const diagnosticConsoleMessages = [];
+const observedServiceWorkers = new WeakSet();
+const observeServiceWorker = (worker) => {
+  if (observedServiceWorkers.has(worker)) return;
+  observedServiceWorkers.add(worker);
+  worker.on('console', (message) => {
+    if (
+      /\[(?:BackgroundFullPageCapture|BackgroundPagePackageDownload|BackgroundPagePackageJob|BackgroundWebSnapshotAssets)\]/.test(
+        message.text()
+      )
+    ) {
+      diagnosticConsoleMessages.push({
+        context: 'service-worker',
+        level: message.type(),
+        text: message.text(),
+      });
+    }
+    if (message.type() === 'warning' || message.type() === 'error') {
+      backgroundConsoleWarnings.push({
+        level: message.type(),
+        text: message.text(),
+      });
+    }
+  });
+};
+context.on('page', (page) => {
+  page.on('console', (message) => {
+    if (
+      /\[(?:ContentFullPageCapture|ContentWebSnapshot|OffscreenDocument|OffscreenRuntime)\]/.test(
+        message.text()
+      )
+    ) {
+      diagnosticConsoleMessages.push({
+        context: 'page',
+        level: message.type(),
+        text: message.text(),
+      });
+    }
+  });
+});
+context.on('serviceworker', observeServiceWorker);
+for (const worker of context.serviceWorkers()) observeServiceWorker(worker);
+
+const report = {
+  backgroundConsoleWarnings,
+  diagnosticConsoleMessages,
+  cases: [],
+  generatedAt: new Date().toISOString(),
+};
 const popupUi = process.env.SNAPSHOT_SMOKE_POPUP_UI === '1';
 const { enableWebSnapshotsForSmoke, verifyCase } = createSmokeCaseVerifier({
   context,
@@ -137,14 +194,14 @@ const { enableWebSnapshotsForSmoke, verifyCase } = createSmokeCaseVerifier({
 
 try {
   const session = await context.browser().newBrowserCDPSession();
-  const loaded = await session.send('Extensions.loadUnpacked', { path: unpackedDir });
+  const loaded = await session.send('Extensions.loadUnpacked', {
+    path: unpackedDir,
+  });
   await session.detach();
   const popup = await context.newPage();
   await popup.setViewportSize({ width: 392, height: 560 });
   await popup.goto(`chrome-extension://${loaded.id}/apps/extension/src/popup/index.html`);
-  if (!popupUi) {
-    await enableWebSnapshotsForSmoke(popup);
-  }
+  await enableWebSnapshotsForSmoke(popup);
   for (const spec of selectedCases) {
     try {
       const result = await verifyCase(loaded.id, popup, spec);
@@ -171,6 +228,16 @@ try {
 
 const passed = report.cases.filter((item) => item.status === 'passed');
 const failures = [];
+const rejectedBackgroundNoise = backgroundConsoleWarnings.filter(({ text }) =>
+  /Rejected runtime message without a valid contract|Failed to disable preparation after navigation|Unauthorized content runtime wake-up sender/.test(
+    text
+  )
+);
+if (rejectedBackgroundNoise.length > 0) {
+  failures.push(
+    `Background emitted known export warning noise: ${JSON.stringify(rejectedBackgroundNoise)}`
+  );
+}
 const requireCase = (condition, item, message) => {
   if (!condition) failures.push(`${item.name}: ${message}`);
 };
@@ -178,6 +245,11 @@ if (passed.length < selectedCases.length) {
   failures.push(`Only ${passed.length}/${selectedCases.length} selected cases completed`);
 }
 for (const item of passed) {
+  if (item.downloadProof) {
+    requireCase(Boolean(item.downloadProof.filename), item, 'download did not publish a filename');
+    continue;
+  }
+  const postCaptureSourceInfo = item.sourceAfterFullScreenshotInfo ?? item.sourceInfo;
   requireCase(
     item.visualInfo.naturalWidth > 0 && item.visualInfo.naturalHeight > 0,
     item,
@@ -217,9 +289,11 @@ for (const item of passed) {
     item,
     'viewer made external network requests'
   );
-  const heightDelta = Math.abs(item.staticInfo.documentHeight - item.sourceInfo.documentHeight);
+  const heightDelta = Math.abs(
+    item.staticInfo.documentHeight - postCaptureSourceInfo.documentHeight
+  );
   requireCase(
-    heightDelta <= Math.max(2, item.sourceInfo.documentHeight * 0.005),
+    heightDelta <= Math.max(2, postCaptureSourceInfo.documentHeight * 0.005),
     item,
     'static document height drifted beyond 0.5%'
   );
@@ -240,21 +314,45 @@ for (const item of passed) {
     'retained capture differs from the live page by more than 5% of pixels'
   );
   requireCase(
-    item.staticInfo.elementCount >= item.sourceInfo.elementCount * 0.85,
+    item.staticInfo.elementCount >= postCaptureSourceInfo.elementCount * 0.85,
     item,
     'static document lost too many elements'
   );
   requireCase(
-    item.staticInfo.textLength >= item.sourceInfo.textLength * 0.95,
+    item.staticInfo.textLength >= postCaptureSourceInfo.textLength * 0.95,
     item,
     'static document lost too much visible text'
   );
   requireCase(
-    item.staticInfo.loadedImages >= item.sourceInfo.loadedImages * 0.9,
+    item.staticInfo.loadedImages >= postCaptureSourceInfo.loadedImages * 0.9,
     item,
     'static document lost too many loaded images'
   );
   if (item.name === 'fixture') {
+    requireCase(
+      item.externalLinkProof?.executableHref === null &&
+        item.externalLinkProof.projectedHref === item.externalLinkProof.openedUrl,
+      item,
+      'safe external link did not remain inert or open in a separate live tab'
+    );
+    requireCase(
+      Boolean(item.sourceInfo.inlineMaskImage && item.sourceInfo.inlineMaskImage !== 'none') &&
+        Boolean(item.staticInfo.inlineMaskImage && item.staticInfo.inlineMaskImage !== 'none'),
+      item,
+      'captured inline SVG CSS mask was lost from the static document'
+    );
+    requireCase(
+      Boolean(item.sourceInfo.escapedMaskImage && item.sourceInfo.escapedMaskImage !== 'none') &&
+        Boolean(item.staticInfo.escapedMaskImage && item.staticInfo.escapedMaskImage !== 'none'),
+      item,
+      'captured CSS-escaped utf8 SVG mask was lost from the static document'
+    );
+    requireCase(
+      postCaptureSourceInfo.dynamicPanelExpanded === true &&
+        item.staticInfo.dynamicPanelExpanded === true,
+      item,
+      'dynamic layout growth was not retained after capture-plan stabilization'
+    );
     requireCase(
       item.staticInfo.shadowCard?.display === 'block' &&
         item.staticInfo.shadowCard.nestedImageWidth > 0 &&
@@ -286,28 +384,43 @@ for (const item of passed) {
   if (popupUi) {
     const popupProof = item.popupProof;
     requireCase(
-      Boolean(popupProof?.setupDialogGeometry) &&
-        popupProof.setupDialogGeometry.top >= 0 &&
-        popupProof.setupDialogGeometry.bottom <= popupProof.setupDialogGeometry.viewportHeight,
+      Boolean(popupProof?.selectionCurtainGeometry) &&
+        popupProof.selectionCurtainGeometry.top >= 0 &&
+        popupProof.selectionCurtainGeometry.bottom <=
+          popupProof.selectionCurtainGeometry.viewportHeight,
       item,
-      'disabled Web Snapshot setup dialog does not fit its viewport'
+      'Package Contents curtain does not fit its viewport'
     );
     requireCase(
-      popupProof?.setupDialogGeometry.buttons.some(
+      popupProof?.selectionCurtainGeometry.buttons.some(
         (button) =>
-          /Open settings|Открыть настройки/i.test(button.text) &&
-          button.bottom <= popupProof.setupDialogGeometry.viewportHeight
+          /Back|Назад/i.test(`${button.text} ${button.ariaLabel}`) &&
+          button.bottom <= popupProof.selectionCurtainGeometry.viewportHeight
       ),
       item,
-      'popup setup action is outside the viewport'
+      'Package Contents curtain back action is outside the viewport'
     );
+    const progressObservations = popupProof?.progressObservations ?? [];
     requireCase(
-      (popupProof?.progressObservations.filter((observation) =>
-        /In progress|В процессе/i.test(observation.text)
-      ).length ?? 0) >= 3,
+      progressObservations.some((observation) =>
+        observation.steps?.some((step) => step.status === 'active')
+      ),
       item,
       'popup did not expose in-progress capture updates'
     );
+    const progressRank = { pending: 0, active: 1, done: 2, error: 2 };
+    const latestProgressRank = new Map();
+    let progressRegressed = false;
+    for (const observation of progressObservations) {
+      for (const step of observation.steps ?? []) {
+        const rank = progressRank[step.status];
+        if (rank === undefined) continue;
+        const previousRank = latestProgressRank.get(step.key) ?? -1;
+        if (rank < previousRank) progressRegressed = true;
+        latestProgressRank.set(step.key, Math.max(previousRank, rank));
+      }
+    }
+    requireCase(!progressRegressed, item, 'popup replayed an already completed progress step');
     requireCase(
       /Open Web Snapshot|Открыть веб-снимок/i.test(popupProof?.resultTitle ?? ''),
       item,

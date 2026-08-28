@@ -112,6 +112,7 @@ function createDefaultSessionState(): PopupExportController['state']['session'] 
       copyRequestIdRef: { current: 0 },
       copyResetTimeoutRef: { current: null },
       requestIdRef: { current: null },
+      terminalRequestIdRef: { current: null },
     },
     transfer: {
       launchedPlan: null,

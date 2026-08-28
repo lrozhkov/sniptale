@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 
-export type PopupActionButtonTone = 'primary' | 'secondary' | 'gallery';
+export type PopupActionButtonTone = 'primary' | 'secondary' | 'gallery' | 'danger';
 
 export interface PopupActionButtonProps {
   icon: ComponentType<{ className?: string }>;

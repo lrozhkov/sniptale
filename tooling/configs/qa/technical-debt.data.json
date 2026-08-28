@@ -1678,6 +1678,7 @@
         "apps/extension/src/background/capture/native-app/sha256.ts",
         "apps/extension/src/background/capture/native-app/telemetry.ts",
         "apps/extension/src/background/capture/native-app/transfer-queue.ts",
+        "apps/extension/src/background/capture/page-package/job/action-indicator.ts",
         "apps/extension/src/background/capture/page-package/job/active-job.ts",
         "apps/extension/src/background/capture/page-package/job/cancellation.ts",
         "apps/extension/src/background/capture/page-package/job/download-effect.ts",
@@ -2293,6 +2294,7 @@
         "apps/extension/src/background/capture/native-app/sha256.ts",
         "apps/extension/src/background/capture/native-app/telemetry.ts",
         "apps/extension/src/background/capture/native-app/transfer-queue.ts",
+        "apps/extension/src/background/capture/page-package/job/action-indicator.ts",
         "apps/extension/src/background/capture/page-package/job/active-job.ts",
         "apps/extension/src/background/capture/page-package/job/cancellation.ts",
         "apps/extension/src/background/capture/page-package/job/download-effect.ts",
@@ -3454,7 +3456,6 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/contracts.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/record-patch.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-page-package-cutover.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/mutation.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/read-primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
@@ -3489,7 +3490,6 @@
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/contracts.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/record-patch.ts",
-        "apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-page-package-cutover.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/mutation.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/read-primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
@@ -3908,16 +3908,14 @@
         "apps/extension/src/composition/persistence/settings/context-menu.guards.ts",
         "apps/extension/src/composition/persistence/settings/file-scheme-consent.ts",
         "apps/extension/src/composition/persistence/settings/guards.ts",
-        "apps/extension/src/composition/persistence/settings/index.ts",
-        "apps/extension/src/composition/persistence/settings/web-snapshot-consent.ts"
+        "apps/extension/src/composition/persistence/settings/index.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/settings/array.guards.ts",
         "apps/extension/src/composition/persistence/settings/context-menu.guards.ts",
         "apps/extension/src/composition/persistence/settings/file-scheme-consent.ts",
         "apps/extension/src/composition/persistence/settings/guards.ts",
-        "apps/extension/src/composition/persistence/settings/index.ts",
-        "apps/extension/src/composition/persistence/settings/web-snapshot-consent.ts"
+        "apps/extension/src/composition/persistence/settings/index.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -4588,6 +4586,7 @@
         "apps/extension/src/content/overlay/viewport-selector/views.tsx",
         "apps/extension/src/content/page-package/composition.ts",
         "apps/extension/src/content/page-package/index.ts",
+        "apps/extension/src/content/page-package/readme.ts",
         "apps/extension/src/content/page-package/staged-transfer.ts",
         "apps/extension/src/content/parser/backends/contracts.ts",
         "apps/extension/src/content/parser/backends/index.ts",
@@ -4885,6 +4884,7 @@
         "apps/extension/src/content/runtime/entrypoint/diagnostics.ts",
         "apps/extension/src/content/runtime/entrypoint/lifecycle.ts",
         "apps/extension/src/content/runtime/entrypoint/markers.ts",
+        "apps/extension/src/content/runtime/shim/document-policy.ts",
         "apps/extension/src/content/runtime/shim/index.ts",
         "apps/extension/src/content/runtime/shim/quick-actions.ts",
         "apps/extension/src/content/runtime/shim/transport/quick-action.ts",
@@ -10171,7 +10171,6 @@
         "apps/extension/src/popup/shell/export/footer/index.tsx",
         "apps/extension/src/popup/shell/export/footer/layout.tsx",
         "apps/extension/src/popup/shell/export/footer/primary-action.tsx",
-        "apps/extension/src/popup/shell/export/footer/snapshot-button.tsx",
         "apps/extension/src/popup/shell/export/footer/tokens.ts",
         "apps/extension/src/popup/shell/export/pages/content.tsx",
         "apps/extension/src/popup/shell/export/pages/drawer.tsx",
@@ -10179,7 +10178,6 @@
         "apps/extension/src/popup/shell/export/pages/page.tsx",
         "apps/extension/src/popup/shell/export/pages/section.tsx",
         "apps/extension/src/popup/shell/export/pages/snapshot-availability.ts",
-        "apps/extension/src/popup/shell/export/pages/snapshot-setup-dialog.tsx",
         "apps/extension/src/popup/shell/export/pages/summary-row.tsx",
         "apps/extension/src/popup/shell/export/pages/summary.tsx",
         "apps/extension/src/popup/shell/export/progress/index.ts",
@@ -10384,7 +10382,6 @@
         "apps/extension/src/popup/shell/export/footer/index.tsx",
         "apps/extension/src/popup/shell/export/footer/layout.tsx",
         "apps/extension/src/popup/shell/export/footer/primary-action.tsx",
-        "apps/extension/src/popup/shell/export/footer/snapshot-button.tsx",
         "apps/extension/src/popup/shell/export/footer/tokens.ts",
         "apps/extension/src/popup/shell/export/pages/content.tsx",
         "apps/extension/src/popup/shell/export/pages/drawer.tsx",
@@ -10392,7 +10389,6 @@
         "apps/extension/src/popup/shell/export/pages/page.tsx",
         "apps/extension/src/popup/shell/export/pages/section.tsx",
         "apps/extension/src/popup/shell/export/pages/snapshot-availability.ts",
-        "apps/extension/src/popup/shell/export/pages/snapshot-setup-dialog.tsx",
         "apps/extension/src/popup/shell/export/pages/summary-row.tsx",
         "apps/extension/src/popup/shell/export/pages/summary.tsx",
         "apps/extension/src/popup/shell/export/progress/index.ts",
@@ -11434,9 +11430,6 @@
         "apps/extension/src/settings/sections/capture/storage-drafts/dialogs.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
-        "apps/extension/src/settings/sections/capture/web-snapshots/content.tsx",
-        "apps/extension/src/settings/sections/capture/web-snapshots/controller.ts",
-        "apps/extension/src/settings/sections/capture/web-snapshots/index.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
@@ -11762,9 +11755,6 @@
         "apps/extension/src/settings/sections/capture/storage-drafts/dialogs.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
-        "apps/extension/src/settings/sections/capture/web-snapshots/content.tsx",
-        "apps/extension/src/settings/sections/capture/web-snapshots/controller.ts",
-        "apps/extension/src/settings/sections/capture/web-snapshots/index.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
@@ -19496,7 +19486,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/popup-driver.mjs",
-        "contentHash": "21d91c0012db7018e09cda8d53ce2782ffec6eb8886451f695ed4cb23457f94b"
+        "contentHash": "f35194671355054c53789b5888cf4189cf1c8b3d3346f38418ea6594025f2e4f"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/case-verification.mjs",
@@ -19504,12 +19494,17 @@
         "tooling/web-snapshot-smoke/source-capture.mjs"
       ],
       "surfaces": [
-        "property:enableForTab/anonymous-7/__sniptaleRuntimeFreshness",
-        "property:enableWebSnapshotsForSmoke/anonymous-177/sniptale_settings",
-        "property:saveSnapshot/anonymous-23/options",
-        "property:saveSnapshot/anonymous-23/orderedTabs",
-        "property:saveSnapshot/anonymous-23/warnings",
-        "property:saveSnapshot/anonymous-23/withFreshness/__sniptaleRuntimeFreshness",
+        "property:downloadSnapshotPackage/anonymous-89/downloadProof",
+        "property:downloadSnapshotPackage/anonymous-89/options",
+        "property:downloadSnapshotPackage/anonymous-89/orderedTabs",
+        "property:downloadSnapshotPackage/anonymous-89/warnings",
+        "property:downloadSnapshotPackage/anonymous-89/withFreshness/__sniptaleRuntimeFreshness",
+        "property:enableForTab/anonymous-11/__sniptaleRuntimeFreshness",
+        "property:enableWebSnapshotsForSmoke/anonymous-374/sniptale_settings",
+        "property:saveSnapshot/anonymous-30/options",
+        "property:saveSnapshot/anonymous-30/orderedTabs",
+        "property:saveSnapshot/anonymous-30/warnings",
+        "property:saveSnapshot/anonymous-30/withFreshness/__sniptaleRuntimeFreshness",
         "property:saveSnapshotThroughPopup/popupProof",
         "property:saveSnapshotThroughPopup/warnings"
       ]
@@ -20376,15 +20371,19 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/runner.mjs",
-        "contentHash": "0318b1f2096de6539fa4b9524ffaa40bf4ae0208b93e8c72ecabf13d36dec5c2"
+        "contentHash": "b62bd712e36243df4c5fddb67abca13cf5f4d028f484f5cf6e72dc615f50c765"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/runner.mjs"
       ],
       "surfaces": [
+        "binding:backgroundConsoleWarnings",
         "binding:cases",
+        "binding:diagnosticConsoleMessages",
         "binding:failures",
         "binding:fixtureResources",
+        "binding:latestProgressRank",
+        "binding:progressRank",
         "binding:report",
         "property:args",
         "property:cases",

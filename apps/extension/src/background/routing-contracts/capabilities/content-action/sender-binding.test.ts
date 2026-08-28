@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
+  runtimeInfo: {
+    getURL: (path: string) => `chrome-extension://test/${path}`,
+  },
+}));
 
 import { authorizeContentSender } from './sender-binding';
 
@@ -23,6 +30,54 @@ describe('authorizeContentSender', () => {
         tabId: 7,
       },
     });
+  });
+
+  it('uses the browser-owned tab URL when Chrome reports the isolated script URL', () => {
+    expect(
+      authorizeContentSender(
+        sender({
+          origin: 'https://example.test',
+          tab: { id: 7, url: 'https://example.test/page' } as chrome.tabs.Tab,
+          url: 'chrome-extension://sniptale/assets/contentRuntimeShim.js',
+        }),
+        7
+      )
+    ).toEqual({
+      allowed: true,
+      principal: {
+        documentId: 'document-7',
+        frameId: 0,
+        senderUrl: 'https://example.test/page',
+        tabId: 7,
+      },
+    });
+  });
+
+  it('allows an owned extension sender only for an explicitly opted-in low-privilege route', () => {
+    const ownedSender = sender({
+      url: 'chrome-extension://test/assets/runtime-generated-entry.js',
+    });
+
+    expect(authorizeContentSender(ownedSender, 7)).toEqual({
+      allowed: false,
+      reason: 'extension-sender',
+    });
+    expect(authorizeContentSender(ownedSender, 7, { allowOwnedExtensionSender: true })).toEqual({
+      allowed: true,
+      principal: {
+        documentId: 'document-7',
+        frameId: 0,
+        senderUrl: 'chrome-extension://test/assets/runtime-generated-entry.js',
+        tabId: 7,
+      },
+    });
+    expect(
+      authorizeContentSender(
+        sender({ url: 'chrome-extension://foreign-extension/assets/runtime.js' }),
+        7,
+        { allowOwnedExtensionSender: true }
+      )
+    ).toEqual({ allowed: false, reason: 'extension-sender' });
   });
 
   it.each([

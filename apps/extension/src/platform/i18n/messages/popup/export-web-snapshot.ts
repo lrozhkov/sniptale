@@ -9,40 +9,6 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
     ru: 'Сохранить снимок',
     en: 'Save snapshot',
   },
-  webSnapshotSetupTitle: {
-    ru: 'Веб-снимки выключены',
-    en: 'Web Snapshots are off',
-  },
-  webSnapshotSetupDescription: {
-    ru: [
-      'Функция сохраняет автономную копию страницы с текстом, оформлением, изображениями',
-      'и полноразмерным скриншотом. Включите её и выберите доступ к ресурсам в настройках.',
-    ].join(' '),
-    en: [
-      'This feature saves a self-contained copy of the page with its text, layout, images,',
-      'and a full-page screenshot. Enable it and choose resource access in Settings.',
-    ].join(' '),
-  },
-  webSnapshotSetupUnavailableTitle: {
-    ru: 'Не удалось проверить настройку',
-    en: 'Could not check the setting',
-  },
-  webSnapshotSetupUnavailableDescription: {
-    ru: 'Откройте настройки Web-снимков, проверьте параметры и попробуйте снова.',
-    en: 'Open Web Snapshot settings, check the options, and try again.',
-  },
-  webSnapshotSetupPrivacyHint: {
-    ru: 'Снимок может содержать видимые личные данные. Проверяйте его перед отправкой.',
-    en: 'A snapshot may contain visible personal information. Review it before sharing.',
-  },
-  webSnapshotSetupClose: {
-    ru: 'Закрыть',
-    en: 'Close',
-  },
-  webSnapshotSetupOpenSettings: {
-    ru: 'Открыть настройки',
-    en: 'Open Settings',
-  },
   webSnapshotSaved: {
     ru: 'Веб-снимок сохранён в Библиотеку',
     en: 'Web snapshot saved to Library',
@@ -60,12 +26,12 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
     en: `${sharedWebSnapshotPluralNameMessage.en} saved to Library with warnings`,
   },
   openWebSnapshot: {
-    ru: `Открыть ${sharedWebSnapshotSingularNameMessage.ru}`,
+    ru: 'Открыть веб-снимок',
     en: `Open ${sharedWebSnapshotSingularNameMessage.en}`,
   },
   openWebSnapshotsGallery: {
-    ru: `Открыть ${sharedWebSnapshotPluralNameMessage.ru} в Библиотеке`,
-    en: `Open ${sharedWebSnapshotPluralNameMessage.en} in Library`,
+    ru: 'Открыть в Библиотеке',
+    en: 'Open Library',
   },
   webSnapshotSaving: {
     ru: 'Сохраняем веб-снимок...',

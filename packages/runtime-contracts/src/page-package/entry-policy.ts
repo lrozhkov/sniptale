@@ -14,6 +14,9 @@ const REQUIRED_WEB_COPY_MIME: Readonly<Record<string, string>> = {
   [PAGE_PACKAGE_ARCHIVE_PATHS.screenshot]: 'image/png',
   [PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail]: 'image/webp',
 };
+const REQUIRED_ROOT_PAGE_DATA_MIME: Readonly<Record<string, string>> = {
+  [PAGE_PACKAGE_ARCHIVE_PATHS.readme]: 'text/markdown',
+};
 const INERT_DIAGNOSTIC_MIME_TYPES = ['application/json', 'text/plain'] as const;
 const ACTIVE_DIAGNOSTIC_PATH_SUFFIXES = [
   '.css',
@@ -87,6 +90,10 @@ export function isPagePackageEntryPath(
       (component === 'webCopy' ||
         (path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot && component === 'images'))
     );
+  }
+  const requiredPageDataMime = REQUIRED_ROOT_PAGE_DATA_MIME[path];
+  if (requiredPageDataMime !== undefined) {
+    return mimeType === requiredPageDataMime;
   }
   switch (component) {
     case 'webCopy':

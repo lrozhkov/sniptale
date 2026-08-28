@@ -1,4 +1,8 @@
-import type { ExportOptions, ExportPagePackage } from '@sniptale/runtime-contracts/export';
+import type {
+  ExportOptions,
+  ExportPagePackage,
+  ExportProgress,
+} from '@sniptale/runtime-contracts/export';
 import type { ArchiveArtifact } from '../../export-manager/archive';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
@@ -21,6 +25,7 @@ export type PopupExportRunner = {
     }
   ) => Promise<ExportPagePackage>;
   cancel: () => void;
+  onProgress?: (callback: (progress: ExportProgress) => void) => void;
 };
 
 export type PopupExportState = {

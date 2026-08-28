@@ -57,6 +57,22 @@ describe('extended diagnostic DOM projection', () => {
     );
   });
 
+  it('keeps long valid SVG path data parseable while redacting diagnostic attributes', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const pathData = `M0 0 ${Array.from({ length: 80 }, (_, index) => `L${index + 1} ${index + 1}`).join(' ')} Z`;
+    path.setAttribute('d', pathData);
+    path.setAttribute('data-token', 'diagnostic-secret');
+    svg.append(path);
+    document.body.append(svg);
+
+    const projection = buildExtendedDiagnosticDomProjection(document);
+
+    expect(projection.html).toContain(`d="${pathData}"`);
+    expect(projection.html).not.toContain('... [truncated]');
+    expect(projection.html).not.toContain('diagnostic-secret');
+  });
+
   it('rejects an oversized element frontier before cloning', () => {
     const root = document.documentElement;
     let remaining = MAX_EXTENDED_DIAGNOSTIC_ELEMENTS;

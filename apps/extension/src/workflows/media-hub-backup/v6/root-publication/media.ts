@@ -260,10 +260,7 @@ async function replaceSanitizedSnapshotPackage(args: {
   if (!isWebSnapshotManifest(metadata.webSnapshot.entry.manifest)) {
     throw new Error('Restored web snapshot manifest is invalid.');
   }
-  if (
-    metadata.webSnapshot.entry.manifest.intent !== 'save' ||
-    metadata.webSnapshot.entry.manifest.diagnosticsLevel === 'extended'
-  ) {
+  if (metadata.webSnapshot.entry.manifest.intent !== 'save') {
     throw new Error('Restored Page Package uses a non-Library profile.');
   }
   const objects = objectMap(args.staged);

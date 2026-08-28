@@ -10,6 +10,7 @@ function createRuntimeSessionState(): Pick<
   | 'copyResetTimeoutRef'
   | 'progress'
   | 'requestIdRef'
+  | 'terminalRequestIdRef'
   | 'result'
   | 'setCopiedFormat'
   | 'setCopyingFormat'
@@ -26,6 +27,7 @@ function createRuntimeSessionState(): Pick<
     copyResetTimeoutRef: { current: null },
     progress: { activeStepKey: null, current: 0, errors: [], message: '', phase: 'idle', total: 0 },
     requestIdRef: { current: null },
+    terminalRequestIdRef: { current: null },
     result: null,
     launchedPlan: null,
     setCopiedFormat: vi.fn(),

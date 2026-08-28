@@ -38,6 +38,7 @@ export type StreamingStitchResult = {
 };
 
 type StreamingFullPageStitcher = {
+  dispose(): void;
   drawFrame(
     dataUrl: string,
     plan: FullPageTilePlan,
@@ -359,6 +360,10 @@ export async function createStreamingFullPageStitcher(args: {
   let frozenExtentWarning = args.frozenExtentWarning;
 
   return {
+    dispose() {
+      firstPending?.close();
+      firstPending = null;
+    },
     async drawFrame(dataUrl, plan, state) {
       const bitmap = firstPending ?? (await decodeFrame(dataUrl));
       firstPending = null;

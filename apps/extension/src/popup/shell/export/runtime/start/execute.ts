@@ -50,7 +50,6 @@ export async function startPopupExport(
         ? {
             ...state.saveSelection,
             includeFullPageScreenshot: true,
-            includePageDiagnostics: false,
             includeWebCopy: true,
           }
         : {
@@ -68,6 +67,7 @@ export async function startPopupExport(
     }
 
     state.requestIdRef.current = jobId;
+    state.terminalRequestIdRef.current = null;
     state.cancelRetryRef.current = {
       exportRunId: jobId,
       owner: 'job',
@@ -100,8 +100,6 @@ export async function startPopupExport(
     if (!response?.success || !response.status) {
       throw new Error(response?.error || translate('popup.export.startExportError'));
     }
-    state.setProgress(response.status.progress);
-    if (response.status.result) state.setResult(response.status.result);
   } catch (error) {
     reportStartExportFailure(state, error);
   }

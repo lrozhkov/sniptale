@@ -106,8 +106,7 @@ function parseCoreDomain(
     case 'capture.after-capture':
     case 'capture.saving':
     case 'capture.retention':
-    case 'system.voice':
-    case 'access.capture-assets': {
+    case 'system.voice': {
       const storageShape = mainSettingsStorageShape(domainId, value);
       const parsed = parseStoredSettings(storageShape);
       if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)
@@ -294,11 +293,6 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
       return {
         voiceInput: { language: value['language'], mode: value['mode'], microphoneDeviceId: null },
       };
-    case 'access.capture-assets':
-      return {
-        authenticatedSnapshotAssetsEnabled: value['authenticated'],
-        anonymousCrossOriginSnapshotAssetsEnabled: value['anonymous'],
-      };
     default:
       return value;
   }
@@ -344,15 +338,6 @@ function coreSettingsTransferData(
             ...(source['language'] === undefined ? {} : { language: parsed.voiceInput?.language }),
             ...(source['mode'] === undefined ? {} : { mode: parsed.voiceInput?.mode }),
           };
-    case 'access.capture-assets':
-      return {
-        ...(source['authenticated'] === undefined
-          ? {}
-          : { authenticated: parsed.authenticatedSnapshotAssetsEnabled }),
-        ...(source['anonymous'] === undefined
-          ? {}
-          : { anonymous: parsed.anonymousCrossOriginSnapshotAssetsEnabled }),
-      };
     default:
       return failSettingsTransferDomain(domainId);
   }

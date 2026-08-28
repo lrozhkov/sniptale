@@ -32,6 +32,55 @@ interface ParsedCssString {
   url: string;
 }
 
+function decodeCssStringEscapes(value: string): string {
+  let decoded = '';
+  for (let index = 0; index < value.length;) {
+    const char = value[index] ?? '';
+    if (char !== '\\') {
+      const codePoint = value.codePointAt(index);
+      if (codePoint === undefined) break;
+      const character = String.fromCodePoint(codePoint);
+      decoded += character;
+      index += character.length;
+      continue;
+    }
+
+    const next = value[index + 1] ?? '';
+    if (next === '\r' && value[index + 2] === '\n') {
+      index += 3;
+      continue;
+    }
+    if (next === '\n' || next === '\r' || next === '\f') {
+      index += 2;
+      continue;
+    }
+
+    let cursor = index + 1;
+    let hex = '';
+    while (hex.length < 6 && /[0-9a-f]/iu.test(value[cursor] ?? '')) {
+      hex += value[cursor];
+      cursor += 1;
+    }
+    if (hex) {
+      decoded += normalizeCssEscapeCodePoint(Number.parseInt(hex, 16));
+      if (value[cursor] === '\r' && value[cursor + 1] === '\n') cursor += 2;
+      else if (/[\t\n\f\r ]/u.test(value[cursor] ?? '')) cursor += 1;
+      index = cursor;
+      continue;
+    }
+
+    const escapedCodePoint = value.codePointAt(index + 1);
+    if (escapedCodePoint === undefined) {
+      index += 1;
+      continue;
+    }
+    const escapedCharacter = String.fromCodePoint(escapedCodePoint);
+    decoded += escapedCharacter;
+    index += 1 + escapedCharacter.length;
+  }
+  return decoded;
+}
+
 function skipCssImport(value: string, index: number): number {
   let cursor = index;
   let inBlockComment = false;
@@ -148,7 +197,7 @@ function parseCssUrlFunction(value: string, index: number): ParsedCssUrlFunction
       continue;
     }
     if (quote ? char === quote : char === ')') {
-      const url = value.slice(start, cursor).trim();
+      const url = decodeCssStringEscapes(value.slice(start, cursor).trim());
       cursor += 1;
       if (quote) {
         while (/\s/u.test(value[cursor] ?? '')) cursor += 1;
@@ -175,7 +224,7 @@ function parseCssString(value: string, index: number): ParsedCssString | null {
       continue;
     }
     if (char === quote) {
-      return { nextIndex: cursor + 1, url: value.slice(start, cursor) };
+      return { nextIndex: cursor + 1, url: decodeCssStringEscapes(value.slice(start, cursor)) };
     }
     if (char === '\n' || char === '\r' || char === '\f') return null;
     cursor += 1;

@@ -29,4 +29,8 @@ export type PopupStartupDescriptor =
       recordingStartFailed?: true;
       startError?: string;
     }
-  | { page: 'export'; launchSelection?: { includeAnnotations: true } };
+  | {
+      page: 'export';
+      destination?: 'export' | 'save';
+      launchSelection?: { includeAnnotations: true };
+    };

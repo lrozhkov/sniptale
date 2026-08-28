@@ -133,7 +133,7 @@ it('routes registered web snapshot asset fetches to the capture action owner', (
   const { routed, sendResponse } = routeMessage({
     type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
     snapshotSessionId: 'snapshot-session-1',
-    url: 'https://upload.wikimedia.org/example.svg',
+    urls: ['https://assets.example.test/example.svg'],
   });
 
   expect(routed).toBe(true);
@@ -141,7 +141,7 @@ it('routes registered web snapshot asset fetches to the capture action owner', (
     {
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
       snapshotSessionId: 'snapshot-session-1',
-      url: 'https://upload.wikimedia.org/example.svg',
+      urls: ['https://assets.example.test/example.svg'],
     },
     42,
     sendResponse

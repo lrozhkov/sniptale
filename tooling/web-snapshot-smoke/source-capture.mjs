@@ -4,9 +4,10 @@ import { inspectDocument } from './document-inspection.mjs';
 import {
   enableForTab,
   enableWebSnapshotsForSmoke,
+  downloadSnapshotPackage,
   saveSnapshot,
   saveSnapshotThroughPopup,
-  verifyDisabledSetupDialog,
+  verifyPackageContentsCurtain,
 } from './popup-driver.mjs';
 
 export async function captureSmokeSource({ context, out, popup, popupUi, spec, state }) {
@@ -14,7 +15,10 @@ export async function captureSmokeSource({ context, out, popup, popupUi, spec, s
   await target.setViewportSize({ width: 1280, height: 800 });
   const consoleErrors = [];
   target.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+      process.stderr.write(`[smoke:${spec.name}] ${message.text()}\n`);
+    }
   });
   await target.goto(spec.url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await target.waitForTimeout(1500);
@@ -25,23 +29,26 @@ export async function captureSmokeSource({ context, out, popup, popupUi, spec, s
   await enableForTab(popup, target, targetTab.id);
   await popup.evaluate((id) => globalThis.chrome.tabs.update(id, { active: true }), targetTab.id);
   await target.bringToFront();
-  if (popupUi && state.setupDialogGeometry === null) {
-    state.setupDialogGeometry = await verifyDisabledSetupDialog(popup, out);
+  if (popupUi && state.selectionCurtainGeometry === null) {
+    state.selectionCurtainGeometry = await verifyPackageContentsCurtain(popup, out);
     await enableWebSnapshotsForSmoke(popup);
   }
   const sourceInfo = await inspectDocument(target);
   const sourceViewportScreenshot = await target.screenshot({ fullPage: false });
   await writeFile(join(out, spec.name + '-source-viewport.png'), sourceViewportScreenshot);
   await target.screenshot({ fullPage: true, path: join(out, spec.name + '-source.png') });
-  const saved = popupUi
-    ? await saveSnapshotThroughPopup({
-        context,
-        out,
-        popup,
-        setupDialogGeometry: state.setupDialogGeometry,
-        specName: spec.name,
-      })
-    : await saveSnapshot(popup, targetTab.id);
+  const saved =
+    process.env.SNAPSHOT_SMOKE_DOWNLOAD === '1'
+      ? await downloadSnapshotPackage(popup, targetTab.id)
+      : popupUi
+        ? await saveSnapshotThroughPopup({
+            context,
+            out,
+            popup,
+            selectionCurtainGeometry: state.selectionCurtainGeometry,
+            specName: spec.name,
+          })
+        : await saveSnapshot(popup, targetTab.id);
   await target.waitForTimeout(250);
   const sourceAfterFullScreenshotInfo = await inspectDocument(target);
   const sourceAfterCaptureViewportScreenshot = await target.screenshot({ fullPage: false });

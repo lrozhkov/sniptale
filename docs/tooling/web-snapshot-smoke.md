@@ -30,6 +30,14 @@ Set `SNAPSHOT_SMOKE_POPUP_UI=1` to save through the visible popup flow and verif
 SNAPSHOT_SMOKE_POPUP_UI=1 SNAPSHOT_SMOKE_CASE=fixture npm run web-snapshot:smoke
 ```
 
+Set `SNAPSHOT_SMOKE_DOWNLOAD=1` to exercise the archive-download lifecycle instead of Library persistence. This mode verifies browser admission, terminal download state, offscreen lease release, and durable output cleanup without retaining the target URL in tooling sources:
+
+```bash
+SNAPSHOT_SMOKE_DOWNLOAD=1 SNAPSHOT_SMOKE_URL='https://target.example/page' SNAPSHOT_SMOKE_CASE=external-url npm run web-snapshot:smoke
+```
+
+Set `SNAPSHOT_SMOKE_RICH_PACKAGE=1` to select the full data-and-files profile. Set `SNAPSHOT_SMOKE_TIMEOUT_MS` to at least `10000` when a live page needs a larger bounded completion window; timeout failures include the last durable phase, progress payload, and revision.
+
 The report records source, retained screenshot, static document, gallery, asset-catalog, and popup observations. The command fails when the static document loses too much layout, text, imagery, or height; when visual pixel drift crosses the bounded thresholds; when the retained screenshot or its 320×180 top-crop thumbnail is unavailable; when the viewer performs an external request; when scripts survive in the static document; or when the reveal/import regression reappears. PNG evidence and `report.json` remain local and ignored by Git.
 
 The runner enables Web Snapshots and both resource-download options only inside its temporary extension profile. It also adds `<all_urls>` only to a temporary copy of the built manifest so the matrix can exercise arbitrary origins; it does not change the product manifest or a user profile.

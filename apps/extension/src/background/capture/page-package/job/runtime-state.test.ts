@@ -148,6 +148,44 @@ it('serializes immutable publications in monotonically increasing revision order
   ]);
 });
 
+it('merges queued phase progress without erasing producer outcomes', async () => {
+  const job = createJob();
+  let releaseFirstWrite!: () => void;
+  mocks.write.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseFirstWrite = resolve;
+      })
+  );
+
+  const producer = updatePagePackageJobStatus(job, {
+    progress: {
+      ...job.status.progress,
+      activeStepKey: 'files',
+      completedStepKeys: ['json', 'markdown'],
+    },
+  });
+  const pagePhase = updatePagePackageJobStatus(job, {
+    progress: {
+      current: 0,
+      errors: [],
+      message: 'Collecting page',
+      phase: 'downloading',
+      total: 1,
+    },
+  });
+
+  await vi.waitFor(() => expect(mocks.write).toHaveBeenCalledOnce());
+  releaseFirstWrite();
+  await Promise.all([producer, pagePhase]);
+
+  expect(job.status.progress).toMatchObject({
+    activeStepKey: 'files',
+    completedStepKeys: ['json', 'markdown'],
+    message: 'Collecting page',
+  });
+});
+
 it('linearizes cancellation admission against terminal completion without deleting completed output', async () => {
   const cancelledFirst = createJob();
   const cancellation = admitPopupExportJobCancellation(cancelledFirst);
@@ -181,6 +219,25 @@ it('linearizes cancellation admission against terminal completion without deleti
   await expect(lateCancellation).resolves.toBe(false);
   expect(completedFirst.status.phase).toBe('completed');
   expect(completedFirst.abortController.signal.aborted).toBe(false);
+});
+
+it('aborts active producers before the cancelling status write finishes', async () => {
+  const job = createJob();
+  let releaseWrite!: () => void;
+  mocks.write.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      })
+  );
+
+  const cancellation = admitPopupExportJobCancellation(job);
+  await vi.waitFor(() => expect(mocks.write).toHaveBeenCalledOnce());
+
+  expect(job.abortController.signal.aborted).toBe(true);
+  expect(job.cancelled).toBe(true);
+  releaseWrite();
+  await expect(cancellation).resolves.toBe(true);
 });
 
 it('keeps the last durable revision after a failed write and does not skip history', async () => {

@@ -26,9 +26,9 @@ export const COMPUTED_STYLE_TARGET_SELECTORS = [
 export type StylesheetMetadata = {
   disabled: boolean;
   href: string | null;
+  id: string;
   media: string[];
   owner: Record<string, unknown> | null;
-  path: string;
   restricted: boolean;
   ruleCount: number | null;
   source: 'document' | 'adopted';

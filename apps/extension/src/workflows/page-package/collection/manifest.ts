@@ -17,10 +17,21 @@ const MAX_FAILURE_MESSAGE_BYTES = 4 * 1024;
 const MAX_ERRORS_REPORT_BYTES = 8 * 1024 * 1024;
 const UTF8_ENCODER = new TextEncoder();
 
-export const PAGE_COLLECTION_README =
-  '# Sniptale Page Collection\n\n' +
-  'This archive contains safe page copies, exported page data, and capture reports. ' +
-  'Open collection-manifest.json to inspect its contents.\n';
+export const PAGE_COLLECTION_README = [
+  '# Sniptale Page Collection',
+  '',
+  'This archive contains one or more Page Packages produced by an explicit export action.',
+  '`collection-manifest.json` is the canonical page inventory and records partial failures.',
+  '',
+  'Each `pages/<number>-<title>/` directory contains its own `manifest.json` and dynamic',
+  '`README.md`. Read those files before inspecting the safe Web copy, exported data,',
+  'attachments, or inert diagnostics. Scripts do not execute in the Web copy; navigation and',
+  'form submission are disabled; retained resources use package-local paths.',
+  '',
+  '`reports/summary.json` contains aggregate counts. `reports/errors.json` identifies pages that',
+  'could not be collected without marking successful pages as failed.',
+  '',
+].join('\n');
 
 type PageCollectionFailureCode = 'page-capture-failed' | 'page-package-rejected';
 

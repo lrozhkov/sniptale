@@ -145,3 +145,21 @@ it('renders an active step without a download counter', async () => {
   expect(container?.textContent).toContain('Files');
   expect(container?.textContent).not.toContain('0/0');
 });
+
+it('renders cancellation as a neutral stopped outcome without a user attribution', async () => {
+  await renderSection(
+    createProps({
+      progress: {
+        phase: 'cancelled',
+        message: 'Ignored cancellation detail',
+        current: 0,
+        total: 0,
+        errors: [],
+      },
+    })
+  );
+
+  expect(container?.textContent).toContain('content.runtime.exportCancelled');
+  expect(container?.textContent).not.toContain('Ignored cancellation detail');
+  expect(container?.querySelector('.lucide-circle-stop')).not.toBeNull();
+});

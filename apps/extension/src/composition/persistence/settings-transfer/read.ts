@@ -147,10 +147,6 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
       tray: video.native?.trayActions,
       telemetry: video.native?.video.telemetry,
     }),
-    'access.capture-assets': payload({
-      authenticated: settings.authenticatedSnapshotAssetsEnabled,
-      anonymous: settings.anonymousCrossOriginSnapshotAssetsEnabled,
-    }),
   };
 
   const locale: AppLocale = preferences[LOCALE_STORAGE_KEY] === 'en' ? 'en' : 'ru';

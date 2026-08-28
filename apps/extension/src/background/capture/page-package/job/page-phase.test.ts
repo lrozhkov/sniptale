@@ -70,7 +70,13 @@ function job(
       ],
       originalActiveTabs: [],
       phase: 'running',
-      progress: { current: 0, errors: [], message: '', phase: 'scanning', total: 2 },
+      progress: {
+        current: 0,
+        errors: [],
+        message: '',
+        phase: 'scanning',
+        total: 2,
+      },
       revision: 1,
       warnings: [],
     },
@@ -85,7 +91,12 @@ function descriptor(ordinal: number) {
     manifestSize: 10,
     ordinal,
     pageId: `page-${ordinal}`,
-    producerStats: { filesCount: 1, filesFailed: 0, rowsCount: 2, sectionsCount: 1 },
+    producerStats: {
+      filesCount: 1,
+      filesFailed: 0,
+      rowsCount: 2,
+      sectionsCount: 1,
+    },
     stagedBlobId: `stage-${ordinal}`,
     title: `Page ${ordinal}`,
     totalBytes: 20,
@@ -117,6 +128,31 @@ it('retains only fixed staged descriptors and continues after a page failure', a
       options: expect.objectContaining({ includeFullPageScreenshot: true }),
     })
   );
+});
+
+it('publishes page collection as a partial progress patch', async () => {
+  const request = vi.fn().mockResolvedValue({ success: true, stagedPagePackage: descriptor(0) });
+  const active = job(request);
+  active.status.orderedTabs = [{ tabId: 7, title: 'One' }];
+  active.status.pageOutcomes = [{ ordinal: 0, status: 'pending', tabId: 7 }];
+  active.status.progress = {
+    ...active.status.progress,
+    activeStepKey: 'files',
+    completedStepKeys: ['json', 'markdown'],
+    failedStepKeys: ['images'],
+  };
+
+  await collectPopupExportPagePackages(active, new Map([[7, { id: 7 } as chrome.tabs.Tab]]));
+
+  expect(updatePagePackageJobStatus).toHaveBeenCalledWith(active, {
+    progress: {
+      current: 0,
+      errors: [],
+      message: `${translate('popup.export.batchCollectingMessage')} One`,
+      phase: 'downloading',
+      total: 1,
+    },
+  });
 });
 
 it('activates and requests the retained Web-copy producer without the legacy screenshot flag', async () => {
@@ -194,6 +230,42 @@ it('does not request the next Save page after cancellation settles the current c
   expect(request).toHaveBeenCalledOnce();
 });
 
+it('does not turn an expected in-flight cancellation into a page failure', async () => {
+  let active: ActivePopupExportJob;
+  const request = vi.fn(async () => {
+    active.cancelled = true;
+    throw new Error('Full-page capture cancelled');
+  });
+  active = job(request);
+  active.status.orderedTabs = [{ tabId: 7, title: 'One' }];
+  active.status.pageOutcomes = [{ ordinal: 0, status: 'pending', tabId: 7 }];
+
+  const result = await collectPopupExportPagePackages(
+    active,
+    new Map([[7, { id: 7 } as chrome.tabs.Tab]])
+  );
+
+  expect(result).toEqual({ errors: [], packages: [] });
+  expect(active.status.pageOutcomes).toEqual([{ ordinal: 0, status: 'pending', tabId: 7 }]);
+});
+
+it('stops waiting for an unresolved page producer when the job is cancelled', async () => {
+  const request = vi.fn(() => new Promise<never>(() => undefined));
+  const active = job(request);
+  active.status.orderedTabs = [{ tabId: 7, title: 'One' }];
+  active.status.pageOutcomes = [{ ordinal: 0, status: 'pending', tabId: 7 }];
+
+  const collection = collectPopupExportPagePackages(
+    active,
+    new Map([[7, { id: 7 } as chrome.tabs.Tab]])
+  );
+  await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+  active.cancelled = true;
+  active.abortController.abort(new Error('Popup export cancelled'));
+
+  await expect(collection).resolves.toEqual({ errors: [], packages: [] });
+});
+
 it('does not surface a content-world failure detail through the public job status', async () => {
   const privateDetail = 'private/account/token?secret=123';
   const request = vi.fn().mockResolvedValue({ success: false, error: privateDetail });
@@ -206,6 +278,24 @@ it('does not surface a content-world failure detail through the public job statu
 
   expect(result.errors).toEqual([`One: ${translate('content.runtime.exportPrepareFailed')}`]);
   expect(result.errors.join(' ')).not.toContain(privateDetail);
+});
+
+it('retains only the bounded preparation diagnostic code from a content failure', async () => {
+  const request = vi.fn().mockResolvedValue({
+    success: false,
+    error: 'Не удалось подготовить экспорт [ARCHIVE_STAGING]',
+  });
+  const active = job(request);
+  active.status.orderedTabs = [{ tabId: 7, title: 'One' }];
+
+  const result = await collectPopupExportPagePackages(
+    active,
+    new Map([[7, { id: 7 } as chrome.tabs.Tab]])
+  );
+
+  expect(result.errors).toEqual([
+    `One: ${translate('content.runtime.exportPrepareFailed')} [ARCHIVE_STAGING]`,
+  ]);
 });
 
 it('keeps exact-bound titles closed under generated progress and failure composition', async () => {

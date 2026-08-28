@@ -4,10 +4,10 @@ import { parseSettingsTransferDomains, SettingsTransferDomainError } from './dom
 
 describe('settings transfer registry', () => {
   it('covers every frozen visible Settings domain once', () => {
-    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(24);
+    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(23);
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.surfaces');
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.gradients');
-    expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('access.capture-assets');
+    expect(SETTINGS_TRANSFER_DOMAIN_IDS).not.toContain('access.capture-assets');
   });
 
   it('classifies secrets, device choices, and actions as non-transferable', () => {
@@ -16,7 +16,17 @@ describe('settings transfer registry', () => {
     expect(byId.get('ai.providers.security-binding')).toBe('secret');
     expect(byId.get('system.voice.microphone')).toBe('device-bound');
     expect(byId.get('system.native.connection')).toBe('action/status');
-    expect(byId.get('access.capture-assets.permissions')).toBe('action/status');
+  });
+
+  it('rejects retired Web Snapshot resource settings instead of importing them', () => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        'access.capture-assets': {
+          schemaVersion: 1,
+          data: { anonymous: true, authenticated: true },
+        },
+      })
+    ).toThrow(SettingsTransferDomainError);
   });
 
   it('rejects undeclared AI provider and provider-domain metadata', () => {

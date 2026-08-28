@@ -7,9 +7,11 @@ export { sanitizeWebSnapshotSvgText } from './sanitize-svg';
 export {
   isAllowedWebSnapshotAssetMimeType,
   resolveWebSnapshotCaptureAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeTypeFromBytes,
 } from './asset-manifest';
 export {
   isSafeWebSnapshotUrl,
+  isSafeWebSnapshotCaptureAssetUrl,
   isWebSnapshotXhtml,
   collectWebSnapshotQueryRoots,
   sanitizeWebSnapshotAttribute,
@@ -20,5 +22,6 @@ export {
   sanitizeWebSnapshotSourceUrl,
   removeWebSnapshotSensitiveControlState,
   serializeWebSnapshotXhtmlDocument,
+  WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE,
 } from './sanitize';
 export { shouldExcludeWebSnapshotFormControlValue } from './sanitize';

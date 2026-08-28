@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   authorizeWebSnapshotAssetFetch,
   authorizeWebSnapshotCaptureRequest,
+  beginWebSnapshotAssetFetch,
   beginWebSnapshotSave,
   cancelWebSnapshotCaptureRequest,
   commitWebSnapshotSave,
@@ -155,6 +156,39 @@ it('blocks a pending commit and identifies an already committed asset for compen
   commitWebSnapshotSave({ assetId: 'asset-saved', sessionId: savedSessionId, tabId: 42 });
   const savedCancellation = cancelWebSnapshotCaptureRequest(42, 'req-saved');
   expect(savedCancellation.committedAssetIds).toEqual(['asset-saved']);
+});
+
+it('aborts active asset fetches only for sessions matching the cancelled request', () => {
+  const firstUrl = 'https://cdn.example.com/first.png';
+  authorizeWebSnapshotCaptureRequest(42, 'req-first', {
+    allowAnonymousCrossOriginAssets: true,
+  });
+  const firstSessionId = registerWebSnapshotAssetSession(42, 'req-first', [firstUrl]);
+  const firstFetch = beginWebSnapshotAssetFetch({
+    sessionId: firstSessionId,
+    tabId: 42,
+    url: firstUrl,
+  });
+
+  vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'snapshot-session-2') });
+  const secondUrl = 'https://cdn.example.com/second.png';
+  authorizeWebSnapshotCaptureRequest(42, 'req-second', {
+    allowAnonymousCrossOriginAssets: true,
+  });
+  const secondSessionId = registerWebSnapshotAssetSession(42, 'req-second', [secondUrl]);
+  const secondFetch = beginWebSnapshotAssetFetch({
+    sessionId: secondSessionId,
+    tabId: 42,
+    url: secondUrl,
+  });
+
+  cancelWebSnapshotCaptureRequest(42, 'req-first');
+
+  expect(firstFetch.signal.aborted).toBe(true);
+  expect(firstFetch.signal.reason).toEqual(new Error('Web snapshot save was cancelled'));
+  expect(secondFetch.signal.aborted).toBe(false);
+  firstFetch.release();
+  secondFetch.release();
 });
 
 it('retains a published asset as non-retryable authority after compensation fails', () => {

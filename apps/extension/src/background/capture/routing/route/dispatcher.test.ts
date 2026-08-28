@@ -11,6 +11,7 @@ const {
   handleRegisterWebSnapshotAssetsMock,
   handleSaveScreenshotToGalleryMock,
   handleStagePagePackageJobChunkMock,
+  handleWebSnapshotSaveProgressMock,
   handleTriggerQuickActionMock,
   browserTabsGetMock,
   ensureActivePageAccessRuntimeMock,
@@ -27,6 +28,7 @@ const {
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
   handleSaveScreenshotToGalleryMock: vi.fn(),
   handleStagePagePackageJobChunkMock: vi.fn(),
+  handleWebSnapshotSaveProgressMock: vi.fn(),
   handleTriggerQuickActionMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
@@ -79,6 +81,7 @@ vi.mock('../actions.quick-action', () => ({
 vi.mock('../actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
   handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
+  handleWebSnapshotSaveProgress: handleWebSnapshotSaveProgressMock,
 }));
 
 vi.mock('../../page-package/job/stage-route', async (importOriginal) => ({
@@ -131,6 +134,7 @@ beforeEach(() => {
   handleRegisterWebSnapshotAssetsMock.mockReturnValue(true);
   handleSaveScreenshotToGalleryMock.mockReturnValue(true);
   handleStagePagePackageJobChunkMock.mockReturnValue(true);
+  handleWebSnapshotSaveProgressMock.mockReturnValue(true);
   handleTriggerQuickActionMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
@@ -269,9 +273,19 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
     {
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
       snapshotSessionId: 'snapshot-session-1',
-      url: 'https://example.test/a.png',
+      urls: ['https://example.test/a.png'],
     },
     handleFetchWebSnapshotAssetMock,
+  ],
+  [
+    {
+      activeStepKey: 'files',
+      current: 1,
+      requestId: 'req-web',
+      total: 2,
+      type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
+    },
+    handleWebSnapshotSaveProgressMock,
   ],
 ];
 

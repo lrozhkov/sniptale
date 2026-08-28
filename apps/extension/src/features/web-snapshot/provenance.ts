@@ -9,7 +9,10 @@ import {
   type FileEntry,
 } from '@zip.js/zip.js';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
-import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
+import {
+  MAX_PAGE_PACKAGE_ENTRIES,
+  PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+} from '@sniptale/runtime-contracts/page-package';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import {
   isWebSnapshotManifest,
@@ -20,7 +23,7 @@ import { assertSafeArchivePath } from '../../composition/archive-transfer/path';
 import { hashWebSnapshotAssetBlob } from './asset-manifest';
 
 const MAX_WEB_SNAPSHOT_PACKAGE_BYTES = 100 * 1024 * 1024;
-const MAX_WEB_SNAPSHOT_PACKAGE_FILE_COUNT = 500;
+const MAX_WEB_SNAPSHOT_PACKAGE_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
 const MAX_WEB_SNAPSHOT_PACKAGE_INFLATED_BYTES = 250 * 1024 * 1024;
 const MAX_WEB_SNAPSHOT_PACKAGE_ENTRY_BYTES = 25 * 1024 * 1024;
 const MAX_WEB_SNAPSHOT_MANIFEST_BYTES = 1024 * 1024;

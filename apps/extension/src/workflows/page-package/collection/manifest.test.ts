@@ -97,7 +97,7 @@ describe('Page Collection planner', () => {
       },
     ]);
     expect(result.errorsText).not.toContain('must-not-leak');
-    expect(result.readmeBytes.byteLength).toBe(164);
+    expect(result.readmeBytes.byteLength).toBe(699);
     expect(new TextDecoder().decode(result.readmeBytes)).toBe(PAGE_COLLECTION_README);
   });
 

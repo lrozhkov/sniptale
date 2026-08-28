@@ -67,6 +67,8 @@ export async function activatePopupExportCaptureTarget(
 ): Promise<void> {
   if (typeof tab.windowId !== 'number') throw new Error('Target window is unavailable');
   if (job.cancelled || job.manualActivationConflict) throw new Error('Screenshot capture stopped');
+  const [currentActive] = await browserTabs.query({ active: true, windowId: tab.windowId });
+  if (currentActive?.id === selected.tabId) return;
   job.expectedActivation = { tabId: selected.tabId, windowId: tab.windowId };
   await browserWindows.update(tab.windowId, { focused: true });
   await browserTabs.update(selected.tabId, { active: true });

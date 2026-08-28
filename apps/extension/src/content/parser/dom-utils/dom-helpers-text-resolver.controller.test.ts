@@ -15,11 +15,7 @@ it('assigns sniptale ids to the resolved original element when the resolver retu
 
   expect(original.dataset['sniptaleId']).toBe('field-1');
   expect(virtual.dataset['sniptaleId']).toBeUndefined();
-  expect(logSpy).toHaveBeenCalledWith(
-    '[ContentDomTextResolver]',
-    'Mapping virtual to original',
-    expect.objectContaining({ id: 'field-1' })
-  );
+  expect(logSpy).not.toHaveBeenCalled();
 });
 
 it('falls back to the provided element when no resolver is registered', () => {

@@ -30,12 +30,22 @@ it('owns Export launch selection and route-local capability state', () => {
   const root = createRoot(container);
   act(() =>
     root.render(
-      <ExportRoute startup={{ page: 'export', launchSelection: { includeAnnotations: true } }} />
+      <ExportRoute
+        startup={{
+          page: 'export',
+          destination: 'save',
+          launchSelection: { includeAnnotations: true },
+        }}
+      />
     )
   );
   expect(mocks.stage).toHaveBeenCalledWith({ includeAnnotations: true });
   expect(mocks.exportPage).toHaveBeenCalledWith(
-    expect.objectContaining({ activeTabCapabilities: { tabId: 7 }, isActive: true })
+    expect.objectContaining({
+      activeTabCapabilities: { tabId: 7 },
+      initialDestination: 'save',
+      isActive: true,
+    })
   );
   act(() => root.unmount());
 });

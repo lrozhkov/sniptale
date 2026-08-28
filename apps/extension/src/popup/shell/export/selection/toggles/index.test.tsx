@@ -201,7 +201,7 @@ it('logs failed persistence writes', async () => {
     expect.any(Error)
   );
   expect(latestState?.values.includeBasicLogs).toBe(false);
-  expect(mocks.toastError).toHaveBeenCalledWith('common.states.error');
+  expect(mocks.toastError).toHaveBeenCalledWith('popup.export.packagePreferencesSaveError');
 });
 
 it('serializes rapid writes and does not let an older failure roll back the latest edit', async () => {

@@ -35,6 +35,10 @@ function parsePopupPage(value: unknown): PopupStartupState['lastPage'] | null {
     : null;
 }
 
+function parseExportDestination(value: unknown): PopupStartupState['lastExportDestination'] | null {
+  return value === 'export' || value === 'save' ? value : null;
+}
+
 export function parseStoredPopupStartupState(value: unknown): Partial<PopupStartupState> {
   if (!isRecord(value)) return {};
   const parsed: Partial<PopupStartupState> = {};
@@ -42,5 +46,7 @@ export function parseStoredPopupStartupState(value: unknown): Partial<PopupStart
   if (selection) parsed.selection = selection;
   const lastPage = parsePopupPage(value['lastPage']);
   if (lastPage) parsed.lastPage = lastPage;
+  const lastExportDestination = parseExportDestination(value['lastExportDestination']);
+  if (lastExportDestination) parsed.lastExportDestination = lastExportDestination;
   return parsed;
 }

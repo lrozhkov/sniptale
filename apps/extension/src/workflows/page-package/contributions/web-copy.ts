@@ -75,7 +75,7 @@ export async function createSafeWebCopyContributions(
   artifacts: SafeWebCopyArtifacts,
   digest: PagePackageBlobDigest
 ): Promise<PagePackageContribution<Blob>[]> {
-  if (artifacts.assets.length > MAX_PAGE_PACKAGE_ENTRIES - 3) {
+  if (artifacts.assets.length > MAX_PAGE_PACKAGE_ENTRIES - 4) {
     throw new Error('Safe Web-copy asset count exceeds the Page Package limit.');
   }
   assertRequiredImageMime(artifacts.screenshotBlob, 'image/png', 'Page screenshot');

@@ -7,7 +7,7 @@ import { cx } from './utils';
 export function SelectionSummaryRow(props: {
   icon: ReactNode;
   label: string;
-  onRemove: () => void;
+  onRemove?: (() => void) | undefined;
   title?: string;
 }) {
   return (
@@ -26,21 +26,23 @@ export function SelectionSummaryRow(props: {
           {props.label}
         </span>
       </div>
-      <button
-        type="button"
-        title={translate('popup.export.removeFromSelectionAction')}
-        aria-label={`${translate('popup.export.removeFromSelectionAction')}: ${props.label}`}
-        className={cx(
-          'absolute right-0.5 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-[7px]',
-          'text-[var(--sniptale-color-text-secondary)] opacity-0 transition-all pointer-events-none',
-          'group-hover:pointer-events-auto group-hover:opacity-100',
-          'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]',
-          'focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none'
-        )}
-        onClick={props.onRemove}
-      >
-        <Minus className="h-3 w-3" />
-      </button>
+      {props.onRemove ? (
+        <button
+          type="button"
+          title={translate('popup.export.removeFromSelectionAction')}
+          aria-label={`${translate('popup.export.removeFromSelectionAction')}: ${props.label}`}
+          className={cx(
+            'absolute right-0.5 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-[7px]',
+            'text-[var(--sniptale-color-text-secondary)] opacity-0 transition-all pointer-events-none',
+            'group-hover:pointer-events-auto group-hover:opacity-100',
+            'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]',
+            'focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none'
+          )}
+          onClick={props.onRemove}
+        >
+          <Minus className="h-3 w-3" />
+        </button>
+      ) : null}
     </div>
   );
 }

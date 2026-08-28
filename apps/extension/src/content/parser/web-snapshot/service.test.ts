@@ -143,7 +143,9 @@ it('reports a successfully preserved unreadable iframe as a static image', async
   expect(mocks.buildWebSnapshotPackage).toHaveBeenCalledWith(
     expect.objectContaining({
       assets: expect.arrayContaining([
-        expect.objectContaining({ localPath: 'assets/sniptale-iframe-raster-1.png' }),
+        expect.objectContaining({
+          localPath: 'assets/sniptale-iframe-raster-1.png',
+        }),
       ]),
     })
   );
@@ -162,6 +164,7 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
   expect(mocks.buildPreparedSnapshotDocument).toHaveBeenCalledWith({
     contextLabel: 'web-snapshot',
     preserveAssetUrls: true,
+    serializeHtml: false,
   });
   expect(mocks.captureWebSnapshotScreenshotWithWarnings.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.buildPreparedSnapshotDocument.mock.invocationCallOrder[0] ?? 0
@@ -212,9 +215,10 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
   ]);
   expect(result.snapshotSessionId).toBe('snapshot-session-1');
   expect(onProgress.mock.calls.map(([update]) => update)).toEqual([
-    { activeStepKey: 'webSnapshotDom', current: 0, total: 4 },
-    { activeStepKey: 'webSnapshotPreview', current: 1, total: 4 },
+    { activeStepKey: 'webSnapshotPreview', current: 0, total: 4 },
+    { activeStepKey: 'webSnapshotDom', current: 1, total: 4 },
     { activeStepKey: 'webSnapshotStyles', current: 2, total: 4 },
+    { activeStepKey: 'webSnapshotAssets', current: 2, total: 4 },
     { activeStepKey: 'webSnapshotAssets', current: 3, total: 4 },
     { activeStepKey: 'webSnapshotAssets', current: 4, total: 4 },
   ]);

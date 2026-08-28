@@ -69,6 +69,7 @@ async function settleLastSettingsLoad() {
 
 async function renderPage(args: {
   controller?: ReturnType<typeof createPopupExportControllerFixture>;
+  initialDestination?: 'export' | 'save';
   isRestrictedPage?: boolean;
 }) {
   if (!container) {
@@ -85,6 +86,9 @@ async function renderPage(args: {
       <ExportPage
         isActive
         activeTabCapabilities={createActiveTabCapabilities(args.isRestrictedPage)}
+        {...(args.initialDestination === undefined
+          ? {}
+          : { initialDestination: args.initialDestination })}
       />
     );
   });
@@ -102,7 +106,6 @@ function triggerFooterActions(footerProps: RenderedFooterProps) {
   footerProps.onCopyJson();
   footerProps.onCopyMarkdown();
   footerProps.onResetExportView();
-  footerProps.onSaveWebSnapshot?.();
   footerProps.onStartExport();
 }
 
@@ -113,7 +116,6 @@ beforeEach(() => {
   mocks.loadSettings.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
-    webSnapshotEnabled: true,
   });
   mocks.usePopupExportControllerMock.mockReset();
 });
@@ -144,13 +146,11 @@ async function verifyContentAndFooterWiring() {
 
   expect(footerProps.copyJsonTitle).toBe('Копировать JSON текущей открытой вкладки');
   expect(footerProps.copyMarkdownTitle).toBe('Копировать Markdown текущей открытой вкладки');
-  expect(footerProps.canSaveWebSnapshot).toBe(true);
-  expect(footerProps.saveWebSnapshotTitle).toBe('Сохранить снимок');
   expect(controller.actions.handleCancelExport).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleCopyJson).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleCopyMarkdown).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleResetExportView).toHaveBeenCalledTimes(1);
-  expect(controller.actions.handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
+  expect(controller.actions.handleSaveWebSnapshot).not.toHaveBeenCalled();
   expect(controller.actions.handleStartExport).toHaveBeenCalledTimes(1);
   expect(controller.state.session.actions.setProgress).not.toHaveBeenCalled();
   expect(controller.state.session.actions.setResult).not.toHaveBeenCalled();
@@ -255,6 +255,29 @@ async function verifyDoneFooterStateForErrorProgress() {
   );
 }
 
+async function verifyLibraryUsesItsRequiredPackagePlan() {
+  await renderPage({
+    controller: createPopupExportControllerFixture({
+      derived: { canExport: false, exportDisabledReason: null },
+      preferences: {
+        includeAnnotations: false,
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+        includePageDiagnostics: false,
+        includeWebCopy: false,
+      },
+    }),
+    initialDestination: 'save',
+  });
+
+  expect(getRenderedFooterProps().canExport).toBe(true);
+}
+
 describe('ExportPage', () => {
   it('passes the controller to content and wires footer handlers', verifyContentAndFooterWiring);
 
@@ -277,5 +300,9 @@ describe('ExportPage', () => {
   it(
     'marks the footer primary action as done while an export error screen is open',
     verifyDoneFooterStateForErrorProgress
+  );
+  it(
+    'uses the required Library plan instead of the Download selection',
+    verifyLibraryUsesItsRequiredPackagePlan
   );
 });

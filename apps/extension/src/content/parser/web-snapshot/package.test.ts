@@ -64,6 +64,12 @@ it('composes one safe static document, standard diagnostics, screenshot, and top
   ).toBe(html);
   expect(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.screenshot)).toBe(screenshotBlob);
   expect(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail)).toBe(thumbnailBlob);
+  const readme = await readPagePackageTestBlobText(
+    findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.readme)
+  );
+  expect(readme).toContain('Safe Web copy');
+  expect(readme).toContain('Scripts and inline event handlers are removed');
+  expect(readme).toContain('Diagnostics level: `standard`');
   const domDiagnostics = await readPagePackageTestBlobText(
     findEntry(result, 'diagnostics/standard/dom.html.txt')
   );

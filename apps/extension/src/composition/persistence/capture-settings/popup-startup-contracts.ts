@@ -7,7 +7,8 @@ export const POPUP_STARTUP_TARGETS = [
   'video:camera',
   'video:screen',
   'tools',
-  'export',
+  'export:download',
+  'export:library',
 ] as const;
 
 export type PopupStartupTarget = (typeof POPUP_STARTUP_TARGETS)[number];
@@ -17,4 +18,5 @@ export type PersistedPopupPage = 'screenshots' | 'video' | 'menu' | 'tools' | 'e
 export type PopupStartupState = {
   selection: PopupStartupSelection;
   lastPage: PersistedPopupPage;
+  lastExportDestination: 'export' | 'save';
 };

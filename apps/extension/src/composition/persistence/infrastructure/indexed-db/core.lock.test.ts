@@ -2,17 +2,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 import { EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores.ts';
 
-const { cutover, openDB } = vi.hoisted(() => ({
-  cutover: vi.fn(async () => undefined),
+const { openDB } = vi.hoisted(() => ({
   openDB: vi.fn(),
 }));
 
 vi.mock('idb', () => ({ openDB }));
-vi.mock('./maintenance/web-snapshot-page-package-cutover', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./maintenance/web-snapshot-page-package-cutover')>()),
-  runWebSnapshotPagePackageCutover: cutover,
-}));
-
 afterEach(() => {
   vi.unstubAllGlobals();
 });

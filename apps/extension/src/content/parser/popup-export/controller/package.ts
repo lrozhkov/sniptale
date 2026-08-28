@@ -9,7 +9,10 @@ import { buildExportPagePackage, composeCombinedPagePackage } from '../../../pag
 import { createPagePackageJobStagedSink } from '../../../page-package/staged-transfer';
 import { writePagePackageArchive } from '../../../../workflows/page-package/archive';
 import { createBackgroundAutoStartContentActionIntentSource } from '../../../platform/privileged-action-intent/client';
-import { publishWebSnapshotSaveProgress } from '../../web-snapshot/progress';
+import {
+  clearWebSnapshotSaveProgress,
+  publishWebSnapshotSaveProgress,
+} from '../../web-snapshot/progress';
 import type { ComposedPagePackage } from '../../../../workflows/page-package/composer';
 import type { PagePackageDiagnosticsLevel } from '@sniptale/runtime-contracts/page-package';
 import {
@@ -17,6 +20,10 @@ import {
   type ExtendedDiagnosticArtifact,
 } from '../../export-manager/diagnostics/extended-evidence';
 import { hashWebSnapshotAssetBlob } from '../../../../features/web-snapshot/asset-manifest';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
+
+const logger = createLogger({ namespace: 'ContentPopupExport' });
 
 type PopupExportBuildPackageSendResponse = (response?: {
   error?: string;
@@ -52,12 +59,64 @@ type PopupExportProducerContext = NonNullable<
   Parameters<PopupExportRequestHandlerRuntime['exportRunner']['buildBlobPackage']>[1]
 >;
 
+class PagePackagePreparationError extends Error {
+  constructor(
+    readonly diagnosticCode: string,
+    options?: ErrorOptions
+  ) {
+    super(`Page Package preparation failed [${diagnosticCode}]`, options);
+  }
+}
+
+async function runPreparationStage<T>(code: string, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof PagePackagePreparationError) throw error;
+    throw new PagePackagePreparationError(code, { cause: error });
+  }
+}
+
+function getSafePreparationCause(error: unknown): string {
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  return sanitizeDiagnosticMessage(
+    cause instanceof Error ? cause.message : String(cause ?? '')
+  ).replace(/([a-z][a-z0-9+.-]*:\/\/)[^/\s@]+@/giu, '$1');
+}
+
+function getPreparationFailureMessage(error: unknown): string {
+  const code = error instanceof PagePackagePreparationError ? error.diagnosticCode : 'UNCLASSIFIED';
+  const detail = getSafePreparationCause(error);
+  return [
+    `${translate('content.runtime.exportPrepareFailed')} [${code}]`,
+    ...(detail ? [detail] : []),
+  ].join(': ');
+}
+
+function getPreparationFailureDiagnostic(error: unknown): string {
+  const code = error instanceof PagePackagePreparationError ? error.diagnosticCode : 'UNCLASSIFIED';
+  const causeMessage = getSafePreparationCause(error);
+  return causeMessage
+    ? `Page Package preparation failed [${code}]: ${causeMessage}`
+    : `Page Package preparation failed [${code}]`;
+}
+
+function isFullPageCaptureCancellation(error: unknown): boolean {
+  return (
+    error instanceof PagePackagePreparationError &&
+    error.diagnosticCode === 'WEB_COPY_WEBSNAPSHOTPREVIEW' &&
+    error.cause instanceof Error &&
+    error.cause.message === 'Full-page capture cancelled'
+  );
+}
+
 function hasStructuredExportSelection(options: ExportOptions): boolean {
   return Boolean(
     options.includeAnnotations ||
     options.includeBasicLogs ||
     options.includeCssDiagnostics ||
     options.includeFiles ||
+    options.includeFullPageScreenshot ||
     options.includeImages ||
     options.includeJson ||
     options.includeMarkdown ||
@@ -68,7 +127,7 @@ function hasStructuredExportSelection(options: ExportOptions): boolean {
 function getRequestedDiagnosticsLevel(
   request: PopupExportBuildPackageRequest
 ): PagePackageDiagnosticsLevel {
-  if (request.intent === 'export' && request.options.includePageDiagnostics) return 'extended';
+  if (request.options.includePageDiagnostics) return 'extended';
   return request.options.includeBasicLogs ||
     request.options.includeCssDiagnostics ||
     request.options.includePageDiagnostics
@@ -132,14 +191,26 @@ async function buildRetainedWebCopy(
   ) {
     throw new Error('Web Snapshot resource policy is unavailable.');
   }
-  const { buildCurrentPageWebSnapshot } = await import('../../web-snapshot/service');
-  const snapshot = await buildCurrentPageWebSnapshot({
-    abortSignal: controller.signal,
-    allowAnonymousCrossOriginAssets: request.allowAnonymousCrossOriginAssets,
-    allowAuthenticatedSameOriginAssets: request.allowAuthenticatedSameOriginAssets,
-    ...producerContext,
-    onProgress: (update) => publishWebSnapshotSaveProgress(request.batchRequestId, update),
-    requestId: request.batchRequestId,
+  let activeStep: string = 'START';
+  const snapshot = await runPreparationStage('WEB_COPY_START', async () => {
+    const { buildCurrentPageWebSnapshot } = await import('../../web-snapshot/service');
+    try {
+      return await buildCurrentPageWebSnapshot({
+        abortSignal: controller.signal,
+        allowAnonymousCrossOriginAssets: request.allowAnonymousCrossOriginAssets,
+        allowAuthenticatedSameOriginAssets: request.allowAuthenticatedSameOriginAssets,
+        ...producerContext,
+        onProgress: (update) => {
+          activeStep = update.activeStepKey;
+          publishWebSnapshotSaveProgress(request.batchRequestId, update);
+        },
+        requestId: request.batchRequestId,
+      });
+    } catch (error) {
+      throw new PagePackagePreparationError(`WEB_COPY_${activeStep.toUpperCase()}`, {
+        cause: error,
+      });
+    }
   });
   return {
     ...snapshot.pagePackage,
@@ -161,7 +232,11 @@ async function composeRequestedWebCopyPackage(
   extendedDiagnosticArtifacts?: readonly ExtendedDiagnosticArtifact[] | undefined
 ): Promise<BuiltJobPagePackage> {
   const { producerStats, snapshotSessionId, ...pagePackage } = webCopy;
-  if (!hasStructuredExportSelection(props.request.options)) {
+  const structuredOptions = {
+    ...props.request.options,
+    includeFullPageScreenshot: false,
+  };
+  if (!hasStructuredExportSelection(structuredOptions)) {
     return {
       ...(await composeCombinedPagePackage({
         artifact: null,
@@ -174,18 +249,28 @@ async function composeRequestedWebCopyPackage(
       snapshotSessionId,
     };
   }
-  const artifact = await props.exportRunner.buildBlobPackage(
-    { ...props.request.options, includeFullPageScreenshot: false },
-    producerContext
+  props.exportRunner.onProgress?.((progress) => {
+    if (progress.activeStepKey) {
+      publishWebSnapshotSaveProgress(props.request.batchRequestId, {
+        activeStepKey: progress.activeStepKey,
+        current: progress.current,
+        total: progress.total,
+      });
+    }
+  });
+  const artifact = await runPreparationStage('SELECTED_DATA', () =>
+    props.exportRunner.buildBlobPackage(structuredOptions, producerContext)
   );
   return {
-    ...(await composeCombinedPagePackage({
-      artifact,
-      diagnosticsLevel,
-      ...(extendedDiagnosticArtifacts === undefined ? {} : { extendedDiagnosticArtifacts }),
-      intent: props.request.intent,
-      webCopy: pagePackage,
-    })),
+    ...(await runPreparationStage('PACKAGE_COMPOSITION', () =>
+      composeCombinedPagePackage({
+        artifact,
+        diagnosticsLevel,
+        ...(extendedDiagnosticArtifacts === undefined ? {} : { extendedDiagnosticArtifacts }),
+        intent: props.request.intent,
+        webCopy: pagePackage,
+      })
+    )),
     producerStats: addProducerStats(producerStats, artifact.stats),
     snapshotSessionId,
   };
@@ -197,6 +282,15 @@ function buildExportOnlyPagePackage(
   diagnosticsLevel: PagePackageDiagnosticsLevel,
   extendedDiagnosticArtifacts?: readonly ExtendedDiagnosticArtifact[] | undefined
 ): Promise<BuiltJobPagePackage> {
+  props.exportRunner.onProgress?.((progress) => {
+    if (progress.activeStepKey) {
+      publishWebSnapshotSaveProgress(props.request.batchRequestId, {
+        activeStepKey: progress.activeStepKey,
+        current: progress.current,
+        total: progress.total,
+      });
+    }
+  });
   return buildExportPagePackage({
     diagnosticsLevel,
     ...(extendedDiagnosticArtifacts === undefined ? {} : { extendedDiagnosticArtifacts }),
@@ -223,13 +317,17 @@ async function buildRequestedPagePackage(
 ): Promise<BuiltJobPagePackage> {
   const producerContext = createPopupExportProducerContext(props.request);
   const diagnosticsLevel = getRequestedDiagnosticsLevel(props.request);
-  const extendedDiagnosticArtifacts = await acquireExtendedDiagnostics(diagnosticsLevel);
+  const extendedDiagnosticArtifacts = await runPreparationStage('DIAGNOSTICS', () =>
+    acquireExtendedDiagnostics(diagnosticsLevel)
+  );
   if (!props.request.includeWebCopy) {
-    return buildExportOnlyPagePackage(
-      props,
-      producerContext,
-      diagnosticsLevel,
-      extendedDiagnosticArtifacts
+    return runPreparationStage('SELECTED_DATA', () =>
+      buildExportOnlyPagePackage(
+        props,
+        producerContext,
+        diagnosticsLevel,
+        extendedDiagnosticArtifacts
+      )
     );
   }
   const webCopy = await buildRetainedWebCopy(props.request, controller, producerContext);
@@ -265,11 +363,13 @@ export function handlePopupExportBuildPackageRuntime(
         ordinal: props.request.ordinal,
         signal: controller.signal,
       });
-      await writePagePackageArchive({
-        package: pagePackage,
-        signal: controller.signal,
-        sink: transfer.sink,
-      });
+      await runPreparationStage('ARCHIVE_STAGING', () =>
+        writePagePackageArchive({
+          package: pagePackage,
+          signal: controller.signal,
+          sink: transfer.sink,
+        })
+      );
       return {
         jobId: props.request.batchRequestId,
         manifestSha256: pagePackage.manifestSha256,
@@ -291,13 +391,19 @@ export function handlePopupExportBuildPackageRuntime(
         stagedPagePackage,
       });
     })
-    .catch(() => {
+    .catch((error: unknown) => {
+      const cancelled = controller.signal.aborted || isFullPageCaptureCancellation(error);
+      if (cancelled) logger.debug('Page Package preparation cancelled by the user');
+      else logger.error(getPreparationFailureDiagnostic(error));
       props.sendResponse({
         success: false,
-        error: translate('content.runtime.exportPrepareFailed'),
+        error: cancelled
+          ? translate('content.runtime.exportCancelled')
+          : getPreparationFailureMessage(error),
       });
     })
     .finally(() => {
+      clearWebSnapshotSaveProgress(props.request.batchRequestId);
       if (props.state.activeExportRequestId === props.request.batchRequestId) {
         delete props.state.activeAbortController;
         props.state.activeExportRequestId = null;

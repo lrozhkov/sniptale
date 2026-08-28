@@ -15,11 +15,13 @@ export interface PreparedSnapshotWarning {
 }
 
 export interface BuildPreparedSnapshotDocumentOptions {
+  abortSignal?: AbortSignal;
   contextLabel?: string;
   iframeTimeoutMs?: number;
   preserveAssetUrls?: boolean;
   root?: HTMLElement;
   rootDocument?: Document;
+  serializeHtml?: boolean;
 }
 
 export interface PreparedSnapshotDocumentResult {

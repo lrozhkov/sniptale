@@ -597,6 +597,21 @@ function registerSanitizerSnapshotTests(): void {
     );
   });
 
+  it('retains inline SVG CSS masks until the asset capture stage can sanitize them', async () => {
+    const mask =
+      'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M1%201h8v8z%22%2F%3E%3C%2Fsvg%3E';
+    document.head.innerHTML = `<style>.icon { mask-image: url("${mask}"); background: #222; }</style>`;
+    document.body.innerHTML = '<span class="icon"></span>';
+
+    const result = await buildPreparedSnapshotDocument({
+      iframeTimeoutMs: 20,
+      preserveAssetUrls: true,
+    });
+
+    expect(result.html).toContain('mask-image: url("data:image/svg+xml');
+    expect(result.html).not.toContain('mask-image: ;');
+  });
+
   it('freezes defined custom-element CSS state in the serialized document', async () => {
     const elementName = `snapshot-defined-${crypto.randomUUID()}`;
     customElements.define(elementName, class extends HTMLElement {});

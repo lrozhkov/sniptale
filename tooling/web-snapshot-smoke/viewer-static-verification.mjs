@@ -29,6 +29,22 @@ export async function verifyStaticSurface({
     ])
   );
   const staticInfo = await inspectDocument(contentFrame);
+  const projectedLink = contentFrame.locator('a[data-sniptale-external-href]').first();
+  let externalLinkProof = null;
+  if ((await projectedLink.count()) > 0) {
+    const projectedHref = await projectedLink.getAttribute('data-sniptale-external-href');
+    const executableHref = await projectedLink.getAttribute('href');
+    const openedPagePromise = context.waitForEvent('page');
+    await projectedLink.click();
+    const openedPage = await openedPagePromise;
+    await openedPage.waitForLoadState('domcontentloaded').catch(() => undefined);
+    externalLinkProof = {
+      executableHref,
+      openedUrl: openedPage.url(),
+      projectedHref,
+    };
+    await openedPage.close();
+  }
   staticInfo.bodyCascade = await inspectFrameBodyCascade(context, viewer);
   staticInfo.framePresentation = await frame.evaluate((iframe) => {
     const style = globalThis.getComputedStyle(iframe);
@@ -100,5 +116,12 @@ export async function verifyStaticSurface({
     images: await assetCatalog.locator('article img').count(),
   };
 
-  return { assetCatalogInfo, fullPagePixel, sourceFullPagePixel, staticInfo, viewportPixel };
+  return {
+    assetCatalogInfo,
+    externalLinkProof,
+    fullPagePixel,
+    sourceFullPagePixel,
+    staticInfo,
+    viewportPixel,
+  };
 }

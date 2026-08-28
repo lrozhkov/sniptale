@@ -12,7 +12,6 @@ vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
 }));
 
 import { ExportPagesDrawerList, ExportPagesHeader } from './drawer';
-import { WebSnapshotSetupDialog } from './snapshot-setup-dialog';
 import { ExportPagesSummary } from './summary';
 
 let container: HTMLDivElement | null = null;
@@ -148,31 +147,6 @@ describe('export pages owner components', () => {
     );
     expect(toggleTabSelection).toHaveBeenCalledWith(7);
     expect(toggleTabSelection).toHaveBeenCalledWith(9);
-  });
-
-  it('renders setup states and routes dialog actions', async () => {
-    const onClose = vi.fn();
-    const onOpenSettings = vi.fn();
-    await renderNode(
-      <WebSnapshotSetupDialog onClose={onClose} onOpenSettings={onOpenSettings} status="error" />
-    );
-
-    const dialog = container?.querySelector('[role="dialog"]');
-    expect((dialog as HTMLElement | null)?.style.maxHeight).toBe('calc(100vh - 24px)');
-    expect(container?.textContent).toContain('popup.export.webSnapshotSetupUnavailableTitle');
-
-    await renderNode(
-      <WebSnapshotSetupDialog onClose={onClose} onOpenSettings={onOpenSettings} status="loaded" />
-    );
-
-    const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
-    await click(buttons[0]);
-    await click(buttons[1]);
-    await click(buttons[2]);
-
-    expect(onClose).toHaveBeenCalledTimes(2);
-    expect(onOpenSettings).toHaveBeenCalledOnce();
-    expect(container?.textContent).toContain('popup.export.webSnapshotSetupTitle');
   });
 
   it('renders empty and populated summaries and ignores fallback removal', async () => {

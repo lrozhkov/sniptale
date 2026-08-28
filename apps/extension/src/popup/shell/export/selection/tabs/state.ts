@@ -13,6 +13,18 @@ import {
 import { useAvailableTabQuery, usePersistedTabSelection } from './query';
 import type { PopupExportTabItem, PopupExportTabSelectionState } from './types';
 
+function createInitialTabs(capabilities: ActiveTabCapabilities): PopupExportTabItem[] {
+  if (capabilities.isRestrictedPage || !capabilities.url) return [];
+  try {
+    const protocol = new URL(capabilities.url).protocol;
+    return protocol === 'http:' || protocol === 'https:' || protocol === 'file:'
+      ? createFallbackTabItem(capabilities)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 function createSelectAllTabsHandler(args: {
   availableTabs: PopupExportTabItem[];
   filteredTabs: PopupExportTabItem[];
@@ -84,7 +96,7 @@ function useTabSelectionBaseState(args: {
   pageAccessStatus: PageAccessStatus | null;
 }) {
   const [availableTabs, setAvailableTabs] = useState<PopupExportTabItem[]>(() =>
-    createFallbackTabItem(args.activeTabCapabilities)
+    createInitialTabs(args.activeTabCapabilities)
   );
   const [filterQuery, setFilterQuery] = useState('');
   const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);

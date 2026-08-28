@@ -30,12 +30,12 @@ it('parses registered web snapshot asset fetch messages and responses', () => {
     fetchContract.parseRequest({
       snapshotSessionId: 'snapshot-session-1',
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-      url: 'https://upload.wikimedia.org/example.svg',
+      urls: ['https://assets.example.test/example.svg'],
     })
   ).toEqual({
     snapshotSessionId: 'snapshot-session-1',
     type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-    url: 'https://upload.wikimedia.org/example.svg',
+    urls: ['https://assets.example.test/example.svg'],
   });
   expect(() =>
     registerContract.parseRequest({
@@ -50,7 +50,45 @@ it('parses registered web snapshot asset fetch messages and responses', () => {
     fetchContract.parseRequest({
       snapshotSessionId: 'snapshot-session-1',
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-      url: `https://cdn.example.com/${'a'.repeat(WEB_SNAPSHOT_MAX_ASSET_URL_LENGTH)}`,
+      urls: [`https://cdn.example.com/${'a'.repeat(WEB_SNAPSHOT_MAX_ASSET_URL_LENGTH)}`],
     })
   ).toThrow('runtime FETCH_WEB_SNAPSHOT_ASSET message');
+});
+
+it('accepts bounded per-asset batch outcomes and rejects malformed response fields', () => {
+  const fetchContract =
+    runtimeActionWebSnapshotSaveMessageContracts[MessageType.FETCH_WEB_SNAPSHOT_ASSET];
+  const validAssets = [
+    {
+      base64: 'YQ==',
+      mimeType: 'image/png',
+      success: true,
+      url: 'https://cdn.example.com/a.png',
+    },
+    {
+      error: 'fetch failed',
+      success: false,
+      url: 'https://cdn.example.com/b.png',
+    },
+  ];
+
+  expect(fetchContract.parseResponse({ assets: validAssets, success: true })).toEqual({
+    assets: validAssets,
+    success: true,
+  });
+
+  for (const assets of [
+    'not-an-array',
+    Array.from({ length: 501 }, () => validAssets[0]),
+    [{ ...validAssets[0], extra: true }],
+    [{ ...validAssets[0], success: 'yes' }],
+    [{ ...validAssets[0], url: '' }],
+    [{ ...validAssets[0], base64: 42 }],
+    [{ ...validAssets[1], error: 42 }],
+    [{ ...validAssets[0], mimeType: 42 }],
+  ]) {
+    expect(() => fetchContract.parseResponse({ assets, success: true })).toThrow(
+      'runtime FETCH_WEB_SNAPSHOT_ASSET response'
+    );
+  }
 });

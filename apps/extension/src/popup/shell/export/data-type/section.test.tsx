@@ -29,11 +29,11 @@ function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
     includeImages: false,
     includeJson: false,
     includeMarkdown: false,
+    includeWebCopy: false,
     isExpanded: false,
     isOpen: true,
     onClose: vi.fn(),
     onOpen: vi.fn(),
-    onRequestWebCopySetup: vi.fn(),
     packagePreferences: {
       actions: {
         setIncludeAnnotations: vi.fn(),
@@ -69,7 +69,17 @@ function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
-    webSnapshotEnabled: true,
+    setIncludeWebCopy: vi.fn(),
+    webCopyResources: {
+      anonymousCrossOriginAssetsEnabled: true,
+      authenticatedSameOriginAssetsEnabled: true,
+      externalLinksEnabled: false,
+      error: null,
+      pending: null,
+      setAnonymousCrossOriginAssetsEnabled: vi.fn(),
+      setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+      setExternalLinksEnabled: vi.fn(),
+    },
     ...overrides,
   };
 }
@@ -123,12 +133,15 @@ it('renders selected summary items and opens the drawer', async () => {
   expect(container?.textContent).toContain('t:popup.export.includeJsonLabel');
   expect(container?.querySelector('section')?.className).toContain('flex-1');
 
-  await act(async () => findButton('t:popup.export.editButton').click());
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="popup.export.selection-trigger"]'
+  );
+  await act(async () => trigger?.click());
 
   expect(props.onOpen).toHaveBeenCalledOnce();
 });
 
-it('allocates the full five-row collapsed summary instead of clipping the last item', async () => {
+it('lets the full collapsed summary claim its intrinsic height', async () => {
   await renderSection({
     includeAnnotations: true,
     includeBasicLogs: true,
@@ -142,15 +155,16 @@ it('allocates the full five-row collapsed summary instead of clipping the last i
     isOpen: false,
   });
 
-  const editButton = findButton('t:popup.export.editButton');
-  const summaryBody = document.getElementById(editButton.getAttribute('aria-controls') ?? '');
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="popup.export.selection-trigger"]'
+  );
+  const summaryBody = document.getElementById(trigger?.getAttribute('aria-controls') ?? '');
   const summary = summaryBody?.querySelector('[data-testid="export-data-type-summary"]');
 
   expect(summary?.children).toHaveLength(9);
   expect(summary?.className).toContain('grid-cols-2');
   expect(Math.ceil((summary?.children.length ?? 0) / 2)).toBe(5);
-  expect(summaryBody?.className).toContain('max-h-[140px]');
-  expect(summaryBody?.className).not.toContain('max-h-[132px]');
+  expect(summaryBody?.className).not.toContain('max-h-[');
 });
 
 it('selects only visible inactive options and renders the empty filter state', async () => {
@@ -178,6 +192,65 @@ it('selects only visible inactive options and renders the empty filter state', a
   expect(container?.textContent).toContain('t:popup.export.noSelectedDataTypes');
 });
 
+it('places compact quick choices directly below the filter and applies them to the full plan', async () => {
+  const setIncludeWebCopy = vi.fn();
+  const setIncludeFullPageScreenshot = vi.fn();
+  const props = await renderSection({
+    destination: 'save',
+    setIncludeFullPageScreenshot,
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+      setIncludeWebCopy,
+    },
+  });
+
+  await setFilter('json');
+  const quickSelection = container?.querySelector('[data-ui="popup.export.quick-selection"]');
+  const filterRow = container?.querySelector('input[type="text"]')?.parentElement?.parentElement;
+  expect(filterRow?.nextElementSibling).toBe(quickSelection);
+  expect(quickSelection?.textContent).not.toContain('t:popup.export.packagePresetLabel');
+  expect(quickSelection?.querySelectorAll('button')).toHaveLength(3);
+
+  await act(async () => findButton('t:popup.export.packagePresetMaterials').click());
+  expect(setIncludeWebCopy).not.toHaveBeenCalled();
+  expect(setIncludeFullPageScreenshot).toHaveBeenCalledWith(true);
+  expect(props.setIncludeFiles).toHaveBeenCalledWith(true);
+  expect(props.setIncludeImages).toHaveBeenCalledWith(true);
+  expect(props.setIncludeBasicLogs).not.toHaveBeenCalled();
+});
+
+it('clears optional Library contents without disabling the mandatory Web copy', async () => {
+  const setIncludeWebCopy = vi.fn();
+  const setIncludeFullPageScreenshot = vi.fn();
+  const props = await renderSection({
+    destination: 'save',
+    includeAnnotations: true,
+    includeBasicLogs: true,
+    includeCssDiagnostics: true,
+    includeFiles: true,
+    includeFullPageScreenshot: true,
+    includePageDiagnostics: true,
+    includeImages: true,
+    includeJson: true,
+    includeMarkdown: true,
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+      setIncludeWebCopy,
+    },
+    setIncludeFullPageScreenshot,
+  });
+
+  await act(async () => findButton('t:popup.export.clearAllTabsButton').click());
+
+  expect(setIncludeWebCopy).not.toHaveBeenCalled();
+  expect(setIncludeFullPageScreenshot).not.toHaveBeenCalled();
+  expect(props.setIncludeJson).toHaveBeenCalledWith(false);
+  expect(props.setIncludeFiles).toHaveBeenCalledWith(false);
+  expect(props.setIncludeBasicLogs).toHaveBeenCalledWith(false);
+});
+
 it('clears selected options and forwards row toggles in disabled presentation', async () => {
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({
@@ -191,6 +264,10 @@ it('clears selected options and forwards row toggles in disabled presentation', 
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+    },
     setIncludeJson,
   });
 
@@ -208,7 +285,7 @@ it('clears selected options and forwards row toggles in disabled presentation', 
   expect(setIncludeJson).not.toHaveBeenCalled();
 });
 
-it('keeps the mandatory Library screenshot inside Web copy instead of offering a toggle', async () => {
+it('locks Web copy and screenshot without adding visual labels while keeping diagnostics selectable', async () => {
   await renderSection({
     destination: 'save',
     includeFullPageScreenshot: true,
@@ -223,13 +300,57 @@ it('keeps the mandatory Library screenshot inside Web copy instead of offering a
   });
 
   expect(container?.textContent).toContain('t:popup.export.packageWebCopyDescription');
-  expect(container?.textContent).not.toContain('t:popup.export.includeFullPageScreenshotLabel');
-  expect(container?.textContent).not.toContain('t:popup.export.includePageDiagnosticsLabel');
+  expect(container?.textContent).toContain('t:popup.export.includeFullPageScreenshotLabel');
+  expect(container?.textContent).toContain('t:popup.export.includePageDiagnosticsLabel');
+  const requiredRows = Array.from(container?.querySelectorAll('label') ?? []).filter((label) =>
+    ['t:popup.export.packageWebCopyLabel', 't:popup.export.includeFullPageScreenshotLabel'].some(
+      (text) => label.textContent?.includes(text)
+    )
+  );
+  expect(requiredRows).toHaveLength(2);
+  expect(container?.textContent).not.toContain('t:popup.export.packageWebCopyRequired');
+  expect(
+    requiredRows.every(
+      (row) => row.querySelector<HTMLInputElement>('input[type="checkbox"]')?.disabled
+    )
+  ).toBe(true);
 });
 
-it('keeps the extended-data disclosure visible at the direct Export action point', async () => {
+it('renders Web Copy inside the data grid and nests resource controls only while selected', async () => {
+  const setIncludeWebCopy = vi.fn();
+  const resources = createProps().webCopyResources;
+  await renderSection({
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+      setIncludeWebCopy,
+    },
+    webCopyResources: resources,
+  });
+
+  expect(container?.querySelector('[data-ui="popup.export.package-presets"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="popup.export.web-copy-card"]')).toBeNull();
+  expect(container?.textContent).toContain('t:popup.export.packageWebCopyLabel');
+  expect(container?.textContent).toContain('t:popup.export.webCopyCurrentSiteLabel');
+  expect(container?.textContent).toContain('t:popup.export.webCopyExternalSitesLabel');
+  expect(container?.textContent).toContain('t:popup.export.webCopyExternalLinksLabel');
+  const currentSiteControl = Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+    label.textContent?.includes('t:popup.export.webCopyCurrentSiteLabel')
+  );
+  expect(currentSiteControl?.parentElement?.className).not.toContain('border-l');
+
+  await act(async () => {
+    const webCopyCheckbox = Array.from(
+      container?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []
+    ).find((checkbox) => checkbox.parentElement?.textContent?.includes('packageWebCopyLabel'));
+    webCopyCheckbox?.click();
+  });
+  expect(setIncludeWebCopy).toHaveBeenCalledWith(expect.any(Function));
+});
+
+it('does not add a separate private-data warning marker to the compact summary', async () => {
   await renderSection({ includePageDiagnostics: true, isOpen: false });
 
-  expect(container?.textContent).toContain('t:popup.export.includePageDiagnosticsDisclosure');
-  expect(container?.querySelector('[role="status"]')).not.toBeNull();
+  expect(container?.textContent).not.toContain('t:popup.export.includePageDiagnosticsDisclosure');
+  expect(container?.querySelector('[role="status"]')).toBeNull();
 });

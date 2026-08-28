@@ -17,6 +17,7 @@ import {
   getWebSnapshotScreenshotFile,
 } from '../../composition/persistence/web-snapshots';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { MAX_PAGE_PACKAGE_ENTRIES } from '@sniptale/runtime-contracts/page-package';
 import { assertZipPackageInflationProfile } from '@sniptale/platform/data/zip-profile';
 import { createViewerAssetObjectUrls } from './asset-objects';
 import type { LoadedWebSnapshotAsset } from './asset-objects';
@@ -33,7 +34,7 @@ export interface LoadedWebSnapshotPackage {
   screenshotUrl: string;
 }
 
-const MAX_VIEWER_FILE_COUNT = 500;
+const MAX_VIEWER_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
 const MAX_VIEWER_COMPRESSED_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_VIEWER_TOTAL_INFLATED_BYTES = 250 * 1024 * 1024;
 const MAX_VIEWER_ASSET_BYTES = 25 * 1024 * 1024;
@@ -65,6 +66,7 @@ function rewriteSrcset(value: string, urlsByPath: Map<string, string>): string {
 
 function rewriteElementUrlAttributes(element: Element, urlsByPath: Map<string, string>): void {
   for (const attribute of URL_ATTRIBUTES) {
+    if (attribute === 'href' && element.tagName.toLowerCase() === 'a') continue;
     const value = element.getAttribute(attribute);
     const objectUrl = value ? urlsByPath.get(normalizeSnapshotAssetPath(value)) : undefined;
     if (objectUrl) element.setAttribute(attribute, objectUrl);
@@ -144,7 +146,7 @@ function resolveViewerEntryByteLimit(path: string): number {
     : MAX_VIEWER_ASSET_BYTES;
 }
 
-async function readViewerPackageEntries(zip: JSZip): Promise<Map<string, Uint8Array>> {
+function inspectViewerPackageEntries(zip: JSZip): Map<string, JSZip.JSZipObject> {
   const files = Object.values(zip.files).filter((file) => !file.dir);
   assertZipPackageInflationProfile(files, {
     assertPath: assertSafeArchivePath,
@@ -156,37 +158,55 @@ async function readViewerPackageEntries(zip: JSZip): Promise<Map<string, Uint8Ar
     resolveEntryMaxBytes: resolveViewerEntryByteLimit,
   });
 
-  const bytesByPath = new Map<string, Uint8Array>();
-  let totalBytes = 0;
+  const filesByPath = new Map<string, JSZip.JSZipObject>();
   for (const file of files) {
     const path = getViewerEntryPath(file);
-    const bytes = await file.async('uint8array');
-    const entryLimit = resolveViewerEntryByteLimit(path);
-    if (bytes.byteLength > entryLimit) {
-      throw new Error('Web snapshot package entry is too large.');
+    if (filesByPath.has(path)) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
     }
-
-    totalBytes += bytes.byteLength;
-    if (totalBytes > MAX_VIEWER_TOTAL_INFLATED_BYTES) {
-      throw new Error('Web snapshot package inflated content is too large.');
-    }
-
-    bytesByPath.set(path, bytes);
+    filesByPath.set(path, file);
   }
 
   for (const requiredPath of REQUIRED_VIEWER_PACKAGE_PATHS) {
-    if (!bytesByPath.has(requiredPath)) {
+    if (!filesByPath.has(requiredPath)) {
       throw new Error('Web snapshot package is missing a required entry.');
     }
   }
 
-  return bytesByPath;
+  return filesByPath;
 }
 
-function readViewerPackageManifest(bytesByPath: Map<string, Uint8Array>): WebSnapshotManifest {
-  const manifestText = new TextDecoder().decode(
-    readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)
+async function readViewerEntry(
+  filesByPath: Map<string, JSZip.JSZipObject>,
+  path: string
+): Promise<Uint8Array> {
+  const file = filesByPath.get(path);
+  if (!file) throw new Error('Web snapshot package is missing a required entry.');
+  const bytes = await file.async('uint8array');
+  if (bytes.byteLength > resolveViewerEntryByteLimit(path)) {
+    throw new Error('Web snapshot package entry is too large.');
+  }
+  return bytes;
+}
+
+async function readViewerWebCopyEntries(
+  filesByPath: Map<string, JSZip.JSZipObject>,
+  manifest: WebSnapshotManifest
+): Promise<Map<string, Uint8Array>> {
+  const selectedPaths = manifest.entries
+    .filter(
+      (entry) =>
+        entry.component === 'webCopy' && entry.path !== WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail
+    )
+    .map((entry) => entry.path);
+  const entries = await Promise.all(
+    selectedPaths.map(async (path) => [path, await readViewerEntry(filesByPath, path)] as const)
   );
+  return new Map(entries);
+}
+
+function parseViewerPackageManifest(manifestBytes: Uint8Array): WebSnapshotManifest {
+  const manifestText = new TextDecoder().decode(manifestBytes);
   let manifest: unknown;
   try {
     manifest = JSON.parse(manifestText) as unknown;
@@ -233,14 +253,33 @@ function assertManifestMatchesRecord(args: {
   }
 }
 
-async function assertViewerInventoryAndDigests(
+function assertViewerInventory(
+  filesByPath: Map<string, JSZip.JSZipObject>,
+  manifest: WebSnapshotManifest
+): void {
+  if (filesByPath.size !== manifest.entries.length + 1) {
+    throw new Error('Page Package archive inventory does not match its manifest.');
+  }
+  const expectedPaths = new Set(manifest.entries.map((entry) => entry.path));
+  for (const path of filesByPath.keys()) {
+    if (path === WEB_SNAPSHOT_PACKAGE_PATHS.manifest) continue;
+    if (!expectedPaths.delete(path)) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
+    }
+  }
+  if (expectedPaths.size > 0) {
+    throw new Error('Page Package archive inventory does not match its manifest.');
+  }
+}
+
+async function assertViewerWebCopyDigests(
   bytesByPath: Map<string, Uint8Array>,
   manifest: WebSnapshotManifest
 ): Promise<void> {
-  if (bytesByPath.size !== manifest.entries.length + 1) {
-    throw new Error('Page Package archive inventory does not match its manifest.');
-  }
-  for (const entry of manifest.entries) {
+  for (const entry of manifest.entries.filter(
+    (candidate) =>
+      candidate.component === 'webCopy' && candidate.path !== WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail
+  )) {
     const bytes = bytesByPath.get(entry.path);
     if (
       !bytes ||
@@ -248,14 +287,6 @@ async function assertViewerInventoryAndDigests(
       (await hashWebSnapshotAssetBytes(bytes)) !== entry.sha256
     ) {
       throw new Error(`Page Package entry metadata does not match: ${entry.path}.`);
-    }
-  }
-  for (const path of bytesByPath.keys()) {
-    if (
-      path !== WEB_SNAPSHOT_PACKAGE_PATHS.manifest &&
-      !manifest.entries.some((entry) => entry.path === path)
-    ) {
-      throw new Error('Page Package archive inventory does not match its manifest.');
     }
   }
 }
@@ -270,13 +301,17 @@ export async function loadWebSnapshotPackage(
 
   assertCompressedViewerPackageSize(record.packageFile);
   const zip = await JSZip.loadAsync(record.packageFile);
-  const bytesByPath = await readViewerPackageEntries(zip);
-  const packageManifest = readViewerPackageManifest(bytesByPath);
-  await assertViewerInventoryAndDigests(bytesByPath, packageManifest);
+  const filesByPath = inspectViewerPackageEntries(zip);
+  const packageManifest = parseViewerPackageManifest(
+    await readViewerEntry(filesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)
+  );
   assertManifestMatchesRecord({
     packageManifest,
     recordManifest: record.manifest,
   });
+  assertViewerInventory(filesByPath, packageManifest);
+  const bytesByPath = await readViewerWebCopyEntries(filesByPath, packageManifest);
+  await assertViewerWebCopyDigests(bytesByPath, packageManifest);
   const screenshot = await readViewerScreenshot(snapshotId);
   await validateRetainedWebSnapshotScreenshot({
     packageBytes: readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.screenshot),

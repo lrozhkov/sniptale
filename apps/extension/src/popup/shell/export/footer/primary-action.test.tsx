@@ -14,12 +14,14 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     iconClassName,
     label,
     onClick,
+    tone,
   }: {
     dataUi?: string;
     disabled?: boolean;
     iconClassName: string;
     label: string;
     onClick: () => void;
+    tone?: string;
   }) => {
     popupActionButtonMock({
       dataUi,
@@ -27,6 +29,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
       iconClassName,
       label,
       onClick,
+      tone,
     });
     return (
       <button type="button" data-ui={dataUi} disabled={disabled} onClick={onClick}>
@@ -114,7 +117,8 @@ describe('ExportFooterPrimaryActionButton', () => {
     expect(props.onStartExport).not.toHaveBeenCalled();
     expect(popupActionButtonMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        iconClassName: 'text-[var(--sniptale-color-text-primary)]',
+        iconClassName: 'text-current',
+        tone: 'danger',
       })
     );
   });

@@ -227,11 +227,6 @@ function parsePrivacySettingsFields(
 
   invalidFieldCount += assignParsedSettingsField(
     nextValue,
-    'webSnapshotEnabled',
-    parseOptionalBoolean(value['webSnapshotEnabled'])
-  );
-  invalidFieldCount += assignParsedSettingsField(
-    nextValue,
     'authenticatedSnapshotAssetsEnabled',
     parseOptionalBoolean(value['authenticatedSnapshotAssetsEnabled'])
   );
@@ -239,6 +234,11 @@ function parsePrivacySettingsFields(
     nextValue,
     'anonymousCrossOriginSnapshotAssetsEnabled',
     parseOptionalBoolean(value['anonymousCrossOriginSnapshotAssetsEnabled'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'externalSnapshotLinksEnabled',
+    parseOptionalBoolean(value['externalSnapshotLinksEnabled'])
   );
   return invalidFieldCount;
 }

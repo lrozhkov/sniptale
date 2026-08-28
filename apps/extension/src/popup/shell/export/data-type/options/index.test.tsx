@@ -50,6 +50,7 @@ function renderComponent(
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
+    includeWebCopy: false,
     setIncludeAnnotations: createToggleSetter(),
     setIncludeBasicLogs: createToggleSetter(),
     setIncludeCssDiagnostics: createToggleSetter(),
@@ -59,6 +60,7 @@ function renderComponent(
     setIncludeImages: createToggleSetter(),
     setIncludeJson: createToggleSetter(),
     setIncludeMarkdown: createToggleSetter(),
+    setIncludeWebCopy: createToggleSetter(),
     ...overrides,
   };
 

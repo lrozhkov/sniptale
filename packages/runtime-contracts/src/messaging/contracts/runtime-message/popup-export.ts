@@ -58,10 +58,7 @@ export type RuntimePopupExportRequestByType = {
   [MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED]: {
     type: typeof MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED;
     requestId: string;
-    activeStepKey: Extract<
-      ExportProgressStepKey,
-      'webSnapshotPreview' | 'webSnapshotDom' | 'webSnapshotStyles' | 'webSnapshotAssets'
-    >;
+    activeStepKey: ExportProgressStepKey;
     current: number;
     total: number;
   };

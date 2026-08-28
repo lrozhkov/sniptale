@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus, Scan } from 'lucide-react';
 import { translate, type AppLocale } from '../../../platform/i18n';
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
+const FIT_ACTUAL_SIZE_THRESHOLD = 0.99;
 
 function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 10) / 10));
@@ -12,7 +13,9 @@ function clampZoom(value: number): number {
 
 function resolveFitZoom(availableWidth: number, contentWidth: number): number {
   if (availableWidth <= 0 || contentWidth <= 0) return 1;
-  return Math.min(1, Math.max(MIN_ZOOM, availableWidth / contentWidth));
+  const ratio = availableWidth / contentWidth;
+  if (ratio >= FIT_ACTUAL_SIZE_THRESHOLD) return 1;
+  return Math.max(MIN_ZOOM, ratio);
 }
 
 export function useViewerZoom(contentWidth: number | null) {
@@ -20,6 +23,13 @@ export function useViewerZoom(contentWidth: number | null) {
   const [availableWidth, setAvailableWidth] = useState(() => window.innerWidth);
   const [manualZoom, setManualZoom] = useState(1);
   const [fitToWidth, setFitToWidth] = useState(true);
+  const dragOriginRef = useRef<{
+    clientX: number;
+    clientY: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (!surface) return undefined;
@@ -37,6 +47,8 @@ export function useViewerZoom(contentWidth: number | null) {
 
   const fitZoom = contentWidth === null ? 1 : resolveFitZoom(availableWidth, contentWidth);
   const zoom = fitToWidth ? fitZoom : manualZoom;
+  const canGrab =
+    contentWidth !== null && Math.ceil(contentWidth * zoom) > Math.floor(availableWidth);
   const setManualFrom = useCallback((next: number) => {
     setManualZoom(clampZoom(next));
     setFitToWidth(false);
@@ -45,7 +57,38 @@ export function useViewerZoom(contentWidth: number | null) {
   return useMemo(
     () => ({
       canZoom: contentWidth !== null,
+      grabClassName: canGrab ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : '',
       fitToWidth,
+      onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+        const target = event.currentTarget;
+        if (
+          event.button !== 0 ||
+          (target.scrollWidth <= target.clientWidth && target.scrollHeight <= target.clientHeight)
+        ) {
+          return;
+        }
+        dragOriginRef.current = {
+          clientX: event.clientX,
+          clientY: event.clientY,
+          scrollLeft: target.scrollLeft,
+          scrollTop: target.scrollTop,
+        };
+        target.setPointerCapture?.(event.pointerId);
+        setIsDragging(true);
+        event.preventDefault();
+      },
+      onPointerMove: (event: React.PointerEvent<HTMLElement>) => {
+        const origin = dragOriginRef.current;
+        if (!origin) return;
+        event.currentTarget.scrollLeft = origin.scrollLeft + origin.clientX - event.clientX;
+        event.currentTarget.scrollTop = origin.scrollTop + origin.clientY - event.clientY;
+      },
+      onPointerUp: (event: React.PointerEvent<HTMLElement>) => {
+        if (!dragOriginRef.current) return;
+        dragOriginRef.current = null;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        setIsDragging(false);
+      },
       onFitToWidth: () => setFitToWidth(true),
       onReset: () => setManualFrom(1),
       onZoomIn: () => setManualFrom(zoom + ZOOM_STEP),
@@ -53,7 +96,7 @@ export function useViewerZoom(contentWidth: number | null) {
       surfaceRef: setSurface,
       zoom,
     }),
-    [contentWidth, fitToWidth, setManualFrom, zoom]
+    [canGrab, contentWidth, fitToWidth, isDragging, setManualFrom, zoom]
   );
 }
 

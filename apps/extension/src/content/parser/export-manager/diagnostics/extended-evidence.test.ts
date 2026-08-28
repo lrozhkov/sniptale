@@ -70,6 +70,10 @@ describe('extended diagnostic evidence', () => {
         mimeType: 'application/json',
       },
       {
+        path: 'diagnostics/extended/transformations.json',
+        mimeType: 'application/json',
+      },
+      {
         path: 'diagnostics/extended/redactions.json',
         mimeType: 'application/json',
       },
@@ -113,6 +117,14 @@ describe('extended diagnostic evidence', () => {
     expect(metadata).toContain('view=full');
     expect(metadata).toMatch(/credential=(?:redacted|\*{3})/);
     expect(metadata).not.toContain('#fragment');
+    const transformations = artifacts.find((entry) =>
+      entry.path.endsWith('/transformations.json')
+    )!.content;
+    expect(transformations).toContain('external-navigation-disabled');
+    expect(transformations).toContain('inline-handler-removed');
+    expect(transformations).toContain('executable-removed');
+    expect(transformations).not.toContain('handler-secret');
+    expect(transformations).not.toContain('url-secret');
     const redactions = artifacts.find((entry) => entry.path.endsWith('/redactions.json'))!.content;
     expect(redactions).toContain('form-control-state');
     expect(redactions).toContain('inline-handler');

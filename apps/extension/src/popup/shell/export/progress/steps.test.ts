@@ -36,7 +36,11 @@ function getDownloadSteps() {
 
 function getFailedSteps() {
   return buildPopupExportProgressSteps({
-    progress: createProgress({ phase: 'error' }),
+    progress: createProgress({
+      completedStepKeys: ['json'],
+      failedStepKeys: ['files'],
+      phase: 'error',
+    }),
     result: {
       success: false,
       errors: ['cancelled'],
@@ -81,7 +85,9 @@ function verifyDownloadingSteps() {
 
 function verifyTerminalFailedExportSteps() {
   const steps = getFailedSteps();
-  expect(steps.every((step) => step.status === 'error')).toBe(true);
+  expect(steps.find((step) => step.key === 'json')?.status).toBe('done');
+  expect(steps.find((step) => step.key === 'files')?.status).toBe('error');
+  expect(steps.find((step) => step.key === 'markdown')?.status).toBe('pending');
 }
 
 function verifyWarningExportSteps() {
@@ -117,7 +123,7 @@ function verifyStartupFailureSteps() {
     selection,
   });
 
-  expect(steps.every((step) => step.status === 'error')).toBe(true);
+  expect(steps.every((step) => step.status === 'pending')).toBe(true);
 }
 
 function verifyScreenshotProgressMessage() {
@@ -191,13 +197,7 @@ function verifyWebSnapshotSteps() {
     },
   });
 
-  expect(steps.map((step) => [step.key, step.status])).toEqual([
-    ['webSnapshotDom', 'done'],
-    ['webSnapshotPreview', 'done'],
-    ['webSnapshotStyles', 'done'],
-    ['webSnapshotAssets', 'done'],
-    ['webSnapshotWarnings', 'done'],
-  ]);
+  expect(steps.map((step) => [step.key, step.status])).toEqual([['webSnapshotDom', 'done']]);
 }
 
 describe('buildPopupExportProgressSteps', () => {
@@ -223,16 +223,60 @@ describe('buildPopupExportProgressSteps', () => {
       },
     });
 
-    expect(steps.map((step) => step.key)).toEqual([
-      'webSnapshotDom',
-      'webSnapshotPreview',
-      'webSnapshotStyles',
-      'webSnapshotAssets',
-      'json',
-      'files',
-    ]);
+    expect(steps.map((step) => step.key)).toEqual(['webSnapshotDom', 'json', 'files']);
     expect(steps[0]?.status).toBe('active');
+    expect(steps[1]?.status).toBe('pending');
     expect(steps.at(-1)?.status).toBe('pending');
+  });
+
+  it('does not infer structured completion from a Web-copy page phase without producer outcomes', () => {
+    const steps = buildPopupExportProgressSteps({
+      progress: createProgress({ activeStepKey: null, phase: 'downloading' }),
+      result: null,
+      selection: {
+        ...selection,
+        includeWebCopy: true,
+      },
+    });
+
+    expect(
+      steps
+        .filter((step) => step.key !== 'webSnapshotDom')
+        .every((step) => step.status === 'pending')
+    ).toBe(true);
+  });
+
+  it('marks the screenshot done when Web-copy advances beyond its shared screenshot capture', () => {
+    const steps = buildPopupExportProgressSteps({
+      progress: createProgress({
+        activeStepKey: 'webSnapshotDom',
+        completedStepKeys: ['webSnapshotPreview'],
+        phase: 'scanning',
+      }),
+      result: null,
+      selection: {
+        ...selection,
+        includeFullPageScreenshot: true,
+        includeWebCopy: true,
+      },
+    });
+
+    expect(steps.find((step) => step.key === 'fullPageScreenshot')?.status).toBe('done');
+  });
+
+  it('does not project an unreported screenshot completion while a Web-copy job starts', () => {
+    const steps = buildPopupExportProgressSteps({
+      progress: createProgress({ activeStepKey: null, phase: 'scanning' }),
+      result: null,
+      selection: {
+        ...selection,
+        includeFullPageScreenshot: true,
+        includeWebCopy: true,
+      },
+    });
+
+    expect(steps.find((step) => step.key === 'webSnapshotDom')?.status).toBe('active');
+    expect(steps.find((step) => step.key === 'fullPageScreenshot')?.status).toBe('pending');
   });
   it('shows annotation preparation as the active selected step', () => {
     const steps = buildPopupExportProgressSteps({
@@ -260,20 +304,14 @@ describe('buildPopupExportProgressSteps', () => {
 
   it('marks text steps as done and files as active during downloading', verifyDownloadingSteps);
 
-  it(
-    'marks all selected steps as failed when export stops before producing an archive',
-    verifyTerminalFailedExportSteps
-  );
+  it('marks only the attributable failed step', verifyTerminalFailedExportSteps);
 
   it(
     'keeps archive warning results from marking every selected step as failed',
     verifyWarningExportSteps
   );
 
-  it(
-    'marks all selected steps as failed when export startup ends in a terminal error',
-    verifyStartupFailureSteps
-  );
+  it('keeps component rows neutral for an unattributed startup error', verifyStartupFailureSteps);
 
   it(
     'prioritizes the runtime progress message when the screenshot step is active',
@@ -289,10 +327,7 @@ describe('buildPopupExportProgressSteps', () => {
     verifyIdleAndDoneProgressStates
   );
 
-  it(
-    'shows web snapshot package parts instead of selected archive sections',
-    verifyWebSnapshotSteps
-  );
+  it('shows Web copy as the same single item selected in Package contents', verifyWebSnapshotSteps);
 
   it('shows real web snapshot phases before a result exists', () => {
     const steps = buildPopupExportProgressSteps({
@@ -304,11 +339,30 @@ describe('buildPopupExportProgressSteps', () => {
       selection,
     });
 
-    expect(steps.map((step) => [step.key, step.status])).toEqual([
-      ['webSnapshotDom', 'done'],
-      ['webSnapshotPreview', 'done'],
-      ['webSnapshotStyles', 'active'],
-      ['webSnapshotAssets', 'pending'],
-    ]);
+    expect(steps.map((step) => [step.key, step.status])).toEqual([['webSnapshotDom', 'active']]);
+  });
+
+  it('keeps multi-page Web copy active until its global completion is published', () => {
+    const pageTransition = buildPopupExportProgressSteps({
+      progress: createProgress({
+        activeStepKey: 'json',
+        completedStepKeys: ['webSnapshotPreview'],
+        phase: 'scanning',
+      }),
+      result: null,
+      selection: { ...selection, includeJson: true, includeWebCopy: true },
+    });
+    const globallyCompleted = buildPopupExportProgressSteps({
+      progress: createProgress({
+        activeStepKey: 'json',
+        completedStepKeys: ['webSnapshotPreview', 'webSnapshotAssets'],
+        phase: 'scanning',
+      }),
+      result: null,
+      selection: { ...selection, includeJson: true, includeWebCopy: true },
+    });
+
+    expect(pageTransition.find((step) => step.key === 'webSnapshotDom')?.status).toBe('active');
+    expect(globallyCompleted.find((step) => step.key === 'webSnapshotDom')?.status).toBe('done');
   });
 });

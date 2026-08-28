@@ -19,11 +19,6 @@ import {
   createSystemViewportPresetCatalog,
 } from '../../../features/viewport-presets/catalog';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
-import {
-  clearWebSnapshotConsent,
-  loadWebSnapshotConsent,
-  saveWebSnapshotConsent,
-} from './web-snapshot-consent';
 
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
@@ -70,9 +65,9 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
-  webSnapshotEnabled: false,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: true,
+  externalSnapshotLinksEnabled: false,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
   voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
 };
@@ -124,33 +119,13 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
 
 /**
  * Settings storage authority lives in this owner. Transferable preferences are synchronized,
- * while the Web Snapshot opt-in is committed through its profile-local consent owner. Callers
- * that change one field should use patchSettings so queued read-modify-write merges against the
- * latest persisted payload.
+ * Callers that change one field should use patchSettings so queued read-modify-write merges
+ * against the latest persisted payload.
  */
 export async function saveSettings(settings: Settings): Promise<void> {
-  const syncedSettings = createSynchronizedSettingsPayload(settings);
-  const { webSnapshotEnabled } = settings;
-  const consentEnabled = webSnapshotEnabled === true;
-
-  if (!consentEnabled) {
-    await saveWebSnapshotConsent(false);
-  }
-
-  await browserStorage.sync.set({ [STORAGE_KEY]: syncedSettings });
-
-  if (consentEnabled) {
-    await saveWebSnapshotConsent(true);
-  }
+  await browserStorage.sync.set({ [STORAGE_KEY]: settings });
 
   logger.debug('Saved settings payload');
-}
-
-export function createSynchronizedSettingsPayload(
-  settings: Settings
-): Omit<Settings, 'webSnapshotEnabled'> {
-  const { webSnapshotEnabled: _localConsent, ...syncedSettings } = settings;
-  return syncedSettings;
 }
 
 function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSettings {
@@ -221,10 +196,7 @@ function normalizeLocalStoragePolicy(parsedValue: Partial<Settings>): LocalStora
  */
 export async function loadSettings(): Promise<NormalizedSettings> {
   const getSyncStorageValue = browserStorage.sync.get.bind(browserStorage.sync);
-  const [result, webSnapshotEnabled] = await Promise.all([
-    getSyncStorageValue([STORAGE_KEY]),
-    loadWebSnapshotConsent(),
-  ]);
+  const result = await getSyncStorageValue([STORAGE_KEY]);
   const parsedSettings = parseStoredSettings(result[STORAGE_KEY]);
 
   if (parsedSettings.hasInvalidRoot) {
@@ -237,14 +209,10 @@ export async function loadSettings(): Promise<NormalizedSettings> {
     });
   }
 
-  return {
-    ...normalizeLoadedSettings(parsedSettings.value),
-    webSnapshotEnabled,
-  };
+  return normalizeLoadedSettings(parsedSettings.value);
 }
 
 export async function clearSettings(): Promise<void> {
-  await clearWebSnapshotConsent();
   await browserStorage.sync.remove([STORAGE_KEY]);
   logger.debug('Cleared settings payload');
 }
@@ -324,13 +292,11 @@ export async function removeRetiredSynchronizedSettings(): Promise<void> {
 
     const nextRaw = { ...(raw as Record<string, unknown>) };
     const removedDiagnostics = retiredField in nextRaw;
-    const removedLegacyWebSnapshotConsent = 'webSnapshotEnabled' in nextRaw;
-    if (!removedDiagnostics && !removedLegacyWebSnapshotConsent) {
+    if (!removedDiagnostics) {
       return loadSettings();
     }
 
     delete nextRaw[retiredField];
-    delete nextRaw['webSnapshotEnabled'];
     await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw });
     return loadSettings();
   });

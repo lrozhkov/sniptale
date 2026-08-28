@@ -23,6 +23,14 @@ const POPUP_ACTION_BUTTON_SECONDARY_CLASS_NAME = [
   'hover:text-[var(--sniptale-color-text-primary)] active:translate-y-px',
 ].join(' ');
 
+const POPUP_ACTION_BUTTON_DANGER_CLASS_NAME = [
+  'border-none bg-transparent text-[var(--sniptale-color-text-primary)] shadow-none',
+  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_14%,transparent)]',
+  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_18%,transparent)]',
+  'hover:text-[var(--sniptale-color-danger)] focus-visible:text-[var(--sniptale-color-danger)]',
+  'active:translate-y-px',
+].join(' ');
+
 export function getPopupActionButtonRootClassName(tone: PopupActionButtonTone, disabled: boolean) {
   if (disabled) {
     return POPUP_ACTION_BUTTON_DISABLED_CLASS_NAME;
@@ -35,6 +43,8 @@ export function getPopupActionButtonRootClassName(tone: PopupActionButtonTone, d
   if (tone === 'gallery') {
     return POPUP_ACTION_BUTTON_SECONDARY_CLASS_NAME;
   }
+
+  if (tone === 'danger') return POPUP_ACTION_BUTTON_DANGER_CLASS_NAME;
 
   return POPUP_ACTION_BUTTON_SECONDARY_CLASS_NAME;
 }

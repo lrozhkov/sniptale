@@ -10,11 +10,10 @@ const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
 
 describe('settings route codec', () => {
   it('exposes the canonical leaf and view inventory', () => {
-    expect(SETTINGS_SECTION_IDS).toHaveLength(14);
+    expect(SETTINGS_SECTION_IDS).toHaveLength(13);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
-      'web-snapshots': [],
       saving: ['settings', 'storage', 'templates'],
       'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
@@ -90,9 +89,6 @@ describe('settings route codec', () => {
     );
     expect(buildSettingsRouteUrl(BASE, { section: 'saving' }).searchParams.get('view')).toBe(
       'settings'
-    );
-    expect(buildSettingsRouteUrl(BASE, { section: 'web-snapshots' }).toString()).toBe(
-      `${BASE}?section=web-snapshots`
     );
     expect(
       buildSettingsRouteUrl(BASE, { section: 'ai-connections' }).searchParams.get('view')

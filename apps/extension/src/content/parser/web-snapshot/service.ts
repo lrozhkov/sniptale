@@ -17,6 +17,9 @@ import { materializeUnreadableIframeRasters } from './iframe-raster';
 import { PreparedSnapshotWarningKind } from '../page-preparation/snapshot';
 import { normalizePopupExportTabTitle } from '@sniptale/runtime-contracts/export';
 import { normalizePagePackageWarnings } from '@sniptale/runtime-contracts/page-package';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'ContentWebSnapshot' });
 
 function throwIfWebSnapshotBuildAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -125,7 +128,8 @@ async function captureRequiredWebSnapshotScreenshot(
   throwIfWebSnapshotBuildAborted(abortSignal);
   const screenshot = await captureWebSnapshotScreenshotWithWarnings(
     contentIntentSource,
-    captureIdentity
+    captureIdentity,
+    abortSignal
   );
   throwIfWebSnapshotBuildAborted(abortSignal);
   return {
@@ -144,12 +148,13 @@ export async function buildCurrentPageWebSnapshot(args: {
   requestId: string;
   onProgress?: ((update: WebSnapshotSaveProgressUpdate) => void) | undefined;
 }): Promise<WebSnapshotBuildResult> {
+  const startedAt = Date.now();
+  logger.log('Web snapshot preparation started');
   throwIfWebSnapshotBuildAborted(args.abortSignal);
-  args.onProgress?.({ activeStepKey: 'webSnapshotDom', current: 0, total: 4 });
   const source = resolveCurrentPageSource();
   args.onProgress?.({
     activeStepKey: 'webSnapshotPreview',
-    current: 1,
+    current: 0,
     total: 4,
   });
   const screenshotResult = await captureRequiredWebSnapshotScreenshot(
@@ -157,14 +162,30 @@ export async function buildCurrentPageWebSnapshot(args: {
     args.fullPageCaptureIdentity,
     args.abortSignal
   );
+  logger.log('Web snapshot screenshot received', {
+    elapsedMs: Date.now() - startedAt,
+    screenshotBytes: screenshotResult.screenshotBlob.size,
+  });
+  args.onProgress?.({ activeStepKey: 'webSnapshotDom', current: 1, total: 4 });
   const preparedSnapshot = await buildPreparedSnapshotDocument({
+    ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
     contextLabel: 'web-snapshot',
     preserveAssetUrls: true,
+    serializeHtml: false,
+  });
+  logger.log('Web snapshot DOM prepared', {
+    elapsedMs: Date.now() - startedAt,
+    elementCount: preparedSnapshot.document.querySelectorAll('*').length,
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const snapshotDocument = preparedSnapshot.document;
   args.onProgress?.({
     activeStepKey: 'webSnapshotStyles',
+    current: 2,
+    total: 4,
+  });
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotAssets',
     current: 2,
     total: 4,
   });
@@ -174,6 +195,11 @@ export async function buildCurrentPageWebSnapshot(args: {
     requestId: args.requestId,
     sourceUrl: source.url,
     ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
+  });
+  logger.log('Web snapshot assets collected', {
+    assetCount: assetResult.assets.length,
+    elapsedMs: Date.now() - startedAt,
+    warningCount: assetResult.warnings.length,
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const { assets, privacyWarnings, snapshotSessionId, warnings } = assetResult;
@@ -222,6 +248,9 @@ export async function buildCurrentPageWebSnapshot(args: {
     source,
     warnings: warningSummary.warnings,
     warningStats: warningSummary.warningStats,
+  });
+  logger.log('Web snapshot package prepared', {
+    elapsedMs: Date.now() - startedAt,
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   args.onProgress?.({

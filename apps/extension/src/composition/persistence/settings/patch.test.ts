@@ -56,11 +56,6 @@ async function flushMicrotasks(turns = 5) {
   }
 }
 
-function withoutWebSnapshotConsent(settings: typeof DEFAULT_SETTINGS) {
-  const { webSnapshotEnabled: _webSnapshotEnabled, ...syncedSettings } = settings;
-  return syncedSettings;
-}
-
 describe('settings patch persistence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -93,10 +88,10 @@ describe('settings patch persistence', () => {
     await expect(firstPatch).resolves.toEqual(firstCommittedSettings);
     await expect(secondPatch).resolves.toEqual(secondCommittedSettings);
     expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(1, {
-      sniptale_settings: withoutWebSnapshotConsent(firstCommittedSettings),
+      sniptale_settings: firstCommittedSettings,
     });
     expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(2, {
-      sniptale_settings: withoutWebSnapshotConsent(secondCommittedSettings),
+      sniptale_settings: secondCommittedSettings,
     });
   });
 });
@@ -118,7 +113,7 @@ describe('settings reset persistence', () => {
     await expect(resetSettingsToDefaults()).resolves.toEqual(createDefaultSettings());
 
     expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith({
-      sniptale_settings: withoutWebSnapshotConsent(createDefaultSettings()),
+      sniptale_settings: createDefaultSettings(),
     });
   });
 });

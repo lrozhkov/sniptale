@@ -46,7 +46,6 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import {
   clearSettings,
-  createDefaultSettings,
   loadSettings,
   removeRetiredSynchronizedSettings,
   saveSettings,
@@ -75,7 +74,7 @@ const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
 const PRIVACY_DEFAULTS = {
   anonymousCrossOriginSnapshotAssetsEnabled: true,
   authenticatedSnapshotAssetsEnabled: true,
-  webSnapshotEnabled: false,
+  externalSnapshotLinksEnabled: false,
 };
 const DEFAULT_FULL_PAGE_CAPTURE = {
   floatingElements: 'once' as const,
@@ -97,6 +96,30 @@ const LIBRARY_STORAGE_POLICY = {
   ...TEMPORARY_STORAGE_POLICY,
   defaultDestination: 'library' as const,
 };
+
+it('does not rewrite synchronized settings when the retired field is absent', async () => {
+  resetSettingsStorageMocks();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: { imageFormat: 'webp' },
+  });
+
+  await removeRetiredSynchronizedSettings();
+
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+});
+
+it('removes only the retired synchronized diagnostics field', async () => {
+  resetSettingsStorageMocks();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: { imageFormat: 'webp', rawDiagnosticsEnabled: true },
+  });
+
+  await removeRetiredSynchronizedSettings();
+
+  expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
+    sniptale_settings: { imageFormat: 'webp' },
+  });
+});
 
 function resetSettingsStorageMocks() {
   vi.clearAllMocks();
@@ -143,14 +166,7 @@ async function verifySaveAndClearContracts() {
   await saveSettings(settings);
   await clearSettings();
 
-  const { webSnapshotEnabled: _webSnapshotEnabled, ...syncedSettings } = settings;
-  expect(browserStorageSyncSetMock).toHaveBeenCalledWith({ sniptale_settings: syncedSettings });
-  expect(browserStorageLocalSetMock).toHaveBeenCalledWith({
-    sniptale_web_snapshot_local_consent: false,
-  });
-  expect(browserStorageLocalRemoveMock).toHaveBeenCalledWith([
-    'sniptale_web_snapshot_local_consent',
-  ]);
+  expect(browserStorageSyncSetMock).toHaveBeenCalledWith({ sniptale_settings: settings });
   expect(browserStorageSyncRemoveMock).toHaveBeenCalledWith(['sniptale_settings']);
   expect(loggerDebugMock).toHaveBeenCalledWith('Saved settings payload');
   expect(loggerDebugMock).toHaveBeenCalledWith('Cleared settings payload');
@@ -230,11 +246,11 @@ async function verifyStoredSettings() {
     defaultExportPresetId: 'export-7',
     imageFormat: 'png' as const,
     imageQuality: 100,
-    webSnapshotEnabled: true,
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
+    externalSnapshotLinksEnabled: false,
     voiceInput: {
       language: 'en-US' as const,
       microphoneDeviceId: null,
@@ -293,6 +309,7 @@ const invalidStoredSettingsFixture = {
   imageQuality: 'high',
   anonymousCrossOriginSnapshotAssetsEnabled: 'yes',
   authenticatedSnapshotAssetsEnabled: 'yes',
+  externalSnapshotLinksEnabled: 'yes',
   rawDiagnosticsEnabled: 'sometimes',
   voiceInput: { language: 'fr-FR', mode: 'always-local' },
 };
@@ -373,58 +390,6 @@ describe('settings', () => {
   it('saves and clears settings through the sync storage seam', verifySaveAndClearContracts);
   it('loads defaults and migrates the legacy download capture action', verifyLoadMigration);
   it('returns stored settings unchanged when all persisted fields are valid', verifyStoredSettings);
-  it('does not migrate legacy synchronized consent into the local consent authority', async () => {
-    browserStorageSyncGetMock.mockResolvedValueOnce({
-      sniptale_settings: { webSnapshotEnabled: true },
-    });
-
-    await expect(loadSettings()).resolves.toMatchObject({ webSnapshotEnabled: false });
-  });
-
-  it('removes legacy consent from synchronized storage without promoting it locally', async () => {
-    browserStorageSyncGetMock
-      .mockResolvedValueOnce({
-        sniptale_settings: { imageQuality: 82, webSnapshotEnabled: true },
-      })
-      .mockResolvedValueOnce({
-        sniptale_settings: { imageQuality: 82 },
-      });
-
-    await removeRetiredSynchronizedSettings();
-
-    expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-      sniptale_settings: { imageQuality: 82 },
-    });
-    expect(browserStorageLocalSetMock).not.toHaveBeenCalled();
-  });
-
-  it('commits enabling consent locally only after synchronized settings are saved', async () => {
-    await saveSettings({ ...createDefaultSettings(), webSnapshotEnabled: true });
-
-    expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-      sniptale_settings: expect.not.objectContaining({ webSnapshotEnabled: expect.anything() }),
-    });
-    expect(browserStorageLocalSetMock).toHaveBeenCalledWith({
-      sniptale_web_snapshot_local_consent: true,
-    });
-    expect(browserStorageSyncSetMock.mock.invocationCallOrder[0]).toBeLessThan(
-      browserStorageLocalSetMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
-    );
-  });
-
-  it('fails closed locally before attempting to save disabled synchronized settings', async () => {
-    browserStorageSyncSetMock.mockRejectedValueOnce(new Error('sync unavailable'));
-
-    await expect(
-      saveSettings({ ...createDefaultSettings(), webSnapshotEnabled: false })
-    ).rejects.toThrow('sync unavailable');
-    expect(browserStorageLocalSetMock).toHaveBeenCalledWith({
-      sniptale_web_snapshot_local_consent: false,
-    });
-    expect(browserStorageLocalSetMock.mock.invocationCallOrder[0]).toBeLessThan(
-      browserStorageSyncSetMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
-    );
-  });
   it('drops invalid persisted settings fields and preserves valid entries', verifyInvalidDrop);
   it('falls back to defaults when the stored settings root is invalid', verifyInvalidRootFallback);
   it('keeps default settings stable when storage returns no payload', async () => {

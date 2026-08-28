@@ -185,7 +185,6 @@ function validatePageInventory(args: {
     (entry) => entry.component === 'diagnostics' && isExtendedDiagnosticPath(entry.path)
   );
   if (args.diagnosticsLevel !== 'extended') return extendedEntries.length === 0;
-  if (args.intent !== 'export') return false;
   return (
     extendedEntries.length === PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.length &&
     PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.every((profile) =>

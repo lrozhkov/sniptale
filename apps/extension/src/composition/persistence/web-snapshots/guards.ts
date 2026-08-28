@@ -19,7 +19,6 @@ export function parseStoredWebSnapshotRecord(value: unknown): StoredWebSnapshotR
     value['screenshotMimeType'] === 'image/png' &&
     isWebSnapshotManifest(value['manifest']) &&
     value['manifest'].intent === 'save' &&
-    value['manifest'].diagnosticsLevel !== 'extended' &&
     typeof value['createdAt'] === 'number' &&
     typeof value['updatedAt'] === 'number' &&
     typeof value['size'] === 'number' &&

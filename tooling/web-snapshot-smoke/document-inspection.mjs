@@ -8,6 +8,11 @@ export async function inspectDocument(pageOrFrame) {
     const hostStyle = host ? globalThis.getComputedStyle(host) : null;
     const sensitiveControl = globalThis.document.querySelector('#sensitive-proof');
     const sensitiveRect = sensitiveControl?.getBoundingClientRect();
+    const inlineMaskIcon = globalThis.document.querySelector('.inline-mask-icon');
+    const inlineMaskStyle = inlineMaskIcon ? globalThis.getComputedStyle(inlineMaskIcon) : null;
+    const escapedMaskIcon = globalThis.document.querySelector('.escaped-mask-icon');
+    const escapedMaskStyle = escapedMaskIcon ? globalThis.getComputedStyle(escapedMaskIcon) : null;
+    const dynamicPanel = globalThis.document.querySelector('.dynamic-panel');
 
     return {
       capturedStyleHasImportTail: Array.from(
@@ -15,9 +20,12 @@ export async function inspectDocument(pageOrFrame) {
       ).some((style) => /600;\s*700&(?:family|display)=/u.test(style.textContent ?? '')),
       documentHeight: globalThis.document.documentElement.scrollHeight,
       documentWidth: globalThis.document.documentElement.scrollWidth,
+      dynamicPanelExpanded: dynamicPanel?.getAttribute('data-expanded') === 'true',
       elementCount: globalThis.document.querySelectorAll('*').length,
+      escapedMaskImage: escapedMaskStyle?.maskImage || escapedMaskStyle?.webkitMaskImage || null,
       hasBody: Boolean(globalThis.document.body),
       loadedImages: images.filter((image) => image.naturalWidth > 0).length,
+      inlineMaskImage: inlineMaskStyle?.maskImage || inlineMaskStyle?.webkitMaskImage || null,
       revealedSectionCount: globalThis.document.querySelectorAll('section.visible').length,
       scriptCount: globalThis.document.querySelectorAll('script').length,
       sensitiveProof:

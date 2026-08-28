@@ -2,6 +2,7 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import {
   handleFetchWebSnapshotAsset,
   handleRegisterWebSnapshotAssets,
+  handleWebSnapshotSaveProgress,
 } from '../actions.web-snapshot';
 import type { RouteCaptureMessageArgs } from './types';
 import { handleStagePagePackageJobChunk } from '../../page-package/job/stage-route';
@@ -16,6 +17,9 @@ export function routeWebSnapshotMessage(args: RouteCaptureMessageArgs): boolean 
   }
   if (message.type === MessageType.FETCH_WEB_SNAPSHOT_ASSET) {
     return handleFetchWebSnapshotAsset(message, resolvedTabId, sendResponse);
+  }
+  if (message.type === MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED) {
+    return handleWebSnapshotSaveProgress(message, resolvedTabId, sendResponse);
   }
   return false;
 }

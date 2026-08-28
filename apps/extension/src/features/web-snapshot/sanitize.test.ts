@@ -2,12 +2,14 @@
 
 import { expect, it } from 'vitest';
 import {
+  isSafeWebSnapshotCaptureAssetUrl,
   isSafeWebSnapshotUrl,
   sanitizeWebSnapshotCssText,
   sanitizeWebSnapshotAttribute,
   sanitizeWebSnapshotFilename,
   sanitizeWebSnapshotHtml,
   shouldExcludeWebSnapshotFormControlValue,
+  WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE,
 } from './sanitize';
 
 it.each([
@@ -52,6 +54,10 @@ it('sanitizes executable attributes and unsafe URLs for web snapshots', () => {
   ).toBeNull();
   expect(isSafeWebSnapshotUrl('https://example.com', null)).toBe(true);
   expect(isSafeWebSnapshotUrl('javascript:alert(1)', null)).toBe(false);
+  const inlineSvg =
+    'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E';
+  expect(isSafeWebSnapshotCaptureAssetUrl(inlineSvg, null)).toBe(true);
+  expect(isSafeWebSnapshotUrl(inlineSvg, null)).toBe(false);
   expect(sanitizeWebSnapshotFilename('A / bad:name', 'fallback')).toBe('A_badname');
 });
 
@@ -133,11 +139,23 @@ it('removes an import whose quoted URL contains semicolons without corrupting fo
 
 it('parses whitespace and escapes in rewritten CSS URL functions', () => {
   const rewritten = sanitizeWebSnapshotCssText(
-    '.hero { background: url  (  "https://cdn.example/im\\age.png"  ); }',
-    (url) => (url === 'https://cdn.example/im\\age.png' ? '../assets/image.png' : null)
+    '.hero { background: url  (  "https://cdn.example/im\\-age.png"  ); }',
+    (url) => (url === 'https://cdn.example/im-age.png' ? '../assets/image.png' : null)
   );
 
   expect(rewritten).toContain('url("../assets/image.png")');
+});
+
+it('decodes authored CSS string escapes before serializing an inline SVG resource', () => {
+  const dataUrl = String.raw`data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><path d=\"M3 3h14v14H3z\"/></svg>`;
+  const css = `.mask-icon { mask-image: url("${dataUrl}"); }`;
+  const rewrite = (url: string) => (url.startsWith('data:image/svg+xml;utf8,') ? url : null);
+  const once = sanitizeWebSnapshotCssText(css, rewrite);
+  const twice = sanitizeWebSnapshotCssText(once, rewrite);
+
+  expect(once).toContain('mask-image: url("data:image/svg+xml;utf8,');
+  expect(once).not.toContain('xmlns=\\\\\\"');
+  expect(twice).toBe(once);
 });
 
 it('fails closed for malformed URL functions and preserves benign block comments', () => {
@@ -333,12 +351,14 @@ it('sanitizes active content and credentials inside declarative shadow roots', (
   expect(html).not.toContain('onerror');
 });
 
-it('removes all navigation targets and external resource URLs from offline viewer HTML', () => {
+it('projects safe anchors as inert external targets and removes external resource URLs', () => {
   const html = sanitizeWebSnapshotHtml(
     [
       '<img src="blob:snapshot-image" srcset="blob:snapshot-image 1x, https://tracker.example/i.png 2x">',
-      '<a href="https://tracker.example/page">External</a>',
+      '<a href="https://tracker.example/page?view=full#part" data-sniptale-external-href="https://forged.example/">External</a>',
+      '<a href="/relative">Relative</a>',
       '<a href="mailto:support@example.com">Mail</a>',
+      '<a href="javascript:alert(1)" data-sniptale-external-href="https://forged.example/">Bad</a>',
       '<link rel="stylesheet" href="https://tracker.example/style.css">',
       '<map><area href="https://tracker.example/map"></map>',
       '<svg><use href="https://tracker.example/icon.svg"></use></svg>',
@@ -350,8 +370,14 @@ it('removes all navigation targets and external resource URLs from offline viewe
   );
 
   expect(html).toContain('src="blob:snapshot-image"');
-  expect(html).not.toContain('href="https://tracker.example/page"');
+  expect(html).not.toContain(' href="https://tracker.example/page');
   expect(html).not.toContain('href="mailto:support@example.com"');
+  expect(html).toContain(
+    `${WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE}="https://tracker.example/page?view=full#part"`
+  );
+  expect(html).toContain(`${WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE}="https://example.com/relative"`);
+  expect(html).not.toContain('forged.example');
+  expect(html).not.toContain('javascript:');
   expect(html).toContain('src="data:image/png;base64,aW1n"');
   expect(html).not.toContain('srcset=');
   expect(html).not.toContain('https://tracker.example/style.css');

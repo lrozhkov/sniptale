@@ -18,6 +18,7 @@ export type {
 export const DEFAULT_POPUP_STARTUP_STATE: PopupStartupState = {
   selection: 'remember-last',
   lastPage: 'menu',
+  lastExportDestination: 'export',
 };
 
 export async function loadPopupStartupState(): Promise<PopupStartupState> {
@@ -47,4 +48,10 @@ export function savePopupStartupSelection(
 
 export function savePopupLastPage(lastPage: PersistedPopupPage): Promise<PopupStartupState> {
   return patchPopupStartupState({ lastPage });
+}
+
+export function savePopupLastExportDestination(
+  lastExportDestination: PopupStartupState['lastExportDestination']
+): Promise<PopupStartupState> {
+  return patchPopupStartupState({ lastExportDestination });
 }

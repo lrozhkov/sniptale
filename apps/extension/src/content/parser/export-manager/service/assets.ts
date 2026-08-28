@@ -42,6 +42,39 @@ export async function collectExportExtraAssets(args: {
 }): Promise<ArchiveAsset[]> {
   args.throwIfCancelled();
   const extraAssets: ArchiveAsset[] = [];
+  const updateDiagnosticProgress = (
+    activeStepKey: 'basicLogs' | 'pageDiagnostics' | 'cssDiagnostics'
+  ) => {
+    updateExportManagerProgress(args.state, {
+      activeStepKey,
+      current: 0,
+      errors: args.warnings,
+      message: translate('content.runtime.scanPageStructure'),
+      phase: 'scanning',
+      total: 1,
+    });
+  };
+
+  if (args.options.includeBasicLogs) updateDiagnosticProgress('basicLogs');
+  extraAssets.push(
+    ...collectCoreLogAssets({
+      options: args.options,
+      treeData: args.snapshot.tree,
+      iframeReadiness: args.snapshot.iframeReadiness,
+      fileCandidatesCount: args.fileCandidatesCount,
+      downloadedFilesCount: args.downloadedFilesCount,
+      warnings: args.warnings,
+      diagnosticsSource: args.diagnosticsSource,
+    })
+  );
+  if (args.options.includePageDiagnostics) updateDiagnosticProgress('pageDiagnostics');
+  extraAssets.push(
+    ...(await collectAdvancedLogAssets(args.options, args.snapshot.tree, args.diagnosticsSource))
+  );
+  args.throwIfCancelled();
+  if (args.options.includeCssDiagnostics) updateDiagnosticProgress('cssDiagnostics');
+  extraAssets.push(...collectCssDiagnosticAssets(args.options, args.diagnosticsSource));
+
   if (args.options.includeFullPageScreenshot) {
     updateExportManagerProgress(args.state, {
       activeStepKey: 'fullPageScreenshot',
@@ -63,22 +96,5 @@ export async function collectExportExtraAssets(args: {
     }
   }
   args.throwIfCancelled();
-
-  extraAssets.push(
-    ...collectCoreLogAssets({
-      options: args.options,
-      treeData: args.snapshot.tree,
-      iframeReadiness: args.snapshot.iframeReadiness,
-      fileCandidatesCount: args.fileCandidatesCount,
-      downloadedFilesCount: args.downloadedFilesCount,
-      warnings: args.warnings,
-      diagnosticsSource: args.diagnosticsSource,
-    })
-  );
-  extraAssets.push(
-    ...(await collectAdvancedLogAssets(args.options, args.snapshot.tree, args.diagnosticsSource))
-  );
-  args.throwIfCancelled();
-  extraAssets.push(...collectCssDiagnosticAssets(args.options, args.diagnosticsSource));
   return extraAssets;
 }

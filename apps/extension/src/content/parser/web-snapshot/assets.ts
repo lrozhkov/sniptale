@@ -1,15 +1,24 @@
 import { extendWebSnapshotAssetSession, requestWebSnapshotAssetSession } from './asset-session';
 import type { WebSnapshotAssetEntry } from './types';
-import { readSameOriginAssetBlob } from './asset-fetch';
+import { fetchAnonymousCrossOriginAssetBlobs, readSameOriginAssetBlob } from './asset-fetch';
 import { createPrivacyWarnings } from './asset-warnings';
 import { collectAssetTargets, collectBackgroundFetchUrls } from './asset-targets';
 import {
   captureAssetTarget,
   createAssetBudget,
+  flushDeferredCssAssetRewrites,
   type CapturedAssetCache,
+  type DeferredCssAssetRewrites,
   type WebSnapshotAssetContext,
 } from './asset-capture';
 import { prepareStylesheetAsset } from './stylesheet-assets';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { parseSrcset } from './asset-targets';
+import { MAX_WEB_SNAPSHOT_ASSETS_BYTES } from './limits';
+
+const logger = createLogger({ namespace: 'ContentWebSnapshot' });
+const ASSET_PREFETCH_CONCURRENCY = 3;
+const ASSET_PREFETCH_TOTAL_TIMEOUT_MS = 45_000;
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -48,7 +57,7 @@ async function fetchSameOriginAssetBlob(args: {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    return await readSameOriginAssetBlob(response);
+    return await readSameOriginAssetBlob(response, args.resolved.href);
   } finally {
     args.abortSignal?.removeEventListener('abort', relayAbort);
     globalThis.clearTimeout(timeoutId);
@@ -73,6 +82,87 @@ function resolveAssetContextWithSource(
   };
 }
 
+function collectSameOriginFetchUrls(
+  targets: ReturnType<typeof collectAssetTargets>['targets'],
+  context: WebSnapshotAssetContext
+): string[] {
+  const urls = new Set<string>();
+  for (const target of targets) {
+    const candidates =
+      target.attribute === 'srcset'
+        ? parseSrcset(target.url).map((item) => item.url)
+        : [target.url];
+    for (const candidate of candidates) {
+      try {
+        const resolved = new URL(candidate, context.baseUrl);
+        if (resolved.origin === context.pageOrigin) urls.add(resolved.href);
+      } catch {
+        // Invalid targets are handled by the canonical capture path.
+      }
+    }
+  }
+  return [...urls];
+}
+
+async function prefetchSameOriginAssets(args: {
+  abortSignal?: AbortSignal | undefined;
+  allowAuthenticatedSameOriginAssets: boolean;
+  context: WebSnapshotAssetContext;
+  targets: ReturnType<typeof collectAssetTargets>['targets'];
+}): Promise<Map<string, Blob | Error>> {
+  const urls = collectSameOriginFetchUrls(args.targets, args.context);
+  if (urls.length === 0) return new Map();
+  const controller = new AbortController();
+  const relayAbort = () => controller.abort(args.abortSignal?.reason);
+  if (args.abortSignal?.aborted) relayAbort();
+  else args.abortSignal?.addEventListener('abort', relayAbort, { once: true });
+  const timeoutId = globalThis.setTimeout(
+    () => controller.abort(new Error('Web snapshot asset collection timed out')),
+    ASSET_PREFETCH_TOTAL_TIMEOUT_MS
+  );
+  const results = new Map<string, Blob | Error>();
+  let retainedBytes = 0;
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < urls.length) {
+      const url = urls[nextIndex];
+      nextIndex += 1;
+      if (!url) continue;
+      try {
+        const blob = await fetchSameOriginAssetBlob({
+          allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+          abortSignal: controller.signal,
+          resolved: new URL(url),
+        });
+        if (retainedBytes + blob.size > MAX_WEB_SNAPSHOT_ASSETS_BYTES) {
+          results.set(url, new Error('web snapshot asset budget exceeded'));
+          controller.abort(new Error('Web snapshot asset budget reached'));
+        } else {
+          retainedBytes += blob.size;
+          results.set(url, blob);
+          if (retainedBytes >= MAX_WEB_SNAPSHOT_ASSETS_BYTES) {
+            controller.abort(new Error('Web snapshot asset budget reached'));
+          }
+        }
+      } catch (error) {
+        results.set(
+          url,
+          error instanceof Error ? error : new Error('same-origin asset fetch failed')
+        );
+      }
+    }
+  };
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(ASSET_PREFETCH_CONCURRENCY, urls.length) }, () => worker())
+    );
+    return results;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+    args.abortSignal?.removeEventListener('abort', relayAbort);
+  }
+}
+
 function registerAssetSession(args: {
   allowAnonymousCrossOriginAssets: boolean;
   context: WebSnapshotAssetContext;
@@ -89,6 +179,7 @@ function registerAssetSession(args: {
 async function captureCollectedAssetTargets(args: {
   allowAnonymousCrossOriginAssets: boolean;
   allowAuthenticatedSameOriginAssets: boolean;
+  anonymousCrossOriginAssets: Map<string, Blob | Error>;
   assets: WebSnapshotAssetEntry[];
   budget: ReturnType<typeof createAssetBudget>;
   context: WebSnapshotAssetContext;
@@ -101,10 +192,17 @@ async function captureCollectedAssetTargets(args: {
     nextAssetIndex: number;
   };
 }): Promise<void> {
-  for (const target of args.targets) {
+  const startedAt = Date.now();
+  const deferredCssAssetRewrites: DeferredCssAssetRewrites = new Map();
+  for (const [targetIndex, target] of args.targets.entries()) {
     throwIfAssetCollectionAborted(args.abortSignal);
+    if (targetIndex > 0 && targetIndex % 25 === 0) {
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+      throwIfAssetCollectionAborted(args.abortSignal);
+    }
     args.state.nextAssetIndex = await captureAssetTarget({
       allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
+      anonymousCrossOriginAssets: args.anonymousCrossOriginAssets,
       assets: args.assets,
       budget: args.budget,
       context: args.context,
@@ -119,15 +217,22 @@ async function captureCollectedAssetTargets(args: {
       target,
       warnings: args.warnings,
       capturedAssetsByUrl: args.state.capturedAssetsByUrl,
+      deferredCssAssetRewrites,
       abortSignal: args.abortSignal,
     });
     throwIfAssetCollectionAborted(args.abortSignal);
   }
+  flushDeferredCssAssetRewrites(deferredCssAssetRewrites);
+  logger.log('Web snapshot asset targets materialized', {
+    elapsedMs: Date.now() - startedAt,
+    targetCount: args.targets.length,
+  });
 }
 
 async function captureNestedStylesheetAssets(args: {
   allowAnonymousCrossOriginAssets: boolean;
   allowAuthenticatedSameOriginAssets: boolean;
+  anonymousCrossOriginAssets: Map<string, Blob | Error>;
   assets: WebSnapshotAssetEntry[];
   budget: ReturnType<typeof createAssetBudget>;
   context: WebSnapshotAssetContext;
@@ -152,16 +257,46 @@ async function captureNestedStylesheetAssets(args: {
     }
     preparedStylesheetUrls.add(stylesheetAsset.originalUrl);
     throwIfAssetCollectionAborted(args.abortSignal);
+    logger.log('Web snapshot stylesheet preparation started', {
+      assetIndex,
+      stylesheetBytes: stylesheetAsset.blob.size,
+    });
     const prepared = await prepareStylesheetAsset(stylesheetAsset);
+    logger.log('Web snapshot stylesheet parsed', {
+      assetIndex,
+      nestedTargetCount: prepared.targets.length,
+    });
     const crossOriginUrls = collectBackgroundFetchUrls(prepared.targets, args.context);
+    const sameOriginAssetsPromise = prefetchSameOriginAssets({
+      abortSignal: args.abortSignal,
+      allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+      context: args.context,
+      targets: prepared.targets,
+    });
     if (args.allowAnonymousCrossOriginAssets) {
       await extendWebSnapshotAssetSession(crossOriginUrls, args.requestId, args.snapshotSessionId);
+      const [nestedAssets, sameOriginAssets] = await Promise.all([
+        fetchAnonymousCrossOriginAssetBlobs(crossOriginUrls, args.snapshotSessionId),
+        sameOriginAssetsPromise,
+      ]);
+      for (const [url, result] of nestedAssets) {
+        args.anonymousCrossOriginAssets.set(url, result);
+      }
+      for (const [url, result] of sameOriginAssets) {
+        args.anonymousCrossOriginAssets.set(url, result);
+      }
+    } else {
+      const sameOriginAssets = await sameOriginAssetsPromise;
+      for (const [url, result] of sameOriginAssets) {
+        args.anonymousCrossOriginAssets.set(url, result);
+      }
     }
     await captureCollectedAssetTargets({
       ...args,
       targets: prepared.targets,
     });
     prepared.finish();
+    logger.log('Web snapshot stylesheet materialized', { assetIndex });
   }
 }
 
@@ -184,7 +319,9 @@ export async function collectWebSnapshotAssets(
   const assets: WebSnapshotAssetEntry[] = [];
   const warnings: string[] = [];
   const context = resolveAssetContextWithSource(root, args.sourceUrl);
-  const targetCollection = collectAssetTargets(root, { baseUrl: context.baseUrl });
+  const targetCollection = collectAssetTargets(root, {
+    baseUrl: context.baseUrl,
+  });
   const targets = targetCollection.targets;
   const privacyWarnings = createPrivacyWarnings(
     targetCollection.warnings,
@@ -203,10 +340,31 @@ export async function collectWebSnapshotAssets(
     targets,
   });
   throwIfAssetCollectionAborted(args.abortSignal);
+  const [crossOriginAssets, sameOriginAssets] = await Promise.all([
+    args.allowAnonymousCrossOriginAssets
+      ? fetchAnonymousCrossOriginAssetBlobs(
+          collectBackgroundFetchUrls(targets, context),
+          snapshotSessionId
+        )
+      : Promise.resolve(new Map<string, Blob | Error>()),
+    prefetchSameOriginAssets({
+      abortSignal: args.abortSignal,
+      allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+      context,
+      targets,
+    }),
+  ]);
+  const anonymousCrossOriginAssets = new Map([...crossOriginAssets, ...sameOriginAssets]);
+  logger.log('Web snapshot primary asset batch received', {
+    fetchedCount: anonymousCrossOriginAssets.size,
+    targetCount: targets.length,
+  });
+  throwIfAssetCollectionAborted(args.abortSignal);
 
   await captureCollectedAssetTargets({
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
     allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+    anonymousCrossOriginAssets,
     assets,
     budget,
     context,
@@ -216,10 +374,14 @@ export async function collectWebSnapshotAssets(
     abortSignal: args.abortSignal,
     state,
   });
+  logger.log('Web snapshot primary asset targets materialized', {
+    assetCount: assets.length,
+  });
 
   await captureNestedStylesheetAssets({
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
     allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+    anonymousCrossOriginAssets,
     assets,
     budget,
     context,

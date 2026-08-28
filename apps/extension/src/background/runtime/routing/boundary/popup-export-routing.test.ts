@@ -101,7 +101,6 @@ beforeEach(() => {
   loadSettingsMock.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
-    webSnapshotEnabled: true,
   });
   sendTabMessageMock.mockResolvedValue({
     error: 'stale listener answered',
@@ -159,6 +158,47 @@ it('attaches the canonical full-page capability to staged Page Package productio
   );
 });
 
+it('terminates an unresponsive Page Package producer and forwards canonical cleanup', async () => {
+  vi.useFakeTimers();
+  try {
+    sendTabMessageMock
+      .mockImplementationOnce(() => new Promise(() => undefined))
+      .mockResolvedValueOnce({ success: true });
+
+    const request = requestPopupExportPagePackage({
+      batchRequestId: 'job-timeout',
+      includeWebCopy: false,
+      intent: 'export',
+      options: {
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: true,
+        includeFullPageScreenshot: true,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+        includePageDiagnostics: false,
+      },
+      ordinal: 0,
+      tabId: 62,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sendTabMessageMock).toHaveBeenCalledTimes(1);
+
+    const rejection = expect(request).rejects.toThrow('Page Package preparation timed out.');
+    await vi.advanceTimersByTimeAsync(180_000);
+    await rejection;
+
+    expect(sendTabMessageMock).toHaveBeenLastCalledWith(62, {
+      exportRunId: 'job-timeout',
+      type: MessageType.EXPORT_POPUP_CANCEL,
+    });
+    expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-timeout');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it('applies Web Snapshot consent, resource policy, and capture authority to combined Export', async () => {
   sendTabMessageMock.mockResolvedValue({
     stagedPagePackage: {
@@ -213,39 +253,6 @@ it('applies Web Snapshot consent, resource policy, and capture authority to comb
   expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-combined');
 });
 
-it('rejects disabled Web-copy consent before target, capability, or capture effects', async () => {
-  loadSettingsMock.mockResolvedValueOnce({
-    anonymousCrossOriginSnapshotAssetsEnabled: true,
-    authenticatedSnapshotAssetsEnabled: true,
-    webSnapshotEnabled: false,
-  });
-
-  await expect(
-    requestPopupExportPagePackage({
-      batchRequestId: 'job-disabled-copy',
-      includeWebCopy: true,
-      intent: 'export',
-      options: {
-        includeBasicLogs: false,
-        includeCssDiagnostics: false,
-        includeFiles: false,
-        includeFullPageScreenshot: false,
-        includeImages: false,
-        includeJson: true,
-        includeMarkdown: false,
-        includePageDiagnostics: false,
-      },
-      ordinal: 0,
-      tabId: 62,
-    })
-  ).rejects.toThrow('disabled');
-
-  expect(browserTabsGetMock).not.toHaveBeenCalled();
-  expect(issueContentGrantMock).not.toHaveBeenCalled();
-  expect(authorizeWebSnapshotCaptureRequestMock).not.toHaveBeenCalled();
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-});
-
 it('cleans Web-copy authority when combined production returns no staged package', async () => {
   sendTabMessageMock.mockResolvedValueOnce({ success: false, error: 'capture failed' });
 
@@ -267,7 +274,7 @@ it('cleans Web-copy authority when combined production returns no staged package
       ordinal: 0,
       tabId: 62,
     })
-  ).rejects.toThrow('does not match requested Web-copy authority');
+  ).rejects.toThrow('capture failed');
 
   expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-failed-copy');
 });

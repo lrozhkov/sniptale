@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   consume: vi.fn(),
   deleteAssets: vi.fn(),
   hasAccess: vi.fn(),
-  loadSettings: vi.fn(),
   open: vi.fn(),
   readAssetFile: vi.fn(),
   readRecovery: vi.fn(),
@@ -20,10 +19,6 @@ const mocks = vi.hoisted(() => ({
   screenshotPipeTo: vi.fn(),
 }));
 
-vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
-  loadSettings: mocks.loadSettings,
-}));
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   readAssetFile: mocks.readAssetFile,
@@ -114,7 +109,6 @@ beforeEach(() => {
   mocks.close.mockResolvedValue(undefined);
   mocks.consume.mockResolvedValue({ prepared: { ref: { kind: 'test' } } });
   mocks.readAssetFile.mockResolvedValue(new File(['package'], 'page-package.zip'));
-  mocks.loadSettings.mockResolvedValue({ webSnapshotEnabled: true });
   mocks.hasAccess.mockResolvedValue(true);
   mocks.open.mockResolvedValue({
     pagePackage: { manifest: { intent: 'save' } },
@@ -315,19 +309,4 @@ it('rejects missing session authority before consuming staged bytes', async () =
 
   expect(result.failures[0]?.error).toContain('session is missing');
   expect(mocks.consume).not.toHaveBeenCalled();
-});
-
-it('rechecks global consent before beginning Library publication', async () => {
-  mocks.loadSettings.mockResolvedValueOnce({ webSnapshotEnabled: false });
-
-  const result = await saveCollectedPagePackages({
-    signal: activeSignal,
-    jobId: 'job-1',
-    packages: [collected(0, 7)],
-  });
-
-  expect(result.failures[0]?.error).toContain('disabled');
-  expect(mocks.begin).not.toHaveBeenCalled();
-  expect(mocks.save).not.toHaveBeenCalled();
-  expect(mocks.close).toHaveBeenCalledOnce();
 });

@@ -6,6 +6,7 @@ import {
 import { sanitizeWebSnapshotCssText } from '../../../../features/web-snapshot/public';
 import { sanitizeDiagnosticUrlAttributeValue } from './page-snapshot.url-attributes';
 import { estimateUtf8Bytes } from '@sniptale/runtime-contracts/validation/base64';
+import { redactSensitiveString } from '@sniptale/platform/security/secret-redaction';
 
 export const MAX_EXTENDED_DIAGNOSTIC_ELEMENTS = 100_000;
 const MAX_EXTENDED_DIAGNOSTIC_HTML_BYTES = 32 * 1024 * 1024;
@@ -44,7 +45,11 @@ function sanitizeScalar(key: string, value: string): string {
   const sanitized = sanitizeRawDiagnosticExportData({ [key]: value });
   if (!sanitized || typeof sanitized !== 'object' || Array.isArray(sanitized)) return '';
   const result = (sanitized as Record<string, unknown>)[key];
-  return typeof result === 'string' ? result : '';
+  if (typeof result !== 'string') return '';
+  if (value.length > 300 && result.endsWith('... [truncated]')) {
+    return redactSensitiveString(value, value.length);
+  }
+  return result;
 }
 
 function elementPath(element: Element): string {
@@ -150,10 +155,10 @@ function redactAttributes(element: Element, redactions: ExtendedDiagnosticRedact
       element.removeAttribute(attribute.name);
       continue;
     }
-    element.setAttribute(
-      attribute.name,
-      sanitizeAttributeValue(element, normalizedName, attribute.value)
-    );
+    const sanitizedValue = sanitizeAttributeValue(element, normalizedName, attribute.value);
+    if (sanitizedValue !== attribute.value) {
+      element.setAttribute(attribute.name, sanitizedValue);
+    }
   }
 }
 

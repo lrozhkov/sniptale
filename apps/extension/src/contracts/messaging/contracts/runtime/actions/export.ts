@@ -164,10 +164,20 @@ export const runtimeActionExportMessageContracts = {
         required: {
           requestId: isString,
           activeStepKey: (value) =>
-            value === 'webSnapshotPreview' ||
+            value === 'annotations' ||
+            value === 'basicLogs' ||
+            value === 'cssDiagnostics' ||
+            value === 'files' ||
+            value === 'fullPageScreenshot' ||
+            value === 'images' ||
+            value === 'json' ||
+            value === 'markdown' ||
+            value === 'pageDiagnostics' ||
+            value === 'webSnapshotAssets' ||
             value === 'webSnapshotDom' ||
+            value === 'webSnapshotPreview' ||
             value === 'webSnapshotStyles' ||
-            value === 'webSnapshotAssets',
+            value === 'webSnapshotWarnings',
           current: (value) => isNumber(value) && Number.isSafeInteger(value) && value >= 0,
           total: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
         },

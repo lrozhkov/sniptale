@@ -128,3 +128,82 @@ it('parses the native popup export job lifecycle contracts', () => {
     requestCapability.parseRequest({ ...capabilityRequest, operation: 'UNKNOWN_OPERATION' })
   ).toThrow();
 });
+
+it('parses every structured Page Package producer progress step', () => {
+  const contract =
+    runtimeActionExportMessageContracts[MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED];
+  const stepKeys = [
+    'annotations',
+    'basicLogs',
+    'cssDiagnostics',
+    'files',
+    'fullPageScreenshot',
+    'images',
+    'json',
+    'markdown',
+    'pageDiagnostics',
+    'webSnapshotAssets',
+    'webSnapshotDom',
+    'webSnapshotPreview',
+    'webSnapshotStyles',
+    'webSnapshotWarnings',
+  ] as const;
+
+  for (const activeStepKey of stepKeys) {
+    const message = {
+      activeStepKey,
+      current: 1,
+      requestId: 'job-1',
+      total: 2,
+      type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
+    } as const;
+    expect(contract.parseRequest(message)).toEqual(message);
+  }
+  expect(() =>
+    contract.parseRequest({
+      activeStepKey: 'unknown',
+      current: 1,
+      requestId: 'job-1',
+      total: 2,
+      type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
+    })
+  ).toThrow();
+});
+
+it('covers routed Page Package policy branches and launch-intent responses', () => {
+  const build = runtimeActionExportMessageContracts[MessageType.EXPORT_POPUP_BUILD_PACKAGE];
+  const base = {
+    batchRequestId: 'job-1',
+    includeWebCopy: false,
+    intent: 'export' as const,
+    options,
+    ordinal: 0,
+    tabId: 7,
+    tabRouteCapabilityToken: 'capability-1',
+    tabRouteRequestId: 'route-1',
+    type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+  };
+  expect(build.parseRequest(base)).toEqual(base);
+  expect(
+    build.parseRequest({
+      ...base,
+      allowAnonymousCrossOriginAssets: true,
+      allowAuthenticatedSameOriginAssets: false,
+      includeWebCopy: true,
+    })
+  ).toMatchObject({ includeWebCopy: true });
+  expect(() => build.parseRequest({ ...base, includeWebCopy: true })).toThrow();
+  expect(() => build.parseRequest({ ...base, allowAnonymousCrossOriginAssets: false })).toThrow();
+
+  const launch =
+    runtimeActionExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT];
+  expect(launch.parseResponse({ page: 'export', success: true })).toEqual({
+    page: 'export',
+    success: true,
+  });
+  expect(launch.parseResponse({ page: null, success: true })).toEqual({
+    page: null,
+    success: true,
+  });
+  expect(() => launch.parseResponse({ page: 'settings', success: true })).toThrow();
+});

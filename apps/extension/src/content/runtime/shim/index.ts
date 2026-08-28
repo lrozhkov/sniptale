@@ -3,6 +3,7 @@ import { createQuickActionHotkeyRuntime } from '../../platform/quick-action-hotk
 import { loadShimQuickActions, shimQuickActionStorage } from './quick-actions';
 import { triggerQuickActionFromShim } from './transport/quick-action';
 import { wakeContentRuntimeFromShim } from './transport/wakeup';
+import { isContentRuntimeShimDocument } from './document-policy';
 
 const CONTENT_RUNTIME_SHIM_CLEANUP_KEY = '__sniptaleContentRuntimeShimCleanup';
 
@@ -45,7 +46,7 @@ function observeFullRuntimeMounted(onMounted: () => void): () => void {
 }
 
 function initializeContentRuntimeShim(): void {
-  if (!isTopLevelWindow()) {
+  if (!isTopLevelWindow() || !isContentRuntimeShimDocument(window.location)) {
     return;
   }
 

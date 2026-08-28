@@ -4,7 +4,6 @@ import {
 } from '@sniptale/runtime-contracts/page-package';
 import type { ArchiveEntrySource } from '../../../../composition/archive-transfer';
 import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
-import { loadSettings } from '../../../../composition/persistence/settings';
 import { readAssetFile } from '../../../../composition/persistence/assets';
 import { hasActivePageAccess } from '../../../page-access/service';
 import { securityE2ECheckpoint } from '../../../../platform/security-e2e-control';
@@ -58,10 +57,6 @@ async function readScreenshotBlob(
 }
 
 async function assertLibraryCommitAllowed(tabId: number): Promise<void> {
-  const settings = await loadSettings();
-  if (!settings.webSnapshotEnabled) {
-    throw new Error('Web Snapshots were disabled before Page Package commit.');
-  }
   if (!(await hasActivePageAccess(tabId))) {
     throw new Error('Page access was revoked before Page Package commit.');
   }

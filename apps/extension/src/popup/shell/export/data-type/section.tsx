@@ -16,11 +16,8 @@ import {
 import { ExportSelectionSectionShell } from '../selection/section-shell';
 import { cx } from '../selection/utils';
 import type { PopupPagePackagePreferenceState } from '../session/types';
-import {
-  PackagePresetControls,
-  WebCopyPackageCard,
-  type PopupPackageDestination,
-} from './package-controls';
+import type { PopupPackageDestination } from './package-controls';
+import type { WebCopyResourcePreferences } from '../pages/snapshot-availability';
 
 type DataTypeSectionProps = ExportOptionToggleProps & {
   destination: PopupPackageDestination;
@@ -28,9 +25,8 @@ type DataTypeSectionProps = ExportOptionToggleProps & {
   isOpen: boolean;
   onClose: () => void;
   onOpen: () => void;
-  onRequestWebCopySetup: () => void;
   packagePreferences: PopupPagePackagePreferenceState;
-  webSnapshotEnabled: boolean;
+  webCopyResources: WebCopyResourcePreferences;
 };
 
 const rowClassName = [
@@ -38,6 +34,14 @@ const rowClassName = [
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_68%,transparent)] last:border-b-0',
 ].join(' ');
 const checkboxClassName = 'mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--sniptale-color-accent)]';
+const REQUIRED_LIBRARY_OPTION_KEYS = new Set<ExportOptionKey>(['webCopy', 'fullPageScreenshot']);
+
+function isRequiredLibraryOption(
+  destination: PopupPackageDestination,
+  key: ExportOptionKey
+): boolean {
+  return destination === 'save' && REQUIRED_LIBRARY_OPTION_KEYS.has(key);
+}
 
 function DataTypeDrawerRow(props: {
   active: boolean;
@@ -63,7 +67,7 @@ function DataTypeDrawerRow(props: {
       />
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-medium text-[var(--sniptale-color-text-primary)]">
-          {props.label}
+          <span>{props.label}</span>
         </div>
         <div className="mt-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
           {props.description}
@@ -98,6 +102,7 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
 
   return {
     disabled: props.disabled,
+    includeWebCopy: props.packagePreferences.includeWebCopy,
     includeAnnotations: props.includeAnnotations,
     includeBasicLogs: props.includeBasicLogs,
     includeCssDiagnostics: props.includeCssDiagnostics,
@@ -116,6 +121,7 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
     setIncludeImages: bindSetter(props.setIncludeImages),
     setIncludeJson: bindSetter(props.setIncludeJson),
     setIncludeMarkdown: bindSetter(props.setIncludeMarkdown),
+    setIncludeWebCopy: props.packagePreferences.setIncludeWebCopy,
   };
 }
 
@@ -166,15 +172,151 @@ function DataTypeFilterBar(props: {
 }
 
 function applyVisibleOptionSelection(args: {
+  destination: PopupPackageDestination;
   nextValue: boolean;
   toggleProps: ExportOptionToggleProps;
   visibleOptions: ExportOptionConfig[];
 }) {
   for (const option of args.visibleOptions) {
+    if (!args.nextValue && isRequiredLibraryOption(args.destination, option.key)) {
+      continue;
+    }
     if (getExportOptionActive(option.key, args.toggleProps) !== args.nextValue) {
       setExportOptionActive(option.key, args.nextValue, args.toggleProps);
     }
   }
+}
+
+function applyQuickSelection(
+  preset: 'web-copy' | 'materials' | 'full',
+  destination: PopupPackageDestination,
+  options: ExportOptionConfig[],
+  toggleProps: ExportOptionToggleProps
+) {
+  for (const option of options) {
+    const nextValue =
+      isRequiredLibraryOption(destination, option.key) ||
+      preset === 'full' ||
+      (preset === 'web-copy' && option.key === 'webCopy') ||
+      (preset === 'materials' && ['json', 'markdown', 'files', 'images'].includes(option.key));
+    if (getExportOptionActive(option.key, toggleProps) !== nextValue) {
+      setExportOptionActive(option.key, nextValue, toggleProps);
+    }
+  }
+}
+
+function QuickSelection(props: {
+  destination: PopupPackageDestination;
+  disabled: boolean;
+  options: ExportOptionConfig[];
+  toggleProps: ExportOptionToggleProps;
+}) {
+  return (
+    <div className="mb-2 flex items-center gap-1" data-ui="popup.export.quick-selection">
+      {(['web-copy', 'materials', 'full'] as const).map((preset) => (
+        <button
+          key={preset}
+          type="button"
+          disabled={props.disabled}
+          className={[
+            'min-w-0 flex-1 rounded-[7px] border px-1.5 py-0.5 text-[9px]',
+            'border-[var(--sniptale-color-border-soft)]',
+            'text-[var(--sniptale-color-text-secondary)]',
+            'hover:border-[var(--sniptale-color-accent)]',
+            'hover:text-[var(--sniptale-color-text-primary)]',
+          ].join(' ')}
+          onClick={() =>
+            applyQuickSelection(preset, props.destination, props.options, props.toggleProps)
+          }
+        >
+          {translate(
+            preset === 'web-copy'
+              ? 'popup.export.packagePresetWebCopy'
+              : preset === 'materials'
+                ? 'popup.export.packagePresetMaterials'
+                : 'popup.export.packagePresetFull'
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function WebCopyResourceControls(props: {
+  disabled: boolean;
+  resources: WebCopyResourcePreferences;
+}) {
+  const items = [
+    {
+      checked: props.resources.authenticatedSameOriginAssetsEnabled,
+      description: translate('popup.export.webCopyCurrentSiteDescription'),
+      label: translate('popup.export.webCopyCurrentSiteLabel'),
+      pending: props.resources.pending === 'authenticated',
+      setChecked: props.resources.setAuthenticatedSameOriginAssetsEnabled,
+    },
+    {
+      checked: props.resources.anonymousCrossOriginAssetsEnabled,
+      description: translate('popup.export.webCopyExternalSitesDescription'),
+      label: translate('popup.export.webCopyExternalSitesLabel'),
+      pending: props.resources.pending === 'anonymous',
+      setChecked: props.resources.setAnonymousCrossOriginAssetsEnabled,
+    },
+    {
+      checked: props.resources.externalLinksEnabled,
+      description: translate('popup.export.webCopyExternalLinksDescription'),
+      label: translate('popup.export.webCopyExternalLinksLabel'),
+      pending: props.resources.pending === 'external-links',
+      setChecked: props.resources.setExternalLinksEnabled,
+    },
+  ];
+  return (
+    <div className="ml-5 pl-3">
+      {items.map((item) => (
+        <label key={item.label} className="flex items-start gap-2 py-1.5">
+          <input
+            type="checkbox"
+            className={checkboxClassName}
+            checked={item.checked}
+            disabled={props.disabled || item.pending || props.resources.pending !== null}
+            onChange={(event) => void item.setChecked(event.currentTarget.checked)}
+          />
+          <span className="min-w-0">
+            <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+              {item.label}
+            </span>
+            <span className="block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+              {item.description}
+            </span>
+          </span>
+        </label>
+      ))}
+      {props.resources.error ? (
+        <div role="status" className="pb-1 text-[10px] text-[var(--sniptale-color-danger)]">
+          {translate('popup.export.webCopyResourceSettingsError')}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OptionGroupLabel({ group }: { group: ExportOptionConfig['group'] }) {
+  return (
+    <div
+      className={[
+        'sticky top-0 z-[1] bg-[var(--sniptale-color-surface-panel)] pb-1 pt-2',
+        'text-[9px] font-semibold uppercase tracking-[0.08em]',
+        'text-[var(--sniptale-color-text-muted-strong)]',
+      ].join(' ')}
+    >
+      {translate(
+        group === 'web-copy'
+          ? 'popup.export.packagePresetWebCopy'
+          : group === 'content'
+            ? 'popup.export.contentGroupLabel'
+            : 'popup.export.diagnosticsGroupLabel'
+      )}
+    </div>
+  );
 }
 
 function renderDataTypeBody(args: {
@@ -184,10 +326,9 @@ function renderDataTypeBody(args: {
   setFilterQuery: (value: string) => void;
   shouldShowClearAll: boolean;
   toggleProps: ExportOptionToggleProps;
+  options: ExportOptionConfig[];
   visibleOptions: ExportOptionConfig[];
-  onRequestWebCopySetup: () => void;
-  packagePreferences: PopupPagePackagePreferenceState;
-  webSnapshotEnabled: boolean;
+  webCopyResources: WebCopyResourcePreferences;
 }) {
   if (!args.visibleOptions.length && args.filterQuery.trim().length > 0) {
     return (
@@ -199,24 +340,11 @@ function renderDataTypeBody(args: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PackagePresetControls
-        destination={args.destination}
-        disabled={args.disabled}
-        onRequestSetup={args.onRequestWebCopySetup}
-        preferences={args.packagePreferences}
-        webSnapshotEnabled={args.webSnapshotEnabled}
-      />
-      <WebCopyPackageCard
-        destination={args.destination}
-        disabled={args.disabled}
-        onRequestSetup={args.onRequestWebCopySetup}
-        preferences={args.packagePreferences}
-        webSnapshotEnabled={args.webSnapshotEnabled}
-      />
       <DataTypeFilterBar
         filterQuery={args.filterQuery}
         onToggleAll={() =>
           applyVisibleOptionSelection({
+            destination: args.destination,
             nextValue: !args.shouldShowClearAll,
             toggleProps: args.toggleProps,
             visibleOptions: args.visibleOptions,
@@ -225,16 +353,29 @@ function renderDataTypeBody(args: {
         setFilterQuery={args.setFilterQuery}
         shouldShowClearAll={args.shouldShowClearAll}
       />
+      <QuickSelection
+        destination={args.destination}
+        disabled={args.disabled}
+        options={args.options}
+        toggleProps={args.toggleProps}
+      />
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        {args.visibleOptions.map((option) => (
-          <DataTypeDrawerRow
-            key={option.key}
-            active={getExportOptionActive(option.key, args.toggleProps)}
-            description={option.description}
-            disabled={args.disabled}
-            label={option.label}
-            onToggle={() => toggleExportOption(option.key, args.toggleProps)}
-          />
+        {args.visibleOptions.map((option, index) => (
+          <div key={option.key}>
+            {index === 0 || args.visibleOptions[index - 1]?.group !== option.group ? (
+              <OptionGroupLabel group={option.group} />
+            ) : null}
+            <DataTypeDrawerRow
+              active={getExportOptionActive(option.key, args.toggleProps)}
+              description={option.description}
+              disabled={args.disabled || isRequiredLibraryOption(args.destination, option.key)}
+              label={option.label}
+              onToggle={() => toggleExportOption(option.key, args.toggleProps)}
+            />
+            {option.key === 'webCopy' && getExportOptionActive(option.key, args.toggleProps) ? (
+              <WebCopyResourceControls disabled={args.disabled} resources={args.webCopyResources} />
+            ) : null}
+          </div>
         ))}
       </div>
     </div>
@@ -244,15 +385,7 @@ function renderDataTypeBody(args: {
 export function ExportDataTypeSection(props: DataTypeSectionProps) {
   const [filterQuery, setFilterQuery] = useState('');
   const toggleProps = createSelectionProps(props);
-  const options = useMemo(
-    () =>
-      getExportOptionConfigs().filter(
-        (option) =>
-          props.destination === 'export' ||
-          (option.key !== 'fullPageScreenshot' && option.key !== 'pageDiagnostics')
-      ),
-    [props.destination]
-  );
+  const options = useMemo(() => getExportOptionConfigs(), []);
   const visibleOptions = useMemo(() => filterOptions(options, filterQuery), [filterQuery, options]);
   const selectedItems = options.filter((option) => getExportOptionActive(option.key, toggleProps));
   const visibleKeys = visibleOptions.map((option) => option.key);
@@ -262,52 +395,30 @@ export function ExportDataTypeSection(props: DataTypeSectionProps) {
     <ExportSelectionSectionShell
       title={translate('popup.export.dataTypesSectionLabel')}
       drawerLabel={translate('popup.export.dataTypesSectionLabel')}
+      drawerDescription={translate('popup.export.dataTypesSectionDescription')}
       isExpanded={props.isExpanded}
       isOpen={props.isOpen}
       onOpen={props.onOpen}
       onClose={props.onClose}
-      bodyClassName={cx(
-        props.isOpen ? 'flex min-h-0 flex-1 flex-col pt-1' : 'max-h-[140px] overflow-hidden pt-1'
-      )}
+      bodyClassName={cx(props.isOpen ? 'flex min-h-0 flex-1 flex-col pt-1' : 'pt-1')}
     >
-      {props.destination === 'export' && props.includePageDiagnostics ? (
-        <div
-          role="status"
-          className={[
-            'mb-2 rounded-[9px] border px-2.5 py-2 text-[10px] leading-4',
-            'border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_42%,transparent)]',
-            'bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_9%,transparent)]',
-            'text-[var(--sniptale-color-text-secondary)]',
-          ].join(' ')}
-        >
-          {translate('popup.export.includePageDiagnosticsDisclosure')}
-        </div>
-      ) : null}
-      {props.isOpen ? (
-        renderDataTypeBody({
-          destination: props.destination,
-          disabled: props.disabled,
-          filterQuery,
-          setFilterQuery,
-          shouldShowClearAll,
-          toggleProps,
-          visibleOptions,
-          onRequestWebCopySetup: props.onRequestWebCopySetup,
-          packagePreferences: props.packagePreferences,
-          webSnapshotEnabled: props.webSnapshotEnabled,
-        })
-      ) : (
-        <>
-          <WebCopyPackageCard
-            destination={props.destination}
-            disabled={props.disabled}
-            onRequestSetup={props.onRequestWebCopySetup}
-            preferences={props.packagePreferences}
-            webSnapshotEnabled={props.webSnapshotEnabled}
-          />
-          {renderDataTypeSummaryItems(selectedItems, toggleProps)}
-        </>
-      )}
+      {props.isOpen
+        ? renderDataTypeBody({
+            destination: props.destination,
+            disabled: props.disabled,
+            filterQuery,
+            setFilterQuery,
+            shouldShowClearAll,
+            toggleProps,
+            options,
+            visibleOptions,
+            webCopyResources: props.webCopyResources,
+          })
+        : renderDataTypeSummaryItems(
+            selectedItems,
+            toggleProps,
+            props.destination === 'save' ? REQUIRED_LIBRARY_OPTION_KEYS : new Set()
+          )}
     </ExportSelectionSectionShell>
   );
 }

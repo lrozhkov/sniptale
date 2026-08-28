@@ -130,6 +130,7 @@ function createSessionState(): PopupExportSessionFixture {
     },
     progressSteps: [],
     requestIdRef: { current: null as string | null },
+    terminalRequestIdRef: { current: null as string | null },
     result: null,
     launchedPlan: null,
     setCopiedFormat: vi.fn(),

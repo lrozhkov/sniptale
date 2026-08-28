@@ -359,6 +359,13 @@ function resolveMinimizedAttributeValue(normalizedName: string, value: string): 
 function minimizeAttributeValue(element: HTMLElement, attributeName: string): void {
   const normalizedName = attributeName.toLowerCase();
   const value = element.getAttribute(attributeName) ?? '';
+  if (
+    element instanceof SVGElement &&
+    (normalizedName === 'width' || normalizedName === 'height')
+  ) {
+    element.setAttribute(attributeName, '0');
+    return;
+  }
   const minimizedValue = resolveMinimizedAttributeValue(normalizedName, value);
 
   if (minimizedValue !== null) {

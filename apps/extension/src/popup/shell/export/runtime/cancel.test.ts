@@ -21,6 +21,7 @@ function createState(overrides = {}) {
   return {
     cancelRetryRef: {
       current: null as {
+        cancellationPending?: true;
         exportRunId: string;
         owner: 'job';
         tabIds: number[];
@@ -28,20 +29,40 @@ function createState(overrides = {}) {
     },
     exportDisabledReason: null as string | null,
     requestIdRef: { current: 'req-1' as string | null },
+    terminalRequestIdRef: { current: null as string | null },
     selectedTabIdsInOrder: [12],
     setProgress: vi.fn(),
+    setResult: vi.fn(),
     ...overrides,
+  };
+}
+
+function createCancellingResponse(jobId = 'req-1') {
+  return {
+    success: true,
+    status: {
+      jobId,
+      phase: 'cancelling',
+      progress: {
+        activeStepKey: 'webSnapshotAssets',
+        current: 2,
+        total: 4,
+        errors: [],
+        message: 'Collecting',
+        phase: 'scanning',
+      },
+    },
   };
 }
 
 function createDeps(overrides = {}) {
   return {
-    sendCancelJobMessage: vi.fn().mockResolvedValue({ success: true }),
+    sendCancelJobMessage: vi.fn().mockResolvedValue(createCancellingResponse()),
     ...overrides,
   };
 }
 
-it('returns early when export actions are disabled', async () => {
+it('cancels the owned job even when new export actions become disabled', async () => {
   const state = createState({
     exportDisabledReason: 'blocked',
   });
@@ -49,11 +70,14 @@ it('returns early when export actions are disabled', async () => {
 
   await cancelPopupExport(state, deps);
 
-  expect(deps.sendCancelJobMessage).not.toHaveBeenCalled();
-  expect(state.setProgress).not.toHaveBeenCalled();
+  expect(deps.sendCancelJobMessage).toHaveBeenCalledWith({
+    jobId: 'req-1',
+    type: 'CANCEL_PAGE_PACKAGE_JOB',
+  });
+  expect(state.setProgress).toHaveBeenCalled();
 });
 
-it('forwards cancellation once to the background job owner', async () => {
+it('retains authority and shows cancelling until the terminal status broadcast arrives', async () => {
   const state = createState({
     selectedTabIdsInOrder: [12, 14],
   });
@@ -61,15 +85,22 @@ it('forwards cancellation once to the background job owner', async () => {
 
   await cancelPopupExport(state, deps);
 
-  expect(state.requestIdRef.current).toBeNull();
-  expect(state.cancelRetryRef.current).toBeNull();
+  expect(state.requestIdRef.current).toBe('req-1');
+  expect(state.cancelRetryRef.current).toEqual({
+    cancellationPending: true,
+    exportRunId: 'req-1',
+    owner: 'job',
+    tabIds: [12, 14],
+  });
+  expect(state.terminalRequestIdRef.current).toBeNull();
+  expect(state.setResult).not.toHaveBeenCalled();
   expect(state.setProgress).toHaveBeenCalledWith({
-    activeStepKey: null,
-    phase: 'error',
-    message: 'content.runtime.exportCancelled',
-    current: 0,
-    total: 0,
-    errors: ['content.runtime.exportCancelled'],
+    activeStepKey: 'webSnapshotAssets',
+    phase: 'scanning',
+    message: 'popup.export.cancellingMessage',
+    current: 2,
+    total: 4,
+    errors: [],
   });
   expect(deps.sendCancelJobMessage).toHaveBeenCalledOnce();
   expect(deps.sendCancelJobMessage).toHaveBeenCalledWith({
@@ -88,7 +119,7 @@ it('logs cancel failures from the runtime boundary', async () => {
   await cancelPopupExport(state, deps);
 
   expect(loggingMocks.logPopupExportCancelFailure).toHaveBeenCalledWith(error);
-  expect(state.requestIdRef.current).toBeNull();
+  expect(state.requestIdRef.current).toBe('req-1');
   expect(state.cancelRetryRef.current).toEqual({
     exportRunId: 'req-1',
     owner: 'job',
@@ -110,7 +141,7 @@ it('treats a fulfilled unsuccessful cancel response as retryable cleanup failure
 
   await cancelPopupExport(state, deps);
 
-  expect(state.requestIdRef.current).toBeNull();
+  expect(state.requestIdRef.current).toBe('req-1');
   expect(state.cancelRetryRef.current).toEqual({
     exportRunId: 'req-1',
     owner: 'job',
@@ -125,30 +156,55 @@ it('treats a fulfilled unsuccessful cancel response as retryable cleanup failure
   );
 });
 
-it('invalidates local work before remote cancellation settles', async () => {
-  let resolveCancellation: ((value: { success: true }) => void) | undefined;
+it('retains local job authority after cancellation admission until terminal publication', async () => {
+  let resolveCancellation:
+    | ((value: ReturnType<typeof createCancellingResponse>) => void)
+    | undefined;
   const state = createState({ selectedTabIdsInOrder: [12, 14] });
   const sendCancelJobMessage = vi.fn(
     () =>
-      new Promise<{ success: true }>((resolve) => {
+      new Promise<ReturnType<typeof createCancellingResponse>>((resolve) => {
         resolveCancellation = resolve;
       })
   );
   const cancellation = cancelPopupExport(state, createDeps({ sendCancelJobMessage }));
 
-  expect(state.requestIdRef.current).toBeNull();
+  expect(state.requestIdRef.current).toBe('req-1');
   expect(state.cancelRetryRef.current).toEqual({
+    cancellationPending: true,
     exportRunId: 'req-1',
     owner: 'job',
     tabIds: [12, 14],
   });
+  expect(state.setProgress).toHaveBeenCalledWith(expect.any(Function));
   state.selectedTabIdsInOrder.splice(0, 2, 99);
-  resolveCancellation?.({ success: true });
+  resolveCancellation?.(createCancellingResponse());
   await cancellation;
+
+  expect(state.requestIdRef.current).toBe('req-1');
+  expect(state.cancelRetryRef.current?.cancellationPending).toBe(true);
 
   expect(sendCancelJobMessage).toHaveBeenCalledOnce();
   expect(sendCancelJobMessage).toHaveBeenCalledWith({
     jobId: 'req-1',
     type: MessageType.CANCEL_PAGE_PACKAGE_JOB,
   });
+});
+
+it('does not dispatch a second cancellation while terminal publication is pending', async () => {
+  const state = createState({
+    cancelRetryRef: {
+      current: {
+        cancellationPending: true as const,
+        exportRunId: 'req-1',
+        owner: 'job' as const,
+        tabIds: [12],
+      },
+    },
+  });
+  const deps = createDeps();
+
+  await cancelPopupExport(state, deps);
+
+  expect(deps.sendCancelJobMessage).not.toHaveBeenCalled();
 });

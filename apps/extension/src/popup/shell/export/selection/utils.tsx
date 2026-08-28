@@ -41,6 +41,8 @@ export function formatPhaseLabel(progress: ExportProgress): string {
         return translate('exportModal.phaseZipping');
       case 'done':
         return translate('popup.tabs.export');
+      case 'cancelled':
+        return translate('content.runtime.exportCancelled');
       case 'error':
         return `${translate('common.states.error')} ${translate('popup.tabs.export').toLowerCase()}`;
     }

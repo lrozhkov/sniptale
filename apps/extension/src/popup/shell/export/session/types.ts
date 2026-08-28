@@ -52,12 +52,14 @@ export type PopupExportSessionTransferState = {
 
 export type PopupExportSessionRefs = {
   cancelRetryRef: MutableRefObject<{
+    cancellationPending?: true;
     exportRunId: string;
     owner: 'job';
     tabIds: number[];
   } | null>;
   copyResetTimeoutRef: MutableRefObject<number | null>;
   copyRequestIdRef: MutableRefObject<number>;
+  terminalRequestIdRef: MutableRefObject<string | null>;
   requestIdRef: MutableRefObject<string | null>;
 };
 

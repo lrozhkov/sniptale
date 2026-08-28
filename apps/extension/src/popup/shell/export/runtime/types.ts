@@ -37,9 +37,7 @@ export type PopupExportRuntimeDeps = {
 
 export type { PopupExportRuntimeContract } from './state';
 
-export type PopupExportRuntimeMessage =
-  | {
-      type: typeof MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED;
-      status: PagePackageJobStatusV1;
-    }
-  | RuntimeRequestByType[typeof MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED];
+export type PopupExportRuntimeMessage = {
+  type: typeof MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED;
+  status: PagePackageJobStatusV1;
+};

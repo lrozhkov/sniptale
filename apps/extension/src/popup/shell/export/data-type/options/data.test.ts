@@ -21,6 +21,7 @@ function createProps(overrides: Partial<ExportOptionToggleProps> = {}): ExportOp
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
+    includeWebCopy: false,
     setIncludeAnnotations: vi.fn(),
     setIncludeBasicLogs: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
@@ -30,6 +31,7 @@ function createProps(overrides: Partial<ExportOptionToggleProps> = {}): ExportOp
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
+    setIncludeWebCopy: vi.fn(),
     ...overrides,
   };
 }
@@ -65,6 +67,7 @@ describe('popup export option metadata', () => {
 
   it('returns the full canonical option list for the unified data-type section', () => {
     expect(getExportOptionConfigs().map((option) => option.key)).toEqual([
+      'webCopy',
       'annotations',
       'json',
       'markdown',
@@ -83,7 +86,7 @@ describe('popup export option metadata', () => {
     );
 
     expect(pageDiagnostics?.label).toBe('Расширенные данные страницы');
-    expect(pageDiagnostics?.description).toContain('видимый текст');
+    expect(pageDiagnostics?.description.toLowerCase()).toContain('видимый текст');
     expect(pageDiagnostics?.description).toContain('исходные ссылки');
     expect(pageDiagnostics?.description).not.toContain('DOM');
     expect(pageDiagnostics?.description).not.toContain('Resource Timing');

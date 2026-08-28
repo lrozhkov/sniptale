@@ -15,22 +15,6 @@ function resolveSelectedImageUrl(image: HTMLImageElement): string | null {
   }
 }
 
-function resolveElementAssetUrl(element: Element, value: string): string | null {
-  try {
-    return new URL(value, element.ownerDocument.baseURI).href;
-  } catch {
-    return null;
-  }
-}
-
-function srcsetContainsSelectedUrl(element: Element, selectedUrl: string): boolean {
-  const srcset = element.getAttribute('srcset') ?? '';
-  return srcset
-    .split(',')
-    .map((candidate) => candidate.trim().split(/\s+/)[0] ?? '')
-    .some((candidateUrl) => resolveElementAssetUrl(element, candidateUrl) === selectedUrl);
-}
-
 export function markSelectedResponsiveCandidates(root: ParentNode): Element[] {
   const markedElements: Element[] = [];
   const images = collectOpenShadowQueryRoots(root).flatMap((queryRoot) =>
@@ -42,21 +26,9 @@ export function markSelectedResponsiveCandidates(root: ParentNode): Element[] {
       continue;
     }
 
-    if (image.hasAttribute('srcset') && srcsetContainsSelectedUrl(image, selectedUrl)) {
+    if (image.hasAttribute('srcset') || image.closest('picture')) {
       image.setAttribute(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE, selectedUrl);
       markedElements.push(image);
-    }
-
-    const picture = image.closest('picture');
-    if (!picture) {
-      continue;
-    }
-
-    for (const source of picture.querySelectorAll('source[srcset]')) {
-      if (srcsetContainsSelectedUrl(source, selectedUrl)) {
-        source.setAttribute(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE, selectedUrl);
-        markedElements.push(source);
-      }
     }
   }
 

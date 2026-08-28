@@ -15,6 +15,9 @@ import {
 } from './view-mode';
 import { WebSnapshotAssetCatalog } from './asset-catalog';
 import { useViewerZoom, WebSnapshotZoomControls } from './viewport-zoom';
+import { loadSettings } from '../../../composition/persistence/settings';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { createLogger } from '@sniptale/platform/observability/logger';
 
 const viewerHeaderClassName = [
   'flex min-h-[52px] items-center justify-between border-b',
@@ -25,6 +28,7 @@ type ViewerViewport = { width: number; height: number } | null;
 type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error'; message: string };
 type ReadySnapshotIframe = { iframe: HTMLIFrameElement; loadedKey: string };
 let loadedPackageRevisionSeed = 0;
+const logger = createLogger({ namespace: 'WebSnapshotViewer' });
 
 function getSourceTitle(sourceTitle: string | null | undefined): string | null {
   const normalizedTitle = sourceTitle?.trim();
@@ -124,8 +128,10 @@ function SnapshotFrameSurface(props: {
   iframeRef: MutableRefObject<HTMLIFrameElement | null>;
   loaded: LoadedWebSnapshotPackage;
   locale: AppLocale;
+  externalLinksEnabled: boolean;
   onIframeElementChange: (iframe: HTMLIFrameElement | null) => void;
   onIframeLoaded: (iframe: HTMLIFrameElement) => void;
+  onOpenExternalLink: (href: string) => void;
   zoom: number;
 }) {
   const { iframeRef, onIframeElementChange, onIframeLoaded } = props;
@@ -138,11 +144,14 @@ function SnapshotFrameSurface(props: {
   );
   const handleIframeLoad = useCallback(() => {
     hydrateSnapshotDeclarativeShadowDom(iframeRef.current?.contentDocument ?? null);
-    blockSnapshotFrameNavigation(iframeRef.current);
+    blockSnapshotFrameNavigation(iframeRef.current, {
+      externalLinksEnabled: props.externalLinksEnabled,
+      onOpenExternalLink: props.onOpenExternalLink,
+    });
     if (iframeRef.current) {
       onIframeLoaded(iframeRef.current);
     }
-  }, [iframeRef, onIframeLoaded]);
+  }, [iframeRef, onIframeLoaded, props.externalLinksEnabled, props.onOpenExternalLink]);
   const resolvedViewport = props.currentViewport ?? props.loaded.manifest.viewport ?? null;
   if (resolvedViewport === null) {
     return (
@@ -258,6 +267,7 @@ function CollapsedToolbarButton(props: { locale: AppLocale; onExpand: () => void
 
 function SnapshotModeContent(props: {
   currentViewport: ViewerViewport;
+  externalLinksEnabled: boolean;
   handleIframeElementChange: (iframe: HTMLIFrameElement | null) => void;
   handleIframeLoaded: (iframe: HTMLIFrameElement) => void;
   iframeRef: MutableRefObject<HTMLIFrameElement | null>;
@@ -265,6 +275,7 @@ function SnapshotModeContent(props: {
   locale: AppLocale;
   mode: WebSnapshotViewerMode;
   onViewportChange: (viewport: ViewerViewport) => void;
+  onOpenExternalLink: (href: string) => void;
   preparationIframe: HTMLIFrameElement | null;
   zoom: number;
 }) {
@@ -286,11 +297,13 @@ function SnapshotModeContent(props: {
     <>
       <SnapshotFrameSurface
         currentViewport={props.currentViewport}
+        externalLinksEnabled={props.externalLinksEnabled}
         iframeRef={props.iframeRef}
         loaded={props.loaded}
         locale={props.locale}
         onIframeElementChange={props.handleIframeElementChange}
         onIframeLoaded={props.handleIframeLoaded}
+        onOpenExternalLink={props.onOpenExternalLink}
         zoom={props.zoom}
       />
       {props.preparationIframe ? (
@@ -304,7 +317,11 @@ function SnapshotModeContent(props: {
   );
 }
 
-function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; locale: AppLocale }) {
+function WebSnapshotViewerSurface(props: {
+  externalLinksEnabled: boolean;
+  loaded: LoadedWebSnapshotPackage;
+  locale: AppLocale;
+}) {
   const [toolbarVisible, setToolbarVisible] = useState(true);
   const [currentViewport, setCurrentViewport] = useState<ViewerViewport>(null);
   const [mode, setMode] = useState<WebSnapshotViewerMode>('static-document');
@@ -318,6 +335,11 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
         ? (props.loaded.manifest.viewport?.width ?? null)
         : null;
   const zoom = useViewerZoom(zoomContentWidth);
+  const openExternalLink = useCallback((href: string) => {
+    void browserTabs.create({ active: true, url: href }).catch(() => {
+      logger.warn('Failed to open an external snapshot link');
+    });
+  }, []);
 
   return (
     <main className="flex h-screen flex-col bg-[var(--sniptale-color-surface-canvas)]">
@@ -334,13 +356,18 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       <section
         ref={zoom.surfaceRef}
         data-testid="snapshot-viewer-surface"
-        className="relative min-h-0 flex-1 overflow-auto"
+        className={`relative min-h-0 flex-1 overflow-auto ${zoom.grabClassName}`}
+        onPointerDown={zoom.onPointerDown}
+        onPointerMove={zoom.onPointerMove}
+        onPointerUp={zoom.onPointerUp}
+        onPointerCancel={zoom.onPointerUp}
       >
         {toolbarVisible ? null : (
           <CollapsedToolbarButton locale={props.locale} onExpand={() => setToolbarVisible(true)} />
         )}
         <SnapshotModeContent
           currentViewport={currentViewport}
+          externalLinksEnabled={props.externalLinksEnabled}
           handleIframeElementChange={handleIframeElementChange}
           handleIframeLoaded={handleIframeLoaded}
           iframeRef={iframeRef}
@@ -348,12 +375,33 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
           locale={props.locale}
           mode={mode}
           onViewportChange={setCurrentViewport}
+          onOpenExternalLink={openExternalLink}
           preparationIframe={preparationIframe}
           zoom={zoom.zoom}
         />
       </section>
     </main>
   );
+}
+
+function useExternalSnapshotLinksEnabled(): boolean {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    let disposed = false;
+    void loadSettings()
+      .then((settings) => {
+        if (!disposed) setEnabled(settings.externalSnapshotLinksEnabled);
+      })
+      .catch(() => {
+        if (!disposed) setEnabled(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  return enabled;
 }
 
 function useLoadedWebSnapshotPackage() {
@@ -398,6 +446,7 @@ function useLoadedWebSnapshotPackage() {
 
 export function WebSnapshotViewerApp() {
   const { error, loaded } = useLoadedWebSnapshotPackage();
+  const externalLinksEnabled = useExternalSnapshotLinksEnabled();
   const locale = useViewerDocumentTitle(loaded);
 
   if (error) {
@@ -416,5 +465,11 @@ export function WebSnapshotViewerApp() {
     );
   }
 
-  return <WebSnapshotViewerSurface loaded={loaded} locale={locale} />;
+  return (
+    <WebSnapshotViewerSurface
+      externalLinksEnabled={externalLinksEnabled}
+      loaded={loaded}
+      locale={locale}
+    />
+  );
 }

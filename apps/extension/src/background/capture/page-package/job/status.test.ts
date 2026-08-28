@@ -182,7 +182,7 @@ it('accepts bounded terminal details and derives both diagnostic component-plan 
   ).toMatchObject({ diagnosticsLevel: 'extended' });
   expect(
     createEffectiveComponentPlan('save', { ...options, includePageDiagnostics: true }, true)
-  ).toMatchObject({ diagnosticsLevel: 'standard' });
+  ).toMatchObject({ diagnosticsLevel: 'extended' });
   expect(
     createEffectiveComponentPlan('save', { ...options, includeFullPageScreenshot: false }, true)
   ).toMatchObject({

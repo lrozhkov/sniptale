@@ -1,6 +1,8 @@
 import { ExportProgressSection } from '../progress';
 import { ExportReadySection } from '../ready';
 import type { PopupExportController } from '../controller';
+import type { PopupPackageDestination } from '../data-type/package-controls';
+import type { WebCopyResourcePreferences } from './snapshot-availability';
 
 type ExportController = PopupExportController;
 
@@ -9,6 +11,7 @@ function shouldRenderProgressContent(controller: ExportController): boolean {
   return (
     derived.isExporting ||
     Boolean(session.transfer.result) ||
+    session.transfer.progress.phase === 'cancelled' ||
     session.transfer.progress.phase === 'error'
   );
 }
@@ -30,13 +33,15 @@ function renderProgressContent(controller: ExportController) {
 
 function renderReadyContent(
   controller: ExportController,
-  onRequestWebCopySetup: () => void,
-  webSnapshotEnabled: boolean
+  destination: PopupPackageDestination,
+  onDestinationChange: (destination: PopupPackageDestination) => void,
+  webCopyResources: WebCopyResourcePreferences
 ) {
   const { derived, preferences, tabs } = controller.state;
   return (
     <ExportReadySection
       availableTabs={tabs.availableTabs}
+      destination={destination}
       disabled={Boolean(derived.exportDisabledReason) || !preferences.hasLoadedPreferences}
       filterQuery={tabs.filterQuery}
       filteredTabs={tabs.filteredTabs}
@@ -65,8 +70,8 @@ function renderReadyContent(
       setIncludeMarkdown={preferences.actions.setIncludeMarkdown}
       setIncludeWebCopy={preferences.setIncludeWebCopy}
       savePreferences={preferences.save}
-      onRequestWebCopySetup={onRequestWebCopySetup}
-      webSnapshotEnabled={webSnapshotEnabled}
+      onDestinationChange={onDestinationChange}
+      webCopyResources={webCopyResources}
       selectedTabIds={tabs.selectedTabIds}
       toggleSelectAllTabs={tabs.toggleSelectAllTabs}
       toggleTabSelection={tabs.toggleTabSelection}
@@ -76,16 +81,18 @@ function renderReadyContent(
 
 export function ExportPageContent({
   controller,
-  onRequestWebCopySetup,
-  webSnapshotEnabled,
+  destination,
+  onDestinationChange,
+  webCopyResources,
 }: {
   controller: ExportController;
-  onRequestWebCopySetup: () => void;
-  webSnapshotEnabled: boolean;
+  destination: PopupPackageDestination;
+  onDestinationChange: (destination: PopupPackageDestination) => void;
+  webCopyResources: WebCopyResourcePreferences;
 }) {
   if (shouldRenderProgressContent(controller)) {
     return renderProgressContent(controller);
   }
 
-  return renderReadyContent(controller, onRequestWebCopySetup, webSnapshotEnabled);
+  return renderReadyContent(controller, destination, onDestinationChange, webCopyResources);
 }

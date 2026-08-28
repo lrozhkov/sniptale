@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleStop, Loader2 } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n/popup';
 import { cx, formatPhaseLabel } from '../selection/utils';
@@ -55,9 +55,19 @@ function getStepStatusClassName(step: PopupExportProgressStep) {
 
 function ExportProgressStepRow({ step }: { step: PopupExportProgressStep }) {
   return (
-    <div className={progressStepRowClassName}>
+    <div
+      className={progressStepRowClassName}
+      data-status={step.status}
+      data-step-key={step.key}
+      data-ui="popup.export.progress-step"
+    >
       <div className={progressStepLabelWrapClassName}>
-        <ExportStepIcon status={step.status} />
+        <span
+          className="inline-flex h-4 w-4 shrink-0 items-center justify-center"
+          data-ui="popup.export.progress-step-icon"
+        >
+          <ExportStepIcon status={step.status} />
+        </span>
         <span title={step.label} className={progressStepLabelClassName}>
           {step.label}
         </span>
@@ -87,6 +97,10 @@ function ExportErrors({ errors }: { errors: string[] }) {
 }
 
 function getProgressHeading(props: ExportProgressSectionProps) {
+  if (!props.result && props.progress.phase === 'cancelled') {
+    return translate('content.runtime.exportCancelled');
+  }
+
   if (!props.result && props.progress.phase === 'error') {
     return translate('popup.export.finishedWithErrors');
   }
@@ -113,6 +127,10 @@ function getProgressDescription(props: ExportProgressSectionProps) {
     return props.progress.message || props.progress.errors[0] || null;
   }
 
+  if (props.progress.phase === 'cancelled') {
+    return null;
+  }
+
   const activeStep = props.progressSteps.find((step) => step.status === 'active') ?? null;
   const progressCounter =
     props.progress.phase === 'downloading' && props.progress.total > 0
@@ -127,6 +145,10 @@ function getProgressDescription(props: ExportProgressSectionProps) {
 }
 
 function ExportSummaryIcon(props: ExportProgressSectionProps) {
+  if (!props.result && props.progress.phase === 'cancelled') {
+    return <CircleStop className="h-5 w-5 text-[var(--sniptale-color-text-secondary)]" />;
+  }
+
   if (!props.result && props.progress.phase === 'error') {
     return <AlertTriangle className="h-5 w-5 text-[var(--sniptale-color-danger)]" />;
   }

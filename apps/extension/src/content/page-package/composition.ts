@@ -15,6 +15,7 @@ import {
 import { createExportContributions } from '../../workflows/page-package/contributions/export';
 import { createDiagnosticContributions } from '../../workflows/page-package/contributions/diagnostics';
 import { sanitizeWebSnapshotSourceUrl } from '../../features/web-snapshot/public';
+import { addPagePackageReadme } from './readme';
 
 export interface PagePackageArchiveArtifact {
   entries: readonly {
@@ -93,11 +94,26 @@ export async function composeExportPagePackage(args: {
     ? 'standard'
     : 'none';
   const diagnosticsLevel = args.diagnosticsLevel ?? defaultDiagnosticsLevel;
-  const contributions = await projectDiagnosticContributions({
+  const projectedContributions = await projectDiagnosticContributions({
     contributions: producedContributions,
     diagnosticsLevel,
     extendedDiagnosticArtifacts: args.extendedDiagnosticArtifacts,
     intent: 'export',
+  });
+  const source = {
+    faviconUrl: normalizePagePackageOptionalUrl(
+      args.source.faviconUrl === null ? null : sanitizeWebSnapshotSourceUrl(args.source.faviconUrl)
+    ),
+    title: args.source.title,
+    url: normalizePagePackageOptionalUrl(
+      args.source.url === null ? null : sanitizeWebSnapshotSourceUrl(args.source.url)
+    ),
+  };
+  const contributions = await addPagePackageReadme({
+    contributions: projectedContributions,
+    diagnosticsLevel,
+    intent: 'export',
+    source,
   });
 
   const pagePackage = await composePagePackage(
@@ -109,17 +125,7 @@ export async function composeExportPagePackage(args: {
       failedResourceCount: args.artifact.stats.filesFailed,
       id: args.id ?? crypto.randomUUID(),
       intent: 'export',
-      source: {
-        faviconUrl: normalizePagePackageOptionalUrl(
-          args.source.faviconUrl === null
-            ? null
-            : sanitizeWebSnapshotSourceUrl(args.source.faviconUrl)
-        ),
-        title: args.source.title,
-        url: normalizePagePackageOptionalUrl(
-          args.source.url === null ? null : sanitizeWebSnapshotSourceUrl(args.source.url)
-        ),
-      },
+      source,
       viewport: args.source.viewport,
       warnings: normalizePagePackageWarnings(args.artifact.errors),
     },
@@ -145,11 +151,17 @@ export async function composeCombinedPagePackage(args: {
     (producedContributions.some((entry) => entry.component === 'diagnostics')
       ? 'standard'
       : 'none');
-  const contributions = await projectDiagnosticContributions({
+  const projectedContributions = await projectDiagnosticContributions({
     contributions: producedContributions,
     diagnosticsLevel,
     extendedDiagnosticArtifacts: args.extendedDiagnosticArtifacts,
     intent: args.intent,
+  });
+  const contributions = await addPagePackageReadme({
+    contributions: projectedContributions,
+    diagnosticsLevel,
+    intent: args.intent,
+    source: args.webCopy.manifest.source,
   });
   const componentStatuses = Object.fromEntries(
     args.webCopy.manifest.components.map((component) => [component.id, component.status])

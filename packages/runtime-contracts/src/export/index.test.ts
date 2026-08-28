@@ -24,7 +24,7 @@ it('keeps export package and progress contracts explicit', () => {
     mimeType?: string;
   }>();
   expectTypeOf<ExportProgress['phase']>().toEqualTypeOf<
-    'idle' | 'scanning' | 'downloading' | 'zipping' | 'done' | 'error'
+    'idle' | 'scanning' | 'downloading' | 'zipping' | 'done' | 'cancelled' | 'error'
   >();
   expectTypeOf<PopupExportResult['kind']>().toEqualTypeOf<'archive' | 'webSnapshot' | undefined>();
   expectTypeOf<ExportOptions['includeAnnotations']>().toEqualTypeOf<boolean | undefined>();

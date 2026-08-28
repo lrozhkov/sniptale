@@ -126,7 +126,7 @@ it('starts Save through the same background job without requesting export-only h
         includeImages: false,
         includeJson: false,
         includeMarkdown: false,
-        includePageDiagnostics: false,
+        includePageDiagnostics: true,
       },
     })
   );
@@ -134,7 +134,7 @@ it('starts Save through the same background job without requesting export-only h
   expect(state.setLaunchedPlan).toHaveBeenCalledWith(
     expect.objectContaining({
       includeFullPageScreenshot: true,
-      includePageDiagnostics: false,
+      includePageDiagnostics: true,
       includeWebCopy: true,
     })
   );
@@ -162,6 +162,9 @@ it('launches a combined download from the remembered download plan', async () =>
   expect(state.setProgress).toHaveBeenCalledWith(
     expect.objectContaining({ activeStepKey: 'webSnapshotDom', phase: 'scanning' })
   );
+  expect(state.setProgress).toHaveBeenCalledOnce();
+  expect(state.setResult).toHaveBeenCalledOnce();
+  expect(state.setResult).toHaveBeenCalledWith(null);
 });
 
 it('uses the independent Library artifact selection without reading download flags', async () => {

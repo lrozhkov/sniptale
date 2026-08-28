@@ -3,7 +3,6 @@ import {
   DATABASE_BACKUP_RECEIPT_KEY,
   DATABASE_RESET_JOURNAL_KEY,
   EXPECTED_STORES,
-  WEB_SNAPSHOT_PAGE_PACKAGE_CUTOVER_KEY,
 } from '../infrastructure/indexed-db/core.stores.ts';
 import {
   AI_CHROME_ENABLED_KEY,
@@ -24,7 +23,6 @@ import type {
   BrowserStorageErasurePlan,
   LocalExtensionDataErasureOptions,
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
-import { WEB_SNAPSHOT_CONSENT_STORAGE_KEY } from '../settings/web-snapshot-consent';
 import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
@@ -42,7 +40,6 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [
 ] as const;
 
 const localPreferenceKeys = [
-  WEB_SNAPSHOT_CONSENT_STORAGE_KEY,
   'sniptale-theme-preference',
   'sniptale-locale-preference',
   'sniptale_ai_modal_spoiler_open',
@@ -97,7 +94,6 @@ const localSensitiveKeys = [
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
   DATABASE_RESET_JOURNAL_KEY,
-  WEB_SNAPSHOT_PAGE_PACKAGE_CUTOVER_KEY,
   'llm_request_history',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',

@@ -31,6 +31,7 @@ const reference = {
   sha256: null,
   size: 7,
 };
+const signal = new AbortController().signal;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -46,15 +47,24 @@ describe('Page Package offscreen download gateway', () => {
       .mockResolvedValueOnce({ success: true, result: 'released' });
     const gateway = createPagePackageDownloadOffscreenGateway();
     await expect(
-      gateway.create({ downloadOperationId: 'operation-1', filename: 'page.zip', reference })
+      gateway.create({
+        downloadOperationId: 'operation-1',
+        filename: 'page.zip',
+        reference,
+        signal,
+      })
     ).resolves.toEqual({ leaseId: 'lease-1', url: 'blob:1' });
     await expect(
-      gateway.confirm({ downloadOperationId: 'operation-1', leaseId: 'lease-1' })
+      gateway.confirm({ downloadOperationId: 'operation-1', leaseId: 'lease-1', signal })
     ).resolves.toBe(true);
     await expect(
       gateway.release({ downloadOperationId: 'operation-1', leaseId: 'lease-1' })
     ).resolves.toBe(true);
     expect(ensureMock).toHaveBeenCalledTimes(3);
+    expect(waitMock).toHaveBeenCalledTimes(3);
+    expect(waitMock).toHaveBeenNthCalledWith(1, 5_000, signal);
+    expect(waitMock).toHaveBeenNthCalledWith(2, 5_000, signal);
+    expect(waitMock).toHaveBeenNthCalledWith(3, 5_000, undefined);
     expect(sendMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -62,6 +72,16 @@ describe('Page Package offscreen download gateway', () => {
         capabilityToken: 'token',
       })
     );
+    expect(sendMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        type: 'OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE',
+        capabilityToken: 'token',
+        downloadOperationId: 'operation-1',
+        leaseId: 'lease-1',
+      })
+    );
+    expect(sendMock.mock.calls[1]?.[0]).not.toHaveProperty('signal');
   });
 
   it('surfaces authoritative offscreen failure', async () => {
@@ -71,6 +91,7 @@ describe('Page Package offscreen download gateway', () => {
         downloadOperationId: 'operation-1',
         filename: 'page.zip',
         reference,
+        signal,
       })
     ).rejects.toThrow('lease rejected');
   });
@@ -81,7 +102,7 @@ describe('Page Package offscreen download gateway', () => {
       .mockResolvedValueOnce({ success: true, result: 'stale' });
     const gateway = createPagePackageDownloadOffscreenGateway();
     await expect(
-      gateway.confirm({ downloadOperationId: 'operation-1', leaseId: 'lease-1' })
+      gateway.confirm({ downloadOperationId: 'operation-1', leaseId: 'lease-1', signal })
     ).resolves.toBe(false);
     await expect(
       gateway.release({ downloadOperationId: 'operation-1', leaseId: 'lease-1' })
@@ -92,7 +113,12 @@ describe('Page Package offscreen download gateway', () => {
     const gateway = createPagePackageDownloadOffscreenGateway();
     sendMock.mockResolvedValueOnce({ success: true, result: 'leased' });
     await expect(
-      gateway.create({ downloadOperationId: 'operation-1', filename: 'page.zip', reference })
+      gateway.create({
+        downloadOperationId: 'operation-1',
+        filename: 'page.zip',
+        reference,
+        signal,
+      })
     ).rejects.toThrow('lease creation failed');
     sendMock.mockResolvedValueOnce({ success: false });
     await expect(

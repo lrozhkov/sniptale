@@ -36,7 +36,6 @@ import {
 import { createEffectiveComponentPlan, isPagePackageJobTerminalPhase } from './status';
 import { clonePagePackageJobStatus } from './status';
 import { recoverInterruptedPagePackageJob } from './recovery';
-import { loadSettings } from '../../../../composition/persistence/settings';
 
 export { assertActivePopupExportStageBinding } from './active-job';
 
@@ -170,15 +169,8 @@ export async function startPagePackageJob(args: {
     if (!args.includeWebCopy) {
       throw new Error('Saved Page Packages require a Web copy.');
     }
-    const settings = await loadSettings();
-    if (!settings.webSnapshotEnabled) {
-      throw new Error('Web Snapshots are disabled in settings.');
-    }
     if (!args.options.includeFullPageScreenshot) {
       throw new Error('Saved Page Packages require a full-page screenshot.');
-    }
-    if (args.options.includePageDiagnostics) {
-      throw new Error('Extended page diagnostics are available only for direct export.');
     }
   }
   const releaseMutation = acquireStartPermit(args.orderedTabs.length);
@@ -207,8 +199,19 @@ export async function cancelPagePackageJob(jobId: string): Promise<PagePackageJo
   }
   const job = activeJob;
   const retryingIncompleteCleanup = job.finishCancellation !== null;
+  const cancellationAlreadyRunning = job.status.phase === 'cancelling';
   const admitted = await admitPopupExportJobCancellation(job);
   if (!admitted) return clonePagePackageJobStatus(job.status);
+  if (!cancellationAlreadyRunning || retryingIncompleteCleanup) {
+    void finishPagePackageJobCancellation(job, retryingIncompleteCleanup).catch(() => undefined);
+  }
+  return clonePagePackageJobStatus(job.status);
+}
+
+async function finishPagePackageJobCancellation(
+  job: ActivePopupExportJob,
+  retryingIncompleteCleanup: boolean
+): Promise<void> {
   if (retryingIncompleteCleanup) {
     await cleanupPopupExportJobCancellation(job);
   } else {
@@ -216,20 +219,20 @@ export async function cancelPagePackageJob(jobId: string): Promise<PagePackageJo
     await job.completion;
   }
   if (job.cancellationCleanupError) throw job.cancellationCleanupError;
-  if (job.finishCancellation) {
-    await updatePagePackageJobStatus(job, {
+  if (!job.finishCancellation) return;
+  await updatePagePackageJobStatus(job, {
+    phase: 'cancelled',
+    progress: {
+      ...job.status.progress,
+      activeStepKey: null,
+      errors: [],
+      message: translate('content.runtime.exportCancelled'),
       phase: 'cancelled',
-      progress: {
-        ...job.status.progress,
-        message: translate('content.runtime.exportCancelled'),
-        phase: 'error',
-      },
-    });
-    const finish = job.finishCancellation;
-    job.finishCancellation = null;
-    finish();
-  }
-  return clonePagePackageJobStatus(job.status);
+    },
+  });
+  const finish = job.finishCancellation;
+  job.finishCancellation = null;
+  finish();
 }
 
 export async function acknowledgePagePackageJobStatus(

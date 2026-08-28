@@ -3,7 +3,6 @@ import { CURRENT_SCHEMA_CONTRACTS } from './schema-contracts';
 import { EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores';
 
 const mocks = vi.hoisted(() => ({
-  cutover: vi.fn(async () => undefined),
   inspect: vi.fn(),
   openDB: vi.fn(),
   resetAlpha: vi.fn(async () => undefined),
@@ -11,10 +10,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('idb', () => ({ openDB: mocks.openDB }));
-vi.mock('./maintenance/web-snapshot-page-package-cutover', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./maintenance/web-snapshot-page-package-cutover')>()),
-  runWebSnapshotPagePackageCutover: mocks.cutover,
-}));
 vi.mock('./admission', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./admission')>()),
   inspectDatabaseAdmission: mocks.inspect,

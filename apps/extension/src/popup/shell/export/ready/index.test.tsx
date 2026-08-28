@@ -63,6 +63,7 @@ function createProps(
 ): ComponentProps<typeof ExportReadySection> {
   return {
     availableTabs: [],
+    destination: 'export',
     disabled: false,
     filterQuery: '',
     filteredTabs: [],
@@ -117,8 +118,17 @@ function createProps(
         includeMarkdown: false,
       },
     },
-    onRequestWebCopySetup: vi.fn(),
-    webSnapshotEnabled: true,
+    onDestinationChange: vi.fn(),
+    webCopyResources: {
+      anonymousCrossOriginAssetsEnabled: true,
+      authenticatedSameOriginAssetsEnabled: true,
+      externalLinksEnabled: false,
+      error: null,
+      pending: null,
+      setAnonymousCrossOriginAssetsEnabled: vi.fn(),
+      setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+      setExternalLinksEnabled: vi.fn(),
+    },
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
     ...overrides,
@@ -182,18 +192,28 @@ it('switches the common editor between independent download and Library preferen
   expect(mocks.dataTypes).toHaveBeenLastCalledWith(
     expect.objectContaining({ destination: 'export', includeFiles: true })
   );
+  expect(container?.textContent).toContain('packageDestinationDownloadDescription');
+  expect(container?.textContent).toContain('packageDestinationLibraryDescription');
   const libraryButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
     button.textContent?.includes('packageDestinationLibrary')
   );
   act(() => libraryButton?.click());
 
-  expect(mocks.dataTypes).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      destination: 'save',
-      includeFiles: false,
-      packagePreferences: props.savePreferences,
-    })
+  expect(props.onDestinationChange).toHaveBeenCalledWith('save');
+  expect(libraryButton?.className).toContain('transition-[flex-grow');
+});
+
+it('keeps destination switching available when no page is selected', () => {
+  const props = createProps({ disabled: true, hasLoadedPreferences: true, selectedCount: 0 });
+  renderReady(props);
+
+  const libraryButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
+    button.textContent?.includes('packageDestinationLibrary')
   );
+  expect(libraryButton?.disabled).toBe(false);
+  act(() => libraryButton?.click());
+  expect(props.onDestinationChange).toHaveBeenCalledWith('save');
+  expect(container?.textContent).toContain('popup.export.noSelectableTabsHint');
 });
 
 it('shows the no-selectable-tabs hint only after loaded disabled state has no selection', () => {
@@ -203,7 +223,7 @@ it('shows the no-selectable-tabs hint only after loaded disabled state has no se
   expect(container?.textContent).not.toContain(hint);
 
   renderReady(createProps({ disabled: false, hasLoadedPreferences: true, selectedCount: 0 }));
-  expect(container?.textContent).not.toContain(hint);
+  expect(container?.textContent).toContain(hint);
 
   renderReady(createProps({ disabled: true, hasLoadedPreferences: true, selectedCount: 1 }));
   expect(container?.textContent).not.toContain(hint);

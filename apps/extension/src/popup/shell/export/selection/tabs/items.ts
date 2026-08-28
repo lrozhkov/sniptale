@@ -83,9 +83,7 @@ export function getTabsForCurrentWindow(
   tabs: chrome.tabs.Tab[],
   activeTabCapabilities: ActiveTabCapabilities
 ) {
-  return tabs.length > 0
-    ? tabs
-        .map((tab) => toPopupExportTabItem(tab, activeTabCapabilities.tabId))
-        .filter((tab): tab is PopupExportTabItem => tab !== null)
-    : createFallbackTabItem(activeTabCapabilities);
+  return tabs
+    .map((tab) => toPopupExportTabItem(tab, activeTabCapabilities.tabId))
+    .filter((tab): tab is PopupExportTabItem => tab !== null);
 }

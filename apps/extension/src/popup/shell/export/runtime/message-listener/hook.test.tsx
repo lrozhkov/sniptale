@@ -43,12 +43,14 @@ function createState() {
   return {
     cancelRetryRef: {
       current: { exportRunId: 'req-1', owner: 'job', tabIds: [42] } as {
+        cancellationPending?: true;
         exportRunId: string;
         owner: 'job' | 'snapshot';
         tabIds: number[];
       } | null,
     },
     requestIdRef: { current: 'req-1' as string | null },
+    terminalRequestIdRef: { current: null as string | null },
     setProgress: vi.fn(),
     setResult: vi.fn(),
   };
@@ -123,6 +125,30 @@ it('reconnects to a running background job after the popup is reopened', async (
   );
 });
 
+it('does not let a late cancelling broadcast reclaim a terminal request', async () => {
+  const state = createState();
+  state.requestIdRef.current = null;
+  state.cancelRetryRef.current = null;
+  state.terminalRequestIdRef.current = 'req-finished';
+  const handlerRef: { current: ((message: unknown) => void) | null } = { current: null };
+  mocks.subscribeToMessages.mockImplementation((handler) => {
+    handlerRef.current = handler;
+    return mocks.unsubscribe;
+  });
+  const status = { ...createStatus('req-finished'), phase: 'cancelling' as const };
+  mocks.parsePopupExportRuntimeMessage.mockReturnValue({
+    status,
+    type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+  });
+
+  await renderNode(<MessageListenerHarness state={state} />);
+  act(() => handlerRef.current?.({ type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED }));
+
+  expect(state.requestIdRef.current).toBeNull();
+  expect(state.cancelRetryRef.current).toBeNull();
+  expect(mocks.applyPopupExportRuntimeMessage).not.toHaveBeenCalled();
+});
+
 afterEach(() => {
   act(() => {
     root?.unmount();
@@ -151,6 +177,12 @@ it('ignores runtime messages that do not parse into popup export messages', asyn
 
 it('passes parsed runtime messages to the apply seam and exposes request clearing', async () => {
   const state = createState();
+  state.cancelRetryRef.current = {
+    cancellationPending: true,
+    exportRunId: 'req-1',
+    owner: 'job',
+    tabIds: [42],
+  };
   const handlerRef: { current: ((message: unknown) => void) | null } = { current: null };
   const parsedMessage = {
     status: createStatus('req-1'),

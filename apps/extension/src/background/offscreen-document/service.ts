@@ -237,8 +237,11 @@ export function createOffscreenDocumentService() {
     return ensureOffscreenDocumentForState(state, justification);
   }
 
-  function waitForOffscreenReady(timeoutMs = OFFSCREEN_READY_TIMEOUT_MS): Promise<void> {
-    return waitForOffscreenReadyForState(state, timeoutMs);
+  function waitForOffscreenReady(
+    timeoutMs: number | null = OFFSCREEN_READY_TIMEOUT_MS,
+    signal?: AbortSignal
+  ): Promise<void> {
+    return waitForOffscreenReadyForState(state, timeoutMs, signal);
   }
 
   function closeOffscreenDocumentForPrivacyErasure(): Promise<void> {
@@ -276,8 +279,11 @@ export function ensureOffscreenDocument(
   return defaultOffscreenDocumentService.getOwner().ensureOffscreenDocument(justification);
 }
 
-export function waitForOffscreenReady(timeoutMs = OFFSCREEN_READY_TIMEOUT_MS): Promise<void> {
-  return defaultOffscreenDocumentService.getOwner().waitForOffscreenReady(timeoutMs);
+export function waitForOffscreenReady(
+  timeoutMs: number | null = OFFSCREEN_READY_TIMEOUT_MS,
+  signal?: AbortSignal
+): Promise<void> {
+  return defaultOffscreenDocumentService.getOwner().waitForOffscreenReady(timeoutMs, signal);
 }
 
 export function closeOffscreenDocumentForPrivacyErasure(): Promise<void> {

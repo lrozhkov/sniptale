@@ -18,8 +18,8 @@ export function ExportFooterPrimaryActionButton(props: {
       <PopupActionButton
         icon={X}
         label={translate('popup.export.cancelExportButton')}
-        iconClassName={footerPrimaryButtonIconClassName}
-        tone="primary"
+        iconClassName="text-current"
+        tone="danger"
         dataUi="popup.export.export-button"
         title={translate('popup.export.cancelExportButton')}
         onClick={props.onCancelExport}

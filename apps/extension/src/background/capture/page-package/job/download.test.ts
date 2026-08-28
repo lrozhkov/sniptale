@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   recordStarting: vi.fn(),
   recordStarted: vi.fn(),
   readFile: vi.fn(),
+  readInterruption: vi.fn(),
   readRecovery: vi.fn(),
   recordAmbiguous: vi.fn(),
   remember: vi.fn(),
@@ -36,7 +37,8 @@ vi.mock('./page-boundary', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./page-boundary')>()),
   openStagedPagePackage: mocks.open,
 }));
-vi.mock('./offscreen-download-gateway', () => ({
+vi.mock('./offscreen-download-gateway', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./offscreen-download-gateway')>()),
   createPagePackageDownloadOffscreenGateway: () => ({
     confirm: mocks.confirm,
     create: mocks.createLease,
@@ -62,6 +64,10 @@ vi.mock('../../download/download-router', async (importOriginal) => ({
     rememberPendingDownload: mocks.remember,
   },
   executeDownloadUrl: mocks.execute,
+}));
+vi.mock('../../download/download-router/service-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../download/download-router/service-state')>()),
+  readDownloadInterruptionReason: mocks.readInterruption,
 }));
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
@@ -173,6 +179,7 @@ beforeEach(() => {
   mocks.readFile.mockResolvedValue(
     new File(['archive'], 'page.zip', { type: 'application/x-sniptale-page-package+zip' })
   );
+  mocks.readInterruption.mockResolvedValue(null);
   mocks.find.mockResolvedValue([{ downloadId: 42, state: 'complete' }]);
   mocks.outputAbort.mockResolvedValue(undefined);
   mocks.outputAppend.mockResolvedValue(undefined);
@@ -268,6 +275,7 @@ it('persists pre-effect, lease and browser identities before awaiting terminal s
     operationId: expect.any(String),
   });
   expect(mocks.confirm).toHaveBeenCalledOnce();
+  expect(mocks.find).not.toHaveBeenCalled();
   expect(mocks.releaseLease).toHaveBeenCalledOnce();
   expect(mocks.cleanupOutput).toHaveBeenCalledOnce();
 });
@@ -284,6 +292,58 @@ it('cancels the browser item and still releases the durable lease when aborted',
   expect(mocks.cancel).toHaveBeenCalledWith(42);
   expect(mocks.releaseLease).toHaveBeenCalledOnce();
   expect(mocks.cleanupOutput).toHaveBeenCalledOnce();
+});
+
+it('retains the browser interruption stage and reason for diagnosis', async () => {
+  mocks.execute.mockImplementationOnce(async ({ onTerminal }) => {
+    queueMicrotask(() => onTerminal('interrupted'));
+    return 42;
+  });
+  mocks.readInterruption.mockResolvedValueOnce('NETWORK_FAILED');
+
+  await expect(downloadCollectedPagePackages(singlePageArgs())).rejects.toThrow(
+    'could not be completed safely [BROWSER_INTERRUPTED]'
+  );
+
+  expect(mocks.readInterruption).toHaveBeenCalledWith(42);
+  expect(mocks.releaseLease).toHaveBeenCalledOnce();
+  expect(mocks.cleanupOutput).toHaveBeenCalledOnce();
+});
+
+it('cleans a cancelled output when browser admission had not produced an id', async () => {
+  const controller = new AbortController();
+  mocks.execute.mockImplementationOnce(async () => {
+    controller.abort();
+    throw new Error('Download admission cancelled');
+  });
+  mocks.find.mockResolvedValueOnce([]);
+  mocks.readRecovery.mockImplementation(async () => ({
+    jobId: 'job-1',
+    output: {
+      assetJournalId: 'journal-1',
+      assetRef: outputReference,
+      cleanupError: null,
+      downloadId: null,
+      downloadOperationId: mocks.recordPrepared.mock.calls[0]?.[0]?.operationId ?? 'operation-1',
+      downloadRequestedAt: 1,
+      filename: 'page.zip',
+      journalVerified: true,
+      kind: 'page-package',
+      leaseUrl: 'blob:page',
+      phase: 'starting-download',
+      urlLeaseId: 'lease-1',
+    },
+    stagedPages: [],
+  }));
+
+  await expect(downloadCollectedPagePackages(singlePageArgs(controller.signal))).rejects.toThrow(
+    'could not be completed safely'
+  );
+
+  expect(mocks.find).toHaveBeenCalledOnce();
+  expect(mocks.releaseLease).toHaveBeenCalledOnce();
+  expect(mocks.cleanupOutput).toHaveBeenCalledOnce();
+  expect(mocks.recordAmbiguous).not.toHaveBeenCalled();
 });
 
 it('surfaces cleanup failure after a successful terminal browser download', async () => {

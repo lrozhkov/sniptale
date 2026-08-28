@@ -50,6 +50,7 @@ describe('composeExportPagePackage', () => {
         sourceIsBlob: source instanceof Blob,
       }))
     ).toEqual([
+      { component: 'pageData', path: 'README.md', sourceIsBlob: true },
       { component: 'pageData', path: 'exports/data/page.json', sourceIsBlob: true },
       { component: 'images', path: 'exports/images/figure.png', sourceIsBlob: true },
       {
@@ -86,6 +87,11 @@ describe('composeExportPagePackage', () => {
         content: '{}',
         mimeType: 'application/json' as const,
         path: 'diagnostics/extended/frames.json' as const,
+      },
+      {
+        content: '{}',
+        mimeType: 'application/json' as const,
+        path: 'diagnostics/extended/transformations.json' as const,
       },
       {
         content: '{}',
@@ -153,12 +159,16 @@ describe('composeExportPagePackage', () => {
     expect(pagePackage.entries).toEqual([
       expect.objectContaining({
         component: 'images',
+        path: 'README.md',
+      }),
+      expect.objectContaining({
+        component: 'images',
         path: 'page-screenshot.png',
         source: screenshot,
       }),
     ]);
     expect(pagePackage.manifest.components).toEqual([
-      expect.objectContaining({ entryCount: 1, id: 'images', status: 'complete' }),
+      expect.objectContaining({ entryCount: 2, id: 'images', status: 'complete' }),
     ]);
   });
 
@@ -231,6 +241,7 @@ describe('composeCombinedPagePackage', () => {
       warnings: ['asset unavailable', 'export note'],
     });
     expect(combined.entries.map((entry) => entry.path)).toEqual([
+      'README.md',
       'snapshot/index.html',
       'page-screenshot.png',
       'thumbnail.webp',

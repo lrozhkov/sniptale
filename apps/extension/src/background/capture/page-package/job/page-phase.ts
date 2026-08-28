@@ -13,6 +13,41 @@ import {
   type ActivePopupExportJob,
 } from './runtime-state';
 import { activatePopupExportCaptureTarget } from './visible';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { markActivePagePackageJobProducerFailure } from './active-job';
+import type { ExportProgressStepKey } from '@sniptale/runtime-contracts/export';
+
+const logger = createLogger({ namespace: 'BackgroundPagePackageJob' });
+const PAGE_PACKAGE_PREPARATION_CODE_PATTERN = /\[([A-Z][A-Z0-9_]{1,63})\]$/u;
+const WEB_COPY_FAILURE_STEPS: Record<string, ExportProgressStepKey> = {
+  WEB_COPY_WEBSNAPSHOTASSETS: 'webSnapshotAssets',
+  WEB_COPY_WEBSNAPSHOTDOM: 'webSnapshotDom',
+  WEB_COPY_WEBSNAPSHOTPREVIEW: 'webSnapshotPreview',
+  WEB_COPY_WEBSNAPSHOTSTYLES: 'webSnapshotStyles',
+  WEB_COPY_WEBSNAPSHOTWARNINGS: 'webSnapshotWarnings',
+};
+
+function resolveFailedProgressStep(
+  error: unknown,
+  activeStepKey: ExportProgressStepKey | null | undefined
+): ExportProgressStepKey | null {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = PAGE_PACKAGE_PREPARATION_CODE_PATTERN.exec(message)?.[1];
+  if (!code) return null;
+  if (code === 'SELECTED_DATA' && activeStepKey && !activeStepKey.startsWith('webSnapshot')) {
+    return activeStepKey;
+  }
+  return WEB_COPY_FAILURE_STEPS[code] ?? null;
+}
+
+function getPublicPagePackagePreparationError(response: unknown): string {
+  const fallback = translate('content.runtime.exportPrepareFailed');
+  if (!isPopupExportPackageResponse(response) || response.success !== false || !response.error) {
+    return fallback;
+  }
+  const code = PAGE_PACKAGE_PREPARATION_CODE_PATTERN.exec(response.error)?.[1];
+  return code ? `${fallback} [${code}]` : fallback;
+}
 
 export interface CollectedStagedPagePackage {
   descriptor: StagedPagePackageDescriptor;
@@ -20,6 +55,21 @@ export interface CollectedStagedPagePackage {
 }
 
 export class PopupExportPagePackageFatalError extends Error {}
+
+function waitForPagePackageResponse(
+  request: Promise<unknown>,
+  signal: AbortSignal
+): Promise<unknown> {
+  if (signal.aborted) return Promise.reject(signal.reason ?? new Error('Popup export cancelled'));
+  let removeAbortListener = () => {};
+  const cancellation = new Promise<never>((_, reject) => {
+    const cancel = () => reject(signal.reason ?? new Error('Popup export cancelled'));
+    signal.addEventListener('abort', cancel, { once: true });
+    removeAbortListener = () => signal.removeEventListener('abort', cancel);
+  });
+  void request.catch(() => undefined);
+  return Promise.race([request, cancellation]).finally(removeAbortListener);
+}
 
 async function requestPopupExportPagePackage(
   job: ActivePopupExportJob,
@@ -40,16 +90,19 @@ async function requestPopupExportPagePackage(
       );
     }
   }
-  const response = await job.contentPort.requestPagePackage({
-    batchRequestId: job.status.jobId,
-    includeWebCopy: job.status.effectiveComponentPlan.components.webCopy,
-    intent: job.status.intent,
-    ordinal,
-    options,
-    tabId: selected.tabId,
-  });
+  const response = await waitForPagePackageResponse(
+    job.contentPort.requestPagePackage({
+      batchRequestId: job.status.jobId,
+      includeWebCopy: job.status.effectiveComponentPlan.components.webCopy,
+      intent: job.status.intent,
+      ordinal,
+      options,
+      tabId: selected.tabId,
+    }),
+    job.abortController.signal
+  );
   if (!isPopupExportPackageResponse(response) || !response.success || !response.stagedPagePackage) {
-    throw new Error(translate('content.runtime.exportPrepareFailed'));
+    throw new Error(getPublicPagePackagePreparationError(response));
   }
   const descriptor = response.stagedPagePackage;
   if (descriptor.jobId !== job.status.jobId || descriptor.ordinal !== ordinal) {
@@ -114,8 +167,19 @@ export async function collectPopupExportPagePackages(
       });
     } catch (error) {
       if (error instanceof PopupExportPagePackageFatalError) throw error;
+      if (job.cancelled) break;
+      logger.error('Page Package page collection failed', {
+        error: popupExportJobErrorText(error),
+        jobId: job.status.jobId,
+        ordinal: index,
+        tabId: selected.tabId,
+      });
       const errorText = truncatePopupExportStatusText(
         `${selected.title}: ${popupExportJobErrorText(error)}`
+      );
+      await markActivePagePackageJobProducerFailure(
+        job,
+        resolveFailedProgressStep(error, job.status.progress.activeStepKey)
       );
       errors.push(errorText);
       await recordPopupExportPageOutcome(job, index, {

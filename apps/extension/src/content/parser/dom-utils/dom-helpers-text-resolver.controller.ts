@@ -21,17 +21,6 @@ function createResolverState(): DomHelpersTextResolverState {
   };
 }
 
-function logVirtualToOriginalAssignment(element: HTMLElement, id: string, original: Node): void {
-  logger.log('Mapping virtual to original', {
-    id,
-    originalHasDataset: !!(original as HTMLElement).dataset,
-    originalId: (original as HTMLElement).id,
-    originalTag: (original as HTMLElement).tagName,
-    virtualId: element.id,
-    virtualTag: element.tagName,
-  });
-}
-
 function warnMissingOriginalElement(element: HTMLElement, id: string): void {
   logger.warn('No original element found for virtual element', {
     className: element.className,
@@ -67,7 +56,6 @@ export function createDomHelpersTextResolverController(): DomHelpersTextResolver
       if (resolver) {
         const original = resolver(element);
         if (original && original !== element) {
-          logVirtualToOriginalAssignment(element, id, original);
           assignParserSniptaleId(original as HTMLElement, id);
           return;
         }

@@ -108,8 +108,18 @@ function createReadyProps(
         includeMarkdown: false,
       },
     },
-    onRequestWebCopySetup: vi.fn(),
-    webSnapshotEnabled: true,
+    destination: 'export',
+    onDestinationChange: vi.fn(),
+    webCopyResources: {
+      anonymousCrossOriginAssetsEnabled: true,
+      authenticatedSameOriginAssetsEnabled: true,
+      externalLinksEnabled: false,
+      error: null,
+      pending: null,
+      setAnonymousCrossOriginAssetsEnabled: vi.fn(),
+      setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+      setExternalLinksEnabled: vi.fn(),
+    },
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
     ...overrides,
@@ -135,11 +145,13 @@ async function dismissByEscape() {
 }
 
 async function openDrawer(index: number) {
-  const editButtons = [...(container?.querySelectorAll('button') ?? [])].filter(
-    (button) => button.textContent === 't:popup.export.editButton'
-  );
-  expect(editButtons).toHaveLength(2);
-  await clickButton(editButtons[index]);
+  const triggers = [
+    ...(container?.querySelectorAll<HTMLButtonElement>(
+      '[data-ui="popup.export.selection-trigger"]'
+    ) ?? []),
+  ];
+  expect(triggers).toHaveLength(2);
+  await clickButton(triggers[index]);
 }
 
 async function verifyDataTypeDrawerCanOpenAndClose() {
@@ -149,13 +161,13 @@ async function verifyDataTypeDrawerCanOpenAndClose() {
     't:popup.export.dataTypesFilterPlaceholder'
   );
   expect(container?.textContent).toContain('t:popup.export.includeBasicLogsLabel');
-  expect(container?.textContent).toContain('t:popup.export.doneButton');
+  expect(container?.querySelector('[data-ui="popup.export.selection-curtain"]')).not.toBeNull();
 
   await dismissByOutsideClick();
 
   expect(container?.textContent).toContain('t:popup.export.includeJsonLabel');
   expect(container?.textContent).toContain('t:popup.export.tabsSectionLabel');
-  expect(container?.textContent).not.toContain('t:popup.export.doneButton');
+  expect(container?.querySelector('[data-ui="popup.export.selection-curtain"]')).toBeNull();
 }
 
 async function verifyTabsDrawerCanOpenAndClose() {

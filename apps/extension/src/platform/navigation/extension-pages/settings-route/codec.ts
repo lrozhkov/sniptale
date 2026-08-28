@@ -3,7 +3,6 @@ export const SETTINGS_SECTION_IDS = [
   'quick-actions',
   'screen-sizes',
   'media-quality',
-  'web-snapshots',
   'saving',
   'annotations',
   'editor-resources',
@@ -22,7 +21,6 @@ export const SETTINGS_SECTION_VIEWS = {
   'quick-actions': [],
   'screen-sizes': [],
   'media-quality': ['image', 'video'],
-  'web-snapshots': [],
   saving: ['settings', 'storage', 'templates'],
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
   'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
@@ -39,7 +37,6 @@ type SettingsRouteWithoutView = {
     | 'interface-browser'
     | 'quick-actions'
     | 'screen-sizes'
-    | 'web-snapshots'
     | 'voice-input'
     | 'settings-transfer';
   view?: never;

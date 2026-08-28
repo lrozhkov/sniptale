@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import {
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
   PAGE_PACKAGE_ARCHIVE_PATHS,
+  PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE,
 } from '@sniptale/runtime-contracts/page-package';
 import type {
   WebSnapshotManifest,
@@ -97,6 +98,54 @@ it('accepts Save packages enriched by retained Export Manager components', async
         path: 'attachments/readme.txt',
       },
     ],
+  });
+
+  await expect(
+    validateWebSnapshotPackage({
+      packageBlob: fixture.packageBlob,
+      payload: createPayload(fixture.manifest),
+      screenshotBlob: fixture.screenshotBlob,
+    })
+  ).resolves.toBeUndefined();
+});
+
+it('accepts asset-rich packages beyond the former preview-only file ceiling', async () => {
+  const base = await createPagePackageArchiveFixture();
+  const fixture = await createPagePackageArchiveFixture({
+    entries: [
+      ...base.entries,
+      ...Array.from({ length: 501 }, (_, index) => ({
+        blob: new Blob([String(index)], { type: 'image/png' }),
+        component: 'webCopy' as const,
+        path: `assets/images/asset-${index}.png`,
+      })),
+    ],
+  });
+
+  await expect(
+    validateWebSnapshotPackage({
+      packageBlob: fixture.packageBlob,
+      payload: createPayload(fixture.manifest),
+      screenshotBlob: fixture.screenshotBlob,
+    })
+  ).resolves.toBeUndefined();
+});
+
+it('accepts explicitly selected inert extended page data in a Library package', async () => {
+  const base = await createPagePackageArchiveFixture();
+  const entries = [
+    ...base.entries.filter((entry) => entry.component !== 'diagnostics'),
+    ...PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map((entry) => ({
+      blob: new Blob([entry.mimeType === 'application/json' ? '{}\n' : '<html>evidence</html>'], {
+        type: entry.mimeType,
+      }),
+      component: 'diagnostics' as const,
+      path: entry.path,
+    })),
+  ];
+  const fixture = await createPagePackageArchiveFixture({
+    entries,
+    manifest: { diagnosticsLevel: 'extended' },
   });
 
   await expect(

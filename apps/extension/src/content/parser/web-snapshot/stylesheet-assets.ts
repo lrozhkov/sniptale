@@ -1,5 +1,5 @@
 import {
-  isSafeWebSnapshotUrl,
+  isSafeWebSnapshotCaptureAssetUrl,
   sanitizeWebSnapshotStylesheetText,
 } from '../../../features/web-snapshot/public';
 import { collectAssetTargets } from './asset-targets';
@@ -18,7 +18,7 @@ function readBlobText(blob: Blob): Promise<string> {
 function resolveStylesheetResourceUrl(value: string, baseUrl: string): string | null {
   const trimmedValue = value.trim();
   if (trimmedValue.startsWith('#')) return trimmedValue;
-  if (!isSafeWebSnapshotUrl(trimmedValue, baseUrl)) return null;
+  if (!isSafeWebSnapshotCaptureAssetUrl(trimmedValue, baseUrl)) return null;
   try {
     const url = new URL(trimmedValue, baseUrl);
     return ['data:', 'http:', 'https:'].includes(url.protocol) ? url.href : null;

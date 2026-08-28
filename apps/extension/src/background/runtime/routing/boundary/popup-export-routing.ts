@@ -47,6 +47,8 @@ type PopupExportTarget = {
   tab: chrome.tabs.Tab;
 };
 
+const PAGE_PACKAGE_BUILD_TIMEOUT_MS = 180_000;
+
 function createWebSnapshotRouteError(stage: string, error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
   return new Error(`${stage}: ${message}`);
@@ -169,9 +171,19 @@ async function sendPopupExportBuildPackage(
   tabId: number,
   message: BuildPagePackageMessage
 ): Promise<unknown> {
-  return target.isOwnedSnapshotViewer
+  const request = target.isOwnedSnapshotViewer
     ? sendViewerPopupExportMessage(createWebSnapshotViewerPorts(), tabId, message)
     : sendTabMessage(tabId, message);
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error('Page Package preparation timed out.')),
+      PAGE_PACKAGE_BUILD_TIMEOUT_MS
+    );
+  });
+  return Promise.race([request, timeout]).finally(() => {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+  });
 }
 
 async function cancelPopupExportCaptureAuthority(tabId: number, requestId: string): Promise<void> {
@@ -204,9 +216,6 @@ export async function requestPopupExportPagePackage(args: {
   } = args.includeWebCopy
     ? await runWebSnapshotRouteStage('load web snapshot settings', async () => {
         const settings = await loadSettings();
-        if (!settings.webSnapshotEnabled) {
-          throw new Error('Web Snapshots are disabled in settings.');
-        }
         return {
           allowAnonymousCrossOriginAssets: settings.anonymousCrossOriginSnapshotAssetsEnabled,
           allowAuthenticatedSameOriginAssets: settings.authenticatedSnapshotAssetsEnabled,
@@ -255,16 +264,17 @@ export async function requestPopupExportPagePackage(args: {
   try {
     response = await sendPopupExportBuildPackage(target, args.tabId, message);
   } catch (error) {
-    if (args.includeWebCopy) {
-      try {
-        await cancelPopupExportCaptureAuthority(args.tabId, args.batchRequestId);
-      } catch (cleanupError) {
-        throw new AggregateError(
-          [error, cleanupError],
-          'Page Package routing and capture cleanup failed.',
-          { cause: cleanupError }
-        );
-      }
+    try {
+      await cancelPopupExportPagePackage({
+        exportRunId: args.batchRequestId,
+        tabId: args.tabId,
+      });
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        'Page Package routing and capture cleanup failed.',
+        { cause: cleanupError }
+      );
     }
     throw error;
   }
@@ -288,6 +298,9 @@ export async function requestPopupExportPagePackage(args: {
       await cancelPopupExportCaptureAuthority(args.tabId, args.batchRequestId);
     }
     if (!authorityMatchesIntent) {
+      if (parsedResponse?.success === false && parsedResponse.error) {
+        throw new Error(parsedResponse.error);
+      }
       throw new Error('Page Package response does not match requested Web-copy authority.');
     }
   }

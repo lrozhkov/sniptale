@@ -2,10 +2,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   authorizeWebSnapshotCaptureRequest,
+  cancelWebSnapshotCaptureRequest,
   registerWebSnapshotAssetSession,
   resetWebSnapshotAssetSessionsForTests,
 } from './session';
-import { fetchWebSnapshotAssetForSession } from './fetch';
+import { fetchWebSnapshotAssetForSession, fetchWebSnapshotAssetsForSession } from './fetch';
 
 const TEN_MIB = 10 * 1024 * 1024;
 
@@ -61,8 +62,63 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   resetWebSnapshotAssetSessionsForTests();
   vi.unstubAllGlobals();
+});
+
+it('bounds a hostile asset batch by concurrency and the session time budget', async () => {
+  vi.useFakeTimers();
+  const urls = Array.from(
+    { length: 12 },
+    (_, index) => `https://cdn.example.com/hanging-${index}.png`
+  );
+  const sessionId = registerSession(urls);
+  let active = 0;
+  let maxActive = 0;
+  vi.mocked(fetch).mockImplementation((_input, init) => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener(
+        'abort',
+        () => {
+          active -= 1;
+          reject(init.signal?.reason);
+        },
+        { once: true }
+      );
+    });
+  });
+
+  const batch = fetchWebSnapshotAssetsForSession({ sessionId, tabId: 42, urls });
+  for (let wave = 0; wave < 4; wave += 1) {
+    await vi.advanceTimersByTimeAsync(15_001);
+  }
+
+  const results = await batch;
+  expect(results).toHaveLength(urls.length);
+  expect(results.every((result) => result.success === false)).toBe(true);
+  expect(maxActive).toBe(3);
+  expect(active).toBe(0);
+});
+
+it('retains per-item failure results when a batch fetch rejects with a non-Error value', async () => {
+  const urls = ['https://cdn.example.com/ok.png', 'https://cdn.example.com/rejected.png'];
+  const sessionId = registerSession(urls);
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    if (String(input).endsWith('/rejected.png')) throw 'network rejected';
+    return createResponse({ contentType: 'image/png' });
+  });
+
+  await expect(fetchWebSnapshotAssetsForSession({ sessionId, tabId: 42, urls })).resolves.toEqual([
+    expect.objectContaining({ success: true, url: urls[0] }),
+    {
+      error: 'anonymous asset fetch failed',
+      success: false,
+      url: urls[1],
+    },
+  ]);
 });
 
 it('fetches registered public assets anonymously', async () => {
@@ -83,6 +139,52 @@ it('fetches registered public assets anonymously', async () => {
     'https://cdn.example.com/image.png',
     expect.objectContaining({ credentials: 'omit' })
   );
+});
+
+it('captures a binary-verified WOFF2 asset served as generic bytes', async () => {
+  const url = 'https://cdn.example.com/typeface.woff2';
+  const sessionId = registerSession([url]);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({ body: 'wOF2font-data', contentType: 'application/octet-stream' })
+  );
+
+  await expect(fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url })).resolves.toEqual({
+    base64: Buffer.from('wOF2font-data').toString('base64'),
+    mimeType: 'font/woff2',
+  });
+});
+
+it('rejects generic response bytes that only claim a font extension', async () => {
+  const url = 'https://cdn.example.com/typeface.woff2';
+  const sessionId = registerSession([url]);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({ body: 'not-font-data', contentType: 'application/octet-stream' })
+  );
+
+  await expect(fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url })).rejects.toThrow(
+    'unsupported web snapshot asset MIME type'
+  );
+});
+
+it('aborts an in-flight public asset fetch when its capture request is cancelled', async () => {
+  const sessionId = registerSession();
+  vi.mocked(fetch).mockImplementationOnce((_input, init) => {
+    const signal = init?.signal;
+    return new Promise<Response>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  });
+
+  const pendingFetch = fetchWebSnapshotAssetForSession({
+    sessionId,
+    tabId: 42,
+    url: 'https://cdn.example.com/image.png',
+  });
+  await Promise.resolve();
+
+  cancelWebSnapshotCaptureRequest(42, 'req-1');
+
+  await expect(pendingFetch).rejects.toThrow('Web snapshot save was cancelled');
 });
 
 it('rejects private-network asset URLs before fetch', async () => {

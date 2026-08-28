@@ -9,14 +9,17 @@ import {
   NotebookText,
   Paperclip,
   SwatchBook,
+  PanelsTopLeft,
 } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n/popup';
 import type {
+  PopupPagePackagePreferenceState,
   PopupExportPreferenceActions,
   PopupExportPreferenceValues,
 } from '../../session/types';
 
 export type ExportOptionKey =
+  | 'webCopy'
   | 'annotations'
   | 'json'
   | 'markdown'
@@ -30,6 +33,8 @@ export type ExportOptionKey =
 export type ExportOptionToggleProps = PopupExportPreferenceActions &
   PopupExportPreferenceValues & {
     disabled: boolean;
+    includeWebCopy: boolean;
+    setIncludeWebCopy: PopupPagePackagePreferenceState['setIncludeWebCopy'];
   };
 
 export type ExportOptionConfig = {
@@ -38,10 +43,22 @@ export type ExportOptionConfig = {
   icon: ComponentType<{ className?: string }>;
   key: ExportOptionKey;
   label: string;
+  group: 'web-copy' | 'content' | 'diagnostics';
 };
 
 export function getExportOptionConfigs(): ExportOptionConfig[] {
-  return [...getContentOptionConfigs(), ...getDiagnosticsOptionConfigs()];
+  return [
+    {
+      accentClassName: 'text-[var(--sniptale-color-accent)]',
+      description: translate('popup.export.packageWebCopyDescription'),
+      group: 'web-copy',
+      icon: PanelsTopLeft,
+      key: 'webCopy',
+      label: translate('popup.export.packageWebCopyLabel'),
+    },
+    ...getContentOptionConfigs(),
+    ...getDiagnosticsOptionConfigs(),
+  ];
 }
 
 export function getContentOptionConfigs(): ExportOptionConfig[] {
@@ -49,6 +66,7 @@ export function getContentOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeAnnotationsDescription'),
+      group: 'content',
       icon: MessageSquareText,
       key: 'annotations',
       label: translate('popup.export.includeAnnotationsLabel'),
@@ -56,6 +74,7 @@ export function getContentOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeJsonDescription'),
+      group: 'content',
       icon: Code2,
       key: 'json',
       label: translate('popup.export.includeJsonLabel'),
@@ -63,6 +82,7 @@ export function getContentOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeMarkdownDescription'),
+      group: 'content',
       icon: FileText,
       key: 'markdown',
       label: translate('popup.export.includeMarkdownLabel'),
@@ -70,6 +90,7 @@ export function getContentOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeFilesDescription'),
+      group: 'content',
       icon: Paperclip,
       key: 'files',
       label: translate('popup.export.includeFilesLabel'),
@@ -77,6 +98,7 @@ export function getContentOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeImagesDescription'),
+      group: 'content',
       icon: Images,
       key: 'images',
       label: translate('popup.export.includeImagesLabel'),
@@ -89,6 +111,7 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeBasicLogsDescription'),
+      group: 'diagnostics',
       icon: NotebookText,
       key: 'basicLogs',
       label: translate('popup.export.includeBasicLogsLabel'),
@@ -96,6 +119,7 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includePageDiagnosticsDescription'),
+      group: 'diagnostics',
       icon: Globe,
       key: 'pageDiagnostics',
       label: translate('popup.export.includePageDiagnosticsLabel'),
@@ -103,6 +127,7 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeCssDiagnosticsDescription'),
+      group: 'diagnostics',
       icon: SwatchBook,
       key: 'cssDiagnostics',
       label: translate('popup.export.includeCssDiagnosticsLabel'),
@@ -110,6 +135,7 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeFullPageScreenshotDescription'),
+      group: 'diagnostics',
       icon: Camera,
       key: 'fullPageScreenshot',
       label: translate('popup.export.includeFullPageScreenshotLabel'),
@@ -119,6 +145,8 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
 
 export function getExportOptionActive(key: ExportOptionKey, props: ExportOptionToggleProps) {
   switch (key) {
+    case 'webCopy':
+      return props.includeWebCopy;
     case 'annotations':
       return props.includeAnnotations;
     case 'json':
@@ -142,6 +170,9 @@ export function getExportOptionActive(key: ExportOptionKey, props: ExportOptionT
 
 export function toggleExportOption(key: ExportOptionKey, props: ExportOptionToggleProps) {
   switch (key) {
+    case 'webCopy':
+      props.setIncludeWebCopy((value) => !value);
+      return;
     case 'annotations':
       props.setIncludeAnnotations((value) => !value);
       return;
@@ -177,6 +208,9 @@ export function setExportOptionActive(
   props: ExportOptionToggleProps
 ) {
   switch (key) {
+    case 'webCopy':
+      props.setIncludeWebCopy(nextValue);
+      return;
     case 'annotations':
       props.setIncludeAnnotations(nextValue);
       return;

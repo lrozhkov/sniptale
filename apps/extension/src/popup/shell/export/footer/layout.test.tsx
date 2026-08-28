@@ -35,21 +35,17 @@ function createProps() {
     canCopyJson: true,
     canCopyMarkdown: true,
     canExport: true,
-    canSaveWebSnapshot: true,
     copyJsonTitle: 'Copy JSON current tab',
     copyMarkdownTitle: 'Copy Markdown current tab',
     copiedFormat: null,
     exportTitle: 'Экспортировать',
     isExporting: false,
-    isSavingWebSnapshot: false,
     isResultReady: false,
     onCancelExport: vi.fn(),
     onCopyJson: vi.fn(),
     onCopyMarkdown: vi.fn(),
     onResetExportView: vi.fn(),
-    onSaveWebSnapshot: vi.fn(),
     onStartExport: vi.fn(),
-    saveWebSnapshotTitle: 'Save web snapshot',
   };
 }
 
@@ -91,47 +87,48 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders the footer surface and all action slots without refresh control', async () => {
+it('renders only Export and preview copy actions while idle', async () => {
   await renderLayout();
 
   expect(container?.firstElementChild?.className).toContain('rounded-[16px]');
   expect(container?.querySelector('[data-ui="popup.export.export-button"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="popup.export.web-snapshot-disclosure"]')).toBeNull();
-  expect(container?.querySelector('[aria-label="Save web snapshot"]')).not.toBeNull();
-  expect(container?.querySelectorAll('button')).toHaveLength(4);
+  expect(container?.querySelector('[aria-label="Save web snapshot"]')).toBeNull();
+  expect(container?.querySelectorAll('button')).toHaveLength(3);
 });
 
-it('disables the snapshot action while it is saving or unavailable', async () => {
-  await renderLayoutWith({ canSaveWebSnapshot: false, isSavingWebSnapshot: true });
-
-  const snapshotButton = container?.querySelector('[aria-label="Save web snapshot"]');
-  expect(snapshotButton).toHaveProperty('disabled', true);
-  expect(snapshotButton?.querySelector('.animate-spin')).not.toBeNull();
-});
-
-it('keeps the snapshot action inert when optional handlers are omitted', async () => {
+it('shows only Done for a completed downloaded package', async () => {
   await renderLayoutWith({
-    canSaveWebSnapshot: undefined,
-    onSaveWebSnapshot: undefined,
-    saveWebSnapshotTitle: undefined,
+    isResultReady: true,
   });
 
-  const snapshotButton = container?.querySelector('[aria-label=""]');
-  expect(snapshotButton).toHaveProperty('disabled', true);
-  (snapshotButton as HTMLButtonElement | null)?.click();
+  expect(container?.querySelectorAll('button')).toHaveLength(1);
+  expect(container?.textContent).toContain('Готово');
+  expect(container?.textContent).not.toContain('Copy JSON');
+  expect(container?.textContent).not.toContain('Copy Markdown');
 });
 
-it('uses the result action in the snapshot slot when a saved snapshot can be opened', async () => {
-  const onOpenWebSnapshotResult = vi.fn();
+it('shows only the cancellation action while an export is running', async () => {
+  await renderLayoutWith({ isExporting: true });
+
+  expect(container?.querySelectorAll('button')).toHaveLength(1);
+  expect(container?.textContent).toContain('Остановить сбор');
+  expect(container?.textContent).not.toContain('Copy JSON');
+  expect(container?.textContent).not.toContain('Copy Markdown');
+});
+
+it('adds Open in Library beside Done for a completed Library save', async () => {
+  const onOpenLibraryResult = vi.fn();
   await renderLayoutWith({
-    canSaveWebSnapshot: false,
-    onOpenWebSnapshotResult,
-    openWebSnapshotResultMode: 'open',
-    openWebSnapshotResultTitle: 'Open snapshot',
+    isResultReady: true,
+    onOpenLibraryResult,
+    openLibraryResultTitle: 'Open in Library',
   });
 
-  const snapshotButton = container?.querySelector('[aria-label="Open snapshot"]');
-  expect(snapshotButton).toHaveProperty('disabled', false);
-  (snapshotButton as HTMLButtonElement | null)?.click();
-  expect(onOpenWebSnapshotResult).toHaveBeenCalledTimes(1);
+  expect(container?.querySelectorAll('button')).toHaveLength(2);
+  const libraryButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('Open in Library')
+  );
+  libraryButton?.click();
+  expect(onOpenLibraryResult).toHaveBeenCalledTimes(1);
 });

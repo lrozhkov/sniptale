@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { loggerWarnMock, sendTabMessageMock } = vi.hoisted(() => ({
+const { loggerDebugMock, loggerWarnMock, sendTabMessageMock } = vi.hoisted(() => ({
+  loggerDebugMock: vi.fn(),
   loggerWarnMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
 }));
@@ -20,7 +21,7 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({
     child: vi.fn(),
-    debug: vi.fn(),
+    debug: loggerDebugMock,
     error: vi.fn(),
     info: vi.fn(),
     log: vi.fn(),
@@ -32,6 +33,7 @@ import { createAckingViewerPortRegistration } from '../../capture/page-preparati
 import { cleanupScreenshotModeAfterNavigation } from './navigation-cleanup';
 
 function resetViewerNavigationCleanupMocks() {
+  loggerDebugMock.mockReset();
   loggerWarnMock.mockReset();
   sendTabMessageMock.mockReset();
 }
@@ -76,8 +78,8 @@ async function verifyViewerViewportCleanupAfterPortDisappears() {
   webSnapshotViewerPorts.clear();
   await cleanupPromise;
 
-  expect(loggerWarnMock).toHaveBeenCalledWith(
-    'Failed to disable preparation after navigation',
+  expect(loggerDebugMock).toHaveBeenCalledWith(
+    'Preparation receiver disappeared during navigation',
     expect.any(Error)
   );
 }

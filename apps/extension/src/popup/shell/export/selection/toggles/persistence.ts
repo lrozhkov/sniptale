@@ -98,7 +98,7 @@ export function usePopupExportPersistence(params: {
       persistPopupPagePackagePreferences({
         committedPreferencesRef: params.committedPreferencesRef,
         hasLoadedPreferencesRef: params.hasLoadedPreferencesRef,
-        onPersistError: () => toast.error(translate('common.states.error')),
+        onPersistError: () => toast.error(translate('popup.export.packagePreferencesSaveError')),
         preferences: { export: exportPreferences, save: savePreferences },
         restoringPreferencesRef: params.restoringPreferencesRef,
         shouldApplyFailure: () => latestAttemptRef.current === attempt,

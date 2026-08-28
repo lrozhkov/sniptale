@@ -98,6 +98,7 @@ function createExpectedDocumentStylesheetMetadata() {
     {
       disabled: false,
       href: null,
+      id: 'document-stylesheet-01',
       media: ['screen'],
       owner: {
         dataUi: 'shell',
@@ -106,7 +107,6 @@ function createExpectedDocumentStylesheetMetadata() {
         rel: null,
         tagName: 'style',
       },
-      path: 'logs/css/stylesheets/document-stylesheet-01.css',
       restricted: false,
       ruleCount: 2,
       source: 'document',
@@ -114,6 +114,7 @@ function createExpectedDocumentStylesheetMetadata() {
     {
       disabled: true,
       href: 'https://cdn.example.test/app.css',
+      id: 'document-stylesheet-02',
       media: [],
       owner: {
         dataUi: null,
@@ -122,7 +123,6 @@ function createExpectedDocumentStylesheetMetadata() {
         rel: 'stylesheet',
         tagName: 'link',
       },
-      path: 'logs/css/stylesheets/document-stylesheet-02.css',
       restricted: true,
       ruleCount: null,
       source: 'document',
@@ -135,9 +135,9 @@ function createExpectedAdoptedStylesheetMetadata() {
     {
       disabled: false,
       href: null,
+      id: 'adopted-stylesheet-03',
       media: [],
       owner: null,
-      path: 'logs/css/stylesheets/adopted-stylesheet-03.css',
       restricted: false,
       ruleCount: 1,
       source: 'adopted',
@@ -145,9 +145,9 @@ function createExpectedAdoptedStylesheetMetadata() {
     {
       disabled: false,
       href: null,
+      id: 'adopted-stylesheet-04',
       media: [],
       owner: null,
-      path: 'logs/css/stylesheets/adopted-stylesheet-04.css',
       restricted: true,
       ruleCount: null,
       source: 'adopted',
@@ -164,33 +164,6 @@ function expectStylesheetManifest(manifest: {
     ...createExpectedDocumentStylesheetMetadata(),
     ...createExpectedAdoptedStylesheetMetadata(),
   ]);
-}
-
-function expectStylesheetAssets(assets: Array<{ path: string; content: Blob | string }>) {
-  expect(assets[1]).toEqual({
-    path: 'logs/css/stylesheets/document-stylesheet-01.css',
-    content:
-      '/* Sniptale stylesheet diagnostic: CSS text redacted. */\n' +
-      '/* source=document; restricted=false; ruleCount=2 */',
-  });
-  expect(assets[2]).toEqual({
-    path: 'logs/css/stylesheets/document-stylesheet-02.css',
-    content:
-      '/* Sniptale stylesheet diagnostic: CSS text redacted. */\n' +
-      '/* source=document; restricted=true; ruleCount=unknown */',
-  });
-  expect(assets[3]).toEqual({
-    path: 'logs/css/stylesheets/adopted-stylesheet-03.css',
-    content:
-      '/* Sniptale stylesheet diagnostic: CSS text redacted. */\n' +
-      '/* source=adopted; restricted=false; ruleCount=1 */',
-  });
-  expect(assets[4]).toEqual({
-    path: 'logs/css/stylesheets/adopted-stylesheet-04.css',
-    content:
-      '/* Sniptale stylesheet diagnostic: CSS text redacted. */\n' +
-      '/* source=adopted; restricted=true; ruleCount=unknown */',
-  });
 }
 
 function expectNoRawStylesheetText(assets: Array<{ path: string; content: Blob | string }>) {
@@ -214,14 +187,7 @@ it('serializes document and adopted stylesheets with metadata and restriction fa
   const assets = buildStylesheetDiagnosticAssets();
   const manifest = readStylesheetManifest(assets);
 
-  expect(assets.map((asset) => asset.path)).toEqual([
-    'logs/css/stylesheets.json',
-    'logs/css/stylesheets/document-stylesheet-01.css',
-    'logs/css/stylesheets/document-stylesheet-02.css',
-    'logs/css/stylesheets/adopted-stylesheet-03.css',
-    'logs/css/stylesheets/adopted-stylesheet-04.css',
-  ]);
+  expect(assets.map((asset) => asset.path)).toEqual(['logs/css/stylesheets.json']);
   expectStylesheetManifest(manifest);
-  expectStylesheetAssets(assets);
   expectNoRawStylesheetText(assets);
 });

@@ -5,6 +5,7 @@ import { respondAsyncRouteEffect } from '../../../routing-contracts/response';
 import type { RuntimeMessageEnvelope } from '../message-guards/guards/shared';
 import { adaptTabLegacyRouteToAction, createActionContext, dispatchAction } from '../action-kernel';
 import { parseRuntimeMessage } from './parser';
+import { isKnownNonBackgroundRuntimeMessage } from '../../../../contracts/messaging/parsers/boundary';
 import { executeImmediateRuntimeRoute } from './executor';
 import { classifyRuntimeMessageRoute, type RuntimeMessagePreflightRoute } from './preflight';
 import { resolveTabIdPromise } from '../tab-dispatch/adapters/tab-id';
@@ -27,6 +28,9 @@ function handleRuntimeMessage(
   sendResponse: ResponseSender,
   deps: BackgroundRuntimeMessageDeps
 ): boolean {
+  if (isKnownNonBackgroundRuntimeMessage(message)) {
+    return false;
+  }
   const parsedMessage = parseRuntimeMessage({
     logger,
     message,

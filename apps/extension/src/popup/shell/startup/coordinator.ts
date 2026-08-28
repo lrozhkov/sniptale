@@ -65,11 +65,14 @@ export async function resolvePopupStartupRoute(): Promise<PopupStartupDescriptor
   if (startup.selection === 'remember-last') {
     return startup.lastPage === 'video'
       ? { page: 'video', recordingSnapshot, postRecordSnapshot }
-      : { page: startup.lastPage };
+      : startup.lastPage === 'export'
+        ? { page: 'export', destination: startup.lastExportDestination }
+        : { page: startup.lastPage };
   }
   if (startup.selection === 'menu') return { page: 'menu' };
   if (startup.selection === 'tools') return { page: 'tools' };
-  if (startup.selection === 'export') return { page: 'export' };
+  if (startup.selection === 'export:download') return { page: 'export', destination: 'export' };
+  if (startup.selection === 'export:library') return { page: 'export', destination: 'save' };
   const videoMode = videoModes[startup.selection];
   if (videoMode) {
     return { page: 'video', videoMode, recordingSnapshot, postRecordSnapshot };

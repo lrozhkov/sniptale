@@ -6,6 +6,10 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Подготовка экспорта...',
     en: 'Preparing export...',
   },
+  cancellingMessage: {
+    ru: 'Останавливаем сбор...',
+    en: 'Stopping collection...',
+  },
   screenshotPermissionDeniedWarning: {
     ru: 'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
     en: 'All-sites access was not granted; export continued without full-page screenshots.',
@@ -62,6 +66,10 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Состав пакета',
     en: 'Package contents',
   },
+  dataTypesSectionDescription: {
+    ru: 'Выберите веб-копию, данные, файлы и диагностику для пакета.',
+    en: 'Choose the Web copy, data, files, and diagnostics for the package.',
+  },
   packageDestinationLabel: {
     ru: 'Настройки действия',
     en: 'Action settings',
@@ -70,9 +78,17 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Скачать',
     en: 'Download',
   },
+  packageDestinationDownloadDescription: {
+    ru: 'Скачать полный пакет страницы как ZIP-архив.',
+    en: 'Download the complete page package as a ZIP archive.',
+  },
   packageDestinationLibrary: {
     ru: 'В библиотеку',
     en: 'To Library',
+  },
+  packageDestinationLibraryDescription: {
+    ru: 'Сохранить веб-копию и открыть веб-снимок.',
+    en: 'Save the Web copy and open the Web Snapshot.',
   },
   packagePresetLabel: {
     ru: 'Быстрый выбор',
@@ -94,17 +110,45 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Всё',
     en: 'Everything',
   },
+  packagePreferencesSaveError: {
+    ru: 'Не удалось сохранить состав пакета. Повторите ещё раз.',
+    en: 'Could not save the package contents. Please try again.',
+  },
   packageWebCopyLabel: {
     ru: 'Веб-копия страницы',
     en: 'Page Web copy',
   },
-  packageWebCopyRequired: {
-    ru: 'обязательно',
-    en: 'required',
-  },
   packageWebCopyDescription: {
-    ru: 'Статический документ, скриншот, стили, изображения и другие ресурсы.',
-    en: 'Static document, screenshot, styles, images, and other resources.',
+    ru: 'Статический документ, стили, изображения и другие ресурсы.',
+    en: 'Static document, styles, images, and other resources.',
+  },
+  webCopyCurrentSiteLabel: {
+    ru: 'Ресурсы текущего сайта',
+    en: 'Current-site resources',
+  },
+  webCopyCurrentSiteDescription: {
+    ru: 'Загружать стили и изображения с доступом текущей вкладки.',
+    en: 'Load styles and images using the current tab’s access.',
+  },
+  webCopyExternalSitesLabel: {
+    ru: 'Ресурсы с других сайтов',
+    en: 'Resources from other sites',
+  },
+  webCopyExternalSitesDescription: {
+    ru: 'Анонимно загружать внешние стили, шрифты и изображения.',
+    en: 'Load external styles, fonts, and images anonymously.',
+  },
+  webCopyExternalLinksLabel: {
+    ru: 'Открывать ссылки из веб-копии',
+    en: 'Open links from the Web copy',
+  },
+  webCopyExternalLinksDescription: {
+    ru: 'Открывать сайт в новой вкладке. При переходе сайт получит обычный сетевой запрос.',
+    en: 'Open the live site in a new tab. Following a link sends a normal network request to it.',
+  },
+  webCopyResourceSettingsError: {
+    ru: 'Не удалось сохранить настройку ресурсов.',
+    en: 'Could not save the resource setting.',
   },
   packageWebCopyDisabledDescription: {
     ru: 'Функция выключена. Откройте настройки, чтобы добавить безопасную автономную копию.',
@@ -122,6 +166,10 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Страницы',
     en: 'Pages',
   },
+  tabsSectionDescription: {
+    ru: 'Выберите доступные вкладки, которые нужно добавить в экспорт.',
+    en: 'Choose the available tabs to include in the export.',
+  },
   editButton: {
     ru: 'Изменить',
     en: 'Edit',
@@ -129,6 +177,10 @@ export const popupExportMessages = defineMessageSource({
   doneButton: {
     ru: 'Готово',
     en: 'Done',
+  },
+  backButton: {
+    ru: 'Назад',
+    en: 'Back',
   },
   removeFromSelectionAction: {
     ru: 'Убрать из экспорта',
@@ -243,12 +295,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Extended page data',
   },
   includePageDiagnosticsDescription: {
-    ru: 'Для скачиваемого пакета: видимый текст, структура, исходные ссылки и метаданные скриптов',
-    en: 'For downloaded packages: visible text, structure, original links, and script metadata',
-  },
-  includePageDiagnosticsDisclosure: {
-    ru: 'Может содержать личные данные с открытой страницы. Сохраняется только в скачиваемый пакет и никогда не запускается.',
-    en: 'May contain private data from the open page. It is stored only in the downloaded package and is never executed.',
+    ru: 'Видимый текст, структура, исходные ссылки и метаданные скриптов',
+    en: 'Visible text, structure, original links, and script metadata',
   },
   includeCssDiagnosticsLabel: {
     ru: 'Оформление и стили',

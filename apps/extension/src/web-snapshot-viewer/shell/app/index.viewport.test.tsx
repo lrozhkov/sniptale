@@ -8,7 +8,9 @@ import { createPagePackageManifestFixture } from '../../../features/web-snapshot
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 
 const mocks = vi.hoisted(() => ({
+  browserTabsCreate: vi.fn(),
   latestFrameLoad: null as (() => void) | null,
+  loadSettings: vi.fn(),
   loadWebSnapshotPackage: vi.fn(),
   readSnapshotIdFromLocation: vi.fn(),
   SnapshotPreparationHost: vi.fn(
@@ -27,6 +29,12 @@ vi.mock('./route', () => ({
 }));
 vi.mock('../../viewer/frame-navigation', () => ({
   blockSnapshotFrameNavigation: vi.fn(),
+}));
+vi.mock('../../../composition/persistence/settings', () => ({
+  loadSettings: mocks.loadSettings,
+}));
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { create: mocks.browserTabsCreate },
 }));
 vi.mock('../../preparation/host', () => ({
   SnapshotPreparationHost: mocks.SnapshotPreparationHost,
@@ -102,6 +110,8 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   mocks.readSnapshotIdFromLocation.mockReturnValue('snapshot-1');
+  mocks.loadSettings.mockResolvedValue({ externalSnapshotLinksEnabled: false });
+  mocks.browserTabsCreate.mockResolvedValue({});
   mocks.SnapshotPreparationHost.mockClear();
 });
 
@@ -143,6 +153,26 @@ it('uses the saved capture viewport as the default snapshot iframe surface', asy
   expect(viewport?.style.transform).toBe('scale(0.4)');
 });
 
+it('uses a true 100% scale instead of blurring a near-width capture by a few pixels', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
+  );
+
+  await renderViewer();
+
+  const scaledViewport = container?.querySelector<HTMLElement>(
+    '[data-testid="snapshot-frame-scaled-viewport"]'
+  );
+  const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
+  const actualSizeButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === '100%'
+  );
+
+  expect(scaledViewport?.style.width).toBe('1030px');
+  expect(viewport?.style.transform).toBe('scale(1)');
+  expect(actualSizeButton).toBeDefined();
+});
+
 it('keeps captured layout dimensions while switching between fit and manual zoom', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
@@ -165,9 +195,9 @@ it('keeps captured layout dimensions while switching between fit and manual zoom
   });
   expect(scaledViewport()?.style.width).toBe('2560px');
   expect(viewport()?.style.transform).toBe('scale(1)');
-  expect(container?.querySelector('[data-testid="snapshot-viewer-surface"]')?.className).toContain(
-    'overflow-auto'
-  );
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  expect(surface?.className).toContain('overflow-auto');
+  expect(surface?.className).toContain('cursor-grab');
 
   const zoomButtons = percentButton?.parentElement?.querySelectorAll('button');
   act(() => {
@@ -187,6 +217,37 @@ it('keeps captured layout dimensions while switching between fit and manual zoom
   });
   expect(scaledViewport()?.style.width).toBe('1024px');
   expect(viewport()?.style.transform).toBe('scale(0.4)');
+});
+
+it('pans an enlarged snapshot with primary-button grab navigation', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
+  );
+  await renderViewer();
+  const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === '40%'
+  );
+  act(() => percentButton?.click());
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  Object.defineProperties(surface!, {
+    clientHeight: { configurable: true, value: 600 },
+    clientWidth: { configurable: true, value: 1024 },
+    scrollHeight: { configurable: true, value: 1440 },
+    scrollWidth: { configurable: true, value: 2560 },
+  });
+
+  act(() => {
+    surface?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 500, clientY: 400 })
+    );
+    surface?.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 350, clientY: 250 })
+    );
+    surface?.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+  });
+
+  expect(surface?.scrollLeft).toBe(150);
+  expect(surface?.scrollTop).toBe(150);
 });
 
 it('keeps the fluid viewer surface for legacy snapshots without viewport metadata', async () => {

@@ -49,7 +49,9 @@ export function getPopupExportDerivedState(args: {
     activeTabExportDisabledReason,
     args.tabSelection
   );
-  const isExporting = getIsExporting(args.session.transfer.progress, args.session.transfer.result);
+  const isExporting =
+    args.session.refs.cancelRetryRef.current?.cancellationPending === true ||
+    getIsExporting(args.session.transfer.progress, args.session.transfer.result);
   const selection = getPopupExportSelection(args.toggles);
   const canExport =
     args.toggles.hasLoadedPreferences &&
@@ -153,6 +155,7 @@ function getIsExporting(
   return (
     progress.phase !== 'idle' &&
     progress.phase !== 'done' &&
+    progress.phase !== 'cancelled' &&
     progress.phase !== 'error' &&
     result === null
   );

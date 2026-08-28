@@ -16,7 +16,8 @@ export function buildPopupStartupOptions(locale: AppLocale): Array<{
     'video:camera',
     'video:screen',
     'tools',
-    'export',
+    'export:download',
+    'export:library',
   ];
   return values.map((value) => ({
     value,

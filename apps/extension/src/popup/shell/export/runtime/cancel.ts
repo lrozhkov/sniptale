@@ -10,8 +10,10 @@ type PopupExportCancellationState = Pick<
   | 'cancelRetryRef'
   | 'exportDisabledReason'
   | 'requestIdRef'
+  | 'terminalRequestIdRef'
   | 'selectedTabIdsInOrder'
   | 'setProgress'
+  | 'setResult'
 >;
 type PopupExportCancellationDeps = Pick<PopupExportRuntimeDeps, 'sendCancelJobMessage'>;
 
@@ -41,14 +43,21 @@ function reportCancellationFailure(state: PopupExportCancellationState, error: u
   });
 }
 
+function isOwnedCancellingStatus(
+  response: Awaited<ReturnType<typeof cancelOwnedExport>>,
+  exportRunId: string
+) {
+  return (
+    response?.success === true &&
+    response.status?.jobId === exportRunId &&
+    response.status.phase === 'cancelling'
+  );
+}
+
 export async function cancelPopupExport(
   state: PopupExportCancellationState,
   deps: PopupExportCancellationDeps = getDefaultPopupExportRuntimeDeps()
 ): Promise<void> {
-  if (state.exportDisabledReason) {
-    return;
-  }
-
   try {
     const activeExportRunId = state.requestIdRef.current;
     const cancellation =
@@ -63,23 +72,31 @@ export async function cancelPopupExport(
     if (!cancellation) {
       return;
     }
-    state.requestIdRef.current = null;
-    state.cancelRetryRef.current = cancellation;
+    if (cancellation.cancellationPending === true) return;
+    state.cancelRetryRef.current = { ...cancellation, cancellationPending: true };
+    state.setProgress((current) => ({
+      ...current,
+      message: translate('popup.export.cancellingMessage'),
+    }));
     const response = await cancelOwnedExport(cancellation, deps);
-    if (response?.success !== true) {
+    if (!isOwnedCancellingStatus(response, cancellation.exportRunId)) {
+      state.cancelRetryRef.current = { ...cancellation };
       reportCancellationFailure(state, response?.error || 'Popup export cancellation was rejected');
       return;
     }
-    state.cancelRetryRef.current = null;
+    const status = response.status;
+    if (!status) throw new Error('Popup export cancellation status is unavailable');
     state.setProgress({
-      activeStepKey: null,
-      phase: 'error',
-      message: translate('content.runtime.exportCancelled'),
-      current: 0,
-      total: 0,
-      errors: [translate('content.runtime.exportCancelled')],
+      ...status.progress,
+      activeStepKey: status.progress.activeStepKey ?? null,
+      message: translate('popup.export.cancellingMessage'),
     });
   } catch (error) {
+    const cancellation = state.cancelRetryRef.current;
+    if (cancellation) {
+      const { cancellationPending: _pending, ...retryable } = cancellation;
+      state.cancelRetryRef.current = retryable;
+    }
     reportCancellationFailure(state, error);
   }
 }

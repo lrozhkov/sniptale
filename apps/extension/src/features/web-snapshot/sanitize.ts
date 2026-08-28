@@ -1,4 +1,5 @@
 import { sanitizeWebSnapshotCssText, sanitizeWebSnapshotStylesheetText } from './sanitize-css';
+import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
 
 const SAFE_WEB_SNAPSHOT_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const SAFE_WEB_SNAPSHOT_DATA_MIME_TYPES = new Set([
@@ -20,6 +21,7 @@ const EXECUTABLE_ELEMENT_SELECTORS = [
   'meta[http-equiv="refresh" i]',
 ];
 const FORM_ATTRIBUTE_NAMES = ['action', 'method', 'target'] as const;
+export const WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE = 'data-sniptale-external-href';
 
 interface WebSnapshotHtmlSanitizeOptions {
   allowedObjectUrls?: readonly string[];
@@ -78,6 +80,20 @@ export function isSafeWebSnapshotUrl(value: string, baseUrl: string | null): boo
   try {
     const url = new URL(trimmedValue, baseUrl ?? 'https://sniptale.invalid/');
     return SAFE_WEB_SNAPSHOT_PROTOCOLS.has(url.protocol) || isSafeWebSnapshotDataUrl(url);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Capture-only URL policy. Inline SVG is admitted here so it can be decoded, sanitized, and
+ * rewritten to an inert local asset; it remains forbidden in the final HTML URL policy.
+ */
+export function isSafeWebSnapshotCaptureAssetUrl(value: string, baseUrl: string | null): boolean {
+  if (isSafeWebSnapshotUrl(value, baseUrl)) return true;
+  try {
+    const url = new URL(value.trim(), baseUrl ?? 'https://sniptale.invalid/');
+    return url.protocol === 'data:' && /^data:image\/svg\+xml(?:[;,])/iu.test(url.href);
   } catch {
     return false;
   }
@@ -160,6 +176,13 @@ function sanitizeElementAttributes(
 ): void {
   const allowedObjectUrls = new Set(options.allowedObjectUrls ?? []);
   const rewriteCssUrl = createOfflineCssUrlRewriter(options);
+  const externalHref = options.offlineOnly
+    ? resolveOfflineExternalAnchorHref(element, baseUrl)
+    : null;
+
+  // Never trust a page-authored capability attribute. Viewer navigation is projected only from
+  // the real href after URL validation below.
+  element.removeAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE);
 
   for (const attribute of Array.from(element.attributes)) {
     const normalizedName = attribute.name.toLowerCase();
@@ -196,6 +219,22 @@ function sanitizeElementAttributes(
     if (sanitized !== attribute.value) {
       element.setAttribute(attribute.name, sanitized);
     }
+  }
+
+  if (externalHref !== null) {
+    element.setAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE, externalHref);
+  }
+}
+
+function resolveOfflineExternalAnchorHref(element: Element, baseUrl: string | null): string | null {
+  if (element.tagName.toLowerCase() !== 'a') return null;
+  const href = element.getAttribute('href');
+  if (href === null || baseUrl === null) return null;
+
+  try {
+    return createSafeExternalHref(new URL(href, baseUrl).toString());
+  } catch {
+    return null;
   }
 }
 

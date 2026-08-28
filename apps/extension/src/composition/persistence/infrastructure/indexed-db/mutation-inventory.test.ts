@@ -15,7 +15,6 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/effect-bundles/backup-restore.ts',
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
-  'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-page-package-cutover.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',

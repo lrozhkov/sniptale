@@ -1,9 +1,15 @@
 import { isPrivateNetworkHost } from '@sniptale/platform/security/private-network-host';
-import { resolveWebSnapshotCaptureAssetMimeType } from '../../../../features/web-snapshot/public';
-import { authorizeWebSnapshotAssetFetch } from './session';
+import { resolveWebSnapshotCaptureAssetMimeTypeFromBytes } from '../../../../features/web-snapshot/public';
+import { beginWebSnapshotAssetFetch } from './session';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'BackgroundWebSnapshotAssets' });
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_ASSET_BYTES = 10 * 1024 * 1024;
+const MAX_BATCH_ASSET_BYTES = 30 * 1024 * 1024;
+const MAX_BATCH_BASE64_CHARACTERS = Math.ceil(MAX_BATCH_ASSET_BYTES / 3) * 4;
+const FETCH_BATCH_CONCURRENCY = 3;
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -102,10 +108,6 @@ async function readStreamingResponseWithLimit(
   return bytes.buffer;
 }
 
-function resolveAllowedMimeType(response: Response): string {
-  return resolveWebSnapshotCaptureAssetMimeType(response.headers.get('content-type'));
-}
-
 export async function fetchWebSnapshotAssetForSession(args: {
   sessionId: string;
   tabId: number;
@@ -115,20 +117,22 @@ export async function fetchWebSnapshotAssetForSession(args: {
   mimeType: string;
 }> {
   const parsedUrl = validateFetchUrl(args.url);
-  authorizeWebSnapshotAssetFetch({
+  const fetchAuthority = beginWebSnapshotAssetFetch({
     sessionId: args.sessionId,
     tabId: args.tabId,
     url: parsedUrl.href,
   });
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => fetchAuthority.abort(new Error('Web snapshot asset fetch timed out')),
+    Math.min(FETCH_TIMEOUT_MS, fetchAuthority.timeoutMs)
+  );
 
   try {
     const response = await fetch(parsedUrl.href, {
       credentials: 'omit',
       redirect: 'manual',
-      signal: controller.signal,
+      signal: fetchAuthority.signal,
     });
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
       throw new Error('web snapshot asset redirects are not allowed');
@@ -138,12 +142,84 @@ export async function fetchWebSnapshotAssetForSession(args: {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const mimeType = resolveAllowedMimeType(response);
+    const buffer = await readResponseWithLimit(response);
+    const mimeType = resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: new Uint8Array(buffer),
+      contentType: response.headers.get('content-type'),
+      url: response.url || parsedUrl.href,
+    });
     return {
-      base64: arrayBufferToBase64(await readResponseWithLimit(response)),
+      base64: arrayBufferToBase64(buffer),
       mimeType,
     };
   } finally {
     clearTimeout(timeoutId);
+    fetchAuthority.release();
   }
+}
+
+type WebSnapshotAssetFetchResult = {
+  base64?: string;
+  error?: string;
+  mimeType?: string;
+  success: boolean;
+  url: string;
+};
+
+export async function fetchWebSnapshotAssetsForSession(args: {
+  sessionId: string;
+  tabId: number;
+  urls: string[];
+}): Promise<WebSnapshotAssetFetchResult[]> {
+  const startedAt = Date.now();
+  logger.log('Web snapshot asset batch started', { assetCount: args.urls.length });
+  const results = new Array<WebSnapshotAssetFetchResult | undefined>(args.urls.length);
+  let nextIndex = 0;
+  let retainedBase64Characters = 0;
+
+  const worker = async () => {
+    while (nextIndex < args.urls.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const url = args.urls[index];
+      if (!url) continue;
+      try {
+        const asset = await fetchWebSnapshotAssetForSession({
+          sessionId: args.sessionId,
+          tabId: args.tabId,
+          url,
+        });
+        if (retainedBase64Characters + asset.base64.length > MAX_BATCH_BASE64_CHARACTERS) {
+          results[index] = {
+            error: 'web snapshot asset batch budget exceeded',
+            success: false,
+            url,
+          };
+          continue;
+        }
+        retainedBase64Characters += asset.base64.length;
+        results[index] = { ...asset, success: true, url };
+      } catch (error) {
+        results[index] = {
+          error: error instanceof Error ? error.message : 'anonymous asset fetch failed',
+          success: false,
+          url,
+        };
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(FETCH_BATCH_CONCURRENCY, args.urls.length) }, () => worker())
+  );
+  const settled = results.filter(
+    (result): result is WebSnapshotAssetFetchResult => result !== undefined
+  );
+  logger.log('Web snapshot asset batch completed', {
+    base64Characters: retainedBase64Characters,
+    elapsedMs: Date.now() - startedAt,
+    failedCount: settled.filter((result) => !result.success).length,
+    succeededCount: settled.filter((result) => result.success).length,
+  });
+  return settled;
 }

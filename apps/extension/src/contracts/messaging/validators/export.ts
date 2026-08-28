@@ -96,6 +96,7 @@ const exportProgressPhases = new Set<ExportProgress['phase']>([
   'downloading',
   'zipping',
   'done',
+  'cancelled',
   'error',
 ]);
 
@@ -154,11 +155,25 @@ export function isExportOptions(value: unknown): value is ExportOptions {
 
 export function isExportProgress(value: unknown): value is ExportProgress {
   return (
-    hasExactKeys(value, ['phase', 'message', 'current', 'total', 'errors'], ['activeStepKey']) &&
+    hasExactKeys(
+      value,
+      ['phase', 'message', 'current', 'total', 'errors'],
+      ['activeStepKey', 'completedStepKeys', 'failedStepKeys']
+    ) &&
     hasOptionalField(
       value,
       'activeStepKey',
       (entry) => entry === null || isExportProgressStepKey(entry)
+    ) &&
+    hasOptionalField(
+      value,
+      'completedStepKeys',
+      (entry) => Array.isArray(entry) && entry.every(isExportProgressStepKey)
+    ) &&
+    hasOptionalField(
+      value,
+      'failedStepKeys',
+      (entry) => Array.isArray(entry) && entry.every(isExportProgressStepKey)
     ) &&
     isExportProgressPhase(value['phase']) &&
     isUtf8BoundedString(value['message'], MAX_POPUP_EXPORT_STATUS_TEXT_BYTES, true) &&

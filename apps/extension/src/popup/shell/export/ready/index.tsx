@@ -10,9 +10,11 @@ import {
   PackageDestinationSwitch,
   type PopupPackageDestination,
 } from '../data-type/package-controls';
+import type { WebCopyResourcePreferences } from '../pages/snapshot-availability';
 
 type ExportReadySectionProps = {
   availableTabs: PopupExportTabItem[];
+  destination: PopupPackageDestination;
   disabled: boolean;
   filterQuery: string;
   filteredTabs: PopupExportTabItem[];
@@ -42,8 +44,8 @@ type ExportReadySectionProps = {
   setIncludeMarkdown: Dispatch<SetStateAction<boolean>>;
   setIncludeWebCopy: Dispatch<SetStateAction<boolean>>;
   savePreferences: PopupPagePackagePreferenceState;
-  onRequestWebCopySetup: () => void;
-  webSnapshotEnabled: boolean;
+  onDestinationChange: (destination: PopupPackageDestination) => void;
+  webCopyResources: WebCopyResourcePreferences;
   toggleSelectAllTabs: () => void;
   toggleTabSelection: (tabId: number) => void;
 };
@@ -51,7 +53,7 @@ type ExportReadySectionProps = {
 function renderReadyHint(
   props: Pick<ExportReadySectionProps, 'disabled' | 'hasLoadedPreferences' | 'selectedCount'>
 ) {
-  if (!props.hasLoadedPreferences || !props.disabled || props.selectedCount > 0) {
+  if (!props.hasLoadedPreferences || props.selectedCount > 0) {
     return null;
   }
 
@@ -83,11 +85,11 @@ function renderDataTypeSection(
       includeImages={props.includeImages}
       includeJson={props.includeJson}
       includeMarkdown={props.includeMarkdown}
+      includeWebCopy={packagePreferences.includeWebCopy}
       isExpanded={isEditingDataTypes}
       isOpen={isEditingDataTypes}
       onClose={onClose}
       onOpen={onOpen}
-      onRequestWebCopySetup={props.onRequestWebCopySetup}
       packagePreferences={packagePreferences}
       setIncludeAnnotations={props.setIncludeAnnotations}
       setIncludeBasicLogs={props.setIncludeBasicLogs}
@@ -98,7 +100,8 @@ function renderDataTypeSection(
       setIncludeImages={props.setIncludeImages}
       setIncludeJson={props.setIncludeJson}
       setIncludeMarkdown={props.setIncludeMarkdown}
-      webSnapshotEnabled={props.webSnapshotEnabled}
+      setIncludeWebCopy={packagePreferences.setIncludeWebCopy}
+      webCopyResources={props.webCopyResources}
     />
   );
 }
@@ -167,7 +170,6 @@ function renderReadySections(
 
 export function ExportReadySection(props: ExportReadySectionProps) {
   const [activeDrawer, setActiveDrawer] = useState<'data-types' | 'pages' | null>(null);
-  const [destination, setDestination] = useState<PopupPackageDestination>('export');
   const exportPreferences: PopupPagePackagePreferenceState = {
     actions: {
       setIncludeAnnotations: props.setIncludeAnnotations,
@@ -194,15 +196,16 @@ export function ExportReadySection(props: ExportReadySectionProps) {
       includeMarkdown: props.includeMarkdown,
     },
   };
-  const packagePreferences = destination === 'export' ? exportPreferences : props.savePreferences;
+  const packagePreferences =
+    props.destination === 'export' ? exportPreferences : props.savePreferences;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <PackageDestinationSwitch
-        destination={destination}
-        disabled={props.disabled}
+        destination={props.destination}
+        disabled={!props.hasLoadedPreferences}
         onChange={(nextDestination) => {
-          setDestination(nextDestination);
+          props.onDestinationChange(nextDestination);
           setActiveDrawer(null);
         }}
       />
@@ -214,7 +217,7 @@ export function ExportReadySection(props: ExportReadySectionProps) {
           includeWebCopy: packagePreferences.includeWebCopy,
           setIncludeWebCopy: packagePreferences.setIncludeWebCopy,
         },
-        destination,
+        props.destination,
         packagePreferences,
         activeDrawer,
         setActiveDrawer

@@ -173,7 +173,7 @@ it('loads tabs from the current window and auto-selects the current exportable t
   ]);
 });
 
-it('includes web snapshot viewer tabs and excludes restricted extension pages', async () => {
+it('excludes all extension-owned pages from export targets', async () => {
   const viewerUrl =
     'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1';
   mocks.browserTabsQuery.mockResolvedValue([
@@ -186,7 +186,7 @@ it('includes web snapshot viewer tabs and excludes restricted extension pages', 
       reason: null,
       supported: true,
     },
-    isRestrictedPage: tab.id === 12,
+    isRestrictedPage: tab.id === 11 || tab.id === 12,
   }));
 
   await renderHarness();
@@ -194,8 +194,26 @@ it('includes web snapshot viewer tabs and excludes restricted extension pages', 
 
   expect(latestValue?.filteredTabs.map((tab) => [tab.tabId, tab.title])).toEqual([
     [7, 'Current tab'],
-    [11, 'Source page - Sniptale Web Snapshot'],
   ]);
+});
+
+it('never exposes the current extension page, including the initial fallback state', async () => {
+  mocks.browserTabsQuery.mockResolvedValue([
+    { id: 7, title: 'Sniptale', url: 'chrome-extension://test/popup.html' },
+  ]);
+
+  await renderHarness({
+    capabilities: createCapabilities({
+      isRestrictedPage: true,
+      title: 'Sniptale',
+      url: 'chrome-extension://test/popup.html',
+    }),
+  });
+
+  expect(latestValue?.availableTabs).toEqual([]);
+  await flushEffects();
+  expect(latestValue?.availableTabs).toEqual([]);
+  expect(latestValue?.selectedTabIds).toEqual([]);
 });
 
 it('includes granted local-file tabs through the explicit file origin scope', async () => {

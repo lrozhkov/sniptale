@@ -1,4 +1,5 @@
 import {
+  MAX_PAGE_PACKAGE_ENTRIES,
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
   PAGE_PACKAGE_ARCHIVE_PATHS,
   parsePagePackageManifest,
@@ -7,7 +8,7 @@ import { openArchiveReader } from '../../composition/archive-transfer/reader';
 import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
 
 const MAX_PREVIEW_PACKAGE_BYTES = 100 * 1024 * 1024;
-const MAX_PREVIEW_FILE_COUNT = 500;
+const MAX_PREVIEW_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
 const MAX_PREVIEW_SCREENSHOT_BYTES = 25 * 1024 * 1024;
 const MAX_PREVIEW_MANIFEST_BYTES = 1024 * 1024;
 

@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 
 import { handlePopupExportCancelRuntime } from './cancel';
 
-it('cancels a running export and always acknowledges the request', () => {
+it('cancels a running export without releasing its owner before asynchronous cleanup', () => {
   const exportRunner = { cancel: vi.fn() };
   const sendResponse = vi.fn();
   const state = { activeExportRequestId: 'req-1', isExportRunning: true };
@@ -17,7 +17,7 @@ it('cancels a running export and always acknowledges the request', () => {
   expect(handled).toBe(true);
   expect(exportRunner.cancel).toHaveBeenCalledTimes(1);
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
-  expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
+  expect(state).toEqual({ activeExportRequestId: 'req-1', isExportRunning: true });
 });
 
 it('aborts the matching request-scoped web snapshot operation', () => {
@@ -38,7 +38,11 @@ it('aborts the matching request-scoped web snapshot operation', () => {
   });
 
   expect(activeAbortController.signal.aborted).toBe(true);
-  expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
+  expect(state).toEqual({
+    activeAbortController,
+    activeExportRequestId: 'req-web',
+    isExportRunning: true,
+  });
 });
 
 it('does not cancel when no export is running', () => {

@@ -8,6 +8,7 @@ vi.mock('../infrastructure/browser-storage', () => ({
 import {
   DEFAULT_POPUP_STARTUP_STATE,
   loadPopupStartupState,
+  savePopupLastExportDestination,
   savePopupLastPage,
   savePopupStartupSelection,
 } from './popup-startup';
@@ -16,6 +17,27 @@ beforeEach(() => {
   vi.clearAllMocks();
   getMock.mockResolvedValue({});
   setMock.mockResolvedValue(undefined);
+});
+
+it('persists the last Export destination without changing its startup choice', async () => {
+  getMock.mockResolvedValue({
+    sniptale_popup_startup: {
+      selection: 'remember-last',
+      lastPage: 'export',
+      lastExportDestination: 'export',
+    },
+  });
+  await savePopupLastExportDestination('save');
+  expect(setMock).toHaveBeenCalledWith(
+    {
+      sniptale_popup_startup: {
+        selection: 'remember-last',
+        lastPage: 'export',
+        lastExportDestination: 'save',
+      },
+    },
+    expect.any(Object)
+  );
 });
 
 it('loads defaults without repairing malformed storage', async () => {
@@ -33,6 +55,7 @@ it('keeps independently valid fields from stored state', async () => {
   await expect(loadPopupStartupState()).resolves.toEqual({
     selection: 'video:screen',
     lastPage: 'menu',
+    lastExportDestination: 'export',
   });
 });
 
@@ -43,6 +66,7 @@ it('loads the new top-level menu and tools destinations from the existing select
   await expect(loadPopupStartupState()).resolves.toEqual({
     selection: 'tools',
     lastPage: 'menu',
+    lastExportDestination: 'export',
   });
 });
 
@@ -58,6 +82,7 @@ it.each([
     await expect(loadPopupStartupState()).resolves.toEqual({
       selection: expected,
       lastPage: 'menu',
+      lastExportDestination: 'export',
     });
     expect(setMock).not.toHaveBeenCalled();
   }
@@ -70,7 +95,11 @@ it('persists startup selection without overwriting the last page', async () => {
   await savePopupStartupSelection('screenshots:desktop');
   expect(setMock).toHaveBeenCalledWith(
     {
-      sniptale_popup_startup: { selection: 'screenshots:desktop', lastPage: 'video' },
+      sniptale_popup_startup: {
+        selection: 'screenshots:desktop',
+        lastPage: 'video',
+        lastExportDestination: 'export',
+      },
     },
     expect.any(Object)
   );
@@ -83,7 +112,11 @@ it('persists the last page without changing the startup selection', async () => 
   await savePopupLastPage('export');
   expect(setMock).toHaveBeenCalledWith(
     {
-      sniptale_popup_startup: { selection: 'video:camera', lastPage: 'export' },
+      sniptale_popup_startup: {
+        selection: 'video:camera',
+        lastPage: 'export',
+        lastExportDestination: 'export',
+      },
     },
     expect.any(Object)
   );

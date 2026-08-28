@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   complete: vi.fn(),
   cleanupCancellation: vi.fn(),
   download: vi.fn(),
+  prepareDownloadRuntime: vi.fn(),
   save: vi.fn(),
   release: vi.fn(),
   releaseOne: vi.fn(),
@@ -19,6 +20,10 @@ vi.mock('./download', async (importOriginal) => ({
   downloadCollectedPagePackages: mocks.download,
   releaseCollectedPagePackage: mocks.releaseOne,
   releaseCollectedPagePackages: mocks.release,
+}));
+vi.mock('./offscreen-download-gateway', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./offscreen-download-gateway')>()),
+  preparePagePackageDownloadRuntime: mocks.prepareDownloadRuntime,
 }));
 vi.mock('./visible', () => ({
   activatePopupExportCaptureTarget: vi.fn(),
@@ -118,6 +123,7 @@ function createJob(): ActivePopupExportJob {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.resolveTabs.mockResolvedValue(new Map([[7, { id: 7 }]]));
+  mocks.prepareDownloadRuntime.mockResolvedValue(undefined);
   mocks.collect.mockImplementation(async (job: ActivePopupExportJob, _tabs, onPackage) => {
     const packages = job.status.orderedTabs.map((tab, ordinal) => stagedItem(ordinal, tab.tabId));
     if (!onPackage) return { errors: [], packages };
@@ -168,20 +174,38 @@ beforeEach(() => {
   });
   mocks.restore.mockResolvedValue(undefined);
   mocks.update.mockImplementation(async (job: ActivePopupExportJob, patch) => {
-    job.status = { ...job.status, ...patch };
+    job.status = {
+      ...job.status,
+      ...patch,
+      ...(patch.progress ? { progress: { ...job.status.progress, ...patch.progress } } : {}),
+    };
   });
   mocks.complete.mockImplementation(async (job: ActivePopupExportJob, patch) => {
     if (job.cancelled) return false;
-    job.status = { ...job.status, ...patch };
+    job.status = {
+      ...job.status,
+      ...patch,
+      ...(patch.progress ? { progress: { ...job.status.progress, ...patch.progress } } : {}),
+    };
     return true;
   });
 });
 
 it('downloads staged pages and publishes terminal status only after browser completion', async () => {
   const job = createJob();
+  job.status.progress = {
+    ...job.status.progress,
+    activeStepKey: 'files',
+    completedStepKeys: ['json', 'markdown'],
+    failedStepKeys: ['images'],
+  };
   const onFinished = vi.fn();
   await executePopupExportJob(job, onFinished);
 
+  expect(mocks.prepareDownloadRuntime).toHaveBeenCalledOnce();
+  expect(mocks.prepareDownloadRuntime.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.collect.mock.invocationCallOrder[0]!
+  );
   expect(mocks.download).toHaveBeenCalledWith(
     expect.objectContaining({
       jobId: 'job-1',
@@ -192,6 +216,10 @@ it('downloads staged pages and publishes terminal status only after browser comp
   expect(job.status.phase).toBe('completed');
   expect(job.status.result).toMatchObject({ filename: 'page-package.zip', success: true });
   expect(job.status.result?.stats).toEqual(producerDescriptor.producerStats);
+  expect(job.status.progress).toMatchObject({
+    completedStepKeys: ['json', 'markdown'],
+    failedStepKeys: ['images'],
+  });
   expect(mocks.release).toHaveBeenCalledWith('job-1');
   expect(onFinished).toHaveBeenCalledOnce();
 });
@@ -241,6 +269,7 @@ it('publishes Save-intent packages through Library without invoking archive down
       signal: expect.any(AbortSignal),
     })
   );
+  expect(mocks.prepareDownloadRuntime).not.toHaveBeenCalled();
   expect(mocks.download).not.toHaveBeenCalled();
   expect(mocks.save).toHaveBeenCalledTimes(2);
   expect(mocks.releaseOne).toHaveBeenCalledTimes(2);
@@ -265,8 +294,8 @@ it('does not publish saved IDs when cancellation owns the terminal transition', 
   await executePopupExportJob(job, vi.fn());
 
   expect(job.status.phase).toBe('cancelled');
-  expect(job.status.result).toMatchObject({ success: false });
-  expect(job.status.result).not.toHaveProperty('snapshotIds');
+  expect(job.status.progress).toMatchObject({ errors: [], phase: 'cancelled' });
+  expect(job.status.result).toBeUndefined();
   expect(mocks.cleanupCancellation).toHaveBeenCalledWith(job);
 });
 

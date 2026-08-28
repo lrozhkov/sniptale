@@ -18,6 +18,9 @@ import { estimateUtf8Bytes } from '@sniptale/runtime-contracts/validation/base64
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAX_EXTENDED_DIAGNOSTIC_HASH_INPUT_BYTES = 32 * 1024 * 1024;
 export const MAX_EXTENDED_DIAGNOSTIC_METADATA_INPUT_BYTES = 32 * 1024 * 1024;
+const MAX_EXTENDED_DIAGNOSTIC_TRANSFORMATIONS = 50_000;
+const EXECUTABLE_TRANSFORMATION_SELECTORS = 'script, object, embed, iframe, frame';
+const RESOURCE_TRANSFORMATION_ATTRIBUTES = new Set(['poster', 'src', 'srcset', 'xlink:href']);
 
 export type ExtendedDiagnosticTextDigest = (value: string) => Promise<string>;
 
@@ -215,6 +218,85 @@ function buildRedactionPayload(redactions: ExtendedDiagnosticRedaction[]): Recor
   return { counts, redactions, total: redactions.length };
 }
 
+function collectTransformationEvidence(documentRoot: Document): Record<string, unknown> {
+  const transformations: Record<string, unknown>[] = [];
+  let omitted = 0;
+  const add = (entry: Record<string, unknown>): void => {
+    if (transformations.length < MAX_EXTENDED_DIAGNOSTIC_TRANSFORMATIONS) {
+      transformations.push(entry);
+    } else omitted += 1;
+  };
+  for (const element of documentRoot.querySelectorAll(EXECUTABLE_TRANSFORMATION_SELECTORS)) {
+    add({
+      element: element.localName,
+      elementPath: elementPath(element),
+      original: null,
+      reason: element.localName === 'iframe' ? 'frame-raster-or-placeholder' : 'executable-removed',
+      rendered: null,
+      type: 'element-rewrite',
+    });
+  }
+  for (const element of documentRoot.querySelectorAll('*')) {
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLocaleLowerCase('en-US');
+      const common = {
+        attribute: name,
+        element: element.localName,
+        elementPath: elementPath(element),
+        type: 'attribute-rewrite',
+      };
+      if (name.startsWith('on')) {
+        add({
+          ...common,
+          original: `[handler omitted; length=${attribute.value.length}]`,
+          reason: 'inline-handler-removed',
+          rendered: null,
+        });
+      } else if (element.localName === 'a' && name === 'href') {
+        add({
+          ...common,
+          original: redactDiagnosticUrlSecrets(attribute.value) ?? null,
+          reason: 'external-navigation-disabled',
+          rendered: null,
+          retainedAs: 'data-sniptale-external-href',
+        });
+      } else if (
+        element.localName === 'form' &&
+        (name === 'action' || name === 'method' || name === 'target')
+      ) {
+        add({
+          ...common,
+          original:
+            name === 'action'
+              ? (redactDiagnosticUrlSecrets(attribute.value) ?? null)
+              : sanitizeScalar(name, attribute.value),
+          reason: 'form-submission-disabled',
+          rendered: null,
+        });
+      } else if (RESOURCE_TRANSFORMATION_ATTRIBUTES.has(name)) {
+        add({
+          ...common,
+          original: redactDiagnosticUrlSecrets(attribute.value) ?? null,
+          reason: 'resource-localized-or-removed',
+          rendered: 'package-local-or-removed',
+        });
+      } else if (name === 'style') {
+        add({
+          ...common,
+          original: `[style omitted; length=${attribute.value.length}]`,
+          reason: 'css-url-sanitization',
+          rendered: '[sanitized inline style]',
+        });
+      }
+    }
+  }
+  return {
+    omitted,
+    total: transformations.length + omitted,
+    transformations,
+  };
+}
+
 export async function buildExtendedDiagnosticArtifacts(args: {
   digestText: ExtendedDiagnosticTextDigest;
   source?: ExportDiagnosticsSource | undefined;
@@ -235,6 +317,7 @@ export async function buildExtendedDiagnosticArtifacts(args: {
     scriptCount: scripts.length,
     stylesheetCount: stylesheets.length,
   });
+  const transformations = collectTransformationEvidence(documentRoot);
   const artifacts: ExtendedDiagnosticArtifact[] = [
     {
       content: projection.html,
@@ -260,6 +343,11 @@ export async function buildExtendedDiagnosticArtifacts(args: {
       content: sanitizeJson({ frames }),
       mimeType: 'application/json',
       path: 'diagnostics/extended/frames.json',
+    },
+    {
+      content: sanitizeJson(transformations),
+      mimeType: 'application/json',
+      path: 'diagnostics/extended/transformations.json',
     },
     {
       content: sanitizeJson(buildRedactionPayload(projection.redactions)),

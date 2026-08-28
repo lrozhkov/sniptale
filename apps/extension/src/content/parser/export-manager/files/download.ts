@@ -11,6 +11,8 @@ import {
 } from './download-utils';
 
 const MAX_EXPORT_DOWNLOAD_BYTES = 100 * 1024 * 1024;
+const EXPORT_RESOURCE_TIMEOUT_MS = 15_000;
+const EXPORT_FILES_TOTAL_TIMEOUT_MS = 45_000;
 
 function createUniqueFilenameFactory() {
   const usedFilenames = new Set<string>();
@@ -87,15 +89,33 @@ async function downloadResource(
     throw new Error('Blocked disallowed download URL');
   }
 
-  const response = await fetch(resolvedUrl, {
-    credentials: 'include',
-    ...(abortSignal === undefined ? {} : { signal: abortSignal }),
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  const requestController = new AbortController();
+  let requestTimedOut = false;
+  const relayAbort = () => requestController.abort(abortSignal?.reason);
+  if (abortSignal?.aborted) relayAbort();
+  else abortSignal?.addEventListener('abort', relayAbort, { once: true });
+  const timeoutId = globalThis.setTimeout(() => {
+    requestTimedOut = true;
+    requestController.abort(new Error('Download timed out'));
+  }, EXPORT_RESOURCE_TIMEOUT_MS);
+  let response: Response;
+  let blob: Blob;
+  try {
+    response = await fetch(resolvedUrl, {
+      credentials: 'include',
+      signal: requestController.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    blob = await readResponseBlobWithLimit(response);
+  } catch (error) {
+    if (requestTimedOut) throw new Error('Download timed out', { cause: error });
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+    abortSignal?.removeEventListener('abort', relayAbort);
   }
-
-  const blob = await readResponseBlobWithLimit(response);
   const contentType = response.headers.get('Content-Type');
   let filename =
     extractFilenameFromContentDisposition(response.headers.get('Content-Disposition')) ||
@@ -135,16 +155,30 @@ export async function downloadFileResources(
   const queue = [...resources];
   let completed = 0;
   const makeUniqueFilename = createUniqueFilenameFactory();
+  const collectionController = new AbortController();
+  let collectionTimedOut = false;
+  const relayAbort = () => collectionController.abort(abortSignal?.reason);
+  if (abortSignal?.aborted) relayAbort();
+  else abortSignal?.addEventListener('abort', relayAbort, { once: true });
+  const collectionTimeoutId = globalThis.setTimeout(() => {
+    collectionTimedOut = true;
+    collectionController.abort(new Error('File collection timed out'));
+  }, EXPORT_FILES_TOTAL_TIMEOUT_MS);
 
   const worker = async () => {
-    while (queue.length > 0 && !isCancelled()) {
+    while (queue.length > 0 && !isCancelled() && !collectionController.signal.aborted) {
       const resource = queue.shift();
       if (!resource) {
         break;
       }
 
       try {
-        const result = await downloadResource(resource, abortSignal, makeUniqueFilename, pageUrl);
+        const result = await downloadResource(
+          resource,
+          collectionController.signal,
+          makeUniqueFilename,
+          pageUrl
+        );
         files.set(result.filename, result.blob);
         if (result.urlUuid) {
           urlUuidToFilename.set(result.urlUuid, result.filename);
@@ -160,10 +194,22 @@ export async function downloadFileResources(
     }
   };
 
-  await Promise.all(
-    Array(Math.min(3, resources.length))
-      .fill(null)
-      .map(() => worker())
-  );
+  try {
+    await Promise.all(
+      Array(Math.min(3, resources.length))
+        .fill(null)
+        .map(() => worker())
+    );
+  } finally {
+    globalThis.clearTimeout(collectionTimeoutId);
+    abortSignal?.removeEventListener('abort', relayAbort);
+  }
+  if (collectionTimedOut && queue.length > 0) {
+    const skippedCount = queue.length;
+    queue.length = 0;
+    completed += skippedCount;
+    errors.push(`Skipped ${skippedCount} file downloads: export file time budget exceeded`);
+    onProgress(completed, resources.length);
+  }
   return { files, errors, urlUuidToFilename };
 }

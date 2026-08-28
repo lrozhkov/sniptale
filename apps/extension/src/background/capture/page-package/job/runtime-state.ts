@@ -100,7 +100,14 @@ export async function updatePagePackageJobStatus(
   const immutablePatch = structuredClone(patch);
   await queueStatusPublication(job, () => {
     const current = durableStatuses.get(job) ?? job.status;
-    return { ...current, ...immutablePatch, revision: current.revision + 1 };
+    return {
+      ...current,
+      ...immutablePatch,
+      ...(immutablePatch.progress
+        ? { progress: { ...current.progress, ...immutablePatch.progress } }
+        : {}),
+      revision: current.revision + 1,
+    };
   });
 }
 
@@ -108,6 +115,8 @@ export function admitPopupExportJobCancellation(job: ActivePopupExportJob): Prom
   return queueStatusOperation(job, async () => {
     const current = durableStatuses.get(job) ?? job.status;
     if (current.phase !== 'running' && current.phase !== 'cancelling') return false;
+    job.cancelled = true;
+    job.abortController.abort();
     if (current.phase === 'running') {
       await commitStatusPublication(job, {
         ...current,
@@ -115,8 +124,6 @@ export function admitPopupExportJobCancellation(job: ActivePopupExportJob): Prom
         revision: current.revision + 1,
       });
     }
-    job.cancelled = true;
-    job.abortController.abort();
     return true;
   });
 }
@@ -132,6 +139,7 @@ export function completePagePackageJobStatus(
     await commitStatusPublication(job, {
       ...current,
       ...immutablePatch,
+      progress: { ...current.progress, ...immutablePatch.progress },
       revision: current.revision + 1,
     });
     return true;

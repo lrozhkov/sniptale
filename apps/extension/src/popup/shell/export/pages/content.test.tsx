@@ -43,8 +43,18 @@ async function renderContent(controller: ReturnType<typeof createPopupExportCont
     root?.render(
       <ExportPageContent
         controller={controller}
-        onRequestWebCopySetup={vi.fn()}
-        webSnapshotEnabled={true}
+        destination="export"
+        onDestinationChange={vi.fn()}
+        webCopyResources={{
+          anonymousCrossOriginAssetsEnabled: true,
+          authenticatedSameOriginAssetsEnabled: true,
+          externalLinksEnabled: false,
+          error: null,
+          pending: null,
+          setAnonymousCrossOriginAssetsEnabled: vi.fn(),
+          setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+          setExternalLinksEnabled: vi.fn(),
+        }}
       />
     );
   });

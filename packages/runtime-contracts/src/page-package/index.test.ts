@@ -4,12 +4,21 @@ import {
   isPagePackageEntryPath,
   isPagePackageMimeType,
   isPagePackageWebCopyAssetMimeType,
+  normalizePagePackageWarnings,
   PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE,
   parsePageCollectionManifest,
   parsePagePackageManifest,
   type PagePackageEntry,
   type PagePackageManifest,
 } from '.';
+
+it('deduplicates repeated package warnings while preserving their first-seen order', () => {
+  expect(normalizePagePackageWarnings(['first', 'repeated', 'repeated', 'last'])).toEqual([
+    'first',
+    'repeated',
+    'last',
+  ]);
+});
 
 function createManifest(): PagePackageManifest {
   const entries = [
@@ -119,7 +128,9 @@ describe('Page Package contract', () => {
     expect(parsePagePackageManifest(collision)).toBeNull();
   });
 
-  it('enforces diagnostics intent and non-mutating NFC strings', () => {
+  it('admits complete extended diagnostics for either intent and enforces non-mutating NFC', () => {
+    const savedExtended = withDiagnostics('extended', createExtendedDiagnosticEntries(), 'save');
+    expect(parsePagePackageManifest(savedExtended)).toEqual(savedExtended);
     const extended = createManifest();
     extended.diagnosticsLevel = 'extended';
     expect(parsePagePackageManifest(extended)).toBeNull();
@@ -132,6 +143,8 @@ describe('Page Package contract', () => {
     expect(isPagePackageMimeType('application/json')).toBe(true);
     expect(isPagePackageMimeType('text/html; charset=utf-8')).toBe(false);
     expect(isPagePackageEntryPath('images', 'exports/images/photo.png', 'image/png')).toBe(true);
+    expect(isPagePackageEntryPath('pageData', 'README.md', 'text/markdown')).toBe(true);
+    expect(isPagePackageEntryPath('webCopy', 'README.md', 'text/markdown')).toBe(true);
     expect(isPagePackageEntryPath('webCopy', 'exports/images/photo.png', 'image/png')).toBe(false);
     expect(isPagePackageWebCopyAssetMimeType('image/png')).toBe(true);
     expect(isPagePackageEntryPath('webCopy', 'assets/photo.png', 'image/png')).toBe(true);

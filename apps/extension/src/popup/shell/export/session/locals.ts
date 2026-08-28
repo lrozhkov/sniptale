@@ -14,7 +14,9 @@ export function usePopupExportSessionState(): PopupExportSessionState {
   const copyResetTimeoutRef = useRef<number | null>(null);
   const copyRequestIdRef = useRef(0);
   const requestIdRef = useRef<string | null>(null);
+  const terminalRequestIdRef = useRef<string | null>(null);
   const cancelRetryRef = useRef<{
+    cancellationPending?: true;
     exportRunId: string;
     owner: 'job';
     tabIds: number[];
@@ -37,6 +39,7 @@ export function usePopupExportSessionState(): PopupExportSessionState {
       copyRequestIdRef,
       copyResetTimeoutRef,
       requestIdRef,
+      terminalRequestIdRef,
     },
     transfer: {
       launchedPlan,

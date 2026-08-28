@@ -1,5 +1,5 @@
 import {
-  isSafeWebSnapshotUrl,
+  isSafeWebSnapshotCaptureAssetUrl,
   collectWebSnapshotQueryRoots,
   sanitizeWebSnapshotCssText,
 } from '../../../features/web-snapshot/public';
@@ -79,8 +79,11 @@ function createSelectedSrcsetTarget(
   warnings: AssetTargetWarning[],
   baseUrl: string
 ): AssetTarget | null {
-  const selectedAttribute = element.getAttribute(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE);
-  element.removeAttribute(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE);
+  const selectedImage =
+    element.tagName.toLowerCase() === 'source'
+      ? element.closest('picture')?.querySelector('img')
+      : element;
+  const selectedAttribute = selectedImage?.getAttribute(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE);
   const selectedUrl = selectedAttribute
     ? resolveCandidateUrl(element, selectedAttribute, baseUrl)
     : null;
@@ -99,14 +102,17 @@ function createSelectedSrcsetTarget(
     }
   }
 
-  if (!selectedCandidate) {
-    removeAssetReference(element, 'srcset');
+  element.removeAttribute('srcset');
+  if (!selectedUrl) {
     return null;
   }
 
-  const selectedSrcset = serializeSrcset([selectedCandidate]);
-  element.setAttribute('srcset', selectedSrcset);
-  return { attribute: 'srcset', element, url: selectedSrcset };
+  if (selectedImage?.tagName.toLowerCase() === 'img') {
+    // The browser already resolved the active responsive candidate. Persist it as an ordinary
+    // source so the capture path never reparses or republishes a complex authored srcset value.
+    selectedImage.setAttribute('src', selectedUrl);
+  }
+  return null;
 }
 
 function pushVisibleAssetTarget(
@@ -141,7 +147,7 @@ function collectCssAssetTargets(
   sanitizeWebSnapshotCssText(cssText, (value) => {
     const trimmedValue = value.trim();
     if (trimmedValue.startsWith('#')) return trimmedValue;
-    if (!isSafeWebSnapshotUrl(trimmedValue, baseUrl)) return null;
+    if (!isSafeWebSnapshotCaptureAssetUrl(trimmedValue, baseUrl)) return null;
     try {
       const resolved = new URL(trimmedValue, baseUrl);
       if (!['data:', 'http:', 'https:'].includes(resolved.protocol)) return null;
@@ -226,6 +232,9 @@ export function collectAssetTargets(
       }
     }
   }
+  for (const element of queryAssetElements(root, `[${SELECTED_SRCSET_CANDIDATE_ATTRIBUTE}]`)) {
+    element.removeAttribute(SELECTED_SRCSET_CANDIDATE_ATTRIBUTE);
+  }
 
   for (const element of queryAssetElements(root, 'img[src], source[src], video[poster]')) {
     const attribute = element.hasAttribute('poster') ? 'poster' : 'src';
@@ -258,7 +267,7 @@ export function collectAssetTargets(
 }
 
 function resolveSafeAssetUrl(value: string, baseUrl: string): string | null {
-  if (!isSafeWebSnapshotUrl(value, baseUrl)) {
+  if (!isSafeWebSnapshotCaptureAssetUrl(value, baseUrl)) {
     return null;
   }
 

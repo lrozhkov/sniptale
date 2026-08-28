@@ -113,6 +113,16 @@ describe('media-utils conversion flows', () => {
     expect(restoredBlob.size).toBe(3);
   });
 
+  it('decodes large base64 payloads incrementally without one duplicate output buffer', async () => {
+    const payload = 'AAAA'.repeat(262_145);
+    const { dataUrlToBlob } = await import('./data-url');
+
+    const restoredBlob = await dataUrlToBlob(`data:image/png;base64,${payload}`);
+
+    expect(restoredBlob.type).toBe('image/png');
+    expect(restoredBlob.size).toBe(786_435);
+  });
+
   it('surfaces translated file-reader failures', async () => {
     FakeFileReader.nextError = new Error('read failed');
     const { blobToDataUrl } = await import('./data-url');

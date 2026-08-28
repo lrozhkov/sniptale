@@ -79,17 +79,19 @@ export interface Settings {
   defaultExportPresetId?: string | null;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;
-  /** Profile-local explicit opt-in gate for creating and retaining Web Snapshots. */
-  webSnapshotEnabled?: boolean;
   authenticatedSnapshotAssetsEnabled: boolean;
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
+  externalSnapshotLinksEnabled?: boolean;
   fullPageCapture?: FullPageCapturePreferences;
   voiceInput?: VoiceInputPreferences;
 }
 
-export type NormalizedSettings = Omit<Settings, 'localStoragePolicy' | 'webSnapshotEnabled'> & {
+export type NormalizedSettings = Omit<
+  Settings,
+  'externalSnapshotLinksEnabled' | 'localStoragePolicy'
+> & {
+  externalSnapshotLinksEnabled: boolean;
   localStoragePolicy: LocalStoragePolicy;
-  webSnapshotEnabled: boolean;
 };
 
 export type SettingsPatch = Omit<

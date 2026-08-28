@@ -294,4 +294,23 @@ describe('ExportProgressSectionView long step lists', () => {
     const rows = container?.querySelectorAll('[class*="border-dashed"]');
     expect(rows?.length).toBe(8);
   });
+
+  it('keeps the status icon visible beside a long Extended page data label', async () => {
+    await renderSection(
+      createProps({
+        progressSteps: [
+          {
+            key: 'pageDiagnostics',
+            label: 'Extended page data with a deliberately long localized label',
+            status: 'active',
+            statusLabel: 'В процессе',
+          },
+        ],
+      })
+    );
+
+    const icon = container?.querySelector('[data-ui="popup.export.progress-step-icon"]');
+    expect(icon?.className).toContain('shrink-0');
+    expect(icon?.querySelector('.animate-spin')).not.toBeNull();
+  });
 });

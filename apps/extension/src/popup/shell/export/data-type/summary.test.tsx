@@ -27,6 +27,7 @@ function createToggleProps(): ExportOptionToggleProps {
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
+    includeWebCopy: true,
     setIncludeBasicLogs: vi.fn(),
     setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
@@ -36,6 +37,7 @@ function createToggleProps(): ExportOptionToggleProps {
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
+    setIncludeWebCopy: vi.fn(),
   };
 }
 
@@ -50,7 +52,11 @@ function createSummaryItem(key: DataTypeSummaryItem['key'], label: string): Data
   };
 }
 
-async function renderSummary(items: DataTypeSummaryItem[], toggleProps = createToggleProps()) {
+async function renderSummary(
+  items: DataTypeSummaryItem[],
+  toggleProps = createToggleProps(),
+  requiredKeys: ReadonlySet<DataTypeSummaryItem['key']> = new Set()
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -58,7 +64,7 @@ async function renderSummary(items: DataTypeSummaryItem[], toggleProps = createT
   }
 
   await act(async () => {
-    root?.render(renderDataTypeSummaryItems(items, toggleProps));
+    root?.render(renderDataTypeSummaryItems(items, toggleProps, requiredKeys));
   });
 
   return toggleProps;
@@ -106,5 +112,21 @@ describe('renderDataTypeSummaryItems', () => {
     expect(container?.querySelector('button')?.getAttribute('title')).toBe(
       't:popup.export.removeFromSelectionAction'
     );
+  });
+
+  it('keeps required Library items plain without exposing inline removal', async () => {
+    await renderSummary(
+      [
+        createSummaryItem('webCopy', 'Web copy'),
+        createSummaryItem('fullPageScreenshot', 'Screenshot'),
+      ],
+      createToggleProps(),
+      new Set(['webCopy', 'fullPageScreenshot'])
+    );
+
+    expect(container?.textContent).toContain('Web copy');
+    expect(container?.textContent).toContain('Screenshot');
+    expect(container?.textContent).not.toContain('t:popup.export.packageWebCopyRequired');
+    expect(container?.querySelector('button')).toBeNull();
   });
 });

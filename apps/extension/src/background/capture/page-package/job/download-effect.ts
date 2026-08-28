@@ -2,6 +2,8 @@ import type { AssetRef } from '../../../../composition/persistence/assets';
 import { loadSettings } from '../../../../composition/persistence/settings';
 import { defaultDownloadRouterService, executeDownloadUrl } from '../../download/download-router';
 import type { DownloadTerminalState } from '../../download/download-router/service-state';
+import { readDownloadInterruptionReason } from '../../download/download-router/service-state';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { createPagePackageDownloadOffscreenGateway } from './offscreen-download-gateway';
 import {
   cleanupRecordedPagePackageOutput,
@@ -18,6 +20,34 @@ import {
 type DownloadLease = Awaited<
   ReturnType<ReturnType<typeof createPagePackageDownloadOffscreenGateway>['create']>
 >;
+type DownloadStage =
+  | 'BROWSER_INTERRUPTED'
+  | 'BROWSER_TERMINAL'
+  | 'DOWNLOAD_ADMISSION'
+  | 'DOWNLOAD_ID_PERSIST'
+  | 'LEASE_CONFIRM'
+  | 'LEASE_CREATE'
+  | 'LEASE_PERSIST'
+  | 'OUTPUT_CLEANUP';
+
+class PagePackageDownloadStageError extends Error {
+  constructor(
+    readonly stage: DownloadStage,
+    cause: unknown
+  ) {
+    super(`Page Package download failed at ${stage}: ${errorText(cause)}`, { cause });
+  }
+}
+
+const logger = createLogger({ namespace: 'BackgroundPagePackageDownload' });
+
+async function runDownloadStage<T>(stage: DownloadStage, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw new PagePackageDownloadStageError(stage, error);
+  }
+}
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -50,7 +80,7 @@ async function startTrackedDownload(args: {
   lease: DownloadLease;
   operationId: string;
   signal: AbortSignal;
-}): Promise<void> {
+}): Promise<number> {
   let resolveTerminal!: (state: DownloadTerminalState) => void;
   const terminal = new Promise<DownloadTerminalState>((resolve) => {
     resolveTerminal = resolve;
@@ -61,32 +91,53 @@ async function startTrackedDownload(args: {
     operationId: args.operationId,
     requestedAt: Date.now(),
   });
-  const downloadId = await executeDownloadUrl({
-    filename: args.filename,
-    onTerminal: resolveTerminal,
-    presetId: settings.defaultExportPresetId ?? undefined,
-    url: args.lease.url,
-  });
+  const downloadId = await runDownloadStage('DOWNLOAD_ADMISSION', () =>
+    executeDownloadUrl({
+      filename: args.filename,
+      onTerminal: resolveTerminal,
+      presetId: settings.defaultExportPresetId ?? undefined,
+      url: args.lease.url,
+    })
+  );
   if (typeof downloadId !== 'number')
     throw new Error('Page Package download did not return an id.');
-  await recordPopupExportDownloadStarted({
-    downloadId,
-    jobId: args.jobId,
-    operationId: args.operationId,
-  });
+  await runDownloadStage('DOWNLOAD_ID_PERSIST', () =>
+    recordPopupExportDownloadStarted({
+      downloadId,
+      jobId: args.jobId,
+      operationId: args.operationId,
+    })
+  );
   const gateway = createPagePackageDownloadOffscreenGateway();
-  if (
-    !(await gateway.confirm({ downloadOperationId: args.operationId, leaseId: args.lease.leaseId }))
-  ) {
-    throw new Error('Page Package download lease was not confirmed.');
+  const confirmed = await runDownloadStage('LEASE_CONFIRM', () =>
+    gateway.confirm({
+      downloadOperationId: args.operationId,
+      leaseId: args.lease.leaseId,
+      signal: args.signal,
+    })
+  );
+  if (!confirmed) {
+    throw new PagePackageDownloadStageError(
+      'LEASE_CONFIRM',
+      'Page Package download lease was not confirmed.'
+    );
   }
   const terminalState = await waitForDownloadOrCancellation({
     downloadId,
     signal: args.signal,
     terminal,
   });
-  if (terminalState !== 'complete')
-    throw new Error(`Page Package download ended with ${terminalState}.`);
+  if (terminalState === 'interrupted') {
+    const reason = await readDownloadInterruptionReason(downloadId);
+    throw new PagePackageDownloadStageError(
+      'BROWSER_INTERRUPTED',
+      reason ?? 'unknown browser interruption'
+    );
+  }
+  if (terminalState !== 'complete') {
+    throw new PagePackageDownloadStageError('BROWSER_TERMINAL', terminalState);
+  }
+  return downloadId;
 }
 
 async function reconcileBrowserAdmission(
@@ -166,16 +217,25 @@ async function ensureBrowserEffectTerminal(
 /** Reconciles the privileged browser effect, then releases lease and durable bytes in order. */
 export async function reconcileAndCleanupPagePackageOutput(
   jobId: string,
-  options: { allowAbsentDownloadCleanup?: boolean; cancelActiveDownload?: boolean } = {}
+  options: {
+    allowAbsentDownloadCleanup?: boolean;
+    cancelActiveDownload?: boolean;
+    verifiedTerminalDownloadId?: number;
+  } = {}
 ): Promise<void> {
   const recovery = await readPagePackageJobRecoveryState();
   const output = recovery?.jobId === jobId ? recovery.output : null;
   if (!output) return;
   try {
-    const terminal = await ensureBrowserEffectTerminal(jobId, output, {
-      allowAbsentDownloadCleanup: options.allowAbsentDownloadCleanup === true,
-      cancelActiveDownload: options.cancelActiveDownload === true,
-    });
+    const hasVerifiedTerminalEffect =
+      options.verifiedTerminalDownloadId !== undefined &&
+      output.downloadId === options.verifiedTerminalDownloadId;
+    const terminal = hasVerifiedTerminalEffect
+      ? true
+      : await ensureBrowserEffectTerminal(jobId, output, {
+          allowAbsentDownloadCleanup: options.allowAbsentDownloadCleanup === true,
+          cancelActiveDownload: options.cancelActiveDownload === true,
+        });
     if (!terminal) return;
     if (output.urlLeaseId !== null) {
       const released = await createPagePackageDownloadOffscreenGateway().release({
@@ -198,13 +258,34 @@ export async function reconcileAndCleanupPagePackageOutput(
   }
 }
 
-function throwDownloadOutcome(operationError: unknown, cleanupError: unknown): void {
+function throwDownloadOutcome(args: {
+  cleanupError: unknown;
+  jobId: string;
+  operationError: unknown;
+  operationId: string;
+  size: number;
+}): void {
+  const { cleanupError, operationError } = args;
   if (operationError === undefined && cleanupError === undefined) return;
   const cause =
     operationError !== undefined && cleanupError !== undefined
       ? new AggregateError([operationError, cleanupError], 'Page Package lifecycle failure.')
       : (operationError ?? cleanupError);
-  throw new Error('Page Package download could not be completed safely.', { cause });
+  const stage =
+    operationError instanceof PagePackageDownloadStageError
+      ? operationError.stage
+      : cleanupError === undefined
+        ? 'DOWNLOAD_ADMISSION'
+        : 'OUTPUT_CLEANUP';
+  logger.error('Page Package download lifecycle failed', {
+    cleanupError: cleanupError === undefined ? null : errorText(cleanupError),
+    jobId: args.jobId,
+    operationError: operationError === undefined ? null : errorText(operationError),
+    operationId: args.operationId,
+    size: args.size,
+    stage,
+  });
+  throw new Error(`Page Package download could not be completed safely [${stage}].`, { cause });
 }
 
 export async function downloadPagePackageReference(args: {
@@ -222,29 +303,43 @@ export async function downloadPagePackageReference(args: {
     reference: args.reference,
   });
   let operationError: unknown;
+  let verifiedTerminalDownloadId: number | undefined;
   try {
-    const lease = await gateway.create({
-      downloadOperationId: operationId,
-      filename: args.filename,
-      reference: args.reference,
-    });
-    await recordPopupExportDownloadLease({
-      jobId: args.jobId,
-      leaseId: lease.leaseId,
-      leaseUrl: lease.url,
-      operationId,
-    });
-    await startTrackedDownload({ ...args, lease, operationId });
+    const lease = await runDownloadStage('LEASE_CREATE', () =>
+      gateway.create({
+        downloadOperationId: operationId,
+        filename: args.filename,
+        reference: args.reference,
+        signal: args.signal,
+      })
+    );
+    await runDownloadStage('LEASE_PERSIST', () =>
+      recordPopupExportDownloadLease({
+        jobId: args.jobId,
+        leaseId: lease.leaseId,
+        leaseUrl: lease.url,
+        operationId,
+      })
+    );
+    verifiedTerminalDownloadId = await startTrackedDownload({ ...args, lease, operationId });
   } catch (error) {
     operationError = error;
   }
   let cleanupError: unknown;
   try {
     await reconcileAndCleanupPagePackageOutput(args.jobId, {
+      allowAbsentDownloadCleanup: args.signal.aborted && verifiedTerminalDownloadId === undefined,
       cancelActiveDownload: true,
+      ...(verifiedTerminalDownloadId === undefined ? {} : { verifiedTerminalDownloadId }),
     });
   } catch (error) {
-    cleanupError = error;
+    cleanupError = new PagePackageDownloadStageError('OUTPUT_CLEANUP', error);
   }
-  throwDownloadOutcome(operationError, cleanupError);
+  throwDownloadOutcome({
+    cleanupError,
+    jobId: args.jobId,
+    operationError,
+    operationId,
+    size: args.reference.size,
+  });
 }

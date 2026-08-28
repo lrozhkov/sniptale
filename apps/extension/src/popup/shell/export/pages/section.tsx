@@ -35,6 +35,7 @@ export function ExportPagesSection(props: ExportPagesSectionProps) {
     <ExportSelectionSectionShell
       title={translate('popup.export.tabsSectionLabel')}
       drawerLabel={translate('popup.export.tabsSectionLabel')}
+      drawerDescription={translate('popup.export.tabsSectionDescription')}
       isExpanded={props.isExpanded}
       isOpen={props.isOpen}
       onOpen={props.onOpen}

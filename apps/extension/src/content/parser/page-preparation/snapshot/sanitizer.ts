@@ -1,5 +1,5 @@
 import {
-  isSafeWebSnapshotUrl,
+  isSafeWebSnapshotCaptureAssetUrl,
   collectWebSnapshotQueryRoots,
   sanitizeWebSnapshotAttribute,
   sanitizeWebSnapshotCssText,
@@ -150,7 +150,7 @@ function disableUnsafeFormBehavior(root: ParentNode): void {
 function resolvePreparedCssUrl(value: string, baseUrl: string): string | null {
   const trimmedValue = value.trim();
   if (trimmedValue.startsWith('#')) return trimmedValue;
-  if (!isSafeWebSnapshotUrl(trimmedValue, baseUrl)) return null;
+  if (!isSafeWebSnapshotCaptureAssetUrl(trimmedValue, baseUrl)) return null;
   try {
     const url = new URL(trimmedValue, baseUrl);
     return ['data:', 'http:', 'https:'].includes(url.protocol) ? url.href : null;

@@ -306,6 +306,7 @@ export const backgroundIngressTabRouteGroups = [
       'REGISTER_WEB_SNAPSHOT_ASSETS',
       'FETCH_WEB_SNAPSHOT_ASSET',
       'STAGE_PAGE_PACKAGE_JOB_CHUNK',
+      'WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED',
     ],
   },
   {

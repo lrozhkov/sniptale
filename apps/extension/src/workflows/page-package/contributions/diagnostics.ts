@@ -143,9 +143,6 @@ export async function createDiagnosticContributions(args: {
   if (args.level === 'standard' && extendedAssets.length > 0) {
     throw new Error('Extended diagnostic artifacts require the extended level.');
   }
-  if (args.level === 'extended' && args.intent !== 'export') {
-    throw new Error('Extended diagnostics are available only for direct export.');
-  }
   const requestedEntryCount =
     standardAssets.length + (args.level === 'extended' ? extendedAssets.length : 0);
   if (requestedEntryCount > MAX_PAGE_PACKAGE_ENTRIES) {

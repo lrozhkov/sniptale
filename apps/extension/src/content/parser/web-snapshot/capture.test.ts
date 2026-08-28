@@ -34,6 +34,7 @@ afterEach(() => {
 });
 
 it('masks sensitive controls in light DOM and open shadow roots only while capturing', async () => {
+  const documentQuerySelectorAll = vi.spyOn(Document.prototype, 'querySelectorAll');
   document.body.innerHTML = [
     '<input name="query" value="ordinary" style="opacity: 0.8">',
     '<input autocomplete="one-time-code" value="123456"',
@@ -79,6 +80,9 @@ it('masks sensitive controls in light DOM and open shadow roots only while captu
     expect(lateControl.style.getPropertyValue('opacity')).toBe('0');
     expect(lateControl.style.getPropertyValue('transition')).toBe('none');
     expect(lateRoot.querySelector('textarea')?.getAttribute(MASK_ATTRIBUTE)).toBeTruthy();
+    expect(
+      documentQuerySelectorAll.mock.calls.filter(([selector]) => selector === '*')
+    ).toHaveLength(1);
     return { captureGeometry, dataUrl: 'data:image/png;base64,cG5n', success: true };
   });
 
@@ -114,6 +118,51 @@ it('restores sensitive control markers without changing page styles when capture
 
   expect(sensitive.style.getPropertyValue('opacity')).toBe('0.6');
   expect(sensitive.style.getPropertyPriority('opacity')).toBe('');
+  expect(sensitive.hasAttribute(MASK_ATTRIBUTE)).toBe(false);
+});
+
+it('masks an open shadow root attached to an existing host during capture', async () => {
+  const host = document.createElement('section');
+  document.body.append(host);
+
+  sendRuntimeMessage.mockImplementation(async () => {
+    const root = host.attachShadow({ mode: 'open' });
+    root.innerHTML = '<input autocomplete="current-password" value="late secret">';
+    const sensitive = root.querySelector<HTMLElement>('input');
+    if (!sensitive) throw new Error('Expected late shadow control');
+
+    await vi.waitFor(() => expect(sensitive.getAttribute(MASK_ATTRIBUTE)).toBeTruthy());
+    expect(sensitive.style.getPropertyValue('opacity')).toBe('0');
+    return { captureGeometry, dataUrl: 'data:image/png;base64,cG5n', success: true };
+  });
+
+  await captureWebSnapshotScreenshotWithWarnings(undefined, {
+    action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    exportRunId: 'late-shadow-root-capture',
+  });
+
+  expect(host.shadowRoot?.querySelector('input')?.hasAttribute(MASK_ATTRIBUTE)).toBe(false);
+});
+
+it('aborts an unresolved screenshot request and restores sensitive controls promptly', async () => {
+  document.body.innerHTML = '<input autocomplete="one-time-code" value="123456">';
+  const sensitive = document.querySelector<HTMLElement>('input');
+  if (!sensitive) throw new Error('Expected sensitive control');
+  sendRuntimeMessage.mockReturnValue(new Promise(() => undefined));
+  const controller = new AbortController();
+
+  const capture = captureWebSnapshotScreenshotWithWarnings(
+    undefined,
+    {
+      action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      exportRunId: 'cancelled-masked-capture',
+    },
+    controller.signal
+  );
+  await vi.waitFor(() => expect(sensitive.getAttribute(MASK_ATTRIBUTE)).toBeTruthy());
+  controller.abort(new Error('Web snapshot save was cancelled'));
+
+  await expect(capture).rejects.toThrow('Web snapshot save was cancelled');
   expect(sensitive.hasAttribute(MASK_ATTRIBUTE)).toBe(false);
 });
 

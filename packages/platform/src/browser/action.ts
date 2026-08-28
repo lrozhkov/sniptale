@@ -3,6 +3,7 @@
  */
 interface BrowserActionAdapter {
   openPopup(options?: chrome.action.OpenPopupOptions): Promise<void>;
+  setIcon(details: Parameters<typeof chrome.action.setIcon>[0]): Promise<void>;
   setTitle(details: chrome.action.TitleDetails): Promise<void>;
   setBadgeText(details: chrome.action.BadgeTextDetails): Promise<void>;
   setBadgeBackgroundColor(details: chrome.action.BadgeColorDetails): Promise<void>;
@@ -11,6 +12,10 @@ interface BrowserActionAdapter {
 export const browserAction: BrowserActionAdapter = {
   openPopup(options) {
     return options ? chrome.action.openPopup(options) : chrome.action.openPopup();
+  },
+
+  setIcon(details) {
+    return chrome.action.setIcon(details);
   },
 
   setTitle(details) {

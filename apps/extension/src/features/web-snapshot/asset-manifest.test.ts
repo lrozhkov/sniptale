@@ -8,6 +8,7 @@ import {
   isAllowedWebSnapshotAssetMimeType,
   normalizeWebSnapshotAssetMimeType,
   resolveWebSnapshotCaptureAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeTypeFromBytes,
 } from './asset-manifest';
 
 afterEach(() => {
@@ -39,6 +40,32 @@ it('resolves HTTP content types through the canonical capture MIME profile', () 
   expect(() => resolveWebSnapshotCaptureAssetMimeType(null)).toThrow(
     'unsupported web snapshot asset MIME type'
   );
+});
+
+it('admits a mislabeled WOFF2 response only when its URL and binary signature agree', () => {
+  const woff2 = new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0, 0, 0, 0]);
+
+  expect(
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: woff2,
+      contentType: 'application/octet-stream',
+      url: 'https://assets.example.test/typeface.woff2?version=1',
+    })
+  ).toBe('font/woff2');
+  expect(() =>
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: new TextEncoder().encode('not a font'),
+      contentType: 'application/octet-stream',
+      url: 'https://assets.example.test/typeface.woff2',
+    })
+  ).toThrow('unsupported web snapshot asset MIME type');
+  expect(() =>
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: woff2,
+      contentType: 'application/octet-stream',
+      url: 'https://assets.example.test/typeface.woff',
+    })
+  ).toThrow('unsupported web snapshot asset MIME type');
 });
 
 it('hashes web snapshot asset bytes and blobs consistently', async () => {

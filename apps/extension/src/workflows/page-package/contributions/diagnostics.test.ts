@@ -42,35 +42,30 @@ describe('Page Package diagnostic contributions', () => {
     ]);
   });
 
-  it('admits the closed extended inventory only for direct export', async () => {
-    const contributions = await createDiagnosticContributions({
-      digest,
-      extendedAssets: extendedAssets(),
-      intent: 'export',
-      level: 'extended',
-      standardAssets: [{ path: 'logs/meta.json', content: '{}' }],
-    });
-    expect(contributions).toHaveLength(7);
-    expect(contributions.slice(1).map((entry) => entry.path)).toEqual(
-      PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map((entry) => entry.path)
-    );
-    expect(contributions.every((entry) => entry.component === 'diagnostics')).toBe(true);
-  });
+  it.each(['export', 'save'] as const)(
+    'admits the closed inert extended inventory for %s intent',
+    async (intent) => {
+      const contributions = await createDiagnosticContributions({
+        digest,
+        extendedAssets: extendedAssets(),
+        intent,
+        level: 'extended',
+        standardAssets: [{ path: 'logs/meta.json', content: '{}' }],
+      });
+      expect(contributions).toHaveLength(PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.length + 1);
+      expect(contributions.slice(1).map((entry) => entry.path)).toEqual(
+        PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map((entry) => entry.path)
+      );
+      expect(contributions.every((entry) => entry.component === 'diagnostics')).toBe(true);
+    }
+  );
 
-  it('fails closed on save, wrong level, malformed inventory and unsafe paths before digest', async () => {
+  it('fails closed on wrong level, malformed inventory and unsafe paths before digest', async () => {
     let digestCalls = 0;
     const trackingDigest = async () => {
       digestCalls += 1;
       return 'd'.repeat(64);
     };
-    await expect(
-      createDiagnosticContributions({
-        digest: trackingDigest,
-        extendedAssets: extendedAssets(),
-        intent: 'save',
-        level: 'extended',
-      })
-    ).rejects.toThrow('only for direct export');
     await expect(
       createDiagnosticContributions({
         digest: trackingDigest,

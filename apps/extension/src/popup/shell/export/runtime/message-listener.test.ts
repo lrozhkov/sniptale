@@ -52,8 +52,7 @@ it('parses only revisioned popup-export job status updates', () => {
   ).toBeNull();
 });
 
-it('applies only matching live web snapshot progress', () => {
-  const setProgress = vi.fn();
+it('ignores producer ingress progress and waits for the revisioned job status', () => {
   const message = {
     activeStepKey: 'webSnapshotPreview' as const,
     current: 2,
@@ -62,44 +61,14 @@ it('applies only matching live web snapshot progress', () => {
     type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
   };
 
-  expect(parsePopupExportRuntimeMessage(message)).toEqual(message);
-  expect(
-    applyPopupExportRuntimeMessage({
-      clearRequestId: vi.fn(),
-      latestStatus: null,
-      message,
-      requestId: 'job-1',
-      setLatestStatus: vi.fn(),
-      setProgress,
-      setResult: vi.fn(),
-    })
-  ).toBe(true);
-  expect(setProgress).toHaveBeenCalledWith({
-    activeStepKey: 'webSnapshotPreview',
-    current: 2,
-    errors: [],
-    message: 'Полноразмерный скриншот',
-    phase: 'scanning',
-    total: 7,
-  });
-
-  expect(
-    applyPopupExportRuntimeMessage({
-      clearRequestId: vi.fn(),
-      latestStatus: null,
-      message,
-      requestId: 'job-2',
-      setLatestStatus: vi.fn(),
-      setProgress,
-      setResult: vi.fn(),
-    })
-  ).toBe(false);
+  expect(parsePopupExportRuntimeMessage(message)).toBeNull();
 });
 
 it('applies a matching job status and merges warnings into progress errors', () => {
   const setProgress = vi.fn();
   const setResult = vi.fn();
   const setLatestStatus = vi.fn();
+  const setLaunchedPlan = vi.fn();
 
   expect(
     applyPopupExportRuntimeMessage({
@@ -108,12 +77,98 @@ it('applies a matching job status and merges warnings into progress errors', () 
       requestId: 'job-1',
       latestStatus: null,
       setLatestStatus,
+      setLaunchedPlan,
       setProgress,
       setResult,
     })
   ).toBe(true);
-  expect(setProgress).toHaveBeenCalledWith(expect.objectContaining({ errors: ['warning'] }));
+  expect(setProgress).toHaveBeenCalledWith(
+    expect.objectContaining({
+      errors: ['warning'],
+    })
+  );
   expect(setLatestStatus).toHaveBeenCalledWith({ jobId: 'job-1', revision: 2 });
+  expect(setLaunchedPlan).toHaveBeenCalledWith({
+    includeAnnotations: false,
+    includeBasicLogs: false,
+    includeCssDiagnostics: false,
+    includeFiles: false,
+    includeFullPageScreenshot: true,
+    includeImages: false,
+    includeJson: true,
+    includeMarkdown: false,
+    includePageDiagnostics: false,
+    includeWebCopy: true,
+  });
+});
+
+it('shows cancellation admission without treating it as terminal', () => {
+  const clearRequestId = vi.fn();
+  const setProgress = vi.fn();
+  const cancellingStatus = {
+    ...status,
+    phase: 'cancelling' as const,
+    revision: 3,
+  };
+
+  expect(
+    applyPopupExportRuntimeMessage({
+      clearRequestId,
+      message: {
+        status: cancellingStatus,
+        type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+      },
+      requestId: 'job-1',
+      latestStatus: null,
+      setLatestStatus: vi.fn(),
+      setProgress,
+      setResult: vi.fn(),
+    })
+  ).toBe(true);
+
+  expect(setProgress).toHaveBeenCalledWith(
+    expect.objectContaining({ message: 'Останавливаем сбор...' })
+  );
+  expect(clearRequestId).not.toHaveBeenCalled();
+});
+
+it('starts a restarted job from its own progress instead of the cancelled job state', () => {
+  const setProgress = vi.fn();
+  const restartedStatus = {
+    ...status,
+    jobId: 'job-2',
+    progress: {
+      activeStepKey: 'webSnapshotPreview' as const,
+      current: 0,
+      errors: [],
+      message: 'Restarted',
+      phase: 'scanning' as const,
+      total: 4,
+    },
+    revision: 1,
+  };
+
+  expect(
+    applyPopupExportRuntimeMessage({
+      clearRequestId: vi.fn(),
+      latestStatus: { jobId: 'job-1', revision: 9 },
+      message: {
+        status: restartedStatus,
+        type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+      },
+      requestId: null,
+      setLatestStatus: vi.fn(),
+      setProgress,
+      setResult: vi.fn(),
+    })
+  ).toBe(true);
+
+  expect(setProgress).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ...restartedStatus.progress,
+      errors: ['warning'],
+    })
+  );
 });
 
 it('ignores status updates for another active job', () => {
@@ -146,3 +201,37 @@ it('rejects stale and duplicate revisions for the same job', () => {
   ).toBe(false);
   expect(setProgress).not.toHaveBeenCalled();
 });
+
+it.each(['cancelled', 'completed', 'failed', 'interrupted'] as const)(
+  'clears the active request for a %s job and applies its result',
+  (phase) => {
+    const clearRequestId = vi.fn();
+    const setRequestId = vi.fn();
+    const setResult = vi.fn();
+    const result = {
+      errors: [],
+      stats: { filesCount: 0, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
+      success: phase === 'completed',
+    };
+    const terminalStatus = { ...status, phase, result, revision: 3 };
+
+    expect(
+      applyPopupExportRuntimeMessage({
+        clearRequestId,
+        latestStatus: null,
+        message: {
+          status: terminalStatus,
+          type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+        },
+        requestId: null,
+        setLatestStatus: vi.fn(),
+        setProgress: vi.fn(),
+        setRequestId,
+        setResult,
+      })
+    ).toBe(true);
+    expect(setRequestId).toHaveBeenCalledWith('job-1');
+    expect(setResult).toHaveBeenCalledWith(result);
+    expect(clearRequestId).toHaveBeenCalledOnce();
+  }
+);

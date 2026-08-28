@@ -9,7 +9,14 @@ import type { PagePackageJobStatusV1 } from '@sniptale/runtime-contracts/page-pa
 import { getDefaultPopupExportRuntimeDeps } from '../default-deps';
 
 export function usePopupExportMessageListener(state: PopupExportRuntimeContract) {
-  const { cancelRetryRef, requestIdRef, setProgress, setResult } = state;
+  const {
+    cancelRetryRef,
+    requestIdRef,
+    setLaunchedPlan,
+    setProgress,
+    setResult,
+    terminalRequestIdRef,
+  } = state;
 
   useEffect(() => {
     let latestStatus: { jobId: string; revision: number } | null = null;
@@ -19,6 +26,7 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
       applyPopupExportRuntimeMessage({
         message,
         requestId: requestIdRef.current,
+        setLaunchedPlan,
         setProgress,
         setResult,
         latestStatus,
@@ -29,11 +37,13 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
           requestIdRef.current = requestId;
         },
         clearRequestId: () => {
+          terminalRequestIdRef.current = requestIdRef.current;
           cancelRetryRef.current = null;
           requestIdRef.current = null;
         },
       });
     const applyJobStatus = (status: PagePackageJobStatusV1) => {
+      if (terminalRequestIdRef.current === status.jobId) return;
       const applied = applyMessage({
         type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
         status,
@@ -53,11 +63,7 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
         return;
       }
 
-      if (typedMessage.type === MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED) {
-        applyJobStatus(typedMessage.status);
-      } else {
-        applyMessage(typedMessage);
-      }
+      applyJobStatus(typedMessage.status);
     };
 
     const unsubscribe = browserRuntime.subscribeToMessages(handleMessage);
@@ -70,5 +76,5 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
         .catch(() => undefined);
     }
     return unsubscribe;
-  }, [cancelRetryRef, requestIdRef, setProgress, setResult]);
+  }, [cancelRetryRef, requestIdRef, setLaunchedPlan, setProgress, setResult, terminalRequestIdRef]);
 }

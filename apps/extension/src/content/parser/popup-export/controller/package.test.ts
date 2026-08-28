@@ -40,6 +40,7 @@ vi.mock('../../../../workflows/page-package/archive', async (importOriginal) => 
 }));
 
 import { handlePopupExportBuildPackageRuntime } from './package';
+import { handlePopupExportCancelRuntime } from './request-handler/cancel';
 
 const options = {
   includeBasicLogs: false,
@@ -66,6 +67,11 @@ const extendedArtifacts = [
   { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/scripts.json' },
   { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/stylesheets.json' },
   { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/frames.json' },
+  {
+    content: '{}',
+    mimeType: 'application/json',
+    path: 'diagnostics/extended/transformations.json',
+  },
   { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/redactions.json' },
 ] as const;
 
@@ -155,6 +161,42 @@ it('returns only the staged descriptor after streaming the composed archive', as
   expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
 });
 
+it('returns a bounded safe staging cause for popup diagnosis', async () => {
+  mocks.build.mockResolvedValue({
+    entries: [],
+    manifest: { id: 'page-1', source: { title: 'Page' }, stats: { totalBytes: 10 } },
+    manifestBytes: new Uint8Array([1, 2]),
+    manifestSha256: 'a'.repeat(64),
+    manifestText: '{}',
+    producerStats: { filesCount: 3, filesFailed: 0, rowsCount: 5, sectionsCount: 2 },
+  });
+  mocks.write.mockRejectedValueOnce(
+    new Error('Archive failed for https://user:secret@example.test/?token=private')
+  );
+  const sendResponse = vi.fn();
+
+  handlePopupExportBuildPackageRuntime({
+    exportRunner: { buildBlobPackage: vi.fn(), buildPackage: vi.fn(), cancel: vi.fn() },
+    request: {
+      batchRequestId: 'job-staging-failure',
+      includeWebCopy: false,
+      intent: 'export',
+      ordinal: 0,
+      options,
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    },
+    sendResponse,
+    state: { activeExportRequestId: null, isExportRunning: false },
+  });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+  const responseText = JSON.stringify(sendResponse.mock.calls);
+  expect(responseText).toContain('ARCHIVE_STAGING');
+  expect(responseText).toContain('Archive failed');
+  expect(responseText).not.toContain('user:secret');
+  expect(responseText).not.toContain('token=private');
+});
+
 it('normalizes the live document title before composing the package', async () => {
   document.title = 'e\u0301'.repeat(MAX_POPUP_EXPORT_TAB_TITLE_BYTES);
   mocks.build.mockRejectedValue(new Error('stop after input inspection'));
@@ -223,6 +265,45 @@ it('passes the background full-page capability into the mature export producer',
       },
     }
   );
+});
+
+it('forwards mature structured-producer progress to the active popup job', async () => {
+  const buildBlobPackage = vi.fn().mockResolvedValue({});
+  const onProgress = vi.fn((callback) => {
+    callback({
+      activeStepKey: 'json',
+      current: 1,
+      errors: [],
+      message: 'JSON',
+      phase: 'scanning',
+      total: 2,
+    });
+  });
+  mocks.build.mockImplementationOnce(async ({ exportProducer, options }) => {
+    await exportProducer.buildBlobPackage(options);
+    throw new Error('stop after progress proof');
+  });
+
+  handlePopupExportBuildPackageRuntime({
+    exportRunner: { buildBlobPackage, buildPackage: vi.fn(), cancel: vi.fn(), onProgress },
+    request: {
+      batchRequestId: 'job-progress',
+      includeWebCopy: false,
+      intent: 'export',
+      ordinal: 0,
+      options,
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    },
+    sendResponse: vi.fn(),
+    state: { activeExportRequestId: null, isExportRunning: false },
+  });
+  await flushTasks();
+
+  expect(mocks.progress).toHaveBeenCalledWith('job-progress', {
+    activeStepKey: 'json',
+    current: 1,
+    total: 2,
+  });
 });
 
 it('uses the mature Web Snapshot producer for Save-intent packages', async () => {
@@ -313,6 +394,112 @@ it('uses the mature Web Snapshot producer for Save-intent packages', async () =>
   });
 });
 
+it('reports an explicitly cancelled package build as a user cancellation', async () => {
+  mocks.buildSnapshot.mockImplementationOnce(
+    ({ abortSignal }: { abortSignal: AbortSignal }) =>
+      new Promise((_, reject) => {
+        abortSignal.addEventListener('abort', () => reject(new Error('capture cancelled')), {
+          once: true,
+        });
+      })
+  );
+  const sendResponse = vi.fn();
+  const exportRunner = { buildBlobPackage: vi.fn(), buildPackage: vi.fn(), cancel: vi.fn() };
+  const state: {
+    activeAbortController?: AbortController;
+    activeExportRequestId: string | null;
+    isExportRunning: boolean;
+  } = { activeExportRequestId: null, isExportRunning: false };
+
+  handlePopupExportBuildPackageRuntime({
+    exportRunner,
+    request: {
+      allowAnonymousCrossOriginAssets: true,
+      allowAuthenticatedSameOriginAssets: true,
+      batchRequestId: 'job-cancelled',
+      includeWebCopy: true,
+      intent: 'save',
+      ordinal: 0,
+      options: { ...options, includeFullPageScreenshot: true, includeJson: false },
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    },
+    sendResponse,
+    state,
+  });
+  await vi.waitFor(() => expect(mocks.buildSnapshot).toHaveBeenCalled());
+  expect(state.activeAbortController).toBeInstanceOf(AbortController);
+  handlePopupExportCancelRuntime({
+    exportRunId: 'job-cancelled',
+    exportRunner,
+    sendResponse: vi.fn(),
+    state,
+  });
+  expect(state.activeExportRequestId).toBe('job-cancelled');
+  expect(state.isExportRunning).toBe(true);
+
+  const overlappingResponse = vi.fn();
+  handlePopupExportBuildPackageRuntime({
+    exportRunner,
+    request: {
+      batchRequestId: 'job-overlapping',
+      includeWebCopy: false,
+      intent: 'export',
+      ordinal: 0,
+      options,
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    },
+    sendResponse: overlappingResponse,
+    state,
+  });
+  expect(overlappingResponse).toHaveBeenCalledWith({
+    error: translate('content.runtime.exportAlreadyRunning'),
+    success: false,
+  });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: translate('content.runtime.exportCancelled'),
+    success: false,
+  });
+  expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
+});
+
+it('classifies a background full-page cancellation as cancellation before tab abort arrives', async () => {
+  mocks.buildSnapshot.mockImplementationOnce(
+    ({
+      onProgress,
+    }: {
+      onProgress(update: { activeStepKey: string; current: number; total: number }): void;
+    }) => {
+      onProgress({ activeStepKey: 'webSnapshotPreview', current: 0, total: 4 });
+      return Promise.reject(new Error('Full-page capture cancelled'));
+    }
+  );
+  const sendResponse = vi.fn();
+
+  handlePopupExportBuildPackageRuntime({
+    exportRunner: { buildBlobPackage: vi.fn(), buildPackage: vi.fn(), cancel: vi.fn() },
+    request: {
+      allowAnonymousCrossOriginAssets: true,
+      allowAuthenticatedSameOriginAssets: true,
+      batchRequestId: 'job-background-cancelled',
+      includeWebCopy: true,
+      intent: 'save',
+      ordinal: 0,
+      options: { ...options, includeFullPageScreenshot: true, includeJson: false },
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    },
+    sendResponse,
+    state: { activeExportRequestId: null, isExportRunning: false },
+  });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: translate('content.runtime.exportCancelled'),
+    success: false,
+  });
+});
+
 it('combines one mature Web Snapshot result with one Export Manager result', async () => {
   const webCopyPackage = {
     entries: [],
@@ -389,6 +576,55 @@ it('combines one mature Web Snapshot result with one Export Manager result', asy
   );
 });
 
+it('skips Export Manager when Web copy already supplies the only selected screenshot', async () => {
+  const pagePackage = {
+    entries: [],
+    manifest: {
+      components: [{ id: 'webCopy' }],
+      id: 'snapshot-screenshot-only',
+      source: { title: 'Screenshot-only page' },
+      stats: { entryCount: 2, failedResourceCount: 0, totalBytes: 20 },
+    },
+    manifestBytes: new Uint8Array([1]),
+    manifestSha256: 'd'.repeat(64),
+    manifestText: '{}',
+  };
+  mocks.buildSnapshot.mockResolvedValueOnce({
+    manifest: pagePackage.manifest,
+    pagePackage,
+    snapshotSessionId: 'ephemeral-screenshot-only-session',
+  });
+  mocks.combine.mockResolvedValueOnce(pagePackage);
+  const buildBlobPackage = vi.fn();
+  const sendResponse = vi.fn();
+
+  handlePopupExportBuildPackageRuntime({
+    exportRunner: { buildBlobPackage, buildPackage: vi.fn(), cancel: vi.fn() },
+    request: {
+      allowAnonymousCrossOriginAssets: true,
+      allowAuthenticatedSameOriginAssets: true,
+      batchRequestId: 'job-screenshot-only',
+      includeWebCopy: true,
+      intent: 'export',
+      ordinal: 0,
+      options: { ...options, includeFullPageScreenshot: true, includeJson: false },
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    },
+    sendResponse,
+    state: { activeExportRequestId: null, isExportRunning: false },
+  });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+  expect(mocks.buildSnapshot).toHaveBeenCalledOnce();
+  expect(buildBlobPackage).not.toHaveBeenCalled();
+  expect(mocks.combine).toHaveBeenCalledWith({
+    artifact: null,
+    diagnosticsLevel: 'none',
+    intent: 'export',
+    webCopy: pagePackage,
+  });
+});
+
 it('does not expose Library session authority from a Web-copy Export package', async () => {
   const pagePackage = {
     entries: [],
@@ -440,7 +676,7 @@ it('does not expose Library session authority from a Web-copy Export package', a
   });
 });
 
-it('acquires disclosed extended evidence before Web-copy transformation for direct Export', async () => {
+it('acquires selected extended evidence before Web-copy transformation for Library Save', async () => {
   const order: string[] = [];
   const pagePackage = {
     entries: [],
@@ -482,7 +718,7 @@ it('acquires disclosed extended evidence before Web-copy transformation for dire
       allowAuthenticatedSameOriginAssets: false,
       batchRequestId: 'job-extended',
       includeWebCopy: true,
-      intent: 'export',
+      intent: 'save',
       ordinal: 0,
       options: { ...options, includeJson: false, includePageDiagnostics: true },
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
@@ -497,7 +733,7 @@ it('acquires disclosed extended evidence before Web-copy transformation for dire
     artifact,
     diagnosticsLevel: 'extended',
     extendedDiagnosticArtifacts: extendedArtifacts,
-    intent: 'export',
+    intent: 'save',
     webCopy: pagePackage,
   });
 });
@@ -529,7 +765,7 @@ it('does not invoke Export Manager or staging after the retained Web Snapshot pr
   expect(mocks.write).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith({
     success: false,
-    error: translate('content.runtime.exportPrepareFailed'),
+    error: `${translate('content.runtime.exportPrepareFailed')} [WEB_COPY_START]: snapshot failed`,
   });
 });
 
@@ -555,8 +791,8 @@ it('reports producer failure and clears cancellation authority', async () => {
 
   expect(sendResponse).toHaveBeenCalledWith({
     success: false,
-    error: translate('content.runtime.exportPrepareFailed'),
+    error: `${translate('content.runtime.exportPrepareFailed')} [SELECTED_DATA]: build failed`,
   });
-  expect(JSON.stringify(sendResponse.mock.calls)).not.toContain('build failed');
+  expect(JSON.stringify(sendResponse.mock.calls)).toContain('build failed');
   expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
 });

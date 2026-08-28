@@ -154,7 +154,7 @@ beforeEach(() => {
 
 it('reads every visible domain while removing secret and device-bound state', async () => {
   const snapshot = await readSettingsTransferSnapshot();
-  expect(Object.keys(snapshot.domains)).toHaveLength(24);
+  expect(Object.keys(snapshot.domains)).toHaveLength(23);
   expect(snapshot.domains['ai.providers']?.data).toEqual({
     items: [
       {
@@ -167,11 +167,7 @@ it('reads every visible domain while removing secret and device-bound state', as
     ],
   });
   expect(snapshot.domains['system.voice']?.data).not.toHaveProperty('microphoneDeviceId');
-  expect(snapshot.domains['access.capture-assets']?.data).toEqual({
-    authenticated: false,
-    anonymous: false,
-  });
-  expect(snapshot.domains['access.capture-assets']?.data).not.toHaveProperty('enabled');
+  expect(snapshot.domains).not.toHaveProperty('access.capture-assets');
   expect(JSON.stringify(snapshot.domains['ai.models']?.data)).not.toContain('authorization');
   expect(snapshot.dynamicItems).toEqual(
     expect.arrayContaining([
@@ -362,7 +358,6 @@ function settingsFixture() {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
-    webSnapshotEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     voiceInput: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: 'device-secret' },

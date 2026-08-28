@@ -110,8 +110,8 @@ export const contentRuntimeMessages = defineMessageSource({
     en: 'Screenshot did not finish. Try again.',
   },
   exportCancelled: {
-    ru: 'Экспорт отменён пользователем',
-    en: 'Export was cancelled by the user',
+    ru: 'Экспорт отменён',
+    en: 'Export cancelled',
   },
   exportCancelFailed: {
     ru: 'Не удалось отменить экспорт и очистить сохранённые данные. Повторите отмену.',

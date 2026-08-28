@@ -4,6 +4,7 @@ export const PAGE_COLLECTION_ARCHIVE_MIME_TYPE =
   'application/x-sniptale-page-collection+zip' as const;
 export const PAGE_PACKAGE_ARCHIVE_PATHS = {
   manifest: 'manifest.json',
+  readme: 'README.md',
   screenshot: 'page-screenshot.png',
   snapshotHtml: 'snapshot/index.html',
   thumbnail: 'thumbnail.webp',
@@ -54,6 +55,10 @@ export const PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE = [
   },
   { path: 'diagnostics/extended/frames.json', mimeType: 'application/json' },
   {
+    path: 'diagnostics/extended/transformations.json',
+    mimeType: 'application/json',
+  },
+  {
     path: 'diagnostics/extended/redactions.json',
     mimeType: 'application/json',
   },
@@ -92,6 +97,7 @@ export type PagePackageProgressPhaseV1 =
   | 'downloading'
   | 'zipping'
   | 'done'
+  | 'cancelled'
   | 'error';
 export type PagePackageProgressStepV1 =
   | 'annotations'
@@ -123,8 +129,10 @@ export interface PagePackageExportOptionsV1 {
 
 export interface PagePackageProgressV1 {
   activeStepKey?: PagePackageProgressStepV1 | null;
+  completedStepKeys?: PagePackageProgressStepV1[];
   current: number;
   errors: string[];
+  failedStepKeys?: PagePackageProgressStepV1[];
   message: string;
   phase: PagePackageProgressPhaseV1;
   total: number;
@@ -202,6 +210,7 @@ export function normalizePagePackageOptionalUrl(value: string | null | undefined
 
 export function normalizePagePackageWarnings(values: readonly string[]): string[] {
   const warnings: string[] = [];
+  const retained = new Set<string>();
   let totalBytes = 0;
   for (const value of values) {
     if (warnings.length >= MAX_PAGE_PACKAGE_WARNINGS) break;
@@ -211,6 +220,8 @@ export function normalizePagePackageWarnings(values: readonly string[]): string[
       value,
       Math.min(MAX_PAGE_PACKAGE_WARNING_BYTES, remaining)
     );
+    if (retained.has(warning)) continue;
+    retained.add(warning);
     warnings.push(warning);
     totalBytes += estimateUtf8Bytes(warning, MAX_PAGE_PACKAGE_WARNING_BYTES);
   }
