@@ -11,6 +11,7 @@ const STATIC_OVERLAY_SELECTORS = [
 ];
 
 const STATIC_OVERLAY_STYLE_ID = 'sniptale-prepared-snapshot-overlay-style';
+const STATIC_OVERLAY_LAYER_ATTRIBUTE = 'data-sniptale-static-overlay-layer';
 const TRANSIENT_OVERLAY_SELECTORS = [
   '.sniptale-app',
   '.sniptale-toolbar-portal-wrapper',
@@ -49,6 +50,11 @@ const STATIC_OVERLAY_STYLE = `
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+
+  [data-sniptale-static-overlay-layer='true'],
+  [data-sniptale-static-overlay-layer='true'] * {
+    pointer-events: none !important;
+  }
 `;
 
 function resolveShadowOverlayRoot(): HTMLElement | null {
@@ -78,7 +84,35 @@ function cloneStaticOverlayNodes(sourceRoot: HTMLElement, snapshot: Document): N
     });
 }
 
-export function appendStaticPagePreparationOverlays(snapshot: Document): void {
+function createStaticOverlayLayer(
+  snapshot: Document,
+  sourceDocument: Document,
+  overlayNodes: Node[]
+): HTMLElement {
+  const sourceWindow = sourceDocument.defaultView;
+  const viewportWidth = sourceWindow?.innerWidth ?? sourceDocument.documentElement.clientWidth;
+  const viewportHeight = sourceWindow?.innerHeight ?? sourceDocument.documentElement.clientHeight;
+  const layer = snapshot.createElement('div');
+  layer.setAttribute(STATIC_OVERLAY_LAYER_ATTRIBUTE, 'true');
+  layer.setAttribute('inert', '');
+  Object.assign(layer.style, {
+    height: `${viewportHeight}px`,
+    left: `${sourceWindow?.scrollX ?? 0}px`,
+    pointerEvents: 'none',
+    position: 'absolute',
+    top: `${sourceWindow?.scrollY ?? 0}px`,
+    transform: 'translateZ(0px)',
+    width: `${viewportWidth}px`,
+    zIndex: '2147483647',
+  });
+  layer.append(...overlayNodes);
+  return layer;
+}
+
+export function appendStaticPagePreparationOverlays(
+  snapshot: Document,
+  sourceDocument: Document = document
+): void {
   const overlayRoot = resolveShadowOverlayRoot();
   if (!overlayRoot) {
     return;
@@ -90,5 +124,5 @@ export function appendStaticPagePreparationOverlays(snapshot: Document): void {
   }
 
   appendStaticOverlayStyle(snapshot);
-  snapshot.body.append(...overlayNodes);
+  snapshot.body.append(createStaticOverlayLayer(snapshot, sourceDocument, overlayNodes));
 }

@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { initializeContentUiRoots } from '../../../platform/dom-host';
+import { mountStyleInAccessibleDocuments } from '../../../platform/frame';
 import { buildPreparedSnapshotDocument } from './builder';
 import { IFRAME_RASTER_RECT_ATTRIBUTES } from './sanitizer';
 import { SELECTED_SRCSET_CANDIDATE_ATTRIBUTE } from './responsive-assets';
@@ -86,6 +87,7 @@ function appendFrameOverlayFixture(overlayRoot: HTMLElement): void {
   const callout = document.createElement('div');
   callout.className = 'sniptale-callout';
   callout.textContent = 'Prepared callout';
+  callout.style.pointerEvents = 'auto';
   const toolbar = document.createElement('div');
   toolbar.className = 'sniptale-toolbar-portal-wrapper';
   toolbar.textContent = 'Runtime toolbar';
@@ -392,6 +394,119 @@ function registerOverlaySnapshotTests(): void {
     expect(result.html).not.toContain('Runtime callout settings');
     expect(result.html).not.toContain('Runtime step badge controls');
     expect(result.html).not.toContain('Runtime free-frame draft');
+  });
+
+  it('anchors prepared overlays to document coordinates so they scroll with the static page', async () => {
+    Object.defineProperty(window, 'scrollX', { configurable: true, value: 23 });
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 417 });
+    appendFrameOverlayFixture(createContentOverlayRoot());
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+    Object.defineProperty(window, 'scrollX', { configurable: true, value: 0 });
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    const overlayLayer = result.document.querySelector<HTMLElement>(
+      '[data-sniptale-static-overlay-layer="true"]'
+    );
+
+    expect(overlayLayer).not.toBeNull();
+    expect(overlayLayer?.style.position).toBe('absolute');
+    expect(overlayLayer?.style.left).toBe('23px');
+    expect(overlayLayer?.style.top).toBe('417px');
+    expect(overlayLayer?.style.transform).toBe('translateZ(0px)');
+    expect(overlayLayer?.style.zIndex).toBe('2147483647');
+    expect(overlayLayer?.hasAttribute('inert')).toBe(true);
+    expect(overlayLayer?.querySelector('.sniptale-frames-container')).not.toBeNull();
+    expect(overlayLayer?.querySelector('.sniptale-callout')).not.toBeNull();
+    expect(overlayLayer?.querySelector<HTMLElement>('.sniptale-callout')?.style.pointerEvents).toBe(
+      'auto'
+    );
+    expect(result.document.body.querySelector(':scope > .sniptale-frames-container')).toBeNull();
+    expect(result.html).toContain("[data-sniptale-static-overlay-layer='true'] *");
+  });
+
+  it('drops extension-owned active-tool cursor styles while preserving page cursor styles', async () => {
+    document.body.innerHTML = '<a id="page-link" style="cursor:pointer">Page link</a>';
+    const cleanupCursor = mountStyleInAccessibleDocuments({
+      styleId: 'sniptale-highlighter-cursor-style',
+      textContent:
+        '*, *::before, *::after { cursor: url("data:image/svg+xml,orange") 4 4, auto !important; }',
+    });
+
+    const result = await buildPreparedSnapshotDocument({
+      iframeTimeoutMs: 20,
+      preserveAssetUrls: true,
+    });
+    cleanupCursor();
+
+    const pageLink = result.document.getElementById('page-link') as HTMLElement | null;
+    expect(pageLink?.style.cursor).toBe('pointer');
+    expect(result.html).not.toContain('data:image/svg+xml,orange');
+  });
+
+  it('preserves a page-authored cursor style that collides with a reserved runtime ID', async () => {
+    document.body.innerHTML = '<a id="page-link">Page link</a>';
+    const cleanupCursor = mountStyleInAccessibleDocuments({
+      styleId: 'sniptale-highlighter-cursor-style',
+      textContent: '* { cursor: crosshair !important; }',
+    });
+    const runtimeStyle = document.getElementById('sniptale-highlighter-cursor-style');
+    const pageStyle = document.createElement('style');
+    pageStyle.id = 'sniptale-highlighter-cursor-style';
+    pageStyle.textContent = '#page-link { cursor: wait !important; }';
+    document.head.prepend(pageStyle);
+
+    const result = await buildPreparedSnapshotDocument({
+      iframeTimeoutMs: 20,
+      preserveAssetUrls: true,
+    });
+    cleanupCursor();
+
+    expect(result.html).toContain('#page-link {cursor: wait !important;}');
+    expect(result.html).not.toContain('cursor: crosshair');
+    expect(runtimeStyle?.isConnected).toBe(false);
+    expect(pageStyle.isConnected).toBe(true);
+    pageStyle.remove();
+  });
+
+  it('drops an owned cursor style reparented into the page body before capture', async () => {
+    const cleanupCursor = mountStyleInAccessibleDocuments({
+      styleId: 'sniptale-highlighter-cursor-style',
+      textContent: '* { cursor: url("data:image/svg+xml,body-orange") !important; }',
+    });
+    const runtimeStyle = document.getElementById('sniptale-highlighter-cursor-style');
+    if (!runtimeStyle) throw new Error('Expected mounted runtime cursor style');
+    document.body.append(runtimeStyle);
+
+    const result = await buildPreparedSnapshotDocument({
+      iframeTimeoutMs: 20,
+      preserveAssetUrls: true,
+    });
+    cleanupCursor();
+
+    expect(result.html).not.toContain('body-orange');
+    expect(runtimeStyle.isConnected).toBe(false);
+  });
+
+  it('drops an owned cursor style reparented into an open shadow root before capture', async () => {
+    const cleanupCursor = mountStyleInAccessibleDocuments({
+      styleId: 'sniptale-highlighter-cursor-style',
+      textContent: '* { cursor: url("data:image/svg+xml,shadow-orange") !important; }',
+    });
+    const runtimeStyle = document.getElementById('sniptale-highlighter-cursor-style');
+    if (!runtimeStyle) throw new Error('Expected mounted runtime cursor style');
+    const host = document.createElement('snapshot-shadow-host');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    shadowRoot.append(runtimeStyle, document.createElement('span'));
+    document.body.append(host);
+
+    const result = await buildPreparedSnapshotDocument({
+      iframeTimeoutMs: 20,
+      preserveAssetUrls: true,
+    });
+    cleanupCursor();
+
+    expect(result.html).not.toContain('shadow-orange');
+    expect(runtimeStyle.isConnected).toBe(false);
   });
 }
 

@@ -3,6 +3,7 @@ import {
   sanitizeWebSnapshotCssText,
 } from '../../../../features/web-snapshot/public';
 import { collectOpenShadowHosts } from '../../dom-tree-parser/traversal/virtual-dom.helpers';
+import { isAccessibleDocumentRuntimeStyle } from '../../../platform/frame';
 
 const SHADOW_STYLE_HOST_ATTRIBUTE = 'data-sniptale-shadow-style-host';
 const SHADOW_BOUNDARY_ATTRIBUTE = 'data-sniptale-shadow-boundary';
@@ -162,6 +163,16 @@ function appendCapturedRenderingEnvironmentStyle(
   snapshot.head.appendChild(style);
 }
 
+function resolveSourceStylesheetOwner(
+  sheet: CSSStyleSheet,
+  sourceOwners: Element[]
+): Element | undefined {
+  if (sheet.ownerNode instanceof Element) return sheet.ownerNode;
+  return sourceOwners.find(
+    (owner) => (owner as HTMLStyleElement | HTMLLinkElement).sheet === sheet
+  );
+}
+
 /** Materializes the live CSSOM because runtime-inserted rules are not represented by DOM cloning. */
 export function materializePreparedSnapshotStyles(
   sourceDocument: Document,
@@ -174,14 +185,15 @@ export function materializePreparedSnapshotStyles(
   const sourceOwners = Array.from(
     sourceDocument.querySelectorAll('style, link[rel~="stylesheet"]')
   );
-  for (const [index, sheet] of Array.from(sourceDocument.styleSheets).entries()) {
+  for (const sheet of Array.from(sourceDocument.styleSheets)) {
     if (sheet.disabled) continue;
-    const fallbackOwner = sourceOwners[index];
+    const fallbackOwner = resolveSourceStylesheetOwner(sheet, sourceOwners);
+    const owner = sheet.ownerNode instanceof Element ? sheet.ownerNode : fallbackOwner;
+    if (isAccessibleDocumentRuntimeStyle(owner)) continue;
     // Preserve authored linked CSS bytes. Chromium's CSSOM serialization can expand shorthands
     // containing var() into empty longhands, which changes
     // box geometry when reparsed. The asset pipeline captures and sanitizes this link recursively.
     if (preserveSourceStylesheetLink(snapshot, sheet, fallbackOwner)) continue;
-    const owner = sheet.ownerNode instanceof Element ? sheet.ownerNode : fallbackOwner;
     const cssText =
       readLosslessInlineStyleSheet(sheet, owner, sourceDocument.baseURI) ??
       readStyleSheetRules(sheet, sourceDocument.baseURI);
@@ -244,8 +256,13 @@ export function markPreparedSnapshotShadowStyles(sourceDocument: Document): {
         boundary.setAttribute(SHADOW_BOUNDARY_ATTRIBUTE, item.id);
         const firstShadowNode = target.childNodes[item.host.childNodes.length] ?? null;
         target.insertBefore(boundary, firstShadowNode);
+        const sourceOwners = Array.from(
+          item.shadowRoot.querySelectorAll('style, link[rel~="stylesheet"]')
+        );
         for (const sheet of Array.from(item.shadowRoot.styleSheets ?? [])) {
           if (sheet.disabled) continue;
+          const owner = resolveSourceStylesheetOwner(sheet, sourceOwners);
+          if (isAccessibleDocumentRuntimeStyle(owner)) continue;
           const cssText = readStyleSheetRules(sheet, sourceDocument.baseURI);
           if (cssText !== null)
             appendMaterializedStyle(snapshot, sheet, cssText, undefined, target);

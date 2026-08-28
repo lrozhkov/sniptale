@@ -49,6 +49,9 @@ function expectCaptureHiddenSelector(selector: string): void {
 
 it('hides transient app UI during screenshot capture without hiding captured annotations', () => {
   [
+    '.sniptale-app',
+    '.sniptale-toolbar',
+    '.sniptale-show-toolbar-button',
     '.sniptale-action-toolbar',
     '.sniptale-toolbar-portal-wrapper',
     '.sniptale-frame-toolbar-trigger',
@@ -107,8 +110,6 @@ it('compensates extension chrome and fixed-metric annotations while page geometr
     )
   );
   const independentlyHiddenAppSelectors = new Set([
-    '.sniptale-toolbar',
-    '.sniptale-show-toolbar-button',
     '.sniptale-callout-adjacent-controls',
     '.sniptale-modal',
     '.sniptale-main-toolbar-popover',

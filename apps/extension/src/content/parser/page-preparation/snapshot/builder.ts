@@ -30,6 +30,7 @@ import { resolvePageScrollRoot } from '../../../platform/page-scroll';
 import type { FullPageCaptureRasterRegion } from '../../../../contracts/full-page-capture';
 import { getAbsolutePosition } from '../../../platform/frame';
 import { collectWebSnapshotQueryRoots } from '../../../../features/web-snapshot/public';
+import { isAccessibleDocumentRuntimeStyle } from '../../../platform/frame';
 
 function isIframeElement(node: Node | null): node is HTMLIFrameElement {
   return node?.nodeType === Node.ELEMENT_NODE && (node as Element).localName === 'iframe';
@@ -76,6 +77,18 @@ function removeContentRuntimeHost(
     if (resolveOriginalElement(element) === contentHost) {
       element.remove();
       return;
+    }
+  }
+}
+
+function removeContentRuntimeStyles(
+  snapshot: Document,
+  resolveOriginalElement: VirtualDomOriginalElementResolver
+): void {
+  for (const root of collectWebSnapshotQueryRoots(snapshot)) {
+    for (const style of root.querySelectorAll('style')) {
+      const original = resolveOriginalElement(style);
+      if (original && isAccessibleDocumentRuntimeStyle(original)) style.remove();
     }
   }
 }
@@ -200,6 +213,10 @@ export async function buildPreparedSnapshotDocument(
       root,
       virtualDomSnapshot.resolveOriginalElement
     );
+    removeContentRuntimeStyles(
+      virtualDomSnapshot.document,
+      virtualDomSnapshot.resolveOriginalElement
+    );
     markUnreadableIframeRasterGeometry(
       virtualDomSnapshot.root,
       virtualDomSnapshot.resolveOriginalElement,
@@ -214,7 +231,7 @@ export async function buildPreparedSnapshotDocument(
     materializePreparedSnapshotStyles(rootDocument, snapshot);
     const liveStateWarnings = liveState.materialize(virtualDomSnapshot.root);
     shadowStyleMarks.materialize(snapshot);
-    appendStaticPagePreparationOverlays(snapshot);
+    appendStaticPagePreparationOverlays(snapshot, rootDocument);
     await yieldPreparedSnapshot(options.abortSignal);
 
     const warnings = [

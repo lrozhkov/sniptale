@@ -11,7 +11,7 @@ export {
   isIframeAccessible,
   walkAllDocuments,
 } from './core';
-export { mountStyleInAccessibleDocuments } from './documents';
+export { isAccessibleDocumentRuntimeStyle, mountStyleInAccessibleDocuments } from './documents';
 export {
   addEventListenerToAllWindowsDynamic,
   addWindowEventListenerToAllWindowsDynamic,

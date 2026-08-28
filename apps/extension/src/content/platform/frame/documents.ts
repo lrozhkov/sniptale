@@ -8,28 +8,43 @@ type AccessibleDocumentStyleParams = {
 };
 
 const logger = createLogger({ namespace: 'FrameIframeDiag', traceEnabled: true });
+const mountedAccessibleDocumentStyles = new WeakSet<Element>();
 
 function isReadyToApplyStyle(doc: Document): boolean {
   return doc.readyState === 'interactive' || doc.readyState === 'complete';
 }
 
-function mountStyleInDocument(doc: Document, params: AccessibleDocumentStyleParams): void {
+function mountStyleInDocument(
+  doc: Document,
+  params: AccessibleDocumentStyleParams
+): HTMLStyleElement | null {
   if (!doc.head || doc.getElementById(params.styleId)) {
-    return;
+    return null;
   }
 
   const style = doc.createElement('style');
   style.id = params.styleId;
   style.textContent = params.textContent;
+  mountedAccessibleDocumentStyles.add(style);
   doc.head.appendChild(style);
   logger.debug('mountStyleInDocument', {
     styleId: params.styleId,
     url: doc.defaultView?.location?.href,
   });
+  return style;
 }
 
-function unmountStyleInDocument(doc: Document, styleId: string): void {
-  doc.getElementById(styleId)?.remove();
+function unmountRuntimeStyle(style: Element): void {
+  if (style.tagName.toLowerCase() === 'style' && mountedAccessibleDocumentStyles.has(style)) {
+    style.remove();
+  }
+}
+
+/** Returns whether the exact style node was mounted by the content runtime style owner. */
+export function isAccessibleDocumentRuntimeStyle(node: Node | undefined): boolean {
+  if (node?.nodeType !== Node.ELEMENT_NODE) return false;
+  const element = node as Element;
+  return element.tagName.toLowerCase() === 'style' && mountedAccessibleDocumentStyles.has(element);
 }
 
 function registerCleanup(cleanupFns: Array<() => void>, cleanup: () => void): void {
@@ -117,6 +132,7 @@ function createDocumentObserver(params: {
 function createDocumentApplier(params: {
   cleanupFns: Array<() => void>;
   mountedDocs: Set<Document>;
+  mountedStyles: Set<Element>;
   observeDocument: (doc: Document) => void;
   scheduleIframeDocumentSetup: (iframe: HTMLIFrameElement) => void;
   styleParams: AccessibleDocumentStyleParams;
@@ -127,7 +143,8 @@ function createDocumentApplier(params: {
     }
 
     params.mountedDocs.add(doc);
-    mountStyleInDocument(doc, params.styleParams);
+    const mountedStyle = mountStyleInDocument(doc, params.styleParams);
+    if (mountedStyle) params.mountedStyles.add(mountedStyle);
     params.observeDocument(doc);
 
     getAccessibleIframes(doc).forEach(params.scheduleIframeDocumentSetup);
@@ -140,6 +157,7 @@ function createDocumentApplier(params: {
  */
 export function mountStyleInAccessibleDocuments(params: AccessibleDocumentStyleParams): () => void {
   const mountedDocs = new Set<Document>();
+  const mountedStyles = new Set<Element>();
   const observedDocs = new WeakSet<Document>();
   const cleanupFns: Array<() => void> = [];
   let applyToDocument = (_doc: Document): void => {};
@@ -155,6 +173,7 @@ export function mountStyleInAccessibleDocuments(params: AccessibleDocumentStyleP
   applyToDocument = createDocumentApplier({
     cleanupFns,
     mountedDocs,
+    mountedStyles,
     observeDocument,
     scheduleIframeDocumentSetup,
     styleParams: params,
@@ -164,8 +183,7 @@ export function mountStyleInAccessibleDocuments(params: AccessibleDocumentStyleP
 
   return () => {
     cleanupFns.forEach((cleanup) => cleanup());
-    mountedDocs.forEach((doc) => {
-      unmountStyleInDocument(doc, params.styleId);
-    });
+    mountedStyles.forEach(unmountRuntimeStyle);
+    mountedStyles.clear();
   };
 }
