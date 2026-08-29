@@ -147,24 +147,32 @@ class PagePackageStagingStore {
     return record;
   }
 
-  private async decodeChunk(
+  private decodeChunk(
     record: PagePackageStageRecord,
     chunk: PagePackageStageChunk,
     chunkSize: number
-  ): Promise<Uint8Array> {
+  ): Uint8Array {
     const nextSize = record.receivedBytes + chunkSize;
     if (!Number.isSafeInteger(nextSize) || nextSize > MAX_PAGE_PACKAGE_BYTES) {
-      await this.release(chunk);
       throw new Error('Page Package stage exceeds its byte limit.');
     }
     const bytes = decodeBase64Bytes(chunk.base64);
     if (bytes.byteLength !== chunkSize) {
-      await this.release(chunk);
       throw new Error('Page Package stage chunk is invalid.');
     }
     record.expectedSequence += 1;
     record.receivedBytes = nextSize;
     return bytes;
+  }
+
+  private async performAppend(
+    record: PagePackageStageRecord,
+    chunk: PagePackageStageChunk,
+    chunkSize: number
+  ): Promise<void> {
+    const bytes = this.decodeChunk(record, chunk, chunkSize);
+    await this.writeChunk(record, chunk, bytes);
+    this.callbacks.assertBindingActive(chunk);
   }
 
   private async writeChunk(
@@ -232,17 +240,15 @@ class PagePackageStagingStore {
     this.callbacks.assertBindingActive(chunk);
     const chunkSize = assertChunk(chunk);
     const record = this.requireWritableRecord(chunk);
-    const bytes = await this.decodeChunk(record, chunk, chunkSize);
-    const operation = this.writeChunk(record, chunk, bytes);
+    const operation = this.performAppend(record, chunk, chunkSize);
     record.activeOperation = operation;
     try {
       await operation;
-      this.callbacks.assertBindingActive(chunk);
       return { complete: chunk.final, stagedBlobId: chunk.stagedBlobId };
     } catch (error) {
       return await this.compensateAppendFailure(record, chunk, error);
     } finally {
-      if (record.activeOperation === operation) record.activeOperation = null;
+      record.activeOperation = null;
     }
   }
 

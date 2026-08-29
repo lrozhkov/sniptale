@@ -70,5 +70,23 @@
     "Fingerprint": "30260b2b8fef68d60456a15da43d3184592ccc21:apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts:generic-api-key:203",
     "SniptaleDebtId": "noise.gitleaks.viewport-capability-token.203",
     "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "docs/architecture/release-source-architecture.md",
+    "StartLine": 217,
+    "Commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
+    "Fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
+    "SniptaleDebtId": "noise.gitleaks.release-source-redacted-example.217",
+    "SniptaleScope": "history"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "src/shared/security/secret-redaction.test.ts",
+    "StartLine": 11,
+    "Commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
+    "Fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
+    "SniptaleDebtId": "noise.gitleaks.secret-redaction-test-fixture.11",
+    "SniptaleScope": "history"
   }
 ]

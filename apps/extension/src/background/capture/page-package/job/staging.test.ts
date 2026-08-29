@@ -146,6 +146,30 @@ describe('Page Package job staging', () => {
     ).resolves.toMatchObject({ complete: true });
   });
 
+  it('rejects a concurrent chunk while the preceding write is active', async () => {
+    let completeWrite: (() => void) | undefined;
+    mocks.append.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          completeWrite = resolve;
+        })
+    );
+    const store = createPagePackageStagingStore(callbacks());
+    const firstAppend = store.append({
+      ...binding,
+      base64: base64('abc'),
+      final: false,
+      sequence: 0,
+    });
+
+    await vi.waitFor(() => expect(completeWrite).toBeTypeOf('function'));
+    await expect(
+      store.append({ ...binding, base64: base64('def'), final: true, sequence: 1 })
+    ).rejects.toThrow('not writable');
+    completeWrite?.();
+    await expect(firstAppend).resolves.toMatchObject({ complete: false });
+  });
+
   it('compensates the writer when admission is revoked after an append', async () => {
     let admissions = 0;
     const store = createPagePackageStagingStore(

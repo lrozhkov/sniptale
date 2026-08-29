@@ -97,9 +97,6 @@ export async function saveWebSnapshotThroughPopup(args: {
   requestId: string;
   tabId: number;
 }): Promise<unknown> {
-  await args.popup.evaluate(async () => {
-    await chrome.storage.local.set({ sniptale_web_snapshot_local_consent: true });
-  });
   const started = (await startPagePackageSave(args)) as { error?: string; success?: boolean };
   if (started.success !== true) return started;
   return waitForPagePackageSave(args.popup, args.requestId);

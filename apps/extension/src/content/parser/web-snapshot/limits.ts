@@ -1,3 +1,5 @@
+import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../../features/web-snapshot/package-policy';
+
 export const MAX_WEB_SNAPSHOT_HTML_BYTES = 8 * 1024 * 1024;
 export const MAX_WEB_SNAPSHOT_WARNINGS = 500;
 export const MAX_WEB_SNAPSHOT_WARNINGS_BYTES = 512 * 1024;
@@ -6,4 +8,3 @@ export const MAX_WEB_SNAPSHOT_ASSET_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxWebCo
 export const MAX_WEB_SNAPSHOT_ASSETS_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxWebCopyAssetsBytes;
 export const MAX_WEB_SNAPSHOT_SCREENSHOT_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes;
 export const MAX_WEB_SNAPSHOT_PACKAGE_INPUT_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes;
-import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../../features/web-snapshot/package-policy';

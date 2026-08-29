@@ -138,9 +138,9 @@
     },
     {
       "family": "apps/extension/src/content/parser/export-manager",
-      "count": 1,
-      "lines": 23,
-      "sampleFingerprint": "a844b3c0f09f82f2d30ba8328625b9206185569d633b49d9cc31be6d2665772a",
+      "count": 3,
+      "lines": 51,
+      "sampleFingerprint": "ee63e5f99e6a4d6f4dc97f47833a8a6076e891caa2d4fc8cd3cbb16e19b6cf3e",
       "debtId": "noise.jscpd.content-parser-export-manager.a844b3c0f09f"
     },
     {
@@ -450,6 +450,90 @@
       "lines": 6,
       "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379",
       "debtId": "noise.jscpd.editor-drawing-object.31e2a1681484"
+    },
+    {
+      "family": "tooling/web-snapshot-smoke",
+      "count": 3,
+      "lines": 39,
+      "sampleFingerprint": "1a2017d1a94fde219762688081d628977274b792b143c8dee368e29d08adb9ee",
+      "debtId": "noise.jscpd.tooling-web-snapshot-smoke.1a2017d1a94f"
+    },
+    {
+      "family": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src",
+      "count": 2,
+      "lines": 23,
+      "sampleFingerprint": "c527d203e6a0f01243faaecdf895aa5b64f2cf7339e2c9a9a8f78eb098a4b007",
+      "debtId": "accepted.jscpd.apps-extension-src-features-web-snapshot-packages-runtime-contracts-src.c527d203e6a0"
+    },
+    {
+      "family": "apps/extension/src/contracts/messaging/contracts",
+      "count": 1,
+      "lines": 19,
+      "sampleFingerprint": "5e0cf769b80479a90ca72c65e54a20264c2dc614a6f80b7009729d63ef759fc0",
+      "debtId": "noise.jscpd.apps-extension-src-contracts-messaging-contracts.5e0cf769b804"
+    },
+    {
+      "family": "apps/extension/src/background/capture/page-package",
+      "count": 1,
+      "lines": 18,
+      "sampleFingerprint": "5276fd13e7baf3f3965fdd7dcb00d93b5581b4a0f2d3427b957c741cf3b6152e",
+      "debtId": "noise.jscpd.apps-extension-src-background-capture-page-package.5276fd13e7ba"
+    },
+    {
+      "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/content/parser/web-snapshot",
+      "count": 1,
+      "lines": 13,
+      "sampleFingerprint": "34cba985cc099f26c1c780a462d67a3879832345b12d134862196993c88ea974",
+      "debtId": "accepted.jscpd.apps-extension-src-content-parser-page-preparation-apps-extension-src-content-parser-web-snapsho.34cba985cc09"
+    },
+    {
+      "family": "packages/runtime-contracts/src",
+      "count": 1,
+      "lines": 13,
+      "sampleFingerprint": "00cf332cf45c3131fa2742a05c8120d12873d86fb5981329154516c377ea3e9d",
+      "debtId": "noise.jscpd.packages-runtime-contracts-src.00cf332cf45c"
+    },
+    {
+      "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/features/web-snapshot",
+      "count": 1,
+      "lines": 12,
+      "sampleFingerprint": "0b8c67f1955b39a65c6dcc152f50d6d70d281aa85aea9d7c41e044be99d36a9a",
+      "debtId": "accepted.jscpd.apps-extension-src-content-parser-web-snapshot-apps-extension-src-features-web-snapshot.0b8c67f1955b"
+    },
+    {
+      "family": "apps/extension/src/popup/shell/export",
+      "count": 1,
+      "lines": 11,
+      "sampleFingerprint": "14212d998303ef4c205224c4ef04e7e4532b6d9dce7bbcee5b7760c8afac5bad",
+      "debtId": "accepted.jscpd.apps-extension-src-popup-shell-export.14212d998303"
+    },
+    {
+      "family": "apps/extension/src/background/capture/page-package <-> apps/extension/src/content/parser/web-snapshot",
+      "count": 1,
+      "lines": 9,
+      "sampleFingerprint": "82bca1c71ce076ad69c6b126e8ec45cd6b27b1c617ccda970dd42f08d72d4948",
+      "debtId": "accepted.jscpd.apps-extension-src-background-capture-page-package-apps-extension-src-content-parser-web-snapsho.82bca1c71ce0"
+    },
+    {
+      "family": "apps/extension/src/background/runtime/routing",
+      "count": 1,
+      "lines": 7,
+      "sampleFingerprint": "7ed58cb681a5b250d4bf5cec328d3777eb584e93d91a6261d85db6254d602775",
+      "debtId": "noise.jscpd.apps-extension-src-background-runtime-routing.7ed58cb681a5"
+    },
+    {
+      "family": "apps/extension/src/content/parser/web-snapshot",
+      "count": 1,
+      "lines": 7,
+      "sampleFingerprint": "ac63f1c7b9febf80816af71373e6a597f936224e44cc77f9533e171754bc2549",
+      "debtId": "accepted.jscpd.apps-extension-src-content-parser-web-snapshot.ac63f1c7b9fe"
+    },
+    {
+      "family": "apps/extension/src/gallery/library/sidebar <-> apps/extension/src/gallery/shell/app-shell",
+      "count": 1,
+      "lines": 7,
+      "sampleFingerprint": "1d0585948e68b9ba47ce6228265f59d135c8b91424b31ccb6eae1276cb26a990",
+      "debtId": "accepted.jscpd.apps-extension-src-gallery-library-sidebar-apps-extension-src-gallery-shell-app-shell.1d0585948e68"
     }
   ]
 }

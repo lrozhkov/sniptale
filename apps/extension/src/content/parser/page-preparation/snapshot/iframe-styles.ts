@@ -183,20 +183,72 @@ function rewriteFontFamilyList(value: string, aliases: ReadonlyMap<string, strin
     .join(', ');
 }
 
-function escapeRegularExpression(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+function isCssIdentifierCharacter(value: string | undefined): boolean {
+  return value ? /[a-z0-9_-]/iu.test(value) : false;
+}
+
+function getOpenCssQuoteAt(value: string, endIndex: number): '"' | "'" | null {
+  let quote: '"' | "'" | null = null;
+  for (let index = 0; index < endIndex; index += 1) {
+    const character = value[index];
+    if (character === '\\') {
+      index += 1;
+    } else if (quote) {
+      if (character === quote) quote = null;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    }
+  }
+  return quote;
+}
+
+function findCaseInsensitiveReference(value: string, family: string, startIndex: number): number {
+  const normalizedFamily = family.toLocaleLowerCase();
+  const lastStartIndex = value.length - family.length;
+  for (let index = startIndex; index <= lastStartIndex; index += 1) {
+    if (value.slice(index, index + family.length).toLocaleLowerCase() === normalizedFamily) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function replaceFontFamilyReference(value: string, family: string, replacement: string): string {
+  let output = '';
+  let outputIndex = 0;
+  let searchIndex = 0;
+
+  while (searchIndex < value.length) {
+    const matchIndex = findCaseInsensitiveReference(value, family, searchIndex);
+    if (matchIndex < 0) break;
+    const familyEnd = matchIndex + family.length;
+    const preceding = value[matchIndex - 1];
+    const following = value[familyEnd];
+    const isExactQuotedFamily = (preceding === '"' || preceding === "'") && following === preceding;
+    const isUnquotedFamily =
+      getOpenCssQuoteAt(value, matchIndex) === null &&
+      !isCssIdentifierCharacter(preceding) &&
+      !isCssIdentifierCharacter(following);
+
+    if (!isExactQuotedFamily && !isUnquotedFamily) {
+      searchIndex = familyEnd;
+      continue;
+    }
+
+    const replacementStart = isExactQuotedFamily ? matchIndex - 1 : matchIndex;
+    const replacementEnd = isExactQuotedFamily ? familyEnd + 1 : familyEnd;
+    output += `${value.slice(outputIndex, replacementStart)}"${replacement}"`;
+    outputIndex = replacementEnd;
+    searchIndex = replacementEnd;
+  }
+
+  return `${output}${value.slice(outputIndex)}`;
 }
 
 function rewriteFontShorthand(value: string, aliases: ReadonlyMap<string, string>): string {
   let rewritten = value;
   for (const [family, replacement] of aliases) {
-    const escaped = escapeRegularExpression(family);
-    rewritten = rewritten
-      .replace(new RegExp(`(["'])${escaped}\\1`, 'giu'), `"${replacement}"`)
-      .replace(
-        new RegExp(`(^|[^a-z0-9_-])${escaped}(?=$|[^a-z0-9_-])`, 'giu'),
-        `$1"${replacement}"`
-      );
+    rewritten = replaceFontFamilyReference(rewritten, family, replacement);
   }
   return rewritten;
 }

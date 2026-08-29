@@ -211,34 +211,35 @@ async function readStoredJobId(popup) {
   );
 }
 
-async function waitForPrimaryAction(popup, pattern, options = {}) {
+async function waitForPrimaryAction(popup, labels, options = {}) {
   await popup.waitForFunction(
-    ({ enabled, source }) => {
+    ({ enabled, labels: expectedLabels }) => {
       const action = globalThis.document.querySelector('[data-ui="popup.export.export-button"]');
+      const actionLabel = `${action?.textContent ?? ''} ${action?.getAttribute('title') ?? ''}`;
       return (
         (enabled !== true || !action?.hasAttribute('disabled')) &&
-        new RegExp(source, 'i').test(
-          `${action?.textContent ?? ''} ${action?.getAttribute('title') ?? ''}`
+        expectedLabels.some((label) =>
+          actionLabel.toLocaleLowerCase().includes(label.toLocaleLowerCase())
         )
       );
     },
-    { enabled: options.enabled === true, source: pattern.source }
+    { enabled: options.enabled === true, labels }
   );
 }
 
 async function cancelAndRestartPopupExport(popup, primaryAction) {
   const firstJobId = await readStoredJobId(popup);
-  await waitForPrimaryAction(popup, /Cancel|Остановить/);
+  await waitForPrimaryAction(popup, ['Cancel', 'Остановить']);
   await primaryAction.click();
-  await waitForPrimaryAction(popup, /Done|Готово/, { enabled: true });
+  await waitForPrimaryAction(popup, ['Done', 'Готово'], { enabled: true });
   const cancellationText = await popup.locator('body').innerText();
   if (!/export cancelled|экспорт отменён/i.test(cancellationText)) {
     throw new Error('Popup did not identify a manual cancellation as a distinct terminal outcome');
   }
   await primaryAction.click();
-  await waitForPrimaryAction(popup, /Export|Экспортировать/, { enabled: true });
+  await waitForPrimaryAction(popup, ['Export', 'Экспортировать'], { enabled: true });
   await primaryAction.click();
-  await waitForPrimaryAction(popup, /Cancel|Остановить/);
+  await waitForPrimaryAction(popup, ['Cancel', 'Остановить']);
 
   const restartDeadline = Date.now() + 5_000;
   while (Date.now() < restartDeadline) {

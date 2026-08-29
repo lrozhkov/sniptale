@@ -4,15 +4,15 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=42, tool-noise=34.
-- Enforced source: codeql=3, gitleaks=8, jscpd=64, license=1.
+- Classification: accepted-architecture=51, tool-noise=40.
+- Enforced source: codeql=4, gitleaks=10, jscpd=76, license=1.
 
 ## Active structural debt
 
 
 ## Duplication
 
-- accepted-architecture=38, tool-noise=26. Every family is exact-count, exact-lines, and sample-fingerprinted.
+- accepted-architecture=46, tool-noise=30. Every family is exact-count, exact-lines, and sample-fingerprinted.
 - Highest-line actionable families:
 
 ## Focused coverage rollout

@@ -72,6 +72,7 @@ it('scopes readable iframe styles to their flattened virtual container', () => {
   iframeStyleSheet.insertRule(
     '@font-face { font-family: Icons; src: url("data:font/woff;base64,d09GRgAAAAA="); }'
   );
+  iframeStyleSheet.insertRule('.icon { font: italic 16px Icons; }');
   iframeStyleSheet.insertRule('body.panel .icon::before, .label { color: red; }');
   iframeStyleSheet.insertRule('body.missing .hidden { color: blue; }');
   iframeStyleSheet.insertRule('html body .deep { color: green; }');
@@ -105,6 +106,8 @@ it('scopes readable iframe styles to their flattened virtual container', () => {
   expect(scopeId).toMatch(/^sniptale-frame-[a-f0-9]{32}-1$/u);
   expect(css).toContain('data:font/woff');
   expect(css).toMatch(/sniptale-iframe-font-[a-f0-9]{32}-1-1/u);
+  expect(css).toMatch(/font:\s*italic 16px "sniptale-iframe-font-[a-f0-9]{32}-1-1"/u);
+  expect(css).not.toMatch(/font:\s*italic 16px Icons/iu);
   expect(css).toContain(`[data-sniptale-iframe-style-scope="${scopeId}"] .icon`);
   expect(css).toContain(`[data-sniptale-iframe-style-scope="${scopeId}"] .label`);
   expect(css).toContain(':not(*) .hidden');

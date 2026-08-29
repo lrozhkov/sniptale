@@ -171,6 +171,48 @@
       "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
     },
     {
+      "id": "noise.gitleaks.release-source-redacted-example.217",
+      "classification": "tool-noise",
+      "owner": "release-architecture-documentation",
+      "risk": "A literal redaction example in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding contains only the placeholder REDACTED in documentation that described secret-flow sanitization; it is not credential material.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217"
+      },
+      "scope": {
+        "commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
+        "file": "docs/architecture/release-source-architecture.md",
+        "fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
+        "line": 217,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history placeholder fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.secret-redaction-test-fixture.11",
+      "classification": "tool-noise",
+      "owner": "shared-security-tests",
+      "risk": "A synthetic redaction fixture in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding contains only the placeholder REDACTED in a secret-redaction test; it is not credential material.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-18",
+      "source": {
+        "kind": "gitleaks",
+        "key": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11"
+      },
+      "scope": {
+        "commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
+        "file": "src/shared/security/secret-redaction.test.ts",
+        "fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
+        "line": 11,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history test-placeholder fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
       "id": "accepted.codeql.locked-toolchain-download-write",
       "classification": "accepted-architecture",
       "owner": "qa-platform",
@@ -232,6 +274,27 @@
         "rule": "js/http-to-file-access"
       },
       "targetAction": "Retain the trusted-origin allowlist, exact pre-write SHA-256 verification, exclusive creation, and cache-root confinement; any source drift requires renewed review."
+    },
+    {
+      "id": "accepted.codeql.transform-stream-transformer-constructor",
+      "classification": "accepted-architecture",
+      "owner": "archive-transfer",
+      "risk": "A broad suppression of argument-count findings could conceal real API misuse in archive streaming code.",
+      "reason": "The Web Streams TransformStream constructor accepts a transformer object as its first argument; CodeQL resolves the browser global to an incompatible zero-argument model and reports this standards-compliant call as superfluous.",
+      "removalCondition": "Remove this entry when CodeQL models the Web Streams TransformStream constructor correctly or the archive boundary no longer uses it.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/composition/archive-transfer/writer.ts:38:f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f",
+        "file": "apps/extension/src/composition/archive-transfer/writer.ts",
+        "line": 38,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Keep the exception exact to this source digest, location, rule, and message; any implementation drift requires renewed review."
     },
     {
       "id": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
@@ -479,23 +542,23 @@
     },
     {
       "id": "noise.jscpd.content-parser-export-manager.a844b3c0f09f",
-      "classification": "tool-noise",
+      "classification": "accepted-architecture",
       "owner": "content-parser-export-manager",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
+      "risk": "A generic extraction could couple independently phased diagnostic owners; unreviewed clone growth could still conceal actionable duplication.",
+      "reason": "The exact population combines one overlapping same-file span with live and prepared diagnostic projections that intentionally retain separate lifecycle ownership.",
+      "removalCondition": "Remove when the diagnostic phases acquire one proven shared behavior owner or jscpd stops reporting the overlapping span.",
+      "reviewBy": "2027-08-29",
       "source": {
         "kind": "jscpd",
         "key": "apps/extension/src/content/parser/export-manager"
       },
       "scope": {
         "family": "apps/extension/src/content/parser/export-manager",
-        "count": 1,
-        "lines": 23,
-        "sampleFingerprint": "a844b3c0f09f82f2d30ba8328625b9206185569d633b49d9cc31be6d2665772a"
+        "count": 3,
+        "lines": 51,
+        "sampleFingerprint": "ee63e5f99e6a4d6f4dc97f47833a8a6076e891caa2d4fc8cd3cbb16e19b6cf3e"
       },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+      "targetAction": "Keep the exact phase-owned and overlapping population visible and reject any further unreviewed growth."
     },
     {
       "id": "noise.jscpd.content-public-preparation-surface.79af704f37cc",
@@ -1536,6 +1599,246 @@
         "sampleFingerprint": "a56a4e79cc2032f882f4309b7ff2ab0b1d5a24eb8a1b7e0112afbdfac53d0a57"
       },
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.tooling-web-snapshot-smoke.1a2017d1a94f",
+      "classification": "tool-noise",
+      "owner": "qa-platform-web-snapshot-smoke",
+      "risk": "Overlapping smoke-driver spans and mode entrypoints can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The exact population contains an overlapping same-file driver span and two intentionally separate local smoke mode entrypoints, not duplicate production authority.",
+      "removalCondition": "Remove when the local smoke entrypoints converge or jscpd stops reporting the overlapping span.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "tooling/web-snapshot-smoke"
+      },
+      "scope": {
+        "count": 3,
+        "family": "tooling/web-snapshot-smoke",
+        "lines": 39,
+        "sampleFingerprint": "1a2017d1a94fde219762688081d628977274b792b143c8dee368e29d08adb9ee"
+      },
+      "targetAction": "Keep this exact local-tool population visible and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.apps-extension-src-features-web-snapshot-packages-runtime-contracts-src.c527d203e6a0",
+      "classification": "accepted-architecture",
+      "owner": "web-snapshot-contracts",
+      "risk": "Sharing validation fragments across product policy and runtime contracts could invert dependency ownership; unreviewed growth could still hide common behavior.",
+      "reason": "The exact pair belongs to the product screenshot admission owner and the dependency-neutral runtime validation contract, which change for different consumers.",
+      "removalCondition": "Remove when a dependency-neutral canonical validator can serve both owners without importing product policy into contracts.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src",
+        "lines": 23,
+        "sampleFingerprint": "c527d203e6a0f01243faaecdf895aa5b64f2cf7339e2c9a9a8f78eb098a4b007"
+      },
+      "targetAction": "Keep the two dependency owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.apps-extension-src-contracts-messaging-contracts.5e0cf769b804",
+      "classification": "tool-noise",
+      "owner": "runtime-messaging-contracts",
+      "risk": "Declarative type-shape similarity can obscure future duplicated routing behavior if the exact detector scope grows.",
+      "reason": "The exact pair is declarative message typing in one contract owner and introduces no second runtime implementation.",
+      "removalCondition": "Remove when the message shapes converge naturally or jscpd stops reporting them.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/contracts/messaging/contracts"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/contracts/messaging/contracts",
+        "lines": 19,
+        "sampleFingerprint": "5e0cf769b80479a90ca72c65e54a20264c2dc614a6f80b7009729d63ef759fc0"
+      },
+      "targetAction": "Keep the declarative population exact; reject any behavioral clone growth."
+    },
+    {
+      "id": "noise.jscpd.apps-extension-src-background-capture-page-package.5276fd13e7ba",
+      "classification": "tool-noise",
+      "owner": "background-page-package",
+      "risk": "An overlapping same-file span can obscure future duplicate staging behavior if its exact detector scope grows.",
+      "reason": "The exact sample is an overlapping clone inside one storage owner rather than a second state authority.",
+      "removalCondition": "Remove when jscpd stops reporting the same-file overlap.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/capture/page-package"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/capture/page-package",
+        "lines": 18,
+        "sampleFingerprint": "5276fd13e7baf3f3965fdd7dcb00d93b5581b4a0f2d3427b957c741cf3b6152e"
+      },
+      "targetAction": "Keep the overlapping span exact and reject any second staging authority."
+    },
+    {
+      "id": "accepted.jscpd.apps-extension-src-content-parser-page-preparation-apps-extension-src-content-parser-web-snapsho.34cba985cc09",
+      "classification": "accepted-architecture",
+      "owner": "content-parser-snapshot-security",
+      "risk": "Combining similar sanitization fragments could collapse separate preparation and asset-publication trust boundaries.",
+      "reason": "The exact pair executes at different trust stages: prepared-document sanitization and fetched-stylesheet asset admission.",
+      "removalCondition": "Remove when both stages can delegate to a dependency-neutral sanitizer with identical inputs and security policy.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/content/parser/web-snapshot"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/content/parser/web-snapshot",
+        "lines": 13,
+        "sampleFingerprint": "34cba985cc099f26c1c780a462d67a3879832345b12d134862196993c88ea974"
+      },
+      "targetAction": "Keep the trust-stage owners exact and reject unreviewed sanitization drift."
+    },
+    {
+      "id": "noise.jscpd.packages-runtime-contracts-src.00cf332cf45c",
+      "classification": "tool-noise",
+      "owner": "runtime-contracts",
+      "risk": "Declarative contract similarity can obscure future duplicated parser behavior if the exact detector scope grows.",
+      "reason": "The exact pair consists only of independently named public type fields inside the canonical contract package.",
+      "removalCondition": "Remove when the public contracts converge without broadening their consumer surface or jscpd stops reporting them.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "packages/runtime-contracts/src"
+      },
+      "scope": {
+        "count": 1,
+        "family": "packages/runtime-contracts/src",
+        "lines": 13,
+        "sampleFingerprint": "00cf332cf45c3131fa2742a05c8120d12873d86fb5981329154516c377ea3e9d"
+      },
+      "targetAction": "Keep the declarative contract population exact and reject behavioral clone growth."
+    },
+    {
+      "id": "accepted.jscpd.apps-extension-src-content-parser-web-snapshot-apps-extension-src-features-web-snapshot.0b8c67f1955b",
+      "classification": "accepted-architecture",
+      "owner": "web-snapshot-assets",
+      "risk": "Combining similar asset metadata fragments could couple capture-time parsing with product-level manifest policy.",
+      "reason": "The exact pair belongs to capture-time asset fetching and feature-level asset manifest validation, which have distinct inputs and consumers.",
+      "removalCondition": "Remove when one dependency-neutral asset metadata contract can serve both owners without moving effects.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/features/web-snapshot"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/features/web-snapshot",
+        "lines": 12,
+        "sampleFingerprint": "0b8c67f1955b39a65c6dcc152f50d6d70d281aa85aea9d7c41e044be99d36a9a"
+      },
+      "targetAction": "Keep capture and manifest owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.apps-extension-src-popup-shell-export.14212d998303",
+      "classification": "accepted-architecture",
+      "owner": "popup-export-ui",
+      "risk": "A shared rendering helper could couple selection and ready-state interaction owners; unreviewed growth could still hide reusable UI behavior.",
+      "reason": "The exact pair appears in two independently changing popup export lifecycle views with different interaction contracts.",
+      "removalCondition": "Remove when both views acquire one stable shared component contract rather than coincidental markup similarity.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/popup/shell/export"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/popup/shell/export",
+        "lines": 11,
+        "sampleFingerprint": "14212d998303ef4c205224c4ef04e7e4532b6d9dce7bbcee5b7760c8afac5bad"
+      },
+      "targetAction": "Keep the lifecycle views exact and reject unreviewed UI clone growth."
+    },
+    {
+      "id": "accepted.jscpd.apps-extension-src-background-capture-page-package-apps-extension-src-content-parser-web-snapsho.82bca1c71ce0",
+      "classification": "accepted-architecture",
+      "owner": "page-package-capture-boundary",
+      "risk": "Sharing orchestration fragments across background and content runtimes could blur privileged-effect ownership.",
+      "reason": "The exact pair belongs to background page-phase orchestration and content-side snapshot capture, which must remain separate runtime authorities.",
+      "removalCondition": "Remove when a runtime-neutral contract eliminates the similarity without moving effects across the messaging boundary.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/capture/page-package <-> apps/extension/src/content/parser/web-snapshot"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/capture/page-package <-> apps/extension/src/content/parser/web-snapshot",
+        "lines": 9,
+        "sampleFingerprint": "82bca1c71ce076ad69c6b126e8ec45cd6b27b1c617ccda970dd42f08d72d4948"
+      },
+      "targetAction": "Keep runtime authorities separate and reject unreviewed orchestration clone growth."
+    },
+    {
+      "id": "noise.jscpd.apps-extension-src-background-runtime-routing.7ed58cb681a5",
+      "classification": "tool-noise",
+      "owner": "background-runtime-routing",
+      "risk": "An overlapping same-file routing span can obscure a future duplicated route authority if its exact scope grows.",
+      "reason": "The exact sample is an overlapping clone inside one routing boundary file rather than a second dispatcher.",
+      "removalCondition": "Remove when jscpd stops reporting the same-file overlap.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/runtime/routing"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/runtime/routing",
+        "lines": 7,
+        "sampleFingerprint": "7ed58cb681a5b250d4bf5cec328d3777eb584e93d91a6261d85db6254d602775"
+      },
+      "targetAction": "Keep the overlap exact and reject any second routing authority."
+    },
+    {
+      "id": "accepted.jscpd.apps-extension-src-content-parser-web-snapshot.ac63f1c7b9fe",
+      "classification": "accepted-architecture",
+      "owner": "content-parser-web-snapshot-assets",
+      "risk": "A premature helper could couple direct asset fetch and stylesheet traversal paths with different error and provenance semantics.",
+      "reason": "The exact pair belongs to two asset-use paths under one owner but retains distinct fetch versus CSS traversal responsibilities.",
+      "removalCondition": "Remove when both paths acquire a single stable asset-reference operation with identical failure semantics.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/parser/web-snapshot"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/parser/web-snapshot",
+        "lines": 7,
+        "sampleFingerprint": "ac63f1c7b9febf80816af71373e6a597f936224e44cc77f9533e171754bc2549"
+      },
+      "targetAction": "Keep fetch and stylesheet responsibilities exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.apps-extension-src-gallery-library-sidebar-apps-extension-src-gallery-shell-app-shell.1d0585948e68",
+      "classification": "accepted-architecture",
+      "owner": "gallery-shell-ui",
+      "risk": "Sharing local view types across sidebar and app-shell owners could create a broad UI state contract for coincidental shape similarity.",
+      "reason": "The exact pair belongs to independently changing sidebar and shell view-state boundaries and carries no duplicated effect owner.",
+      "removalCondition": "Remove when both UI owners acquire one canonical state contract with proven shared consumers.",
+      "reviewBy": "2027-08-29",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/gallery/library/sidebar <-> apps/extension/src/gallery/shell/app-shell"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/gallery/library/sidebar <-> apps/extension/src/gallery/shell/app-shell",
+        "lines": 7,
+        "sampleFingerprint": "1d0585948e68b9ba47ce6228265f59d135c8b91424b31ccb6eae1276cb26a990"
+      },
+      "targetAction": "Keep sidebar and shell state owners exact and reject unreviewed clone growth."
     }
   ],
   "coverageOwners": [
@@ -14218,7 +14521,7 @@
       "remediation": "Keep globs bounded to real package roots and review every ignore/wildcard change.",
       "exactSource": {
         "path": "tooling/configs/qa/knip.json",
-        "contentHash": "f963abaa4b0ac6f48316127fd5b90a42b1970a8016f794c13082d5005512302c"
+        "contentHash": "4807555885569bff009888bd348ac4dd9cb8148a3520dca78f1c6df721426764"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -19693,7 +19996,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/popup-driver.mjs",
-        "contentHash": "d405b550c974a3c77c36b2b782067f0fc0509439191a20daf093ddd93ea568ad"
+        "contentHash": "0eb20e3f5110f5452261095723d6bf993b85902d735e4d0d1be5adf811387e49"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/case-verification.mjs",
@@ -19710,8 +20013,8 @@
         "property:downloadSnapshotPackage/anonymous-95/warnings",
         "property:downloadSnapshotPackage/anonymous-95/withFreshness/__sniptaleRuntimeFreshness",
         "property:enableForTab/anonymous-11/__sniptaleRuntimeFreshness",
-        "property:enableWebSnapshotsForSmoke/anonymous-381/fullPageQuality",
-        "property:enableWebSnapshotsForSmoke/anonymous-381/sniptale_settings",
+        "property:enableWebSnapshotsForSmoke/anonymous-382/fullPageQuality",
+        "property:enableWebSnapshotsForSmoke/anonymous-382/sniptale_settings",
         "property:saveSnapshot/anonymous-30/captureTiming",
         "property:saveSnapshot/anonymous-30/options",
         "property:saveSnapshot/anonymous-30/sources",
@@ -21295,7 +21598,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/security/support.ts",
-        "contentHash": "ee5ccb28e4db20eeb270b8714057cc8d850e0562c263045ec28de2e070deb1f8"
+        "contentHash": "68f8b57623b45cfd1436f8a71f0030b41123b308c0f1d84cedaa66e5ae784a51"
       },
       "consumers": [
         "tooling/test/e2e/security/hostile-page.spec.ts",
