@@ -76,6 +76,20 @@ function validateLock(lock) {
   }
 }
 
+function validateHostRuntime({ environment, lock }) {
+  if (process.version !== `v${lock.node.version}`) {
+    throw new Error(`Node version drift: expected ${lock.node.version}, got ${process.version}`);
+  }
+  const npmVersion = spawnSync('npm', ['--version'], {
+    encoding: 'utf8',
+    env: normalizedProxyEnvironment(environment),
+  });
+  const npmOutput = `${npmVersion.stdout ?? ''}${npmVersion.stderr ?? ''}`.trim();
+  if (npmVersion.status !== 0 || npmVersion.stdout.trim() !== lock.node.npmVersion) {
+    throw new Error(`npm version drift: expected ${lock.node.npmVersion}, got ${npmOutput}`);
+  }
+}
+
 async function provisionCommonTools({ bin, downloads, environment, lock, semgrep }) {
   await download(lock.osvScanner, path.join(bin, 'osv-scanner'));
   await download(lock.gitleaks, path.join(downloads, 'gitleaks.tar.gz'));
@@ -261,6 +275,7 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
   const lock = JSON.parse(lockBytes);
   const mutationPackage = JSON.parse(mutationPackageBytes);
   validateLock(lock);
+  validateHostRuntime({ environment, lock });
   if (
     lane === 'release' &&
     (sha256(mutationPackageBytes) !== lock.mutationRunner.packageJsonSha256 ||

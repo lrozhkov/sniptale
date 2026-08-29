@@ -73,8 +73,22 @@ it('pins project Node for every workflow job that executes a repository Node ent
 
 it('installs exact publication dependencies before the only npm-backed workflow entrypoint', () => {
   const release = fs.readFileSync(RELEASE, 'utf8');
-  expect(release.indexOf('npm ci --ignore-scripts')).toBeLessThan(
+  const npmBootstrap = 'npm ci --ignore-scripts --prefix tooling/configs/ci/npm';
+  expect(release).toContain(`tooling/configs/ci/npm/node_modules/.bin`);
+  expect(release.indexOf(npmBootstrap)).toBeLessThan(
+    release.indexOf('npm ci --ignore-scripts', release.indexOf(npmBootstrap) + 1)
+  );
+  expect(release.lastIndexOf('npm ci --ignore-scripts')).toBeLessThan(
     release.indexOf('node tooling/ci/prepare-release-assets.mjs')
+  );
+});
+
+it('uses the locked npm before candidate dependency installation', () => {
+  const quality = fs.readFileSync(QUALITY, 'utf8');
+  const npmBootstrap = 'npm ci --ignore-scripts --prefix candidate/tooling/configs/ci/npm';
+  expect(quality).toContain(`candidate/tooling/configs/ci/npm/node_modules/.bin`);
+  expect(quality.indexOf(npmBootstrap)).toBeLessThan(
+    quality.indexOf('npm ci --ignore-scripts', quality.indexOf(npmBootstrap) + 1)
   );
 });
 

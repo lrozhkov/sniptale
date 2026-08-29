@@ -1,4 +1,4 @@
-import { BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
+import { BlobWriter, TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { describe, expect, it } from 'vitest';
 import { createBoundedArchiveBlobReader, openArchiveReader } from './reader';
 import { createArchiveMemorySink } from './test-support';
@@ -194,6 +194,22 @@ describe('archive transfer', () => {
 
     const reader = await openArchiveReader(new Blob([bytes]));
     await expect(reader.entry('media.bin')?.pipeTo(new WritableStream())).rejects.toThrow();
+    await reader.close();
+  });
+
+  it('rejects entry data declared beyond the archive boundary', async () => {
+    const zip = new ZipWriter(new Uint8ArrayWriter(), { dataDescriptor: false });
+    await zip.add('media.bin', new TextReader('media'), { compressionMethod: 0 });
+    const bytes = await zip.close();
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const localHeaderOffset = findSignatureFromEnd(bytes, [0x50, 0x4b, 0x03, 0x04]);
+    const centralHeaderOffset = findSignatureFromEnd(bytes, [0x50, 0x4b, 0x01, 0x02]);
+    const declaredSize = bytes.byteLength + 1;
+    view.setUint32(localHeaderOffset + 18, declaredSize, true);
+    view.setUint32(centralHeaderOffset + 20, declaredSize, true);
+
+    const reader = await openArchiveReader(new Blob([bytes]));
+    await expect(reader.entry('media.bin')?.text()).rejects.toThrow('Entry data out of bounds');
     await reader.close();
   });
 

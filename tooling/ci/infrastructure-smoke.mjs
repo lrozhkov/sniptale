@@ -132,6 +132,7 @@ try {
   }
 
   expectVersion('node', 'node', lock.node.version);
+  expectVersion('npm', 'npm', lock.node.npmVersion);
   expectVersion('semgrep', 'semgrep', lock.semgrep.version, ['--legacy', '--version']);
   expectVersion('codeql', 'codeql', lock.codeql.version);
   expectVersion('osv-scanner', 'osv-scanner', lock.osvScanner.version);

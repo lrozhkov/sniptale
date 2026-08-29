@@ -1,0 +1,7 @@
+{
+  "name": "sniptale-ci-npm",
+  "private": true,
+  "dependencies": {
+    "npm": "11.19.1"
+  }
+}

@@ -106,7 +106,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047`
 - Repository/source: https://github.com/gpac/mp4box.js.git
 
-### `@zip.js/zip.js` 2.8.53
+### `@zip.js/zip.js` 2.8.61
 
 - Installed path: `node_modules/@zip.js/zip.js`
 - Declared license expression: `BSD-3-Clause`
@@ -114,7 +114,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/@zip.js/zip.js/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt`](LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt)
+- Redistributed license text: [`LICENSES/dependencies/@zip.js__zip.js-2.8.61.txt`](LICENSES/dependencies/@zip.js__zip.js-2.8.61.txt)
 - License text SHA-256: `1b7ebc8d7889ed25491484ab2b102370742ca6c0b26650a0c62cc2269b579b84`
 - Repository/source: https://github.com/gildas-lormeau/zip.js.git
 
@@ -142,7 +142,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710`
 - Repository/source: https://github.com/isaacs/core-util-is
 
-### `dompurify` 3.4.13
+### `dompurify` 3.4.14
 
 - Installed path: `node_modules/dompurify`
 - Declared license expression: `(MPL-2.0 OR Apache-2.0)`
@@ -150,7 +150,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/dompurify/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/dompurify-3.4.13.txt`](LICENSES/dependencies/dompurify-3.4.13.txt)
+- Redistributed license text: [`LICENSES/dependencies/dompurify-3.4.14.txt`](LICENSES/dependencies/dompurify-3.4.14.txt)
 - License text SHA-256: `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`
 - Repository/source: https://github.com/cure53/DOMPurify.git
 

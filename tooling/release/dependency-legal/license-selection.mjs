@@ -14,7 +14,7 @@ const REVIEWED_TEXT_MARKERS = new Map([
 
 /** Exact legal choices reviewed for the disjunctive expressions in the current production tree. */
 export const DEFAULT_REVIEWED_LICENSE_SELECTIONS = [
-  { packageName: 'dompurify', selectedLicense: 'Apache-2.0', version: '3.4.13' },
+  { packageName: 'dompurify', selectedLicense: 'Apache-2.0', version: '3.4.14' },
   { packageName: 'jszip', selectedLicense: 'MIT', version: '3.10.1' },
 ];
 

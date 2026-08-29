@@ -26,6 +26,9 @@ const semgrepRequirements = fs.readFileSync('/tmp/semgrep-requirements.lock', 'u
 if (!semgrepRequirements.includes(`semgrep==${lock.semgrep.version}`)) {
   throw new Error('Semgrep requirements drifted from toolchain.lock.json.');
 }
+if (sha256File('/opt/sniptale-npm/package-lock.json') !== lock.node.npmLockSha256) {
+  throw new Error('npm package lock drifted from toolchain.lock.json.');
+}
 
 function run(command, args) {
   const result = spawnSync(command, args, { stdio: 'inherit' });
@@ -144,6 +147,7 @@ if (
 
 const expected = [
   ['node', lock.node.version, ['--version']],
+  ['npm', lock.node.npmVersion, ['--version']],
   ['codeql', lock.codeql.version, ['--version']],
   ['osv-scanner', lock.osvScanner.version, ['--version']],
   ['gitleaks', lock.gitleaks.version, ['--version']],

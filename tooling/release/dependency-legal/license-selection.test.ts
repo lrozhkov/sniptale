@@ -76,7 +76,7 @@ async function createDisjunctFixture(order: 'forward' | 'reverse' = 'forward') {
         files: { LICENSE: 'Apache License\nVersion 2.0\n' },
         license: '(MPL-2.0 OR Apache-2.0)',
         name: 'dompurify',
-        version: '3.4.13',
+        version: '3.4.14',
       },
       {
         files: { 'LICENSE.markdown': `${MIT_TEXT}\nGPL version 3\n` },
@@ -131,11 +131,11 @@ it('rejects stale and invalid reviewed disjunct selections', async () => {
     generateDependencyLegalClosure({
       repoRoot,
       reviewedSelections: [
-        { packageName: 'dompurify', selectedLicense: 'GPL-2.0', version: '3.4.13' },
+        { packageName: 'dompurify', selectedLicense: 'GPL-2.0', version: '3.4.14' },
         { packageName: 'jszip', selectedLicense: 'MIT', version: '3.10.1' },
       ],
     })
-  ).rejects.toThrow('Invalid reviewed license selection GPL-2.0 for dompurify@3.4.13');
+  ).rejects.toThrow('Invalid reviewed license selection GPL-2.0 for dompurify@3.4.14');
 });
 
 it('rejects drift in the installed text for a reviewed disjunct choice', async () => {
@@ -145,14 +145,14 @@ it('rejects drift in the installed text for a reviewed disjunct choice', async (
         files: { LICENSE: 'Mozilla Public License Version 2.0\n' },
         license: '(MPL-2.0 OR Apache-2.0)',
         name: 'dompurify',
-        version: '3.4.13',
+        version: '3.4.14',
       },
     ],
     rootDependencies: { dompurify: '^3' },
   });
 
   await expect(generateDependencyLegalClosure({ repoRoot })).rejects.toThrow(
-    'Reviewed license text drift for dompurify@3.4.13: Apache-2.0'
+    'Reviewed license text drift for dompurify@3.4.14: Apache-2.0'
   );
 });
 

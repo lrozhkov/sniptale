@@ -166,11 +166,15 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const semgrepLock = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock', 'utf8');
   expect(dockerfile.startsWith(`FROM ${lock.node.image}\n`)).toBe(true);
   expect(CANONICAL_IMAGE_ENVIRONMENT.NODE_VERSION).toBe(lock.node.version);
+  expect(dockerfile).toContain('npm ci --ignore-scripts --prefix /opt/sniptale-npm');
+  expect(dockerfile).toContain(`test "$(npm --version)" = ${lock.node.npmVersion}`);
   expect(dockerfile).toMatch(/apt-get install[^\n]*\bprocps\b/u);
   expect(semgrepLock).toContain(`semgrep==${lock.semgrep.version}`);
   expect(installer).toContain("['semgrep', lock.semgrep.version, ['--legacy', '--version']]");
+  expect(installer).toContain("['npm', lock.node.npmVersion, ['--version']]");
   expect(installer).toContain("run('ps', ['--version'])");
   const playwrightLock = fs.readFileSync('tooling/configs/ci/playwright/package-lock.json');
+  const npmLock = fs.readFileSync('tooling/configs/ci/npm/package-lock.json');
   const projectLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
   const projectPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   const playwrightPackage = JSON.parse(
@@ -179,11 +183,19 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(crypto.createHash('sha256').update(playwrightLock).digest('hex')).toBe(
     lock.playwright.npmLockSha256
   );
+  expect(crypto.createHash('sha256').update(npmLock).digest('hex')).toBe(lock.node.npmLockSha256);
+  const npmPackage = JSON.parse(fs.readFileSync('tooling/configs/ci/npm/package.json', 'utf8'));
+  expect(npmPackage.dependencies.npm).toBe(lock.node.npmVersion);
   expect(playwrightPackage.dependencies['@playwright/test']).toBe(lock.playwright.version);
   expect(projectLock.packages['node_modules/playwright'].version).toBe(lock.playwright.version);
   const expectedNodeEngine = `>=${lock.node.version} <23`;
   expect(projectPackage.engines.node).toBe(expectedNodeEngine);
   expect(projectLock.packages[''].engines.node).toBe(expectedNodeEngine);
+  expect(projectPackage.packageManager).toBe(`npm@${lock.node.npmVersion}`);
+  expect(projectPackage.devEngines).toEqual({
+    runtime: { name: 'node', version: expectedNodeEngine, onFail: 'error' },
+    packageManager: { name: 'npm', version: lock.node.npmVersion, onFail: 'error' },
+  });
   expect(Object.keys(lock.projectToolchain).sort()).toEqual([
     'oxfmt',
     'oxlint',
@@ -250,7 +262,7 @@ it('keeps the residual ESLint TypeScript peer exception explicit and diagnosable
   const npmrc = fs.readFileSync('.npmrc', 'utf8').trim().split('\n').sort();
   const projectPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   const projectLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-  expect(npmrc).toEqual(['legacy-peer-deps=true', 'loglevel=error']);
+  expect(npmrc).toEqual(['legacy-peer-deps=true', 'loglevel=error', 'min-release-age=7']);
   expect(projectPackage.devDependencies.typescript).toMatch(/^npm:@typescript\/typescript6@/u);
   expect(projectPackage.devDependencies).toHaveProperty('typescript-eslint');
   expect(projectLock.packages['node_modules/typescript-eslint'].peerDependencies.typescript).toBe(

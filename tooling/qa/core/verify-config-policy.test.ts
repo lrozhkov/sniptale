@@ -4,7 +4,12 @@ import { createTempRoot, importFresh, writeFile } from './test-helpers';
 
 function createPassingPackageJson() {
   return {
-    engines: { node: '>=22.22.1 <23' },
+    packageManager: 'npm@11.19.1',
+    engines: { node: '>=22.23.2 <23' },
+    devEngines: {
+      runtime: { name: 'node', version: '>=22.23.2 <23', onFail: 'error' },
+      packageManager: { name: 'npm', version: '11.19.1', onFail: 'error' },
+    },
     dependencies: {
       react: '^19.2.5',
       'react-dom': '^19.2.5',
@@ -33,6 +38,7 @@ function createFailingPackageJson() {
 
 function writeConfigPolicyPackageJson(root, packageJson) {
   writeFile(root, 'package.json', JSON.stringify(packageJson, null, 2));
+  writeFile(root, '.npmrc', 'legacy-peer-deps=true\nloglevel=error\nmin-release-age=7\n');
   writeFile(
     root,
     'package-lock.json',
@@ -97,11 +103,11 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'package.json',
-        message: 'engines.node must be ">=22.22.1 <23"',
+        message: 'engines.node must be ">=22.23.2 <23"',
       }),
       expect.objectContaining({
         file: 'package-lock.json',
-        message: 'packages[""].engines.node must be ">=22.22.1 <23"',
+        message: 'packages[""].engines.node must be ">=22.23.2 <23"',
       }),
       expect.objectContaining({
         file: 'package.json',
@@ -184,8 +190,33 @@ it('rejects lockfile engine drift independently from the root package', async ()
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
     rule: 'config-policy',
     file: 'package-lock.json',
-    message: 'packages[""].engines.node must be ">=22.22.1 <23"',
+    message: 'packages[""].engines.node must be ">=22.23.2 <23"',
   });
+});
+
+it('rejects a committed release-age exclusion instead of making security bypass permanent', async () => {
+  const root = createTempRoot('verify-config-policy-release-age-exclusion-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(
+    root,
+    '.npmrc',
+    [
+      'legacy-peer-deps=true',
+      'loglevel=error',
+      'min-release-age=7',
+      'min-release-age-exclude[]=@zip.js/zip.js',
+      '',
+    ].join('\n')
+  );
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([
+    expect.objectContaining({ file: '.npmrc', message: expect.stringContaining('exactly') }),
+    expect.objectContaining({
+      file: '.npmrc',
+      message: 'urgent security exclusions must stay one-shot and must not be committed',
+    }),
+  ]);
 });
 
 it('does not accept the Vite build target from an unrelated object', async () => {

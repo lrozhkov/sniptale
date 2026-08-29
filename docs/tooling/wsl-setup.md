@@ -37,12 +37,15 @@ Install through the current supported `nvm` bootstrap, then:
 
 ```bash
 source ~/.bashrc
-nvm install 22
-nvm use 22
+nvm install 22.23.2
+nvm use 22.23.2
+npm install --global npm@11.19.1 --ignore-scripts --min-release-age-exclude=npm
 hash -r
 ```
 
-Verify `which node`, `which npm`, `node --version`, `npm --version`, and `npm config list` before installing repository dependencies.
+Verify `which node`, `which npm`, `node --version`, `npm --version`, and `npm config list` before installing repository dependencies. The expected package-manager identity is declared by `packageManager` and enforced by `devEngines`; do not update the lock with another npm version.
+
+`npm@11.19.1` is an intentional urgent-security exception to the seven-day age window: it fixes the high-severity `tar` advisory still present in npm 12.0.2. CI obtains the same package through `tooling/configs/ci/npm/package-lock.json`, verifies its registry integrity, and retains no permanent age exclusion.
 
 If non-interactive tools cannot see Node, expose the active Linux binaries through `~/.local/bin`:
 
@@ -90,7 +93,10 @@ From the repository root:
 
 ```bash
 rm -rf node_modules
-npm ci
+npm ci --ignore-scripts
+npm rebuild canvas
+node node_modules/@ast-grep/cli/postinstall.js
+npm run prepare
 ```
 
 Repository-local agent instructions and skills are separate from dependency installation. Install them explicitly with `npm run agents:install` only when wanted; see [Optional agent tooling](../agent-tooling/README.md).
@@ -102,6 +108,14 @@ ls node_modules/@esbuild
 ```
 
 If only a Windows artifact exists, recheck Node/npm resolution, remove `node_modules`, and run `npm ci` again.
+
+Repository resolution keeps ordinary package releases behind a seven-day admission window. Do not disable `min-release-age` to take a routine update early. When a published upstream security fix is both reachable in Sniptale and too young for the window, admit only that exact package for the one install command:
+
+```bash
+npm install '<package>@<exact-version>' --min-release-age-exclude='<package>'
+```
+
+Record the upstream security evidence in the task manifest, verify that no `min-release-age-exclude` line was added to `.npmrc`, and run the dependency wave through its normal review and closeout. The exclusion applies only to the named package; its transitive dependencies remain subject to the seven-day window.
 
 ## Verify The Environment
 

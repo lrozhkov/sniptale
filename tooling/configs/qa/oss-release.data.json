@@ -57,9 +57,9 @@
       "source": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt",
+      "archivePath": "LICENSES/dependencies/@zip.js__zip.js-2.8.61.txt",
       "sha256": "1b7ebc8d7889ed25491484ab2b102370742ca6c0b26650a0c62cc2269b579b84",
-      "source": "LICENSES/dependencies/@zip.js__zip.js-2.8.53.txt"
+      "source": "LICENSES/dependencies/@zip.js__zip.js-2.8.61.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt",
@@ -72,9 +72,9 @@
       "source": "LICENSES/dependencies/core-util-is-1.0.3.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/dompurify-3.4.13.txt",
+      "archivePath": "LICENSES/dependencies/dompurify-3.4.14.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-      "source": "LICENSES/dependencies/dompurify-3.4.13.txt"
+      "source": "LICENSES/dependencies/dompurify-3.4.14.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/fabric-7.4.0.txt",
@@ -223,12 +223,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "aec6df7c20701a70905688bf6c328ae1acf5d47ba1880830c83bdbd3634b41a7",
+      "sha256": "6e78f77fe3fe4bff59298a2b492c9eed17b5bde6ecc3379e7c3b4d64c06a3b16",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "d56f0eadb72e6c06930cd2c873426bd36a063215d2b4cbe0f77f9760da61039e",
+      "sha256": "2a2dded4531a2b77884a69820419fe47075b177260b2229e8686add2632a6c3e",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
@@ -322,7 +322,7 @@
     "reviewedSelections": [
       {
         "packageName": "dompurify",
-        "version": "3.4.13",
+        "version": "3.4.14",
         "selectedLicense": "Apache-2.0"
       },
       {

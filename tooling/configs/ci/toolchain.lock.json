@@ -2,9 +2,11 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "22.22.1",
-    "image": "node:22.22.1-bookworm-slim@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d",
-    "baseDebianSnapshot": "20260316T000000Z"
+    "version": "22.23.2",
+    "npmVersion": "11.19.1",
+    "npmLockSha256": "932f17ca169077779515e713010cc23effdca443305ba77096fe17360c3ad298",
+    "image": "node:22.23.2-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5",
+    "baseDebianSnapshot": "20260829T000000Z"
   },
   "projectToolchain": {
     "oxfmt": { "packagePath": "node_modules/oxfmt", "version": "0.64.0" },
@@ -41,9 +43,9 @@
     "requirementsSha256": "22eb51c3ee8b0ef5f2c10c10989e07ea10bb7d90c10e77c7eaacdfeb0c6fd8c5"
   },
   "debian": {
-    "snapshot": "20260316T000000Z",
-    "archiveUrl": "https://snapshot.debian.org/archive/debian/20260316T000000Z",
-    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20260316T000000Z",
+    "snapshot": "20260829T000000Z",
+    "archiveUrl": "https://snapshot.debian.org/archive/debian/20260829T000000Z",
+    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20260829T000000Z",
     "suites": ["bookworm", "bookworm-updates", "bookworm-security"]
   },
   "playwright": {

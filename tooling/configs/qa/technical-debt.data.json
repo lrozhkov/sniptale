@@ -1949,6 +1949,7 @@
         "apps/extension/src/background/capture/full-page/page-agent-transport.ts",
         "apps/extension/src/background/capture/full-page/planner.ts",
         "apps/extension/src/background/capture/full-page/raster.ts",
+        "apps/extension/src/background/capture/full-page/reduced-policy.ts",
         "apps/extension/src/background/capture/full-page/session-lease.ts",
         "apps/extension/src/background/capture/full-page/stitch.ts",
         "apps/extension/src/background/capture/full-page/types.ts",
@@ -2569,6 +2570,7 @@
         "apps/extension/src/background/capture/full-page/page-agent-transport.ts",
         "apps/extension/src/background/capture/full-page/planner.ts",
         "apps/extension/src/background/capture/full-page/raster.ts",
+        "apps/extension/src/background/capture/full-page/reduced-policy.ts",
         "apps/extension/src/background/capture/full-page/session-lease.ts",
         "apps/extension/src/background/capture/full-page/stitch.ts",
         "apps/extension/src/background/capture/full-page/types.ts",
@@ -13242,6 +13244,7 @@
         "apps/extension/src/web-snapshot-viewer/viewer/document-policy.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/frame-interactions.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/frame-navigation.ts",
+        "apps/extension/src/web-snapshot-viewer/viewer/frame-pan.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/iframe.tsx",
         "apps/extension/src/web-snapshot-viewer/viewer/package-files.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/print-projection.ts"
@@ -16757,7 +16760,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container-command.mjs",
-        "contentHash": "486973056babe128b3cd6ae7021b46ba5adf07f283af7c1710b52edde1fc9ccf"
+        "contentHash": "382cf26be74a4aa8f504d2634491b1aee07c8188bb47b6af92f9fdc6f0fa57ce"
       },
       "consumers": [
         "tooling/ci/ci-contract.test.ts",
@@ -18683,7 +18686,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/infrastructure-smoke.mjs",
-        "contentHash": "3ced5bb213fa0f69a21d55df402220d275b3b31315b80574cd74ae1333e98871"
+        "contentHash": "6888342c8b3885eccb63dc1da67ccc01462ff0e1a5f6d721ce6bea4408879669"
       },
       "consumers": [
         "tooling/ci/infrastructure-smoke.mjs"
@@ -18704,7 +18707,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/install-toolchain.mjs",
-        "contentHash": "db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e"
+        "contentHash": "73f39fbf8c8af9858a4b42560a4311ae45339ea110b9b2ae6a58ab4fecd4ca89"
       },
       "consumers": [
         "tooling/ci/install-toolchain.mjs"
@@ -19007,7 +19010,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/dependency-legal/license-selection.mjs",
-        "contentHash": "4c5fbde1becf2ce4e503a2b1200ac605896513c4ef6d3b7ac0c4f5ee9e6b9f7c"
+        "contentHash": "ba0e1e9af1060e6f08f723f16e3e0cea42b086c61ec4e2d9c3e656adb30138f9"
       },
       "consumers": [
         "tooling/release/dependency-legal/index.mjs",
@@ -19178,7 +19181,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/local-toolchain.mjs",
-        "contentHash": "bde065a7fd378a21b22a1b17fa0ac57a7d9319f90ef236c703eb425682d0d38b"
+        "contentHash": "acb369925032c0b52027d213c42200054657353f9eb7333cc09f226ca380c6f5"
       },
       "consumers": [
         "tooling/ci/local-toolchain.mjs",
@@ -23143,13 +23146,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-config-policy.mjs",
-        "contentHash": "6e61469c07e0cd58a1562f1044f0ee2800f21a472a498277926f770c5c8d9b5b"
+        "contentHash": "a523429411bcc7f9cb9b9cf2c33bc7c60ee43de16eeee3ff54342308ce42b36c"
       },
       "consumers": [
         "tooling/qa/core/verify-config-policy.mjs",
         "tooling/qa/core/verify-focused-triggered.execution.mjs"
       ],
       "surfaces": [
+        "binding:REQUIRED_NPM_CONFIG",
         "binding:REQUIRED_PACKAGE_DEPENDENCY_PREFIXES",
         "binding:REQUIRED_PACKAGE_DEV_DEPENDENCY_PREFIXES",
         "binding:REQUIRED_TSCONFIG_FLAGS",

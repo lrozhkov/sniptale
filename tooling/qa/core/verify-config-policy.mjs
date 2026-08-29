@@ -12,6 +12,7 @@ import { hasRequiredViteBuildTarget } from './verify-config-policy.vite-target.m
 import { collectExtensionBuildLayoutViolations } from './verify-extension-build-layout.mjs';
 
 const MANIFEST_PATH = 'apps/extension/manifest.json';
+const NPMRC_PATH = '.npmrc';
 const PACKAGE_JSON_PATH = 'package.json';
 const PACKAGE_LOCK_PATH = 'package-lock.json';
 const TSCONFIG_PATH = 'tsconfig.json';
@@ -33,7 +34,13 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
 const REQUIRED_BUILD_TARGET = 'chrome140';
-const REQUIRED_NODE_ENGINE = '>=22.22.1 <23';
+const REQUIRED_NODE_ENGINE = '>=22.23.2 <23';
+const REQUIRED_PACKAGE_MANAGER = 'npm@11.19.1';
+const REQUIRED_NPM_CONFIG = Object.freeze([
+  'legacy-peer-deps=true',
+  'loglevel=error',
+  'min-release-age=7',
+]);
 const REQUIRED_PACKAGE_DEPENDENCY_PREFIXES = {
   react: '^19.2.',
   'react-dom': '^19.2.',
@@ -131,8 +138,60 @@ function collectRuntimeBaselineViolations({ compilerOptions, manifest, viteConfi
   return violations;
 }
 
-function collectPackageBaselineViolations(packageJson, packageLock) {
+function collectNpmPolicyViolations(packageJson, npmrcSource) {
   const violations = [];
+  const npmConfig = npmrcSource
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith('#'));
+  if (!arraysMatch(npmConfig, REQUIRED_NPM_CONFIG)) {
+    violations.push(
+      createViolation(
+        NPMRC_PATH,
+        `npm config must be exactly ${JSON.stringify(REQUIRED_NPM_CONFIG)}`
+      )
+    );
+  }
+  if (npmConfig.some((line) => line.startsWith('min-release-age-exclude'))) {
+    violations.push(
+      createViolation(
+        NPMRC_PATH,
+        'urgent security exclusions must stay one-shot and must not be committed'
+      )
+    );
+  }
+
+  if (packageJson.packageManager !== REQUIRED_PACKAGE_MANAGER) {
+    violations.push(
+      createViolation(
+        PACKAGE_JSON_PATH,
+        `packageManager must be ${JSON.stringify(REQUIRED_PACKAGE_MANAGER)}`
+      )
+    );
+  }
+  if (
+    packageJson.devEngines?.runtime?.name !== 'node' ||
+    packageJson.devEngines.runtime.version !== REQUIRED_NODE_ENGINE ||
+    packageJson.devEngines.runtime.onFail !== 'error'
+  ) {
+    violations.push(
+      createViolation(PACKAGE_JSON_PATH, 'devEngines.runtime must enforce the Node engine baseline')
+    );
+  }
+  if (
+    packageJson.devEngines?.packageManager?.name !== 'npm' ||
+    packageJson.devEngines.packageManager.version !== '11.19.1' ||
+    packageJson.devEngines.packageManager.onFail !== 'error'
+  ) {
+    violations.push(
+      createViolation(PACKAGE_JSON_PATH, 'devEngines.packageManager must enforce npm 11.19.1')
+    );
+  }
+  return violations;
+}
+
+function collectPackageBaselineViolations(packageJson, packageLock, npmrcSource) {
+  const violations = collectNpmPolicyViolations(packageJson, npmrcSource);
 
   if (packageJson.engines?.node !== REQUIRED_NODE_ENGINE) {
     violations.push(
@@ -181,6 +240,7 @@ function collectPackageBaselineViolations(packageJson, packageLock) {
 export function collectConfigPolicyViolations({ rootDir = repoRoot } = {}) {
   const packageJson = readJson(PACKAGE_JSON_PATH, rootDir);
   const packageLock = readJson(PACKAGE_LOCK_PATH, rootDir);
+  const npmrcSource = readText(NPMRC_PATH, rootDir);
   const tsconfigCompilerOptions = readTsConfig(TSCONFIG_PATH, rootDir).compilerOptions ?? {};
   const tsconfigNodeCompilerOptions =
     readTsConfig(TSCONFIG_NODE_PATH, rootDir).compilerOptions ?? {};
@@ -198,7 +258,7 @@ export function collectConfigPolicyViolations({ rootDir = repoRoot } = {}) {
       manifest,
       viteConfigSource,
     }),
-    ...collectPackageBaselineViolations(packageJson, packageLock),
+    ...collectPackageBaselineViolations(packageJson, packageLock, npmrcSource),
     ...collectCompilerOptionViolations({
       file: TSCONFIG_NODE_PATH,
       compilerOptions: tsconfigNodeCompilerOptions,
