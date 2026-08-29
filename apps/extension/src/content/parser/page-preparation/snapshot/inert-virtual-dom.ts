@@ -109,12 +109,36 @@ function createVirtualIframeContainer(
   container.setAttribute('data-virtual-iframe', 'true');
   container.id = iframeId;
   if (originalIframe.className) container.className = originalIframe.className;
+  const inlineStyle = originalIframe.getAttribute('style');
+  if (inlineStyle) container.setAttribute('style', inlineStyle);
+  const width = originalIframe.getAttribute('width');
+  const height = originalIframe.getAttribute('height');
+  if (width && !container.style.width) container.style.width = normalizeIframeDimension(width);
+  if (height && !container.style.height) container.style.height = normalizeIframeDimension(height);
   if (originalIframe.src) container.setAttribute('data-iframe-src', originalIframe.src);
   for (const name of ['data-application-code', 'data-origin']) {
     const value = originalIframe.getAttribute(name);
     if (value) container.setAttribute(name, value);
   }
   return container;
+}
+
+function normalizeIframeDimension(value: string): string {
+  const normalized = value.trim();
+  let dotSeen = false;
+  let digitSeen = false;
+  const isUnitlessNumber =
+    normalized.length > 0 &&
+    Array.from(normalized).every((character) => {
+      if (character >= '0' && character <= '9') {
+        digitSeen = true;
+        return true;
+      }
+      if (character !== '.' || dotSeen) return false;
+      dotSeen = true;
+      return true;
+    });
+  return isUnitlessNumber && digitSeen ? `${normalized}px` : normalized;
 }
 
 function embedInertIframe(originalIframe: HTMLIFrameElement, maps: VirtualNodeMaps): void {

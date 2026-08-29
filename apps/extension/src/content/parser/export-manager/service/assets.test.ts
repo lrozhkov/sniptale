@@ -5,10 +5,20 @@ import type { ExportOptions } from '@sniptale/runtime-contracts/export';
 import type { PreparedDOMTreeSnapshot } from '../../dom-tree-parser/snapshot';
 import { collectExportExtraAssets } from './assets';
 import { createExportManagerState } from './state';
+import {
+  createExportCancelledError,
+  createExportDiagnosticsSource,
+  getExportCompletedMessage,
+} from './source';
 
 const { captureScreenshot, captureViewportScreenshot } = vi.hoisted(() => ({
   captureScreenshot: vi.fn(),
   captureViewportScreenshot: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
+  runtimeInfo: { getManifest: () => ({ version: 'test' }) },
 }));
 
 vi.mock('../../web-snapshot/capture', () => ({
@@ -44,7 +54,34 @@ function createSnapshot(): PreparedDOMTreeSnapshot {
   };
 }
 
-it('composes exactly the three Page Diagnostics assets when that option is enabled alone', async () => {
+it('selects live diagnostics for detached snapshots inside a page runtime', () => {
+  const detached = document.implementation.createHTMLDocument('detached');
+
+  expect(createExportDiagnosticsSource({ document: detached })).toMatchObject({
+    document,
+    view: window,
+  });
+  expect(
+    createExportDiagnosticsSource({ document: detached, pageUrl: window.location.href })
+  ).toMatchObject({ document, view: window });
+  expect(
+    createExportDiagnosticsSource({
+      document: detached,
+      pageUrl: `${window.location.origin}/other`,
+    })
+  ).toMatchObject({ document, view: window });
+  expect(
+    createExportDiagnosticsSource({ document: detached, pageUrl: 'https://other.test/' })
+  ).toMatchObject({ document, view: window });
+  expect(createExportDiagnosticsSource()).toBeUndefined();
+});
+
+it('exposes localized export completion and cancellation outcomes', () => {
+  expect(createExportCancelledError()).toBeInstanceOf(Error);
+  expect(getExportCompletedMessage()).not.toBe('');
+});
+
+it('composes the two inert DOM Page Diagnostics assets when that option is enabled alone', async () => {
   document.documentElement.replaceChildren(
     document.createElement('head'),
     document.createElement('body')
@@ -62,11 +99,7 @@ it('composes exactly the three Page Diagnostics assets when that option is enabl
     throwIfCancelled: () => undefined,
   });
 
-  expect(assets.map((asset) => asset.path)).toEqual([
-    'logs/dom.html',
-    'logs/virtual-dom.html',
-    'logs/resource-timing.json',
-  ]);
+  expect(assets.map((asset) => asset.path)).toEqual(['logs/dom.html', 'logs/virtual-dom.html']);
   expect(assets.map((asset) => asset.path)).not.toContain('logs/console.json');
   expect(assets.map((asset) => asset.path)).not.toContain('logs/page-summary.json');
 });
@@ -149,4 +182,29 @@ it('stores an optional visible-area screenshot separately from the full-page res
     path: 'visible-viewport.webp',
   });
   expect(assets.map((asset) => asset.path)).not.toContain('page-viewport-preview.png');
+});
+
+it('writes consolidated issues after screenshot warnings are known', async () => {
+  captureScreenshot.mockResolvedValueOnce({
+    blob: new Blob(['png'], { type: 'image/png' }),
+    coverage: 'full-page',
+    warnings: ['Page extent grew after capture was frozen'],
+  });
+  const assets = await collectExportExtraAssets({
+    downloadedFilesCount: 0,
+    fileCandidatesCount: 0,
+    options: {
+      ...createPageDiagnosticsOnlyOptions(),
+      includeBasicLogs: true,
+      includeFullPageScreenshot: true,
+    },
+    snapshot: createSnapshot(),
+    state: createExportManagerState(),
+    throwIfCancelled: () => undefined,
+    warnings: [],
+  });
+
+  const issues = assets.find((asset) => asset.path === 'logs/issues.json');
+  expect(String(issues?.content)).toContain('Page extent grew after capture was frozen');
+  expect(assets.find((asset) => asset.path === 'logs/capture-timeline.json')).toBeDefined();
 });

@@ -2,7 +2,6 @@ const OFFLINE_SNAPSHOT_CSP = [
   "default-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
-  "navigate-to 'none'",
   'img-src blob: data:',
   'font-src blob: data:',
   "style-src 'unsafe-inline' blob:",

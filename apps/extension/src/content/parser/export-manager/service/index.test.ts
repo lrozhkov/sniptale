@@ -213,7 +213,7 @@ beforeEach(() => {
 
 describe('export-manager service source ownership', () => {
   it('uses the owned snapshot source for package builds', async () => {
-    const { snapshotDocument, snapshotSource } = createSnapshotSource();
+    const { snapshotSource } = createSnapshotSource();
     const service = createExportManagerService({ snapshotSource });
     collectFilesForExportManagerMock.mockResolvedValue(
       createTransferResult('preview-a', 'uuid-a', 'file-a.txt')
@@ -222,14 +222,9 @@ describe('export-manager service source ownership', () => {
     await service.buildPackage(createExportOptions());
 
     expect(prepareDOMTreeSnapshotMock).toHaveBeenCalledWith('export-manager', snapshotSource);
-    expect(collectCoreLogAssetsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        diagnosticsSource: expect.objectContaining({
-          document: snapshotDocument,
-          pageUrl: 'https://snapshot.example/page',
-        }),
-      })
-    );
+    const diagnosticsSource = collectCoreLogAssetsMock.mock.calls[0]?.[0]?.diagnosticsSource;
+    expect(diagnosticsSource?.document).toBe(document);
+    expect(diagnosticsSource?.pageUrl).toBe('https://snapshot.example/page');
   });
 });
 

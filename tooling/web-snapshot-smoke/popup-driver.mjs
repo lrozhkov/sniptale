@@ -27,7 +27,7 @@ export async function enableForTab(popup, target, tabId) {
 
 export async function saveSnapshot(popup, tabId, options = {}) {
   return popup.evaluate(
-    async ({ id, jobId, timeoutMs }) => {
+    async ({ id, jobId, richPackage, timeoutMs }) => {
       const withFreshness = (message) => ({
         ...message,
         __sniptaleRuntimeFreshness: {
@@ -43,14 +43,14 @@ export async function saveSnapshot(popup, tabId, options = {}) {
           captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
           sources: [{ kind: 'tab', tabId: id, title: 'Smoke page' }],
           options: {
-            includeBasicLogs: false,
-            includeCssDiagnostics: false,
+            includeBasicLogs: richPackage,
+            includeCssDiagnostics: richPackage,
             includeFiles: false,
             includeFullPageScreenshot: true,
             includeImages: false,
             includeJson: false,
             includeMarkdown: false,
-            includePageDiagnostics: false,
+            includePageDiagnostics: richPackage,
           },
           type: 'START_PAGE_PACKAGE_JOB',
           warnings: [],
@@ -84,6 +84,7 @@ export async function saveSnapshot(popup, tabId, options = {}) {
     {
       id: tabId,
       jobId: crypto.randomUUID(),
+      richPackage: options.richPackage === true,
       timeoutMs: options.timeoutMs ?? packageTimeoutMs,
     }
   );

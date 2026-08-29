@@ -1,5 +1,9 @@
 import { extendWebSnapshotAssetSession, requestWebSnapshotAssetSession } from './asset-session';
-import type { WebSnapshotAssetEntry } from './types';
+import type {
+  WebSnapshotAssetEntry,
+  WebSnapshotDiagnosticAssetLedger,
+  WebSnapshotDiagnosticAssetTargetCollection,
+} from './types';
 import { fetchAnonymousCrossOriginAssetBlobs, readSameOriginAssetBlob } from './asset-fetch';
 import { createPrivacyWarnings } from './asset-warnings';
 import { collectAssetTargets, collectBackgroundFetchUrls } from './asset-targets';
@@ -16,12 +20,94 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseSrcset } from './asset-targets';
 import { MAX_WEB_SNAPSHOT_ASSETS_BYTES } from './limits';
 import { resolveWebSnapshotAssetRequestUrl } from './asset-url';
+import { sanitizeDiagnosticUrl } from '@sniptale/platform/observability/diagnostics/sanitizer';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 
 const logger = createLogger({ namespace: 'ContentWebSnapshot' });
 const ASSET_PREFETCH_CONCURRENCY = 3;
 const ASSET_PREFETCH_TOTAL_TIMEOUT_MS = 45_000;
 
 const FETCH_TIMEOUT_MS = 15_000;
+const MAX_DIAGNOSTIC_ASSET_LEDGER_ENTRIES = 10_000;
+
+function sanitizeAssetFragment(fragment: string): string | null {
+  if (!fragment) return null;
+  return /^#[a-z0-9_.:-]{1,200}$/iu.test(fragment)
+    ? fragment
+    : `[fragment redacted; length=${fragment.length}]`;
+}
+
+function collectDiagnosticAssetTargetSeeds(
+  targets: ReturnType<typeof collectAssetTargets>['targets'],
+  context: WebSnapshotAssetContext,
+  output: WebSnapshotDiagnosticAssetTargetCollection
+): void {
+  for (const target of targets) {
+    const candidates =
+      target.attribute === 'srcset'
+        ? parseSrcset(target.url).map((candidate) => candidate.url)
+        : [target.url];
+    for (const candidate of candidates) {
+      output.total += 1;
+      if (output.entries.length >= MAX_DIAGNOSTIC_ASSET_LEDGER_ENTRIES) continue;
+      try {
+        const resolved = new URL(candidate, context.baseUrl);
+        const requestIdentity = resolveWebSnapshotAssetRequestUrl(candidate, context.baseUrl);
+        const resolvedUrl = sanitizeDiagnosticUrl(resolved.href) ?? null;
+        output.entries.push({
+          authoredKind: candidate.trim().startsWith('data:')
+            ? 'embedded'
+            : /^[a-z][a-z0-9+.-]*:/iu.test(candidate.trim())
+              ? 'absolute'
+              : 'relative',
+          authoredUrl: resolvedUrl,
+          fragment: sanitizeAssetFragment(resolved.hash),
+          requestIdentity,
+          requestUrl: sanitizeDiagnosticUrl(requestIdentity) ?? null,
+          resolvedUrl,
+          usage: {
+            attribute: target.attribute,
+            element: target.element.tagName.toLowerCase(),
+          },
+        });
+      } catch {
+        // Invalid targets are excluded by the canonical capture URL policy.
+      }
+    }
+  }
+}
+
+export function finalizeWebSnapshotDiagnosticAssetLedger(args: {
+  assets: readonly WebSnapshotAssetEntry[];
+  manifest: WebSnapshotManifest;
+  targets: WebSnapshotDiagnosticAssetTargetCollection;
+}): WebSnapshotDiagnosticAssetLedger {
+  const assetsByUrl = new Map(args.assets.map((asset) => [asset.originalUrl, asset]));
+  const manifestByPath = new Map(args.manifest.entries.map((entry) => [entry.path, entry]));
+  const entries = args.targets.entries.map((seed) => {
+    const asset = assetsByUrl.get(seed.requestIdentity);
+    const manifestEntry = asset ? manifestByPath.get(asset.localPath) : undefined;
+    return {
+      authoredKind: seed.authoredKind,
+      authoredUrl: seed.authoredUrl,
+      fragment: seed.fragment,
+      localPath: asset?.localPath ?? null,
+      mimeType: manifestEntry?.mimeType ?? asset?.blob.type ?? null,
+      requestUrl: seed.requestUrl,
+      resolvedUrl: seed.resolvedUrl,
+      sha256: manifestEntry?.sha256 ?? null,
+      size: manifestEntry?.size ?? asset?.blob.size ?? null,
+      status: asset ? ('captured' as const) : ('skipped' as const),
+      reason: asset ? null : 'not-retained-by-capture-policy-or-fetch',
+      usage: seed.usage,
+    };
+  });
+  return {
+    entries,
+    omitted: Math.max(0, args.targets.total - entries.length),
+    total: args.targets.total,
+  };
+}
 
 function throwIfAssetCollectionAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -237,6 +323,7 @@ async function captureNestedStylesheetAssets(args: {
   assets: WebSnapshotAssetEntry[];
   budget: ReturnType<typeof createAssetBudget>;
   context: WebSnapshotAssetContext;
+  diagnosticAssetTargets: WebSnapshotDiagnosticAssetTargetCollection;
   requestId: string;
   snapshotSessionId: string;
   state: {
@@ -263,6 +350,7 @@ async function captureNestedStylesheetAssets(args: {
       stylesheetBytes: stylesheetAsset.blob.size,
     });
     const prepared = await prepareStylesheetAsset(stylesheetAsset);
+    collectDiagnosticAssetTargetSeeds(prepared.targets, args.context, args.diagnosticAssetTargets);
     logger.log('Web snapshot stylesheet parsed', {
       assetIndex,
       nestedTargetCount: prepared.targets.length,
@@ -312,6 +400,7 @@ export async function collectWebSnapshotAssets(
   }
 ): Promise<{
   assets: WebSnapshotAssetEntry[];
+  diagnosticAssetTargets: WebSnapshotDiagnosticAssetTargetCollection;
   privacyWarnings: string[];
   snapshotSessionId: string;
   warnings: string[];
@@ -324,6 +413,11 @@ export async function collectWebSnapshotAssets(
     baseUrl: context.baseUrl,
   });
   const targets = targetCollection.targets;
+  const diagnosticAssetTargets: WebSnapshotDiagnosticAssetTargetCollection = {
+    entries: [],
+    total: 0,
+  };
+  collectDiagnosticAssetTargetSeeds(targets, context, diagnosticAssetTargets);
   const privacyWarnings = createPrivacyWarnings(
     targetCollection.warnings,
     args.allowAuthenticatedSameOriginAssets,
@@ -386,6 +480,7 @@ export async function collectWebSnapshotAssets(
     assets,
     budget,
     context,
+    diagnosticAssetTargets,
     requestId: args.requestId,
     snapshotSessionId,
     state,
@@ -393,5 +488,5 @@ export async function collectWebSnapshotAssets(
     abortSignal: args.abortSignal,
   });
 
-  return { assets, privacyWarnings, snapshotSessionId, warnings };
+  return { assets, diagnosticAssetTargets, privacyWarnings, snapshotSessionId, warnings };
 }

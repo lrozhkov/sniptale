@@ -16,7 +16,8 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
 
-import { collectWebSnapshotAssets } from './assets';
+import { collectWebSnapshotAssets, finalizeWebSnapshotDiagnosticAssetLedger } from './assets';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 function collectAssets(
   args: {
     allowAnonymousCrossOriginAssets?: boolean;
@@ -287,6 +288,38 @@ it('fetches an SVG sprite once while preserving CSS and DOM use fragments', asyn
   );
   expect(document.querySelector('#reject-use')?.getAttribute('xlink:href')).toMatch(
     /^\.\.\/assets\/1-[^"#]+\.svg#reject$/u
+  );
+  const asset = result.assets[0]!;
+  const ledger = finalizeWebSnapshotDiagnosticAssetLedger({
+    assets: result.assets,
+    manifest: createPagePackageManifestFixture({
+      entries: [
+        {
+          component: 'webCopy',
+          mimeType: 'image/svg+xml',
+          path: asset.localPath,
+          sha256: 'a'.repeat(64),
+          size: asset.blob.size,
+        },
+      ],
+    }),
+    targets: result.diagnosticAssetTargets,
+  });
+  expect(ledger.entries).toHaveLength(4);
+  expect(ledger.entries).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        fragment: '#approve',
+        localPath: asset.localPath,
+        sha256: 'a'.repeat(64),
+        status: 'captured',
+        usage: { attribute: 'href', element: 'use' },
+      }),
+      expect.objectContaining({
+        fragment: '#reject',
+        usage: { attribute: 'xlink:href', element: 'use' },
+      }),
+    ])
   );
 });
 

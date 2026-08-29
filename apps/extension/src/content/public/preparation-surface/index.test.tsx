@@ -322,6 +322,15 @@ it('keeps linked and free-frame creation plus hover eligibility inside accepted 
   expect(hasFrameForElement(outsideTarget)).toBe(true);
 });
 
+it('registers stable highlighter callbacks once across surface rerenders', () => {
+  renderSurface();
+  expect(runtimeMocks.registerFrameCallbacks).toHaveBeenCalledTimes(1);
+
+  renderSurface();
+
+  expect(runtimeMocks.registerFrameCallbacks).toHaveBeenCalledTimes(1);
+});
+
 function createPorts(): PreparationHostPorts {
   return {
     acceptsElement: (element) => element.ownerDocument === iframe?.contentDocument,

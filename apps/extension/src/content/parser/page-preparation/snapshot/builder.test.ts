@@ -151,6 +151,22 @@ function registerIframeSnapshotTests(): void {
     expect(result.html).not.toContain('<iframe');
   });
 
+  it('retains readable iframe layout dimensions on the inert virtual container', async () => {
+    const iframe = createReadableIframe('sized-frame', '<p>Iframe body content</p>');
+    iframe.setAttribute('width', '100%');
+    iframe.setAttribute('height', '859');
+    iframe.style.overflow = 'hidden';
+    document.body.append(iframe);
+
+    const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
+
+    const snapshot = new DOMParser().parseFromString(result.html, 'text/html');
+    const container = snapshot.querySelector<HTMLElement>('[data-virtual-iframe="true"]');
+    expect(container?.style.width).toBe('100%');
+    expect(container?.style.height).toBe('859px');
+    expect(container?.style.overflow).toBe('hidden');
+  });
+
   it('preserves nested accessible iframe content through the virtual DOM pipeline', async () => {
     const outer = createReadableIframe('outer-frame', '<iframe id="inner-frame"></iframe>');
     const outerDocument = outer.contentDocument!;

@@ -145,9 +145,32 @@ it('uses verified Page Package MIME metadata for preview and original downloads'
     'text/css',
     'image/png',
     'text/css',
+    'text/html',
     'image/png',
     'application/x-sniptale-page-package+zip',
   ]);
+});
+
+it('materializes percent-encoded asset filenames without decoding away their manifest path', async () => {
+  await stubWebSnapshotRecord({
+    assets: [
+      {
+        content: 'jpeg',
+        mimeType: 'image/jpeg',
+        path: 'assets/portrait_%28cropped%29.jpg',
+      },
+    ],
+    html: '<img src="../assets/portrait_%28cropped%29.jpg">',
+  });
+  const createdBlobs: Blob[] = [];
+  stubObjectUrlStatics((blob) => {
+    createdBlobs.push(blob);
+    return `blob:snapshot-asset-${createdBlobs.length}`;
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.html).toContain('src="blob:snapshot-asset-1"');
 });
 
 it('rejects content whose declared digest does not match', async () => {
@@ -230,6 +253,32 @@ it('rewrites nested CSS resources to verified object URLs', async () => {
 
   expect(capturedCss).toContain('url("blob:snapshot-asset-2")');
   expect(loaded.html).toContain('href="blob:snapshot-asset-3"');
+});
+
+it('retains SVG fragments referenced from an external captured stylesheet', async () => {
+  const css = '.approve { background-image: url("../assets/icons.svg#approve"); }';
+  await stubWebSnapshotRecord({
+    assets: [
+      { content: css, mimeType: 'text/css', path: 'assets/styles.css' },
+      {
+        content: '<svg xmlns="http://www.w3.org/2000/svg"><symbol id="approve" /></svg>',
+        mimeType: 'image/svg+xml',
+        path: 'assets/icons.svg',
+      },
+    ],
+    html: '<link rel="stylesheet" href="../assets/styles.css"><button class="approve">OK</button>',
+  });
+  const createdBlobs: Blob[] = [];
+  stubObjectUrlStatics((blob) => {
+    createdBlobs.push(blob);
+    return `blob:snapshot-asset-${createdBlobs.length}`;
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const capturedCss = await readTestBlobText(createdBlobs[3]!);
+
+  expect(capturedCss).toContain('url("blob:snapshot-asset-3#approve")');
+  expect(loaded.html).toContain('href="blob:snapshot-asset-4"');
 });
 
 it('creates imported CSS dependencies before their parent stylesheet', async () => {

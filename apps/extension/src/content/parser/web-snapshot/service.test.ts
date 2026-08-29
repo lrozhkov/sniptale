@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   buildWebSnapshotPackage: vi.fn(),
   captureWebSnapshotScreenshotWithWarnings: vi.fn(),
   collectWebSnapshotAssets: vi.fn(),
+  finalizeWebSnapshotDiagnosticAssetLedger: vi.fn(),
   materializeUnreadableIframeRasters: vi.fn(),
   serializePreparedSnapshotDocument: vi.fn(),
 }));
@@ -20,6 +21,7 @@ vi.mock('../page-preparation/snapshot', async (importOriginal) => ({
 
 vi.mock('./assets', () => ({
   collectWebSnapshotAssets: mocks.collectWebSnapshotAssets,
+  finalizeWebSnapshotDiagnosticAssetLedger: mocks.finalizeWebSnapshotDiagnosticAssetLedger,
 }));
 
 vi.mock('./capture', async (importOriginal) => ({
@@ -69,6 +71,11 @@ beforeEach(() => {
     privacyWarnings: ['Authenticated same-site assets were enabled'],
     snapshotSessionId: 'snapshot-session-1',
     warnings: ['Asset skipped'],
+  });
+  mocks.finalizeWebSnapshotDiagnosticAssetLedger.mockReturnValue({
+    entries: [],
+    omitted: 0,
+    total: 0,
   });
   mocks.captureWebSnapshotScreenshotWithWarnings.mockResolvedValue({
     blob: new Blob(['shot'], { type: 'image/png' }),

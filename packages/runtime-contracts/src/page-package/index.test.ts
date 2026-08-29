@@ -90,7 +90,7 @@ function createExtendedDiagnosticEntries(): PagePackageEntry[] {
   return PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map((profile, index) => ({
     ...profile,
     component: 'diagnostics' as const,
-    sha256: String(index + 1).repeat(64),
+    sha256: ((index + 1) % 16).toString(16).repeat(64),
     size: 1,
   }));
 }
@@ -217,14 +217,20 @@ describe('Page Package contract', () => {
   });
 
   it('owns one closed extended diagnostic path and MIME profile', () => {
-    expect(getPagePackageExtendedDiagnosticMimeType('diagnostics/extended/live-dom.html.txt')).toBe(
-      'text/plain'
+    expect(
+      isPagePackageEntryPath('diagnostics', 'diagnostics/index.json', 'application/json')
+    ).toBe(true);
+    expect(isPagePackageEntryPath('diagnostics', 'diagnostics/index.json', 'text/plain')).toBe(
+      false
     );
+    expect(
+      getPagePackageExtendedDiagnosticMimeType('diagnostics/extended/page/live-dom.html.txt')
+    ).toBe('text/plain');
     expect(getPagePackageExtendedDiagnosticMimeType('diagnostics/extended/scripts.json')).toBe(
       'application/json'
     );
     expect(
-      getPagePackageExtendedDiagnosticMimeType('diagnostics/extended/live-dom.html')
+      getPagePackageExtendedDiagnosticMimeType('diagnostics/extended/page/live-dom.html')
     ).toBeNull();
     expect(getPagePackageExtendedDiagnosticMimeType('diagnostics/extended/script.js')).toBeNull();
   });
@@ -252,7 +258,7 @@ describe('Page Package contract', () => {
     const renamed = createExtendedDiagnosticEntries();
     renamed[0] = {
       ...renamed[0]!,
-      path: 'diagnostics/extended/live-dom.html',
+      path: 'diagnostics/extended/page/live-dom.html',
       mimeType: 'text/html',
     };
     expect(parsePagePackageManifest(withDiagnostics('extended', renamed))).toBeNull();

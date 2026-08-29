@@ -15,7 +15,7 @@ it('adds a root manifest-listed guide derived from the actual package components
       {
         component: 'diagnostics',
         mimeType: 'text/plain',
-        path: 'diagnostics/extended/live-dom.html.txt',
+        path: 'diagnostics/extended/page/live-dom.html.txt',
         sha256: 'b'.repeat(64),
         size: 8,
         source: new Blob(['evidence'], { type: 'text/plain' }),
@@ -38,7 +38,28 @@ it('adds a root manifest-listed guide derived from the actual package components
   expect(text).toContain('Scripts and inline event handlers are removed');
   expect(text).toContain('cookies, browser storage');
   expect(text).toContain('safe URL query values may remain');
+  expect(text).toContain('diagnostics/index.json');
+  expect(text).toContain('Diagnostic map');
+  expect(text).toContain('not an execution trace');
+  expect(text).toContain('no request or response headers');
+  expect(text).toContain('without user-entered values');
+  expect(text).toContain('Applied limitations');
+  expect(text).toContain('application safety ceilings');
   expect(text).toContain('Validate `manifest.json`');
+  const diagnosticIndex = contributions.find(({ path }) => path === 'diagnostics/index.json');
+  expect(diagnosticIndex).toBeDefined();
+  const index = JSON.parse((await diagnosticIndex!.source.text()) || 'null') as unknown;
+  expect(index).toMatchObject({
+    authority: {
+      archiveInventory: 'manifest.json',
+      publishedRepresentation: 'snapshot/index.html',
+    },
+    representations: [
+      { available: true, path: 'diagnostics/extended/page/live-dom.html.txt', stage: 'live' },
+      { available: false, path: null, stage: 'prepared' },
+      { available: true, path: 'snapshot/index.html', stage: 'published' },
+    ],
+  });
 });
 
 it('replaces an earlier root guide when the combined package contents change', async () => {
@@ -59,6 +80,38 @@ it('replaces an earlier root guide when the combined package contents change', a
 
   expect(contributions.filter(({ path }) => path === 'README.md')).toHaveLength(1);
   await expect(contributions[0]?.source.text()).resolves.not.toBe('old');
+});
+
+it('does not claim that an extended diagnostic placeholder is a published Web copy', async () => {
+  const contributions = await addPagePackageReadme({
+    contributions: [
+      {
+        component: 'diagnostics',
+        mimeType: 'text/plain',
+        path: 'diagnostics/extended/page/published-dom.html.txt',
+        sha256: 'a'.repeat(64),
+        size: 24,
+        source: new Blob(['Web Copy was not selected'], { type: 'text/plain' }),
+      },
+    ],
+    diagnosticsLevel: 'extended',
+    intent: 'export',
+    source: { faviconUrl: null, title: null, url: null },
+  });
+
+  const diagnosticIndex = contributions.find(({ path }) => path === 'diagnostics/index.json');
+  const index = JSON.parse((await diagnosticIndex!.source.text()) || 'null') as {
+    authority: { publishedRepresentation: string | null };
+    representations: Array<{ available: boolean; path: string | null; stage: string }>;
+    safety: { publishedDocumentIsSanitized: boolean };
+  };
+  expect(index.authority.publishedRepresentation).toBeNull();
+  expect(index.representations).toContainEqual({
+    available: false,
+    path: null,
+    stage: 'published',
+  });
+  expect(index.safety.publishedDocumentIsSanitized).toBe(false);
 });
 
 it('omits analysis instructions for package paths that were not selected', async () => {

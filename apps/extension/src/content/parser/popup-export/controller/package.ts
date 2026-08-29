@@ -17,8 +17,11 @@ import type { ComposedPagePackage } from '../../../../workflows/page-package/com
 import type { PagePackageDiagnosticsLevel } from '@sniptale/runtime-contracts/page-package';
 import {
   buildExtendedDiagnosticArtifacts,
+  enrichExtendedDiagnosticArtifacts,
   type ExtendedDiagnosticArtifact,
 } from '../../export-manager/diagnostics/extended-evidence';
+import { PAGE_PACKAGE_ARCHIVE_PATHS } from '@sniptale/runtime-contracts/page-package';
+import type { WebSnapshotDiagnosticAssetLedger } from '../../web-snapshot/types';
 import { hashWebSnapshotAssetBlob } from '../../../../features/web-snapshot/asset-manifest';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
@@ -54,7 +57,10 @@ type BuiltJobPagePackage = ComposedPagePackage<Blob> & {
   producerStats: import('@sniptale/runtime-contracts/export').ExportResult['stats'];
   snapshotSessionId?: string;
 };
-type BuiltWebCopyPagePackage = BuiltJobPagePackage & { snapshotSessionId: string };
+type BuiltWebCopyPagePackage = BuiltJobPagePackage & {
+  diagnosticAssetLedger: WebSnapshotDiagnosticAssetLedger;
+  snapshotSessionId: string;
+};
 type PopupExportProducerContext = NonNullable<
   Parameters<PopupExportRequestHandlerRuntime['exportRunner']['buildBlobPackage']>[1]
 >;
@@ -214,6 +220,7 @@ async function buildRetainedWebCopy(
   });
   return {
     ...snapshot.pagePackage,
+    diagnosticAssetLedger: snapshot.diagnosticAssetLedger,
     producerStats: {
       filesCount: snapshot.manifest.stats.entryCount,
       filesFailed: snapshot.manifest.stats.failedResourceCount,
@@ -231,7 +238,12 @@ async function composeRequestedWebCopyPackage(
   diagnosticsLevel: PagePackageDiagnosticsLevel,
   extendedDiagnosticArtifacts?: readonly ExtendedDiagnosticArtifact[] | undefined
 ): Promise<BuiltJobPagePackage> {
-  const { producerStats, snapshotSessionId, ...pagePackage } = webCopy;
+  const {
+    diagnosticAssetLedger: _diagnosticAssetLedger,
+    producerStats,
+    snapshotSessionId,
+    ...pagePackage
+  } = webCopy;
   const structuredOptions = {
     ...props.request.options,
     includeFullPageScreenshot: false,
@@ -274,6 +286,32 @@ async function composeRequestedWebCopyPackage(
     producerStats: addProducerStats(producerStats, artifact.stats),
     snapshotSessionId,
   };
+}
+
+async function enrichExtendedDiagnosticsForWebCopy(
+  artifacts: readonly ExtendedDiagnosticArtifact[] | undefined,
+  webCopy: BuiltWebCopyPagePackage
+): Promise<ExtendedDiagnosticArtifact[] | undefined> {
+  if (!artifacts) return undefined;
+  const publishedEntry = webCopy.entries.find(
+    (entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml
+  );
+  if (!publishedEntry) {
+    throw new Error('Published Web Copy entry is unavailable for extended diagnostics.');
+  }
+  const publishedHtml =
+    typeof publishedEntry.source.text === 'function'
+      ? await publishedEntry.source.text()
+      : await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(reader.error ?? new Error('Web Copy text read failed.'));
+          reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+          reader.readAsText(publishedEntry.source);
+        });
+  return enrichExtendedDiagnosticArtifacts(artifacts, {
+    assetLedger: webCopy.diagnosticAssetLedger,
+    publishedHtml,
+  });
 }
 
 function buildExportOnlyPagePackage(
@@ -331,12 +369,16 @@ async function buildRequestedPagePackage(
     );
   }
   const webCopy = await buildRetainedWebCopy(props.request, controller, producerContext);
+  const enrichedExtendedDiagnosticArtifacts = await enrichExtendedDiagnosticsForWebCopy(
+    extendedDiagnosticArtifacts,
+    webCopy
+  );
   return composeRequestedWebCopyPackage(
     props,
     webCopy,
     producerContext,
     diagnosticsLevel,
-    extendedDiagnosticArtifacts
+    enrichedExtendedDiagnosticArtifacts
   );
 }
 

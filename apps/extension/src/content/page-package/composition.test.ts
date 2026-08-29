@@ -7,6 +7,7 @@ import { createDiagnosticContributions } from '../../workflows/page-package/cont
 import {
   MAX_PAGE_PACKAGE_URL_BYTES,
   MAX_PAGE_PACKAGE_WARNING_BYTES,
+  PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE,
 } from '@sniptale/runtime-contracts/page-package';
 
 describe('composeExportPagePackage', () => {
@@ -51,6 +52,7 @@ describe('composeExportPagePackage', () => {
       }))
     ).toEqual([
       { component: 'pageData', path: 'README.md', sourceIsBlob: true },
+      { component: 'diagnostics', path: 'diagnostics/index.json', sourceIsBlob: true },
       { component: 'pageData', path: 'exports/data/page.json', sourceIsBlob: true },
       { component: 'images', path: 'exports/images/figure.png', sourceIsBlob: true },
       {
@@ -62,43 +64,12 @@ describe('composeExportPagePackage', () => {
   });
 
   it('adds the complete inert extended inventory only to an explicitly extended Export', async () => {
-    const extendedDiagnosticArtifacts = [
-      {
-        content: '<html><body>visible evidence</body></html>',
-        mimeType: 'text/plain' as const,
-        path: 'diagnostics/extended/live-dom.html.txt' as const,
-      },
-      {
-        content: '{}',
-        mimeType: 'application/json' as const,
-        path: 'diagnostics/extended/document-metadata.json' as const,
-      },
-      {
-        content: '{}',
-        mimeType: 'application/json' as const,
-        path: 'diagnostics/extended/scripts.json' as const,
-      },
-      {
-        content: '{}',
-        mimeType: 'application/json' as const,
-        path: 'diagnostics/extended/stylesheets.json' as const,
-      },
-      {
-        content: '{}',
-        mimeType: 'application/json' as const,
-        path: 'diagnostics/extended/frames.json' as const,
-      },
-      {
-        content: '{}',
-        mimeType: 'application/json' as const,
-        path: 'diagnostics/extended/transformations.json' as const,
-      },
-      {
-        content: '{}',
-        mimeType: 'application/json' as const,
-        path: 'diagnostics/extended/redactions.json' as const,
-      },
-    ];
+    const extendedDiagnosticArtifacts = PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map(
+      (entry) => ({
+        ...entry,
+        content: entry.mimeType === 'text/plain' ? 'inert evidence' : '{}',
+      })
+    );
     const pagePackage = await composeExportPagePackage({
       artifact: createArchiveArtifact({
         archiveBaseName: 'page',
@@ -112,10 +83,11 @@ describe('composeExportPagePackage', () => {
     });
 
     expect(pagePackage.manifest.diagnosticsLevel).toBe('extended');
+    const extendedPaths = new Set<string>(
+      PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map(({ path }) => path)
+    );
     expect(
-      pagePackage.entries
-        .filter(({ path }) => path.startsWith('diagnostics/extended/'))
-        .map(({ path }) => path)
+      pagePackage.entries.filter(({ path }) => extendedPaths.has(path)).map(({ path }) => path)
     ).toEqual(extendedDiagnosticArtifacts.map(({ path }) => path));
   });
 

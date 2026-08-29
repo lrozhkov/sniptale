@@ -4,6 +4,7 @@ import {
   collectAdvancedLogAssets,
   collectCssDiagnosticAssets,
   collectCoreLogAssets,
+  buildIssuesAsset,
 } from '../diagnostics';
 import type { ArchiveAsset } from '../archive';
 import type { ExportDiagnosticsSource } from '../diagnostics/source';
@@ -16,6 +17,7 @@ import {
   captureWebSnapshotViewportScreenshot,
 } from '../../web-snapshot/capture';
 import { translate } from '../../../../platform/i18n';
+import { buildCaptureTimelineAsset } from '../diagnostics/timeline';
 
 export function finishExportSuccess(
   state: ExportManagerState,
@@ -131,5 +133,19 @@ export async function collectExportExtraAssets(args: {
     }
   }
   args.throwIfCancelled();
+  if (args.options.includeBasicLogs) {
+    extraAssets.push(
+      buildIssuesAsset({
+        options: args.options,
+        treeData: args.snapshot.tree,
+        iframeReadiness: args.snapshot.iframeReadiness,
+        fileCandidatesCount: args.fileCandidatesCount,
+        downloadedFilesCount: args.downloadedFilesCount,
+        warnings: args.warnings,
+        diagnosticsSource: args.diagnosticsSource,
+      })
+    );
+    extraAssets.push(buildCaptureTimelineAsset(args.state));
+  }
   return extraAssets;
 }

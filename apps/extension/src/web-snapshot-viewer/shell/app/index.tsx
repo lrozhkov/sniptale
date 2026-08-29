@@ -314,6 +314,7 @@ function WebSnapshotViewerSurface(props: {
         ref={zoom.surfaceRef}
         data-testid="snapshot-viewer-surface"
         className={`relative min-h-0 w-full min-w-0 max-w-full flex-1 overflow-auto ${zoom.grabClassName}`}
+        style={{ scrollbarGutter: 'stable' }}
         onPointerDown={zoom.onPointerDown}
         onPointerMove={zoom.onPointerMove}
         onPointerUp={zoom.onPointerUp}

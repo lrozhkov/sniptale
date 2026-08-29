@@ -39,7 +39,7 @@ it('uses the iframe load event as the navigation-blocking hook', () => {
   expect(onLoad).toHaveBeenCalledTimes(1);
 });
 
-it('keeps srcdoc snapshots no-scripts so about:srcdoc script blocking is expected', () => {
+it('keeps srcdoc snapshots no-scripts with a browser-supported offline policy', () => {
   act(() => {
     root?.render(
       <WebSnapshotFrame
@@ -55,7 +55,7 @@ it('keeps srcdoc snapshots no-scripts so about:srcdoc script blocking is expecte
 
   expect(iframeElement?.getAttribute('srcdoc')).toContain('<script>');
   expect(iframeElement?.getAttribute('srcdoc')).toContain("form-action 'none'");
-  expect(iframeElement?.getAttribute('srcdoc')).toContain("navigate-to 'none'");
+  expect(iframeElement?.getAttribute('srcdoc')).not.toContain('navigate-to');
   expect(iframeElement?.getAttribute('srcdoc')).toContain(
     '<style data-sniptale-viewer-baseline>@layer sniptale-viewer-baseline{body{font-size:initial}}</style>'
   );

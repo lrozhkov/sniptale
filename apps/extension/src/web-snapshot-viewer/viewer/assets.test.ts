@@ -280,6 +280,7 @@ it('loads a valid package and rewrites captured asset references to object URLs'
     'blob:snapshot-asset',
     'blob:snapshot-asset',
     'blob:snapshot-asset',
+    'blob:snapshot-asset',
   ]);
   expect(loaded.archiveFilename).toBe('Snapshot.sniptale-page-package.zip');
   expect(loaded.archiveSize).toBeGreaterThan(0);
@@ -292,7 +293,7 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   );
   expect(loaded.html).not.toContain(' href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
-  expect(URL.createObjectURL).toHaveBeenCalledTimes(4);
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(5);
 });
 
 it('materializes SVG sprite fragments in DOM and CSS asset references', async () => {

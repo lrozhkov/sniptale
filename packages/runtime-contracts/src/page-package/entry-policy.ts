@@ -36,7 +36,7 @@ function hasRecursiveLeaf(path: string, prefix: string): boolean {
 }
 
 export function isExtendedDiagnosticPath(path: string): boolean {
-  return path.startsWith('diagnostics/extended/');
+  return path.startsWith('diagnostics/extended/') || path.startsWith('diagnostics/runtime/');
 }
 
 function isActiveDiagnosticPath(path: string): boolean {
@@ -55,6 +55,9 @@ function isDiagnosticEntryPath(path: string, mimeType: string): boolean {
   }
   if (isExtendedDiagnosticPath(path)) {
     return getPagePackageExtendedDiagnosticMimeType(path) === mimeType;
+  }
+  if (path === PAGE_PACKAGE_ARCHIVE_PATHS.diagnosticsIndex) {
+    return mimeType === 'application/json';
   }
   return (
     hasRecursiveLeaf(path, 'diagnostics/standard/') || hasRecursiveLeaf(path, 'diagnostics/export/')

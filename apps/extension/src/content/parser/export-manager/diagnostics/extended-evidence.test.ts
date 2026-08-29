@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import {
   buildExtendedDiagnosticArtifacts,
+  enrichExtendedDiagnosticArtifacts,
   MAX_EXTENDED_DIAGNOSTIC_METADATA_INPUT_BYTES,
 } from './extended-evidence';
 import { MAX_EXTENDED_DIAGNOSTIC_ELEMENTS } from './extended-evidence.dom';
@@ -50,9 +51,18 @@ describe('extended diagnostic evidence', () => {
     });
     expect(artifacts.map(({ path, mimeType }) => ({ path, mimeType }))).toEqual([
       {
-        path: 'diagnostics/extended/live-dom.html.txt',
+        path: 'diagnostics/extended/page/live-dom.html.txt',
         mimeType: 'text/plain',
       },
+      {
+        path: 'diagnostics/extended/page/prepared-dom.html.txt',
+        mimeType: 'text/plain',
+      },
+      {
+        path: 'diagnostics/extended/page/published-dom.html.txt',
+        mimeType: 'text/plain',
+      },
+      { path: 'diagnostics/extended/assets.json', mimeType: 'application/json' },
       {
         path: 'diagnostics/extended/document-metadata.json',
         mimeType: 'application/json',
@@ -75,6 +85,18 @@ describe('extended diagnostic evidence', () => {
       },
       {
         path: 'diagnostics/extended/redactions.json',
+        mimeType: 'application/json',
+      },
+      {
+        path: 'diagnostics/runtime/page-state.json',
+        mimeType: 'application/json',
+      },
+      {
+        path: 'diagnostics/runtime/resource-timing.json',
+        mimeType: 'application/json',
+      },
+      {
+        path: 'diagnostics/runtime/application-map.json',
         mimeType: 'application/json',
       },
     ]);
@@ -129,6 +151,17 @@ describe('extended diagnostic evidence', () => {
     expect(redactions).toContain('form-control-state');
     expect(redactions).toContain('inline-handler');
     expect(redactions).toContain('stylesheet-body');
+
+    const enriched = enrichExtendedDiagnosticArtifacts(artifacts, {
+      assetLedger: { entries: [{ localPath: 'assets/1-icon.svg', status: 'captured' }] },
+      publishedHtml: '<!doctype html><main>Published copy</main>',
+    });
+    expect(
+      enriched.find((entry) => entry.path.endsWith('/published-dom.html.txt'))?.content
+    ).toContain('Published copy');
+    expect(enriched.find((entry) => entry.path.endsWith('/assets.json'))?.content).toContain(
+      'assets/1-icon.svg'
+    );
   });
 
   it('rejects invalid injected hashes without exporting script content', async () => {

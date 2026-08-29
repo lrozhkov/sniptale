@@ -38,6 +38,9 @@ it('projects progress defaults only when a callback is registered', () => {
 
   updateExportManagerProgress(state, { phase: 'done', message: 'ignored' });
   expect(progressSpy).not.toHaveBeenCalled();
+  expect(state.diagnosticTimeline).toEqual([
+    expect.objectContaining({ phase: 'done', step: null }),
+  ]);
 
   setExportManagerProgressCallback(state, progressSpy);
   updateExportManagerProgress(state, {
@@ -53,4 +56,7 @@ it('projects progress defaults only when a callback is registered', () => {
     total: 0,
     errors: [],
   });
+  expect(state.diagnosticTimeline.at(-1)).toEqual(
+    expect.objectContaining({ phase: 'done', step: null })
+  );
 });

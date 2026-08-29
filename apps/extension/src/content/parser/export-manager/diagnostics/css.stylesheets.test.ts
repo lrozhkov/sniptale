@@ -191,3 +191,23 @@ it('serializes document and adopted stylesheets with metadata and restriction fa
   expectStylesheetManifest(manifest);
   expectNoRawStylesheetText(assets);
 });
+
+it('bounds and sanitizes page-authored stylesheet and iframe metadata', () => {
+  const styleOwner = document.createElement('style');
+  styleOwner.id = `token=private-${'x'.repeat(5_000)}`;
+  styleOwner.setAttribute('data-ui', 'secret=private-value');
+  styleOwner.setAttribute('media', 'url("data:text/plain,private-body")');
+  Object.defineProperty(document, 'styleSheets', {
+    configurable: true,
+    value: [createSheet({ media: ['screen and (token=private)'], ownerNode: styleOwner })],
+  });
+
+  const content = String(buildStylesheetDiagnosticAssets()[0]?.content);
+
+  expect(content).toContain('token=***');
+  expect(content).toContain('secret=***');
+  expect(content).toContain('[embedded text/plain]');
+  expect(content).not.toContain('private-value');
+  expect(content).not.toContain('private-body');
+  expect(content.length).toBeLessThan(2_000);
+});

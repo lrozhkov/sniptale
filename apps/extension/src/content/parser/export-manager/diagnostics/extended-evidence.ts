@@ -14,6 +14,12 @@ import {
 } from './extended-evidence.dom';
 import { resolveDiagnosticsDocument, type ExportDiagnosticsSource } from './source';
 import { estimateUtf8Bytes } from '@sniptale/runtime-contracts/validation/base64';
+import { buildVirtualDomSnapshotHtml } from './snapshot';
+import {
+  buildRuntimeApplicationMap,
+  buildRuntimePageState,
+  buildRuntimeResourceTiming,
+} from './runtime';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAX_EXTENDED_DIAGNOSTIC_HASH_INPUT_BYTES = 32 * 1024 * 1024;
@@ -117,12 +123,40 @@ function collectFrameMetadata(documentRoot: Document): Record<string, unknown>[]
   if (frames.length > MAX_EXTENDED_DIAGNOSTIC_ELEMENTS) {
     throw new Error('Extended diagnostic frame inventory exceeds the element limit.');
   }
-  return frames.map((frame) => ({
-    accessible: (frame as HTMLIFrameElement).contentDocument !== null,
-    elementPath: elementPath(frame),
-    src: redactDiagnosticUrlSecrets(frame.getAttribute('src') ?? undefined) ?? null,
-    srcdocLength: frame.getAttribute('srcdoc')?.length ?? 0,
-  }));
+  return frames.map((frame) => {
+    let frameDocument: Document | null = null;
+    try {
+      frameDocument = (frame as HTMLIFrameElement).contentDocument;
+    } catch {
+      frameDocument = null;
+    }
+    const frameView = frameDocument?.defaultView;
+    return {
+      accessible: frameDocument !== null,
+      elementCount: frameDocument?.querySelectorAll('*').length ?? null,
+      elementPath: elementPath(frame),
+      flattening: frameDocument ? 'eligible' : 'unavailable-origin-policy',
+      src: redactDiagnosticUrlSecrets(frame.getAttribute('src') ?? undefined) ?? null,
+      srcdocLength: frame.getAttribute('srcdoc')?.length ?? 0,
+      stylesheetCount: frameDocument?.styleSheets.length ?? null,
+      viewport: frameView ? { height: frameView.innerHeight, width: frameView.innerWidth } : null,
+    };
+  });
+}
+
+function collectOpenShadowRootMetadata(documentRoot: Document): Record<string, unknown>[] {
+  const roots: Record<string, unknown>[] = [];
+  for (const element of documentRoot.querySelectorAll('*')) {
+    if (!element.shadowRoot) continue;
+    roots.push({
+      adoptedStylesheetCount: element.shadowRoot.adoptedStyleSheets?.length ?? 0,
+      elementCount: element.shadowRoot.querySelectorAll('*').length,
+      hostPath: elementPath(element),
+      mode: element.shadowRoot.mode,
+    });
+    if (roots.length >= MAX_EXTENDED_DIAGNOSTIC_ELEMENTS) break;
+  }
+  return roots;
 }
 
 function collectHashableElements(documentRoot: Document): {
@@ -309,6 +343,7 @@ export async function buildExtendedDiagnosticArtifacts(args: {
   const scripts = await collectScriptMetadata(hashable.scripts, args.digestText);
   const stylesheets = await collectStylesheetMetadata(hashable.styles, args.digestText);
   const frames = collectFrameMetadata(documentRoot);
+  const shadowRoots = collectOpenShadowRootMetadata(documentRoot);
   const metadata = buildDocumentMetadata({
     documentRoot,
     elementCount: projection.elementCount,
@@ -318,11 +353,31 @@ export async function buildExtendedDiagnosticArtifacts(args: {
     stylesheetCount: stylesheets.length,
   });
   const transformations = collectTransformationEvidence(documentRoot);
+  const preparedDom = buildVirtualDomSnapshotHtml(args.source);
+  const unavailablePublishedDom = [
+    '<!-- Published Web Copy was not selected or had not been materialized at this stage. -->',
+    '<!-- See diagnostics/index.json and manifest.json for authoritative availability. -->',
+  ].join('\n');
   const artifacts: ExtendedDiagnosticArtifact[] = [
     {
       content: projection.html,
       mimeType: 'text/plain',
-      path: 'diagnostics/extended/live-dom.html.txt',
+      path: 'diagnostics/extended/page/live-dom.html.txt',
+    },
+    {
+      content: preparedDom,
+      mimeType: 'text/plain',
+      path: 'diagnostics/extended/page/prepared-dom.html.txt',
+    },
+    {
+      content: unavailablePublishedDom,
+      mimeType: 'text/plain',
+      path: 'diagnostics/extended/page/published-dom.html.txt',
+    },
+    {
+      content: sanitizeJson({ availability: 'web-copy-not-collected', entries: [] }),
+      mimeType: 'application/json',
+      path: 'diagnostics/extended/assets.json',
     },
     {
       content: sanitizeJson(metadata),
@@ -340,7 +395,7 @@ export async function buildExtendedDiagnosticArtifacts(args: {
       path: 'diagnostics/extended/stylesheets.json',
     },
     {
-      content: sanitizeJson({ frames }),
+      content: sanitizeJson({ frames, openShadowRoots: shadowRoots }),
       mimeType: 'application/json',
       path: 'diagnostics/extended/frames.json',
     },
@@ -354,6 +409,21 @@ export async function buildExtendedDiagnosticArtifacts(args: {
       mimeType: 'application/json',
       path: 'diagnostics/extended/redactions.json',
     },
+    {
+      content: sanitizeJson(buildRuntimePageState(args.source)),
+      mimeType: 'application/json',
+      path: 'diagnostics/runtime/page-state.json',
+    },
+    {
+      content: sanitizeJson(buildRuntimeResourceTiming(args.source)),
+      mimeType: 'application/json',
+      path: 'diagnostics/runtime/resource-timing.json',
+    },
+    {
+      content: sanitizeJson(buildRuntimeApplicationMap(args.source)),
+      mimeType: 'application/json',
+      path: 'diagnostics/runtime/application-map.json',
+    },
   ];
   if (
     artifacts.some((artifact, index) => {
@@ -364,4 +434,34 @@ export async function buildExtendedDiagnosticArtifacts(args: {
     throw new Error('Extended diagnostic artifact inventory does not match its contract.');
   }
   return artifacts;
+}
+
+export function enrichExtendedDiagnosticArtifacts(
+  artifacts: readonly ExtendedDiagnosticArtifact[],
+  args: { assetLedger: unknown; publishedHtml: string }
+): ExtendedDiagnosticArtifact[] {
+  const publishedBytes = estimateUtf8Bytes(
+    args.publishedHtml,
+    MAX_EXTENDED_DIAGNOSTIC_METADATA_INPUT_BYTES
+  );
+  if (publishedBytes > MAX_EXTENDED_DIAGNOSTIC_METADATA_INPUT_BYTES) {
+    throw new Error('Published Web Copy diagnostics exceed the byte limit.');
+  }
+  const assetLedger = sanitizeJson(args.assetLedger);
+  const assetLedgerBytes = estimateUtf8Bytes(
+    assetLedger,
+    MAX_EXTENDED_DIAGNOSTIC_METADATA_INPUT_BYTES
+  );
+  if (assetLedgerBytes > MAX_EXTENDED_DIAGNOSTIC_METADATA_INPUT_BYTES) {
+    throw new Error('Extended asset diagnostics exceed the byte limit.');
+  }
+  return artifacts.map((artifact) => {
+    if (artifact.path === 'diagnostics/extended/page/published-dom.html.txt') {
+      return { ...artifact, content: args.publishedHtml };
+    }
+    if (artifact.path === 'diagnostics/extended/assets.json') {
+      return { ...artifact, content: assetLedger };
+    }
+    return { ...artifact };
+  });
 }

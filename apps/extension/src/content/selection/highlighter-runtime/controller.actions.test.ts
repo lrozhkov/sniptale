@@ -85,7 +85,7 @@ it('registers callbacks and routes frame actions through them', () => {
   expect(removeFrame).toHaveBeenCalledWith('frame-1');
   expect(clearFrames).toHaveBeenCalledTimes(1);
   expect(logger.warn).not.toHaveBeenCalled();
-  expect(logger.log).toHaveBeenCalledWith('Frame callbacks registered');
+  expect(logger.debug).toHaveBeenCalledWith('Frame callbacks registered');
 });
 
 it('owns pause and editing state transitions', () => {

@@ -15,8 +15,13 @@ export function resolveWebSnapshotLocalAssetReference(
     const base = new URL(sourcePath, 'https://sniptale.invalid/');
     const resolved = new URL(trimmed, base);
     if (resolved.origin !== base.origin || resolved.search) return null;
-    const path = decodeURIComponent(resolved.pathname.replace(/^\//u, ''));
-    return assetPaths.has(path) ? { fragment: resolved.hash, path } : null;
+    const encodedPath = resolved.pathname.replace(/^\//u, '');
+    if (assetPaths.has(encodedPath)) {
+      return { fragment: resolved.hash, path: encodedPath };
+    }
+
+    const decodedPath = decodeURIComponent(encodedPath);
+    return assetPaths.has(decodedPath) ? { fragment: resolved.hash, path: decodedPath } : null;
   } catch {
     return null;
   }

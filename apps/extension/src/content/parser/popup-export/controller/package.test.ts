@@ -3,8 +3,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { MAX_POPUP_EXPORT_TAB_TITLE_BYTES } from '@sniptale/runtime-contracts/export';
+import { PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE } from '@sniptale/runtime-contracts/page-package';
 import { translate } from '../../../../platform/i18n';
-
 const mocks = vi.hoisted(() => ({
   build: vi.fn(),
   buildSnapshot: vi.fn(),
@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   stage: vi.fn(),
   write: vi.fn(),
 }));
-
 vi.mock('../../../page-package', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../page-package')>()),
   buildExportPagePackage: mocks.build,
@@ -53,27 +52,10 @@ const options = {
   includeMarkdown: false,
 };
 
-const extendedArtifacts = [
-  {
-    content: '<html></html>',
-    mimeType: 'text/plain',
-    path: 'diagnostics/extended/live-dom.html.txt',
-  },
-  {
-    content: '{}',
-    mimeType: 'application/json',
-    path: 'diagnostics/extended/document-metadata.json',
-  },
-  { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/scripts.json' },
-  { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/stylesheets.json' },
-  { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/frames.json' },
-  {
-    content: '{}',
-    mimeType: 'application/json',
-    path: 'diagnostics/extended/transformations.json',
-  },
-  { content: '{}', mimeType: 'application/json', path: 'diagnostics/extended/redactions.json' },
-] as const;
+const extendedArtifacts = PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map((entry) => ({
+  ...entry,
+  content: entry.mimeType === 'text/plain' ? 'inert evidence' : '{}',
+}));
 
 async function flushTasks(): Promise<void> {
   await vi.waitFor(() => expect(mocks.build).toHaveBeenCalled());
@@ -679,7 +661,16 @@ it('does not expose Library session authority from a Web-copy Export package', a
 it('acquires selected extended evidence before Web-copy transformation for Library Save', async () => {
   const order: string[] = [];
   const pagePackage = {
-    entries: [],
+    entries: [
+      {
+        component: 'webCopy',
+        mimeType: 'text/html',
+        path: 'snapshot/index.html',
+        sha256: 'a'.repeat(64),
+        size: 35,
+        source: new Blob(['<!doctype html><main>Published</main>'], { type: 'text/html' }),
+      },
+    ],
     manifest: {
       components: [{ id: 'webCopy' }],
       id: 'snapshot-extended',
@@ -697,6 +688,7 @@ it('acquires selected extended evidence before Web-copy transformation for Libra
   mocks.buildSnapshot.mockImplementationOnce(async () => {
     order.push('web-copy');
     return {
+      diagnosticAssetLedger: { entries: [], omitted: 0, total: 0 },
       manifest: pagePackage.manifest,
       pagePackage,
       snapshotSessionId: 'ephemeral-extended-session',
@@ -732,7 +724,15 @@ it('acquires selected extended evidence before Web-copy transformation for Libra
   expect(mocks.combine).toHaveBeenCalledWith({
     artifact,
     diagnosticsLevel: 'extended',
-    extendedDiagnosticArtifacts: extendedArtifacts,
+    extendedDiagnosticArtifacts: expect.arrayContaining([
+      expect.objectContaining({
+        content: '<!doctype html><main>Published</main>',
+        path: 'diagnostics/extended/page/published-dom.html.txt',
+      }),
+      expect.objectContaining({
+        path: 'diagnostics/extended/assets.json',
+      }),
+    ]),
     intent: 'save',
     webCopy: pagePackage,
   });

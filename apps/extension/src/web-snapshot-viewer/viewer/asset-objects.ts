@@ -3,6 +3,8 @@ import {
   normalizeWebSnapshotAssetMimeType,
 } from '../../features/web-snapshot/asset-manifest';
 import {
+  appendWebSnapshotAssetFragment,
+  resolveWebSnapshotLocalAssetReference,
   sanitizeWebSnapshotStylesheetText,
   sanitizeWebSnapshotSvgText,
 } from '../../features/web-snapshot/public';
@@ -81,7 +83,7 @@ function createViewerAssetBlob(
   path: string,
   bytes: Uint8Array,
   manifestEntry: PagePackageEntry | undefined,
-  resolveAssetUrl: (path: string) => string | null
+  resolveAssetUrl: (reference: string, sourcePath: string) => string | null
 ): Blob {
   const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
   copy.set(bytes);
@@ -95,7 +97,7 @@ function createViewerAssetBlob(
         sanitizeWebSnapshotStylesheetText(css, (url) => {
           const trimmedUrl = url.trim();
           if (trimmedUrl.startsWith('#')) return trimmedUrl;
-          return resolveAssetUrl(trimmedUrl.replace(/^\.\.\//u, ''));
+          return resolveAssetUrl(trimmedUrl, path);
         }),
       ],
       { type: 'text/css' }
@@ -155,6 +157,21 @@ export async function createViewerAssetObjectUrls(
     const cssEntriesByPath = new Map(
       validatedEntries.filter(isCssEntry).map((entry) => [entry.path, entry])
     );
+    const assetPaths = new Set(validatedEntries.map((entry) => entry.path));
+    const resolveMaterializedAssetUrl = (
+      referenceValue: string,
+      sourcePath: string,
+      resolvePath: (path: string) => string | null
+    ): string | null => {
+      const reference = resolveWebSnapshotLocalAssetReference(
+        referenceValue,
+        sourcePath,
+        assetPaths
+      );
+      if (!reference) return null;
+      const objectUrl = resolvePath(reference.path);
+      return objectUrl ? appendWebSnapshotAssetFragment(objectUrl, reference.fragment) : null;
+    };
     for (const entry of validatedEntries) {
       const mimeType = entry.manifestEntry?.mimeType ?? 'application/octet-stream';
       const downloadEligible = entry.manifestEntry !== undefined;
@@ -171,7 +188,12 @@ export async function createViewerAssetObjectUrls(
         entry.path,
         entry.bytes,
         entry.manifestEntry,
-        (assetPath) => urlsByPath.get(assetPath) ?? null
+        (referenceValue, sourcePath) =>
+          resolveMaterializedAssetUrl(
+            referenceValue,
+            sourcePath,
+            (assetPath) => urlsByPath.get(assetPath) ?? null
+          )
       );
       const objectUrl = URL.createObjectURL(blob);
       objectUrls.push(objectUrl);
@@ -193,10 +215,12 @@ export async function createViewerAssetObjectUrls(
           entry.path,
           entry.bytes,
           entry.manifestEntry,
-          (assetPath) =>
-            cssEntriesByPath.has(assetPath)
-              ? createCssObjectUrl(assetPath)
-              : (urlsByPath.get(assetPath) ?? null)
+          (referenceValue, sourcePath) =>
+            resolveMaterializedAssetUrl(referenceValue, sourcePath, (assetPath) =>
+              cssEntriesByPath.has(assetPath)
+                ? createCssObjectUrl(assetPath)
+                : (urlsByPath.get(assetPath) ?? null)
+            )
         );
         const objectUrl = URL.createObjectURL(blob);
         objectUrls.push(objectUrl);

@@ -1,4 +1,4 @@
-import { collectWebSnapshotAssets } from './assets';
+import { collectWebSnapshotAssets, finalizeWebSnapshotDiagnosticAssetLedger } from './assets';
 import { captureWebSnapshotScreenshotWithWarnings } from './capture';
 import { buildWebSnapshotPackage } from './package';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
@@ -267,6 +267,11 @@ export async function buildCurrentPageWebSnapshot(args: {
 
   return {
     ...packaged,
+    diagnosticAssetLedger: finalizeWebSnapshotDiagnosticAssetLedger({
+      assets,
+      manifest: packaged.manifest,
+      targets: assetResult.diagnosticAssetTargets,
+    }),
     snapshotSessionId,
     warnings: warningSummary.warnings,
   };

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { inspectDocument } from './document-inspection.mjs';
+import { verifySnapshotDiagnostics } from './diagnostics-verification.mjs';
 import { compareScreenshots } from './pixel-comparison.mjs';
 import { enableForTab, saveSnapshot } from './popup-driver.mjs';
 import { prepareExternalTarget, settleRenderedDocument } from './page-preparation.mjs';
@@ -255,7 +256,24 @@ async function saveTargetSnapshot(popup, page) {
   await enableForTab(popup, page, tab.id);
   await popup.evaluate((id) => globalThis.chrome.tabs.update(id, { active: true }), tab.id);
   await page.bringToFront();
-  return saveSnapshot(popup, tab.id, { timeoutMs: 180_000 });
+  return saveSnapshot(popup, tab.id, { richPackage: true, timeoutMs: 180_000 });
+}
+
+async function readViewerArchive(viewer) {
+  const archiveBase64 = await viewer
+    .locator('a[download][href^="blob:"]')
+    .first()
+    .evaluate(async (link) => {
+      const bytes = new Uint8Array(
+        await fetch(link.href).then((response) => response.arrayBuffer())
+      );
+      let binary = '';
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      }
+      return globalThis.btoa(binary);
+    });
+  return Buffer.from(archiveBase64, 'base64');
 }
 
 async function captureExportedEvidence(context, descriptor, extensionId, saved) {
@@ -265,9 +283,11 @@ async function captureExportedEvidence(context, descriptor, extensionId, saved) 
     await viewer.goto(
       `chrome-extension://${extensionId}/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=${encodeURIComponent(saved.assetId)}`
     );
-    return descriptor.comparison === 'static'
-      ? await materializeStaticDocument(context, viewer)
-      : await materializeRetainedScreenshot(viewer);
+    const evidence =
+      descriptor.comparison === 'static'
+        ? await materializeStaticDocument(context, viewer)
+        : await materializeRetainedScreenshot(viewer);
+    return { ...evidence, archiveBytes: await readViewerArchive(viewer) };
   } finally {
     await viewer.close();
   }
@@ -302,6 +322,7 @@ function buildTargetMetrics(descriptor, page, source, exported, saved, pixel) {
             imageStats: exported.info.imageStats,
             images: exported.info.loadedImages,
             textLength: exported.info.textLength,
+            unloadedImageSamples: exported.info.unloadedImageSamples,
           }
         : null,
       source: {
@@ -309,6 +330,7 @@ function buildTargetMetrics(descriptor, page, source, exported, saved, pixel) {
         imageStats: source.info.imageStats,
         images: source.info.loadedImages,
         textLength: source.info.textLength,
+        unloadedImageSamples: source.info.unloadedImageSamples,
       },
     },
     source: {
@@ -332,6 +354,11 @@ export async function verifyExternalTarget({ context, descriptor, extensionId, o
     const source = await captureSourceEvidence(context, descriptor, page, targetOut);
     const saved = await saveTargetSnapshot(popup, page);
     const exported = await captureExportedEvidence(context, descriptor, extensionId, saved);
+    const diagnostics = await verifySnapshotDiagnostics(exported.archiveBytes);
+    await writeFile(
+      join(targetOut, 'diagnostics-check.json'),
+      `${JSON.stringify(diagnostics, null, 2)}\n`
+    );
     await writeFile(join(targetOut, 'exported.png'), exported.bytes);
     const pixel = await compareScreenshots(context, source.bytes, exported.bytes, {
       createDiff: true,
@@ -343,6 +370,11 @@ export async function verifyExternalTarget({ context, descriptor, extensionId, o
     await writeFile(join(targetOut, 'diff.png'), Buffer.from(diffBase64, 'base64'));
     const metrics = buildTargetMetrics(descriptor, page, source, exported, saved, pixel);
     const failures = evaluateThresholds(descriptor, metrics);
+    failures.push(...diagnostics.violations.map((id) => `diagnostics ${id}`));
+    metrics.diagnostics = {
+      status: diagnostics.status,
+      violations: diagnostics.violations,
+    };
     metrics.status = failures.length === 0 ? 'passed' : 'failed';
     if (failures.length > 0) metrics.failures = failures;
     await writeFile(join(targetOut, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`);

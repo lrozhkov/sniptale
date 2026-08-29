@@ -4632,6 +4632,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/core.test.expectations.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.computed-styles.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/css.fonts.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/css.sanitizer.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.stylesheets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/dom-driver.ts",
@@ -4642,8 +4644,10 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.url-attributes.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/runtime.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/source.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/timeline.ts",
         "apps/extension/src/content/parser/export-manager/files/disposition-filename.ts",
         "apps/extension/src/content/parser/export-manager/files/download-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
@@ -4700,6 +4704,7 @@
         "apps/extension/src/content/parser/page-preparation/local-save/service.ts",
         "apps/extension/src/content/parser/page-preparation/local-save/types.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/builder.ts",
+        "apps/extension/src/content/parser/page-preparation/snapshot/iframe-styles.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/index.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/inert-virtual-dom.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/interaction-state.ts",
@@ -4707,6 +4712,7 @@
         "apps/extension/src/content/parser/page-preparation/snapshot/overlays.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/responsive-assets.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/sanitizer.ts",
+        "apps/extension/src/content/parser/page-preparation/snapshot/style-assets.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/styles.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/types.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/warnings.ts",
@@ -4813,6 +4819,7 @@
         "apps/extension/src/content/parser/web-snapshot/asset-fetch.ts",
         "apps/extension/src/content/parser/web-snapshot/asset-session.ts",
         "apps/extension/src/content/parser/web-snapshot/asset-targets.ts",
+        "apps/extension/src/content/parser/web-snapshot/asset-url.ts",
         "apps/extension/src/content/parser/web-snapshot/asset-warnings.ts",
         "apps/extension/src/content/parser/web-snapshot/assets.ts",
         "apps/extension/src/content/parser/web-snapshot/capture.ts",
@@ -5319,6 +5326,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/core.test.expectations.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.computed-styles.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/css.fonts.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/css.sanitizer.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.stylesheets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/css.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/dom-driver.ts",
@@ -5329,8 +5338,10 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.url-attributes.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/runtime.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/source.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/timeline.ts",
         "apps/extension/src/content/parser/export-manager/files/disposition-filename.ts",
         "apps/extension/src/content/parser/export-manager/files/download-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
@@ -9351,6 +9362,7 @@
       "productionFiles": [
         "apps/extension/src/features/web-snapshot/asset-manifest.ts",
         "apps/extension/src/features/web-snapshot/asset-validation.ts",
+        "apps/extension/src/features/web-snapshot/local-asset-reference.ts",
         "apps/extension/src/features/web-snapshot/manifest.ts",
         "apps/extension/src/features/web-snapshot/mime-signature.ts",
         "apps/extension/src/features/web-snapshot/package-policy.ts",
@@ -9364,6 +9376,7 @@
       "rolloutFiles": [
         "apps/extension/src/features/web-snapshot/asset-manifest.ts",
         "apps/extension/src/features/web-snapshot/asset-validation.ts",
+        "apps/extension/src/features/web-snapshot/local-asset-reference.ts",
         "apps/extension/src/features/web-snapshot/manifest.ts",
         "apps/extension/src/features/web-snapshot/mime-signature.ts",
         "apps/extension/src/features/web-snapshot/package-policy.ts",
@@ -13039,6 +13052,7 @@
         "apps/extension/src/workflows/page-package/contributions/diagnostics.ts",
         "apps/extension/src/workflows/page-package/contributions/export.ts",
         "apps/extension/src/workflows/page-package/contributions/web-copy.ts",
+        "apps/extension/src/workflows/page-package/diagnostic-index.ts",
         "apps/extension/src/workflows/page-package/import/contracts.ts",
         "apps/extension/src/workflows/page-package/import/entry-source.ts",
         "apps/extension/src/workflows/page-package/import/index.ts",
@@ -17114,6 +17128,26 @@
       ]
     },
     {
+      "id": "policy.source.diagnostics-verification-mjs.16410d9520",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/diagnostics-verification.mjs",
+        "contentHash": "928df4647467ed3b38c99159586f611fb268af07dba1139ae606a824cdd3f515"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/diagnostics-verification.mjs",
+        "tooling/web-snapshot-smoke/diagnostics-verification.test.ts",
+        "tooling/web-snapshot-smoke/polygon-verification.mjs"
+      ],
+      "surfaces": [
+        "binding:REQUIRED_PATHS"
+      ]
+    },
+    {
       "id": "policy.source.discovery-mjs.d42e45d16b",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17162,7 +17196,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/document-inspection.mjs",
-        "contentHash": "1095a927216c982305f678cab585d9a95f2a39a2f4ed35d846a9d2026a709721"
+        "contentHash": "055abd01ac3110fa3702fc1c7fac8175d1956e6b6be83b2008d59a202751fc89"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/document-inspection.mjs",
@@ -19600,7 +19634,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/polygon-verification.mjs",
-        "contentHash": "e0ec1a3a882d9bcc81572a39607727995c4c7159b4100d65bed39e858a50c2b7"
+        "contentHash": "2e9c97ce7914dd916c37e8835cf93018ccf2be324ac943b2713cd148b2545801"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/polygon-runner.mjs",
@@ -19627,7 +19661,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/popup-driver.mjs",
-        "contentHash": "e9e5c082a6ebcde2574e4341e98e20ebbb05ffc25b0a196a5f0528be7bae7cd1"
+        "contentHash": "1a795d27cc106a8c14900f8871a3f5d6d313fd0867ec718bf62da972703bbde1"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/case-verification.mjs",
@@ -19637,15 +19671,15 @@
         "tooling/web-snapshot-smoke/source-capture.mjs"
       ],
       "surfaces": [
-        "property:downloadSnapshotPackage/anonymous-94/captureTiming",
-        "property:downloadSnapshotPackage/anonymous-94/downloadProof",
-        "property:downloadSnapshotPackage/anonymous-94/options",
-        "property:downloadSnapshotPackage/anonymous-94/sources",
-        "property:downloadSnapshotPackage/anonymous-94/warnings",
-        "property:downloadSnapshotPackage/anonymous-94/withFreshness/__sniptaleRuntimeFreshness",
+        "property:downloadSnapshotPackage/anonymous-95/captureTiming",
+        "property:downloadSnapshotPackage/anonymous-95/downloadProof",
+        "property:downloadSnapshotPackage/anonymous-95/options",
+        "property:downloadSnapshotPackage/anonymous-95/sources",
+        "property:downloadSnapshotPackage/anonymous-95/warnings",
+        "property:downloadSnapshotPackage/anonymous-95/withFreshness/__sniptaleRuntimeFreshness",
         "property:enableForTab/anonymous-11/__sniptaleRuntimeFreshness",
-        "property:enableWebSnapshotsForSmoke/anonymous-380/fullPageQuality",
-        "property:enableWebSnapshotsForSmoke/anonymous-380/sniptale_settings",
+        "property:enableWebSnapshotsForSmoke/anonymous-381/fullPageQuality",
+        "property:enableWebSnapshotsForSmoke/anonymous-381/sniptale_settings",
         "property:saveSnapshot/anonymous-30/captureTiming",
         "property:saveSnapshot/anonymous-30/options",
         "property:saveSnapshot/anonymous-30/sources",

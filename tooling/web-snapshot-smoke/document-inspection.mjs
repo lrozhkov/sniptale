@@ -36,6 +36,15 @@ export async function inspectDocument(pageOrFrame) {
         total: images.length,
       },
       loadedImages: images.filter((image) => image.naturalWidth > 0).length,
+      unloadedImageSamples: images
+        .filter((image) => image.naturalWidth === 0)
+        .slice(0, 20)
+        .map((image) => ({
+          alt: image.getAttribute('alt') ?? '',
+          authoredResource: image.getAttribute('resource') ?? '',
+          currentSource: image.currentSrc,
+          source: image.getAttribute('src') ?? '',
+        })),
       inlineMaskImage: inlineMaskStyle?.maskImage || inlineMaskStyle?.webkitMaskImage || null,
       revealedSectionCount: globalThis.document.querySelectorAll('section.visible').length,
       scriptCount: globalThis.document.querySelectorAll('script').length,

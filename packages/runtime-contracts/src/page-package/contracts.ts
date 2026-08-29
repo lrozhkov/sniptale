@@ -5,6 +5,7 @@ export const PAGE_PACKAGE_ARCHIVE_MIME_TYPE = 'application/x-sniptale-page-packa
 export const PAGE_COLLECTION_ARCHIVE_MIME_TYPE =
   'application/x-sniptale-page-collection+zip' as const;
 export const PAGE_PACKAGE_ARCHIVE_PATHS = {
+  diagnosticsIndex: 'diagnostics/index.json',
   manifest: 'manifest.json',
   partialScreenshot: 'page-viewport-preview.png',
   readme: 'README.md',
@@ -61,7 +62,10 @@ export const PAGE_PACKAGE_WEB_COPY_ASSET_MIME_TYPES = [
 ] as const;
 
 export const PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE = [
-  { path: 'diagnostics/extended/live-dom.html.txt', mimeType: 'text/plain' },
+  { path: 'diagnostics/extended/page/live-dom.html.txt', mimeType: 'text/plain' },
+  { path: 'diagnostics/extended/page/prepared-dom.html.txt', mimeType: 'text/plain' },
+  { path: 'diagnostics/extended/page/published-dom.html.txt', mimeType: 'text/plain' },
+  { path: 'diagnostics/extended/assets.json', mimeType: 'application/json' },
   {
     path: 'diagnostics/extended/document-metadata.json',
     mimeType: 'application/json',
@@ -78,6 +82,18 @@ export const PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE = [
   },
   {
     path: 'diagnostics/extended/redactions.json',
+    mimeType: 'application/json',
+  },
+  {
+    path: 'diagnostics/runtime/page-state.json',
+    mimeType: 'application/json',
+  },
+  {
+    path: 'diagnostics/runtime/resource-timing.json',
+    mimeType: 'application/json',
+  },
+  {
+    path: 'diagnostics/runtime/application-map.json',
     mimeType: 'application/json',
   },
 ] as const;

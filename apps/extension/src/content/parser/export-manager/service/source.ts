@@ -39,9 +39,17 @@ export function createExportDiagnosticsSource(
     return undefined;
   }
 
+  const sourceDocument = snapshotSource.document;
+  const ambientWindow = typeof window === 'undefined' ? undefined : window;
+  const ambientProtocol = ambientWindow?.location.protocol;
+  const liveDocumentMatchesSource =
+    sourceDocument.defaultView === null &&
+    ambientWindow !== undefined &&
+    (ambientProtocol === 'http:' || ambientProtocol === 'https:' || ambientProtocol === 'file:');
+  const diagnosticsDocument = liveDocumentMatchesSource ? ambientWindow.document : sourceDocument;
   return {
-    document: snapshotSource.document,
+    document: diagnosticsDocument,
     pageUrl: snapshotSource.pageUrl ?? undefined,
-    view: snapshotSource.document.defaultView,
+    view: liveDocumentMatchesSource ? ambientWindow : diagnosticsDocument.defaultView,
   };
 }

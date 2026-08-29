@@ -206,6 +206,7 @@ it('keeps captured layout dimensions while switching between fit and manual zoom
   expect(viewport()?.style.height).toBe('1440px');
   const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
   expect(surface?.className).toContain('overflow-auto');
+  expect(surface?.style.scrollbarGutter).toBe('stable');
   expect(surface?.className).toContain('cursor-grab');
 
   const zoomButtons = percentButton?.parentElement?.querySelectorAll('button');

@@ -23,8 +23,11 @@ An unavailable page, server error, CAPTCHA/login wall, or missing readiness sele
   source.png
   exported.png
   diff.png
+  diagnostics-check.json
   metrics.json
 ```
+
+The visual comparison remains the polygon's primary authority. For every successfully saved target, `diagnostics-check.json` independently verifies the diagnostic index, monotonic capture timeline, live/prepared/published DOM stages, exact published Web Copy parity, asset ledger metadata, CSS/font probes, iframe and open Shadow DOM inventories, inert diagnostic paths, sensitive-URL redaction, and manifest inventory plus SHA-256 digests. A violated diagnostic invariant fails that target with its own named reason; it never changes or relaxes the pixel thresholds.
 
 A target that cannot reach comparison still writes `metrics.json` with its `skipped` or `failed` status and concrete reason; unavailable image artifacts are not fabricated.
 

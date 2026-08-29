@@ -17,7 +17,7 @@ function createExtendedManifest(): WebSnapshotManifest {
       ...PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE.map((entry, index) => ({
         ...entry,
         component: 'diagnostics' as const,
-        sha256: String(index + 1).repeat(64),
+        sha256: ((index + 1) % 16).toString(16).repeat(64),
         size: 1,
       })),
     ],
