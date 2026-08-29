@@ -21,6 +21,10 @@ import type { WebCopyResourcePreferences } from '../pages/snapshot-availability'
 import type { FullPageCapturePreferences } from '../../../../contracts/full-page-capture';
 import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../../contracts/full-page-capture';
 import { PackageCaptureBehaviorSettings } from './capture-behavior';
+import {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  type ExportResourceLimits,
+} from '@sniptale/runtime-contracts/export';
 
 type DataTypeSectionProps = ExportOptionToggleProps & {
   destination: PopupPackageDestination;
@@ -32,6 +36,8 @@ type DataTypeSectionProps = ExportOptionToggleProps & {
   onOpenSettings?: () => void;
   captureBehavior?: FullPageCapturePreferences;
   onCaptureBehaviorChange?: (preferences: FullPageCapturePreferences) => void;
+  resourceLimits?: ExportResourceLimits;
+  onResourceLimitsChange?: (limits: ExportResourceLimits) => void;
   packagePreferences: PopupPagePackagePreferenceState;
   webCopyResources: WebCopyResourcePreferences;
 };
@@ -445,6 +451,8 @@ export function ExportDataTypeSection(props: DataTypeSectionProps) {
         <PackageCaptureBehaviorSettings
           preferences={props.captureBehavior ?? DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES}
           onChange={props.onCaptureBehaviorChange ?? (() => undefined)}
+          resourceLimits={props.resourceLimits ?? DEFAULT_EXPORT_RESOURCE_LIMITS}
+          onResourceLimitsChange={props.onResourceLimitsChange ?? (() => undefined)}
         />
       ) : props.isOpen ? (
         renderDataTypeBody({

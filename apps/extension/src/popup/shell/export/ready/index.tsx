@@ -110,6 +110,8 @@ function renderDataTypeSection(
       onOpenSettings={onOpenSettings}
       captureBehavior={captureBehavior.preferences}
       onCaptureBehaviorChange={captureBehavior.update}
+      resourceLimits={captureBehavior.resourceLimits}
+      onResourceLimitsChange={captureBehavior.updateResourceLimits}
       packagePreferences={packagePreferences}
       setIncludeAnnotations={props.setIncludeAnnotations}
       setIncludeBasicLogs={props.setIncludeBasicLogs}

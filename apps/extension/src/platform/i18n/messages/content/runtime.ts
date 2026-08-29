@@ -73,6 +73,10 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Извлечение изображений из Froala редакторов...',
     en: 'Extracting images from Froala editors...',
   },
+  scanPageImages: {
+    ru: 'Поиск изображений страницы...',
+    en: 'Finding page images...',
+  },
   exportParagraphLabel: {
     ru: 'Абзац',
     en: 'Paragraph',

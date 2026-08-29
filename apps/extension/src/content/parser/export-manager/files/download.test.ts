@@ -234,6 +234,33 @@ it('blocks cross-origin credentialed downloads before issuing the request', asyn
   ]);
 });
 
+it('prevents passive page images from automatically following redirects', async () => {
+  const resource: FileResource = {
+    filename: 'image.png',
+    source: 'page-image',
+    url: 'https://example.com/redirect-to-cdn',
+  };
+  const fetchMock = installFetchMock(async (_url, init) => {
+    expect(init).toEqual({
+      credentials: 'include',
+      redirect: 'manual',
+      signal: expect.any(AbortSignal),
+    });
+    return new Response(null, { status: 302, statusText: 'Found' });
+  });
+
+  const result = await downloadFileResources(
+    [resource],
+    undefined,
+    () => false,
+    () => undefined
+  );
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.files.size).toBe(0);
+  expect(result.errors).toEqual(['Failed to download image.png: HTTP 302: Found']);
+});
+
 it('returns empty collections when the input queue is empty', async () => {
   const progress = vi.fn();
 
@@ -245,6 +272,48 @@ it('returns empty collections when the input queue is empty', async () => {
     urlUuidToFilename: new Map(),
   });
   expect(progress).not.toHaveBeenCalled();
+});
+
+it('admits only the configured number of resources before starting downloads', async () => {
+  const fetchMock = installFetchMock(async () => createResponse('ok'));
+  const resources = [
+    createResource('https://example.com/first.bin', 'first.bin'),
+    createResource('https://example.com/second.bin', 'second.bin'),
+  ];
+
+  const result = await downloadFileResources(
+    resources,
+    undefined,
+    () => false,
+    () => undefined,
+    undefined,
+    { maxFileCount: 1, maxFileSizeMiB: 10, maxTotalSizeMiB: 10 }
+  );
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(listFileNames(result)).toEqual(['first.bin']);
+  expect(result.errors).toEqual(['Skipped 1 files: attachment count limit exceeded']);
+});
+
+it('skips a downloaded resource that would exceed the configured total', async () => {
+  installFetchMock(async () => new Response('x'.repeat(6 * 1024 * 1024)));
+  const resources = [
+    createResource('https://example.com/first.bin', 'first.bin'),
+    createResource('https://example.com/second.bin', 'second.bin'),
+  ];
+
+  const result = await downloadFileResources(
+    resources,
+    undefined,
+    () => false,
+    () => undefined,
+    undefined,
+    { maxFileCount: 10, maxFileSizeMiB: 10, maxTotalSizeMiB: 10 }
+  );
+
+  expect(result.files.size).toBe(1);
+  expect(result.errors).toHaveLength(1);
+  expect(result.errors[0]).toContain('Total attachment size limit exceeded');
 });
 
 it('does not start a new queued download after cancellation flips in flight', async () => {

@@ -176,6 +176,7 @@ it('reads every visible domain while removing secret and device-bound state', as
     },
   });
   expect(snapshot.domains['capture.pages']?.data).toEqual({
+    resourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
     timing: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
   });
   expect(snapshot.domains).not.toHaveProperty('access.capture-assets');
@@ -377,6 +378,7 @@ function settingsFixture() {
     },
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
+    exportResourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
     pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
     voiceInput: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: 'device-secret' },
   };

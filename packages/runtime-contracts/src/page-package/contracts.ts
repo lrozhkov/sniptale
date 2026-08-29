@@ -1,3 +1,5 @@
+import type { ExportResourceLimits } from '../export/resource-limits';
+
 export const PAGE_PACKAGE_SCHEMA_VERSION = 1 as const;
 export const PAGE_PACKAGE_ARCHIVE_MIME_TYPE = 'application/x-sniptale-page-package+zip' as const;
 export const PAGE_COLLECTION_ARCHIVE_MIME_TYPE =
@@ -143,6 +145,7 @@ export interface PagePackageExportOptionsV1 {
   includeJson: boolean;
   includeMarkdown: boolean;
   includePageDiagnostics: boolean;
+  resourceLimits?: ExportResourceLimits;
 }
 
 export interface PagePackageProgressV1 {

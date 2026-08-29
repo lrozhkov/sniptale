@@ -16,6 +16,7 @@ import { browserStorage } from '../infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { loadSettings } from '../settings';
 import { parsePagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
+import { parseExportResourceLimits } from '@sniptale/runtime-contracts/export';
 
 const SYNC_KEYS = [
   'sniptale_settings',
@@ -181,6 +182,11 @@ function applySettingsWrites(context: WriteBuildContext): void {
     const timing = parsePagePackageCaptureTimingPolicy(pages['timing']);
     if (!timing) throw new Error('Imported page capture timing settings are invalid');
     nextSettings.pagePackageCaptureTiming = timing;
+  }
+  if (pages?.['resourceLimits'] !== undefined) {
+    const resourceLimits = parseExportResourceLimits(pages['resourceLimits']);
+    if (!resourceLimits) throw new Error('Imported export resource limits are invalid');
+    nextSettings.exportResourceLimits = resourceLimits;
   }
   const afterCapture = data('capture.after-capture');
   if (afterCapture?.['action'] !== undefined)

@@ -284,7 +284,10 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
         fullPageQuality: value['fullPageQuality'],
       };
     case 'capture.pages':
-      return { pagePackageCaptureTiming: value['timing'] };
+      return {
+        exportResourceLimits: value['resourceLimits'],
+        pagePackageCaptureTiming: value['timing'],
+      };
     case 'capture.after-capture':
       return { captureAction: value['action'] };
     case 'capture.saving':
@@ -325,7 +328,12 @@ function coreSettingsTransferData(
           : { fullPageQuality: parsed.fullPageQuality }),
       };
     case 'capture.pages':
-      return source['timing'] === undefined ? {} : { timing: parsed.pagePackageCaptureTiming };
+      return {
+        ...(source['resourceLimits'] === undefined
+          ? {}
+          : { resourceLimits: parsed.exportResourceLimits }),
+        ...(source['timing'] === undefined ? {} : { timing: parsed.pagePackageCaptureTiming }),
+      };
     case 'capture.after-capture':
       return source['action'] === undefined ? {} : { action: parsed.captureAction };
     case 'capture.saving':

@@ -9,9 +9,16 @@ import {
   isPagePackageJobStatus,
   isPopupExportPackageResponse,
   isExportProgress,
+  isPagePackageCaptureSources,
+  isPagePackageJobTabs,
   isPopupExportPreviewResponse,
   isPopupExportResult,
 } from './export';
+
+it('rejects empty page-package tab and source collections', () => {
+  expect(isPagePackageJobTabs([])).toBe(false);
+  expect(isPagePackageCaptureSources([])).toBe(false);
+});
 
 it('accepts only complete export options payloads', () => {
   expect(
@@ -24,6 +31,21 @@ it('accepts only complete export options payloads', () => {
       includePageDiagnostics: false,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
+    })
+  ).toBe(true);
+
+  expect(
+    isExportOptions({
+      includeJson: true,
+      includeMarkdown: true,
+      includeFiles: true,
+      includeImages: true,
+      includeBasicLogs: false,
+      includePageDiagnostics: false,
+      includeCssDiagnostics: false,
+      includeFullPageScreenshot: true,
+      includeViewportScreenshot: true,
+      resourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
     })
   ).toBe(true);
 
@@ -52,6 +74,20 @@ it('accepts only complete export options payloads', () => {
       includePageDiagnostics: false,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
+    })
+  ).toBe(false);
+  expect(isExportOptions(null)).toBe(false);
+  expect(
+    isExportOptions({
+      includeJson: true,
+      includeMarkdown: true,
+      includeFiles: true,
+      includeImages: true,
+      includeBasicLogs: false,
+      includePageDiagnostics: false,
+      includeCssDiagnostics: false,
+      includeFullPageScreenshot: true,
+      resourceLimits: { maxFileCount: 101, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
     })
   ).toBe(false);
 
@@ -136,6 +172,7 @@ it('narrows popup export job phases and positive integer revisions', () => {
       includeJson: true,
       includeMarkdown: true,
       includePageDiagnostics: false,
+      resourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
     },
     effectiveComponentPlan: {
       components: {
@@ -164,6 +201,15 @@ it('narrows popup export job phases and positive integer revisions', () => {
   expect(isPagePackageJobStatus({ ...status, revision: 0 })).toBe(false);
   expect(isPagePackageJobStatus({ ...status, revision: 1.5 })).toBe(false);
   expect(isPagePackageJobStatus({ ...status, unexpected: true })).toBe(false);
+  expect(
+    isPagePackageJobStatus({
+      ...status,
+      effectiveOptions: {
+        ...status.effectiveOptions,
+        resourceLimits: { maxFileCount: 101, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+      },
+    })
+  ).toBe(false);
   expect(
     isPagePackageJobStatus({
       ...status,

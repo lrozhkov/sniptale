@@ -8,6 +8,10 @@ import type {
   Settings,
 } from '../../../contracts/settings';
 import { parseFullPageQualityPolicy } from '../../../contracts/full-page-capture';
+import {
+  parseExportResourceLimits,
+  type ExportResourceLimits,
+} from '@sniptale/runtime-contracts/export';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { parseVoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
@@ -156,6 +160,11 @@ function parseOptionalFullPageQuality(value: unknown): ParsedFieldValue<FullPage
   return parseFullPageQualityPolicy(value) ?? INVALID_FIELD;
 }
 
+function parseOptionalExportResourceLimits(value: unknown): ParsedFieldValue<ExportResourceLimits> {
+  if (value === undefined) return undefined;
+  return parseExportResourceLimits(value) ?? INVALID_FIELD;
+}
+
 function parseOptionalPagePackageCaptureTiming(
   value: unknown
 ): ParsedFieldValue<PagePackageCaptureTimingPolicy> {
@@ -281,6 +290,11 @@ function parseScalarSettingsFields(
     nextValue,
     'fullPageCapture',
     parseOptionalFullPageCapture(value['fullPageCapture'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'exportResourceLimits',
+    parseOptionalExportResourceLimits(value['exportResourceLimits'])
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,

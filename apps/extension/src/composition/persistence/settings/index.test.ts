@@ -91,6 +91,11 @@ const DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING = {
   loadTimeoutMs: 30_000,
   settleDelayMs: 2_000,
 };
+const DEFAULT_EXPORT_RESOURCE_LIMITS = {
+  maxFileCount: 30,
+  maxFileSizeMiB: 30,
+  maxTotalSizeMiB: 150,
+};
 const DEFAULT_VOICE_INPUT = {
   language: 'ru-RU' as const,
   microphoneDeviceId: null,
@@ -209,6 +214,7 @@ async function verifyLoadMigration() {
     localStoragePolicy: LIBRARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
     pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
@@ -261,6 +267,7 @@ async function verifyStoredSettings() {
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
     pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
@@ -355,6 +362,7 @@ const expectedInvalidStoredSettingsResult = {
   localStoragePolicy: LIBRARY_STORAGE_POLICY,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
   fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+  exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
   pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
   voiceInput: DEFAULT_VOICE_INPUT,
   ...PRIVACY_DEFAULTS,
@@ -392,6 +400,7 @@ async function verifyInvalidRootFallback() {
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
     pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,

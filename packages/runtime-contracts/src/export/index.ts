@@ -1,6 +1,13 @@
 import type { FieldContentRole } from '../dom-tree';
 import { estimateUtf8Bytes } from '../validation/base64';
 import { MAX_PAGE_PACKAGE_TITLE_BYTES } from '../page-package/contracts';
+import type { ExportResourceLimits } from './resource-limits';
+export {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  EXPORT_RESOURCE_LIMITS_ABSOLUTE,
+  parseExportResourceLimits,
+  type ExportResourceLimits,
+} from './resource-limits';
 
 export const MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES = 5 * 1024 * 1024;
 
@@ -61,6 +68,7 @@ export interface ExportOptions {
   includeCssDiagnostics: boolean; // включить stylesheets/computed-styles bundle
   includeFullPageScreenshot: boolean; // включить full-page screenshot в корень архива
   includeViewportScreenshot?: boolean; // включить отдельный screenshot видимой области
+  resourceLimits?: ExportResourceLimits; // ограничить скачиваемые вложения и изображения
 }
 
 /**
@@ -69,7 +77,8 @@ export interface ExportOptions {
 export interface FileResource {
   url: string;
   filename: string;
-  source: 'direct' | 'dynamic'; // прямая ссылка или из модального окна
+  // Прямая ссылка, поддерживаемое превью или стандартное изображение страницы.
+  source: 'direct' | 'dynamic' | 'page-image';
   rowId?: string; // ID строки таблицы (для связи с JSON)
   columnName?: string; // Имя колонки
   tableName?: string; // Название таблицы/секции

@@ -5,6 +5,11 @@ import {
 } from '../../../../contracts/full-page-capture';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
 import { translate } from '../../../../platform/i18n/popup';
+import {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  EXPORT_RESOURCE_LIMITS_ABSOLUTE,
+  type ExportResourceLimits,
+} from '@sniptale/runtime-contracts/export';
 
 export function usePackageCaptureBehaviorPreferences() {
   const [preferences, setPreferences] = useState<FullPageCapturePreferences>({
@@ -12,6 +17,10 @@ export function usePackageCaptureBehaviorPreferences() {
   });
   const mountedRef = useRef(true);
   const revisionRef = useRef(0);
+  const limitsRevisionRef = useRef(0);
+  const [resourceLimits, setResourceLimits] = useState<ExportResourceLimits>({
+    ...DEFAULT_EXPORT_RESOURCE_LIMITS,
+  });
   useEffect(() => {
     mountedRef.current = true;
     let active = true;
@@ -19,6 +28,9 @@ export function usePackageCaptureBehaviorPreferences() {
       .then((settings) => {
         if (active && revisionRef.current === 0) {
           setPreferences(settings.fullPageCapture ?? DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES);
+        }
+        if (active && limitsRevisionRef.current === 0) {
+          setResourceLimits(settings.exportResourceLimits);
         }
       })
       .catch(() => undefined);
@@ -41,7 +53,21 @@ export function usePackageCaptureBehaviorPreferences() {
         .catch(() => undefined);
     });
   };
-  return { preferences, update };
+  const updateResourceLimits = (next: ExportResourceLimits) => {
+    const revision = limitsRevisionRef.current + 1;
+    limitsRevisionRef.current = revision;
+    setResourceLimits(next);
+    void patchSettings({ exportResourceLimits: next }).catch(() => {
+      void loadSettings()
+        .then((settings) => {
+          if (mountedRef.current && limitsRevisionRef.current === revision) {
+            setResourceLimits(settings.exportResourceLimits);
+          }
+        })
+        .catch(() => undefined);
+    });
+  };
+  return { preferences, resourceLimits, update, updateResourceLimits };
 }
 
 function ToggleRow(props: {
@@ -73,6 +99,8 @@ function ToggleRow(props: {
 export function PackageCaptureBehaviorSettings(props: {
   preferences: FullPageCapturePreferences;
   onChange: (preferences: FullPageCapturePreferences) => void;
+  resourceLimits: ExportResourceLimits;
+  onResourceLimitsChange: (limits: ExportResourceLimits) => void;
 }) {
   return (
     <div
@@ -123,6 +151,72 @@ export function PackageCaptureBehaviorSettings(props: {
       <p className="py-2.5 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
         {translate('popup.export.captureBehaviorHelp')}
       </p>
+      <div className="py-2.5">
+        <div className="text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+          {translate('popup.export.resourceLimitsTitle')}
+        </div>
+        <p className="mt-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+          {translate('popup.export.resourceLimitsDescription')}
+        </p>
+        <ResourceLimitSelect
+          label={translate('popup.export.resourceLimitCountLabel')}
+          value={props.resourceLimits.maxFileCount}
+          values={[10, 20, 30, 50, EXPORT_RESOURCE_LIMITS_ABSOLUTE.maxFileCount]}
+          onChange={(maxFileCount) =>
+            props.onResourceLimitsChange({ ...props.resourceLimits, maxFileCount })
+          }
+        />
+        <ResourceLimitSelect
+          label={translate('popup.export.resourceLimitFileSizeLabel')}
+          value={props.resourceLimits.maxFileSizeMiB}
+          values={[10, 20, 30, 50, EXPORT_RESOURCE_LIMITS_ABSOLUTE.maxFileSizeMiB]}
+          suffix={translate('popup.export.resourceLimitMiB')}
+          onChange={(maxFileSizeMiB) =>
+            props.onResourceLimitsChange({ ...props.resourceLimits, maxFileSizeMiB })
+          }
+        />
+        <ResourceLimitSelect
+          label={translate('popup.export.resourceLimitTotalSizeLabel')}
+          value={props.resourceLimits.maxTotalSizeMiB}
+          values={[50, 100, 150, EXPORT_RESOURCE_LIMITS_ABSOLUTE.maxTotalSizeMiB]}
+          suffix={translate('popup.export.resourceLimitMiB')}
+          onChange={(maxTotalSizeMiB) =>
+            props.onResourceLimitsChange({ ...props.resourceLimits, maxTotalSizeMiB })
+          }
+        />
+        <p className="mt-2 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+          {translate('popup.export.resourceLimitsHelp')}
+        </p>
+      </div>
     </div>
+  );
+}
+
+function ResourceLimitSelect(props: {
+  label: string;
+  onChange: (value: number) => void;
+  suffix?: string;
+  value: number;
+  values: number[];
+}) {
+  const values = props.values.includes(props.value)
+    ? props.values
+    : [...props.values, props.value].sort((left, right) => left - right);
+  return (
+    <label className="mt-2 flex items-center justify-between gap-3">
+      <span className="text-[10px] text-[var(--sniptale-color-text-secondary)]">{props.label}</span>
+      <select
+        className="h-7 w-[92px] rounded-[8px] border bg-transparent px-2 text-[10px]"
+        value={props.value}
+        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
+      >
+        {values.map((value) => (
+          <option key={value} value={value}>
+            {value}
+            {props.suffix ? ` ${props.suffix}` : ''}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from './download-utils';
 export { collectFroalaImageResources } from '../formats/froala';
 export { downloadFileResources } from './download';
+export { collectPageImageResources } from './page-images';
 
 const logger = createLogger({ namespace: 'ContentExportManager' });
 

@@ -127,6 +127,7 @@ it('starts Save through the same background job without requesting export-only h
         includeJson: false,
         includeMarkdown: false,
         includePageDiagnostics: true,
+        resourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
       },
     })
   );
@@ -165,6 +166,27 @@ it('launches a combined download from the remembered download plan', async () =>
   expect(state.setProgress).toHaveBeenCalledOnce();
   expect(state.setResult).toHaveBeenCalledOnce();
   expect(state.setResult).toHaveBeenCalledWith(null);
+});
+
+it('snapshots the current attachment limits into the background job', async () => {
+  const state = createStartState();
+  const loadExportResourceLimits = vi.fn(async () => ({
+    maxFileCount: 50,
+    maxFileSizeMiB: 20,
+    maxTotalSizeMiB: 100,
+  }));
+  const deps = createStartDeps({ loadExportResourceLimits });
+
+  await startPopupExportImpl(state, deps);
+
+  expect(loadExportResourceLimits).toHaveBeenCalledOnce();
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      options: expect.objectContaining({
+        resourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+      }),
+    })
+  );
 });
 
 it('uses the independent Library artifact selection without reading download flags', async () => {

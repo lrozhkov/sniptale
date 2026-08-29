@@ -81,6 +81,7 @@ describe('settings transfer AI owner transaction', () => {
           imageFormat: 'webp',
           authenticatedSnapshotAssetsEnabled: false,
           anonymousCrossOriginSnapshotAssetsEnabled: false,
+          exportResourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
           pagePackageCaptureTiming: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 },
           voiceInput: expect.objectContaining({ microphoneDeviceId: null }),
         }),
@@ -448,7 +449,10 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
     'capture.image': { schemaVersion: 1, data: { format: 'webp', quality: 80 } },
     'capture.pages': {
       schemaVersion: 1,
-      data: { timing: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 } },
+      data: {
+        resourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+        timing: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 },
+      },
     },
     'capture.after-capture': { schemaVersion: 1, data: { action: 'copy' } },
     'capture.saving': {
@@ -559,6 +563,7 @@ function settingsFixture(): NormalizedSettings {
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     externalSnapshotLinksEnabled: false,
+    exportResourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
     pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
   };
 }

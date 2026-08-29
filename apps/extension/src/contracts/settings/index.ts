@@ -3,6 +3,7 @@ import type { ViewportPreset } from '../../features/viewport-presets/contracts';
 import type { FullPageCapturePreferences, FullPageQualityPolicy } from '../full-page-capture';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import type { PagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
+import type { ExportResourceLimits } from '@sniptale/runtime-contracts/export';
 export type {
   FullPageCapturePreferences,
   FullPageFloatingElementsMode,
@@ -87,6 +88,7 @@ export interface Settings {
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
   externalSnapshotLinksEnabled?: boolean;
   fullPageCapture?: FullPageCapturePreferences;
+  exportResourceLimits?: ExportResourceLimits;
   pagePackageCaptureTiming?: PagePackageCaptureTimingPolicy;
   voiceInput?: VoiceInputPreferences;
 }
@@ -94,11 +96,13 @@ export interface Settings {
 export type NormalizedSettings = Omit<
   Settings,
   | 'externalSnapshotLinksEnabled'
+  | 'exportResourceLimits'
   | 'fullPageQuality'
   | 'localStoragePolicy'
   | 'pagePackageCaptureTiming'
 > & {
   externalSnapshotLinksEnabled: boolean;
+  exportResourceLimits: ExportResourceLimits;
   fullPageQuality: FullPageQualityPolicy;
   localStoragePolicy: LocalStoragePolicy;
   pagePackageCaptureTiming: PagePackageCaptureTimingPolicy;
@@ -110,6 +114,7 @@ export type SettingsPatch = Omit<
   | 'contextMenu'
   | 'defaultViewportPresetId'
   | 'fullPageCapture'
+  | 'exportResourceLimits'
   | 'fullPageQuality'
   | 'localStoragePolicy'
   | 'pagePackageCaptureTiming'
@@ -119,6 +124,7 @@ export type SettingsPatch = Omit<
   contentToolbar?: Partial<ContentToolbarPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
   fullPageCapture?: Partial<FullPageCapturePreferences>;
+  exportResourceLimits?: Partial<ExportResourceLimits>;
   fullPageQuality?: FullPageQualityPolicy;
   localStoragePolicy?: Partial<LocalStoragePolicy>;
   pagePackageCaptureTiming?: PagePackageCaptureTimingPolicy;

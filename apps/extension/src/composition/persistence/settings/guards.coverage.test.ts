@@ -76,6 +76,14 @@ describe('settings guards valid payload coverage', () => {
       }).value.pagePackageCaptureTiming
     ).toEqual({ loadTimeoutMs: 60_000, settleDelayMs: 3_000 });
   });
+
+  it('accepts bounded export resource limits', () => {
+    expect(
+      parseStoredSettings({
+        exportResourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+      }).value.exportResourceLimits
+    ).toEqual({ maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 });
+  });
 });
 
 describe('settings guards invalid payload coverage', () => {
@@ -85,6 +93,17 @@ describe('settings guards invalid payload coverage', () => {
     });
     expect(parsed.invalidFieldCount).toBe(1);
     expect(parsed.value.pagePackageCaptureTiming).toBeUndefined();
+  });
+  it('drops excessive export resource limits from storage', () => {
+    const parsed = parseStoredSettings({
+      exportResourceLimits: {
+        maxFileCount: 101,
+        maxFileSizeMiB: Number.POSITIVE_INFINITY,
+        maxTotalSizeMiB: 201,
+      },
+    });
+    expect(parsed.invalidFieldCount).toBe(1);
+    expect(parsed.value.exportResourceLimits).toBeUndefined();
   });
   it('counts invalid toolbar, array, and context-menu fields independently', () => {
     expect(

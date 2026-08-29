@@ -12,6 +12,7 @@ import {
   MAX_POPUP_EXPORT_TAB_TITLE_BYTES,
   MAX_POPUP_EXPORT_WARNINGS_TOTAL_BYTES,
   isCanonicalPopupExportJobId,
+  parseExportResourceLimits,
 } from '@sniptale/runtime-contracts/export';
 import {
   MAX_PAGE_COLLECTION_PAGES,
@@ -144,10 +145,15 @@ export function isExportOptions(value: unknown): value is ExportOptions {
         'includeCssDiagnostics',
         'includeFullPageScreenshot',
       ],
-      ['includeAnnotations', 'includeViewportScreenshot']
+      ['includeAnnotations', 'includeViewportScreenshot', 'resourceLimits']
     ) &&
     hasOptionalField(value, 'includeAnnotations', isBoolean) &&
     hasOptionalField(value, 'includeViewportScreenshot', isBoolean) &&
+    hasOptionalField(
+      value,
+      'resourceLimits',
+      (entry) => parseExportResourceLimits(entry) !== null
+    ) &&
     isBoolean(value['includeJson']) &&
     isBoolean(value['includeMarkdown']) &&
     isBoolean(value['includeFiles']) &&

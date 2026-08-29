@@ -2,6 +2,7 @@ import { translate } from '../../../../platform/i18n';
 import type {
   ExportOptions,
   ExportProgress,
+  ExportResourceLimits,
   FileResource,
 } from '@sniptale/runtime-contracts/export';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
@@ -9,6 +10,7 @@ import {
   collectDirectLinks,
   collectDynamicLinks,
   collectFroalaImageResources,
+  collectPageImageResources,
   downloadFileResources,
 } from '../files';
 import type { ExportDiagnosticsSource } from '../diagnostics/source';
@@ -66,8 +68,18 @@ async function collectImageExportFiles(args: {
     args.diagnosticsSource
   );
 
+  pushScanningProgress(args.updateProgress, 'images', translate('content.runtime.scanPageImages'));
+  const genericFiles = collectPageImageResources(args.diagnosticsSource);
+  const specializedUrls = new Set(
+    [...files, ...froalaResult.resources].map((resource) => resource.url)
+  );
+
   return {
-    files: [...files, ...froalaResult.resources],
+    files: [
+      ...files,
+      ...froalaResult.resources,
+      ...genericFiles.filter((resource) => !specializedUrls.has(resource.url)),
+    ],
     previewToDownloadMap: froalaResult.previewToDownloadMap,
   };
 }
@@ -109,7 +121,8 @@ export async function downloadExportFiles(
   abortSignal: AbortSignal | undefined,
   isCancelled: () => boolean,
   updateProgress: UpdateProgress,
-  diagnosticsSource?: ExportDiagnosticsSource
+  diagnosticsSource?: ExportDiagnosticsSource,
+  resourceLimits?: ExportResourceLimits
 ): Promise<{ files: Map<string, Blob>; errors: string[]; urlUuidToFilename: Map<string, string> }> {
   updateProgress({
     activeStepKey: 'files',
@@ -132,6 +145,7 @@ export async function downloadExportFiles(
         total,
       });
     },
-    diagnosticsSource?.pageUrl
+    diagnosticsSource?.pageUrl,
+    resourceLimits
   );
 }

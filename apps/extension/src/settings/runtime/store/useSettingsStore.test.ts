@@ -38,6 +38,7 @@ const settingsFixture = {
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   externalSnapshotLinksEnabled: false,
+  exportResourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
   pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
 };
 

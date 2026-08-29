@@ -10,6 +10,7 @@ export function getDefaultPopupExportRuntimeDeps(): PopupExportRuntimeDeps {
     clearTimeout: (timeoutId) => window.clearTimeout(timeoutId),
     createRequestId: () => crypto.randomUUID(),
     getActiveTabId: getActiveTabId as PopupExportRuntimeDeps['getActiveTabId'],
+    loadExportResourceLimits: async () => (await loadSettings()).exportResourceLimits,
     loadPageCaptureTiming: async () => (await loadSettings()).pagePackageCaptureTiming,
     requestPreview: async (tabId, fallbackKey) => requestPopupExportPreview(tabId, fallbackKey),
     scheduleTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),

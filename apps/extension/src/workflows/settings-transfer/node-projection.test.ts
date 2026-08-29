@@ -21,6 +21,7 @@ describe('settings transfer canonical node projection', () => {
     ['ai.models', 'defaultModelId', 'default'],
     ['ai.prompt-templates', 'order', 'items'],
     ['capture.video', 'profiles', 'profiles'],
+    ['capture.pages', 'resourceLimits', 'resourceLimits'],
   ])('maps %s.%s to the registry field %s', (domainId, field, expected) => {
     expect(normalizeSettingsTransferRegistryField(domainId, field)).toBe(expected);
   });

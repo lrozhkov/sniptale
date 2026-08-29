@@ -24,6 +24,11 @@ import {
 } from '../../../features/viewport-presets/catalog';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
 import {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  parseExportResourceLimits,
+  type ExportResourceLimits,
+} from '@sniptale/runtime-contracts/export';
+import {
   DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
   parsePagePackageCaptureTimingPolicy,
 } from '@sniptale/runtime-contracts/page-package';
@@ -77,6 +82,7 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: true,
   externalSnapshotLinksEnabled: false,
+  exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
   pagePackageCaptureTiming: { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
   voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
@@ -105,6 +111,10 @@ function cloneFullPageCapturePreferences(
   return { ...settings };
 }
 
+function cloneExportResourceLimits(settings: ExportResourceLimits): ExportResourceLimits {
+  return { ...settings };
+}
+
 export function createDefaultSettings(): NormalizedSettings {
   return {
     ...DEFAULT_SETTINGS,
@@ -112,6 +122,7 @@ export function createDefaultSettings(): NormalizedSettings {
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
     localStoragePolicy: { ...DEFAULT_LOCAL_STORAGE_POLICY },
     fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
+    exportResourceLimits: cloneExportResourceLimits(DEFAULT_EXPORT_RESOURCE_LIMITS),
     fullPageQuality: { ...DEFAULT_FULL_PAGE_QUALITY_POLICY },
     pagePackageCaptureTiming: { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
     voiceInput: { ...DEFAULT_VOICE_INPUT_SETTINGS },
@@ -135,6 +146,12 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
  * against the latest persisted payload.
  */
 export async function saveSettings(settings: Settings): Promise<void> {
+  if (
+    settings.exportResourceLimits !== undefined &&
+    !parseExportResourceLimits(settings.exportResourceLimits)
+  ) {
+    throw new Error('Export resource limits are invalid');
+  }
   if (
     settings.fullPageQuality !== undefined &&
     !parseFullPageQualityPolicy(settings.fullPageQuality)
@@ -176,6 +193,10 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSett
     fullPageCapture: {
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
       ...parsedValue.fullPageCapture,
+    },
+    exportResourceLimits: {
+      ...DEFAULT_EXPORT_RESOURCE_LIMITS,
+      ...parsedValue.exportResourceLimits,
     },
     fullPageQuality: { ...(parsedValue.fullPageQuality ?? DEFAULT_FULL_PAGE_QUALITY_POLICY) },
     pagePackageCaptureTiming: {
@@ -273,6 +294,11 @@ function applySettingsPatch(
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
       ...currentSettings.fullPageCapture,
       ...settingsPatch.fullPageCapture,
+    },
+    exportResourceLimits: {
+      ...DEFAULT_EXPORT_RESOURCE_LIMITS,
+      ...currentSettings.exportResourceLimits,
+      ...settingsPatch.exportResourceLimits,
     },
     fullPageQuality: settingsPatch.fullPageQuality ?? currentSettings.fullPageQuality,
     pagePackageCaptureTiming:

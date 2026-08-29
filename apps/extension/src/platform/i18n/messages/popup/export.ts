@@ -75,8 +75,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Snapshot settings',
   },
   packageCaptureSettingsDescription: {
-    ru: 'Настройте подготовку страницы для полноразмерного снимка.',
-    en: 'Configure page preparation for the full-page capture.',
+    ru: 'Настройте подготовку страницы и безопасные пределы вложений.',
+    en: 'Configure page preparation and safe attachment limits.',
   },
   captureLazyContentLabel: {
     ru: 'Загружать содержимое при прокрутке',
@@ -108,6 +108,22 @@ export const popupExportMessages = defineMessageSource({
   captureBehaviorHelp: {
     ru: 'Длинные и динамические страницы захватываются в безопасных пределах приложения. Время загрузки адресов настраивается в разделе «Страницы», а качество — в настройках изображений.',
     en: 'Long and dynamic pages are captured within the app’s safety limits. Address loading waits are under Pages; image quality is configured in Image settings.',
+  },
+  resourceLimitsTitle: {
+    ru: 'Вложения и изображения',
+    en: 'Attachments and images',
+  },
+  resourceLimitsDescription: {
+    ru: 'Ограничения действуют вместе для файлов, оригиналов из поддерживаемых превью и обычных изображений страницы.',
+    en: 'Limits apply together to files, originals from supported previews, and ordinary page images.',
+  },
+  resourceLimitCountLabel: { ru: 'Не больше файлов', en: 'Maximum files' },
+  resourceLimitFileSizeLabel: { ru: 'Размер одного файла', en: 'Per-file size' },
+  resourceLimitTotalSizeLabel: { ru: 'Общий размер', en: 'Total size' },
+  resourceLimitMiB: { ru: 'МБ', en: 'MiB' },
+  resourceLimitsHelp: {
+    ru: 'Ресурсы сверх лимита пропускаются с предупреждением, а пакет продолжает собираться.',
+    en: 'Resources over a limit are skipped with a warning while package creation continues.',
   },
   packageDestinationLabel: {
     ru: 'Настройки действия',
@@ -348,20 +364,20 @@ export const popupExportMessages = defineMessageSource({
     en: 'Text and tables',
   },
   includeFilesLabel: {
-    ru: 'Файлы',
-    en: 'Files',
+    ru: 'Вложения',
+    en: 'Attachments',
   },
   includeFilesDescription: {
-    ru: 'Документы и вложения со страницы',
-    en: 'Documents and attachments from the page',
+    ru: 'Явные ссылки скачивания и поддерживаемые вложения страницы',
+    en: 'Explicit download links and supported page attachments',
   },
   includeImagesLabel: {
     ru: 'Изображения',
     en: 'Images',
   },
   includeImagesDescription: {
-    ru: 'Изображения и превью со страницы',
-    en: 'Images and previews from the page',
+    ru: 'Обычные изображения и оригиналы из поддерживаемых превью',
+    en: 'Ordinary images and originals from supported previews',
   },
   includeBasicLogsLabel: {
     ru: 'Журнал экспорта',

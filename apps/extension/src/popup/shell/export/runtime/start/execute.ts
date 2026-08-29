@@ -6,6 +6,7 @@ import { getPopupExportSelection } from '../../session/selectors';
 import { buildPopupExportOptions } from '../options';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
   MAX_POPUP_EXPORT_JOB_TABS,
   normalizePopupExportTabTitle,
 } from '@sniptale/runtime-contracts/export';
@@ -61,7 +62,10 @@ export async function startPopupExport(
             ...getPopupExportSelection(state),
             includeWebCopy: state.includeWebCopy,
           };
-    const options = buildPopupExportOptions(plan);
+    const resourceLimits = deps.loadExportResourceLimits
+      ? await deps.loadExportResourceLimits()
+      : { ...DEFAULT_EXPORT_RESOURCE_LIMITS };
+    const options = { ...buildPopupExportOptions(plan), resourceLimits };
     const warnings: string[] = [];
     if (
       state.activeSourceMode === 'urls' ||

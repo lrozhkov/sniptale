@@ -116,6 +116,7 @@ export const settingsTransferMessages = defineMessageSource({
     quality: message('Качество', 'Quality'),
     fullPageQuality: message('Пределы полноразмерных снимков', 'Full-page screenshot limits'),
     timing: message('Ожидание загрузки страниц', 'Page loading waits'),
+    resourceLimits: message('Пределы вложений и изображений', 'Attachment and image limits'),
     profiles: message('Профили', 'Profiles'),
     selection: message('Выбор профиля', 'Profile selection'),
     output: message('Выходной формат', 'Output format'),

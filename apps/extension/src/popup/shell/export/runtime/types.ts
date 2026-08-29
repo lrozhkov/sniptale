@@ -17,6 +17,9 @@ export type PopupExportRuntimeDeps = {
   loadPageCaptureTiming?: () => Promise<
     import('@sniptale/runtime-contracts/page-package').PagePackageCaptureTimingPolicy
   >;
+  loadExportResourceLimits?: () => Promise<
+    import('@sniptale/runtime-contracts/export').ExportResourceLimits
+  >;
   requestPreview: (
     tabId: number,
     fallbackKey: PopupExportPreviewErrorKey

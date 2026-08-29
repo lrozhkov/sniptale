@@ -1,10 +1,13 @@
 import { expect, expectTypeOf, it } from 'vitest';
 
 import {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  EXPORT_RESOURCE_LIMITS_ABSOLUTE,
   isBrowserAnnotationsExportText,
   MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES,
   MAX_POPUP_EXPORT_TAB_TITLE_BYTES,
   normalizePopupExportTabTitle,
+  parseExportResourceLimits,
   truncatePopupExportStatusText,
 } from '.';
 
@@ -29,6 +32,27 @@ it('keeps export package and progress contracts explicit', () => {
   expectTypeOf<PopupExportResult['kind']>().toEqualTypeOf<'archive' | 'webSnapshot' | undefined>();
   expectTypeOf<ExportOptions['includeAnnotations']>().toEqualTypeOf<boolean | undefined>();
   expectTypeOf<'annotations'>().toMatchTypeOf<ExportProgressStepKey>();
+});
+
+it('parses bounded export resource limits and rejects damaged or excessive values', () => {
+  expect(parseExportResourceLimits(DEFAULT_EXPORT_RESOURCE_LIMITS)).toEqual(
+    DEFAULT_EXPORT_RESOURCE_LIMITS
+  );
+  expect(
+    parseExportResourceLimits({
+      ...DEFAULT_EXPORT_RESOURCE_LIMITS,
+      maxFileCount: EXPORT_RESOURCE_LIMITS_ABSOLUTE.maxFileCount + 1,
+    })
+  ).toBeNull();
+  expect(
+    parseExportResourceLimits({ ...DEFAULT_EXPORT_RESOURCE_LIMITS, maxFileSizeMiB: Number.NaN })
+  ).toBeNull();
+  expect(
+    parseExportResourceLimits({ ...DEFAULT_EXPORT_RESOURCE_LIMITS, maxTotalSizeMiB: 0 })
+  ).toBeNull();
+  expect(
+    parseExportResourceLimits({ ...DEFAULT_EXPORT_RESOURCE_LIMITS, unexpected: true })
+  ).toBeNull();
 });
 
 it('accepts empty annotation artifacts while enforcing their UTF-8 byte budget', () => {

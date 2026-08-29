@@ -103,7 +103,10 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('capture.image', 'quality'),
     field('capture.image', 'fullPageQuality'),
   ]),
-  ...domain('capture.pages', [field('capture.pages', 'timing')]),
+  ...domain('capture.pages', [
+    field('capture.pages', 'timing'),
+    field('capture.pages', 'resourceLimits'),
+  ]),
   ...domain('capture.video', [
     field('capture.video', 'profiles', { kind: 'collection', dynamicItems: true }),
     field('capture.video', 'selection'),

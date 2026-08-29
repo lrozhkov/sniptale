@@ -43,6 +43,10 @@ export function listPreviewTriggers(documentRoot: Document = document): HTMLElem
   return Array.from(documentRoot.querySelectorAll<HTMLElement>(EXPORT_SELECTORS.previewTrigger));
 }
 
+export function listPageImages(documentRoot: Document = document): HTMLImageElement[] {
+  return Array.from(documentRoot.querySelectorAll<HTMLImageElement>('img'));
+}
+
 export function listComputedStyleRootTargets(documentRoot: Document = document): Element[] {
   return [documentRoot.documentElement, documentRoot.body];
 }

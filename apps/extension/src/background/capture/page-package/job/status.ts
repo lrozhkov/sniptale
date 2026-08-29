@@ -16,6 +16,7 @@ import {
   MAX_POPUP_EXPORT_TAB_TITLE_BYTES,
   MAX_POPUP_EXPORT_WARNINGS_TOTAL_BYTES,
   isCanonicalPopupExportJobId,
+  parseExportResourceLimits,
 } from '@sniptale/runtime-contracts/export';
 
 export type { PagePackageJobStatusV1 } from '@sniptale/runtime-contracts/page-package';
@@ -127,22 +128,28 @@ function isExactKeys(
 }
 
 function parseExportOptions(value: unknown): PagePackageExportOptionsV1 | null {
+  const requiredBooleanKeys = [
+    'includeBasicLogs',
+    'includeCssDiagnostics',
+    'includeFiles',
+    'includeFullPageScreenshot',
+    'includeImages',
+    'includeJson',
+    'includeMarkdown',
+    'includePageDiagnostics',
+  ] as const;
+  const optionalBooleanKeys = ['includeAnnotations', 'includeViewportScreenshot'] as const;
   if (
-    !isExactKeys(
-      value,
-      [
-        'includeBasicLogs',
-        'includeCssDiagnostics',
-        'includeFiles',
-        'includeFullPageScreenshot',
-        'includeImages',
-        'includeJson',
-        'includeMarkdown',
-        'includePageDiagnostics',
-      ],
-      ['includeAnnotations', 'includeViewportScreenshot']
+    !isExactKeys(value, requiredBooleanKeys, [
+      'includeAnnotations',
+      'includeViewportScreenshot',
+      'resourceLimits',
+    ]) ||
+    !requiredBooleanKeys.every((key) => typeof value[key] === 'boolean') ||
+    !optionalBooleanKeys.every(
+      (key) => value[key] === undefined || typeof value[key] === 'boolean'
     ) ||
-    !Object.values(value).every((entry) => typeof entry === 'boolean')
+    (value['resourceLimits'] !== undefined && !parseExportResourceLimits(value['resourceLimits']))
   )
     return null;
   return value as unknown as PagePackageExportOptionsV1;
