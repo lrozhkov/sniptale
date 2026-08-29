@@ -46,21 +46,42 @@ function sourceProtocol(sourceUrl) {
   }
 }
 
-function admissionRow(packageJson, lockPath, entry, rules) {
+function bundledOwner(lock, lockPath, entry) {
+  if (entry.inBundle !== true) return null;
+  const packageName = resolveLockPackageName(lockPath, entry);
+  if (!packageName) return null;
+  return (
+    Object.entries(lock.packages ?? {})
+      .filter(
+        ([candidatePath, candidate]) =>
+          candidatePath &&
+          lockPath.startsWith(`${candidatePath}/node_modules/`) &&
+          Array.isArray(candidate.bundleDependencies) &&
+          candidate.bundleDependencies.every((dependency) => typeof dependency === 'string') &&
+          candidate.bundleDependencies.includes(packageName)
+      )
+      .sort(([leftPath], [rightPath]) => rightPath.length - leftPath.length)[0] ?? null
+  );
+}
+
+function admissionRow(packageJson, lock, lockPath, entry, rules) {
   const name = resolveLockPackageName(lockPath, entry);
   const scope = name && classifyDependencyScope(packageJson, lockPath, name, entry);
   const artifactInclusion = scope?.includes('development')
     ? 'development-only'
     : 'source-runtime-candidate';
+  const owner = bundledOwner(lock, lockPath, entry);
+  const ownerEntry = owner?.[1];
   const row = {
     packageName: name,
     resolvedVersion: entry.version,
     dependencyScope: scope,
     artifactInclusion,
-    sourceUrl: entry.resolved,
-    sourceProtocol: sourceProtocol(entry.resolved),
-    integrity: entry.integrity,
+    sourceUrl: entry.resolved ?? ownerEntry?.resolved,
+    sourceProtocol: sourceProtocol(entry.resolved ?? ownerEntry?.resolved),
+    integrity: entry.integrity ?? ownerEntry?.integrity,
     hasInstallScript: Boolean(entry.hasInstallScript),
+    bundledBy: owner ? resolveLockPackageName(owner[0], ownerEntry) : null,
   };
   return {
     ...row,
@@ -94,7 +115,7 @@ function violation(rule, message) {
 export function collectDependencyAdmission({ packageJson, lock, rules }) {
   const rows = Object.entries(lock.packages ?? {})
     .filter(([lockPath, entry]) => lockPath && !isWorkspaceLockEntry(lockPath, entry))
-    .map(([lockPath, entry]) => admissionRow(packageJson, lockPath, entry, rules))
+    .map(([lockPath, entry]) => admissionRow(packageJson, lock, lockPath, entry, rules))
     .sort((left, right) =>
       `${left.packageName}@${left.resolvedVersion}`.localeCompare(
         `${right.packageName}@${right.resolvedVersion}`

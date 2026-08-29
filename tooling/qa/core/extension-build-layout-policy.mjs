@@ -137,6 +137,8 @@ function commandAndDependencyErrors(policy, rootPackage, appPackage) {
 
 function configSourceErrors(source) {
   const requiredMarkers = [
+    "from '@tailwindcss/vite'",
+    'tailwindcss()',
     'root: BUILD_LAYOUT.appRoot',
     'outDir: BUILD_LAYOUT.outputRoot',
     'emptyOutDir: true',
@@ -149,23 +151,17 @@ function configSourceErrors(source) {
     .map((marker) => `Vite config is missing layout marker: ${marker}`);
 }
 
-function styleConfigSourceErrors(postcssSource, tailwindSource) {
+function styleConfigSourceErrors(tailwindStylesSource) {
   const errors = [];
   for (const marker of [
-    "import tailwindConfig from './tailwind.config.js'",
-    'tailwindcss: tailwindConfig',
+    "@import 'tailwindcss' source(none)",
+    "@source '../../../../apps/extension/src'",
+    "@source '..'",
+    'border-color: var(--color-gray-200, currentcolor)',
+    '@theme inline',
   ]) {
-    if (!postcssSource.includes(marker)) {
-      errors.push(`PostCSS config is missing Tailwind ownership marker: ${marker}`);
-    }
-  }
-  for (const marker of [
-    "fileURLToPath(new URL('.', import.meta.url))",
-    "resolve(APP_ROOT, 'src/**/*.{js,jsx,ts,tsx}')",
-    "resolve(APP_ROOT, '../../packages/ui/src/**/*.{js,jsx,ts,tsx}')",
-  ]) {
-    if (!tailwindSource.includes(marker)) {
-      errors.push(`Tailwind config is missing bounded content marker: ${marker}`);
+    if (!tailwindStylesSource.includes(marker)) {
+      errors.push(`Tailwind stylesheet is missing bounded ownership marker: ${marker}`);
     }
   }
   return errors;
@@ -176,8 +172,7 @@ export function extensionBuildLayoutErrors({
   rootPackage,
   appPackage,
   viteConfigSource,
-  postcssConfigSource,
-  tailwindConfigSource,
+  tailwindStylesSource,
   existingPaths = new Set(),
   retiredFiles = [],
 } = {}) {
@@ -185,7 +180,7 @@ export function extensionBuildLayoutErrors({
     ...policyShapeErrors(policy),
     ...commandAndDependencyErrors(policy, rootPackage, appPackage),
     ...configSourceErrors(viteConfigSource),
-    ...styleConfigSourceErrors(postcssConfigSource, tailwindConfigSource),
+    ...styleConfigSourceErrors(tailwindStylesSource),
     ...(policy.configPaths ?? [])
       .filter((file) => !existingPaths.has(file))
       .map((file) => `required app build config is missing: ${file}`),

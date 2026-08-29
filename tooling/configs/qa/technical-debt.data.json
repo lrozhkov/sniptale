@@ -14707,7 +14707,7 @@
       "remediation": "Limit ignored roots to generated, dependency, or explicitly non-source trees.",
       "exactSource": {
         "path": "tooling/qa/core/verify-oxlint.mjs",
-        "contentHash": "cf68929bea5b887ee0ed3bebb7c847ab6bf7028ae48208a6147bdb4af88560e7"
+        "contentHash": "e45052c3430d1ef58886055aba41f34d5b741f0740f17061e7b96ffbde2eb14c"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
@@ -17837,7 +17837,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/extension-build-layout-policy.mjs",
-        "contentHash": "ba3cae52d273556fe14959c000a9381d4e458bc40d4b86ca9f203f297ed44997"
+        "contentHash": "46c8d21dffaffd57a8228288df21358485bf558c44df723129dc6ad9d39c481a"
       },
       "consumers": [
         "tooling/qa/core/extension-build-layout-policy.mjs",
@@ -20082,25 +20082,6 @@
       ]
     },
     {
-      "id": "policy.source.postcss-config-js.2cba0c4f01",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "apps/extension/postcss.config.js",
-        "contentHash": "fa987cb690e1760bb027a0627b7abf7f02d97a2651713108a62935c24e52febd"
-      },
-      "consumers": [
-        "apps/extension/postcss.config.js"
-      ],
-      "surfaces": [
-        "property:autoprefixer",
-        "property:plugins"
-      ]
-    },
-    {
       "id": "policy.source.pre-push-mjs.594309623c",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -21626,40 +21607,6 @@
       ]
     },
     {
-      "id": "policy.source.tailwind-config-js.1297838995",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "apps/extension/tailwind.config.js",
-        "contentHash": "26f76e7bc595e0a513ece2135ce509880e94fb0611c4e364666a95fe2ea1db99"
-      },
-      "consumers": [
-        "apps/extension/postcss.config.js",
-        "apps/extension/tailwind.config.js"
-      ],
-      "surfaces": [
-        "property:accent",
-        "property:border",
-        "property:borderRadius",
-        "property:boxShadow",
-        "property:brand",
-        "property:colors",
-        "property:content",
-        "property:extend",
-        "property:icon",
-        "property:plugins",
-        "property:status",
-        "property:surface",
-        "property:text",
-        "property:theme",
-        "property:transitionDuration",
-        "property:transitionTimingFunction"
-      ]
-    },
-    {
       "id": "policy.source.target-only-path-inventory-mjs.4e85545eab",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -21688,7 +21635,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/target-only-path-references.mjs",
-        "contentHash": "8098af00554b6bb651f9b21cfba152bab95cd548581c28c77ed3d79789cd98c3"
+        "contentHash": "04856dfab7754ac68a78adf3d98ef62afcd908d5bac03ac35db0c9978c86fc9a"
       },
       "consumers": [
         "tooling/qa/core/target-only-path-inventory.mjs",
@@ -21809,7 +21756,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/technical-debt-policy-sources.mjs",
-        "contentHash": "b4499f1270f77d7272c675008a75e1aded022476e822b5f4f55592e417070988"
+        "contentHash": "94a16cec99dae411bc951caa8cb156995219a391bc0069e14c78a7f19a87f11d"
       },
       "consumers": [
         "tooling/qa/core/technical-debt-policy-discovery.mjs",
@@ -23122,7 +23069,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
-        "contentHash": "dc7f48c01a04a824621c4e58e10623bbb7e786923c643c8840d8dec30dd5fce7"
+        "contentHash": "f342804ca73734df57b8109793015c3d728a76c402b3ac3235c2a0b44111d644"
       },
       "consumers": [
         "tooling/qa/core/full-verify-audit-steps.mjs",
@@ -23134,7 +23081,7 @@
       ],
       "surfaces": [
         "property:appendReleaseArchiveStepOrBlock/dependencies",
-        "property:collectReleaseArchiveStep/anonymous-157/dependencies",
+        "property:collectReleaseArchiveStep/anonymous-159/dependencies",
         "property:collectReleaseArchiveStep/dependencies"
       ]
     },
@@ -23171,7 +23118,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/security/verify-dependency-admission.mjs",
-        "contentHash": "b5ea586249c3fefb10e4cf7c9d83e4685739088a1c593ee8165d03616b22b7b8"
+        "contentHash": "2ad39bcd87f602c40b8b0ec93f4475a04fcc4508cede1e7860b3750be94418f3"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.runtime.mjs",
@@ -23430,7 +23377,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-extension-build-layout.mjs",
-        "contentHash": "b01569e972bbc9a0fe424e68b078b62d32380f3cebecc3562813a06ca3e66cb3"
+        "contentHash": "df24dfe703e8bf4930b6bcbe084fe7b90aee3641dc60d21d9e705fc606de35e9"
       },
       "consumers": [
         "tooling/qa/core/verify-config-policy.mjs",
@@ -24942,7 +24889,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "apps/extension/vite.config.ts",
-        "contentHash": "f989d958df12514cfbc5bd6521c5497b1189824a4d8701ac7a75e8ada82b4903"
+        "contentHash": "cf47836ff16ce94efd23b930c9c53ac918d80bc57d04cc2ccfd6d39fb7e6ddba"
       },
       "consumers": [
         "apps/extension/vite.config.ts",
@@ -24952,14 +24899,14 @@
         "binding:MANROPE_FONT_FILES",
         "binding:RELEASE_OXC_MINIFY_OPTIONS",
         "binding:REQUIRED_APP_HTML_OUTPUTS",
-        "property:anonymous-146/allow",
-        "property:anonymous-146/build",
-        "property:anonymous-146/fs",
-        "property:anonymous-146/headers",
-        "property:anonymous-146/plugins",
-        "property:anonymous-146/resolve",
-        "property:anonymous-146/server",
-        "property:anonymous-146/worker",
+        "property:anonymous-147/allow",
+        "property:anonymous-147/build",
+        "property:anonymous-147/fs",
+        "property:anonymous-147/headers",
+        "property:anonymous-147/plugins",
+        "property:anonymous-147/resolve",
+        "property:anonymous-147/server",
+        "property:anonymous-147/worker",
         "property:compress",
         "property:createRollupOptions/output"
       ]

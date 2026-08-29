@@ -90,12 +90,14 @@ export function collectDeadExportsStep({ deadExportsRunner = runDeadExportsCheck
 
 const EXTENSION_BUILD_DIRECTORY_TRIGGER = /^apps\/extension\/(?:build|public)\//u;
 const EXTENSION_BUILD_FILE_TRIGGER =
-  /^apps\/extension\/(?:manifest|package|postcss\.config|tailwind\.config|vite\.config)\.(?:js|json|ts)$/u;
+  /^apps\/extension\/(?:manifest|package|vite\.config)\.(?:json|ts)$/u;
+const TAILWIND_STYLES_TRIGGER = 'packages/ui/src/styles/tailwind.css';
 
 function requiresExtensionBuildEquivalence(targetFiles = []) {
   return targetFiles.some(
     (file) =>
       file === 'package.json' ||
+      file === TAILWIND_STYLES_TRIGGER ||
       EXTENSION_BUILD_DIRECTORY_TRIGGER.test(file) ||
       EXTENSION_BUILD_FILE_TRIGGER.test(file)
   );

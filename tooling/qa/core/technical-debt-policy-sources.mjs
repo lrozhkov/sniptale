@@ -14,8 +14,6 @@ export const POLICY_DISCOVERY_SOURCE_MANIFEST = Object.freeze({
   recursiveRoots: Object.freeze(['tooling']),
   exactFiles: Object.freeze([
     '.dependency-cruiser.cjs',
-    'apps/extension/postcss.config.js',
-    'apps/extension/tailwind.config.js',
     'apps/extension/vite.config.ts',
     '.oxlintrc.json',
     '.oxlintrc.strict.json',

@@ -3,8 +3,6 @@
   "appRoot": "apps/extension",
   "configPaths": [
     "apps/extension/manifest.json",
-    "apps/extension/postcss.config.js",
-    "apps/extension/tailwind.config.js",
     "apps/extension/vite.config.ts",
     "apps/extension/build/content-runtime-build-id.ts",
     "apps/extension/build/injected-build-shim-guard.ts",
@@ -12,7 +10,8 @@
     "apps/extension/build/injected-build.ts",
     "apps/extension/build/layout.data.json",
     "apps/extension/build/layout.ts",
-    "apps/extension/build/extension-html-inputs.ts"
+    "apps/extension/build/extension-html-inputs.ts",
+    "packages/ui/src/styles/tailwind.css"
   ],
   "manifestPath": "apps/extension/manifest.json",
   "publicRoot": "apps/extension/public",
@@ -240,8 +239,9 @@
   },
   "appDevDependencies": [
     "@crxjs/vite-plugin",
+    "@tailwindcss/postcss",
+    "@tailwindcss/vite",
     "@vitejs/plugin-react",
-    "autoprefixer",
     "esbuild",
     "postcss",
     "tailwindcss",

@@ -49,7 +49,7 @@ it('runs root/app equivalence for extension build-layout changes', async () => {
   expect(buildRunner).not.toHaveBeenCalled();
 });
 
-it.each(['apps/extension/postcss.config.js', 'apps/extension/tailwind.config.js'])(
+it.each(['packages/ui/src/styles/tailwind.css'])(
   'runs root/app equivalence for %s',
   async (targetFile) => {
     const buildRunner = vi.fn();

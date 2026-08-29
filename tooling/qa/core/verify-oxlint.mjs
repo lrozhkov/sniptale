@@ -32,9 +32,7 @@ const OXLINT_IGNORED_ROOT_SEGMENTS = new Set([
 
 export const REPO_WIDE_OXLINT_FILES = [
   '.dependency-cruiser.cjs',
-  'apps/extension/postcss.config.js',
   'apps/extension/public/popup-theme-paint.js',
-  'apps/extension/tailwind.config.js',
   'apps/extension/vite.config.ts',
   'playwright.config.ts',
   'vitest.config.ts',

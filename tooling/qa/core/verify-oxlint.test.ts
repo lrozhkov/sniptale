@@ -143,9 +143,7 @@ it('keeps the canonical roots equal to the complete supported repository lint in
 
   expect(module.REPO_WIDE_OXLINT_FILES).toEqual([
     '.dependency-cruiser.cjs',
-    'apps/extension/postcss.config.js',
     'apps/extension/public/popup-theme-paint.js',
-    'apps/extension/tailwind.config.js',
     'apps/extension/vite.config.ts',
     'playwright.config.ts',
     'vitest.config.ts',

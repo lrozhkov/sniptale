@@ -22,7 +22,6 @@ const CONTENT_RUNTIME_ENTRY = 'apps/extension/src/content/index.tsx';
 const CONTENT_RUNTIME_OUTPUT = 'assets/contentRuntime.js';
 const CONTENT_RUNTIME_SHIM_ENTRY = 'apps/extension/src/content/runtime/shim/index.ts';
 const CONTENT_RUNTIME_SHIM_OUTPUT = 'assets/contentRuntimeShim.js';
-const TAILWIND_CONFIG_PATH = 'apps/extension/tailwind.config.js';
 
 export function isTraceMessagesEnabledForMode(
   mode: string,
@@ -82,7 +81,7 @@ export function buildContentRuntime(mode: string): Plugin {
         platform: 'browser',
         plugins: [
           createReleaseSafeDependencyAliasPlugin(repositoryRoot),
-          createInlineCssTextPlugin(appRoot, join(repositoryRoot, TAILWIND_CONFIG_PATH)),
+          createInlineCssTextPlugin(appRoot),
         ],
         sourcemap: mode !== 'release',
         target: ['chrome140'],

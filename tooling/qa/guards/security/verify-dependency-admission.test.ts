@@ -48,6 +48,76 @@ it('accepts an exact registry source, integrity, install approval and root lifec
   expect(collectDependencyAdmission(inputs()).violations).toEqual([]);
 });
 
+it('inherits provenance only from an ancestor tarball that declares the bundled child', () => {
+  const bundled = inputs();
+  bundled.lock.packages['node_modules/native-tool'].bundleDependencies = ['bundled-child'];
+  bundled.lock.packages['node_modules/native-tool/node_modules/bundled-child'] = {
+    version: '2.0.0',
+    dev: true,
+    inBundle: true,
+  };
+
+  const result = collectDependencyAdmission(bundled);
+
+  expect(result.violations).toEqual([]);
+  expect(result.rows).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        packageName: 'bundled-child',
+        bundledBy: 'native-tool',
+        integrity: 'sha512-fixture',
+        sourceUrl: 'https://registry.npmjs.org/native-tool/-/native-tool-1.0.0.tgz',
+      }),
+    ])
+  );
+});
+
+it('rejects bundled metadata without an ancestor bundle declaration', () => {
+  const bundled = inputs();
+  bundled.lock.packages['node_modules/native-tool/node_modules/bundled-child'] = {
+    version: '2.0.0',
+    dev: true,
+    inBundle: true,
+  };
+
+  expect(collectDependencyAdmission(bundled).violations).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'dependency-lock-metadata',
+        message: expect.stringContaining('bundled-child@2.0.0'),
+      }),
+      expect.objectContaining({
+        rule: 'dependency-source-admission',
+        message: expect.stringContaining('bundled-child@2.0.0'),
+      }),
+    ])
+  );
+});
+
+it('rejects a malformed string bundle declaration even when it contains the child name', () => {
+  const bundled = inputs();
+  bundled.lock.packages['node_modules/native-tool'].bundleDependencies =
+    'prefix-bundled-child-suffix';
+  bundled.lock.packages['node_modules/native-tool/node_modules/bundled-child'] = {
+    version: '2.0.0',
+    dev: true,
+    inBundle: true,
+  };
+
+  expect(collectDependencyAdmission(bundled).violations).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'dependency-lock-metadata',
+        message: expect.stringContaining('bundled-child@2.0.0'),
+      }),
+      expect.objectContaining({
+        rule: 'dependency-source-admission',
+        message: expect.stringContaining('bundled-child@2.0.0'),
+      }),
+    ])
+  );
+});
+
 it('rejects unapproved protocol, missing integrity and an unapproved install script', () => {
   const invalid = inputs();
   const entry = invalid.lock.packages['node_modules/native-tool'];

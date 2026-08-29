@@ -106,7 +106,6 @@ function classifyReference(path, policy) {
   if (
     path === 'apps/extension/build/layout.data.json' ||
     path === 'apps/extension/package.json' ||
-    path === 'apps/extension/postcss.config.js' ||
     path === 'apps/extension/build/injected-build-shim-guard.ts' ||
     path === 'tooling/test/harness/content-runtime-shim-guard.test.ts'
   ) {

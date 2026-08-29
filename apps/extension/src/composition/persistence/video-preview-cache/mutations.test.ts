@@ -18,6 +18,7 @@ class MemoryPreviewCacheDatabase implements VideoPreviewCacheDatabasePort {
   metadata = new Map<string, unknown>();
   mutationCount = 0;
   records = new Map<string, unknown>();
+  private mutationQueue: Promise<void> = Promise.resolve();
 
   async close(): Promise<void> {}
 
@@ -30,15 +31,19 @@ class MemoryPreviewCacheDatabase implements VideoPreviewCacheDatabasePort {
   async mutateExisting<T>(
     operation: (tx: VideoPreviewCacheTransaction) => Promise<T>
   ): Promise<T | null> {
-    if (!this.instanceExists) return null;
-    this.mutationCount += 1;
-    return operation(this.createTransaction());
+    return this.enqueueMutation(async () => {
+      if (!this.instanceExists) return null;
+      this.mutationCount += 1;
+      return operation(this.createTransaction());
+    });
   }
 
   async mutateOrCreate<T>(operation: (tx: VideoPreviewCacheTransaction) => Promise<T>): Promise<T> {
-    this.instanceExists = true;
-    this.mutationCount += 1;
-    return operation(this.createTransaction());
+    return this.enqueueMutation(async () => {
+      this.instanceExists = true;
+      this.mutationCount += 1;
+      return operation(this.createTransaction());
+    });
   }
 
   async readExisting<T>(
@@ -49,6 +54,15 @@ class MemoryPreviewCacheDatabase implements VideoPreviewCacheDatabasePort {
 
   async verifyAbsent(): Promise<boolean> {
     return !this.instanceExists;
+  }
+
+  private enqueueMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.mutationQueue.then(operation);
+    this.mutationQueue = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
   }
 
   private createTransaction(): VideoPreviewCacheTransaction {

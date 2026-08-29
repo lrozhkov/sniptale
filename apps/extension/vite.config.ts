@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { crx } from '@crxjs/vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
 import manifest from './manifest.json';
 import {
   buildContentRuntime,
@@ -151,6 +152,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
+    tailwindcss(),
     createReactTransformPlugins(),
     crx({ manifest: buildManifestForMode(manifest, mode) }),
     buildContentRuntime(mode),

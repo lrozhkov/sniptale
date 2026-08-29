@@ -1,3 +1,76 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source(none);
+
+@source '../../../../apps/extension/src';
+@source '..';
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@theme inline {
+  --color-background: var(--sniptale-color-surface-canvas);
+  --color-surface-1: var(--sniptale-color-surface-panel);
+  --color-surface-canvas: var(--sniptale-color-surface-canvas);
+  --color-surface-panel: var(--sniptale-color-surface-panel);
+  --color-surface-glass: var(--sniptale-color-surface-panel-glass);
+  --color-surface-overlay: var(--sniptale-color-surface-overlay);
+  --color-surface-input: var(--sniptale-color-surface-input);
+  --color-surface-hover: var(--sniptale-color-surface-hover);
+  --color-border-subtle: var(--sniptale-color-border-subtle);
+  --color-border-soft: var(--sniptale-color-border-soft);
+  --color-border-strong: var(--sniptale-color-border-strong);
+  --color-border-accent: var(--sniptale-color-border-accent-strong);
+  --color-text-primary: var(--sniptale-color-text-primary);
+  --color-text-strong: var(--sniptale-color-text-primary-strong);
+  --color-text-secondary: var(--sniptale-color-text-secondary);
+  --color-text-muted: var(--sniptale-color-text-muted);
+  --color-text-dim: var(--sniptale-color-text-dim);
+  --color-brand-primary: var(--sniptale-color-accent);
+  --color-brand-secondary: var(--sniptale-color-danger);
+  --color-accent: var(--sniptale-color-accent);
+  --color-accent-emphasis: var(--sniptale-color-accent-emphasis);
+  --color-accent-soft: var(--sniptale-color-accent-soft);
+  --color-accent-glow: var(--sniptale-color-accent-glow);
+  --color-status-success: var(--sniptale-color-success);
+  --color-status-warning: var(--sniptale-color-warning);
+  --color-status-danger: var(--sniptale-color-danger);
+  --color-status-info: var(--sniptale-color-info);
+  --color-success: var(--sniptale-color-success);
+  --color-warning: var(--sniptale-color-warning);
+  --color-danger: var(--sniptale-color-danger);
+  --color-info: var(--sniptale-color-info);
+  --color-default: var(--sniptale-color-border-soft);
+  --color-primary: var(--sniptale-color-text-primary);
+  --color-secondary: var(--sniptale-color-text-secondary);
+  --color-tertiary: var(--sniptale-color-text-dim);
+  --color-icon-purple: #c084fc;
+  --color-icon-teal: #5eead4;
+  --color-icon-blue: #60a5fa;
+  --radius-sm: var(--sniptale-radius-sm);
+  --radius-md: var(--sniptale-radius-md);
+  --radius-lg: var(--sniptale-radius-lg);
+  --radius-xl: var(--sniptale-radius-xl);
+  --shadow-sm: var(--sniptale-shadow-sm);
+  --shadow-floating: var(--sniptale-shadow-floating);
+  --shadow-floating-strong: var(--sniptale-shadow-floating-strong);
+  --shadow-glow-orange: 0 0 15px
+    color-mix(in srgb, var(--sniptale-color-accent-glow) 72%, transparent);
+  --shadow-glow-red: 0 0 20px color-mix(in srgb, var(--sniptale-color-danger) 35%, transparent);
+  --shadow-glow-green: 0 0 8px color-mix(in srgb, var(--sniptale-color-success) 40%, transparent);
+  --ease-spring: var(--sniptale-motion-spring);
+  --ease-smooth: var(--sniptale-motion-smooth);
+}
+
+@utility duration-fast {
+  transition-duration: var(--sniptale-duration-fast);
+}
+
+@utility duration-normal {
+  transition-duration: var(--sniptale-duration-normal);
+}

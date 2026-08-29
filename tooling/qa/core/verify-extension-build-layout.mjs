@@ -11,9 +11,10 @@ export {
 
 export const EXTENSION_BUILD_LAYOUT_PATH = 'apps/extension/build/layout.data.json';
 const VITE_CONFIG_PATH = 'apps/extension/vite.config.ts';
-const POSTCSS_CONFIG_PATH = 'apps/extension/postcss.config.js';
-const TAILWIND_CONFIG_PATH = 'apps/extension/tailwind.config.js';
+const TAILWIND_STYLES_PATH = 'packages/ui/src/styles/tailwind.css';
 const RETIRED_BUILD_PATHS = [
+  'apps/extension/postcss.config.js',
+  'apps/extension/tailwind.config.js',
   'postcss.config.js',
   'public',
   'src/manifest.json',
@@ -62,8 +63,7 @@ export function collectExtensionBuildLayoutViolations({ rootDir = repoRoot } = {
     rootPackage: readJson(rootDir, 'package.json'),
     appPackage: readJson(rootDir, 'apps/extension/package.json'),
     viteConfigSource: fs.readFileSync(path.join(rootDir, VITE_CONFIG_PATH), 'utf8'),
-    postcssConfigSource: fs.readFileSync(path.join(rootDir, POSTCSS_CONFIG_PATH), 'utf8'),
-    tailwindConfigSource: fs.readFileSync(path.join(rootDir, TAILWIND_CONFIG_PATH), 'utf8'),
+    tailwindStylesSource: fs.readFileSync(path.join(rootDir, TAILWIND_STYLES_PATH), 'utf8'),
     existingPaths,
     retiredFiles,
   }).map((message) => ({ rule: 'config-policy', file: EXTENSION_BUILD_LAYOUT_PATH, message }));

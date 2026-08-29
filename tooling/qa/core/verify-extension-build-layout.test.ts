@@ -10,6 +10,8 @@ import {
 } from './verify-extension-build-layout.mjs';
 
 const VITE_SOURCE = [
+  "from '@tailwindcss/vite'",
+  'tailwindcss()',
   'root: BUILD_LAYOUT.appRoot',
   'outDir: BUILD_LAYOUT.outputRoot',
   'emptyOutDir: true',
@@ -18,14 +20,12 @@ const VITE_SOURCE = [
   'extensionHtmlInputs(BUILD_LAYOUT)',
 ].join('\n');
 const RETIRED_VITE_CONFIG_PATH = 'vite.config.ts';
-const POSTCSS_SOURCE = [
-  "import tailwindConfig from './tailwind.config.js'",
-  'tailwindcss: tailwindConfig',
-].join('\n');
-const TAILWIND_SOURCE = [
-  "fileURLToPath(new URL('.', import.meta.url))",
-  "resolve(APP_ROOT, 'src/**/*.{js,jsx,ts,tsx}')",
-  "resolve(APP_ROOT, '../../packages/ui/src/**/*.{js,jsx,ts,tsx}')",
+const TAILWIND_STYLES_SOURCE = [
+  "@import 'tailwindcss' source(none)",
+  "@source '../../../../apps/extension/src'",
+  "@source '..'",
+  'border-color: var(--color-gray-200, currentcolor)',
+  '@theme inline',
 ].join('\n');
 
 function existingPaths(policy = POLICY) {
@@ -43,8 +43,7 @@ it('accepts the complete bounded app build layout', () => {
       rootPackage: ROOT_PACKAGE,
       appPackage: APP_PACKAGE,
       viteConfigSource: VITE_SOURCE,
-      postcssConfigSource: POSTCSS_SOURCE,
-      tailwindConfigSource: TAILWIND_SOURCE,
+      tailwindStylesSource: TAILWIND_STYLES_SOURCE,
       existingPaths: existingPaths(),
     })
   ).toEqual([]);
@@ -66,8 +65,7 @@ it('rejects broad inputs, app-local output, command drift and missing configs', 
       rootPackage: ROOT_PACKAGE,
       appPackage,
       viteConfigSource: 'export default {}',
-      postcssConfigSource: 'export default {}',
-      tailwindConfigSource: 'export default {}',
+      tailwindStylesSource: '',
       existingPaths: paths,
       retiredFiles: [RETIRED_VITE_CONFIG_PATH],
     })
@@ -79,8 +77,7 @@ it('rejects broad inputs, app-local output, command drift and missing configs', 
       expect.stringContaining('app development dependency closure'),
       expect.stringContaining('required app build config is missing'),
       expect.stringContaining('Vite config is missing layout marker'),
-      expect.stringContaining('PostCSS config is missing Tailwind ownership marker'),
-      expect.stringContaining('Tailwind config is missing bounded content marker'),
+      expect.stringContaining('Tailwind stylesheet is missing bounded ownership marker'),
       expect.stringContaining('retired root build input remains'),
     ])
   );
@@ -97,8 +94,7 @@ it('rejects path traversal through app and external input roots', () => {
       rootPackage: ROOT_PACKAGE,
       appPackage: APP_PACKAGE,
       viteConfigSource: VITE_SOURCE,
-      postcssConfigSource: POSTCSS_SOURCE,
-      tailwindConfigSource: TAILWIND_SOURCE,
+      tailwindStylesSource: TAILWIND_STYLES_SOURCE,
       existingPaths: existingPaths(policy),
     })
   ).toEqual(
@@ -119,8 +115,7 @@ it('requires every app-owned build helper registered in config paths', () => {
       rootPackage: ROOT_PACKAGE,
       appPackage: APP_PACKAGE,
       viteConfigSource: VITE_SOURCE,
-      postcssConfigSource: POSTCSS_SOURCE,
-      tailwindConfigSource: TAILWIND_SOURCE,
+      tailwindStylesSource: TAILWIND_STYLES_SOURCE,
       existingPaths: paths,
     })
   ).toContain(

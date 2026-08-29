@@ -1,10 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 
-import autoprefixer from 'autoprefixer';
+import tailwindcss from '@tailwindcss/postcss';
 import type { Plugin as EsbuildPlugin } from 'esbuild';
 import postcss from 'postcss';
-import tailwindcss from 'tailwindcss';
 
 export function createReleaseSafeDependencyAliasPlugin(repositoryRoot: string): EsbuildPlugin {
   const aliases = new Map([
@@ -62,19 +61,13 @@ async function inlineCssImports(filePath: string, visited = new Set<string>()): 
   return css + source.slice(cursor);
 }
 
-async function buildInlineCssText(filePath: string, tailwindConfigPath: string): Promise<string> {
+async function buildInlineCssText(filePath: string): Promise<string> {
   return (
-    await postcss([tailwindcss(tailwindConfigPath), autoprefixer()]).process(
-      await inlineCssImports(filePath),
-      { from: filePath }
-    )
+    await postcss([tailwindcss()]).process(await inlineCssImports(filePath), { from: filePath })
   ).css;
 }
 
-export function createInlineCssTextPlugin(
-  appRoot: string,
-  tailwindConfigPath: string
-): EsbuildPlugin {
+export function createInlineCssTextPlugin(appRoot: string): EsbuildPlugin {
   return {
     name: 'sniptale:inline-css-text',
     setup(build) {
@@ -87,9 +80,7 @@ export function createInlineCssTextPlugin(
         return { namespace: 'sniptale-inline-css', path: resolved.path };
       });
       build.onLoad({ filter: /\.css$/, namespace: 'sniptale-inline-css' }, async (args) => ({
-        contents: `export default ${JSON.stringify(
-          await buildInlineCssText(args.path, tailwindConfigPath)
-        )};`,
+        contents: `export default ${JSON.stringify(await buildInlineCssText(args.path))};`,
         loader: 'js',
       }));
     },
