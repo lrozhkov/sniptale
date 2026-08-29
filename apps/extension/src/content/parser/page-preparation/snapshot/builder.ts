@@ -31,6 +31,7 @@ import type { FullPageCaptureRasterRegion } from '../../../../contracts/full-pag
 import { getAbsolutePosition } from '../../../platform/frame';
 import { collectWebSnapshotQueryRoots } from '../../../../features/web-snapshot/public';
 import { isAccessibleDocumentRuntimeStyle } from '../../../platform/frame';
+import { normalizePreparedSnapshotInteractionState } from './interaction-state';
 
 function isIframeElement(node: Node | null): node is HTMLIFrameElement {
   return node?.nodeType === Node.ELEMENT_NODE && (node as Element).localName === 'iframe';
@@ -208,6 +209,7 @@ export async function buildPreparedSnapshotDocument(
     const virtualDomSnapshot = buildInertPreparedSnapshotVirtualDom(rootDocument, root);
     await yieldPreparedSnapshot(options.abortSignal);
     clearPreparedSnapshotIframeRasterAttributes(virtualDomSnapshot.document);
+    normalizePreparedSnapshotInteractionState(virtualDomSnapshot.document);
     removeContentRuntimeHost(
       virtualDomSnapshot.root,
       root,
