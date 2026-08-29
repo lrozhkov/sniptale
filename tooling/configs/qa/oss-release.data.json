@@ -197,11 +197,6 @@
       "source": "LICENSES/dependencies/string_decoder-1.1.1.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/use-sync-external-store-1.6.0.txt",
-      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
-      "source": "LICENSES/dependencies/use-sync-external-store-1.6.0.txt"
-    },
-    {
       "archivePath": "LICENSES/dependencies/util-deprecate-1.0.2.txt",
       "sha256": "0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7",
       "source": "LICENSES/dependencies/util-deprecate-1.0.2.txt"
@@ -212,9 +207,9 @@
       "source": "LICENSES/dependencies/zod-4.4.3.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/zustand-4.5.7.txt",
+      "archivePath": "LICENSES/dependencies/zustand-5.0.15.txt",
       "sha256": "c1e6e266563517467b1bf874817d23e426f3149252bd7d42758cd697514b8417",
-      "source": "LICENSES/dependencies/zustand-4.5.7.txt"
+      "source": "LICENSES/dependencies/zustand-5.0.15.txt"
     },
     {
       "archivePath": "NOTICE",
@@ -223,12 +218,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "fdfdc658c84c53358d70ff86d429c6a5968e5bc23457d0a5be9056c7c58749d0",
+      "sha256": "4f5478ba383dd97c9e55c3c7c329cafcec2266d6228dc9c34b74875b50e01221",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "cf4881c1a6425f4646bd6972630c8d4f34486e1fa34f6f1ce7ae81c52594fd31",
+      "sha256": "ad0b51344dabb8fc8b5edd5f610bfc3c39ec91aab2beacd38ca46b51f1ceaef3",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

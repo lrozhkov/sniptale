@@ -464,19 +464,6 @@
       "version": "1.1.1"
     },
     {
-      "archivePath": "LICENSES/dependencies/use-sync-external-store-1.6.0.txt",
-      "licenseExpression": "MIT",
-      "licenseSource": "node_modules/use-sync-external-store/LICENSE",
-      "licenseSourceKind": "installed-file",
-      "licenseStorageKind": "generated-copy",
-      "packageName": "use-sync-external-store",
-      "packagePath": "node_modules/use-sync-external-store",
-      "selectedLicense": "MIT",
-      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
-      "sourceUrl": "https://github.com/facebook/react.git",
-      "version": "1.6.0"
-    },
-    {
       "archivePath": "LICENSES/dependencies/util-deprecate-1.0.2.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/util-deprecate/LICENSE",
@@ -503,7 +490,7 @@
       "version": "4.4.3"
     },
     {
-      "archivePath": "LICENSES/dependencies/zustand-4.5.7.txt",
+      "archivePath": "LICENSES/dependencies/zustand-5.0.15.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/zustand/LICENSE",
       "licenseSourceKind": "installed-file",
@@ -513,7 +500,7 @@
       "selectedLicense": "MIT",
       "sha256": "c1e6e266563517467b1bf874817d23e426f3149252bd7d42758cd697514b8417",
       "sourceUrl": "https://github.com/pmndrs/zustand.git",
-      "version": "4.5.7"
+      "version": "5.0.15"
     }
   ],
   "schemaVersion": 1

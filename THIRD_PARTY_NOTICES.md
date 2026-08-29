@@ -443,18 +443,6 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b`
 - Repository/source: https://github.com/nodejs/string_decoder.git
 
-### `use-sync-external-store` 1.6.0
-
-- Installed path: `node_modules/use-sync-external-store`
-- Declared license expression: `MIT`
-- Selected license: `MIT`
-- License source class: `installed-file`
-- License source: `node_modules/use-sync-external-store/LICENSE`
-- License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/use-sync-external-store-1.6.0.txt`](LICENSES/dependencies/use-sync-external-store-1.6.0.txt)
-- License text SHA-256: `da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93`
-- Repository/source: https://github.com/facebook/react.git
-
 ### `util-deprecate` 1.0.2
 
 - Installed path: `node_modules/util-deprecate`
@@ -479,7 +467,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8`
 - Repository/source: https://github.com/colinhacks/zod.git
 
-### `zustand` 4.5.7
+### `zustand` 5.0.15
 
 - Installed path: `node_modules/zustand`
 - Declared license expression: `MIT`
@@ -487,6 +475,6 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/zustand/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/zustand-4.5.7.txt`](LICENSES/dependencies/zustand-4.5.7.txt)
+- Redistributed license text: [`LICENSES/dependencies/zustand-5.0.15.txt`](LICENSES/dependencies/zustand-5.0.15.txt)
 - License text SHA-256: `c1e6e266563517467b1bf874817d23e426f3149252bd7d42758cd697514b8417`
 - Repository/source: https://github.com/pmndrs/zustand.git

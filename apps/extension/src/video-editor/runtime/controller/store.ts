@@ -16,6 +16,25 @@ import { useVideoEditorStore, type VideoEditorState } from '../../state/store';
 
 type PortSelector<Port, Selection> = (port: Port) => Selection;
 
+const projectHistoryStatusByState = new WeakMap<
+  VideoEditorState['projectHistory'],
+  HistoryPort['projectHistoryStatus']
+>();
+
+function selectProjectHistoryStatus(
+  projectHistory: VideoEditorState['projectHistory']
+): HistoryPort['projectHistoryStatus'] {
+  const cached = projectHistoryStatusByState.get(projectHistory);
+  if (cached) return cached;
+  const status = {
+    canUndo: projectHistory.transaction === null && projectHistory.past.length > 0,
+    canRedo: projectHistory.transaction === null && projectHistory.future.length > 0,
+    error: projectHistory.error,
+  };
+  projectHistoryStatusByState.set(projectHistory, status);
+  return status;
+}
+
 function usePort<Port, Selection>(
   selectPort: (state: VideoEditorState) => Port,
   selector: PortSelector<Port, Selection>
@@ -139,11 +158,7 @@ function selectHistoryPort(state: VideoEditorState): HistoryPort {
     endProjectHistoryTransaction: state.endProjectHistoryTransaction,
     isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
     projectHistoryTransactionActive: state.projectHistory.transaction !== null,
-    projectHistoryStatus: {
-      canUndo: state.projectHistory.transaction === null && state.projectHistory.past.length > 0,
-      canRedo: state.projectHistory.transaction === null && state.projectHistory.future.length > 0,
-      error: state.projectHistory.error,
-    },
+    projectHistoryStatus: selectProjectHistoryStatus(state.projectHistory),
     redoProject: state.redoProject,
     undoProject: state.undoProject,
   };
