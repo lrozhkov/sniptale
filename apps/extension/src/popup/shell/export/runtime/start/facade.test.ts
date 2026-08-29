@@ -208,6 +208,20 @@ it('keeps the job cancellation authority when screenshot permission is declined'
   );
 });
 
+it('does not dispatch URL sources when all-sites permission is declined', async () => {
+  const state = createStartState();
+  state.activeSourceMode = 'urls';
+  state.selectedUrls = ['https://example.test/'];
+  const requestAllUrlsPermission = vi.fn(async () => false);
+  const deps = createStartDeps({ requestAllUrlsPermission });
+
+  await startPopupExportImpl(state, deps);
+
+  expect(requestAllUrlsPermission).toHaveBeenCalledOnce();
+  expect(deps.sendStartJobMessage).not.toHaveBeenCalled();
+  expect(state.setProgress).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'error' }));
+});
+
 it('normalizes browser titles and caps generated start requests to the contract maximum', async () => {
   const availableTabs = Array.from({ length: 257 }, (_, index) => ({
     disabledReason: null,
@@ -226,8 +240,9 @@ it('normalizes browser titles and caps generated start requests to the contract 
   await startPopupExportImpl(state, deps);
 
   const request = vi.mocked(deps.sendStartJobMessage!).mock.calls[0]![0];
-  expect(request.orderedTabs).toHaveLength(256);
-  expect(new TextEncoder().encode(request.orderedTabs[0]!.title).byteLength).toBeLessThanOrEqual(
-    2 * 1024
-  );
+  expect(request.sources).toHaveLength(256);
+  expect(
+    new TextEncoder().encode(request.sources[0]!.kind === 'tab' ? request.sources[0]!.title : '')
+      .byteLength
+  ).toBeLessThanOrEqual(2 * 1024);
 });

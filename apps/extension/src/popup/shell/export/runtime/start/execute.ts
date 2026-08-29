@@ -10,6 +10,7 @@ import {
   normalizePopupExportTabTitle,
 } from '@sniptale/runtime-contracts/export';
 import { translate } from '../../../../../platform/i18n/popup';
+import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
 
 export async function startPopupExport(
   state: PopupExportRuntimeContract,
@@ -43,7 +44,11 @@ export async function startPopupExport(
           : [];
       })
       .slice(0, MAX_POPUP_EXPORT_JOB_TABS);
-    if (orderedTabs.length === 0) return;
+    const sources =
+      state.activeSourceMode === 'urls'
+        ? state.selectedUrls.map((url) => ({ kind: 'url' as const, url }))
+        : orderedTabs.map((tab) => ({ kind: 'tab' as const, ...tab }));
+    if (sources.length === 0) return;
 
     const plan =
       intent === 'save'
@@ -58,20 +63,30 @@ export async function startPopupExport(
           };
     const options = buildPopupExportOptions(plan);
     const warnings: string[] = [];
-    if (intent === 'export' && options.includeFullPageScreenshot) {
+    if (
+      state.activeSourceMode === 'urls' ||
+      (intent === 'export' && options.includeFullPageScreenshot)
+    ) {
       const granted = await (deps.requestAllUrlsPermission?.() ?? Promise.resolve(true));
       if (!granted) {
-        options.includeFullPageScreenshot = false;
-        warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+        if (state.activeSourceMode === 'urls')
+          throw new Error(translate('popup.export.urlPermissionDenied'));
+        else {
+          options.includeFullPageScreenshot = false;
+          warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+        }
       }
     }
+    const captureTiming = deps.loadPageCaptureTiming
+      ? await deps.loadPageCaptureTiming()
+      : { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING };
 
     state.requestIdRef.current = jobId;
     state.terminalRequestIdRef.current = null;
     state.cancelRetryRef.current = {
       exportRunId: jobId,
       owner: 'job',
-      tabIds: orderedTabs.map((tab) => tab.tabId),
+      tabIds: state.activeSourceMode === 'urls' ? [] : orderedTabs.map((tab) => tab.tabId),
     };
     const effectivePlan = {
       ...plan,
@@ -82,7 +97,7 @@ export async function startPopupExport(
     state.setProgress({
       activeStepKey: effectivePlan.includeWebCopy ? 'webSnapshotDom' : null,
       current: 0,
-      total: orderedTabs.length,
+      total: sources.length,
       errors: [],
       message: translate('popup.export.preparingPreview'),
       phase: 'scanning',
@@ -93,7 +108,8 @@ export async function startPopupExport(
       includeWebCopy: effectivePlan.includeWebCopy,
       intent,
       jobId,
-      orderedTabs,
+      captureTiming,
+      sources,
       options,
       warnings,
     });

@@ -87,6 +87,10 @@ const DEFAULT_FULL_PAGE_QUALITY = {
   minScalePercent: 100,
   profile: 'maximum' as const,
 };
+const DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING = {
+  loadTimeoutMs: 30_000,
+  settleDelayMs: 2_000,
+};
 const DEFAULT_VOICE_INPUT = {
   language: 'ru-RU' as const,
   microphoneDeviceId: null,
@@ -205,6 +209,7 @@ async function verifyLoadMigration() {
     localStoragePolicy: LIBRARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });
@@ -256,6 +261,7 @@ async function verifyStoredSettings() {
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
     externalSnapshotLinksEnabled: false,
@@ -349,6 +355,7 @@ const expectedInvalidStoredSettingsResult = {
   localStoragePolicy: LIBRARY_STORAGE_POLICY,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
   fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+  pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
   voiceInput: DEFAULT_VOICE_INPUT,
   ...PRIVACY_DEFAULTS,
 };
@@ -385,6 +392,7 @@ async function verifyInvalidRootFallback() {
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });

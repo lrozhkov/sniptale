@@ -14,7 +14,7 @@ vi.mock('./index', async (importOriginal) => ({
   acknowledgePagePackageJobStatus: mocks.ack,
   cancelPagePackageJob: mocks.cancel,
   getPagePackageJobStatus: mocks.getStatus,
-  startPagePackageJob: mocks.start,
+  startPagePackageJobFromSources: mocks.start,
 }));
 
 import { routePagePackageJobMessage } from './route';
@@ -52,7 +52,8 @@ it('routes start, status, cancellation, and acknowledgement through the job owne
         intent: 'export',
         jobId: 'job-1',
         options,
-        orderedTabs: [{ tabId: 7, title: 'Page' }],
+        captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+        sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],
         type: MessageType.START_PAGE_PACKAGE_JOB,
         warnings: [],
       },

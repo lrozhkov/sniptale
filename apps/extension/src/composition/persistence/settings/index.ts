@@ -23,6 +23,10 @@ import {
   createSystemViewportPresetCatalog,
 } from '../../../features/viewport-presets/catalog';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
+import {
+  DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
+  parsePagePackageCaptureTimingPolicy,
+} from '@sniptale/runtime-contracts/page-package';
 
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
@@ -74,6 +78,7 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   anonymousCrossOriginSnapshotAssetsEnabled: true,
   externalSnapshotLinksEnabled: false,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+  pagePackageCaptureTiming: { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
   voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
 };
 
@@ -108,6 +113,7 @@ export function createDefaultSettings(): NormalizedSettings {
     localStoragePolicy: { ...DEFAULT_LOCAL_STORAGE_POLICY },
     fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
     fullPageQuality: { ...DEFAULT_FULL_PAGE_QUALITY_POLICY },
+    pagePackageCaptureTiming: { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
     voiceInput: { ...DEFAULT_VOICE_INPUT_SETTINGS },
     presets: [],
     viewportPresets: cloneViewportPresets(DEFAULT_VIEWPORT_PRESETS),
@@ -134,6 +140,12 @@ export async function saveSettings(settings: Settings): Promise<void> {
     !parseFullPageQualityPolicy(settings.fullPageQuality)
   ) {
     throw new Error('Full-page screenshot quality settings are invalid');
+  }
+  if (
+    settings.pagePackageCaptureTiming !== undefined &&
+    !parsePagePackageCaptureTimingPolicy(settings.pagePackageCaptureTiming)
+  ) {
+    throw new Error('Page capture timing settings are invalid');
   }
   await browserStorage.sync.set({ [STORAGE_KEY]: settings });
 
@@ -166,6 +178,9 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSett
       ...parsedValue.fullPageCapture,
     },
     fullPageQuality: { ...(parsedValue.fullPageQuality ?? DEFAULT_FULL_PAGE_QUALITY_POLICY) },
+    pagePackageCaptureTiming: {
+      ...(parsedValue.pagePackageCaptureTiming ?? DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING),
+    },
     voiceInput: {
       ...DEFAULT_VOICE_INPUT_SETTINGS,
       ...parsedValue.voiceInput,
@@ -260,6 +275,8 @@ function applySettingsPatch(
       ...settingsPatch.fullPageCapture,
     },
     fullPageQuality: settingsPatch.fullPageQuality ?? currentSettings.fullPageQuality,
+    pagePackageCaptureTiming:
+      settingsPatch.pagePackageCaptureTiming ?? currentSettings.pagePackageCaptureTiming,
     localStoragePolicy: {
       ...currentSettings.localStoragePolicy,
       ...settingsPatch.localStoragePolicy,

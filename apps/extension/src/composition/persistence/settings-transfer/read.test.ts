@@ -154,7 +154,7 @@ beforeEach(() => {
 
 it('reads every visible domain while removing secret and device-bound state', async () => {
   const snapshot = await readSettingsTransferSnapshot();
-  expect(Object.keys(snapshot.domains)).toHaveLength(23);
+  expect(Object.keys(snapshot.domains)).toHaveLength(24);
   expect(snapshot.domains['ai.providers']?.data).toEqual({
     items: [
       {
@@ -174,6 +174,9 @@ it('reads every visible domain while removing secret and device-bound state', as
       minScalePercent: 50,
       profile: 'safe',
     },
+  });
+  expect(snapshot.domains['capture.pages']?.data).toEqual({
+    timing: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
   });
   expect(snapshot.domains).not.toHaveProperty('access.capture-assets');
   expect(JSON.stringify(snapshot.domains['ai.models']?.data)).not.toContain('authorization');
@@ -374,6 +377,7 @@ function settingsFixture() {
     },
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
+    pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
     voiceInput: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: 'device-secret' },
   };
 }

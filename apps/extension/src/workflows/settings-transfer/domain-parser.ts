@@ -103,6 +103,7 @@ function parseCoreDomain(
     }
     case 'capture.viewport-presets':
     case 'capture.image':
+    case 'capture.pages':
     case 'capture.after-capture':
     case 'capture.saving':
     case 'capture.retention':
@@ -282,6 +283,8 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
         imageQuality: value['quality'],
         fullPageQuality: value['fullPageQuality'],
       };
+    case 'capture.pages':
+      return { pagePackageCaptureTiming: value['timing'] };
     case 'capture.after-capture':
       return { captureAction: value['action'] };
     case 'capture.saving':
@@ -321,6 +324,8 @@ function coreSettingsTransferData(
           ? {}
           : { fullPageQuality: parsed.fullPageQuality }),
       };
+    case 'capture.pages':
+      return source['timing'] === undefined ? {} : { timing: parsed.pagePackageCaptureTiming };
     case 'capture.after-capture':
       return source['action'] === undefined ? {} : { action: parsed.captureAction };
     case 'capture.saving':

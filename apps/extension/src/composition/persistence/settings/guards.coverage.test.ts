@@ -68,9 +68,24 @@ describe('settings guards valid payload coverage', () => {
       },
     });
   });
+
+  it('accepts bounded page capture timing', () => {
+    expect(
+      parseStoredSettings({
+        pagePackageCaptureTiming: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 },
+      }).value.pagePackageCaptureTiming
+    ).toEqual({ loadTimeoutMs: 60_000, settleDelayMs: 3_000 });
+  });
 });
 
 describe('settings guards invalid payload coverage', () => {
+  it('drops unsafe page capture timing from storage', () => {
+    const parsed = parseStoredSettings({
+      pagePackageCaptureTiming: { loadTimeoutMs: Number.POSITIVE_INFINITY, settleDelayMs: -1 },
+    });
+    expect(parsed.invalidFieldCount).toBe(1);
+    expect(parsed.value.pagePackageCaptureTiming).toBeUndefined();
+  });
   it('counts invalid toolbar, array, and context-menu fields independently', () => {
     expect(
       parseStoredSettings({

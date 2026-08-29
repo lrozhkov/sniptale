@@ -145,8 +145,16 @@ it('renders the ready state with selection props and disabled state', async () =
       derived: { exportDisabledReason: 'blocked' },
       preferences: { hasLoadedPreferences: false },
       tabs: {
+        activeSourceMode: 'urls',
         selectedCount: 0,
         selectedTabIds: [],
+        selectedUrls: ['https://example.test/'],
+        setActiveSourceMode: vi.fn(),
+        setUrlInput: vi.fn(),
+        removeSelectedUrl: vi.fn(),
+        urlInput: 'example.test',
+        urlInputInvalid: [],
+        urlInputOverflow: 0,
       },
     })
   );
@@ -158,6 +166,7 @@ it('renders the ready state with selection props and disabled state', async () =
       hasLoadedPreferences: false,
       selectedCount: 0,
       selectedTabIds: [],
+      selectedUrls: ['https://example.test/'],
       includeWebCopy: false,
       savePreferences: expect.objectContaining({ includeWebCopy: true }),
     })

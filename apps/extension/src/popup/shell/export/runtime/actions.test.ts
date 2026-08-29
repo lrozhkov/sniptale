@@ -110,11 +110,19 @@ function createPreferenceState(): PopupExportPreferenceFixture {
 
 function createSessionState(): PopupExportSessionFixture {
   return {
+    activeSourceMode: 'tabs',
     canCopyJson: true,
     canCopyMarkdown: true,
     canExport: true,
     copiedFormat: null,
     copyingFormat: null,
+    selectedUrls: [],
+    setActiveSourceMode: vi.fn(),
+    setUrlInput: vi.fn(),
+    removeSelectedUrl: vi.fn(),
+    urlInput: '',
+    urlInputInvalid: [],
+    urlInputOverflow: 0,
     cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 0 },
     copyResetTimeoutRef: { current: null as number | null },
@@ -244,7 +252,7 @@ it('starts single-tab export through injected runtime deps', async () => {
     expect.objectContaining({
       type: MessageType.START_PAGE_PACKAGE_JOB,
       jobId: 'req-1',
-      orderedTabs: [{ tabId: 12, title: 'Current tab' }],
+      sources: [{ kind: 'tab', tabId: 12, title: 'Current tab' }],
       options: expect.objectContaining({
         includeCssDiagnostics: true,
         includeJson: true,

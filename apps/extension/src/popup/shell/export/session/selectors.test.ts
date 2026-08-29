@@ -118,6 +118,7 @@ function createTabSelectionState(
   overrides: Partial<PopupExportTabSelectionState> = {}
 ): PopupExportTabSelectionState {
   return {
+    activeSourceMode: 'tabs',
     availableTabs: [],
     filterQuery: '',
     filteredTabs: [],
@@ -125,9 +126,16 @@ function createTabSelectionState(
     selectedCount: 1,
     selectedTabIds: [1],
     selectedTabIdsInOrder: [1],
+    selectedUrls: [],
+    setActiveSourceMode: vi.fn(),
     setFilterQuery: vi.fn(),
+    setUrlInput: vi.fn(),
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
+    removeSelectedUrl: vi.fn(),
+    urlInput: '',
+    urlInputInvalid: [],
+    urlInputOverflow: 0,
     ...overrides,
   };
 }

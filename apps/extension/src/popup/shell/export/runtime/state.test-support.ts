@@ -101,17 +101,26 @@ function createRuntimeToggleState(): Pick<
 function createRuntimeTabState(): Pick<
   PopupExportRuntimeContract,
   | 'availableTabs'
+  | 'activeSourceMode'
   | 'filterQuery'
   | 'filteredTabs'
   | 'isFilterActive'
   | 'selectedCount'
   | 'selectedTabIds'
   | 'selectedTabIdsInOrder'
+  | 'selectedUrls'
+  | 'setActiveSourceMode'
   | 'setFilterQuery'
+  | 'setUrlInput'
   | 'toggleSelectAllTabs'
   | 'toggleTabSelection'
+  | 'removeSelectedUrl'
+  | 'urlInput'
+  | 'urlInputInvalid'
+  | 'urlInputOverflow'
 > {
   return {
+    activeSourceMode: 'tabs',
     availableTabs: [],
     filterQuery: '',
     filteredTabs: [],
@@ -119,9 +128,16 @@ function createRuntimeTabState(): Pick<
     selectedCount: 1,
     selectedTabIds: [11],
     selectedTabIdsInOrder: [11],
+    selectedUrls: [],
+    setActiveSourceMode: vi.fn(),
     setFilterQuery: vi.fn(),
+    setUrlInput: vi.fn(),
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
+    removeSelectedUrl: vi.fn(),
+    urlInput: '',
+    urlInputInvalid: [],
+    urlInputOverflow: 0,
   };
 }
 

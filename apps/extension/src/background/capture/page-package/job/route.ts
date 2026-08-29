@@ -6,7 +6,7 @@ import {
   acknowledgePagePackageJobStatus,
   cancelPagePackageJob,
   getPagePackageJobStatus,
-  startPagePackageJob,
+  startPagePackageJobFromSources,
 } from './index';
 import type { PopupExportJobContentPort } from './runtime-state';
 
@@ -24,7 +24,7 @@ export function routePagePackageJobMessage(
         runtimeActionExportMessageContracts[MessageType.START_PAGE_PACKAGE_JOB].parseRequest(
           message
         );
-      work = startPagePackageJob({ ...parsed, contentPort }).then((status) => ({
+      work = startPagePackageJobFromSources({ ...parsed, contentPort }).then((status) => ({
         success: true,
         status,
       }));

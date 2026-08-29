@@ -13,7 +13,8 @@ import {
   isPopupExportPackageResponse,
   isPopupExportPreviewResponse,
   isPagePackageJobStatus,
-  isPagePackageJobTabs,
+  isPagePackageCaptureSources,
+  isPagePackageCaptureTiming,
   isPopupExportJobWarnings,
 } from '../../../validators/export';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
@@ -85,7 +86,8 @@ export const runtimeActionExportMessageContracts = {
           includeWebCopy: (value) => typeof value === 'boolean',
           intent: (value) => value === 'export' || value === 'save',
           jobId: isPopupExportJobId,
-          orderedTabs: isPagePackageJobTabs,
+          captureTiming: isPagePackageCaptureTiming,
+          sources: isPagePackageCaptureSources,
           options: isExportOptions,
           warnings: isPopupExportJobWarnings,
         },

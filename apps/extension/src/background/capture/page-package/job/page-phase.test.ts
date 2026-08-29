@@ -7,6 +7,9 @@ vi.mock('./visible', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./visible')>()),
   activatePopupExportCaptureTarget: vi.fn(async () => undefined),
 }));
+vi.mock('./page-readiness', () => ({
+  waitForPagePackageCaptureReadiness: vi.fn(async () => undefined),
+}));
 import type { ActivePopupExportJob, PopupExportJobContentPort } from './runtime-state';
 import { translate } from '../../../../platform/i18n';
 import { updatePagePackageJobStatus } from './runtime-state';

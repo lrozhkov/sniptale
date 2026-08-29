@@ -128,6 +128,9 @@ function getExportDisabledReason(
   activeTabExportDisabledReason: string | null,
   tabSelection: PopupExportTabSelectionState
 ): string | null {
+  if (tabSelection.activeSourceMode === 'urls' && tabSelection.selectedUrls.length > 0) {
+    return null;
+  }
   if (hasSelectedExportableTabs(tabSelection)) {
     return null;
   }
@@ -136,6 +139,7 @@ function getExportDisabledReason(
 }
 
 function hasSelectedExportableTabs(tabSelection: PopupExportTabSelectionState): boolean {
+  if (tabSelection.activeSourceMode === 'urls') return tabSelection.selectedUrls.length > 0;
   if (tabSelection.selectedTabIds.length === 0) {
     return false;
   }

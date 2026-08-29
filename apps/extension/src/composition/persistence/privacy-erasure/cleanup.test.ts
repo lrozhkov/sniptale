@@ -106,6 +106,7 @@ it('returns the keys removed from each browser storage area', async () => {
   expect(result.sessionStorageKeysRemoved).toContain('interaction-diagnostics-active-sessions');
   expect(result.sessionStorageKeysRemoved).toContain('sniptale_popup_export_job');
   expect(result.sessionStorageKeysRemoved).toContain('sniptale_page_package_job');
+  expect(result.sessionStorageKeysRemoved).toContain('sniptale_page_package_temporary_tabs');
   expect(result.sessionStorageKeysRemoved).toContain(AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY);
   expect(result.sessionStorageKeysRemoved).toContain('scenarioPresentationSession:session-1');
   expect(result.syncStorageKeysRemoved).toContain('sniptale_settings');

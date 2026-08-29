@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   cleanupLibrary: vi.fn(),
   release: vi.fn(),
+  cleanupTemporaryTabs: vi.fn(),
 }));
 
 vi.mock('./download', async (importOriginal) => ({
@@ -12,6 +13,10 @@ vi.mock('./download', async (importOriginal) => ({
 vi.mock('./library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./library')>()),
   cleanupRecordedPagePackageLibraryAssets: mocks.cleanupLibrary,
+}));
+vi.mock('./source-tabs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./source-tabs')>()),
+  cleanupTemporaryPagePackageTabs: mocks.cleanupTemporaryTabs,
 }));
 
 import {
@@ -75,6 +80,7 @@ function job(): ActivePopupExportJob {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.cleanupLibrary.mockResolvedValue(undefined);
+  mocks.cleanupTemporaryTabs.mockResolvedValue(undefined);
   mocks.release.mockResolvedValue(undefined);
 });
 

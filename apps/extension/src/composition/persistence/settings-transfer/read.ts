@@ -99,6 +99,7 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
       quality: settings.imageQuality,
       fullPageQuality: settings.fullPageQuality,
     }),
+    'capture.pages': payload({ timing: settings.pagePackageCaptureTiming }),
     'capture.video': payload({
       profiles: video.qualityProfiles,
       qualityProfileId: video.qualityProfileId,

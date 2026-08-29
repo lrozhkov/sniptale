@@ -71,7 +71,8 @@ it('proxies the native popup-export job API and optional host permission', async
     includeWebCopy: false,
     intent: 'export',
     options,
-    orderedTabs: [{ tabId: 7, title: 'Page' }],
+    captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+    sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],
     type: MessageType.START_PAGE_PACKAGE_JOB,
     warnings: ['permission denied'],
   });

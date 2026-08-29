@@ -14,6 +14,9 @@ export type PopupExportRuntimeDeps = {
   clearTimeout: (timeoutId: number) => void;
   createRequestId: () => string;
   getActiveTabId: typeof getActiveTabId;
+  loadPageCaptureTiming?: () => Promise<
+    import('@sniptale/runtime-contracts/page-package').PagePackageCaptureTimingPolicy
+  >;
   requestPreview: (
     tabId: number,
     fallbackKey: PopupExportPreviewErrorKey

@@ -22,6 +22,10 @@ import {
   type PagePackageJobPhaseV1,
   type PagePackageJobStatusV1,
   type PagePackageJobTab,
+  type PagePackageCaptureSource,
+  parsePagePackageCaptureTimingPolicy,
+  normalizePagePackageCaptureUrl,
+  MAX_PAGE_PACKAGE_URL_SOURCES,
 } from '@sniptale/runtime-contracts/page-package';
 import { estimateUtf8Bytes } from '@sniptale/runtime-contracts/validation/base64';
 import { hasOptionalField, isBoolean, isNumber, isRecord, isString } from './index';
@@ -234,6 +238,44 @@ export function isPagePackageJobTabs(value: unknown): value is PagePackageJobTab
     return false;
   }
   return new Set(value.map((tab) => tab.tabId)).size === value.length;
+}
+
+export function isPagePackageCaptureSources(value: unknown): value is PagePackageCaptureSource[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_POPUP_EXPORT_JOB_TABS) {
+    return false;
+  }
+  const kinds = new Set<string>();
+  const identities = new Set<string>();
+  for (const source of value) {
+    if (!isRecord(source) || typeof source['kind'] !== 'string') return false;
+    kinds.add(source['kind']);
+    if (source['kind'] === 'tab') {
+      if (
+        Object.keys(source).length !== 3 ||
+        !isNonNegativeInteger(source['tabId']) ||
+        !isUtf8BoundedString(source['title'], MAX_POPUP_EXPORT_TAB_TITLE_BYTES, true)
+      ) {
+        return false;
+      }
+      identities.add(String(source['tabId']));
+    } else if (source['kind'] === 'url') {
+      if (Object.keys(source).length !== 2 || typeof source['url'] !== 'string') return false;
+      const normalized = normalizePagePackageCaptureUrl(source['url']);
+      if (!normalized || normalized !== source['url']) return false;
+      identities.add(normalized);
+    } else {
+      return false;
+    }
+  }
+  return (
+    kinds.size === 1 &&
+    identities.size === value.length &&
+    (!kinds.has('url') || value.length <= MAX_PAGE_PACKAGE_URL_SOURCES)
+  );
+}
+
+export function isPagePackageCaptureTiming(value: unknown): boolean {
+  return parsePagePackageCaptureTimingPolicy(value) !== null;
 }
 
 export function isPopupExportJobWarnings(value: unknown): value is string[] {

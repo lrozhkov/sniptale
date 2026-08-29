@@ -12,6 +12,7 @@ import {
 } from './items';
 import { useAvailableTabQuery, usePersistedTabSelection } from './query';
 import type { PopupExportTabItem, PopupExportTabSelectionState } from './types';
+import { parsePopupExportUrls, removePopupExportUrl } from '../urls/parser';
 
 function createInitialTabs(capabilities: ActiveTabCapabilities): PopupExportTabItem[] {
   if (capabilities.isRestrictedPage || !capabilities.url) return [];
@@ -66,27 +67,44 @@ function createToggleTabSelectionHandler(args: {
 }
 
 function createTabSelectionState(args: {
+  activeSourceMode: 'tabs' | 'urls';
   availableTabs: PopupExportTabItem[];
   filterQuery: string;
   filteredTabs: PopupExportTabItem[];
   isFilterActive: boolean;
   selectedTabIds: number[];
   selectedTabIdsInOrder: number[];
+  selectedUrls: string[];
+  setActiveSourceMode: Dispatch<SetStateAction<'tabs' | 'urls'>>;
   setFilterQuery: Dispatch<SetStateAction<string>>;
+  setUrlInput: Dispatch<SetStateAction<string>>;
   toggleSelectAllTabs: () => void;
   toggleTabSelection: (tabId: number) => void;
+  removeSelectedUrl: (url: string) => void;
+  urlInput: string;
+  urlInputInvalid: string[];
+  urlInputOverflow: number;
 }): PopupExportTabSelectionState {
   return {
+    activeSourceMode: args.activeSourceMode,
     availableTabs: args.availableTabs,
     filterQuery: args.filterQuery,
     filteredTabs: args.filteredTabs,
     isFilterActive: args.isFilterActive,
-    selectedCount: args.selectedTabIds.length,
+    selectedCount:
+      args.activeSourceMode === 'tabs' ? args.selectedTabIds.length : args.selectedUrls.length,
     selectedTabIds: args.selectedTabIds,
     selectedTabIdsInOrder: args.selectedTabIdsInOrder,
+    selectedUrls: args.selectedUrls,
+    setActiveSourceMode: args.setActiveSourceMode,
     setFilterQuery: args.setFilterQuery,
+    setUrlInput: args.setUrlInput,
     toggleSelectAllTabs: args.toggleSelectAllTabs,
     toggleTabSelection: args.toggleTabSelection,
+    removeSelectedUrl: args.removeSelectedUrl,
+    urlInput: args.urlInput,
+    urlInputInvalid: args.urlInputInvalid,
+    urlInputOverflow: args.urlInputOverflow,
   };
 }
 
@@ -174,6 +192,9 @@ function useTabSelectionController(args: {
   pageAccessStatus: PageAccessStatus | null;
 }) {
   const baseState = useTabSelectionBaseState(args);
+  const [activeSourceMode, setActiveSourceMode] = useState<'tabs' | 'urls'>('tabs');
+  const [urlInput, setUrlInput] = useState('');
+  const parsedUrls = useMemo(() => parsePopupExportUrls(urlInput), [urlInput]);
   const derivedState = useTabSelectionDerivedState({
     availableTabs: baseState.availableTabs,
     filterQuery: baseState.filterQuery,
@@ -185,15 +206,24 @@ function useTabSelectionController(args: {
   });
 
   return {
+    activeSourceMode,
     availableTabs: baseState.availableTabs,
     filterQuery: baseState.filterQuery,
     filteredTabs: derivedState.filteredTabs,
     isFilterActive: derivedState.isFilterActive,
     selectedTabIds: baseState.selectedTabIds,
     selectedTabIdsInOrder: derivedState.selectedTabIdsInOrder,
+    selectedUrls: parsedUrls.urls,
+    setActiveSourceMode,
     setFilterQuery: baseState.setFilterQuery,
+    setUrlInput,
     toggleSelectAllTabs: derivedState.toggleSelectAllTabs,
     toggleTabSelection: derivedState.toggleTabSelection,
+    removeSelectedUrl: (url: string) =>
+      setUrlInput((current) => removePopupExportUrl(current, url)),
+    urlInput,
+    urlInputInvalid: parsedUrls.invalid,
+    urlInputOverflow: parsedUrls.overflowCount,
   };
 }
 
@@ -208,14 +238,22 @@ export function usePopupExportTabSelection(args: {
   });
 
   return createTabSelectionState({
+    activeSourceMode: state.activeSourceMode,
     availableTabs: state.availableTabs,
     filterQuery: state.filterQuery,
     filteredTabs: state.filteredTabs,
     isFilterActive: state.isFilterActive,
     selectedTabIds: state.selectedTabIds,
     selectedTabIdsInOrder: state.selectedTabIdsInOrder,
+    selectedUrls: state.selectedUrls,
+    setActiveSourceMode: state.setActiveSourceMode,
     setFilterQuery: state.setFilterQuery,
+    setUrlInput: state.setUrlInput,
     toggleSelectAllTabs: state.toggleSelectAllTabs,
     toggleTabSelection: state.toggleTabSelection,
+    removeSelectedUrl: state.removeSelectedUrl,
+    urlInput: state.urlInput,
+    urlInputInvalid: state.urlInputInvalid,
+    urlInputOverflow: state.urlInputOverflow,
   });
 }

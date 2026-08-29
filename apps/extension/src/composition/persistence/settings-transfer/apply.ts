@@ -15,6 +15,7 @@ import type { SurfaceStylePresetCatalog } from '../surface-style-presets/contrac
 import { browserStorage } from '../infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { loadSettings } from '../settings';
+import { parsePagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
 
 const SYNC_KEYS = [
   'sniptale_settings',
@@ -175,6 +176,12 @@ function applySettingsWrites(context: WriteBuildContext): void {
       'fullPageQuality'
     ] as NormalizedSettings['fullPageQuality'];
   }
+  const pages = data('capture.pages');
+  if (pages?.['timing'] !== undefined) {
+    const timing = parsePagePackageCaptureTimingPolicy(pages['timing']);
+    if (!timing) throw new Error('Imported page capture timing settings are invalid');
+    nextSettings.pagePackageCaptureTiming = timing;
+  }
   const afterCapture = data('capture.after-capture');
   if (afterCapture?.['action'] !== undefined)
     nextSettings.captureAction = afterCapture['action'] as NormalizedSettings['captureAction'];
@@ -203,7 +210,7 @@ function applySettingsWrites(context: WriteBuildContext): void {
       microphoneDeviceId: null,
     };
   }
-  if (preferences || viewports || image || afterCapture || saving || retention || voice)
+  if (preferences || viewports || image || pages || afterCapture || saving || retention || voice)
     syncWrites['sniptale_settings'] = nextSettings;
 }
 

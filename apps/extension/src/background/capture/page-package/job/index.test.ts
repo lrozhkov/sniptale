@@ -12,7 +12,11 @@ const mocks = vi.hoisted(() => ({
   readDurable: vi.fn(),
   readStatus: vi.fn(),
   recover: vi.fn(),
+  reconcileTemporaryTabs: vi.fn(),
   update: vi.fn(),
+  materialize: vi.fn(),
+  closeTemporaryTabs: vi.fn(),
+  containsPermission: vi.fn(),
 }));
 
 vi.mock('./execute', () => ({ executePopupExportJob: mocks.execute }));
@@ -34,6 +38,15 @@ vi.mock('./storage', async (importOriginal) => ({
   readPagePackageJobStatus: mocks.readStatus,
 }));
 vi.mock('./recovery', () => ({ recoverInterruptedPagePackageJob: mocks.recover }));
+vi.mock('./source-tabs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./source-tabs')>()),
+  cleanupTemporaryPagePackageTabs: mocks.closeTemporaryTabs,
+  materializePagePackageCaptureSources: mocks.materialize,
+  reconcileTemporaryPagePackageTabs: mocks.reconcileTemporaryTabs,
+}));
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { contains: mocks.containsPermission },
+}));
 
 import {
   acknowledgePagePackageJobStatus,
@@ -42,6 +55,7 @@ import {
   erasePopupExportJobState,
   getPagePackageJobStatus,
   startPagePackageJob,
+  startPagePackageJobFromSources,
 } from './index';
 import type { ActivePopupExportJob } from './runtime-state';
 
@@ -123,6 +137,10 @@ beforeEach(() => {
   mocks.hasResources.mockResolvedValue(false);
   mocks.readStatus.mockResolvedValue(null);
   mocks.recover.mockResolvedValue(undefined);
+  mocks.reconcileTemporaryTabs.mockResolvedValue(undefined);
+  mocks.closeTemporaryTabs.mockResolvedValue(undefined);
+  mocks.containsPermission.mockResolvedValue(true);
+  mocks.materialize.mockResolvedValue({ orderedTabs: tabs, temporaryTabIds: [] });
   mocks.update.mockImplementation(async (job: ActivePopupExportJob, patch) => {
     job.status = { ...job.status, ...patch, revision: job.status.revision + 1 };
   });
@@ -149,6 +167,116 @@ beforeEach(() => {
       )
     );
   });
+});
+
+it('materializes URL sources before claiming the job and retains capture timing', async () => {
+  const execution = createExecutionControl();
+  mocks.materialize.mockResolvedValue({
+    orderedTabs: [{ tabId: 31, title: 'https://example.test/' }],
+    temporaryTabIds: [31],
+  });
+  await startPagePackageJobFromSources({
+    captureTiming: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 },
+    contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+    includeWebCopy: false,
+    intent: 'export',
+    jobId: 'url-job',
+    options,
+    sources: [{ kind: 'url', url: 'https://example.test/' }],
+    warnings: [],
+  });
+  expect(execution.activeJob.captureTiming).toEqual({
+    loadTimeoutMs: 60_000,
+    settleDelayMs: 3_000,
+  });
+  expect(execution.activeJob.temporaryTabIds).toEqual([31]);
+  execution.finish();
+  await execution.settled;
+});
+
+it('closes materialized tabs if initial publication rejects the job', async () => {
+  mocks.materialize.mockResolvedValue({
+    orderedTabs: [{ tabId: 31, title: 'https://example.test/' }],
+    temporaryTabIds: [31],
+  });
+  mocks.publish.mockRejectedValueOnce(new Error('publication failed'));
+  await expect(
+    startPagePackageJobFromSources({
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: 'url-job',
+      options,
+      sources: [{ kind: 'url', url: 'https://example.test/' }],
+      warnings: [],
+    })
+  ).rejects.toThrow('publication failed');
+  expect(mocks.closeTemporaryTabs).toHaveBeenCalledWith('url-job', [31]);
+});
+
+it('rejects URL sources before creating tabs when the live host grant is absent', async () => {
+  mocks.containsPermission.mockResolvedValueOnce(false);
+  await expect(
+    startPagePackageJobFromSources({
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      includeWebCopy: true,
+      intent: 'export',
+      jobId: 'url-job',
+      options,
+      sources: [{ kind: 'url', url: 'https://example.test/' }],
+      warnings: [],
+    })
+  ).rejects.toThrow();
+  expect(mocks.materialize).not.toHaveBeenCalled();
+});
+
+it('reconciles retained temporary-tab ownership before a new URL admission', async () => {
+  mocks.reconcileTemporaryTabs.mockRejectedValueOnce(new Error('retained cleanup failed'));
+  await expect(
+    startPagePackageJobFromSources({
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      includeWebCopy: true,
+      intent: 'export',
+      jobId: 'url-job',
+      options,
+      sources: [{ kind: 'url', url: 'https://example.test/' }],
+      warnings: [],
+    })
+  ).rejects.toThrow('retained cleanup failed');
+  expect(mocks.containsPermission).not.toHaveBeenCalled();
+  expect(mocks.materialize).not.toHaveBeenCalled();
+});
+
+it('reconciles retained URL-tab ownership before direct context-menu admission', async () => {
+  mocks.reconcileTemporaryTabs.mockRejectedValueOnce(new Error('retained cleanup failed'));
+  await expect(
+    startPagePackageJob({
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: 'context-job',
+      options,
+      orderedTabs: tabs,
+      warnings: [],
+    })
+  ).rejects.toThrow('retained cleanup failed');
+  expect(mocks.publish).not.toHaveBeenCalled();
+
+  const execution = createExecutionControl();
+  await startPagePackageJob({
+    contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+    includeWebCopy: false,
+    intent: 'export',
+    jobId: 'context-job-retry',
+    options,
+    orderedTabs: tabs,
+    warnings: [],
+  });
+  execution.finish();
+  await execution.settled;
 });
 
 afterEach(async () => {

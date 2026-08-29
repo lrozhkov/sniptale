@@ -40,6 +40,7 @@ function renderReadyContent(
   const { derived, preferences, tabs } = controller.state;
   return (
     <ExportReadySection
+      activeSourceMode={tabs.activeSourceMode}
       availableTabs={tabs.availableTabs}
       destination={destination}
       disabled={Boolean(derived.exportDisabledReason) || !preferences.hasLoadedPreferences}
@@ -58,6 +59,8 @@ function renderReadyContent(
       includeWebCopy={preferences.includeWebCopy}
       isFilterActive={tabs.isFilterActive}
       selectedCount={tabs.selectedCount}
+      selectedUrls={tabs.selectedUrls}
+      setActiveSourceMode={tabs.setActiveSourceMode}
       setIncludeAnnotations={preferences.actions.setIncludeAnnotations}
       setIncludeBasicLogs={preferences.actions.setIncludeBasicLogs}
       setIncludeCssDiagnostics={preferences.actions.setIncludeCssDiagnostics}
@@ -75,6 +78,11 @@ function renderReadyContent(
       selectedTabIds={tabs.selectedTabIds}
       toggleSelectAllTabs={tabs.toggleSelectAllTabs}
       toggleTabSelection={tabs.toggleTabSelection}
+      removeSelectedUrl={tabs.removeSelectedUrl}
+      setUrlInput={tabs.setUrlInput}
+      urlInput={tabs.urlInput}
+      urlInputInvalid={tabs.urlInputInvalid}
+      urlInputOverflow={tabs.urlInputOverflow}
     />
   );
 }

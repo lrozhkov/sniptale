@@ -38,6 +38,7 @@ const settingsFixture = {
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   externalSnapshotLinksEnabled: false,
+  pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
 };
 
 const {

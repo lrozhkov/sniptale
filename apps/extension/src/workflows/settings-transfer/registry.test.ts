@@ -4,7 +4,7 @@ import { parseSettingsTransferDomains, SettingsTransferDomainError } from './dom
 
 describe('settings transfer registry', () => {
   it('covers every frozen visible Settings domain once', () => {
-    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(23);
+    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(24);
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.surfaces');
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.gradients');
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).not.toContain('access.capture-assets');

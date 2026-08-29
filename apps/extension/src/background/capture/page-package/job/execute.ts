@@ -17,6 +17,7 @@ import {
 } from './page-phase';
 import { saveCollectedPagePackages } from './library';
 import {
+  appendPopupExportJobWarning,
   completePagePackageJobStatus,
   popupExportJobErrorText,
   updatePagePackageJobStatus,
@@ -25,6 +26,7 @@ import {
 import { cleanupPopupExportJobCancellation } from './cancellation';
 import { startPagePackageActionIndicator } from './action-indicator';
 import { preparePagePackageDownloadRuntime } from './offscreen-download-gateway';
+import { cleanupTemporaryPagePackageTabs } from './source-tabs';
 
 function aggregateProducerStats(
   current: ExportResult['stats'],
@@ -168,6 +170,12 @@ async function finalizePopupExportJob(
   onFinished: () => void
 ): Promise<void> {
   await restorePopupExportOriginalTabs(job);
+  try {
+    await cleanupTemporaryPagePackageTabs(job.status.jobId, job.temporaryTabIds ?? []);
+    job.temporaryTabIds = [];
+  } catch {
+    await appendPopupExportJobWarning(job, translate('popup.export.temporaryTabsCleanupWarning'));
+  }
   if (!stagedCleanupComplete && !job.cancelled) {
     await releaseCollectedPagePackages(job.status.jobId).catch(() => undefined);
   }

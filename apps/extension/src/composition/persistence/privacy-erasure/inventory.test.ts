@@ -61,6 +61,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.session).toContain('sniptale_popup_export_tab_selection_session');
   expect(plan.session).toContain('sniptale_popup_export_job');
   expect(plan.session).toContain('sniptale_page_package_job');
+  expect(plan.session).toContain('sniptale_page_package_temporary_tabs');
   expect(plan.session).toContain('sniptale_native_full_page_capture_lease');
   expect(plan.session).toContain(AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY);
   expect(plan.session).toContain(AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY);

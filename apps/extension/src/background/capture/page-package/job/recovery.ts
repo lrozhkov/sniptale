@@ -6,6 +6,8 @@ import {
 } from './storage';
 import { reservePopupExportErasureExclusion } from './lifecycle-gate';
 import { cleanupRecordedPagePackageLibraryAssets } from './library';
+import { cleanupTemporaryPagePackageTabs } from './source-tabs';
+import { readTemporaryPagePackageTabs } from './temporary-tabs-storage';
 
 // policyStateIds: popup-export-jobs, popup-export-erasure-exclusion
 let recoveryQueue = Promise.resolve();
@@ -19,6 +21,19 @@ export function recoverInterruptedPagePackageJob(
     .then(async () => {
       await exclusion.waitForActiveMutations();
       const failures: unknown[] = [];
+      let temporaryTabs: Awaited<ReturnType<typeof readTemporaryPagePackageTabs>> = null;
+      try {
+        temporaryTabs = await readTemporaryPagePackageTabs();
+      } catch (error) {
+        failures.push(error);
+      }
+      if (temporaryTabs) {
+        try {
+          await cleanupTemporaryPagePackageTabs(temporaryTabs.jobId, temporaryTabs.tabIds);
+        } catch (error) {
+          failures.push(error);
+        }
+      }
       try {
         await reconcileUnmatchedPagePackageJobJournals();
       } catch (error) {

@@ -33,6 +33,7 @@ export type ActivePopupExportJob = {
   cancellationCleanupError: unknown | null;
   cancellationQueue: Promise<void>;
   contentPort: PopupExportJobContentPort;
+  captureTiming?: import('@sniptale/runtime-contracts/page-package').PagePackageCaptureTimingPolicy;
   expectedActivation: { tabId: number; windowId: number } | null;
   lastActivatedByWindow: Map<number, number>;
   manualActivationConflict: boolean;
@@ -41,6 +42,7 @@ export type ActivePopupExportJob = {
   completion: Promise<void> | null;
   finishCancellation: (() => void) | null;
   unsubscribeActivation: (() => void) | null;
+  temporaryTabIds?: number[];
 };
 
 const durableStatuses = new WeakMap<ActivePopupExportJob, PagePackageJobStatusV1>();

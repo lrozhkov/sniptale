@@ -81,6 +81,7 @@ describe('settings transfer AI owner transaction', () => {
           imageFormat: 'webp',
           authenticatedSnapshotAssetsEnabled: false,
           anonymousCrossOriginSnapshotAssetsEnabled: false,
+          pagePackageCaptureTiming: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 },
           voiceInput: expect.objectContaining({ microphoneDeviceId: null }),
         }),
         sniptale_callout_presets: expect.any(Object),
@@ -445,6 +446,10 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
       data: { items: [{ id: 'viewport-a', width: 1280, height: 720 }], defaultId: 'viewport-a' },
     },
     'capture.image': { schemaVersion: 1, data: { format: 'webp', quality: 80 } },
+    'capture.pages': {
+      schemaVersion: 1,
+      data: { timing: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 } },
+    },
     'capture.after-capture': { schemaVersion: 1, data: { action: 'copy' } },
     'capture.saving': {
       schemaVersion: 1,
@@ -554,5 +559,6 @@ function settingsFixture(): NormalizedSettings {
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     externalSnapshotLinksEnabled: false,
+    pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
   };
 }

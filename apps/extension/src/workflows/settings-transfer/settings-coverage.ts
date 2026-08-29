@@ -4,7 +4,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'interface-browser': ['interface.preferences'],
   'quick-actions': ['capture.quick-actions'],
   'screen-sizes': ['capture.viewport-presets'],
-  'media-quality': ['capture.image', 'capture.video'],
+  'media-quality': ['capture.image', 'capture.video', 'capture.pages'],
   saving: ['capture.after-capture', 'capture.saving', 'capture.retention'],
   annotations: ['styles.borders', 'styles.callouts', 'styles.numbering', 'styles.tags'],
   'editor-resources': [

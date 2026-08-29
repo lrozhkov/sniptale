@@ -2,6 +2,7 @@ import type { CaptureActionType } from '@sniptale/runtime-contracts/capture/acti
 import type { ViewportPreset } from '../../features/viewport-presets/contracts';
 import type { FullPageCapturePreferences, FullPageQualityPolicy } from '../full-page-capture';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
+import type { PagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
 export type {
   FullPageCapturePreferences,
   FullPageFloatingElementsMode,
@@ -86,16 +87,21 @@ export interface Settings {
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
   externalSnapshotLinksEnabled?: boolean;
   fullPageCapture?: FullPageCapturePreferences;
+  pagePackageCaptureTiming?: PagePackageCaptureTimingPolicy;
   voiceInput?: VoiceInputPreferences;
 }
 
 export type NormalizedSettings = Omit<
   Settings,
-  'externalSnapshotLinksEnabled' | 'fullPageQuality' | 'localStoragePolicy'
+  | 'externalSnapshotLinksEnabled'
+  | 'fullPageQuality'
+  | 'localStoragePolicy'
+  | 'pagePackageCaptureTiming'
 > & {
   externalSnapshotLinksEnabled: boolean;
   fullPageQuality: FullPageQualityPolicy;
   localStoragePolicy: LocalStoragePolicy;
+  pagePackageCaptureTiming: PagePackageCaptureTimingPolicy;
 };
 
 export type SettingsPatch = Omit<
@@ -106,6 +112,7 @@ export type SettingsPatch = Omit<
   | 'fullPageCapture'
   | 'fullPageQuality'
   | 'localStoragePolicy'
+  | 'pagePackageCaptureTiming'
   | 'saveCapturesToGallery'
   | 'voiceInput'
 > & {
@@ -114,6 +121,7 @@ export type SettingsPatch = Omit<
   fullPageCapture?: Partial<FullPageCapturePreferences>;
   fullPageQuality?: FullPageQualityPolicy;
   localStoragePolicy?: Partial<LocalStoragePolicy>;
+  pagePackageCaptureTiming?: PagePackageCaptureTimingPolicy;
   voiceInput?: Partial<VoiceInputPreferences>;
 };
 

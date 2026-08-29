@@ -1,6 +1,7 @@
 import { releaseCollectedPagePackages } from './download';
 import { cleanupRecordedPagePackageLibraryAssets } from './library';
 import type { ActivePopupExportJob } from './runtime-state';
+import { cleanupTemporaryPagePackageTabs } from './source-tabs';
 
 function throwCancellationFailures(failures: unknown[]): void {
   if (failures.length === 1) throw failures[0];
@@ -32,6 +33,9 @@ export function cleanupPopupExportJobCancellation(job: ActivePopupExportJob): Pr
       cancelPagePackageJobCaptureAuthorities(job),
       cleanupRecordedPagePackageLibraryAssets(job.status.jobId),
       releaseCollectedPagePackages(job.status.jobId),
+      cleanupTemporaryPagePackageTabs(job.status.jobId, job.temporaryTabIds ?? []).then(() => {
+        job.temporaryTabIds = [];
+      }),
     ]);
     throwCancellationFailures(
       retainedResults.flatMap((result) =>

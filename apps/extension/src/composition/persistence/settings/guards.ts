@@ -15,6 +15,10 @@ import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guard
 import { parseSavePresets, parseViewportPresets } from './array.guards.ts';
 import { assignParsedContextMenuSettings } from './context-menu.guards.ts';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
+import {
+  parsePagePackageCaptureTimingPolicy,
+  type PagePackageCaptureTimingPolicy,
+} from '@sniptale/runtime-contracts/page-package';
 
 interface ParsedSettingsStorageValue {
   hasInvalidRoot: boolean;
@@ -152,6 +156,13 @@ function parseOptionalFullPageQuality(value: unknown): ParsedFieldValue<FullPage
   return parseFullPageQualityPolicy(value) ?? INVALID_FIELD;
 }
 
+function parseOptionalPagePackageCaptureTiming(
+  value: unknown
+): ParsedFieldValue<PagePackageCaptureTimingPolicy> {
+  if (value === undefined) return undefined;
+  return parsePagePackageCaptureTimingPolicy(value) ?? INVALID_FIELD;
+}
+
 function parseOptionalVoiceInput(value: unknown): ParsedFieldValue<VoiceInputPreferences> {
   if (value === undefined) {
     return undefined;
@@ -275,6 +286,11 @@ function parseScalarSettingsFields(
     nextValue,
     'fullPageQuality',
     parseOptionalFullPageQuality(value['fullPageQuality'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'pagePackageCaptureTiming',
+    parseOptionalPagePackageCaptureTiming(value['pagePackageCaptureTiming'])
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,

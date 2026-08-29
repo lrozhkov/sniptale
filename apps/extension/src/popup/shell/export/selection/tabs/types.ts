@@ -15,6 +15,7 @@ export type PopupExportFallbackTab = Pick<
 >;
 
 export interface PopupExportTabSelectionState {
+  activeSourceMode: 'tabs' | 'urls';
   availableTabs: PopupExportTabItem[];
   filterQuery: string;
   filteredTabs: PopupExportTabItem[];
@@ -22,7 +23,14 @@ export interface PopupExportTabSelectionState {
   selectedCount: number;
   selectedTabIds: number[];
   selectedTabIdsInOrder: number[];
+  selectedUrls: string[];
+  setActiveSourceMode: (mode: 'tabs' | 'urls') => void;
   setFilterQuery: (value: string) => void;
+  setUrlInput: (value: string) => void;
   toggleSelectAllTabs: () => void;
   toggleTabSelection: (tabId: number) => void;
+  removeSelectedUrl: (url: string) => void;
+  urlInput: string;
+  urlInputInvalid: string[];
+  urlInputOverflow: number;
 }

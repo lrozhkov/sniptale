@@ -122,6 +122,7 @@ const sessionSensitiveKeys = [
   'sniptale_popup_export_tab_selection_session',
   'sniptale_popup_export_job',
   'sniptale_page_package_job',
+  'sniptale_page_package_temporary_tabs',
   'sniptale_full_page_capture_lease',
   'sniptale_native_full_page_capture_lease',
   'sniptale_project_export_active_job',

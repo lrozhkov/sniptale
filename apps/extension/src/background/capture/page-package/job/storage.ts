@@ -23,6 +23,7 @@ import {
   type PersistedPagePackageOutput,
   type PersistedStagedPage,
 } from './storage-record';
+import { readTemporaryPagePackageTabs } from './temporary-tabs-storage';
 
 export type { PersistedPagePackageOutput } from './storage-record';
 
@@ -713,11 +714,13 @@ export async function interruptStoredPopupExportJob(expectedJobId: string): Prom
 export async function hasUnresolvedPagePackageResources(): Promise<boolean> {
   await mutationQueue;
   const record = await readRecordUnlocked();
+  const temporaryTabs = await readTemporaryPagePackageTabs();
   return (
-    !!record &&
-    (record.libraryCleanupAssetIds.length > 0 ||
-      record.output !== null ||
-      record.stagedPages.length > 0)
+    temporaryTabs !== null ||
+    (!!record &&
+      (record.libraryCleanupAssetIds.length > 0 ||
+        record.output !== null ||
+        record.stagedPages.length > 0))
   );
 }
 

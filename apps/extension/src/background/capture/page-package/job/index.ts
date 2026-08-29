@@ -1,8 +1,11 @@
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
 import type {
+  PagePackageCaptureSource,
+  PagePackageCaptureTimingPolicy,
   PagePackageJobStatusV1,
   PagePackageJobTab,
 } from '@sniptale/runtime-contracts/page-package';
+import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
 import {
   MAX_POPUP_EXPORT_JOB_TABS,
   normalizePopupExportTabTitle,
@@ -28,6 +31,7 @@ import {
 } from './storage';
 import { acquirePopupExportMutationPermit } from './lifecycle-gate';
 import { securityE2ECheckpoint } from '../../../../platform/security-e2e-control';
+import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import {
   claimActivePagePackageJob,
   getActivePagePackageJob,
@@ -36,8 +40,25 @@ import {
 import { createEffectiveComponentPlan, isPagePackageJobTerminalPhase } from './status';
 import { clonePagePackageJobStatus } from './status';
 import { recoverInterruptedPagePackageJob } from './recovery';
+import {
+  cleanupTemporaryPagePackageTabs,
+  materializePagePackageCaptureSources,
+  reconcileTemporaryPagePackageTabs,
+} from './source-tabs';
 
 export { assertActivePopupExportStageBinding } from './active-job';
+
+function assertPagePackageStartInvariants(args: {
+  includeWebCopy: boolean;
+  intent: 'export' | 'save';
+  options: ExportOptions;
+}): void {
+  if (args.intent !== 'save') return;
+  if (!args.includeWebCopy) throw new Error('Saved Page Packages require a Web copy.');
+  if (!args.options.includeFullPageScreenshot) {
+    throw new Error('Saved Page Packages require a full-page screenshot.');
+  }
+}
 
 function createPopupExportJob(args: {
   contentPort: PopupExportJobContentPort;
@@ -46,6 +67,8 @@ function createPopupExportJob(args: {
   jobId: string;
   options: ExportOptions;
   orderedTabs: PagePackageJobTab[];
+  captureTiming?: PagePackageCaptureTimingPolicy;
+  temporaryTabIds?: number[];
   warnings: string[];
 }): ActivePopupExportJob {
   return {
@@ -56,6 +79,7 @@ function createPopupExportJob(args: {
     cancellationCleanupError: null,
     cancellationQueue: Promise.resolve(),
     contentPort: args.contentPort,
+    captureTiming: args.captureTiming ?? { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
     completion: null,
     finishCancellation: null,
     expectedActivation: null,
@@ -94,16 +118,15 @@ function createPopupExportJob(args: {
       activatedTabIds: [],
     },
     unsubscribeActivation: null,
+    temporaryTabIds: [...(args.temporaryTabIds ?? [])],
   };
 }
+
+let startReserved = false;
 
 function acquireStartPermit(orderedTabCount: number) {
   const releaseMutation = acquirePopupExportMutationPermit();
   if (!releaseMutation) throw new Error('Popup export is unavailable during privacy erasure');
-  if (getActivePagePackageJob()) {
-    releaseMutation();
-    throw new Error('Another popup export job is already active');
-  }
   if (orderedTabCount === 0) {
     releaseMutation();
     throw new Error('Popup export requires at least one tab');
@@ -112,7 +135,18 @@ function acquireStartPermit(orderedTabCount: number) {
     releaseMutation();
     throw new Error('Popup export exceeds the supported tab count');
   }
-  return releaseMutation;
+  if (startReserved || getActivePagePackageJob()) {
+    releaseMutation();
+    throw new Error('Another popup export job is already active');
+  }
+  startReserved = true;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    startReserved = false;
+    releaseMutation();
+  };
 }
 
 function claimJobOrRelease(job: ActivePopupExportJob, releaseMutation: () => void): void {
@@ -160,25 +194,68 @@ export async function startPagePackageJob(args: {
   jobId: string;
   options: ExportOptions;
   orderedTabs: PagePackageJobTab[];
+  captureTiming?: PagePackageCaptureTimingPolicy;
+  temporaryTabIds?: number[];
   warnings: string[];
 }): Promise<PagePackageJobStatusV1> {
   if (new Set(args.orderedTabs.map((tab) => tab.tabId)).size !== args.orderedTabs.length) {
     throw new Error('Page Package tabs must be unique.');
   }
-  if (args.intent === 'save') {
-    if (!args.includeWebCopy) {
-      throw new Error('Saved Page Packages require a Web copy.');
-    }
-    if (!args.options.includeFullPageScreenshot) {
-      throw new Error('Saved Page Packages require a full-page screenshot.');
-    }
-  }
+  assertPagePackageStartInvariants(args);
   const releaseMutation = acquireStartPermit(args.orderedTabs.length);
-  const job = createPopupExportJob(args);
-  claimJobOrRelease(job, releaseMutation);
-  await verifyStartSecurityCheckpoint(job, releaseMutation);
-  await beginJobExecution(job, releaseMutation);
-  return clonePagePackageJobStatus(job.status);
+  try {
+    await reconcileTemporaryPagePackageTabs();
+    const job = createPopupExportJob(args);
+    claimJobOrRelease(job, releaseMutation);
+    await verifyStartSecurityCheckpoint(job, releaseMutation);
+    await beginJobExecution(job, releaseMutation);
+    return clonePagePackageJobStatus(job.status);
+  } catch (error) {
+    releaseMutation();
+    throw error;
+  }
+}
+
+export async function startPagePackageJobFromSources(args: {
+  captureTiming: PagePackageCaptureTimingPolicy;
+  contentPort: PopupExportJobContentPort;
+  includeWebCopy: boolean;
+  intent: 'export' | 'save';
+  jobId: string;
+  options: ExportOptions;
+  sources: PagePackageCaptureSource[];
+  warnings: string[];
+}): Promise<PagePackageJobStatusV1> {
+  assertPagePackageStartInvariants(args);
+  const releaseMutation = acquireStartPermit(args.sources.length);
+  let materialized: Awaited<ReturnType<typeof materializePagePackageCaptureSources>> | null = null;
+  try {
+    await reconcileTemporaryPagePackageTabs();
+    if (
+      args.sources[0]?.kind === 'url' &&
+      !(await browserPermissions.contains({ origins: ['<all_urls>'] }))
+    ) {
+      throw new Error(translate('popup.export.urlPermissionDenied'));
+    }
+    materialized = await materializePagePackageCaptureSources(args.jobId, args.sources);
+    const job = createPopupExportJob({
+      ...args,
+      orderedTabs: materialized.orderedTabs,
+      temporaryTabIds: materialized.temporaryTabIds,
+    });
+    claimJobOrRelease(job, releaseMutation);
+    await verifyStartSecurityCheckpoint(job, releaseMutation);
+    await beginJobExecution(job, releaseMutation);
+    return clonePagePackageJobStatus(job.status);
+  } catch (error) {
+    if (materialized) {
+      await cleanupTemporaryPagePackageTabs(args.jobId, materialized.temporaryTabIds).catch(
+        () => undefined
+      );
+    }
+    releaseMutation();
+    throw error;
+  }
 }
 
 export async function getPagePackageJobStatus(

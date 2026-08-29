@@ -16,6 +16,8 @@ import { activatePopupExportCaptureTarget } from './visible';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { markActivePagePackageJobProducerFailure } from './active-job';
 import type { ExportProgressStepKey } from '@sniptale/runtime-contracts/export';
+import { waitForPagePackageCaptureReadiness } from './page-readiness';
+import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
 
 const logger = createLogger({ namespace: 'BackgroundPagePackageJob' });
 const PAGE_PACKAGE_PREPARATION_CODE_PATTERN = /\[([A-Z][A-Z0-9_]{1,63})\]$/u;
@@ -150,6 +152,11 @@ export async function collectPopupExportPagePackages(
       },
     });
     try {
+      await waitForPagePackageCaptureReadiness({
+        signal: job.abortController.signal,
+        tabId: selected.tabId,
+        timing: job.captureTiming ?? DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
+      });
       const descriptor = await requestPopupExportPagePackage(
         job,
         tab,

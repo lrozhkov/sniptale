@@ -5,7 +5,11 @@ import type {
   PopupExportPackageResponse,
   PopupExportPreviewResponse,
 } from '../../../export';
-import type { PagePackageJobStatusV1, PagePackageJobTab } from '../../../page-package';
+import type {
+  PagePackageCaptureSource,
+  PagePackageCaptureTimingPolicy,
+  PagePackageJobStatusV1,
+} from '../../../page-package';
 
 export type PopupTabRouteOperation =
   | typeof MessageType.EXPORT_POPUP_PREVIEW
@@ -35,7 +39,8 @@ export type RuntimePopupExportRequestByType = {
     includeWebCopy: boolean;
     intent: 'export' | 'save';
     jobId: string;
-    orderedTabs: PagePackageJobTab[];
+    captureTiming: PagePackageCaptureTimingPolicy;
+    sources: PagePackageCaptureSource[];
     options: ExportOptions;
     warnings: string[];
   };

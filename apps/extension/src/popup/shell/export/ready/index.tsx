@@ -11,8 +11,10 @@ import {
   type PopupPackageDestination,
 } from '../data-type/package-controls';
 import type { WebCopyResourcePreferences } from '../pages/snapshot-availability';
+import { usePageCaptureTimingPreferences } from '../pages/capture-timing';
 
 type ExportReadySectionProps = {
+  activeSourceMode?: 'tabs' | 'urls';
   availableTabs: PopupExportTabItem[];
   destination: PopupPackageDestination;
   disabled: boolean;
@@ -32,6 +34,8 @@ type ExportReadySectionProps = {
   isFilterActive: boolean;
   selectedCount: number;
   selectedTabIds: number[];
+  selectedUrls?: string[];
+  setActiveSourceMode?: (mode: 'tabs' | 'urls') => void;
   setIncludeAnnotations: Dispatch<SetStateAction<boolean>>;
   setIncludeBasicLogs: Dispatch<SetStateAction<boolean>>;
   setIncludeCssDiagnostics: Dispatch<SetStateAction<boolean>>;
@@ -48,6 +52,11 @@ type ExportReadySectionProps = {
   webCopyResources: WebCopyResourcePreferences;
   toggleSelectAllTabs: () => void;
   toggleTabSelection: (tabId: number) => void;
+  removeSelectedUrl?: (url: string) => void;
+  setUrlInput?: (value: string) => void;
+  urlInput?: string;
+  urlInputInvalid?: string[];
+  urlInputOverflow?: number;
 };
 
 function renderReadyHint(
@@ -108,26 +117,40 @@ function renderDataTypeSection(
 
 function renderPagesSection(
   props: ExportReadySectionProps,
-  activeDrawer: 'data-types' | 'pages' | null,
+  activeDrawer: 'data-types' | 'pages' | 'page-settings' | null,
   isEditingPages: boolean,
   onClose: () => void,
-  onOpen: () => void
+  onOpen: () => void,
+  onOpenSettings: () => void,
+  timing: ReturnType<typeof usePageCaptureTimingPreferences>
 ) {
   return (
     <ExportPagesSection
+      activeSourceMode={props.activeSourceMode ?? 'tabs'}
       availableTabs={props.availableTabs}
       filterQuery={props.filterQuery}
       filteredTabs={props.filteredTabs}
-      isExpanded={isEditingPages || !activeDrawer}
+      isExpanded={isEditingPages || activeDrawer === 'page-settings' || !activeDrawer}
       isFilterActive={props.isFilterActive}
-      isOpen={isEditingPages}
+      isOpen={isEditingPages || activeDrawer === 'page-settings'}
+      isSettingsOpen={activeDrawer === 'page-settings'}
       onClose={onClose}
       onOpen={onOpen}
+      onOpenSettings={onOpenSettings}
       selectedCount={props.selectedCount}
       selectedTabIds={props.selectedTabIds}
+      selectedUrls={props.selectedUrls ?? []}
+      setActiveSourceMode={props.setActiveSourceMode ?? (() => undefined)}
       setFilterQuery={props.setFilterQuery}
       toggleSelectAllTabs={props.toggleSelectAllTabs}
       toggleTabSelection={props.toggleTabSelection}
+      removeSelectedUrl={props.removeSelectedUrl ?? (() => undefined)}
+      setUrlInput={props.setUrlInput ?? (() => undefined)}
+      timing={timing.timing}
+      onTimingChange={timing.update}
+      urlInput={props.urlInput ?? ''}
+      urlInputInvalid={props.urlInputInvalid ?? []}
+      urlInputOverflow={props.urlInputOverflow ?? 0}
       {...(activeDrawer === null ? { className: 'pt-2.5' } : {})}
     />
   );
@@ -137,11 +160,12 @@ function renderReadySections(
   props: ExportReadySectionProps,
   destination: PopupPackageDestination,
   packagePreferences: PopupPagePackagePreferenceState,
-  activeDrawer: 'data-types' | 'pages' | null,
-  setActiveDrawer: (nextValue: 'data-types' | 'pages' | null) => void
+  activeDrawer: 'data-types' | 'pages' | 'page-settings' | null,
+  setActiveDrawer: (nextValue: 'data-types' | 'pages' | 'page-settings' | null) => void,
+  timing: ReturnType<typeof usePageCaptureTimingPreferences>
 ) {
   const isEditingDataTypes = activeDrawer === 'data-types';
-  const isEditingPages = activeDrawer === 'pages';
+  const isEditingPages = activeDrawer === 'pages' || activeDrawer === 'page-settings';
 
   return (
     <>
@@ -161,7 +185,9 @@ function renderReadySections(
             activeDrawer,
             isEditingPages,
             () => setActiveDrawer(null),
-            () => setActiveDrawer('pages')
+            () => setActiveDrawer('pages'),
+            () => setActiveDrawer('page-settings'),
+            timing
           )
         : null}
     </>
@@ -169,7 +195,10 @@ function renderReadySections(
 }
 
 export function ExportReadySection(props: ExportReadySectionProps) {
-  const [activeDrawer, setActiveDrawer] = useState<'data-types' | 'pages' | null>(null);
+  const [activeDrawer, setActiveDrawer] = useState<'data-types' | 'pages' | 'page-settings' | null>(
+    null
+  );
+  const timing = usePageCaptureTimingPreferences();
   const exportPreferences: PopupPagePackagePreferenceState = {
     actions: {
       setIncludeAnnotations: props.setIncludeAnnotations,
@@ -220,7 +249,8 @@ export function ExportReadySection(props: ExportReadySectionProps) {
         props.destination,
         packagePreferences,
         activeDrawer,
-        setActiveDrawer
+        setActiveDrawer,
+        timing
       )}
       {renderReadyHint(props)}
     </div>

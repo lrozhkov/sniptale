@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   reconcile: vi.fn(),
   reconcileJournals: vi.fn(),
+  cleanupTemporaryTabs: vi.fn(),
+  readTemporaryTabs: vi.fn(),
 }));
 
 vi.mock('./library', () => ({
@@ -23,6 +25,14 @@ vi.mock('./storage', async (importOriginal) => ({
   readPagePackageJobRecoveryState: mocks.read,
   reconcileUnmatchedPagePackageJobJournals: mocks.reconcileJournals,
 }));
+vi.mock('./source-tabs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./source-tabs')>()),
+  cleanupTemporaryPagePackageTabs: mocks.cleanupTemporaryTabs,
+}));
+vi.mock('./temporary-tabs-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./temporary-tabs-storage')>()),
+  readTemporaryPagePackageTabs: mocks.readTemporaryTabs,
+}));
 
 import { recoverInterruptedPagePackageJob } from './recovery';
 import { acquirePopupExportMutationPermit } from './lifecycle-gate';
@@ -33,6 +43,17 @@ beforeEach(() => {
   mocks.cleanupLibrary.mockResolvedValue(undefined);
   mocks.reconcile.mockResolvedValue(undefined);
   mocks.reconcileJournals.mockResolvedValue(undefined);
+  mocks.cleanupTemporaryTabs.mockResolvedValue(undefined);
+  mocks.readTemporaryTabs.mockResolvedValue(null);
+});
+
+it('closes exact durably owned temporary tabs before recovering the job record', async () => {
+  mocks.readTemporaryTabs.mockResolvedValue({ jobId: 'job-1', tabIds: [11, 12] });
+  mocks.read.mockResolvedValue(null);
+
+  await recoverInterruptedPagePackageJob();
+
+  expect(mocks.cleanupTemporaryTabs).toHaveBeenCalledWith('job-1', [11, 12]);
 });
 
 it('reconciles output and staged authorities before completing restart recovery', async () => {

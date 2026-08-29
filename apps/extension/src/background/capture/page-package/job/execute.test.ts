@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   resolveTabs: vi.fn(),
   restore: vi.fn(),
   subscribe: vi.fn(),
+  cleanupTemporaryTabs: vi.fn(),
   update: vi.fn(),
 }));
 
@@ -47,6 +48,10 @@ vi.mock('./runtime-state', async (importOriginal) => ({
 vi.mock('./cancellation', () => ({
   cancelPagePackageJobCaptureAuthorities: vi.fn(),
   cleanupPopupExportJobCancellation: mocks.cleanupCancellation,
+}));
+vi.mock('./source-tabs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./source-tabs')>()),
+  cleanupTemporaryPagePackageTabs: mocks.cleanupTemporaryTabs,
 }));
 
 import { executePopupExportJob } from './execute';
@@ -122,6 +127,7 @@ function createJob(): ActivePopupExportJob {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.cleanupTemporaryTabs.mockResolvedValue(undefined);
   mocks.resolveTabs.mockResolvedValue(new Map([[7, { id: 7 }]]));
   mocks.prepareDownloadRuntime.mockResolvedValue(undefined);
   mocks.collect.mockImplementation(async (job: ActivePopupExportJob, _tabs, onPackage) => {

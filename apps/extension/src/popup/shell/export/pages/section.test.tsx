@@ -36,6 +36,7 @@ function createProps(
   overrides: Partial<React.ComponentProps<typeof ExportPagesSection>> = {}
 ): React.ComponentProps<typeof ExportPagesSection> {
   return {
+    activeSourceMode: 'tabs',
     availableTabs: defaultTabs,
     filterQuery: '',
     filteredTabs: defaultTabs,
@@ -46,9 +47,18 @@ function createProps(
     onOpen: vi.fn(),
     selectedCount: 1,
     selectedTabIds: [7],
+    selectedUrls: [],
+    setActiveSourceMode: vi.fn(),
     setFilterQuery: vi.fn(),
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
+    removeSelectedUrl: vi.fn(),
+    setUrlInput: vi.fn(),
+    timing: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+    onTimingChange: vi.fn(),
+    urlInput: '',
+    urlInputInvalid: [],
+    urlInputOverflow: 0,
     ...overrides,
   };
 }
@@ -91,6 +101,88 @@ describe('ExportPagesSection', () => {
     'switches the bulk action label to clear-all only for fully selected visible tabs',
     verifyBulkActionLabels
   );
+  it('edits and summarizes address sources independently from tabs', verifyAddressMode);
+});
+
+async function verifyAddressMode(): Promise<void> {
+  const setUrlInput = vi.fn();
+  const setActiveSourceMode = vi.fn();
+  await renderSection(
+    createProps({
+      activeSourceMode: 'urls',
+      isOpen: true,
+      selectedCount: 2,
+      selectedUrls: ['https://one.example/', 'https://two.example/'],
+      setUrlInput,
+      setActiveSourceMode,
+      urlInput: 'one.example\ntwo.example',
+      urlInputInvalid: [],
+    })
+  );
+  const textarea = container?.querySelector('textarea');
+  expect(textarea?.value).toBe('one.example\ntwo.example');
+  await act(async () => {
+    if (!textarea) return;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(textarea, 'three.example');
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(setUrlInput).toHaveBeenCalledWith('three.example');
+
+  await renderSection(
+    createProps({
+      activeSourceMode: 'urls',
+      selectedCount: 2,
+      selectedUrls: ['https://one.example/', 'https://two.example/'],
+      removeSelectedUrl: vi.fn(),
+    })
+  );
+  expect(container?.textContent).toContain('one.example');
+  expect(container?.textContent).toContain('two.example');
+  const removeButton = getRemoveButtons()[0];
+  await act(async () => removeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+  await renderSection(
+    createProps({
+      activeSourceMode: 'urls',
+      isOpen: true,
+      urlInput: 'bad value',
+      urlInputInvalid: ['bad value'],
+      urlInputOverflow: 2,
+    })
+  );
+  expect(container?.textContent).toContain('t:popup.export.urlInputLimit');
+
+  await renderSection(
+    createProps({
+      activeSourceMode: 'urls',
+      isOpen: true,
+      urlInput: 'bad value',
+      urlInputInvalid: ['bad value'],
+      urlInputOverflow: 0,
+    })
+  );
+  expect(container?.textContent).toContain('t:popup.export.urlInputInvalid');
+}
+
+it('renders capture timing settings and persists a changed option', async () => {
+  const onTimingChange = vi.fn();
+  await renderSection(
+    createProps({
+      isOpen: true,
+      isSettingsOpen: true,
+      timing: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      onTimingChange,
+    })
+  );
+  const select = container?.querySelector('select');
+  await act(async () => {
+    if (!select) return;
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    setter?.call(select, '60000');
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(onTimingChange).toHaveBeenCalledWith({ loadTimeoutMs: 60_000, settleDelayMs: 2_000 });
 });
 
 async function verifyEmptySummary(): Promise<void> {

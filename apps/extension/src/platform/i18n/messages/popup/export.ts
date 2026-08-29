@@ -167,8 +167,50 @@ export const popupExportMessages = defineMessageSource({
     en: 'Pages',
   },
   tabsSectionDescription: {
-    ru: 'Выберите доступные вкладки, которые нужно добавить в экспорт.',
-    en: 'Choose the available tabs to include in the export.',
+    ru: 'Выберите открытые вкладки или добавьте список веб-адресов.',
+    en: 'Choose open tabs or add a list of web addresses.',
+  },
+  pageSourceModeLabel: { ru: 'Источник страниц', en: 'Page source' },
+  pageSourceTabs: { ru: 'Вкладки', en: 'Tabs' },
+  pageSourceUrls: { ru: 'Адреса', en: 'Addresses' },
+  urlInputLabel: { ru: 'Список веб-адресов', en: 'Web address list' },
+  urlInputPlaceholder: {
+    ru: 'Один адрес на строку\nexample.com\nhttps://example.org/page',
+    en: 'One address per line\nexample.com\nhttps://example.org/page',
+  },
+  urlInputHelp: {
+    ru: 'Можно разделять адреса новой строкой, запятой или точкой с запятой.',
+    en: 'Separate addresses with a new line, comma, or semicolon.',
+  },
+  urlInputInvalid: {
+    ru: 'Не распознано адресов: {{count}}',
+    en: 'Unrecognized addresses: {{count}}',
+  },
+  urlInputLimit: {
+    ru: 'Пропущено адресов сверх лимита: {{count}}',
+    en: 'Addresses over the limit were skipped: {{count}}',
+  },
+  noSelectedUrls: { ru: 'Не добавлены адреса для экспорта', en: 'No addresses added for export' },
+  urlPermissionDenied: {
+    ru: 'Разрешите доступ к сайтам, чтобы открыть и захватить добавленные адреса.',
+    en: 'Allow site access to open and capture the added addresses.',
+  },
+  pageSettingsTitle: { ru: 'Настройки захвата страниц', en: 'Page capture settings' },
+  pageSettingsDescription: {
+    ru: 'Настройте ожидание загрузки для вкладок и добавленных адресов.',
+    en: 'Configure loading waits for tabs and added addresses.',
+  },
+  pageLoadTimeout: { ru: 'Ожидание загрузки', en: 'Page load timeout' },
+  pageSettleDelay: { ru: 'Пауза после загрузки', en: 'Delay after loading' },
+  pageTimingHelp: {
+    ru: 'Если страница не загрузится вовремя, она будет пропущена. Пауза помогает дождаться анимаций и динамического содержимого.',
+    en: 'A page that does not load in time is skipped. The delay lets animations and dynamic content settle.',
+  },
+  noDelay: { ru: 'Без паузы', en: 'No delay' },
+  secondsShort: { ru: 'с', en: 'sec' },
+  temporaryTabsCleanupWarning: {
+    ru: 'Не удалось автоматически закрыть некоторые временные вкладки.',
+    en: 'Some temporary capture tabs could not be closed automatically.',
   },
   editButton: {
     ru: 'Изменить',

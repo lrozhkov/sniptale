@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { useEffect, useId, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Settings2 } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n/popup';
 import {
@@ -19,6 +19,7 @@ type ExportSelectionSectionShellProps = {
   isOpen: boolean;
   onClose: () => void;
   onOpen: () => void;
+  onOpenSettings?: () => void;
   title: string;
 };
 
@@ -96,6 +97,7 @@ export function ExportSelectionSectionShell({
   isOpen,
   onClose,
   onOpen,
+  onOpenSettings,
   title,
 }: ExportSelectionSectionShellProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -146,34 +148,51 @@ export function ExportSelectionSectionShell({
 
   return (
     <section ref={rootRef} className={cx(shellClassName, isExpanded && 'flex-1', className)}>
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-controls={drawerId}
-        aria-expanded={isOpen}
-        className={triggerClassName}
-        data-ui="popup.export.selection-trigger"
-        onClick={onOpen}
-      >
-        <span
-          className={[
-            'min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
-            'text-[var(--sniptale-color-text-muted-strong)]',
-          ].join(' ')}
-          data-ui="popup.export.selection-heading"
+      <div className="group flex items-center">
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-controls={drawerId}
+          aria-expanded={isOpen}
+          className={cx(triggerClassName, 'min-w-0 flex-1')}
+          data-ui="popup.export.selection-trigger"
+          onClick={onOpen}
         >
-          {title}
-        </span>
-        <ChevronRight
-          aria-hidden="true"
-          className={[
-            'h-3.5 w-3.5 shrink-0 translate-x-0.5 opacity-0',
-            'transition-[opacity,transform] duration-150',
-            'group-hover:translate-x-0 group-hover:opacity-100',
-            'group-focus-visible:translate-x-0 group-focus-visible:opacity-100',
-          ].join(' ')}
-        />
-      </button>
+          <span
+            className={[
+              'min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
+              'text-[var(--sniptale-color-text-muted-strong)]',
+            ].join(' ')}
+            data-ui="popup.export.selection-heading"
+          >
+            {title}
+          </span>
+          <ChevronRight
+            aria-hidden="true"
+            className={[
+              'h-3.5 w-3.5 shrink-0 translate-x-0.5 opacity-0',
+              'transition-[opacity,transform] duration-150',
+              'group-hover:translate-x-0 group-hover:opacity-100',
+              'group-focus-visible:translate-x-0 group-focus-visible:opacity-100',
+            ].join(' ')}
+          />
+        </button>
+        {onOpenSettings ? (
+          <button
+            type="button"
+            aria-label={translate('popup.export.pageSettingsTitle')}
+            className={[
+              'rounded-[8px] p-1.5 opacity-0 transition-opacity',
+              'text-[var(--sniptale-color-text-secondary)]',
+              'hover:bg-[var(--sniptale-color-surface-hover)]',
+              'group-hover:opacity-100 group-focus-within:opacity-100',
+            ].join(' ')}
+            onClick={onOpenSettings}
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
       <div
         id={drawerId}
         aria-label={drawerLabel}
