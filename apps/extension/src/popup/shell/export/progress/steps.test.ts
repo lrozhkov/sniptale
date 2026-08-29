@@ -129,7 +129,7 @@ function verifyStartupFailureSteps() {
 function verifyScreenshotProgressMessage() {
   const steps = getScreenshotSteps();
   expect(steps.find((step) => step.key === 'fullPageScreenshot')?.status).toBe('active');
-  expect(steps.find((step) => step.key === 'json')?.status).toBe('pending');
+  expect(steps.find((step) => step.key === 'json')?.status).toBe('done');
 }
 
 function verifyStandaloneImagesProgress() {
@@ -200,7 +200,163 @@ function verifyWebSnapshotSteps() {
   expect(steps.map((step) => [step.key, step.status])).toEqual([['webSnapshotDom', 'done']]);
 }
 
+function verifyExportOnlyWorkflowOrder() {
+  const steps = buildPopupExportProgressSteps({
+    progress: createProgress({ phase: 'idle' }),
+    result: null,
+    selection: {
+      ...selection,
+      includeAnnotations: true,
+      includeCssDiagnostics: true,
+      includeFullPageScreenshot: true,
+      includePageDiagnostics: true,
+    },
+  });
+
+  expect(steps.map((step) => step.key)).toEqual([
+    'annotations',
+    'json',
+    'markdown',
+    'files',
+    'images',
+    'basicLogs',
+    'pageDiagnostics',
+    'cssDiagnostics',
+    'fullPageScreenshot',
+  ]);
+}
+
+function verifyWebCopyWorkflowOrder() {
+  const steps = buildPopupExportProgressSteps({
+    progress: createProgress({ phase: 'idle' }),
+    result: null,
+    selection: {
+      ...selection,
+      includeAnnotations: true,
+      includeCssDiagnostics: true,
+      includeFullPageScreenshot: true,
+      includePageDiagnostics: true,
+      includeWebCopy: true,
+    },
+  });
+
+  expect(steps.map((step) => step.key)).toEqual([
+    'webSnapshotDom',
+    'fullPageScreenshot',
+    'annotations',
+    'json',
+    'markdown',
+    'files',
+    'images',
+    'basicLogs',
+    'pageDiagnostics',
+    'cssDiagnostics',
+  ]);
+}
+
+function verifyMonotonicStructuredProjection() {
+  const steps = buildPopupExportProgressSteps({
+    progress: createProgress({
+      activeStepKey: 'cssDiagnostics',
+      completedStepKeys: ['basicLogs', 'pageDiagnostics'],
+      phase: 'scanning',
+    }),
+    result: null,
+    selection: {
+      ...selection,
+      includeAnnotations: true,
+      includeCssDiagnostics: true,
+      includePageDiagnostics: true,
+    },
+  });
+
+  expect(steps.map((step) => [step.key, step.status])).toEqual([
+    ['annotations', 'done'],
+    ['json', 'done'],
+    ['markdown', 'done'],
+    ['files', 'done'],
+    ['images', 'done'],
+    ['basicLogs', 'done'],
+    ['pageDiagnostics', 'done'],
+    ['cssDiagnostics', 'active'],
+  ]);
+}
+
+function verifySequentialTabWorkflowFrontier() {
+  const selected = {
+    ...selection,
+    includeAnnotations: true,
+    includeCssDiagnostics: true,
+    includeFullPageScreenshot: true,
+    includePageDiagnostics: true,
+  };
+  const firstTabAtFinalStep = buildPopupExportProgressSteps({
+    progress: createProgress({
+      activeStepKey: 'fullPageScreenshot',
+      completedStepKeys: [],
+      phase: 'scanning',
+    }),
+    result: null,
+    selection: selected,
+  });
+  const secondTabRestarted = buildPopupExportProgressSteps({
+    progress: createProgress({
+      activeStepKey: 'annotations',
+      completedStepKeys: [],
+      phase: 'scanning',
+    }),
+    result: null,
+    selection: selected,
+  });
+  const globallyAdvanced = buildPopupExportProgressSteps({
+    progress: createProgress({
+      activeStepKey: 'json',
+      completedStepKeys: ['annotations'],
+      phase: 'scanning',
+    }),
+    result: null,
+    selection: selected,
+  });
+
+  expect(firstTabAtFinalStep.map((step) => step.status)).toEqual([
+    'active',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+    'pending',
+  ]);
+  expect(secondTabRestarted.map((step) => step.status)).toEqual(
+    firstTabAtFinalStep.map((step) => step.status)
+  );
+  expect(globallyAdvanced.slice(0, 3).map((step) => step.status)).toEqual([
+    'done',
+    'active',
+    'pending',
+  ]);
+}
+
 describe('buildPopupExportProgressSteps', () => {
+  it('orders export-only rows by the producer workflow', verifyExportOnlyWorkflowOrder);
+
+  it(
+    'keeps the shared Web-copy screenshot next to the stage that captures it',
+    verifyWebCopyWorkflowOrder
+  );
+
+  it(
+    'projects completed structured rows monotonically from a later producer step',
+    verifyMonotonicStructuredProjection
+  );
+
+  it(
+    'does not advance or reset the global workflow frontier between sequential tabs',
+    verifySequentialTabWorkflowFrontier
+  );
+
   it('shows Web-copy and structured steps immediately for a combined launched plan', () => {
     const steps = buildPopupExportProgressSteps({
       progress: {
@@ -314,7 +470,7 @@ describe('buildPopupExportProgressSteps', () => {
   it('keeps component rows neutral for an unattributed startup error', verifyStartupFailureSteps);
 
   it(
-    'prioritizes the runtime progress message when the screenshot step is active',
+    'keeps earlier producer rows complete when the final screenshot step is active',
     verifyScreenshotProgressMessage
   );
 

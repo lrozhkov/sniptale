@@ -49,11 +49,12 @@ export type PopupExportProgressStep = {
   statusLabel: string;
 };
 
+const FULL_PAGE_SCREENSHOT_STEP_DEFINITION: ExportStepDefinition = {
+  key: 'fullPageScreenshot',
+  labelKey: 'popup.export.includeFullPageScreenshotLabel',
+};
+
 const EXPORT_STEP_DEFINITIONS: ExportStepDefinition[] = [
-  {
-    key: 'fullPageScreenshot',
-    labelKey: 'popup.export.includeFullPageScreenshotLabel',
-  },
   { key: 'annotations', labelKey: 'popup.export.includeAnnotationsLabel' },
   { key: 'json', labelKey: 'popup.export.includeJsonLabel' },
   { key: 'markdown', labelKey: 'popup.export.includeMarkdownLabel' },
@@ -68,6 +69,7 @@ const EXPORT_STEP_DEFINITIONS: ExportStepDefinition[] = [
     key: 'cssDiagnostics',
     labelKey: 'popup.export.includeCssDiagnosticsLabel',
   },
+  FULL_PAGE_SCREENSHOT_STEP_DEFINITION,
 ];
 
 const WEB_SNAPSHOT_STEP_DEFINITION: ExportStepDefinition = {
@@ -263,7 +265,11 @@ function buildStructuredProgressSteps(args: {
   result: PopupExportResult | null;
   selection: ExportStepSelection;
 }): PopupExportProgressStep[] {
-  const selectedDefinitions = EXPORT_STEP_DEFINITIONS.filter(({ key }) =>
+  const workflowDefinitions =
+    args.selection.includeWebCopy && args.selection.includeFullPageScreenshot
+      ? [FULL_PAGE_SCREENSHOT_STEP_DEFINITION, ...EXPORT_STEP_DEFINITIONS.slice(0, -1)]
+      : EXPORT_STEP_DEFINITIONS;
+  const selectedDefinitions = workflowDefinitions.filter(({ key }) =>
     isStepSelected(key, args.selection)
   );
 
@@ -283,6 +289,16 @@ function buildStructuredProgressSteps(args: {
   }
   const hasExplicitOutcomes =
     args.progress.completedStepKeys !== undefined || args.progress.failedStepKeys !== undefined;
+  const completedFrontierIndex = hasExplicitOutcomes
+    ? selectedDefinitions.reduce(
+        (frontier, { key }, index) => (completedStepKeys.has(key) ? index : frontier),
+        -1
+      )
+    : -1;
+  const projectedActiveIndex =
+    hasExplicitOutcomes && activeIndex > completedFrontierIndex + 1
+      ? completedFrontierIndex + 1
+      : activeIndex;
 
   return selectedDefinitions.map(({ key, labelKey }, index) => {
     let status: ExportStepStatus = 'pending';
@@ -291,11 +307,11 @@ function buildStructuredProgressSteps(args: {
       status = 'error';
     } else if (hasCompletedArchiveResult(args.result)) {
       status = 'done';
-    } else if (completedStepKeys.has(key)) {
+    } else if (completedStepKeys.has(key) || index <= completedFrontierIndex) {
       status = 'done';
     } else if (!hasExplicitOutcomes && activeIndex >= 0 && index < activeIndex) {
       status = 'done';
-    } else if (key === activeStepKey) {
+    } else if (index === projectedActiveIndex) {
       status = 'active';
     }
 
