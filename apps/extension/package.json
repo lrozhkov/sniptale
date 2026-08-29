@@ -7,7 +7,7 @@
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
     "@fontsource/marck-script": "5.3.0",
-    "@iconify-icons/tabler": "^1.2.95",
+    "@iconify-icons/tabler": "^2.0.0",
     "@iconify/react": "^6.0.2",
     "@sniptale/foundation": "0.3.3",
     "@sniptale/platform": "0.3.3",
@@ -20,7 +20,7 @@
     "fabric": "^7.4.0",
     "idb": "^8.0.3",
     "jszip": "^3.10.1",
-    "lucide-react": "^0.575.0",
+    "lucide-react": "^1.33.0",
     "mediabunny": "^1.55.2",
     "mp4-muxer": "^5.2.2",
     "react": "^19.2.8",

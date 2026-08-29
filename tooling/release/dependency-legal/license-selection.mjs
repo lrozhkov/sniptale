@@ -165,9 +165,9 @@ function canonicalAlias(record, aliases) {
 async function createLegalMaterial(record, selections, pinnedSources, canonicalLicenseAliases) {
   const selectedLicense = resolveSelectedLicense(record, selections);
   const selectedText =
+    (await selectPinnedLicenseSource(record, selectedLicense, pinnedSources)) ??
     (await selectLicenseFile(record)) ??
-    (await selectReadmeLicense(record)) ??
-    (await selectPinnedLicenseSource(record, selectedLicense, pinnedSources));
+    (await selectReadmeLicense(record));
   if (!selectedText) {
     throw new Error(`Installed package has no redistributable license text: ${record.packagePath}`);
   }

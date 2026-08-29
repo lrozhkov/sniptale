@@ -32,9 +32,9 @@
       "source": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt",
-      "sha256": "896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f",
-      "source": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt"
+      "archivePath": "LICENSES/dependencies/@iconify-icons__tabler-2.0.0.txt",
+      "sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db",
+      "source": "LICENSES/dependencies/@iconify-icons__tabler-2.0.0.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/@iconify__react-6.0.2.txt",
@@ -117,9 +117,9 @@
       "source": "LICENSES/dependencies/lie-3.3.0.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/lucide-react-0.575.0.txt",
-      "sha256": "668dcc52803480e0a026b31140a4cae668772663cd764e5991d252eef03f98db",
-      "source": "LICENSES/dependencies/lucide-react-0.575.0.txt"
+      "archivePath": "LICENSES/dependencies/lucide-react-1.33.0.txt",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "source": "LICENSES/dependencies/lucide-react-1.33.0.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.55.2.txt",
@@ -218,12 +218,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "4f5478ba383dd97c9e55c3c7c329cafcec2266d6228dc9c34b74875b50e01221",
+      "sha256": "c39e948e144409e86c1cd3b7bf30929f1572e7f36d6fd619ddf8077750cea726",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "ad0b51344dabb8fc8b5edd5f610bfc3c39ec91aab2beacd38ca46b51f1ceaef3",
+      "sha256": "bd65d86d09ce550d996ab6916206d14b1af934d5d57bb8d2e5c7c687a9f0cca8",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
@@ -301,17 +301,18 @@
     "pinnedSources": [
       {
         "packageName": "@iconify-icons/tabler",
-        "packageVersion": "1.2.95",
-        "packageResolved": "https://registry.npmjs.org/@iconify-icons/tabler/-/tabler-1.2.95.tgz",
-        "packageIntegrity": "sha512-d7bcyNs/AHWcdTwN+2/yohPeU0Kg5jvzt9JiLFnTnx9HYc54q2cU08rSEF0rIVHB5PEP9M8dTN/ZFxquAFCamw==",
-        "upstreamVersion": "2.40.0",
+        "packageVersion": "2.0.0",
+        "packageResolved": "https://registry.npmjs.org/@iconify-icons/tabler/-/tabler-2.0.0.tgz",
+        "packageIntegrity": "sha512-73ZsYlBPQeewtoXLoYDgy7VR7Uu1ylupwBQX3vg3Pjy71haX4YlYrh+drTh78BAbHluJmkdyREN2dnEWWwyASA==",
+        "upstreamVersion": "3.46.0",
         "upstreamAuthorName": "Paweł Kuna",
         "upstreamAuthorUrl": "https://github.com/tabler/tabler-icons",
         "upstreamLicenseMetadataUrl": "https://github.com/tabler/tabler-icons/blob/master/LICENSE",
+        "upstreamMetadataPath": "index.js",
         "license": "MIT",
-        "originUrl": "https://raw.githubusercontent.com/tabler/tabler-icons/v2.40.0/LICENSE",
-        "sourcePath": "tooling/release/dependency-legal/sources/tabler-icons-2.40.0.LICENSE",
-        "sha256": "896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f"
+        "originUrl": "https://raw.githubusercontent.com/tabler/tabler-icons/v3.46.0/LICENSE",
+        "sourcePath": "tooling/release/dependency-legal/sources/tabler-icons-3.46.0.LICENSE",
+        "sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db"
       }
     ],
     "reviewedSelections": [

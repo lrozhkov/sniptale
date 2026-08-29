@@ -27,24 +27,24 @@
       "version": "5.3.0"
     },
     {
-      "archivePath": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt",
+      "archivePath": "LICENSES/dependencies/@iconify-icons__tabler-2.0.0.txt",
       "licenseExpression": "MIT",
       "licenseProvenance": {
         "kind": "pinned-upstream",
-        "originUrl": "https://raw.githubusercontent.com/tabler/tabler-icons/v2.40.0/LICENSE",
-        "sha256": "896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f",
-        "sourcePath": "tooling/release/dependency-legal/sources/tabler-icons-2.40.0.LICENSE",
-        "upstreamVersion": "2.40.0"
+        "originUrl": "https://raw.githubusercontent.com/tabler/tabler-icons/v3.46.0/LICENSE",
+        "sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db",
+        "sourcePath": "tooling/release/dependency-legal/sources/tabler-icons-3.46.0.LICENSE",
+        "upstreamVersion": "3.46.0"
       },
-      "licenseSource": "tooling/release/dependency-legal/sources/tabler-icons-2.40.0.LICENSE",
+      "licenseSource": "tooling/release/dependency-legal/sources/tabler-icons-3.46.0.LICENSE",
       "licenseSourceKind": "pinned-upstream",
       "licenseStorageKind": "generated-copy",
       "packageName": "@iconify-icons/tabler",
       "packagePath": "node_modules/@iconify-icons/tabler",
       "selectedLicense": "MIT",
-      "sha256": "896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f",
-      "sourceUrl": "https://icon-sets.iconify.design/tabler/",
-      "version": "1.2.95"
+      "sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db",
+      "sourceUrl": "https://registry.npmjs.org/@iconify-icons/tabler/-/tabler-2.0.0.tgz",
+      "version": "2.0.0"
     },
     {
       "archivePath": "LICENSES/dependencies/@iconify__react-6.0.2.txt",
@@ -255,7 +255,7 @@
       "version": "3.3.0"
     },
     {
-      "archivePath": "LICENSES/dependencies/lucide-react-0.575.0.txt",
+      "archivePath": "LICENSES/dependencies/lucide-react-1.33.0.txt",
       "licenseExpression": "ISC",
       "licenseSource": "node_modules/lucide-react/LICENSE",
       "licenseSourceKind": "installed-file",
@@ -263,9 +263,9 @@
       "packageName": "lucide-react",
       "packagePath": "node_modules/lucide-react",
       "selectedLicense": "ISC",
-      "sha256": "668dcc52803480e0a026b31140a4cae668772663cd764e5991d252eef03f98db",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
       "sourceUrl": "https://github.com/lucide-icons/lucide.git",
-      "version": "0.575.0"
+      "version": "1.33.0"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.55.2.txt",

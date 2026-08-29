@@ -8,21 +8,23 @@ import { createLegalFixture } from './test-support';
 
 const MIT_TEXT = 'MIT License\n\nCopyright Example\n';
 const TABLER_INTEGRITY = 'sha512-dGFibGVyLWZpeHR1cmU=';
-const TABLER_SHA256 = '896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f';
-const TABLER_SOURCE_PATH = 'tooling/release/dependency-legal/sources/tabler-icons-2.40.0.LICENSE';
+const TABLER_SHA256 = 'b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db';
+const TABLER_SOURCE_PATH = 'tooling/release/dependency-legal/sources/tabler-icons-3.46.0.LICENSE';
+const TABLER_METADATA_PATH = 'index.js';
 const TABLER_SOURCE = {
   license: 'MIT',
-  originUrl: 'https://raw.githubusercontent.com/tabler/tabler-icons/v2.40.0/LICENSE',
+  originUrl: 'https://raw.githubusercontent.com/tabler/tabler-icons/v3.46.0/LICENSE',
   packageIntegrity: TABLER_INTEGRITY,
   packageName: '@iconify-icons/tabler',
-  packageResolved: 'https://registry.example.test/tabler-1.2.95.tgz',
-  packageVersion: '1.2.95',
+  packageResolved: 'https://registry.example.test/tabler-2.0.0.tgz',
+  packageVersion: '2.0.0',
   sha256: TABLER_SHA256,
   sourcePath: TABLER_SOURCE_PATH,
   upstreamAuthorName: 'Paweł Kuna',
   upstreamAuthorUrl: 'https://github.com/tabler/tabler-icons',
   upstreamLicenseMetadataUrl: 'https://github.com/tabler/tabler-icons/blob/master/LICENSE',
-  upstreamVersion: '2.40.0',
+  upstreamMetadataPath: TABLER_METADATA_PATH,
+  upstreamVersion: '3.46.0',
 };
 
 interface TablerFixtureOptions {
@@ -36,16 +38,23 @@ async function createTablerFixture({
   iconSetInfo = {},
   integrity = TABLER_INTEGRITY,
   resolved = TABLER_SOURCE.packageResolved,
-  version = '1.2.95',
+  version = '2.0.0',
 }: TablerFixtureOptions = {}) {
+  const metadata = {
+    author: { name: 'Paweł Kuna', url: TABLER_SOURCE.upstreamAuthorUrl },
+    license: { spdx: 'MIT', url: TABLER_SOURCE.upstreamLicenseMetadataUrl },
+    version: '3.46.0',
+    ...iconSetInfo,
+  };
   const repoRoot = await createLegalFixture({
     packages: [
       {
-        iconSetInfo: {
-          author: { name: 'Paweł Kuna', url: TABLER_SOURCE.upstreamAuthorUrl },
-          license: { spdx: 'MIT', url: TABLER_SOURCE.upstreamLicenseMetadataUrl },
-          version: '2.40.0',
-          ...iconSetInfo,
+        files: {
+          [TABLER_METADATA_PATH]: [
+            `const iconSetInfo = ${JSON.stringify(metadata, null, 2)};`,
+            'export default iconSetInfo;',
+            '',
+          ].join('\n'),
         },
         integrity,
         name: '@iconify-icons/tabler',
@@ -53,7 +62,7 @@ async function createTablerFixture({
         version,
       },
     ],
-    rootDependencies: { '@iconify-icons/tabler': '^1' },
+    rootDependencies: { '@iconify-icons/tabler': '^2' },
   });
   return repoRoot;
 }
@@ -63,7 +72,7 @@ async function seedTablerSource(repoRoot: string, contents?: string) {
   await fs.mkdir(path.dirname(destination), { recursive: true });
   const source =
     contents ??
-    (await fs.readFile(new URL('./sources/tabler-icons-2.40.0.LICENSE', import.meta.url), 'utf8'));
+    (await fs.readFile(new URL('./sources/tabler-icons-3.46.0.LICENSE', import.meta.url), 'utf8'));
   await fs.writeFile(destination, source);
 }
 
@@ -176,8 +185,12 @@ it('records an exact corresponding-source URL for a selected MPL package', async
   expect(closure.entries[0].correspondingSourceUrl).toBe(resolved);
 });
 
-it('uses the exact pinned Tabler Icons 2.40.0 MIT source offline', async () => {
+it('uses the exact pinned Tabler Icons 3.46.0 MIT source over an installed pointer', async () => {
   const repoRoot = await createTablerFixture();
+  await fs.writeFile(
+    path.join(repoRoot, 'node_modules/@iconify-icons/tabler/LICENSE.md'),
+    '# License\n\nRead full license: https://github.com/tabler/tabler-icons/blob/master/LICENSE\n'
+  );
   await seedTablerSource(repoRoot);
 
   const closure = await generateDependencyLegalClosure({
@@ -190,12 +203,12 @@ it('uses the exact pinned Tabler Icons 2.40.0 MIT source offline', async () => {
       originUrl: TABLER_SOURCE.originUrl,
       sha256: TABLER_SHA256,
       sourcePath: TABLER_SOURCE_PATH,
-      upstreamVersion: '2.40.0',
+      upstreamVersion: '3.46.0',
     },
     licenseSource: TABLER_SOURCE_PATH,
     licenseSourceKind: 'pinned-upstream',
   });
-  expect(closure.licenseFiles[0].contents).toContain('Copyright (c) 2020-2023 Paweł Kuna');
+  expect(closure.licenseFiles[0].contents).toContain('Copyright (c) 2020-2026 Paweł Kuna');
 });
 
 it('rejects missing or drifted pinned Tabler source bytes', async () => {
@@ -268,5 +281,5 @@ it('rejects stale pinned dependency license registrations', async () => {
       pinnedSources: [TABLER_SOURCE],
       repoRoot,
     })
-  ).rejects.toThrow('Stale pinned dependency license source for @iconify-icons/tabler@1.2.95');
+  ).rejects.toThrow('Stale pinned dependency license source for @iconify-icons/tabler@2.0.0');
 });

@@ -12533,6 +12533,7 @@
         "apps/extension/src/ui/popup-shell/action-footer/tokens.ts",
         "apps/extension/src/ui/popup-shell/expanding-mode-button/index.tsx",
         "apps/extension/src/ui/popup-shell/footer/action.tsx",
+        "apps/extension/src/ui/popup-shell/footer/github-icon.tsx",
         "apps/extension/src/ui/popup-shell/footer/index.tsx",
         "apps/extension/src/ui/popup-shell/footer/language-toggle.tsx",
         "apps/extension/src/ui/popup-shell/footer/theme-toggle.tsx",
@@ -19010,7 +19011,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/dependency-legal/license-selection.mjs",
-        "contentHash": "ba0e1e9af1060e6f08f723f16e3e0cea42b086c61ec4e2d9c3e656adb30138f9"
+        "contentHash": "753e6697c59bb63f1f51329dc77c794c9bab903705c1b0ec8a0d50674b5a69de"
       },
       "consumers": [
         "tooling/release/dependency-legal/index.mjs",
@@ -19784,7 +19785,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/dependency-legal/pinned-source.mjs",
-        "contentHash": "b0e6d5ece32ebf6009a557f80718ecd8b206cf5a52b3dfb442a3b0efc3915fdf"
+        "contentHash": "b697be7f8f68f4ae8945c237ee7f7ca86d2056c1058fd1593bdb8ad122dcef65"
       },
       "consumers": [
         "tooling/release/dependency-legal/license-selection.mjs",
