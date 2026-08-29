@@ -13,7 +13,7 @@ export interface PermissionInfo {
   icon: LucideIcon;
   state: PermissionState;
   type: PermissionType;
-  chromePermission?: chrome.runtime.ManifestPermissions;
+  chromePermission?: chrome.runtime.ManifestPermission;
   originPattern?: string;
   originPatterns?: string[];
 }

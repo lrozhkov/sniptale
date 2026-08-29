@@ -7,7 +7,7 @@ export function createLicensePolicy(
   const exceptions = reviewedExceptions ?? [
     {
       packageName: 'eslint-plugin-sonarjs',
-      resolvedVersion: '4.0.3',
+      resolvedVersion: '4.2.0',
       dependencyScope: 'direct-development',
       artifactInclusion: 'development-only',
       licenseExpression: 'LGPL-3.0-only',
@@ -37,7 +37,7 @@ export function createLicenseSbom() {
       {
         type: 'library',
         name: 'eslint-plugin-sonarjs',
-        version: '4.0.3',
+        version: '4.2.0',
         licenses: [{ license: { id: 'LGPL-3.0-only' } }],
         properties: [
           { name: 'cdx:npm:package:path', value: 'node_modules/eslint-plugin-sonarjs' },
@@ -57,10 +57,10 @@ export function createLicenseLock(root: string, { runtime = false } = {}) {
       lockfileVersion: 3,
       packages: {
         '': runtime
-          ? { dependencies: { 'eslint-plugin-sonarjs': '4.0.3' } }
-          : { devDependencies: { 'eslint-plugin-sonarjs': '4.0.3' } },
+          ? { dependencies: { 'eslint-plugin-sonarjs': '4.2.0' } }
+          : { devDependencies: { 'eslint-plugin-sonarjs': '4.2.0' } },
         'node_modules/eslint-plugin-sonarjs': {
-          version: '4.0.3',
+          version: '4.2.0',
           ...(runtime ? {} : { dev: true }),
         },
       },
@@ -76,7 +76,7 @@ export function createReviewedExceptionSbom({ developmentProperty = 'true' } = {
       {
         type: 'library',
         name: 'eslint-plugin-sonarjs',
-        version: '4.0.3',
+        version: '4.2.0',
         licenses: [{ license: { id: 'LGPL-3.0-only' } }],
         properties: [
           { name: 'cdx:npm:package:path', value: 'node_modules/eslint-plugin-sonarjs' },

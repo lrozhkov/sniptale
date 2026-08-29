@@ -175,7 +175,7 @@ it('rejects a reviewed license exception without an exact live SBOM match', asyn
           {
             type: 'library',
             name: 'eslint-plugin-sonarjs',
-            version: '4.0.3',
+            version: '4.2.0',
             licenses: [{ license: { id: 'MIT' } }],
           },
         ],
@@ -186,7 +186,7 @@ it('rejects a reviewed license exception without an exact live SBOM match', asyn
 
   expect(result.violations).toEqual([
     expect.objectContaining({
-      message: expect.stringContaining('eslint-plugin-sonarjs@4.0.3: LGPL-3.0-only'),
+      message: expect.stringContaining('eslint-plugin-sonarjs@4.2.0: LGPL-3.0-only'),
       rule: 'license-policy-stale-exception',
     }),
   ]);

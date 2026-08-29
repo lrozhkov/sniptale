@@ -1,47 +1,39 @@
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 
-type BrowserPermissionsApi = {
-  contains(query: { origins?: string[]; permissions?: string[] }): Promise<boolean>;
-  remove(query: { origins?: string[]; permissions?: string[] }): Promise<boolean>;
-  request(query: { origins?: string[]; permissions?: string[] }): Promise<boolean>;
-};
-
-const permissionsApi = browserPermissions as BrowserPermissionsApi;
-
 export function requestChromePermission(
-  chromePermission: chrome.runtime.ManifestPermissions
+  chromePermission: chrome.runtime.ManifestPermission
 ): Promise<boolean> {
-  return permissionsApi.request({ permissions: [chromePermission] });
+  return browserPermissions.request({ permissions: [chromePermission] });
 }
 
 export function requestOriginPermission(originPattern: string): Promise<boolean> {
-  return permissionsApi.request({ origins: [originPattern] });
+  return browserPermissions.request({ origins: [originPattern] });
 }
 
 export function requestOriginPermissions(originPatterns: string[]): Promise<boolean> {
-  return permissionsApi.request({ origins: originPatterns });
+  return browserPermissions.request({ origins: originPatterns });
 }
 
 export function removeOriginPermissions(originPatterns: string[]): Promise<boolean> {
-  return permissionsApi.remove({ origins: originPatterns });
+  return browserPermissions.remove({ origins: originPatterns });
 }
 
 export function removeChromePermission(
-  chromePermission: chrome.runtime.ManifestPermissions
+  chromePermission: chrome.runtime.ManifestPermission
 ): Promise<boolean> {
-  return permissionsApi.remove({ permissions: [chromePermission] });
+  return browserPermissions.remove({ permissions: [chromePermission] });
 }
 
 export function containsChromePermission(
-  chromePermission: chrome.runtime.ManifestPermissions
+  chromePermission: chrome.runtime.ManifestPermission
 ): Promise<boolean> {
-  return permissionsApi.contains({ permissions: [chromePermission] });
+  return browserPermissions.contains({ permissions: [chromePermission] });
 }
 
 export function containsOriginPermission(originPattern: string): Promise<boolean> {
-  return permissionsApi.contains({ origins: [originPattern] });
+  return browserPermissions.contains({ origins: [originPattern] });
 }
 
 export function containsOriginPermissions(originPatterns: string[]): Promise<boolean> {
-  return permissionsApi.contains({ origins: originPatterns });
+  return browserPermissions.contains({ origins: originPatterns });
 }

@@ -406,7 +406,7 @@
       "reviewBy": "2027-07-12",
       "source": {
         "kind": "license",
-        "key": "eslint-plugin-sonarjs@4.0.3:direct-development:development-only:LGPL-3.0-only"
+        "key": "eslint-plugin-sonarjs@4.2.0:direct-development:development-only:LGPL-3.0-only"
       },
       "scope": {
         "approvalOwner": "repository-owner",
@@ -416,7 +416,7 @@
         "licenseExpression": "LGPL-3.0-only",
         "packageName": "eslint-plugin-sonarjs",
         "reason": "Reviewed tooling-only audit dependency; it is not bundled into the extension release artifact.",
-        "resolvedVersion": "4.0.3"
+        "resolvedVersion": "4.2.0"
       },
       "targetAction": "Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact."
     },
@@ -14544,7 +14544,7 @@
       "remediation": "Review dependency scope and artifact inclusion, then narrow or remove the exact exception; never add a package wildcard.",
       "exactSource": {
         "path": "tooling/configs/qa/licenses.json",
-        "contentHash": "48c510169f45dd0f4cb92f4c8046b533b99e1a94c0d7a1cb7d800d7cac96b764"
+        "contentHash": "2770c769256acae9f55cfc0f4f447826e272ff06d290cb517f75fffbc618e021"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -16957,7 +16957,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/control-digest.mjs",
-        "contentHash": "19be23d27f76a821c3337923f51b5aac45b503e385e2410c33eb5cfb4362559d"
+        "contentHash": "2360c97d76396452777b91fbb18529cdfc699af344682444b7850e5384dfb0ae"
       },
       "consumers": [
         "tooling/ci/admit-candidate-proof.mjs",

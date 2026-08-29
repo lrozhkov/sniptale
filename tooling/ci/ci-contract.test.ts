@@ -269,7 +269,7 @@ it('keeps the residual ESLint TypeScript peer exception explicit and diagnosable
   expect(projectPackage.devDependencies.typescript).toMatch(/^npm:@typescript\/typescript6@/u);
   expect(projectPackage.devDependencies).toHaveProperty('typescript-eslint');
   expect(projectLock.packages['node_modules/typescript-eslint'].peerDependencies.typescript).toBe(
-    '>=4.8.4 <6.0.0'
+    '>=4.8.4 <6.1.0'
   );
 });
 

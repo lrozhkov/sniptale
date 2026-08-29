@@ -35,7 +35,7 @@
   "reviewedExceptions": [
     {
       "packageName": "eslint-plugin-sonarjs",
-      "resolvedVersion": "4.0.3",
+      "resolvedVersion": "4.2.0",
       "dependencyScope": "direct-development",
       "artifactInclusion": "development-only",
       "licenseExpression": "LGPL-3.0-only",

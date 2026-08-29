@@ -19,6 +19,7 @@ const CONTROL_FILES = Object.freeze([
   '.dockerignore',
   '.editorconfig',
   '.npmrc',
+  '.nvmrc',
   '.oxfmtignore',
   '.oxfmtrc.json',
   '.oxlintrc.json',
