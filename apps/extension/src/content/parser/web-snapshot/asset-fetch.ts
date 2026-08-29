@@ -9,6 +9,7 @@ import {
 } from '../../../features/web-snapshot/public';
 import { MAX_WEB_SNAPSHOT_ASSET_BYTES } from './limits';
 import type { WebSnapshotAssetEntry } from './types';
+import { resolveWebSnapshotAssetRequestUrl } from './asset-url';
 
 const EXTENSION_BY_TYPE: Record<string, string> = {
   'font/woff': 'woff',
@@ -237,7 +238,7 @@ export async function fetchAssetUrl(args: {
     throw new Error('unsafe URL');
   }
 
-  const resolved = new URL(args.url, args.baseUrl);
+  const resolved = new URL(resolveWebSnapshotAssetRequestUrl(args.url, args.baseUrl));
   const resolvedUrl = resolved.href;
   const fetchedBlob = await fetchAssetBlob({
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,

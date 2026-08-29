@@ -9,9 +9,11 @@ import {
   sanitizeWebSnapshotXhtml,
   serializeWebSnapshotXhtmlDocument,
   validateImportedWebSnapshotAsset,
+  appendWebSnapshotAssetFragment,
+  resolveWebSnapshotLocalAssetReference,
 } from '../../../features/web-snapshot/public';
 
-const URL_ATTRIBUTES = ['href', 'poster', 'src'] as const;
+const URL_ATTRIBUTES = ['href', 'poster', 'src', 'xlink:href'] as const;
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 
 function decodeText(blob: Blob, path: string): Promise<string> {
@@ -31,15 +33,8 @@ function resolveLocalAssetPath(
 ): string | null {
   const trimmed = value.trim();
   if (trimmed.startsWith('#')) return trimmed;
-  try {
-    const base = new URL(sourcePath, 'https://sniptale.invalid/');
-    const resolved = new URL(trimmed, base);
-    if (resolved.origin !== base.origin || resolved.search || resolved.hash) return null;
-    const path = decodeURIComponent(resolved.pathname.replace(/^\//u, ''));
-    return assetPaths.has(path) ? path : null;
-  } catch {
-    return null;
-  }
+  const reference = resolveWebSnapshotLocalAssetReference(value, sourcePath, assetPaths);
+  return reference ? appendWebSnapshotAssetFragment(reference.path, reference.fragment) : null;
 }
 
 function rewriteSrcset(

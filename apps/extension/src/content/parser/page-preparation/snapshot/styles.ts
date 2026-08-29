@@ -1,9 +1,6 @@
-import {
-  isSafeWebSnapshotCaptureAssetUrl,
-  sanitizeWebSnapshotCssText,
-} from '../../../../features/web-snapshot/public';
 import { collectOpenShadowHosts } from '../../dom-tree-parser/traversal/virtual-dom.helpers';
 import { isAccessibleDocumentRuntimeStyle } from '../../../platform/frame';
+import { sanitizePreparedSnapshotCapturedCssText } from './style-assets';
 
 const SHADOW_STYLE_HOST_ATTRIBUTE = 'data-sniptale-shadow-style-host';
 const SHADOW_BOUNDARY_ATTRIBUTE = 'data-sniptale-shadow-boundary';
@@ -15,38 +12,16 @@ interface MarkedShadowStyleHost {
   shadowRoot: ShadowRoot;
 }
 
-function rewriteCapturedCssUrl(value: string, baseUrl: string): string | null {
-  const trimmedValue = value.trim();
-  if (trimmedValue.startsWith('#')) return trimmedValue;
-  if (!isSafeWebSnapshotCaptureAssetUrl(trimmedValue, baseUrl)) return null;
-  try {
-    const resolved = new URL(trimmedValue, baseUrl);
-    return ['data:', 'http:', 'https:'].includes(resolved.protocol) ? resolved.href : null;
-  } catch {
-    return null;
-  }
-}
-
 function readStyleSheetRules(sheet: CSSStyleSheet, documentBaseUrl: string): string | null {
   try {
     const stylesheetBaseUrl = sheet.href ?? documentBaseUrl;
     return Array.from(sheet.cssRules)
-      .map((rule) =>
-        sanitizeWebSnapshotCssText(rule.cssText, (url) =>
-          rewriteCapturedCssUrl(url, stylesheetBaseUrl)
-        )
-      )
+      .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule.cssText, stylesheetBaseUrl))
       .filter(Boolean)
       .join('\n');
   } catch {
     return null;
   }
-}
-
-function sanitizeCapturedCssText(cssText: string, stylesheetBaseUrl: string): string {
-  return sanitizeWebSnapshotCssText(cssText, (url) =>
-    rewriteCapturedCssUrl(url, stylesheetBaseUrl)
-  );
 }
 
 function readAuthoredInlineStyleRules(owner: Element): string[] | null {
@@ -81,14 +56,17 @@ function readLosslessInlineStyleSheet(
       (rule, index) => liveRules[liveRules.length - authoredRules.length + index] === rule
     );
     const stylesheetBaseUrl = sheet.href ?? documentBaseUrl;
-    const sanitizedAuthoredCss = sanitizeCapturedCssText(authoredCssText, stylesheetBaseUrl);
+    const sanitizedAuthoredCss = sanitizePreparedSnapshotCapturedCssText(
+      authoredCssText,
+      stylesheetBaseUrl
+    );
     if (liveRules.length === authoredRules.length && authoredRulesRemainPrefix) {
       return sanitizedAuthoredCss;
     }
     if (liveRules.length > authoredRules.length && authoredRulesRemainPrefix) {
       const appendedCss = liveRules
         .slice(authoredRules.length)
-        .map((rule) => sanitizeCapturedCssText(rule, stylesheetBaseUrl))
+        .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule, stylesheetBaseUrl))
         .filter(Boolean)
         .join('\n');
       return [sanitizedAuthoredCss, appendedCss].filter(Boolean).join('\n');
@@ -96,7 +74,7 @@ function readLosslessInlineStyleSheet(
     if (liveRules.length > authoredRules.length && authoredRulesRemainSuffix) {
       const prependedCss = liveRules
         .slice(0, liveRules.length - authoredRules.length)
-        .map((rule) => sanitizeCapturedCssText(rule, stylesheetBaseUrl))
+        .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule, stylesheetBaseUrl))
         .filter(Boolean)
         .join('\n');
       return [prependedCss, sanitizedAuthoredCss].filter(Boolean).join('\n');

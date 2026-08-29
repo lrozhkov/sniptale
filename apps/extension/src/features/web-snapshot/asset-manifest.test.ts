@@ -68,6 +68,25 @@ it('admits a mislabeled WOFF2 response only when its URL and binary signature ag
   ).toThrow('unsupported web snapshot asset MIME type');
 });
 
+it('normalizes an inline font MIME alias only when its WOFF signature is valid', () => {
+  const woff = new Uint8Array([0x77, 0x4f, 0x46, 0x46, 0, 0, 0, 0]);
+
+  expect(
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: woff,
+      contentType: 'application/font-woff;charset=utf-8',
+      url: 'data:application/font-woff;base64,d09GRgAAAAA=',
+    })
+  ).toBe('font/woff');
+  expect(() =>
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: new TextEncoder().encode('not a font'),
+      contentType: 'font/woff',
+      url: 'data:font/woff;base64,bm90IGEgZm9udA==',
+    })
+  ).toThrow('unsupported web snapshot asset MIME type');
+});
+
 it('hashes web snapshot asset bytes and blobs consistently', async () => {
   const bytes = new TextEncoder().encode('asset');
 

@@ -15,6 +15,7 @@ import { prepareStylesheetAsset } from './stylesheet-assets';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseSrcset } from './asset-targets';
 import { MAX_WEB_SNAPSHOT_ASSETS_BYTES } from './limits';
+import { resolveWebSnapshotAssetRequestUrl } from './asset-url';
 
 const logger = createLogger({ namespace: 'ContentWebSnapshot' });
 const ASSET_PREFETCH_CONCURRENCY = 3;
@@ -94,7 +95,7 @@ function collectSameOriginFetchUrls(
         : [target.url];
     for (const candidate of candidates) {
       try {
-        const resolved = new URL(candidate, context.baseUrl);
+        const resolved = new URL(resolveWebSnapshotAssetRequestUrl(candidate, context.baseUrl));
         if (resolved.origin === context.pageOrigin) urls.add(resolved.href);
       } catch {
         // Invalid targets are handled by the canonical capture path.

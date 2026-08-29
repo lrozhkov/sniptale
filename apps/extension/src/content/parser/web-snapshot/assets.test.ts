@@ -130,9 +130,12 @@ it('packages CSS image and font resources and rewrites them to offline asset pat
   vi.mocked(fetch).mockImplementation(async (input) => {
     const url = String(input);
     const type = url.endsWith('.woff2') ? 'font/woff2' : 'image/png';
-    return new Response(url.endsWith('.woff2') ? 'font' : 'png', {
-      headers: { 'content-type': type },
-    });
+    return new Response(
+      url.endsWith('.woff2') ? new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0, 0, 0, 0]) : 'png',
+      {
+        headers: { 'content-type': type },
+      }
+    );
   });
   document.head.innerHTML = [
     '<style>',
@@ -244,6 +247,78 @@ it('deduplicates repeated CSS resources across stylesheets within one capture', 
   expect(result.assets).toHaveLength(1);
   expect(styles[0]).toContain('../assets/1-');
   expect(styles[1]).toContain('../assets/1-');
+});
+
+it('fetches an SVG sprite once while preserving CSS and DOM use fragments', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    success: true,
+    snapshotSessionId: 'snapshot-session-svg-fragments',
+  });
+  const sprite = [
+    '<svg xmlns="http://www.w3.org/2000/svg">',
+    '<symbol id="approve" viewBox="0 0 10 10"><path d="M1 5h8"/></symbol>',
+    '<symbol id="reject" viewBox="0 0 10 10"><path d="M1 1l8 8"/></symbol>',
+    '</svg>',
+  ].join('');
+  vi.mocked(fetch).mockResolvedValue(
+    new Response(sprite, { headers: { 'content-type': 'image/svg+xml' } })
+  );
+  document.head.innerHTML = [
+    '<style>',
+    '.approve { background-image: url("/icons.svg#approve"); }',
+    '.reject { background-image: url("/icons.svg#reject"); }',
+    '</style>',
+  ].join('');
+  document.body.innerHTML = [
+    '<svg><use id="approve-use" href="/icons.svg#approve"></use></svg>',
+    '<svg><use id="reject-use" xlink:href="/icons.svg#reject"></use></svg>',
+  ].join('');
+
+  const result = await collectAssets({ allowAuthenticatedSameOriginAssets: true });
+  const css = document.querySelector('style')?.textContent ?? '';
+
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledWith('http://localhost:3000/icons.svg', expect.any(Object));
+  expect(result.assets).toHaveLength(1);
+  expect(css).toMatch(/url\("\.\.\/assets\/1-[^"#]+\.svg#approve"\)/u);
+  expect(css).toMatch(/url\("\.\.\/assets\/1-[^"#]+\.svg#reject"\)/u);
+  expect(document.querySelector('#approve-use')?.getAttribute('href')).toMatch(
+    /^\.\.\/assets\/1-[^"#]+\.svg#approve$/u
+  );
+  expect(document.querySelector('#reject-use')?.getAttribute('xlink:href')).toMatch(
+    /^\.\.\/assets\/1-[^"#]+\.svg#reject$/u
+  );
+});
+
+it('packages a bounded inline WOFF icon font instead of dropping its font face', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    success: true,
+    snapshotSessionId: 'snapshot-session-inline-font',
+  });
+  const fontBytes = new Uint8Array([0x77, 0x4f, 0x46, 0x46, 0, 0, 0, 0]);
+  const fontDataUrl = `data:application/font-woff;base64,${btoa(
+    String.fromCharCode(...fontBytes)
+  )}`;
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    if (String(input) === fontDataUrl) {
+      return new Response(fontBytes, { headers: { 'content-type': 'font/woff' } });
+    }
+    return new Response('png', { headers: { 'content-type': 'image/png' } });
+  });
+  document.head.innerHTML = [
+    '<style>',
+    `@font-face { font-family: Icons; src: url("${fontDataUrl}") format("woff"); }`,
+    '.icon::before { font-family: Icons; content: "\\f101"; }',
+    '</style>',
+  ].join('');
+
+  const result = await collectAssets();
+  const css = document.querySelector('style')?.textContent ?? '';
+
+  expect(result.assets).toHaveLength(1);
+  expect(result.assets[0]?.blob.type).toBe('font/woff');
+  expect(css).toMatch(/src: url\("\.\.\/assets\/1-[^"/]+\.woff"\)/u);
+  expect(css).not.toContain('data:application/font-woff');
 });
 
 it('recursively packages resources discovered inside captured external stylesheets', async () => {

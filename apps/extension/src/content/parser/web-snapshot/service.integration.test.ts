@@ -165,6 +165,9 @@ it('packages prepared iframe and overlay markup into viewer HTML and diagnostics
   const packageEntries = await readSnapshotPackage(result);
 
   expect(packageEntries.html).toContain('data-virtual-iframe="true"');
+  expect(packageEntries.html).toMatch(
+    /data-sniptale-iframe-style-scope="sniptale-frame-[a-f0-9]{32}-1"/u
+  );
   expect(packageEntries.html).toContain('Iframe body content');
   expect(packageEntries.html).toContain('sniptale-frames-container');
   expect(packageEntries.html).toContain('sniptale-highlight-container');
@@ -181,6 +184,51 @@ it('packages prepared iframe and overlay markup into viewer HTML and diagnostics
     height: window.innerHeight,
     width: window.innerWidth,
   });
+});
+
+it('packages an inline icon font used by readable iframe content', async () => {
+  const fontBytes = new Uint8Array([0x77, 0x4f, 0x46, 0x46, 0, 0, 0, 0]);
+  const fontDataUrl = `data:application/font-woff;base64,${btoa(
+    String.fromCharCode(...fontBytes)
+  )}`;
+  const iframe = createReadableIframe(
+    'details-frame',
+    '<section class="dynamic-fields"><span class="expand-icon"></span>Additional details</section>'
+  );
+  if (!iframe.contentDocument) throw new Error('Expected readable iframe document');
+  const frameStyleSheet = new CSSStyleSheet();
+  frameStyleSheet.insertRule(
+    `@font-face { font-family: EmbeddedIcons; src: url("${fontDataUrl}") format("woff"); }`
+  );
+  frameStyleSheet.insertRule(
+    '.expand-icon::before { font-family: EmbeddedIcons; content: "\\f101"; }'
+  );
+  Object.defineProperty(iframe.contentDocument, 'styleSheets', {
+    configurable: true,
+    value: [frameStyleSheet],
+  });
+  document.body.append(iframe);
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    if (String(input) === fontDataUrl) {
+      return new Response(fontBytes, { headers: { 'content-type': 'application/font-woff' } });
+    }
+    return new Response('asset', { headers: { 'content-type': 'image/png' } });
+  });
+
+  const result = await buildCurrentPageWebSnapshot({
+    allowAnonymousCrossOriginAssets: false,
+    allowAuthenticatedSameOriginAssets: true,
+    requestId: 'req-web',
+  });
+  const packageEntries = await readSnapshotPackage(result);
+
+  expect(packageEntries.html).toContain('data-virtual-iframe="true"');
+  expect(packageEntries.html).toContain('dynamic-fields');
+  expect(packageEntries.html).toMatch(/src: url\("\.\.\/assets\/\d+-[^"/]+\.woff"\)/u);
+  expect(packageEntries.html).not.toContain('data:application/font-woff');
+  expect(result.manifest.entries).toEqual(
+    expect.arrayContaining([expect.objectContaining({ mimeType: 'font/woff' })])
+  );
 });
 
 it('keeps unreadable iframe warnings in the manifest without failing package creation', async () => {

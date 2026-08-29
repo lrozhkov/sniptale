@@ -5,12 +5,13 @@ import {
 } from '../../../features/web-snapshot/public';
 import { SELECTED_SRCSET_CANDIDATE_ATTRIBUTE } from '../page-preparation/snapshot/responsive-assets';
 import { isHiddenAssetElement, removeAssetReference } from './asset-dom';
+import { resolveWebSnapshotAssetRequestUrl } from './asset-url';
 
 const DOCUMENT_NODE_TYPE = 9;
 const DOCUMENT_FRAGMENT_NODE_TYPE = 11;
 
 export type AssetTarget = {
-  attribute: 'css-url' | 'href' | 'poster' | 'src' | 'srcset';
+  attribute: 'css-url' | 'href' | 'poster' | 'src' | 'srcset' | 'xlink:href';
   element: Element;
   url: string;
 };
@@ -127,6 +128,7 @@ function pushVisibleAssetTarget(
     !isDeclarativeShadowContent &&
     target.attribute !== 'css-url' &&
     target.attribute !== 'href' &&
+    target.attribute !== 'xlink:href' &&
     isHiddenAssetElement(target.element, root)
   ) {
     removeAssetReference(target.element, target.attribute);
@@ -153,7 +155,7 @@ function collectCssAssetTargets(
       if (!['data:', 'http:', 'https:'].includes(resolved.protocol)) return null;
       if (!collectedUrls.has(resolved.href)) {
         collectedUrls.add(resolved.href);
-        targets.push({ attribute: 'css-url', element, url: resolved.href });
+        targets.push({ attribute: 'css-url', element, url: trimmedValue });
       }
       return resolved.href;
     } catch {
@@ -249,6 +251,14 @@ export function collectAssetTargets(
     }
   }
 
+  for (const element of queryAssetElements(root, 'use')) {
+    const attribute = element.hasAttribute('href') ? 'href' : 'xlink:href';
+    const url = element.getAttribute(attribute);
+    if (url && !url.startsWith('#')) {
+      targets.push({ attribute, element, url });
+    }
+  }
+
   for (const element of queryAssetElements(root, 'link[rel~="stylesheet"][href]')) {
     const url = element.getAttribute('href');
     if (url) {
@@ -272,7 +282,7 @@ function resolveSafeAssetUrl(value: string, baseUrl: string): string | null {
   }
 
   try {
-    return new URL(value, baseUrl).href;
+    return resolveWebSnapshotAssetRequestUrl(value, baseUrl);
   } catch {
     return null;
   }

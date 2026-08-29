@@ -28,6 +28,19 @@ const FONT_SIGNATURES = {
   'font/woff': [0x77, 0x4f, 0x46, 0x46],
   'font/woff2': [0x77, 0x4f, 0x46, 0x32],
 } as const;
+const WEB_SNAPSHOT_CAPTURE_FONT_MIME_TYPES = new Set([
+  'application/font-woff',
+  'application/font-woff2',
+  'application/x-font-woff',
+  'application/x-font-woff2',
+  'font/woff',
+  'font/woff2',
+]);
+
+export function isWebSnapshotCaptureFontMimeType(value: string | null | undefined): boolean {
+  const mimeType = value?.split(';')[0]?.trim().toLowerCase();
+  return mimeType !== undefined && WEB_SNAPSHOT_CAPTURE_FONT_MIME_TYPES.has(mimeType);
+}
 
 function hasByteSignature(bytes: Uint8Array, signature: readonly number[]): boolean {
   return signature.every((byte, index) => bytes[index] === byte);
@@ -42,6 +55,13 @@ export function resolveWebSnapshotCaptureAssetMimeTypeFromBytes(args: {
   contentType: string | null;
   url: string;
 }): string {
+  const signatureMimeType = Object.entries(FONT_SIGNATURES).find(([, signature]) =>
+    hasByteSignature(args.bytes, signature)
+  )?.[0];
+  if (isWebSnapshotCaptureFontMimeType(args.contentType)) {
+    if (signatureMimeType) return signatureMimeType;
+    throw new Error('unsupported web snapshot asset MIME type');
+  }
   try {
     return resolveWebSnapshotCaptureAssetMimeType(args.contentType);
   } catch (error) {
@@ -52,9 +72,9 @@ export function resolveWebSnapshotCaptureAssetMimeTypeFromBytes(args: {
       throw error;
     }
 
-    for (const [mimeType, signature] of Object.entries(FONT_SIGNATURES)) {
+    for (const mimeType of Object.keys(FONT_SIGNATURES)) {
       const extension = mimeType === 'font/woff2' ? '.woff2' : '.woff';
-      if (pathname.endsWith(extension) && hasByteSignature(args.bytes, signature)) {
+      if (pathname.endsWith(extension) && signatureMimeType === mimeType) {
         return mimeType;
       }
     }

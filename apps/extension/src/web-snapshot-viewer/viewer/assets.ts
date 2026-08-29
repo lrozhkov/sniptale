@@ -12,6 +12,8 @@ import {
   sanitizeWebSnapshotHtml,
   sanitizeWebSnapshotXhtml,
   serializeWebSnapshotXhtmlDocument,
+  appendWebSnapshotAssetFragment,
+  resolveWebSnapshotLocalAssetReference,
 } from '../../features/web-snapshot/public';
 import {
   getWebSnapshotRecord,
@@ -53,60 +55,81 @@ function createViewerArchiveFilename(manifest: WebSnapshotManifest): string {
 }
 
 const MAX_VIEWER_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
-const URL_ATTRIBUTES = ['href', 'poster', 'src'] as const;
+const URL_ATTRIBUTES = ['href', 'poster', 'src', 'xlink:href'] as const;
 const REQUIRED_VIEWER_PACKAGE_PATHS = new Set([
   WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
   WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
   WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail,
 ]);
 
-function normalizeSnapshotAssetPath(value: string): string {
-  return value.replace(/^\.\.\//, '');
+function resolveViewerAssetReference(
+  value: string,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): string | null {
+  const reference = resolveWebSnapshotLocalAssetReference(
+    value,
+    WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
+    assetPaths
+  );
+  if (!reference) return null;
+  const objectUrl = urlsByPath.get(reference.path);
+  return objectUrl ? appendWebSnapshotAssetFragment(objectUrl, reference.fragment) : null;
 }
 
-function rewriteSrcset(value: string, urlsByPath: Map<string, string>): string {
+function rewriteSrcset(
+  value: string,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): string {
   return value
     .split(',')
     .map((candidate) => candidate.trim())
     .filter(Boolean)
     .flatMap((candidate) => {
       const [url = '', ...descriptorParts] = candidate.split(/\s+/);
-      const objectUrl = urlsByPath.get(normalizeSnapshotAssetPath(url));
+      const objectUrl = resolveViewerAssetReference(url, urlsByPath, assetPaths);
       return objectUrl ? [`${objectUrl} ${descriptorParts.join(' ')}`.trim()] : [];
     })
     .join(', ');
 }
 
-function rewriteElementUrlAttributes(element: Element, urlsByPath: Map<string, string>): void {
+function rewriteElementUrlAttributes(
+  element: Element,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): void {
   for (const attribute of URL_ATTRIBUTES) {
     if (attribute === 'href' && element.tagName.toLowerCase() === 'a') continue;
     const value = element.getAttribute(attribute);
-    const objectUrl = value ? urlsByPath.get(normalizeSnapshotAssetPath(value)) : undefined;
+    const objectUrl = value ? resolveViewerAssetReference(value, urlsByPath, assetPaths) : null;
     if (objectUrl) element.setAttribute(attribute, objectUrl);
   }
 
   const srcset = element.getAttribute('srcset');
   if (!srcset) return;
-  const rewritten = rewriteSrcset(srcset, urlsByPath);
+  const rewritten = rewriteSrcset(srcset, urlsByPath, assetPaths);
   if (rewritten) element.setAttribute('srcset', rewritten);
   else element.removeAttribute('srcset');
 }
 
 function rewriteDocumentStyleAssetReferences(
   document: Document,
-  urlsByPath: Map<string, string>
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
 ): void {
   for (const root of collectWebSnapshotQueryRoots(document)) {
     for (const styleElement of root.querySelectorAll('style')) {
       styleElement.textContent = rewriteCssAssetReferences(
         styleElement.textContent ?? '',
-        urlsByPath
+        urlsByPath,
+        assetPaths
       );
     }
     for (const element of root.querySelectorAll('[style]')) {
       element.setAttribute(
         'style',
-        rewriteCssAssetReferences(element.getAttribute('style') ?? '', urlsByPath)
+        rewriteCssAssetReferences(element.getAttribute('style') ?? '', urlsByPath, assetPaths)
       );
     }
   }
@@ -124,23 +147,28 @@ function rewriteAssetReferences(
   if (xhtml && document.querySelector('parsererror')) {
     throw new Error('Web snapshot XHTML is invalid.');
   }
+  const assetPaths = new Set(urlsByPath.keys());
   for (const root of collectWebSnapshotQueryRoots(document)) {
-    for (const element of root.querySelectorAll('[src], [srcset], [href], [poster]')) {
-      rewriteElementUrlAttributes(element, urlsByPath);
+    for (const element of root.querySelectorAll('*')) {
+      rewriteElementUrlAttributes(element, urlsByPath, assetPaths);
     }
   }
-  rewriteDocumentStyleAssetReferences(document, urlsByPath);
+  rewriteDocumentStyleAssetReferences(document, urlsByPath, assetPaths);
 
   return xhtml
     ? serializeWebSnapshotXhtmlDocument(document)
     : `<!doctype html>${document.documentElement.outerHTML}`;
 }
 
-function rewriteCssAssetReferences(cssText: string, urlsByPath: Map<string, string>): string {
+function rewriteCssAssetReferences(
+  cssText: string,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): string {
   return sanitizeWebSnapshotCssText(cssText, (url) => {
     const trimmedUrl = url.trim();
     if (trimmedUrl.startsWith('#') || trimmedUrl.startsWith('data:')) return trimmedUrl;
-    return urlsByPath.get(normalizeSnapshotAssetPath(trimmedUrl)) ?? null;
+    return resolveViewerAssetReference(trimmedUrl, urlsByPath, assetPaths);
   });
 }
 

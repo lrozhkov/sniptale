@@ -18,6 +18,7 @@ import type {
 } from './types';
 import { createIframeTimeoutWarning } from './warnings';
 import { markPreparedSnapshotShadowStyles, materializePreparedSnapshotStyles } from './styles';
+import { materializePreparedSnapshotIframeStyles } from './iframe-styles';
 import { capturePreparedSnapshotLiveState } from './live-state';
 import { resolveContentShadowRoot } from '../../../platform/dom-host';
 import type { VirtualDomOriginalElementResolver } from '../../dom-tree-parser/traversal';
@@ -231,6 +232,7 @@ export async function buildPreparedSnapshotDocument(
     await yieldPreparedSnapshot(options.abortSignal);
     const snapshot = virtualDomSnapshot.document;
     materializePreparedSnapshotStyles(rootDocument, snapshot);
+    materializePreparedSnapshotIframeStyles(snapshot, virtualDomSnapshot.resolveOriginalElement);
     const liveStateWarnings = liveState.materialize(virtualDomSnapshot.root);
     shadowStyleMarks.materialize(snapshot);
     appendStaticPagePreparationOverlays(snapshot, rootDocument);

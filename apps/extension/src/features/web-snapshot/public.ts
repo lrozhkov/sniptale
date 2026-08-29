@@ -7,6 +7,10 @@ export { sanitizeWebSnapshotSvgText } from './sanitize-svg';
 export { assertWebSnapshotMimeSignature } from './mime-signature';
 export { validateImportedWebSnapshotAsset } from './asset-validation';
 export {
+  appendWebSnapshotAssetFragment,
+  resolveWebSnapshotLocalAssetReference,
+} from './local-asset-reference';
+export {
   isAllowedWebSnapshotAssetMimeType,
   resolveWebSnapshotCaptureAssetMimeType,
   resolveWebSnapshotCaptureAssetMimeTypeFromBytes,

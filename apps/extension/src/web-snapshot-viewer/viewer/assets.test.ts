@@ -295,6 +295,24 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   expect(URL.createObjectURL).toHaveBeenCalledTimes(4);
 });
 
+it('materializes SVG sprite fragments in DOM and CSS asset references', async () => {
+  await stubWebSnapshotRecord({
+    extras: { 'assets/icons.svg': '<svg></svg>' },
+    html: [
+      '<!doctype html>',
+      '<style>.approve { background-image: url("../assets/icons.svg#approve"); }</style>',
+      '<svg><use href="../assets/icons.svg#approve"></use>',
+      '<use xlink:href="../assets/icons.svg#reject"></use></svg>',
+    ].join(''),
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.html).toContain('url("blob:snapshot-asset#approve")');
+  expect(loaded.html).toContain('href="blob:snapshot-asset#approve"');
+  expect(loaded.html).toContain('xlink:href="blob:snapshot-asset#reject"');
+});
+
 it('loads a partial viewport preview and exposes its coverage to the Viewer UI', async () => {
   await stubWebSnapshotRecord({ screenshotCoverage: 'viewport' });
 

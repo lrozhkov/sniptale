@@ -4,6 +4,10 @@ import { sanitizeWebSnapshotCssText } from '../../../features/web-snapshot/publi
 import { MAX_WEB_SNAPSHOT_ASSET_BYTES, MAX_WEB_SNAPSHOT_ASSETS_BYTES } from './limits';
 import { parseSrcset, serializeSrcset, type AssetTarget } from './asset-targets';
 import type { WebSnapshotAssetEntry } from './types';
+import {
+  createWebSnapshotLocalAssetReference,
+  resolveWebSnapshotAssetRequestUrl,
+} from './asset-url';
 
 interface AssetByteBudget {
   totalBytes: number;
@@ -141,7 +145,11 @@ async function captureSrcsetAssets(args: {
       if (!acceptAssetWithinBudget(asset, args.budget, args.warnings)) {
         continue;
       }
-      candidate.url = `../${asset.localPath}`;
+      candidate.url = createWebSnapshotLocalAssetReference(
+        asset.localPath,
+        candidate.url,
+        args.context.baseUrl
+      );
       assets.push(asset);
     } catch (error) {
       throwIfAssetCaptureAborted(args.abortSignal);
@@ -225,13 +233,15 @@ function removeFailedAssetReference(
 function applyCapturedAssetReference(
   target: AssetTarget,
   asset: WebSnapshotAssetEntry,
+  baseUrl: string,
   deferredCssAssetRewrites?: DeferredCssAssetRewrites
 ): void {
-  if (deferCssAssetReference(target, `../${asset.localPath}`, deferredCssAssetRewrites)) return;
+  const replacement = createWebSnapshotLocalAssetReference(asset.localPath, target.url, baseUrl);
+  if (deferCssAssetReference(target, replacement, deferredCssAssetRewrites)) return;
   if (target.attribute === 'css-url') {
-    rewriteCssAssetReference(target, `../${asset.localPath}`);
+    rewriteCssAssetReference(target, replacement);
   } else {
-    target.element.setAttribute(target.attribute, `../${asset.localPath}`);
+    target.element.setAttribute(target.attribute, replacement);
   }
 }
 
@@ -261,11 +271,16 @@ async function captureSingleAsset(args: {
   deferredCssAssetRewrites?: DeferredCssAssetRewrites;
 }): Promise<WebSnapshotAssetEntry | null> {
   throwIfAssetCaptureAborted(args.abortSignal);
-  const resolvedUrl = new URL(args.target.url, args.context.baseUrl).href;
+  const resolvedUrl = resolveWebSnapshotAssetRequestUrl(args.target.url, args.context.baseUrl);
   if (args.capturedAssetsByUrl.has(resolvedUrl)) {
     const cachedAsset = args.capturedAssetsByUrl.get(resolvedUrl) ?? null;
     if (cachedAsset) {
-      applyCapturedAssetReference(args.target, cachedAsset, args.deferredCssAssetRewrites);
+      applyCapturedAssetReference(
+        args.target,
+        cachedAsset,
+        args.context.baseUrl,
+        args.deferredCssAssetRewrites
+      );
     } else {
       applyRejectedAsset({
         capturedAssetsByUrl: args.capturedAssetsByUrl,
@@ -285,7 +300,12 @@ async function captureSingleAsset(args: {
       });
     }
     args.capturedAssetsByUrl.set(resolvedUrl, asset);
-    applyCapturedAssetReference(args.target, asset, args.deferredCssAssetRewrites);
+    applyCapturedAssetReference(
+      args.target,
+      asset,
+      args.context.baseUrl,
+      args.deferredCssAssetRewrites
+    );
     return asset;
   } catch (error) {
     throwIfAssetCaptureAborted(args.abortSignal);

@@ -1,5 +1,6 @@
 import { sanitizeWebSnapshotCssText, sanitizeWebSnapshotStylesheetText } from './sanitize-css';
 import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
+import { isWebSnapshotCaptureFontMimeType } from './asset-manifest';
 
 const SAFE_WEB_SNAPSHOT_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const SAFE_WEB_SNAPSHOT_DATA_MIME_TYPES = new Set([
@@ -52,7 +53,10 @@ function createOfflineCssUrlRewriter(
   const allowedObjectUrls = new Set(options.allowedObjectUrls ?? []);
   return (value) => {
     const trimmedValue = value.trim();
-    if (trimmedValue.startsWith('#') || allowedObjectUrls.has(trimmedValue)) {
+    if (
+      trimmedValue.startsWith('#') ||
+      isAllowedOfflineAssetReference(trimmedValue, allowedObjectUrls)
+    ) {
       return trimmedValue;
     }
     try {
@@ -94,7 +98,9 @@ export function isSafeWebSnapshotCaptureAssetUrl(value: string, baseUrl: string 
   if (isSafeWebSnapshotUrl(value, baseUrl)) return true;
   try {
     const url = new URL(value.trim(), baseUrl ?? 'https://sniptale.invalid/');
-    return url.protocol === 'data:' && /^data:image\/svg\+xml(?:[;,])/iu.test(url.href);
+    if (url.protocol !== 'data:') return false;
+    if (/^data:image\/svg\+xml(?:[;,])/iu.test(url.href)) return true;
+    return isWebSnapshotCaptureFontMimeType(url.pathname.split(';', 1)[0]);
   } catch {
     return false;
   }
@@ -287,7 +293,7 @@ function isSafeOfflineWebSnapshotUrl(value: string, allowedObjectUrls: Set<strin
   if (trimmedValue.length === 0 || trimmedValue.startsWith('#')) {
     return true;
   }
-  if (allowedObjectUrls.has(trimmedValue)) {
+  if (isAllowedOfflineAssetReference(trimmedValue, allowedObjectUrls)) {
     return true;
   }
 
@@ -297,6 +303,15 @@ function isSafeOfflineWebSnapshotUrl(value: string, allowedObjectUrls: Set<strin
   } catch {
     return false;
   }
+}
+
+function isAllowedOfflineAssetReference(
+  value: string,
+  allowedObjectUrls: ReadonlySet<string>
+): boolean {
+  if (allowedObjectUrls.has(value)) return true;
+  const fragmentIndex = value.indexOf('#');
+  return fragmentIndex > 0 && allowedObjectUrls.has(value.slice(0, fragmentIndex));
 }
 
 function sanitizeStyleElements(root: ParentNode, options: WebSnapshotHtmlSanitizeOptions): void {

@@ -58,6 +58,12 @@ it('sanitizes executable attributes and unsafe URLs for web snapshots', () => {
     'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E';
   expect(isSafeWebSnapshotCaptureAssetUrl(inlineSvg, null)).toBe(true);
   expect(isSafeWebSnapshotUrl(inlineSvg, null)).toBe(false);
+  const inlineWoff = 'data:application/font-woff;charset=utf-8;base64,d09GRgAAAAA=';
+  expect(isSafeWebSnapshotCaptureAssetUrl(inlineWoff, null)).toBe(true);
+  expect(isSafeWebSnapshotUrl(inlineWoff, null)).toBe(false);
+  expect(isSafeWebSnapshotCaptureAssetUrl('data:text/html;base64,PGgxPng8L2gxPg==', null)).toBe(
+    false
+  );
   expect(sanitizeWebSnapshotFilename('A / bad:name', 'fallback')).toBe('A_badname');
 });
 
