@@ -290,6 +290,96 @@ it('returns an explicit visible-area fallback when the configured single-image b
   expect(raster.captureFrame).toHaveBeenCalledOnce();
 });
 
+it('retries an export as a reduced full-page image before considering a visible-area fallback', async () => {
+  mocks.loadSettings.mockResolvedValueOnce({
+    fullPageCapture: {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    },
+    fullPageQuality: {
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 100,
+      profile: 'maximum',
+    },
+  });
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.captureTiles
+    .mockRejectedValueOnce(new Error('Full-page screenshot exceeds the configured quality limits'))
+    .mockImplementationOnce(async (args: { options: { qualityPolicy: unknown } }) => ({
+      dataUrl: 'data:image/png;base64,reduced-full-page',
+      metadata: { downscaled: true, qualityPolicy: args.options.qualityPolicy },
+    }));
+
+  await expect(
+    captureFullPageTransaction(156, undefined, {
+      backendKind: 'native',
+      documentId: 'document-156',
+      exportRunId: 'reduced-export',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,reduced-full-page',
+      metadata: expect.objectContaining({
+        qualityPolicy: expect.objectContaining({ minScalePercent: 10, profile: 'custom' }),
+      }),
+    })
+  );
+
+  expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+});
+
+it('returns an explicit visible-area fallback when reduced export geometry remains unstable', async () => {
+  mocks.loadSettings.mockResolvedValueOnce({
+    fullPageCapture: {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    },
+    fullPageQuality: {
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 100,
+      profile: 'maximum',
+    },
+  });
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  const raster = {
+    captureFrame: vi.fn().mockResolvedValue('data:image/png;base64,viewport-after-retry'),
+    release: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.createNative.mockResolvedValue(raster);
+  mocks.captureTiles
+    .mockRejectedValueOnce(new Error('Full-page screenshot exceeds the configured quality limits'))
+    .mockRejectedValueOnce(new Error('Full-page capture viewport changed during capture'));
+
+  await expect(
+    captureFullPageTransaction(157, undefined, {
+      backendKind: 'native',
+      documentId: 'document-157',
+      exportRunId: 'unstable-reduced-export',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,viewport-after-retry',
+      metadata: expect.objectContaining({ viewportFallback: true }),
+    })
+  );
+  expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+  expect(raster.captureFrame).toHaveBeenCalledOnce();
+});
+
 it('keeps the complete frozen plan when page extent continues growing after restart', async () => {
   const agent = {
     heartbeat: vi.fn().mockResolvedValue(undefined),

@@ -95,6 +95,33 @@ it('composes one safe static document, standard diagnostics, screenshot, and top
   );
 });
 
+it('publishes a viewport fallback only as an explicit partial preview', async () => {
+  const screenshotBlob = new Blob(['partial'], { type: 'image/png' });
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
+
+  const result = await buildWebSnapshotPackage({
+    assets: [],
+    html: '<!doctype html><html><body>Static page</body></html>',
+    screenshotBlob,
+    screenshotCoverage: 'viewport',
+    source: createSource(),
+    warnings: ['Only the visible area was retained'],
+  });
+
+  expect(result.manifest.entries.map((entry) => entry.path)).toContain(
+    PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot
+  );
+  expect(result.manifest.entries.map((entry) => entry.path)).not.toContain(
+    PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+  );
+  expect(result.manifest.components.find((component) => component.id === 'webCopy')?.status).toBe(
+    'partial'
+  );
+  expect(
+    await readPagePackageTestBlobText(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.readme))
+  ).toContain('not a full-page screenshot');
+});
+
 it('records asset metadata and structured capture status in the canonical manifest', async () => {
   createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
   const asset = new Blob(['body { color: red; }'], { type: 'text/css' });

@@ -2,6 +2,7 @@ import {
   MAX_PAGE_PACKAGE_ENTRIES,
   PAGE_PACKAGE_ARCHIVE_PATHS,
   parsePagePackageManifest,
+  resolvePagePackageScreenshotEntry,
   type PagePackageEntry,
   type PagePackageManifest,
 } from '@sniptale/runtime-contracts/page-package';
@@ -98,10 +99,9 @@ async function validatePreviewImages(
   manifest: PagePackageManifest,
   signal?: AbortSignal
 ): Promise<void> {
-  for (const path of [
-    PAGE_PACKAGE_ARCHIVE_PATHS.screenshot,
-    PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail,
-  ]) {
+  const screenshot = resolvePagePackageScreenshotEntry(manifest.entries);
+  if (!screenshot) throw new Error('Page Package screenshot coverage is invalid.');
+  for (const path of [screenshot.path, PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail]) {
     const entry = manifest.entries.find((candidate) => candidate.path === path);
     const source = reader.entry(path);
     if (!entry || !source) throw new Error(`Page Package entry is missing: ${path}.`);
@@ -111,7 +111,7 @@ async function validatePreviewImages(
       resolveWebSnapshotEntryByteLimit(path, entry.mimeType),
       signal
     );
-    if (path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot) {
+    if (path === screenshot.path) {
       await validateWebSnapshotScreenshotBlob(blob);
     } else {
       await validateImportedWebSnapshotAsset(blob, entry.mimeType, path);

@@ -4,11 +4,27 @@ export const PAGE_COLLECTION_ARCHIVE_MIME_TYPE =
   'application/x-sniptale-page-collection+zip' as const;
 export const PAGE_PACKAGE_ARCHIVE_PATHS = {
   manifest: 'manifest.json',
+  partialScreenshot: 'page-viewport-preview.png',
   readme: 'README.md',
   screenshot: 'page-screenshot.png',
   snapshotHtml: 'snapshot/index.html',
   thumbnail: 'thumbnail.webp',
 } as const;
+
+export type PagePackageScreenshotCoverage = 'full-page' | 'viewport';
+
+export function resolvePagePackageScreenshotEntry(
+  entries: readonly Pick<PagePackageEntry, 'path'>[]
+): { coverage: PagePackageScreenshotCoverage; path: string } | null {
+  const hasFullPage = entries.some((entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot);
+  const hasViewport = entries.some(
+    (entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot
+  );
+  if (hasFullPage === hasViewport) return null;
+  return hasFullPage
+    ? { coverage: 'full-page', path: PAGE_PACKAGE_ARCHIVE_PATHS.screenshot }
+    : { coverage: 'viewport', path: PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot };
+}
 export const MAX_PAGE_PACKAGE_ENTRIES = 25_000;
 export const MAX_PAGE_PACKAGE_ENTRY_BYTES = 16 * 1024 * 1024 * 1024;
 export const MAX_PAGE_PACKAGE_TOTAL_BYTES = 64 * 1024 * 1024 * 1024;

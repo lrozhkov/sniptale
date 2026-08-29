@@ -23,7 +23,9 @@ export const WEB_SNAPSHOT_ARCHIVE_RESOURCE_PROFILE: ArchiveResourceProfile = {
 
 export function resolveWebSnapshotEntryByteLimit(path: string, mimeType?: string): number {
   if (path === 'manifest.json') return WEB_SNAPSHOT_PACKAGE_POLICY.maxManifestBytes;
-  if (path === 'page-screenshot.png') return WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes;
+  if (path === 'page-screenshot.png' || path === 'page-viewport-preview.png') {
+    return WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes;
+  }
   if (
     path === 'snapshot/index.html' ||
     path.startsWith('diagnostics/') ||

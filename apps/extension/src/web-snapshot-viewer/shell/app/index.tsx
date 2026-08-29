@@ -287,6 +287,7 @@ function SnapshotModeContent(props: {
       <WebSnapshotVisualSurface
         locale={props.locale}
         screenshotUrl={props.loaded.screenshotUrl}
+        screenshotCoverage={props.loaded.screenshotCoverage}
         sourceTitle={props.loaded.manifest.source.title}
         viewport={props.loaded.manifest.viewport ?? undefined}
         zoom={props.zoom}

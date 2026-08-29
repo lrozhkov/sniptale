@@ -17,7 +17,11 @@ import {
   getWebSnapshotScreenshotFile,
 } from '../../composition/persistence/web-snapshots';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
-import { MAX_PAGE_PACKAGE_ENTRIES } from '@sniptale/runtime-contracts/page-package';
+import {
+  MAX_PAGE_PACKAGE_ENTRIES,
+  resolvePagePackageScreenshotEntry,
+  type PagePackageScreenshotCoverage,
+} from '@sniptale/runtime-contracts/page-package';
 import { assertZipPackageInflationProfile } from '@sniptale/platform/data/zip-profile';
 import { createViewerAssetObjectUrls } from './asset-objects';
 import type { LoadedWebSnapshotAsset } from './asset-objects';
@@ -36,6 +40,7 @@ export interface LoadedWebSnapshotPackage {
   manifest: WebSnapshotManifest;
   objectUrls: string[];
   screenshotUrl: string;
+  screenshotCoverage: PagePackageScreenshotCoverage;
 }
 
 const MAX_VIEWER_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
@@ -43,7 +48,6 @@ const URL_ATTRIBUTES = ['href', 'poster', 'src'] as const;
 const REQUIRED_VIEWER_PACKAGE_PATHS = new Set([
   WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
   WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
-  WEB_SNAPSHOT_PACKAGE_PATHS.screenshot,
   WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail,
 ]);
 
@@ -301,6 +305,10 @@ export async function loadWebSnapshotPackage(
   const packageManifest = parseViewerPackageManifest(
     await readViewerEntry(filesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)
   );
+  const screenshotSelection = resolvePagePackageScreenshotEntry(packageManifest.entries);
+  if (!screenshotSelection || !filesByPath.has(screenshotSelection.path)) {
+    throw new Error('Web snapshot package is missing a required screenshot entry.');
+  }
   assertManifestMatchesRecord({
     packageManifest,
     recordManifest: record.manifest,
@@ -310,7 +318,7 @@ export async function loadWebSnapshotPackage(
   await assertViewerWebCopyDigests(bytesByPath, packageManifest);
   const screenshot = await readViewerScreenshot(snapshotId);
   await validateRetainedWebSnapshotScreenshot({
-    packageBytes: readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.screenshot),
+    packageBytes: readRequiredViewerEntry(bytesByPath, screenshotSelection.path),
     screenshotBlob: screenshot,
   });
 
@@ -351,6 +359,7 @@ export async function loadWebSnapshotPackage(
       manifest: record.manifest,
       objectUrls,
       screenshotUrl,
+      screenshotCoverage: screenshotSelection.coverage,
     };
   } catch (error) {
     revokeWebSnapshotObjectUrls(objectUrls);

@@ -5,6 +5,7 @@ import {
 import { createArchivePathAllocator } from '../../../composition/archive-transfer/path';
 import { isAllowedWebSnapshotAssetMimeType } from '../../../features/web-snapshot/public';
 import type { PagePackageContribution } from '../paths';
+import type { PagePackageScreenshotCoverage } from '@sniptale/runtime-contracts/page-package';
 import {
   createBlobContribution,
   normalizeContributionMimeType,
@@ -21,6 +22,7 @@ interface SafeWebCopyArtifacts {
   assets: readonly SafeWebCopyAsset[];
   html: string;
   screenshotBlob: Blob;
+  screenshotCoverage?: PagePackageScreenshotCoverage;
   thumbnailBlob: Blob;
 }
 
@@ -48,7 +50,12 @@ function hasCanonicalAssetExtension(path: string, mimeType: string): boolean {
 }
 
 function assertAssetPaths(assets: readonly SafeWebCopyAsset[]): void {
-  const collisionKeys = new Set(['snapshot/index.html', 'page-screenshot.png', 'thumbnail.webp']);
+  const collisionKeys = new Set([
+    'snapshot/index.html',
+    'page-screenshot.png',
+    'page-viewport-preview.png',
+    'thumbnail.webp',
+  ]);
   const allocator = createArchivePathAllocator();
   for (const asset of assets) {
     const mimeType = normalizeContributionMimeType(asset.blob.type);
@@ -90,7 +97,10 @@ export async function createSafeWebCopyContributions(
     {
       blob: artifacts.screenshotBlob,
       mimeType: 'image/png',
-      path: 'page-screenshot.png',
+      path:
+        (artifacts.screenshotCoverage ?? 'full-page') === 'full-page'
+          ? 'page-screenshot.png'
+          : 'page-viewport-preview.png',
     },
     {
       blob: artifacts.thumbnailBlob,

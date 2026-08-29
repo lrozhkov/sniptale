@@ -100,6 +100,65 @@ describe('Page Package contract', () => {
     expect(parsePagePackageManifest(createManifest())).toEqual(createManifest());
   });
 
+  it('accepts exactly one explicit screenshot coverage path', () => {
+    const partial = createManifest();
+    const screenshot = partial.entries.find((entry) => entry.path === 'page-screenshot.png');
+    if (!screenshot) throw new Error('Expected screenshot fixture');
+    screenshot.path = 'page-viewport-preview.png';
+    partial.components[0]!.status = 'partial';
+    expect(parsePagePackageManifest(partial)).toEqual(partial);
+
+    const ambiguous = createManifest();
+    ambiguous.entries.push({
+      ...ambiguous.entries[1]!,
+      path: 'page-viewport-preview.png',
+    });
+    ambiguous.components[0]!.entryCount += 1;
+    ambiguous.components[0]!.totalBytes += ambiguous.entries.at(-1)!.size;
+    ambiguous.stats.entryCount += 1;
+    ambiguous.stats.totalBytes += ambiguous.entries.at(-1)!.size;
+    expect(parsePagePackageManifest(ambiguous)).toBeNull();
+
+    const crossComponentAmbiguity = createManifest();
+    const partialEntry = {
+      ...crossComponentAmbiguity.entries[1]!,
+      component: 'images' as const,
+      path: 'page-viewport-preview.png',
+    };
+    crossComponentAmbiguity.entries.push(partialEntry);
+    crossComponentAmbiguity.components.push({
+      id: 'images',
+      status: 'partial',
+      entryCount: 1,
+      totalBytes: partialEntry.size,
+    });
+    crossComponentAmbiguity.stats.entryCount += 1;
+    crossComponentAmbiguity.stats.totalBytes += partialEntry.size;
+    expect(parsePagePackageManifest(crossComponentAmbiguity)).toBeNull();
+
+    const mislabeledExportPreview = createManifest();
+    mislabeledExportPreview.intent = 'export';
+    mislabeledExportPreview.entries = [
+      {
+        ...mislabeledExportPreview.entries[1]!,
+        component: 'images',
+        path: 'page-viewport-preview.png',
+      },
+    ];
+    mislabeledExportPreview.components = [
+      { id: 'images', status: 'complete', entryCount: 1, totalBytes: 20 },
+    ];
+    mislabeledExportPreview.stats = {
+      entryCount: 1,
+      totalBytes: 20,
+      failedResourceCount: 0,
+      warningCount: 0,
+    };
+    expect(parsePagePackageManifest(mislabeledExportPreview)).toBeNull();
+    mislabeledExportPreview.components[0]!.status = 'partial';
+    expect(parsePagePackageManifest(mislabeledExportPreview)).toEqual(mislabeledExportPreview);
+  });
+
   it('rejects extra keys, mismatched inventory, missing required web-copy entries and collisions', () => {
     expect(parsePagePackageManifest({ ...createManifest(), extra: true })).toBeNull();
     const mismatched = createManifest();

@@ -1,8 +1,20 @@
 import { useState } from 'react';
 import type { WebSnapshotViewport } from '@sniptale/runtime-contracts/web-snapshot';
+import type { PagePackageScreenshotCoverage } from '@sniptale/runtime-contracts/page-package';
 import { translate, type AppLocale } from '../../../platform/i18n';
 
 export type WebSnapshotViewerMode = 'assets' | 'static-document' | 'visual';
+
+const partialNoticeStyle = {
+  background: [
+    'color-mix(in srgb, var(--sniptale-color-warning-soft) 28%,',
+    'var(--sniptale-color-surface-panel) 72%)',
+  ].join(' '),
+  borderColor: [
+    'color-mix(in srgb, var(--sniptale-color-warning) 34%,',
+    'var(--sniptale-color-border-soft) 66%)',
+  ].join(' '),
+} as const;
 
 export function WebSnapshotViewerModeSwitch(props: {
   locale: AppLocale;
@@ -57,6 +69,7 @@ function ModeButton(props: { active: boolean; label: string; onClick: () => void
 export function WebSnapshotVisualSurface(props: {
   locale: AppLocale;
   screenshotUrl: string;
+  screenshotCoverage: PagePackageScreenshotCoverage;
   sourceTitle: string | null;
   viewport?: WebSnapshotViewport | undefined;
   zoom: number;
@@ -80,7 +93,20 @@ export function WebSnapshotVisualSurface(props: {
     : translate('webSnapshotViewer.app.visualAlt', props.locale);
 
   return (
-    <div className="min-h-full min-w-max bg-[var(--sniptale-color-surface-canvas)]">
+    <div className="relative min-h-full min-w-max bg-[var(--sniptale-color-surface-canvas)]">
+      {props.screenshotCoverage === 'viewport' ? (
+        <div
+          className={[
+            'absolute left-3 top-3 z-10 w-fit max-w-[min(32rem,calc(100vw-1.5rem))]',
+            'rounded-lg border px-3 py-2 text-xs shadow-sm',
+            'text-[var(--sniptale-color-text-primary)]',
+          ].join(' ')}
+          role="status"
+          style={partialNoticeStyle}
+        >
+          {translate('webSnapshotViewer.app.partialScreenshotNotice', props.locale)}
+        </div>
+      ) : null}
       <img
         alt={alt}
         className="mx-auto block h-auto max-w-none bg-white"

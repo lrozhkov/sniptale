@@ -172,6 +172,34 @@ describe('composeExportPagePackage', () => {
     ]);
   });
 
+  it('marks an export-only visible-area preview as partial', async () => {
+    const preview = new Blob(['preview'], { type: 'image/png' });
+    const pagePackage = await composeExportPagePackage({
+      artifact: createArchiveArtifact({
+        archiveBaseName: 'page',
+        entries: [
+          {
+            path: 'page-viewport-preview.png',
+            binaryContent: preview,
+            mimeType: 'image/png',
+          },
+        ],
+        errors: ['Full-page coverage was unavailable.'],
+        stats: { filesCount: 1, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
+      }),
+      source: { faviconUrl: null, title: 'Page', url: 'https://page.test/', viewport: null },
+    });
+
+    expect(pagePackage.manifest.components).toEqual([
+      expect.objectContaining({ id: 'images', status: 'partial' }),
+    ]);
+    expect(pagePackage.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'page-viewport-preview.png', source: preview }),
+      ])
+    );
+  });
+
   it('closes retained producer URLs and warnings under the manifest contract', async () => {
     const pagePackage = await composeExportPagePackage({
       artifact: createArchiveArtifact({

@@ -11,7 +11,10 @@ import {
 
 describe('full-page quality policy boundary', () => {
   it('keeps factory defaults canonical and parses exact built-in and custom profiles', () => {
-    expect(DEFAULT_FULL_PAGE_QUALITY_POLICY).toBe(FULL_PAGE_QUALITY_PROFILES.safe);
+    expect(DEFAULT_FULL_PAGE_QUALITY_POLICY).toBe(FULL_PAGE_QUALITY_PROFILES.maximum);
+    expect(parseFullPageQualityPolicy(FULL_PAGE_QUALITY_PROFILES.maximum)).toEqual(
+      FULL_PAGE_QUALITY_PROFILES.maximum
+    );
     expect(parseFullPageQualityPolicy(FULL_PAGE_QUALITY_PROFILES['high-quality'])).toEqual(
       FULL_PAGE_QUALITY_PROFILES['high-quality']
     );

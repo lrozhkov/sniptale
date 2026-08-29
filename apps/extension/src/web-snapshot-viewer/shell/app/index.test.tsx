@@ -99,6 +99,7 @@ function createLoadedPackage(args: {
     html: args.html ?? '<p>Snapshot</p>',
     manifest: createViewerManifest(args.manifest ?? {}),
     objectUrls: args.objectUrls ?? [],
+    screenshotCoverage: 'full-page',
     screenshotUrl: 'blob:snapshot-screenshot',
   };
 }

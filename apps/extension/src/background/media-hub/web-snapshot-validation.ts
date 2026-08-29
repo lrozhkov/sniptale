@@ -4,6 +4,7 @@ import {
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
   PAGE_PACKAGE_ARCHIVE_PATHS,
   parsePagePackageManifest,
+  resolvePagePackageScreenshotEntry,
   type PagePackageEntry,
   type PagePackageManifest,
 } from '@sniptale/runtime-contracts/page-package';
@@ -134,6 +135,8 @@ async function validateArchiveEntries(args: {
   manifest: PagePackageManifest;
   screenshotBlob: Blob;
 }): Promise<void> {
+  const screenshotSelection = resolvePagePackageScreenshotEntry(args.manifest.entries);
+  if (!screenshotSelection) throw new Error('Page Package screenshot coverage is invalid.');
   let packageScreenshotBytes: Uint8Array | null = null;
   for (const declared of args.manifest.entries) {
     const archiveEntry = args.entriesByPath.get(declared.path);
@@ -142,7 +145,7 @@ async function validateArchiveEntries(args: {
     if ((await hashWebSnapshotAssetBytes(bytes)) !== declared.sha256) {
       throw new Error(`Page Package entry digest does not match: ${declared.path}.`);
     }
-    if (declared.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot) {
+    if (declared.path === screenshotSelection.path) {
       packageScreenshotBytes = bytes;
     }
   }

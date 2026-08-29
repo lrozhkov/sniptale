@@ -1,6 +1,7 @@
 import {
   PAGE_PACKAGE_ARCHIVE_PATHS,
   normalizePagePackageWarnings,
+  resolvePagePackageScreenshotEntry,
   type PagePackageComponentId,
   type PagePackageComponentStatus,
 } from '@sniptale/runtime-contracts/page-package';
@@ -40,10 +41,13 @@ export async function rebuildWebSnapshotImport(
         .filter((entry) => entry.component === 'webCopy' && entry.path.startsWith('assets/'))
         .map((entry) => entry.path)
     );
-    const screenshotEntry = importedManifest.entries.find(
-      (entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
-    );
-    const screenshotSource = opened.reader.entry(PAGE_PACKAGE_ARCHIVE_PATHS.screenshot);
+    const screenshotSelection = resolvePagePackageScreenshotEntry(importedManifest.entries);
+    const screenshotEntry = screenshotSelection
+      ? importedManifest.entries.find((entry) => entry.path === screenshotSelection.path)
+      : undefined;
+    const screenshotSource = screenshotSelection
+      ? opened.reader.entry(screenshotSelection.path)
+      : undefined;
     if (!screenshotEntry || !screenshotSource)
       throw new Error('Page Package screenshot is missing.');
     const screenshotBlob = await readArchiveEntryBlob(
@@ -67,7 +71,7 @@ export async function rebuildWebSnapshotImport(
       const source = opened.reader.entry(entry.path);
       if (!source) throw new Error(`Page Package entry is missing: ${entry.path}.`);
       const original =
-        entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+        entry.path === screenshotSelection?.path
           ? screenshotBlob
           : await readArchiveEntryBlob(
               source,

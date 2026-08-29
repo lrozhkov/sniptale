@@ -3,6 +3,7 @@ import {
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
   PAGE_PACKAGE_ARCHIVE_PATHS,
   parsePagePackageManifest,
+  resolvePagePackageScreenshotEntry,
 } from '@sniptale/runtime-contracts/page-package';
 import { openArchiveReader } from '../../composition/archive-transfer/reader';
 import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
@@ -46,10 +47,13 @@ export async function loadWebSnapshotScreenshotBlob(packageBlob: Blob): Promise<
     if (declaredPaths.size > 0) {
       throw new Error('Page Package archive inventory does not match its manifest.');
     }
-    const screenshotMetadata = manifest.entries.find(
-      (entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
-    );
-    const screenshotSource = reader.entry(PAGE_PACKAGE_ARCHIVE_PATHS.screenshot);
+    const screenshotSelection = resolvePagePackageScreenshotEntry(manifest.entries);
+    const screenshotMetadata = screenshotSelection
+      ? manifest.entries.find((entry) => entry.path === screenshotSelection.path)
+      : undefined;
+    const screenshotSource = screenshotSelection
+      ? reader.entry(screenshotSelection.path)
+      : undefined;
     if (
       !screenshotMetadata ||
       !screenshotSource ||

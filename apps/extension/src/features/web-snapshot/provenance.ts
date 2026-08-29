@@ -12,6 +12,7 @@ import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapsh
 import {
   MAX_PAGE_PACKAGE_ENTRIES,
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+  resolvePagePackageScreenshotEntry,
 } from '@sniptale/runtime-contracts/page-package';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import {
@@ -138,15 +139,19 @@ export async function sanitizeWebSnapshotPackageProvenance(
 }
 
 export async function readWebSnapshotPackageScreenshotBytes(
-  packageBlob: Blob
+  packageBlob: Blob,
+  manifest?: WebSnapshotManifest
 ): Promise<Uint8Array> {
   const opened = await openWebSnapshotPackage(
     packageBlob,
     WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes
   );
   try {
+    const packageManifest = manifest ?? (await readWebSnapshotPackageManifest(opened.entries));
+    const screenshotSelection = resolvePagePackageScreenshotEntry(packageManifest.entries);
+    if (!screenshotSelection) throw new Error('Web snapshot package is missing screenshot.');
     const screenshot = opened.entries.find(
-      (entry) => !entry.directory && entry.filename === WEB_SNAPSHOT_PACKAGE_PATHS.screenshot
+      (entry) => !entry.directory && entry.filename === screenshotSelection.path
     );
     if (!screenshot) throw new Error('Web snapshot package is missing screenshot.');
     const blob = await readEntryBlob(screenshot, 'application/octet-stream');

@@ -1,4 +1,5 @@
 import type { PagePackageViewport } from '@sniptale/runtime-contracts/page-package';
+import type { PagePackageScreenshotCoverage } from '@sniptale/runtime-contracts/page-package';
 import type { ComposedPagePackage } from '../../../workflows/page-package/composer';
 
 export interface WebSnapshotAssetEntry {
@@ -24,6 +25,7 @@ export interface WebSnapshotBuildResult {
   manifest: ComposedPagePackage<Blob>['manifest'];
   pagePackage: ComposedPagePackage<Blob>;
   screenshotBlob: Blob;
+  screenshotCoverage: PagePackageScreenshotCoverage;
   screenshotMimeType: 'image/png';
   snapshotSessionId: string;
   warnings: string[];

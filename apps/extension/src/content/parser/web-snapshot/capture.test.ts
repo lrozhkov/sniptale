@@ -179,3 +179,24 @@ it('rejects a screenshot response without canonical capture geometry', async () 
     })
   ).rejects.toThrow();
 });
+
+it('classifies a visible-viewport fallback as partial instead of publishing it as full-page', async () => {
+  sendRuntimeMessage.mockResolvedValue({
+    captureGeometry,
+    dataUrl: 'data:image/png;base64,cG5n',
+    success: true,
+    viewportFallback: true,
+  });
+
+  await expect(
+    captureWebSnapshotScreenshotWithWarnings(undefined, {
+      action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      exportRunId: 'viewport-fallback',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      coverage: 'viewport',
+      warnings: expect.arrayContaining([expect.stringContaining('видимая область')]),
+    })
+  );
+});

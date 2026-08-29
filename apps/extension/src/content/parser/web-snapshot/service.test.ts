@@ -73,6 +73,7 @@ beforeEach(() => {
   mocks.captureWebSnapshotScreenshotWithWarnings.mockResolvedValue({
     blob: new Blob(['shot'], { type: 'image/png' }),
     captureGeometry,
+    coverage: 'full-page',
     warnings: [],
   });
   mocks.materializeUnreadableIframeRasters.mockResolvedValue({
@@ -86,6 +87,7 @@ beforeEach(() => {
       type: 'application/x-sniptale-page-package+zip',
     }),
     screenshotBlob: new Blob(['shot'], { type: 'image/png' }),
+    screenshotCoverage: 'full-page',
     screenshotMimeType: 'image/png',
   });
 });
@@ -240,4 +242,27 @@ it('fails before packaging when the required full-page screenshot capture fails'
   expect(mocks.collectWebSnapshotAssets).not.toHaveBeenCalled();
   expect(mocks.buildWebSnapshotPackage).not.toHaveBeenCalled();
   expect(mocks.serializePreparedSnapshotDocument).not.toHaveBeenCalled();
+});
+
+it('packages a visible-area fallback as partial and does not project offscreen iframe rasters from it', async () => {
+  mocks.captureWebSnapshotScreenshotWithWarnings.mockResolvedValueOnce({
+    blob: new Blob(['partial'], { type: 'image/png' }),
+    captureGeometry,
+    coverage: 'viewport',
+    warnings: ['Only the visible area was retained'],
+  });
+
+  await buildCurrentPageWebSnapshot({
+    allowAnonymousCrossOriginAssets: false,
+    allowAuthenticatedSameOriginAssets: false,
+    requestId: 'req-partial',
+  });
+
+  expect(mocks.materializeUnreadableIframeRasters).not.toHaveBeenCalled();
+  expect(mocks.buildWebSnapshotPackage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      screenshotCoverage: 'viewport',
+      warnings: expect.arrayContaining(['Only the visible area was retained']),
+    })
+  );
 });

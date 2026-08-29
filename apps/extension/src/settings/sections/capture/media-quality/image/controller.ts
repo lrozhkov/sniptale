@@ -71,7 +71,6 @@ export function useImageSettingsSection() {
         field: 'maxFileSizeMiB' | 'maxMegapixels' | 'minScalePercent',
         value: number
       ) => void persistFullPageQuality({ ...fullPageQuality, [field]: value, profile: 'custom' }),
-      handleReset: () => void persistFullPageQuality({ ...DEFAULT_FULL_PAGE_QUALITY_POLICY }),
     },
     isLoading,
     isQualityDisabled: imageFormat === 'png',

@@ -1,5 +1,5 @@
 import {
-  PAGE_PACKAGE_ARCHIVE_PATHS,
+  resolvePagePackageScreenshotEntry,
   type PagePackageManifest,
 } from '@sniptale/runtime-contracts/page-package';
 import type { ArchiveEntrySource } from '../../../../composition/archive-transfer';
@@ -82,8 +82,12 @@ async function prepareLibraryPagePackage(
     if (opened.pagePackage.manifest.intent !== 'save') {
       throw new Error('Library accepts only Save-intent Page Packages.');
     }
+    const screenshotSelection = resolvePagePackageScreenshotEntry(
+      opened.pagePackage.manifest.entries
+    );
+    if (!screenshotSelection) throw new Error('Page Package screenshot coverage is invalid.');
     const screenshotBlob = await readScreenshotBlob(
-      opened.reader.entry(PAGE_PACKAGE_ARCHIVE_PATHS.screenshot),
+      opened.reader.entry(screenshotSelection.path),
       signal
     );
     await opened.reader.close();

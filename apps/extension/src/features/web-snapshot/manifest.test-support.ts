@@ -55,6 +55,9 @@ function deriveComponents(entries: readonly PagePackageEntry[]): PagePackageComp
     };
     current.entryCount += 1;
     current.totalBytes += entry.size;
+    if (entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot) {
+      current.status = 'partial';
+    }
     components.set(entry.component, current);
   }
   return Array.from(components.values());

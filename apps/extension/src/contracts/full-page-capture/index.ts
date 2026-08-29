@@ -1,6 +1,6 @@
 export type FullPageFloatingElementsMode = 'hide' | 'once' | 'repeat';
 
-export type FullPageQualityProfile = 'safe' | 'high-quality' | 'custom';
+export type FullPageQualityProfile = 'safe' | 'high-quality' | 'maximum' | 'custom';
 
 export interface FullPageQualityPolicy {
   maxFileSizeMiB: number;
@@ -32,10 +32,16 @@ export const FULL_PAGE_QUALITY_PROFILES = {
     minScalePercent: 75,
     profile: 'high-quality',
   },
+  maximum: {
+    maxFileSizeMiB: FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxFileSizeMiB,
+    maxMegapixels: FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxMegapixels,
+    minScalePercent: 100,
+    profile: 'maximum',
+  },
 } as const satisfies Record<Exclude<FullPageQualityProfile, 'custom'>, FullPageQualityPolicy>;
 
 export const DEFAULT_FULL_PAGE_QUALITY_POLICY: FullPageQualityPolicy =
-  FULL_PAGE_QUALITY_PROFILES.safe;
+  FULL_PAGE_QUALITY_PROFILES.maximum;
 
 function isFiniteIntegerInRange(value: unknown, min: number, max: number): value is number {
   return (
@@ -62,7 +68,7 @@ export function parseFullPageQualityPolicy(value: unknown): FullPageQualityPolic
     return null;
   }
   const profile = record['profile'];
-  if (profile === 'safe' || profile === 'high-quality') {
+  if (profile === 'safe' || profile === 'high-quality' || profile === 'maximum') {
     const expected = FULL_PAGE_QUALITY_PROFILES[profile];
     return record['maxMegapixels'] === expected.maxMegapixels &&
       record['minScalePercent'] === expected.minScalePercent &&

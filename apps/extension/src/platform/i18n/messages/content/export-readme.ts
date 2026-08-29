@@ -65,6 +65,10 @@ export const contentExportReadmeMessages = defineMessageSource({
     ru: 'снимок страницы целиком',
     en: 'full-page screenshot',
   },
+  partialScreenshotDescription: {
+    ru: 'Частичный снимок только видимой области (не полноразмерный)',
+    en: 'Partial visible-area image (not a full-page screenshot)',
+  },
   diagnosticsDescription: {
     ru: 'логи, диагностические данные и предупреждения экспорта',
     en: 'logs, diagnostic data, and export warnings',

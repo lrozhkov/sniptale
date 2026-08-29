@@ -6,6 +6,7 @@ import {
   MAX_PAGE_PACKAGE_TOTAL_BYTES,
   MAX_PAGE_PACKAGE_URL_BYTES,
   PAGE_PACKAGE_ARCHIVE_PATHS,
+  resolvePagePackageScreenshotEntry,
   PAGE_PACKAGE_COMPONENT_IDS,
   PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE,
   PAGE_PACKAGE_SCHEMA_VERSION,
@@ -39,7 +40,6 @@ import {
 
 const REQUIRED_WEB_COPY_PATHS = [
   PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml,
-  PAGE_PACKAGE_ARCHIVE_PATHS.screenshot,
   PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail,
 ] as const;
 
@@ -170,12 +170,32 @@ function validatePageInventory(args: {
     }
   }
   if ([...byComponent.keys()].some((id) => !listed.has(id))) return false;
+  const hasPackageScreenshotPath = args.entries.some(
+    (entry) =>
+      entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot ||
+      entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot
+  );
+  const packageScreenshot = resolvePagePackageScreenshotEntry(args.entries);
+  if (hasPackageScreenshotPath && packageScreenshot === null) {
+    return false;
+  }
+  if (packageScreenshot?.coverage === 'viewport') {
+    const screenshotEntry = args.entries.find((entry) => entry.path === packageScreenshot.path);
+    const screenshotComponent = args.components.find(
+      (component) => component.id === screenshotEntry?.component
+    );
+    if (screenshotComponent?.status !== 'partial') return false;
+  }
   const webCopyPaths = new Set(
     args.entries.filter((entry) => entry.component === 'webCopy').map((entry) => entry.path)
   );
+  const webCopyScreenshot = resolvePagePackageScreenshotEntry(
+    args.entries.filter((entry) => entry.component === 'webCopy')
+  );
   if (
     listed.has('webCopy') &&
-    REQUIRED_WEB_COPY_PATHS.some((required) => !webCopyPaths.has(required))
+    (REQUIRED_WEB_COPY_PATHS.some((required) => !webCopyPaths.has(required)) ||
+      webCopyScreenshot === null)
   ) {
     return false;
   }

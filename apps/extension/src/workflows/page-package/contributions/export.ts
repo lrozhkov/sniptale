@@ -63,7 +63,10 @@ function classifyEntry(
 } {
   assertSafeArchivePath(path);
   const sourceSegments = path.split('/');
-  if (path === 'page-screenshot.png' && mimeType === 'image/png') {
+  if (
+    (path === 'page-screenshot.png' || path === 'page-viewport-preview.png') &&
+    mimeType === 'image/png'
+  ) {
     return { component: 'images', prefix: [], sourceSegments };
   }
   const first = sourceSegments[0]?.toLocaleLowerCase('en-US');

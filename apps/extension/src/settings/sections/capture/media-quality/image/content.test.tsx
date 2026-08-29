@@ -62,7 +62,6 @@ function createState(overrides: Partial<ImageSettingsState> = {}): ImageSettings
         profile: 'safe',
       },
       handleProfileChange: vi.fn(),
-      handleReset: vi.fn(),
       handleValueCommit: vi.fn(),
       handleValuePreview: vi.fn(),
     },
@@ -97,6 +96,8 @@ describe('ImageSettingsSectionContent', () => {
     expect(container?.firstElementChild?.className).not.toContain('!max-w-[560px]');
     expect(container?.textContent).toContain('imageSettings.section.formatWebpLabel');
     expect(container?.querySelector('ul')).toBeNull();
+    expect(container?.textContent).toContain('imageSettings.section.fullPageProfileMaximum');
+    expect(container?.textContent).not.toContain('imageSettings.section.fullPageReset');
 
     const buttons = Array.from(container?.querySelectorAll('button') ?? []);
     await act(async () => {

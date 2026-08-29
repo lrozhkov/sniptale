@@ -1,6 +1,9 @@
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
+import {
+  PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+  PAGE_PACKAGE_ARCHIVE_PATHS,
+} from '@sniptale/runtime-contracts/page-package';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from './manifest';
 import {
   createPagePackageArchiveFixture,
@@ -30,6 +33,24 @@ describe('Page Package provenance sanitizer', () => {
     const expected = await JSZip.loadAsync(
       await readPagePackageTestBlobBytes(fixture.packageBlob)
     ).then((zip) => zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot)?.async('uint8array'));
+
+    await expect(readWebSnapshotPackageScreenshotBytes(fixture.packageBlob)).resolves.toEqual(
+      expected
+    );
+  });
+
+  it('reads an explicit partial screenshot when restoring a Library package', async () => {
+    const complete = await createPagePackageArchiveFixture();
+    const fixture = await createPagePackageArchiveFixture({
+      entries: complete.entries.map((entry) =>
+        entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+          ? { ...entry, path: PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot }
+          : entry
+      ),
+    });
+    const expected = await JSZip.loadAsync(
+      await readPagePackageTestBlobBytes(fixture.packageBlob)
+    ).then((zip) => zip.file(PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot)?.async('uint8array'));
 
     await expect(readWebSnapshotPackageScreenshotBytes(fixture.packageBlob)).resolves.toEqual(
       expected

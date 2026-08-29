@@ -36,6 +36,26 @@ it('accepts a bounded custom full-page quality policy from settings import', () 
   });
 });
 
+it('accepts the canonical maximum-quality profile from settings import', () => {
+  expect(
+    parseSettingsTransferDomains(
+      packageWithPolicy({
+        maxFileSizeMiB: 128,
+        maxMegapixels: 80,
+        minScalePercent: 100,
+        profile: 'maximum',
+      })
+    )['capture.image']?.data
+  ).toEqual({
+    fullPageQuality: {
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 100,
+      profile: 'maximum',
+    },
+  });
+});
+
 it.each([0, -1, 129])('rejects an unsafe imported maximum file size: %s', (maxFileSizeMiB) => {
   expect(() =>
     parseSettingsTransferDomains(

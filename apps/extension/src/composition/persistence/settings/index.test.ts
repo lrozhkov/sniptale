@@ -82,10 +82,10 @@ const DEFAULT_FULL_PAGE_CAPTURE = {
   preloadLazyContent: true,
 };
 const DEFAULT_FULL_PAGE_QUALITY = {
-  maxFileSizeMiB: 64,
-  maxMegapixels: 64,
-  minScalePercent: 50,
-  profile: 'safe' as const,
+  maxFileSizeMiB: 128,
+  maxMegapixels: 80,
+  minScalePercent: 100,
+  profile: 'maximum' as const,
 };
 const DEFAULT_VOICE_INPUT = {
   language: 'ru-RU' as const,

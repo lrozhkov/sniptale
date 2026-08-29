@@ -42,6 +42,7 @@ import type {
   FullPageCaptureGeometry,
   FullPageCaptureTileState,
 } from '../../../contracts/full-page-capture';
+import { FULL_PAGE_QUALITY_PROFILES } from '../../../contracts/full-page-capture';
 import type { FullPageTilePlan } from './planner';
 
 const documentGeometry: FullPageCaptureGeometry = {
@@ -308,6 +309,7 @@ it('classifies an over-budget downscale working set as a quality-limit failure',
     firstFrameDataUrl: 'tile-working-set',
     frozenExtentWarning: false,
     geometry,
+    qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
     warnings: [],
   });
   await stitcher.drawFrame('tile-working-set', tilePlan(), tileState(geometry));
@@ -318,7 +320,9 @@ it('classifies an over-budget downscale working set as a quality-limit failure',
   }
   mocks.convertToBlob.mockResolvedValueOnce(new OversizedEncoding([], { type: 'image/png' }));
 
-  await expect(stitcher.finish({ format: 'png' })).rejects.toThrow('configured quality limits');
+  await expect(
+    stitcher.finish({ format: 'png', qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe })
+  ).rejects.toThrow('configured quality limits');
 });
 
 it('fails closed when a tile cannot be decoded or an output context cannot be created', async () => {

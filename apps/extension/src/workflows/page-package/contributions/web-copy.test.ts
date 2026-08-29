@@ -42,6 +42,15 @@ describe('safe Web-copy Page Package contributions', () => {
     ]);
   });
 
+  it('uses a distinct root path for an explicitly partial viewport preview', async () => {
+    const contributions = await createSafeWebCopyContributions(
+      { ...artifacts(), screenshotCoverage: 'viewport' },
+      digest
+    );
+    expect(contributions.map((entry) => entry.path)).toContain('page-viewport-preview.png');
+    expect(contributions.map((entry) => entry.path)).not.toContain('page-screenshot.png');
+  });
+
   it('rejects wrong required image formats, escaped assets, ZIPs and case collisions', async () => {
     await expect(
       createSafeWebCopyContributions(

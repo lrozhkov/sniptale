@@ -181,7 +181,12 @@ export async function captureWebSnapshotScreenshotWithWarnings(
     exportRunId: crypto.randomUUID(),
   },
   abortSignal?: AbortSignal | undefined
-): Promise<{ blob: Blob; captureGeometry: FullPageCaptureGeometry; warnings: string[] }> {
+): Promise<{
+  blob: Blob;
+  captureGeometry: FullPageCaptureGeometry;
+  coverage: 'full-page' | 'viewport';
+  warnings: string[];
+}> {
   const services = getContentRuntimeServices();
   const restoreSensitiveControls = maskSensitiveControlsForScreenshot();
   let response;
@@ -215,6 +220,7 @@ export async function captureWebSnapshotScreenshotWithWarnings(
   return {
     blob,
     captureGeometry: response.captureGeometry,
+    coverage: response.viewportFallback ? ('viewport' as const) : ('full-page' as const),
     warnings: [
       ...(response.downscaled
         ? [translate('content.runtime.captureFullPageDownscaledWarning')]

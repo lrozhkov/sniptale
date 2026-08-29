@@ -147,10 +147,17 @@ describe('useImageSettingsSection', () => {
     expect(latestState?.imageQuality).toBe(85);
   });
 
-  it('applies built-in profiles, custom values, and one-click factory reset', async () => {
+  it('starts from maximum quality and applies built-in and custom profiles', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     useSettingsStoreMock.mockReturnValue(createStoreState({ settings: {}, updateSettings }));
     await renderHarness();
+
+    expect(latestState?.fullPage.policy).toEqual({
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 100,
+      profile: 'maximum',
+    });
 
     await act(async () => latestState?.fullPage.handleProfileChange('high-quality'));
     expect(updateSettings).toHaveBeenLastCalledWith({
@@ -167,13 +174,13 @@ describe('useImageSettingsSection', () => {
       fullPageQuality: expect.objectContaining({ minScalePercent: 40, profile: 'custom' }),
     });
 
-    await act(async () => latestState?.fullPage.handleReset());
+    await act(async () => latestState?.fullPage.handleProfileChange('maximum'));
     expect(updateSettings).toHaveBeenLastCalledWith({
       fullPageQuality: {
-        maxFileSizeMiB: 64,
-        maxMegapixels: 64,
-        minScalePercent: 50,
-        profile: 'safe',
+        maxFileSizeMiB: 128,
+        maxMegapixels: 80,
+        minScalePercent: 100,
+        profile: 'maximum',
       },
     });
   });

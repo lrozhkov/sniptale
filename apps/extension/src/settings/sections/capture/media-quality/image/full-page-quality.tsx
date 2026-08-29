@@ -9,6 +9,7 @@ type State = ReturnType<typeof useImageSettingsSection>;
 const PROFILE_OPTIONS = [
   { labelKey: 'imageSettings.section.fullPageProfileSafe', value: 'safe' },
   { labelKey: 'imageSettings.section.fullPageProfileHighQuality', value: 'high-quality' },
+  { labelKey: 'imageSettings.section.fullPageProfileMaximum', value: 'maximum' },
   { labelKey: 'imageSettings.section.fullPageProfileCustom', value: 'custom' },
 ] as const;
 
@@ -87,7 +88,7 @@ export function FullPageQualitySettings({ state }: { state: State }) {
   const limits = FULL_PAGE_QUALITY_ABSOLUTE_LIMITS;
   return (
     <div className="mt-2 space-y-1 border-t border-[var(--sniptale-color-border-subtle)] pt-3">
-      <div className="flex items-start justify-between gap-3 px-1">
+      <div className="px-1">
         <div>
           <div className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('imageSettings.section.fullPageTitle')}
@@ -96,17 +97,6 @@ export function FullPageQualitySettings({ state }: { state: State }) {
             {translate('imageSettings.section.fullPageDescription')}
           </p>
         </div>
-        <button
-          type="button"
-          className={[
-            'shrink-0 rounded-md px-2 py-1 text-xs',
-            'text-[var(--sniptale-color-accent)]',
-            'hover:bg-[var(--sniptale-color-surface-hover)]',
-          ].join(' ')}
-          onClick={state.fullPage.handleReset}
-        >
-          {translate('imageSettings.section.fullPageReset')}
-        </button>
       </div>
       <SettingsControlRow label={translate('imageSettings.section.fullPageProfileLabel')}>
         <ProfileSelector state={state} />

@@ -59,6 +59,7 @@ import type { MediaHubBackupRootEnvelope } from '../contracts';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import { validateRetainedWebSnapshotScreenshot } from '../../../../features/web-snapshot/screenshot-validation';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 
 type MutableStore = {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -242,11 +243,12 @@ function assertRestoredWebSnapshotMediaProfile(args: {
 }
 
 async function validateRestoredWebSnapshotScreenshot(args: {
+  manifest: WebSnapshotManifest;
   packageBlob: Blob;
   screenshotBlob: Blob;
 }): Promise<void> {
   await validateRetainedWebSnapshotScreenshot({
-    packageBytes: await readWebSnapshotPackageScreenshotBytes(args.packageBlob),
+    packageBytes: await readWebSnapshotPackageScreenshotBytes(args.packageBlob, args.manifest),
     screenshotBlob: args.screenshotBlob,
   });
 }
@@ -278,6 +280,7 @@ async function replaceSanitizedSnapshotPackage(args: {
     `${metadata.entry.id}-screenshot`
   );
   await validateRestoredWebSnapshotScreenshot({
+    manifest: sanitized.manifest,
     packageBlob: sanitized.packageBlob,
     screenshotBlob: screenshotFile,
   });

@@ -78,7 +78,12 @@ it('applies a custom minimum scale and raster size to the same tile planner', ()
 });
 
 it('rejects hostile 2D geometry before materializing its cartesian product', () => {
-  expect(() => createFullPageTilePlan(geometry(10_000, 10_000, 65, 65))).toThrow(
-    'Full-page screenshot requires too many raster tiles'
-  );
+  expect(() =>
+    createFullPageTilePlan(geometry(10_000, 10_000, 65, 65), {
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 50,
+      profile: 'custom',
+    })
+  ).toThrow('Full-page screenshot requires too many raster tiles');
 });

@@ -57,6 +57,7 @@ async function createPackageBlob(args: {
   extras?: Record<string, string | Uint8Array>;
   html?: string | Uint8Array;
   manifest?: WebSnapshotManifest | string;
+  screenshotCoverage?: 'full-page' | 'viewport';
 }): Promise<{ manifest: WebSnapshotManifest; packageBlob: Blob }> {
   const html =
     args.html ??
@@ -80,7 +81,10 @@ async function createPackageBlob(args: {
     {
       blob: toBlob(createPagePackagePngBytes(), 'image/png'),
       component: 'webCopy',
-      path: PAGE_PACKAGE_ARCHIVE_PATHS.screenshot,
+      path:
+        args.screenshotCoverage === 'viewport'
+          ? PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot
+          : PAGE_PACKAGE_ARCHIVE_PATHS.screenshot,
     },
     {
       blob: new Blob(['webp'], { type: 'image/webp' }),
@@ -112,7 +116,16 @@ async function createPackageBlob(args: {
   for (const [path, content] of Object.entries(args.extras ?? {})) {
     if (path.includes('..')) zip.file(path, content, { createFolders: false });
   }
-  const manifest = args.manifest ?? fixture.manifest;
+  const manifest =
+    args.manifest ??
+    (args.screenshotCoverage === 'viewport'
+      ? {
+          ...fixture.manifest,
+          components: fixture.manifest.components.map((component) =>
+            component.id === 'webCopy' ? { ...component, status: 'partial' as const } : component
+          ),
+        }
+      : fixture.manifest);
   zip.file(
     WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
     typeof manifest === 'string' ? manifest : JSON.stringify(manifest)
@@ -130,10 +143,14 @@ async function stubWebSnapshotRecord(args: {
   html?: string | Uint8Array;
   manifest?: WebSnapshotManifest | string;
   recordManifest?: WebSnapshotManifest;
+  screenshotCoverage?: 'full-page' | 'viewport';
 }): Promise<void> {
   const packageArgs: Parameters<typeof createPackageBlob>[0] = {
     ...(args.diagnosticExtras === undefined ? {} : { diagnosticExtras: args.diagnosticExtras }),
     ...(args.manifest === undefined ? {} : { manifest: args.manifest }),
+    ...(args.screenshotCoverage === undefined
+      ? {}
+      : { screenshotCoverage: args.screenshotCoverage }),
   };
   if (args.extras !== undefined) {
     packageArgs.extras = args.extras;
@@ -264,6 +281,7 @@ it('loads a valid package and rewrites captured asset references to object URLs'
     'blob:snapshot-asset',
   ]);
   expect(loaded.screenshotUrl).toBe('blob:snapshot-asset');
+  expect(loaded.screenshotCoverage).toBe('full-page');
   expect(loaded.html).toContain('src="blob:snapshot-asset"');
   expect(loaded.html).toContain(
     '<a data-sniptale-external-href="https://example.test/assets/document.png">Document</a>'
@@ -271,6 +289,15 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   expect(loaded.html).not.toContain(' href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
   expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
+});
+
+it('loads a partial viewport preview and exposes its coverage to the Viewer UI', async () => {
+  await stubWebSnapshotRecord({ screenshotCoverage: 'viewport' });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.screenshotCoverage).toBe('viewport');
+  expect(mocks.validateRetainedWebSnapshotScreenshot).toHaveBeenCalledOnce();
 });
 
 it('loads an asset-rich package beyond the removed legacy viewer file ceiling', async () => {

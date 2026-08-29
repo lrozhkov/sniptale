@@ -122,6 +122,7 @@ async function captureRequiredWebSnapshotScreenshot(
   captureGeometry: Awaited<
     ReturnType<typeof captureWebSnapshotScreenshotWithWarnings>
   >['captureGeometry'];
+  coverage: Awaited<ReturnType<typeof captureWebSnapshotScreenshotWithWarnings>>['coverage'];
   screenshotBlob: Blob;
   warnings: string[];
 }> {
@@ -134,6 +135,7 @@ async function captureRequiredWebSnapshotScreenshot(
   throwIfWebSnapshotBuildAborted(abortSignal);
   return {
     captureGeometry: screenshot.captureGeometry,
+    coverage: screenshot.coverage,
     screenshotBlob: screenshot.blob,
     warnings: screenshot.warnings,
   };
@@ -203,11 +205,14 @@ export async function buildCurrentPageWebSnapshot(args: {
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const { assets, privacyWarnings, snapshotSessionId, warnings } = assetResult;
-  const iframeRasters = await materializeUnreadableIframeRasters(
-    snapshotDocument,
-    screenshotResult.screenshotBlob,
-    screenshotResult.captureGeometry
-  );
+  const iframeRasters =
+    screenshotResult.coverage === 'full-page'
+      ? await materializeUnreadableIframeRasters(
+          snapshotDocument,
+          screenshotResult.screenshotBlob,
+          screenshotResult.captureGeometry
+        )
+      : { assets: [], rasterizedTargets: [] };
   assets.push(...iframeRasters.assets);
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const rasterizedIframeTargets = new Set(iframeRasters.rasterizedTargets);
@@ -245,6 +250,7 @@ export async function buildCurrentPageWebSnapshot(args: {
     },
     html,
     screenshotBlob: screenshotResult.screenshotBlob,
+    screenshotCoverage: screenshotResult.coverage,
     source,
     warnings: warningSummary.warnings,
     warningStats: warningSummary.warningStats,

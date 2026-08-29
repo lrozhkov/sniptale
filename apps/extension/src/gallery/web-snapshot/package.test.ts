@@ -23,6 +23,21 @@ it('loads the verified full-page screenshot from a Page Package', async () => {
   );
 });
 
+it('loads an explicitly declared visible-area preview without treating it as page-screenshot.png', async () => {
+  const base = await createPagePackageArchiveFixture();
+  const entries = base.entries.map((entry) =>
+    entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+      ? { ...entry, path: PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot }
+      : entry
+  );
+  const fixture = await createPagePackageArchiveFixture({ entries });
+
+  await expect(loadWebSnapshotScreenshotBlob(fixture.packageBlob)).resolves.toBeInstanceOf(Blob);
+  expect(fixture.manifest.entries.map((entry) => entry.path)).not.toContain(
+    PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+  );
+});
+
 it('accepts declared nested assets and diagnostic entries', async () => {
   const base = await createPagePackageArchiveFixture();
   const entries: PagePackageFixtureEntry[] = [

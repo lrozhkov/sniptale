@@ -81,6 +81,7 @@ function createLoadedPackage(
     html: '<p>Snapshot</p>',
     manifest: createViewerManifest(manifest),
     objectUrls: [],
+    screenshotCoverage: 'full-page',
     screenshotUrl: 'blob:snapshot-screenshot',
   };
 }

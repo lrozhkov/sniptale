@@ -3,6 +3,7 @@ import { loadSettings } from '../../../composition/persistence/settings';
 import {
   DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
   DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  FULL_PAGE_QUALITY_ABSOLUTE_LIMITS,
 } from '../../../contracts/full-page-capture';
 import type {
   FullPageCapturePreferences,
@@ -52,6 +53,14 @@ function isFullPageQualityBudgetError(error: unknown): error is Error {
     error instanceof Error &&
     (error.message === FULL_PAGE_RASTER_BUDGET_ERROR ||
       error.message === FULL_PAGE_FILE_BUDGET_ERROR)
+  );
+}
+
+function isFullPageGeometryInstabilityError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    (error.message === FULL_PAGE_EXTENT_GREW_ERROR ||
+      error.message === VIEWPORT_CHANGED_DURING_CAPTURE_ERROR)
   );
 }
 
@@ -216,10 +225,7 @@ async function runPreparedPageCaptureWithViewportRetry(
     return await runPreparedPageCapture({ ...args, onProgress });
   } catch (error) {
     if (!args.abortSignal?.aborted && isFullPageQualityBudgetError(error)) {
-      logger.warn(
-        `Using visible viewport fallback after full-page quality limit: ${error.message}`
-      );
-      return runPreparedViewportFallback(args, QUALITY_FALLBACK_WARNING);
+      return runReducedFullPageOrViewportFallback(args, onProgress, error);
     }
     if (
       args.abortSignal?.aborted ||
@@ -238,10 +244,7 @@ async function runPreparedPageCaptureWithViewportRetry(
       });
     } catch (retryError) {
       if (!args.abortSignal?.aborted && isFullPageQualityBudgetError(retryError)) {
-        logger.warn(
-          `Using visible viewport fallback after full-page quality limit: ${retryError.message}`
-        );
-        return runPreparedViewportFallback(args, QUALITY_FALLBACK_WARNING);
+        return runReducedFullPageOrViewportFallback(args, onProgress, retryError);
       }
       if (
         args.abortSignal?.aborted ||
@@ -257,6 +260,50 @@ async function runPreparedPageCaptureWithViewportRetry(
       return runPreparedViewportFallback(args, VIEWPORT_FALLBACK_WARNING);
     }
   }
+}
+
+async function runReducedFullPageOrViewportFallback(
+  args: Parameters<typeof runPreparedPageCapture>[0],
+  onProgress: (current: number, total: number) => void,
+  originalError: Error
+): Promise<Omit<FullPageCaptureTransaction, 'jobId'>> {
+  const policy = args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY;
+  if (
+    args.options.exportRunId &&
+    policy.minScalePercent > FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.minScalePercent
+  ) {
+    logger.warn(
+      `Retrying export capture at the minimum safe full-page scale: ${originalError.message}`
+    );
+    try {
+      return await runPreparedPageCapture({
+        ...args,
+        onProgress,
+        options: {
+          ...args.options,
+          qualityPolicy: {
+            ...policy,
+            minScalePercent: FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.minScalePercent,
+            profile: 'custom',
+          },
+        },
+        restartOnExtentGrowth: false,
+      });
+    } catch (retryError) {
+      if (
+        args.abortSignal?.aborted ||
+        (!isFullPageQualityBudgetError(retryError) &&
+          !isFullPageGeometryInstabilityError(retryError))
+      ) {
+        throw retryError;
+      }
+      logger.warn(`Minimum-scale full-page export retry failed: ${retryError.message}`);
+    }
+  }
+  logger.warn(
+    `Using visible viewport fallback after full-page quality limit: ${originalError.message}`
+  );
+  return runPreparedViewportFallback(args, QUALITY_FALLBACK_WARNING);
 }
 
 async function runPreparedViewportFallback(

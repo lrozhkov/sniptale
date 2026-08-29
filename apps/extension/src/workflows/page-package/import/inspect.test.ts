@@ -52,6 +52,25 @@ it('inspects an exact current standard Save Page Package without publishing it',
   });
 });
 
+it('accepts a current package with an explicitly partial viewport preview', async () => {
+  const base = await createPagePackageArchiveFixture();
+  const fixture = await createPagePackageArchiveFixture({
+    entries: base.entries.map((entry) =>
+      entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+        ? { ...entry, path: PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot }
+        : entry
+    ),
+  });
+
+  await expect(inspectWebSnapshotImport(asImportFile(fixture.packageBlob))).resolves.toMatchObject({
+    manifest: {
+      components: expect.arrayContaining([
+        expect.objectContaining({ id: 'webCopy', status: 'partial' }),
+      ]),
+    },
+  });
+});
+
 it('rejects unsupported names and Page Package profiles without fallback', async () => {
   const fixture = await createPagePackageArchiveFixture();
   await expect(

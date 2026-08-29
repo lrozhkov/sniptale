@@ -7,7 +7,10 @@ vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
   dataUrlToBlob: mocks.dataUrlToBlob,
 }));
 
-import { DEFAULT_FULL_PAGE_QUALITY_POLICY } from '../../../contracts/full-page-capture';
+import {
+  DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  FULL_PAGE_QUALITY_PROFILES,
+} from '../../../contracts/full-page-capture';
 import { assertFullPageViewportFallbackWithinPolicy } from './fallback-admission';
 
 function pngHeader(width: number, height: number): Uint8Array {
@@ -58,7 +61,7 @@ it('admits a browser PNG within the selected file and raster budgets', async () 
   await expect(
     assertFullPageViewportFallbackWithinPolicy({
       dataUrl: 'data:image/png;base64,capture',
-      policy: DEFAULT_FULL_PAGE_QUALITY_POLICY,
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
     })
   ).resolves.toEqual({ height: 500, width: 800 });
 });
@@ -71,7 +74,7 @@ it('rejects a viewport fallback above the selected encoded-file ceiling before d
   await expect(
     assertFullPageViewportFallbackWithinPolicy({
       dataUrl: 'data:image/png;base64,capture',
-      policy: DEFAULT_FULL_PAGE_QUALITY_POLICY,
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
     })
   ).rejects.toThrow('configured maximum file size');
 });

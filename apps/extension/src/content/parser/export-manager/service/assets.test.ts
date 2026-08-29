@@ -69,7 +69,11 @@ it('composes exactly the three Page Diagnostics assets when that option is enabl
 
 it('reuses the full-page capture seam as a Blob export contribution', async () => {
   const screenshot = new Blob(['png'], { type: 'image/png' });
-  captureScreenshot.mockResolvedValue({ blob: screenshot, warnings: ['capture adjusted'] });
+  captureScreenshot.mockResolvedValue({
+    blob: screenshot,
+    coverage: 'full-page',
+    warnings: ['capture adjusted'],
+  });
   const options = { ...createPageDiagnosticsOnlyOptions(), includeFullPageScreenshot: true };
   const warnings: string[] = [];
 
@@ -93,4 +97,28 @@ it('reuses the full-page capture seam as a Blob export contribution', async () =
   });
   expect(assets).toContainEqual({ content: screenshot, path: 'page-screenshot.png' });
   expect(warnings).toContain('capture adjusted');
+});
+
+it('stores a viewport fallback under an explicit partial path instead of page-screenshot.png', async () => {
+  const screenshot = new Blob(['partial'], { type: 'image/png' });
+  captureScreenshot.mockResolvedValueOnce({
+    blob: screenshot,
+    coverage: 'viewport',
+    warnings: ['Only the visible area is available'],
+  });
+  const warnings: string[] = [];
+
+  const assets = await collectExportExtraAssets({
+    downloadedFilesCount: 0,
+    fileCandidatesCount: 0,
+    options: { ...createPageDiagnosticsOnlyOptions(), includeFullPageScreenshot: true },
+    snapshot: createSnapshot(),
+    state: createExportManagerState(),
+    throwIfCancelled: () => undefined,
+    warnings,
+  });
+
+  expect(assets.map((asset) => asset.path)).not.toContain('page-screenshot.png');
+  expect(assets).toContainEqual({ content: screenshot, path: 'page-viewport-preview.png' });
+  expect(warnings).toContain('Only the visible area is available');
 });

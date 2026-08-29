@@ -11,6 +11,7 @@ import { hasUnsafePathSegment, utf8Size } from './parser-primitives';
 const MIME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const REQUIRED_WEB_COPY_MIME: Readonly<Record<string, string>> = {
   [PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml]: 'text/html',
+  [PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot]: 'image/png',
   [PAGE_PACKAGE_ARCHIVE_PATHS.screenshot]: 'image/png',
   [PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail]: 'image/webp',
 };
@@ -88,7 +89,9 @@ export function isPagePackageEntryPath(
     return (
       mimeType === requiredMime &&
       (component === 'webCopy' ||
-        (path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot && component === 'images'))
+        ((path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot ||
+          path === PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot) &&
+          component === 'images'))
     );
   }
   const requiredPageDataMime = REQUIRED_ROOT_PAGE_DATA_MIME[path];

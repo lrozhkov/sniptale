@@ -132,6 +132,7 @@ beforeEach(() => {
       viewportHeight: 768,
       viewportWidth: 1024,
     },
+    coverage: 'full-page',
     warnings: [],
   });
   createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
@@ -283,6 +284,7 @@ it('clones the live DOM after full-page capture reveals lazy page sections', asy
         viewportHeight: 768,
         viewportWidth: 1024,
       },
+      coverage: 'full-page',
       warnings: [],
     };
   });

@@ -89,7 +89,11 @@ export async function collectExportExtraAssets(args: {
         args.contentIntentSource,
         args.fullPageCaptureIdentity
       );
-      extraAssets.push({ content: screenshot.blob, path: 'page-screenshot.png' });
+      extraAssets.push({
+        content: screenshot.blob,
+        path:
+          screenshot.coverage === 'full-page' ? 'page-screenshot.png' : 'page-viewport-preview.png',
+      });
       args.warnings.push(...screenshot.warnings);
     } catch {
       args.warnings.push(translate('content.runtime.captureFullPageScreenshotFailed'));

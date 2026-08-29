@@ -1,6 +1,8 @@
 import {
   normalizePagePackageOptionalUrl,
   normalizePagePackageWarnings,
+  PAGE_PACKAGE_ARCHIVE_PATHS,
+  type PagePackageComponentStatus,
   type PagePackageExtendedDiagnosticPath,
   type PagePackageViewport,
 } from '@sniptale/runtime-contracts/page-package';
@@ -50,6 +52,17 @@ function digestBytes(bytes: Uint8Array): Promise<string> {
   const copy = new Uint8Array(new ArrayBuffer(bytes.byteLength));
   copy.set(bytes);
   return hashWebSnapshotAssetBlob(new Blob([copy]));
+}
+
+function resolveExportComponentStatuses(
+  contributions: readonly { component: string; path: string }[]
+): Partial<Record<'images', PagePackageComponentStatus>> {
+  return contributions.some(
+    ({ component, path }) =>
+      component === 'images' && path === PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot
+  )
+    ? { images: 'partial' }
+    : {};
 }
 
 async function projectDiagnosticContributions(args: {
@@ -119,7 +132,7 @@ export async function composeExportPagePackage(args: {
   const pagePackage = await composePagePackage(
     {
       capturedAt: args.capturedAt ?? new Date().toISOString(),
-      componentStatuses: {},
+      componentStatuses: resolveExportComponentStatuses(contributions),
       contributions,
       diagnosticsLevel,
       failedResourceCount: args.artifact.stats.filesFailed,
@@ -166,6 +179,7 @@ export async function composeCombinedPagePackage(args: {
   const componentStatuses = Object.fromEntries(
     args.webCopy.manifest.components.map((component) => [component.id, component.status])
   );
+  Object.assign(componentStatuses, resolveExportComponentStatuses(contributions));
   const failedResourceCount =
     args.webCopy.manifest.stats.failedResourceCount + (args.artifact?.stats.filesFailed ?? 0);
   if (!Number.isSafeInteger(failedResourceCount)) {

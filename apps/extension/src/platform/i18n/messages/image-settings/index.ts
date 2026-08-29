@@ -41,6 +41,7 @@ export const imageSettingsMessages = defineMessageSource({
     fullPageProfileLabel: { ru: 'Профиль', en: 'Profile' },
     fullPageProfileSafe: { ru: 'Безопасный', en: 'Safe' },
     fullPageProfileHighQuality: { ru: 'Высокое качество', en: 'High quality' },
+    fullPageProfileMaximum: { ru: 'Максимальное', en: 'Maximum' },
     fullPageProfileCustom: { ru: 'Пользовательский', en: 'Custom' },
     fullPageMaxSize: {
       ru: 'Максимальный размер полноразмерного снимка, Мп',
@@ -54,7 +55,6 @@ export const imageSettingsMessages = defineMessageSource({
       ru: 'Максимальный размер файла, МиБ',
       en: 'Maximum file size, MiB',
     },
-    fullPageReset: { ru: 'Вернуть заводские', en: 'Restore defaults' },
     fullPageInvalidValue: {
       ru: 'Введите значение в указанном безопасном диапазоне.',
       en: 'Enter a value within the shown safe range.',

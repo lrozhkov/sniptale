@@ -61,6 +61,10 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Сохранённый скриншот веб-страницы',
       en: 'Saved screenshot of the web page',
     },
+    partialScreenshotNotice: {
+      ru: 'Сохранена только видимая область. Статический документ и вложения доступны полностью в пределах собранных данных.',
+      en: 'Only the visible area was saved. The static document and attachments remain available for the collected content.',
+    },
     collapseToolbar: {
       ru: 'Свернуть панель',
       en: 'Collapse toolbar',

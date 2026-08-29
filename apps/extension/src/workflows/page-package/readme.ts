@@ -16,6 +16,16 @@ type ReadmeInput = {
   source: PagePackageSource;
 };
 
+const PARTIAL_SCREENSHOT_NOTE = [
+  '- `page-viewport-preview.png` contains only the visible-area fallback',
+  'and is not a full-page screenshot; `thumbnail.webp` is its compact preview.',
+].join(' ');
+
+const PARTIAL_SCREENSHOT_ANALYSIS_STEP = [
+  '4. Treat `page-viewport-preview.png` only as partial visible-area evidence;',
+  'use the static document for the captured page content.',
+].join(' ');
+
 function escapeCode(value: string): string {
   return value.replaceAll('`', '\\`');
 }
@@ -41,7 +51,7 @@ function createPagePackageReadme(input: ReadmeInput): string {
       entries,
       'images',
       'Images and captures',
-      'exports/images/ or page-screenshot.png'
+      'exports/images/ or a declared root screenshot path'
     ),
     componentLine(entries, 'attachments', 'Downloaded attachments', 'attachments/'),
     componentLine(entries, 'diagnostics', 'Inert diagnostics', 'diagnostics/'),
@@ -60,7 +70,9 @@ function createPagePackageReadme(input: ReadmeInput): string {
           '- Captured resource URLs are rewritten to local package paths.',
           'The Viewer blocks page-initiated network access.',
         ].join(' '),
-        '- `page-screenshot.png` is visual evidence; `thumbnail.webp` is a compact preview.',
+        entries.some((entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot)
+          ? PARTIAL_SCREENSHOT_NOTE
+          : '- `page-screenshot.png` is full-page visual evidence; `thumbnail.webp` is a compact preview.',
       ]
     : ['- No safe Web copy was selected for this package.'];
   const diagnosticNotes =
@@ -88,7 +100,9 @@ function createPagePackageReadme(input: ReadmeInput): string {
       : null,
     entries.some((entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot)
       ? '4. Compare `page-screenshot.png` with the Web copy when visual fidelity matters.'
-      : null,
+      : entries.some((entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot)
+        ? PARTIAL_SCREENSHOT_ANALYSIS_STEP
+        : null,
     entries.some((entry) => ['pageData', 'attachments', 'diagnostics'].includes(entry.component))
       ? '5. Inspect the listed exported data, attachments, and inert diagnostics as needed.'
       : null,

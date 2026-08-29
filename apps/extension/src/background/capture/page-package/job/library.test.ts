@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../../../features/web-snapshot/package-policy';
+import { PAGE_PACKAGE_ARCHIVE_PATHS } from '@sniptale/runtime-contracts/page-package';
 
 const mocks = vi.hoisted(() => ({
   begin: vi.fn(),
@@ -112,7 +113,12 @@ beforeEach(() => {
   mocks.readAssetFile.mockResolvedValue(new File(['package'], 'page-package.zip'));
   mocks.hasAccess.mockResolvedValue(true);
   mocks.open.mockResolvedValue({
-    pagePackage: { manifest: { intent: 'save' } },
+    pagePackage: {
+      manifest: {
+        entries: [{ path: PAGE_PACKAGE_ARCHIVE_PATHS.screenshot }],
+        intent: 'save',
+      },
+    },
     reader: { close: mocks.close, entry: () => screenshotSource() },
   });
   mocks.save.mockImplementation(async (input) => input.assetId);
@@ -167,6 +173,29 @@ it('publishes a staged Save package through the existing journaled Library owner
   );
   expect(mocks.clearCleanupAssets).not.toHaveBeenCalled();
   expect(mocks.close).toHaveBeenCalledOnce();
+});
+
+it('publishes an explicit viewport preview without looking for page-screenshot.png', async () => {
+  const entry = vi.fn(() => screenshotSource());
+  mocks.open.mockResolvedValueOnce({
+    pagePackage: {
+      manifest: {
+        entries: [{ path: PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot }],
+        intent: 'save',
+      },
+    },
+    reader: { close: mocks.close, entry },
+  });
+
+  const result = await saveCollectedPagePackages({
+    jobId: 'job-1',
+    packages: [collected(0, 7)],
+    signal: activeSignal,
+  });
+
+  expect(result).toEqual({ failures: [], snapshotIds: ['asset-1'] });
+  expect(entry).toHaveBeenCalledWith(PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot);
+  expect(entry).not.toHaveBeenCalledWith(PAGE_PACKAGE_ARCHIVE_PATHS.screenshot);
 });
 
 it('continues sequential publication after one page fails', async () => {
@@ -279,7 +308,12 @@ it('clears restart-safe Library authority only after the retained asset deletion
 
 it('rejects an oversized screenshot before allocating or publishing it', async () => {
   mocks.open.mockResolvedValueOnce({
-    pagePackage: { manifest: { intent: 'save' } },
+    pagePackage: {
+      manifest: {
+        entries: [{ path: PAGE_PACKAGE_ARCHIVE_PATHS.screenshot }],
+        intent: 'save',
+      },
+    },
     reader: {
       close: mocks.close,
       entry: () => ({

@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import {
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
   PAGE_PACKAGE_ARCHIVE_PATHS,
+  resolvePagePackageScreenshotEntry,
   type PagePackageComponentId,
   type PagePackageEntry,
   type PagePackageManifest,
@@ -114,9 +115,11 @@ export async function createPagePackageArchiveFixture(
     createFolders: false,
   });
   const archive = await zip.generateAsync({ type: 'uint8array' });
-  const screenshotBlob =
-    sourceEntries.find((entry) => entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot)?.blob ??
-    new Blob([], { type: 'image/png' });
+  const screenshotSelection = resolvePagePackageScreenshotEntry(entries);
+  const screenshotBlob = screenshotSelection
+    ? (sourceEntries.find((entry) => entry.path === screenshotSelection.path)?.blob ??
+      new Blob([], { type: 'image/png' }))
+    : new Blob([], { type: 'image/png' });
   return {
     entries: sourceEntries,
     manifest,

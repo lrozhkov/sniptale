@@ -4,6 +4,7 @@ import {
   normalizePagePackageOptionalUrl,
   normalizePagePackageWarnings,
 } from '@sniptale/runtime-contracts/page-package';
+import type { PagePackageScreenshotCoverage } from '@sniptale/runtime-contracts/page-package';
 import { buildCssDiagnosticAssets } from '../export-manager/diagnostics/css';
 import {
   buildDomSnapshotHtml,
@@ -110,6 +111,7 @@ function assertPackageInputsWithinBudget(args: {
   domDiagnostics: DomDiagnosticSnapshots;
   html: string;
   screenshotBlob: Blob;
+  screenshotCoverage?: PagePackageScreenshotCoverage;
   thumbnailBlob: Blob;
   warnings: readonly string[];
 }): void {
@@ -152,6 +154,7 @@ export async function buildWebSnapshotPackage(args: {
   diagnosticsSource?: ExportDiagnosticsSource | undefined;
   html: string;
   screenshotBlob: Blob;
+  screenshotCoverage?: PagePackageScreenshotCoverage;
   source: WebSnapshotPageSource;
   warnings: string[];
   warningStats?: WebSnapshotWarningStats | undefined;
@@ -159,8 +162,10 @@ export async function buildWebSnapshotPackage(args: {
   manifest: ComposedPagePackage<Blob>['manifest'];
   pagePackage: ComposedPagePackage<Blob>;
   screenshotBlob: Blob;
+  screenshotCoverage: PagePackageScreenshotCoverage;
   screenshotMimeType: 'image/png';
 }> {
+  const screenshotCoverage = args.screenshotCoverage ?? 'full-page';
   if (args.screenshotBlob.type !== 'image/png') {
     throw new Error('Page Package screenshot must use image/png.');
   }
@@ -190,6 +195,7 @@ export async function buildWebSnapshotPackage(args: {
         assets: args.assets,
         html: args.html,
         screenshotBlob: args.screenshotBlob,
+        screenshotCoverage,
         thumbnailBlob,
       },
       hashWebSnapshotAssetBlob
@@ -222,7 +228,8 @@ export async function buildWebSnapshotPackage(args: {
       capturedAt: new Date().toISOString(),
       componentStatuses: {
         diagnostics: 'complete',
-        webCopy: failedResourceCount > 0 ? 'partial' : 'complete',
+        webCopy:
+          failedResourceCount > 0 || screenshotCoverage === 'viewport' ? 'partial' : 'complete',
       },
       contributions,
       diagnosticsLevel: 'standard',
@@ -243,6 +250,7 @@ export async function buildWebSnapshotPackage(args: {
     manifest: pagePackage.manifest,
     pagePackage,
     screenshotBlob: args.screenshotBlob,
+    screenshotCoverage,
     screenshotMimeType: 'image/png',
   };
 }
