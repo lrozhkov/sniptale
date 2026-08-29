@@ -50,6 +50,16 @@ const DEFAULT_DEPS: PagePackageActionIndicatorDeps = {
   setTitle: (details) => browserAction.setTitle(details),
 };
 
+export async function restorePagePackageProgressPopup(
+  job: ActivePopupExportJob,
+  windowId: number
+): Promise<void> {
+  if (job.cancelled || job.status.orderedTabs.length < 2) return;
+  await Promise.resolve()
+    .then(() => browserAction.openPopup({ windowId }))
+    .catch(() => undefined);
+}
+
 export function startPagePackageActionIndicator(
   job: ActivePopupExportJob,
   deps: PagePackageActionIndicatorDeps = DEFAULT_DEPS

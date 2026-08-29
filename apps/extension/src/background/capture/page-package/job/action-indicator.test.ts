@@ -10,7 +10,10 @@ vi.mock('@sniptale/platform/browser/action', () => ({
   browserAction: browserActionMocks,
 }));
 
-import { startPagePackageActionIndicator } from './action-indicator';
+import {
+  restorePagePackageProgressPopup,
+  startPagePackageActionIndicator,
+} from './action-indicator';
 import type { ActivePopupExportJob } from './runtime-state';
 
 function createJob(tabCount: number): ActivePopupExportJob {
@@ -64,7 +67,9 @@ it('does not change the action icon for a single page or reopen a cancelled job'
 
   const cancelled = createJob(2);
   cancelled.cancelled = true;
+  await restorePagePackageProgressPopup(cancelled, 3);
   await startPagePackageActionIndicator(cancelled, deps)();
+  expect(browserActionMocks.openPopup).not.toHaveBeenCalled();
   expect(deps.openPopup).not.toHaveBeenCalled();
 });
 

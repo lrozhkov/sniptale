@@ -3,6 +3,7 @@ import { browserWindows } from '@sniptale/platform/browser/windows';
 import { truncatePopupExportStatusText } from '@sniptale/runtime-contracts/export';
 import type { PagePackageJobTab } from '@sniptale/runtime-contracts/page-package';
 import { translate } from '../../../../platform/i18n';
+import { restorePagePackageProgressPopup } from './action-indicator';
 import {
   appendPopupExportJobWarning,
   popupExportJobErrorText,
@@ -75,10 +76,14 @@ export async function activatePopupExportCaptureTarget(
   const [active] = await browserTabs.query({ active: true, windowId: tab.windowId });
   if (active?.id !== selected.tabId) throw new Error('Target tab did not remain active');
   job.lastActivatedByWindow.set(tab.windowId, selected.tabId);
-  if (!job.status.activatedTabIds.includes(selected.tabId)) {
-    await updatePagePackageJobStatus(job, {
-      activatedTabIds: [...job.status.activatedTabIds, selected.tabId],
-    });
+  try {
+    if (!job.status.activatedTabIds.includes(selected.tabId)) {
+      await updatePagePackageJobStatus(job, {
+        activatedTabIds: [...job.status.activatedTabIds, selected.tabId],
+      });
+    }
+  } finally {
+    await restorePagePackageProgressPopup(job, tab.windowId);
   }
 }
 
