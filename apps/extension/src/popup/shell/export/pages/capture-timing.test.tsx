@@ -11,7 +11,7 @@ vi.mock('../../../../composition/persistence/settings', async (importOriginal) =
   patchSettings: mocks.patchSettings,
 }));
 
-import { usePageCaptureTimingPreferences } from './capture-timing';
+import { PageCaptureTimingSettings, usePageCaptureTimingPreferences } from './capture-timing';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -126,4 +126,22 @@ it('does not let an earlier failed write rollback a later successful update', as
     resolveReload({ pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 } })
   );
   expect(container.querySelector('output')?.textContent).toBe('120000:5000');
+});
+
+it('keeps page timing selects compact inside the settings curtain', async () => {
+  await act(async () =>
+    root.render(
+      <PageCaptureTimingSettings
+        timing={{ loadTimeoutMs: 30_000, settleDelayMs: 2_000 }}
+        onChange={vi.fn()}
+      />
+    )
+  );
+
+  const selects = container.querySelectorAll('[data-ui="popup.export.page-timing-select"]');
+  expect(selects).toHaveLength(2);
+  for (const select of selects) {
+    expect(select.className).toContain('!w-[104px]');
+    expect(select.className).toContain('!max-w-[104px]');
+  }
 });

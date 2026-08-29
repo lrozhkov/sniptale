@@ -27,10 +27,17 @@ type ExportSelectionSectionShellProps = {
 const shellClassName = 'flex min-h-0 flex-col overflow-hidden';
 
 const triggerClassName = [
-  'group -mx-1 flex w-[calc(100%+8px)] items-center rounded-[9px] px-2 py-1.5 text-left',
-  'transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
+  'min-w-0 flex-1 py-1.5 text-left outline-none',
+  'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
 ].join(' ');
+
+function isFloatingInteractionEvent(event: PointerEvent): boolean {
+  return event.composedPath().some((target) => {
+    const element =
+      target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+    return Boolean(element?.closest('[data-floating-ui-root="true"]'));
+  });
+}
 
 function useInlineDrawerDismiss(
   isOpen: boolean,
@@ -48,7 +55,11 @@ function useInlineDrawerDismiss(
     wasOpenRef.current = true;
 
     function handlePointerDown(event: PointerEvent) {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target) &&
+        !isFloatingInteractionEvent(event)
+      ) {
         onClose();
       }
     }
@@ -150,29 +161,19 @@ export function ExportSelectionSectionShell({
 
   return (
     <section ref={rootRef} className={cx(shellClassName, isExpanded && 'flex-1', className)}>
-      {onOpenSettings ? (
-        <button
-          type="button"
-          aria-label={settingsAriaLabel ?? translate('popup.export.pageSettingsTitle')}
-          className={[
-            'mb-0.5 w-fit rounded-[7px] px-1.5 py-0.5 text-[10px] font-medium',
-            'text-[var(--sniptale-color-text-secondary)] transition-colors',
-            'hover:bg-[var(--sniptale-color-surface-hover)]',
-            'hover:text-[var(--sniptale-color-text-primary)]',
-          ].join(' ')}
-          data-ui="popup.export.selection-settings"
-          onClick={onOpenSettings}
-        >
-          {translate('popup.export.settingsAction')}
-        </button>
-      ) : null}
-      <div className="group flex items-center">
+      <div
+        className={[
+          'group -mx-1 flex w-[calc(100%+8px)] items-center gap-1 rounded-[9px] px-2',
+          'transition-colors',
+          'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
+        ].join(' ')}
+      >
         <button
           ref={triggerRef}
           type="button"
           aria-controls={drawerId}
           aria-expanded={isOpen}
-          className={cx(triggerClassName, 'min-w-0 flex-1')}
+          className={triggerClassName}
           data-ui="popup.export.selection-trigger"
           onClick={onOpen}
         >
@@ -185,16 +186,32 @@ export function ExportSelectionSectionShell({
           >
             {title}
           </span>
-          <ChevronRight
-            aria-hidden="true"
-            className={[
-              'h-3.5 w-3.5 shrink-0 translate-x-0.5 opacity-0',
-              'transition-[opacity,transform] duration-150',
-              'group-hover:translate-x-0 group-hover:opacity-100',
-              'group-focus-visible:translate-x-0 group-focus-visible:opacity-100',
-            ].join(' ')}
-          />
         </button>
+        {onOpenSettings ? (
+          <button
+            type="button"
+            aria-label={settingsAriaLabel ?? translate('popup.export.pageSettingsTitle')}
+            className={[
+              'shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-medium',
+              'text-[var(--sniptale-color-text-secondary)] transition-colors',
+              'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_70%,transparent)]',
+              'hover:text-[var(--sniptale-color-text-primary)]',
+            ].join(' ')}
+            data-ui="popup.export.selection-settings"
+            onClick={onOpenSettings}
+          >
+            {translate('popup.export.settingsAction')}
+          </button>
+        ) : null}
+        <ChevronRight
+          aria-hidden="true"
+          className={[
+            'h-3.5 w-3.5 shrink-0 translate-x-0.5 opacity-0',
+            'transition-[opacity,transform] duration-150',
+            'group-hover:translate-x-0 group-hover:opacity-100',
+            'group-focus-within:translate-x-0 group-focus-within:opacity-100',
+          ].join(' ')}
+        />
       </div>
       <div
         id={drawerId}

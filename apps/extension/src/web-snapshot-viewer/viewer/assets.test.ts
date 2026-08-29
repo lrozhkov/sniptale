@@ -57,6 +57,7 @@ async function createPackageBlob(args: {
   extras?: Record<string, string | Uint8Array>;
   html?: string | Uint8Array;
   manifest?: WebSnapshotManifest | string;
+  packageFiles?: PagePackageFixtureEntry[];
   screenshotCoverage?: 'full-page' | 'viewport';
 }): Promise<{ manifest: WebSnapshotManifest; packageBlob: Blob }> {
   const html =
@@ -91,6 +92,7 @@ async function createPackageBlob(args: {
       component: 'webCopy',
       path: PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail,
     },
+    ...(args.packageFiles ?? []),
     ...Object.entries(args.extras ?? {})
       .filter(([path]) => !path.includes('..'))
       .map(([path, content]) => ({
@@ -142,12 +144,14 @@ async function stubWebSnapshotRecord(args: {
   extras?: Record<string, string | Uint8Array>;
   html?: string | Uint8Array;
   manifest?: WebSnapshotManifest | string;
+  packageFiles?: PagePackageFixtureEntry[];
   recordManifest?: WebSnapshotManifest;
   screenshotCoverage?: 'full-page' | 'viewport';
 }): Promise<void> {
   const packageArgs: Parameters<typeof createPackageBlob>[0] = {
     ...(args.diagnosticExtras === undefined ? {} : { diagnosticExtras: args.diagnosticExtras }),
     ...(args.manifest === undefined ? {} : { manifest: args.manifest }),
+    ...(args.packageFiles === undefined ? {} : { packageFiles: args.packageFiles }),
     ...(args.screenshotCoverage === undefined
       ? {}
       : { screenshotCoverage: args.screenshotCoverage }),
@@ -294,6 +298,35 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   expect(loaded.html).not.toContain(' href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
   expect(URL.createObjectURL).toHaveBeenCalledTimes(5);
+});
+
+it('lists exported images and attachments lazily and verifies only the selected download', async () => {
+  await stubWebSnapshotRecord({
+    packageFiles: [
+      {
+        blob: new Blob(['report'], { type: 'application/pdf' }),
+        component: 'attachments',
+        path: 'attachments/report.pdf',
+      },
+      {
+        blob: new Blob(['image'], { type: 'image/png' }),
+        component: 'images',
+        path: 'exports/images/photo.png',
+      },
+    ],
+  });
+
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+
+  expect(loaded.packageFiles.map((file) => [file.kind, file.path])).toEqual([
+    ['attachment', 'attachments/report.pdf'],
+    ['exported-image', 'exports/images/photo.png'],
+  ]);
+  const extractedAttachment = await loaded.extractPackageFile('attachments/report.pdf');
+  await expect(readTestBlobText(extractedAttachment)).resolves.toBe('report');
+  await expect(loaded.extractPackageFile('diagnostics/standard/errors.log')).rejects.toThrow(
+    'not available for download'
+  );
 });
 
 it('materializes SVG sprite fragments in DOM and CSS asset references', async () => {

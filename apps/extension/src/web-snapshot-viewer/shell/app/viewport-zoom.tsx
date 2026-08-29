@@ -6,6 +6,7 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
 const FIT_ACTUAL_SIZE_THRESHOLD = 0.99;
+const OVERFLOW_ROUNDING_TOLERANCE = 1;
 
 function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 10) / 10));
@@ -18,9 +19,19 @@ function resolveFitZoom(availableWidth: number, contentWidth: number): number {
   return Math.max(MIN_ZOOM, ratio);
 }
 
+function isInteractivePointerTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return (
+    target.closest(
+      'a, button, input, select, textarea, [role="button"], [contenteditable="true"]'
+    ) !== null
+  );
+}
+
 export function useViewerZoom(contentWidth: number | null) {
   const [surface, setSurface] = useState<HTMLElement | null>(null);
   const [availableWidth, setAvailableWidth] = useState(() => window.innerWidth);
+  const [outerWidth, setOuterWidth] = useState(() => window.innerWidth);
   const [availableHeight, setAvailableHeight] = useState(() => window.innerHeight);
   const [manualZoom, setManualZoom] = useState(1);
   const [fitToWidth, setFitToWidth] = useState(true);
@@ -35,7 +46,9 @@ export function useViewerZoom(contentWidth: number | null) {
   useEffect(() => {
     if (!surface) return undefined;
     const measure = () => {
-      setAvailableWidth(surface.clientWidth || window.innerWidth);
+      const nextAvailableWidth = surface.clientWidth || window.innerWidth;
+      setAvailableWidth(nextAvailableWidth);
+      setOuterWidth(surface.offsetWidth || nextAvailableWidth);
       setAvailableHeight(surface.clientHeight || window.innerHeight);
     };
     measure();
@@ -51,8 +64,16 @@ export function useViewerZoom(contentWidth: number | null) {
 
   const fitZoom = contentWidth === null ? 1 : resolveFitZoom(availableWidth, contentWidth);
   const zoom = fitToWidth ? fitZoom : manualZoom;
-  const canGrab =
-    contentWidth !== null && Math.ceil(contentWidth * zoom) > Math.floor(availableWidth);
+  const scaledContentWidth = contentWidth === null ? null : contentWidth * zoom;
+  const scrollbarGutterWidth = Math.max(0, outerWidth - availableWidth);
+  const meaningfulHorizontalOverflow =
+    scaledContentWidth !== null &&
+    Math.ceil(scaledContentWidth) >
+      Math.floor(availableWidth + scrollbarGutterWidth + OVERFLOW_ROUNDING_TOLERANCE);
+  const suppressScrollbarGutterOverflow =
+    scaledContentWidth !== null &&
+    scaledContentWidth > availableWidth &&
+    !meaningfulHorizontalOverflow;
   const setManualFrom = useCallback((next: number) => {
     setManualZoom(clampZoom(next));
     setFitToWidth(false);
@@ -62,12 +83,20 @@ export function useViewerZoom(contentWidth: number | null) {
     () => ({
       canZoom: contentWidth !== null,
       availableHeight,
-      grabClassName: canGrab ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : '',
+      grabClassName: meaningfulHorizontalOverflow
+        ? isDragging
+          ? 'cursor-grabbing'
+          : 'cursor-grab'
+        : '',
+      horizontalOverflowClassName: suppressScrollbarGutterOverflow
+        ? 'overflow-x-hidden'
+        : 'overflow-x-auto',
       fitToWidth,
       onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
         const target = event.currentTarget;
         if (
           event.button !== 0 ||
+          isInteractivePointerTarget(event.target) ||
           (target.scrollWidth <= target.clientWidth && target.scrollHeight <= target.clientHeight)
         ) {
           return;
@@ -101,7 +130,16 @@ export function useViewerZoom(contentWidth: number | null) {
       surfaceRef: setSurface,
       zoom,
     }),
-    [availableHeight, canGrab, contentWidth, fitToWidth, isDragging, setManualFrom, zoom]
+    [
+      availableHeight,
+      contentWidth,
+      fitToWidth,
+      isDragging,
+      meaningfulHorizontalOverflow,
+      setManualFrom,
+      suppressScrollbarGutterOverflow,
+      zoom,
+    ]
   );
 }
 

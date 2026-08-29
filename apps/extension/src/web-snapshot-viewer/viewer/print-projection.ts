@@ -21,9 +21,18 @@ function mediaMatches(mediaText: string, targetWindow: Window): boolean {
   return mediaText.trim() === '' || targetWindow.matchMedia(mediaText).matches;
 }
 
+function includesPrintMedia(mediaText: string): boolean {
+  return mediaText.split(',').some((mediaQuery) => {
+    const tokens = mediaQuery.trim().toLocaleLowerCase('en-US').split(' ').filter(Boolean);
+    if (tokens[0] === 'only') tokens.shift();
+    return tokens[0] === 'print' && (tokens.length === 1 || tokens[1] === 'and');
+  });
+}
+
 function serializeCssRule(rule: CSSRule, targetWindow: Window): string {
   if (rule.type === CSS_MEDIA_RULE) {
     const mediaRule = rule as CSSMediaRule;
+    if (includesPrintMedia(mediaRule.conditionText)) return mediaRule.cssText;
     return mediaMatches(mediaRule.conditionText, targetWindow)
       ? serializeCssRules(mediaRule.cssRules, targetWindow)
       : '';
@@ -31,11 +40,19 @@ function serializeCssRule(rule: CSSRule, targetWindow: Window): string {
 
   if (rule.type === CSS_IMPORT_RULE) {
     const importRule = rule as CSSImportRule;
-    if (!mediaMatches(importRule.media.mediaText, targetWindow)) return '';
     if (!importRule.styleSheet) {
       throw new Error('Snapshot print stylesheet import is unavailable.');
     }
-    return serializeCssRules(importRule.styleSheet.cssRules, targetWindow);
+    const mediaText = importRule.media.mediaText;
+    if (includesPrintMedia(mediaText)) {
+      return `@media ${mediaText}{${serializeCssRules(
+        importRule.styleSheet.cssRules,
+        targetWindow
+      )}}`;
+    }
+    return mediaMatches(mediaText, targetWindow)
+      ? serializeCssRules(importRule.styleSheet.cssRules, targetWindow)
+      : '';
   }
 
   const nestedRules = getNestedRules(rule);
@@ -90,16 +107,31 @@ export function freezeSnapshotMediaQueries(document: Document, targetWindow: Win
   }
 }
 
-function appendPrintStyles(document: Document, viewport: WebSnapshotViewport | null): void {
-  const width = Math.max(1, Math.round(viewport?.width ?? document.documentElement.clientWidth));
-  const height = Math.max(1, Math.round(viewport?.height ?? document.documentElement.clientHeight));
+function appendPrintStyles(document: Document): void {
   const style = createProjectionStyleElement(document);
   style.setAttribute('data-sniptale-print-policy', '');
   style.textContent = [
-    `@page{size:${width}px ${height}px;margin:0}`,
-    `html,body{width:${width}px;margin:0!important;`,
+    '@page{size:auto;margin:12mm}',
+    'html,body{width:auto!important;min-width:0!important;max-width:none!important;',
+    'overflow:visible!important;margin:0!important;',
     '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}',
-    'img,svg,canvas,video,table,pre,blockquote{break-inside:avoid-page}',
+    'img,svg,canvas,video,pre,blockquote{break-inside:avoid-page}',
+  ].join('');
+  (document.head ?? document.documentElement).append(style);
+}
+
+function appendImagePrintStyles(document: Document, pageWidth: number, pageHeight: number): void {
+  const style = createProjectionStyleElement(document);
+  style.setAttribute('data-sniptale-image-print-policy', '');
+  style.textContent = [
+    `@page{size:${pageWidth}px ${pageHeight}px;margin:0}`,
+    'html,body{margin:0!important;padding:0!important;',
+    '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}',
+    `.sniptale-image-page{position:relative;width:${pageWidth}px;height:${pageHeight}px;`,
+    'overflow:hidden;break-after:page;page-break-after:always}',
+    '.sniptale-image-page:last-child{break-after:auto;page-break-after:auto}',
+    `.sniptale-image-page img{position:absolute;left:0;width:${pageWidth}px;max-width:none;`,
+    'height:auto;display:block}',
   ].join('');
   (document.head ?? document.documentElement).append(style);
 }
@@ -141,6 +173,26 @@ function waitForFrameLoad(frame: HTMLIFrameElement): Promise<void> {
   });
 }
 
+function createPrintFrame(
+  hostDocument: Document,
+  width: number,
+  height: number
+): HTMLIFrameElement {
+  const frame = hostDocument.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
+  frame.style.cssText = [
+    'position:fixed',
+    'left:-100000px',
+    'top:0',
+    `width:${Math.max(1, Math.round(width))}px`,
+    `height:${Math.max(1, Math.round(height))}px`,
+    'border:0',
+    'pointer-events:none',
+  ].join(';');
+  return frame;
+}
+
 async function withProjectionTimeout<T>(work: Promise<T>, targetWindow: Window): Promise<T> {
   let timeoutId: number | null = null;
   const timeout = new Promise<never>((_resolve, reject) => {
@@ -168,18 +220,11 @@ export async function printWebSnapshotProjection(args: {
     throw new Error('Snapshot print host is unavailable.');
   }
 
-  const frame = hostDocument.createElement('iframe');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
-  frame.style.cssText = [
-    'position:fixed',
-    'left:-100000px',
-    'top:0',
-    `width:${Math.max(1, Math.round(args.viewport?.width ?? hostWindow.innerWidth))}px`,
-    `height:${Math.max(1, Math.round(args.viewport?.height ?? hostWindow.innerHeight))}px`,
-    'border:0',
-    'pointer-events:none',
-  ].join(';');
+  const frame = createPrintFrame(
+    hostDocument,
+    args.viewport?.width ?? hostWindow.innerWidth,
+    args.viewport?.height ?? hostWindow.innerHeight
+  );
   const loaded = waitForFrameLoad(frame);
   if (args.documentUrl) frame.src = args.documentUrl;
   else frame.srcdoc = withOfflineSnapshotPolicy(args.html, false);
@@ -194,7 +239,99 @@ export async function printWebSnapshotProjection(args: {
     }
     hydrateSnapshotDeclarativeShadowDom(projectionDocument);
     freezeSnapshotMediaQueries(projectionDocument, projectionWindow);
-    appendPrintStyles(projectionDocument, args.viewport);
+    appendPrintStyles(projectionDocument);
+    await withProjectionTimeout(
+      waitForProjectionLayout(projectionDocument, projectionWindow),
+      hostWindow
+    );
+    projectionWindow.focus();
+    projectionWindow.print();
+  } finally {
+    frame.remove();
+  }
+}
+
+function resolveImagePrintPageSize(args: {
+  image: HTMLImageElement;
+  viewport: WebSnapshotViewport | null;
+  window: Window;
+}): { height: number; width: number } {
+  const width = Math.max(1, Math.round(args.image.naturalWidth || args.viewport?.width || 1));
+  const capturedAspectHeight = args.viewport
+    ? (args.viewport.height * width) / args.viewport.width
+    : Math.min(args.image.naturalHeight || args.window.innerHeight, args.window.innerHeight);
+  return { height: Math.max(1, Math.round(capturedAspectHeight)), width };
+}
+
+function populateImagePrintPages(args: {
+  document: Document;
+  image: HTMLImageElement;
+  pageHeight: number;
+  pageWidth: number;
+  screenshotUrl: string;
+}): void {
+  const imageHeight = Math.max(1, args.image.naturalHeight || args.pageHeight);
+  const pageCount = Math.max(1, Math.ceil(imageHeight / args.pageHeight));
+  args.document.body.replaceChildren();
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    const page = args.document.createElement('div');
+    page.className = 'sniptale-image-page';
+    const image = args.document.createElement('img');
+    image.alt = '';
+    image.src = args.screenshotUrl;
+    image.style.top = `${-pageIndex * args.pageHeight}px`;
+    page.append(image);
+    args.document.body.append(page);
+  }
+}
+
+export async function printWebSnapshotImageProjection(args: {
+  screenshotUrl: string;
+  viewport: WebSnapshotViewport | null;
+  hostDocument?: Document;
+}): Promise<void> {
+  const hostDocument = args.hostDocument ?? document;
+  const hostWindow = hostDocument.defaultView;
+  if (!hostWindow || !hostDocument.body) {
+    throw new Error('Snapshot image print host is unavailable.');
+  }
+  const frame = createPrintFrame(
+    hostDocument,
+    args.viewport?.width ?? hostWindow.innerWidth,
+    args.viewport?.height ?? hostWindow.innerHeight
+  );
+  const loaded = waitForFrameLoad(frame);
+  frame.srcdoc = withOfflineSnapshotPolicy(
+    '<!doctype html><html><head></head><body></body></html>',
+    false
+  );
+  hostDocument.body.append(frame);
+
+  try {
+    await withProjectionTimeout(loaded, hostWindow);
+    const projectionDocument = frame.contentDocument;
+    const projectionWindow = frame.contentWindow;
+    if (!projectionDocument || !projectionWindow) {
+      throw new Error('Snapshot image print projection is unavailable.');
+    }
+    const probe = projectionDocument.createElement('img');
+    probe.alt = '';
+    probe.src = args.screenshotUrl;
+    projectionDocument.body.append(probe);
+    await withProjectionTimeout(waitForImage(probe), hostWindow);
+    const pageSize = resolveImagePrintPageSize({
+      image: probe,
+      viewport: args.viewport,
+      window: projectionWindow,
+    });
+    appendImagePrintStyles(projectionDocument, pageSize.width, pageSize.height);
+    populateImagePrintPages({
+      document: projectionDocument,
+      image: probe,
+      pageHeight: pageSize.height,
+      pageWidth: pageSize.width,
+      screenshotUrl: args.screenshotUrl,
+    });
     await withProjectionTimeout(
       waitForProjectionLayout(projectionDocument, projectionWindow),
       hostWindow

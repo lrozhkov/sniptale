@@ -153,6 +153,9 @@ it('opens capture behavior settings from the Package contents row', async () => 
   await act(async () => settingsButton?.click());
 
   expect(onOpenSettings).toHaveBeenCalledOnce();
+  expect(settingsButton?.parentElement).toBe(
+    container?.querySelector('[data-ui="popup.export.selection-trigger"]')?.parentElement
+  );
 });
 
 it('renders the capture behavior controls in the settings curtain', async () => {
@@ -299,6 +302,35 @@ it('clears optional Library contents without disabling the mandatory Web copy', 
   expect(props.setIncludeBasicLogs).toHaveBeenCalledWith(false);
 });
 
+it('clears Web copy and its full-page screenshot together in Download mode', async () => {
+  const setIncludeWebCopy = vi.fn();
+  const setIncludeFullPageScreenshot = vi.fn();
+  await renderSection({
+    destination: 'export',
+    includeAnnotations: true,
+    includeBasicLogs: true,
+    includeCssDiagnostics: true,
+    includeFiles: true,
+    includeFullPageScreenshot: true,
+    includeViewportScreenshot: true,
+    includePageDiagnostics: true,
+    includeImages: true,
+    includeJson: true,
+    includeMarkdown: true,
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+      setIncludeWebCopy,
+    },
+    setIncludeFullPageScreenshot,
+  });
+
+  await act(async () => findButton('t:popup.export.clearAllTabsButton').click());
+
+  expect(setIncludeWebCopy).toHaveBeenCalledWith(false);
+  expect(setIncludeFullPageScreenshot).toHaveBeenCalledWith(false);
+});
+
 it('clears selected options and forwards row toggles in disabled presentation', async () => {
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({
@@ -327,7 +359,7 @@ it('clears selected options and forwards row toggles in disabled presentation', 
 
   await act(async () => findButton('t:popup.export.clearAllTabsButton').click());
   expect(setIncludeJson).toHaveBeenCalledWith(false);
-  expect(props.setIncludeFullPageScreenshot).not.toHaveBeenCalled();
+  expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledWith(false);
 
   setIncludeJson.mockClear();
   checkboxes[0]?.dispatchEvent(new Event('change', { bubbles: true }));

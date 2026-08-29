@@ -222,8 +222,16 @@ function applyVisibleOptionSelection(args: {
   toggleProps: ExportOptionToggleProps;
   visibleOptions: ExportOptionConfig[];
 }) {
+  const clearsWebCopy =
+    !args.nextValue &&
+    args.destination !== 'save' &&
+    args.visibleOptions.some((option) => option.key === 'webCopy');
+
   for (const option of args.visibleOptions) {
-    if (!args.nextValue && isRequiredOption(args.destination, option.key, args.toggleProps)) {
+    const remainsRequired =
+      isRequiredLibraryOption(args.destination, option.key) ||
+      (option.key === 'fullPageScreenshot' && args.toggleProps.includeWebCopy && !clearsWebCopy);
+    if (!args.nextValue && remainsRequired) {
       continue;
     }
     if (getExportOptionActive(option.key, args.toggleProps) !== args.nextValue) {
@@ -263,11 +271,11 @@ function QuickSelection(props: {
           type="button"
           disabled={props.disabled}
           className={[
-            'h-8 min-w-0 rounded-[7px] border px-1.5 text-[9px]',
-            'border-[var(--sniptale-color-border-soft)]',
-            'text-[var(--sniptale-color-text-secondary)]',
-            'hover:border-[var(--sniptale-color-accent)]',
-            'hover:text-[var(--sniptale-color-text-primary)]',
+            'h-8 min-w-0 rounded-[9px] px-1.5 text-[10px] font-medium',
+            'text-[var(--sniptale-color-text-primary)] transition-colors',
+            'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
+            'outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+            'disabled:pointer-events-none disabled:opacity-45',
           ].join(' ')}
           onClick={() =>
             applyQuickSelection(preset, props.destination, props.options, props.toggleProps)

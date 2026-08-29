@@ -106,7 +106,7 @@ export function PackageCaptureBehaviorSettings(props: {
   return (
     <div
       className={[
-        'min-h-0 overflow-y-auto divide-y pr-1',
+        'min-h-0 overflow-x-hidden overflow-y-auto divide-y pr-1',
         'divide-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_60%,transparent)]',
       ].join(' ')}
     >
@@ -124,8 +124,8 @@ export function PackageCaptureBehaviorSettings(props: {
         description={translate('popup.export.captureFreezeMotionDescription')}
         onChange={(freezeMotion) => props.onChange({ ...props.preferences, freezeMotion })}
       />
-      <div className="flex items-start justify-between gap-3 py-2.5">
-        <span className="min-w-0">
+      <div className="flex min-w-0 items-start justify-between gap-2 py-2.5">
+        <span className="min-w-0 flex-1">
           <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
             {translate('popup.export.captureFloatingElementsLabel')}
           </span>
@@ -135,7 +135,8 @@ export function PackageCaptureBehaviorSettings(props: {
         </span>
         <PopupSelect
           aria-label={translate('popup.export.captureFloatingElementsLabel')}
-          containerClassName="w-[116px] shrink-0"
+          containerClassName="!w-[112px] !max-w-[112px] flex-none"
+          dataUi="popup.export.capture-floating-elements-select"
           value={props.preferences.floatingElements}
           onChange={(floatingElements) =>
             props.onChange({
@@ -205,11 +206,14 @@ function ResourceLimitSelect(props: {
     ? props.values
     : [...props.values, props.value].sort((left, right) => left - right);
   return (
-    <div className="mt-2 flex items-center justify-between gap-3">
-      <span className="text-[10px] text-[var(--sniptale-color-text-secondary)]">{props.label}</span>
+    <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+      <span className="min-w-0 flex-1 text-[10px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+        {props.label}
+      </span>
       <PopupSelect
         aria-label={props.label}
-        containerClassName="w-[104px] shrink-0"
+        containerClassName="!w-[88px] !max-w-[88px] flex-none"
+        dataUi="popup.export.resource-limit-select"
         value={String(props.value)}
         onChange={(value) => props.onChange(Number(value))}
         options={values.map((value) => ({

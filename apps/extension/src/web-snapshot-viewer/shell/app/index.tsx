@@ -3,23 +3,28 @@ import { translate, useAppLocale, type AppLocale } from '../../../platform/i18n'
 import { readSnapshotIdFromLocation } from './route';
 import { SnapshotPreparationHost } from '../../preparation/host';
 import { blockSnapshotFrameNavigation } from '../../viewer/frame-navigation';
+import { installSnapshotFrameStaticInteractions } from '../../viewer/frame-interactions';
 import { hydrateSnapshotDeclarativeShadowDom } from '../../viewer/declarative-shadow';
 import { loadWebSnapshotPackage, revokeWebSnapshotObjectUrls } from '../../viewer/assets';
 import { WebSnapshotFrame } from '../../viewer/iframe';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
+import type { ViewerPackageFile } from '../../viewer/package-files';
 import { WebSnapshotVisualSurface, type WebSnapshotViewerMode } from './view-mode';
 import { WebSnapshotAssetCatalog } from './asset-catalog';
 import { useViewerZoom } from './viewport-zoom';
-import { loadSettings } from '../../../composition/persistence/settings';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { printWebSnapshotProjection } from '../../viewer/print-projection';
+import {
+  printWebSnapshotImageProjection,
+  printWebSnapshotProjection,
+} from '../../viewer/print-projection';
 import { CollapsedToolbarButton, SnapshotViewerToolbar } from './toolbar';
 
 type ViewerViewport = { width: number; height: number } | null;
 type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error'; message: string };
 type ReadySnapshotIframe = { iframe: HTMLIFrameElement; loadedKey: string };
 let loadedPackageRevisionSeed = 0;
+const PACKAGE_FILE_DOWNLOAD_URL_LIFETIME_MS = 1500;
 const logger = createLogger({ namespace: 'WebSnapshotViewer' });
 
 function getSourceTitle(sourceTitle: string | null | undefined): string | null {
@@ -44,6 +49,18 @@ function getViewerErrorMessage(error: ViewerError, locale: AppLocale): string {
   return error.message;
 }
 
+function downloadViewerPackageFile(blob: Blob, filename: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.download = filename;
+  anchor.href = objectUrl;
+  anchor.hidden = true;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), PACKAGE_FILE_DOWNLOAD_URL_LIFETIME_MS);
+}
+
 function useViewerDocumentTitle(loaded: LoadedWebSnapshotPackage | null): AppLocale {
   const locale = useAppLocale();
 
@@ -64,10 +81,13 @@ function SnapshotFrameSurface(props: {
   externalLinksEnabled: boolean;
   onIframeElementChange: (iframe: HTMLIFrameElement | null) => void;
   onIframeLoaded: (iframe: HTMLIFrameElement) => void;
+  onExternalLinkPreviewChange: (href: string | null) => void;
   onOpenExternalLink: (href: string) => void;
   zoom: number;
 }) {
   const { iframeRef, onIframeElementChange, onIframeLoaded } = props;
+  const navigationCleanupRef = useRef<(() => void) | null>(null);
+  const interactionCleanupRef = useRef<(() => void) | null>(null);
   const handleIframeRef = useCallback(
     (node: HTMLIFrameElement | null) => {
       iframeRef.current = node;
@@ -75,16 +95,49 @@ function SnapshotFrameSurface(props: {
     },
     [iframeRef, onIframeElementChange]
   );
-  const handleIframeLoad = useCallback(() => {
-    hydrateSnapshotDeclarativeShadowDom(iframeRef.current?.contentDocument ?? null);
-    blockSnapshotFrameNavigation(iframeRef.current, {
+  const installNavigationPolicy = useCallback(() => {
+    navigationCleanupRef.current?.();
+    navigationCleanupRef.current = blockSnapshotFrameNavigation(iframeRef.current, {
       externalLinksEnabled: props.externalLinksEnabled,
+      onExternalLinkPreviewChange: props.onExternalLinkPreviewChange,
       onOpenExternalLink: props.onOpenExternalLink,
     });
+  }, [
+    iframeRef,
+    props.externalLinksEnabled,
+    props.onExternalLinkPreviewChange,
+    props.onOpenExternalLink,
+  ]);
+  const installStaticInteractions = useCallback(() => {
+    interactionCleanupRef.current?.();
+    interactionCleanupRef.current = installSnapshotFrameStaticInteractions(iframeRef.current);
+  }, [iframeRef]);
+  const handleIframeLoad = useCallback(() => {
+    hydrateSnapshotDeclarativeShadowDom(iframeRef.current?.contentDocument ?? null);
+    installNavigationPolicy();
+    installStaticInteractions();
     if (iframeRef.current) {
       onIframeLoaded(iframeRef.current);
     }
-  }, [iframeRef, onIframeLoaded, props.externalLinksEnabled, props.onOpenExternalLink]);
+  }, [iframeRef, installNavigationPolicy, installStaticInteractions, onIframeLoaded]);
+  useEffect(() => {
+    if (iframeRef.current?.contentDocument?.readyState === 'complete') {
+      installNavigationPolicy();
+    }
+    return () => {
+      navigationCleanupRef.current?.();
+      navigationCleanupRef.current = null;
+    };
+  }, [iframeRef, installNavigationPolicy]);
+  useEffect(() => {
+    if (iframeRef.current?.contentDocument?.readyState === 'complete') {
+      installStaticInteractions();
+    }
+    return () => {
+      interactionCleanupRef.current?.();
+      interactionCleanupRef.current = null;
+    };
+  }, [iframeRef, installStaticInteractions]);
   const resolvedViewport = props.currentViewport ?? props.loaded.manifest.viewport ?? null;
   if (resolvedViewport === null) {
     return (
@@ -193,13 +246,22 @@ function SnapshotModeContent(props: {
   loaded: LoadedWebSnapshotPackage;
   locale: AppLocale;
   mode: WebSnapshotViewerMode;
+  onDownloadPackageFile: (file: ViewerPackageFile) => Promise<void>;
   onViewportChange: (viewport: ViewerViewport) => void;
+  onExternalLinkPreviewChange: (href: string | null) => void;
   onOpenExternalLink: (href: string) => void;
   preparationIframe: HTMLIFrameElement | null;
   zoom: number;
 }) {
   if (props.mode === 'assets') {
-    return <WebSnapshotAssetCatalog assets={props.loaded.assets} locale={props.locale} />;
+    return (
+      <WebSnapshotAssetCatalog
+        assets={props.loaded.assets}
+        locale={props.locale}
+        onDownloadPackageFile={props.onDownloadPackageFile}
+        packageFiles={props.loaded.packageFiles}
+      />
+    );
   }
   if (props.mode === 'visual') {
     return (
@@ -224,6 +286,7 @@ function SnapshotModeContent(props: {
         locale={props.locale}
         onIframeElementChange={props.handleIframeElementChange}
         onIframeLoaded={props.handleIframeLoaded}
+        onExternalLinkPreviewChange={props.onExternalLinkPreviewChange}
         onOpenExternalLink={props.onOpenExternalLink}
         zoom={props.zoom}
       />
@@ -238,16 +301,15 @@ function SnapshotModeContent(props: {
   );
 }
 
-function WebSnapshotViewerSurface(props: {
-  externalLinksEnabled: boolean;
-  loaded: LoadedWebSnapshotPackage;
-  locale: AppLocale;
-}) {
+function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; locale: AppLocale }) {
   const [toolbarVisible, setToolbarVisible] = useState(true);
   const [currentViewport, setCurrentViewport] = useState<ViewerViewport>(null);
+  const [externalLinksEnabled, setExternalLinksEnabled] = useState(false);
+  const [externalLinkPreview, setExternalLinkPreview] = useState<string | null>(null);
   const [mode, setMode] = useState<WebSnapshotViewerMode>('static-document');
   const [printState, setPrintState] = useState<'error' | 'idle' | 'preparing'>('idle');
   const printPendingRef = useRef(false);
+  const packageFileDownloadPendingRef = useRef(false);
   const { handleIframeElementChange, handleIframeLoaded, iframeRef, preparationIframe } =
     useSnapshotPreparationFrame(props.loaded);
   const resolvedViewport = currentViewport ?? props.loaded.manifest.viewport ?? null;
@@ -263,15 +325,37 @@ function WebSnapshotViewerSurface(props: {
       logger.warn('Failed to open an external snapshot link');
     });
   }, []);
+  const downloadPackageFile = useCallback(
+    async (file: ViewerPackageFile) => {
+      if (packageFileDownloadPendingRef.current) {
+        throw new Error('Another snapshot package file is already being extracted.');
+      }
+      packageFileDownloadPendingRef.current = true;
+      try {
+        const blob = await props.loaded.extractPackageFile(file.path);
+        downloadViewerPackageFile(blob, file.name);
+      } finally {
+        packageFileDownloadPendingRef.current = false;
+      }
+    },
+    [props.loaded]
+  );
   const printSnapshot = useCallback(() => {
     if (printPendingRef.current) return;
     printPendingRef.current = true;
     setPrintState('preparing');
-    void printWebSnapshotProjection({
-      documentUrl: props.loaded.documentUrl,
-      html: props.loaded.html,
-      viewport: props.loaded.manifest.viewport,
-    })
+    const projection =
+      mode === 'visual'
+        ? printWebSnapshotImageProjection({
+            screenshotUrl: props.loaded.screenshotUrl,
+            viewport: props.loaded.manifest.viewport,
+          })
+        : printWebSnapshotProjection({
+            documentUrl: props.loaded.documentUrl,
+            html: props.loaded.html,
+            viewport: props.loaded.manifest.viewport,
+          });
+    void projection
       .then(() => {
         printPendingRef.current = false;
         setPrintState('idle');
@@ -281,7 +365,7 @@ function WebSnapshotViewerSurface(props: {
         logger.warn('Failed to prepare snapshot PDF projection');
         setPrintState('error');
       });
-  }, [props.loaded]);
+  }, [mode, props.loaded]);
 
   return (
     <main
@@ -290,10 +374,12 @@ function WebSnapshotViewerSurface(props: {
     >
       {toolbarVisible ? (
         <SnapshotViewerToolbar
+          externalLinksEnabled={externalLinksEnabled}
           loaded={props.loaded}
           locale={props.locale}
           mode={mode}
           onCollapse={() => setToolbarVisible(false)}
+          onExternalLinksEnabledChange={setExternalLinksEnabled}
           onModeChange={setMode}
           onPrint={printSnapshot}
           printPending={printState === 'preparing'}
@@ -313,7 +399,8 @@ function WebSnapshotViewerSurface(props: {
       <section
         ref={zoom.surfaceRef}
         data-testid="snapshot-viewer-surface"
-        className={`relative min-h-0 w-full min-w-0 max-w-full flex-1 overflow-auto ${zoom.grabClassName}`}
+        className={`relative min-h-0 w-full min-w-0 max-w-full flex-1 overflow-y-auto
+          ${zoom.horizontalOverflowClassName} ${zoom.grabClassName}`}
         style={{ scrollbarGutter: 'stable' }}
         onPointerDown={zoom.onPointerDown}
         onPointerMove={zoom.onPointerMove}
@@ -326,41 +413,38 @@ function WebSnapshotViewerSurface(props: {
         <SnapshotModeContent
           availableHeight={zoom.availableHeight}
           currentViewport={currentViewport}
-          externalLinksEnabled={props.externalLinksEnabled}
+          externalLinksEnabled={externalLinksEnabled}
           handleIframeElementChange={handleIframeElementChange}
           handleIframeLoaded={handleIframeLoaded}
           iframeRef={iframeRef}
           loaded={props.loaded}
           locale={props.locale}
           mode={mode}
+          onDownloadPackageFile={downloadPackageFile}
           onViewportChange={setCurrentViewport}
+          onExternalLinkPreviewChange={setExternalLinkPreview}
           onOpenExternalLink={openExternalLink}
           preparationIframe={preparationIframe}
           zoom={zoom.zoom}
         />
       </section>
+      {externalLinkPreview === null ? null : (
+        <div
+          className="pointer-events-none fixed bottom-0 left-0 z-30 max-w-[min(720px,calc(100vw-16px))]
+            truncate rounded-tr-md border border-b-0 border-l-0
+            border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
+            px-2.5 py-1 text-[11px] text-[var(--sniptale-color-text-muted)] shadow-md"
+          data-testid="snapshot-external-link-preview"
+          title={externalLinkPreview}
+        >
+          <span className="sr-only">
+            {translate('webSnapshotViewer.app.externalLinkDestination', props.locale)}:{' '}
+          </span>
+          {externalLinkPreview}
+        </div>
+      )}
     </main>
   );
-}
-
-function useExternalSnapshotLinksEnabled(): boolean {
-  const [enabled, setEnabled] = useState(false);
-
-  useEffect(() => {
-    let disposed = false;
-    void loadSettings()
-      .then((settings) => {
-        if (!disposed) setEnabled(settings.externalSnapshotLinksEnabled);
-      })
-      .catch(() => {
-        if (!disposed) setEnabled(false);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, []);
-
-  return enabled;
 }
 
 function useLoadedWebSnapshotPackage() {
@@ -405,7 +489,6 @@ function useLoadedWebSnapshotPackage() {
 
 export function WebSnapshotViewerApp() {
   const { error, loaded } = useLoadedWebSnapshotPackage();
-  const externalLinksEnabled = useExternalSnapshotLinksEnabled();
   const locale = useViewerDocumentTitle(loaded);
 
   if (error) {
@@ -424,11 +507,5 @@ export function WebSnapshotViewerApp() {
     );
   }
 
-  return (
-    <WebSnapshotViewerSurface
-      externalLinksEnabled={externalLinksEnabled}
-      loaded={loaded}
-      locale={locale}
-    />
-  );
+  return <WebSnapshotViewerSurface loaded={loaded} locale={locale} />;
 }

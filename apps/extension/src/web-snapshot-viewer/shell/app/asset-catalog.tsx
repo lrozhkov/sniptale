@@ -1,8 +1,17 @@
 import { Download, File, FileCode2, Image, Type } from 'lucide-react';
+import { useState } from 'react';
 import type { LoadedWebSnapshotAsset } from '../../viewer/asset-objects';
+import type { ViewerPackageFile } from '../../viewer/package-files';
 import { translate, type AppLocale } from '../../../platform/i18n';
+import {
+  formatCatalogFileSize,
+  getCatalogFileFormat,
+  getCatalogFileName,
+} from './file-presentation';
+import { ViewerPackageFileList } from './package-file-list';
 
 type AssetKind = 'font' | 'image' | 'other' | 'style';
+type CatalogSection = 'attachments' | 'exported-images' | 'resources';
 
 function getAssetKind(asset: LoadedWebSnapshotAsset): AssetKind {
   if (asset.mimeType.startsWith('image/')) return 'image';
@@ -11,37 +20,12 @@ function getAssetKind(asset: LoadedWebSnapshotAsset): AssetKind {
   return 'other';
 }
 
-function formatAssetSize(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getAssetName(path: string): string {
-  return path.split('/').at(-1) || path;
-}
-
-function getAssetFormat(asset: LoadedWebSnapshotAsset): string {
-  const subtype = asset.mimeType.split('/')[1]?.split(';')[0]?.trim().toLowerCase();
-  const canonicalFormats: Record<string, string> = {
-    jpeg: 'JPEG',
-    'svg+xml': 'SVG',
-    'x-font-ttf': 'TTF',
-    'x-font-woff': 'WOFF',
-  };
-  if (subtype && subtype !== 'octet-stream') {
-    return canonicalFormats[subtype] ?? subtype.toUpperCase();
-  }
-  const extension = getAssetName(asset.path).split('.').at(-1);
-  return extension && extension !== getAssetName(asset.path) ? extension.toUpperCase() : 'BIN';
-}
-
 function groupAssetsByFormat(
   assets: LoadedWebSnapshotAsset[]
 ): Map<string, LoadedWebSnapshotAsset[]> {
   const groups = new Map<string, LoadedWebSnapshotAsset[]>();
   for (const asset of assets) {
-    const format = getAssetFormat(asset);
+    const format = getCatalogFileFormat(asset);
     groups.set(format, [...(groups.get(format) ?? []), asset]);
   }
   return groups;
@@ -70,11 +54,15 @@ const assetFormatTitleClassName = [
   'mb-2 text-[10px] font-semibold uppercase tracking-wide',
   'text-[var(--sniptale-color-text-muted)]',
 ].join(' ');
+const catalogTabClassName = [
+  'h-8 rounded-md px-2.5 text-[11px] font-medium transition-colors',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+].join(' ');
 
 function AssetCard(props: { asset: LoadedWebSnapshotAsset; locale: AppLocale }) {
   const kind = getAssetKind(props.asset);
   const Icon = kind === 'font' ? Type : kind === 'style' ? FileCode2 : File;
-  const assetName = getAssetName(props.asset.path);
+  const assetName = getCatalogFileName(props.asset.path);
   const downloadLabel = translate('webSnapshotViewer.app.downloadAsset', props.locale);
 
   return (
@@ -82,7 +70,7 @@ function AssetCard(props: { asset: LoadedWebSnapshotAsset; locale: AppLocale }) 
       {kind === 'image' ? (
         <div className={assetPreviewClassName}>
           <img
-            alt={getAssetName(props.asset.path)}
+            alt={getCatalogFileName(props.asset.path)}
             className="max-h-full max-w-full object-contain"
             loading="lazy"
             src={props.asset.url}
@@ -98,11 +86,11 @@ function AssetCard(props: { asset: LoadedWebSnapshotAsset; locale: AppLocale }) 
           className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
           title={props.asset.path}
         >
-          {getAssetName(props.asset.path)}
+          {getCatalogFileName(props.asset.path)}
         </p>
         <div className="mt-1 flex items-center gap-1">
           <p className="min-w-0 flex-1 truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
-            {props.asset.mimeType} · {formatAssetSize(props.asset.size)}
+            {props.asset.mimeType} · {formatCatalogFileSize(props.asset.size)}
           </p>
           {props.asset.downloadUrl ? (
             <a
@@ -140,11 +128,68 @@ const assetGroups: Array<{
   { icon: File, kind: 'other', labelKey: 'webSnapshotViewer.app.assetOther' },
 ];
 
+function ResourceAssetGroups(props: { assets: LoadedWebSnapshotAsset[]; locale: AppLocale }) {
+  return assetGroups.map((group) => {
+    const assets = props.assets.filter((asset) => getAssetKind(asset) === group.kind);
+    if (assets.length === 0) return null;
+    const GroupIcon = group.icon;
+    const assetsByFormat = groupAssetsByFormat(assets);
+    return (
+      <section key={group.kind}>
+        <h3 className={assetGroupTitleClassName}>
+          <GroupIcon aria-hidden className="size-4" />
+          {translate(group.labelKey, props.locale)} ({assets.length})
+        </h3>
+        <div className="space-y-4">
+          {Array.from(assetsByFormat.entries()).map(([format, formatAssets]) => (
+            <div key={format}>
+              <h4 className={assetFormatTitleClassName}>
+                {format} ({formatAssets.length})
+              </h4>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+                {formatAssets.map((asset) => (
+                  <AssetCard asset={asset} key={asset.path} locale={props.locale} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  });
+}
+
 export function WebSnapshotAssetCatalog(props: {
   assets: LoadedWebSnapshotAsset[];
+  packageFiles: ViewerPackageFile[];
   locale: AppLocale;
+  onDownloadPackageFile: (file: ViewerPackageFile) => Promise<void>;
 }) {
-  if (props.assets.length === 0) {
+  const [selectedSection, setSelectedSection] = useState<CatalogSection>('exported-images');
+  const exportedImages = props.packageFiles.filter((file) => file.kind === 'exported-image');
+  const attachments = props.packageFiles.filter((file) => file.kind === 'attachment');
+  const sections = [
+    {
+      count: exportedImages.length,
+      id: 'exported-images' as const,
+      label: translate('webSnapshotViewer.app.exportedImages', props.locale),
+    },
+    {
+      count: attachments.length,
+      id: 'attachments' as const,
+      label: translate('webSnapshotViewer.app.downloadedAttachments', props.locale),
+    },
+    {
+      count: props.assets.length,
+      id: 'resources' as const,
+      label: translate('webSnapshotViewer.app.pageResources', props.locale),
+    },
+  ].filter((section) => section.count > 0);
+  const resolvedSection = sections.some((section) => section.id === selectedSection)
+    ? selectedSection
+    : sections[0]?.id;
+
+  if (sections.length === 0 || resolvedSection === undefined) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-sm text-[var(--sniptale-color-text-muted)]">
         {translate('webSnapshotViewer.app.assetsEmpty', props.locale)}
@@ -162,34 +207,39 @@ export function WebSnapshotAssetCatalog(props: {
           {translate('webSnapshotViewer.app.assetsDescription', props.locale)}
         </p>
       </div>
-      {assetGroups.map((group) => {
-        const assets = props.assets.filter((asset) => getAssetKind(asset) === group.kind);
-        if (assets.length === 0) return null;
-        const GroupIcon = group.icon;
-        const assetsByFormat = groupAssetsByFormat(assets);
-        return (
-          <section key={group.kind}>
-            <h3 className={assetGroupTitleClassName}>
-              <GroupIcon aria-hidden className="size-4" />
-              {translate(group.labelKey, props.locale)} ({assets.length})
-            </h3>
-            <div className="space-y-4">
-              {Array.from(assetsByFormat.entries()).map(([format, formatAssets]) => (
-                <div key={format}>
-                  <h4 className={assetFormatTitleClassName}>
-                    {format} ({formatAssets.length})
-                  </h4>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-                    {formatAssets.map((asset) => (
-                      <AssetCard asset={asset} key={asset.path} locale={props.locale} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+      <div
+        aria-label={translate('webSnapshotViewer.app.assetsTitle', props.locale)}
+        className="flex flex-wrap gap-1"
+        role="group"
+      >
+        {sections.map((section) => {
+          const selected = section.id === resolvedSection;
+          return (
+            <button
+              type="button"
+              aria-pressed={selected}
+              className={`${catalogTabClassName} ${
+                selected
+                  ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
+                  : 'text-[var(--sniptale-color-text-muted)] hover:text-[var(--sniptale-color-text-primary)]'
+              }`}
+              key={section.id}
+              onClick={() => setSelectedSection(section.id)}
+            >
+              {section.label} ({section.count})
+            </button>
+          );
+        })}
+      </div>
+      {resolvedSection === 'resources' ? (
+        <ResourceAssetGroups assets={props.assets} locale={props.locale} />
+      ) : (
+        <ViewerPackageFileList
+          files={resolvedSection === 'attachments' ? attachments : exportedImages}
+          locale={props.locale}
+          onDownloadPackageFile={props.onDownloadPackageFile}
+        />
+      )}
     </div>
   );
 }

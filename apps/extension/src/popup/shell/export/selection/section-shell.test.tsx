@@ -10,6 +10,7 @@ vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
 }));
 
 import { ExportSelectionSectionShell } from './section-shell';
+import { PopupSelect } from '../../../../ui/popup-shell/select';
 
 type ShellProps = ComponentProps<typeof ExportSelectionSectionShell>;
 
@@ -52,8 +53,19 @@ afterEach(() => {
 
 describe('ExportSelectionSectionShell', () => {
   it('renders the closed shell and delegates opening', async () => {
-    const props = await renderShell({ bodyClassName: 'drawer-body', className: 'owner-shell' });
-    const button = container?.querySelector('button') as HTMLButtonElement;
+    const onOpenSettings = vi.fn();
+    const props = await renderShell({
+      bodyClassName: 'drawer-body',
+      className: 'owner-shell',
+      onOpenSettings,
+      settingsAriaLabel: 'Selection settings',
+    });
+    const button = container?.querySelector(
+      '[data-ui="popup.export.selection-trigger"]'
+    ) as HTMLButtonElement;
+    const settingsButton = container?.querySelector(
+      '[data-ui="popup.export.selection-settings"]'
+    ) as HTMLButtonElement;
     const drawer = container?.querySelector('[aria-label="Export options"]');
     const heading = container?.querySelector<HTMLElement>(
       '[data-ui="popup.export.selection-heading"]'
@@ -66,11 +78,18 @@ describe('ExportSelectionSectionShell', () => {
     expect(heading?.className).toContain('var(--sniptale-color-text-muted-strong)');
     expect(button.getAttribute('data-ui')).toBe('popup.export.selection-trigger');
     expect(button.textContent).not.toContain('t:popup.export.editButton');
-    expect(button.querySelector('svg')?.className.baseVal).toContain('group-hover:opacity-100');
+    expect(button.parentElement?.querySelector('svg')?.className.baseVal).toContain(
+      'group-hover:opacity-100'
+    );
+    expect(settingsButton.parentElement).toBe(button.parentElement);
+    expect(settingsButton.getAttribute('aria-label')).toBe('Selection settings');
     expect(drawer?.className).toContain('drawer-body');
     expect(container?.querySelector('section')?.className).toContain('owner-shell');
 
     await act(async () => button.click());
+    expect(props.onOpen).toHaveBeenCalledOnce();
+    await act(async () => settingsButton.click());
+    expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(props.onOpen).toHaveBeenCalledOnce();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -112,6 +131,37 @@ describe('ExportSelectionSectionShell', () => {
       await Promise.resolve();
     });
     expect(document.activeElement?.getAttribute('data-ui')).toBe('popup.export.selection-trigger');
+  });
+
+  it('keeps the curtain open while a portaled product select commits an option', async () => {
+    const onChange = vi.fn();
+    const props = await renderShell({
+      isOpen: true,
+      children: (
+        <PopupSelect
+          aria-label="Capture policy"
+          onChange={onChange}
+          options={[
+            { label: 'First', value: 'first' },
+            { label: 'Second', value: 'second' },
+          ]}
+          value="first"
+        />
+      ),
+    });
+    const select = container?.querySelector('[aria-label="Capture policy"]') as HTMLButtonElement;
+    await act(async () => select.click());
+    const option = [...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (candidate) => candidate.textContent === 'Second'
+    );
+
+    await act(async () => {
+      option?.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+      option?.click();
+    });
+
+    expect(onChange).toHaveBeenCalledWith('second');
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 
   it('keeps keyboard focus inside the open curtain', async () => {

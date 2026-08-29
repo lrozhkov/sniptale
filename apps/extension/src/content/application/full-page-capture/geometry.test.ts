@@ -90,6 +90,53 @@ it('selects one dominant internal scroller and composes shell plus full content 
   );
 });
 
+it('captures a dominant internal scroller vertically without expanding a hostile horizontal extent', () => {
+  const documentRoot = useDocumentRoot();
+  defineBox(documentRoot, {
+    clientHeight: 600,
+    clientWidth: 800,
+    scrollHeight: 600,
+    scrollWidth: 800,
+  });
+  const scroller = document.createElement('div');
+  scroller.style.overflowX = 'auto';
+  scroller.style.overflowY = 'auto';
+  defineBox(scroller, {
+    clientHeight: 500,
+    clientWidth: 760,
+    scrollHeight: 2_400,
+    scrollWidth: 50_000,
+  });
+  Object.defineProperties(scroller, {
+    clientLeft: { configurable: true, value: 0 },
+    clientTop: { configurable: true, value: 0 },
+  });
+  vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({
+    bottom: 550,
+    height: 500,
+    left: 20,
+    right: 780,
+    top: 50,
+    width: 760,
+    x: 20,
+    y: 50,
+    toJSON: () => ({}),
+  });
+  document.body.append(scroller);
+
+  const geometry = measureCaptureGeometry(resolvePageScrollRoot());
+
+  expect(geometry).toEqual(
+    expect.objectContaining({
+      extentHeight: 2_400,
+      extentWidth: 760,
+      outputHeight: 2_500,
+      outputWidth: 800,
+      rootKind: 'element',
+    })
+  );
+});
+
 it('fails closed when two independent internal scrollers have comparable scores', () => {
   const documentRoot = useDocumentRoot();
   defineBox(documentRoot, {

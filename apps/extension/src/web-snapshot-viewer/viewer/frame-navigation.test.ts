@@ -17,19 +17,30 @@ function createFrameWithLink(href: string): { iframe: HTMLIFrameElement; link: H
 it('keeps snapshot navigation inert when external links are disabled', () => {
   const { iframe, link } = createFrameWithLink('https://example.test/page');
   const onOpenExternalLink = vi.fn();
-  blockSnapshotFrameNavigation(iframe, { externalLinksEnabled: false, onOpenExternalLink });
+  const onExternalLinkPreviewChange = vi.fn();
+  blockSnapshotFrameNavigation(iframe, {
+    externalLinksEnabled: false,
+    onExternalLinkPreviewChange,
+    onOpenExternalLink,
+  });
 
   const click = new MouseEvent('click', { bubbles: true, cancelable: true });
   link.dispatchEvent(click);
 
   expect(click.defaultPrevented).toBe(true);
+  link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  expect(onExternalLinkPreviewChange).not.toHaveBeenCalled();
   expect(onOpenExternalLink).not.toHaveBeenCalled();
 });
 
 it('opens only a validated projected HTTP(S) link after an explicit click', () => {
   const { iframe, link } = createFrameWithLink('https://example.test/page?view=full#part');
   const onOpenExternalLink = vi.fn();
-  blockSnapshotFrameNavigation(iframe, { externalLinksEnabled: true, onOpenExternalLink });
+  blockSnapshotFrameNavigation(iframe, {
+    externalLinksEnabled: true,
+    onExternalLinkPreviewChange: vi.fn(),
+    onOpenExternalLink,
+  });
 
   link.click();
   expect(onOpenExternalLink).toHaveBeenCalledWith('https://example.test/page?view=full#part');
@@ -46,10 +57,35 @@ it('continues to block form submission independently of the link setting', () =>
   iframe.contentDocument!.body.appendChild(form);
   blockSnapshotFrameNavigation(iframe, {
     externalLinksEnabled: true,
+    onExternalLinkPreviewChange: vi.fn(),
     onOpenExternalLink: vi.fn(),
   });
 
   const submit = new Event('submit', { bubbles: true, cancelable: true });
   form.dispatchEvent(submit);
   expect(submit.defaultPrevented).toBe(true);
+});
+
+it('previews only safe enabled links and removes its frame listeners on cleanup', () => {
+  const { iframe, link } = createFrameWithLink('https://example.test/page?view=full#part');
+  const onExternalLinkPreviewChange = vi.fn();
+  const onOpenExternalLink = vi.fn();
+  const cleanup = blockSnapshotFrameNavigation(iframe, {
+    externalLinksEnabled: true,
+    onExternalLinkPreviewChange,
+    onOpenExternalLink,
+  });
+
+  link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  expect(onExternalLinkPreviewChange).toHaveBeenLastCalledWith(
+    'https://example.test/page?view=full#part'
+  );
+  link.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+  expect(onExternalLinkPreviewChange).toHaveBeenLastCalledWith(null);
+
+  cleanup();
+  onExternalLinkPreviewChange.mockClear();
+  link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  expect(onOpenExternalLink).not.toHaveBeenCalled();
+  expect(onExternalLinkPreviewChange).not.toHaveBeenCalled();
 });

@@ -36,4 +36,9 @@ it('maps every package entry family to its canonical byte limit', () => {
   expect(resolveWebSnapshotEntryByteLimit('assets/image.png', 'image/png')).toBe(
     WEB_SNAPSHOT_PACKAGE_POLICY.maxAssetEntryBytes
   );
+  for (const path of ['attachments/report.pdf', 'exports/images/photo.png']) {
+    expect(resolveWebSnapshotEntryByteLimit(path)).toBe(
+      WEB_SNAPSHOT_PACKAGE_POLICY.maxExportResourceEntryBytes
+    );
+  }
 });

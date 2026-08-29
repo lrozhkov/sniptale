@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
   blockSnapshotFrameNavigation: vi.fn(),
   browserTabsCreate: vi.fn(),
   latestFrameLoad: null as (() => void) | null,
-  loadSettings: vi.fn(),
   loadWebSnapshotPackage: vi.fn(),
+  printWebSnapshotImageProjection: vi.fn(),
   printWebSnapshotProjection: vi.fn(),
   readSnapshotIdFromLocation: vi.fn(),
   revokeWebSnapshotObjectUrls: vi.fn(),
@@ -40,10 +40,8 @@ vi.mock('../../viewer/frame-navigation', () => ({
 }));
 vi.mock('../../viewer/print-projection', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../viewer/print-projection')>()),
+  printWebSnapshotImageProjection: mocks.printWebSnapshotImageProjection,
   printWebSnapshotProjection: mocks.printWebSnapshotProjection,
-}));
-vi.mock('../../../composition/persistence/settings', () => ({
-  loadSettings: mocks.loadSettings,
 }));
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { create: mocks.browserTabsCreate },
@@ -94,9 +92,11 @@ function createViewerManifest(overrides: Partial<WebSnapshotManifest> = {}): Web
 
 function createLoadedPackage(args: {
   assets?: LoadedWebSnapshotPackage['assets'];
+  extractPackageFile?: LoadedWebSnapshotPackage['extractPackageFile'];
   html?: string;
   manifest?: Partial<WebSnapshotManifest>;
   objectUrls?: string[];
+  packageFiles?: LoadedWebSnapshotPackage['packageFiles'];
 }): LoadedWebSnapshotPackage {
   return {
     archiveFilename: 'Page_title.sniptale-page-package.zip',
@@ -104,10 +104,13 @@ function createLoadedPackage(args: {
     archiveUrl: 'blob:snapshot-archive',
     assets: args.assets ?? [],
     documentUrl: null,
+    extractPackageFile: args.extractPackageFile ?? vi.fn(async () => new Blob(['file'])),
     html: args.html ?? '<p>Snapshot</p>',
     manifest: createViewerManifest(args.manifest ?? {}),
     objectUrls: args.objectUrls ?? [],
+    packageFiles: args.packageFiles ?? [],
     screenshotCoverage: 'full-page',
+    screenshotFilename: 'Page_title.png',
     screenshotUrl: 'blob:snapshot-screenshot',
   };
 }
@@ -139,7 +142,8 @@ beforeEach(() => {
   mocks.loadWebSnapshotPackage.mockReset();
   mocks.printWebSnapshotProjection.mockReset();
   mocks.printWebSnapshotProjection.mockResolvedValue(undefined);
-  mocks.loadSettings.mockResolvedValue({ externalSnapshotLinksEnabled: false });
+  mocks.printWebSnapshotImageProjection.mockReset();
+  mocks.printWebSnapshotImageProjection.mockResolvedValue(undefined);
   mocks.browserTabsCreate.mockResolvedValue({});
   document.documentElement.lang = 'en';
   document.title = 'Sniptale Web Snapshot';
@@ -151,8 +155,7 @@ beforeEach(() => {
   mocks.SnapshotPreparationHost.mockClear();
 });
 
-it('opens a projected snapshot link in a new active tab only when the setting is enabled', async () => {
-  mocks.loadSettings.mockResolvedValue({ externalSnapshotLinksEnabled: true });
+it('keeps links blocked until the Viewer toggle enables preview and external navigation', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
 
   await act(async () => {
@@ -160,10 +163,30 @@ it('opens a projected snapshot link in a new active tab only when the setting is
   });
   await loadSnapshotIframe();
 
-  const options = mocks.blockSnapshotFrameNavigation.mock.calls.at(-1)?.[1] as
-    | { externalLinksEnabled: boolean; onOpenExternalLink: (href: string) => void }
+  let options = mocks.blockSnapshotFrameNavigation.mock.calls.at(-1)?.[1] as
+    | {
+        externalLinksEnabled: boolean;
+        onExternalLinkPreviewChange: (href: string | null) => void;
+        onOpenExternalLink: (href: string) => void;
+      }
     | undefined;
+  expect(options?.externalLinksEnabled).toBe(false);
+  expect(container?.querySelector('[data-testid="snapshot-external-link-preview"]')).toBeNull();
+
+  const enableButton = container?.querySelector<HTMLButtonElement>(
+    `[aria-label="${translate('webSnapshotViewer.app.enableExternalLinks', 'en')}"]`
+  );
+  await act(async () => enableButton?.click());
+  options = mocks.blockSnapshotFrameNavigation.mock.calls.at(-1)?.[1] as typeof options;
   expect(options?.externalLinksEnabled).toBe(true);
+
+  await act(async () => {
+    options?.onExternalLinkPreviewChange('https://example.test/next');
+  });
+  expect(
+    container?.querySelector('[data-testid="snapshot-external-link-preview"]')?.textContent
+  ).toContain('https://example.test/next');
+
   await act(async () => {
     options?.onOpenExternalLink('https://example.test/next');
   });
@@ -242,6 +265,8 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
       `a[aria-label="${translate('webSnapshotViewer.app.downloadPackage', 'en')}"]`
     )?.textContent
   ).toContain('ZIP');
+  expect(container?.querySelector('header')?.children[1]?.textContent).toContain('ZIP');
+  expect(container?.querySelector('header')?.children[1]?.textContent).toContain('PDF');
 
   const collapseButton = container?.querySelector(
     `button[aria-label="${translate('webSnapshotViewer.app.collapseToolbar', 'en')}"]`
@@ -355,6 +380,26 @@ it('opens with the static document and switches explicitly to the screenshot', a
   act(() => image?.dispatchEvent(new Event('load')));
   expect(image?.style.width).toBe('711.1111111111111px');
   expect(container?.querySelector('iframe')).toBeNull();
+  const screenshotDownload = container?.querySelector<HTMLAnchorElement>(
+    `a[aria-label="${translate('webSnapshotViewer.app.downloadScreenshot', 'en')}"]`
+  );
+  expect(screenshotDownload?.href).toBe('blob:snapshot-screenshot');
+  expect(screenshotDownload?.download).toBe('Page_title.png');
+  expect(screenshotDownload?.textContent).toContain('PNG');
+  expect(
+    container?.querySelector(
+      `a[aria-label="${translate('webSnapshotViewer.app.downloadPackage', 'en')}"]`
+    )
+  ).toBeNull();
+  const pdfButton = container?.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('webSnapshotViewer.app.exportPdf', 'en')}"]`
+  );
+  await act(async () => pdfButton?.click());
+  expect(mocks.printWebSnapshotImageProjection).toHaveBeenCalledWith({
+    screenshotUrl: 'blob:snapshot-screenshot',
+    viewport: { deviceScaleFactor: 1, height: 900, width: 1440 },
+  });
+  expect(mocks.printWebSnapshotProjection).not.toHaveBeenCalled();
 });
 
 it('shows verified nested assets without replacing the static-document default', async () => {
@@ -395,6 +440,69 @@ it('shows verified nested assets without replacing the static-document default',
   expect(container?.textContent).toContain('1.png');
   expect(container?.textContent).toContain('2.css');
   expect(container?.querySelector('iframe')).toBeNull();
+  expect(
+    container?.querySelector(
+      `a[aria-label="${translate('webSnapshotViewer.app.downloadPackage', 'en')}"]`
+    )
+  ).toBeNull();
+  expect(
+    container?.querySelector(
+      `a[aria-label="${translate('webSnapshotViewer.app.downloadScreenshot', 'en')}"]`
+    )
+  ).toBeNull();
+  expect(
+    container?.querySelector(
+      `button[aria-label="${translate('webSnapshotViewer.app.exportPdf', 'en')}"]`
+    )
+  ).toBeNull();
+});
+
+it('extracts one selected attachment and downloads its original bytes', async () => {
+  const extractPackageFile = vi.fn(async () => new Blob(['report'], { type: 'application/pdf' }));
+  const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:report');
+  const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  const clickAnchor = vi
+    .spyOn(HTMLAnchorElement.prototype, 'click')
+    .mockImplementation(() => undefined);
+  vi.useFakeTimers();
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({
+      extractPackageFile,
+      packageFiles: [
+        {
+          kind: 'attachment',
+          mimeType: 'application/pdf',
+          name: 'report.pdf',
+          path: 'attachments/report.pdf',
+          size: 6,
+        },
+      ],
+    })
+  );
+
+  try {
+    await act(async () => root?.render(<WebSnapshotViewerApp />));
+    const filesButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === translate('webSnapshotViewer.app.assetsMode', 'en')
+    );
+    await act(async () => filesButton?.click());
+    const downloadButton = container?.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('webSnapshotViewer.app.downloadAsset', 'en')}: report.pdf"]`
+    );
+    await act(async () => downloadButton?.click());
+
+    expect(extractPackageFile).toHaveBeenCalledExactlyOnceWith('attachments/report.pdf');
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    expect(clickAnchor).toHaveBeenCalledOnce();
+    expect(document.querySelector('a[href="blob:report"]')).toBeNull();
+    await act(async () => vi.runAllTimers());
+    expect(revokeObjectUrl).toHaveBeenCalledExactlyOnceWith('blob:report');
+  } finally {
+    vi.useRealTimers();
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
+    clickAnchor.mockRestore();
+  }
 });
 
 it('mounts preparation only after the current snapshot iframe load event', async () => {

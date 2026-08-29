@@ -22,20 +22,20 @@ export const webSnapshotViewerMessages = defineMessageSource({
       en: 'Static document',
     },
     assetsMode: {
-      ru: 'Вложения',
-      en: 'Attachments',
+      ru: 'Файлы',
+      en: 'Files',
     },
     assetsTitle: {
-      ru: 'Вложения снимка',
-      en: 'Snapshot attachments',
+      ru: 'Файлы снимка',
+      en: 'Snapshot files',
     },
     assetsDescription: {
-      ru: 'Проверенные локальные файлы, которые использует статический документ.',
-      en: 'Verified local files used by the static document.',
+      ru: 'Извлечённые изображения, вложения и локальные ресурсы статического документа.',
+      en: 'Extracted images, attachments, and local resources used by the static document.',
     },
     assetsEmpty: {
-      ru: 'В этом снимке нет сохранённых вложений.',
-      en: 'This snapshot has no saved attachments.',
+      ru: 'В этом снимке нет сохранённых файлов.',
+      en: 'This snapshot has no saved files.',
     },
     assetImages: {
       ru: 'Изображения',
@@ -53,6 +53,22 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Другие файлы',
       en: 'Other files',
     },
+    exportedImages: {
+      ru: 'Изображения страницы',
+      en: 'Page images',
+    },
+    downloadedAttachments: {
+      ru: 'Вложения',
+      en: 'Attachments',
+    },
+    pageResources: {
+      ru: 'Ресурсы веб-копии',
+      en: 'Web Copy resources',
+    },
+    packageFileDownloadFailed: {
+      ru: 'Не удалось извлечь файл: содержимое повреждено или не соответствует снимку.',
+      en: 'Could not extract the file because it is damaged or does not match the snapshot.',
+    },
     downloadAsset: {
       ru: 'Скачать оригинал',
       en: 'Download original',
@@ -65,6 +81,10 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Скачать исходный архив',
       en: 'Download original archive',
     },
+    downloadScreenshot: {
+      ru: 'Скачать исходный скриншот',
+      en: 'Download original screenshot',
+    },
     exportPdf: {
       ru: 'Экспортировать в PDF',
       en: 'Export to PDF',
@@ -72,6 +92,22 @@ export const webSnapshotViewerMessages = defineMessageSource({
     exportPdfFailed: {
       ru: 'Не удалось подготовить PDF. Попробуйте ещё раз.',
       en: 'Could not prepare the PDF. Try again.',
+    },
+    externalLinks: {
+      ru: 'Ссылки',
+      en: 'Links',
+    },
+    enableExternalLinks: {
+      ru: 'Разрешить переходы по ссылкам',
+      en: 'Allow opening links',
+    },
+    disableExternalLinks: {
+      ru: 'Запретить переходы по ссылкам',
+      en: 'Block opening links',
+    },
+    externalLinkDestination: {
+      ru: 'Адрес ссылки',
+      en: 'Link destination',
     },
     visualAlt: {
       ru: 'Сохранённый скриншот веб-страницы',

@@ -48,11 +48,14 @@ function TimingSelect(props: {
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2">
-      <span className="text-[11px] text-[var(--sniptale-color-text-primary)]">{props.label}</span>
+    <div className="flex min-w-0 items-center justify-between gap-2 py-2">
+      <span className="min-w-0 flex-1 text-[11px] leading-4 text-[var(--sniptale-color-text-primary)]">
+        {props.label}
+      </span>
       <PopupSelect
         aria-label={props.label}
-        containerClassName="w-[116px] shrink-0"
+        containerClassName="!w-[104px] !max-w-[104px] flex-none"
+        dataUi="popup.export.page-timing-select"
         value={String(props.value)}
         onChange={(value) => props.onChange(Number(value))}
         options={props.values.map((value) => ({

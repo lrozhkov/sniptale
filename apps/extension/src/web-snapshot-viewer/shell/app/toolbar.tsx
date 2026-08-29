@@ -1,4 +1,12 @@
-import { Download, FileDown, LoaderCircle, PanelTopClose, PanelTopOpen } from 'lucide-react';
+import {
+  Download,
+  FileDown,
+  Link2,
+  Link2Off,
+  LoaderCircle,
+  PanelTopClose,
+  PanelTopOpen,
+} from 'lucide-react';
 import { formatDateTime, formatNumber, translate, type AppLocale } from '../../../platform/i18n';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 import { WebSnapshotViewerModeSwitch, type WebSnapshotViewerMode } from './view-mode';
@@ -29,10 +37,18 @@ function formatArchiveMegabytes(size: number, locale: AppLocale): string {
 function ViewerToolbarActions(props: {
   loaded: LoadedWebSnapshotPackage;
   locale: AppLocale;
+  mode: WebSnapshotViewerMode;
   onPrint: () => void;
   printPending: boolean;
 }) {
-  const downloadLabel = translate('webSnapshotViewer.app.downloadPackage', props.locale);
+  if (props.mode === 'assets') return null;
+  const showsScreenshot = props.mode === 'visual';
+  const downloadLabel = translate(
+    showsScreenshot
+      ? 'webSnapshotViewer.app.downloadScreenshot'
+      : 'webSnapshotViewer.app.downloadPackage',
+    props.locale
+  );
   const pdfLabel = translate('webSnapshotViewer.app.exportPdf', props.locale);
 
   return (
@@ -44,12 +60,14 @@ function ViewerToolbarActions(props: {
       <a
         aria-label={downloadLabel}
         className={`${toolbarButtonClassName} gap-1 px-2`}
-        download={props.loaded.archiveFilename}
-        href={props.loaded.archiveUrl}
+        download={showsScreenshot ? props.loaded.screenshotFilename : props.loaded.archiveFilename}
+        href={showsScreenshot ? props.loaded.screenshotUrl : props.loaded.archiveUrl}
         title={downloadLabel}
       >
         <Download aria-hidden="true" size={15} />
-        <span className="text-[10px] font-bold tracking-wide">ZIP</span>
+        <span className="text-[10px] font-bold tracking-wide">
+          {showsScreenshot ? 'PNG' : 'ZIP'}
+        </span>
       </a>
       <button
         type="button"
@@ -70,11 +88,50 @@ function ViewerToolbarActions(props: {
   );
 }
 
+function ViewerLinkToggle(props: {
+  enabled: boolean;
+  locale: AppLocale;
+  onChange: (enabled: boolean) => void;
+}) {
+  const actionLabel = translate(
+    props.enabled
+      ? 'webSnapshotViewer.app.disableExternalLinks'
+      : 'webSnapshotViewer.app.enableExternalLinks',
+    props.locale
+  );
+  const Icon = props.enabled ? Link2 : Link2Off;
+  const stateClassName = props.enabled
+    ? [
+        'border-[var(--sniptale-color-accent)]',
+        'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
+        'text-[var(--sniptale-color-accent)]',
+      ].join(' ')
+    : 'border-[var(--sniptale-color-border-soft)]';
+
+  return (
+    <button
+      type="button"
+      aria-label={actionLabel}
+      aria-pressed={props.enabled}
+      className={`${toolbarButtonClassName} gap-1.5 border px-2 ${stateClassName}`}
+      onClick={() => props.onChange(!props.enabled)}
+      title={actionLabel}
+    >
+      <Icon aria-hidden="true" size={15} />
+      <span className="text-[10px] font-semibold">
+        {translate('webSnapshotViewer.app.externalLinks', props.locale)}
+      </span>
+    </button>
+  );
+}
+
 export function SnapshotViewerToolbar(props: {
+  externalLinksEnabled: boolean;
   loaded: LoadedWebSnapshotPackage;
   locale: AppLocale;
   mode: WebSnapshotViewerMode;
   onCollapse: () => void;
+  onExternalLinksEnabledChange: (enabled: boolean) => void;
   onModeChange: (mode: WebSnapshotViewerMode) => void;
   onPrint: () => void;
   printPending: boolean;
@@ -111,13 +168,21 @@ export function SnapshotViewerToolbar(props: {
           </span>
         </div>
       </div>
+      <ViewerToolbarActions
+        loaded={props.loaded}
+        locale={props.locale}
+        mode={props.mode}
+        onPrint={props.onPrint}
+        printPending={props.printPending}
+      />
       <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
-        <ViewerToolbarActions
-          loaded={props.loaded}
-          locale={props.locale}
-          onPrint={props.onPrint}
-          printPending={props.printPending}
-        />
+        {props.mode === 'static-document' ? (
+          <ViewerLinkToggle
+            enabled={props.externalLinksEnabled}
+            locale={props.locale}
+            onChange={props.onExternalLinksEnabledChange}
+          />
+        ) : null}
         {props.mode === 'assets' ? null : (
           <WebSnapshotZoomControls locale={props.locale} {...props.zoom} />
         )}

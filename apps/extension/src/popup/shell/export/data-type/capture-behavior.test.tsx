@@ -203,3 +203,30 @@ it('updates each compact resource limit control and displays custom stored value
     [{ maxFileCount: 17, maxFileSizeMiB: 19, maxTotalSizeMiB: 100 }],
   ]);
 });
+
+it('keeps capture and resource selects compact inside the settings curtain', async () => {
+  await act(async () =>
+    root.render(
+      <PackageCaptureBehaviorSettings
+        preferences={{ floatingElements: 'once', freezeMotion: true, preloadLazyContent: true }}
+        onChange={vi.fn()}
+        resourceLimits={{ maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 }}
+        onResourceLimitsChange={vi.fn()}
+      />
+    )
+  );
+
+  const floatingSelect = container.querySelector(
+    '[data-ui="popup.export.capture-floating-elements-select"]'
+  );
+  const resourceSelects = container.querySelectorAll(
+    '[data-ui="popup.export.resource-limit-select"]'
+  );
+  expect(floatingSelect?.className).toContain('!w-[112px]');
+  expect(floatingSelect?.className).toContain('!max-w-[112px]');
+  expect(resourceSelects).toHaveLength(3);
+  for (const select of resourceSelects) {
+    expect(select.className).toContain('!w-[88px]');
+    expect(select.className).toContain('!max-w-[88px]');
+  }
+});

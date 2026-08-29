@@ -81,10 +81,13 @@ function createLoadedPackage(
     archiveUrl: 'blob:snapshot-archive',
     assets: [],
     documentUrl: null,
+    extractPackageFile: vi.fn(async () => new Blob(['file'])),
     html: '<p>Snapshot</p>',
     manifest: createViewerManifest(manifest),
     objectUrls: [],
+    packageFiles: [],
     screenshotCoverage: 'full-page',
+    screenshotFilename: 'Page_title.png',
     screenshotUrl: 'blob:snapshot-screenshot',
   };
 }
@@ -178,6 +181,59 @@ it('uses a true 100% scale instead of blurring a near-width capture by a few pix
   expect(actualSizeButton).toBeDefined();
 });
 
+it('does not expose horizontal scrolling caused only by the vertical scrollbar gutter', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
+  );
+
+  await renderViewer();
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  Object.defineProperties(surface!, {
+    clientWidth: { configurable: true, value: 1020 },
+    offsetWidth: { configurable: true, value: 1030 },
+  });
+  act(() => window.dispatchEvent(new Event('resize')));
+
+  const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
+  expect(viewport?.style.transform).toBe('scale(1)');
+  expect(surface?.className).toContain('overflow-x-hidden');
+  expect(surface?.className).toContain('overflow-y-auto');
+});
+
+it('does not let grab navigation consume the collapsed toolbar button pointer gesture', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
+  );
+
+  await renderViewer();
+  const collapseButton = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+    (button) => button.querySelector('.lucide-panel-top-close') !== null
+  );
+  expect(collapseButton).toBeTruthy();
+  act(() => collapseButton?.click());
+  const expandButton = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+    (button) => button.querySelector('.lucide-panel-top-open') !== null
+  );
+  expect(expandButton).toBeTruthy();
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  Object.defineProperties(surface!, {
+    clientHeight: { configurable: true, value: 700 },
+    clientWidth: { configurable: true, value: 1020 },
+    scrollHeight: { configurable: true, value: 800 },
+    scrollWidth: { configurable: true, value: 1030 },
+  });
+  const pointerDown = new MouseEvent('pointerdown', {
+    bubbles: true,
+    button: 0,
+    cancelable: true,
+  });
+
+  act(() => expandButton?.dispatchEvent(pointerDown));
+  expect(pointerDown.defaultPrevented).toBe(false);
+  act(() => expandButton?.click());
+  expect(container?.querySelector('header')).not.toBeNull();
+});
+
 it('keeps captured layout dimensions while switching between fit and manual zoom', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
@@ -205,7 +261,8 @@ it('keeps captured layout dimensions while switching between fit and manual zoom
   expect(viewport()?.style.transform).toBe('scale(1)');
   expect(viewport()?.style.height).toBe('1440px');
   const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
-  expect(surface?.className).toContain('overflow-auto');
+  expect(surface?.className).toContain('overflow-x-auto');
+  expect(surface?.className).toContain('overflow-y-auto');
   expect(surface?.style.scrollbarGutter).toBe('stable');
   expect(surface?.className).toContain('cursor-grab');
 

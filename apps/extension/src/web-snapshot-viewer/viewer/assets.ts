@@ -35,6 +35,11 @@ import {
   resolveWebSnapshotEntryByteLimit,
   WEB_SNAPSHOT_PACKAGE_POLICY,
 } from '../../features/web-snapshot/package-policy';
+import {
+  createViewerPackageFileCatalog,
+  createViewerPackageFileExtractor,
+  type ViewerPackageFile,
+} from './package-files';
 
 export interface LoadedWebSnapshotPackage {
   archiveFilename: string;
@@ -45,8 +50,16 @@ export interface LoadedWebSnapshotPackage {
   html: string;
   manifest: WebSnapshotManifest;
   objectUrls: string[];
+  packageFiles: ViewerPackageFile[];
+  extractPackageFile: (path: string) => Promise<Blob>;
+  screenshotFilename: string;
   screenshotUrl: string;
   screenshotCoverage: PagePackageScreenshotCoverage;
+}
+
+function createViewerScreenshotFilename(manifest: WebSnapshotManifest): string {
+  const sourceName = manifest.source.title ?? manifest.source.url ?? 'web-snapshot';
+  return `${sanitizeWebSnapshotFilename(sourceName, 'web-snapshot')}.png`;
 }
 
 function createViewerArchiveFilename(manifest: WebSnapshotManifest): string {
@@ -351,6 +364,11 @@ export async function loadWebSnapshotPackage(
     recordManifest: record.manifest,
   });
   assertViewerInventory(filesByPath, packageManifest);
+  const packageFiles = createViewerPackageFileCatalog(packageManifest);
+  const extractPackageFile = createViewerPackageFileExtractor({
+    manifest: packageManifest,
+    readEntry: (path) => readViewerEntry(filesByPath, path),
+  });
   const bytesByPath = await readViewerWebCopyEntries(filesByPath, packageManifest);
   await assertViewerWebCopyDigests(bytesByPath, packageManifest);
   const screenshot = await readViewerScreenshot(snapshotId);
@@ -398,6 +416,9 @@ export async function loadWebSnapshotPackage(
       html: sanitizedDocument,
       manifest: record.manifest,
       objectUrls,
+      packageFiles,
+      extractPackageFile,
+      screenshotFilename: createViewerScreenshotFilename(record.manifest),
       screenshotUrl,
       screenshotCoverage: screenshotSelection.coverage,
     };

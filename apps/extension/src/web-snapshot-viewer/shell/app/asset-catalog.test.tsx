@@ -56,6 +56,8 @@ it('groups attachments by media family and format and downloads verified origina
           },
         ]}
         locale="en"
+        onDownloadPackageFile={vi.fn(async () => undefined)}
+        packageFiles={[]}
       />
     );
   });
@@ -74,4 +76,85 @@ it('groups attachments by media family and format and downloads verified origina
   expect(download?.href).toBe('blob:original-svg');
   expect(download?.download).toBe('diagram.svg');
   expect(container.querySelector('a[aria-label="Download original: legacy.bin"]')).toBeNull();
+});
+
+it('lists exported files from manifest metadata and extracts only the selected item', async () => {
+  const onDownloadPackageFile = vi.fn(async () => undefined);
+  await act(async () => {
+    root.render(
+      <WebSnapshotAssetCatalog
+        assets={[]}
+        locale="en"
+        onDownloadPackageFile={onDownloadPackageFile}
+        packageFiles={[
+          {
+            kind: 'exported-image',
+            mimeType: 'image/png',
+            name: 'photo.png',
+            path: 'exports/images/photo.png',
+            size: 4096,
+          },
+          {
+            kind: 'attachment',
+            mimeType: 'application/pdf',
+            name: 'report.pdf',
+            path: 'attachments/report.pdf',
+            size: 8192,
+          },
+        ]}
+      />
+    );
+  });
+
+  expect(container.textContent).toContain('Page images (1)');
+  expect(container.textContent).toContain('Attachments (1)');
+  expect(container.textContent).toContain('photo.png');
+  expect(container.textContent).not.toContain('report.pdf');
+
+  const attachmentsButton = Array.from(container.querySelectorAll('button')).find(
+    (button) => button.textContent === 'Attachments (1)'
+  );
+  await act(async () => attachmentsButton?.click());
+  expect(container.textContent).toContain('report.pdf');
+
+  const downloadButton = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Download original: report.pdf"]'
+  );
+  await act(async () => downloadButton?.click());
+  expect(onDownloadPackageFile).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ path: 'attachments/report.pdf' })
+  );
+});
+
+it('shows an item-level extraction error without hiding the remaining catalog', async () => {
+  await act(async () => {
+    root.render(
+      <WebSnapshotAssetCatalog
+        assets={[]}
+        locale="en"
+        onDownloadPackageFile={vi.fn(async () => {
+          throw new Error('digest mismatch');
+        })}
+        packageFiles={[
+          {
+            kind: 'attachment',
+            mimeType: 'application/pdf',
+            name: 'report.pdf',
+            path: 'attachments/report.pdf',
+            size: 8192,
+          },
+        ]}
+      />
+    );
+  });
+
+  const downloadButton = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Download original: report.pdf"]'
+  );
+  await act(async () => downloadButton?.click());
+
+  expect(container.querySelector('[role="status"]')?.textContent).toContain(
+    'Could not extract the file'
+  );
+  expect(container.textContent).toContain('report.pdf');
 });
