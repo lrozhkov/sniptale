@@ -38,4 +38,82 @@ describe('markdown block rendering', () => {
 
     expect(lines).toEqual(['## Summary', '', '- **Status:** Open', '']);
   });
+
+  it('keeps every hard-broken line inside a quote', () => {
+    const lines: string[] = [];
+
+    appendBlockAwareSectionMarkdown({
+      lines,
+      section: {
+        type: 'section',
+        id: 'section-1',
+        title: 'Summary',
+        children: [],
+        kind: 'narrative',
+      },
+      blocks: [
+        {
+          id: 'block-quote',
+          sectionId: 'section-1',
+          kind: 'quote',
+          text: 'First line Second line',
+          inlineContent: [
+            { kind: 'text', text: 'First line' },
+            { kind: 'line-break' },
+            { kind: 'text', text: 'Second line' },
+          ],
+        },
+      ],
+      tables: [],
+    });
+
+    expect(lines).toEqual(['## Summary', '', '> First line  \n> Second line', '']);
+  });
+
+  it('keeps hard-break continuations inside paragraphs and ordered list items', () => {
+    const lines: string[] = [];
+    const inlineContent = [
+      { kind: 'text' as const, text: 'First line' },
+      { kind: 'line-break' as const },
+      { kind: 'text' as const, text: '# Second line' },
+    ];
+
+    appendBlockAwareSectionMarkdown({
+      lines,
+      section: {
+        type: 'section',
+        id: 'section-1',
+        title: 'Summary',
+        children: [],
+        kind: 'narrative',
+      },
+      blocks: [
+        {
+          id: 'block-paragraph',
+          sectionId: 'section-1',
+          kind: 'paragraph',
+          text: 'First line # Second line',
+          inlineContent,
+        },
+        {
+          id: 'block-list',
+          sectionId: 'section-1',
+          kind: 'list',
+          items: ['First line # Second line'],
+          itemInlineContent: [inlineContent],
+          listStyle: 'ordered',
+        },
+      ],
+      tables: [],
+    });
+
+    expect(lines).toEqual([
+      '## Summary',
+      '',
+      'First line  \n\\# Second line',
+      '',
+      '1. First line  \n   \\# Second line',
+      '',
+    ]);
+  });
 });

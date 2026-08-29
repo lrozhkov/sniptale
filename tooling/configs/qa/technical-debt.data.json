@@ -4761,6 +4761,7 @@
         "apps/extension/src/content/parser/parsers/generic/text/helpers.ts",
         "apps/extension/src/content/parser/parsers/generic/text/narrative-blocks.helpers.ts",
         "apps/extension/src/content/parser/parsers/generic/text/narrative-fields.helpers.ts",
+        "apps/extension/src/content/parser/parsers/generic/text/narrative-inline-content.ts",
         "apps/extension/src/content/parser/parsers/generic/text/page-context.helpers.ts",
         "apps/extension/src/content/parser/parsers/generic/text/search-results.ts",
         "apps/extension/src/content/parser/parsers/generic/text/sections.helpers.ts",
@@ -5416,6 +5417,7 @@
         "apps/extension/src/content/parser/parsers/generic/text/helpers.ts",
         "apps/extension/src/content/parser/parsers/generic/text/narrative-blocks.helpers.ts",
         "apps/extension/src/content/parser/parsers/generic/text/narrative-fields.helpers.ts",
+        "apps/extension/src/content/parser/parsers/generic/text/narrative-inline-content.ts",
         "apps/extension/src/content/parser/parsers/generic/text/page-context.helpers.ts",
         "apps/extension/src/content/parser/parsers/generic/text/search-results.ts",
         "apps/extension/src/content/parser/parsers/generic/text/sections.helpers.ts",
@@ -12924,7 +12926,9 @@
         "apps/extension/src/web-snapshot-viewer/preparation/scenario/listeners.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/surface/controller.ts",
         "apps/extension/src/web-snapshot-viewer/shell/app/asset-catalog.tsx",
+        "apps/extension/src/web-snapshot-viewer/shell/app/file-presentation.ts",
         "apps/extension/src/web-snapshot-viewer/shell/app/index.tsx",
+        "apps/extension/src/web-snapshot-viewer/shell/app/package-file-list.tsx",
         "apps/extension/src/web-snapshot-viewer/shell/app/route.ts",
         "apps/extension/src/web-snapshot-viewer/shell/app/toolbar.tsx",
         "apps/extension/src/web-snapshot-viewer/shell/app/view-mode.tsx",
@@ -12933,8 +12937,10 @@
         "apps/extension/src/web-snapshot-viewer/viewer/assets.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/declarative-shadow.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/document-policy.ts",
+        "apps/extension/src/web-snapshot-viewer/viewer/frame-interactions.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/frame-navigation.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/iframe.tsx",
+        "apps/extension/src/web-snapshot-viewer/viewer/package-files.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/print-projection.ts"
       ],
       "rolloutFiles": [],
@@ -16484,6 +16490,27 @@
       ]
     },
     {
+      "id": "policy.source.content-export-verification-mjs.cce6f01309",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/content-export-verification.mjs",
+        "contentHash": "cbaf3df733c41f0eb44a75ee67e26b1587949c82bd5abfede8ca598d67b6826d"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/content-export-verification.mjs",
+        "tooling/web-snapshot-smoke/content-export-verification.test.ts",
+        "tooling/web-snapshot-smoke/polygon-verification.mjs"
+      ],
+      "surfaces": [
+        "binding:SAFE_IMAGE_PROTOCOLS",
+        "binding:SAFE_LINK_PROTOCOLS"
+      ]
+    },
+    {
       "id": "policy.source.content-root-mjs.0e5c00db3c",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17685,7 +17712,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/external-targets.mjs",
-        "contentHash": "1c1c641ba0769deeaab833b09b94ae210c8c1fa81021a778e1ef6b6fcacbd7e5"
+        "contentHash": "647906101e93ffa3adb3d450df6e388caea5ade307b3e7ee3a02ee0fba8b5bd2"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/external-targets.mjs",
@@ -17695,6 +17722,11 @@
         "binding:DEFAULT_EXTERNAL_TARGETS",
         "binding:DEFAULT_THRESHOLDS",
         "binding:EXTENDED_EXTERNAL_TARGETS",
+        "property:contentExpectations",
+        "property:contentExpectations[1]",
+        "property:contentExpectations[2]",
+        "property:contentExpectations[3]",
+        "property:contentExpectations[4]",
         "property:thresholds",
         "property:thresholds[1]"
       ]
@@ -19634,7 +19666,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/polygon-verification.mjs",
-        "contentHash": "2e9c97ce7914dd916c37e8835cf93018ccf2be324ac943b2713cd148b2545801"
+        "contentHash": "98e13d33f5dd7609a0f9ba9b72d71c2f82521aee22c6d0f9df73797e95927ca5"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/polygon-runner.mjs",
@@ -19661,7 +19693,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/popup-driver.mjs",
-        "contentHash": "1a795d27cc106a8c14900f8871a3f5d6d313fd0867ec718bf62da972703bbde1"
+        "contentHash": "d405b550c974a3c77c36b2b782067f0fc0509439191a20daf093ddd93ea568ad"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/case-verification.mjs",

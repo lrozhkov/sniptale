@@ -1,4 +1,4 @@
-import type { FieldContentRole } from '../dom-tree';
+import type { DocumentInlineNode, FieldContentRole } from '../dom-tree';
 import { estimateUtf8Bytes } from '../validation/base64';
 import { MAX_PAGE_PACKAGE_TITLE_BYTES } from '../page-package/contracts';
 import type { ExportResourceLimits } from './resource-limits';
@@ -108,6 +108,7 @@ export interface ExportSection {
     type: 'string' | 'link' | 'number' | 'boolean' | 'image' | 'status';
     contentRole?: FieldContentRole;
     linkRef?: string;
+    inlineContent?: DocumentInlineNode[];
   }>;
   tables?: Array<{
     title: string;

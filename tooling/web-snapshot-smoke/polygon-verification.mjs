@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { inspectDocument } from './document-inspection.mjs';
+import { verifyContentExports } from './content-export-verification.mjs';
 import { verifySnapshotDiagnostics } from './diagnostics-verification.mjs';
 import { compareScreenshots } from './pixel-comparison.mjs';
 import { enableForTab, saveSnapshot } from './popup-driver.mjs';
@@ -72,7 +73,10 @@ async function stitchViewportTiles(context, tiles, width, height) {
         scale: rasterScale,
       }
     );
-    return { bytes: Buffer.from(dataUrl.split(',', 2)[1], 'base64'), rasterScale };
+    return {
+      bytes: Buffer.from(dataUrl.split(',', 2)[1], 'base64'),
+      rasterScale,
+    };
   } finally {
     await compositor.close();
   }
@@ -80,7 +84,10 @@ async function stitchViewportTiles(context, tiles, width, height) {
 
 async function captureLiveSource(context, page, descriptor) {
   if (!descriptor.scrollRootSelector) {
-    const bytes = await page.screenshot({ animations: 'disabled', fullPage: true });
+    const bytes = await page.screenshot({
+      animations: 'disabled',
+      fullPage: true,
+    });
     const dimensions = await page.evaluate(() => {
       const root = globalThis.document.scrollingElement ?? globalThis.document.documentElement;
       return { height: root.scrollHeight, width: root.scrollWidth };
@@ -114,9 +121,17 @@ async function captureLiveSource(context, page, descriptor) {
     if (seenTops.has(top)) continue;
     seenTops.add(top);
     await page.waitForTimeout(100);
-    const bytes = await page.screenshot({ animations: 'disabled', fullPage: false });
+    const bytes = await page.screenshot({
+      animations: 'disabled',
+      fullPage: false,
+    });
     if (top === 0) {
-      tiles.push({ bytes, sourceHeight: VIEWPORT.height, sourceWidth: VIEWPORT.width, top: 0 });
+      tiles.push({
+        bytes,
+        sourceHeight: VIEWPORT.height,
+        sourceWidth: VIEWPORT.width,
+        top: 0,
+      });
     } else {
       tiles.push({
         bytes,
@@ -150,7 +165,10 @@ async function captureStaticDocument(context, viewer, iframe, frame, geometry) {
     if (seenTops.has(top)) continue;
     seenTops.add(top);
     await viewer.waitForTimeout(30);
-    tiles.push({ bytes: await iframe.screenshot({ animations: 'disabled' }), top });
+    tiles.push({
+      bytes: await iframe.screenshot({ animations: 'disabled' }),
+      top,
+    });
   }
   await frame.evaluate(() => globalThis.scrollTo(0, 0));
   return stitchViewportTiles(context, tiles, geometry.width, geometry.height);
@@ -335,7 +353,11 @@ function buildTargetMetrics(descriptor, page, source, exported, saved, pixel) {
     },
     source: {
       geometry: sourceGeometry,
-      raster: { height: pixel.leftHeight, scale: source.rasterScale, width: pixel.leftWidth },
+      raster: {
+        height: pixel.leftHeight,
+        scale: source.rasterScale,
+        width: pixel.leftWidth,
+      },
     },
     status: 'passed',
     thresholds: descriptor.thresholds,
@@ -354,11 +376,24 @@ export async function verifyExternalTarget({ context, descriptor, extensionId, o
     const source = await captureSourceEvidence(context, descriptor, page, targetOut);
     const saved = await saveTargetSnapshot(popup, page);
     const exported = await captureExportedEvidence(context, descriptor, extensionId, saved);
+    await writeFile(join(targetOut, 'package.zip'), exported.archiveBytes);
     const diagnostics = await verifySnapshotDiagnostics(exported.archiveBytes);
+    const contentExports = descriptor.contentExpectations
+      ? await verifyContentExports(exported.archiveBytes, {
+          expectedUrl: page.url(),
+          ...descriptor.contentExpectations,
+        })
+      : null;
     await writeFile(
       join(targetOut, 'diagnostics-check.json'),
       `${JSON.stringify(diagnostics, null, 2)}\n`
     );
+    if (contentExports) {
+      await writeFile(
+        join(targetOut, 'content-check.json'),
+        `${JSON.stringify(contentExports, null, 2)}\n`
+      );
+    }
     await writeFile(join(targetOut, 'exported.png'), exported.bytes);
     const pixel = await compareScreenshots(context, source.bytes, exported.bytes, {
       createDiff: true,
@@ -371,10 +406,20 @@ export async function verifyExternalTarget({ context, descriptor, extensionId, o
     const metrics = buildTargetMetrics(descriptor, page, source, exported, saved, pixel);
     const failures = evaluateThresholds(descriptor, metrics);
     failures.push(...diagnostics.violations.map((id) => `diagnostics ${id}`));
+    if (contentExports) {
+      failures.push(...contentExports.violations.map((id) => `content ${id}`));
+    }
     metrics.diagnostics = {
       status: diagnostics.status,
       violations: diagnostics.violations,
     };
+    if (contentExports) {
+      metrics.contentExports = {
+        metrics: contentExports.metrics,
+        status: contentExports.status,
+        violations: contentExports.violations,
+      };
+    }
     metrics.status = failures.length === 0 ? 'passed' : 'failed';
     if (failures.length > 0) metrics.failures = failures;
     await writeFile(join(targetOut, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`);

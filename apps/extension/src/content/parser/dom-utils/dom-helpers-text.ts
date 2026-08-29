@@ -25,6 +25,10 @@ export function setGetOriginalElementFn(fn: ((node: Node) => Node | null) | null
   domHelpersTextResolverControllerOwner.getOwner().setResolver(fn);
 }
 
+export function resolveOriginalElement(node: Node): Node | null {
+  return domHelpersTextResolverControllerOwner.getOwner().getResolver()?.(node) ?? null;
+}
+
 export function extractCleanText(element: HTMLElement): string {
   if (!element) return '';
 
@@ -89,9 +93,15 @@ export function extractNarrativeText(element: HTMLElement): string {
   return normalizeCompositeText(clone.textContent || '');
 }
 
-export function extractLinkText(element: HTMLElement): { text: string; href?: string } {
+export function extractLinkText(element: HTMLElement): {
+  text: string;
+  href?: string;
+} {
   if (element.tagName.toLowerCase() === 'a') {
-    return { href: (element as HTMLAnchorElement).href, text: extractCompositeText(element) };
+    return {
+      href: (element as HTMLAnchorElement).href,
+      text: extractCompositeText(element),
+    };
   }
 
   const links = Array.from(element.querySelectorAll('a'));

@@ -17,6 +17,11 @@ export type DocumentBlockKind =
   | 'data-table'
   | 'thread-message'
   | 'attachment';
+export type DocumentInlineNode =
+  | { kind: 'text'; text: string }
+  | { kind: 'link'; text: string; url: string }
+  | { kind: 'image'; alt: string; sourceUrl: string; linkUrl?: string }
+  | { kind: 'line-break' };
 export type ExtractionClass = 'record' | 'narrative' | 'thread' | 'results' | 'mixed' | 'unknown';
 export type QualitySignalKind =
   | 'weak-root-selection'
@@ -160,6 +165,10 @@ export interface DocumentBlock {
   kind: DocumentBlockKind;
   text?: string;
   items?: string[];
+  inlineContent?: DocumentInlineNode[];
+  itemInlineContent?: DocumentInlineNode[][];
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  listStyle?: 'ordered' | 'unordered';
   tableRef?: string;
   targetRef?: TargetRef;
   evidence?: EvidenceRef[];

@@ -14,6 +14,7 @@ const target = (descriptor) =>
 export const DEFAULT_EXTERNAL_TARGETS = Object.freeze([
   target({
     comparison: 'static',
+    contentExpectations: Object.freeze({ minimumImages: 1, minimumLinks: 1 }),
     id: 'wiki-world-wide-web',
     readySelector: '#firstHeading',
     url: 'https://en.wikipedia.org/wiki/World_Wide_Web',
@@ -31,18 +32,21 @@ export const DEFAULT_EXTERNAL_TARGETS = Object.freeze([
   }),
   target({
     comparison: 'static',
+    contentExpectations: Object.freeze({ minimumLinks: 1 }),
     id: 'jira-public-issue',
     readySelector: '#content',
     url: 'https://jira.atlassian.com/browse/JRASERVER-60118',
   }),
   target({
     comparison: 'static',
+    contentExpectations: Object.freeze({ minimumLinks: 1 }),
     id: 'mui-data-grid-virtualization',
     readySelector: '.MuiDataGrid-root',
     url: 'https://mui.com/x/react-data-grid/virtualization/',
   }),
   target({
     comparison: 'static',
+    contentExpectations: Object.freeze({ minimumLinks: 1 }),
     id: 'ant-design-table',
     readySelector: '.ant-table-wrapper',
     thresholds: Object.freeze({
@@ -61,6 +65,7 @@ export const DEFAULT_EXTERNAL_TARGETS = Object.freeze([
   }),
   target({
     comparison: 'static',
+    contentExpectations: Object.freeze({ minimumLinks: 1 }),
     id: 'next-commerce-product',
     readySelector: 'main',
     url: 'https://demo.vercel.store/product/acme-geometric-circles-t-shirt',

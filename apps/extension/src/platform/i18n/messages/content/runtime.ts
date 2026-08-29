@@ -93,6 +93,10 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Текст',
     en: 'Text',
   },
+  exportImageLabel: {
+    ru: 'Изображение',
+    en: 'Image',
+  },
   captureFullPageScreenshot: {
     ru: 'Снимаем скриншот всей страницы...',
     en: 'Capturing the full-page screenshot...',

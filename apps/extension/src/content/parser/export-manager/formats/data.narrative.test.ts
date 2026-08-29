@@ -20,6 +20,21 @@ function createRichNarrativeBlocksTree(): ParsedDOMTree {
     ],
     blocks: [
       {
+        id: 'block-paragraph',
+        sectionId: 'section-narrative',
+        kind: 'paragraph',
+        text: 'Read the reference.',
+        inlineContent: [
+          { kind: 'text', text: 'Read ' },
+          {
+            kind: 'link',
+            text: 'the reference',
+            url: 'https://example.test/reference',
+          },
+          { kind: 'text', text: '.' },
+        ],
+      },
+      {
         id: 'block-quote',
         sectionId: 'section-narrative',
         kind: 'quote',
@@ -105,6 +120,21 @@ it('exports quote, callout, and code narrative blocks as text fields', () => {
     {
       title: 'Overview',
       fields: [
+        {
+          contentRole: 'paragraph',
+          inlineContent: [
+            { kind: 'text', text: 'Read ' },
+            {
+              kind: 'link',
+              text: 'the reference',
+              url: 'https://example.test/reference',
+            },
+            { kind: 'text', text: '.' },
+          ],
+          label: 'Абзац',
+          type: 'string',
+          value: 'Read the reference.',
+        },
         {
           label: 'Текст',
           value: 'Quoted note',
