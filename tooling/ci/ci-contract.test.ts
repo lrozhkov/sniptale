@@ -188,7 +188,8 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(npmPackage.dependencies.npm).toBe(lock.node.npmVersion);
   expect(playwrightPackage.dependencies['@playwright/test']).toBe(lock.playwright.version);
   expect(projectLock.packages['node_modules/playwright'].version).toBe(lock.playwright.version);
-  const expectedNodeEngine = `>=${lock.node.version} <23`;
+  const nodeMajor = Number.parseInt(lock.node.version, 10);
+  const expectedNodeEngine = `>=${lock.node.version} <${nodeMajor + 1}`;
   expect(projectPackage.engines.node).toBe(expectedNodeEngine);
   expect(projectLock.packages[''].engines.node).toBe(expectedNodeEngine);
   expect(projectPackage.packageManager).toBe(`npm@${lock.node.npmVersion}`);

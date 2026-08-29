@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "22.23.2",
+    "version": "24.18.0",
     "npmVersion": "11.19.1",
     "npmLockSha256": "932f17ca169077779515e713010cc23effdca443305ba77096fe17360c3ad298",
-    "image": "node:22.23.2-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5",
+    "image": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
     "baseDebianSnapshot": "20260829T000000Z"
   },
   "projectToolchain": {
@@ -37,10 +37,10 @@
     "version": "18.2.0"
   },
   "openstackController": {
-    "pythonVersion": "3.12.11",
-    "image": "python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
-    "openstacksdkVersion": "4.17.0",
-    "requirementsSha256": "22eb51c3ee8b0ef5f2c10c10989e07ea10bb7d90c10e77c7eaacdfeb0c6fd8c5"
+    "pythonVersion": "3.12.13",
+    "image": "python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2",
+    "openstacksdkVersion": "4.18.0",
+    "requirementsSha256": "df86d7f1ea14e50e1fbabdfdfb8efc4af76bb9ab8c91955f04707f97e350a7f4"
   },
   "debian": {
     "snapshot": "20260829T000000Z",
@@ -75,7 +75,7 @@
       }
     ]
   },
-  "semgrep": { "version": "1.173.0" },
+  "semgrep": { "version": "1.174.0" },
   "codeql": {
     "version": "2.26.3",
     "url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.26.3/codeql-bundle-linux64.tar.gz",

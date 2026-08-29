@@ -24,7 +24,7 @@
     },
     {
       "packageName": "esbuild",
-      "resolvedVersion": "0.28.1",
+      "resolvedVersion": "0.28.2",
       "dependencyScope": "transitive-development",
       "artifactInclusion": "development-only",
       "reason": "Pinned build tool installs its platform binary during local development setup.",

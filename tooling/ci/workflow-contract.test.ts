@@ -38,12 +38,12 @@ it('pins every external Action to an approved full commit SHA', () => {
     'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
     'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
     'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
-    'actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae',
-    'actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae',
-    'docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c',
+    'actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9',
+    'actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9',
+    'docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e',
     'docker/login-action@dbcb813823bdd20940b903addbd779551569679f',
     'docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a',
-    'github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd',
+    'github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28',
     'coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329',
   ]) {
     expect(uses).toContain(pin);

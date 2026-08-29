@@ -34,7 +34,7 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
 const REQUIRED_BUILD_TARGET = 'chrome140';
-const REQUIRED_NODE_ENGINE = '>=22.23.2 <23';
+const REQUIRED_NODE_ENGINE = '>=24.18.0 <25';
 const REQUIRED_PACKAGE_MANAGER = 'npm@11.19.1';
 const REQUIRED_NPM_CONFIG = Object.freeze([
   'legacy-peer-deps=true',

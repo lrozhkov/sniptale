@@ -5,9 +5,9 @@ import { createTempRoot, importFresh, writeFile } from './test-helpers';
 function createPassingPackageJson() {
   return {
     packageManager: 'npm@11.19.1',
-    engines: { node: '>=22.23.2 <23' },
+    engines: { node: '>=24.18.0 <25' },
     devEngines: {
-      runtime: { name: 'node', version: '>=22.23.2 <23', onFail: 'error' },
+      runtime: { name: 'node', version: '>=24.18.0 <25', onFail: 'error' },
       packageManager: { name: 'npm', version: '11.19.1', onFail: 'error' },
     },
     dependencies: {
@@ -103,11 +103,11 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'package.json',
-        message: 'engines.node must be ">=22.23.2 <23"',
+        message: 'engines.node must be ">=24.18.0 <25"',
       }),
       expect.objectContaining({
         file: 'package-lock.json',
-        message: 'packages[""].engines.node must be ">=22.23.2 <23"',
+        message: 'packages[""].engines.node must be ">=24.18.0 <25"',
       }),
       expect.objectContaining({
         file: 'package.json',
@@ -190,7 +190,7 @@ it('rejects lockfile engine drift independently from the root package', async ()
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
     rule: 'config-policy',
     file: 'package-lock.json',
-    message: 'packages[""].engines.node must be ">=22.23.2 <23"',
+    message: 'packages[""].engines.node must be ">=24.18.0 <25"',
   });
 });
 

@@ -368,9 +368,9 @@ keystoneauth1==5.15.0 \
     --hash=sha256:9e2a4cf45cc2e2164093157091bc073eda1f334f755e8fab9fd25420c6f6acef \
     --hash=sha256:ce2cacdfd028e65bd23ff403d6572ebfab3b006d6d2dde3aa85c263675a9fbb5
     # via openstacksdk
-openstacksdk==4.17.0 \
-    --hash=sha256:3c968f8b97b38b7d73ddb88d16c6a7d80bcc554c5fbfcc12638a7b51bdae144e \
-    --hash=sha256:827e1ade488db6116f59af1da6c97dbdfeeb879d3fc96bca99b19351f15df8ba
+openstacksdk==4.18.0 \
+    --hash=sha256:17d033c19a07df90116b67c0750b2218acdc45cdcf659d4c137f084667b26993 \
+    --hash=sha256:466f2f869bcf6dec717a5e6c65c0522b1bd061d53310c7bf11982e0d9244f70c
     # via -r tooling/configs/ci/openstack-controller-requirements.in
 os-service-types==1.9.0 \
     --hash=sha256:1f2e5fb71d1f6f4ff31d8992674f2368465bc2f25cd94018015c3ddbfc5c617f \

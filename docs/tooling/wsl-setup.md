@@ -31,14 +31,14 @@ sudo apt-get install -y build-essential curl git python3 python3-pip xvfb
 
 `xvfb` supports headless extension smoke when WSL has no `DISPLAY`.
 
-## Install Linux Node.js 22
+## Install Linux Node.js 24
 
 Install through the current supported `nvm` bootstrap, then:
 
 ```bash
 source ~/.bashrc
-nvm install 22.23.2
-nvm use 22.23.2
+nvm install 24.18.0
+nvm use 24.18.0
 npm install --global npm@11.19.1 --ignore-scripts --min-release-age-exclude=npm
 hash -r
 ```

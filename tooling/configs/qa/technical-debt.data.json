@@ -16760,7 +16760,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/ci/container-command.mjs",
-        "contentHash": "382cf26be74a4aa8f504d2634491b1aee07c8188bb47b6af92f9fdc6f0fa57ce"
+        "contentHash": "a06bb4061d46d95f1e5630c353d41ac738fd30e0274389b106649a66d919d1e9"
       },
       "consumers": [
         "tooling/ci/ci-contract.test.ts",
@@ -23146,7 +23146,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-config-policy.mjs",
-        "contentHash": "a523429411bcc7f9cb9b9cf2c33bc7c60ee43de16eeee3ff54342308ce42b36c"
+        "contentHash": "150a1a7acb1a182bddc213f2e134ef623006d15bff794239c46abb37c6c93402"
       },
       "consumers": [
         "tooling/qa/core/verify-config-policy.mjs",
