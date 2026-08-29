@@ -132,8 +132,8 @@
     "@sniptale/foundation": "0.3.3",
     "@sniptale/runtime-contracts": "0.3.3",
     "lucide-react": "^0.575.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "vitest": "^4.1.10"

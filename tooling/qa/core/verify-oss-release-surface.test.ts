@@ -52,7 +52,7 @@ function manropeAsset(font: Buffer) {
   return {
     id: 'manrope',
     sourcePackage: '@fontsource-variable/manrope',
-    version: '5.2.8',
+    version: '5.3.0',
     license: 'OFL-1.1',
     copyright: 'Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)',
     artifacts: [
@@ -113,7 +113,7 @@ function seedLicensedPackages(root: string) {
       packages: {
         '': { license: 'AGPL-3.0-or-later' },
         'apps/extension': { license: 'AGPL-3.0-or-later' },
-        'node_modules/@fontsource-variable/manrope': { license: 'OFL-1.1', version: '5.2.8' },
+        'node_modules/@fontsource-variable/manrope': { license: 'OFL-1.1', version: '5.3.0' },
         'packages/foundation': { license: 'AGPL-3.0-or-later' },
       },
     })}\n`
@@ -123,7 +123,7 @@ function seedLicensedPackages(root: string) {
 function seedLegalAndContributorFiles(root: string, font: Buffer) {
   const manrope = {
     sourcePackage: '@fontsource-variable/manrope',
-    version: '5.2.8',
+    version: '5.3.0',
     license: 'OFL-1.1',
     copyright: 'Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)',
     licensePath: 'LICENSES/OFL-1.1.txt',

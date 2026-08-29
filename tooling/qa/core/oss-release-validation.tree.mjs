@@ -26,7 +26,7 @@ export function validatePackages(root, policy, inventory) {
     }
   }
   const manropeDependency = lock.packages?.['node_modules/@fontsource-variable/manrope'];
-  if (manropeDependency?.version !== '5.2.8' || manropeDependency?.license !== 'OFL-1.1') {
+  if (manropeDependency?.version !== '5.3.0' || manropeDependency?.license !== 'OFL-1.1') {
     errors.push('package-lock Manrope provenance drift');
   }
   return errors;
@@ -118,7 +118,7 @@ export function validateBundledAssets(root, policy, inventory) {
   const manrope = policy.bundledAssets.find((asset) => asset.id === 'manrope');
   if (
     manrope?.sourcePackage !== '@fontsource-variable/manrope' ||
-    manrope?.version !== '5.2.8' ||
+    manrope?.version !== '5.3.0' ||
     manrope?.license !== 'OFL-1.1' ||
     manrope?.copyright !==
       'Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)'

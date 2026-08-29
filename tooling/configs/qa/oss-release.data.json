@@ -62,9 +62,9 @@
       "source": "LICENSES/dependencies/@zip.js__zip.js-2.8.61.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt",
+      "archivePath": "LICENSES/dependencies/@zumer__snapdom-2.24.7.txt",
       "sha256": "c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2",
-      "source": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt"
+      "source": "LICENSES/dependencies/@zumer__snapdom-2.24.7.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
@@ -122,9 +122,9 @@
       "source": "LICENSES/dependencies/lucide-react-0.575.0.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/mediabunny-1.46.0.txt",
+      "archivePath": "LICENSES/dependencies/mediabunny-1.55.2.txt",
       "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
-      "source": "LICENSES/dependencies/mediabunny-1.46.0.txt"
+      "source": "LICENSES/dependencies/mediabunny-1.55.2.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/mp4-muxer-5.2.2.txt",
@@ -157,14 +157,14 @@
       "source": "LICENSES/dependencies/process-nextick-args-2.0.1.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/react-19.2.5.txt",
+      "archivePath": "LICENSES/dependencies/react-19.2.8.txt",
       "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
-      "source": "LICENSES/dependencies/react-19.2.5.txt"
+      "source": "LICENSES/dependencies/react-19.2.8.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/react-dom-19.2.5.txt",
+      "archivePath": "LICENSES/dependencies/react-dom-19.2.8.txt",
       "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
-      "source": "LICENSES/dependencies/react-dom-19.2.5.txt"
+      "source": "LICENSES/dependencies/react-dom-19.2.8.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/readable-stream-2.3.8.txt",
@@ -207,9 +207,9 @@
       "source": "LICENSES/dependencies/util-deprecate-1.0.2.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/zod-4.3.6.txt",
+      "archivePath": "LICENSES/dependencies/zod-4.4.3.txt",
       "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8",
-      "source": "LICENSES/dependencies/zod-4.3.6.txt"
+      "source": "LICENSES/dependencies/zod-4.4.3.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/zustand-4.5.7.txt",
@@ -223,12 +223,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "6e78f77fe3fe4bff59298a2b492c9eed17b5bde6ecc3379e7c3b4d64c06a3b16",
+      "sha256": "fdfdc658c84c53358d70ff86d429c6a5968e5bc23457d0a5be9056c7c58749d0",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "2a2dded4531a2b77884a69820419fe47075b177260b2229e8686add2632a6c3e",
+      "sha256": "cf4881c1a6425f4646bd6972630c8d4f34486e1fa34f6f1ce7ae81c52594fd31",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
@@ -255,7 +255,7 @@
     {
       "id": "manrope",
       "sourcePackage": "@fontsource-variable/manrope",
-      "version": "5.2.8",
+      "version": "5.3.0",
       "license": "OFL-1.1",
       "copyright": "Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)",
       "artifacts": [
@@ -298,7 +298,7 @@
     "canonicalLicenseAliases": [
       {
         "packageName": "@fontsource-variable/manrope",
-        "version": "5.2.8",
+        "version": "5.3.0",
         "archivePath": "LICENSES/OFL-1.1.txt",
         "sha256": "d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30"
       }

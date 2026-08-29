@@ -34,12 +34,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "dcec91d88255f6043bd0f1acf27709b5b4495164def1ce7f16a1154dd09ee877"
+      "sha256": "8c7f0498ca9c5b864a3cd38e94269157e7d6204a1d034ff267e3e9db8365b23b"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "dcec91d88255f6043bd0f1acf27709b5b4495164def1ce7f16a1154dd09ee877"
+      "sha256": "8c7f0498ca9c5b864a3cd38e94269157e7d6204a1d034ff267e3e9db8365b23b"
     },
     {
       "category": "bundled-font",
@@ -74,7 +74,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/oss-release-validation.tree.mjs",
-      "sha256": "24a48ede90b885469749d889c7435d62570908d1da346cd6d64a68fa14290c48"
+      "sha256": "48febaf6870c0de78fc21ff60660e9a3a49b99003ec7d24098980cd5ebd0e8a4"
     },
     {
       "category": "archive-integration",

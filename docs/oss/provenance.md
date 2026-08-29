@@ -10,7 +10,7 @@ Local Git authorship corroborates repository history but does not replace the co
 
 ## Bundled Manrope font
 
-The extension bundles three Manrope 5.2.8 WOFF2 files from `@fontsource-variable/manrope`. Each policy entry maps the bundled path to an exact installed package source path and SHA-256; validation rejects missing, additional, changed, or source-divergent bytes. `LICENSES/OFL-1.1.txt` is the single canonical redistributed copy of the installed package `LICENSE`. The dependency manifest references that file instead of generating a duplicate. The fonts remain under OFL-1.1; Sniptale code remains under AGPL-3.0-or-later.
+The extension bundles three Manrope 5.3.0 WOFF2 files from `@fontsource-variable/manrope`. Each policy entry maps the bundled path to an exact installed package source path and SHA-256; validation rejects missing, additional, changed, or source-divergent bytes. `LICENSES/OFL-1.1.txt` is the single canonical redistributed copy of the installed package `LICENSE`. The dependency manifest references that file instead of generating a duplicate. The fonts remain under OFL-1.1; Sniptale code remains under AGPL-3.0-or-later.
 
 ## Dependency legal closure
 
