@@ -43,6 +43,7 @@ beforeEach(() => {
   mocks.loadSettings.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: true,
+    externalSnapshotAssetRedirectsEnabled: true,
     externalSnapshotLinksEnabled: false,
   });
 });
@@ -60,6 +61,7 @@ it('loads the current Page Web copy resource policy', async () => {
   expect(latest).toMatchObject({
     anonymousCrossOriginAssetsEnabled: false,
     authenticatedSameOriginAssetsEnabled: true,
+    externalAssetRedirectsEnabled: true,
     externalLinksEnabled: false,
     error: null,
     pending: null,
@@ -70,6 +72,7 @@ it('persists each resource switch and adopts the normalized settings result', as
   mocks.patchSettings.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
+    externalSnapshotAssetRedirectsEnabled: true,
     externalSnapshotLinksEnabled: true,
   });
   await act(async () => root.render(<Harness />));
@@ -83,6 +86,7 @@ it('persists each resource switch and adopts the normalized settings result', as
   expect(latest).toMatchObject({
     anonymousCrossOriginAssetsEnabled: true,
     authenticatedSameOriginAssetsEnabled: false,
+    externalAssetRedirectsEnabled: true,
     externalLinksEnabled: true,
     error: null,
     pending: null,
@@ -93,6 +97,7 @@ it('persists the external-link opt-in independently from resource loading', asyn
   mocks.patchSettings.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: true,
+    externalSnapshotAssetRedirectsEnabled: true,
     externalSnapshotLinksEnabled: true,
   });
   await act(async () => root.render(<Harness />));
@@ -102,6 +107,24 @@ it('persists the external-link opt-in independently from resource loading', asyn
 
   expect(mocks.patchSettings).toHaveBeenCalledWith({ externalSnapshotLinksEnabled: true });
   expect(latest?.externalLinksEnabled).toBe(true);
+});
+
+it('persists the external redirect policy from the popup resource controls', async () => {
+  mocks.patchSettings.mockResolvedValue({
+    anonymousCrossOriginSnapshotAssetsEnabled: true,
+    authenticatedSnapshotAssetsEnabled: true,
+    externalSnapshotAssetRedirectsEnabled: false,
+    externalSnapshotLinksEnabled: false,
+  });
+  await act(async () => root.render(<Harness />));
+  await flush();
+
+  await act(async () => latest?.setExternalAssetRedirectsEnabled(false));
+
+  expect(mocks.patchSettings).toHaveBeenCalledWith({
+    externalSnapshotAssetRedirectsEnabled: false,
+  });
+  expect(latest?.externalAssetRedirectsEnabled).toBe(false);
 });
 
 it('surfaces load and update failures without leaving a pending switch', async () => {
@@ -126,6 +149,7 @@ it.each(['resolve', 'reject'] as const)(
     let resolveLoad!: (value: {
       anonymousCrossOriginSnapshotAssetsEnabled: boolean;
       authenticatedSnapshotAssetsEnabled: boolean;
+      externalSnapshotAssetRedirectsEnabled: boolean;
       externalSnapshotLinksEnabled: boolean;
     }) => void;
     let rejectLoad!: (reason: Error) => void;
@@ -144,6 +168,7 @@ it.each(['resolve', 'reject'] as const)(
         resolveLoad({
           anonymousCrossOriginSnapshotAssetsEnabled: false,
           authenticatedSnapshotAssetsEnabled: false,
+          externalSnapshotAssetRedirectsEnabled: true,
           externalSnapshotLinksEnabled: false,
         });
       } else {

@@ -34,7 +34,7 @@ function createActions(): UseGalleryAppActionsResult {
       importBackup: vi.fn(),
       importSelectedFile: vi.fn(),
       importMediaFiles: vi.fn(),
-      inspectDroppedWebSnapshot: vi.fn(),
+      importDroppedFiles: vi.fn(),
       inspectWebSnapshot: vi.fn(),
     },
     preview: {

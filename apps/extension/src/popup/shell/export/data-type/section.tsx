@@ -155,14 +155,19 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
 }
 
 function DataTypeFilterBar(props: {
+  disabled: boolean;
+  destination: PopupPackageDestination;
   filterQuery: string;
   onToggleAll: () => void;
+  options: ExportOptionConfig[];
   setFilterQuery: (value: string) => void;
   shouldShowClearAll: boolean;
+  toggleProps: ExportOptionToggleProps;
 }) {
+  const [isFilterFocused, setIsFilterFocused] = useState(false);
   return (
-    <div className="flex items-center gap-1.5 pb-2">
-      <div className="relative min-w-0 flex-1">
+    <div className="flex h-8 items-center gap-1 pb-2" data-ui="popup.export.quick-selection">
+      <div className={cx('relative min-w-0', isFilterFocused ? 'flex-1' : 'w-[66px] shrink-0')}>
         <Search
           className={[
             'pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2',
@@ -176,17 +181,20 @@ function DataTypeFilterBar(props: {
           placeholder={translate('popup.export.dataTypesFilterPlaceholder')}
           className={[
             'h-8 w-full rounded-[9px] border bg-transparent pl-7 pr-2.5 text-[11px]',
+            'transition-[width] duration-150',
             'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
             'text-[var(--sniptale-color-text-primary)] placeholder:text-[var(--sniptale-color-text-dim)]',
             'outline-none focus:border-[var(--sniptale-color-accent)]',
           ].join(' ')}
+          onBlur={() => setIsFilterFocused(false)}
+          onFocus={() => setIsFilterFocused(true)}
         />
       </div>
       <button
         type="button"
         onClick={props.onToggleAll}
         className={[
-          'shrink-0 rounded-[9px] px-1.5 py-1 text-[10px] font-medium',
+          'h-8 shrink-0 rounded-[9px] px-1.5 text-[10px] font-medium',
           'text-[var(--sniptale-color-text-primary)] transition-colors',
           'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
           'outline-none focus-visible:outline-none',
@@ -196,6 +204,14 @@ function DataTypeFilterBar(props: {
           ? translate('popup.export.clearAllTabsButton')
           : translate('popup.export.selectAllTabsButton')}
       </button>
+      {!isFilterFocused ? (
+        <QuickSelection
+          destination={props.destination}
+          disabled={props.disabled}
+          options={props.options}
+          toggleProps={props.toggleProps}
+        />
+      ) : null}
     </div>
   );
 }
@@ -217,7 +233,7 @@ function applyVisibleOptionSelection(args: {
 }
 
 function applyQuickSelection(
-  preset: 'web-copy' | 'materials' | 'full',
+  preset: 'web-copy' | 'materials',
   destination: PopupPackageDestination,
   options: ExportOptionConfig[],
   toggleProps: ExportOptionToggleProps
@@ -225,7 +241,6 @@ function applyQuickSelection(
   for (const option of options) {
     const nextValue =
       isRequiredOption(destination, option.key, toggleProps) ||
-      preset === 'full' ||
       (preset === 'web-copy' && option.key === 'webCopy') ||
       (preset === 'materials' && ['json', 'markdown', 'files', 'images'].includes(option.key));
     if (getExportOptionActive(option.key, toggleProps) !== nextValue) {
@@ -241,14 +256,14 @@ function QuickSelection(props: {
   toggleProps: ExportOptionToggleProps;
 }) {
   return (
-    <div className="mb-2 flex items-center gap-1" data-ui="popup.export.quick-selection">
-      {(['web-copy', 'materials', 'full'] as const).map((preset) => (
+    <div className="flex shrink-0 items-center gap-1">
+      {(['web-copy', 'materials'] as const).map((preset) => (
         <button
           key={preset}
           type="button"
           disabled={props.disabled}
           className={[
-            'min-w-0 flex-1 rounded-[7px] border px-1.5 py-0.5 text-[9px]',
+            'h-8 min-w-0 rounded-[7px] border px-1.5 text-[9px]',
             'border-[var(--sniptale-color-border-soft)]',
             'text-[var(--sniptale-color-text-secondary)]',
             'hover:border-[var(--sniptale-color-accent)]',
@@ -261,9 +276,7 @@ function QuickSelection(props: {
           {translate(
             preset === 'web-copy'
               ? 'popup.export.packagePresetWebCopy'
-              : preset === 'materials'
-                ? 'popup.export.packagePresetMaterials'
-                : 'popup.export.packagePresetFull'
+              : 'popup.export.packagePresetMaterials'
           )}
         </button>
       ))}
@@ -291,6 +304,15 @@ function WebCopyResourceControls(props: {
       setChecked: props.resources.setAnonymousCrossOriginAssetsEnabled,
     },
     {
+      checked: props.resources.externalAssetRedirectsEnabled,
+      description: translate('popup.export.webCopyExternalRedirectsDescription'),
+      disabled: !props.resources.anonymousCrossOriginAssetsEnabled,
+      indent: true,
+      label: translate('popup.export.webCopyExternalRedirectsLabel'),
+      pending: props.resources.pending === 'external-redirects',
+      setChecked: props.resources.setExternalAssetRedirectsEnabled,
+    },
+    {
       checked: props.resources.externalLinksEnabled,
       description: translate('popup.export.webCopyExternalLinksDescription'),
       label: translate('popup.export.webCopyExternalLinksLabel'),
@@ -301,12 +323,20 @@ function WebCopyResourceControls(props: {
   return (
     <div className="ml-5 pl-3">
       {items.map((item) => (
-        <label key={item.label} className="flex items-start gap-2 py-1.5">
+        <label
+          key={item.label}
+          className={['flex items-start gap-2 py-1.5', item.indent ? 'ml-4' : ''].join(' ')}
+        >
           <input
             type="checkbox"
             className={checkboxClassName}
             checked={item.checked}
-            disabled={props.disabled || item.pending || props.resources.pending !== null}
+            disabled={
+              props.disabled ||
+              item.disabled === true ||
+              item.pending ||
+              props.resources.pending !== null
+            }
             onChange={(event) => void item.setChecked(event.currentTarget.checked)}
           />
           <span className="min-w-0">
@@ -370,6 +400,8 @@ function renderDataTypeBody(args: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <DataTypeFilterBar
+        disabled={args.disabled}
+        destination={args.destination}
         filterQuery={args.filterQuery}
         onToggleAll={() =>
           applyVisibleOptionSelection({
@@ -379,13 +411,9 @@ function renderDataTypeBody(args: {
             visibleOptions: args.visibleOptions,
           })
         }
+        options={args.options}
         setFilterQuery={args.setFilterQuery}
         shouldShowClearAll={args.shouldShowClearAll}
-      />
-      <QuickSelection
-        destination={args.destination}
-        disabled={args.disabled}
-        options={args.options}
         toggleProps={args.toggleProps}
       />
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">

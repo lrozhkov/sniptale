@@ -4,11 +4,13 @@ import { loadSettings, patchSettings } from '../../../../composition/persistence
 export type WebCopyResourcePreferences = {
   anonymousCrossOriginAssetsEnabled: boolean;
   authenticatedSameOriginAssetsEnabled: boolean;
+  externalAssetRedirectsEnabled: boolean;
   externalLinksEnabled: boolean;
   error: string | null;
-  pending: 'anonymous' | 'authenticated' | 'external-links' | null;
+  pending: 'anonymous' | 'authenticated' | 'external-redirects' | 'external-links' | null;
   setAnonymousCrossOriginAssetsEnabled: (enabled: boolean) => Promise<void>;
   setAuthenticatedSameOriginAssetsEnabled: (enabled: boolean) => Promise<void>;
+  setExternalAssetRedirectsEnabled: (enabled: boolean) => Promise<void>;
   setExternalLinksEnabled: (enabled: boolean) => Promise<void>;
 };
 
@@ -16,9 +18,10 @@ export function useWebCopyResourcePreferences(): WebCopyResourcePreferences {
   const [state, setState] = useState({
     anonymousCrossOriginAssetsEnabled: true,
     authenticatedSameOriginAssetsEnabled: true,
+    externalAssetRedirectsEnabled: true,
     externalLinksEnabled: false,
     error: null as string | null,
-    pending: null as 'anonymous' | 'authenticated' | 'external-links' | null,
+    pending: null as 'anonymous' | 'authenticated' | 'external-redirects' | 'external-links' | null,
   });
 
   useEffect(() => {
@@ -30,6 +33,7 @@ export function useWebCopyResourcePreferences(): WebCopyResourcePreferences {
             ...current,
             anonymousCrossOriginAssetsEnabled: settings.anonymousCrossOriginSnapshotAssetsEnabled,
             authenticatedSameOriginAssetsEnabled: settings.authenticatedSnapshotAssetsEnabled,
+            externalAssetRedirectsEnabled: settings.externalSnapshotAssetRedirectsEnabled,
             externalLinksEnabled: settings.externalSnapshotLinksEnabled,
           }));
         }
@@ -43,7 +47,7 @@ export function useWebCopyResourcePreferences(): WebCopyResourcePreferences {
   }, []);
 
   const update = async (
-    pending: 'anonymous' | 'authenticated' | 'external-links',
+    pending: 'anonymous' | 'authenticated' | 'external-redirects' | 'external-links',
     patch: Parameters<typeof patchSettings>[0]
   ) => {
     setState((current) => ({ ...current, error: null, pending }));
@@ -52,6 +56,7 @@ export function useWebCopyResourcePreferences(): WebCopyResourcePreferences {
       setState({
         anonymousCrossOriginAssetsEnabled: settings.anonymousCrossOriginSnapshotAssetsEnabled,
         authenticatedSameOriginAssetsEnabled: settings.authenticatedSnapshotAssetsEnabled,
+        externalAssetRedirectsEnabled: settings.externalSnapshotAssetRedirectsEnabled,
         externalLinksEnabled: settings.externalSnapshotLinksEnabled,
         error: null,
         pending: null,
@@ -67,6 +72,8 @@ export function useWebCopyResourcePreferences(): WebCopyResourcePreferences {
       update('anonymous', { anonymousCrossOriginSnapshotAssetsEnabled: enabled }),
     setAuthenticatedSameOriginAssetsEnabled: (enabled) =>
       update('authenticated', { authenticatedSnapshotAssetsEnabled: enabled }),
+    setExternalAssetRedirectsEnabled: (enabled) =>
+      update('external-redirects', { externalSnapshotAssetRedirectsEnabled: enabled }),
     setExternalLinksEnabled: (enabled) =>
       update('external-links', { externalSnapshotLinksEnabled: enabled }),
   };

@@ -122,11 +122,13 @@ function createProps(
     webCopyResources: {
       anonymousCrossOriginAssetsEnabled: true,
       authenticatedSameOriginAssetsEnabled: true,
+      externalAssetRedirectsEnabled: true,
       externalLinksEnabled: false,
       error: null,
       pending: null,
       setAnonymousCrossOriginAssetsEnabled: vi.fn(),
       setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+      setExternalAssetRedirectsEnabled: vi.fn(),
       setExternalLinksEnabled: vi.fn(),
     },
     toggleSelectAllTabs: vi.fn(),

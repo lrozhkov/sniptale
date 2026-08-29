@@ -104,6 +104,7 @@ beforeEach(() => {
   loadSettingsMock.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
+    externalSnapshotAssetRedirectsEnabled: true,
   });
   sendTabMessageMock.mockResolvedValue({
     error: 'stale listener answered',
@@ -234,6 +235,11 @@ it('terminates an unresponsive Page Package producer and forwards canonical clea
 });
 
 it('applies Web Snapshot consent, resource policy, and capture authority to combined Export', async () => {
+  loadSettingsMock.mockResolvedValueOnce({
+    anonymousCrossOriginSnapshotAssetsEnabled: true,
+    authenticatedSnapshotAssetsEnabled: false,
+    externalSnapshotAssetRedirectsEnabled: true,
+  });
   sendTabMessageMock.mockResolvedValue({
     stagedPagePackage: {
       jobId: 'job-combined',
@@ -269,7 +275,8 @@ it('applies Web Snapshot consent, resource policy, and capture authority to comb
 
   expect(loadSettingsMock).toHaveBeenCalledTimes(1);
   expect(authorizeWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-combined', {
-    allowAnonymousCrossOriginAssets: false,
+    allowAnonymousCrossOriginAssets: true,
+    allowExternalAssetRedirects: true,
   });
   expect(issueContentGrantMock).toHaveBeenCalledWith({
     actionTypes: [MessageType.EXPORT_CAPTURE_FULL_PAGE],
@@ -278,7 +285,7 @@ it('applies Web Snapshot consent, resource policy, and capture authority to comb
   expect(sendTabMessageMock).toHaveBeenCalledWith(
     62,
     expect.objectContaining({
-      allowAnonymousCrossOriginAssets: false,
+      allowAnonymousCrossOriginAssets: true,
       allowAuthenticatedSameOriginAssets: false,
       includeWebCopy: true,
       intent: 'export',
@@ -390,6 +397,7 @@ it('carries stored Web Snapshot policy through the common Save package request',
 
   expect(authorizeWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-save', {
     allowAnonymousCrossOriginAssets: false,
+    allowExternalAssetRedirects: false,
   });
   expect(sendTabMessageMock).toHaveBeenCalledWith(
     62,

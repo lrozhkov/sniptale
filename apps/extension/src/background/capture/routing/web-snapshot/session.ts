@@ -8,6 +8,7 @@ type SnapshotSession = {
   activeAssetFetchControllers: Set<AbortController>;
   assetFetchDeadlineAt: number;
   allowAnonymousCrossOriginAssets: boolean;
+  allowExternalAssetRedirects: boolean;
   assetId: string | null;
   allowedUrls: Set<string>;
   cancelRequested: boolean;
@@ -19,6 +20,7 @@ type SnapshotSession = {
 
 type PendingCaptureRequest = {
   allowAnonymousCrossOriginAssets: boolean;
+  allowExternalAssetRedirects: boolean;
   createdAt: number;
 };
 
@@ -89,7 +91,10 @@ function createCaptureRequestKey(tabId: number, requestId: string): string {
 export function authorizeWebSnapshotCaptureRequest(
   tabId: number,
   requestId: string,
-  options: { allowAnonymousCrossOriginAssets?: boolean } = {}
+  options: {
+    allowAnonymousCrossOriginAssets?: boolean;
+    allowExternalAssetRedirects?: boolean;
+  } = {}
 ): void {
   purgeExpiredSessions();
   const requestKey = createCaptureRequestKey(tabId, requestId);
@@ -98,6 +103,9 @@ export function authorizeWebSnapshotCaptureRequest(
   }
   pendingCaptureRequests.set(requestKey, {
     allowAnonymousCrossOriginAssets: options.allowAnonymousCrossOriginAssets === true,
+    allowExternalAssetRedirects:
+      options.allowAnonymousCrossOriginAssets === true &&
+      options.allowExternalAssetRedirects === true,
     createdAt: Date.now(),
   });
 }
@@ -138,6 +146,7 @@ export function registerWebSnapshotAssetSession(
     activeAssetFetchControllers: new Set(),
     assetFetchDeadlineAt: Date.now() + SNAPSHOT_ASSET_COLLECTION_BUDGET_MS,
     allowAnonymousCrossOriginAssets: request.allowAnonymousCrossOriginAssets,
+    allowExternalAssetRedirects: request.allowExternalAssetRedirects,
     assetId: null,
     allowedUrls,
     cancelRequested: false,
@@ -215,12 +224,19 @@ export function beginWebSnapshotAssetFetch(args: {
   sessionId: string;
   tabId: number;
   url: string;
-}): { abort(reason?: unknown): void; release(): void; signal: AbortSignal; timeoutMs: number } {
+}): {
+  abort(reason?: unknown): void;
+  allowExternalAssetRedirects: boolean;
+  release(): void;
+  signal: AbortSignal;
+  timeoutMs: number;
+} {
   const session = resolveAuthorizedWebSnapshotAssetFetch(args);
   const controller = new AbortController();
   session.activeAssetFetchControllers.add(controller);
   return {
     abort: (reason) => controller.abort(reason),
+    allowExternalAssetRedirects: session.allowExternalAssetRedirects,
     release: () => session.activeAssetFetchControllers.delete(controller),
     signal: controller.signal,
     timeoutMs: Math.max(0, session.assetFetchDeadlineAt - Date.now()),

@@ -7,6 +7,7 @@ import {
 import type { GalleryImportController } from './controller-types';
 import type { GalleryBusyAction } from './shared';
 import { createGalleryUserFacingActionError } from './shared';
+import { resolveGalleryMediaImportMimeType } from '../media-import-profile';
 
 function importErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
@@ -39,18 +40,22 @@ export function createInspectWebSnapshotImportAction(
   };
 }
 
-export function createInspectDroppedWebSnapshotImportAction(
+export function createImportDroppedLibraryFilesAction(
   controller: GalleryImportController,
-  inspectFile: ReturnType<typeof createInspectWebSnapshotImportAction>
+  inspectWebSnapshot: ReturnType<typeof createInspectWebSnapshotImportAction>,
+  importMediaFiles: (files: File[]) => Promise<void>
 ) {
   return async (files: File[]): Promise<void> => {
-    if (files.length !== 1) {
-      controller.actions.surface.setBanner(
-        translate('gallery.importModal.webSnapshotDropSingleFile')
-      );
+    if (files.length === 0) return;
+    if (files.every((file) => resolveGalleryMediaImportMimeType(file) !== null)) {
+      await importMediaFiles(files);
       return;
     }
-    await inspectFile(files[0] ?? null);
+    if (files.length === 1 && files[0]?.name.toLowerCase().endsWith('.sniptale-page-package.zip')) {
+      await inspectWebSnapshot(files[0]);
+      return;
+    }
+    controller.actions.surface.setBanner(translate('gallery.importModal.libraryDropUnsupported'));
   };
 }
 

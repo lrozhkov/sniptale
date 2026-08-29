@@ -264,6 +264,11 @@ function parsePrivacySettingsFields(
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,
+    'externalSnapshotAssetRedirectsEnabled',
+    parseOptionalBoolean(value['externalSnapshotAssetRedirectsEnabled'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
     'externalSnapshotLinksEnabled',
     parseOptionalBoolean(value['externalSnapshotLinksEnabled'])
   );

@@ -237,6 +237,11 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
       )
       ?.getAttribute('href')
   ).toBe('blob:snapshot-archive');
+  expect(
+    container?.querySelector<HTMLAnchorElement>(
+      `a[aria-label="${translate('webSnapshotViewer.app.downloadPackage', 'en')}"]`
+    )?.textContent
+  ).toContain('ZIP');
 
   const collapseButton = container?.querySelector(
     `button[aria-label="${translate('webSnapshotViewer.app.collapseToolbar', 'en')}"]`

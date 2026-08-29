@@ -6,7 +6,7 @@ import { createPagePackageManifestFixture } from '../../../features/web-snapshot
 import { createBusyActionRunner } from './shared';
 import {
   createConfirmWebSnapshotImportAction,
-  createInspectDroppedWebSnapshotImportAction,
+  createImportDroppedLibraryFilesAction,
   createInspectWebSnapshotImportAction,
 } from './web-snapshot-import';
 
@@ -93,27 +93,40 @@ it('ignores an empty picker and localizes unsupported archive inspection', async
   expect(getState().storage.banner).toBe('gallery.importModal.webSnapshotUnsupported');
 });
 
-it('routes one dropped file through the same inspection and rejects ambiguous drops', async () => {
+it('routes dropped media and Web Snapshot files through their existing import owners', async () => {
   const { controller, getState } = createController();
   const inspectFile = createInspectWebSnapshotImportAction(
     controller,
     createBusyActionRunner(controller)
   );
-  const inspectDrop = createInspectDroppedWebSnapshotImportAction(controller, inspectFile);
-  const file = new File(['zip'], 'snapshot.sniptale-page-package.zip');
+  const importMediaFiles = vi.fn(async () => undefined);
+  const importDrop = createImportDroppedLibraryFilesAction(
+    controller,
+    inspectFile,
+    importMediaFiles
+  );
+  const file = new File(['zip'], 'Snapshot.SNIPTALE-PAGE-PACKAGE.ZIP');
   mocks.inspect.mockResolvedValue(inspection);
 
-  await inspectDrop([file]);
+  const mediaFiles = [
+    new File(['image'], 'photo.png', { type: 'image/png' }),
+    new File(['video'], 'clip.mp4', { type: 'video/mp4' }),
+  ];
+  await importDrop(mediaFiles);
+  expect(importMediaFiles).toHaveBeenCalledWith(mediaFiles);
+  expect(mocks.inspect).not.toHaveBeenCalled();
+
+  await importDrop([file]);
   expect(mocks.inspect).toHaveBeenCalledWith(file);
   expect(getState().storage.pendingWebSnapshotImport).toEqual({ file, inspection });
 
   controller.actions.surface.setPendingWebSnapshotImport(null);
-  await inspectDrop([]);
-  expect(getState().storage.banner).toBe('gallery.importModal.webSnapshotDropSingleFile');
+  await importDrop([]);
+  expect(getState().storage.banner).toBeNull();
   expect(mocks.inspect).toHaveBeenCalledTimes(1);
 
-  await inspectDrop([file, new File(['zip'], 'second.sniptale-page-package.zip')]);
-  expect(getState().storage.banner).toBe('gallery.importModal.webSnapshotDropSingleFile');
+  await importDrop([file, mediaFiles[0]!]);
+  expect(getState().storage.banner).toBe('gallery.importModal.libraryDropUnsupported');
   expect(mocks.inspect).toHaveBeenCalledTimes(1);
 });
 

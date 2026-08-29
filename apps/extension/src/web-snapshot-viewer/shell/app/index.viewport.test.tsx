@@ -140,7 +140,7 @@ it('resizes the snapshot iframe surface when viewer viewport state changes', asy
   expect(viewport?.style.height).toBe('844px');
 });
 
-it('uses the saved capture viewport as the default snapshot iframe surface', async () => {
+it('keeps the saved width and expands a reduced default viewport downward', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
   );
@@ -149,11 +149,12 @@ it('uses the saved capture viewport as the default snapshot iframe surface', asy
 
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('2560px');
-  expect(viewport?.style.height).toBe('1440px');
+  expect(viewport?.style.height).toBe('1920px');
   const scaledViewport = container?.querySelector<HTMLElement>(
     '[data-testid="snapshot-frame-scaled-viewport"]'
   );
   expect(scaledViewport?.style.width).toBe('1024px');
+  expect(scaledViewport?.style.height).toBe('768px');
   expect(viewport?.style.transform).toBe('scale(0.4)');
 });
 
@@ -189,7 +190,10 @@ it('keeps captured layout dimensions while switching between fit and manual zoom
   const viewport = () =>
     container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(scaledViewport()?.style.width).toBe('1024px');
+  expect(scaledViewport()?.className).toContain('overflow-hidden');
   expect(viewport()?.style.width).toBe('2560px');
+  expect(viewport()?.style.height).toBe('1920px');
+  expect(scaledViewport()?.style.height).toBe('768px');
 
   const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
     (button) => button.textContent === '40%'
@@ -199,6 +203,7 @@ it('keeps captured layout dimensions while switching between fit and manual zoom
   });
   expect(scaledViewport()?.style.width).toBe('2560px');
   expect(viewport()?.style.transform).toBe('scale(1)');
+  expect(viewport()?.style.height).toBe('1440px');
   const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
   expect(surface?.className).toContain('overflow-auto');
   expect(surface?.className).toContain('cursor-grab');

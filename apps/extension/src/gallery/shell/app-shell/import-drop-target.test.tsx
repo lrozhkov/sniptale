@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { GalleryWebSnapshotDropTarget } from './web-snapshot-drop-target';
+import { GalleryImportDropTarget } from './import-drop-target';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -29,12 +29,12 @@ function dispatchDrag(
 function renderTarget(props: { disabled?: boolean; onFilesDrop?: (files: File[]) => void } = {}) {
   act(() => {
     root?.render(
-      <GalleryWebSnapshotDropTarget
+      <GalleryImportDropTarget
         disabled={props.disabled ?? false}
         {...(props.onFilesDrop ? { onFilesDrop: props.onFilesDrop } : {})}
       >
         <div data-ui="test.library-content" />
-      </GalleryWebSnapshotDropTarget>
+      </GalleryImportDropTarget>
     );
   });
   const target = container?.querySelector('[data-ui="gallery.page.root"]');
@@ -64,8 +64,8 @@ it('shows a localized overlay and forwards dropped files without browser navigat
 
   const enter = dispatchDrag(target, 'dragenter', [file]);
   expect(enter.event.defaultPrevented).toBe(true);
-  expect(container?.textContent).toContain('gallery.importModal.webSnapshotDropTitle');
-  expect(container?.textContent).toContain('gallery.importModal.webSnapshotDropDescription');
+  expect(container?.textContent).toContain('gallery.importModal.libraryDropTitle');
+  expect(container?.textContent).toContain('gallery.importModal.libraryDropDescription');
 
   const over = dispatchDrag(target, 'dragover', [file]);
   expect(over.event.defaultPrevented).toBe(true);
@@ -74,7 +74,7 @@ it('shows a localized overlay and forwards dropped files without browser navigat
   const drop = dispatchDrag(target, 'drop', [file]);
   expect(drop.event.defaultPrevented).toBe(true);
   expect(onFilesDrop).toHaveBeenCalledWith([file]);
-  expect(container?.querySelector('[data-ui="gallery.web-snapshot-drop-target"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.import-drop-target"]')).toBeNull();
 });
 
 it('ignores non-file drags and blocks imports while another Library action is busy', () => {
@@ -84,7 +84,7 @@ it('ignores non-file drags and blocks imports while another Library action is bu
 
   const textDrag = dispatchDrag(target, 'dragenter', [], ['text/plain']);
   expect(textDrag.event.defaultPrevented).toBe(false);
-  expect(container?.querySelector('[data-ui="gallery.web-snapshot-drop-target"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.import-drop-target"]')).toBeNull();
 
   dispatchDrag(target, 'dragenter', [file]);
   const over = dispatchDrag(target, 'dragover', [file]);
@@ -102,8 +102,8 @@ it('keeps the overlay visible across nested drag targets until the root is left'
   dispatchDrag(target, 'dragenter', []);
   dispatchDrag(child, 'dragenter', []);
   dispatchDrag(child, 'dragleave', []);
-  expect(container?.querySelector('[data-ui="gallery.web-snapshot-drop-target"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.import-drop-target"]')).not.toBeNull();
 
   dispatchDrag(target, 'dragleave', []);
-  expect(container?.querySelector('[data-ui="gallery.web-snapshot-drop-target"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.import-drop-target"]')).toBeNull();
 });

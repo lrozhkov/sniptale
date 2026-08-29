@@ -4650,6 +4650,7 @@
         "apps/extension/src/content/parser/export-manager/files/index.ts",
         "apps/extension/src/content/parser/export-manager/files/modal-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/naming.ts",
+        "apps/extension/src/content/parser/export-manager/files/page-images.ts",
         "apps/extension/src/content/parser/export-manager/formats/data.ts",
         "apps/extension/src/content/parser/export-manager/formats/froala.ts",
         "apps/extension/src/content/parser/export-manager/formats/markdown.ts",
@@ -5336,6 +5337,7 @@
         "apps/extension/src/content/parser/export-manager/files/index.ts",
         "apps/extension/src/content/parser/export-manager/files/modal-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/naming.ts",
+        "apps/extension/src/content/parser/export-manager/files/page-images.ts",
         "apps/extension/src/content/parser/export-manager/formats/data.ts",
         "apps/extension/src/content/parser/export-manager/formats/froala.ts",
         "apps/extension/src/content/parser/export-manager/formats/markdown.ts",
@@ -9444,6 +9446,7 @@
         "apps/extension/src/gallery/library/ui/index.tsx",
         "apps/extension/src/gallery/platform/browser-driver/index.ts",
         "apps/extension/src/gallery/shell/app-shell/bindings.tsx",
+        "apps/extension/src/gallery/shell/app-shell/import-drop-target.tsx",
         "apps/extension/src/gallery/shell/app-shell/index.tsx",
         "apps/extension/src/gallery/shell/app-shell/layout.tsx",
         "apps/extension/src/gallery/shell/app-shell/overlays.tsx",
@@ -9533,6 +9536,7 @@
         "apps/extension/src/gallery/library/ui/index.tsx",
         "apps/extension/src/gallery/platform/browser-driver/index.ts",
         "apps/extension/src/gallery/shell/app-shell/bindings.tsx",
+        "apps/extension/src/gallery/shell/app-shell/import-drop-target.tsx",
         "apps/extension/src/gallery/shell/app-shell/index.tsx",
         "apps/extension/src/gallery/shell/app-shell/layout.tsx",
         "apps/extension/src/gallery/shell/app-shell/overlays.tsx",
@@ -10179,6 +10183,7 @@
         "apps/extension/src/popup/shell/bootstrap/video.ts",
         "apps/extension/src/popup/shell/command-palette/route-first.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
+        "apps/extension/src/popup/shell/export/data-type/capture-behavior.tsx",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
         "apps/extension/src/popup/shell/export/data-type/package-controls.tsx",
@@ -10393,6 +10398,7 @@
         "apps/extension/src/popup/shell/bootstrap/video.ts",
         "apps/extension/src/popup/shell/command-palette/route-first.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
+        "apps/extension/src/popup/shell/export/data-type/capture-behavior.tsx",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
         "apps/extension/src/popup/shell/export/data-type/package-controls.tsx",
@@ -13408,6 +13414,7 @@
         "packages/runtime-contracts/src/effect-v1/validation/scene.ts",
         "packages/runtime-contracts/src/effect-v1/validation/shared.ts",
         "packages/runtime-contracts/src/export/index.ts",
+        "packages/runtime-contracts/src/export/resource-limits.ts",
         "packages/runtime-contracts/src/highlighter/annotation-template-tags.ts",
         "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
@@ -13540,6 +13547,7 @@
         "packages/runtime-contracts/src/effect-v1/validation/scene.ts",
         "packages/runtime-contracts/src/effect-v1/validation/shared.ts",
         "packages/runtime-contracts/src/export/index.ts",
+        "packages/runtime-contracts/src/export/resource-limits.ts",
         "packages/runtime-contracts/src/highlighter/annotation-template-tags.ts",
         "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
@@ -17146,6 +17154,27 @@
       ]
     },
     {
+      "id": "policy.source.document-inspection-mjs.0af95ebd53",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/document-inspection.mjs",
+        "contentHash": "1095a927216c982305f678cab585d9a95f2a39a2f4ed35d846a9d2026a709721"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/document-inspection.mjs",
+        "tooling/web-snapshot-smoke/polygon-verification.mjs",
+        "tooling/web-snapshot-smoke/source-capture.mjs",
+        "tooling/web-snapshot-smoke/viewer-static-verification.mjs"
+      ],
+      "surfaces": [
+        "property:inspectDocument/anonymous-2/imageStats"
+      ]
+    },
+    {
       "id": "policy.source.documentation-facts-mjs.bd0142e828",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17611,6 +17640,29 @@
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]"
+      ]
+    },
+    {
+      "id": "policy.source.external-targets-mjs.4a2921dcec",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/external-targets.mjs",
+        "contentHash": "1c1c641ba0769deeaab833b09b94ae210c8c1fa81021a778e1ef6b6fcacbd7e5"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/external-targets.mjs",
+        "tooling/web-snapshot-smoke/polygon-runner.mjs"
+      ],
+      "surfaces": [
+        "binding:DEFAULT_EXTERNAL_TARGETS",
+        "binding:DEFAULT_THRESHOLDS",
+        "binding:EXTENDED_EXTERNAL_TARGETS",
+        "property:thresholds",
+        "property:thresholds[1]"
       ]
     },
     {
@@ -19516,6 +19568,57 @@
       ]
     },
     {
+      "id": "policy.source.polygon-runner-mjs.525064fc0d",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/polygon-runner.mjs",
+        "contentHash": "8f72408562e858e628ab2df841d1fbe3cf8ce92ca82724634ab2a4c0e30f9140"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/polygon-runner.mjs"
+      ],
+      "surfaces": [
+        "binding:report",
+        "binding:result",
+        "binding:result[1]",
+        "property:args",
+        "property:ignoreDefaultArgs",
+        "property:results",
+        "property:viewport"
+      ]
+    },
+    {
+      "id": "policy.source.polygon-verification-mjs.0dcb2684bf",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/web-snapshot-smoke/polygon-verification.mjs",
+        "contentHash": "e0ec1a3a882d9bcc81572a39607727995c4c7159b4100d65bed39e858a50c2b7"
+      },
+      "consumers": [
+        "tooling/web-snapshot-smoke/polygon-runner.mjs",
+        "tooling/web-snapshot-smoke/polygon-verification.mjs"
+      ],
+      "surfaces": [
+        "binding:QUALITY_POLICY",
+        "binding:VIEWPORT",
+        "property:buildTargetMetrics/exported",
+        "property:buildTargetMetrics/raster",
+        "property:buildTargetMetrics/raster[1]",
+        "property:buildTargetMetrics/sanity",
+        "property:buildTargetMetrics/source",
+        "property:buildTargetMetrics/source[1]",
+        "property:captureLiveSource/geometry"
+      ]
+    },
+    {
       "id": "policy.source.popup-driver-mjs.bd493c7340",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -19524,23 +19627,28 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/web-snapshot-smoke/popup-driver.mjs",
-        "contentHash": "f35194671355054c53789b5888cf4189cf1c8b3d3346f38418ea6594025f2e4f"
+        "contentHash": "e9e5c082a6ebcde2574e4341e98e20ebbb05ffc25b0a196a5f0528be7bae7cd1"
       },
       "consumers": [
         "tooling/web-snapshot-smoke/case-verification.mjs",
+        "tooling/web-snapshot-smoke/polygon-runner.mjs",
+        "tooling/web-snapshot-smoke/polygon-verification.mjs",
         "tooling/web-snapshot-smoke/popup-driver.mjs",
         "tooling/web-snapshot-smoke/source-capture.mjs"
       ],
       "surfaces": [
-        "property:downloadSnapshotPackage/anonymous-89/downloadProof",
-        "property:downloadSnapshotPackage/anonymous-89/options",
-        "property:downloadSnapshotPackage/anonymous-89/orderedTabs",
-        "property:downloadSnapshotPackage/anonymous-89/warnings",
-        "property:downloadSnapshotPackage/anonymous-89/withFreshness/__sniptaleRuntimeFreshness",
+        "property:downloadSnapshotPackage/anonymous-94/captureTiming",
+        "property:downloadSnapshotPackage/anonymous-94/downloadProof",
+        "property:downloadSnapshotPackage/anonymous-94/options",
+        "property:downloadSnapshotPackage/anonymous-94/sources",
+        "property:downloadSnapshotPackage/anonymous-94/warnings",
+        "property:downloadSnapshotPackage/anonymous-94/withFreshness/__sniptaleRuntimeFreshness",
         "property:enableForTab/anonymous-11/__sniptaleRuntimeFreshness",
-        "property:enableWebSnapshotsForSmoke/anonymous-374/sniptale_settings",
+        "property:enableWebSnapshotsForSmoke/anonymous-380/fullPageQuality",
+        "property:enableWebSnapshotsForSmoke/anonymous-380/sniptale_settings",
+        "property:saveSnapshot/anonymous-30/captureTiming",
         "property:saveSnapshot/anonymous-30/options",
-        "property:saveSnapshot/anonymous-30/orderedTabs",
+        "property:saveSnapshot/anonymous-30/sources",
         "property:saveSnapshot/anonymous-30/warnings",
         "property:saveSnapshot/anonymous-30/withFreshness/__sniptaleRuntimeFreshness",
         "property:saveSnapshotThroughPopup/popupProof",
@@ -20412,6 +20520,7 @@
         "contentHash": "b62bd712e36243df4c5fddb67abca13cf5f4d028f484f5cf6e72dc615f50c765"
       },
       "consumers": [
+        "tooling/web-snapshot-smoke/polygon-runner.mjs",
         "tooling/web-snapshot-smoke/runner.mjs"
       ],
       "surfaces": [

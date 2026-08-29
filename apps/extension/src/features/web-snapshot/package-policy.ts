@@ -12,6 +12,8 @@ export const WEB_SNAPSHOT_PACKAGE_POLICY = {
   maxScreenshotBytes: FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxFileSizeMiB * MEBIBYTE,
   maxTextEntryBytes: 10 * MEBIBYTE,
   maxTotalInflatedBytes: 250 * MEBIBYTE,
+  maxWebCopyAssetBytes: 10 * MEBIBYTE,
+  maxWebCopyAssetsBytes: 128 * MEBIBYTE,
 } as const;
 
 export const WEB_SNAPSHOT_ARCHIVE_RESOURCE_PROFILE: ArchiveResourceProfile = {

@@ -221,17 +221,17 @@ export const galleryImportModalMessages = defineMessageSource({
     ru: 'Не удалось безопасно проверить Web Snapshot. Файл повреждён, изменён или содержит неподдерживаемые данные.',
     en: 'The Web Snapshot could not be validated safely. The file is damaged, modified, or contains unsupported data.',
   },
-  webSnapshotDropTitle: {
-    ru: 'Отпустите веб-снимок для импорта',
-    en: 'Drop the Web Snapshot to import',
+  libraryDropTitle: {
+    ru: 'Отпустите файлы для импорта',
+    en: 'Drop files to import',
   },
-  webSnapshotDropDescription: {
-    ru: 'Используйте один файл .sniptale-page-package.zip',
-    en: 'Use one .sniptale-page-package.zip file',
+  libraryDropDescription: {
+    ru: 'Фото, видео или один файл Web Snapshot',
+    en: 'Photos, videos, or one Web Snapshot file',
   },
-  webSnapshotDropSingleFile: {
-    ru: 'Для импорта веб-снимка перетащите один файл Page Package.',
-    en: 'Drop one Page Package file to import a Web Snapshot.',
+  libraryDropUnsupported: {
+    ru: 'Перетащите фото и видео либо один файл Web Snapshot отдельно.',
+    en: 'Drop photos and videos, or one Web Snapshot file separately.',
   },
   webSnapshotImportedRefreshFailed: {
     ru: 'Снимок импортирован, но список библиотеки не обновился. Перезагрузите библиотеку, чтобы увидеть его.',

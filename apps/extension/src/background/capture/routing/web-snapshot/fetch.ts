@@ -1,4 +1,5 @@
 import { isPrivateNetworkHost } from '@sniptale/platform/security/private-network-host';
+import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../../../features/web-snapshot/package-policy';
 import { resolveWebSnapshotCaptureAssetMimeTypeFromBytes } from '../../../../features/web-snapshot/public';
 import { beginWebSnapshotAssetFetch } from './session';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -6,8 +7,8 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 const logger = createLogger({ namespace: 'BackgroundWebSnapshotAssets' });
 
 const FETCH_TIMEOUT_MS = 15_000;
-const MAX_ASSET_BYTES = 10 * 1024 * 1024;
-const MAX_BATCH_ASSET_BYTES = 30 * 1024 * 1024;
+const MAX_ASSET_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxWebCopyAssetBytes;
+const MAX_BATCH_ASSET_BYTES = WEB_SNAPSHOT_PACKAGE_POLICY.maxWebCopyAssetsBytes;
 const MAX_BATCH_BASE64_CHARACTERS = Math.ceil(MAX_BATCH_ASSET_BYTES / 3) * 4;
 const FETCH_BATCH_CONCURRENCY = 3;
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -129,15 +130,20 @@ export async function fetchWebSnapshotAssetForSession(args: {
   );
 
   try {
+    const redirect = fetchAuthority.allowExternalAssetRedirects ? 'follow' : 'manual';
     const response = await fetch(parsedUrl.href, {
       credentials: 'omit',
-      redirect: 'manual',
+      redirect,
       signal: fetchAuthority.signal,
     });
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
       throw new Error('web snapshot asset redirects are not allowed');
     }
-    validateFetchUrl(response.url || parsedUrl.href);
+    const responseUrl = response.url || (redirect === 'manual' ? parsedUrl.href : null);
+    if (!responseUrl) {
+      throw new Error('redirected asset response URL is unavailable');
+    }
+    validateFetchUrl(responseUrl);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -146,7 +152,7 @@ export async function fetchWebSnapshotAssetForSession(args: {
     const mimeType = resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
       bytes: new Uint8Array(buffer),
       contentType: response.headers.get('content-type'),
-      url: response.url || parsedUrl.href,
+      url: responseUrl,
     });
     return {
       base64: arrayBufferToBase64(buffer),

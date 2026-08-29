@@ -2,7 +2,7 @@ import { UploadCloud } from 'lucide-react';
 import { useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 
-interface GalleryWebSnapshotDropTargetProps {
+interface GalleryImportDropTargetProps {
   children: ReactNode;
   disabled: boolean;
   onFilesDrop?: (files: File[]) => void;
@@ -14,7 +14,7 @@ function hasFilePayload(event: DragEvent<HTMLElement>): boolean {
   );
 }
 
-export function GalleryWebSnapshotDropTarget(props: GalleryWebSnapshotDropTargetProps) {
+export function GalleryImportDropTarget(props: GalleryImportDropTargetProps) {
   const [isActive, setIsActive] = useState(false);
   const dragDepthRef = useRef(0);
 
@@ -68,7 +68,7 @@ export function GalleryWebSnapshotDropTarget(props: GalleryWebSnapshotDropTarget
       {props.children}
       {isActive ? (
         <div
-          data-ui="gallery.web-snapshot-drop-target"
+          data-ui="gallery.import-drop-target"
           role="status"
           aria-live="polite"
           className={
@@ -85,10 +85,10 @@ export function GalleryWebSnapshotDropTarget(props: GalleryWebSnapshotDropTarget
               aria-hidden="true"
             />
             <strong className="text-base font-semibold">
-              {translate('gallery.importModal.webSnapshotDropTitle')}
+              {translate('gallery.importModal.libraryDropTitle')}
             </strong>
             <span className="text-sm text-[var(--sniptale-color-text-secondary)]">
-              {translate('gallery.importModal.webSnapshotDropDescription')}
+              {translate('gallery.importModal.libraryDropDescription')}
             </span>
           </div>
         </div>

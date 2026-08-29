@@ -6,7 +6,7 @@ import { GallerySidebar } from '../../library/sidebar';
 import { GalleryImportProgressCard } from '../../library/import-progress-card';
 import type { GalleryAppLayoutProps } from './types';
 import { GALLERY_MEDIA_IMPORT_ACCEPT } from '../../library/media-import-profile';
-import { GalleryWebSnapshotDropTarget } from './web-snapshot-drop-target';
+import { GalleryImportDropTarget } from './import-drop-target';
 
 function GalleryImportInput(props: GalleryAppLayoutProps) {
   return (
@@ -120,9 +120,9 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
 
 export function GalleryAppLayout(props: GalleryAppLayoutProps) {
   return (
-    <GalleryWebSnapshotDropTarget
+    <GalleryImportDropTarget
       disabled={props.state.storage.isBusy}
-      {...(props.onWebSnapshotImportDrop ? { onFilesDrop: props.onWebSnapshotImportDrop } : {})}
+      {...(props.onImportFilesDrop ? { onFilesDrop: props.onImportFilesDrop } : {})}
     >
       <GalleryImportInput {...props} />
       <GalleryMediaImportInput {...props} />
@@ -175,6 +175,6 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           <GalleryMainSection {...props} />
         </div>
       </div>
-    </GalleryWebSnapshotDropTarget>
+    </GalleryImportDropTarget>
   );
 }

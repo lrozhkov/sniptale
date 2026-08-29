@@ -87,7 +87,7 @@
       "classification": "empty-for-clause-spacing",
       "reason": "Oxfmt omits the space before the closing parenthesis when the update clause is empty.",
       "beforeSha256": "26d5ce3f64ea058e217b1586fca906c26855afa65c625bb66c703ba23a681e1f",
-      "afterSha256": "86920420df108128473c9605ea3c1e29266f8db0eb340ae4ae60f268f9178f89"
+      "afterSha256": "c348398abe040b365fca6854bf985967c1921059f6a90b43b9a38d0041e631e0"
     },
     {
       "path": "apps/extension/src/video-editor/state/export-state/actions.ts",

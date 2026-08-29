@@ -43,12 +43,13 @@ function ViewerToolbarActions(props: {
     >
       <a
         aria-label={downloadLabel}
-        className={`${toolbarButtonClassName} w-8`}
+        className={`${toolbarButtonClassName} gap-1 px-2`}
         download={props.loaded.archiveFilename}
         href={props.loaded.archiveUrl}
         title={downloadLabel}
       >
         <Download aria-hidden="true" size={15} />
+        <span className="text-[10px] font-bold tracking-wide">ZIP</span>
       </a>
       <button
         type="button"

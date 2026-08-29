@@ -55,6 +55,14 @@ const STATIC_OVERLAY_STYLE = `
   [data-sniptale-static-overlay-layer='true'] * {
     pointer-events: none !important;
   }
+
+  [data-sniptale-static-overlay-layer='true'] .sniptale-callout,
+  [data-sniptale-static-overlay-layer='true'] .sniptale-callout * {
+    cursor: text !important;
+    pointer-events: auto !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
 `;
 
 function resolveShadowOverlayRoot(): HTMLElement | null {
@@ -94,7 +102,6 @@ function createStaticOverlayLayer(
   const viewportHeight = sourceWindow?.innerHeight ?? sourceDocument.documentElement.clientHeight;
   const layer = snapshot.createElement('div');
   layer.setAttribute(STATIC_OVERLAY_LAYER_ATTRIBUTE, 'true');
-  layer.setAttribute('inert', '');
   Object.assign(layer.style, {
     height: `${viewportHeight}px`,
     left: `${sourceWindow?.scrollX ?? 0}px`,

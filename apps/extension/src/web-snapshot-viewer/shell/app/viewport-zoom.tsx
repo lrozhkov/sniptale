@@ -21,6 +21,7 @@ function resolveFitZoom(availableWidth: number, contentWidth: number): number {
 export function useViewerZoom(contentWidth: number | null) {
   const [surface, setSurface] = useState<HTMLElement | null>(null);
   const [availableWidth, setAvailableWidth] = useState(() => window.innerWidth);
+  const [availableHeight, setAvailableHeight] = useState(() => window.innerHeight);
   const [manualZoom, setManualZoom] = useState(1);
   const [fitToWidth, setFitToWidth] = useState(true);
   const dragOriginRef = useRef<{
@@ -33,7 +34,10 @@ export function useViewerZoom(contentWidth: number | null) {
 
   useEffect(() => {
     if (!surface) return undefined;
-    const measure = () => setAvailableWidth(surface.clientWidth || window.innerWidth);
+    const measure = () => {
+      setAvailableWidth(surface.clientWidth || window.innerWidth);
+      setAvailableHeight(surface.clientHeight || window.innerHeight);
+    };
     measure();
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => measure());
@@ -57,6 +61,7 @@ export function useViewerZoom(contentWidth: number | null) {
   return useMemo(
     () => ({
       canZoom: contentWidth !== null,
+      availableHeight,
       grabClassName: canGrab ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : '',
       fitToWidth,
       onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
@@ -96,7 +101,7 @@ export function useViewerZoom(contentWidth: number | null) {
       surfaceRef: setSurface,
       zoom,
     }),
-    [canGrab, contentWidth, fitToWidth, isDragging, setManualFrom, zoom]
+    [availableHeight, canGrab, contentWidth, fitToWidth, isDragging, setManualFrom, zoom]
   );
 }
 

@@ -414,7 +414,7 @@ function registerOverlaySnapshotTests(): void {
     expect(overlayLayer?.style.top).toBe('417px');
     expect(overlayLayer?.style.transform).toBe('translateZ(0px)');
     expect(overlayLayer?.style.zIndex).toBe('2147483647');
-    expect(overlayLayer?.hasAttribute('inert')).toBe(true);
+    expect(overlayLayer?.hasAttribute('inert')).toBe(false);
     expect(overlayLayer?.querySelector('.sniptale-frames-container')).not.toBeNull();
     expect(overlayLayer?.querySelector('.sniptale-callout')).not.toBeNull();
     expect(overlayLayer?.querySelector<HTMLElement>('.sniptale-callout')?.style.pointerEvents).toBe(
@@ -422,6 +422,10 @@ function registerOverlaySnapshotTests(): void {
     );
     expect(result.document.body.querySelector(':scope > .sniptale-frames-container')).toBeNull();
     expect(result.html).toContain("[data-sniptale-static-overlay-layer='true'] *");
+    expect(result.html).toContain(
+      "[data-sniptale-static-overlay-layer='true'] .sniptale-callout *"
+    );
+    expect(result.html).toContain('user-select: text !important');
   });
 
   it('drops extension-owned active-tool cursor styles while preserving page cursor styles', async () => {

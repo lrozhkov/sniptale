@@ -42,7 +42,7 @@ import { createImportMediaFilesAction } from './media-file-import';
 import type { MediaFileImportConflictStrategy } from '../import-types';
 import {
   createConfirmWebSnapshotImportAction,
-  createInspectDroppedWebSnapshotImportAction,
+  createImportDroppedLibraryFilesAction,
   createInspectWebSnapshotImportAction,
 } from './web-snapshot-import';
 
@@ -97,9 +97,10 @@ function buildGalleryAppActionsResult(args: {
       importBackup: args.handleImport,
       importSelectedFile: args.handleImportSelectedFile,
       importMediaFiles: args.handleImportMediaFiles,
-      inspectDroppedWebSnapshot: createInspectDroppedWebSnapshotImportAction(
+      importDroppedFiles: createImportDroppedLibraryFilesAction(
         controller,
-        inspectWebSnapshot
+        inspectWebSnapshot,
+        args.handleImportMediaFiles
       ),
       inspectWebSnapshot,
     },

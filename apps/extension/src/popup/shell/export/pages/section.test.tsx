@@ -175,12 +175,15 @@ it('renders capture timing settings and persists a changed option', async () => 
       onTimingChange,
     })
   );
-  const select = container?.querySelector('select');
+  const select = container?.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]');
   await act(async () => {
-    if (!select) return;
-    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
-    setter?.call(select, '60000');
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    select?.click();
+  });
+  const option = [...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (candidate) => candidate.textContent === '60 t:popup.export.secondsShort'
+  );
+  await act(async () => {
+    option?.click();
   });
   expect(onTimingChange).toHaveBeenCalledWith({ loadTimeoutMs: 60_000, settleDelayMs: 2_000 });
 });

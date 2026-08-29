@@ -177,7 +177,7 @@ it('updates each compact resource limit control and displays custom stored value
       />
     )
   );
-  const selects = container.querySelectorAll('select');
+  const selects = container.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="listbox"]');
   expect(selects).toHaveLength(4);
 
   for (const [index, value] of [
@@ -187,8 +187,13 @@ it('updates each compact resource limit control and displays custom stored value
   ] as const) {
     await act(async () => {
       const select = selects.item(index);
-      select.value = value;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+      select.click();
+    });
+    const option = [...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (candidate) => candidate.textContent?.startsWith(value)
+    );
+    await act(async () => {
+      option?.click();
     });
   }
 

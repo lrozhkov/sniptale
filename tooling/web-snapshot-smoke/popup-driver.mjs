@@ -25,7 +25,7 @@ export async function enableForTab(popup, target, tabId) {
   await target.waitForTimeout(750);
 }
 
-export async function saveSnapshot(popup, tabId) {
+export async function saveSnapshot(popup, tabId, options = {}) {
   return popup.evaluate(
     async ({ id, jobId, timeoutMs }) => {
       const withFreshness = (message) => ({
@@ -40,7 +40,8 @@ export async function saveSnapshot(popup, tabId) {
           includeWebCopy: true,
           intent: 'save',
           jobId,
-          orderedTabs: [{ tabId: id, title: 'Smoke page' }],
+          captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+          sources: [{ kind: 'tab', tabId: id, title: 'Smoke page' }],
           options: {
             includeBasicLogs: false,
             includeCssDiagnostics: false,
@@ -80,7 +81,11 @@ export async function saveSnapshot(popup, tabId) {
       }
       throw new Error('Snapshot save timed out');
     },
-    { id: tabId, jobId: crypto.randomUUID(), timeoutMs: packageTimeoutMs }
+    {
+      id: tabId,
+      jobId: crypto.randomUUID(),
+      timeoutMs: options.timeoutMs ?? packageTimeoutMs,
+    }
   );
 }
 
@@ -99,7 +104,8 @@ export async function downloadSnapshotPackage(popup, tabId) {
           includeWebCopy: true,
           intent: 'export',
           jobId,
-          orderedTabs: [{ tabId: id, title: 'Smoke page' }],
+          captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+          sources: [{ kind: 'tab', tabId: id, title: 'Smoke page' }],
           options: {
             includeBasicLogs: richPackage,
             includeCssDiagnostics: richPackage,
@@ -380,6 +386,12 @@ export async function enableWebSnapshotsForSmoke(popup) {
         anonymousCrossOriginSnapshotAssetsEnabled: true,
         authenticatedSnapshotAssetsEnabled: true,
         externalSnapshotLinksEnabled: true,
+        fullPageQuality: {
+          maxFileSizeMiB: 128,
+          maxMegapixels: 80,
+          minScalePercent: 100,
+          profile: 'maximum',
+        },
       },
     });
   });

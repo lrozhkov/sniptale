@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { useEffect, useId, useRef } from 'react';
-import { ChevronRight, Settings2 } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n/popup';
 import {
@@ -150,6 +150,22 @@ export function ExportSelectionSectionShell({
 
   return (
     <section ref={rootRef} className={cx(shellClassName, isExpanded && 'flex-1', className)}>
+      {onOpenSettings ? (
+        <button
+          type="button"
+          aria-label={settingsAriaLabel ?? translate('popup.export.pageSettingsTitle')}
+          className={[
+            'mb-0.5 w-fit rounded-[7px] px-1.5 py-0.5 text-[10px] font-medium',
+            'text-[var(--sniptale-color-text-secondary)] transition-colors',
+            'hover:bg-[var(--sniptale-color-surface-hover)]',
+            'hover:text-[var(--sniptale-color-text-primary)]',
+          ].join(' ')}
+          data-ui="popup.export.selection-settings"
+          onClick={onOpenSettings}
+        >
+          {translate('popup.export.settingsAction')}
+        </button>
+      ) : null}
       <div className="group flex items-center">
         <button
           ref={triggerRef}
@@ -179,21 +195,6 @@ export function ExportSelectionSectionShell({
             ].join(' ')}
           />
         </button>
-        {onOpenSettings ? (
-          <button
-            type="button"
-            aria-label={settingsAriaLabel ?? translate('popup.export.pageSettingsTitle')}
-            className={[
-              'rounded-[8px] p-1.5 opacity-0 transition-opacity',
-              'text-[var(--sniptale-color-text-secondary)]',
-              'hover:bg-[var(--sniptale-color-surface-hover)]',
-              'group-hover:opacity-100 group-focus-within:opacity-100',
-            ].join(' ')}
-            onClick={onOpenSettings}
-          >
-            <Settings2 className="h-3.5 w-3.5" />
-          </button>
-        ) : null}
       </div>
       <div
         id={drawerId}

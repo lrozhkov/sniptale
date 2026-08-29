@@ -73,11 +73,13 @@ function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
     webCopyResources: {
       anonymousCrossOriginAssetsEnabled: true,
       authenticatedSameOriginAssetsEnabled: true,
+      externalAssetRedirectsEnabled: true,
       externalLinksEnabled: false,
       error: null,
       pending: null,
       setAnonymousCrossOriginAssetsEnabled: vi.fn(),
       setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+      setExternalAssetRedirectsEnabled: vi.fn(),
       setExternalLinksEnabled: vi.fn(),
     },
     ...overrides,
@@ -235,7 +237,7 @@ it('selects only visible inactive options and renders the empty filter state', a
   expect(container?.textContent).toContain('t:popup.export.noSelectedDataTypes');
 });
 
-it('places compact quick choices directly below the filter and applies them to the full plan', async () => {
+it('places compact quick choices beside the filter and applies them to the full plan', async () => {
   const setIncludeWebCopy = vi.fn();
   const setIncludeFullPageScreenshot = vi.fn();
   const props = await renderSection({
@@ -250,9 +252,11 @@ it('places compact quick choices directly below the filter and applies them to t
 
   await setFilter('json');
   const quickSelection = container?.querySelector('[data-ui="popup.export.quick-selection"]');
-  const filterRow = container?.querySelector('input[type="text"]')?.parentElement?.parentElement;
-  expect(filterRow?.nextElementSibling).toBe(quickSelection);
+  expect(quickSelection?.contains(container?.querySelector('input[type="text"]') ?? null)).toBe(
+    true
+  );
   expect(quickSelection?.textContent).not.toContain('t:popup.export.packagePresetLabel');
+  expect(quickSelection?.textContent).not.toContain('t:popup.export.packagePresetFull');
   expect(quickSelection?.querySelectorAll('button')).toHaveLength(3);
 
   await act(async () => findButton('t:popup.export.packagePresetMaterials').click());
@@ -378,6 +382,7 @@ it('renders Web Copy inside the data grid and nests resource controls only while
   expect(container?.textContent).toContain('t:popup.export.packageWebCopyLabel');
   expect(container?.textContent).toContain('t:popup.export.webCopyCurrentSiteLabel');
   expect(container?.textContent).toContain('t:popup.export.webCopyExternalSitesLabel');
+  expect(container?.textContent).toContain('t:popup.export.webCopyExternalRedirectsLabel');
   expect(container?.textContent).toContain('t:popup.export.webCopyExternalLinksLabel');
   const currentSiteControl = Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
     label.textContent?.includes('t:popup.export.webCopyCurrentSiteLabel')
@@ -391,6 +396,27 @@ it('renders Web Copy inside the data grid and nests resource controls only while
     webCopyCheckbox?.click();
   });
   expect(setIncludeWebCopy).toHaveBeenCalledWith(expect.any(Function));
+});
+
+it('keeps redirect capture subordinate to external resource capture', async () => {
+  const resources = createProps().webCopyResources;
+  await renderSection({
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+    },
+    webCopyResources: {
+      ...resources,
+      anonymousCrossOriginAssetsEnabled: false,
+      externalAssetRedirectsEnabled: true,
+    },
+  });
+
+  const redirectRow = Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+    label.textContent?.includes('t:popup.export.webCopyExternalRedirectsLabel')
+  );
+  expect(redirectRow?.querySelector<HTMLInputElement>('input')?.checked).toBe(true);
+  expect(redirectRow?.querySelector<HTMLInputElement>('input')?.disabled).toBe(true);
 });
 
 it('does not add a separate private-data warning marker to the compact summary', async () => {

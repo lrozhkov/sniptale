@@ -86,6 +86,7 @@ export interface Settings {
   fullPageQuality?: FullPageQualityPolicy;
   authenticatedSnapshotAssetsEnabled: boolean;
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
+  externalSnapshotAssetRedirectsEnabled?: boolean;
   externalSnapshotLinksEnabled?: boolean;
   fullPageCapture?: FullPageCapturePreferences;
   exportResourceLimits?: ExportResourceLimits;
@@ -95,12 +96,14 @@ export interface Settings {
 
 export type NormalizedSettings = Omit<
   Settings,
+  | 'externalSnapshotAssetRedirectsEnabled'
   | 'externalSnapshotLinksEnabled'
   | 'exportResourceLimits'
   | 'fullPageQuality'
   | 'localStoragePolicy'
   | 'pagePackageCaptureTiming'
 > & {
+  externalSnapshotAssetRedirectsEnabled: boolean;
   externalSnapshotLinksEnabled: boolean;
   exportResourceLimits: ExportResourceLimits;
   fullPageQuality: FullPageQualityPolicy;

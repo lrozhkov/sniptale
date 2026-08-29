@@ -70,6 +70,7 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Выберите веб-копию, данные, файлы и диагностику для пакета.',
     en: 'Choose the Web copy, data, files, and diagnostics for the package.',
   },
+  settingsAction: { ru: 'Настройка', en: 'Settings' },
   packageCaptureSettingsTitle: {
     ru: 'Настройки снимка',
     en: 'Snapshot settings',
@@ -161,10 +162,6 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Данные и файлы',
     en: 'Data and files',
   },
-  packagePresetFull: {
-    ru: 'Всё',
-    en: 'Everything',
-  },
   packagePreferencesSaveError: {
     ru: 'Не удалось сохранить состав пакета. Повторите ещё раз.',
     en: 'Could not save the package contents. Please try again.',
@@ -192,6 +189,14 @@ export const popupExportMessages = defineMessageSource({
   webCopyExternalSitesDescription: {
     ru: 'Анонимно загружать внешние стили, шрифты и изображения.',
     en: 'Load external styles, fonts, and images anonymously.',
+  },
+  webCopyExternalRedirectsLabel: {
+    ru: 'Разрешать перенаправления ресурсов',
+    en: 'Allow resource redirects',
+  },
+  webCopyExternalRedirectsDescription: {
+    ru: 'Следовать на другой публичный HTTPS-адрес, если ресурс перенаправляет запрос.',
+    en: 'Follow to another public HTTPS address when an asset redirects the request.',
   },
   webCopyExternalLinksLabel: {
     ru: 'Открывать ссылки из веб-копии',

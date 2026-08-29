@@ -17,6 +17,7 @@ function createResponse(args: {
   contentType?: string;
   ok?: boolean;
   status?: number;
+  url?: string;
 }): Response {
   const body =
     args.bodyStream === undefined ? createBodyStream([args.body ?? 'asset']) : args.bodyStream;
@@ -27,6 +28,7 @@ function createResponse(args: {
     },
     status: args.ok === false ? (args.status ?? 500) : (args.status ?? 200),
   });
+  if (args.url) Object.defineProperty(response, 'url', { value: args.url });
   vi.spyOn(response, 'blob');
   return response;
 }
@@ -42,9 +44,13 @@ function createBodyStream(chunks: string[]): ReadableStream<Uint8Array> {
   });
 }
 
-function registerSession(urls: string[] = ['https://cdn.example.com/image.png']): string {
+function registerSession(
+  urls: string[] = ['https://cdn.example.com/image.png'],
+  allowExternalAssetRedirects = false
+): string {
   authorizeWebSnapshotCaptureRequest(42, 'req-1', {
     allowAnonymousCrossOriginAssets: true,
+    allowExternalAssetRedirects,
   });
   return registerWebSnapshotAssetSession(42, 'req-1', urls);
 }
@@ -226,6 +232,65 @@ it('rejects public insecure HTTP asset URLs before fetch', async () => {
   ).rejects.toThrow('insecure web snapshot asset URLs are not allowed');
 
   expect(fetch).not.toHaveBeenCalled();
+});
+
+it('rejects external asset redirects without following their target', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl]);
+  const redirect = createResponse({ bodyStream: null, status: 302 });
+  redirect.headers.set('location', 'https://redirected.example.com/image.png');
+  vi.mocked(fetch).mockResolvedValueOnce(redirect);
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).rejects.toThrow('web snapshot asset redirects are not allowed');
+  expect(fetch).toHaveBeenCalledWith(
+    sourceUrl,
+    expect.objectContaining({ credentials: 'omit', redirect: 'manual' })
+  );
+});
+
+it('follows an external asset redirect only when the capture session allows it', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl], true);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({
+      contentType: 'image/png',
+      url: 'https://avatars.example.com/image.png',
+    })
+  );
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).resolves.toEqual({
+    base64: Buffer.from('asset').toString('base64'),
+    mimeType: 'image/png',
+  });
+  expect(fetch).toHaveBeenCalledWith(
+    sourceUrl,
+    expect.objectContaining({ credentials: 'omit', redirect: 'follow' })
+  );
+});
+
+it('rejects a redirected response whose final URL is not a public HTTPS target', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl], true);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({ contentType: 'image/png', url: 'http://127.0.0.1/image.png' })
+  );
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).rejects.toThrow('private network asset URLs are not allowed');
+});
+
+it('rejects an allowed redirect when the final response URL is unavailable', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl], true);
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).rejects.toThrow('redirected asset response URL is unavailable');
 });
 
 it('rejects URLs that were not registered for the session', async () => {

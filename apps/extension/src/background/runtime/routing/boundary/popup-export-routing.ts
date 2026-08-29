@@ -222,12 +222,14 @@ export async function requestPopupExportPagePackage(args: {
   const resourcePolicy: {
     allowAnonymousCrossOriginAssets?: boolean;
     allowAuthenticatedSameOriginAssets?: boolean;
+    allowExternalAssetRedirects?: boolean;
   } = args.includeWebCopy
     ? await runWebSnapshotRouteStage('load web snapshot settings', async () => {
         const settings = await loadSettings();
         return {
           allowAnonymousCrossOriginAssets: settings.anonymousCrossOriginSnapshotAssetsEnabled,
           allowAuthenticatedSameOriginAssets: settings.authenticatedSnapshotAssetsEnabled,
+          allowExternalAssetRedirects: settings.externalSnapshotAssetRedirectsEnabled,
         };
       })
     : {};
@@ -250,6 +252,9 @@ export async function requestPopupExportPagePackage(args: {
   if (args.includeWebCopy) {
     authorizeWebSnapshotCaptureRequest(args.tabId, args.batchRequestId, {
       allowAnonymousCrossOriginAssets: resourcePolicy.allowAnonymousCrossOriginAssets === true,
+      allowExternalAssetRedirects:
+        resourcePolicy.allowAnonymousCrossOriginAssets === true &&
+        resourcePolicy.allowExternalAssetRedirects === true,
     });
   }
   const message: BuildPagePackageMessage = args.includeWebCopy

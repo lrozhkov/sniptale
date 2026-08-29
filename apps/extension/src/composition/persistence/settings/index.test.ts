@@ -74,6 +74,7 @@ const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
 const PRIVACY_DEFAULTS = {
   anonymousCrossOriginSnapshotAssetsEnabled: true,
   authenticatedSnapshotAssetsEnabled: true,
+  externalSnapshotAssetRedirectsEnabled: true,
   externalSnapshotLinksEnabled: false,
 };
 const DEFAULT_FULL_PAGE_CAPTURE = {
@@ -271,6 +272,7 @@ async function verifyStoredSettings() {
     pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
+    externalSnapshotAssetRedirectsEnabled: false,
     externalSnapshotLinksEnabled: false,
     voiceInput: {
       language: 'en-US' as const,
@@ -330,6 +332,7 @@ const invalidStoredSettingsFixture = {
   imageQuality: 'high',
   anonymousCrossOriginSnapshotAssetsEnabled: 'yes',
   authenticatedSnapshotAssetsEnabled: 'yes',
+  externalSnapshotAssetRedirectsEnabled: 'yes',
   externalSnapshotLinksEnabled: 'yes',
   rawDiagnosticsEnabled: 'sometimes',
   voiceInput: { language: 'fr-FR', mode: 'always-local' },

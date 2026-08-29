@@ -13,6 +13,7 @@ export async function inspectDocument(pageOrFrame) {
     const escapedMaskIcon = globalThis.document.querySelector('.escaped-mask-icon');
     const escapedMaskStyle = escapedMaskIcon ? globalThis.getComputedStyle(escapedMaskIcon) : null;
     const dynamicPanel = globalThis.document.querySelector('.dynamic-panel');
+    const imageSources = images.map((image) => image.getAttribute('src') ?? '');
 
     return {
       capturedStyleHasImportTail: Array.from(
@@ -24,6 +25,16 @@ export async function inspectDocument(pageOrFrame) {
       elementCount: globalThis.document.querySelectorAll('*').length,
       escapedMaskImage: escapedMaskStyle?.maskImage || escapedMaskStyle?.webkitMaskImage || null,
       hasBody: Boolean(globalThis.document.body),
+      imageStats: {
+        blobSources: imageSources.filter((source) => source.startsWith('blob:')).length,
+        dataSources: imageSources.filter((source) => source.startsWith('data:')).length,
+        localSources: imageSources.filter(
+          (source) => source.length > 0 && !/^(?:blob:|data:|https?:)/u.test(source)
+        ).length,
+        missingSources: imageSources.filter((source) => source.length === 0).length,
+        networkSources: imageSources.filter((source) => /^https?:/u.test(source)).length,
+        total: images.length,
+      },
       loadedImages: images.filter((image) => image.naturalWidth > 0).length,
       inlineMaskImage: inlineMaskStyle?.maskImage || inlineMaskStyle?.webkitMaskImage || null,
       revealedSectionCount: globalThis.document.querySelectorAll('section.visible').length,

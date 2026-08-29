@@ -56,6 +56,7 @@ function useViewerDocumentTitle(loaded: LoadedWebSnapshotPackage | null): AppLoc
 }
 
 function SnapshotFrameSurface(props: {
+  availableHeight: number;
   currentViewport: ViewerViewport;
   iframeRef: MutableRefObject<HTMLIFrameElement | null>;
   loaded: LoadedWebSnapshotPackage;
@@ -99,19 +100,24 @@ function SnapshotFrameSurface(props: {
     );
   }
 
+  const logicalHeight =
+    props.currentViewport === null && props.zoom < 1
+      ? Math.max(resolvedViewport.height, Math.ceil(props.availableHeight / props.zoom))
+      : resolvedViewport.height;
+
   return (
     <div
       data-testid="snapshot-frame-scaled-viewport"
-      className="mx-auto max-w-none shrink-0"
+      className="mx-auto max-w-none shrink-0 overflow-hidden"
       style={{
-        height: `${resolvedViewport.height * props.zoom}px`,
+        height: `${logicalHeight * props.zoom}px`,
         width: `${resolvedViewport.width * props.zoom}px`,
       }}
     >
       <div
         data-testid="snapshot-frame-viewport"
         style={{
-          height: `${resolvedViewport.height}px`,
+          height: `${logicalHeight}px`,
           transform: `scale(${props.zoom})`,
           transformOrigin: 'top left',
           width: `${resolvedViewport.width}px`,
@@ -178,6 +184,7 @@ function useSnapshotPreparationFrame(loaded: LoadedWebSnapshotPackage) {
 }
 
 function SnapshotModeContent(props: {
+  availableHeight: number;
   currentViewport: ViewerViewport;
   externalLinksEnabled: boolean;
   handleIframeElementChange: (iframe: HTMLIFrameElement | null) => void;
@@ -209,6 +216,7 @@ function SnapshotModeContent(props: {
   return (
     <>
       <SnapshotFrameSurface
+        availableHeight={props.availableHeight}
         currentViewport={props.currentViewport}
         externalLinksEnabled={props.externalLinksEnabled}
         iframeRef={props.iframeRef}
@@ -315,6 +323,7 @@ function WebSnapshotViewerSurface(props: {
           <CollapsedToolbarButton locale={props.locale} onExpand={() => setToolbarVisible(true)} />
         )}
         <SnapshotModeContent
+          availableHeight={zoom.availableHeight}
           currentViewport={currentViewport}
           externalLinksEnabled={props.externalLinksEnabled}
           handleIframeElementChange={handleIframeElementChange}

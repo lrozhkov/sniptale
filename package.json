@@ -56,7 +56,7 @@
     "qa:e2e:build": "vite build --config apps/extension/vite.config.ts --mode test-e2e",
     "qa:e2e:build:release": "SNIPTALE_RELEASE_E2E_OUTPUT=1 vite build --config apps/extension/vite.config.ts --mode release",
     "qa:e2e:build:security": "vite build --config apps/extension/vite.config.ts --mode security-e2e",
-    "web-snapshot:smoke": "npm run build && node tooling/web-snapshot-smoke/runner.mjs",
+    "web-snapshot:smoke": "npm run build && node tooling/web-snapshot-smoke/polygon-runner.mjs",
     "qa:raw:oxlint": "node tooling/qa/core/verify-oxlint.mjs",
     "qa:raw:oxfmt": "node tooling/qa/core/verify-oxfmt.mjs",
     "qa:raw:typecheck": "node tooling/qa/core/verify-typecheck.mjs",

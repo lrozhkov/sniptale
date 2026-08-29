@@ -81,6 +81,7 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   fullPageQuality: DEFAULT_FULL_PAGE_QUALITY_POLICY,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: true,
+  externalSnapshotAssetRedirectsEnabled: true,
   externalSnapshotLinksEnabled: false,
   exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,

@@ -10,6 +10,7 @@ import {
   EXPORT_RESOURCE_LIMITS_ABSOLUTE,
   type ExportResourceLimits,
 } from '@sniptale/runtime-contracts/export';
+import { PopupSelect } from '../../../../ui/popup-shell/select';
 
 export function usePackageCaptureBehaviorPreferences() {
   const [preferences, setPreferences] = useState<FullPageCapturePreferences>({
@@ -123,7 +124,7 @@ export function PackageCaptureBehaviorSettings(props: {
         description={translate('popup.export.captureFreezeMotionDescription')}
         onChange={(freezeMotion) => props.onChange({ ...props.preferences, freezeMotion })}
       />
-      <label className="flex items-start justify-between gap-3 py-2.5">
+      <div className="flex items-start justify-between gap-3 py-2.5">
         <span className="min-w-0">
           <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
             {translate('popup.export.captureFloatingElementsLabel')}
@@ -132,22 +133,23 @@ export function PackageCaptureBehaviorSettings(props: {
             {translate('popup.export.captureFloatingElementsDescription')}
           </span>
         </span>
-        <select
-          className="h-8 shrink-0 rounded-[8px] border bg-transparent px-2 text-[11px]"
+        <PopupSelect
+          aria-label={translate('popup.export.captureFloatingElementsLabel')}
+          containerClassName="w-[116px] shrink-0"
           value={props.preferences.floatingElements}
-          onChange={(event) =>
+          onChange={(floatingElements) =>
             props.onChange({
               ...props.preferences,
-              floatingElements: event.currentTarget
-                .value as FullPageCapturePreferences['floatingElements'],
+              floatingElements: floatingElements as FullPageCapturePreferences['floatingElements'],
             })
           }
-        >
-          <option value="once">{translate('popup.export.captureFloatingOnce')}</option>
-          <option value="hide">{translate('popup.export.captureFloatingHide')}</option>
-          <option value="repeat">{translate('popup.export.captureFloatingRepeat')}</option>
-        </select>
-      </label>
+          options={[
+            { value: 'once', label: translate('popup.export.captureFloatingOnce') },
+            { value: 'hide', label: translate('popup.export.captureFloatingHide') },
+            { value: 'repeat', label: translate('popup.export.captureFloatingRepeat') },
+          ]}
+        />
+      </div>
       <p className="py-2.5 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
         {translate('popup.export.captureBehaviorHelp')}
       </p>
@@ -203,20 +205,18 @@ function ResourceLimitSelect(props: {
     ? props.values
     : [...props.values, props.value].sort((left, right) => left - right);
   return (
-    <label className="mt-2 flex items-center justify-between gap-3">
+    <div className="mt-2 flex items-center justify-between gap-3">
       <span className="text-[10px] text-[var(--sniptale-color-text-secondary)]">{props.label}</span>
-      <select
-        className="h-7 w-[92px] rounded-[8px] border bg-transparent px-2 text-[10px]"
-        value={props.value}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
-      >
-        {values.map((value) => (
-          <option key={value} value={value}>
-            {value}
-            {props.suffix ? ` ${props.suffix}` : ''}
-          </option>
-        ))}
-      </select>
-    </label>
+      <PopupSelect
+        aria-label={props.label}
+        containerClassName="w-[104px] shrink-0"
+        value={String(props.value)}
+        onChange={(value) => props.onChange(Number(value))}
+        options={values.map((value) => ({
+          value: String(value),
+          label: `${value}${props.suffix ? ` ${props.suffix}` : ''}`,
+        }))}
+      />
+    </div>
   );
 }

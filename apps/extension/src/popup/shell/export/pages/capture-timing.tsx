@@ -3,6 +3,7 @@ import type { PagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts
 import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
 import { translate } from '../../../../platform/i18n/popup';
+import { PopupSelect } from '../../../../ui/popup-shell/select';
 
 export function usePageCaptureTimingPreferences() {
   const [timing, setTiming] = useState<PagePackageCaptureTimingPolicy>({
@@ -47,22 +48,22 @@ function TimingSelect(props: {
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 py-2">
+    <div className="flex items-center justify-between gap-3 py-2">
       <span className="text-[11px] text-[var(--sniptale-color-text-primary)]">{props.label}</span>
-      <select
-        className="h-8 rounded-[8px] border bg-transparent px-2 text-[11px]"
-        value={props.value}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
-      >
-        {props.values.map((value) => (
-          <option key={value} value={value}>
-            {value === 0
+      <PopupSelect
+        aria-label={props.label}
+        containerClassName="w-[116px] shrink-0"
+        value={String(props.value)}
+        onChange={(value) => props.onChange(Number(value))}
+        options={props.values.map((value) => ({
+          value: String(value),
+          label:
+            value === 0
               ? translate('popup.export.noDelay')
-              : `${value / 1000} ${translate('popup.export.secondsShort')}`}
-          </option>
-        ))}
-      </select>
-    </label>
+              : `${value / 1000} ${translate('popup.export.secondsShort')}`,
+        }))}
+      />
+    </div>
   );
 }
 

@@ -468,22 +468,21 @@ it('stops fetching more DOM assets after the aggregate byte budget is exhausted'
         headers: { 'content-type': 'image/png' },
       })
   );
-  document.body.innerHTML = [
-    '<img id="first" src="/first.png">',
-    '<img id="second" src="/second.png">',
-    '<img id="third" src="/third.png">',
-    '<img id="fourth" src="/fourth.png">',
-  ].join('');
+  const assetCount = 13;
+  document.body.innerHTML = Array.from(
+    { length: assetCount },
+    (_, index) => `<img id="asset-${index}" src="/asset-${index}.png">`
+  ).join('');
 
   const result = await collectAssets({
     allowAuthenticatedSameOriginAssets: true,
   });
 
-  expect(fetch).toHaveBeenCalledTimes(4);
-  expect(result.assets).toHaveLength(3);
-  expect(document.querySelector('#fourth')?.hasAttribute('src')).toBe(false);
+  expect(fetch).toHaveBeenCalledTimes(assetCount);
+  expect(result.assets).toHaveLength(12);
+  expect(document.querySelector('#asset-12')?.hasAttribute('src')).toBe(false);
   expect(result.warnings).toEqual([
-    'Asset skipped: http://localhost:3000/fourth.png (web snapshot asset budget exceeded)',
+    'Asset skipped: http://localhost:3000/asset-12.png (web snapshot asset budget exceeded)',
   ]);
 });
 

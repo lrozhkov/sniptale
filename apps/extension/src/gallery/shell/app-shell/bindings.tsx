@@ -150,8 +150,7 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     viewMode: props.viewMode,
     onImportFileChange: (file: File | null) => void actions.importing.importSelectedFile(file),
     onMediaImportFileChange: (files: File[]) => void actions.importing.importMediaFiles(files),
-    onWebSnapshotImportDrop: (files: File[]) =>
-      void actions.importing.inspectDroppedWebSnapshot(files),
+    onImportFilesDrop: (files: File[]) => void actions.importing.importDroppedFiles(files),
     onWebSnapshotImportFileChange: (file: File | null) =>
       void actions.importing.inspectWebSnapshot(file),
     onActiveImportCancel: actions.importing.cancelActiveImport,
