@@ -56,18 +56,6 @@ export function ViewerPackageFileList(props: {
                 aria-hidden
                 className="size-5 shrink-0 text-[var(--sniptale-color-text-muted)]"
               />
-              <div className="min-w-0 flex-1">
-                <p
-                  className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
-                  title={file.path}
-                >
-                  {file.name}
-                </p>
-                <p className="mt-0.5 truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
-                  {getCatalogFileFormat(file)} · {file.mimeType} ·{' '}
-                  {formatCatalogFileSize(file.size)}
-                </p>
-              </div>
               <button
                 type="button"
                 aria-label={`${downloadLabel}: ${file.name}`}
@@ -82,6 +70,18 @@ export function ViewerPackageFileList(props: {
                   <Download aria-hidden="true" size={13} />
                 )}
               </button>
+              <div className="min-w-0 flex-1">
+                <p
+                  className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
+                  title={file.path}
+                >
+                  {file.name}
+                </p>
+                <p className="mt-0.5 truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
+                  {getCatalogFileFormat(file)} · {file.mimeType} ·{' '}
+                  {formatCatalogFileSize(file.size)}
+                </p>
+              </div>
             </div>
             {errorPath === file.path ? (
               <p

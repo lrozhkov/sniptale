@@ -5,6 +5,7 @@ import type { ActivePopupExportJob } from './runtime-state';
 
 const ACTION_ICON_SIZES = [16, 32] as const;
 const ACTION_ICON_FRAME_INTERVAL_MS = 420;
+const POPUP_RESTORE_RETRY_DELAY_MS = 120;
 const DEFAULT_ACTION_ICON_PATHS = {
   16: 'icons/icon-16.png',
   48: 'icons/icon-48.png',
@@ -55,9 +56,13 @@ export async function restorePagePackageProgressPopup(
   windowId: number
 ): Promise<void> {
   if (job.cancelled || job.status.orderedTabs.length < 2) return;
-  await Promise.resolve()
-    .then(() => browserAction.openPopup({ windowId }))
-    .catch(() => undefined);
+  try {
+    await browserAction.openPopup({ windowId });
+  } catch {
+    await new Promise<void>((resolve) => setTimeout(resolve, POPUP_RESTORE_RETRY_DELAY_MS));
+    if (job.cancelled) return;
+    await browserAction.openPopup({ windowId }).catch(() => undefined);
+  }
 }
 
 export function startPagePackageActionIndicator(

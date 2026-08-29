@@ -1,4 +1,4 @@
-type Axis = 'x' | 'y';
+import { installSnapshotFramePan } from './frame-pan';
 
 type DisclosureProjection = {
   controller: HTMLElement;
@@ -20,44 +20,10 @@ const DIRECTIONAL_CLASS_PAIRS = [
   ['chevron-down', 'chevron-up'],
   ['icon-chevron-down', 'icon-chevron-up'],
 ] as const;
-
 function toElement(target: EventTarget | null): HTMLElement | null {
   if (!target || (target as Node).nodeType !== Node.ELEMENT_NODE) return null;
   const element = target as HTMLElement;
   return typeof element.closest === 'function' ? element : null;
-}
-
-function isClippedScrollable(element: HTMLElement, axis: Axis): boolean {
-  const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-  if (!style) return false;
-  const overflow = axis === 'x' ? style.overflowX : style.overflowY;
-  const extent =
-    axis === 'x'
-      ? element.scrollWidth - element.clientWidth
-      : element.scrollHeight - element.clientHeight;
-  return overflow === 'hidden' && extent > 2;
-}
-
-function findClippedScrollableAncestor(target: HTMLElement, axis: Axis): HTMLElement | null {
-  let current: HTMLElement | null = target;
-  while (current && current !== current.ownerDocument.body) {
-    if (isClippedScrollable(current, axis)) return current;
-    current = current.parentElement;
-  }
-  return current && isClippedScrollable(current, axis) ? current : null;
-}
-
-function moveClippedScroller(element: HTMLElement, axis: Axis, delta: number): boolean {
-  const position = axis === 'x' ? element.scrollLeft : element.scrollTop;
-  const maximum =
-    axis === 'x'
-      ? Math.max(0, element.scrollWidth - element.clientWidth)
-      : Math.max(0, element.scrollHeight - element.clientHeight);
-  const next = Math.max(0, Math.min(maximum, position + delta));
-  if (next === position) return false;
-  if (axis === 'x') element.scrollLeft = next;
-  else element.scrollTop = next;
-  return true;
 }
 
 function isVisuallyHidden(element: HTMLElement): boolean {
@@ -192,33 +158,13 @@ function closeDisclosure(projection: DisclosureProjection): void {
  * projected onto already-sanitized DOM.
  */
 export function installSnapshotFrameStaticInteractions(
-  iframe: HTMLIFrameElement | null
+  iframe: HTMLIFrameElement | null,
+  options: { dragHint?: string } = {}
 ): () => void {
   const doc = iframe?.contentDocument;
   if (!doc) return () => undefined;
   const disclosures = new Map<HTMLElement, DisclosureProjection>();
-
-  const handleWheel = (event: WheelEvent) => {
-    if (event.ctrlKey) return;
-    const target = toElement(event.target);
-    if (!target) return;
-    const horizontal = findClippedScrollableAncestor(target, 'x');
-    const vertical = findClippedScrollableAncestor(target, 'y');
-    const horizontalDelta = event.deltaX || (event.shiftKey || !vertical ? event.deltaY : 0);
-    if (
-      horizontal &&
-      horizontalDelta !== 0 &&
-      moveClippedScroller(horizontal, 'x', horizontalDelta)
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    if (vertical && event.deltaY !== 0 && moveClippedScroller(vertical, 'y', event.deltaY)) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  };
+  const cleanupPan = installSnapshotFramePan(doc, options.dragHint);
   const handleClick = (event: MouseEvent) => {
     if (event.button !== 0 || event.defaultPrevented) return;
     const target = toElement(event.target);
@@ -235,11 +181,10 @@ export function installSnapshotFrameStaticInteractions(
     event.stopPropagation();
   };
 
-  doc.addEventListener('wheel', handleWheel, { capture: true, passive: false });
   doc.addEventListener('click', handleClick, true);
   return () => {
-    doc.removeEventListener('wheel', handleWheel, true);
     doc.removeEventListener('click', handleClick, true);
+    cleanupPan();
     for (const projection of disclosures.values()) closeDisclosure(projection);
   };
 }

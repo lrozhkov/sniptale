@@ -32,7 +32,7 @@ function includesPrintMedia(mediaText: string): boolean {
 function serializeCssRule(rule: CSSRule, targetWindow: Window): string {
   if (rule.type === CSS_MEDIA_RULE) {
     const mediaRule = rule as CSSMediaRule;
-    if (includesPrintMedia(mediaRule.conditionText)) return mediaRule.cssText;
+    if (includesPrintMedia(mediaRule.conditionText)) return '';
     return mediaMatches(mediaRule.conditionText, targetWindow)
       ? serializeCssRules(mediaRule.cssRules, targetWindow)
       : '';
@@ -44,12 +44,7 @@ function serializeCssRule(rule: CSSRule, targetWindow: Window): string {
       throw new Error('Snapshot print stylesheet import is unavailable.');
     }
     const mediaText = importRule.media.mediaText;
-    if (includesPrintMedia(mediaText)) {
-      return `@media ${mediaText}{${serializeCssRules(
-        importRule.styleSheet.cssRules,
-        targetWindow
-      )}}`;
-    }
+    if (includesPrintMedia(mediaText)) return '';
     return mediaMatches(mediaText, targetWindow)
       ? serializeCssRules(importRule.styleSheet.cssRules, targetWindow)
       : '';
@@ -107,13 +102,15 @@ export function freezeSnapshotMediaQueries(document: Document, targetWindow: Win
   }
 }
 
-function appendPrintStyles(document: Document): void {
+function appendPrintStyles(document: Document, viewport: WebSnapshotViewport | null): void {
   const style = createProjectionStyleElement(document);
   style.setAttribute('data-sniptale-print-policy', '');
+  const pageWidth = Math.max(1, Math.round(viewport?.width ?? 1280));
+  const pageHeight = Math.max(1, Math.round(viewport?.height ?? 720));
   style.textContent = [
-    '@page{size:auto;margin:12mm}',
-    'html,body{width:auto!important;min-width:0!important;max-width:none!important;',
-    'overflow:visible!important;margin:0!important;',
+    `@page{size:${pageWidth}px ${pageHeight}px;margin:0}`,
+    `html,body{width:${pageWidth}px!important;max-width:${pageWidth}px!important;`,
+    'margin:0!important;padding:0!important;overflow-x:hidden!important;',
     '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}',
     'img,svg,canvas,video,pre,blockquote{break-inside:avoid-page}',
   ].join('');
@@ -239,7 +236,7 @@ export async function printWebSnapshotProjection(args: {
     }
     hydrateSnapshotDeclarativeShadowDom(projectionDocument);
     freezeSnapshotMediaQueries(projectionDocument, projectionWindow);
-    appendPrintStyles(projectionDocument);
+    appendPrintStyles(projectionDocument, args.viewport);
     await withProjectionTimeout(
       waitForProjectionLayout(projectionDocument, projectionWindow),
       hostWindow

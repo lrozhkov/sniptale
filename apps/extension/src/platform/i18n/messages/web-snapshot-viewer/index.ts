@@ -109,6 +109,10 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Адрес ссылки',
       en: 'Link destination',
     },
+    dragScrollableArea: {
+      ru: 'Перетащите, чтобы прокрутить',
+      en: 'Drag to scroll',
+    },
     visualAlt: {
       ru: 'Сохранённый скриншот веб-страницы',
       en: 'Saved screenshot of the web page',

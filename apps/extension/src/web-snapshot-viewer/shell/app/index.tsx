@@ -110,8 +110,10 @@ function SnapshotFrameSurface(props: {
   ]);
   const installStaticInteractions = useCallback(() => {
     interactionCleanupRef.current?.();
-    interactionCleanupRef.current = installSnapshotFrameStaticInteractions(iframeRef.current);
-  }, [iframeRef]);
+    interactionCleanupRef.current = installSnapshotFrameStaticInteractions(iframeRef.current, {
+      dragHint: translate('webSnapshotViewer.app.dragScrollableArea', props.locale),
+    });
+  }, [iframeRef, props.locale]);
   const handleIframeLoad = useCallback(() => {
     hydrateSnapshotDeclarativeShadowDom(iframeRef.current?.contentDocument ?? null);
     installNavigationPolicy();

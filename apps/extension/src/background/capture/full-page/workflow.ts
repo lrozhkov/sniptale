@@ -32,6 +32,7 @@ import { startFullPageCaptureHeartbeat } from './heartbeat';
 import { cleanupStoredFullPageCaptureLease } from './lifecycle';
 import { FULL_PAGE_FILE_BUDGET_ERROR, FULL_PAGE_RASTER_BUDGET_ERROR } from './budgets';
 import { assertFullPageViewportFallbackWithinPolicy } from './fallback-admission';
+import { resolveReducedExportPolicy } from './reduced-policy';
 
 const logger = createLogger({ namespace: 'BackgroundFullPageCapture' });
 // Content-side preparation can legitimately spend up to ~24 s on fonts, bounded lazy-content
@@ -268,7 +269,8 @@ async function runReducedFullPageOrViewportFallback(
   const policy = args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY;
   if (
     args.options.exportRunId &&
-    policy.minScalePercent > FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.minScalePercent
+    (policy.minScalePercent > FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.minScalePercent ||
+      originalError.message === FULL_PAGE_FILE_BUDGET_ERROR)
   ) {
     logger.warn(
       `Retrying export capture at the minimum safe full-page scale: ${originalError.message}`
@@ -279,11 +281,7 @@ async function runReducedFullPageOrViewportFallback(
         onProgress,
         options: {
           ...args.options,
-          qualityPolicy: {
-            ...policy,
-            minScalePercent: FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.minScalePercent,
-            profile: 'custom',
-          },
+          qualityPolicy: resolveReducedExportPolicy(policy, originalError),
         },
         restartOnExtentGrowth: false,
       });

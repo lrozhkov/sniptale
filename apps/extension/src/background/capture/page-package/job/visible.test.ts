@@ -182,7 +182,7 @@ it('activates and records the selected screenshot target through the browser sea
   expect(job.status.activatedTabIds).toEqual([7]);
 });
 
-it('does not refocus or reactivate an already active capture target', async () => {
+it('restores multi-page progress without reactivating an already active first target', async () => {
   const job = createJob();
   mocks.query.mockResolvedValue([{ id: 7, windowId: 3 }]);
 
@@ -190,7 +190,7 @@ it('does not refocus or reactivate an already active capture target', async () =
 
   expect(mocks.updateWindow).not.toHaveBeenCalled();
   expect(mocks.update).not.toHaveBeenCalled();
-  expect(mocks.openPopup).not.toHaveBeenCalled();
+  expect(mocks.openPopup).toHaveBeenCalledWith({ windowId: 3 });
   expect(job.lastActivatedByWindow).toEqual(new Map());
   expect(job.status.activatedTabIds).toEqual([]);
 });

@@ -17,7 +17,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('freezes screen media branches for the captured viewport and preserves print semantics', () => {
+it('freezes screen media branches for the captured viewport and removes page-authored print CSS', () => {
   const style = document.createElement('style');
   style.textContent = [
     '.base { color: black; }',
@@ -39,8 +39,8 @@ it('freezes screen media branches for the captured viewport and preserves print 
   expect(frozenCss).toContain('.base');
   expect(frozenCss).toContain('.wide');
   expect(frozenCss).not.toContain('.narrow');
-  expect(frozenCss).toContain('@media print');
-  expect(frozenCss).toContain('.print-only');
+  expect(frozenCss).not.toContain('@media print');
+  expect(frozenCss).not.toContain('.print-only');
   expect(frozenCss).not.toContain('@media screen');
 });
 
@@ -89,9 +89,9 @@ it('prints a disposable offline projection and removes it after the print dialog
   expect(frame.style.height).toBe('900px');
   expect(image?.loading).toBe('eager');
   expect(decode).toHaveBeenCalledOnce();
-  expect(printPolicy).toContain('@page{size:auto;margin:12mm}');
-  expect(printPolicy).toContain('width:auto!important');
-  expect(printPolicy).not.toContain('size:1440px 900px');
+  expect(printPolicy).toContain('@page{size:1440px 900px;margin:0}');
+  expect(printPolicy).toContain('width:1440px!important');
+  expect(printPolicy).toContain('overflow-x:hidden!important');
   expect(printWithPolicy).toHaveBeenCalledOnce();
   expect(document.querySelector('iframe')).toBeNull();
 });

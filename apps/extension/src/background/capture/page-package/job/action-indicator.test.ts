@@ -73,6 +73,21 @@ it('does not change the action icon for a single page or reopen a cancelled job'
   expect(deps.openPopup).not.toHaveBeenCalled();
 });
 
+it('retries popup restoration after the first post-activation open is rejected', async () => {
+  vi.useFakeTimers();
+  browserActionMocks.openPopup.mockClear();
+  browserActionMocks.openPopup
+    .mockRejectedValueOnce(new Error('Popup is still closing'))
+    .mockResolvedValueOnce(undefined);
+
+  const restoration = restorePagePackageProgressPopup(createJob(2), 3);
+  await vi.advanceTimersByTimeAsync(120);
+  await restoration;
+
+  expect(browserActionMocks.openPopup).toHaveBeenNthCalledWith(1, { windowId: 3 });
+  expect(browserActionMocks.openPopup).toHaveBeenNthCalledWith(2, { windowId: 3 });
+});
+
 it('keeps capture authority independent from action presentation failures', async () => {
   vi.useFakeTimers();
   const job = createJob(2);
