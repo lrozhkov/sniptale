@@ -93,6 +93,7 @@ export function shouldRunConfigPolicy(targetFiles) {
   return targetFiles.some(
     (file) =>
       [
+        '.nvmrc',
         'package.json',
         'package-lock.json',
         'apps/extension/package.json',

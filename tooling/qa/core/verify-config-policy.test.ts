@@ -38,6 +38,7 @@ function createFailingPackageJson() {
 
 function writeConfigPolicyPackageJson(root, packageJson) {
   writeFile(root, 'package.json', JSON.stringify(packageJson, null, 2));
+  writeFile(root, '.nvmrc', '24.18.0\n');
   writeFile(root, '.npmrc', 'legacy-peer-deps=true\nloglevel=error\nmin-release-age=7\n');
   writeFile(
     root,
@@ -191,6 +192,19 @@ it('rejects lockfile engine drift independently from the root package', async ()
     rule: 'config-policy',
     file: 'package-lock.json',
     message: 'packages[""].engines.node must be ">=24.18.0 <25"',
+  });
+});
+
+it('rejects Node version-manager drift independently from package metadata', async () => {
+  const root = createTempRoot('verify-config-policy-nvmrc-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(root, '.nvmrc', '22.23.2\n');
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
+    rule: 'config-policy',
+    file: '.nvmrc',
+    message: '.nvmrc must contain exactly 24.18.0',
   });
 });
 

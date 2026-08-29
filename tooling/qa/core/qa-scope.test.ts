@@ -143,6 +143,7 @@ describe('shared QA controls', () => {
     await withCwd(root, async () => {
       const module = await importFresh<typeof import('./qa-scope.mjs')>('./qa-scope.mjs');
       const controls = [
+        '.nvmrc',
         'package.json',
         'package-lock.json',
         '.oxlintrc.json',

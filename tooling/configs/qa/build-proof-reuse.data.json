@@ -10,6 +10,7 @@
     "tooling/release"
   ],
   "configFiles": [
+    ".nvmrc",
     "package.json",
     "package-lock.json",
     "apps/extension/package.json",

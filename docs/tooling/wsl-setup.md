@@ -43,6 +43,8 @@ npm install --global npm@11.19.1 --ignore-scripts --min-release-age-exclude=npm
 hash -r
 ```
 
+The repository `.nvmrc` pins the same exact Node `24.18.0` developer runtime and is checked against package, CI, container, and toolchain authorities. npm remains pinned separately to `11.19.1` by `packageManager`, `devEngines`, and the CI npm lock.
+
 Verify `which node`, `which npm`, `node --version`, `npm --version`, and `npm config list` before installing repository dependencies. The expected package-manager identity is declared by `packageManager` and enforced by `devEngines`; do not update the lock with another npm version.
 
 `npm@11.19.1` is an intentional urgent-security exception to the seven-day age window: it fixes the high-severity `tar` advisory still present in npm 12.0.2. CI obtains the same package through `tooling/configs/ci/npm/package-lock.json`, verifies its registry integrity, and retains no permanent age exclusion.

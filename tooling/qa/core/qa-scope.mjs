@@ -65,6 +65,7 @@ const VITE_CONFIG_PATTERN = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 const SHARED_CONTROL_FILES = new Set([
   '.dependency-cruiser.cjs',
   '.editorconfig',
+  '.nvmrc',
   '.npmrc',
   '.oxfmtignore',
   '.oxfmtrc.json',

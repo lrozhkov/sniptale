@@ -177,6 +177,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const npmLock = fs.readFileSync('tooling/configs/ci/npm/package-lock.json');
   const projectLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
   const projectPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  const nvmrc = fs.readFileSync('.nvmrc', 'utf8');
   const playwrightPackage = JSON.parse(
     fs.readFileSync('tooling/configs/ci/playwright/package.json', 'utf8')
   );
@@ -193,6 +194,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(projectPackage.engines.node).toBe(expectedNodeEngine);
   expect(projectLock.packages[''].engines.node).toBe(expectedNodeEngine);
   expect(projectPackage.packageManager).toBe(`npm@${lock.node.npmVersion}`);
+  expect(nvmrc).toBe(`${lock.node.version}\n`);
   expect(projectPackage.devEngines).toEqual({
     runtime: { name: 'node', version: expectedNodeEngine, onFail: 'error' },
     packageManager: { name: 'npm', version: lock.node.npmVersion, onFail: 'error' },

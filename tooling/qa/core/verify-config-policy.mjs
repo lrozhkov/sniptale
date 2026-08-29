@@ -12,6 +12,7 @@ import { hasRequiredViteBuildTarget } from './verify-config-policy.vite-target.m
 import { collectExtensionBuildLayoutViolations } from './verify-extension-build-layout.mjs';
 
 const MANIFEST_PATH = 'apps/extension/manifest.json';
+const NVMRC_PATH = '.nvmrc';
 const NPMRC_PATH = '.npmrc';
 const PACKAGE_JSON_PATH = 'package.json';
 const PACKAGE_LOCK_PATH = 'package-lock.json';
@@ -34,6 +35,7 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
 const REQUIRED_BUILD_TARGET = 'chrome140';
+const REQUIRED_NODE_VERSION = '24.18.0';
 const REQUIRED_NODE_ENGINE = '>=24.18.0 <25';
 const REQUIRED_PACKAGE_MANAGER = 'npm@11.19.1';
 const REQUIRED_NPM_CONFIG = Object.freeze([
@@ -138,7 +140,7 @@ function collectRuntimeBaselineViolations({ compilerOptions, manifest, viteConfi
   return violations;
 }
 
-function collectNpmPolicyViolations(packageJson, npmrcSource) {
+function collectNpmPolicyViolations(packageJson, npmrcSource, nvmrcSource) {
   const violations = [];
   const npmConfig = npmrcSource
     .split(/\r?\n/u)
@@ -169,6 +171,11 @@ function collectNpmPolicyViolations(packageJson, npmrcSource) {
       )
     );
   }
+  if (nvmrcSource !== `${REQUIRED_NODE_VERSION}\n`) {
+    violations.push(
+      createViolation(NVMRC_PATH, `.nvmrc must contain exactly ${REQUIRED_NODE_VERSION}`)
+    );
+  }
   if (
     packageJson.devEngines?.runtime?.name !== 'node' ||
     packageJson.devEngines.runtime.version !== REQUIRED_NODE_ENGINE ||
@@ -190,8 +197,8 @@ function collectNpmPolicyViolations(packageJson, npmrcSource) {
   return violations;
 }
 
-function collectPackageBaselineViolations(packageJson, packageLock, npmrcSource) {
-  const violations = collectNpmPolicyViolations(packageJson, npmrcSource);
+function collectPackageBaselineViolations(packageJson, packageLock, npmrcSource, nvmrcSource) {
+  const violations = collectNpmPolicyViolations(packageJson, npmrcSource, nvmrcSource);
 
   if (packageJson.engines?.node !== REQUIRED_NODE_ENGINE) {
     violations.push(
@@ -240,6 +247,7 @@ function collectPackageBaselineViolations(packageJson, packageLock, npmrcSource)
 export function collectConfigPolicyViolations({ rootDir = repoRoot } = {}) {
   const packageJson = readJson(PACKAGE_JSON_PATH, rootDir);
   const packageLock = readJson(PACKAGE_LOCK_PATH, rootDir);
+  const nvmrcSource = readText(NVMRC_PATH, rootDir);
   const npmrcSource = readText(NPMRC_PATH, rootDir);
   const tsconfigCompilerOptions = readTsConfig(TSCONFIG_PATH, rootDir).compilerOptions ?? {};
   const tsconfigNodeCompilerOptions =
@@ -258,7 +266,7 @@ export function collectConfigPolicyViolations({ rootDir = repoRoot } = {}) {
       manifest,
       viteConfigSource,
     }),
-    ...collectPackageBaselineViolations(packageJson, packageLock, npmrcSource),
+    ...collectPackageBaselineViolations(packageJson, packageLock, npmrcSource, nvmrcSource),
     ...collectCompilerOptionViolations({
       file: TSCONFIG_NODE_PATH,
       compilerOptions: tsconfigNodeCompilerOptions,
