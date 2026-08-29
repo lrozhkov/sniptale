@@ -146,6 +146,7 @@ it('uses verified Page Package MIME metadata for preview and original downloads'
     'image/png',
     'text/css',
     'image/png',
+    'application/x-sniptale-page-package+zip',
   ]);
 });
 

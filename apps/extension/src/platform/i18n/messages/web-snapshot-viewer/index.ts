@@ -57,6 +57,22 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Скачать оригинал',
       en: 'Download original',
     },
+    exportActions: {
+      ru: 'Скачать и экспортировать',
+      en: 'Download and export',
+    },
+    downloadPackage: {
+      ru: 'Скачать исходный архив',
+      en: 'Download original archive',
+    },
+    exportPdf: {
+      ru: 'Экспортировать в PDF',
+      en: 'Export to PDF',
+    },
+    exportPdfFailed: {
+      ru: 'Не удалось подготовить PDF. Попробуйте ещё раз.',
+      en: 'Could not prepare the PDF. Try again.',
+    },
     visualAlt: {
       ru: 'Сохранённый скриншот веб-страницы',
       en: 'Saved screenshot of the web page',
@@ -92,10 +108,6 @@ export const webSnapshotViewerMessages = defineMessageSource({
     fitToWidth: {
       ru: 'По ширине окна',
       en: 'Fit to window width',
-    },
-    pngDprHint: {
-      ru: 'Скриншот показан в исходном качестве. Масштаб меняет только размер просмотра.',
-      en: 'The screenshot is shown at its original quality. Zoom only changes the viewing size.',
     },
     loading: {
       ru: 'Загрузка снимка...',

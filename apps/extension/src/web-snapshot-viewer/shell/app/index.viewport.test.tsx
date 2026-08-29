@@ -76,6 +76,9 @@ function createLoadedPackage(
   manifest: Partial<WebSnapshotManifest> = {}
 ): LoadedWebSnapshotPackage {
   return {
+    archiveFilename: 'Page_title.sniptale-page-package.zip',
+    archiveSize: 5_000_000,
+    archiveUrl: 'blob:snapshot-archive',
     assets: [],
     documentUrl: null,
     html: '<p>Snapshot</p>',

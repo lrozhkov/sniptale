@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { PanelTopClose, PanelTopOpen } from 'lucide-react';
 import { translate, useAppLocale, type AppLocale } from '../../../platform/i18n';
 import { readSnapshotIdFromLocation } from './route';
 import { SnapshotPreparationHost } from '../../preparation/host';
@@ -8,21 +7,14 @@ import { hydrateSnapshotDeclarativeShadowDom } from '../../viewer/declarative-sh
 import { loadWebSnapshotPackage, revokeWebSnapshotObjectUrls } from '../../viewer/assets';
 import { WebSnapshotFrame } from '../../viewer/iframe';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
-import {
-  WebSnapshotViewerModeSwitch,
-  WebSnapshotVisualSurface,
-  type WebSnapshotViewerMode,
-} from './view-mode';
+import { WebSnapshotVisualSurface, type WebSnapshotViewerMode } from './view-mode';
 import { WebSnapshotAssetCatalog } from './asset-catalog';
-import { useViewerZoom, WebSnapshotZoomControls } from './viewport-zoom';
+import { useViewerZoom } from './viewport-zoom';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createLogger } from '@sniptale/platform/observability/logger';
-
-const viewerHeaderClassName = [
-  'flex min-h-[52px] items-center justify-between border-b',
-  'border-[var(--sniptale-color-border-soft)] px-4',
-].join(' ');
+import { printWebSnapshotProjection } from '../../viewer/print-projection';
+import { CollapsedToolbarButton, SnapshotViewerToolbar } from './toolbar';
 
 type ViewerViewport = { width: number; height: number } | null;
 type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error'; message: string };
@@ -33,13 +25,6 @@ const logger = createLogger({ namespace: 'WebSnapshotViewer' });
 function getSourceTitle(sourceTitle: string | null | undefined): string | null {
   const normalizedTitle = sourceTitle?.trim();
   return normalizedTitle ? normalizedTitle : null;
-}
-
-function getHeaderTitle(loaded: LoadedWebSnapshotPackage, locale: AppLocale): string {
-  return (
-    getSourceTitle(loaded.manifest.source.title) ??
-    translate('webSnapshotViewer.app.documentTitleFallback', locale)
-  );
 }
 
 function getDocumentTitle(loaded: LoadedWebSnapshotPackage | null, locale: AppLocale): string {
@@ -68,59 +53,6 @@ function useViewerDocumentTitle(loaded: LoadedWebSnapshotPackage | null): AppLoc
   }, [loaded, locale]);
 
   return locale;
-}
-
-function SnapshotViewerHeader(props: {
-  loaded: LoadedWebSnapshotPackage;
-  locale: AppLocale;
-  mode: WebSnapshotViewerMode;
-  onCollapse: () => void;
-  onModeChange: (mode: WebSnapshotViewerMode) => void;
-  zoom: ReturnType<typeof useViewerZoom>;
-}) {
-  const collapseToolbarLabel = translate('webSnapshotViewer.app.collapseToolbar', props.locale);
-
-  return (
-    <header className={viewerHeaderClassName}>
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-          {getHeaderTitle(props.loaded, props.locale)}
-        </div>
-        <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]">
-          {props.loaded.manifest.source.url}
-        </div>
-        {props.mode === 'visual' ? (
-          <div className="truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
-            {translate('webSnapshotViewer.app.pngDprHint', props.locale)}
-          </div>
-        ) : null}
-      </div>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {props.mode === 'assets' ? null : (
-          <WebSnapshotZoomControls locale={props.locale} {...props.zoom} />
-        )}
-        <WebSnapshotViewerModeSwitch
-          locale={props.locale}
-          mode={props.mode}
-          onModeChange={props.onModeChange}
-        />
-        <button
-          type="button"
-          aria-label={collapseToolbarLabel}
-          title={collapseToolbarLabel}
-          className={[
-            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
-            'text-[var(--sniptale-color-text-muted)] transition hover:bg-[var(--sniptale-color-surface-hover)]',
-            'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
-            'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
-          ].join(' ')}
-          onClick={props.onCollapse}
-        >
-          <PanelTopClose aria-hidden="true" size={16} strokeWidth={2} />
-        </button>
-      </div>
-    </header>
-  );
 }
 
 function SnapshotFrameSurface(props: {
@@ -245,26 +177,6 @@ function useSnapshotPreparationFrame(loaded: LoadedWebSnapshotPackage) {
   };
 }
 
-function CollapsedToolbarButton(props: { locale: AppLocale; onExpand: () => void }) {
-  const label = translate('webSnapshotViewer.app.expandToolbar', props.locale);
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className={[
-        'fixed right-3 top-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-lg',
-        'border border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] shadow-md',
-        'text-[var(--sniptale-color-text-muted)] hover:text-[var(--sniptale-color-text-primary)]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
-      ].join(' ')}
-      onClick={props.onExpand}
-    >
-      <PanelTopOpen aria-hidden="true" size={17} />
-    </button>
-  );
-}
-
 function SnapshotModeContent(props: {
   currentViewport: ViewerViewport;
   externalLinksEnabled: boolean;
@@ -326,6 +238,8 @@ function WebSnapshotViewerSurface(props: {
   const [toolbarVisible, setToolbarVisible] = useState(true);
   const [currentViewport, setCurrentViewport] = useState<ViewerViewport>(null);
   const [mode, setMode] = useState<WebSnapshotViewerMode>('static-document');
+  const [printState, setPrintState] = useState<'error' | 'idle' | 'preparing'>('idle');
+  const printPendingRef = useRef(false);
   const { handleIframeElementChange, handleIframeLoaded, iframeRef, preparationIframe } =
     useSnapshotPreparationFrame(props.loaded);
   const resolvedViewport = currentViewport ?? props.loaded.manifest.viewport ?? null;
@@ -341,23 +255,57 @@ function WebSnapshotViewerSurface(props: {
       logger.warn('Failed to open an external snapshot link');
     });
   }, []);
+  const printSnapshot = useCallback(() => {
+    if (printPendingRef.current) return;
+    printPendingRef.current = true;
+    setPrintState('preparing');
+    void printWebSnapshotProjection({
+      documentUrl: props.loaded.documentUrl,
+      html: props.loaded.html,
+      viewport: props.loaded.manifest.viewport,
+    })
+      .then(() => {
+        printPendingRef.current = false;
+        setPrintState('idle');
+      })
+      .catch(() => {
+        printPendingRef.current = false;
+        logger.warn('Failed to prepare snapshot PDF projection');
+        setPrintState('error');
+      });
+  }, [props.loaded]);
 
   return (
-    <main className="flex h-screen flex-col bg-[var(--sniptale-color-surface-canvas)]">
+    <main
+      className="flex h-screen w-full min-w-0 max-w-full flex-col overflow-hidden
+        bg-[var(--sniptale-color-surface-canvas)]"
+    >
       {toolbarVisible ? (
-        <SnapshotViewerHeader
+        <SnapshotViewerToolbar
           loaded={props.loaded}
           locale={props.locale}
           mode={mode}
           onCollapse={() => setToolbarVisible(false)}
           onModeChange={setMode}
+          onPrint={printSnapshot}
+          printPending={printState === 'preparing'}
           zoom={zoom}
         />
+      ) : null}
+      {printState === 'error' ? (
+        <div
+          className="fixed right-4 top-16 z-30 rounded-lg border border-[var(--sniptale-color-danger)]
+            bg-[var(--sniptale-color-surface-panel)] px-3 py-2 text-xs
+            text-[var(--sniptale-color-danger)] shadow-lg"
+          role="alert"
+        >
+          {translate('webSnapshotViewer.app.exportPdfFailed', props.locale)}
+        </div>
       ) : null}
       <section
         ref={zoom.surfaceRef}
         data-testid="snapshot-viewer-surface"
-        className={`relative min-h-0 flex-1 overflow-auto ${zoom.grabClassName}`}
+        className={`relative min-h-0 w-full min-w-0 max-w-full flex-1 overflow-auto ${zoom.grabClassName}`}
         onPointerDown={zoom.onPointerDown}
         onPointerMove={zoom.onPointerMove}
         onPointerUp={zoom.onPointerUp}

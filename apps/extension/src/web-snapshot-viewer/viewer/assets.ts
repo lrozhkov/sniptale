@@ -8,6 +8,7 @@ import {
   collectWebSnapshotQueryRoots,
   isWebSnapshotXhtml,
   sanitizeWebSnapshotCssText,
+  sanitizeWebSnapshotFilename,
   sanitizeWebSnapshotHtml,
   sanitizeWebSnapshotXhtml,
   serializeWebSnapshotXhtmlDocument,
@@ -34,6 +35,9 @@ import {
 } from '../../features/web-snapshot/package-policy';
 
 export interface LoadedWebSnapshotPackage {
+  archiveFilename: string;
+  archiveSize: number;
+  archiveUrl: string;
   assets: LoadedWebSnapshotAsset[];
   documentUrl: string | null;
   html: string;
@@ -41,6 +45,11 @@ export interface LoadedWebSnapshotPackage {
   objectUrls: string[];
   screenshotUrl: string;
   screenshotCoverage: PagePackageScreenshotCoverage;
+}
+
+function createViewerArchiveFilename(manifest: WebSnapshotManifest): string {
+  const sourceName = manifest.source.title ?? manifest.source.url ?? 'web-snapshot';
+  return `${sanitizeWebSnapshotFilename(sourceName, 'web-snapshot')}.sniptale-page-package.zip`;
 }
 
 const MAX_VIEWER_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
@@ -352,7 +361,12 @@ export async function loadWebSnapshotPackage(
     if (documentUrl) objectUrls.push(documentUrl);
     const screenshotUrl = URL.createObjectURL(screenshot);
     objectUrls.push(screenshotUrl);
+    const archiveUrl = URL.createObjectURL(record.packageFile);
+    objectUrls.push(archiveUrl);
     return {
+      archiveFilename: createViewerArchiveFilename(record.manifest),
+      archiveSize: record.packageFile.size,
+      archiveUrl,
       assets,
       documentUrl,
       html: sanitizedDocument,

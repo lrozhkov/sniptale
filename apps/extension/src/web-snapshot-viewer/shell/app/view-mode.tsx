@@ -25,8 +25,8 @@ export function WebSnapshotViewerModeSwitch(props: {
     <div
       role="group"
       aria-label={translate('webSnapshotViewer.app.modeLabel', props.locale)}
-      className="ml-auto flex shrink-0 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-        bg-[var(--sniptale-color-surface-muted)] p-0.5"
+      className="ml-auto flex min-w-0 max-w-full flex-wrap rounded-[8px] border
+        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-muted)] p-0.5"
     >
       <ModeButton
         active={props.mode === 'static-document'}

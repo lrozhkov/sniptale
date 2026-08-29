@@ -100,16 +100,17 @@ export function useViewerZoom(contentWidth: number | null) {
   );
 }
 
-export function WebSnapshotZoomControls(props: {
+export interface ViewerZoomControls {
   canZoom: boolean;
   fitToWidth: boolean;
-  locale: AppLocale;
   onFitToWidth: () => void;
   onReset: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   zoom: number;
-}) {
+}
+
+export function WebSnapshotZoomControls(props: ViewerZoomControls & { locale: AppLocale }) {
   if (!props.canZoom) return null;
   const percent = `${Math.round(props.zoom * 100)}%`;
   const buttonClassName = [

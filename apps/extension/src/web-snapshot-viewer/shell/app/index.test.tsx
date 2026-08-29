@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   latestFrameLoad: null as (() => void) | null,
   loadSettings: vi.fn(),
   loadWebSnapshotPackage: vi.fn(),
+  printWebSnapshotProjection: vi.fn(),
   readSnapshotIdFromLocation: vi.fn(),
   revokeWebSnapshotObjectUrls: vi.fn(),
   useAppLocale: vi.fn(() => 'en'),
@@ -36,6 +37,10 @@ vi.mock('./route', () => ({
 }));
 vi.mock('../../viewer/frame-navigation', () => ({
   blockSnapshotFrameNavigation: mocks.blockSnapshotFrameNavigation,
+}));
+vi.mock('../../viewer/print-projection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../viewer/print-projection')>()),
+  printWebSnapshotProjection: mocks.printWebSnapshotProjection,
 }));
 vi.mock('../../../composition/persistence/settings', () => ({
   loadSettings: mocks.loadSettings,
@@ -94,6 +99,9 @@ function createLoadedPackage(args: {
   objectUrls?: string[];
 }): LoadedWebSnapshotPackage {
   return {
+    archiveFilename: 'Page_title.sniptale-page-package.zip',
+    archiveSize: 5_000_000,
+    archiveUrl: 'blob:snapshot-archive',
     assets: args.assets ?? [],
     documentUrl: null,
     html: args.html ?? '<p>Snapshot</p>',
@@ -129,6 +137,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.latestFrameLoad = null;
   mocks.loadWebSnapshotPackage.mockReset();
+  mocks.printWebSnapshotProjection.mockReset();
+  mocks.printWebSnapshotProjection.mockResolvedValue(undefined);
   mocks.loadSettings.mockResolvedValue({ externalSnapshotLinksEnabled: false });
   mocks.browserTabsCreate.mockResolvedValue({});
   document.documentElement.lang = 'en';
@@ -211,6 +221,22 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
   expect(document.title).toBe('Page title - Sniptale Web Snapshot');
   expect(container?.textContent).toContain('Page title');
   expect(container?.textContent).toContain('https://example.com/page');
+  expect(container?.querySelector('[data-testid="snapshot-metadata"]')?.textContent).toContain(
+    '5 MB'
+  );
+  const metadata = container?.querySelector('[data-testid="snapshot-metadata"]');
+  expect(metadata?.parentElement?.children).toHaveLength(2);
+  expect(container?.querySelector('main')?.className).toContain('overflow-hidden');
+  expect(container?.querySelector('header')?.className).toContain('max-w-full');
+  expect(container?.querySelector('header')?.className).toContain('flex-wrap');
+  expect(container?.querySelector('header')?.className).not.toContain('overflow-hidden');
+  expect(
+    container
+      ?.querySelector<HTMLAnchorElement>(
+        `a[aria-label="${translate('webSnapshotViewer.app.downloadPackage', 'en')}"]`
+      )
+      ?.getAttribute('href')
+  ).toBe('blob:snapshot-archive');
 
   const collapseButton = container?.querySelector(
     `button[aria-label="${translate('webSnapshotViewer.app.collapseToolbar', 'en')}"]`
@@ -232,6 +258,7 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
     `button[aria-label="${translate('webSnapshotViewer.app.expandToolbar', 'en')}"]`
   ) as HTMLButtonElement | null;
   expect(expandButton).toBeTruthy();
+  expect(expandButton?.className).toContain('right-6');
 
   act(() => expandButton?.click());
   expect(container?.textContent).toContain('Page title');
@@ -239,6 +266,60 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
 
   await loadSnapshotIframe();
   expect(container?.querySelector('iframe')).not.toBeNull();
+});
+
+it('prepares the sanitized static document as a PDF projection on explicit action', async () => {
+  const loaded = createLoadedPackage({
+    manifest: { viewport: { deviceScaleFactor: 1, height: 900, width: 1440 } },
+  });
+  mocks.loadWebSnapshotPackage.mockResolvedValue(loaded);
+
+  await act(async () => {
+    root?.render(<WebSnapshotViewerApp />);
+  });
+  const pdfButton = container?.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('webSnapshotViewer.app.exportPdf', 'en')}"]`
+  );
+  await act(async () => {
+    pdfButton?.click();
+  });
+
+  expect(mocks.printWebSnapshotProjection).toHaveBeenCalledWith({
+    documentUrl: loaded.documentUrl,
+    html: loaded.html,
+    viewport: loaded.manifest.viewport,
+  });
+  expect(pdfButton?.disabled).toBe(false);
+});
+
+it('prevents duplicate PDF preparation and surfaces a localized failure', async () => {
+  let rejectPrint: (error: Error) => void = () => undefined;
+  mocks.printWebSnapshotProjection.mockReturnValue(
+    new Promise<void>((_resolve, reject) => {
+      rejectPrint = reject;
+    })
+  );
+  mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
+
+  await act(async () => {
+    root?.render(<WebSnapshotViewerApp />);
+  });
+  const pdfButton = container?.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('webSnapshotViewer.app.exportPdf', 'en')}"]`
+  );
+  act(() => {
+    pdfButton?.click();
+    pdfButton?.click();
+  });
+  expect(mocks.printWebSnapshotProjection).toHaveBeenCalledOnce();
+  expect(pdfButton?.disabled).toBe(true);
+
+  await act(async () => rejectPrint(new Error('print failed')));
+
+  expect(pdfButton?.disabled).toBe(false);
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    translate('webSnapshotViewer.app.exportPdfFailed', 'en')
+  );
 });
 
 it('opens with the static document and switches explicitly to the screenshot', async () => {
