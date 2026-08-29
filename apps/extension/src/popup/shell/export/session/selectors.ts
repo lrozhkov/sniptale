@@ -8,6 +8,7 @@ import type {
 } from './types';
 import type { PopupPagePackageSelection } from '../../../../composition/persistence/popup-export-preferences';
 import type { PopupExportTabSelectionState } from '../selection/tabs/types';
+import { isRestrictedBrowserPage } from '../../../../features/tab-capabilities/url';
 
 export function getPopupExportSelection(
   toggles: { values: PopupExportSelection } | PopupExportSelection
@@ -54,6 +55,10 @@ export function getPopupExportDerivedState(args: {
     args.session.refs.cancelRetryRef.current?.cancellationPending === true ||
     getIsExporting(args.session.transfer.progress, args.session.transfer.result);
   const selection = getPopupExportSelection(args.toggles);
+  const canCopyActiveTabPreview =
+    !isRestrictedBrowserPage(args.activeTabCapabilities.url) &&
+    !activeTabExportDisabledReason &&
+    !args.session.copy.copyingFormat;
   const canExport =
     args.toggles.hasLoadedPreferences &&
     getCanExport({
@@ -65,8 +70,8 @@ export function getPopupExportDerivedState(args: {
     });
 
   return {
-    canCopyJson: !activeTabExportDisabledReason && !args.session.copy.copyingFormat,
-    canCopyMarkdown: !activeTabExportDisabledReason && !args.session.copy.copyingFormat,
+    canCopyJson: canCopyActiveTabPreview,
+    canCopyMarkdown: canCopyActiveTabPreview,
     canExport,
     exportDisabledReason,
     isExporting,

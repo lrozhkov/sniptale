@@ -168,6 +168,7 @@ function createBlockedActiveTabSelectionState(): Partial<PopupExportTabSelection
 
 function createDerivationInput(
   overrides: {
+    activeTabUrl?: string | null;
     capability?: { reason: string | null; supported: boolean };
     session?: Partial<PopupExportSessionState>;
     tabSelection?: Partial<PopupExportTabSelectionState>;
@@ -177,6 +178,7 @@ function createDerivationInput(
   return {
     activeTabCapabilities: {
       export: overrides.capability ?? { reason: null, supported: true },
+      url: overrides.activeTabUrl ?? 'https://example.test',
     } as never,
     session: createSessionState(overrides.session),
     tabSelection: createTabSelectionState(overrides.tabSelection),
@@ -231,6 +233,19 @@ describe('popup export derived state', () => {
 
     expect(derived.canCopyJson).toBe(true);
     expect(derived.canCopyMarkdown).toBe(true);
+  });
+
+  it('disables active-tab copy on extension pages even when batch export remains supported', () => {
+    const derived = getPopupExportDerivedState({
+      ...createDerivationInput({
+        activeTabUrl:
+          'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1',
+      }),
+    });
+
+    expect(derived.canExport).toBe(true);
+    expect(derived.canCopyJson).toBe(false);
+    expect(derived.canCopyMarkdown).toBe(false);
   });
 
   it('keeps copy actions available when json and markdown export toggles are disabled', () => {
