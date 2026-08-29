@@ -42,6 +42,7 @@ import { createImportMediaFilesAction } from './media-file-import';
 import type { MediaFileImportConflictStrategy } from '../import-types';
 import {
   createConfirmWebSnapshotImportAction,
+  createInspectDroppedWebSnapshotImportAction,
   createInspectWebSnapshotImportAction,
 } from './web-snapshot-import';
 
@@ -80,6 +81,7 @@ function buildGalleryAppActionsResult(args: {
   withBusy: ReturnType<typeof createBusyActionRunner>;
 }): UseGalleryAppActionsResult {
   const { controller, withBusy } = args;
+  const inspectWebSnapshot = createInspectWebSnapshotImportAction(controller, withBusy);
 
   return {
     backup: args.backupActions,
@@ -95,7 +97,11 @@ function buildGalleryAppActionsResult(args: {
       importBackup: args.handleImport,
       importSelectedFile: args.handleImportSelectedFile,
       importMediaFiles: args.handleImportMediaFiles,
-      inspectWebSnapshot: createInspectWebSnapshotImportAction(controller, withBusy),
+      inspectDroppedWebSnapshot: createInspectDroppedWebSnapshotImportAction(
+        controller,
+        inspectWebSnapshot
+      ),
+      inspectWebSnapshot,
     },
     preview: {
       close: args.handlePreviewClose,

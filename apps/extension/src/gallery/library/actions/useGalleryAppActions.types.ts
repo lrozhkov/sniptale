@@ -24,6 +24,7 @@ export interface UseGalleryAppActionsResult {
     importBackup: (strategy: MediaHubImportConflictStrategy) => Promise<void>;
     importSelectedFile: (file: File | null) => Promise<void>;
     importMediaFiles: (files: File[]) => Promise<void>;
+    inspectDroppedWebSnapshot: (files: File[]) => Promise<void>;
     inspectWebSnapshot: (file: File | null) => Promise<void>;
   };
   preview: {

@@ -6,6 +6,7 @@ import { createPagePackageManifestFixture } from '../../../features/web-snapshot
 import { createBusyActionRunner } from './shared';
 import {
   createConfirmWebSnapshotImportAction,
+  createInspectDroppedWebSnapshotImportAction,
   createInspectWebSnapshotImportAction,
 } from './web-snapshot-import';
 
@@ -90,6 +91,30 @@ it('ignores an empty picker and localizes unsupported archive inspection', async
   await action(new File(['zip'], 'snapshot.sniptale-page-package.zip'));
   expect(getState().storage.pendingWebSnapshotImport).toBeNull();
   expect(getState().storage.banner).toBe('gallery.importModal.webSnapshotUnsupported');
+});
+
+it('routes one dropped file through the same inspection and rejects ambiguous drops', async () => {
+  const { controller, getState } = createController();
+  const inspectFile = createInspectWebSnapshotImportAction(
+    controller,
+    createBusyActionRunner(controller)
+  );
+  const inspectDrop = createInspectDroppedWebSnapshotImportAction(controller, inspectFile);
+  const file = new File(['zip'], 'snapshot.sniptale-page-package.zip');
+  mocks.inspect.mockResolvedValue(inspection);
+
+  await inspectDrop([file]);
+  expect(mocks.inspect).toHaveBeenCalledWith(file);
+  expect(getState().storage.pendingWebSnapshotImport).toEqual({ file, inspection });
+
+  controller.actions.surface.setPendingWebSnapshotImport(null);
+  await inspectDrop([]);
+  expect(getState().storage.banner).toBe('gallery.importModal.webSnapshotDropSingleFile');
+  expect(mocks.inspect).toHaveBeenCalledTimes(1);
+
+  await inspectDrop([file, new File(['zip'], 'second.sniptale-page-package.zip')]);
+  expect(getState().storage.banner).toBe('gallery.importModal.webSnapshotDropSingleFile');
+  expect(mocks.inspect).toHaveBeenCalledTimes(1);
 });
 
 it('does nothing when confirmation has no pending inspected file', async () => {

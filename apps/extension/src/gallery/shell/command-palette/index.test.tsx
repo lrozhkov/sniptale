@@ -57,6 +57,7 @@ function createActions(): UseGalleryAppActionsResult {
       importBackup: vi.fn(async () => undefined),
       importSelectedFile: vi.fn(async () => undefined),
       importMediaFiles: vi.fn(async () => undefined),
+      inspectDroppedWebSnapshot: vi.fn(async () => undefined),
       inspectWebSnapshot: vi.fn(async () => undefined),
     },
     preview: {

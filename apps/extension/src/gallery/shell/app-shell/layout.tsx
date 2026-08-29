@@ -6,6 +6,7 @@ import { GallerySidebar } from '../../library/sidebar';
 import { GalleryImportProgressCard } from '../../library/import-progress-card';
 import type { GalleryAppLayoutProps } from './types';
 import { GALLERY_MEDIA_IMPORT_ACCEPT } from '../../library/media-import-profile';
+import { GalleryWebSnapshotDropTarget } from './web-snapshot-drop-target';
 
 function GalleryImportInput(props: GalleryAppLayoutProps) {
   return (
@@ -119,13 +120,9 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
 
 export function GalleryAppLayout(props: GalleryAppLayoutProps) {
   return (
-    <div
-      data-ui="gallery.page.root"
-      className={
-        'sniptale-extension-surface flex h-full min-h-0 w-full overflow-hidden ' +
-        'bg-[var(--sniptale-color-surface-canvas)] p-4 ' +
-        'text-[var(--sniptale-color-text-primary)]'
-      }
+    <GalleryWebSnapshotDropTarget
+      disabled={props.state.storage.isBusy}
+      {...(props.onWebSnapshotImportDrop ? { onFilesDrop: props.onWebSnapshotImportDrop } : {})}
     >
       <GalleryImportInput {...props} />
       <GalleryMediaImportInput {...props} />
@@ -178,6 +175,6 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           <GalleryMainSection {...props} />
         </div>
       </div>
-    </div>
+    </GalleryWebSnapshotDropTarget>
   );
 }

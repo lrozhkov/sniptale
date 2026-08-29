@@ -40,6 +40,7 @@ type TestLayoutProps = {
   onImportFileChange: (file: File | null) => void;
   onMediaImportFileChange: (files: File[]) => void;
   onImportMediaClick: () => void;
+  onWebSnapshotImportDrop: (files: File[]) => void;
   onPendingExportClose: () => void;
   onPendingImportClose: () => void;
   onPendingMediaImportClose: () => void;
@@ -98,6 +99,7 @@ function createActions(): UseGalleryAppActionsResult {
       importBackup: vi.fn(async () => undefined),
       importSelectedFile: vi.fn(async () => undefined),
       importMediaFiles: vi.fn(async () => undefined),
+      inspectDroppedWebSnapshot: vi.fn(async () => undefined),
       inspectWebSnapshot: vi.fn(async () => undefined),
     },
     preview: {
@@ -180,6 +182,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
   act(() => {
     layoutProps.onImportFileChange(null);
     layoutProps.onMediaImportFileChange([]);
+    layoutProps.onWebSnapshotImportDrop([]);
     layoutProps.onConfirmDialogClose();
     layoutProps.onPendingExportClose();
     layoutProps.onBackupExportConfirm({ scope: 'all' });
@@ -223,6 +226,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
   expect(importInputRef.current?.click).toHaveBeenCalledTimes(1);
   expect(mediaImportInputRef.current?.click).toHaveBeenCalledTimes(1);
   expect(actions.importing.importMediaFiles).toHaveBeenCalledWith([]);
+  expect(actions.importing.inspectDroppedWebSnapshot).toHaveBeenCalledWith([]);
   expect(actions.importing.closePendingMediaImport).toHaveBeenCalledTimes(1);
   expect(actions.importing.confirmMediaFileImport).toHaveBeenCalledWith('skip');
   expect(actions.selection.downloadBackup).toHaveBeenCalledTimes(1);

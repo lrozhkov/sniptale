@@ -39,6 +39,21 @@ export function createInspectWebSnapshotImportAction(
   };
 }
 
+export function createInspectDroppedWebSnapshotImportAction(
+  controller: GalleryImportController,
+  inspectFile: ReturnType<typeof createInspectWebSnapshotImportAction>
+) {
+  return async (files: File[]): Promise<void> => {
+    if (files.length !== 1) {
+      controller.actions.surface.setBanner(
+        translate('gallery.importModal.webSnapshotDropSingleFile')
+      );
+      return;
+    }
+    await inspectFile(files[0] ?? null);
+  };
+}
+
 export function createConfirmWebSnapshotImportAction(
   controller: GalleryImportController,
   withBusy: GalleryBusyAction

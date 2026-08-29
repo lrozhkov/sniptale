@@ -32,6 +32,7 @@ export interface GalleryAppLayoutProps {
   viewMode: GalleryViewMode;
   onImportFileChange: (file: File | null) => void;
   onMediaImportFileChange: (files: File[]) => void;
+  onWebSnapshotImportDrop?: (files: File[]) => void;
   onWebSnapshotImportFileChange?: (file: File | null) => void;
   onActiveImportCancel: () => void;
   onActiveImportDismiss: () => void;

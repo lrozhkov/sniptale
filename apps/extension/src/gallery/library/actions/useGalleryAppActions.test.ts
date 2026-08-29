@@ -152,6 +152,7 @@ describe('useGalleryAppActions', () => {
     actions.preview.openInEditor(createMediaItem({ id: 'asset-3' }));
 
     expect(actionMocks.createBusyActionRunnerMock).toHaveBeenCalledWith(controller);
+    expect(actions.importing.inspectDroppedWebSnapshot).toEqual(expect.any(Function));
     expect(getState().storage.pendingMediaImport).toBeNull();
     expect(actionMocks.createInspectExportBackupActionMock).toHaveBeenCalledTimes(1);
     expect(actionMocks.createNavigatePreviewActionMock).toHaveBeenCalledWith(controller);
