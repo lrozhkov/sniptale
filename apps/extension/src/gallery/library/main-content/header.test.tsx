@@ -241,6 +241,14 @@ it('opens compact storage actions without a separate cleanup workflow', () => {
 
   expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(4);
   expect(menu?.textContent).toContain('gallery.app.importMediaFiles');
+  const dangerSeparator = menu?.querySelector(
+    '[data-ui="gallery.header.storage-menu-danger-separator"]'
+  );
+  expect(dangerSeparator?.getAttribute('role')).toBe('separator');
+  expect(dangerSeparator?.previousElementSibling?.textContent).toContain(
+    'gallery.app.importBackup'
+  );
+  expect(dangerSeparator?.nextElementSibling?.textContent).toContain('gallery.app.deleteAll');
   clickButton(exportButton);
 
   expect(props.onExportBackup).toHaveBeenCalledTimes(1);

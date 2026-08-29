@@ -473,6 +473,8 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
     id: 'asset-1',
     filename: 'capture.png',
     size: 512,
+    sourceTitle: 'Example page',
+    sourceUrl: 'https://www.example.com/articles/capture',
     tags: [],
   });
   const onPreviewOpen = vi.fn();
@@ -515,13 +517,20 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   expect(container?.textContent).toContain('size:512');
   expect(container?.textContent).toContain('date:1');
   expect(container?.textContent).toContain(translate('gallery.app.listColumnType'));
+  expect(container?.textContent).toContain(translate('gallery.app.listColumnSource'));
   expect(container?.textContent).toContain(translate('gallery.app.listColumnName'));
+  expect(container?.querySelector('[data-ui="gallery.list.source"]')?.textContent).toContain(
+    'Example page'
+  );
+  expect(container?.querySelector('[data-ui="gallery.list.source"]')?.textContent).toContain(
+    'example.com'
+  );
   const listHeader = container?.querySelector<HTMLElement>('[data-ui="gallery.list.header"]');
   const listRow = container?.querySelector<HTMLElement>('[data-ui="gallery.list.row"]');
   expect(listHeader?.style.gridTemplateColumns).toBe(listRow?.style.gridTemplateColumns);
-  expect(listHeader?.children).toHaveLength(7);
-  expect(listRow?.children).toHaveLength(7);
-  expect(listHeader?.style.gridTemplateColumns).toContain('minmax(240px, 2.2fr)');
+  expect(listHeader?.children).toHaveLength(8);
+  expect(listRow?.children).toHaveLength(8);
+  expect(listHeader?.style.gridTemplateColumns).toContain('minmax(220px, 2fr)');
   expect(listHeader?.className).toContain('z-10');
   const columnHeaders = Array.from(
     container?.querySelectorAll<HTMLElement>('[role="columnheader"]') ?? []
@@ -536,6 +545,16 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   );
   expect(previewHeader?.hasAttribute('title')).toBe(false);
   expect(columnHeaders.every((header) => header.className.includes('min-w-0'))).toBe(true);
+  expect(columnHeaders.map((header) => header.textContent)).toEqual([
+    translate('gallery.app.listColumnSelection'),
+    translate('gallery.app.listColumnType'),
+    translate('gallery.app.listColumnPreview'),
+    translate('gallery.app.listColumnSource'),
+    translate('gallery.app.listColumnCreated'),
+    translate('gallery.app.listColumnName'),
+    translate('gallery.app.listColumnTags'),
+    translate('gallery.app.listColumnSize'),
+  ]);
 
   const kindIcon = container?.querySelector('[data-ui="test.icon"]');
   const thumbnail = container?.querySelector('[data-ui="test.thumb"]');

@@ -71,12 +71,60 @@ function GalleryRecordingGroupLabel({ item }: Pick<GalleryCardDetailsProps, 'ite
   );
 }
 
+function getGallerySourcePresentation(item: GalleryItem) {
+  let hostname: string | null = null;
+
+  if (item.sourceUrl) {
+    try {
+      const parsedUrl = new URL(item.sourceUrl);
+      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+        hostname = parsedUrl.hostname.replace(/^www\./iu, '') || null;
+      }
+    } catch {
+      hostname = null;
+    }
+  }
+
+  const recordingSource = isGalleryMediaItem(item)
+    ? (item.recordingGroupView?.sourceLabel ?? null)
+    : null;
+  const label = recordingSource ?? item.sourceTitle ?? hostname;
+  const detail = hostname && hostname !== label ? hostname : null;
+
+  return {
+    detail,
+    label,
+    title: [item.sourceTitle ?? recordingSource, item.sourceUrl].filter(Boolean).join(' · '),
+  };
+}
+
 export function GalleryListDetails(props: GalleryCardDetailsProps) {
   const tagsLabel = props.item.tags.join(', ');
   const dateLabel = formatDate(props.item.createdAt);
+  const source = getGallerySourcePresentation(props.item);
 
   return (
     <>
+      <div
+        className="min-w-0 text-xs text-[var(--sniptale-color-text-secondary)]"
+        title={source.title || undefined}
+        role="cell"
+        data-ui="gallery.list.source"
+      >
+        <div className="truncate font-medium">{source.label || '—'}</div>
+        {source.detail ? (
+          <div className="mt-0.5 truncate text-[11px] text-[var(--sniptale-color-text-muted)]">
+            {source.detail}
+          </div>
+        ) : null}
+      </div>
+      <div
+        className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
+        title={dateLabel}
+        role="cell"
+      >
+        {dateLabel}
+      </div>
       <button
         type="button"
         onClick={() => props.onPreviewOpen(props.item)}
@@ -96,13 +144,6 @@ export function GalleryListDetails(props: GalleryCardDetailsProps) {
         role="cell"
       >
         {tagsLabel || '—'}
-      </div>
-      <div
-        className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
-        title={dateLabel}
-        role="cell"
-      >
-        {dateLabel}
       </div>
       <div className="text-right text-xs text-[var(--sniptale-color-text-muted)]" role="cell">
         {props.item.size > 0 ? formatBytes(props.item.size) : '—'}

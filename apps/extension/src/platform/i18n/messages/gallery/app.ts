@@ -447,6 +447,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Превью',
     en: 'Preview',
   },
+  listColumnSource: {
+    ru: 'Источник',
+    en: 'Source',
+  },
   listColumnName: {
     ru: 'Название',
     en: 'Name',

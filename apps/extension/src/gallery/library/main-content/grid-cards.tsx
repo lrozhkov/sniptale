@@ -28,11 +28,12 @@ function isGalleryPreviewUpdating(item: GalleryItem): boolean {
 }
 
 const GALLERY_LIST_LAYOUT_STYLE = {
-  gridTemplateColumns: '32px 32px 48px minmax(240px, 2.2fr) minmax(100px, 1fr) 132px 88px',
+  gridTemplateColumns:
+    '32px 32px 48px minmax(160px, 1.35fr) 132px minmax(220px, 2fr) minmax(100px, 1fr) 88px',
 } satisfies CSSProperties;
 
 const GALLERY_LIST_ROW_CLASS_NAME = [
-  'grid min-w-[860px] items-center gap-3 px-3 py-2.5',
+  'grid min-w-[1040px] items-center gap-3 px-3 py-2.5',
   'border-b border-[var(--sniptale-color-border-soft)] last:border-b-0',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
@@ -548,7 +549,7 @@ export function GalleryMediaList(
   const units = buildGalleryListUnits(props.filteredItems);
 
   return (
-    <div className="min-w-[860px]" role="table">
+    <div className="min-w-[1040px]" role="table">
       <div
         data-ui="gallery.list.header"
         style={GALLERY_LIST_LAYOUT_STYLE}
@@ -572,13 +573,16 @@ export function GalleryMediaList(
           <span className="sr-only">{translate('gallery.app.listColumnPreview')}</span>
         </span>
         <span className="min-w-0 truncate" role="columnheader">
+          {translate('gallery.app.listColumnSource')}
+        </span>
+        <span className="min-w-0 truncate" role="columnheader">
+          {translate('gallery.app.listColumnCreated')}
+        </span>
+        <span className="min-w-0 truncate" role="columnheader">
           {translate('gallery.app.listColumnName')}
         </span>
         <span className="min-w-0 truncate" role="columnheader">
           {translate('gallery.app.listColumnTags')}
-        </span>
-        <span className="min-w-0 truncate" role="columnheader">
-          {translate('gallery.app.listColumnCreated')}
         </span>
         <span className="min-w-0 truncate text-right" role="columnheader">
           {translate('gallery.app.listColumnSize')}
@@ -612,7 +616,7 @@ export function GalleryMediaList(
           >
             <div
               style={GALLERY_LIST_LAYOUT_STYLE}
-              className={cx('grid min-w-[860px] items-center gap-3 px-3 py-2')}
+              className={cx('grid min-w-[1040px] items-center gap-3 px-3 py-2')}
               role="row"
             >
               <div

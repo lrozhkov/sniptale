@@ -215,6 +215,11 @@ function GalleryStorageMenu(
           label={translate('gallery.app.importBackup')}
           onClick={() => props.closeAndRun(props.onImportBackupClick)}
         />
+        <div
+          role="separator"
+          data-ui="gallery.header.storage-menu-danger-separator"
+          className="mx-2.5 my-1.5 border-t border-[var(--sniptale-color-border-soft)]"
+        />
         <GalleryStorageMenuAction
           danger
           disabled={props.isBusy}
