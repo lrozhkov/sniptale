@@ -11,7 +11,10 @@ import { getExportCompletedMessage } from './source';
 import { updateExportManagerProgress, type ExportManagerState } from './state';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
-import { captureWebSnapshotScreenshotWithWarnings } from '../../web-snapshot/capture';
+import {
+  captureWebSnapshotScreenshotWithWarnings,
+  captureWebSnapshotViewportScreenshot,
+} from '../../web-snapshot/capture';
 import { translate } from '../../../../platform/i18n';
 
 export function finishExportSuccess(
@@ -97,6 +100,34 @@ export async function collectExportExtraAssets(args: {
       args.warnings.push(...screenshot.warnings);
     } catch {
       args.warnings.push(translate('content.runtime.captureFullPageScreenshotFailed'));
+    }
+  }
+  if (args.options.includeViewportScreenshot) {
+    updateExportManagerProgress(args.state, {
+      activeStepKey: 'viewportScreenshot',
+      current: 0,
+      errors: args.warnings,
+      message: translate('content.runtime.captureVisibleScreenshot'),
+      phase: 'scanning',
+      total: 1,
+    });
+    try {
+      const screenshot = await captureWebSnapshotViewportScreenshot(
+        args.contentIntentSource,
+        args.state.abortController?.signal
+      );
+      const extension =
+        screenshot.type === 'image/jpeg'
+          ? 'jpg'
+          : screenshot.type === 'image/webp'
+            ? 'webp'
+            : 'png';
+      extraAssets.push({
+        content: screenshot,
+        path: `visible-viewport.${extension}`,
+      });
+    } catch {
+      args.warnings.push(translate('content.runtime.captureVisibleScreenshotFailed'));
     }
   }
   args.throwIfCancelled();

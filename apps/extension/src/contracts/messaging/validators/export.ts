@@ -83,6 +83,7 @@ const exportProgressStepKeys = new Set<ExportProgressStepKey>([
   'cssDiagnostics',
   'files',
   'fullPageScreenshot',
+  'viewportScreenshot',
   'pageDiagnostics',
   'images',
   'json',
@@ -143,9 +144,10 @@ export function isExportOptions(value: unknown): value is ExportOptions {
         'includeCssDiagnostics',
         'includeFullPageScreenshot',
       ],
-      ['includeAnnotations']
+      ['includeAnnotations', 'includeViewportScreenshot']
     ) &&
     hasOptionalField(value, 'includeAnnotations', isBoolean) &&
+    hasOptionalField(value, 'includeViewportScreenshot', isBoolean) &&
     isBoolean(value['includeJson']) &&
     isBoolean(value['includeMarkdown']) &&
     isBoolean(value['includeFiles']) &&

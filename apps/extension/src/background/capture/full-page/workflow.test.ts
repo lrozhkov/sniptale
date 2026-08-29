@@ -149,7 +149,7 @@ it('runs native scroll-and-stitch behind the shared visible-capture coordinator 
   expect(mocks.releaseLease).toHaveBeenCalledTimes(1);
 });
 
-it('always preloads lazy content for an export capture even when interactive capture disables it', async () => {
+it('respects the shared lazy-content preference for export capture', async () => {
   mocks.loadSettings.mockResolvedValueOnce({
     fullPageCapture: {
       floatingElements: 'hide',
@@ -179,7 +179,7 @@ it('always preloads lazy content for an export capture even when interactive cap
     expect.objectContaining({
       floatingElements: 'hide',
       freezeMotion: false,
-      preloadLazyContent: true,
+      preloadLazyContent: false,
     }),
     expect.any(Object)
   );

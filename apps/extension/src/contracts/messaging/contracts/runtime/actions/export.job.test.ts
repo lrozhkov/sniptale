@@ -165,6 +165,7 @@ it('parses every structured Page Package producer progress step', () => {
     'cssDiagnostics',
     'files',
     'fullPageScreenshot',
+    'viewportScreenshot',
     'images',
     'json',
     'markdown',

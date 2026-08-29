@@ -22,6 +22,7 @@ export const DEFAULT_POPUP_EXPORT_PREFERENCES: PopupExportPreferences = {
   includeCssDiagnostics: false,
   includeFiles: true,
   includeFullPageScreenshot: false,
+  includeViewportScreenshot: false,
   includePageDiagnostics: false,
   includeImages: true,
   includeJson: true,
@@ -34,6 +35,7 @@ const EMPTY_STRUCTURED_SELECTION: PopupExportPreferences = {
   includeCssDiagnostics: false,
   includeFiles: false,
   includeFullPageScreenshot: false,
+  includeViewportScreenshot: false,
   includePageDiagnostics: false,
   includeImages: false,
   includeJson: false,
@@ -86,10 +88,11 @@ export async function savePopupPagePackagePreferences(
   preferences: PopupPagePackagePreferences
 ): Promise<void> {
   if (
+    (preferences.export.includeWebCopy && !preferences.export.includeFullPageScreenshot) ||
     preferences.save.includeWebCopy !== true ||
     preferences.save.includeFullPageScreenshot !== true
   ) {
-    throw new Error('Library package preferences must include Web copy and its screenshot');
+    throw new Error('Web-copy package preferences must include the full-page screenshot');
   }
 
   try {

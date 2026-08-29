@@ -89,7 +89,7 @@ function createPreferenceState(): PopupExportPreferenceFixture {
       includeBasicLogs: false,
       includeCssDiagnostics: false,
       includeFiles: false,
-      includeFullPageScreenshot: false,
+      includeFullPageScreenshot: true,
       includePageDiagnostics: false,
       includeImages: false,
       includeJson: false,
@@ -339,9 +339,7 @@ it('keeps the saved screenshot preference and starts without captures when host 
   expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
     expect.objectContaining({
       options: expect.objectContaining({ includeFullPageScreenshot: false }),
-      warnings: [
-        'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
-      ],
+      warnings: ['Доступ ко всем страницам не выдан: экспорт продолжен без скриншотов.'],
     })
   );
 });

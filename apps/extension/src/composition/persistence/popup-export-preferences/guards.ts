@@ -32,6 +32,7 @@ const POPUP_EXPORT_PREFERENCE_KEYS = [
   'includeCssDiagnostics',
   'includeFiles',
   'includeFullPageScreenshot',
+  'includeViewportScreenshot',
   'includePageDiagnostics',
   'includeImages',
   'includeJson',
@@ -47,6 +48,7 @@ function parsePagePackageSelection(value: unknown): PopupPagePackageSelection | 
   if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0) {
     return null;
   }
+  parsed.value.includeViewportScreenshot ??= false;
   if (POPUP_EXPORT_PREFERENCE_KEYS.some((key) => parsed.value[key] === undefined)) {
     return null;
   }
@@ -69,6 +71,7 @@ export function parseStoredPopupPagePackagePreferences(
   if (
     !exportSelection ||
     !saveSelection ||
+    (exportSelection.includeWebCopy && !exportSelection.includeFullPageScreenshot) ||
     saveSelection.includeWebCopy !== true ||
     saveSelection.includeFullPageScreenshot !== true
   ) {

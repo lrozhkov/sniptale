@@ -158,9 +158,7 @@ async function runFullPageCapture(args: {
   const settings = await loadSettings();
   const configuredPreferences =
     args.options.preferences ?? settings.fullPageCapture ?? DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES;
-  const preferences = args.options.exportRunId
-    ? { ...configuredPreferences, preloadLazyContent: true }
-    : configuredPreferences;
+  const preferences = configuredPreferences;
   const options = { ...args.options, qualityPolicy: settings.fullPageQuality };
   const agent = createFullPagePageAgentTransport({ documentId, tabId: args.tabId });
   let result: Omit<FullPageCaptureTransaction, 'jobId'> | null = null;

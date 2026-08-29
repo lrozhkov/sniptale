@@ -80,7 +80,10 @@ async function requestPopupExportPagePackage(
   ordinal: number,
   options: ExportOptions
 ): Promise<StagedPagePackageDescriptor> {
-  if (job.status.effectiveComponentPlan.includeScreenshot) {
+  if (
+    job.status.effectiveComponentPlan.includeScreenshot ||
+    options.includeViewportScreenshot === true
+  ) {
     try {
       await activatePopupExportCaptureTarget(job, tab, selected);
     } catch {

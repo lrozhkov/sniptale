@@ -81,7 +81,10 @@ vi.mock('../../../capture/page-preparation/viewer-ports', async (importOriginal)
   sendViewerPopupExportMessage: sendViewerPopupExportMessageMock,
 }));
 
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  CaptureMessageType,
+  MessageType,
+} from '@sniptale/runtime-contracts/messaging/message-types';
 import { createBackgroundRuntimeState } from '../../../application/runtime-state';
 import {
   cancelPopupExportPagePackage,
@@ -156,6 +159,37 @@ it('attaches the canonical full-page capability to staged Page Package productio
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     })
   );
+});
+
+it('grants data-only visible capture alongside full-page capture', async () => {
+  sendTabMessageMock.mockResolvedValue({ success: true });
+
+  await requestPopupExportPagePackage({
+    batchRequestId: 'job-both-screenshots',
+    includeWebCopy: false,
+    intent: 'export',
+    options: {
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: true,
+      includeViewportScreenshot: true,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+      includePageDiagnostics: false,
+    },
+    ordinal: 0,
+    tabId: 62,
+  });
+
+  expect(issueContentGrantMock).toHaveBeenCalledWith({
+    actionTypes: [
+      MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
+    ],
+    tabId: 62,
+  });
 });
 
 it('terminates an unresponsive Page Package producer and forwards canonical cleanup', async () => {

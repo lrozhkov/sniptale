@@ -171,6 +171,7 @@ export const runtimeActionExportMessageContracts = {
             value === 'cssDiagnostics' ||
             value === 'files' ||
             value === 'fullPageScreenshot' ||
+            value === 'viewportScreenshot' ||
             value === 'images' ||
             value === 'json' ||
             value === 'markdown' ||

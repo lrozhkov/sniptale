@@ -29,6 +29,7 @@ export type ExportProgressStepKey =
   | 'pageDiagnostics'
   | 'cssDiagnostics'
   | 'fullPageScreenshot'
+  | 'viewportScreenshot'
   | 'webSnapshotPreview'
   | 'webSnapshotDom'
   | 'webSnapshotStyles'
@@ -59,6 +60,7 @@ export interface ExportOptions {
   includePageDiagnostics: boolean;
   includeCssDiagnostics: boolean; // включить stylesheets/computed-styles bundle
   includeFullPageScreenshot: boolean; // включить full-page screenshot в корень архива
+  includeViewportScreenshot?: boolean; // включить отдельный screenshot видимой области
 }
 
 /**

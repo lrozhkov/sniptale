@@ -208,6 +208,26 @@ it('keeps the job cancellation authority when screenshot permission is declined'
   );
 });
 
+it('requests screenshot authority for a visible-area-only export and drops it on denial', async () => {
+  const state = createStartState();
+  state.includeViewportScreenshot = true;
+  const requestAllUrlsPermission = vi.fn(async () => false);
+  const deps = createStartDeps({ requestAllUrlsPermission });
+
+  await startPopupExportImpl(state, deps);
+
+  expect(requestAllUrlsPermission).toHaveBeenCalledOnce();
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      options: expect.objectContaining({ includeViewportScreenshot: false }),
+      warnings: expect.arrayContaining([expect.any(String)]),
+    })
+  );
+  expect(state.setLaunchedPlan).toHaveBeenCalledWith(
+    expect.objectContaining({ includeViewportScreenshot: false })
+  );
+});
+
 it('does not dispatch URL sources when all-sites permission is declined', async () => {
   const state = createStartState();
   state.activeSourceMode = 'urls';

@@ -10,6 +10,7 @@ function createPreferenceState(selection = DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCE
       setIncludeCssDiagnostics: vi.fn(),
       setIncludeFiles: vi.fn(),
       setIncludeFullPageScreenshot: vi.fn(),
+      setIncludeViewportScreenshot: vi.fn(),
       setIncludePageDiagnostics: vi.fn(),
       setIncludeImages: vi.fn(),
       setIncludeJson: vi.fn(),
@@ -26,7 +27,9 @@ it('persists both changed destinations as one authority', async () => {
   const committed = { current: DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES };
   const exportState = createPreferenceState({
     ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export,
+    includeFullPageScreenshot: true,
     includeWebCopy: true,
+    includeViewportScreenshot: true,
   });
   const saveState = createPreferenceState({
     ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save,
@@ -42,7 +45,7 @@ it('persists both changed destinations as one authority', async () => {
   });
 
   expect(savePreferences).toHaveBeenCalledWith({
-    export: expect.objectContaining({ includeWebCopy: true }),
+    export: expect.objectContaining({ includeWebCopy: true, includeViewportScreenshot: true }),
     save: expect.objectContaining({ includeJson: true, includeWebCopy: true }),
   });
 });
@@ -51,6 +54,7 @@ it('persists a Download Web-copy-only change', async () => {
   const savePreferences = vi.fn(async () => undefined);
   const exportState = createPreferenceState({
     ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export,
+    includeFullPageScreenshot: true,
     includeWebCopy: true,
   });
 
@@ -90,6 +94,7 @@ it('rolls both destinations back after a failed write', async () => {
   });
 
   expect(exportState.actions.setIncludeJson).toHaveBeenCalledWith(true);
+  expect(exportState.actions.setIncludeViewportScreenshot).toHaveBeenCalledWith(false);
   expect(saveState.setIncludeWebCopy).toHaveBeenCalledWith(true);
   expect(onPersistError).toHaveBeenCalledOnce();
 });

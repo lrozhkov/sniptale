@@ -148,6 +148,7 @@ function getPostAnnotationsActiveStep(options: ExportOptions): ExportProgressSte
   if (options.includePageDiagnostics) return 'pageDiagnostics';
   if (options.includeCssDiagnostics) return 'cssDiagnostics';
   if (options.includeFullPageScreenshot) return 'fullPageScreenshot';
+  if (options.includeViewportScreenshot) return 'viewportScreenshot';
   return undefined;
 }
 

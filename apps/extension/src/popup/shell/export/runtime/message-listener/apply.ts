@@ -12,6 +12,7 @@ function selectionFromEffectivePlan(status: PagePackageJobStatusV1): PopupPagePa
     includeCssDiagnostics: options.includeCssDiagnostics && components.diagnostics,
     includeFiles: options.includeFiles && components.attachments,
     includeFullPageScreenshot: status.effectiveComponentPlan.includeScreenshot,
+    includeViewportScreenshot: options.includeViewportScreenshot === true,
     includePageDiagnostics: options.includePageDiagnostics && components.diagnostics,
     includeImages: options.includeImages && components.images,
     includeJson: options.includeJson && components.pageData,

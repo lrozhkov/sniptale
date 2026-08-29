@@ -97,6 +97,14 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Не удалось снять скриншот всей страницы',
     en: 'Failed to capture the full-page screenshot',
   },
+  captureVisibleScreenshot: {
+    ru: 'Снимаем видимую область',
+    en: 'Capturing the visible area',
+  },
+  captureVisibleScreenshotFailed: {
+    ru: 'Не удалось снять видимую область страницы',
+    en: 'Could not capture the visible page area',
+  },
   captureFullPageDownscaledWarning: {
     ru: 'Снимок всей страницы уменьшен, чтобы сохранить его одним изображением',
     en: 'The full-page screenshot was downscaled to keep it as one image',

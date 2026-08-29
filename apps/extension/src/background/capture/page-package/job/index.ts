@@ -71,6 +71,11 @@ function createPopupExportJob(args: {
   temporaryTabIds?: number[];
   warnings: string[];
 }): ActivePopupExportJob {
+  const effectiveOptions: ExportOptions = {
+    ...args.options,
+    includeFullPageScreenshot: args.includeWebCopy || args.options.includeFullPageScreenshot,
+    includeViewportScreenshot: args.options.includeViewportScreenshot === true,
+  };
   return {
     abortController: new AbortController(),
     affectedWindowIds: new Set(),
@@ -89,7 +94,7 @@ function createPopupExportJob(args: {
     status: {
       effectiveComponentPlan: createEffectiveComponentPlan(
         args.intent,
-        args.options,
+        effectiveOptions,
         args.includeWebCopy
       ),
       intent: args.intent,
@@ -105,7 +110,7 @@ function createPopupExportJob(args: {
         status: 'pending',
         tabId: tab.tabId,
       })),
-      effectiveOptions: { ...args.options },
+      effectiveOptions,
       progress: {
         current: 0,
         total: args.orderedTabs.length,

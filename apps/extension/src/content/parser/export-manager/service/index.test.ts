@@ -415,6 +415,29 @@ describe('export-manager browser annotations delivery', () => {
     });
   });
 
+  it('continues annotations-only data collection with the selected viewport screenshot step', async () => {
+    const service = createExportManagerService({
+      prepareAnnotationsText: vi.fn().mockResolvedValue('annotation evidence'),
+    });
+    const progressSpy = vi.fn();
+    service.onProgress(progressSpy);
+
+    await service.buildPackage({
+      ...createAnnotationsOnlyOptions(),
+      includeViewportScreenshot: true,
+    });
+
+    const progressEvents = progressSpy.mock.calls.map(([progress]) => progress);
+    const annotationsIndex = progressEvents.findIndex(
+      (progress) => progress.activeStepKey === 'annotations'
+    );
+    expect(progressEvents[annotationsIndex + 1]).toMatchObject({
+      activeStepKey: 'viewportScreenshot',
+      message: 'content.runtime.scanPageStructure',
+      phase: 'scanning',
+    });
+  });
+
   it('fails annotations-only export without starting page capture when formatting fails', async () => {
     const prepareAnnotationsText = vi.fn().mockRejectedValue(new Error('format failed'));
     const service = createExportManagerService({ prepareAnnotationsText });

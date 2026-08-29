@@ -28,7 +28,11 @@ it('uses independent current defaults and does not read the legacy key', async (
 
 it('round-trips the exact current schema and projects download artifacts for context menu', async () => {
   const preferences = {
-    export: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export, includeWebCopy: true },
+    export: {
+      ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export,
+      includeFullPageScreenshot: true,
+      includeWebCopy: true,
+    },
     save: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save, includeJson: true },
   };
   getMock
@@ -103,6 +107,6 @@ it('refuses to persist a Library selection without its required screenshot', asy
         includeFullPageScreenshot: false,
       },
     })
-  ).rejects.toThrow('must include Web copy and its screenshot');
+  ).rejects.toThrow('must include the full-page screenshot');
   expect(setMock).not.toHaveBeenCalled();
 });

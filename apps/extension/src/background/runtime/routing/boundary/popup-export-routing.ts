@@ -3,7 +3,10 @@ import type * as ViewerContracts from '../../../../workflows/page-preparation/co
 import { sendTabMessage } from '../../../../platform/runtime-messaging';
 import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities/url';
 import { loadSettings } from '../../../../composition/persistence/settings';
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  CaptureMessageType,
+  MessageType,
+} from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   authorizeWebSnapshotCaptureRequest,
   cancelWebSnapshotCaptureRequest,
@@ -18,7 +21,6 @@ import { respondAsyncRouteWithLogger } from '../../../routing-contracts/response
 import type { PopupExportViewerMessage } from '../message-guards/guards/shared';
 import * as contentActionRoute from '../../../routing-contracts/capabilities/content-action/route';
 import type { TabRouteArgs } from './shared';
-import type { FullPageExportCaptureAction } from '../../../../contracts/full-page-capture';
 import { cancelFullPageCaptureByExportRunId } from '../../../capture/full-page/cancellation';
 import { consumePopupExportLaunchIntent } from '../../../capture/annotation-export/popup-launch-intent';
 import { assertPopupTabRouteTargetDocument } from '../capabilities/popup-tab/route-capabilities';
@@ -74,10 +76,17 @@ function createViewerPopupExportMessage(
   return viewerMessage;
 }
 
-function issueFullPageExportContentIntentGrant(tabId: number, action: FullPageExportCaptureAction) {
+function issueExportCaptureContentIntentGrant(args: {
+  includeFullPage: boolean;
+  includeViewport: boolean;
+  tabId: number;
+}) {
   return contentActionRoute.issueContentPrivilegedActionAutoStartGrant({
-    actionTypes: [action],
-    tabId,
+    actionTypes: [
+      ...(args.includeFullPage ? [MessageType.EXPORT_CAPTURE_FULL_PAGE] : []),
+      ...(args.includeViewport ? [CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP] : []),
+    ],
+    tabId: args.tabId,
   });
 }
 
@@ -223,14 +232,19 @@ export async function requestPopupExportPagePackage(args: {
       })
     : {};
   const target = await resolvePopupExportTarget(args.tabId);
-  const fullPageCapture =
-    args.includeWebCopy || args.options.includeFullPageScreenshot
+  const includeFullPageCapture = args.includeWebCopy || args.options.includeFullPageScreenshot;
+  const includeViewportCapture = args.options.includeViewportScreenshot === true;
+  const captureGrant =
+    includeFullPageCapture || includeViewportCapture
       ? {
-          contentIntentGrant: issueFullPageExportContentIntentGrant(
-            args.tabId,
-            MessageType.EXPORT_CAPTURE_FULL_PAGE
-          ),
-          fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+          contentIntentGrant: issueExportCaptureContentIntentGrant({
+            includeFullPage: includeFullPageCapture,
+            includeViewport: includeViewportCapture,
+            tabId: args.tabId,
+          }),
+          ...(includeFullPageCapture
+            ? { fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE }
+            : {}),
         }
       : {};
   if (args.includeWebCopy) {
@@ -244,7 +258,7 @@ export async function requestPopupExportPagePackage(args: {
         allowAuthenticatedSameOriginAssets:
           resourcePolicy.allowAuthenticatedSameOriginAssets === true,
         batchRequestId: args.batchRequestId,
-        ...fullPageCapture,
+        ...captureGrant,
         includeWebCopy: true,
         intent: args.intent,
         ordinal: args.ordinal,
@@ -253,7 +267,7 @@ export async function requestPopupExportPagePackage(args: {
       }
     : {
         batchRequestId: args.batchRequestId,
-        ...fullPageCapture,
+        ...captureGrant,
         includeWebCopy: false,
         intent: args.intent,
         ordinal: args.ordinal,

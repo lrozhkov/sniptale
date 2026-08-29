@@ -21,6 +21,7 @@ type ExportStepDefinition = {
     | 'popup.export.includePageDiagnosticsLabel'
     | 'popup.export.includeCssDiagnosticsLabel'
     | 'popup.export.includeFullPageScreenshotLabel'
+    | 'popup.export.includeViewportScreenshotLabel'
     | 'popup.export.packageWebCopyLabel'
     | 'popup.export.webSnapshotPreviewStep'
     | 'popup.export.webSnapshotDomStep'
@@ -35,6 +36,7 @@ type ExportStepSelection = {
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
+  includeViewportScreenshot?: boolean;
   includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
@@ -53,6 +55,10 @@ const FULL_PAGE_SCREENSHOT_STEP_DEFINITION: ExportStepDefinition = {
   key: 'fullPageScreenshot',
   labelKey: 'popup.export.includeFullPageScreenshotLabel',
 };
+const VIEWPORT_SCREENSHOT_STEP_DEFINITION: ExportStepDefinition = {
+  key: 'viewportScreenshot',
+  labelKey: 'popup.export.includeViewportScreenshotLabel',
+};
 
 const EXPORT_STEP_DEFINITIONS: ExportStepDefinition[] = [
   { key: 'annotations', labelKey: 'popup.export.includeAnnotationsLabel' },
@@ -70,6 +76,7 @@ const EXPORT_STEP_DEFINITIONS: ExportStepDefinition[] = [
     labelKey: 'popup.export.includeCssDiagnosticsLabel',
   },
   FULL_PAGE_SCREENSHOT_STEP_DEFINITION,
+  VIEWPORT_SCREENSHOT_STEP_DEFINITION,
 ];
 
 const WEB_SNAPSHOT_STEP_DEFINITION: ExportStepDefinition = {
@@ -91,6 +98,7 @@ const ZIPPING_KEYS: ExportStepKey[] = [
   'pageDiagnostics',
   'cssDiagnostics',
   'fullPageScreenshot',
+  'viewportScreenshot',
 ];
 
 function isStepSelected(key: ExportStepKey, selection: ExportStepSelection) {
@@ -113,6 +121,8 @@ function isStepSelected(key: ExportStepKey, selection: ExportStepSelection) {
       return selection.includeCssDiagnostics;
     case 'fullPageScreenshot':
       return selection.includeFullPageScreenshot;
+    case 'viewportScreenshot':
+      return selection.includeViewportScreenshot === true;
     case 'webSnapshotPreview':
     case 'webSnapshotDom':
     case 'webSnapshotStyles':
@@ -267,7 +277,10 @@ function buildStructuredProgressSteps(args: {
 }): PopupExportProgressStep[] {
   const workflowDefinitions =
     args.selection.includeWebCopy && args.selection.includeFullPageScreenshot
-      ? [FULL_PAGE_SCREENSHOT_STEP_DEFINITION, ...EXPORT_STEP_DEFINITIONS.slice(0, -1)]
+      ? [
+          FULL_PAGE_SCREENSHOT_STEP_DEFINITION,
+          ...EXPORT_STEP_DEFINITIONS.filter(({ key }) => key !== 'fullPageScreenshot'),
+        ]
       : EXPORT_STEP_DEFINITIONS;
   const selectedDefinitions = workflowDefinitions.filter(({ key }) =>
     isStepSelected(key, args.selection)

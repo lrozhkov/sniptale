@@ -121,6 +121,7 @@ export type PagePackageProgressStepV1 =
   | 'cssDiagnostics'
   | 'files'
   | 'fullPageScreenshot'
+  | 'viewportScreenshot'
   | 'images'
   | 'json'
   | 'markdown'
@@ -137,6 +138,7 @@ export interface PagePackageExportOptionsV1 {
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
+  includeViewportScreenshot?: boolean;
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;

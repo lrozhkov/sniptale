@@ -98,6 +98,7 @@ it('applies a matching job status and merges warnings into progress errors', () 
     includeJson: true,
     includeMarkdown: false,
     includePageDiagnostics: false,
+    includeViewportScreenshot: false,
     includeWebCopy: true,
   });
 });

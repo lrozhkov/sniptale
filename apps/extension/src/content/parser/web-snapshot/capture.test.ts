@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  CaptureMessageType,
+  MessageType,
+} from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   installContentRuntimeMessagingMock,
   resetContentRuntimeMessagingMock,
 } from '../../platform/runtime-services/services.test-support';
-import { captureWebSnapshotScreenshotWithWarnings } from './capture';
+import {
+  captureWebSnapshotScreenshotWithWarnings,
+  captureWebSnapshotViewportScreenshot,
+} from './capture';
 
 const sendRuntimeMessage = vi.fn();
 const MASK_ATTRIBUTE = 'data-sniptale-sensitive-screenshot-mask';
@@ -199,4 +205,26 @@ it('classifies a visible-viewport fallback as partial instead of publishing it a
       warnings: expect.arrayContaining([expect.stringContaining('видимая область')]),
     })
   );
+});
+
+it('captures the visible area as data only while extension UI is hidden', async () => {
+  sendRuntimeMessage.mockImplementation(async (message: { type: string }) => {
+    expect(message.type).toBe(CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP);
+    expect(document.body.classList.contains('sniptale-capture-ui-hidden')).toBe(true);
+    return { dataUrl: 'data:image/png;base64,cG5n', success: true };
+  });
+
+  await expect(captureWebSnapshotViewportScreenshot()).resolves.toEqual(
+    expect.objectContaining({ type: 'image/png' })
+  );
+  expect(document.body.classList.contains('sniptale-capture-ui-hidden')).toBe(false);
+});
+
+it('restores the prior capture UI state when visible capture fails', async () => {
+  document.body.classList.add('sniptale-capture-ui-hidden');
+  sendRuntimeMessage.mockRejectedValue(new Error('capture transport failed'));
+
+  await expect(captureWebSnapshotViewportScreenshot()).rejects.toThrow('capture transport failed');
+  expect(document.body.classList.contains('sniptale-capture-ui-hidden')).toBe(true);
+  document.body.classList.remove('sniptale-capture-ui-hidden');
 });

@@ -200,6 +200,38 @@ describe('composeExportPagePackage', () => {
     );
   });
 
+  it('keeps an optional visible-area screenshot beside the primary full-page screenshot', async () => {
+    const pagePackage = await composeExportPagePackage({
+      artifact: createArchiveArtifact({
+        archiveBaseName: 'page',
+        entries: [
+          {
+            path: 'page-screenshot.png',
+            binaryContent: new Blob(['full'], { type: 'image/png' }),
+            mimeType: 'image/png',
+          },
+          {
+            path: 'visible-viewport.webp',
+            binaryContent: new Blob(['visible'], { type: 'image/webp' }),
+            mimeType: 'image/webp',
+          },
+        ],
+        errors: [],
+        stats: { filesCount: 2, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
+      }),
+      source: { faviconUrl: null, title: 'Page', url: 'https://page.test/', viewport: null },
+    });
+
+    expect(pagePackage.entries.map((entry) => entry.path)).toEqual([
+      'README.md',
+      'page-screenshot.png',
+      'exports/images/visible-viewport.webp',
+    ]);
+    expect(pagePackage.manifest.components).toEqual([
+      expect.objectContaining({ id: 'images', status: 'complete' }),
+    ]);
+  });
+
   it('closes retained producer URLs and warnings under the manifest contract', async () => {
     const pagePackage = await composeExportPagePackage({
       artifact: createArchiveArtifact({

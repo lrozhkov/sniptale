@@ -19,6 +19,9 @@ export function usePopupExportPreferenceState(
   const [includeFullPageScreenshot, setIncludeFullPageScreenshot] = useState(
     initial.includeFullPageScreenshot
   );
+  const [includeViewportScreenshot, setIncludeViewportScreenshot] = useState(
+    initial.includeViewportScreenshot === true
+  );
   const [includeWebCopy, setIncludeWebCopy] = useState(initial.includeWebCopy);
 
   return {
@@ -28,6 +31,7 @@ export function usePopupExportPreferenceState(
       setIncludeCssDiagnostics,
       setIncludeFiles,
       setIncludeFullPageScreenshot,
+      setIncludeViewportScreenshot,
       setIncludePageDiagnostics,
       setIncludeImages,
       setIncludeJson,
@@ -39,6 +43,7 @@ export function usePopupExportPreferenceState(
       includeCssDiagnostics,
       includeFiles,
       includeFullPageScreenshot,
+      includeViewportScreenshot,
       includePageDiagnostics,
       includeImages,
       includeJson,

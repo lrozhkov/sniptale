@@ -15,6 +15,7 @@ export function isPopupExportOptions(value: unknown): value is ExportOptions {
 
   return (
     isOptionalBoolean(value['includeAnnotations']) &&
+    isOptionalBoolean(value['includeViewportScreenshot']) &&
     typeof value['includeJson'] === 'boolean' &&
     typeof value['includeMarkdown'] === 'boolean' &&
     typeof value['includeFiles'] === 'boolean' &&

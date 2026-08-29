@@ -65,7 +65,8 @@ export async function startPopupExport(
     const warnings: string[] = [];
     if (
       state.activeSourceMode === 'urls' ||
-      (intent === 'export' && options.includeFullPageScreenshot)
+      (intent === 'export' &&
+        (options.includeFullPageScreenshot || options.includeViewportScreenshot === true))
     ) {
       const granted = await (deps.requestAllUrlsPermission?.() ?? Promise.resolve(true));
       if (!granted) {
@@ -73,6 +74,7 @@ export async function startPopupExport(
           throw new Error(translate('popup.export.urlPermissionDenied'));
         else {
           options.includeFullPageScreenshot = false;
+          options.includeViewportScreenshot = false;
           warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
         }
       }
@@ -91,6 +93,7 @@ export async function startPopupExport(
     const effectivePlan = {
       ...plan,
       includeFullPageScreenshot: options.includeFullPageScreenshot,
+      includeViewportScreenshot: options.includeViewportScreenshot === true,
     };
     state.setResult(null);
     state.setLaunchedPlan(effectivePlan);

@@ -11,8 +11,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Stopping collection...',
   },
   screenshotPermissionDeniedWarning: {
-    ru: 'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
-    en: 'All-sites access was not granted; export continued without full-page screenshots.',
+    ru: 'Доступ ко всем страницам не выдан: экспорт продолжен без скриншотов.',
+    en: 'All-sites access was not granted; export continued without screenshots.',
   },
   manualTabConflictWarning: {
     ru: 'Скриншоты больше не снимаются: активная вкладка была переключена вручную.',
@@ -69,6 +69,45 @@ export const popupExportMessages = defineMessageSource({
   dataTypesSectionDescription: {
     ru: 'Выберите веб-копию, данные, файлы и диагностику для пакета.',
     en: 'Choose the Web copy, data, files, and diagnostics for the package.',
+  },
+  packageCaptureSettingsTitle: {
+    ru: 'Настройки снимка',
+    en: 'Snapshot settings',
+  },
+  packageCaptureSettingsDescription: {
+    ru: 'Настройте подготовку страницы для полноразмерного снимка.',
+    en: 'Configure page preparation for the full-page capture.',
+  },
+  captureLazyContentLabel: {
+    ru: 'Загружать содержимое при прокрутке',
+    en: 'Load content while scrolling',
+  },
+  captureLazyContentDescription: {
+    ru: 'Предварительно пройти страницу, чтобы появились отложенные изображения и блоки.',
+    en: 'Warm up the page so deferred images and sections can appear.',
+  },
+  captureFreezeMotionLabel: {
+    ru: 'Остановить анимации',
+    en: 'Pause animations',
+  },
+  captureFreezeMotionDescription: {
+    ru: 'Зафиксировать движущиеся элементы на время захвата для ровной склейки.',
+    en: 'Freeze moving elements during capture for consistent stitching.',
+  },
+  captureFloatingElementsLabel: {
+    ru: 'Закреплённые элементы',
+    en: 'Pinned elements',
+  },
+  captureFloatingElementsDescription: {
+    ru: 'Как показывать шапки, чаты и панели, закреплённые поверх страницы.',
+    en: 'How headers, chats, and panels pinned over the page are captured.',
+  },
+  captureFloatingOnce: { ru: 'Один раз', en: 'Once' },
+  captureFloatingHide: { ru: 'Скрыть', en: 'Hide' },
+  captureFloatingRepeat: { ru: 'Повторять', en: 'Repeat' },
+  captureBehaviorHelp: {
+    ru: 'Длинные и динамические страницы захватываются в безопасных пределах приложения. Время загрузки адресов настраивается в разделе «Страницы», а качество — в настройках изображений.',
+    en: 'Long and dynamic pages are captured within the app’s safety limits. Address loading waits are under Pages; image quality is configured in Image settings.',
   },
   packageDestinationLabel: {
     ru: 'Настройки действия',
@@ -349,12 +388,20 @@ export const popupExportMessages = defineMessageSource({
     en: 'Colors, fonts, CSS styles, and element properties',
   },
   includeFullPageScreenshotLabel: {
-    ru: 'Скриншот',
-    en: 'Screenshot',
+    ru: 'Скриншот всей страницы',
+    en: 'Full-page screenshot',
   },
   includeFullPageScreenshotDescription: {
     ru: 'Снимок всей страницы целиком',
     en: 'Capture of the entire page',
+  },
+  includeViewportScreenshotLabel: {
+    ru: 'Скриншот видимой части',
+    en: 'Visible-area screenshot',
+  },
+  includeViewportScreenshotDescription: {
+    ru: 'Отдельный снимок области, которая видна перед началом захвата',
+    en: 'A separate capture of the area visible before collection starts',
   },
   copyButton: {
     ru: 'Копировать',

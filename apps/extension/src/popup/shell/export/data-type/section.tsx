@@ -18,13 +18,20 @@ import { cx } from '../selection/utils';
 import type { PopupPagePackagePreferenceState } from '../session/types';
 import type { PopupPackageDestination } from './package-controls';
 import type { WebCopyResourcePreferences } from '../pages/snapshot-availability';
+import type { FullPageCapturePreferences } from '../../../../contracts/full-page-capture';
+import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../../contracts/full-page-capture';
+import { PackageCaptureBehaviorSettings } from './capture-behavior';
 
 type DataTypeSectionProps = ExportOptionToggleProps & {
   destination: PopupPackageDestination;
   isExpanded: boolean;
   isOpen: boolean;
+  isSettingsOpen?: boolean;
   onClose: () => void;
   onOpen: () => void;
+  onOpenSettings?: () => void;
+  captureBehavior?: FullPageCapturePreferences;
+  onCaptureBehaviorChange?: (preferences: FullPageCapturePreferences) => void;
   packagePreferences: PopupPagePackagePreferenceState;
   webCopyResources: WebCopyResourcePreferences;
 };
@@ -35,12 +42,24 @@ const rowClassName = [
 ].join(' ');
 const checkboxClassName = 'mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--sniptale-color-accent)]';
 const REQUIRED_LIBRARY_OPTION_KEYS = new Set<ExportOptionKey>(['webCopy', 'fullPageScreenshot']);
+const REQUIRED_WEB_COPY_OPTION_KEYS = new Set<ExportOptionKey>(['fullPageScreenshot']);
 
 function isRequiredLibraryOption(
   destination: PopupPackageDestination,
   key: ExportOptionKey
 ): boolean {
   return destination === 'save' && REQUIRED_LIBRARY_OPTION_KEYS.has(key);
+}
+
+function isRequiredOption(
+  destination: PopupPackageDestination,
+  key: ExportOptionKey,
+  toggleProps: ExportOptionToggleProps
+): boolean {
+  return (
+    isRequiredLibraryOption(destination, key) ||
+    (key === 'fullPageScreenshot' && toggleProps.includeWebCopy)
+  );
 }
 
 function DataTypeDrawerRow(props: {
@@ -108,6 +127,7 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
     includeCssDiagnostics: props.includeCssDiagnostics,
     includeFiles: props.includeFiles,
     includeFullPageScreenshot: props.includeFullPageScreenshot,
+    includeViewportScreenshot: props.includeViewportScreenshot === true,
     includePageDiagnostics: props.includePageDiagnostics,
     includeImages: props.includeImages,
     includeJson: props.includeJson,
@@ -117,6 +137,9 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
     setIncludeCssDiagnostics: bindSetter(props.setIncludeCssDiagnostics),
     setIncludeFiles: bindSetter(props.setIncludeFiles),
     setIncludeFullPageScreenshot: bindSetter(props.setIncludeFullPageScreenshot),
+    ...(props.setIncludeViewportScreenshot
+      ? { setIncludeViewportScreenshot: bindSetter(props.setIncludeViewportScreenshot) }
+      : {}),
     setIncludePageDiagnostics: bindSetter(props.setIncludePageDiagnostics),
     setIncludeImages: bindSetter(props.setIncludeImages),
     setIncludeJson: bindSetter(props.setIncludeJson),
@@ -178,7 +201,7 @@ function applyVisibleOptionSelection(args: {
   visibleOptions: ExportOptionConfig[];
 }) {
   for (const option of args.visibleOptions) {
-    if (!args.nextValue && isRequiredLibraryOption(args.destination, option.key)) {
+    if (!args.nextValue && isRequiredOption(args.destination, option.key, args.toggleProps)) {
       continue;
     }
     if (getExportOptionActive(option.key, args.toggleProps) !== args.nextValue) {
@@ -195,7 +218,7 @@ function applyQuickSelection(
 ) {
   for (const option of options) {
     const nextValue =
-      isRequiredLibraryOption(destination, option.key) ||
+      isRequiredOption(destination, option.key, toggleProps) ||
       preset === 'full' ||
       (preset === 'web-copy' && option.key === 'webCopy') ||
       (preset === 'materials' && ['json', 'markdown', 'files', 'images'].includes(option.key));
@@ -368,7 +391,9 @@ function renderDataTypeBody(args: {
             <DataTypeDrawerRow
               active={getExportOptionActive(option.key, args.toggleProps)}
               description={option.description}
-              disabled={args.disabled || isRequiredLibraryOption(args.destination, option.key)}
+              disabled={
+                args.disabled || isRequiredOption(args.destination, option.key, args.toggleProps)
+              }
               label={option.label}
               onToggle={() => toggleExportOption(option.key, args.toggleProps)}
             />
@@ -393,32 +418,57 @@ export function ExportDataTypeSection(props: DataTypeSectionProps) {
 
   return (
     <ExportSelectionSectionShell
-      title={translate('popup.export.dataTypesSectionLabel')}
-      drawerLabel={translate('popup.export.dataTypesSectionLabel')}
-      drawerDescription={translate('popup.export.dataTypesSectionDescription')}
+      title={translate(
+        props.isSettingsOpen
+          ? 'popup.export.packageCaptureSettingsTitle'
+          : 'popup.export.dataTypesSectionLabel'
+      )}
+      drawerLabel={translate(
+        props.isSettingsOpen
+          ? 'popup.export.packageCaptureSettingsTitle'
+          : 'popup.export.dataTypesSectionLabel'
+      )}
+      drawerDescription={translate(
+        props.isSettingsOpen
+          ? 'popup.export.packageCaptureSettingsDescription'
+          : 'popup.export.dataTypesSectionDescription'
+      )}
       isExpanded={props.isExpanded}
       isOpen={props.isOpen}
       onOpen={props.onOpen}
       onClose={props.onClose}
+      {...(props.onOpenSettings ? { onOpenSettings: props.onOpenSettings } : {})}
+      settingsAriaLabel={translate('popup.export.packageCaptureSettingsTitle')}
       bodyClassName={cx(props.isOpen ? 'flex min-h-0 flex-1 flex-col pt-1' : 'pt-1')}
     >
-      {props.isOpen
-        ? renderDataTypeBody({
-            destination: props.destination,
-            disabled: props.disabled,
-            filterQuery,
-            setFilterQuery,
-            shouldShowClearAll,
-            toggleProps,
-            options,
-            visibleOptions,
-            webCopyResources: props.webCopyResources,
-          })
-        : renderDataTypeSummaryItems(
-            selectedItems,
-            toggleProps,
-            props.destination === 'save' ? REQUIRED_LIBRARY_OPTION_KEYS : new Set()
-          )}
+      {props.isSettingsOpen ? (
+        <PackageCaptureBehaviorSettings
+          preferences={props.captureBehavior ?? DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES}
+          onChange={props.onCaptureBehaviorChange ?? (() => undefined)}
+        />
+      ) : props.isOpen ? (
+        renderDataTypeBody({
+          destination: props.destination,
+          disabled: props.disabled,
+          filterQuery,
+          setFilterQuery,
+          shouldShowClearAll,
+          toggleProps,
+          options,
+          visibleOptions,
+          webCopyResources: props.webCopyResources,
+        })
+      ) : (
+        renderDataTypeSummaryItems(
+          selectedItems,
+          toggleProps,
+          props.destination === 'save'
+            ? REQUIRED_LIBRARY_OPTION_KEYS
+            : props.includeWebCopy
+              ? REQUIRED_WEB_COPY_OPTION_KEYS
+              : new Set()
+        )
+      )}
     </ExportSelectionSectionShell>
   );
 }

@@ -2,12 +2,13 @@ import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diag
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { getContentRuntimeServices } from '../../platform/runtime-services/services';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { translate } from '../../../platform/i18n';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../contracts/full-page-capture';
 import type { FullPageCaptureGeometry } from '../../../contracts/full-page-capture';
 import { shouldExcludeWebSnapshotFormControlValue } from '../../../features/web-snapshot/public';
-import { isContentOwnedElement } from '../../platform/dom-host';
+import { isContentOwnedElement, resolveContentShadowRoot } from '../../platform/dom-host';
 import { collectOpenShadowQueryRoots } from '../dom-tree-parser/traversal/virtual-dom.helpers';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
@@ -15,6 +16,25 @@ const SENSITIVE_CONTROL_MASK_ATTRIBUTE = 'data-sniptale-sensitive-screenshot-mas
 const SENSITIVE_CONTROL_SELECTOR = 'input, select, textarea';
 const OPEN_SHADOW_DISCOVERY_INTERVAL_MS = 250;
 const logger = createLogger({ namespace: 'ContentWebSnapshot' });
+
+function waitForCaptureUiToHide(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function hideCaptureUi(): () => void {
+  const body = document.body;
+  const contentHost = resolveContentShadowRoot()?.host;
+  const bodyWasHidden = body?.classList.contains('sniptale-capture-ui-hidden') ?? false;
+  const hostWasHidden = contentHost?.classList.contains('sniptale-capture-ui-hidden') ?? false;
+  body?.classList.add('sniptale-capture-ui-hidden');
+  contentHost?.classList.add('sniptale-capture-ui-hidden');
+  return () => {
+    if (!bodyWasHidden) body?.classList.remove('sniptale-capture-ui-hidden');
+    if (!hostWasHidden) contentHost?.classList.remove('sniptale-capture-ui-hidden');
+  };
+}
 
 function waitForCaptureResponse<T>(request: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return request;
@@ -233,4 +253,35 @@ export async function captureWebSnapshotScreenshotWithWarnings(
         : []),
     ],
   };
+}
+
+export async function captureWebSnapshotViewportScreenshot(
+  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
+  abortSignal?: AbortSignal | undefined
+): Promise<Blob> {
+  const services = getContentRuntimeServices();
+  const restoreSensitiveControls = maskSensitiveControlsForScreenshot();
+  const restoreCaptureUi = hideCaptureUi();
+  let response;
+  try {
+    await waitForCaptureUiToHide();
+    const message = await services.contentActionIntent.attachContentActionIntent(
+      { type: CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP },
+      contentIntentSource
+    );
+    response = await waitForCaptureResponse(
+      services.messaging.sendRuntimeMessage(message),
+      abortSignal
+    );
+  } finally {
+    restoreCaptureUi();
+    restoreSensitiveControls();
+  }
+  if (!response.success || !response.dataUrl) {
+    const message = sanitizeDiagnosticMessage(
+      response.error ?? translate('content.runtime.captureVisibleScreenshotFailed')
+    );
+    throw new Error(message || translate('content.runtime.captureVisibleScreenshotFailed'));
+  }
+  return dataUrlToBlob(response.dataUrl, abortSignal);
 }

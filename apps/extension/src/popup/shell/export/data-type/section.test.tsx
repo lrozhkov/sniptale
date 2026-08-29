@@ -141,6 +141,34 @@ it('renders selected summary items and opens the drawer', async () => {
   expect(props.onOpen).toHaveBeenCalledOnce();
 });
 
+it('opens capture behavior settings from the Package contents row', async () => {
+  const onOpenSettings = vi.fn();
+  await renderSection({ isOpen: false, onOpenSettings });
+
+  const settingsButton = container?.querySelector<HTMLButtonElement>(
+    '[aria-label="t:popup.export.packageCaptureSettingsTitle"]'
+  );
+  await act(async () => settingsButton?.click());
+
+  expect(onOpenSettings).toHaveBeenCalledOnce();
+});
+
+it('renders the capture behavior controls in the settings curtain', async () => {
+  await renderSection({
+    isOpen: true,
+    isSettingsOpen: true,
+    captureBehavior: {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    },
+  });
+
+  expect(container?.textContent).toContain('t:popup.export.packageCaptureSettingsTitle');
+  expect(container?.textContent).toContain('t:popup.export.captureLazyContentLabel');
+  expect(container?.textContent).toContain('t:popup.export.captureFloatingElementsLabel');
+});
+
 it('lets the full collapsed summary claim its intrinsic height', async () => {
   await renderSection({
     includeAnnotations: true,
@@ -148,6 +176,7 @@ it('lets the full collapsed summary claim its intrinsic height', async () => {
     includeCssDiagnostics: true,
     includeFiles: true,
     includeFullPageScreenshot: true,
+    includeViewportScreenshot: true,
     includePageDiagnostics: true,
     includeImages: true,
     includeJson: true,
@@ -161,10 +190,24 @@ it('lets the full collapsed summary claim its intrinsic height', async () => {
   const summaryBody = document.getElementById(trigger?.getAttribute('aria-controls') ?? '');
   const summary = summaryBody?.querySelector('[data-testid="export-data-type-summary"]');
 
-  expect(summary?.children).toHaveLength(9);
+  expect(summary?.children).toHaveLength(10);
   expect(summary?.className).toContain('grid-cols-2');
   expect(Math.ceil((summary?.children.length ?? 0) / 2)).toBe(5);
   expect(summaryBody?.className).not.toContain('max-h-[');
+});
+
+it('does not expose removal for the full-page screenshot required by Web Copy', async () => {
+  await renderSection({
+    includeFullPageScreenshot: true,
+    includeWebCopy: true,
+    isOpen: false,
+  });
+
+  expect(
+    container?.querySelector(
+      '[aria-label="t:popup.export.removeFromSelectionAction: t:popup.export.includeFullPageScreenshotLabel"]'
+    )
+  ).toBeNull();
 });
 
 it('selects only visible inactive options and renders the empty filter state', async () => {
@@ -230,6 +273,7 @@ it('clears optional Library contents without disabling the mandatory Web copy', 
     includeCssDiagnostics: true,
     includeFiles: true,
     includeFullPageScreenshot: true,
+    includeViewportScreenshot: true,
     includePageDiagnostics: true,
     includeImages: true,
     includeJson: true,
@@ -260,6 +304,7 @@ it('clears selected options and forwards row toggles in disabled presentation', 
     includeCssDiagnostics: true,
     includeFiles: true,
     includeFullPageScreenshot: true,
+    includeViewportScreenshot: true,
     includePageDiagnostics: true,
     includeImages: true,
     includeJson: true,
@@ -278,7 +323,7 @@ it('clears selected options and forwards row toggles in disabled presentation', 
 
   await act(async () => findButton('t:popup.export.clearAllTabsButton').click());
   expect(setIncludeJson).toHaveBeenCalledWith(false);
-  expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledWith(false);
+  expect(props.setIncludeFullPageScreenshot).not.toHaveBeenCalled();
 
   setIncludeJson.mockClear();
   checkboxes[0]?.dispatchEvent(new Event('change', { bubbles: true }));

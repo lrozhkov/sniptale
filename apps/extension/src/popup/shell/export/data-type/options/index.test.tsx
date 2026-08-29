@@ -56,6 +56,7 @@ function renderComponent(
     setIncludeCssDiagnostics: createToggleSetter(),
     setIncludeFiles: createToggleSetter(),
     setIncludeFullPageScreenshot: createToggleSetter(),
+    setIncludeViewportScreenshot: createToggleSetter(),
     setIncludePageDiagnostics: createToggleSetter(),
     setIncludeImages: createToggleSetter(),
     setIncludeJson: createToggleSetter(),
@@ -99,17 +100,19 @@ describe('ExportOptionToggles', () => {
 
     expect(container?.textContent).toContain('t:popup.export.contentGroupLabel');
     expect(container?.textContent).toContain('t:popup.export.diagnosticsGroupLabel');
-    expect(buttons).toHaveLength(9);
+    expect(buttons).toHaveLength(10);
 
     act(() => {
       buttons[1]?.click();
       buttons[6]?.click();
       buttons[8]?.click();
+      buttons[9]?.click();
     });
 
     expect(props.setIncludeJson).toHaveBeenCalledTimes(1);
     expect(props.setIncludePageDiagnostics).toHaveBeenCalledTimes(1);
     expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledTimes(1);
+    expect(props.setIncludeViewportScreenshot).toHaveBeenCalledTimes(1);
   });
 
   it('disables image exports without files and applies global disabled state', () => {

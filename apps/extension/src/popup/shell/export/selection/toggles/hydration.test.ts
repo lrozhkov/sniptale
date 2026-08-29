@@ -10,6 +10,7 @@ function createPreferenceState() {
       setIncludeCssDiagnostics: vi.fn(),
       setIncludeFiles: vi.fn(),
       setIncludeFullPageScreenshot: vi.fn(),
+      setIncludeViewportScreenshot: vi.fn(),
       setIncludePageDiagnostics: vi.fn(),
       setIncludeImages: vi.fn(),
       setIncludeJson: vi.fn(),
@@ -27,7 +28,11 @@ it('hydrates both destinations independently', async () => {
   const committed = { current: null };
   const loaded = { current: false };
   const preferences = {
-    export: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export, includeJson: false },
+    export: {
+      ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export,
+      includeJson: false,
+      includeViewportScreenshot: true,
+    },
     save: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save, includeJson: true },
   };
 
@@ -40,6 +45,7 @@ it('hydrates both destinations independently', async () => {
   await vi.waitFor(() => expect(loaded.current).toBe(true));
 
   expect(exportState.actions.setIncludeJson).toHaveBeenCalledWith(false);
+  expect(exportState.actions.setIncludeViewportScreenshot).toHaveBeenCalledWith(true);
   expect(saveState.actions.setIncludeJson).toHaveBeenCalledWith(true);
   expect(saveState.setIncludeWebCopy).toHaveBeenCalledWith(true);
   expect(committed.current).toEqual(preferences);

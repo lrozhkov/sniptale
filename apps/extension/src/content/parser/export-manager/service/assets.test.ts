@@ -6,10 +6,14 @@ import type { PreparedDOMTreeSnapshot } from '../../dom-tree-parser/snapshot';
 import { collectExportExtraAssets } from './assets';
 import { createExportManagerState } from './state';
 
-const captureScreenshot = vi.hoisted(() => vi.fn());
+const { captureScreenshot, captureViewportScreenshot } = vi.hoisted(() => ({
+  captureScreenshot: vi.fn(),
+  captureViewportScreenshot: vi.fn(),
+}));
 
 vi.mock('../../web-snapshot/capture', () => ({
   captureWebSnapshotScreenshotWithWarnings: captureScreenshot,
+  captureWebSnapshotViewportScreenshot: captureViewportScreenshot,
 }));
 
 function createPageDiagnosticsOnlyOptions(): ExportOptions {
@@ -121,4 +125,28 @@ it('stores a viewport fallback under an explicit partial path instead of page-sc
   expect(assets.map((asset) => asset.path)).not.toContain('page-screenshot.png');
   expect(assets).toContainEqual({ content: screenshot, path: 'page-viewport-preview.png' });
   expect(warnings).toContain('Only the visible area is available');
+});
+
+it('stores an optional visible-area screenshot separately from the full-page result', async () => {
+  const screenshot = new Blob(['viewport'], { type: 'image/webp' });
+  captureViewportScreenshot.mockResolvedValueOnce(screenshot);
+
+  const assets = await collectExportExtraAssets({
+    downloadedFilesCount: 0,
+    fileCandidatesCount: 0,
+    options: {
+      ...createPageDiagnosticsOnlyOptions(),
+      includeViewportScreenshot: true,
+    },
+    snapshot: createSnapshot(),
+    state: createExportManagerState(),
+    throwIfCancelled: () => undefined,
+    warnings: [],
+  });
+
+  expect(assets).toContainEqual({
+    content: screenshot,
+    path: 'visible-viewport.webp',
+  });
+  expect(assets.map((asset) => asset.path)).not.toContain('page-viewport-preview.png');
 });

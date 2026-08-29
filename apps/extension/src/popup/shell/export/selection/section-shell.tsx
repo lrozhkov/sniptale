@@ -20,6 +20,7 @@ type ExportSelectionSectionShellProps = {
   onClose: () => void;
   onOpen: () => void;
   onOpenSettings?: () => void;
+  settingsAriaLabel?: string;
   title: string;
 };
 
@@ -98,6 +99,7 @@ export function ExportSelectionSectionShell({
   onClose,
   onOpen,
   onOpenSettings,
+  settingsAriaLabel,
   title,
 }: ExportSelectionSectionShellProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -180,7 +182,7 @@ export function ExportSelectionSectionShell({
         {onOpenSettings ? (
           <button
             type="button"
-            aria-label={translate('popup.export.pageSettingsTitle')}
+            aria-label={settingsAriaLabel ?? translate('popup.export.pageSettingsTitle')}
             className={[
               'rounded-[8px] p-1.5 opacity-0 transition-opacity',
               'text-[var(--sniptale-color-text-secondary)]',

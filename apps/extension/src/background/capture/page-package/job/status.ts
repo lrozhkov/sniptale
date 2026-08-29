@@ -67,6 +67,7 @@ const PROGRESS_STEPS: readonly PagePackageProgressStepV1[] = [
   'cssDiagnostics',
   'files',
   'fullPageScreenshot',
+  'viewportScreenshot',
   'images',
   'json',
   'markdown',
@@ -139,7 +140,7 @@ function parseExportOptions(value: unknown): PagePackageExportOptionsV1 | null {
         'includeMarkdown',
         'includePageDiagnostics',
       ],
-      ['includeAnnotations']
+      ['includeAnnotations', 'includeViewportScreenshot']
     ) ||
     !Object.values(value).every((entry) => typeof entry === 'boolean')
   )
@@ -327,7 +328,7 @@ export function createEffectiveComponentPlan(
     components: {
       attachments: options.includeFiles,
       diagnostics: diagnosticsEnabled,
-      images: options.includeImages,
+      images: options.includeImages || options.includeViewportScreenshot === true,
       pageData: options.includeJson || options.includeMarkdown,
       webCopy: includeWebCopy,
     },

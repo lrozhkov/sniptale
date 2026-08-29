@@ -16,6 +16,7 @@ export type PopupExportPreferenceActions = {
   setIncludeCssDiagnostics: Dispatch<SetStateAction<boolean>>;
   setIncludeFiles: Dispatch<SetStateAction<boolean>>;
   setIncludeFullPageScreenshot: Dispatch<SetStateAction<boolean>>;
+  setIncludeViewportScreenshot?: Dispatch<SetStateAction<boolean>>;
   setIncludePageDiagnostics: Dispatch<SetStateAction<boolean>>;
   setIncludeImages: Dispatch<SetStateAction<boolean>>;
   setIncludeJson: Dispatch<SetStateAction<boolean>>;

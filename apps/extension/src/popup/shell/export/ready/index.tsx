@@ -12,6 +12,7 @@ import {
 } from '../data-type/package-controls';
 import type { WebCopyResourcePreferences } from '../pages/snapshot-availability';
 import { usePageCaptureTimingPreferences } from '../pages/capture-timing';
+import { usePackageCaptureBehaviorPreferences } from '../data-type/capture-behavior';
 
 type ExportReadySectionProps = {
   activeSourceMode?: 'tabs' | 'urls';
@@ -26,6 +27,7 @@ type ExportReadySectionProps = {
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
+  includeViewportScreenshot?: boolean;
   includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
@@ -42,6 +44,7 @@ type ExportReadySectionProps = {
   setFilterQuery: (value: string) => void;
   setIncludeFiles: Dispatch<SetStateAction<boolean>>;
   setIncludeFullPageScreenshot: Dispatch<SetStateAction<boolean>>;
+  setIncludeViewportScreenshot?: Dispatch<SetStateAction<boolean>>;
   setIncludePageDiagnostics: Dispatch<SetStateAction<boolean>>;
   setIncludeImages: Dispatch<SetStateAction<boolean>>;
   setIncludeJson: Dispatch<SetStateAction<boolean>>;
@@ -78,8 +81,11 @@ function renderDataTypeSection(
   destination: PopupPackageDestination,
   packagePreferences: PopupPagePackagePreferenceState,
   isEditingDataTypes: boolean,
+  isSettingsOpen: boolean,
   onClose: () => void,
-  onOpen: () => void
+  onOpen: () => void,
+  onOpenSettings: () => void,
+  captureBehavior: ReturnType<typeof usePackageCaptureBehaviorPreferences>
 ) {
   return (
     <ExportDataTypeSection
@@ -90,6 +96,7 @@ function renderDataTypeSection(
       includeCssDiagnostics={props.includeCssDiagnostics}
       includeFiles={props.includeFiles}
       includeFullPageScreenshot={props.includeFullPageScreenshot}
+      includeViewportScreenshot={props.includeViewportScreenshot === true}
       includePageDiagnostics={props.includePageDiagnostics}
       includeImages={props.includeImages}
       includeJson={props.includeJson}
@@ -97,14 +104,21 @@ function renderDataTypeSection(
       includeWebCopy={packagePreferences.includeWebCopy}
       isExpanded={isEditingDataTypes}
       isOpen={isEditingDataTypes}
+      isSettingsOpen={isSettingsOpen}
       onClose={onClose}
       onOpen={onOpen}
+      onOpenSettings={onOpenSettings}
+      captureBehavior={captureBehavior.preferences}
+      onCaptureBehaviorChange={captureBehavior.update}
       packagePreferences={packagePreferences}
       setIncludeAnnotations={props.setIncludeAnnotations}
       setIncludeBasicLogs={props.setIncludeBasicLogs}
       setIncludeCssDiagnostics={props.setIncludeCssDiagnostics}
       setIncludeFiles={props.setIncludeFiles}
       setIncludeFullPageScreenshot={props.setIncludeFullPageScreenshot}
+      {...(props.setIncludeViewportScreenshot
+        ? { setIncludeViewportScreenshot: props.setIncludeViewportScreenshot }
+        : {})}
       setIncludePageDiagnostics={props.setIncludePageDiagnostics}
       setIncludeImages={props.setIncludeImages}
       setIncludeJson={props.setIncludeJson}
@@ -160,11 +174,14 @@ function renderReadySections(
   props: ExportReadySectionProps,
   destination: PopupPackageDestination,
   packagePreferences: PopupPagePackagePreferenceState,
-  activeDrawer: 'data-types' | 'pages' | 'page-settings' | null,
-  setActiveDrawer: (nextValue: 'data-types' | 'pages' | 'page-settings' | null) => void,
-  timing: ReturnType<typeof usePageCaptureTimingPreferences>
+  activeDrawer: 'data-types' | 'package-settings' | 'pages' | 'page-settings' | null,
+  setActiveDrawer: (
+    nextValue: 'data-types' | 'package-settings' | 'pages' | 'page-settings' | null
+  ) => void,
+  timing: ReturnType<typeof usePageCaptureTimingPreferences>,
+  captureBehavior: ReturnType<typeof usePackageCaptureBehaviorPreferences>
 ) {
-  const isEditingDataTypes = activeDrawer === 'data-types';
+  const isEditingDataTypes = activeDrawer === 'data-types' || activeDrawer === 'package-settings';
   const isEditingPages = activeDrawer === 'pages' || activeDrawer === 'page-settings';
 
   return (
@@ -175,8 +192,11 @@ function renderReadySections(
             destination,
             packagePreferences,
             isEditingDataTypes,
+            activeDrawer === 'package-settings',
             () => setActiveDrawer(null),
-            () => setActiveDrawer('data-types')
+            () => setActiveDrawer('data-types'),
+            () => setActiveDrawer('package-settings'),
+            captureBehavior
           )
         : null}
       {!isEditingDataTypes
@@ -195,10 +215,11 @@ function renderReadySections(
 }
 
 export function ExportReadySection(props: ExportReadySectionProps) {
-  const [activeDrawer, setActiveDrawer] = useState<'data-types' | 'pages' | 'page-settings' | null>(
-    null
-  );
+  const [activeDrawer, setActiveDrawer] = useState<
+    'data-types' | 'package-settings' | 'pages' | 'page-settings' | null
+  >(null);
   const timing = usePageCaptureTimingPreferences();
+  const captureBehavior = usePackageCaptureBehaviorPreferences();
   const exportPreferences: PopupPagePackagePreferenceState = {
     actions: {
       setIncludeAnnotations: props.setIncludeAnnotations,
@@ -206,6 +227,9 @@ export function ExportReadySection(props: ExportReadySectionProps) {
       setIncludeCssDiagnostics: props.setIncludeCssDiagnostics,
       setIncludeFiles: props.setIncludeFiles,
       setIncludeFullPageScreenshot: props.setIncludeFullPageScreenshot,
+      ...(props.setIncludeViewportScreenshot
+        ? { setIncludeViewportScreenshot: props.setIncludeViewportScreenshot }
+        : {}),
       setIncludePageDiagnostics: props.setIncludePageDiagnostics,
       setIncludeImages: props.setIncludeImages,
       setIncludeJson: props.setIncludeJson,
@@ -219,6 +243,7 @@ export function ExportReadySection(props: ExportReadySectionProps) {
       includeCssDiagnostics: props.includeCssDiagnostics,
       includeFiles: props.includeFiles,
       includeFullPageScreenshot: props.includeFullPageScreenshot,
+      includeViewportScreenshot: props.includeViewportScreenshot === true,
       includePageDiagnostics: props.includePageDiagnostics,
       includeImages: props.includeImages,
       includeJson: props.includeJson,
@@ -250,7 +275,8 @@ export function ExportReadySection(props: ExportReadySectionProps) {
         packagePreferences,
         activeDrawer,
         setActiveDrawer,
-        timing
+        timing,
+        captureBehavior
       )}
       {renderReadyHint(props)}
     </div>

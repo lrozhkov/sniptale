@@ -28,7 +28,8 @@ export type ExportOptionKey =
   | 'basicLogs'
   | 'pageDiagnostics'
   | 'cssDiagnostics'
-  | 'fullPageScreenshot';
+  | 'fullPageScreenshot'
+  | 'viewportScreenshot';
 
 export type ExportOptionToggleProps = PopupExportPreferenceActions &
   PopupExportPreferenceValues & {
@@ -140,6 +141,14 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
       key: 'fullPageScreenshot',
       label: translate('popup.export.includeFullPageScreenshotLabel'),
     },
+    {
+      accentClassName: 'text-[var(--sniptale-color-accent)]',
+      description: translate('popup.export.includeViewportScreenshotDescription'),
+      group: 'diagnostics',
+      icon: Camera,
+      key: 'viewportScreenshot',
+      label: translate('popup.export.includeViewportScreenshotLabel'),
+    },
   ];
 }
 
@@ -165,13 +174,18 @@ export function getExportOptionActive(key: ExportOptionKey, props: ExportOptionT
       return props.includePageDiagnostics;
     case 'fullPageScreenshot':
       return props.includeFullPageScreenshot;
+    case 'viewportScreenshot':
+      return props.includeViewportScreenshot === true;
   }
 }
 
 export function toggleExportOption(key: ExportOptionKey, props: ExportOptionToggleProps) {
   switch (key) {
     case 'webCopy':
-      props.setIncludeWebCopy((value) => !value);
+      props.setIncludeWebCopy((value) => {
+        if (!value) props.setIncludeFullPageScreenshot(true);
+        return !value;
+      });
       return;
     case 'annotations':
       props.setIncludeAnnotations((value) => !value);
@@ -199,6 +213,9 @@ export function toggleExportOption(key: ExportOptionKey, props: ExportOptionTogg
       return;
     case 'fullPageScreenshot':
       props.setIncludeFullPageScreenshot((value) => !value);
+      return;
+    case 'viewportScreenshot':
+      props.setIncludeViewportScreenshot?.((value) => !value);
   }
 }
 
@@ -209,6 +226,7 @@ export function setExportOptionActive(
 ) {
   switch (key) {
     case 'webCopy':
+      if (nextValue) props.setIncludeFullPageScreenshot(true);
       props.setIncludeWebCopy(nextValue);
       return;
     case 'annotations':
@@ -237,6 +255,9 @@ export function setExportOptionActive(
       return;
     case 'fullPageScreenshot':
       props.setIncludeFullPageScreenshot(nextValue);
+      return;
+    case 'viewportScreenshot':
+      props.setIncludeViewportScreenshot?.(nextValue);
   }
 }
 

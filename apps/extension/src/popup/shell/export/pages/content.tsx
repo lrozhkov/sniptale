@@ -52,6 +52,7 @@ function renderReadyContent(
       includeCssDiagnostics={preferences.values.includeCssDiagnostics}
       includeFiles={preferences.values.includeFiles}
       includeFullPageScreenshot={preferences.values.includeFullPageScreenshot}
+      includeViewportScreenshot={preferences.values.includeViewportScreenshot === true}
       includePageDiagnostics={preferences.values.includePageDiagnostics}
       includeImages={preferences.values.includeImages}
       includeJson={preferences.values.includeJson}
@@ -67,6 +68,9 @@ function renderReadyContent(
       setFilterQuery={tabs.setFilterQuery}
       setIncludeFiles={preferences.actions.setIncludeFiles}
       setIncludeFullPageScreenshot={preferences.actions.setIncludeFullPageScreenshot}
+      {...(preferences.actions.setIncludeViewportScreenshot
+        ? { setIncludeViewportScreenshot: preferences.actions.setIncludeViewportScreenshot }
+        : {})}
       setIncludePageDiagnostics={preferences.actions.setIncludePageDiagnostics}
       setIncludeImages={preferences.actions.setIncludeImages}
       setIncludeJson={preferences.actions.setIncludeJson}
