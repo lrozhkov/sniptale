@@ -1,9 +1,6 @@
-import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
-import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
-  AGGREGATE_PRESENTATIONS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   MEDIA_LIBRARY_STORE,
@@ -22,7 +19,7 @@ import {
   type VideoProjectEntry,
 } from '../../../../composition/persistence/projects/contracts';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance';
-import { encodePortablePresentation, encodePortableThumbnail } from '../root-codecs/media';
+import { encodePortableThumbnail } from '../root-codecs/media';
 import type { PortableVideoProjectMetadata } from '../root-codecs/projects';
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { MediaHubBackupRootInventoryItem } from '../export';
@@ -33,6 +30,7 @@ import {
   type InventoryDatabase,
 } from './helpers';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
+import { buildPortableAggregatePresentation } from './presentation';
 
 function selected(
   id: string,
@@ -177,17 +175,27 @@ async function buildVideoProjectRoot(args: {
   );
   const projectAssets = await buildProjectAssets(args.db, args.entry, collector);
   const projectExports = await buildProjectExports(args.db, args.entry, collector);
-  const projectThumbnail = parseMediaThumbnailEntry(
-    await args.db.get(THUMBNAILS_STORE, `video-project:${args.entry.id}`)
-  );
-  const presentation = parseAggregatePresentationEntry(
-    await args.db.get(
-      AGGREGATE_PRESENTATIONS_STORE,
-      createAggregatePresentationKey({ id: args.entry.id, kind: 'video-project' })
-    )
-  );
   const { effectSnapshots: _effectSnapshots, ...project } = args.entry.project;
   const portableSnapshots = buildPortableEffectSnapshots(args.entry, collector);
+  const storedProjectThumbnail = parseMediaThumbnailEntry(
+    await args.db.get(THUMBNAILS_STORE, `video-project:${args.entry.id}`)
+  );
+  const projectThumbnail = storedProjectThumbnail
+    ? encodePortableThumbnail(
+        storedProjectThumbnail,
+        collector.addObject(
+          storedProjectThumbnail.blob,
+          `${args.entry.id}-thumbnail`,
+          storedProjectThumbnail.blob.type || 'image/png'
+        )
+      )
+    : undefined;
+  const presentation = await buildPortableAggregatePresentation({
+    addObject: collector.addObject,
+    aggregateId: args.entry.id,
+    aggregateKind: 'video-project',
+    db: args.db,
+  });
   const metadata: PortableVideoProjectMetadata = {
     entry: {
       ...args.entry,
@@ -195,39 +203,8 @@ async function buildVideoProjectRoot(args: {
     },
     projectAssets,
     projectExports,
-    ...(projectThumbnail
-      ? {
-          thumbnail: encodePortableThumbnail(
-            projectThumbnail,
-            collector.addObject(
-              projectThumbnail.blob,
-              `${args.entry.id}-thumbnail`,
-              projectThumbnail.blob.type || 'image/png'
-            )
-          ),
-        }
-      : {}),
-    ...(presentation
-      ? {
-          presentation: encodePortablePresentation({
-            entry: presentation,
-            ...(presentation.previewBlob
-              ? {
-                  previewObjectId: collector.addObject(
-                    presentation.previewBlob,
-                    `${args.entry.id}-preview`,
-                    presentation.previewBlob.type || 'image/png'
-                  ),
-                }
-              : {}),
-            thumbnailObjectId: collector.addObject(
-              presentation.thumbnailBlob,
-              `${args.entry.id}-presentation-thumbnail`,
-              presentation.thumbnailBlob.type || 'image/png'
-            ),
-          }),
-        }
-      : {}),
+    ...(projectThumbnail ? { thumbnail: projectThumbnail } : {}),
+    ...(presentation ? { presentation } : {}),
   };
   return {
     descriptor: {
@@ -246,7 +223,7 @@ async function buildVideoProjectRoot(args: {
       thumbnailCount:
         projectExports.filter((item) => item.thumbnail).length +
         (projectThumbnail ? 1 : 0) +
-        (presentation ? 1 + (presentation.previewBlob ? 1 : 0) : 0),
+        (presentation ? 1 + (presentation.previewObjectId ? 1 : 0) : 0),
       webSnapshotCount: 0,
     },
   };

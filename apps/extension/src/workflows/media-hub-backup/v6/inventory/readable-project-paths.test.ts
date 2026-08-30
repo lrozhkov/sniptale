@@ -5,6 +5,16 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   readAssetFile: mocks.readAssetFile,
 }));
+vi.mock('../../../../features/video/project/effect-instance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../features/video/project/effect-instance')>()),
+  verifyVideoProjectEffectSnapshotIntegrity: vi.fn(async () => undefined),
+}));
+vi.mock('../../../../composition/persistence/projects/read-guards', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../composition/persistence/projects/read-guards')
+  >()),
+  parseVideoProjectEntryResult: (entry: unknown) => ({ entry, status: 'ready' }),
+}));
 
 import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
 import {
@@ -32,6 +42,27 @@ function ref(assetId: string, mimeType: string) {
 describe('readable project archive paths', () => {
   it('places video project assets and exports in named user directories', async () => {
     const project = createVideoProjectEntryWithMediaClip({ name: 'Demo/Project' });
+    project.project.effectSnapshots = [
+      {
+        id: 'snapshot-1',
+        assets: [
+          {
+            blob: new Blob(['effect'], { type: 'image/png' }),
+            byteLength: 6,
+            id: 'effect-asset',
+            kind: 'image',
+            mimeType: 'image/png',
+            sha256: 'a'.repeat(64),
+          },
+        ],
+        documentId: 'document-1',
+        kind: 'standalone',
+        retainedByteLength: 8,
+        schemaVersion: 'sniptale.effect.v1',
+        sha256: 'b'.repeat(64),
+        source: '{}',
+      },
+    ];
     const asset = createProjectAssetEntry({
       assetId: 'project-asset-object',
       id: 'project-asset-1',
@@ -61,6 +92,27 @@ describe('readable project archive paths', () => {
         if (store === 'asset_refs') {
           return ref(String(key), key === 'project-export-object' ? 'video/webm' : asset.mimeType);
         }
+        if (store === 'thumbnails') {
+          if (String(key).startsWith('export:')) return undefined;
+          return {
+            assetId: `video-project:${project.id}`,
+            blob: new Blob(['thumbnail'], { type: 'image/png' }),
+            createdAt: 1,
+            height: 90,
+            updatedAt: 2,
+            width: 160,
+          };
+        }
+        if (store === 'aggregate_presentations') {
+          return {
+            aggregateId: project.id,
+            aggregateKind: 'video-project',
+            presentationRevision: 1,
+            previewBlob: new Blob(['preview'], { type: 'image/png' }),
+            thumbnailBlob: new Blob(['presentation-thumbnail'], { type: 'image/png' }),
+            updatedAt: 2,
+          };
+        }
         return undefined;
       }),
       getAll: vi.fn(async () => [project]),
@@ -74,7 +126,15 @@ describe('readable project archive paths', () => {
       paths: createArchivePathAllocator(),
     });
     const payload = await root!.load();
-    expect(payload.objects.map((object) => object.ref.path)).toEqual([
+    expect(payload.objects.map((object) => object.ref.filename)).toEqual([
+      'Camera clip.webm',
+      'Final?.webm',
+      'snapshot-1-effect-asset',
+      `${project.id}-thumbnail`,
+      `${project.id}-preview`,
+      `${project.id}-presentation-thumbnail`,
+    ]);
+    expect(payload.objects.slice(0, 2).map((object) => object.ref.path)).toEqual([
       'Recordings/Projects/Demo-Project/Assets/Camera clip.webm',
       'Exports/Demo-Project/Final-.webm',
     ]);
@@ -103,9 +163,30 @@ describe('readable project archive paths', () => {
     };
     mocks.readAssetFile.mockResolvedValue(new File(['x'], asset.id, { type: asset.mimeType }));
     const db = {
-      get: vi.fn(async (store: string) =>
-        store === 'asset_refs' ? ref(asset.assetId, asset.mimeType) : undefined
-      ),
+      get: vi.fn(async (store: string) => {
+        if (store === 'asset_refs') return ref(asset.assetId, asset.mimeType);
+        if (store === 'thumbnails') {
+          return {
+            assetId: `scenario:${scenario.id}`,
+            blob: new Blob(['thumbnail'], { type: 'image/png' }),
+            createdAt: 1,
+            height: 90,
+            updatedAt: 2,
+            width: 160,
+          };
+        }
+        if (store === 'aggregate_presentations') {
+          return {
+            aggregateId: scenario.id,
+            aggregateKind: 'scenario',
+            presentationRevision: 1,
+            previewBlob: new Blob(['preview'], { type: 'image/png' }),
+            thumbnailBlob: new Blob(['presentation-thumbnail'], { type: 'image/png' }),
+            updatedAt: 2,
+          };
+        }
+        return undefined;
+      }),
       getAll: vi.fn(async () => [entry]),
       getAllFromIndex: vi.fn(async (store: string) => (store === 'scenario_assets' ? [asset] : [])),
     };
@@ -115,8 +196,14 @@ describe('readable project archive paths', () => {
       paths: createArchivePathAllocator(),
     });
     const payload = await root!.load();
-    expect(payload.objects.map((object) => object.ref.path)).toEqual([
-      'Drafts/Scenarios/Scenario- One/Assets/Asset 001.png',
+    expect(payload.objects.map((object) => object.ref.filename)).toEqual([
+      'Asset 001.png',
+      `${scenario.id}-thumbnail`,
+      `${scenario.id}-preview`,
+      `${scenario.id}-presentation-thumbnail`,
     ]);
+    expect(payload.objects[0]?.ref.path).toBe(
+      'Drafts/Scenarios/Scenario- One/Assets/Asset 001.png'
+    );
   });
 });

@@ -1,9 +1,6 @@
-import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
-import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
-  AGGREGATE_PRESENTATIONS_STORE,
   MEDIA_LIBRARY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
@@ -20,7 +17,7 @@ import { parseMediaLibraryEntry } from '../../../../composition/persistence/medi
 import type { ScenarioProjectEntry } from '../../../../composition/persistence/scenario/contracts';
 import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/editor-documents';
 import { encodePortableEditorDocument } from '../root-codecs/editor-document';
-import { encodePortablePresentation, encodePortableThumbnail } from '../root-codecs/media';
+import { encodePortableThumbnail } from '../root-codecs/media';
 import {
   encodePortableScenarioProjectEntry,
   type PortableScenarioProjectMetadata,
@@ -35,6 +32,7 @@ import {
   type InventoryDatabase,
 } from './helpers';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
+import { buildPortableAggregatePresentation } from './presentation';
 
 function readSelectedScenarioProjects(
   rows: unknown[],
@@ -180,54 +178,33 @@ async function buildScenarioProjectRoot(args: {
     .sort((left, right) => left.id.localeCompare(right.id));
   const stepDocuments = await buildScenarioDocuments(args.db, args.entry, collector, args.options);
   const exportThumbnails = await buildScenarioExportThumbnails(args.db, exports, collector);
-  const projectThumbnail = parseMediaThumbnailEntry(
+  const storedProjectThumbnail = parseMediaThumbnailEntry(
     await args.db.get(THUMBNAILS_STORE, `scenario:${args.entry.id}`)
   );
-  const presentation = parseAggregatePresentationEntry(
-    await args.db.get(
-      AGGREGATE_PRESENTATIONS_STORE,
-      createAggregatePresentationKey({ id: args.entry.id, kind: 'scenario' })
-    )
-  );
+  const projectThumbnail = storedProjectThumbnail
+    ? encodePortableThumbnail(
+        storedProjectThumbnail,
+        collector.addObject(
+          storedProjectThumbnail.blob,
+          `${args.entry.id}-thumbnail`,
+          storedProjectThumbnail.blob.type || 'image/png'
+        )
+      )
+    : undefined;
+  const presentation = await buildPortableAggregatePresentation({
+    addObject: collector.addObject,
+    aggregateId: args.entry.id,
+    aggregateKind: 'scenario',
+    db: args.db,
+  });
   const metadata: PortableScenarioProjectMetadata = {
     assets,
     entry: encodePortableScenarioProjectEntry(projectScenarioPrivacy(args.entry, args.options)),
     exportThumbnails,
     exports,
     stepDocuments,
-    ...(projectThumbnail
-      ? {
-          thumbnail: encodePortableThumbnail(
-            projectThumbnail,
-            collector.addObject(
-              projectThumbnail.blob,
-              `${args.entry.id}-thumbnail`,
-              projectThumbnail.blob.type || 'image/png'
-            )
-          ),
-        }
-      : {}),
-    ...(presentation
-      ? {
-          presentation: encodePortablePresentation({
-            entry: presentation,
-            ...(presentation.previewBlob
-              ? {
-                  previewObjectId: collector.addObject(
-                    presentation.previewBlob,
-                    `${args.entry.id}-preview`,
-                    presentation.previewBlob.type || 'image/png'
-                  ),
-                }
-              : {}),
-            thumbnailObjectId: collector.addObject(
-              presentation.thumbnailBlob,
-              `${args.entry.id}-presentation-thumbnail`,
-              presentation.thumbnailBlob.type || 'image/png'
-            ),
-          }),
-        }
-      : {}),
+    ...(projectThumbnail ? { thumbnail: projectThumbnail } : {}),
+    ...(presentation ? { presentation } : {}),
   };
   return {
     descriptor: {
@@ -246,7 +223,7 @@ async function buildScenarioProjectRoot(args: {
       thumbnailCount:
         exportThumbnails.length +
         (projectThumbnail ? 1 : 0) +
-        (presentation ? 1 + (presentation.previewBlob ? 1 : 0) : 0),
+        (presentation ? 1 + (presentation.previewObjectId ? 1 : 0) : 0),
       webSnapshotCount: 0,
     },
   };
