@@ -374,11 +374,13 @@ function validateReuseReceipts(root, manifest, lane, archives, declared, lanePol
     }
     validateReceiptReuse(manifest, 'build', build);
   }
-  const unit = validateUnitReceipt(root);
-  if (unit.producer?.controlDigest !== manifest.controlDigest) {
-    throw new Error('Candidate receipt crosses QA control digests: .tmp/qa/unit-proof.json');
+  if (lane === 'proof') {
+    const unit = validateUnitReceipt(root);
+    if (unit.producer?.controlDigest !== manifest.controlDigest) {
+      throw new Error('Candidate receipt crosses QA control digests: .tmp/qa/unit-proof.json');
+    }
+    validateReceiptReuse(manifest, 'unit', unit);
   }
-  validateReceiptReuse(manifest, 'unit', unit);
   if (lane !== 'release') return;
   validateCodeqlEvidence(root, manifest, declared, trustedRoot);
   validateCoverageEvidence(root, manifest, declared, trustedRoot);

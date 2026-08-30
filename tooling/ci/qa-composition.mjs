@@ -114,23 +114,17 @@ async function collectVerifiedFastProofReleaseSteps(releaseDeltaCollector) {
   ];
 }
 
-async function collectFreshFastProofReleaseSteps(productProofCollector, releaseDeltaCollector) {
-  const fast = await productProofCollector();
+async function collectFreshReleaseControlSteps(productProofCollector, releaseDeltaCollector) {
+  const prerequisite = await productProofCollector();
   const delta = await releaseDeltaCollector();
   const byLabel = new Map();
-  for (const step of [...fast.steps, ...delta.steps]) {
+  for (const step of [...prerequisite.steps, ...delta.steps]) {
     if (byLabel.has(step.label) && !RELEASE_DELTA_LABELS.has(step.label)) {
-      throw new Error(`Fresh Fast prerequisite repeats a control result: ${String(step.label)}`);
+      throw new Error(`Fresh release prerequisite repeats a control result: ${String(step.label)}`);
     }
     byLabel.set(step.label, step);
   }
-  const occurrences = [
-    ...createCiProductControlOccurrences('proof'),
-    ...createCiProductControlOccurrences('release').filter(
-      ({ label }) =>
-        !createCiProductControlOccurrences('proof').some((step) => step.label === label)
-    ),
-  ];
+  const occurrences = createCiProductControlOccurrences('release');
   return occurrences.map(({ label }) => {
     const step = byLabel.get(label);
     if (!step) throw new Error(`Missing release product control result: ${label}`);
@@ -144,9 +138,10 @@ export async function collectCiReleaseResults({
   scopeResolver = resolveCiScope,
   productProofCollector = (verifyScope) =>
     collectFullVerifyStepResults({
+      includeTests: false,
       includeArtifactSteps: false,
       releaseMode: true,
-      excludedControlLabels: ciExcludedControlLabels('proof'),
+      excludedControlLabels: [...ciExcludedControlLabels('proof'), 'Unit tests'],
       verifyScope,
     }),
   releaseDeltaCollector = (verifyScope, { includeArtifactSteps }) =>
@@ -165,7 +160,7 @@ export async function collectCiReleaseResults({
     releaseDeltaCollector(verifyScope, { includeArtifactSteps });
   const productSteps = reuseFastProof
     ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta(true))
-    : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta(true));
+    : await collectFreshReleaseControlSteps(collectProductProof, collectReleaseDelta(true));
   const productionBuild = reuseFastProof
     ? createReusedFastControlStep({ id: 'qa.rule.production-build', label: 'Production build' })
     : productionBuildCollector();
@@ -178,7 +173,7 @@ export async function collectCiReleaseResults({
   });
   return {
     context: { mode: 'ci:release', scope: 'commit' },
-    executionMode: reuseFastProof ? 'reuse-fast-proof' : 'fresh-fast-proof',
+    executionMode: reuseFastProof ? 'reuse-fast-proof' : 'fresh-release-controls',
     steps: [...productSteps, productionBuild, ...audit.steps],
   };
 }

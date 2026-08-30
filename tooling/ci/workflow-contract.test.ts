@@ -166,6 +166,7 @@ describe('workflow supply-chain and privilege contracts', () => {
       'qa-image': { contents: 'read', packages: 'write' },
       provision: { contents: 'read', packages: 'read' },
       'canonical-qa': { actions: 'read', contents: 'read' },
+      'advisory-artifacts': { contents: 'read' },
       'infrastructure-smoke': { contents: 'read', packages: 'read' },
       'trusted-admission': { actions: 'read', contents: 'read' },
       cleanup: { actions: 'read', contents: 'read', packages: 'read' },

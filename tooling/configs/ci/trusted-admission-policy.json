@@ -50,7 +50,6 @@
       "derivedPhases": [],
       "requiredFiles": [
         ".tmp/qa/build-proof.json",
-        ".tmp/qa/unit-proof.json",
         ".tmp/qa/codeql-proof.json",
         ".tmp/qa/coverage-proof.json",
         ".tmp/coverage/canonical/coverage-final.json",
@@ -71,7 +70,7 @@
       ],
       "reuse": {
         "build": ["fresh", "reused"],
-        "unit": ["fresh", "reused"],
+        "unit": ["unavailable"],
         "codeql": ["fresh", "reused"],
         "coverage": ["fresh", "reused"]
       }

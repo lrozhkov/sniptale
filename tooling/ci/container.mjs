@@ -157,9 +157,10 @@ if (reuseAllowed && process.env.SNIPTALE_FAST_PROOF_PATH && !reusableFastProof) 
     'Reusable Fast proof is incompatible; running the complete Fast prerequisite on this runner.\n'
   );
 }
-const unitProofHostPath = reuseAllowed
-  ? resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH)
-  : null;
+const unitProofHostPath =
+  lane === 'proof' && reuseAllowed
+    ? resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH)
+    : null;
 const buildProofHostPaths = reuseAllowed
   ? resolveReusableBuildProofHostPaths({
       proofPath: process.env.SNIPTALE_BUILD_PROOF_PATH,
@@ -178,7 +179,12 @@ const coverageProofHostPaths = reuseAllowed
       reportsPath: process.env.SNIPTALE_COVERAGE_REPORTS_PATH,
     })
   : null;
-if (reuseAllowed && process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
+if (
+  lane === 'proof' &&
+  reuseAllowed &&
+  process.env.SNIPTALE_UNIT_PROOF_PATH &&
+  !unitProofHostPath
+) {
   process.stderr.write('Reusable unit proof is unavailable; running the complete unit suite.\n');
 }
 if (

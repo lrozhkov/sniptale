@@ -15,7 +15,7 @@ const passed = { label: 'passed', status: 'ok' as const };
 const productionBuildPassed = { label: 'Production build', status: 'ok' as const };
 const productionBuildCollector = () => productionBuildPassed;
 
-it('machine-fixes full Vitest to Fast proof and release readiness to release provenance', async () => {
+it('assigns full units to Fast proof and full coverage to release provenance', async () => {
   const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
   expect(policy.gateCapabilities.proof).toMatchObject({ fullVitest: true, releaseReady: false });
   expect(policy.gateCapabilities.proof.scope).toBe('repository-wide');
@@ -35,6 +35,7 @@ it('machine-fixes full Vitest to Fast proof and release readiness to release pro
     'utf8'
   );
   expect(source).toContain('includeTests: true');
+  expect(source).toContain('includeTests: false');
   expect(source).toContain('resolveRepositoryVerifyScope()');
   expect(source).not.toContain('resolveFullVerifyScope');
   expect(source).toContain('collectReleaseDeltaStepResults');
@@ -155,7 +156,7 @@ it('fails closed when the release-only result closure is incomplete', async () =
 
 it.each([
   {
-    name: 'fresh Fast proof',
+    name: 'fresh release controls',
     reuseFastProof: false,
     expectedReusedAuditControls: ['npm-audit'],
     expectedExecutions: [
@@ -285,20 +286,16 @@ it('keeps advisory mutation outside release control results', async () => {
     reusedControlIds: ['npm-audit'],
     session: undefined,
   });
+  expect(result.executionMode).toBe('fresh-release-controls');
+  expect(result.steps.map(({ label }) => label)).not.toContain('Unit tests');
   expect(result.steps.map(({ label, status }) => [label, status])).toEqual([
-    ...createCiProductControlOccurrences('proof').map(({ label }) => [
-      label,
-      label === 'Unit tests' ? 'failed' : 'ok',
-    ]),
-    ['SonarJS', 'ok'],
-    ['Build', 'ok'],
-    ['Release archive', 'ok'],
+    ...createCiProductControlOccurrences('release').map(({ label }) => [label, 'ok']),
     ['Production build', 'ok'],
     ['CodeQL', 'failed'],
   ]);
 });
 
-it('shares one observed repository scope across fresh Fast and release-only controls', async () => {
+it('shares one observed repository scope across fresh release prerequisites and delta controls', async () => {
   const verifyScope = { kind: 'repository-scope' };
   const scopeResolver = vi.fn(() => verifyScope);
   const productProofCollector = vi.fn(async () => ({

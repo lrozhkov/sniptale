@@ -5,7 +5,7 @@
   "owners": {
     "decision": "tooling/qa/proof/unit/unit-test-proof.mjs",
     "execution": "tooling/qa/composition/repository/full-verification/unit-test-steps.mjs",
-    "ciTransport": "tooling/ci/select-unit-proof.mjs",
+    "ciTransport": "tooling/ci/proof-host-inputs.mjs",
     "ciMount": "tooling/ci/proof-host-inputs.mjs",
     "artifactSeal": "tooling/ci/proof-artifact-seal.mjs"
   },
@@ -27,10 +27,8 @@
     "tooling/qa/wrappers/build.mjs",
     "tooling/ci/container.mjs",
     "tooling/ci/artifacts.mjs",
-    "tooling/ci/select-unit-proof.mjs",
     "tooling/ci/proof-artifact-seal.mjs",
-    "tooling/ci/proof-host-inputs.mjs",
-    ".github/workflows/_canonical-proof.yml"
+    "tooling/ci/proof-host-inputs.mjs"
   ],
   "modes": {
     "local": "validated local receipt or full-suite fallback",

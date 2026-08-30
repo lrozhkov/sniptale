@@ -13,7 +13,7 @@ Public workflow graphs live in [`pr.yml`](../../.github/workflows/pr.yml), [`pro
 Purpose-specific public workflows expose the shared proof graph without mixing maintenance and deployment triggers:
 
 - Fast PR Gate runs `ci:proof`: repository-wide Fast controls, full Vitest, the fast PR audit profile, and one fresh `npm run build:release` without ZIP, build proof, or reuse. It excludes SonarJS, coverage, CodeQL, Release archive, and release-only audits, so it does not prove release readiness.
-- Release provenance Gate runs `ci:release`. It consumes an exact Fast proof or completes the same Fast prerequisite on the current VM before the separate release-only SonarJS, Build/Release archive, and full release audit; it does not run a second unit-test owner.
+- Release provenance Gate runs `ci:release`. It consumes an exact Fast proof when available; otherwise it executes the repository-wide non-unit prerequisite controls before the release-only SonarJS, Build/Release archive, and full release audit. `Full product coverage` is the release gate's only full Vitest execution and proves both the suite and coverage thresholds.
 
 Repository audit evidence, topology inventory, and mutation results run after canonical proof sealing in an isolated, non-blocking CI job and are uploaded only as optional advisory artifacts. Their failures are visible as advisory failures and do not satisfy or block the canonical quality-control graph.
 - Selectel connectivity performs read-only controller admission.

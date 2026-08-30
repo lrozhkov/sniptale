@@ -345,7 +345,7 @@ export async function collectFullVerifyStepResults({
   return {
     scopeDetail: includeTests
       ? collectUnitTestScopeDetail(context)
-      : 'full Vitest supplied by the Fast Gate prerequisite',
+      : "full Vitest delegated to the caller's canonical proof owner",
     steps,
   };
 }

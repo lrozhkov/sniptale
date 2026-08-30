@@ -58,7 +58,7 @@ function createProofRoot() {
     owners: {
       decision: 'tooling/qa/proof/unit/unit-test-proof.mjs',
       execution: 'tooling/qa/composition/repository/full-verification/unit-test-steps.mjs',
-      ciTransport: 'tooling/ci/select-unit-proof.mjs',
+      ciTransport: 'tooling/ci/proof-host-inputs.mjs',
       ciMount: 'tooling/ci/proof-host-inputs.mjs',
       artifactSeal: 'tooling/ci/proof-artifact-seal.mjs',
     },

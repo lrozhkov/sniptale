@@ -51,8 +51,9 @@ function readProofSemanticsPolicy(repositoryRoot) {
     policy.invariants?.resourceProfileAffectsReuseCompatibility !== false ||
     policy.reuseCompatibility?.authority !== 'environment-profile' ||
     policy.invariants?.fastGateNeverClaimsReleaseReadiness !== true ||
-    policy.invariants?.fullVitestOwnedByFastGate !== true ||
-    policy.invariants?.releaseProvenanceRequiresFastProof !== true ||
+    policy.invariants?.fastGateFullVitestOwner !== 'unit-tests' ||
+    policy.invariants?.releaseGateFullVitestOwner !== 'full-product-coverage' ||
+    policy.invariants?.releaseProvenanceAcceptsFastProofReuse !== true ||
     JSON.stringify(policy.invariants?.diffAwareWrappersExactly) !==
       JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout']) ||
     policy.invariants?.ciGatesAreRepositoryWide !== true ||
@@ -227,7 +228,6 @@ const LANE_FILES = {
   ],
   release: [
     '.tmp/qa/build-proof.json',
-    '.tmp/qa/unit-proof.json',
     '.tmp/qa/codeql-proof.json',
     '.tmp/qa/coverage-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
@@ -243,10 +243,7 @@ const LANE_FILES = {
   ],
 };
 
-const REUSABLE_FAST_REPORTS = new Set([
-  '.tmp/qa/unit-proof.json',
-  '.tmp/npm-audit/signatures.json',
-]);
+const REUSABLE_FAST_REPORTS = new Set(['.tmp/npm-audit/signatures.json']);
 
 export function copyReusableFastReport(
   file,

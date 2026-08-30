@@ -43,8 +43,9 @@
     "diffAwareWrappersExactly": ["qa:release-harness", "qa:checkpoint", "qa:closeout"],
     "ciGatesAreRepositoryWide": true,
     "fastGateNeverClaimsReleaseReadiness": true,
-    "fullVitestOwnedByFastGate": true,
-    "releaseProvenanceRequiresFastProof": true,
+    "fastGateFullVitestOwner": "unit-tests",
+    "releaseGateFullVitestOwner": "full-product-coverage",
+    "releaseProvenanceAcceptsFastProofReuse": true,
     "ciBuildIsNonProof": true,
     "ciBuildArtifactAdmissibleForProvenance": false
   }

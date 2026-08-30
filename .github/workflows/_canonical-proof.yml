@@ -430,10 +430,6 @@ jobs:
             fi
           fi
           if [ "$PROOF_LANE" = release ]; then
-            unit_root="$RUNNER_TEMP/release-unit-proof"
-            unit_proof="$RUNNER_TEMP/unit-proof.json"
-            restored=$(cd trusted-control && node tooling/ci/select-unit-proof.mjs restore-latest-release "$unit_root" "$unit_proof")
-            if [ -n "$restored" ]; then echo "SNIPTALE_UNIT_PROOF_PATH=$unit_proof" >> "$GITHUB_ENV"; fi
             codeql_root="$RUNNER_TEMP/release-codeql-proof"
             codeql_proof="$RUNNER_TEMP/codeql-proof.json"
             codeql_sarif="$RUNNER_TEMP/codeql-sarif.sarif"

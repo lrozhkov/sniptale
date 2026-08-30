@@ -725,7 +725,12 @@ it('keeps host phase dispatch dependency-free and seals through trusted code in 
   expect(collectExternalHostImports('tooling/ci/run-lane.mjs')).toEqual([]);
   expect(collectExternalHostImports('tooling/ci/seal-lane-in-container.mjs')).toEqual([]);
   for (const entry of collectWorkflowNodeEntrypoints()) {
-    const allowed = entry === 'tooling/ci/prepare-release-assets.mjs' ? ['jszip'] : [];
+    const allowed =
+      entry === 'tooling/ci/prepare-release-assets.mjs'
+        ? ['jszip']
+        : entry === 'tooling/ci/advisory-artifacts.mjs'
+          ? ['typescript']
+          : [];
     expect(collectExternalHostImports(entry), entry).toEqual(allowed);
   }
   expect(containerSource).toContain('${trustedRoot}:/opt/sniptale-trusted:ro');

@@ -260,6 +260,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
 function releaseFixture({ reused = false } = {}) {
   const value = fixture();
   const { artifact, commit, manifest } = value;
+  fs.rmSync(path.join(artifact, '.tmp/qa/unit-proof.json'));
   const archive = 'build/sniptale_0.3.3_test.zip';
   write(artifact, archive, 'zip');
   const build = sealReceipt({
@@ -346,7 +347,7 @@ function releaseFixture({ reused = false } = {}) {
   ].map((id) => ({ id, status: 'passed' }));
   manifest.proofReuse = {
     build: 'fresh',
-    unit: 'fresh',
+    unit: 'unavailable',
     codeql: reused ? 'reused' : 'fresh',
     coverage: reused ? 'reused' : 'fresh',
   };
