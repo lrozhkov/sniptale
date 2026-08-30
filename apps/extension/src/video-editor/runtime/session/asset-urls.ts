@@ -4,21 +4,52 @@ import { getRecording } from '../../../composition/persistence/recordings/index'
 import { getScenarioAsset } from '../../../composition/persistence/scenario/projects';
 import type { VideoProject } from '../../../features/video/project/types/index';
 
+interface VideoEditorAssetUrlEntry {
+  sourceFingerprint: string;
+  url: string;
+}
+
+interface LoadedVideoEditorAssetUrl extends VideoEditorAssetUrlEntry {
+  assetId: string;
+}
+
+type VideoEditorAssetUrlCache = Record<string, VideoEditorAssetUrlEntry>;
+
+function getVideoEditorAssetSourceFingerprint(asset: VideoProject['assets'][number]): string {
+  if (asset.source.kind === 'recording') {
+    return `recording:${asset.source.recordingId}`;
+  }
+
+  if (asset.source.kind === 'scenario-asset') {
+    return `scenario-asset:${asset.source.scenarioAssetId}`;
+  }
+
+  return `project-asset:${asset.source.projectAssetId}`;
+}
+
 async function loadVideoEditorAssetUrl(
   asset: VideoProject['assets'][number]
-): Promise<readonly [string, string] | null> {
+): Promise<LoadedVideoEditorAssetUrl | null> {
+  const sourceFingerprint = getVideoEditorAssetSourceFingerprint(asset);
+
   if (asset.source.kind === 'recording') {
     const entry = await getRecording(asset.source.recordingId);
-    return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
+    return entry
+      ? { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(entry.file) }
+      : null;
   }
 
   if (asset.source.kind === 'scenario-asset') {
     const entry = await getScenarioAsset(asset.source.scenarioAssetId);
-    return entry ? [asset.id, URL.createObjectURL(entry.file)] : null;
+    return entry
+      ? { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(entry.file) }
+      : null;
   }
 
   const entry = await getProjectAsset(asset.source.projectAssetId);
-  if (entry.status === 'ready') return [asset.id, URL.createObjectURL(entry.entry.file)];
+  if (entry.status === 'ready') {
+    return { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(entry.entry.file) };
+  }
   if (entry.status === 'not-found') return null;
   throw new Error(`Project asset ${asset.source.projectAssetId} ${entry.status}.`);
 }
@@ -29,24 +60,35 @@ function revokeVideoEditorAssetUrl(url: string): void {
   }
 }
 
-function cleanupRemovedAssets(cache: Record<string, string>, nextAssetIds: Set<string>): void {
-  Object.entries(cache).forEach(([assetId, url]) => {
-    if (!nextAssetIds.has(assetId)) {
-      revokeVideoEditorAssetUrl(url);
+function cleanupStaleAssets(
+  cache: VideoEditorAssetUrlCache,
+  nextSourcesByAssetId: ReadonlyMap<string, string>
+): void {
+  Object.entries(cache).forEach(([assetId, entry]) => {
+    if (nextSourcesByAssetId.get(assetId) !== entry.sourceFingerprint) {
+      revokeVideoEditorAssetUrl(entry.url);
       delete cache[assetId];
     }
   });
 }
 
-function applyLoadedAssetPairs(
-  cache: Record<string, string>,
-  pairs: Array<readonly [string, string] | null>
-) {
-  pairs.forEach((pair) => {
-    if (pair) {
-      cache[pair[0]] = pair[1];
+function applyLoadedAssetUrls(
+  cache: VideoEditorAssetUrlCache,
+  loadedAssetUrls: readonly (LoadedVideoEditorAssetUrl | null)[]
+): void {
+  loadedAssetUrls.forEach((loadedAssetUrl) => {
+    if (loadedAssetUrl) {
+      const previousEntry = cache[loadedAssetUrl.assetId];
+      if (previousEntry && previousEntry.url !== loadedAssetUrl.url) {
+        revokeVideoEditorAssetUrl(previousEntry.url);
+      }
+      cache[loadedAssetUrl.assetId] = loadedAssetUrl;
     }
   });
+}
+
+function projectAssetUrlCache(cache: VideoEditorAssetUrlCache): Record<string, string> {
+  return Object.fromEntries(Object.entries(cache).map(([assetId, entry]) => [assetId, entry.url]));
 }
 
 function getVideoProjectAssetPlanKey(project: VideoProject | null): string | null {
@@ -55,13 +97,7 @@ function getVideoProjectAssetPlanKey(project: VideoProject | null): string | nul
   }
 
   return project.assets
-    .map((asset) =>
-      asset.source.kind === 'recording'
-        ? `${asset.id}:recording:${asset.source.recordingId}`
-        : asset.source.kind === 'scenario-asset'
-          ? `${asset.id}:scenario-asset:${asset.source.scenarioAssetId}`
-          : `${asset.id}:project-asset:${asset.source.projectAssetId}`
-    )
+    .map((asset) => `${asset.id}:${getVideoEditorAssetSourceFingerprint(asset)}`)
     .join('|');
 }
 
@@ -88,10 +124,15 @@ function useStableVideoProjectAssets(
 
 async function loadMissingAssetUrls(
   assets: readonly VideoProject['assets'][number][],
-  cache: Record<string, string>
+  cache: VideoEditorAssetUrlCache
 ) {
-  const missingAssets = assets.filter((asset) => !cache[asset.id]);
-  return Promise.all(missingAssets.map((asset) => loadVideoEditorAssetUrl(asset)));
+  const missingAssets = assets.filter(
+    (asset) => cache[asset.id]?.sourceFingerprint !== getVideoEditorAssetSourceFingerprint(asset)
+  );
+  const results = await Promise.allSettled(
+    missingAssets.map((asset) => loadVideoEditorAssetUrl(asset))
+  );
+  return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
 }
 
 /**
@@ -99,40 +140,46 @@ async function loadMissingAssetUrls(
  */
 export function useVideoEditorAssetUrls(project: VideoProject | null): Record<string, string> {
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
-  const assetUrlCacheRef = useRef<Record<string, string>>({});
+  const assetUrlCacheRef = useRef<VideoEditorAssetUrlCache>({});
   const stableAssets = useStableVideoProjectAssets(project);
 
   useEffect(() => {
     return () => {
-      Object.values(assetUrlCacheRef.current).forEach(revokeVideoEditorAssetUrl);
+      Object.values(assetUrlCacheRef.current).forEach((entry) =>
+        revokeVideoEditorAssetUrl(entry.url)
+      );
       assetUrlCacheRef.current = {};
     };
   }, []);
 
   useEffect(() => {
     if (!stableAssets) {
-      cleanupRemovedAssets(assetUrlCacheRef.current, new Set());
+      cleanupStaleAssets(assetUrlCacheRef.current, new Map());
       setAssetUrls({});
       return;
     }
 
     let cancelled = false;
-    const knownAssetIds = new Set(stableAssets.map((asset) => asset.id));
-    cleanupRemovedAssets(assetUrlCacheRef.current, knownAssetIds);
+    const nextSourcesByAssetId = new Map(
+      stableAssets.map((asset) => [asset.id, getVideoEditorAssetSourceFingerprint(asset)])
+    );
+    cleanupStaleAssets(assetUrlCacheRef.current, nextSourcesByAssetId);
 
     const loadMissingUrls = async () => {
-      const pairs = await loadMissingAssetUrls(stableAssets, assetUrlCacheRef.current);
+      const loadedAssetUrls = await loadMissingAssetUrls(stableAssets, assetUrlCacheRef.current);
 
       if (cancelled) {
-        pairs.forEach((pair) => pair && revokeVideoEditorAssetUrl(pair[1]));
+        loadedAssetUrls.forEach(
+          (loadedAssetUrl) => loadedAssetUrl && revokeVideoEditorAssetUrl(loadedAssetUrl.url)
+        );
         return;
       }
 
-      applyLoadedAssetPairs(assetUrlCacheRef.current, pairs);
-      setAssetUrls({ ...assetUrlCacheRef.current });
+      applyLoadedAssetUrls(assetUrlCacheRef.current, loadedAssetUrls);
+      setAssetUrls(projectAssetUrlCache(assetUrlCacheRef.current));
     };
 
-    setAssetUrls({ ...assetUrlCacheRef.current });
+    setAssetUrls(projectAssetUrlCache(assetUrlCacheRef.current));
     void loadMissingUrls();
     return () => {
       cancelled = true;
