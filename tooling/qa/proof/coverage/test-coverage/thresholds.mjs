@@ -5,7 +5,7 @@ import {
   isCoverageTargetFile,
 } from './registry.mjs';
 
-export function resolveCoverageThreshold(relativePath) {
+export function resolveCoverageThreshold(relativePath, { isNew = false } = {}) {
   if (!isCoverageTargetFile(relativePath)) {
     return null;
   }
@@ -22,6 +22,10 @@ export function resolveCoverageThreshold(relativePath) {
   const rolloutGroup = findCoverageRolloutGroup(relativePath);
   if (rolloutGroup) {
     return COVERAGE_THRESHOLDS[rolloutGroup.threshold];
+  }
+
+  if (isNew) {
+    return COVERAGE_THRESHOLDS.ui;
   }
 
   return null;

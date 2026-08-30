@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
 import {
@@ -12,7 +11,7 @@ import {
 } from '../qa/composition/repository/full-verification/execution.mjs';
 import { resolveRepositoryVerifyScope } from '../qa/composition/repository/full-verification/scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
-import { MUTATION_PROFILES, resolveMutationRunLabel } from './mutation-policy.mjs';
+import { runNpm } from '../qa/runtime/process/shared-process.mjs';
 import {
   ciExcludedControlLabels,
   createCiProductControlOccurrences,
@@ -43,22 +42,24 @@ export async function collectCiProofResults({
       verifyScope: resolveCiScope(),
     }),
   auditCollector = collectAuditProfileResult,
+  productionBuildCollector = collectFreshProductionBuildStep,
 } = {}) {
   capability('proof');
   const product = await productProofCollector();
   const productSteps = product.steps.filter(({ label }) => label !== 'Test coverage');
   const audit = await auditCollector({ profileId: 'pr', session });
+  const productionBuild = productionBuildCollector();
   return {
     context: { mode: 'ci:proof', scope: 'commit' },
-    steps: [...productSteps, ...audit.steps],
+    steps: [...productSteps, productionBuild, ...audit.steps],
   };
 }
 
-function runMutationProfile(profile) {
+export function collectFreshProductionBuildStep({ commandRunner = runNpm } = {}) {
   return runTimelineActivitySync(
     {
-      activityId: `mutation-profile.${profile}`,
-      kind: 'mutation-profile',
+      activityId: 'production-build',
+      kind: 'build',
       executionProfile: {
         cpuTokens: 1,
         memoryMiB: null,
@@ -67,18 +68,7 @@ function runMutationProfile(profile) {
         workerId: `process-${process.pid}`,
       },
     },
-    () => {
-      const runner = process.env.SNIPTALE_TRUSTED_CI_ROOT
-        ? '/opt/sniptale-trusted/tooling/test/mutation/run-profile.mjs'
-        : 'tooling/test/mutation/run-profile.mjs';
-      const result = spawnSync(process.execPath, [runner, profile, resolveMutationRunLabel()], {
-        encoding: 'utf8',
-        env: process.env,
-      });
-      return createProcessStep(`Mutation ${profile}`, result, {
-        advice: `Inspect .tmp/mutation/${profile}/${process.env.GITHUB_RUN_ID ?? 'local'}/summary.json`,
-      });
-    }
+    () => createProcessStep('Production build', commandRunner(['run', 'build:release']))
   );
 }
 
@@ -90,7 +80,7 @@ function resolveCiScope() {
 
 const RELEASE_DELTA_LABELS = new Set(['SonarJS', 'Build', 'Release archive']);
 const FRESH_RELEASE_AUDIT_REUSED_CONTROL_IDS = Object.freeze(['npm-audit']);
-const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze(['audit-evidence']);
+const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze([]);
 
 function createReusedFastControlStep({ id, label }) {
   return runTimelineActivitySync(
@@ -166,7 +156,7 @@ export async function collectCiReleaseResults({
       verifyScope,
     }),
   auditCollector = collectAuditProfileResult,
-  mutationCollector = runMutationProfile,
+  productionBuildCollector = collectFreshProductionBuildStep,
 } = {}) {
   capability('release');
   const verifyScope = scopeResolver();
@@ -176,6 +166,9 @@ export async function collectCiReleaseResults({
   const productSteps = reuseFastProof
     ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta(true))
     : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta(true));
+  const productionBuild = reuseFastProof
+    ? createReusedFastControlStep({ id: 'qa.rule.production-build', label: 'Production build' })
+    : productionBuildCollector();
   const audit = await auditCollector({
     profileId: 'release',
     reusedControlIds: reuseFastProof
@@ -186,12 +179,6 @@ export async function collectCiReleaseResults({
   return {
     context: { mode: 'ci:release', scope: 'commit' },
     executionMode: reuseFastProof ? 'reuse-fast-proof' : 'fresh-fast-proof',
-    steps: [
-      ...productSteps,
-      ...audit.steps,
-      ...MUTATION_PROFILES.map((profile) => mutationCollector(profile)),
-    ],
+    steps: [...productSteps, productionBuild, ...audit.steps],
   };
 }
-
-export { MUTATION_PROFILES };

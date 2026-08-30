@@ -56,27 +56,12 @@ function createOkBuildStep() {
 }
 
 export function createGreenBuildValidationSteps() {
-  return [
-    { label: 'Naming', status: 'ok' as const, detail: '', durationMs: 0 },
-    {
-      label: 'HTML sanitizer ownership',
-      status: 'ok' as const,
-      detail: '',
-      durationMs: 0,
-    },
-    { label: 'Architecture guardrails', status: 'ok' as const, detail: '', durationMs: 0 },
-    { label: 'Dependency boundaries', status: 'ok' as const, detail: '', durationMs: 0 },
-    { label: 'Cycles', status: 'ok' as const, detail: '', durationMs: 0 },
-    { label: 'Root side effects', status: 'ok' as const, detail: '', durationMs: 0 },
-    { label: 'Typecheck', status: 'ok' as const, detail: '', durationMs: 0 },
-    { label: 'Unit tests', status: 'ok' as const, detail: '', durationMs: 0 },
-    createOkBuildStep(),
-  ];
+  return [createOkBuildStep()];
 }
 
 export function createGreenBuildCloseoutResult() {
   return {
-    scopeDetail: 'broader related tests (1 related file)',
+    scopeDetail: 'fresh checkpoint reused; artifact build only',
     steps: createGreenBuildValidationSteps(),
   };
 }

@@ -119,7 +119,7 @@ it('discovers exact registry authorities and ignores ordinary or unrelated confi
   const movedPath = 'apps/extension/src/background/moved-owner.ts';
   writeFile(
     root,
-    'tooling/configs/qa/validation-manifest.json',
+    'tooling/configs/qa/manifest-permissions.data.json',
     `${JSON.stringify({ tools: [{ source: movedPath }] })}\n`
   );
   writeFile(
@@ -136,7 +136,7 @@ it('discovers exact registry authorities and ignores ordinary or unrelated confi
   const report = await collectReport(root, { targetFiles: [movedPath], codeFiles: [] });
 
   expect(report.pathAudits).toEqual([
-    expect.stringContaining('tooling/configs/qa/validation-manifest.json'),
+    expect.stringContaining('tooling/configs/qa/manifest-permissions.data.json'),
   ]);
 });
 
@@ -248,13 +248,9 @@ it('forecasts broad qa:build scope without test-size budgets', async () => {
     codeFiles: ['apps/extension/src/platform/runtime-messaging/index.ts'],
   });
 
-  expect(report.buildScopeForecast).toEqual(
-    expect.arrayContaining([
-      expect.stringContaining('bounded owner and affected-consumer discovery required'),
-      expect.stringContaining('broad transitive scope expected'),
-    ])
-  );
-  expect(report.buildScopeForecast[0]).not.toContain('broader related tests');
+  expect(report.buildScopeForecast).toEqual([
+    'qa:build forecast: fresh checkpoint reused; production artifact build required',
+  ]);
   expect(report).not.toHaveProperty('buildScopeBudgetRisks');
 });
 
@@ -267,13 +263,9 @@ it('does not claim an exact selected scope for bounded manifest forecasting', as
     codeFiles: [],
   });
 
-  expect(report.buildScopeForecast[0]).toContain(
-    'selected unit-test scope=consumer-discovery-required'
-  );
-  expect(report.buildScopeForecast[0]).not.toContain('skipped');
-  expect(report.buildScopeForecast).toEqual(
-    expect.arrayContaining([expect.stringContaining('broad transitive scope expected')])
-  );
+  expect(report.buildScopeForecast).toEqual([
+    'qa:build forecast: fresh checkpoint reused; production artifact build required',
+  ]);
 });
 
 it('forecasts exact owner tests without a broad transitive warning', async () => {
@@ -303,24 +295,23 @@ it('forecasts exact owner tests without a broad transitive warning', async () =>
     addedFiles: targetFiles.filter((file) => !file.startsWith('docs/')),
   });
 
-  expect(report.buildScopeForecast).toEqual([expect.stringContaining('selection=owner-direct')]);
-  expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=4');
-  expect(report.buildScopeForecast).not.toEqual(
-    expect.arrayContaining([expect.stringContaining('broad transitive scope expected')])
-  );
+  expect(report.buildScopeForecast).toEqual([
+    'qa:build forecast: fresh checkpoint reused; production artifact build required',
+  ]);
 });
 
 it('reports the skip profile and zero selected tests for a non-product-test diff', async () => {
   const root = createTempRoot('guardrail-build-skip-');
-  writeFile(root, 'docs/tooling/example.md', 'No product tests.\n');
+  writeFile(root, 'tooling/qa/example.mjs', 'export {};\n');
 
   const report = await collectReport(root, {
-    targetFiles: ['docs/tooling/example.md'],
+    targetFiles: ['tooling/qa/example.mjs'],
     codeFiles: [],
   });
 
-  expect(report.buildScopeForecast).toEqual([expect.stringContaining('selection=skip')]);
-  expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=0');
+  expect(report.buildScopeForecast).toEqual([
+    'qa:build forecast: control-only diff; artifact build skipped',
+  ]);
 });
 
 it('forecasts the full-suite fallback for a deleted owner without surviving proof', async () => {
@@ -331,9 +322,8 @@ it('forecasts the full-suite fallback for a deleted owner without surviving proo
   });
 
   expect(report.buildScopeForecast).toEqual([
-    expect.stringContaining('selection=related-transitive'),
+    'qa:build forecast: fresh checkpoint reused; production artifact build required',
   ]);
-  expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=full-suite');
 });
 
 it('uses the full diff for build forecasting while behavioral hints stay diff-filtered', async () => {
@@ -358,8 +348,7 @@ it('uses the full diff for build forecasting while behavioral hints stay diff-fi
     },
   });
 
-  expect(report.buildScopeForecast[0]).toContain('graph-closed changed-owner proof');
-  expect(report.buildScopeForecast[0]).not.toContain('full product test suite');
+  expect(report.buildScopeForecast[0]).toContain('production artifact build required');
   expect(report.clusters).toEqual(['apps/extension/src=2']);
 });
 

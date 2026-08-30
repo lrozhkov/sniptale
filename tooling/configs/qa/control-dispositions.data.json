@@ -16,11 +16,6 @@
       "kind": "orphan-executable",
       "path": "tooling/qa/policy/technical-debt/technical-debt-report.mjs",
       "rationale": "This import-safe maintenance operator verifies or regenerates the compact technical-debt report and registry through its tested transaction."
-    },
-    {
-      "kind": "unsafe-import",
-      "path": "tooling/qa/guards/product-contracts/verify-sniptale-identity.mjs",
-      "rationale": "The control self-spawns this source as a bounded ZIP inspection worker; normal imports remain inert unless the private worker argument is present."
     }
   ]
 }

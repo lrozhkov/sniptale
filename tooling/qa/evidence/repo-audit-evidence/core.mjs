@@ -3,7 +3,6 @@ import path from 'node:path';
 
 import { collectRepositoryProfile } from './repository-profile.mjs';
 import { collectVerificationProfile } from './verification-profile.mjs';
-import { loadValidationManifest } from '../../policy/validation/manifest.mjs';
 
 function safeReadJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -56,9 +55,8 @@ export function createSmellInventory(findings, topCount) {
 export function collectRepoAuditEvidence({ rootDir = process.cwd(), topCount = 10 } = {}) {
   const root = path.resolve(rootDir);
   const packageJson = safeReadJson(path.join(root, 'package.json'));
-  const validationManifest = { claims: loadValidationManifest({ root }) };
   const { profile } = collectRepositoryProfile(root, topCount);
-  const { verification, loopholes } = collectVerificationProfile(packageJson, validationManifest);
+  const { verification, loopholes } = collectVerificationProfile(packageJson);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -74,7 +72,6 @@ export function collectRepoAuditEvidence({ rootDir = process.cwd(), topCount = 1
     verification,
     loopholes,
     recommendedAuditCommands: [
-      'node tooling/qa/audits/contracts/evidence.mjs --json',
       'npm run ci:release',
       'npm run qa:structural-audit',
       'npm run qa:release-harness',

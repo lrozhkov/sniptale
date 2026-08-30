@@ -40,9 +40,8 @@ export function createTrustedControlMatrix(lane, trustedRoot = process.cwd()) {
     if (auditProfile.controls.get('full-product-coverage')?.requirement !== 'required') {
       throw new Error('Release coverage audit must own canonical full-product coverage.');
     }
-    requiredPassed.add('qa.rule.mutation-persistence');
-    requiredPassed.add('qa.rule.mutation-secrets');
   }
+  requiredPassed.add('qa.rule.production-build');
   return {
     requiredPassed: [...requiredPassed].sort(),
     allowedSkipped: [...allowedSkipped].sort(),

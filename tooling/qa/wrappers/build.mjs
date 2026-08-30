@@ -1,6 +1,5 @@
 import { collectBuildStep } from '../composition/closeout/closeout-step-helpers/check.mjs';
 import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
-import { collectBuildCloseoutStepResults } from '../composition/build/execution/check.mjs';
 import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
 import { assertFreshCheckpointState } from '../composition/checkpoint/verify-checkpoint.state.helpers.mjs';
 import { assertFreshHarnessState } from '../composition/harness/execution/state.mjs';
@@ -57,9 +56,16 @@ export function parseBuildOptions(argv = []) {
   };
 }
 
+async function collectArtifactBuildSteps({ context }) {
+  return {
+    scopeDetail: 'fresh checkpoint reused; artifact build only',
+    steps: [await collectBuildStep({ targetFiles: context.targetFiles })],
+  };
+}
+
 export async function runBuildCloseout({
   argv = [],
-  closeoutStepCollector = collectBuildCloseoutStepResults,
+  closeoutStepCollector = collectArtifactBuildSteps,
   contextCollector = collectCurrentDiffContext,
   harnessStateAsserter = assertFreshHarnessState,
   checkpointStateAsserter = assertFreshCheckpointState,

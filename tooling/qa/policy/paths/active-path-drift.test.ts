@@ -101,11 +101,11 @@ function expectActiveWorkflowDocPaths() {
   );
 
   expect(codeQuality).toContain('tooling/configs/qa/quality-baseline.json');
-  expect(codeQuality).toContain('tooling/configs/qa/validation-manifest.json');
+  expect(codeQuality).toContain('tooling/qa/composition/control-inventory/discovery.mjs');
   expect(codeQuality).not.toContain('tooling/qa/core/quality-baseline.json');
   expect(codeQuality).not.toContain('tooling/qa/core/validation-manifest.json');
 
-  expect(repoAuditSkill).toContain('tooling/configs/qa/validation-manifest.json');
+  expect(repoAuditSkill).toContain('derived control inventory');
   expect(repoAuditSkill).not.toContain('tooling/qa/core/validation-manifest.json');
 }
 

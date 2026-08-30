@@ -67,10 +67,7 @@ describe('repository executable origin projection', () => {
       ])
     );
     expect(projection.registrationAuthorityPaths).not.toEqual(
-      expect.arrayContaining([
-        'tooling/configs/qa/control-dispositions.data.json',
-        'tooling/configs/qa/validation-manifest.json',
-      ])
+      expect.arrayContaining(['tooling/configs/qa/control-dispositions.data.json'])
     );
     expect(
       projection.registrationAuthorityPaths.every((authority) =>

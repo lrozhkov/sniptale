@@ -2,7 +2,6 @@ const TOOL_SOURCES = new Map([
   ['ast-grep.mjs', 'tooling/qa/audits/ast-grep/ast-grep.mjs'],
   ['build-step.mjs', 'tooling/qa/composition/build/build-step.mjs'],
   ['codeql.mjs', 'tooling/qa/audits/codeql/codeql.mjs'],
-  ['evidence.mjs', 'tooling/qa/audits/contracts/evidence.mjs'],
   ['git', 'git'],
   ['gitleaks.mjs', 'tooling/qa/audits/gitleaks/gitleaks.mjs'],
   ['knip.mjs', 'tooling/qa/audits/knip/knip.mjs'],
@@ -125,10 +124,6 @@ const TOOL_SOURCES = new Map([
   [
     'verify-shared-style-ownership.mjs',
     'tooling/qa/guards/product-contracts/verify-shared-style-ownership.mjs',
-  ],
-  [
-    'verify-sniptale-identity.mjs',
-    'tooling/qa/guards/product-contracts/verify-sniptale-identity.mjs',
   ],
   ['verify-sonarjs.mjs', 'tooling/qa/guards/quality/sonarjs/check.mjs'],
   [

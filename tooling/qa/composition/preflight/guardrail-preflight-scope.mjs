@@ -3,20 +3,12 @@ import path from 'node:path';
 
 import { fromRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import { OWNER_LOCAL_SCOPES } from '../repository/full-verification/scope.mjs';
-import { resolveBuildCloseoutScope } from '../build/scope/scope.mjs';
 import { findCoverageRolloutGroup } from '../../proof/coverage/test-coverage/registry.mjs';
 import { resolveCoverageThreshold } from '../../proof/coverage/test-coverage/thresholds.mjs';
-import { expandRelatedTestScope } from '../../proof/unit/unit-test-plan.mjs';
+import { isProductQaFile } from '../scope/qa-scope.mjs';
 
 const COVERAGE_HINT_FILE_PATTERN = /\.[cm]?[jt]sx?$/u;
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
-const BROAD_BUILD_SCOPE_FAMILIES = new Set([
-  'manifest-owned',
-  'package-and-app-core',
-  'messaging-runtime',
-  'parser-snapshot-export',
-  'storage-persistence',
-]);
 
 function collectClusterKeys(targetFiles) {
   return targetFiles.map((file) => {
@@ -90,46 +82,14 @@ export function collectScopeHints(targetFiles, codeFiles) {
   return hints;
 }
 
-export function collectBuildScopeForecast(
-  { targetFiles, riskTargetFiles = targetFiles, codeFiles, addedFiles = [] },
-  buildScopeOptions = {}
-) {
+export function collectBuildScopeForecast({ targetFiles }) {
   if (targetFiles.length === 0) return { details: [] };
-  const { testScope } = resolveBuildCloseoutScope(
-    { targetFiles, riskTargetFiles, qualityTargetFiles: riskTargetFiles, codeFiles, addedFiles },
-    { repoCodeFiles: codeFiles, ...buildScopeOptions }
-  );
-  const selectedUnitFiles =
-    testScope.directTestFiles.length > 0
-      ? testScope.directTestFiles
-      : expandRelatedTestScope(testScope.relatedFiles);
-  const broadFamilies = testScope.matchedFamilies.filter((family) =>
-    BROAD_BUILD_SCOPE_FAMILIES.has(family)
-  );
-  const selectedScopeDetail = testScope.fullSuite
-    ? 'full-suite'
-    : testScope.profile === 'related-transitive' && broadFamilies.length > 0
-      ? 'consumer-discovery-required'
-      : selectedUnitFiles.length;
-  const forecastScopeDetail =
-    testScope.profile === 'related-transitive' && broadFamilies.length > 0
-      ? [
-          `selection=${testScope.profile}`,
-          `execution=${testScope.executionClass}`,
-          `related-inputs=${testScope.relatedFiles.length}`,
-          'bounded owner and affected-consumer discovery required',
-          testScope.profileReason ? `selection-reason=${testScope.profileReason}` : '',
-        ]
-          .filter(Boolean)
-          .join('; ')
-      : testScope.detail;
-  const details = [
-    `qa:build forecast: ${forecastScopeDetail}; selected unit-test scope=${selectedScopeDetail}`,
-  ];
-  if (testScope.profile === 'related-transitive' && broadFamilies.length > 0) {
-    details.push(
-      `broad transitive scope expected for ${broadFamilies.join(', ')}: check related mocks and tests before closeout`
-    );
-  }
-  return { details };
+  const productTargets = targetFiles.filter(isProductQaFile);
+  return {
+    details: [
+      productTargets.length > 0
+        ? 'qa:build forecast: fresh checkpoint reused; production artifact build required'
+        : 'qa:build forecast: control-only diff; artifact build skipped',
+    ],
+  };
 }

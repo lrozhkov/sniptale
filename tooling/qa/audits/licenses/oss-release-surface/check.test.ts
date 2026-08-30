@@ -183,11 +183,6 @@ function seedReleaseIntegrations(root: string) {
   );
   write(
     root,
-    'tooling/configs/qa/validation-manifest.json',
-    JSON.stringify({ tool: 'verify-oss-release-surface.mjs' })
-  );
-  write(
-    root,
     'tooling/qa/composition/catalog/catalog.data.mjs',
     "export const steps = ['verify-oss-release-surface.mjs'];\n"
   );

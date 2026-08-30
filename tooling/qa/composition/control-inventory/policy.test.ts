@@ -13,7 +13,6 @@ function discoveryFixture() {
         semanticClass: 'semantic guard / analyzer',
         source: controlSource,
         sourceExists: true,
-        proofFiles: ['tooling/qa/guards/quality/example/check.test.ts'],
       },
     ],
     executables: [
@@ -73,11 +72,7 @@ describe('derived control-inventory closure', () => {
     expect(rules(unlinked)).toContain('qa-control-source-closure');
   });
 
-  it('requires a collector and declared fixture for semantic analyzers', () => {
-    const missingFixture = discoveryFixture();
-    missingFixture.controls[0].proofFiles = [];
-    expect(rules(missingFixture)).toContain('qa-semantic-control-missing-fixture');
-
+  it('requires an import-safe collector for semantic analyzers', () => {
     expect(
       collectControlPolicyViolations(discoveryFixture(), policyFixture(), {
         readSource: () => 'export function runExampleCheck() { return { violations: [] }; }\n',

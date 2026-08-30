@@ -8,11 +8,7 @@ import { AUDIT_STEPS } from '../../../composition/catalog/definitions.data.mjs';
 import { createTempRoot } from '../../../test-support/test-helpers';
 import { createSecuritySemanticCases } from './security';
 
-const INTERNAL_AUDIT_CONTROL_IDS = new Set([
-  'audit-evidence',
-  'full-product-coverage',
-  'topology-report',
-]);
+const INTERNAL_AUDIT_CONTROL_IDS = new Set(['full-product-coverage']);
 
 export function requiredExternalControlIds() {
   const profiles = JSON.parse(

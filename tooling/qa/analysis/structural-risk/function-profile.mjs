@@ -8,9 +8,7 @@ import {
 
 const ALGORITHM_PATTERN =
   /(?:^|\/)(?:parser|parsers|algorithm|algorithms|reducer|reducers)(?:\/|\.)/u;
-const REGISTERED_PURE_ALGORITHM_OWNERS = new Set([
-  'tooling/qa/composition/build/deleted-closure/deleted-aggregate.mjs',
-]);
+const REGISTERED_PURE_ALGORITHM_OWNERS = new Set();
 
 function containsJsx(node) {
   let found = false;

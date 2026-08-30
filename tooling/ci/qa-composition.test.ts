@@ -3,11 +3,17 @@ import fs from 'node:fs';
 import { expect, it, vi } from 'vitest';
 
 import { createReleaseControlOccurrences } from '../qa/composition/catalog/release-occurrences.mjs';
-import { collectCiProofResults, collectCiReleaseResults } from './qa-composition.mjs';
+import {
+  collectCiProofResults,
+  collectCiReleaseResults,
+  collectFreshProductionBuildStep,
+} from './qa-composition.mjs';
 import { createCiProductControlOccurrences } from './product-control-policy.mjs';
 import { createTrustedControlMatrix } from './trusted-control-matrix.mjs';
 
 const passed = { label: 'passed', status: 'ok' as const };
+const productionBuildPassed = { label: 'Production build', status: 'ok' as const };
+const productionBuildCollector = () => productionBuildPassed;
 
 it('machine-fixes full Vitest to Fast proof and release readiness to release provenance', async () => {
   const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
@@ -42,6 +48,7 @@ it('machine-fixes full Vitest to Fast proof and release readiness to release pro
       ],
     }),
     auditCollector: async () => ({ steps: [passed] }),
+    productionBuildCollector,
   });
   const release = await collectCiReleaseResults({
     reuseFastProof: true,
@@ -53,7 +60,7 @@ it('machine-fixes full Vitest to Fast proof and release readiness to release pro
       ],
     }),
     auditCollector: async () => ({ steps: [passed] }),
-    mutationCollector: () => passed,
+    productionBuildCollector,
   });
   expect(proof.context).toMatchObject({ mode: 'ci:proof' });
   expect(proof.steps).toEqual(
@@ -75,7 +82,7 @@ it('machine-fixes full Vitest to Fast proof and release readiness to release pro
       ],
     }),
     auditCollector: async () => ({ steps: [passed] }),
-    mutationCollector: () => passed,
+    productionBuildCollector,
   });
   expect(reusedRelease).toMatchObject({ executionMode: 'reuse-fast-proof' });
   expect(reusedRelease.steps).toEqual(
@@ -141,6 +148,7 @@ it('fails closed when the release-only result closure is incomplete', async () =
           { label: 'Build', status: 'ok' },
         ],
       }),
+      productionBuildCollector,
     })
   ).rejects.toThrow('Missing release-only control result: Release archive');
 });
@@ -160,7 +168,7 @@ it.each([
   {
     name: 'reused Fast proof',
     reuseFastProof: true,
-    expectedReusedAuditControls: ['audit-evidence'],
+    expectedReusedAuditControls: [],
     expectedExecutions: [
       'release-delta',
       'audit:npm-audit:live',
@@ -212,7 +220,7 @@ it.each([
       productProofCollector,
       releaseDeltaCollector,
       auditCollector,
-      mutationCollector: () => passed,
+      productionBuildCollector,
     });
 
     expect(productProofCollector).toHaveBeenCalledTimes(reuseFastProof ? 0 : 1);
@@ -237,6 +245,7 @@ it('runs the Fast audit after returned product failures and aggregates both resu
       steps: [{ label: 'Oxlint', status: 'failed' as const }],
     }),
     auditCollector,
+    productionBuildCollector,
   });
 
   expect(auditCollector).toHaveBeenCalledWith({ profileId: 'pr', session: undefined });
@@ -248,13 +257,9 @@ it('runs the Fast audit after returned product failures and aggregates both resu
   );
 });
 
-it('runs the release audit and every mutation profile after returned failures', async () => {
+it('keeps advisory mutation outside release control results', async () => {
   const auditCollector = vi.fn(async () => ({
     steps: [{ label: 'CodeQL', status: 'failed' as const }],
-  }));
-  const mutationCollector = vi.fn((profile: string) => ({
-    label: `Mutation ${profile}`,
-    status: 'failed' as const,
   }));
 
   const result = await collectCiReleaseResults({
@@ -272,7 +277,7 @@ it('runs the release audit and every mutation profile after returned failures', 
       ],
     }),
     auditCollector,
-    mutationCollector,
+    productionBuildCollector,
   });
 
   expect(auditCollector).toHaveBeenCalledWith({
@@ -280,10 +285,6 @@ it('runs the release audit and every mutation profile after returned failures', 
     reusedControlIds: ['npm-audit'],
     session: undefined,
   });
-  expect(mutationCollector.mock.calls.map(([profile]) => profile)).toEqual([
-    'persistence',
-    'secrets',
-  ]);
   expect(result.steps.map(({ label, status }) => [label, status])).toEqual([
     ...createCiProductControlOccurrences('proof').map(({ label }) => [
       label,
@@ -292,9 +293,8 @@ it('runs the release audit and every mutation profile after returned failures', 
     ['SonarJS', 'ok'],
     ['Build', 'ok'],
     ['Release archive', 'ok'],
+    ['Production build', 'ok'],
     ['CodeQL', 'failed'],
-    ['Mutation persistence', 'failed'],
-    ['Mutation secrets', 'failed'],
   ]);
 });
 
@@ -320,7 +320,7 @@ it('shares one observed repository scope across fresh Fast and release-only cont
     productProofCollector,
     releaseDeltaCollector,
     auditCollector: async () => ({ steps: [] }),
-    mutationCollector: () => passed,
+    productionBuildCollector,
   });
 
   expect(scopeResolver).toHaveBeenCalledOnce();
@@ -332,7 +332,7 @@ it('shares one observed repository scope across fresh Fast and release-only cont
 
 it('keeps infrastructure exceptions fail-fast instead of treating them as control results', async () => {
   const auditCollector = vi.fn();
-  const mutationCollector = vi.fn();
+  const productionBuildSpy = vi.fn(productionBuildCollector);
 
   await expect(
     collectCiReleaseResults({
@@ -340,9 +340,18 @@ it('keeps infrastructure exceptions fail-fast instead of treating them as contro
         throw new Error('worker result envelope is unavailable');
       },
       auditCollector,
-      mutationCollector,
+      productionBuildCollector: productionBuildSpy,
     })
   ).rejects.toThrow('worker result envelope is unavailable');
   expect(auditCollector).not.toHaveBeenCalled();
-  expect(mutationCollector).not.toHaveBeenCalled();
+  expect(productionBuildSpy).not.toHaveBeenCalled();
+});
+
+it('runs a fresh release-mode production build exactly once without proof or archive ownership', () => {
+  const commandRunner = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
+  const { label, status } = collectFreshProductionBuildStep({ commandRunner });
+
+  expect({ label, status }).toEqual({ label: 'Production build', status: 'ok' });
+  expect(commandRunner).toHaveBeenCalledOnce();
+  expect(commandRunner).toHaveBeenCalledWith(['run', 'build:release']);
 });

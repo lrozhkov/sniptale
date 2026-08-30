@@ -145,14 +145,6 @@ it('fails commit mode when staging leaves no staged changes to commit', async ()
   });
 
   expect(result.steps.map((step) => [step.label, step.status])).toEqual([
-    ['Naming', 'ok'],
-    ['HTML sanitizer ownership', 'ok'],
-    ['Architecture guardrails', 'ok'],
-    ['Dependency boundaries', 'ok'],
-    ['Cycles', 'ok'],
-    ['Root side effects', 'ok'],
-    ['Typecheck', 'ok'],
-    ['Unit tests', 'ok'],
     ['Build', 'ok'],
     ['Stage changes', 'ok'],
     ['Task artifacts', 'ok'],
@@ -187,14 +179,6 @@ it('blocks commit staging when the diff changes after the fresh checkpoint state
     });
 
     expect(result.steps.map((step) => [step.label, step.status])).toEqual([
-      ['Naming', 'ok'],
-      ['HTML sanitizer ownership', 'ok'],
-      ['Architecture guardrails', 'ok'],
-      ['Dependency boundaries', 'ok'],
-      ['Cycles', 'ok'],
-      ['Root side effects', 'ok'],
-      ['Typecheck', 'ok'],
-      ['Unit tests', 'ok'],
       ['Build', 'ok'],
       ['Stage changes', 'ok'],
       ['Task artifacts', 'ok'],
@@ -228,36 +212,4 @@ it('blocks qa:build before commit mode when checkpoint state is stale for the cu
       })
     ).rejects.toThrow(/Run npm run qa:checkpoint/u);
   });
-});
-
-it('blocks the build step when related unit tests fail in qa:build', async () => {
-  const module = await import('./build.mjs');
-
-  const result = await module.runBuildCloseout({
-    ...TEST_BUILD_DEPENDENCIES,
-    argv: [],
-    contextCollector: createBuildContext,
-    checkpointStateAsserter: () => {},
-    closeoutStepCollector: async () => ({
-      scopeDetail: 'broader related tests (1 related file)',
-      steps: [
-        { label: 'Naming', status: 'ok' as const, detail: '', durationMs: 0 },
-        {
-          label: 'HTML sanitizer ownership',
-          status: 'ok' as const,
-          detail: '',
-          durationMs: 0,
-        },
-        { label: 'Unit tests', status: 'failed' as const, summary: 'failed' as const },
-        { label: 'Build', status: 'blocked' as const, detail: 'earlier hardfail steps failed' },
-      ],
-    }),
-  });
-
-  expect(result.steps.map((step) => [step.label, step.status])).toEqual([
-    ['Naming', 'ok'],
-    ['HTML sanitizer ownership', 'ok'],
-    ['Unit tests', 'failed'],
-    ['Build', 'blocked'],
-  ]);
 });

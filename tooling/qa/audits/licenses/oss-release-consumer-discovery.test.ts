@@ -61,7 +61,6 @@ it('discovers every supported release consumer category and ignores tests', asyn
 it.each([
   'tooling/qa/composition/checkpoint/focused-triggered/execution.mjs',
   'tooling/qa/composition/repository/full-verification/violation-steps.mjs',
-  'tooling/configs/qa/validation-manifest.json',
   'tooling/qa/composition/catalog/catalog.data.mjs',
 ])('rejects an omitted authoritative release integration: %s', async (relativePath) => {
   const root = createTempRoot('oss-release-consumer-omission-');
@@ -74,7 +73,6 @@ it.each([
   for (const integration of [
     'tooling/qa/composition/checkpoint/focused-triggered/execution.mjs',
     'tooling/qa/composition/repository/full-verification/violation-steps.mjs',
-    'tooling/configs/qa/validation-manifest.json',
     'tooling/qa/composition/catalog/catalog.data.mjs',
   ]) {
     write(root, integration, 'verify-oss-release-surface.mjs\n');

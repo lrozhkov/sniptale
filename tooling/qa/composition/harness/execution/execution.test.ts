@@ -60,7 +60,6 @@ function compositionDiscoveryFixture() {
         consumers: ['tooling/qa/composition/example.mjs'],
       },
     ],
-    validationClaims: [],
   };
 }
 

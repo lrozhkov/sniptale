@@ -11,7 +11,6 @@ const VERIFY_ALL_VIOLATION_STEP_ORDER = [
   'Boundary casts',
   'Boundary inputs',
   'ZIP package profile',
-  'Sniptale identity',
   'Network fetch policy',
   'Entrypoint wiring',
   'Dependency admission',
@@ -190,10 +189,6 @@ it('keeps qa:preflight read-only and outside closeout state', () => {
 it('keeps qa:build gated on fresh checkpoint state with opt-in commit close-out', () => {
   const source = fs.readFileSync('tooling/qa/wrappers/build.mjs', 'utf8');
   const runSource = fs.readFileSync('tooling/qa/wrappers/build/build-run.mjs', 'utf8');
-  const executionSource = fs.readFileSync(
-    'tooling/qa/composition/build/execution/check.mjs',
-    'utf8'
-  );
   const commitStepSource = fs.readFileSync(
     'tooling/qa/wrappers/build/execution/commit-steps.mjs',
     'utf8'
@@ -203,9 +198,8 @@ it('keeps qa:build gated on fresh checkpoint state with opt-in commit close-out'
   expect(source).toContain('checkpointStateAsserter = assertFreshCheckpointState');
   expect(runSource).toContain("checkpointStateAsserter(context, 'qa:build');");
   expect(source).toContain("harnessStateAsserter(context, 'qa:build');");
-  expect(source).toContain('closeoutStepCollector = collectBuildCloseoutStepResults');
-  expect(executionSource).toContain('runArchitectureGuardrailCheck');
-  expect(executionSource).toContain("'Architecture guardrails'");
+  expect(source).toContain('closeoutStepCollector = collectArtifactBuildSteps');
+  expect(source).toContain('fresh checkpoint reused; artifact build only');
   expect(source).toContain('runObservedWrapper({');
   expect(source).toContain('blocking: true');
   expect(source).toContain("parseWrapperArguments('qa:build', argv)");
@@ -215,6 +209,7 @@ it('keeps qa:build gated on fresh checkpoint state with opt-in commit close-out'
   expect(commitStepSource).toContain("'Task artifacts'");
   expect(commitStepSource).toContain("'Git commit'");
   expect(source).not.toContain('collectFocusedStepResults(');
+  expect(source).not.toContain('collectBuildCloseoutStepResults');
 });
 
 it('routes every canonical wrapper entrypoint through the observed lifecycle', () => {

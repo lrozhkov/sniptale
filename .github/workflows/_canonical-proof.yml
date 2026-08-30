@@ -542,6 +542,53 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+  advisory-artifacts:
+    needs: canonical-qa
+    if: >-
+      always() &&
+      needs.canonical-qa.result == 'success' &&
+      (inputs.gate == 'fast' || inputs.gate == 'release-provenance')
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          {
+            ref: '${{ env.TRUSTED_CONTROL_SHA }}',
+            path: trusted-control,
+            fetch-depth: 0,
+            persist-credentials: false,
+          }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          {
+            ref: '${{ env.CANDIDATE_SHA }}',
+            path: candidate,
+            fetch-depth: 0,
+            persist-credentials: false,
+          }
+      - uses: ./trusted-control/.github/actions/setup-locked-node
+        with: { repository-root: trusted-control }
+      - name: Install exact candidate dependencies
+        working-directory: candidate
+        run: npm ci --ignore-scripts
+      - name: Collect report-only advisory evidence
+        working-directory: candidate
+        run: node tooling/ci/advisory-artifacts.mjs "$PROOF_LANE"
+      - name: Upload report-only advisory evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: advisory-evidence-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            candidate/.tmp/repo-audit
+            candidate/.tmp/mutation
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
+
   infrastructure-smoke:
     needs: [qa-image, provision]
     if: >-

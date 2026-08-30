@@ -67,9 +67,7 @@
       "requiredPrefixes": [
         ".tmp/qa-observability/runs/",
         ".tmp/qa-logs/",
-        ".tmp/coverage/canonical/html/",
-        ".tmp/mutation/persistence/",
-        ".tmp/mutation/secrets/"
+        ".tmp/coverage/canonical/html/"
       ],
       "reuse": {
         "build": ["fresh", "reused"],

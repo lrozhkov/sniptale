@@ -77,7 +77,6 @@ const REQUIRED_CONSUMER_INTEGRATIONS = new Map([
     'tooling/qa/composition/repository/full-verification/violation-steps.mjs',
     'validator-integration',
   ],
-  ['tooling/configs/qa/validation-manifest.json', 'validator-integration'],
   ['tooling/qa/composition/catalog/catalog.data.mjs', 'validator-integration'],
   ['package.json', 'release-command'],
   ['apps/extension/manifest.json', 'bundled-font'],

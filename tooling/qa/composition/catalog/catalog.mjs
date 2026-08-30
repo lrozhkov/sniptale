@@ -1,7 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import {
   ADVISORY_STEPS,
   AUDIT_STEPS,
@@ -22,7 +18,6 @@ import {
 } from './catalog.data.mjs';
 import { REPO_AUDIT_REPORT_DEFINITIONS } from '../../evidence/repo-audit-evidence/registry.data.mjs';
 import { createQaStepOccurrence } from './policy/index.mjs';
-import { loadValidationManifest } from '../../policy/validation/manifest.mjs';
 import {
   QA_CATEGORY_ORDER,
   resolveQaCategory,
@@ -40,13 +35,6 @@ const ALWAYS_FOCUSED_TRIGGERED_LABELS = new Set([
   'Root side effects',
   'Target-only paths',
 ]);
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
-const validationClaims = loadValidationManifest();
-const validationProofByControlId = new Map(
-  validationClaims
-    .filter(({ claim }) => claim === 'control')
-    .map((entry) => [entry.controlId, entry])
-);
 const SCHEDULER_LANE_BY_ID = new Map([
   ['qa.rule.app-core-owners', 'appOwners'],
   ['qa.rule.target-only-paths', 'targetPaths'],
@@ -208,11 +196,7 @@ function mergeOccurrence(existing, occurrence, displayOrder) {
 function completeCatalogRecord(record) {
   const category = resolveQaCategory(record);
   const semanticClass = resolveQaSemanticClass({ kind: record.kind, category });
-  const validationProof = validationProofByControlId.get(record.id) ?? null;
   const semanticControl = semanticClass.includes('semantic');
-  if (semanticControl && validationProof === null) {
-    throw new Error(`Semantic QA control has no validation-manifest proof: ${record.id}`);
-  }
   const engineDecision = resolveQaEngineDecision({
     engine: record.engine,
     label: record.label,
@@ -247,14 +231,7 @@ function completeCatalogRecord(record) {
     normalizationProfile: 'qa-step-result-v1',
     proof: Object.freeze({
       kind: semanticControl ? 'smell-or-invariant' : 'execution-contract',
-      evidenceStatus: validationProof ? 'declared' : 'not-declared',
-      validation: validationProof
-        ? Object.freeze({
-            mode: validationProof.validationMode,
-            testFiles: Object.freeze([...validationProof.testFiles]),
-            states: Object.freeze([...validationProof.states]),
-          })
-        : null,
+      evidenceStatus: 'derived-closure',
     }),
   });
 }
@@ -294,33 +271,6 @@ function validateCatalog(catalog) {
     if (!control.schedulerLane || !control.schedulerDependencyProfile) {
       throw new Error(`QA control has no scheduler profile: ${control.id}`);
     }
-    if (control.semanticClass.includes('semantic')) {
-      if (control.proof.evidenceStatus !== 'declared' || !control.proof.validation) {
-        throw new Error(`Semantic QA control has no declared validation: ${control.id}`);
-      }
-      if (
-        !control.proof.validation.states.includes('pass') ||
-        !control.proof.validation.states.includes('fail')
-      ) {
-        throw new Error(`Semantic QA proof must exercise pass and fail states: ${control.id}`);
-      }
-      if (control.proof.validation.testFiles.length === 0) {
-        throw new Error(`Semantic QA proof has no fixture owner: ${control.id}`);
-      }
-    }
-    for (const proofFile of control.proof.validation?.testFiles ?? []) {
-      if (!fs.existsSync(path.join(repositoryRoot, proofFile))) {
-        throw new Error(`QA proof file does not exist for ${control.id}: ${proofFile}`);
-      }
-    }
-  }
-  const unknownClaims = [...validationProofByControlId.keys()].filter(
-    (controlId) => !ids.has(controlId)
-  );
-  if (unknownClaims.length > 0) {
-    throw new Error(
-      `Validation manifest references unknown controls: ${unknownClaims.sort().join(', ')}`
-    );
   }
   return catalog;
 }

@@ -12,7 +12,6 @@ import { runLicenseCheck } from '../../../audits/licenses/licenses.mjs';
 import { runAudit as runNpmAudit } from '../../../audits/supply-chain/npm-audit.mjs';
 import { runAuditSignatures } from '../../../audits/supply-chain/npm-audit-signatures.mjs';
 import { runOsvCheck } from '../../../audits/osv/check.mjs';
-import { collectEvidenceStep, collectTopologyStep } from '../audit-inventory-steps.mjs';
 import {
   collectProfiledAsyncStep,
   collectProfiledSyncStep,
@@ -129,8 +128,6 @@ export async function collectAuditSteps({ profile, onProgress }) {
   const asyncSteps = await collectAsyncAuditToolSteps(profile, onProgress);
   return [
     asyncSteps.coverageStep,
-    collectEvidenceStep(profile, { onProgress }),
-    collectTopologyStep(profile, { onProgress }),
     collectNpmGateStep(profile, 'npm-audit', 'npm audit', runNpmAudit, onProgress),
     collectNpmGateStep(
       profile,

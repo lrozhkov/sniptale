@@ -48,21 +48,6 @@ describe('function profile classification', () => {
     expect(metric.functions[0]?.profile).toBe('entrypoint');
   });
 
-  it('uses the pure profile for the registered deleted-aggregate AST owner', () => {
-    const metric = analyzeStructuralSource(
-      'tooling/qa/composition/build/deleted-closure/deleted-aggregate.mjs',
-      `function collectBindings(nodes) {
-        const bindings = [];
-        for (const node of nodes) {
-          if (node.kind === 'import') bindings.push(node.name);
-        }
-        return bindings;
-      }`
-    );
-
-    expect(metric.functions[0]?.profile).toBe('pure');
-  });
-
   it('does not count declarative fixture property fallbacks as test branching', () => {
     const metric = analyzeStructuralSource(
       'apps/extension/src/settings/section.test.ts',

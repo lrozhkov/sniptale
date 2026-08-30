@@ -154,14 +154,12 @@ it('keeps full product coverage in the audit profile only', () => {
     'tooling/qa/composition/repository/full-verification/execution.mjs',
     'utf8'
   );
-  const buildSource = fs.readFileSync('tooling/qa/composition/build/execution/check.mjs', 'utf8');
 
   expect(source).toContain('collectFullCoverageAuditStep');
   expect(coverageSource).toContain("createOkStep('Full product coverage'");
   expect(coverageSource).toContain("coverageMode: 'manual'");
   expect(coverageSource).toContain('formatCoverageAuditReport');
   expect(releaseSource).toContain('coverageEnabled: false');
-  expect(buildSource).toContain('coverageEnabled: false');
 });
 
 it('keeps the audit profile as an internal collector without a wrapper CLI', () => {

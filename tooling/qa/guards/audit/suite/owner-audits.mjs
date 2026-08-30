@@ -29,10 +29,7 @@ const ROOT_FILE_PATTERN = new RegExp(
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const SUPPORT_FILE_PATTERN =
   /\.(?:test-helpers|test-support|fixtures|test\.fixtures|test\.helpers)\.[cm]?[jt]sx?$/u;
-const REGISTRY_EXACT_FILES = new Set([
-  'tooling/configs/qa/validation-manifest.json',
-  'tooling/configs/qa/manifest-permissions.data.json',
-]);
+const REGISTRY_EXACT_FILES = new Set(['tooling/configs/qa/manifest-permissions.data.json']);
 const REGISTRY_NAME_MARKERS = ['.data.', '.rules.', '.registry.'];
 
 function isRegistryFile(file) {

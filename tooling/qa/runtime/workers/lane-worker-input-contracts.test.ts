@@ -1,7 +1,6 @@
 import { expect, it } from 'vitest';
 
 import { parseFullVerifyWorkerInput } from '../../composition/repository/full-verification/worker.mjs';
-import { parseBuildWorkerInput } from '../../composition/build/scheduler-worker/worker.mjs';
 import { parseFocusedWorkerInput } from '../../composition/checkpoint/focused/worker.mjs';
 
 function focusedContext() {
@@ -62,26 +61,6 @@ it('rejects malformed nested focused baseline allowances', () => {
       vitestMaxWorkers: 4,
     })
   ).toThrow(/exactly one of line or contentHash/u);
-});
-
-it('rejects omitted build-scope booleans instead of narrowing test proof', () => {
-  expect(() =>
-    parseBuildWorkerInput({
-      buildScope: {
-        staticScope: 'repo-wide',
-        testScope: {
-          detail: 'related tests',
-          directTestFiles: [],
-          relatedFiles: ['src/example.ts'],
-          requireRelatedTests: true,
-        },
-      },
-      context: { codeFiles: [], targetFiles: [] },
-      lane: 'tests',
-      typecheckCheckerCount: 4,
-      vitestMaxWorkers: 4,
-    })
-  ).toThrow(/invalid field population/u);
 });
 
 it('rejects extra full-verification context authority', () => {

@@ -21,7 +21,6 @@ const CATEGORY_BY_LABEL = new Map([
   ['Changed-line readability', 'lexical-and-path'],
   ['AI hygiene', 'lexical-and-path'],
   ['Suppression directives', 'lexical-and-path'],
-  ['Sniptale identity', 'lexical-and-path'],
   ['Oxlint', 'syntax-core'],
   ['SonarJS', 'single-file-semantics'],
   ['Boundary casts', 'syntax-core'],

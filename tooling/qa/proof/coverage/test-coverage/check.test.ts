@@ -89,6 +89,38 @@ it('skips excluded and out-of-scope files', () => {
   ).toBeNull();
 });
 
+it('enrolls every new eligible production file without enrolling unchanged legacy files', () => {
+  const file = 'apps/extension/src/content/unrolled/new-production-owner.ts';
+  expect(resolveCoverageThreshold(file)).toBeNull();
+  expect(resolveCoverageThreshold(file, { isNew: true })).toEqual(UI_THRESHOLD);
+  expect(
+    resolveCoverageThreshold('apps/extension/src/content/unrolled/new-owner.types.ts', {
+      isNew: true,
+    })
+  ).toBeNull();
+});
+
+it('targets and fails missing coverage for an added production file outside rollout', () => {
+  const file = 'apps/extension/src/content/unrolled/new-production-owner.ts';
+  const changedTargets = {
+    addedFiles: [file],
+    changedFiles: [file],
+    changedLineMap: new Map([[file, new Set([1])]]),
+    untrackedFiles: new Set<string>(),
+  };
+  expect(
+    resolveCoverageTargetFiles({
+      changedTargets,
+      codeFileCollector: () => [file],
+      files: [file],
+      sourceReader: () => 'export const value = 1;',
+    })
+  ).toEqual([file]);
+  expect(collectCoverageViolations([file], new Map(), { changedTargets })).toEqual([
+    expect.objectContaining({ file, rule: 'test-coverage-missing-file' }),
+  ]);
+});
+
 it('references only existing exact rollout files', () => {
   for (const file of EXACT_ROLLOUT_FILES) {
     expect(existsSync(file)).toBe(true);

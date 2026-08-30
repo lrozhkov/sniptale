@@ -66,31 +66,31 @@ it('uses the empty tree as the base for new branch pushes', () => {
   ]);
 });
 
-it('uses changed-range checkpoint and build proof for new branch pushes', () => {
+it('uses only the changed-range checkpoint for new branch pushes', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/feature ${LOCAL_SHA} refs/heads/feature ${ZERO_SHA}\n`,
     gitRunner: () => ({ stdout: 'src/example.ts\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint', 'qa:internal:build']);
+  expect(commands).toEqual(['qa:checkpoint']);
 });
 
-it('runs release harness when pushed commits include tooling changes from a clean tree', () => {
+it('leaves release-harness proof to explicit closeout for tooling changes', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
     gitRunner: () => ({ stdout: 'tooling/qa/hooks/pre-push.mjs\n' }),
   });
 
-  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:internal:build']);
+  expect(commands).toEqual(['qa:checkpoint']);
 });
 
-it('runs release harness for shared controls that affect product and harness authority', () => {
+it('keeps shared-control pre-push proof checkpoint-only', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
     gitRunner: () => ({ stdout: 'package.json\n.husky/pre-push\n' }),
   });
 
-  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:internal:build']);
+  expect(commands).toEqual(['qa:checkpoint']);
 });
 
 it('skips release harness for a generated inventory-only push', () => {
@@ -99,7 +99,7 @@ it('skips release harness for a generated inventory-only push', () => {
     gitRunner: () => ({ stdout: 'tooling/configs/qa/technical-debt.data.json\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint', 'qa:internal:build']);
+  expect(commands).toEqual(['qa:checkpoint']);
 });
 
 it('rejects malformed hook input instead of silently weakening pushed-range proof', () => {

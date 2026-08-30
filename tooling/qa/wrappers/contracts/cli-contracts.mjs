@@ -125,7 +125,7 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
     lifecycleLabel: 'CI release',
     scripts: [],
     usage: 'npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]',
-    description: 'Run full release proof, audits, coverage, and mutation waves.',
+    description: 'Run full release proof, blocking audits, coverage, and advisory artifacts.',
     options: NO_OPTIONS,
   },
   'qa:e2e': {

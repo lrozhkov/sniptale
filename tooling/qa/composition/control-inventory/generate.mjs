@@ -29,7 +29,6 @@ export function buildControlInventory(discovery, policy) {
     executables: discovery.executables,
     packageQaScripts: discovery.packageQaScripts,
     policyFiles: discovery.policyFiles,
-    validationEntries: discovery.validationEntries,
   };
 }
 

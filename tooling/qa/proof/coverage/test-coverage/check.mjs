@@ -101,6 +101,13 @@ function filterCoverageNeutralChangedFiles(
   });
 }
 
+function isNewCoverageFile(relativePath, changedTargets) {
+  return (
+    (changedTargets.addedFiles ?? []).includes(relativePath) ||
+    changedTargets.untrackedFiles?.has(relativePath) === true
+  );
+}
+
 export function resolveCoverageTargetFiles({
   files = [],
   codeFileCollector = codeFiles,
@@ -118,20 +125,25 @@ export function resolveCoverageTargetFiles({
       ? codeFileCollector(files)
       : (changedWorkspaceFiles ?? lineCheck({ scope: 'workspace' }).files);
 
+  const effectiveChangedTargets =
+    changedTargets ??
+    (changedWorkspaceFiles == null
+      ? collectChangedTargets({ scope: 'workspace' })
+      : {
+          addedFiles: changedWorkspaceFiles,
+          changedFiles: changedWorkspaceFiles,
+          changedLineMap: new Map(),
+          untrackedFiles: new Set(changedWorkspaceFiles),
+        });
+
   return filterCoverageNeutralChangedFiles(
-    candidateFiles.filter((file) => resolveCoverageThreshold(file) !== null),
-    {
-      changedTargets:
-        changedTargets ??
-        (changedWorkspaceFiles == null
-          ? collectChangedTargets({ scope: 'workspace' })
-          : {
-              changedFiles: changedWorkspaceFiles,
-              changedLineMap: new Map(),
-              untrackedFiles: new Set(changedWorkspaceFiles),
-            }),
-      sourceReader,
-    }
+    candidateFiles.filter(
+      (file) =>
+        resolveCoverageThreshold(file, {
+          isNew: isNewCoverageFile(file, effectiveChangedTargets),
+        }) !== null
+    ),
+    { changedTargets: effectiveChangedTargets, sourceReader }
   );
 }
 
@@ -146,7 +158,9 @@ export function collectCoverageViolations(
   const violations = [];
 
   for (const relativePath of relativeFiles) {
-    const threshold = resolveCoverageThreshold(relativePath);
+    const threshold = resolveCoverageThreshold(relativePath, {
+      isNew: isNewCoverageFile(relativePath, changedTargets),
+    });
     if (!threshold) {
       continue;
     }

@@ -17,11 +17,7 @@ import { createTempRoot } from '../../test-support/test-helpers';
 
 type CommandStatus = number | null | undefined;
 
-const INTERNAL_AUDIT_CONTROL_IDS = new Set([
-  'audit-evidence',
-  'full-product-coverage',
-  'topology-report',
-]);
+const INTERNAL_AUDIT_CONTROL_IDS = new Set(['full-product-coverage']);
 const npmAuditClean = JSON.stringify({
   auditReportVersion: 2,
   vulnerabilities: {},

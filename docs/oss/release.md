@@ -29,7 +29,7 @@ npm run qa:closeout -- -m "chore(release): prepare release"
 npm run ci:release
 ```
 
-`ci:release` runs the same release composition locally in WSL and externally through the pinned QA image. It performs product proof, complete audit and coverage, mutation profiles, creates the release-mode extension build, validates manifest/security boundaries, and writes a deterministic archive under `build/`. The archive combines extension files with the complete policy-owned legal payload and rejects missing files, extra dependency legal files, digest drift, unsafe paths, or collisions.
+`ci:release` runs the same release composition locally in WSL and externally through the pinned QA image. It performs product proof, complete blocking audit and coverage, creates the release-mode extension build, validates manifest/security boundaries, and writes a deterministic archive under `build/`. CI runs mutation profiles only afterward in an isolated non-blocking advisory-artifact job. The archive combines extension files with the complete policy-owned legal payload and rejects missing files, extra dependency legal files, digest drift, unsafe paths, or collisions.
 
 The extension zip is not a stand-alone source distribution. Conveyance must make Corresponding Source for the exact artifact available under AGPL-3.0-or-later through the same distribution surface, including the repository tree, lockfile, build/QA tooling, legal notices, and producing commit identity.
 

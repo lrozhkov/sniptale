@@ -47,7 +47,6 @@ export const FOCUSED_CODE_VIOLATION_LABELS = Object.freeze([
   'Boundary casts',
   'Boundary inputs',
   'ZIP package profile',
-  'Sniptale identity',
   'Domain fixture realism',
   'Network fetch policy',
   'Entrypoint wiring',
@@ -104,17 +103,7 @@ export const HARNESS_STEPS = [
   ['unit-tests', 'Unit tests', 'verify-unit-tests.mjs', 'conditional'],
 ];
 
-export const BUILD_STEPS = [
-  ['naming', 'Naming', 'verify-naming.mjs'],
-  ['html-sanitizer-ownership', 'HTML sanitizer ownership', 'verify-html-sanitizer-ownership.mjs'],
-  ['architecture-guardrails', 'Architecture guardrails', 'verify-architecture-guardrails.mjs'],
-  ['dependency-boundaries', 'Dependency boundaries', 'verify-boundaries.mjs'],
-  ['cycles', 'Cycles', 'verify-cycles.mjs'],
-  ['root-side-effects', 'Root side effects', 'verify-root-side-effects.mjs'],
-  ['typecheck', 'Typecheck', 'verify-typecheck.mjs'],
-  ['unit-tests', 'Unit tests', 'verify-unit-tests.mjs'],
-  ['build', 'Build', 'build-step.mjs'],
-];
+export const BUILD_STEPS = [['build', 'Build', 'build-step.mjs']];
 
 export const BUILD_COMMIT_STEPS = [
   ['stage-changes', 'Stage changes', 'git', 'conditional'],
@@ -184,18 +173,12 @@ export const CI_COMPOSITION_STEPS = [
     'tooling/ci/main-proof-transport.mjs',
   ],
   [
-    'mutation-persistence',
-    'Mutation persistence',
-    'run-profile.mjs',
-    'conditional',
-    'tooling/test/mutation/run-profile.mjs',
-  ],
-  [
-    'mutation-secrets',
-    'Mutation secrets',
-    'run-profile.mjs',
-    'conditional',
-    'tooling/test/mutation/run-profile.mjs',
+    'production-build',
+    'Production build',
+    'qa-composition.mjs',
+    'always',
+    'tooling/ci/qa-composition.mjs',
+    ['ci:proof', 'ci:release'],
   ],
   [
     'main-proof-verification',
@@ -311,8 +294,6 @@ export const STRUCTURAL_AUDIT_STEPS = [
 
 export const AUDIT_STEPS = [
   ['full-product-coverage', 'Full product coverage', 'verify-test-coverage.mjs'],
-  ['audit-evidence', 'Audit evidence report-only inventory', 'evidence.mjs'],
-  ['topology-report', 'Topology report-only inventory', 'verify-naming.mjs'],
   ['npm-audit', 'npm audit', 'npm-audit.mjs'],
   ['npm-audit-signatures', 'npm audit signatures', 'npm-audit-signatures.mjs'],
   ['osv-scanner', 'OSV-Scanner', 'osv.mjs'],
@@ -329,7 +310,6 @@ export const FULL_VIOLATION_STEP_TOOLS = new Map([
   ['Boundary casts', 'verify-boundary-casts.mjs'],
   ['Boundary inputs', 'verify-boundary-inputs.mjs'],
   ['ZIP package profile', 'verify-zip-package-profile.mjs'],
-  ['Sniptale identity', 'verify-sniptale-identity.mjs'],
   ['Network fetch policy', 'verify-network-fetch-policy.mjs'],
   ['Entrypoint wiring', 'verify-entrypoint-wiring.mjs'],
   ['Logging policy', 'verify-logging.mjs'],

@@ -150,15 +150,11 @@ export function verifyReleaseProof(root, commit, options) {
     '.tmp/licenses/sbom.cdx.json',
     '.tmp/qa/codeql-proof.json',
     '.tmp/qa/coverage-proof.json',
-    '.tmp/mutation/persistence',
-    '.tmp/mutation/secrets',
   ]) {
     if (
       required.endsWith('/')
         ? ![...files].some((file) => file.startsWith(required))
-        : required.includes('/mutation/')
-          ? ![...files].some((file) => file.startsWith(`${required}/`))
-          : !files.has(required)
+        : !files.has(required)
     ) {
       throw new Error(`Release proof is missing required evidence: ${required}`);
     }

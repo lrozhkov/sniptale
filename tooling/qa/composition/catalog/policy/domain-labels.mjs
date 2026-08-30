@@ -16,7 +16,6 @@ export const QA_LABELS_BY_DOMAIN = {
     'Root side effects',
     'Runtime topology',
     'Shared style ownership',
-    'Sniptale identity',
     'Target-only paths',
     'UI automation seams',
     'ZIP package profile',

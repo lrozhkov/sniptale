@@ -70,7 +70,8 @@ export function expectWrapperCoverage(verification: Verification) {
   ]);
   expect(verification.harnessWrapperTools).toContain('verify-qa-controls.mjs');
   expect(verification.harnessWrapperTools).not.toContain('verify-qa-rule-coverage-contract.mjs');
-  expect(verification.buildWrapperTools).toContain('verify-architecture-guardrails.mjs');
+  expect(verification.buildWrapperTools).toContain('build-step.mjs');
+  expect(verification.buildWrapperTools).not.toContain('verify-architecture-guardrails.mjs');
   expect(verification.auditWrapperTools).toContain('codeql.mjs');
   expect(verification.advisoryWrapperTools).toEqual(['verify-advisory.mjs']);
   expect(verification.closeoutWrapperTools).toEqual(['checkpoint.mjs', 'build.mjs']);

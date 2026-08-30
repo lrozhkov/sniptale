@@ -135,9 +135,9 @@ it('requires fail-late CI evidence after an earlier control failure', () => {
     status: index === 0 ? ('failed' as const) : ('ok' as const),
   }));
   const auditSteps = AUDIT_STEPS.map(([, label]) => ({ label, status: 'ok' as const }));
-  const mutationSteps = CI_COMPOSITION_STEPS.filter(([, label]) =>
-    label.startsWith('Mutation ')
-  ).map(([, label]) => ({ label, status: 'ok' as const }));
+  const ciGateSteps = CI_COMPOSITION_STEPS.filter(([, label]) => label === 'Production build').map(
+    ([, label]) => ({ label, status: 'ok' as const })
+  );
 
   expect(() => assertQaExecutionContract({ wrapperId: 'ci:proof', steps: proofSteps })).toThrow(
     /missing=.*Full product coverage/u
@@ -148,7 +148,7 @@ it('requires fail-late CI evidence after an earlier control failure', () => {
       mode: 'reuse-fast-proof',
       steps: [{ label: 'Fast proof reuse', status: 'ok' }, ...releaseSteps, ...auditSteps],
     })
-  ).toThrow(/missing=.*Mutation persistence/u);
+  ).toThrow(/missing=.*Production build/u);
   expect(() =>
     assertQaExecutionContract({
       wrapperId: 'ci:release',
@@ -157,7 +157,7 @@ it('requires fail-late CI evidence after an earlier control failure', () => {
         { label: 'Fast proof reuse', status: 'ok' },
         ...releaseSteps,
         ...auditSteps,
-        ...mutationSteps,
+        ...ciGateSteps,
       ],
     })
   ).not.toThrow();

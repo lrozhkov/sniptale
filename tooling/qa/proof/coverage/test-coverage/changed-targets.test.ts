@@ -6,11 +6,29 @@ const FILE = 'apps/extension/src/editor/document/file-actions/index.ts';
 
 function changedTargets(lines: number[]) {
   return {
+    addedFiles: [],
     changedFiles: [FILE],
     changedLineMap: new Map([[FILE, new Set(lines)]]),
     untrackedFiles: new Set<string>(),
   };
 }
+
+it('enrolls an untracked production file outside the rollout registry', () => {
+  const file = 'apps/extension/src/content/unrolled/new-runtime.ts';
+  expect(
+    resolveCoverageTargetFiles({
+      changedTargets: {
+        addedFiles: [file],
+        changedFiles: [file],
+        changedLineMap: new Map(),
+        untrackedFiles: new Set([file]),
+      },
+      codeFileCollector: () => [file],
+      files: [file],
+      sourceReader: () => 'export const value = 1;',
+    })
+  ).toEqual([file]);
+});
 
 describe('resolveCoverageTargetFiles coverage-neutral changes', () => {
   it('skips modified files whose changed lines are coverage-neutral topology glue', () => {

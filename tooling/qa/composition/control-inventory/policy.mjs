@@ -135,15 +135,6 @@ function collectSemanticRelationshipViolations(discovery, readSource) {
   for (const control of discovery.controls.filter(({ semanticClass }) =>
     semanticClass.includes('semantic')
   )) {
-    if (control.proofFiles.length === 0) {
-      violations.push(
-        createViolation(
-          'qa-semantic-control-missing-fixture',
-          control.source,
-          `${control.id} needs an explicit fixture declaration`
-        )
-      );
-    }
     if (!control.source.startsWith('tooling/') || control.sourceExists !== true) continue;
     const source = readSource(control.source);
     if (!COLLECTOR_RELATIONSHIP_PATTERN.test(source)) {

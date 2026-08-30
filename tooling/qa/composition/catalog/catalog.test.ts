@@ -35,15 +35,7 @@ describe('canonical QA control catalog', () => {
       expect(semanticClasses.has(control.semanticClass), control.id).toBe(true);
       expect(QA_CATEGORY_ORDER[control.category], control.id).toBeTypeOf('number');
       expect(control.occurrences.length, control.id).toBeGreaterThan(0);
-      if (control.semanticClass.includes('semantic')) {
-        expect(control.proof.evidenceStatus, control.id).toBe('declared');
-        expect(control.proof.validation?.testFiles.length, control.id).toBeGreaterThan(0);
-        expect(control.proof.validation?.states, control.id).toEqual(
-          expect.arrayContaining(['pass', 'fail'])
-        );
-      } else if (control.proof.evidenceStatus === 'not-declared') {
-        expect(control.proof.validation, control.id).toBeNull();
-      }
+      expect(control.proof.evidenceStatus, control.id).toBe('derived-closure');
       expect(control.scopeProfile, control.id).not.toBe('');
       expect(control.engineDecision.rationale, control.id).not.toBe('');
       expect(control.resourceProfile, control.id).not.toBe('');

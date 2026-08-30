@@ -48,8 +48,7 @@ it('requires base-owned fast and release control matrices while permitting decla
       'qa.rule.codeql',
       'qa.rule.full-product-coverage',
       'qa.rule.npm-audit',
-      'qa.rule.mutation-persistence',
-      'qa.rule.mutation-secrets',
+      'qa.rule.production-build',
     ])
   );
   expect(release.requiredPassed).not.toContain('qa.rule.unit-tests');

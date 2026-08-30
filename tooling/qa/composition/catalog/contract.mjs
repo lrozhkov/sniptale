@@ -45,12 +45,12 @@ const CHECKPOINT_LABELS = [
 const CI_PROOF_LABELS = createCiProductControlOccurrences('proof').map(({ label }) => label);
 const CI_RELEASE_LABELS = createCiProductControlOccurrences('release').map(({ label }) => label);
 const AUDIT_LABELS = tupleLabels(AUDIT_STEPS);
-const MUTATION_LABELS = tupleLabels(CI_COMPOSITION_STEPS).filter((label) =>
-  label.startsWith('Mutation ')
+const CI_GATE_LABELS = tupleLabels(CI_COMPOSITION_STEPS).filter(
+  (label) => label === 'Production build'
 );
 
 function ciProofContract() {
-  return { required: [...CI_PROOF_LABELS, ...AUDIT_LABELS] };
+  return { required: [...CI_PROOF_LABELS, ...CI_GATE_LABELS, ...AUDIT_LABELS] };
 }
 
 function ciReleaseContract(mode) {
@@ -61,7 +61,7 @@ function ciReleaseContract(mode) {
           ...CI_PROOF_LABELS,
           ...CI_RELEASE_LABELS.filter((label) => !CI_PROOF_LABELS.includes(label)),
         ];
-  return { required: [...proofLabels, ...AUDIT_LABELS, ...MUTATION_LABELS] };
+  return { required: [...proofLabels, ...CI_GATE_LABELS, ...AUDIT_LABELS] };
 }
 
 function buildContract(mode, hasFailure) {

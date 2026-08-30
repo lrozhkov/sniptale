@@ -7,7 +7,6 @@ import { fromRelativePath, repoRoot } from '../../analysis/repository/shared-pat
 import { collectRepositoryExecutableOrigins } from './executable-origins/repository.mjs';
 import { createExecutableOriginSourceFile } from './executable-origins/source.mjs';
 import { analyzeExecutableEntrypoint } from './executables/check.mjs';
-import { loadValidationManifest } from '../../policy/validation/manifest.mjs';
 
 export const CONTROL_POLICY_PATH = 'tooling/configs/qa/control-dispositions.data.json';
 export const CONTROL_INVENTORY_PATH = '.tmp/qa-controls/control-inventory.json';
@@ -37,31 +36,6 @@ function collectRepoFiles(root, predicate) {
     baseDir: repoRoot,
     predicate,
   }).sort();
-}
-
-function collectValidationProof({ controlIds, executableTargets }) {
-  const entries = loadValidationManifest({
-    controlExists: (controlId) => controlIds.has(controlId),
-    executableExists: (source) => executableTargets.has(source),
-  });
-  const proofByControlId = new Map();
-  for (const entry of entries.filter(({ claim }) => claim === 'control')) {
-    proofByControlId.set(entry.controlId, [...new Set(entry.testFiles)].sort());
-  }
-  return { entries, proofByControlId };
-}
-
-function collectReferencedTests(definition, proofByControlId) {
-  return [...(proofByControlId.get(definition.id) ?? [])];
-}
-
-export function projectExecutableManifestProof(validationEntries, executableTargets) {
-  const targetSet = new Set(executableTargets);
-  return new Map(
-    validationEntries
-      .filter(({ claim, source }) => claim === 'executable' && targetSet.has(source))
-      .map((entry) => [entry.source, [...new Set(entry.testFiles)].sort()])
-  );
 }
 
 function collectPackageQaScripts() {
@@ -95,12 +69,7 @@ function entrypointMetadata(file, origins, readSource) {
   };
 }
 
-export function buildExecutableDiscovery({
-  controls,
-  executableProof = new Map(),
-  originProjection,
-  readSource,
-}) {
+export function buildExecutableDiscovery({ controls, originProjection, readSource }) {
   const originsByTarget = new Map();
   for (const origin of originProjection.origins) {
     const current = originsByTarget.get(origin.target) ?? [];
@@ -114,8 +83,6 @@ export function buildExecutableDiscovery({
     const exactControls = controls.filter(({ source }) => source === file);
     const proofFiles = [
       ...new Set([
-        ...exactControls.flatMap(({ proofFiles: files }) => files),
-        ...(executableProof.get(file) ?? []),
         ...origins
           .filter(({ kind }) => kind === 'test-process-target')
           .map(({ authority }) => authority),
@@ -163,40 +130,24 @@ function collectPolicyConsumers(policyFiles) {
 
 export function collectControlDiscovery() {
   const originProjection = collectRepositoryExecutableOrigins();
-  const { entries: validationEntries, proofByControlId } = collectValidationProof({
-    controlIds: new Set(QA_RULE_DEFINITIONS.map(({ id }) => id)),
-    executableTargets: new Set(originProjection.targets),
-  });
   const controls = QA_RULE_DEFINITIONS.map((definition) => ({
     ...definition,
     sourceExists: definition.source.startsWith('tooling/')
       ? fs.existsSync(fromRelativePath(definition.source))
       : null,
-    proofFiles: collectReferencedTests(definition, proofByControlId),
   }));
   const policyFiles = collectPolicyFiles();
   const packageQaScripts = collectPackageQaScripts();
-  const executableProof = projectExecutableManifestProof(
-    validationEntries,
-    originProjection.targets
-  );
   return {
     schemaVersion: 4,
     controls,
     executables: buildExecutableDiscovery({
       controls,
-      executableProof,
       originProjection,
       readSource: (file) => fs.readFileSync(fromRelativePath(file), 'utf8'),
     }),
     packageQaScripts,
     policyFiles: collectPolicyConsumers(policyFiles),
-    validationEntries,
-    validationClaims: validationEntries.map((entry) =>
-      entry.claim === 'control'
-        ? { claim: 'control', controlId: entry.controlId }
-        : { claim: 'executable', source: entry.source }
-    ),
   };
 }
 
