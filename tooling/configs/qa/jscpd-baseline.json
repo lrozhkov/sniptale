@@ -1,5 +1,5 @@
 {
-  "$comment": "Exact current jscpd detector owner-family inventory. Finding triage is intentionally deferred to the dedicated baseline task.",
+  "$comment": "Exact current jscpd detector owner-family inventory after complete finding triage; intentional and deferred findings remain admitted.",
   "version": 3,
   "description": "Complete blocking ci:release jscpd baseline for the current repository tree.",
   "families": [
@@ -24,7 +24,7 @@
     {
       "family": "apps/extension/src/workflows/media-hub-backup/v6",
       "count": 5,
-      "lines": 100,
+      "lines": 70,
       "sampleFingerprint": "d9b2422c546164f66cade64b525f791291c3b963971c7cfe233368cfad2fd897"
     },
     {
@@ -65,9 +65,9 @@
     },
     {
       "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/scenario",
-      "count": 3,
-      "lines": 33,
-      "sampleFingerprint": "4c79cf4f31e0f5f2d027a6eaedf1321927f9dfe26efa4da262b2ee3f99da1842"
+      "count": 2,
+      "lines": 21,
+      "sampleFingerprint": "aea771a89ad4b6e962139c5abf0eccdec32e7485b5662d456f30199af7c33e90"
     },
     {
       "family": "apps/extension/src/composition/persistence/scenario",
