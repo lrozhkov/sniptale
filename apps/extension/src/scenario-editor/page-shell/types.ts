@@ -3,7 +3,7 @@ import type {
   ScenarioProjectV3,
   ScenarioSlide,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import type { ScenarioV3PageSaveState } from './runtime/types';
+import type { ScenarioV3PageSaveState, ScenarioV3SaveOutcome } from './runtime/types';
 import type { ScenarioAggregateChildMutation } from '../../composition/persistence/scenario/aggregate-mutations';
 
 export type CommitScenarioV3AggregateMutation = (
@@ -13,7 +13,7 @@ export type CommitScenarioV3AggregateMutation = (
 
 export interface ScenarioV3EditorSaveStatus {
   error: string | null;
-  retrySave: () => Promise<void>;
+  retrySave: () => Promise<ScenarioV3SaveOutcome | null>;
   state: ScenarioV3PageSaveState;
 }
 

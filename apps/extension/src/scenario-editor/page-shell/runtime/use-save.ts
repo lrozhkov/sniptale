@@ -1,15 +1,15 @@
 import { useCallback, useRef, type MutableRefObject } from 'react';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { getScenarioV3RuntimeErrorMessage, saveScenarioV3EditorProject } from './save';
-import type { ScenarioV3PageSaveState } from './types';
+import type { ScenarioV3PageSaveState, ScenarioV3SaveOutcome } from './types';
 
 interface ScenarioV3SaveController {
-  saveProject: (project: ScenarioProjectV3) => Promise<void>;
+  saveProject: (project: ScenarioProjectV3) => Promise<ScenarioV3SaveOutcome>;
 }
 
 interface QueuedScenarioV3Save {
   project: ScenarioProjectV3;
-  resolve: (project: ScenarioProjectV3) => void;
+  resolve: (outcome: ScenarioV3SaveOutcome) => void;
 }
 
 interface ScenarioV3SaveQueue {
@@ -47,7 +47,7 @@ export function useScenarioV3ProjectSaver(args: {
         setError,
         setProject,
         setSaveState,
-      }).then(() => undefined),
+      }),
     [savedProjectRef, saveRevisionRef, setError, setProject, setSaveState]
   );
 
@@ -65,7 +65,7 @@ function enqueueScenarioV3EditorSave(args: {
 }) {
   const queue = args.queue;
   if (!queue) {
-    return Promise.resolve(args.nextProject);
+    return Promise.resolve({ status: 'failed' } as const);
   }
 
   queue.latestProjectRef.current = args.nextProject;
@@ -73,7 +73,7 @@ function enqueueScenarioV3EditorSave(args: {
   args.setSaveState('saving');
   args.setError(null);
 
-  return new Promise<ScenarioProjectV3>((resolve) => {
+  return new Promise<ScenarioV3SaveOutcome>((resolve) => {
     const queuedSave = {
       project: args.nextProject,
       resolve,
@@ -97,7 +97,7 @@ function settleSupersededScenarioV3Save(queuedSave: QueuedScenarioV3Save | null)
     return;
   }
 
-  queuedSave.resolve(queuedSave.project);
+  queuedSave.resolve({ status: 'superseded' });
 }
 
 function startScenarioV3EditorSave(args: {
@@ -133,10 +133,10 @@ async function runScenarioV3EditorSave(args: {
       baseUpdatedAt,
     });
     applyScenarioV3EditorSaveSuccess({ ...args, savedProject });
-    args.queuedSave.resolve(savedProject);
+    args.queuedSave.resolve({ project: savedProject, status: 'saved' });
   } catch (nextError) {
     applyScenarioV3EditorSaveFailure({ ...args, nextError });
-    args.queuedSave.resolve(args.queuedSave.project);
+    args.queuedSave.resolve({ status: 'failed' });
   }
 }
 
@@ -187,7 +187,9 @@ function flushQueuedScenarioV3EditorSave(args: {
   const queuedSave = args.queue.queuedSaveRef.current;
   args.queue.queuedSaveRef.current = null;
   if (!queuedSave || args.savedProjectRef.current === queuedSave.project) {
-    queuedSave?.resolve(queuedSave.project);
+    if (queuedSave) {
+      queuedSave.resolve({ project: queuedSave.project, status: 'saved' });
+    }
     return;
   }
 

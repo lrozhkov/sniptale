@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { useScenarioV3ProjectSaver } from './use-save';
+import type { ScenarioV3SaveOutcome } from './types';
 
 const { saveScenarioProjectRecordV3Mock } = vi.hoisted(() => ({
   saveScenarioProjectRecordV3Mock: vi.fn(),
@@ -22,7 +23,8 @@ vi.mock('../../../composition/persistence/scenario/store/v3', async (importOrigi
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-let currentSaveProject: ((project: ScenarioProjectV3) => Promise<void>) | null = null;
+let currentSaveProject: ((project: ScenarioProjectV3) => Promise<ScenarioV3SaveOutcome>) | null =
+  null;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -142,7 +144,7 @@ async function clickSave() {
 
 function requestSave(project: ScenarioProjectV3) {
   expect(currentSaveProject).not.toBeNull();
-  let savePromise!: Promise<void>;
+  let savePromise!: Promise<ScenarioV3SaveOutcome>;
   act(() => {
     savePromise = currentSaveProject?.(project) ?? Promise.reject(new Error('missing saver'));
   });

@@ -89,7 +89,7 @@ afterEach(() => {
 
 it('renders every document save state and routes document actions', () => {
   const props = createFloatingProps();
-  const retrySave = vi.fn(async () => undefined);
+  const retrySave = vi.fn(async () => null);
 
   renderNode(
     <ScenarioFloatingDocumentBar

@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 it('passes page save status into the scenario shell content seam', () => {
-  const retrySave = vi.fn(async () => undefined);
+  const retrySave = vi.fn(async () => null);
 
   act(() => {
     root?.render(

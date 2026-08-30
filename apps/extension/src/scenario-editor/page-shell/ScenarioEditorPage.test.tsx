@@ -57,7 +57,7 @@ function registerPageRouteTest() {
 
 function registerFloatingToolRouteTest() {
   it('routes v3 shell floating tools through their canonical panels', () => {
-    const retrySave = vi.fn(async () => undefined);
+    const retrySave = vi.fn(async () => null);
     act(() => {
       root?.render(
         <ScenarioV3EditorShell

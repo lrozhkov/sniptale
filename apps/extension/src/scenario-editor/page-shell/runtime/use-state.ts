@@ -2,27 +2,31 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { readScenarioEditorProjectId } from '@sniptale/runtime-contracts/scenario-editor/session';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import type { ScenarioV3PageProjectState, ScenarioV3PageSaveState } from './types';
+import type {
+  ScenarioV3PageProjectState,
+  ScenarioV3PageSaveState,
+  ScenarioV3SaveOutcome,
+} from './types';
 import { useScenarioV3ProjectLoader } from './use-load';
 import { useScenarioV3ProjectSaver } from './use-save';
 
 function useScenarioV3ProjectMutations(args: {
   project: ScenarioProjectV3 | null;
-  saveProject: (project: ScenarioProjectV3) => Promise<void>;
+  saveProject: (project: ScenarioProjectV3) => Promise<ScenarioV3SaveOutcome>;
   setProject: (project: ScenarioProjectV3) => void;
 }) {
   const { project, saveProject, setProject } = args;
   const updateProject = useCallback(
     (nextProject: ScenarioProjectV3) => {
       setProject(nextProject);
-      void saveProject(nextProject);
+      return saveProject(nextProject);
     },
     [saveProject, setProject]
   );
 
   const retrySave = useCallback(() => {
     if (!project) {
-      return Promise.resolve();
+      return Promise.resolve(null);
     }
 
     return saveProject(project);
