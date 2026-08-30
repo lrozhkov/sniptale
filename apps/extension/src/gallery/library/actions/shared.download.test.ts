@@ -77,3 +77,21 @@ it('surfaces persistent backing-file cleanup failure after terminal download sta
   await vi.waitFor(() => expect(onReleaseError).toHaveBeenCalledWith(releaseError));
   expect(release).toHaveBeenCalledOnce();
 });
+
+it('releases a download lease at the bounded deadline when Chrome emits no events', async () => {
+  vi.useFakeTimers();
+  const release = vi.fn().mockResolvedValue(undefined);
+  const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:orphaned-download');
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+  downloadBlob(new Blob(['zip']), 'backup.zip', release);
+  await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+
+  expect(revoke).toHaveBeenCalledOnce();
+  expect(release).toHaveBeenCalledOnce();
+  downloads.created?.({ id: 9, state: 'in_progress', url: 'blob:orphaned-download' });
+  downloads.changed?.({ id: 9, state: { current: 'complete' } });
+  await Promise.resolve();
+  expect(release).toHaveBeenCalledOnce();
+});

@@ -74,6 +74,7 @@ function createPreviewDraftSetter<Key extends keyof GalleryAppState['preview']['
 function createControllerActions(
   stateRef: ReturnType<typeof createGalleryStateRef>
 ): GalleryAppStateController['actions'] {
+  let activeBackupExport: AbortController | null = null;
   return {
     filters: {
       createSavedView: async () => Promise.reject(new Error('Not implemented in test controller.')),
@@ -109,10 +110,21 @@ function createControllerActions(
       refresh: vi.fn(async () => undefined),
     },
     surface: {
+      beginBlockingOperation: () => () => undefined,
+      cancelActiveBackupExport: () => {
+        activeBackupExport?.abort();
+        activeBackupExport = null;
+      },
+      releaseActiveBackupExport: (abortController) => {
+        if (activeBackupExport === abortController) activeBackupExport = null;
+      },
+      replaceActiveBackupExport: (abortController) => {
+        activeBackupExport?.abort();
+        activeBackupExport = abortController;
+      },
       setActiveImport: createNestedSetter({ area: 'storage', key: 'activeImport', stateRef }),
       setBanner: createNestedSetter({ area: 'storage', key: 'banner', stateRef }),
       setConfirmDialog: createNestedSetter({ area: 'storage', key: 'confirmDialog', stateRef }),
-      setIsBusy: () => undefined,
       setPendingExport: createNestedSetter({ area: 'storage', key: 'pendingExport', stateRef }),
       setPendingImport: createNestedSetter({ area: 'storage', key: 'pendingImport', stateRef }),
       setPendingMediaImport: createNestedSetter({

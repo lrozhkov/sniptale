@@ -15,10 +15,6 @@ import type { GalleryItem } from '../items';
 import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
 import { type GalleryBusyAction } from './shared';
 
-const activeBackupExportAbortControllers = new WeakMap<
-  GalleryBackupExportController,
-  AbortController
->();
 const activeImportAbortControllers = new Map<string, AbortController>();
 let importRunSequence = 0;
 
@@ -83,9 +79,8 @@ export function createExportBackupAction(
 export function createConfirmExportBackupAction(controller: GalleryBackupExportController) {
   return async (options: MediaHubBackupExportOptions, withBusy: GalleryBusyAction) => {
     await withBusy(async () => {
-      activeBackupExportAbortControllers.get(controller)?.abort();
       const abortController = new AbortController();
-      activeBackupExportAbortControllers.set(controller, abortController);
+      controller.actions.surface.replaceActiveBackupExport(abortController);
       try {
         const summary = await inspectLocalMediaHubBackup(options);
         if (abortController.signal.aborted) {
@@ -99,9 +94,7 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         controller.actions.surface.setPendingExport(null);
         await controller.actions.storage.refresh();
       } finally {
-        if (activeBackupExportAbortControllers.get(controller) === abortController) {
-          activeBackupExportAbortControllers.delete(controller);
-        }
+        controller.actions.surface.releaseActiveBackupExport(abortController);
       }
     });
   };
@@ -109,8 +102,7 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
 
 export function createClosePendingExportAction(controller: GalleryBackupExportController) {
   return () => {
-    activeBackupExportAbortControllers.get(controller)?.abort();
-    activeBackupExportAbortControllers.delete(controller);
+    controller.actions.surface.cancelActiveBackupExport();
     controller.actions.surface.setPendingExport(null);
   };
 }

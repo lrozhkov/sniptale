@@ -66,9 +66,12 @@ function renderHook() {
 function configureSurfaceStateMock() {
   useGallerySurfaceStateMock.mockReturnValue({
     actions: {
+      beginBlockingOperation: vi.fn(() => () => undefined),
+      cancelActiveBackupExport: vi.fn(),
+      releaseActiveBackupExport: vi.fn(),
+      replaceActiveBackupExport: vi.fn(),
       setBanner: vi.fn(),
       setConfirmDialog: vi.fn(),
-      setIsBusy: vi.fn(),
       setPendingExport: vi.fn(),
       setPendingImport: vi.fn(),
       setPendingMediaImport: vi.fn(),

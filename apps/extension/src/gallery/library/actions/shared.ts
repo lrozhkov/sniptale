@@ -41,7 +41,7 @@ export function openGalleryConfirmDialog(
 
 export function createBusyActionRunner({ actions }: Pick<GallerySurfaceController, 'actions'>) {
   return async (action: () => Promise<void>) => {
-    actions.surface.setIsBusy(true);
+    const releaseOperation = actions.surface.beginBlockingOperation();
     try {
       await action();
     } catch (error) {
@@ -52,7 +52,7 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
           : translate('gallery.app.actionFailed')
       );
     } finally {
-      actions.surface.setIsBusy(false);
+      releaseOperation();
     }
   };
 }
@@ -99,10 +99,8 @@ function trackBlobDownloadCleanup(
         .then(release)
         .catch((error: unknown) => onReleaseError?.(error));
   };
-  if (!tracksTerminalState) {
-    timeoutId = window.setTimeout(cleanup, 1000);
-    return;
-  }
+  timeoutId = window.setTimeout(cleanup, tracksTerminalState ? 24 * 60 * 60 * 1000 : 1000);
+  if (!tracksTerminalState) return;
 
   unsubscribeCreated = browserDownloads.subscribeToCreated((item) => {
     if (item.url !== url && item.finalUrl !== url) return;

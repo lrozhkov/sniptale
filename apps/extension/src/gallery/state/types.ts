@@ -170,6 +170,10 @@ interface GalleryAppPreviewActions {
 }
 
 interface GalleryAppSurfaceActions {
+  beginBlockingOperation: () => () => void;
+  cancelActiveBackupExport: () => void;
+  releaseActiveBackupExport: (abortController: AbortController) => void;
+  replaceActiveBackupExport: (abortController: AbortController) => void;
   setActiveImport: Dispatch<SetStateAction<ActiveImportState | null>>;
   setPendingImport: Dispatch<SetStateAction<PendingImportState | null>>;
   setPendingMediaImport: Dispatch<SetStateAction<PendingMediaFileImportState | null>>;
@@ -177,7 +181,6 @@ interface GalleryAppSurfaceActions {
   setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
   setBanner: Dispatch<SetStateAction<string | null>>;
-  setIsBusy: Dispatch<SetStateAction<boolean>>;
 }
 
 interface GalleryAppActions {

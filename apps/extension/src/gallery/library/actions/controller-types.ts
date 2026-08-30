@@ -128,6 +128,9 @@ interface GalleryBackupExportControllerActions {
     refresh: () => Promise<void>;
   };
   surface: {
+    cancelActiveBackupExport: () => void;
+    releaseActiveBackupExport: (abortController: AbortController) => void;
+    replaceActiveBackupExport: (abortController: AbortController) => void;
     setBanner: Dispatch<SetStateAction<string | null>>;
     setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   };
@@ -164,9 +167,9 @@ export interface GalleryBackupExportController {
 export interface GallerySurfaceController {
   actions: {
     surface: {
+      beginBlockingOperation: () => () => void;
       setBanner: Dispatch<SetStateAction<string | null>>;
       setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
-      setIsBusy: Dispatch<SetStateAction<boolean>>;
       setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
     };
   };

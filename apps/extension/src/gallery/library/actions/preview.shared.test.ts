@@ -132,9 +132,12 @@ function createRunBusy(setBanner = vi.fn(), setIsBusy = vi.fn()) {
   return createBusyActionRunner({
     actions: {
       surface: {
+        beginBlockingOperation: () => {
+          setIsBusy(true);
+          return () => setIsBusy(false);
+        },
         setBanner,
         setConfirmDialog: vi.fn(),
-        setIsBusy,
         setPendingExport: vi.fn(),
       },
     },

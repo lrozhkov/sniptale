@@ -148,10 +148,13 @@ function configureStorageWorkflowMock(
 ) {
   useGalleryStorageWorkflowMock.mockReturnValue({
     actions: {
+      beginBlockingOperation: vi.fn(() => () => undefined),
+      cancelActiveBackupExport: vi.fn(),
       refresh: vi.fn(),
+      releaseActiveBackupExport: vi.fn(),
+      replaceActiveBackupExport: vi.fn(),
       setBanner: vi.fn(),
       setConfirmDialog: vi.fn(),
-      setIsBusy: vi.fn(),
       setPendingExport: vi.fn(),
       setPendingImport: vi.fn(),
       setPendingMediaImport: vi.fn(),
