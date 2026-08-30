@@ -9,9 +9,8 @@ import {
   type PhysicalDeleteAssetOperation,
 } from '../../../../composition/persistence/assets';
 import { putAggregatePresentationBackupRestore } from '../../../../composition/persistence/aggregate-presentations/backup-restore';
-import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
-import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
+import { preparePortableAggregatePresentation } from './presentation';
 import { decodePortableEditorDocument } from '../root-codecs/editor-document';
 import { putImageWorkspaceBackupRestore } from '../../../../composition/persistence/image-workspaces/backup-restore';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
@@ -455,32 +454,6 @@ function prepareWorkspace(args: {
   return { refs, workspace };
 }
 
-async function preparePresentation(args: {
-  mediaId: string;
-  metadata: PortableMedia;
-  objects: StagedObjectMap;
-}): Promise<AggregatePresentationEntry | null> {
-  if (!args.metadata.presentation) return null;
-  const thumbnailBlob = await readAssetFile(
-    requireObject(args.objects, args.metadata.presentation.thumbnailObjectId).ref,
-    `${args.mediaId}-presentation-thumbnail`
-  );
-  const previewBlob = args.metadata.presentation.previewObjectId
-    ? await readAssetFile(
-        requireObject(args.objects, args.metadata.presentation.previewObjectId).ref,
-        `${args.mediaId}-preview`
-      )
-    : undefined;
-  const presentation = parseAggregatePresentationEntry({
-    ...args.metadata.presentation.entry,
-    aggregateId: args.mediaId,
-    thumbnailBlob,
-    ...(previewBlob ? { previewBlob } : {}),
-  });
-  if (!presentation) throw new Error('Restored aggregate presentation is invalid.');
-  return presentation;
-}
-
 async function prepareMediaRoot(args: {
   metadata: PortableMedia;
   objects: StagedObjectMap;
@@ -513,10 +486,11 @@ async function prepareMediaRoot(args: {
   });
   const [thumbnail, presentation] = await Promise.all([
     prepareThumbnail({ mediaId: restoredEntry.id, metadata: args.metadata, objects: args.objects }),
-    preparePresentation({
-      mediaId: restoredEntry.id,
-      metadata: args.metadata,
-      objects: args.objects,
+    preparePortableAggregatePresentation({
+      getObjectRef: (objectId) => requireObject(args.objects, objectId).ref,
+      invalidMessage: 'Restored aggregate presentation is invalid.',
+      metadata: args.metadata.presentation,
+      targetId: restoredEntry.id,
     }),
   ]);
   const workspace = prepareWorkspace({
