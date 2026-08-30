@@ -21,7 +21,14 @@ type ToolSettingsKey = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text' | 'step'
 type ToolSettingsPatch = Pick<EditorState, 'toolSettings' | 'selectionToolSettings'>;
 type RuntimeStatePatch = Pick<
   EditorState,
-  'layers' | 'selection' | 'cropSelection' | 'history' | 'viewport' | 'frame' | 'browserFrame'
+  | 'layers'
+  | 'selection'
+  | 'cropReady'
+  | 'cropSelection'
+  | 'history'
+  | 'viewport'
+  | 'frame'
+  | 'browserFrame'
 >;
 type ResetDocumentState = Pick<
   EditorState,
@@ -100,7 +107,8 @@ export function createRuntimePatch(
   return {
     layers: patch.layers ?? state.layers,
     selection: patch.selection ?? state.selection,
-    cropSelection: patch.cropSelection === undefined ? state.cropSelection : patch.cropSelection,
+    cropReady: patch.cropReady,
+    cropSelection: patch.cropSelection,
     history: patch.history ?? state.history,
     viewport: patch.viewport ?? state.viewport,
     frame: patch.frame ? normalizeEditorFrameSettings(patch.frame) : state.frame,

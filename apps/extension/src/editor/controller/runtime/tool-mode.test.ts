@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getObjectDimensionsMock: vi.fn(() => ({ height: 45, width: 120 })),
   getSingleSelectionTypeMock: vi.fn(() => 'rectangle'),
   isUserObjectMock: vi.fn(() => true),
-  setCropReadyMock: vi.fn(),
   syncRuntimeMock: vi.fn(),
   syncSelectionToolSettingsFromObjectMock: vi.fn(),
 }));
@@ -16,7 +15,6 @@ let storeState: {
   browserFrame: { enabled: boolean };
   frame: { backgroundColor: string };
   syncRuntime: typeof mocks.syncRuntimeMock;
-  setCropReady: typeof mocks.setCropReadyMock;
 };
 
 vi.mock('../../state/useEditorStore', () => ({
@@ -48,7 +46,6 @@ function initializeStoreState() {
   storeState = {
     browserFrame: { enabled: false },
     frame: { backgroundColor: '#fff' },
-    setCropReady: mocks.setCropReadyMock,
     syncRuntime: mocks.syncRuntimeMock,
   };
 }
@@ -79,12 +76,12 @@ function registerRuntimeSyncTests() {
     );
     expect(mocks.syncRuntimeMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        cropReady: true,
         history: { canRedo: true, canUndo: true, index: 2, size: 4 },
         layers: [{ id: 'layer-1' }],
         selection: expect.objectContaining({ selectedObjectId: 'rect-1' }),
       })
     );
-    expect(mocks.setCropReadyMock).toHaveBeenCalledWith(true);
   });
 }
 
@@ -98,10 +95,10 @@ function registerRuntimeFallbackTests() {
 
     expect(mocks.syncRuntimeMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        cropReady: false,
         history: { canRedo: false, canUndo: false, index: 0, size: 1 },
       })
     );
-    expect(mocks.setCropReadyMock).toHaveBeenCalledWith(false);
   });
 }
 

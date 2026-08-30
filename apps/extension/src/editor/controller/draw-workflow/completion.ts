@@ -42,7 +42,7 @@ export function completeEditorDrawWorkflow(options: {
     case 'discard':
       return createDiscardDrawWorkflowState(canvas, drawSession, syncRuntimeState);
     case 'crop':
-      return createCropDrawWorkflowState(canvas, completion, syncRuntimeState);
+      return createCropDrawWorkflowState(canvas, completion);
     case 'complete':
       return createCompletedDrawWorkflowState(canvas, completion, commitHistory, syncRuntimeState);
     default:

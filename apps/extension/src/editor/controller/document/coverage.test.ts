@@ -7,7 +7,6 @@ const storeState = {
   frame: { padding: 12 },
   resetDocumentState: vi.fn(),
   setBrowserFrame: vi.fn(),
-  setCropReady: vi.fn(),
   setImageData: vi.fn(),
   setInspector: vi.fn(),
   setPageTitle: vi.fn(),

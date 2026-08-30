@@ -1,6 +1,5 @@
 import type { Canvas, Rect } from 'fabric';
 import { Point } from 'fabric';
-import { useEditorStore } from '../../state/useEditorStore';
 import type { CropSelection } from '../core/types';
 import {
   applyCropGuideSelection,
@@ -62,7 +61,6 @@ export function previewEditorCanvasSizeSelection(
   }
   context.canvas.setActiveObject(cropGuide);
   context.canvas.requestRenderAll();
-  useEditorStore.getState().setCropReady(Boolean(nextCropSelection));
 
   return {
     cropGuide,
@@ -95,7 +93,6 @@ export function clearEditorCanvasSizePreview(context: {
   context.canvas.remove(context.cropGuide);
   context.canvas.discardActiveObject();
   context.canvas.requestRenderAll();
-  useEditorStore.getState().setCropReady(false);
   return {
     cropGuide: null,
     cropSelection: null,

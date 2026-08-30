@@ -1,5 +1,4 @@
 import type { Canvas, Rect } from 'fabric';
-import { useEditorStore } from '../../state/useEditorStore';
 import { cancelEditorCropDrawSession, clearEditorCropGuide } from '../transient';
 import type { CropSelection, DrawSession } from '../core/types';
 
@@ -26,7 +25,6 @@ export function clearEditorControllerCropSelection(context: {
     canvas,
     cropGuide,
   });
-  useEditorStore.getState().setCropReady(false);
   canvas.requestRenderAll();
   return nextState;
 }

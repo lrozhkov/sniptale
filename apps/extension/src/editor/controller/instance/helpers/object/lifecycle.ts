@@ -43,9 +43,13 @@ export function startDrawSessionForController(
     return;
   }
 
+  const cropProjectionChanged = controller.cropSelection !== nextState.cropSelection;
   controller.drawSession = nextState.drawSession;
   controller.cropGuide = nextState.cropGuide;
   controller.cropSelection = nextState.cropSelection;
+  if (cropProjectionChanged) {
+    controller.syncRuntimeState();
+  }
 }
 
 export function getActiveCropRectForController(controller: EditorControllerInstance) {
