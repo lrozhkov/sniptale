@@ -167,16 +167,10 @@ it('downloads recordings and starts project export through the export owner', as
   expect(executeDownloadBlobMock).toHaveBeenCalledWith(expect.any(Blob), 'project.mp4', 'preset-1');
 
   const settings = createExportSettings();
-  expect(
-    handleStartProjectExport(
-      { input: createInputReference(), jobId: 'job-1', settings },
-      sendResponse,
-      VIDEO_EDITOR_OWNER
-    )
-  ).toEqual({ handled: true, keepChannelOpen: true });
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await handleStartProjectExport(
+    { input: createInputReference(), jobId: 'job-1', settings },
+    VIDEO_EDITOR_OWNER
+  );
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({

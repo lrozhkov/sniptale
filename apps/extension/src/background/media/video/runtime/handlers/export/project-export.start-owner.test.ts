@@ -73,10 +73,6 @@ import { handleStartProjectExport } from './project-export';
 const VIDEO_EDITOR_URL = 'chrome-extension://test/apps/extension/src/video-editor/index.html';
 const VIDEO_EDITOR_OWNER = { documentId: 'editor-doc-1', senderUrl: VIDEO_EDITOR_URL };
 
-function createSendResponse() {
-  return vi.fn<(response?: unknown) => void>();
-}
-
 function createProject(): VideoProject {
   return {
     actionEvents: [],
@@ -122,12 +118,6 @@ function createExportSettings(): VideoProjectExportSettings {
   };
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   loadProjectExportInputMock.mockResolvedValue(createProject());
@@ -138,15 +128,14 @@ beforeEach(() => {
 });
 
 it('rejects start attempts that would overwrite a running job owner', async () => {
-  const sendResponse = createSendResponse();
   const settings = createExportSettings();
 
-  handleStartProjectExport(
-    { input: createInputReference(), jobId: 'job-1', settings },
-    sendResponse,
-    VIDEO_EDITOR_OWNER
-  );
-  await flushPromises();
+  await expect(
+    handleStartProjectExport(
+      { input: createInputReference(), jobId: 'job-1', settings },
+      VIDEO_EDITOR_OWNER
+    )
+  ).rejects.toThrow('Project export is already running');
 
   expect(reserveLedgerMock).toHaveBeenCalledWith({
     jobId: 'job-1',
@@ -159,9 +148,5 @@ it('rejects start attempts that would overwrite a running job owner', async () =
     input: createInputReference(),
     jobId: 'job-1',
     settings,
-  });
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'Project export is already running',
-    success: false,
   });
 });

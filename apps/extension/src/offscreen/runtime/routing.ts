@@ -295,8 +295,7 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
-      await handleProjectExportRuntimeMessage(message, sendResponse);
-      return;
+      return await handleProjectExportRuntimeMessage(message, sendResponse);
   }
 }
 

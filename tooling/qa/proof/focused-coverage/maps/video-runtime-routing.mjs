@@ -5,7 +5,7 @@ export const VIDEO_RECORDING_RUNTIME_ROUTING_OWNER_MAPPINGS = [
     reason:
       'The public media route entrypoint is covered by video runtime and control route suites.',
     testFiles: [
-      'apps/extension/src/background/media/video/runtime/router.export.test.ts',
+      'apps/extension/src/background/media/video/runtime/router.extended.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/control-route.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/control-route.start.test.ts',
       'apps/extension/src/background/runtime/routing/action-kernel/handlers.project-export.test.ts',

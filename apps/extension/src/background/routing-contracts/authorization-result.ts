@@ -1,9 +1,7 @@
 import type { ProjectExportPreauthorization } from './project-export-preauthorization';
 import type { BackgroundOwnedRoutePreauthorization } from './owned-route-context';
 
-export type IpcPreauthorization =
-  | BackgroundOwnedRoutePreauthorization
-  | ProjectExportPreauthorization;
+type IpcPreauthorization = BackgroundOwnedRoutePreauthorization | ProjectExportPreauthorization;
 
 type AuthorizedIpcMessage = {
   authorized: true;

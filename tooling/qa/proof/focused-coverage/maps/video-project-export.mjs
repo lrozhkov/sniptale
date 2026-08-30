@@ -1,12 +1,13 @@
 export const VIDEO_PROJECT_EXPORT_OWNER_MAPPINGS = [
   {
     owner: 'video-project-export-runtime-authority',
-    productionFile: 'apps/extension/src/background/media/video/runtime/handlers/export/route.ts',
+    productionFile:
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.ts',
     reason:
-      'Project export runtime route preauthorization is covered by focused route authorization tests.',
+      'Descriptor-bound project export authorization and dispatch are covered by action-kernel tests.',
     testFiles: [
-      'apps/extension/src/background/media/video/runtime/handlers/export/route.authorization.test.ts',
-      'apps/extension/src/background/media/video/runtime/handlers/export/root.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.project-export.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/registry.drift.test.ts',
     ],
   },
   {
@@ -24,21 +25,11 @@ export const VIDEO_PROJECT_EXPORT_OWNER_MAPPINGS = [
   },
   {
     owner: 'video-project-export-runtime-authority',
-    productionFile: 'apps/extension/src/background/media/video/runtime/router.ts',
-    reason: 'Project export runtime routing is covered by sender/capability route suites.',
-    testFiles: [
-      'apps/extension/src/background/media/video/runtime/router.export.test.ts',
-      'apps/extension/src/background/media/video/runtime/router.extended.test.ts',
-      'apps/extension/src/background/media/video/runtime/handlers/export/root.test.ts',
-    ],
-  },
-  {
-    owner: 'video-project-export-runtime-authority',
     productionFile: 'apps/extension/src/background/media/video/runtime/sender-policy.ts',
     reason: 'Video editor sender ownership is covered by sender-policy and router tests.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/sender-policy.test.ts',
-      'apps/extension/src/background/media/video/runtime/router.export.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.project-export.test.ts',
     ],
   },
   {

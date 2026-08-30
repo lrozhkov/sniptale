@@ -11,7 +11,6 @@ import {
   handleDownloadProjectExport,
   handleDownloadRecordingSidecar,
 } from './handlers/export/download';
-import { routeExportRuntimeMessage } from './handlers/export/route';
 import type { RouteResult } from './handlers/shared';
 import { handleRegisterCameraRecorderControl } from './handlers/state/camera-recorder-registration';
 import {
@@ -32,7 +31,6 @@ import {
   handleRecordingState,
 } from './handlers/state/recording-state-response';
 import { routeStateLifecycleRuntimeMessage } from './handlers/state/route';
-import type { ProjectExportPreauthorization } from '../../../routing-contracts/project-export-preauthorization';
 import { acceptVideoSourceReady } from '../capture-surface';
 
 function mapRuntimeDiagnosticEvent(message: {
@@ -128,8 +126,7 @@ export function routeVideoRuntimeMessage(
   message: VideoRuntimeMessage,
   sendResponse: ResponseSender,
   senderTabId?: number,
-  sender?: chrome.runtime.MessageSender,
-  projectExportPreauthorization?: ProjectExportPreauthorization
+  sender?: chrome.runtime.MessageSender
 ): RouteResult {
   const recordingRoute = routeRecordingRuntimeMessage(message, sendResponse, senderTabId, sender);
   if (recordingRoute) {
@@ -139,16 +136,6 @@ export function routeVideoRuntimeMessage(
   const stateLifecycleRoute = routeStateLifecycleRuntimeMessage(message, sendResponse);
   if (stateLifecycleRoute) {
     return stateLifecycleRoute;
-  }
-
-  const exportRoute = routeExportRuntimeMessage(
-    message,
-    sendResponse,
-    sender,
-    projectExportPreauthorization
-  );
-  if (exportRoute) {
-    return exportRoute;
   }
 
   if (message.type === VideoMessageType.DIAGNOSTIC_EVENT_FROM_CS) {

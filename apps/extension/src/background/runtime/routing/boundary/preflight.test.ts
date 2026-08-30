@@ -112,8 +112,7 @@ function verifiesVideoRuntimeRouteResult() {
     { type: VideoMessageType.GET_RECORDING_STATE },
     sendResponse,
     9,
-    createSender(9),
-    undefined
+    createSender(9)
   );
 }
 
@@ -146,8 +145,7 @@ function verifiesOffscreenOnlyVideoRuntimeSenderGate() {
     message,
     sendResponse,
     undefined,
-    createSender(undefined, 'chrome-extension://test/apps/extension/src/offscreen/offscreen.html'),
-    undefined
+    createSender(undefined, 'chrome-extension://test/apps/extension/src/offscreen/offscreen.html')
   );
 
   const downloadMessage = {

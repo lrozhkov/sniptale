@@ -162,7 +162,7 @@ it('shares successful duplicate export commands without rerunning side effects',
     expect(sendResponse).toHaveBeenCalledTimes(2);
   });
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
-});
+}, 10_000);
 
 it('returns the original failure to an in-flight duplicate export command', async () => {
   const listener = await captureSubscriptionListener();

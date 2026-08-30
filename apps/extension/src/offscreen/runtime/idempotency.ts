@@ -179,6 +179,20 @@ export function getOffscreenCommandIdempotencyPolicy(
 
 function readCorrelationId(message: OffscreenIdempotencyMessage): string {
   if (
+    message.type === VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT ||
+    message.type === VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT
+  ) {
+    if (typeof message.jobId !== 'string' || message.jobId.length === 0) {
+      throw new Error(`Missing ${message.type} job identity`);
+    }
+    return message.jobId;
+  }
+
+  return readLegacyCorrelationId(message);
+}
+
+function readLegacyCorrelationId(message: OffscreenIdempotencyMessage): string {
+  if (
     typeof message.reference === 'object' &&
     message.reference !== null &&
     !Array.isArray(message.reference) &&

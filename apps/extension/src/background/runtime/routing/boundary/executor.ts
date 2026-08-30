@@ -5,6 +5,7 @@ import {
   createActionContext,
   dispatchAction,
 } from '../action-kernel';
+import { getBackgroundIngressDescriptor } from '../../../../contracts/messaging/contracts/runtime';
 import type { BackgroundRuntimeMessageDeps } from './shared';
 import type { RuntimeMessagePreflightRoute } from './preflight';
 
@@ -24,11 +25,23 @@ export function executeImmediateRuntimeRoute(args: {
     sendResponse: args.sendResponse,
     sender: args.sender,
   });
-  const action = adaptImmediateLegacyRouteToAction({
-    context,
-    parsedMessage: args.parsedMessage,
-    route: args.route,
-  });
+  const descriptor = getBackgroundIngressDescriptor(args.parsedMessage.type);
+  const action =
+    args.route.kind === 'video-runtime' &&
+    descriptor?.classification === 'routed' &&
+    (descriptor.handlerId === 'project-export-runtime' ||
+      descriptor.handlerId === 'project-export-capabilities')
+      ? {
+          actionKind: 'video-runtime' as const,
+          context,
+          message: args.route.message,
+          routeName: `video-runtime:${args.route.message.type}` as const,
+        }
+      : adaptImmediateLegacyRouteToAction({
+          context,
+          parsedMessage: args.parsedMessage,
+          route: args.route,
+        });
   const result = dispatchAction(action);
   return result.handled ? { done: true, keepChannelOpen: result.keepChannelOpen } : { done: false };
 }

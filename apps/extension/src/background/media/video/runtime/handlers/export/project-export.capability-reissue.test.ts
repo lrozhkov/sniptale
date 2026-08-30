@@ -47,10 +47,6 @@ const VIDEO_EDITOR_URL = 'chrome-extension://test/apps/extension/src/video-edito
 const VIDEO_EDITOR_OWNER = { documentId: 'editor-doc-1', senderUrl: VIDEO_EDITOR_URL };
 const OTHER_VIDEO_EDITOR_OWNER = { documentId: 'editor-doc-2', senderUrl: VIDEO_EDITOR_URL };
 
-function createSendResponse() {
-  return vi.fn<(response?: unknown) => void>();
-}
-
 function createExportSettings() {
   return {
     downloadAfterExport: true,
@@ -91,12 +87,6 @@ function createCapabilitiesResponse() {
   };
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   resetProjectExportRuntimeCapabilitiesForTests();
@@ -108,17 +98,12 @@ beforeEach(() => {
 });
 
 it('reissues cancel authority for the owner of a running export ledger entry', async () => {
-  const sendResponse = createSendResponse();
   loadActiveLedgerMock.mockResolvedValueOnce(createRunningLedger(VIDEO_EDITOR_OWNER));
 
-  handleGetProjectExportCapabilities(
+  const response = await handleGetProjectExportCapabilities(
     { jobId: 'job-4', settings: createExportSettings() },
-    sendResponse,
     VIDEO_EDITOR_OWNER
   );
-  await flushPromises();
-
-  const response = sendResponse.mock.calls[0]?.[0] as { cancelCapabilityToken?: string };
   expect(response).toEqual(
     expect.objectContaining({
       cancelCapabilityToken: expect.any(String),
@@ -137,20 +122,12 @@ it('reissues cancel authority for the owner of a running export ledger entry', a
 });
 
 it('does not issue start or cancel authority for a different owner of an active job', async () => {
-  const sendResponse = createSendResponse();
   loadActiveLedgerMock.mockResolvedValueOnce(createRunningLedger(OTHER_VIDEO_EDITOR_OWNER));
 
-  handleGetProjectExportCapabilities(
+  const response = await handleGetProjectExportCapabilities(
     { jobId: 'job-4', settings: createExportSettings() },
-    sendResponse,
     VIDEO_EDITOR_OWNER
   );
-  await flushPromises();
-
-  const response = sendResponse.mock.calls[0]?.[0] as {
-    cancelCapabilityToken?: string;
-    capabilityToken?: string;
-  };
   expect(response).toEqual(
     expect.not.objectContaining({ cancelCapabilityToken: expect.any(String) })
   );
@@ -158,23 +135,15 @@ it('does not issue start or cancel authority for a different owner of an active 
 });
 
 it('does not issue start authority while another export job is running', async () => {
-  const sendResponse = createSendResponse();
   loadActiveLedgerMock.mockResolvedValueOnce({
     ...createRunningLedger(VIDEO_EDITOR_OWNER),
     jobId: 'job-other',
   });
 
-  handleGetProjectExportCapabilities(
+  const response = await handleGetProjectExportCapabilities(
     { jobId: 'job-4', settings: createExportSettings() },
-    sendResponse,
     VIDEO_EDITOR_OWNER
   );
-  await flushPromises();
-
-  const response = sendResponse.mock.calls[0]?.[0] as {
-    cancelCapabilityToken?: string;
-    capabilityToken?: string;
-  };
   expect(response).toEqual(
     expect.not.objectContaining({ cancelCapabilityToken: expect.any(String) })
   );
@@ -182,18 +151,13 @@ it('does not issue start authority while another export job is running', async (
 });
 
 it('issues start authority when no active ledger owns the requested job', async () => {
-  const sendResponse = createSendResponse();
   const settings = createExportSettings();
   loadActiveLedgerMock.mockResolvedValueOnce(null);
 
-  handleGetProjectExportCapabilities(
+  const response = await handleGetProjectExportCapabilities(
     { jobId: 'job-4', settings },
-    sendResponse,
     VIDEO_EDITOR_OWNER
   );
-  await flushPromises();
-
-  const response = sendResponse.mock.calls[0]?.[0] as { capabilityToken?: string };
   expect(response).toEqual(
     expect.objectContaining({
       capabilityToken: expect.any(String),
@@ -213,17 +177,13 @@ it('issues start authority when no active ledger owns the requested job', async 
 });
 
 it('returns raw capabilities without ledger lookup when no job id is requested', async () => {
-  const sendResponse = createSendResponse();
-
-  handleGetProjectExportCapabilities(
+  const response = await handleGetProjectExportCapabilities(
     { settings: createExportSettings() },
-    sendResponse,
     VIDEO_EDITOR_OWNER
   );
-  await flushPromises();
 
   expect(loadActiveLedgerMock).not.toHaveBeenCalled();
-  expect(sendResponse).toHaveBeenCalledWith(
+  expect(response).toEqual(
     expect.objectContaining({
       capabilities: expect.any(Object),
       success: true,

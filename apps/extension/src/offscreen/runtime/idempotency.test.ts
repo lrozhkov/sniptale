@@ -83,6 +83,31 @@ it('tracks job-correlated export commands and shares duplicate completion', asyn
   await expect(duplicate.completion).resolves.toBeUndefined();
 });
 
+it('namespaces project export replay by command, job, and authority generation', () => {
+  const start = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'generation-export-scope',
+    message: { jobId: 'job-export-scope', type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT },
+  });
+  const cancel = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'generation-export-scope',
+    message: { jobId: 'job-export-scope', type: VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT },
+  });
+  const nextGeneration = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'generation-export-scope-next',
+    message: { jobId: 'job-export-scope', type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT },
+  });
+
+  expect(start).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+  expect(cancel).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+  expect(nextGeneration).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+  expect(() =>
+    markOffscreenSideEffectCommand({
+      capabilityGeneration: 'generation-export-missing-job',
+      message: { type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT },
+    })
+  ).toThrow('Missing OFFSCREEN_START_PROJECT_EXPORT job identity');
+});
+
 it('shares one camera negotiation per peer without replaying it across peers', async () => {
   const firstPeer = markOffscreenSideEffectCommand({
     capabilityGeneration: 'camera-generation',

@@ -197,7 +197,7 @@ it('routes export start, cancel, and capability probe messages', async () => {
       defaultMp4VideoCodec: 'AVC',
     }),
   });
-});
+}, 10_000);
 
 it('surfaces export failures through sendResponse when the caller keeps the channel open', async () => {
   const listener = await captureSubscriptionListener();

@@ -23,6 +23,7 @@ import {
 } from './routing';
 import { authorizeOffscreenRuntimeCommand } from './authorization';
 import { markOffscreenSideEffectCommand } from './idempotency';
+import { buildProjectExportCommandSuccessResponse } from './project-export-response';
 
 const logger = createLogger({ namespace: 'OffscreenRuntime' });
 
@@ -83,7 +84,12 @@ function routeParsedOffscreenMessage(
     message: parsedMessage,
   });
   if (idempotency.duplicate) {
-    return routeDuplicateOffscreenCommand(idempotency.completion, responseHandler, responseMode);
+    return routeDuplicateOffscreenCommand(
+      idempotency.completion,
+      responseHandler,
+      responseMode,
+      parsedMessage.type
+    );
   }
 
   if (responseMode === 'immediate-ack') {
@@ -105,7 +111,7 @@ function routeParsedOffscreenMessage(
   void work
     .then((result) => {
       if (responseHandler && responseMode === 'deferred-ack') {
-        responseHandler(buildOffscreenCommandSuccessResponse(result));
+        responseHandler(buildOffscreenCommandResponse(parsedMessage.type, result));
       }
     })
     .catch((error) => {
@@ -134,25 +140,32 @@ function trackOffscreenRuntimeWork(
 function routeDuplicateOffscreenCommand(
   completion: Promise<unknown>,
   responseHandler: ResponseSender | undefined,
-  responseMode: ReturnType<typeof resolveOffscreenRuntimeResponseMode>
+  responseMode: ReturnType<typeof resolveOffscreenRuntimeResponseMode>,
+  type: HandledOffscreenRuntimeMessageType
 ): boolean | undefined {
   if (responseMode === 'immediate-ack') {
     responseHandler?.({ success: true, result: 'accepted' });
     return responseHandler ? false : undefined;
   }
 
-  void completion.then(
-    (result) => {
-      responseHandler?.(buildOffscreenCommandSuccessResponse(result));
-    },
-    (error) => {
+  void completion
+    .then((result) => {
+      responseHandler?.(buildOffscreenCommandResponse(type, result));
+    })
+    .catch((error) => {
       responseHandler?.({
         success: false,
         error: error instanceof Error ? error.message : String(error),
       });
-    }
-  );
+    });
   return responseHandler ? true : undefined;
+}
+
+function buildOffscreenCommandResponse(type: HandledOffscreenRuntimeMessageType, result: unknown) {
+  return (
+    buildProjectExportCommandSuccessResponse(type, result) ??
+    buildOffscreenCommandSuccessResponse(result)
+  );
 }
 
 function buildOffscreenCommandSuccessResponse(result: unknown) {

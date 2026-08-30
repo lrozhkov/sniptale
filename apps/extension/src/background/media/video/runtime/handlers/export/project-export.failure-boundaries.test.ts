@@ -90,10 +90,6 @@ const VIDEO_EDITOR_OWNER = {
   senderUrl: 'chrome-extension://test/apps/extension/src/video-editor/index.html',
 };
 
-function createSendResponse() {
-  return vi.fn<(response?: unknown) => void>();
-}
-
 function createProject(): VideoProject {
   return {
     actionEvents: [],
@@ -139,12 +135,6 @@ function createExportSettings(): VideoProjectExportSettings {
   };
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   loadProjectExportInputMock.mockResolvedValue(createProject());
@@ -160,124 +150,95 @@ beforeEach(() => {
 });
 
 it('rejects project export launch when offscreen returns a failure ack', async () => {
-  const sendResponse = createSendResponse();
   sendRuntimeMessageMock.mockResolvedValueOnce({
     error: 'launch rejected',
     success: false,
   });
 
-  handleStartProjectExport(
-    { input: createInputReference(), jobId: 'job-1', settings: createExportSettings() },
-    sendResponse,
-    VIDEO_EDITOR_OWNER
-  );
-  await flushPromises();
+  await expect(
+    handleStartProjectExport(
+      { input: createInputReference(), jobId: 'job-1', settings: createExportSettings() },
+      VIDEO_EDITOR_OWNER
+    )
+  ).rejects.toThrow('launch rejected');
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ capabilityToken: expect.any(String) })
   );
   expect(markTerminalMock).toHaveBeenCalledWith('job-1', 'failed', 'Error: launch rejected');
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'launch rejected',
-    success: false,
-  });
 });
 
 it('rejects project export launch when offscreen omits the acceptance ack', async () => {
-  const sendResponse = createSendResponse();
   sendRuntimeMessageMock.mockResolvedValueOnce(undefined);
 
-  handleStartProjectExport(
-    { input: createInputReference(), jobId: 'job-1', settings: createExportSettings() },
-    sendResponse,
-    VIDEO_EDITOR_OWNER
-  );
-  await flushPromises();
+  await expect(
+    handleStartProjectExport(
+      { input: createInputReference(), jobId: 'job-1', settings: createExportSettings() },
+      VIDEO_EDITOR_OWNER
+    )
+  ).rejects.toThrow('Project export launch rejected');
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ capabilityToken: expect.any(String) })
   );
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'Project export launch rejected',
-    success: false,
-  });
 });
 
 it('rejects project export cancellation when offscreen returns a failure ack', async () => {
-  const sendResponse = createSendResponse();
   sendRuntimeMessageMock.mockResolvedValueOnce({
     error: 'cancel rejected',
     success: false,
   });
 
-  handleCancelProjectExport({ jobId: 'job-2' }, sendResponse);
-  await flushPromises();
+  await expect(handleCancelProjectExport({ jobId: 'job-2' })).rejects.toThrow('cancel rejected');
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ capabilityToken: expect.any(String) })
   );
   expect(requestCancelMock).toHaveBeenCalledWith('job-2');
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'cancel rejected',
-    success: false,
-  });
 });
 
 it('does not issue export authority when capability probing fails', async () => {
-  const sendResponse = createSendResponse();
   sendRuntimeMessageMock.mockRejectedValueOnce(new Error('probe failed'));
 
-  handleGetProjectExportCapabilities(
-    { jobId: 'job-3', settings: createExportSettings() },
-    sendResponse,
-    VIDEO_EDITOR_OWNER
-  );
-  await flushPromises();
+  await expect(
+    handleGetProjectExportCapabilities(
+      { jobId: 'job-3', settings: createExportSettings() },
+      VIDEO_EDITOR_OWNER
+    )
+  ).rejects.toThrow('probe failed');
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ capabilityToken: expect.any(String) })
   );
   expect(loadActiveLedgerMock).not.toHaveBeenCalled();
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'probe failed',
-    success: false,
-  });
 });
 
 it('does not issue export authority for unsuccessful capability responses', async () => {
-  const sendResponse = createSendResponse();
   sendRuntimeMessageMock.mockResolvedValueOnce({
     error: 'codec unsupported',
     success: false,
   });
 
-  handleGetProjectExportCapabilities(
-    { jobId: 'job-3', settings: createExportSettings() },
-    sendResponse,
-    VIDEO_EDITOR_OWNER
-  );
-  await flushPromises();
+  await expect(
+    handleGetProjectExportCapabilities(
+      { jobId: 'job-3', settings: createExportSettings() },
+      VIDEO_EDITOR_OWNER
+    )
+  ).resolves.toEqual({ error: 'codec unsupported', success: false });
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ capabilityToken: expect.any(String) })
   );
   expect(loadActiveLedgerMock).not.toHaveBeenCalled();
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'codec unsupported',
-    success: false,
-  });
 });
 
 it('probes capabilities even when an existing offscreen document is not observable yet', async () => {
-  const sendResponse = createSendResponse();
   hasOffscreenDocumentMock.mockReturnValueOnce(false);
 
-  handleGetProjectExportCapabilities(
+  await handleGetProjectExportCapabilities(
     { settings: createExportSettings() },
-    sendResponse,
     VIDEO_EDITOR_OWNER
   );
-  await flushPromises();
 
   expect(waitForOffscreenReadyMock).not.toHaveBeenCalled();
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(

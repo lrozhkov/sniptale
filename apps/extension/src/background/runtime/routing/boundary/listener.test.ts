@@ -96,8 +96,7 @@ it('routes parsed immediate video runtime messages through their owner', () => {
     message,
     sendResponse,
     3,
-    createSender(3),
-    undefined
+    createSender(3)
   );
 });
 

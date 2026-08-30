@@ -50,7 +50,6 @@ export const AUDIT_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.test.ts',
       'apps/extension/src/background/media/video/runtime/handlers/state/root.test.ts',
       'apps/extension/src/background/media/video/runtime/router.branches.test.ts',
-      'apps/extension/src/background/media/video/runtime/router.export.test.ts',
       'apps/extension/src/background/media/video/runtime/router.fallback.test.ts',
     ],
   },
