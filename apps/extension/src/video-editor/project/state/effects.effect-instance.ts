@@ -56,7 +56,6 @@ function createApplyEffectDocument(
       return host
         ? {
             ...update,
-            selectedClipId: host.id,
             selectedTrackId: host.trackId,
             selection: { clipId: host.id, kind: VideoEditorSelectionKind.CLIP },
           }

@@ -27,7 +27,6 @@ function applyInsertionResult(
 ): string | null {
   set((state) => applyProjectUpdate(state, () => result.project));
   set({
-    selectedClipId: result.selectedClipId,
     selectedTrackId: result.selectedTrackId,
     ...(result.selectedClipId
       ? { selection: { kind: VideoEditorSelectionKind.CLIP, clipId: result.selectedClipId } }

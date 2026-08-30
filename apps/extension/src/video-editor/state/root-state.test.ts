@@ -212,8 +212,8 @@ function verifyTimelineActions(): void {
   expect(timeline.getState()).toMatchObject({
     currentTime: 12,
     isPlaying: true,
-    selectedClipId: 'audio-1',
     selectedTrackId: audioTrack!.id,
+    selection: { kind: 'clip', clipId: 'audio-1' },
   });
 }
 

@@ -279,7 +279,7 @@ it('reads invocation-time command snapshots from the canonical store', () => {
   act(() => {
     useVideoEditorStore.setState({
       currentTime: 750,
-      selectedClipId: 'clip-latest',
+      selection: { kind: 'clip', clipId: 'clip-latest' },
       exportState: { ...useVideoEditorStore.getState().exportState, jobId: 'job-latest' },
     });
   });

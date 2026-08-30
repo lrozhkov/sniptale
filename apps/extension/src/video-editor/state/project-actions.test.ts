@@ -84,12 +84,11 @@ describe('video editor timeline project state', () => {
 
     store.getState().setProject(project);
     expect(store.getState()).toMatchObject({
-      selectedClipId: visibleClip.id,
       selectedTrackId: overlayTrack.id,
       selection: { kind: 'clip', clipId: visibleClip.id },
     });
 
-    store.getState().deleteClip(store.getState().selectedClipId!);
+    store.getState().deleteClip(visibleClip.id);
     expect(store.getState().project?.clips.map((clip) => clip.id)).toEqual([subtitleClip.id]);
   });
 });

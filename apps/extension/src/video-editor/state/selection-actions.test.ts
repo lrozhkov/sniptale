@@ -37,7 +37,6 @@ function createSelectionStore() {
     project: createEmptyVideoProject('Selection'),
     recordingId: null,
     saveState: 'idle',
-    selectedClipId: null,
     selectedTrackId: null,
     selection: { kind: 'scene' },
   } as VideoEditorState;

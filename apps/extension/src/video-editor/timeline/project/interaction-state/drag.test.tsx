@@ -14,6 +14,7 @@ import {
 } from '../../../../features/video/project/types';
 import { useProjectTimelineDrag } from './drag';
 import { useVideoEditorStore, type VideoEditorState } from '../../../state/store';
+import { resolveSelectedClipId } from '../../../contracts/selection';
 import { usePlaybackShortcuts } from '../../../runtime/session/playback/shortcuts';
 import type { PlaybackHandlers, PlaybackLatestState } from '../../../interaction/playback/types';
 import type { VideoEditorProjectHistoryTransactionActions } from '../../../contracts/commands/history';
@@ -114,7 +115,7 @@ function createPlaybackShortcutState(state: VideoEditorState): PlaybackLatestSta
     project: state.project,
     projectHistoryTransactionActive: state.projectHistory.transaction !== null,
     selectedActionEvent: null,
-    selectedClipId: state.selectedClipId,
+    selectedClipId: resolveSelectedClipId(state.selection),
     selectedMotionRegion: null,
     selection: state.selection,
   };

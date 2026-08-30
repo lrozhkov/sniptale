@@ -1,12 +1,13 @@
 import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
+import type { ClipSelectionPort } from '../../../contracts/controller-store';
 import { useVideoEditorStore, type VideoEditorState } from '../../../state/store';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import { createWorkspaceTimelineEditingActions } from './timeline-actions';
 
 function createStore(project = createEmptyVideoProject('Timeline actions')) {
-  const store: VideoEditorState = {
+  const store: VideoEditorState & Pick<ClipSelectionPort, 'selectedClipId'> = {
     ...useVideoEditorStore.getInitialState(),
     project,
     recordingId: 'recording-1',

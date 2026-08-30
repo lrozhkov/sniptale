@@ -36,3 +36,7 @@ export type VideoEditorSelection =
       kind: typeof VideoEditorSelectionKind.MOTION_REGION;
       motionRegionId: string;
     };
+
+export function resolveSelectedClipId(selection: VideoEditorSelection): string | null {
+  return selection.kind === VideoEditorSelectionKind.CLIP ? selection.clipId : null;
+}

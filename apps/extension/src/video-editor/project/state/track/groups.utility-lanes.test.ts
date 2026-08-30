@@ -11,7 +11,6 @@ function createMutableState() {
     currentTime: 0,
     project,
     projectHistory: resetVideoEditorProjectHistory(project.id),
-    selectedClipId: null,
     selectedTrackId: null,
     selection: { kind: 'scene' },
   } as VideoEditorProjectState;

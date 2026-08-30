@@ -12,7 +12,6 @@ export interface VideoEditorProjectSliceState {
   placementMode: VideoEditorPlacementMode | null;
   selection: VideoEditorSelection;
   selectedTrackId: string | null;
-  selectedClipId: string | null;
 }
 
 type VideoEditorProjectSlice = VideoEditorProjectSliceState & VideoEditorProjectActions;

@@ -123,7 +123,6 @@ function verifyProjectHelperGuards(): void {
       project,
       projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'clip', clipId: 'video-1' },
-      selectedClipId: 'video-1',
       selectedTrackId: project.tracks[0]!.id,
     } as VideoEditorProjectState,
     () => ({
@@ -132,7 +131,7 @@ function verifyProjectHelperGuards(): void {
       tracks: [project.tracks[1]!],
     })
   );
-  expect(nextState.selectedClipId).toBeNull();
+  expect(nextState.selection).toEqual({ kind: 'scene' });
   expect(nextState.selectedTrackId).toBe(project.tracks[1]!.id);
   expectMotionSelectionCleanup(project);
   expectMotionPlacementModeCleanupOnFocusModeChange(project);
@@ -213,7 +212,6 @@ function expectMotionSelectionCleanup(project: VideoProject): void {
       project: motionProject,
       projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'motion-region', motionRegionId: 'motion-1' },
-      selectedClipId: null,
       selectedTrackId: project.tracks[0]!.id,
     } as VideoEditorProjectState,
     (currentProject) => ({
@@ -249,7 +247,6 @@ function expectActionPlacementPreserved(project: VideoProject): void {
       project: actionProject,
       projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'action-segment', actionEventId: 'action-1' },
-      selectedClipId: null,
       selectedTrackId: project.tracks[0]!.id,
     } as VideoEditorProjectState,
     (currentProject) => ({
@@ -286,7 +283,6 @@ function expectMotionPlacementModeCleanupOnFocusModeChange(project: VideoProject
       project: motionProject,
       projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'motion-region', motionRegionId: 'motion-1' },
-      selectedClipId: null,
       selectedTrackId: project.tracks[0]!.id,
     } as VideoEditorProjectState,
     (currentProject) => ({

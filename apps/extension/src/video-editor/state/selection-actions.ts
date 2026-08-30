@@ -66,7 +66,6 @@ function createSelectSceneAction(set: VideoEditorStoreSet): VideoEditorState['se
         state.placementMode
       ),
       selection: createSceneSelection(),
-      selectedClipId: null,
       selectedTrackId: state.selectedTrackId ?? resolveInitialSelectedTrackId(state.project),
     }));
 }
@@ -85,7 +84,6 @@ function createSelectTrackAction(set: VideoEditorStoreSet): VideoEditorState['se
       return {
         placementMode: resolvePlacementModeAfterSelectionChange(selection, state.placementMode),
         selection,
-        selectedClipId: null,
         selectedTrackId,
       };
     });
@@ -105,7 +103,6 @@ function createSelectClipAction(set: VideoEditorStoreSet): VideoEditorState['sel
       return {
         placementMode: resolvePlacementModeAfterSelectionChange(selection, state.placementMode),
         selection,
-        selectedClipId,
         selectedTrackId: resolveSelectedTrackId(state, selectedClipId),
       };
     });
@@ -124,7 +121,6 @@ function createSelectTransitionAction(
       return {
         placementMode: resolvePlacementModeAfterSelectionChange(selection, state.placementMode),
         selection,
-        selectedClipId: null,
         selectedTrackId:
           resolveTransitionTrackId(state.project, transitionId) ?? state.selectedTrackId,
       };
@@ -144,7 +140,6 @@ function createSelectCursorSegmentAction(
       return {
         placementMode: resolvePlacementModeAfterSelectionChange(selection, state.placementMode),
         selection,
-        selectedClipId: null,
         selectedTrackId: state.selectedTrackId,
       };
     });
@@ -163,7 +158,6 @@ function createSelectObjectTrackAction(
       return {
         placementMode: resolvePlacementModeAfterSelectionChange(selection, state.placementMode),
         selection,
-        selectedClipId: null,
         selectedTrackId: state.selectedTrackId,
       };
     });
@@ -182,7 +176,6 @@ function createSelectActionSegmentAction(
       return {
         placementMode: resolvePlacementModeAfterSelectionChange(selection, state.placementMode),
         selection,
-        selectedClipId: null,
         selectedTrackId: state.selectedTrackId,
       };
     });
@@ -201,7 +194,6 @@ function createSelectMotionRegionAction(
       return {
         placementMode: resolvePlacementModeAfterSelectionChange(selection, state.placementMode),
         selection,
-        selectedClipId: null,
         selectedTrackId: state.selectedTrackId,
       };
     });

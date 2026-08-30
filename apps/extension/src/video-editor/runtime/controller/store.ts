@@ -13,6 +13,7 @@ import type {
   VideoEditorProjectStorageStatus,
 } from '../../contracts/controller-store';
 import { useVideoEditorStore, type VideoEditorState } from '../../state/store';
+import { resolveSelectedClipId } from '../../contracts/selection';
 
 type PortSelector<Port, Selection> = (port: Port) => Selection;
 
@@ -111,7 +112,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
 
 function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
   return {
-    selectedClipId: state.selectedClipId,
+    selectedClipId: resolveSelectedClipId(state.selection),
     selectedTrackId: state.selectedTrackId,
     selection: state.selection,
     selectActionSegment: state.selectActionSegment,
@@ -301,7 +302,7 @@ export function getCurrentVideoEditorCurrentTime(): number {
 }
 
 export function getCurrentVideoEditorSelectedClipId(): string | null {
-  return useVideoEditorStore.getState().selectedClipId;
+  return resolveSelectedClipId(useVideoEditorStore.getState().selection);
 }
 
 export function getCurrentVideoEditorExportStateSnapshot() {
