@@ -40,7 +40,7 @@ it('loads blobs from project assets', async () => {
   getAssetByIdMock.mockReturnValue({
     source: { kind: 'project-asset', projectAssetId: 'asset-1' },
   });
-  getProjectAssetMock.mockResolvedValue({ file: blob });
+  getProjectAssetMock.mockResolvedValue({ entry: { file: blob }, status: 'ready' });
 
   await expect(loadBlobForAsset(PROJECT, 'asset-1')).resolves.toBe(blob);
   expect(getRecordingMock).not.toHaveBeenCalled();
@@ -56,7 +56,7 @@ it('rejects when the asset or its backing blob cannot be found', async () => {
   getAssetByIdMock.mockReturnValueOnce({
     source: { kind: 'project-asset', projectAssetId: 'asset-2' },
   });
-  getProjectAssetMock.mockResolvedValueOnce(null);
+  getProjectAssetMock.mockResolvedValueOnce({ status: 'not-found' });
 
   await expect(loadBlobForAsset(PROJECT, 'asset-2')).rejects.toThrow(
     'Project asset asset-2 not found.'

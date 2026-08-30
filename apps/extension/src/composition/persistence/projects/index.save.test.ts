@@ -261,14 +261,18 @@ it('commits video project mutations with the supplied base revision', async () =
   );
 });
 
-it('falls back to the submitted project when mutation read-back is unavailable', async () => {
+it('returns the project committed by the transaction without a second read', async () => {
   const { commitVideoProjectMutation } = await import('./index-mutations');
   const nextProject = createVideoProject({ name: 'Fallback mutation' });
 
-  projectsDbMocks.txGetMock.mockResolvedValue(undefined);
-  projectsDbMocks.dbGetMock.mockResolvedValue(undefined);
+  projectsDbMocks.txGetMock.mockReset().mockResolvedValue(undefined);
+  vi.spyOn(Date, 'now').mockReturnValue(1000);
 
-  await expect(commitVideoProjectMutation(nextProject)).resolves.toEqual(nextProject);
+  await expect(commitVideoProjectMutation(nextProject)).resolves.toEqual({
+    ...nextProject,
+    updatedAt: 1000,
+  });
+  expect(projectsDbMocks.dbGetMock).not.toHaveBeenCalled();
 });
 
 it('commits a video workspace with explicit placement and returns its durable revision', async () => {

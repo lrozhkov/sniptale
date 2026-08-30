@@ -112,7 +112,10 @@ it('keeps existing asset urls when the project rerenders without asset-list chan
   const onUrlsChange = vi.fn();
   const project = createProjectWithSingleAsset();
 
-  assetUrlMocks.getProjectAssetMock.mockResolvedValue(createProjectAssetEntry());
+  assetUrlMocks.getProjectAssetMock.mockResolvedValue({
+    entry: createProjectAssetEntry(),
+    status: 'ready',
+  });
 
   await renderHarness({
     onUrlsChange,

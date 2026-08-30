@@ -79,11 +79,23 @@ export interface ProjectAssetEntry {
   size: number;
 }
 
-export interface HydratedProjectAssetEntry extends ProjectAssetEntry {
+interface HydratedProjectAssetEntry extends ProjectAssetEntry {
   file: File;
 }
 
 export type StoredProjectAssetEntry = ProjectAssetEntry;
+
+export type ProjectAssetReadResult =
+  | { entry: HydratedProjectAssetEntry; status: 'ready' }
+  | { status: 'not-found' }
+  | {
+      reason: 'invalid-asset-entry' | 'invalid-asset-reference';
+      status: 'invalid';
+    }
+  | {
+      reason: 'asset-entry-unavailable' | 'asset-reference-unavailable' | 'asset-file-unavailable';
+      status: 'unavailable';
+    };
 
 export interface ProjectExportEntry {
   assetId: string;

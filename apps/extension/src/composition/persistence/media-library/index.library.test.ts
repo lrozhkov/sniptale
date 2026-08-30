@@ -294,15 +294,32 @@ async function verifyGetMediaAssetBlobFlow() {
     .mockResolvedValueOnce(
       createMediaEntry({ source: { kind: 'project-asset', projectAssetId: 'asset-1' } })
     )
+    .mockResolvedValueOnce(
+      createMediaEntry({ source: { kind: 'project-asset', projectAssetId: 'asset-missing' } })
+    )
+    .mockResolvedValueOnce(
+      createMediaEntry({ source: { kind: 'project-asset', projectAssetId: 'asset-unavailable' } })
+    )
     .mockResolvedValueOnce(undefined);
   dbMocks.getRecordingMock.mockResolvedValueOnce({ file: recordingBlob });
   dbMocks.getProjectExportMock.mockResolvedValueOnce({ file: recordingBlob });
-  dbMocks.getProjectAssetMock.mockResolvedValueOnce({ file: projectAssetBlob });
+  dbMocks.getProjectAssetMock.mockResolvedValueOnce({
+    entry: { file: projectAssetBlob },
+    status: 'ready',
+  });
+  dbMocks.getProjectAssetMock.mockResolvedValueOnce({ status: 'not-found' }).mockResolvedValueOnce({
+    reason: 'asset-file-unavailable',
+    status: 'unavailable',
+  });
 
   await expect(getMediaAssetBlob('screenshot')).resolves.toBe(screenshotBlob);
   await expect(getMediaAssetBlob('recording')).resolves.toBe(recordingBlob);
   await expect(getMediaAssetBlob('export')).resolves.toBe(recordingBlob);
   await expect(getMediaAssetBlob('asset')).resolves.toBe(projectAssetBlob);
+  await expect(getMediaAssetBlob('asset-missing')).resolves.toBeUndefined();
+  await expect(getMediaAssetBlob('asset-unavailable')).rejects.toThrow(
+    'Project asset asset-unavailable unavailable.'
+  );
   await expect(getMediaAssetBlob('missing')).resolves.toBeUndefined();
 }
 

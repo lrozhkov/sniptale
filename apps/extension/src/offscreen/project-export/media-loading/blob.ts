@@ -23,10 +23,13 @@ export async function loadBlobForSource(source: BlobAssetSource): Promise<Blob> 
   }
 
   const projectAsset = await getProjectAsset(source.projectAssetId);
-  if (!projectAsset) {
+  if (projectAsset.status === 'not-found') {
     throw new Error(`Project asset ${source.projectAssetId} not found.`);
   }
-  return projectAsset.file;
+  if (projectAsset.status !== 'ready') {
+    throw new Error(`Project asset ${source.projectAssetId} ${projectAsset.status}.`);
+  }
+  return projectAsset.entry.file;
 }
 
 export async function loadBlobForAsset(
