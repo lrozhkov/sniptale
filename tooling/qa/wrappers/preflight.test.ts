@@ -7,7 +7,7 @@ import {
   runGit,
   withCwd,
   writeFile,
-} from '../core/test-helpers';
+} from '../test-support/test-helpers';
 
 const GIT_INTEGRATION_TIMEOUT = 15_000;
 

@@ -98,8 +98,8 @@ function expectContentHostBaseStyles(host: HTMLElement | null): void {
   expect(host?.getAttribute('style')).toContain('opacity: 1;');
   expect(host?.getAttribute('style')).toContain('transform: none;');
   expect(host?.getAttribute('style')).toContain('pointer-events: none;');
-  expect(host?.getAttribute('style')).toContain('width: 0;');
-  expect(host?.getAttribute('style')).toContain('height: 0;');
+  expect(host?.style.width).toBe('0px');
+  expect(host?.style.height).toBe('0px');
   expect(host?.getAttribute('style')).toContain('overflow: visible;');
   expect(host?.getAttribute('style')).not.toContain('all:');
   expect(host?.getAttribute('style')).not.toContain('color-scheme:');

@@ -168,5 +168,5 @@ it('previews safely scoped custom styles on their matching callout parts', () =>
   expect(markup).toContain('data-ui="shared.callout-preview.connector"');
   expect(markup).toContain('style="opacity:0.5"');
   expect(markup).toContain('data-ui="shared.callout-preview.connector-line"');
-  expect(markup).toContain('style="stroke:#ff0000;stroke-dasharray:6 3"');
+  expect(markup).toContain('style="stroke:rgb(255, 0, 0);stroke-dasharray:6 3"');
 });

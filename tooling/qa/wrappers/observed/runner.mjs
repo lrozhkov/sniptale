@@ -7,9 +7,9 @@ import {
   resolveObservabilityRoot,
   withObservabilityTimeline,
 } from '../../runtime/observability/index.mjs';
-import { assertQaExecutionContract } from '../../core/qa-steps/contract.mjs';
-import { acquireBlockingWrapperLock } from '../../runtime/blocking-wrapper-lock.helpers.mjs';
-import { parseWrapperArguments } from '../cli-contracts.mjs';
+import { assertQaExecutionContract } from '../../composition/catalog/contract.mjs';
+import { acquireBlockingWrapperLock } from '../../runtime/locking/blocking-wrapper-lock.helpers.mjs';
+import { parseWrapperArguments } from '../contracts/cli-contracts.mjs';
 import { formatObservedRunSummary, normalizeObservedStep } from './output.mjs';
 import { createHelpStep, recordObservedResult, resolveInvocationMode } from './result.mjs';
 export {

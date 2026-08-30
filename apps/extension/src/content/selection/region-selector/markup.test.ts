@@ -24,7 +24,7 @@ it('builds the complete styled region selector surface', () => {
   const instruction = root.lastElementChild as HTMLElement;
 
   expect(root.id).toBe('sniptale-overlay');
-  expect(root.style.background).toBe('transparent');
+  expect(getComputedStyle(root).backgroundColor).toBe('rgba(0, 0, 0, 0)');
   expect(masks).toHaveLength(4);
   for (const mask of masks) {
     expect(mask.style.background).toContain(

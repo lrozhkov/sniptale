@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { harnessReady } from './browser-mocks';
+import { harnessReady } from './browser-mocks/browser-mocks';
 import { App } from '../../../apps/extension/src/video-editor/shell/app';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';

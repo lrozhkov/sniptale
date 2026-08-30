@@ -249,13 +249,9 @@ function newestReleaseArchive(startedAtMs, repositoryRoot = root) {
 
 const LANE_FILES = {
   proof: [
-    '.tmp/qa/build-proof.json',
     '.tmp/qa/unit-proof.json',
-    '.tmp/semgrep/results.json',
-    '.tmp/semgrep/results.sarif',
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
-    '.tmp/npm-audit/results.json',
     '.tmp/npm-audit/signatures.json',
   ],
   release: [
@@ -266,8 +262,6 @@ const LANE_FILES = {
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',
-    '.tmp/semgrep/results.json',
-    '.tmp/semgrep/results.sarif',
     '.tmp/codeql/results.filtered.sarif',
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
@@ -280,11 +274,7 @@ const LANE_FILES = {
 
 const REUSABLE_FAST_REPORTS = new Set([
   '.tmp/qa/unit-proof.json',
-  '.tmp/npm-audit/results.json',
   '.tmp/npm-audit/signatures.json',
-  '.tmp/osv/results.json',
-  '.tmp/semgrep/results.json',
-  '.tmp/semgrep/results.sarif',
 ]);
 
 export function copyReusableFastReport(
@@ -374,7 +364,7 @@ function collectLaneReports({
       copyExternalFile(proofPath, destinationRoot, 'fast-proof/proof-manifest.json');
     }
   }
-  if ((lane === 'release' || lane === 'proof') && required) {
+  if (lane === 'release' && required) {
     copyFile(newestReleaseArchive(startedAtMs, repositoryRoot), destinationRoot, undefined, {
       repositoryRoot,
     });

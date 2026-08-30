@@ -13,7 +13,7 @@ import {
   writeJsonAtomic,
 } from './storage.mjs';
 import { summarizeSteps } from './run.mjs';
-import { assertObservedQaRuleId } from '../../core/qa-steps/runtime-registry.mjs';
+import { assertObservedQaRuleId } from '../../composition/catalog/runtime-registry.mjs';
 
 function readRecord(filePath, runsRoot) {
   try {

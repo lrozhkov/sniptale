@@ -60,7 +60,7 @@ export const SHARED_DESIGN_SYSTEM_COMMANDS_REGISTRY: DesignSystemRegistryEntry[]
     ],
     usageContexts: [
       usage('popup.command-palette', 'Popup > Command Palette', 'Popup > Command palette', [
-        'apps/extension/src/popup/shell/command-palette/index.tsx',
+        'apps/extension/src/popup/shell/command-palette/route-first.tsx',
         'apps/extension/src/popup/shell/app/index.tsx',
       ]),
       usage(

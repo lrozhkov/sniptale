@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { isHarnessInventoryOnlyFile } from '../qa/core/qa-scope.mjs';
+import { isHarnessInventoryOnlyFile } from '../qa/composition/scope/qa-scope.mjs';
 
 const CONTROL_ROOTS = Object.freeze([
   '.github/workflows',

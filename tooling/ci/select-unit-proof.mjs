@@ -1,13 +1,13 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { verifyMainProof, verifyReleaseProof } from './verify-main-proof.mjs';
-import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import {
   downloadSuccessfulMainProof,
   downloadLatestReleaseProof,
   removeSafeRestoreOutput,
   runGitHubCli,
 } from './main-proof-transport.mjs';
+import { sealVerifiedProofFiles } from './proof-artifact-seal.mjs';
 
 const UNIT_PROOF_FILE = '.tmp/qa/unit-proof.json';
 
@@ -19,17 +19,10 @@ export function selectVerifiedUnitProof(
 ) {
   const root = path.resolve(artifactRoot);
   const { manifest } = verifier(root, commit);
-  if (!manifest.files.some(({ file }) => file === UNIT_PROOF_FILE)) {
-    throw new Error('Successful main proof does not contain a full unit proof.');
-  }
-  const source = path.join(root, UNIT_PROOF_FILE);
-  const sourceStat = fs.lstatSync(source);
-  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
-    throw new Error('Unsafe full unit proof in successful main artifact.');
-  }
   const resolvedDestination = path.resolve(destination);
-  fs.mkdirSync(path.dirname(resolvedDestination), { recursive: true });
-  fs.copyFileSync(source, resolvedDestination, fs.constants.COPYFILE_EXCL);
+  sealVerifiedProofFiles(root, manifest, [
+    { destination: resolvedDestination, relativePath: UNIT_PROOF_FILE },
+  ]);
   return resolvedDestination;
 }
 

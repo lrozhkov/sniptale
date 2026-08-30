@@ -69,6 +69,7 @@ function createSelectionModeCancelButton(args: {
     transform-origin: center;
     z-index: ${args.zIndexBase + 1};
   `;
+  button.style.lineHeight = '1';
 
   button.appendChild(createCancelIcon());
   button.addEventListener('mousedown', (event) => {

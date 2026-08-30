@@ -1,0 +1,270 @@
+id: browser-action-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/action for chrome.action badge/title access.
+rule:
+  pattern: chrome.action.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:setTitle|setBadgeText|setBadgeBackgroundColor)$' }
+---
+id: browser-runtime-info
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/runtime for chrome.runtime manifest/URL/context access.
+rule:
+  pattern: chrome.runtime.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:getManifest|getURL|getContexts|getPlatformInfo)$' }
+---
+id: browser-runtime-connect-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/runtime for chrome.runtime.connect access.
+rule:
+  pattern: chrome.runtime.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:connect)$' }
+---
+id: browser-runtime-installed-listener
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/runtime for chrome.runtime.onInstalled subscriptions.
+rule:
+  pattern: chrome.runtime.$SCOPE.$METHOD($$$ARGS)
+constraints:
+  SCOPE: { regex: '^(?:onInstalled)$' }
+  METHOD: { regex: '^(?:addListener|removeListener)$' }
+---
+id: browser-runtime-message-listener
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/runtime for chrome.runtime message and connection subscriptions.
+rule:
+  pattern: chrome.runtime.$SCOPE.$METHOD($$$ARGS)
+constraints:
+  SCOPE: { regex: '^(?:onMessage|onConnect)$' }
+  METHOD: { regex: '^(?:addListener|removeListener)$' }
+---
+id: browser-runtime-last-error
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/runtime for chrome.runtime.lastError access.
+rule:
+  pattern: chrome.runtime.lastError
+---
+id: browser-storage-direct
+language: TypeScript
+severity: error
+message: Use the composition/persistence/infrastructure/browser-storage owner for chrome.storage access.
+rule:
+  pattern: chrome.storage.$AREA.$METHOD($$$ARGS)
+constraints:
+  AREA: { regex: '^(?:local|sync|session)$' }
+  METHOD: { regex: '^(?:get|set|remove)$' }
+---
+id: browser-storage-listener
+language: TypeScript
+severity: error
+message: Use the composition/persistence/infrastructure/browser-storage owner for chrome.storage.onChanged subscriptions.
+rule:
+  pattern: chrome.storage.onChanged.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:addListener|removeListener)$' }
+---
+id: browser-tabs-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/tabs for chrome.tabs access.
+rule:
+  pattern: chrome.tabs.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:get|query|create|update|remove|captureVisibleTab|reload|setZoom)$' }
+---
+id: browser-windows-listener
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/windows for window bounds subscriptions.
+rule:
+  pattern: chrome.windows.$SCOPE.$METHOD($$$ARGS)
+constraints:
+  SCOPE: { regex: '^(?:onBoundsChanged)$' }
+  METHOD: { regex: '^(?:addListener|removeListener)$' }
+---
+id: browser-tabs-listener
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/tabs for tab listener subscriptions.
+rule:
+  pattern: chrome.tabs.$SCOPE.$METHOD($$$ARGS)
+constraints:
+  SCOPE: { regex: '^(?:onUpdated|onActivated|onRemoved)$' }
+  METHOD: { regex: '^(?:addListener|removeListener)$' }
+---
+id: browser-web-navigation-listener
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/web-navigation for webNavigation subscriptions.
+rule:
+  pattern: chrome.webNavigation.$SCOPE.$METHOD($$$ARGS)
+constraints:
+  SCOPE: { regex: '^(?:onBeforeNavigate)$' }
+  METHOD: { regex: '^(?:addListener|removeListener)$' }
+---
+id: browser-downloads-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/downloads for chrome.downloads access.
+rule:
+  pattern: chrome.downloads.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:download|search)$' }
+---
+id: browser-windows-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/windows for chrome.windows access.
+rule:
+  pattern: chrome.windows.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:get|update)$' }
+---
+id: browser-system-display-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/displays for chrome.system.display access.
+rule:
+  pattern: chrome.system.display.getInfo($$$ARGS)
+---
+id: browser-downloads-listener
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/downloads for download listener subscriptions.
+rule:
+  pattern: chrome.downloads.onChanged.$METHOD($$$ARGS)
+constraints:
+  METHOD: { regex: '^(?:addListener|removeListener)$' }
+---
+id: browser-offscreen-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/offscreen for chrome.offscreen access.
+rule:
+  pattern: chrome.offscreen.createDocument($$$ARGS)
+---
+id: browser-tab-capture-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/tab-capture for chrome.tabCapture access.
+rule:
+  pattern: chrome.tabCapture.getMediaStreamId($$$ARGS)
+---
+id: browser-scripting-direct
+language: TypeScript
+severity: error
+message: Use @sniptale/platform/browser/scripting for chrome.scripting.executeScript.
+rule:
+  pattern: chrome.scripting.executeScript($$$ARGS)
+---
+id: browser-local-storage-direct
+language: TypeScript
+severity: error
+message: Use a canonical owner seam for localStorage access; do not access it directly from arbitrary production modules.
+rule:
+  pattern: $TARGET.$METHOD($$$ARGS)
+constraints:
+  TARGET: { regex: '^(?:localStorage|window\.localStorage)$' }
+  METHOD: { regex: '^(?:getItem|setItem|removeItem|clear)$' }
+---
+id: browser-history-direct
+language: TypeScript
+severity: error
+message: Use a canonical owner seam for history mutations outside registered runtime owners.
+rule:
+  pattern: $TARGET.$METHOD($$$ARGS)
+constraints:
+  TARGET: { regex: '^(?:history|window\.history)$' }
+  METHOD: { regex: '^(?:pushState|replaceState|back|forward)$' }
+---
+id: browser-broadcast-channel-direct
+language: TypeScript
+severity: error
+message: Use a canonical owner seam for BroadcastChannel construction.
+rule:
+  pattern: new $TARGET($$$ARGS)
+constraints:
+  TARGET: { regex: '^(?:BroadcastChannel|window\.BroadcastChannel)$' }
+---
+id: messaging-direct-send-runtime
+language: TypeScript
+severity: error
+message: Use the runtime-messaging owner instead of direct chrome.runtime.sendMessage.
+rule:
+  pattern: chrome.runtime.sendMessage($$$ARGS)
+---
+id: messaging-direct-send-tabs
+language: TypeScript
+severity: error
+message: Use the runtime-messaging owner instead of direct chrome.tabs.sendMessage.
+rule:
+  pattern: chrome.tabs.sendMessage($$$ARGS)
+---
+id: messaging-chrome-stub
+language: TypeScript
+severity: error
+message: Use FakeRuntimeMessagingTransport or injected messaging dependencies.
+rule:
+  pattern: vi.stubGlobal('chrome', $$$ARGS)
+---
+id: messaging-chrome-stub-double
+language: TypeScript
+severity: error
+message: Use FakeRuntimeMessagingTransport or injected messaging dependencies.
+rule:
+  pattern: vi.stubGlobal("chrome", $$$ARGS)
+---
+id: design-system-legacy-import-ts
+language: TypeScript
+severity: error
+message: Use the canonical design-system owner instead of a retired UI import.
+rule:
+  all:
+    - kind: import_statement
+    - regex: '(?:shared/components(?:/index)?|popup/components/PopupActionButton)'
+---
+id: design-system-legacy-import-tsx
+language: Tsx
+severity: error
+message: Use the canonical design-system owner instead of a retired UI import.
+rule:
+  all:
+    - kind: import_statement
+    - regex: '(?:shared/components(?:/index)?|popup/components/PopupActionButton)'
+---
+id: design-system-raw-family-class
+language: Tsx
+severity: error
+message: Use the canonical design-system component instead of raw product-family classes.
+rule:
+  all:
+    - any:
+        - pattern:
+            context: '<div className="$VALUE" />'
+            selector: jsx_attribute
+        - pattern:
+            context: '<div className={$VALUE} />'
+            selector: jsx_attribute
+    - regex: '^className\s*=.*\bsniptale-(?:modal(?:-(?:backdrop|accent|header|close|body|footer))?|input|textarea|btn-(?:primary|secondary)|glass-(?:toolbar(?:-(?:button|divider))?|icon-button|chip|switch|range|input|mini-button|preset-(?:list|item|preview|meta|name)|color-(?:trigger|option|row)|bold-button|row|grid-3|dim)|dropdown-(?:menu|item|divider)|popover-(?:menu|item|divider)|toolbar-menu-(?:item|title|list|item-copy|item-label|item-hint|item-badge)|confirm-(?:dialog|title|message|actions|cancel|danger)|toast-(?:icon|icon-wrapper|message)|countdown-(?:toast-container|toast|main|icon|copy|label|number|suffix|cancel))(?:\s|[''"`}])'
+---
+id: design-system-direct-body-portal-ts
+language: TypeScript
+severity: error
+message: Use the theme-safe portal owner instead of portalling directly to document.body.
+rule:
+  pattern: createPortal($CONTENT, document.body)
+---
+id: design-system-direct-body-portal-tsx
+language: Tsx
+severity: error
+message: Use the theme-safe portal owner instead of portalling directly to document.body.
+rule:
+  pattern: createPortal($CONTENT, document.body)

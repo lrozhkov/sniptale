@@ -3,15 +3,8 @@ const FULL_DIFF_SCOPED_TOOLS = new Set([
   'verify-structural-risk.mjs',
   'verify-instance-ownership.mjs',
   'verify-read-path-side-effects.mjs',
-  'verify-read-safe-naming.mjs',
-  'verify-lifecycle-intent.mjs',
-  'verify-success-failure-asymmetry.mjs',
-  'verify-destructive-async-swaps.mjs',
-  'verify-storage-write-patterns.mjs',
+  'verify-persistence-ownership.mjs',
   'verify-parser-snapshot-purity.mjs',
-  'verify-history-detached-snapshots.mjs',
-  'verify-history-revision-semantics.mjs',
-  'verify-history-transaction-lifecycle.mjs',
   'verify-ui-automation-seams.mjs',
 ]);
 

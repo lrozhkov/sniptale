@@ -61,8 +61,7 @@ describe('AnnotatableImageSurface', () => {
     expect(style).toContain('var(--sniptale-color-text-muted)');
     expect(style).toContain('var(--sniptale-color-surface-canvas)');
     expect(style).not.toContain('rgba(255, 255, 255, 0.12)');
-    expect(style).toContain('background-position-x: 0px, 10px;');
-    expect(style).toContain('background-position-y: 0px, 10px;');
+    expect(style).toContain('background-position: 0px 0px, 10px 10px;');
     expect(style).toContain('background-size: 20px 20px;');
     expect(container?.innerHTML).not.toContain('overflow-x-auto');
   });
@@ -81,8 +80,7 @@ describe('AnnotatableImageSurface', () => {
 
     expect(style).toContain('background-color: rgb(1, 2, 3);');
     expect(style).toContain('background-image: none;');
-    expect(style).toContain('background-position-x: center;');
-    expect(style).toContain('background-position-y: center;');
+    expect(style).toContain('background-position: center center;');
     expect(style).toContain('background-size: 8px 8px;');
   });
 });

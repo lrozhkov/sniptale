@@ -1,0 +1,226 @@
+import {
+  formatQaResourceProfile,
+  resolveQaReleaseResourceProfile,
+  resolveQaResourceProfile,
+} from '../../../runtime/scheduling/resource-profile.mjs';
+import { parseLaneResult } from '../../../runtime/workers/lane-worker-contract.mjs';
+import { runQaLaneWorker } from '../../../runtime/workers/lane-worker-runner.mjs';
+import {
+  appendTaskScheduleDetail,
+  appendTaskScheduleDetailToFirst,
+  appendTaskResultScheduleDetail,
+  formatTaskScheduleDetail,
+  runBoundedTasks,
+} from '../../../runtime/scheduling/task-scheduler.mjs';
+import { BUILD_TEST_EXECUTION_CLASSES } from '../test-profiles/test-profiles.mjs';
+import {
+  TYPECHECK_CHECKERS,
+  TYPESCRIPT_TOOL_VERSION,
+} from '../../../analysis/source/typescript-cli.mjs';
+
+const BUILD_WORKER_URL = new URL('./worker.mjs', import.meta.url);
+const BUILD_LANE_RESOURCES = Object.freeze({
+  typecheck: { cpuTokens: TYPECHECK_CHECKERS.full, memoryMiB: 5120 },
+  tests: { memoryMiB: 4096 },
+  security: { cpuTokens: 1, memoryMiB: 3072 },
+  graph: { cpuTokens: 1, memoryMiB: 1536 },
+  static: { cpuTokens: 1, memoryMiB: 1024 },
+});
+
+const BUILD_RESULT_SHAPES = Object.freeze({
+  typecheck: { typecheckStep: 'step' },
+  tests: { testSteps: 'steps' },
+  security: { securityStep: 'step' },
+  graph: { dependencySteps: 'steps' },
+  static: {
+    namingStep: 'step',
+    architectureStep: 'step',
+    rootSideEffectsStep: 'step',
+  },
+});
+
+export function runBuildLaneWorker({
+  buildScope,
+  context,
+  lane,
+  memoryMiB,
+  signal,
+  typecheckCheckerCount,
+  vitestMaxWorkers,
+}) {
+  return runQaLaneWorker({
+    label: `Build QA worker ${lane}`,
+    memoryMiB,
+    resultParser: (value) => parseLaneResult(value, { lane, shapes: BUILD_RESULT_SHAPES }),
+    signal,
+    workerData: { buildScope, context, lane, typecheckCheckerCount, vitestMaxWorkers },
+    workerUrl: BUILD_WORKER_URL,
+  });
+}
+
+function createBuildWorkerContext(context) {
+  return { codeFiles: context.codeFiles, targetFiles: context.targetFiles };
+}
+
+function createBuildWorkerScope(buildScope) {
+  return {
+    staticScope: buildScope.staticScope,
+    testScope: {
+      detail: buildScope.testScope.detail,
+      directTestFiles: buildScope.testScope.directTestFiles,
+      fullSuite: buildScope.testScope.fullSuite,
+      relatedFiles: buildScope.testScope.relatedFiles,
+      requireRelatedTests: buildScope.testScope.requireRelatedTests,
+    },
+  };
+}
+
+function createTasks({ buildScope, context, profile, workerRunner }) {
+  const workerBuildScope = createBuildWorkerScope(buildScope);
+  const workerContext = createBuildWorkerContext(context);
+  const typecheckCheckerCount = Math.min(TYPECHECK_CHECKERS.full, profile.cpuTokens);
+  return ['typecheck', 'tests', 'security', 'graph', 'static'].map((lane) => {
+    const resources =
+      lane === 'typecheck'
+        ? { ...BUILD_LANE_RESOURCES.typecheck, cpuTokens: typecheckCheckerCount }
+        : BUILD_LANE_RESOURCES[lane];
+    const dedicatedSaturatedTests =
+      buildScope.testScope.executionClass === BUILD_TEST_EXECUTION_CLASSES.saturated &&
+      lane === 'tests';
+    const cpuTokens =
+      lane === 'tests'
+        ? dedicatedSaturatedTests
+          ? profile.cpuTokens
+          : profile.vitestMaxWorkers
+        : resources.cpuTokens;
+    const memoryMiB = dedicatedSaturatedTests ? profile.memoryMiB : resources.memoryMiB;
+    return {
+      id: lane,
+      cpuTokens,
+      exclusive: dedicatedSaturatedTests,
+      executionProfile:
+        lane === 'typecheck'
+          ? {
+              checkerCount: typecheckCheckerCount,
+              toolName: 'typescript',
+              toolVersion: TYPESCRIPT_TOOL_VERSION,
+            }
+          : {},
+      memoryMiB,
+      workers:
+        lane === 'tests'
+          ? profile.vitestMaxWorkers
+          : lane === 'typecheck'
+            ? typecheckCheckerCount
+            : 1,
+      run: ({ signal }) =>
+        workerRunner({
+          buildScope: workerBuildScope,
+          context: workerContext,
+          lane,
+          memoryMiB,
+          signal,
+          typecheckCheckerCount,
+          vitestMaxWorkers: profile.vitestMaxWorkers,
+        }),
+    };
+  });
+}
+
+function requireExecutionClass(buildScope) {
+  const executionClass = buildScope?.testScope?.executionClass;
+  if (!Object.values(BUILD_TEST_EXECUTION_CLASSES).includes(executionClass)) {
+    throw new Error(
+      'Build test scope executionClass must be bounded-concurrent or saturated-exclusive.'
+    );
+  }
+  return executionClass;
+}
+
+function annotate(result, profile) {
+  const detail = formatTaskScheduleDetail(result, profile);
+  const value = result.value;
+  if (result.id === 'typecheck') {
+    return appendTaskResultScheduleDetail(value, 'typecheckStep', detail);
+  }
+  if (result.id === 'tests') {
+    return appendTaskResultScheduleDetail(value, 'testSteps', detail, { list: true });
+  }
+  if (result.id === 'security') {
+    return { ...value, securityStep: appendTaskScheduleDetail(value.securityStep, detail) };
+  }
+  if (result.id === 'graph') {
+    return {
+      ...value,
+      dependencySteps: appendTaskScheduleDetailToFirst(value.dependencySteps, detail),
+    };
+  }
+  return {
+    ...value,
+    namingStep: appendTaskScheduleDetail(
+      value.namingStep,
+      `${detail}; ${formatQaResourceProfile(profile)}`
+    ),
+  };
+}
+
+function assemble(results) {
+  const lanes = new Map(results.map((result) => [result.id, result.value]));
+  const staticLane = lanes.get('static');
+  const security = lanes.get('security');
+  const graph = lanes.get('graph');
+  const typecheck = lanes.get('typecheck');
+  const tests = lanes.get('tests');
+  return [
+    staticLane.namingStep,
+    security.securityStep,
+    staticLane.architectureStep,
+    ...graph.dependencySteps,
+    staticLane.rootSideEffectsStep,
+    typecheck.typecheckStep,
+    ...tests.testSteps,
+  ];
+}
+
+export async function collectScheduledBuildStepResults(
+  { buildScope, context },
+  {
+    saturatedProfileResolver = resolveQaReleaseResourceProfile,
+    profile = resolveQaResourceProfile(),
+    scheduler = runBoundedTasks,
+    workerRunner = runBuildLaneWorker,
+  } = {}
+) {
+  const executionClass = requireExecutionClass(buildScope);
+  const tasks = createTasks({ buildScope, context, profile, workerRunner });
+  if (executionClass === BUILD_TEST_EXECUTION_CLASSES.bounded) {
+    const results = await scheduler(tasks, { profile });
+    return assemble(results.map((result) => ({ ...result, value: annotate(result, profile) })));
+  }
+
+  const prerequisiteResults = await scheduler(
+    tasks.filter(({ id }) => id !== 'tests'),
+    { profile }
+  );
+  const selectedSaturatedProfile = saturatedProfileResolver();
+  const saturatedTasks = createTasks({
+    buildScope,
+    context,
+    profile: selectedSaturatedProfile,
+    workerRunner,
+  });
+  const saturatedResults = await scheduler(
+    saturatedTasks.filter(({ id }) => id === 'tests'),
+    { profile: selectedSaturatedProfile }
+  );
+  return assemble([
+    ...prerequisiteResults.map((result) => ({
+      ...result,
+      value: annotate(result, profile),
+    })),
+    ...saturatedResults.map((result) => ({
+      ...result,
+      value: annotate(result, selectedSaturatedProfile),
+    })),
+  ]);
+}

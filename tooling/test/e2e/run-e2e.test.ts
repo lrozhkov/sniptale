@@ -7,20 +7,20 @@ import { parseE2eOptions, runE2e } from './run-e2e.mjs';
 it('maps e2e suites to canonical Playwright spec sets', () => {
   expect(parseE2eOptions(['--suite', 'smoke'])).toMatchObject({
     headed: false,
-    specs: ['tooling/test/e2e/extension-smoke.spec.ts'],
+    specs: ['tooling/test/e2e/extension-smoke/extension-smoke.spec.ts'],
     suite: 'smoke',
   });
   expect(parseE2eOptions(['--suite', 'critical', '--headed'])).toMatchObject({
     headed: true,
     specs: [
-      'tooling/test/e2e/extension-critical-full-page.spec.ts',
-      'tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts',
-      'tooling/test/e2e/extension-critical-media.spec.ts',
-      'tooling/test/e2e/extension-critical-offscreen.spec.ts',
-      'tooling/test/e2e/extension-critical-popup.spec.ts',
-      'tooling/test/e2e/extension-critical-recording-restart.spec.ts',
-      'tooling/test/e2e/extension-critical-video.spec.ts',
-      'tooling/test/e2e/extension-critical-video-effects.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-full-page.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-media.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-offscreen.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-popup.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-recording-restart.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-video.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-video-effects.spec.ts',
     ],
     suite: 'critical',
   });
@@ -91,7 +91,11 @@ it('records Playwright result after a green E2E build', () => {
       playwrightHeadless = options.env.PLAYWRIGHT_HEADLESS;
       extensionBuildDir = options.env.SNIPTALE_EXTENSION_BUILD_DIR;
       return {
-        status: args.includes('tooling/test/e2e/extension-critical-video.spec.ts') ? 2 : 0,
+        status: args.includes(
+          'tooling/test/e2e/extension-critical/extension-critical-video.spec.ts'
+        )
+          ? 2
+          : 0,
         stdout: 'playwright output',
         stderr: '',
       };
@@ -110,14 +114,14 @@ it('records Playwright result after a green E2E build', () => {
     scope: 'runtime-smoke',
     suite: 'critical',
     targetFiles: [
-      'tooling/test/e2e/extension-critical-full-page.spec.ts',
-      'tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts',
-      'tooling/test/e2e/extension-critical-media.spec.ts',
-      'tooling/test/e2e/extension-critical-offscreen.spec.ts',
-      'tooling/test/e2e/extension-critical-popup.spec.ts',
-      'tooling/test/e2e/extension-critical-recording-restart.spec.ts',
-      'tooling/test/e2e/extension-critical-video.spec.ts',
-      'tooling/test/e2e/extension-critical-video-effects.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-full-page.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-media.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-offscreen.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-popup.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-recording-restart.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-video.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-video-effects.spec.ts',
     ],
   });
 });

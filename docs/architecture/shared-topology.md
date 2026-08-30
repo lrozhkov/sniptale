@@ -31,7 +31,7 @@ Code remains app-local when it requires extension lifecycle, product state, conc
 
 ## Classification authority
 
-`tooling/configs/qa/app-core-owner-policy.data.json` is the exact authority for current app-core paths, final owners, allowed edges, required authorities, and entrypoint rules. This document explains the model but does not duplicate that inventory.
+`tooling/configs/qa/app-core-owner-policy.data.json` is the exact authority for current app-core paths, final owners, allowed edges, and required authorities. This document explains the model but does not duplicate that inventory.
 
 Package-boundary and app-core-owner guards reject unclassified paths, reverse package edges, package-to-app edges, undeclared workspace dependencies, missing or bypassed exports, broad barrels, retired roots, forbidden feature/runtime/persistence edges, and misplaced lifecycle globals.
 

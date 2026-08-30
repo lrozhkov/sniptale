@@ -5,18 +5,18 @@ import { build as buildEsbuild } from 'esbuild';
 import {
   assertContentRuntimeShimInputsAreCompact,
   assertContentRuntimeShimOutputIsCompact,
-} from './injected-build-shim-guard';
+} from './injected-build-shim-guard.ts';
 import {
   createContentRuntimeBuildId,
   readExtensionManifestVersion,
-} from './content-runtime-build-id';
+} from './content-runtime-build-id.ts';
 import {
   assertBundleHasNoImports,
   createInlineCssTextPlugin,
   createReleaseSafeDependencyAliasPlugin,
   getReleaseDrop,
   resolveOutDir,
-} from './injected-build-support';
+} from './injected-build-support.ts';
 
 const CONTENT_RUNTIME_ENTRY = 'apps/extension/src/content/index.tsx';
 const CONTENT_RUNTIME_OUTPUT = 'assets/contentRuntime.js';
@@ -25,13 +25,17 @@ const CONTENT_RUNTIME_SHIM_OUTPUT = 'assets/contentRuntimeShim.js';
 
 export function isTraceMessagesEnabledForMode(
   mode: string,
-  env: Pick<NodeJS.ProcessEnv, 'VITE_TRACE_MESSAGES'> = process.env
+  env: Partial<Pick<NodeJS.ProcessEnv, 'VITE_TRACE_MESSAGES'>> = process.env
 ): boolean {
   return mode !== 'release' && env.VITE_TRACE_MESSAGES === 'true';
 }
 
 export function getTraceWsUrlForMode(mode: string): string {
   return mode === 'release' ? 'about:blank' : 'ws://localhost';
+}
+
+export function shouldEmitBuildSourcemaps(mode: string): boolean {
+  return mode !== 'production' && mode !== 'release';
 }
 
 function contentRuntimeDefines(mode: string, buildId: string) {
@@ -83,7 +87,7 @@ export function buildContentRuntime(mode: string): Plugin {
           createReleaseSafeDependencyAliasPlugin(repositoryRoot),
           createInlineCssTextPlugin(appRoot),
         ],
-        sourcemap: mode !== 'release',
+        sourcemap: shouldEmitBuildSourcemaps(mode),
         target: ['chrome140'],
       });
       const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports);
@@ -127,7 +131,7 @@ export function buildContentRuntimeShim(mode: string): Plugin {
         outfile: shimOutputPath,
         platform: 'browser',
         plugins: [createReleaseSafeDependencyAliasPlugin(repositoryRoot)],
-        sourcemap: mode !== 'release',
+        sourcemap: shouldEmitBuildSourcemaps(mode),
         target: ['chrome140'],
       });
       const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports);

@@ -1,0 +1,165 @@
+import { expect, it, vi } from 'vitest';
+
+import { collectScheduledFullVerifySteps, runFullVerifyLaneWorker } from './scheduler.mjs';
+import { runBoundedTasks } from '../../../runtime/scheduling/task-scheduler.mjs';
+
+function step(label: string) {
+  return { label, status: 'ok' as const, detail: '', durationMs: 1 };
+}
+
+function laneValue(lane: string) {
+  if (lane === 'appOwners') return { ownerStep: step('App-core owners') };
+  if (lane === 'targetPaths') return { ownerStep: step('Target-only paths') };
+  if (lane === 'light') {
+    return {
+      lineLengthStep: step('Changed-line readability'),
+      aiHygieneStep: step('AI hygiene'),
+      structuralRiskStep: step('Structural risk'),
+      namingStep: step('Naming'),
+      violationSteps: [step('Messaging'), step('App-core owners'), step('Target-only paths')],
+      i18nStep: step('i18n'),
+      designSystemStep: step('Design system'),
+      auditStep: step('Audit'),
+    };
+  }
+  if (lane === 'lint') {
+    return {
+      loggingStep: step('Logging policy'),
+      oxlintStep: step('Oxlint'),
+      sonarjsStep: step('SonarJS'),
+      securityStep: step('HTML sanitizer ownership'),
+    };
+  }
+  if (lane === 'graph') {
+    return {
+      dependencySteps: [step('Dependency boundaries'), step('Cycles')],
+      deadExportsStep: step('Dead exports'),
+    };
+  }
+  if (lane === 'typecheck') return { typecheckStep: step('Typecheck') };
+  return { testSteps: [step('Unit tests'), step('Test coverage')] };
+}
+
+const profile = {
+  cpuTokens: 8,
+  logicalCpuCount: 12,
+  memoryMiB: 12 * 1024,
+  physicalCoreCount: 6,
+  totalMemoryMiB: 16 * 1024,
+  vitestMaxWorkers: 4,
+};
+
+it('keeps release result order while running the pre-build lanes concurrently', async () => {
+  const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
+  const scheduler = vi.fn(runBoundedTasks);
+  const steps = await collectScheduledFullVerifySteps(
+    { releaseMode: true },
+    { profile, scheduler, workerRunner }
+  );
+
+  expect(steps.map(({ label }) => label)).toEqual([
+    'Changed-line readability',
+    'AI hygiene',
+    'Oxlint',
+    'Logging policy',
+    'SonarJS',
+    'HTML sanitizer ownership',
+    'Structural risk',
+    'Naming',
+    'Messaging',
+    'App-core owners',
+    'Target-only paths',
+    'Dependency boundaries',
+    'Cycles',
+    'i18n',
+    'Design system',
+    'Audit',
+    'Dead exports',
+    'Typecheck',
+    'Unit tests',
+    'Test coverage',
+  ]);
+  expect(workerRunner).toHaveBeenCalledWith(
+    expect.objectContaining({ lane: 'tests', vitestMaxWorkers: 4 })
+  );
+  const scheduledTasks = scheduler.mock.calls.flatMap(([tasks]) => tasks);
+  expect(scheduledTasks?.find(({ id }) => id === 'lint')).toMatchObject({
+    cpuTokens: 6,
+    dependencies: [],
+    memoryMiB: 6144,
+    workers: 6,
+  });
+  expect(scheduledTasks?.find(({ id }) => id === 'typecheck')?.dependencies).toEqual(['lint']);
+  expect(scheduledTasks?.find(({ id }) => id === 'graph')?.dependencies).toEqual([
+    'lint',
+    'typecheck',
+  ]);
+  expect(scheduledTasks?.find(({ id }) => id === 'light')).toMatchObject({
+    dependencies: ['lint', 'typecheck'],
+    memoryMiB: 2048,
+  });
+  expect(workerRunner).toHaveBeenCalledWith(
+    expect.objectContaining({ lane: 'lint', oxlintThreadCount: 6 })
+  );
+  expect(scheduledTasks?.find(({ id }) => id === 'tests')).toMatchObject({
+    cpuTokens: 8,
+    exclusive: true,
+    memoryMiB: 12 * 1024,
+  });
+});
+
+it('executes a non-release test lane in a real worker without starting build', async () => {
+  const value = await runFullVerifyLaneWorker({
+    context: {
+      baseline: { allowances: [] },
+      codeFiles: [],
+      excludedControlLabels: [],
+      releaseMode: false,
+      targetFiles: [],
+    },
+    lane: 'tests',
+    memoryMiB: 1024,
+    oxlintThreadCount: 2,
+    typecheckCheckerCount: 4,
+    vitestMaxWorkers: 2,
+  });
+
+  expect(value.testSteps.map(({ status }) => status)).toEqual(['skipped', 'skipped']);
+});
+
+it('runs release tests only after every non-test lane at the minimum profile', async () => {
+  const startedLanes: string[] = [];
+  const workerRunner = vi.fn(async ({ lane }: { lane: string }) => {
+    startedLanes.push(lane);
+    return laneValue(lane);
+  });
+  const scheduler = vi.fn(runBoundedTasks);
+
+  await collectScheduledFullVerifySteps(
+    { releaseMode: true },
+    {
+      profile: { ...profile, cpuTokens: 2, memoryMiB: 6144, vitestMaxWorkers: 2 },
+      scheduler,
+      workerRunner,
+    }
+  );
+
+  expect(scheduler).toHaveBeenCalledTimes(2);
+  expect(scheduler.mock.calls[0]?.[0].map(({ id }) => id)).not.toContain('tests');
+  expect(scheduler.mock.calls[1]?.[0].map(({ id }) => id)).toEqual(['tests']);
+  expect(startedLanes.at(-1)).toBe('tests');
+});
+
+it('cannot schedule Vitest when the shared caller selects the fast proof contract', async () => {
+  const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
+  const scheduler = vi.fn(runBoundedTasks);
+
+  const steps = await collectScheduledFullVerifySteps(
+    { releaseMode: true },
+    { includeTests: false, profile, scheduler, workerRunner }
+  );
+
+  expect(workerRunner.mock.calls.map(([input]) => input.lane)).not.toContain('tests');
+  expect(steps.map(({ label }) => label)).not.toContain('Unit tests');
+  expect(scheduler).toHaveBeenCalledTimes(1);
+});

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import { createProofSemanticDigest } from './artifacts.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { createTempRoot, writeFile, writeJson } from '../qa/core/test-helpers';
+import { createTempRoot, writeFile, writeJson } from '../qa/test-support/test-helpers';
 import { verifyProjectToolchain } from './verify-project-toolchain.mjs';
 
 function createProjectToolchainFixture(prefix: string) {

@@ -129,7 +129,7 @@ describe('selection-mode confirmed toolbar', () => {
     ).toBe(true);
     expect(tooltip.widthDecreaseButton.style.width).toBe('22px');
     expect(tooltip.aspectRatioButton.style.width).toBe('30px');
-    expect(tooltip.widthDecreaseButton.style.background).toBe('transparent');
+    expect(getComputedStyle(tooltip.widthDecreaseButton).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     expect(tooltip.aspectRatioButton.style.background).toBe('');
     expect(tooltip.widthDecreaseButton.getAttribute('style')).not.toContain('border:');
     expect(tooltip.heightIncreaseButton.getAttribute('style')).not.toContain('border:');
@@ -214,7 +214,7 @@ describe('selection-mode confirmed toolbar', () => {
     setContentSizeTooltipPosition(tooltip.root, position);
 
     expect(tooltip.root.style.width).toBe('max-content');
-    expect(tooltip.root.style.minWidth).toBe('0');
+    expect(tooltip.root.style.minWidth).toBe('0px');
     expect(position.x + 420).toBeLessThanOrEqual(1268);
   });
 

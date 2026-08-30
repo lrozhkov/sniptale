@@ -1,13 +1,16 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
-import { createOkStep, createProcessStep } from '../qa/core/focused-qa-results.mjs';
+import {
+  createOkStep,
+  createProcessStep,
+} from '../qa/composition/checkpoint/focused-qa-results.mjs';
 import { collectAuditProfileResult } from '../qa/wrappers/audit.mjs';
 import {
   collectFullVerifyStepResults,
   collectReleaseDeltaStepResults,
-} from '../qa/core/verify-all.execution.mjs';
-import { resolveRepositoryVerifyScope } from '../qa/core/verify-all.scope.mjs';
+} from '../qa/composition/repository/full-verification/execution.mjs';
+import { resolveRepositoryVerifyScope } from '../qa/composition/repository/full-verification/scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
 import { MUTATION_PROFILES, resolveMutationRunLabel } from './mutation-policy.mjs';
 import {
@@ -33,6 +36,7 @@ export async function collectCiProofResults({
   session,
   productProofCollector = () =>
     collectFullVerifyStepResults({
+      includeArtifactSteps: false,
       includeTests: true,
       releaseMode: true,
       excludedControlLabels: ciExcludedControlLabels('proof'),
@@ -85,13 +89,8 @@ function resolveCiScope() {
 }
 
 const RELEASE_DELTA_LABELS = new Set(['SonarJS', 'Build', 'Release archive']);
-const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze([
-  'audit-evidence',
-  'npm-audit',
-  'npm-audit-signatures',
-  'osv-scanner',
-  'semgrep',
-]);
+const FRESH_RELEASE_AUDIT_REUSED_CONTROL_IDS = Object.freeze(['npm-audit']);
+const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze(['audit-evidence']);
 
 function createReusedFastControlStep({ id, label }) {
   return runTimelineActivitySync(
@@ -155,6 +154,7 @@ export async function collectCiReleaseResults({
   scopeResolver = resolveCiScope,
   productProofCollector = (verifyScope) =>
     collectFullVerifyStepResults({
+      includeArtifactSteps: false,
       releaseMode: true,
       excludedControlLabels: ciExcludedControlLabels('proof'),
       verifyScope,
@@ -175,10 +175,12 @@ export async function collectCiReleaseResults({
     releaseDeltaCollector(verifyScope, { includeArtifactSteps });
   const productSteps = reuseFastProof
     ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta(true))
-    : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta(false));
+    : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta(true));
   const audit = await auditCollector({
     profileId: 'release',
-    reusedControlIds: reuseFastProof ? REUSED_FAST_AUDIT_CONTROL_IDS : [],
+    reusedControlIds: reuseFastProof
+      ? REUSED_FAST_AUDIT_CONTROL_IDS
+      : FRESH_RELEASE_AUDIT_REUSED_CONTROL_IDS,
     session,
   });
   return {

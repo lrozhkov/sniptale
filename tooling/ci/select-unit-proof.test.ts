@@ -3,15 +3,29 @@ import path from 'node:path';
 
 import { expect, it, vi } from 'vitest';
 
-import { createTempRoot, writeFile } from '../qa/core/test-helpers';
+import { createTempRoot, writeFile } from '../qa/test-support/test-helpers';
 import { verifyMainProof } from './verify-main-proof.mjs';
 
 vi.mock('./verify-main-proof.mjs', () => ({
   verifyMainProof: vi.fn(() => ({
-    manifest: { files: [{ file: '.tmp/qa/unit-proof.json', sha256: 'a'.repeat(64) }] },
+    manifest: {
+      files: [
+        {
+          file: '.tmp/qa/unit-proof.json',
+          sha256: '5c5ce2fdd3156a954f60b61cab4f1cfb4e789c3d14e91794324ce7e3fc390ba9',
+        },
+      ],
+    },
   })),
   verifyReleaseProof: vi.fn(() => ({
-    manifest: { files: [{ file: '.tmp/qa/unit-proof.json', sha256: 'a'.repeat(64) }] },
+    manifest: {
+      files: [
+        {
+          file: '.tmp/qa/unit-proof.json',
+          sha256: '5c5ce2fdd3156a954f60b61cab4f1cfb4e789c3d14e91794324ce7e3fc390ba9',
+        },
+      ],
+    },
   })),
 }));
 

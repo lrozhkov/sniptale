@@ -13,7 +13,7 @@ import {
   sanitizeDiagnostic,
 } from './sanitize.mjs';
 import { appendBoundedLog, writeJsonAtomic } from './storage.mjs';
-import { assertObservedQaRuleId } from '../../core/qa-steps/runtime-registry.mjs';
+import { assertObservedQaRuleId } from '../../composition/catalog/runtime-registry.mjs';
 
 function createQueuedActivity(input, timestamp) {
   const { dependencies, executionProfile, kind, reused, waitDurations, waitReasons } = input;

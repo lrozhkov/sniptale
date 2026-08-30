@@ -4,8 +4,6 @@ import { AUDIT_PROFILES_PATH, resolveAuditProfile } from '../qa/audits/profiles/
 import { createCiProductControlOccurrences } from './product-control-policy.mjs';
 
 const COMMIT_INAPPLICABLE_CONTROLS = Object.freeze({
-  'qa.rule.history-revision-semantics': 'no-applicable-targets',
-  'qa.rule.history-transaction-lifecycle': 'no-applicable-targets',
   'qa.rule.interactive-controller-ownership': 'no-applicable-targets',
   'qa.rule.parser-snapshot-purity': 'no-applicable-targets',
 });

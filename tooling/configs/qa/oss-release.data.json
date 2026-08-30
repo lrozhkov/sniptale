@@ -286,7 +286,6 @@
     "docs/oss/provenance.md",
     "docs/oss/release.md"
   ],
-  "releaseConsumerManifest": "tooling/configs/qa/oss-release-consumers.data.json",
   "dependencyLegal": {
     "manifestPath": "THIRD_PARTY_DEPENDENCIES.json",
     "licenseDirectory": "LICENSES/dependencies",

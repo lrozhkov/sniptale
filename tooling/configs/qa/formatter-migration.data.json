@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "baselineCommit": "e4426463b534c4b297f4670f73aef84c55e1b8b6",
   "sourceFormatter": "prettier@3.8.1",
   "targetFormatter": "oxfmt@0.64.0",
@@ -23,106 +23,137 @@
       "path": "apps/extension/src/background/application/runtime-state/index.test.ts",
       "classification": "callback-wrapping",
       "reason": "Oxfmt wraps a typed function expression passed to vi.fn at the call boundary.",
+      "beforePath": "apps/extension/src/background/application/runtime-state/index.test.ts",
       "beforeSha256": "1401625836107cd111f824777412cd6ef0843a3198304098d810f28aa26b4771",
-      "afterSha256": "3f39a58598f10e4329866eba11316b839e5c23858d202619956de94d66e25f9e"
+      "migrationPath": "apps/extension/src/background/application/runtime-state/index.test.ts",
+      "migrationSha256": "3f39a58598f10e4329866eba11316b839e5c23858d202619956de94d66e25f9e"
     },
     {
       "path": "apps/extension/src/background/frame-annotation-raster/route.test.ts",
       "classification": "callback-wrapping",
       "reason": "Oxfmt keeps the concise async callback inside vi.fn on one call-expression group.",
+      "beforePath": "apps/extension/src/background/frame-annotation-raster/route.test.ts",
       "beforeSha256": "56b838d492159e9f4909db7465af248421f45880991c4e0da8031be3d8f87863",
-      "afterSha256": "c528045485129ab2a0d5c64ce13d4f7319c87bb4baf55040348b391eedbbeba1"
+      "migrationPath": "apps/extension/src/background/frame-annotation-raster/route.test.ts",
+      "migrationSha256": "0ed8f3082ca9bff80f95df3724777832e5c7704108ea27f59a5f2f2637bae3b4"
     },
     {
       "path": "apps/extension/src/background/runtime/bootstrap/index.test.ts",
       "classification": "callback-wrapping",
       "reason": "Oxfmt wraps a typed function expression passed to vi.fn at the call boundary.",
+      "beforePath": "apps/extension/src/background/runtime/bootstrap/index.test.ts",
       "beforeSha256": "bc75cc6bdab10cbf76ba842162e81112cc7b170edc6f2783f04508fdbf171203",
-      "afterSha256": "4377a428de896e6d37eebcf458c56775a981ecbcee092c75256c2639b6f01550"
+      "migrationPath": "apps/extension/src/background/runtime/bootstrap/index.test.ts",
+      "migrationSha256": "4377a428de896e6d37eebcf458c56775a981ecbcee092c75256c2639b6f01550"
     },
     {
       "path": "apps/extension/src/background/runtime/routing/action-kernel/routes.ts",
       "classification": "callback-wrapping",
       "reason": "Oxfmt keeps the map callback attached to the member-call expression.",
+      "beforePath": "apps/extension/src/background/runtime/routing/action-kernel/routes.ts",
       "beforeSha256": "a17ef704fc5c4cc9fb9710d677299f865c52fd2fe0ea4bbee2adea987af6b90a",
-      "afterSha256": "babad6aaa92044f3bc7bd79d4c2a56af831efd5c0106d4e138f3cc1f3e6da6e4"
+      "migrationPath": "apps/extension/src/background/runtime/routing/action-kernel/routes.ts",
+      "migrationSha256": "babad6aaa92044f3bc7bd79d4c2a56af831efd5c0106d4e138f3cc1f3e6da6e4"
     },
     {
       "path": "apps/extension/src/content/overlay/toolbar/controls/drawing.test.tsx",
       "classification": "callback-wrapping",
       "reason": "Oxfmt wraps the mockImplementation function at the call boundary.",
+      "beforePath": "apps/extension/src/content/overlay/toolbar/controls/drawing.test.tsx",
       "beforeSha256": "d71032a804d15b6eef6d6bf8fedcff9c07c30fd33db6b73a9b60e825d805c031",
-      "afterSha256": "1903f2da3bd509aeb6d92f87ee35edb51de3a1a7b83f1ce7d8156a2e5377e843"
+      "migrationPath": "apps/extension/src/content/overlay/toolbar/controls/drawing.test.tsx",
+      "migrationSha256": "1903f2da3bd509aeb6d92f87ee35edb51de3a1a7b83f1ce7d8156a2e5377e843"
     },
     {
       "path": "apps/extension/src/content/selection/frame-runtime/react/useFrameManagerPublicResult.test.tsx",
       "classification": "callback-wrapping",
       "reason": "Oxfmt keeps the concise typed callback inside vi.fn on one call-expression group.",
+      "beforePath": "apps/extension/src/content/selection/frame-runtime/react/useFrameManagerPublicResult.test.tsx",
       "beforeSha256": "b3ce59c124325df60a9b893b38330926bef552f8225b5e24e9c37c5eb9955bca",
-      "afterSha256": "78ec35826dc9b1191f7e69b4dbee1c052b7226353a941f721307fa53a547d7f8"
+      "migrationPath": "apps/extension/src/content/selection/frame-runtime/react/useFrameManagerPublicResult.test.tsx",
+      "migrationSha256": "78ec35826dc9b1191f7e69b4dbee1c052b7226353a941f721307fa53a547d7f8"
     },
     {
       "path": "apps/extension/src/editor/frame-annotation/plane.test.tsx",
       "classification": "callback-wrapping",
       "reason": "Oxfmt wraps the mockImplementation function at the call boundary.",
+      "beforePath": "apps/extension/src/editor/frame-annotation/plane.test.tsx",
       "beforeSha256": "463215bfd5bc905875d04c5da68a084e09c900a1697d0b53d536905ea2c22c1b",
-      "afterSha256": "fe4986b2a4414ac2ca949fc8125499c166720e7a7ea7ec382c099dab9d57e220"
+      "migrationPath": "apps/extension/src/editor/frame-annotation/plane.test.tsx",
+      "migrationSha256": "fe4986b2a4414ac2ca949fc8125499c166720e7a7ea7ec382c099dab9d57e220"
     },
     {
       "path": "apps/extension/src/editor/inspector/layers/height.test-support.ts",
       "classification": "callback-wrapping",
       "reason": "Oxfmt wraps typed measurement getter callbacks at their call boundaries.",
+      "beforePath": "apps/extension/src/editor/inspector/layers/height.test-support.ts",
       "beforeSha256": "b2eeca4f6b7a9416c3aaf3af0066dd0627c397b31f73f2325dd9536471b1d37a",
-      "afterSha256": "051ecb84b287ab2a87468a59d2e74e30edfe655e42da3deed78c533f24a7ddfa"
+      "migrationPath": "apps/extension/src/editor/inspector/layers/height.test-support.ts",
+      "migrationSha256": "051ecb84b287ab2a87468a59d2e74e30edfe655e42da3deed78c533f24a7ddfa"
     },
     {
       "path": "apps/extension/src/editor/objects/custom-shapes/path-data.ts",
       "classification": "empty-for-clause-spacing",
       "reason": "Oxfmt omits the space before the closing parenthesis when the update clause is empty.",
+      "beforePath": "apps/extension/src/editor/objects/custom-shapes/path-data.ts",
       "beforeSha256": "5abc80411638ff94db19081e5a67753435bb2d3d84a1476d3b3bf3241efbca66",
-      "afterSha256": "40819aae612ef31d027eafd58440ae335677bde6815ba69377dee69393b27da8"
+      "migrationPath": "apps/extension/src/editor/objects/custom-shapes/path-data.ts",
+      "migrationSha256": "40819aae612ef31d027eafd58440ae335677bde6815ba69377dee69393b27da8"
     },
     {
       "path": "apps/extension/src/features/web-snapshot/sanitize-css.ts",
       "classification": "empty-for-clause-spacing",
       "reason": "Oxfmt omits the space before the closing parenthesis when the update clause is empty.",
+      "beforePath": "apps/extension/src/features/web-snapshot/sanitize-css.ts",
       "beforeSha256": "26d5ce3f64ea058e217b1586fca906c26855afa65c625bb66c703ba23a681e1f",
-      "afterSha256": "c348398abe040b365fca6854bf985967c1921059f6a90b43b9a38d0041e631e0"
+      "migrationPath": "apps/extension/src/features/web-snapshot/sanitize-css.ts",
+      "migrationSha256": "1f38421bb2638191b6883385e6b1f0045c2daff2d79237cf0550c8d048ab1077"
     },
     {
       "path": "apps/extension/src/video-editor/state/export-state/actions.ts",
       "classification": "callback-wrapping",
       "reason": "Oxfmt keeps concise state-setter callbacks attached to their call expressions.",
+      "beforePath": "apps/extension/src/video-editor/state/export-state/actions.ts",
       "beforeSha256": "1c0e6115c7cf12b5d9d0507922e7ff36a03eca6d459c3972eaa09c6b35ee091d",
-      "afterSha256": "3f7724a130960eeec5faf9c8bffcb62318490bf2777a40a635d30723d33dbe2d"
+      "migrationPath": "apps/extension/src/video-editor/state/export-state/actions.ts",
+      "migrationSha256": "3f7724a130960eeec5faf9c8bffcb62318490bf2777a40a635d30723d33dbe2d"
     },
     {
       "path": "apps/extension/src/video-editor/state/selection-actions.ts",
       "classification": "callback-wrapping",
       "reason": "Oxfmt keeps concise state-setter callbacks attached to their call expressions.",
+      "beforePath": "apps/extension/src/video-editor/state/selection-actions.ts",
       "beforeSha256": "a65ca5fa79a417df6214ad56b2709404bbb24f3ed05bf3f016a32f7b8f9e43eb",
-      "afterSha256": "19ed71095ad83f94ee55112e0501e40677dd4b305b7195b2925280a876623444"
+      "migrationPath": "apps/extension/src/video-editor/state/selection-actions.ts",
+      "migrationSha256": "19ed71095ad83f94ee55112e0501e40677dd4b305b7195b2925280a876623444"
     },
     {
       "path": "packages/platform/src/security/css-safety.ts",
       "classification": "empty-for-clause-spacing",
       "reason": "Oxfmt omits the space before the closing parenthesis when the update clause is empty.",
+      "beforePath": "packages/platform/src/security/css-safety.ts",
       "beforeSha256": "88075dd6dd52fa927790c1af01a3936b1fcde90d6f3a8da241e6402800062a66",
-      "afterSha256": "ac34070f8398c87882a9302d523d08b2bf04f9c36d9aaf6cf397229b47e28829"
+      "migrationPath": "packages/platform/src/security/css-safety.ts",
+      "migrationSha256": "ac34070f8398c87882a9302d523d08b2bf04f9c36d9aaf6cf397229b47e28829"
     },
     {
-      "path": "tooling/qa/runtime/task-scheduler.mjs",
+      "path": "tooling/qa/runtime/scheduling/task-scheduler.mjs",
       "classification": "empty-for-clause-spacing",
       "reason": "Oxfmt omits the space before the closing parenthesis when the update clause is empty.",
+      "beforePath": "tooling/qa/runtime/task-scheduler.mjs",
       "beforeSha256": "82092935d1bb2228d693f20cd88e71254fce66b824d119142c3d0b6cb730e290",
-      "afterSha256": "16f40fd5fae05a97da3d815e68c5acf01362c033d7a12dfd2eaa471c484951c1"
+      "migrationPath": "tooling/qa/runtime/task-scheduler.mjs",
+      "migrationSha256": "28564509f4b7d162e5285ee78ca3acddfa2f08a9eccbb527933f5af7b42dacd7"
     },
     {
-      "path": "tooling/test/e2e/extension-critical-media.spec.ts",
+      "path": "tooling/test/e2e/extension-critical/extension-critical-media.spec.ts",
       "classification": "awaited-chain-grouping",
       "reason": "Oxfmt groups the nested await expression before the chained file operations.",
+      "beforePath": "tooling/test/e2e/extension-critical-media.spec.ts",
       "beforeSha256": "23c943d71bc9b658e1563738a5761702f12bfa03e95ef81c59a30662164946ae",
-      "afterSha256": "403f4be56c8e28e93037b41645d4ad01d60c9ceaa9a8427edf8c4272360b8493"
+      "migrationPath": "tooling/test/e2e/extension-critical-media.spec.ts",
+      "migrationSha256": "403f4be56c8e28e93037b41645d4ad01d60c9ceaa9a8427edf8c4272360b8493"
     }
-  ]
+  ],
+  "migrationCommit": "fa2209850865a119439f778967b6ed0a2be7ec9e"
 }

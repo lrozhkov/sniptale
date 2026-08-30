@@ -77,6 +77,7 @@ describe('Page Collection planner', () => {
       requestedPageCount: 2,
       pageCount: 1,
       failedPageCount: 1,
+      warningCount: 0,
     });
     expect(result.archiveOrder).toEqual([
       'collection-manifest.json',

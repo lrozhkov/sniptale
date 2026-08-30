@@ -10,7 +10,7 @@ import { sealLaneArtifacts } from './seal-lane-artifacts.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
-} from '../qa/runtime/resource-profile.mjs';
+} from '../qa/runtime/scheduling/resource-profile.mjs';
 
 const lane = process.argv[2];
 if (!['proof', 'release'].includes(lane)) {
@@ -90,6 +90,11 @@ const commands = [
     'verify-project-toolchain',
     process.execPath,
     [path.join(process.cwd(), 'tooling/ci/verify-project-toolchain.mjs')],
+  ],
+  [
+    'validate-workflows',
+    process.execPath,
+    [path.join(process.cwd(), 'tooling/ci/validate-workflows.mjs'), 'actionlint'],
   ],
   ['provision-canvas', 'npm', ['rebuild', 'canvas']],
   ['provision-ast-grep', process.execPath, ['node_modules/@ast-grep/cli/postinstall.js']],

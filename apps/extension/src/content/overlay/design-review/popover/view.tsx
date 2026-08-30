@@ -20,7 +20,7 @@ function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void
   return (
     <div
       className={[
-        'min-w-0 border-t p-3',
+        'min-w-0 border-t border-solid p-3',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)]',
       ].join(' ')}
@@ -203,7 +203,7 @@ export function DesignReviewPopover(props: {
           {props.state.settingsOpen ? (
             <div
               className={[
-                'overflow-y-auto border-t',
+                'overflow-y-auto border-t border-solid',
                 'border-[color:var(--sniptale-color-border-soft)]',
               ].join(' ')}
               style={{

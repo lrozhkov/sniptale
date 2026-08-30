@@ -59,8 +59,18 @@ function collectVerificationArrays(packageJson, validationManifest, wrappers) {
   const focusedCoverageTools = [
     ...new Set([...focusedWrapperTools, ...focusedTriggerCoveredTools]),
   ].sort();
-  const validationEntries = validationManifest.tools ?? [];
-  const validatedTools = new Map(validationEntries.map((entry) => [entry.tool, entry]));
+  const validationEntries = validationManifest.claims ?? [];
+  const controlToolById = new Map(
+    Object.values(wrappers)
+      .flat()
+      .map(({ id, tool }) => [id, tool])
+  );
+  const validatedTools = new Set(
+    validationEntries
+      .filter(({ claim }) => claim === 'control')
+      .map(({ controlId }) => controlToolById.get(controlId))
+      .filter(Boolean)
+  );
   const qualityScripts = getQualityScriptEntries(packageJson);
   const advisoryScripts = qualityScripts.filter((entry) => entry.entryKind === 'advisory');
   const repoAuditReportTools = REPO_AUDIT_REPORT_DEFINITIONS.map(({ tool }) => tool).sort();
@@ -144,11 +154,19 @@ function collectLoopholes({
   ];
 }
 
-function collectSkipCapableTools(validationEntries) {
+function collectSkipCapableTools(validationEntries, wrappers) {
+  const controlToolById = new Map(
+    Object.values(wrappers)
+      .flat()
+      .map(({ id, tool }) => [id, tool])
+  );
   return validationEntries
     .filter((entry) => entry.states.includes('skip'))
     .map((entry) => ({
-      tool: entry.tool,
+      tool:
+        entry.claim === 'control'
+          ? (controlToolById.get(entry.controlId) ?? entry.controlId)
+          : entry.source,
       validationMode: entry.validationMode,
       states: entry.states,
     }))
@@ -217,7 +235,7 @@ export function collectVerificationProfile(packageJson, validationManifest) {
       script.startsWith('check:') &&
       !arrays.fullWrapperTools.includes(tool)
   );
-  const skipCapableTools = collectSkipCapableTools(arrays.validationEntries);
+  const skipCapableTools = collectSkipCapableTools(arrays.validationEntries, wrappers);
 
   return {
     verification: createVerificationPayload({

@@ -1,4 +1,5 @@
 import { translate } from '../../../../platform/i18n';
+import { createPopupExportController } from '../../../parser/popup-export';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { RuntimeMessageRequest, RuntimeMessageResponse } from './types';
 
@@ -23,9 +24,7 @@ export function handlePopupExportMessage(
 ): void {
   const loadPopupExportController =
     popupExportControllerPromise ??
-    (popupExportControllerPromise = import('../../../parser/popup-export').then(
-      ({ createPopupExportController }) => createPopupExportController()
-    ));
+    (popupExportControllerPromise = Promise.resolve().then(() => createPopupExportController()));
 
   void loadPopupExportController
     .then((popupExportController) => {

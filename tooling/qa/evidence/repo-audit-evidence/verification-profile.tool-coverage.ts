@@ -5,39 +5,7 @@ type ToolCoverageEntry = Verification['toolCoverage'][number];
 
 export const BASE_WRAPPER_TOOL_COVERAGE: ToolCoverageEntry[] = [
   {
-    tool: 'verify-read-safe-naming.mjs',
-    script: null,
-    entryKind: 'wrapper-only',
-    fullScope: 'diff-scoped',
-    focusedScope: 'always-run',
-    manualOnly: false,
-  },
-  {
-    tool: 'verify-lifecycle-intent.mjs',
-    script: null,
-    entryKind: 'wrapper-only',
-    fullScope: 'diff-scoped',
-    focusedScope: 'always-run',
-    manualOnly: false,
-  },
-  {
-    tool: 'verify-success-failure-asymmetry.mjs',
-    script: null,
-    entryKind: 'wrapper-only',
-    fullScope: 'diff-scoped',
-    focusedScope: 'always-run',
-    manualOnly: false,
-  },
-  {
-    tool: 'verify-destructive-async-swaps.mjs',
-    script: null,
-    entryKind: 'wrapper-only',
-    fullScope: 'diff-scoped',
-    focusedScope: 'always-run',
-    manualOnly: false,
-  },
-  {
-    tool: 'verify-storage-write-patterns.mjs',
+    tool: 'verify-persistence-ownership.mjs',
     script: null,
     entryKind: 'wrapper-only',
     fullScope: 'diff-scoped',
@@ -53,7 +21,7 @@ export const BASE_WRAPPER_TOOL_COVERAGE: ToolCoverageEntry[] = [
     manualOnly: false,
   },
   {
-    tool: 'verify-build.mjs',
+    tool: 'build-step.mjs',
     script: null,
     entryKind: 'wrapper-only',
     fullScope: 'repo-wide',
@@ -71,22 +39,6 @@ export const BASE_WRAPPER_TOOL_COVERAGE: ToolCoverageEntry[] = [
 ];
 
 export const HYBRID_WRAPPER_TOOL_COVERAGE: ToolCoverageEntry[] = [
-  {
-    tool: 'verify-history-detached-snapshots.mjs',
-    script: null,
-    entryKind: 'wrapper-only',
-    fullScope: 'diff-scoped',
-    focusedScope: 'always-run',
-    manualOnly: false,
-  },
-  {
-    tool: 'verify-history-transaction-lifecycle.mjs',
-    script: null,
-    entryKind: 'wrapper-only',
-    fullScope: 'diff-scoped',
-    focusedScope: 'always-run',
-    manualOnly: false,
-  },
   {
     tool: 'verify-unit-tests.mjs',
     script: null,

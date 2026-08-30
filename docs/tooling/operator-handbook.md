@@ -10,9 +10,10 @@ Short command and review lookup. Full external behavior is in [ci-cd.md](ci-cd.m
 | Harness/shared-control proof | `npm run qa:release-harness` | Required when the live scope classifier reports executable harness targets. |
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, artifact policy, and commit. |
-| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs Fast PR Gate controls directly in WSL without Docker, including full Vitest but excluding release-only SonarJS, coverage, CodeQL, mutation, and release audit controls. It does not prove release readiness. Dirty workspace is diagnostic and non-admissible externally. |
+| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs repository-wide Fast controls, full Vitest, and fast PR audits directly in WSL without Docker. It excludes SonarJS, coverage, CodeQL, mutation, Build, Release archive, and release-only audits, so it does not prove release readiness. Dirty workspace is diagnostic and non-admissible externally. |
 | Local full release gate | `npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]` | Runs the same composition owner as Release provenance Gate directly in WSL, including heavy audit and mutation profiles. |
 | Quick local build bypass | `npm run ci:build` | Runs the project npm build only; it is not a release build, emits no QA proof, and is never accepted for provenance. |
+| Ordinary unpacked build | `npm run build` | Production-mode Vite build only; no typecheck, QA proof, packaging, or build source maps. |
 | Local PR bypass proof | `npm run ci:proof -- --pr <number> --reason "<audit note>" [resource flags]` | Requires clean `origin/main`, validates exact remote PR authority, posts proof hashes and the mandatory reason, and never merges. |
 | Unpacked release build | `npm run build:release` | Release-mode Vite output only; no typecheck, full QA, or package admission. |
 | Package-only debugging | `npm run release:package-only` | Diagnostic packaging; does not replace `ci:proof` or `ci:release`. |
@@ -23,15 +24,17 @@ Short command and review lookup. Full external behavior is in [ci-cd.md](ci-cd.m
 
 The normal local delivery order remains `qa:release-harness` when selected, `qa:checkpoint`, required review, then one `qa:closeout`. Do not repeatedly closeout/commit/push to debug CI: use local `ci:proof` and `ci:release` first.
 
+Typecheck and artifact construction are independent owners. `npm run build`, `npm run ci:build`, and `npm run build:release` invoke Vite without an embedded typecheck; blocking QA and CI compositions schedule Typecheck before Build explicitly. Production and release builds omit source maps. The dedicated E2E build modes retain source maps for diagnostics.
+
 QA implementation, owner maps, generated inventories, and product code may change together in one ordinary PR. Candidate QA executes once under the trusted-base envelope; no separate bootstrap PR is required. The GitHub summary must show `QA controls changed` and both candidate and trusted control digests. Review QA changes normally and remember that the envelope proves phase, identity, schema, hash, execution, artifact, and graph completeness but does not rerun the previous controls. The accepted implementation becomes trusted only after merge to `main`.
 
 ## GitHub operations
 
-Ready PRs run Fast PR Gate with `SELECTEL_QA_PROFILES`. A merge to `main` does not repeat that gate for the squash commit. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Continuous Integration → Run workflow → release-provenance**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`, creates the canonical `main` proof, and publishes the admitted immutable QA image. It reuses an exact fast proof when possible, otherwise completes the missing Fast controls on the same release VM. Full Vitest belongs to Fast proof; release readiness additionally requires the release-only controls.
+Ready PRs run Fast PR Gate with `SELECTEL_QA_PROFILES`. A merge to `main` does not repeat that gate for the squash commit. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Release provenance → Run workflow**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`, creates the canonical `main` proof, publishes the admitted immutable images, publishes admitted coverage, and attests the exact release subjects. It reuses an exact fast proof when possible, otherwise completes the missing Fast controls on the same release VM. Full Vitest belongs to Fast proof; release readiness additionally requires the release-only controls.
 
 The proof artifact name is `fast-proof-<commit>-<run-id>-<producer-attempt>` or `release-provenance-<commit>-<run-id>-<producer-attempt>`. The job summary contains its URL and exact download command. A failed downstream-job retry discovers the highest live producer attempt from the run artifact inventory and does not rerun a green VM merely because the consumer attempt changed. Proof is uploaded before cleanup. Confirm the cleanup receipt marks the runner registration, VM, VM ports, disposable security group, router interface, router, subnet, network, and volumes deleted before treating the run as complete. When the early receipt is unavailable, the cleanup artifact must identify `recover-cleanup` for the exact run attempt rather than a repository-wide sweep. The independent daily TTL sweep is recovery, not the normal cleanup path.
 
-To recover one interrupted historical attempt without provisioning another runner, dispatch **Actions → Continuous Integration → selectel-recovery** from `main` and supply its exact GitHub run ID and run attempt. This mode builds only the controller from the dispatched `main` commit, discovers resources by the bound run identity, deletes the complete lifecycle set, and uploads a recovery receipt. It cannot build a QA image or enter the provision job.
+To recover one interrupted historical attempt without provisioning another runner, dispatch **Actions → Selectel maintenance → Run workflow** from `main`, select `recover`, and supply its exact GitHub run ID and run attempt. This mode builds only the controller from the dispatched `main` commit, discovers resources by the bound run identity, deletes the complete lifecycle set, and uploads a recovery receipt. It cannot build a QA image or enter the proof graph.
 
 To publish, first create and push a GitHub-verifiable annotated signing tag matching the package version. Then run **Actions → Continuous Deployment** with that tag, the successful Release provenance run ID, and product-facing Markdown for the release highlights and compatibility notes. The workflow supplies the stable introduction, install instructions, and alpha warning. Deployment creates no VM and performs no QA rebuild. If publication fails, rerun deployment against the same provenance proof and notes.
 
@@ -68,18 +71,24 @@ Use direct commands only to diagnose the failed owner:
 
 | Area | Command |
 | --- | --- |
-| Documentation facts | `node tooling/qa/core/verify-documentation-facts.mjs` |
-| Config baseline | `node tooling/qa/core/verify-config-policy.mjs` |
-| Typecheck | `node tooling/qa/core/verify-typecheck.mjs` |
-| Oxlint | `node tooling/qa/core/verify-oxlint.mjs` |
-| Oxfmt | `node tooling/qa/core/verify-oxfmt.mjs` |
-| Security Oxlint JS-plugin rules | `node tooling/qa/core/verify-oxlint.mjs` |
-| Release-only SonarJS ESLint | `node tooling/qa/core/verify-sonarjs.mjs` |
-| Build | `node tooling/qa/core/verify-build.mjs` |
-| Security guardrails | `node tooling/qa/guards/security/verify-security.mjs` |
+| Documentation facts | `node tooling/qa/policy/documentation/documentation-facts/documentation-facts.mjs` |
+| Config baseline | `node tooling/qa/guards/product-contracts/config/config-policy/check.mjs` |
+| Extension build layout | `node tooling/qa/guards/product-contracts/extension-build/verify-extension-build-layout.mjs` |
+| Typecheck | `node tooling/qa/proof/typecheck/execution/check.mjs` |
+| Tooling coverage (separate maintenance proof) | `node tooling/qa/proof/unit/verify-unit-tests.mjs --suite harness --coverage` |
+| Oxlint | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
+| Oxfmt | `node tooling/qa/guards/quality/verify-oxfmt.mjs` |
+| Unified ast-grep syntax scan | `node tooling/qa/audits/ast-grep/ast-grep.mjs` |
+| Security and syntax-only SonarJS Oxlint JS-plugin rules | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
+| Release-only type-aware SonarJS ESLint residual | `node tooling/qa/guards/quality/sonarjs/check.mjs` |
+| Build | `node tooling/qa/composition/build/build-step.mjs` |
+| HTML sanitizer ownership residual | `node tooling/qa/guards/security/html-sanitizer-ownership/check.mjs` |
+| jscpd 5 release audit | `node tooling/qa/audits/jscpd/check.mjs` |
 | Runtime boundaries | `node tooling/qa/guards/architecture/verify-boundaries.mjs` |
-| Runtime topology | `node tooling/qa/guards/architecture/verify-runtime-topology.mjs` |
-| Manifest permissions | `node tooling/qa/guards/architecture/verify-manifest-permissions.mjs` |
-| Task artifacts | `node tooling/qa/core/verify-task-artifacts.mjs` |
+| Runtime topology | `node tooling/qa/guards/architecture/runtime-topology/check.mjs` |
+| Manifest permissions | `node tooling/qa/guards/architecture/manifest-permissions/check.mjs` |
+| Task artifacts | `node tooling/qa/composition/closeout/verify-task-artifacts.mjs` |
 
 Treat DNS, proxy, TLS, registry, browser dependency, Docker engine, and missing binary failures as environment failures. Do not manually stage a closeout candidate or stage `tasks/**`.
+
+Tooling coverage writes its report to `.tmp/coverage/tooling` and enforces one repository-wide floor for statements, branches, functions, and lines. It is intentionally independent from `ci:release`, product coverage, release provenance, and the public wrapper composition.

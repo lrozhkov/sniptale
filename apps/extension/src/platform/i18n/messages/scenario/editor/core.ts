@@ -49,6 +49,60 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Экспорт',
     en: 'Export',
   },
+  exportScenarioDeck: {
+    ru: 'Экспорт сценария',
+    en: 'Export scenario deck',
+  },
+  exportedWithMissingAssets: {
+    ru: 'Экспортировано с отсутствующими ресурсами',
+    en: 'Exported with missing assets',
+  },
+  exportCreated: {
+    ru: 'Экспорт создан.',
+    en: 'Export created.',
+  },
+  exportFailed: { ru: 'Не удалось экспортировать', en: 'Export failed' },
+  exporting: { ru: 'Экспорт...', en: 'Exporting...' },
+  exportFormat: { ru: 'Формат экспорта', en: 'Export format' },
+  format: { ru: 'Формат', en: 'Format' },
+  exportHtmlDeck: { ru: 'HTML-презентация', en: 'HTML deck' },
+  exportMarkdownBundle: { ru: 'Пакет Markdown', en: 'Markdown bundle' },
+  exportAssetMode: { ru: 'Режим ресурсов', en: 'Asset mode' },
+  exportAssets: { ru: 'Ресурсы', en: 'Assets' },
+  exportEmbedImages: { ru: 'Встроить изображения', en: 'Embed images' },
+  exportAssetsFolder: { ru: 'Папка ресурсов', en: 'Assets folder' },
+  exportMarkdownBundleHint: {
+    ru: 'Markdown экспортируется как переносимый ZIP с SVG-превью слайдов и файлами ресурсов.',
+    en: 'Markdown is exported as a portable ZIP with slide SVG previews and asset files.',
+  },
+  exportIncludeSpeakerNotes: {
+    ru: 'Включить заметки докладчика',
+    en: 'Include speaker notes',
+  },
+  exportIncludeSpeakerNotesHint: {
+    ru: 'Добавляет заметки для каждого слайда в экспорт HTML и Markdown.',
+    en: 'Adds per-slide notes blocks to HTML and Markdown exports.',
+  },
+  exportShowMissingPlaceholders: {
+    ru: 'Показывать места отсутствующих ресурсов',
+    en: 'Show missing asset placeholders',
+  },
+  exportShowMissingPlaceholdersHint: {
+    ru: 'Сохраняет диагностику экспорта, если ресурс изображения не удалось найти.',
+    en: 'Keeps export diagnostics visible when an image asset cannot be resolved.',
+  },
+  exportIncludeSourceJson: {
+    ru: 'Включить исходный JSON слайдов',
+    en: 'Include slide source JSON',
+  },
+  exportIncludeSourceJsonHint: {
+    ru: 'Добавляет редактируемый документ сценария для обмена через AI/API.',
+    en: 'Adds the editable scenario document for AI/API round trips.',
+  },
+  startX: { ru: 'Начало X', en: 'Start X' },
+  startY: { ru: 'Начало Y', en: 'Start Y' },
+  endX: { ru: 'Конец X', en: 'End X' },
+  endY: { ru: 'Конец Y', en: 'End Y' },
   videoAction: {
     ru: 'Видео',
     en: 'Video',

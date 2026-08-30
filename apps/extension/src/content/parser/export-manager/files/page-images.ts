@@ -2,7 +2,7 @@ import type { FileResource } from '@sniptale/runtime-contracts/export';
 
 import { isContentOwnedElement } from '../../../platform/dom-host';
 import { getCurrentExportPageUrl, listPageImages } from '../diagnostics/dom-driver';
-import type { ExportDiagnosticsSource } from '../diagnostics/source';
+import { resolveDiagnosticsDocument, type ExportDiagnosticsSource } from '../diagnostics/source';
 import {
   generateFilename,
   getFileExtension,
@@ -55,12 +55,12 @@ function resolveDisplayedImage(image: HTMLImageElement, pageUrl: string): string
  * currentSrc is authoritative for responsive images; malformed srcset values are never reparsed.
  */
 export function collectPageImageResources(source?: ExportDiagnosticsSource): FileResource[] {
-  const document = source?.document ?? globalThis.document;
+  const documentRoot = resolveDiagnosticsDocument(source);
   const pageUrl = getCurrentExportPageUrl(source?.pageUrl) || 'https://sniptale.invalid';
   const resources: FileResource[] = [];
   const seenUrls = new Set<string>();
 
-  for (const image of listPageImages(document)) {
+  for (const image of listPageImages(documentRoot)) {
     if (isContentOwnedElement(image) || !isLikelyContentImage(image)) continue;
     const url = resolveLinkedOriginal(image, pageUrl) ?? resolveDisplayedImage(image, pageUrl);
     if (!url || seenUrls.has(url)) continue;

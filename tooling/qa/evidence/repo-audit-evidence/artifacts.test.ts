@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { expect, it } from 'vitest';
 
-import { createTempRoot } from '../../core/test-helpers';
+import { createTempRoot } from '../../test-support/test-helpers';
 import {
   persistRepoAuditEvidence,
   persistRepoAuditTopology,

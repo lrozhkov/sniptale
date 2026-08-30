@@ -296,7 +296,7 @@ function BorderBehaviorSection(props: BorderStyleInspectorProps) {
           />
         </div>
       </div>
-      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <div className="grid gap-2 border-t border-solid border-[var(--sniptale-color-border-soft)] pt-3">
         <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
           {translate('highlighter.editor.linkedTemplatesTitle')}
         </div>

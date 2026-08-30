@@ -8,7 +8,7 @@ import {
   parseAgentToolingCliOptions,
   removeAgentTooling,
 } from './agent-tooling.mjs';
-import { createTempRoot } from '../qa/core/test-helpers';
+import { createTempRoot } from '../qa/test-support/test-helpers';
 
 function createKit() {
   const root = createTempRoot('agent-tooling-');

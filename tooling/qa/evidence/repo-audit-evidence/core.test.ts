@@ -13,12 +13,6 @@ function expectAuditReportSections(report: string) {
   expect(report).toContain(
     '- Structural maintenance: npm run qa:structural-audit (manual-report-only)\n'
   );
-  expect(report).toContain(
-    [
-      '- verify-interface-surfaces.mjs:',
-      'node tooling/qa/core/verify-interface-surfaces.mjs --repo-wide --report-only\n',
-    ].join(' ')
-  );
 }
 
 function createAuditReportFixture() {
@@ -47,14 +41,7 @@ function createAuditReportFixture() {
           tool: 'verify-advisory.mjs',
         },
       ],
-      repoAuditReportDefinitions: [
-        {
-          tool: 'verify-interface-surfaces.mjs',
-          commands: [
-            'node tooling/qa/core/verify-interface-surfaces.mjs --repo-wide --report-only',
-          ],
-        },
-      ],
+      repoAuditReportDefinitions: [],
       skipCapableTools: [],
     },
   };

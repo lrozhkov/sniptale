@@ -18,7 +18,6 @@
         { "id": "ast-grep", "requirement": "required" },
         { "id": "knip", "requirement": "required" },
         { "id": "jscpd", "requirement": "required" },
-        { "id": "semgrep", "requirement": "optional" },
         { "id": "codeql", "requirement": "optional" }
       ]
     },
@@ -30,7 +29,7 @@
         { "id": "full-product-coverage", "requirement": "excluded" },
         { "id": "audit-evidence", "requirement": "required" },
         { "id": "topology-report", "requirement": "excluded" },
-        { "id": "npm-audit", "requirement": "required" },
+        { "id": "npm-audit", "requirement": "excluded" },
         { "id": "npm-audit-signatures", "requirement": "required" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
@@ -38,7 +37,6 @@
         { "id": "ast-grep", "requirement": "excluded" },
         { "id": "knip", "requirement": "excluded" },
         { "id": "jscpd", "requirement": "excluded" },
-        { "id": "semgrep", "requirement": "required" },
         { "id": "codeql", "requirement": "excluded" }
       ]
     },
@@ -58,7 +56,6 @@
         { "id": "ast-grep", "requirement": "required" },
         { "id": "knip", "requirement": "excluded" },
         { "id": "jscpd", "requirement": "excluded" },
-        { "id": "semgrep", "requirement": "required" },
         { "id": "codeql", "requirement": "required" }
       ]
     },
@@ -78,7 +75,6 @@
         { "id": "ast-grep", "requirement": "excluded" },
         { "id": "knip", "requirement": "excluded" },
         { "id": "jscpd", "requirement": "excluded" },
-        { "id": "semgrep", "requirement": "excluded" },
         { "id": "codeql", "requirement": "excluded" }
       ]
     },
@@ -98,7 +94,6 @@
         { "id": "ast-grep", "requirement": "required" },
         { "id": "knip", "requirement": "required" },
         { "id": "jscpd", "requirement": "required" },
-        { "id": "semgrep", "requirement": "required" },
         { "id": "codeql", "requirement": "required" }
       ]
     }

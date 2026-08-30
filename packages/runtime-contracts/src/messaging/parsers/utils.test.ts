@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 
 import {
@@ -88,6 +88,17 @@ it('returns the original zod schema after compile-time contract binding', () => 
   const defineTestSchema = defineZodSchema<{ id: string }>();
 
   expect(defineTestSchema(schema)).toBe(schema);
+});
+
+it('requires schema output to preserve optional contract fields', () => {
+  const optionalSchema = z.object({ filename: z.string().optional() });
+  const requiredSchema = z.object({ filename: z.string() });
+  const defineOptionalSchema = defineZodSchema<{ filename?: string }>();
+  type OptionalParameter = Parameters<typeof defineOptionalSchema<typeof optionalSchema>>[0];
+  type RequiredParameter = Parameters<typeof defineOptionalSchema<typeof requiredSchema>>[0];
+
+  expectTypeOf<OptionalParameter>().toEqualTypeOf<typeof optionalSchema>();
+  expectTypeOf<RequiredParameter>().toBeNever();
 });
 
 it('returns the original message registry after compile-time contract binding', () => {

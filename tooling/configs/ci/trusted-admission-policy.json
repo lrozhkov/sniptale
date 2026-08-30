@@ -6,26 +6,47 @@
       "claim": "fast-pr-gate",
       "fullVitest": true,
       "releaseReady": false,
-      "freshPhases": ["install", "verify-project-toolchain", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "proof"],
+      "freshPhases": [
+        "runtime-parity",
+        "install",
+        "verify-project-toolchain",
+        "validate-workflows",
+        "provision-canvas",
+        "verify-canvas",
+        "provision-ast-grep",
+        "verify-ast-grep",
+        "proof"
+      ],
       "derivedPhases": ["non-gate-input-reuse"],
       "requiredFiles": [
-        ".tmp/qa/build-proof.json",
         ".tmp/qa/unit-proof.json",
-        ".tmp/semgrep/results.json",
-        ".tmp/semgrep/results.sarif",
         ".tmp/osv/results.json",
         ".tmp/gitleaks/report.json",
-        ".tmp/npm-audit/results.json",
         ".tmp/npm-audit/signatures.json"
       ],
       "requiredPrefixes": [".tmp/qa-observability/runs/", ".tmp/qa-logs/"],
-      "reuse": { "build": ["fresh", "reused"], "unit": ["fresh", "reused"], "codeql": ["unavailable"], "coverage": ["unavailable"] }
+      "reuse": {
+        "build": ["unavailable"],
+        "unit": ["fresh", "reused"],
+        "codeql": ["unavailable"],
+        "coverage": ["unavailable"]
+      }
     },
     "release": {
       "claim": "release-provenance",
       "fullVitest": true,
       "releaseReady": true,
-      "freshPhases": ["install", "verify-project-toolchain", "provision-canvas", "verify-canvas", "provision-ast-grep", "verify-ast-grep", "release"],
+      "freshPhases": [
+        "runtime-parity",
+        "install",
+        "verify-project-toolchain",
+        "validate-workflows",
+        "provision-canvas",
+        "verify-canvas",
+        "provision-ast-grep",
+        "verify-ast-grep",
+        "release"
+      ],
       "derivedPhases": [],
       "requiredFiles": [
         ".tmp/qa/build-proof.json",
@@ -35,8 +56,6 @@
         ".tmp/coverage/canonical/coverage-final.json",
         ".tmp/coverage/canonical/coverage-summary.json",
         ".tmp/coverage/canonical/lcov.info",
-        ".tmp/semgrep/results.json",
-        ".tmp/semgrep/results.sarif",
         ".tmp/codeql/results.filtered.sarif",
         ".tmp/osv/results.json",
         ".tmp/gitleaks/report.json",
@@ -52,7 +71,12 @@
         ".tmp/mutation/persistence/",
         ".tmp/mutation/secrets/"
       ],
-      "reuse": { "build": ["fresh", "reused"], "unit": ["fresh", "reused"], "codeql": ["fresh", "reused"], "coverage": ["fresh", "reused"] }
+      "reuse": {
+        "build": ["fresh", "reused"],
+        "unit": ["fresh", "reused"],
+        "codeql": ["fresh", "reused"],
+        "coverage": ["fresh", "reused"]
+      }
     }
   },
   "proof": "A pull request executes its candidate QA controls once. Trusted base validates mandatory phases, candidate identity, proof schema, evidence hashes, execution compatibility, artifact closure, reuse disposition, and final graph status without re-executing the previous controls. Both control digests and candidate-controls disposition remain explicit; cross-digest reuse and docs-only derivation are forbidden, and release provenance requires the accepted main control digest.",

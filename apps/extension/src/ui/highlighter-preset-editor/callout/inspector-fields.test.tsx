@@ -17,7 +17,7 @@ vi.mock(
   })
 );
 
-import { AdditionalSettings } from './inspector-fields';
+import { AdditionalSettings, ChoiceField } from './inspector-fields';
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
@@ -49,6 +49,7 @@ it('restores and remembers the open state across panel remounts', async () => {
   const details = await renderAdditionalSettings();
   await act(async () => Promise.resolve());
   expect(details.open).toBe(true);
+  expect(details.className).toContain('border-solid');
 
   await act(async () => {
     details.open = false;
@@ -64,4 +65,28 @@ it('restores and remembers the open state across panel remounts', async () => {
   const reopenedDetails = await renderAdditionalSettings();
   expect(reopenedDetails.open).toBe(false);
   expect(loadMock).toHaveBeenCalledTimes(1);
+});
+
+it('renders and selects an additional-settings choice', async () => {
+  const onChange = vi.fn();
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  await act(async () => {
+    root?.render(
+      <ChoiceField
+        getLabel={(value) => `choice-${value}`}
+        label="Choice"
+        onChange={onChange}
+        options={['first', 'second']}
+        value="first"
+      />
+    );
+  });
+
+  const second = Array.from(host.querySelectorAll('button')).find(
+    (button) => button.textContent === 'choice-second'
+  );
+  await act(async () => second?.click());
+  expect(onChange).toHaveBeenCalledWith('second');
 });

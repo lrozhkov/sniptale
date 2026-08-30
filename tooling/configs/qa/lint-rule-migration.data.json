@@ -34,7 +34,7 @@
         "packages/runtime-contracts/src/**/*.{ts,tsx}"
       ],
       "decision": "Custom guard",
-      "targetOwner": "tooling/qa/core/contract-enum-guard.mjs"
+      "targetOwner": "tooling/qa/guards/product-contracts/contracts/contract-enum-guard.mjs"
     },
     {
       "id": "eslint-plugin-security",
@@ -220,7 +220,7 @@
       "priorRule": "no-restricted-syntax",
       "priorApplications": [{ "scope": "contract-roots", "severity": "error" }],
       "decision": "Custom guard",
-      "targetOwner": "tooling/qa/core/contract-enum-guard.mjs",
+      "targetOwner": "tooling/qa/guards/product-contracts/contracts/contract-enum-guard.mjs",
       "targetRule": "contract-enum"
     },
     {
@@ -293,9 +293,9 @@
         { "scope": "typescript-general", "severity": "error" },
         { "scope": "javascript", "severity": "error" }
       ],
-      "decision": "Move JS plugin",
+      "decision": "Move",
       "targetOwner": ".oxlintrc.json",
-      "targetRule": "security/detect-eval-with-expression"
+      "targetRule": "no-eval"
     },
     {
       "priorRule": "security/detect-new-buffer",
@@ -350,11 +350,7 @@
   "oxlint": {
     "categoryDecisions": { "correctness": "off" },
     "defaultActiveSeverity": "error",
-    "warningRuleIds": [
-      "no-unused-vars",
-      "react/exhaustive-deps",
-      "security/detect-unsafe-regex"
-    ],
+    "warningRuleIds": ["no-unused-vars", "react/exhaustive-deps", "security/detect-unsafe-regex"],
     "mixedSeverityRuleIds": ["no-unused-vars"],
     "activeRuleIds": [
       "constructor-super",
@@ -374,6 +370,7 @@
       "no-class-assign",
       "no-compare-neg-zero",
       "no-cond-assign",
+      "no-console",
       "no-const-assign",
       "no-constant-binary-expression",
       "no-constant-condition",
@@ -388,6 +385,7 @@
       "no-empty-character-class",
       "no-empty-pattern",
       "no-empty-static-block",
+      "no-eval",
       "no-ex-assign",
       "no-extra-boolean-cast",
       "no-fallthrough",
@@ -398,6 +396,7 @@
       "no-irregular-whitespace",
       "no-loss-of-precision",
       "no-misleading-character-class",
+      "no-new-func",
       "no-new-native-nonconstructor",
       "no-nonoctal-decimal-escape",
       "no-obj-calls",
@@ -433,15 +432,19 @@
       "react/jsx-no-script-url",
       "react/jsx-no-target-blank",
       "react/no-children-prop",
+      "react/no-danger",
       "react/no-danger-with-children",
       "react/rules-of-hooks",
       "react/void-dom-elements-no-children",
       "require-yield",
       "security/detect-bidi-characters",
       "security/detect-buffer-noassert",
-      "security/detect-eval-with-expression",
       "security/detect-new-buffer",
       "security/detect-unsafe-regex",
+      "sonarjs/no-all-duplicated-branches",
+      "sonarjs/no-duplicate-in-composite",
+      "sonarjs/no-duplicated-branches",
+      "sonarjs/no-nested-assignment",
       "typescript/consistent-type-imports",
       "typescript/no-duplicate-enum-values",
       "typescript/no-empty-object-type",
@@ -498,6 +501,10 @@
       "react/rules-of-hooks",
       "security/detect-non-literal-regexp",
       "security/detect-object-injection",
+      "sonarjs/no-all-duplicated-branches",
+      "sonarjs/no-duplicate-in-composite",
+      "sonarjs/no-duplicated-branches",
+      "sonarjs/no-nested-assignment",
       "typescript/ban-ts-comment",
       "typescript/consistent-type-imports",
       "typescript/no-explicit-any",
@@ -515,24 +522,20 @@
   "customGuards": [
     {
       "id": "contract-enum",
-      "implementation": "tooling/qa/core/contract-enum-guard.mjs",
-      "executionOwner": "tooling/qa/core/verify-oxlint.mjs",
+      "implementation": "tooling/qa/guards/product-contracts/contracts/contract-enum-guard.mjs",
+      "executionOwner": "tooling/qa/guards/quality/verify-oxlint.mjs",
       "compilerApi": "typescript@6",
       "roots": ["apps/extension/src/contracts/", "packages/runtime-contracts/src/"]
     }
   ],
   "residualEslint": [
     {
-      "owner": "tooling/qa/core/verify-sonarjs.mjs",
+      "owner": "tooling/qa/guards/quality/sonarjs/check.mjs",
       "scope": ["apps/extension/src/**", "packages/*/src/**"],
       "rules": [
         "sonarjs/arguments-order",
         "sonarjs/different-types-comparison",
-        "sonarjs/no-all-duplicated-branches",
-        "sonarjs/no-duplicated-branches",
-        "sonarjs/no-duplicate-in-composite",
         "sonarjs/no-misleading-array-reverse",
-        "sonarjs/no-nested-assignment",
         "sonarjs/no-try-promise",
         "sonarjs/reduce-initial-value"
       ],

@@ -8,6 +8,11 @@ import {
   getInfrastructureSmokeTimeoutMs,
   isAcceptedDockerResult,
 } from './infrastructure-smoke-process.mjs';
+import {
+  assertSemanticRuntimeParity,
+  createSemanticRuntimeParityReceipt,
+  verifyRuntimeParity,
+} from './runtime-parity.mjs';
 
 const imageReference = process.argv[2];
 if (!/^ghcr\.io\/lrozhkov\/sniptale-qa@sha256:[a-f0-9]{64}$/u.test(imageReference ?? '')) {
@@ -25,6 +30,7 @@ if (typeof mutationVersion !== 'string' || mutationVersion.length === 0) {
 }
 const destination = 'build/selectel-controller/infrastructure-smoke.json';
 const checks = [];
+const runtimeParity = {};
 const startedAt = new Date().toISOString();
 const inspectBrowserScript = [
   "const fs=require('node:fs');",
@@ -66,6 +72,36 @@ function runHostCommand({ id, command, args }) {
   }
 }
 
+function verifyHostRuntimeParity() {
+  try {
+    runtimeParity.host = createSemanticRuntimeParityReceipt(
+      verifyRuntimeParity({ lock }),
+      'selectel-host'
+    );
+    checks.push({ id: 'host-runtime-parity', status: 'passed' });
+  } catch (error) {
+    checks.push({ id: 'host-runtime-parity', status: 'failed' });
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`host-runtime-parity failed: ${reason}`, { cause: error });
+  }
+}
+
+function verifyContainerRuntimeParity() {
+  const output = runInImage('container-runtime-parity', 'node', [
+    '/opt/sniptale-ci/runtime-parity.mjs',
+    '/opt/sniptale-ci/toolchain.lock.json',
+  ]);
+  try {
+    const receipt = JSON.parse(output);
+    runtimeParity.container = createSemanticRuntimeParityReceipt(receipt, 'qa-container');
+    assertSemanticRuntimeParity(runtimeParity.host, runtimeParity.container);
+  } catch (error) {
+    checks.at(-1).status = 'failed';
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`container-runtime-parity receipt rejected: ${reason}`, { cause: error });
+  }
+}
+
 function runInImage(id, command, args = [], options = {}) {
   return runDocker(
     [
@@ -74,7 +110,7 @@ function runInImage(id, command, args = [], options = {}) {
       '--cap-drop=ALL',
       '--security-opt=no-new-privileges',
       ...(options.dockerArgs ?? ['--network=none']),
-      ...getInfrastructureSmokeEnvironment(id).flatMap((value) => ['--env', value]),
+      ...getInfrastructureSmokeEnvironment().flatMap((value) => ['--env', value]),
       imageReference,
       command,
       ...args,
@@ -119,6 +155,7 @@ try {
     throw new Error('Malformed Selectel host tool registry.');
   }
   for (const check of hostTools.checks) runHostCommand(check);
+  verifyHostRuntimeParity();
 
   const repoDigests = runDocker(
     ['image', 'inspect', imageReference, '--format', '{{json .RepoDigests}}'],
@@ -131,9 +168,7 @@ try {
     throw new Error('The locally pulled QA image is not bound to the requested immutable digest.');
   }
 
-  expectVersion('node', 'node', lock.node.version);
-  expectVersion('npm', 'npm', lock.node.npmVersion);
-  expectVersion('semgrep', 'semgrep', lock.semgrep.version, ['--legacy', '--version']);
+  verifyContainerRuntimeParity();
   expectVersion('codeql', 'codeql', lock.codeql.version);
   expectVersion('osv-scanner', 'osv-scanner', lock.osvScanner.version);
   expectVersion('gitleaks', 'gitleaks', lock.gitleaks.version);
@@ -200,6 +235,7 @@ try {
     startedAt,
     completedAt: new Date().toISOString(),
     checks,
+    runtimeParity,
     failure,
   };
   fs.mkdirSync(path.dirname(destination), { recursive: true });

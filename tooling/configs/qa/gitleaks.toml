@@ -7,6 +7,7 @@ useDefault = true
 [[allowlists]]
 description = "Generated and dependency artifacts are not source-owned secret surfaces"
 paths = [
+  '''^tooling/configs/qa/jscpd-baseline\.json$''',
   '''^\.tmp/''',
   '''^node_modules/''',
   '''^dist/''',

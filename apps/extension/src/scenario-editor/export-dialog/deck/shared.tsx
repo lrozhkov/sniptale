@@ -1,11 +1,12 @@
 import type { ScenarioDeckExportResult } from '../../project/export/deck/types';
 import type { ScenarioDeckExportStatus } from './use-dialog-state';
+import { translate } from '../../../platform/i18n';
 
 export function ScenarioDeckExportHeader(props: { projectName: string }) {
   return (
     <div>
       <h2 className="text-xl font-semibold text-[var(--sniptale-color-text-primary)]">
-        Export scenario deck
+        {translate('scenario.editor.exportScenarioDeck')}
       </h2>
       <p className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">{props.projectName}</p>
     </div>
@@ -26,10 +27,15 @@ export function ScenarioDeckExportStatusMessage(props: {
   if (props.result.missingAssetIds.length > 0) {
     return (
       <p className="text-sm text-[var(--sniptale-color-warning)]">
-        Exported with missing assets: {props.result.missingAssetIds.join(', ')}
+        {translate('scenario.editor.exportedWithMissingAssets')}:{' '}
+        {props.result.missingAssetIds.join(', ')}
       </p>
     );
   }
 
-  return <p className="text-sm text-[var(--sniptale-color-success)]">Export created.</p>;
+  return (
+    <p className="text-sm text-[var(--sniptale-color-success)]">
+      {translate('scenario.editor.exportCreated')}
+    </p>
+  );
 }

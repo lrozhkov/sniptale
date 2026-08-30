@@ -16,7 +16,7 @@ If a correction begins to change new runtime contracts, every persistence writer
 
 ## Runtime And Package Ownership
 
-Runtime folders under `apps/extension/src/background`, `apps/extension/src/content`, `apps/extension/src/camera-recorder`, `apps/extension/src/effect-runtime-sandbox`, and extension/editor page roots do not import one another directly by default. The sanctioned one-way Web Snapshot Viewer preparation reuse is documented in the runtime and code-organization architecture notes. The canonical runtime set lives in `tooling/qa/core/runtime-topology.data.json`.
+Runtime folders under `apps/extension/src/background`, `apps/extension/src/content`, `apps/extension/src/camera-recorder`, `apps/extension/src/effect-runtime-sandbox`, and extension/editor page roots do not import one another directly by default. The sanctioned one-way Web Snapshot Viewer preparation reuse is documented in the runtime and code-organization architecture notes. The canonical runtime set lives in `tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json`.
 
 Cross-runtime reuse goes through explicit workspace packages or app-core contracts, adapters, messaging, persistence, i18n, theme, and UI owners. Root entrypoints stay bootstrap, dependency wiring, page/app shells, or thin public facades.
 

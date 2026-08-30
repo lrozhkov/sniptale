@@ -100,6 +100,16 @@ describe('Page Package contract', () => {
     expect(parsePagePackageManifest(createManifest())).toEqual(createManifest());
   });
 
+  it('keeps failed-resource and warning counters independent', () => {
+    const failedWithoutWarnings = createManifest();
+    failedWithoutWarnings.stats.failedResourceCount = 1;
+    expect(parsePagePackageManifest(failedWithoutWarnings)).toEqual(failedWithoutWarnings);
+
+    const mismatchedWarnings = createManifest();
+    mismatchedWarnings.stats.warningCount = 1;
+    expect(parsePagePackageManifest(mismatchedWarnings)).toBeNull();
+  });
+
   it('accepts exactly one explicit screenshot coverage path', () => {
     const partial = createManifest();
     const screenshot = partial.entries.find((entry) => entry.path === 'page-screenshot.png');

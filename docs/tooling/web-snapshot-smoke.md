@@ -2,6 +2,8 @@
 
 This is a local visual-fidelity polygon. It is deliberately not part of QA or CI and does not keep copies or golden screenshots of third-party sites in the repository. Its single question is whether a saved Web Copy visually matches the live page after the same preparation.
 
+The command starts with the ordinary production-mode Vite build. That build does not run Typecheck and does not emit source maps; run `npm run typecheck` separately when the investigation also needs static type proof.
+
 ## External-site polygon
 
 Run the default catalog, one target, or the optional extended catalog:
@@ -12,7 +14,7 @@ npm run web-snapshot:smoke -- --target sap-ui5-cart
 npm run web-snapshot:smoke -- --extended
 ```
 
-Targets are declared in `tooling/web-snapshot-smoke/external-targets.mjs`. Each page is opened at a 1280×800 viewport, waits for its readiness selector and image decoding, receives two complete lazy-loading scroll passes, and must reach stable document dimensions. The tool then captures the live reference, creates a real Library Web Snapshot, opens it in the existing Viewer, and captures the comparison surface at the same viewport.
+Targets are declared in `tooling/web-snapshot-smoke/support/external-targets.mjs`. Each page is opened at a 1280×800 viewport, waits for its readiness selector and image decoding, receives two complete lazy-loading scroll passes, and must reach stable document dimensions. The tool then captures the live reference, creates a real Library Web Snapshot, opens it in the existing Viewer, and captures the comparison surface at the same viewport.
 
 Regular DOM pages use the static Web Copy as visual authority. Canvas, WebGL, and PDF targets use the retained full-page screenshot. Screenshot comparisons normalize an intentional uniform downscale caused by the full-page quality policy, while recording both original dimensions and the scale in metrics. The temporary browser profile is pinned to the application's `maximum` quality profile (80 MP, 100% minimum scale, 128 MiB) so local user settings cannot make runs incomparable.
 
@@ -80,6 +82,8 @@ SNAPSHOT_SMOKE_DOWNLOAD=1 SNAPSHOT_SMOKE_URL='https://target.example/page' SNAPS
 Set `SNAPSHOT_SMOKE_RICH_PACKAGE=1` to select the full data-and-files profile. Set `SNAPSHOT_SMOKE_TIMEOUT_MS` to at least `10000` when a live page needs a larger bounded completion window; timeout failures include the last durable phase, progress payload, and revision.
 
 The report records source, retained screenshot, static document, gallery, asset-catalog, and popup observations. The command fails when the static document loses too much layout, text, imagery, or height; when visual pixel drift crosses the bounded thresholds; when the retained screenshot or its 320×180 top-crop thumbnail is unavailable; when the viewer performs an external request; when scripts survive in the static document; or when the reveal/import regression reappears. PNG evidence and `report.json` remain local and ignored by Git.
+
+Each fixture run clears the previous result root before capture, binds `report.json` to the complete built `dist` bytes and the exact non-empty selected-case set, and removes its temporary Chromium profile and extension copy on both success and failure. A failed run can retain only evidence from that current candidate and selected case set.
 
 The runner enables Web Snapshots and both resource-download options only inside its temporary extension profile. It also adds `<all_urls>` only to a temporary copy of the built manifest so the matrix can exercise arbitrary origins; it does not change the product manifest or a user profile.
 

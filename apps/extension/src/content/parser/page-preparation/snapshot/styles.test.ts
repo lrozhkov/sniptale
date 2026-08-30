@@ -105,7 +105,9 @@ it('preserves stylesheet order and media conditions', () => {
 
   materializePreparedSnapshotStyles(document, snapshot);
 
-  const styles = Array.from(snapshot.querySelectorAll('style'));
+  const styles = Array.from(
+    snapshot.querySelectorAll('style[data-sniptale-captured-stylesheet="true"]')
+  );
   expect(styles).toHaveLength(2);
   expect(styles[0]?.textContent).toContain('.first');
   expect(styles[1]?.textContent).toContain('@media screen');

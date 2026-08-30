@@ -1,0 +1,332 @@
+import { expect, it } from 'vitest';
+
+import { createTempRoot, importFresh, writeFile } from '../../../../test-support/test-helpers';
+
+function createPassingPackageJson() {
+  return {
+    packageManager: 'npm@11.19.1',
+    engines: { node: '>=24.18.0 <25' },
+    devEngines: {
+      runtime: { name: 'node', version: '>=24.18.0 <25', onFail: 'error' },
+      packageManager: { name: 'npm', version: '11.19.1', onFail: 'error' },
+    },
+    dependencies: {
+      react: '^19.2.5',
+      'react-dom': '^19.2.5',
+    },
+    devDependencies: {
+      '@types/react': '^19.2.14',
+      '@types/react-dom': '^19.2.3',
+      '@vitejs/plugin-react': '^6.1.0',
+    },
+  };
+}
+
+function createFailingPackageJson() {
+  return {
+    dependencies: {
+      react: '^18.2.0',
+      'react-dom': '^18.2.0',
+    },
+    devDependencies: {
+      '@types/react': '^18.2.61',
+      '@types/react-dom': '^18.2.19',
+      '@vitejs/plugin-react': '^4.2.1',
+    },
+  };
+}
+
+function writeConfigPolicyPackageJson(root, packageJson) {
+  writeFile(root, 'package.json', JSON.stringify(packageJson, null, 2));
+  writeFile(root, '.nvmrc', '24.18.0\n');
+  writeFile(root, '.npmrc', 'legacy-peer-deps=true\nloglevel=error\nmin-release-age=7\n');
+  writeFile(
+    root,
+    'package-lock.json',
+    JSON.stringify({ packages: { '': { engines: packageJson.engines } } }, null, 2)
+  );
+}
+
+function writePassingConfigPolicyFixture(root) {
+  writeConfigPolicyPackageJson(root, createPassingPackageJson());
+  writeFile(
+    root,
+    'tsconfig.json',
+    `{
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    /* Baseline guardrail */
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedSideEffectImports": true,
+    "verbatimModuleSyntax": true
+  }
+}
+`
+  );
+  writeFile(
+    root,
+    'tsconfig.node.json',
+    JSON.stringify(
+      {
+        compilerOptions: {
+          forceConsistentCasingInFileNames: true,
+          noUncheckedSideEffectImports: true,
+          verbatimModuleSyntax: true,
+        },
+      },
+      null,
+      2
+    )
+  );
+  writeFile(
+    root,
+    'apps/extension/manifest.json',
+    JSON.stringify({ minimum_chrome_version: '148' }, null, 2)
+  );
+  writeFile(
+    root,
+    'apps/extension/vite.config.ts',
+    "export default { build: { target: 'chrome140' } };\n"
+  );
+}
+
+async function importConfigPolicyModule() {
+  return importFresh<typeof import('./check.mjs')>('./check.mjs', import.meta.url);
+}
+
+function expectConfigPolicyViolationsToContain(violations) {
+  expect(violations).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        file: 'tsconfig.json',
+        message: 'compilerOptions.target must be "ES2024"',
+      }),
+      expect.objectContaining({
+        file: 'package.json',
+        message: 'engines.node must be ">=24.18.0 <25"',
+      }),
+      expect.objectContaining({
+        file: 'package-lock.json',
+        message: 'packages[""].engines.node must be ">=24.18.0 <25"',
+      }),
+      expect.objectContaining({
+        file: 'package.json',
+        message: expect.stringContaining('dependencies.react must stay on the'),
+      }),
+      expect.objectContaining({
+        file: 'package.json',
+        message: expect.stringContaining('devDependencies.@vitejs/plugin-react must stay on the'),
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.json',
+        message: 'compilerOptions.noUncheckedSideEffectImports must be true',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.json',
+        message: 'compilerOptions.verbatimModuleSyntax must be true',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.json',
+        message: 'compilerOptions.lib must be ["ES2024","DOM","DOM.Iterable"]',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.node.json',
+        message: 'compilerOptions.noUncheckedSideEffectImports must be true',
+      }),
+      expect.objectContaining({
+        file: 'tsconfig.node.json',
+        message: 'compilerOptions.verbatimModuleSyntax must be true',
+      }),
+      expect.objectContaining({
+        file: 'apps/extension/manifest.json',
+        message: 'minimum_chrome_version must be a decimal Chrome major version',
+      }),
+      expect.objectContaining({
+        file: 'apps/extension/manifest.json',
+        message:
+          'message_serialization must remain absent until a production messaging owner requires it',
+      }),
+      expect.objectContaining({
+        file: 'apps/extension/vite.config.ts',
+        message: 'build.target must be "chrome140"',
+      }),
+    ])
+  );
+}
+
+it('passes when runtime baseline config matches policy', async () => {
+  const root = createTempRoot('verify-config-policy-pass-');
+  writePassingConfigPolicyFixture(root);
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([]);
+});
+
+it('does not accept the Vite build target when chrome140 appears only in a comment', async () => {
+  const root = createTempRoot('verify-config-policy-vite-comment-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(
+    root,
+    'apps/extension/vite.config.ts',
+    ['// target: "chrome140"', "export default { build: { target: 'chrome139' } };", ''].join('\n')
+  );
+
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([
+    expect.objectContaining({
+      file: 'apps/extension/vite.config.ts',
+      message: 'build.target must be "chrome140"',
+    }),
+  ]);
+});
+
+it('rejects lockfile engine drift independently from the root package', async () => {
+  const root = createTempRoot('verify-config-policy-lock-engine-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(root, 'package-lock.json', JSON.stringify({ packages: { '': {} } }, null, 2));
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
+    rule: 'config-policy',
+    file: 'package-lock.json',
+    message: 'packages[""].engines.node must be ">=24.18.0 <25"',
+  });
+});
+
+it('rejects malformed versions that merely share the governed prefix', async () => {
+  const root = createTempRoot('verify-config-policy-version-prefix-');
+  const packageJson = createPassingPackageJson();
+  packageJson.dependencies.react = '^19.2.not-semver';
+  packageJson.devDependencies['@vitejs/plugin-react'] = '^6.1.preview';
+  writePassingConfigPolicyFixture(root);
+  writeConfigPolicyPackageJson(root, packageJson);
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ message: expect.stringContaining('dependencies.react') }),
+      expect.objectContaining({
+        message: expect.stringContaining('devDependencies.@vitejs/plugin-react'),
+      }),
+    ])
+  );
+});
+
+it('rejects Node version-manager drift independently from package metadata', async () => {
+  const root = createTempRoot('verify-config-policy-nvmrc-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(root, '.nvmrc', '22.23.2\n');
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
+    rule: 'config-policy',
+    file: '.nvmrc',
+    message: '.nvmrc must contain exactly 24.18.0',
+  });
+});
+
+it('rejects a committed release-age exclusion instead of making security bypass permanent', async () => {
+  const root = createTempRoot('verify-config-policy-release-age-exclusion-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(
+    root,
+    '.npmrc',
+    [
+      'legacy-peer-deps=true',
+      'loglevel=error',
+      'min-release-age=7',
+      'min-release-age-exclude[]=@zip.js/zip.js',
+      '',
+    ].join('\n')
+  );
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([
+    expect.objectContaining({ file: '.npmrc', message: expect.stringContaining('exactly') }),
+    expect.objectContaining({
+      file: '.npmrc',
+      message: 'urgent security exclusions must stay one-shot and must not be committed',
+    }),
+  ]);
+});
+
+it('does not accept the Vite build target from an unrelated object', async () => {
+  const root = createTempRoot('verify-config-policy-vite-unrelated-object-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(
+    root,
+    'apps/extension/vite.config.ts',
+    [
+      "const fixture = { build: { target: 'chrome140' } };",
+      'void fixture;',
+      "export default { build: { target: 'chrome139' } };",
+      '',
+    ].join('\n')
+  );
+
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([
+    expect.objectContaining({
+      file: 'apps/extension/vite.config.ts',
+      message: 'build.target must be "chrome140"',
+    }),
+  ]);
+});
+
+it('accepts the Vite build target from a defineConfig callback return object', async () => {
+  const root = createTempRoot('verify-config-policy-vite-define-config-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(
+    root,
+    'apps/extension/vite.config.ts',
+    [
+      "import { defineConfig } from 'vite';",
+      "export default defineConfig(() => ({ build: { target: 'chrome140' } }));",
+      '',
+    ].join('\n')
+  );
+
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([]);
+});
+
+it('reports missing strictness flags, build target, and malformed runtime config', async () => {
+  const root = createTempRoot('verify-config-policy-fail-');
+  writeConfigPolicyPackageJson(root, createFailingPackageJson());
+  writeFile(
+    root,
+    'tsconfig.json',
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2020',
+          lib: ['ES2020', 'DOM'],
+        },
+      },
+      null,
+      2
+    )
+  );
+  writeFile(root, 'tsconfig.node.json', JSON.stringify({ compilerOptions: {} }, null, 2));
+  writeFile(
+    root,
+    'apps/extension/manifest.json',
+    JSON.stringify(
+      {
+        minimum_chrome_version: 'not-a-version',
+        message_serialization: 'structured_clone',
+      },
+      null,
+      2
+    )
+  );
+  writeFile(root, 'apps/extension/vite.config.ts', 'export default { build: {} };\n');
+
+  const module = await importConfigPolicyModule();
+
+  expectConfigPolicyViolationsToContain(module.collectConfigPolicyViolations({ rootDir: root }));
+});

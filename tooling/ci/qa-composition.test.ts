@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 import { expect, it, vi } from 'vitest';
 
-import { createReleaseControlOccurrences } from '../qa/core/qa-steps/release-occurrences.mjs';
+import { createReleaseControlOccurrences } from '../qa/composition/catalog/release-occurrences.mjs';
 import { collectCiProofResults, collectCiReleaseResults } from './qa-composition.mjs';
 import { createCiProductControlOccurrences } from './product-control-policy.mjs';
 import { createTrustedControlMatrix } from './trusted-control-matrix.mjs';
@@ -24,11 +24,14 @@ it('machine-fixes full Vitest to Fast proof and release readiness to release pro
     'qa:closeout',
   ]);
   const source = fs.readFileSync('tooling/ci/qa-composition.mjs', 'utf8');
-  const executionSource = fs.readFileSync('tooling/qa/core/verify-all.execution.mjs', 'utf8');
+  const executionSource = fs.readFileSync(
+    'tooling/qa/composition/repository/full-verification/execution.mjs',
+    'utf8'
+  );
   expect(source).toContain('includeTests: true');
   expect(source).toContain('resolveRepositoryVerifyScope()');
   expect(source).not.toContain('resolveFullVerifyScope');
-  expect(source).not.toContain('runReleaseWrapper');
+  expect(source).toContain('collectReleaseDeltaStepResults');
   expect(executionSource).toContain('releaseMode ? DEFAULT_OXLINT_ROOTS : codeFiles');
   const proof = await collectCiProofResults({
     productProofCollector: async () => ({
@@ -142,6 +145,88 @@ it('fails closed when the release-only result closure is incomplete', async () =
   ).rejects.toThrow('Missing release-only control result: Release archive');
 });
 
+it.each([
+  {
+    name: 'fresh Fast proof',
+    reuseFastProof: false,
+    expectedReusedAuditControls: ['npm-audit'],
+    expectedExecutions: [
+      'product:npm-audit',
+      'release-delta',
+      'audit:npm-audit:reused',
+      'audit:npm-audit-signatures:live',
+    ],
+  },
+  {
+    name: 'reused Fast proof',
+    reuseFastProof: true,
+    expectedReusedAuditControls: ['audit-evidence'],
+    expectedExecutions: [
+      'release-delta',
+      'audit:npm-audit:live',
+      'audit:npm-audit-signatures:live',
+    ],
+  },
+])(
+  'executes npm vulnerability and signature gates exactly once with $name',
+  async ({ expectedExecutions, expectedReusedAuditControls, reuseFastProof }) => {
+    const executions: string[] = [];
+    const productProofCollector = vi.fn(async () => {
+      executions.push('product:npm-audit');
+      return {
+        steps: createCiProductControlOccurrences('proof').map(({ label }) => ({
+          label,
+          status: 'ok' as const,
+        })),
+      };
+    });
+    const releaseDeltaCollector = vi.fn(async () => {
+      executions.push('release-delta');
+      return {
+        steps: [
+          { label: 'SonarJS', status: 'ok' as const },
+          { label: 'Build', status: 'ok' as const },
+          { label: 'Release archive', status: 'ok' as const },
+        ],
+      };
+    });
+    const auditCollector = vi.fn(async ({ reusedControlIds }: { reusedControlIds: string[] }) => {
+      const reused = new Set(reusedControlIds);
+      for (const controlId of ['npm-audit', 'npm-audit-signatures']) {
+        executions.push(`audit:${controlId}:${reused.has(controlId) ? 'reused' : 'live'}`);
+      }
+      return {
+        steps: [
+          {
+            label: 'npm audit',
+            status: 'ok' as const,
+            detail: reused.has('npm-audit') ? 'reused current product proof' : 'live npm audit',
+          },
+          { label: 'npm audit signatures', status: 'ok' as const, detail: 'live signatures' },
+        ],
+      };
+    });
+
+    const result = await collectCiReleaseResults({
+      reuseFastProof,
+      productProofCollector,
+      releaseDeltaCollector,
+      auditCollector,
+      mutationCollector: () => passed,
+    });
+
+    expect(productProofCollector).toHaveBeenCalledTimes(reuseFastProof ? 0 : 1);
+    expect(auditCollector).toHaveBeenCalledWith({
+      profileId: 'release',
+      reusedControlIds: expectedReusedAuditControls,
+      session: undefined,
+    });
+    expect(executions).toEqual(expectedExecutions);
+    expect(result.steps.filter(({ label }) => label === 'npm audit')).toHaveLength(1);
+    expect(result.steps.filter(({ label }) => label === 'npm audit signatures')).toHaveLength(1);
+  }
+);
+
 it('runs the Fast audit after returned product failures and aggregates both results', async () => {
   const auditCollector = vi.fn(async () => ({
     steps: [{ label: 'npm audit', status: 'failed' as const }],
@@ -192,7 +277,7 @@ it('runs the release audit and every mutation profile after returned failures', 
 
   expect(auditCollector).toHaveBeenCalledWith({
     profileId: 'release',
-    reusedControlIds: [],
+    reusedControlIds: ['npm-audit'],
     session: undefined,
   });
   expect(mutationCollector.mock.calls.map(([profile]) => profile)).toEqual([
@@ -205,6 +290,8 @@ it('runs the release audit and every mutation profile after returned failures', 
       label === 'Unit tests' ? 'failed' : 'ok',
     ]),
     ['SonarJS', 'ok'],
+    ['Build', 'ok'],
+    ['Release archive', 'ok'],
     ['CodeQL', 'failed'],
     ['Mutation persistence', 'failed'],
     ['Mutation secrets', 'failed'],
@@ -239,7 +326,7 @@ it('shares one observed repository scope across fresh Fast and release-only cont
   expect(scopeResolver).toHaveBeenCalledOnce();
   expect(productProofCollector).toHaveBeenCalledWith(verifyScope);
   expect(releaseDeltaCollector).toHaveBeenCalledWith(verifyScope, {
-    includeArtifactSteps: false,
+    includeArtifactSteps: true,
   });
 });
 

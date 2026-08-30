@@ -1,124 +1,87 @@
-# Code Quality
+# Code quality
 
-Updated: 2026-08-14
+This document defines the Sniptale quality model and the acceptance rules for guards. Commands belong in the [operator handbook](operator-handbook.md), wrapper order in [wrapper summary](wrapper-summary.md), and exact executable membership in the machine-owned QA catalog and control inventory.
 
-This document owns the Sniptale quality model, guard families, baseline policy, and the boundary between deterministic enforcement and review judgment. Workflow belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md), and command lookup in [operator-handbook.md](operator-handbook.md).
+## Model
 
-## Quality Model
+Quality enforcement is hybrid. Oxfmt owns formatting. Oxlint owns ordinary JS/TS lint, type-aware rules, React, Vitest, accessibility, Security rules, and syntax-only SonarJS rules. Ast-grep owns syntax patterns that do not need semantic state. Release-only ESLint owns the small residual SonarJS set that needs parser services. Repository-specific ownership, lifecycle, topology, cross-artifact, and proof-reuse invariants remain custom only when a ready engine cannot express them without losing semantics.
 
-Sniptale quality has four layers:
+A logical result may aggregate several controls, but it is not automatically one analyzer owner. Categories organize execution; they do not define filesystem ownership. One owner has one authority and one independent reason to change.
 
-1. Deterministic controls enforce rules that can be detected with acceptable noise.
-2. Risk-based independent review evaluates high-risk judgment that deterministic controls cannot fully encode.
-3. Unified closeout proves and commits the accepted candidate.
-4. Escaped-defect follow-up adds failing proof, explains the safety-net gap, and makes the same-change deterministic-improvement decision explicit.
+The canonical machine entrypoints are:
 
-The canonical order is `implementation → qa:checkpoint → required review → qa:closeout`. Required review receives the complete green candidate, runs independently without inherited context, and is repeated only when a correction changes the reviewed behavior, owner, public contract, or security seam. Low-risk changes do not require a separate review.
+- `tooling/qa/composition/catalog/catalog.mjs` for control identity, category, order, and wrapper membership;
+- `tooling/qa/composition/control-inventory/discovery.mjs` for executable, consumer, policy, and proof closure;
+- `tooling/configs/qa/validation-manifest.json` for exact control-to-test navigation;
+- `tooling/configs/qa/quality-baseline.json` for narrow accepted static-analysis debt;
+- `tooling/qa/composition/scope/qa-scope.mjs` for product, harness, and inventory scope.
 
-Quality, correctness, maintainability, security, and explicit ownership are default priorities; focused wrapper cost never justifies weaker architecture or proof.
+Documentation must not restate the full catalog, file population, lane size, or generated counts.
 
-## Deterministic Control Authorities
+## Wrapper boundary
 
-The machine authority is source and policy, not prose. This mapping identifies the current owner for each guard family.
+`qa:release-harness` owns executable tooling and shared-control changes. It auto-formats the current diff, validates composition and conditional dependency admission/typecheck, runs Oxlint and affected harness tests, then writes a freshness stamp.
 
-| Guard family | Machine authority |
-| --- | --- |
-| Wrapper step/control identity and lane populations | `tooling/qa/core/qa-steps/**`, `tooling/qa/core/qa-controls/**`, `tooling/configs/qa/control-dispositions.data.json` |
-| Validation coverage | `tooling/configs/qa/validation-manifest.json` |
-| Product/harness/shared-control scope | `tooling/qa/core/qa-scope.mjs` |
-| Runtime/import/owner topology | `tooling/qa/core/runtime-topology.data.json`, `tooling/qa/guards/architecture/**`, `tooling/qa/core/architecture-guardrails*.mjs` |
-| Manifest permissions | `tooling/configs/qa/manifest-permissions.data.json`, `tooling/qa/guards/architecture/verify-manifest-permissions.mjs` |
-| Browser, messaging, storage, and security ownership | `tooling/qa/policy/**`, `tooling/configs/qa/security-*-ownership.data.json`, `tooling/qa/guards/security/**` |
-| Product identity retirement | `tooling/qa/core/verify-sniptale-identity.mjs`, `tooling/release/artifact-security-identity.mjs` |
-| Structural risk and allowances | `tooling/qa/core/structural-risk/**`, `tooling/qa/core/verify-structural-risk.mjs`, `tooling/configs/qa/structural-risk-allowances.data.json` |
-| Manual topology/fragmentation maintenance | `tooling/qa/core/topology-fragmentation*.mjs`, `tooling/qa/wrappers/structural-audit.mjs` |
-| Readability, AI hygiene, naming, suppression, and logging | `tooling/qa/core/quality.config.mjs`, `tooling/qa/core/verify-ai-hygiene.mjs`, `tooling/qa/guards/quality/**`, focused verifier definitions |
-| Coverage rollout, unit-test profiles, and thresholds | `tooling/qa/core/verify-test-coverage.registry.mjs`, exact-path inventory in `tooling/qa/core/verify-test-coverage.rollout-files.data.mjs`, `tooling/qa/core/verify-test-coverage.thresholds.mjs`, `tooling/qa/core/verify-build.test-profiles.mjs`, focused owner maps |
-| Audit requiredness and structured skips | `tooling/configs/qa/audit-profiles.data.json`, `tooling/qa/audits/profiles/**` |
-| Formatting and lint ownership | `.oxfmtrc.json`, `.oxfmtignore`, `.oxlintrc.json`, `tooling/configs/qa/formatter-migration.data.json`, `tooling/configs/qa/lint-rule-migration.data.json` |
-| Canonical TypeScript CLI and compatibility API | `tooling/qa/core/typescript-cli.mjs`, `@typescript/native` for TS7 CLI, `typescript` alias for TS6 compiler API only |
-| Baselines, exceptions, and technical debt | `tooling/configs/qa/*baseline*`, `tooling/configs/qa/technical-debt.data.json`, owner-specific policy registries |
+`qa:checkpoint` auto-formats the diff, requires a fresh harness stamp where applicable, records non-blocking advisory signals, and runs focused product controls and affected tests. `qa:closeout` consumes a fresh checkpoint, performs a fresh build and artifact closure, stages the admitted diff, and commits.
 
-`qa:checkpoint` and broader lanes consume these authorities; documentation summarizes them and must not create a competing list of exact executable steps.
+The canonical local order is `implementation → qa:checkpoint → required review → qa:closeout`. When harness/shared-control files changed, `qa:release-harness` runs before checkpoint.
 
-Exact coverage rollout paths live separately from the executable resolver so rename/object-list maintenance remains inventory-only. A change limited to `verify-test-coverage.rollout-files.data.mjs` is validated by checkpoint owner checks and does not require a fresh release-harness stamp; changes to thresholds, prefix matching, exclusions, traversal, or resolver behavior remain executable harness changes.
+`ci:proof` is the fast repository proof and excludes Build, ZIP, SonarJS residuals, coverage, CodeQL, mutation, and release-only audits. `ci:release` owns build/package and release-only assurance. Tooling execution coverage remains a separate maintenance proof and never expands `ci:release` or release provenance.
 
-## Enforced Families
+## Guard necessity
 
-### Static Correctness And Readability
+Every guard family is accepted against the current repository, not its historical name or registry row. Before changing or retaining it, answer:
 
-The enforced floor includes TypeScript/module hygiene, type-aware Oxlint with the exact Security JS-plugin rules, release-only curated SonarJS correctness rules, Oxfmt formatting of supported non-Markdown files, changed-line readability, diff-scoped structural pressure, AI hygiene, naming, suppression bans, canonical logging, dead-export fallout, and cycle checks. Tests are not exempt, but their structural profile reflects their different role.
+1. Which reachable defect or product/process invariant does it protect?
+2. Are its roots, paths, consumers, wrapper modes, and owners current?
+3. Is the current repository population non-vacuous?
+4. Is the invariant already owned by types, a ready analyzer, an owner test, or another stronger guard?
+5. Would the rule encourage artificial files, facades, wrappers, naming, or abstractions merely to satisfy a metric?
+6. Can a ready engine replace it without losing diff-aware checkpoint/closeout behavior?
+7. Is the correct disposition `Remove`, `Replace`, `Consolidate`, or a proved `Keep`?
 
-Oxfmt is the only formatter authority. Oxlint owns ordinary, TypeScript-aware, React Hooks, Vitest, JSX accessibility, and the six enabled `eslint-plugin-security` rules through its locked JS-plugin API. The focused policy keeps non-literal RegExp advisory disabled while unsafe regex remains blocking; the repository-wide Fast policy enables both warnings, preserving the former severity split without a second ESLint parse. The previously installed React Refresh ESLint dependency did not own an effective rule, so `react/only-export-components` is machine-recorded as `Do not adopt`; React Refresh transformation is instead owned by `@vitejs/plugin-react` 6 and its Oxc path. The nine type-aware SonarJS rules are the only retained ESLint lane and run only in release verification. Native TypeScript 7 owns every blocking CLI typecheck; the package exposed as `typescript` is the TypeScript 6 compatibility shim for QA AST consumers and is never a canonical CLI fallback. The machine toolchain lock separately binds that shim and the actual `@typescript/old` runtime it loads.
+A useful intent with a failed implementation is not automatically retired. Reimplement it only when the invariant remains valuable and can be expressed with current, low-noise evidence. Otherwise remove it instead of preserving an identity for its own sake.
 
-Metrics are signals, not architecture boundaries. A file below a limit may still have the wrong owner, and a line-count extraction is incomplete when the same public contract or hidden seam remains.
+## Atomic acceptance
 
-### Diff-Scoped Structural Risk
+An atomic guard change is accepted only when all of the following hold:
 
-Structural enforcement receives only behaviorally changed tracked or untracked code files. It reads each selected file's complete current AST and, for existing files, its `HEAD` shape. Unchanged, import-only, mock-only, and rename-only files do not become candidates. There is no repository-wide enforcement mode.
+- production consumers and wrapper occurrences are known;
+- current roots and owner seams are used;
+- every claimed smell has a negative fixture that blocks;
+- a cohesive valid example passes without artificial splitting;
+- live-repository execution proves the detector is not vacuous;
+- changed-file and full-scan modes preserve their intended scope;
+- previous and candidate findings are compared when an engine changes;
+- old implementations, stale paths, forwarding layers, duplicate authority, and temporary comparison paths are gone after parity;
+- production modules, single-consumer helpers, proxies, and navigation transitions have an explicit Consolidate or justified Keep result.
 
-File pressure combines physical lines with external owner groups and edges, exports, effect families, state authorities, effectful clusters, and cohesion. Function pressure uses role profiles for tests, declarative test fixtures, generated/data code, registered entrypoints/facades/routes, React components/hooks, proven pure parser/algorithm/reducer functions, adapters, registered orchestration owners, and default functions. The detector scores length, statements, cyclomatic/cognitive/nesting/recovery pressure, parameters, effects, state, ownership, and cohesion. File-level state authority follows same-file lexical aliases and proven local helper calls. Aliases rooted at `.current` of a const binding created by React `useRef` normalize to that ref authority. Mutable ref/setter members passed together to a local helper also normalize to one strongly named persistence, sync, transaction, or workflow session anchor only when every relevant object property is statically resolved and all calls agree on that anchor; generic session names, multiple anchors, spreads/computed properties, different refs, plain nested objects, dynamic accesses, escaped helpers, and unresolved aliases remain distinct or conservative. Effects are interpreted by layer: a highly cohesive single-owner adapter with simple control flow tolerates state projection, cohesive workflow/application orchestration is bounded, and UI owners are strict. Declarative test-fixture builders do not treat property-level nullish fallback expressions inside one returned object or array as control flow, while `&&`/`||` gating, real branches, recovery, effects, mutation, size, dependency, export, and ownership pressure remain visible.
+Test names and fixtures should describe the defect, not detector internals. A registry entry or declared `pass`/`fail` state is navigation metadata, not proof by itself.
 
-Absolute high scores do not by themselves fail a pre-existing cohesive orchestration owner. The exemption requires machine registration, high cohesion, no UI effects, bounded branching/nesting, and narrow ownership. Hard caps or disqualifying behavior still fail. For existing files and functions, structural delta is explicit: `+0..2` is accepted or reported as legacy pressure, `+3..5` is advisory, and `>5` fails; newly crossed or worsened hard caps fail. New files and functions use the absolute policy.
+## Structural and topology controls
 
-Current-diff consolidation lineage may compare a surviving function with a deleted same-owner predecessor when its normalized body, signature, semantic declaration shape, and referenced import/top-level dependency provenance are equivalent. A deleted file contributes a file baseline only when all of its functions and normalized top-level statements are present in the same surviving owner; partial, cross-owner, or top-level-semantic changes do not. Move-only functions are rescored under the current profile so path/profile changes do not create a false delta while absolute current-context pressure remains visible. Reports expose `deltaKind` as `new`, `same-path`, `move-only`, or `consolidated`. Explicit-file preflight and manual structural audit remain report-only and do not infer deleted-file lineage from the workspace diff.
+Metrics are signals, not architecture boundaries. They must not force a cohesive owner to split or create a folder merely to reduce a score. Blocking structure rules require a concrete dependency, ownership, public-surface, side-effect, or state-authority invariant. Broad complexity and topology reports stay advisory/manual unless a low-noise semantic defect is demonstrated.
 
-Changed ordinary lines have a `120` hard limit. Module specifiers have a `200` limit; classified URL, regex, hash/signature, protocol, and snapshot literals have a `240` limit; exactly classified generated/data/fixture files have a `1000` limit. Structural allowances are hash-locked to normalized AST bodies and symbol signatures and carry owner, reason, removal condition, and review date. Inline suppression is not allowed.
+Diff-aware structural analysis compares behavioral files with `HEAD`; unchanged, import-only, mock-only, and rename-only files are not candidates. A topology change optimizes navigation and ownership clarity, not raw file count. Forwarding-only and single-consumer modules require consolidation unless a public contract, runtime boundary, cross-owner seam, or independent change reason justifies them.
 
-Model token counts, token hotspots, and text-token budgets are not quality signals and are not collected in enforcement, advisory, preflight, or audit evidence. AI hygiene covers dead comments and classified oversized literals only.
+## Security and release assurance
 
-### Architecture And Ownership
+Security syntax and ownership rules use the smallest capable engine. Global data flow remains release-only. Supply-chain locks and artifact digests are valid when they bind an external binary, dependency graph, immutable image, release payload, or proof input.
 
-Deterministic controls cover runtime boundaries, dependency direction, manifest drift, thin entrypoints/facades, boundary input, browser/messaging/storage ownership, shared UI/style ownership, heavyweight dependencies, public-surface widening, returned-object growth, multi-message transition chains, detached controller methods, UI automation seams, and selected state/lifecycle hazards.
+Repository-derived consumer inventories are validated from the live tree and are not checked in as SHA or count snapshots. A digest stored beside the complete data it hashes is not an independent authority. Baselines contain only measured legacy findings or confirmed tool noise; they never self-update during a blocking run.
 
-The Sniptale identity control rejects retired product roots and the retired Effect public version in current tracked/candidate paths, UTF-8 contents, embedded ZIP entry names and text payloads, and release artifacts. Dependency, cache, ignored task, and temporary directories are outside the current-tree scan; their produced artifacts are checked at the release boundary instead.
+The pinned jscpd 5 release audit keeps the current complete baseline blocking only on new, changed, improved, or stale clone families. Baseline triage and reduction are a separate future task. Checkpoint, closeout, and `ci:proof` do not run jscpd.
 
-Architecture baselines and owner allowlists are migration containment, not permission for new debt. New or changed paths must resolve to their actual owner rather than the nearest facade.
+## Coverage
 
-### Security And Data Handling
+Product coverage and its proof reuse remain release concerns. Tooling coverage is invoked separately with `node tooling/qa/proof/unit/verify-unit-tests.mjs --suite harness --coverage`; it instruments executable `tooling/**/*.{mjs,cjs,js,ts,tsx}`, writes `.tmp/coverage/tooling`, and applies one global floor of 70% statements, 67% branches, 78% functions, and 70% lines. Owner-local smell fixtures remain the primary semantic proof.
 
-Controls cover unsafe execution/rendering sinks, sanitizer ownership, plaintext secret storage, sensitive retention, secret-bearing network headers, diagnostic sanitization, privileged browser access, and manifest permission/resource policy. Security review remains broader than these matchers.
+## Review and exceptions
 
-### Behavioral Proof And Release Confidence
+Automated controls own deterministic properties. Architecture and security review own intent, authority placement, trust boundaries, and semantic tradeoffs that cannot be reduced safely to a low-noise rule.
 
-Focused proof follows explicit owner mappings and the current diff. Closeout may reuse the same exact owner proof only for bounded low-risk profiles; the machine classifier keeps shared/public, background/offscreen, manifest, persistence, runtime-messaging, parser/export, ambiguous, and broad changes on affected-consumer discovery. A HEAD-proven owner-local deleted TypeScript path with a path-segment-safe match to one project uses that owner and declared reverse-consumer closure; unproven missing paths, broad shared or unmapped deletions retain the full-workspace typecheck fallback. Deleted tests remain in the diff fingerprint but are never counted or invoked as executable proof. A deletion or consolidation wave may run direct surviving owner tests only when the HEAD consumer chain terminates completely inside one changed owner group, every surviving changed production file has deterministic owner proof, and the bounded owner-test budget holds; partial, cross-owner, missing, uncovered, dead-export-only, or otherwise ambiguous closures retain affected-consumer discovery or the full-suite fallback. UI proof guidance compares normalized view signatures across the diff: JSX structure, text, presentation attributes, CSS, and imperative render/style forms, including imperative rendering nested inside event handlers, may need representative visual states, while callback-identity rewiring and state/controller-only changes need behavioral state/action/lifecycle proof instead of screenshot guidance. Lifecycle and async proof covers failure, duplicate, replay, stale-result, rollback, or restore only when the current control flow exposes that distinct reachable state and its impact is material to acceptance or an invariant; a filename profile or theoretical possibility does not admit new behavior. Full product coverage and external audit engines remain audit/release concerns rather than normal closeout gates.
+Review findings are classified as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening. Only the first three block closeout when supported by evidence. A new behavior, recovery path, compatibility layer, or proof obligation requires a concrete reachable trigger and connection to acceptance or a material invariant.
 
-## Judgment-Only Rules
+Every exception names its rule, exact scope, owner, reason, risk, and removal condition. Baseline growth is a policy change. Inline suppression directives are not a local exception mechanism.
 
-The following remain required implementation/review judgment where current automation cannot detect them reliably without excessive noise:
-
-- whether a topology is immediately brittle under known accepted adjacent changes, without adding structure for hypothetical future work
-- whether a controller/state/props surface mixes independent authorities despite a moderate structural score
-- whether an extraction is a mechanical or distributed split that preserves the same broad contract
-- whether shared residency is genuinely cross-runtime or merely a nested runtime-specific owner
-- whether generic helpers conceal meaningful multi-transport, persistence, or authorization orchestration beyond current structural matchers
-- whether failure, rollback, compensation, or user-visible degradation is complete for reachable product semantics admitted by acceptance or a material invariant
-- whether algorithmic/scaling behavior is acceptable on parser, export, media, timeline, storage, or capture hot paths
-
-These rules are not “advisory therefore optional,” but they remain bounded by scenario admission. Preflight and required high-risk review enforce them as judgment only for concrete reachable triggers tied to acceptance or material invariants. A hypothetical future scenario is not a blocker. When repeated observed findings gain a low-noise detector, promote them to structured advisory or hard fail with explicit scope, fixtures, and false-positive policy.
-
-## Review And Escaped Defects
-
-A green pipeline is necessary but not sufficient when the current diff changes a high-risk seam. Security Code Review is required only for actual changes to privilege, trust, authorization, sensitive data policy, sanitization/import-export policy, secrets, retention, privacy, manifest permissions, or MV3 lifecycle authority. Architecture Code Review is required only for actual changes to runtime ownership, state/public contracts, dependency direction, parser semantics, UI/i18n/design-system ownership, or notable topology. Owner-local extraction, test/proof-only changes, literal clone removal, and mechanical moves that preserve those seams close as `not required: low-risk change`.
-
-Collect all review findings before editing and classify each as a current-wave regression, direct acceptance blocker, provable security issue, or pre-existing hardening. The first three categories block closeout when supported by evidence. Report pre-existing hardening only when it is evidenced and materially relevant to the reviewed decision, or when the user explicitly requested a broader inventory; otherwise omit it. Unrelated pre-existing defects are not `Request changes`. A finding that asks for new behavior, state, recovery, compatibility, or proof identifies the concrete reachable trigger, material impact, and connection to frozen acceptance or an invariant; without that evidence it is omitted unless the user explicitly requested a speculative-hardening inventory. Extra tests, hypothetical future cases, or stronger guarantees not required by the frozen acceptance criteria are not current findings. Confirm blockers against the frozen acceptance criteria and make one consolidated correction. Mechanical cleanup does not trigger another review; changed behavior, ownership, public contracts, dependency direction, parser semantics, or security authority does.
-
-An escaped defect requires failing proof first and classification of the missed safety-net condition, such as policy-only, narrow detector, changed-scope-only, accepted tradeoff, or success-biased proof. Repeated observed defects with a common low-noise signature should become deterministic controls; a single incident, theoretical bypass, or one-off product semantic does not justify a repository-wide guard without additional evidence.
-
-## Baselines And Exceptions
-
-The canonical general baseline is `tooling/configs/qa/quality-baseline.json` and is expected to remain empty in normal state. Owner-specific baselines and technical-debt rows exist only for measured legacy debt or confirmed tool noise.
-
-Every exception needs a rule/control identity, exact target scope, owner, reason, risk, removal action/condition, and review date where its schema supports one. Baseline growth is a policy change, not ordinary implementation fallout. Inline suppression directives are not a local exception mechanism.
-
-Audit-tool baselines remain bounded by their own policy owners. A jscpd debt entry additionally freezes criteria, negative cases, and non-goals in its registry record. The scan remains release-audit-only: `ci:release` deletes the previous report before execution, writes a fresh report, and validates exact baseline/registry scope and stale removal. Fast checkpoint, closeout, and `ci:proof` do not run jscpd. Report-only or optional engines must emit explicit status and skip reasons; unavailable external tooling must not be confused with a green result.
-
-`qa:structural-audit` is a separate manual, report-only architecture-maintenance lane. It may enumerate repository code and writes a bounded sanitized snapshot, but findings never become a PR gate and agents do not run it as routine implementation proof. Its topology section keeps a disjoint deterministic path-owner partition and adds explicitly overlapping forwarding-edge operation candidates. A forwarding-only module with exactly one production consumer is reported as `Consolidate` with a stable non-forwarding merge target or as `Keep` with a concrete public-contract, runtime, cross-owner, or unresolved-topology veto. The artifact retains every edge ID, decision, provider target, consumer, and resolved merge target in a compact lossless section; rich cluster and structural sections remain bounded samples, and overflow fails instead of silently dropping edge records. The report measures navigation, forwarding/proxy, public-contract, state/effect/recovery, cohesion, and unresolved-graph signals, and reports `Split`, `Consolidate`, or `Keep`. It minimizes navigation transitions while retaining explicit boundaries; it never treats raw file count or a structural finding as an instruction to split. The cluster analysis complements structural concentration rather than creating another advisory or blocking guard. It does not collect token inventories and is not part of `ci:release`.
-
-Heavy lifecycle tools stay in their owning lanes: repository audit in `ci:release`, build and release archive checks in the internal build/closeout owners. Their source changes are not focused blind spots: `qa:release-harness` selects exact adjacent owner tests for `verify-audit.mjs`, `verify-build.mjs`, `package-dist.mjs`, and `verify-architecture-guardrails.mjs`. Do not pull the full lifecycle operation into checkpoint to prove an implementation-only diff.
-
-## Drift Control
-
-Workflow-policy changes keep `docs/agent-tooling/**`, affected active tooling documents, package scripts, wrappers, and machine policy synchronized. Deterministic tools and wrappers record validation coverage in `tooling/configs/qa/validation-manifest.json`.
-
-When a document starts mixing workflow, implementation policy, wrapper behavior, command catalogs, and quality policy, move each meaning back to its owner instead of growing another handbook.
+An escaped defect gets a failing proof first, followed by a decision on whether the miss was narrow scope, weak semantics, stale topology, or an accepted tradeoff. A repeated low-noise pattern may justify a guard; a single incident or hypothetical bypass does not.

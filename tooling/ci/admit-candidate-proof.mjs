@@ -8,11 +8,14 @@ import { createProofSemanticDigest } from './artifacts.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
 import { validateTrustedControlResults } from './trusted-control-matrix.mjs';
-import { stableStringify } from '../qa/core/proof-input.mjs';
+import { stableStringify } from '../qa/proof/contracts/proof-input.mjs';
 import { listRegularProofFiles } from './proof-file-inventory.mjs';
+import { parseFullUnitProof } from '../qa/proof/unit/unit-test-proof.mjs';
 
 const POLICY_PATH = 'tooling/configs/ci/trusted-admission-policy.json';
 const SEMANTICS_POLICY_PATH = 'tooling/configs/ci/proof-semantics.json';
+const CODEQL_PROOF_POLICY_PATH = 'tooling/configs/qa/codeql-proof-reuse.data.json';
+const COVERAGE_PROOF_POLICY_PATH = 'tooling/configs/qa/coverage-proof-reuse.data.json';
 
 function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -57,7 +60,7 @@ function validateExecutionCompatibility(manifest, lane, lanePolicy, trustedRoot)
   }
 }
 
-function validateFileInventory(root, manifest, lanePolicy) {
+function validateFileInventory(root, manifest, lane, lanePolicy) {
   if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
     throw new Error('Candidate proof file inventory is missing.');
   }
@@ -96,8 +99,14 @@ function validateFileInventory(root, manifest, lanePolicy) {
     }
   }
   const archives = [...declared.keys()].filter((file) => /^build\/sniptale_.+\.zip$/u.test(file));
-  if (archives.length !== 1)
-    throw new Error('Candidate proof must contain exactly one release ZIP.');
+  const expectedArchiveCount = lane === 'release' ? 1 : 0;
+  if (archives.length !== expectedArchiveCount) {
+    throw new Error(
+      lane === 'release'
+        ? 'Candidate release proof must contain exactly one release ZIP.'
+        : 'Fast proof must not contain a release ZIP.'
+    );
+  }
   const physical = listRegularProofFiles(root, 'Candidate proof');
   const expectedPhysical = [...declared.keys(), 'SHA256SUMS', 'proof-manifest.json'].sort();
   if (JSON.stringify(physical) !== JSON.stringify(expectedPhysical)) {
@@ -130,6 +139,118 @@ function validateReceipt(root, relative, artifactKind) {
     throw new Error(`Malformed candidate receipt: ${relative}`);
   }
   return receipt;
+}
+
+function validateUnitReceipt(root) {
+  const relative = '.tmp/qa/unit-proof.json';
+  try {
+    return parseFullUnitProof(JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8')));
+  } catch {
+    throw new Error(`Malformed candidate receipt: ${relative}`);
+  }
+}
+
+function validateReceiptReuse(manifest, name, receipt) {
+  const observed = receipt.reusedFrom ? 'reused' : 'fresh';
+  if (manifest.proofReuse?.[name] !== observed) {
+    throw new Error(`Candidate proof ${name} reuse status does not match its receipt.`);
+  }
+}
+
+function readReleaseProofPolicy(trustedRoot, relative, artifactKind) {
+  const policy = JSON.parse(fs.readFileSync(path.join(trustedRoot, relative), 'utf8'));
+  if (policy?.schemaVersion !== 1 || policy.artifactKind !== artifactKind) {
+    throw new Error(`Malformed release proof policy: ${relative}`);
+  }
+  return policy;
+}
+
+function validateCodeqlEvidence(root, manifest, declared, trustedRoot) {
+  const policy = readReleaseProofPolicy(
+    trustedRoot,
+    CODEQL_PROOF_POLICY_PATH,
+    'sniptale-codeql-proof-reuse-policy'
+  );
+  if (
+    policy.proofPath !== '.tmp/qa/codeql-proof.json' ||
+    policy.sarifPath !== '.tmp/codeql/results.filtered.sarif'
+  ) {
+    throw new Error(`Malformed release proof policy: ${CODEQL_PROOF_POLICY_PATH}`);
+  }
+  const receipt = validateReceipt(root, policy.proofPath, 'sniptale-codeql-proof');
+  if (
+    receipt.producer?.controlDigest !== manifest.controlDigest ||
+    !/^[a-f0-9]{64}$/u.test(receipt.sarifSha256 ?? '') ||
+    receipt.sarifSha256 !== declared.get(policy.sarifPath)
+  ) {
+    throw new Error('Candidate CodeQL receipt does not bind the admitted SARIF.');
+  }
+  validateReceiptReuse(manifest, 'codeql', receipt);
+}
+
+function parseCoverageReportInventory(receipt) {
+  if (!Array.isArray(receipt.reports) || receipt.reports.length === 0) {
+    throw new Error('Candidate coverage receipt report inventory is missing.');
+  }
+  const reports = new Map();
+  for (const entry of receipt.reports) {
+    const file = entry?.file;
+    if (
+      Object.keys(entry ?? {})
+        .sort()
+        .join(',') !== 'file,sha256' ||
+      typeof file !== 'string' ||
+      file.length === 0 ||
+      file === '..' ||
+      file.startsWith('../') ||
+      path.posix.isAbsolute(file) ||
+      path.posix.normalize(file) !== file ||
+      !/^[a-f0-9]{64}$/u.test(entry.sha256 ?? '') ||
+      reports.has(file)
+    ) {
+      throw new Error(`Malformed candidate coverage report identity: ${String(file)}`);
+    }
+    reports.set(file, entry.sha256);
+  }
+  return reports;
+}
+
+function validateCoverageEvidence(root, manifest, declared, trustedRoot) {
+  const policy = readReleaseProofPolicy(
+    trustedRoot,
+    COVERAGE_PROOF_POLICY_PATH,
+    'sniptale-coverage-proof-reuse-policy'
+  );
+  if (
+    policy.proofPath !== '.tmp/qa/coverage-proof.json' ||
+    policy.reportDirectory !== '.tmp/coverage/canonical' ||
+    !Array.isArray(policy.reportFiles)
+  ) {
+    throw new Error(`Malformed release proof policy: ${COVERAGE_PROOF_POLICY_PATH}`);
+  }
+  const receipt = validateReceipt(root, policy.proofPath, 'sniptale-coverage-proof');
+  if (receipt.producer?.controlDigest !== manifest.controlDigest) {
+    throw new Error('Candidate coverage receipt crosses QA control digests.');
+  }
+  const receiptReports = parseCoverageReportInventory(receipt);
+  const reportPrefix = `${policy.reportDirectory}/`;
+  const admittedReports = new Map(
+    [...declared.entries()]
+      .filter(([file]) => file.startsWith(reportPrefix))
+      .map(([file, digest]) => [file.slice(reportPrefix.length), digest])
+  );
+  for (const file of policy.reportFiles) {
+    if (!receiptReports.has(file)) {
+      throw new Error(`Candidate coverage receipt is missing required report: ${file}`);
+    }
+  }
+  if (
+    stableStringify([...receiptReports.entries()].sort()) !==
+    stableStringify([...admittedReports.entries()].sort())
+  ) {
+    throw new Error('Candidate coverage receipt does not bind the admitted report inventory.');
+  }
+  validateReceiptReuse(manifest, 'coverage', receipt);
 }
 
 function validateRunRecord(root, manifest, lane, derived, trustedRoot) {
@@ -235,32 +356,32 @@ function validateMandatoryPhases(manifest, lanePolicy) {
   return derived;
 }
 
-function validateReuseReceipts(root, manifest, lane, archives, lanePolicy) {
+function validateReuseReceipts(root, manifest, lane, archives, declared, lanePolicy, trustedRoot) {
   for (const [name, allowed] of Object.entries(lanePolicy.reuse)) {
     if (!allowed.includes(manifest.proofReuse?.[name])) {
       throw new Error(`Candidate proof has inadmissible ${name} reuse status.`);
     }
   }
-  const build = validateReceipt(root, '.tmp/qa/build-proof.json', 'sniptale-build-zip-proof');
-  if (
-    build.producer?.id !== 'qa-release-archive-owner' ||
-    build.producer.controlDigest !== manifest.controlDigest ||
-    build.archive.file !== path.basename(archives[0]) ||
-    build.archive.sha256 !== sha256(path.join(root, archives[0]))
-  ) {
-    throw new Error('Candidate build receipt does not bind the admitted ZIP.');
-  }
-  if (lane !== 'release') return;
-  for (const [relative, artifactKind] of [
-    ['.tmp/qa/unit-proof.json', 'sniptale-full-unit-proof'],
-    ['.tmp/qa/codeql-proof.json', 'sniptale-codeql-proof'],
-    ['.tmp/qa/coverage-proof.json', 'sniptale-coverage-proof'],
-  ]) {
-    const receipt = validateReceipt(root, relative, artifactKind);
-    if (receipt.producer?.controlDigest !== manifest.controlDigest) {
-      throw new Error(`Candidate receipt crosses QA control digests: ${relative}`);
+  if (lane === 'release') {
+    const build = validateReceipt(root, '.tmp/qa/build-proof.json', 'sniptale-build-zip-proof');
+    if (
+      build.producer?.id !== 'qa-release-archive-owner' ||
+      build.producer.controlDigest !== manifest.controlDigest ||
+      build.archive.file !== path.basename(archives[0]) ||
+      build.archive.sha256 !== sha256(path.join(root, archives[0]))
+    ) {
+      throw new Error('Candidate build receipt does not bind the admitted ZIP.');
     }
+    validateReceiptReuse(manifest, 'build', build);
   }
+  const unit = validateUnitReceipt(root);
+  if (unit.producer?.controlDigest !== manifest.controlDigest) {
+    throw new Error('Candidate receipt crosses QA control digests: .tmp/qa/unit-proof.json');
+  }
+  validateReceiptReuse(manifest, 'unit', unit);
+  if (lane !== 'release') return;
+  validateCodeqlEvidence(root, manifest, declared, trustedRoot);
+  validateCoverageEvidence(root, manifest, declared, trustedRoot);
 }
 
 export function admitCandidateProof({
@@ -283,8 +404,12 @@ export function admitCandidateProof({
   const lanePolicy = policy.lanes[lane];
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'proof-manifest.json'), 'utf8'));
   const candidateTree = git(resolvedCandidate, ['rev-parse', `${commit}^{tree}`]);
-  const controlDigest = createCandidateControlDigest({ cwd: resolvedCandidate });
-  const trustedControlDigest = createCandidateControlDigest({ cwd: trustedRoot });
+  const controlDigest = createCandidateControlDigest({
+    cwd: resolvedCandidate,
+  });
+  const trustedControlDigest = createCandidateControlDigest({
+    cwd: trustedRoot,
+  });
   const controlsChanged = controlDigest !== trustedControlDigest;
   const controlDisposition = controlsChanged ? 'candidate-controls' : 'trusted-controls';
   const gateInputDigest = createFastGateInputDigest({
@@ -313,9 +438,9 @@ export function admitCandidateProof({
   if (lane === 'release' && (controlsChanged || expectedTrustedControlSha !== commit)) {
     throw new Error('Release proof requires QA controls already trusted by the main commit.');
   }
-  const { archives } = validateFileInventory(root, manifest, lanePolicy);
+  const { archives, declared } = validateFileInventory(root, manifest, lane, lanePolicy);
   validateExecutionCompatibility(manifest, lane, lanePolicy, trustedRoot);
-  validateReuseReceipts(root, manifest, lane, archives, lanePolicy);
+  validateReuseReceipts(root, manifest, lane, archives, declared, lanePolicy, trustedRoot);
   if (lane === 'proof' && (manifest.fullVitest !== true || manifest.releaseReady !== false)) {
     throw new Error('Fast proof must prove full Vitest without claiming release readiness.');
   }

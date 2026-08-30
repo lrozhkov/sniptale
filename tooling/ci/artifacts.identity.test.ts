@@ -120,7 +120,7 @@ it('copies Fast audit evidence only when the sealed manifest and bytes agree', (
   temporaryRoots.push(root);
   const proofRoot = path.join(root, 'proof');
   const destinationRoot = path.join(root, 'release');
-  const relative = '.tmp/semgrep/results.json';
+  const relative = '.tmp/npm-audit/signatures.json';
   const source = path.join(proofRoot, relative);
   fs.mkdirSync(path.dirname(source), { recursive: true });
   fs.mkdirSync(destinationRoot);

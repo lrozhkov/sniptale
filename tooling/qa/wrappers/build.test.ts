@@ -12,7 +12,7 @@ import {
   seedFreshCheckpointState,
   withCwd,
   writeFile,
-} from './build.test-support';
+} from './build/execution/test-support';
 
 const TEST_BUILD_DEPENDENCIES = { producerRunId: 'build-test-run' };
 
@@ -75,34 +75,12 @@ it('keeps plain qa:build free of staging and commit calls', async () => {
   expect(commandCalls).toEqual([]);
 });
 
-it('reuses one fresh artifact build only for commit closeout and still runs commit guards', async () => {
+it('rejects the retired local build-state reuse option', async () => {
   const module = await import('./build.mjs');
-  const calls: string[] = [];
-  const result = await module.runBuildCloseout({
-    argv: ['--commit', '--reuse-build', '-m', 'Reuse artifact build'],
-    contextCollector: createBuildContext,
-    checkpointStateAsserter: () => calls.push('checkpoint'),
-    buildStateAsserter: () => calls.push('build-state'),
-    closeoutStepCollector: async () => {
-      throw new Error('a reused artifact build must not rerun full validation or build');
-    },
-    commandRunner: (_command: string, args: string[]) => ({
-      status: 0,
-      stderr: '',
-      stdout: args[0] === 'diff' ? 'tracked.ts\n' : '',
-    }),
-    taskArtifactCheck: () => ({ files: [], violations: [] }),
-  });
 
-  expect(result.steps.map((step) => [step.label, step.status])).toEqual([
-    ['Build', 'skipped'],
-    ['Pre-commit diff guard', 'ok'],
-    ['Stage changes', 'ok'],
-    ['Task artifacts', 'ok'],
-    ['Git commit', 'ok'],
-  ]);
-  expect(calls).toEqual(['checkpoint', 'build-state', 'checkpoint']);
-  expect(() => module.parseBuildOptions(['--reuse-build'])).toThrow(/requires --commit/u);
+  expect(() =>
+    module.parseBuildOptions(['--commit', '--reuse-build', '-m', 'Reuse artifact build'])
+  ).toThrow(/requires a fresh build/u);
 });
 
 it('does not stage or commit when build validation fails in commit mode', async () => {
@@ -168,19 +146,17 @@ it('fails commit mode when staging leaves no staged changes to commit', async ()
 
   expect(result.steps.map((step) => [step.label, step.status])).toEqual([
     ['Naming', 'ok'],
-    ['Security', 'ok'],
+    ['HTML sanitizer ownership', 'ok'],
     ['Architecture guardrails', 'ok'],
     ['Dependency boundaries', 'ok'],
     ['Cycles', 'ok'],
-    ['Canonical facades', 'ok'],
     ['Root side effects', 'ok'],
     ['Typecheck', 'ok'],
     ['Unit tests', 'ok'],
-    ['Test coverage', 'ok'],
     ['Build', 'ok'],
-    ['Pre-commit diff guard', 'ok'],
     ['Stage changes', 'ok'],
     ['Task artifacts', 'ok'],
+    ['Pre-commit diff guard', 'ok'],
     ['Git commit', 'failed'],
   ]);
   expect(commandCalls.some(({ args }) => args[0] === 'commit')).toBe(false);
@@ -212,22 +188,22 @@ it('blocks commit staging when the diff changes after the fresh checkpoint state
 
     expect(result.steps.map((step) => [step.label, step.status])).toEqual([
       ['Naming', 'ok'],
-      ['Security', 'ok'],
+      ['HTML sanitizer ownership', 'ok'],
       ['Architecture guardrails', 'ok'],
       ['Dependency boundaries', 'ok'],
       ['Cycles', 'ok'],
-      ['Canonical facades', 'ok'],
       ['Root side effects', 'ok'],
       ['Typecheck', 'ok'],
       ['Unit tests', 'ok'],
-      ['Test coverage', 'ok'],
       ['Build', 'ok'],
+      ['Stage changes', 'ok'],
+      ['Task artifacts', 'ok'],
       ['Pre-commit diff guard', 'failed'],
     ]);
   });
 
   expect(readGit(root, 'log', '-1', '--pretty=%s')).toBe('init');
-  expect(readGit(root, 'diff', '--cached', '--name-only')).toBe('');
+  expect(readGit(root, 'diff', '--cached', '--name-only')).toBe('tracked.ts\nunrelated.ts');
 });
 
 it('blocks qa:build before commit mode when checkpoint state is stale for the current diff', async () => {
@@ -266,13 +242,13 @@ it('blocks the build step when related unit tests fail in qa:build', async () =>
       scopeDetail: 'broader related tests (1 related file)',
       steps: [
         { label: 'Naming', status: 'ok' as const, detail: '', durationMs: 0 },
-        { label: 'Security', status: 'ok' as const, detail: '', durationMs: 0 },
-        { label: 'Unit tests', status: 'failed' as const, summary: 'failed' as const },
         {
-          label: 'Test coverage',
-          status: 'skipped' as const,
-          detail: 'skipped: unit tests failed' as const,
+          label: 'HTML sanitizer ownership',
+          status: 'ok' as const,
+          detail: '',
+          durationMs: 0,
         },
+        { label: 'Unit tests', status: 'failed' as const, summary: 'failed' as const },
         { label: 'Build', status: 'blocked' as const, detail: 'earlier hardfail steps failed' },
       ],
     }),
@@ -280,9 +256,8 @@ it('blocks the build step when related unit tests fail in qa:build', async () =>
 
   expect(result.steps.map((step) => [step.label, step.status])).toEqual([
     ['Naming', 'ok'],
-    ['Security', 'ok'],
+    ['HTML sanitizer ownership', 'ok'],
     ['Unit tests', 'failed'],
-    ['Test coverage', 'skipped'],
     ['Build', 'blocked'],
   ]);
 });

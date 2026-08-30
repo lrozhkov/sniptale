@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { resolveRepositoryWritePath } from '../../policy/repository-contained-paths.mjs';
+import { resolveRepositoryWritePath } from '../../policy/paths/repository-contained-paths.mjs';
 import {
   collectSensitiveEnvironmentValues,
   sanitizeLogText,

@@ -38,15 +38,21 @@ it('captures icon pseudo-element content and font evidence without requiring vis
     configurable: true,
     value: () => ({ height: 16, width: 16, x: 1, y: 2 }),
   });
-  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
-    const style = document.createElement('span').style;
-    style.setProperty('display', element === icon ? 'inline-block' : 'none');
-    style.setProperty('visibility', 'visible');
-    style.setProperty('opacity', '1');
-    if (element === icon) style.setProperty('font-family', 'Icons');
-    if (element === icon && pseudo === '::before') style.setProperty('content', '"\\e001"');
-    return style;
-  });
+  vi.spyOn(window, 'getComputedStyle').mockImplementation(
+    (element, pseudo) =>
+      ({
+        getPropertyValue(property: string) {
+          if (property === 'display') return element === icon ? 'inline-block' : 'none';
+          if (property === 'visibility') return 'visible';
+          if (property === 'opacity') return '1';
+          if (property === 'font-family' && element === icon) return 'Icons';
+          if (property === 'content' && element === icon && pseudo === '::before') {
+            return '"\\e001"';
+          }
+          return '';
+        },
+      }) as CSSStyleDeclaration
+  );
 
   const payload = JSON.parse(String(buildComputedStyleDiagnosticAsset().content)) as {
     targets: Array<{ pseudoElements?: { before?: Record<string, string> } }>;

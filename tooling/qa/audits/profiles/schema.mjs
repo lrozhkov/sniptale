@@ -1,4 +1,4 @@
-import { AUDIT_STEPS } from '../../core/qa-steps/definitions.data.mjs';
+import { AUDIT_STEPS } from '../../composition/catalog/definitions.data.mjs';
 
 export const AUDIT_PROFILE_SCHEMA_VERSION = 1;
 export const AUDIT_PROFILE_IDS = Object.freeze([
@@ -18,7 +18,6 @@ const securityEngineIds = [
   'osv-scanner',
   'gitleaks',
   'ast-grep',
-  'semgrep',
   'codeql',
 ];
 
@@ -108,19 +107,22 @@ function assertIsolatedCoverageProfile(profile) {
 
 function assertFastPrProfile(profile) {
   if (profile.id !== 'pr') return;
-  const required = new Set([
-    'audit-evidence',
-    'npm-audit',
-    'npm-audit-signatures',
-    'osv-scanner',
-    'gitleaks',
-    'semgrep',
-  ]);
+  const required = new Set(['audit-evidence', 'npm-audit-signatures', 'osv-scanner', 'gitleaks']);
   const invalid = profile.controls
     .filter(({ id, requirement }) => requirement !== (required.has(id) ? 'required' : 'excluded'))
     .map(({ id }) => id);
   if (invalid.length > 0) {
     throw new TypeError(`audit profile pr has invalid fast-gate controls: ${invalid.join(', ')}`);
+  }
+}
+
+function assertRepositoryProfile(profile) {
+  if (profile.id !== 'repository') return;
+  const invalid = profile.controls
+    .filter(({ id, requirement }) => requirement !== (id === 'codeql' ? 'optional' : 'required'))
+    .map(({ id }) => id);
+  if (invalid.length > 0) {
+    throw new TypeError(`audit profile repository has invalid controls: ${invalid.join(', ')}`);
   }
 }
 
@@ -160,6 +162,7 @@ function parseProfile(value) {
   };
   assertCompleteControls(profile);
   assertRequiredSecurityEngines(profile);
+  assertRepositoryProfile(profile);
   assertFastPrProfile(profile);
   assertIsolatedCoverageProfile(profile);
   assertCompleteReleaseProfile(profile);
@@ -182,9 +185,6 @@ export function parseAuditProfiles(value) {
   const missingProfiles = AUDIT_PROFILE_IDS.filter((id) => !profileIds.includes(id));
   if (missingProfiles.length > 0) {
     throw new TypeError(`missing audit profiles: ${missingProfiles.join(', ')}`);
-  }
-  if (!profileIds.includes(value.defaultProfile)) {
-    throw new TypeError(`default audit profile is not declared: ${value.defaultProfile}`);
   }
   return { schemaVersion: value.schemaVersion, defaultProfile: value.defaultProfile, profiles };
 }

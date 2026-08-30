@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "platform": "linux/amd64",
+  "builderFrontend": "dockerfile.v1/buildkit",
+  "provenanceMode": "max",
+  "sbom": true,
+  "idleTtlSeconds": 604800,
+  "contextControlFiles": [".dockerignore"],
+  "images": {
+    "qa": {
+      "repository": "ghcr.io/lrozhkov/sniptale-qa",
+      "tagPrefix": "candidate-cache-v1-qa",
+      "dockerfile": "tooling/ci/Dockerfile",
+      "quarantinedKeys": []
+    },
+    "controller": {
+      "repository": "ghcr.io/lrozhkov/sniptale-controller",
+      "tagPrefix": "candidate-cache-v1-controller",
+      "dockerfile": "tooling/ci/selectel/Dockerfile.controller",
+      "quarantinedKeys": []
+    }
+  }
+}

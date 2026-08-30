@@ -138,7 +138,7 @@ it('does not let a large title font impose the input default character width on 
   const title = document.querySelector<HTMLInputElement>('[data-sniptale-callout-title]');
   const titleShell = document.querySelector<HTMLElement>('[data-sniptale-callout-title-shell]');
   expect(title?.size).toBe(1);
-  expect(title?.style.minWidth).toBe('0');
+  expect(title?.style.minWidth).toBe('0px');
   expect(titleShell?.style.fontSize).toBe('72px');
   expect(titleShell?.style.textTransform).toBe('uppercase');
   expect(props.containerRef.current?.style.filter).toBe('');
@@ -194,8 +194,8 @@ it('does not let a large title font impose the input default character width on 
     )
   );
   expect(props.containerRef.current?.style.backgroundColor).toBe('transparent');
-  expect(props.containerRef.current?.style.backgroundImage).toBe('');
-  expect(props.containerRef.current?.style.backdropFilter).toBeUndefined();
+  expect(props.containerRef.current?.style.backgroundImage).toBe('none');
+  expect(props.containerRef.current?.style.backdropFilter).toBe('');
   expect(props.containerRef.current?.style.borderColor).toBe('transparent');
   expect(props.containerRef.current?.style.boxShadow).toBe('');
   expect(props.containerRef.current?.style.filter).toBe('');

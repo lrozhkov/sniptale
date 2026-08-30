@@ -1,13 +1,26 @@
-export { AUDIT_PROFILES_PATH, loadAuditProfiles, resolveAuditProfile } from './registry.mjs';
-export {
-  AUDIT_CONTROL_REQUIREMENTS,
-  AUDIT_PROFILE_IDS,
-  AUDIT_PROFILE_SCHEMA_VERSION,
-  GITLEAKS_SCOPES,
-  parseAuditProfiles,
-} from './schema.mjs';
-export {
-  AUDIT_ADAPTER_SKIP_REASONS,
-  AUDIT_PROFILE_SKIP_REASONS,
-  resolveOptionalAuditSkipReason,
-} from './skip-reasons.mjs';
+export { AUDIT_PROFILES_PATH, resolveAuditProfile } from './registry.mjs';
+export const AUDIT_ADAPTER_SKIP_REASONS = Object.freeze({
+  toolUnavailable: 'audit.tool-unavailable',
+  bootstrapFailed: 'audit.bootstrap-failed',
+  noApplicableTargets: 'audit.no-applicable-targets',
+});
+
+export const AUDIT_PROFILE_SKIP_REASONS = Object.freeze({
+  profileNotSelected: 'audit.profile-not-selected',
+  optionalEngineUnavailable: 'audit.optional-engine-unavailable',
+  optionalEngineBootstrapFailed: 'audit.optional-engine-bootstrap-failed',
+  optionalNoApplicableTargets: 'audit.optional-no-applicable-targets',
+});
+
+const optionalSkipReasonByAdapterReason = Object.freeze({
+  [AUDIT_ADAPTER_SKIP_REASONS.toolUnavailable]:
+    AUDIT_PROFILE_SKIP_REASONS.optionalEngineUnavailable,
+  [AUDIT_ADAPTER_SKIP_REASONS.bootstrapFailed]:
+    AUDIT_PROFILE_SKIP_REASONS.optionalEngineBootstrapFailed,
+  [AUDIT_ADAPTER_SKIP_REASONS.noApplicableTargets]:
+    AUDIT_PROFILE_SKIP_REASONS.optionalNoApplicableTargets,
+});
+
+export function resolveOptionalAuditSkipReason(adapterReasonId) {
+  return optionalSkipReasonByAdapterReason[adapterReasonId] ?? null;
+}

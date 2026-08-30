@@ -1,0 +1,87 @@
+name: Selectel smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Infrastructure operation
+        required: true
+        default: smoke
+        type: choice
+        options: [smoke, connectivity]
+      force_rebuild:
+        description: Build separate forced candidate images
+        required: false
+        default: false
+        type: boolean
+      force_rebuild_reason:
+        description: Required audit reason for a forced rebuild
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selectel-smoke-${{ inputs.mode }}
+  cancel-in-progress: true
+
+env:
+  GATE_MODE: ${{ inputs.mode == 'connectivity' && 'selectel-connectivity' || 'selectel-smoke' }}
+
+jobs:
+  selectel-controller-preflight:
+    if: github.ref == 'refs/heads/main' && inputs.mode == 'connectivity'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: selectel-runner-controller
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:preflight .
+      - name: Validate Selectel connectivity without writes
+        env:
+          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
+          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}
+          SELECTEL_RELEASE_PROFILES: ${{ vars.SELECTEL_RELEASE_PROFILES }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+          SNIPTALE_PROOF_LANE: proof
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME --env SELECTEL_QA_PROFILES \
+            --env SNIPTALE_PROOF_LANE \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            sniptale-controller:preflight preflight
+          mv build/selectel-controller/preflight.json build/selectel-controller/preflight-qa.json
+          export SNIPTALE_PROOF_LANE=release
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_QA_PROFILES="$SELECTEL_RELEASE_PROFILES" \
+            --env SNIPTALE_PROOF_LANE \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            sniptale-controller:preflight preflight
+          mv build/selectel-controller/preflight.json build/selectel-controller/preflight-release.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: selectel-connectivity-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/selectel-controller/preflight-*.json
+          if-no-files-found: error
+          retention-days: 30
+
+  canonical-smoke:
+    if: github.ref == 'refs/heads/main' && inputs.mode == 'smoke'
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    uses: ./.github/workflows/_canonical-proof.yml
+    with:
+      gate: selectel-smoke
+      force_rebuild: ${{ inputs.force_rebuild }}
+      force_rebuild_reason: ${{ inputs.force_rebuild_reason }}

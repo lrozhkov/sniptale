@@ -3,7 +3,7 @@ import { dirname, relative, resolve, sep } from 'node:path';
 
 import type { Plugin } from 'vite';
 
-import type { ExtensionBuildLayout } from './layout';
+import type { ExtensionBuildLayout } from './layout.ts';
 
 function normalized(path: string): string {
   return path.replaceAll('\\', '/');

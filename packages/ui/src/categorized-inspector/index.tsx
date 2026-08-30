@@ -142,7 +142,10 @@ export function CategorizedInspector<SectionId extends string>(props: {
     <div className="grid min-h-48 grid-cols-[3rem_minmax(0,1fr)]" data-ui={props.dataUi}>
       <nav
         aria-label={props.ariaLabel}
-        className="grid content-start gap-1 border-r border-[color:var(--sniptale-color-border-soft)] p-1.5"
+        className={[
+          'grid content-start gap-1 border-r border-solid p-1.5',
+          'border-[color:var(--sniptale-color-border-soft)]',
+        ].join(' ')}
       >
         {props.sections.map((section, index) => (
           <InspectorSectionNavigationItem

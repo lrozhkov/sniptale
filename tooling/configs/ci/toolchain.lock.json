@@ -75,7 +75,6 @@
       }
     ]
   },
-  "semgrep": { "version": "1.174.0" },
   "codeql": {
     "version": "2.26.3",
     "url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.26.3/codeql-bundle-linux64.tar.gz",
@@ -98,7 +97,7 @@
     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
   },
   "mutationRunner": {
-    "packageJsonSha256": "6daf99b028772fe29b6a3a530e3c6b968fa57a551e30c2e0be10b9675c8f1770",
-    "packageLockSha256": "b4d726999eef958f7257e790ede029459fa41476c79f4ea630c1312167d6c3ac"
+    "packageJsonSha256": "05deb61af130e3c1ef441d91f1c07b0f1ca1e5b5dc642286c912ddf8bb9d82b9",
+    "packageLockSha256": "776566966623d74eb57d3290d6224b7c1f3e99a071edcc2c11d1488888fe7b0d"
   }
 }

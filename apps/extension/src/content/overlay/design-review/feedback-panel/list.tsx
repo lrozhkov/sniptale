@@ -78,7 +78,7 @@ function FeedbackPreview(props: { record: BrowserDomAnnotationRecord; rect: DOMR
       <div className="mt-1 truncate font-mono text-[10px] text-[var(--sniptale-color-text-dim)]">
         {props.record.evidence.targetPath}
       </div>
-      <div className="my-3 border-t border-[color:var(--sniptale-color-border-soft)]" />
+      <div className="my-3 border-t border-solid border-[color:var(--sniptale-color-border-soft)]" />
       <p className="whitespace-pre-wrap break-words text-xs leading-5">
         {getRecordSummary(props.record)}
       </p>

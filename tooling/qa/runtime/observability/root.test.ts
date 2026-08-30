@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { createTempRoot, initGitRepo } from '../../core/test-helpers';
+import { createTempRoot, initGitRepo } from '../../test-support/test-helpers';
 import { resolveObservabilityRoot } from './root.mjs';
 
 describe('resolveObservabilityRoot', () => {

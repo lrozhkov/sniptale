@@ -26,6 +26,6 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/foundation/src",
-    "typecheck": "node ../../tooling/qa/core/typescript-cli.mjs --noEmit --project tsconfig.json"
+    "typecheck": "node ../../tooling/qa/analysis/source/typescript-cli.mjs --noEmit --project tsconfig.json"
   }
 }

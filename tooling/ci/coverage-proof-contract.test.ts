@@ -6,7 +6,8 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   const policy = JSON.parse(
     fs.readFileSync('tooling/configs/qa/coverage-proof-reuse.data.json', 'utf8')
   );
-  const quality = fs.readFileSync('.github/workflows/quality-gate.yml', 'utf8');
+  const canonicalProof = fs.readFileSync('.github/workflows/_canonical-proof.yml', 'utf8');
+  const provenance = fs.readFileSync('.github/workflows/provenance.yml', 'utf8');
   const release = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
   const artifacts = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
@@ -19,28 +20,34 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
     reportDirectory: '.tmp/coverage/canonical',
     reportFiles: ['coverage-final.json', 'coverage-summary.json', 'lcov.info', 'html/index.html'],
     owners: {
-      decision: 'tooling/qa/core/coverage-proof.mjs',
-      execution: 'tooling/qa/core/audit-coverage-step.mjs',
+      decision: 'tooling/qa/proof/coverage/coverage-proof.mjs',
+      execution: 'tooling/qa/proof/coverage/audit-coverage-step.mjs',
       ciTransport: 'tooling/ci/select-coverage-proof.mjs',
-      ciMount: 'tooling/ci/coverage-proof-host.mjs',
+      ciMount: 'tooling/ci/proof-host-inputs.mjs',
     },
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
-  expect(quality).toContain('select-coverage-proof.mjs restore-latest-release');
-  expect(quality).toContain('SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof');
-  expect(release).toContain('Download exact published release proof');
+  expect(canonicalProof).toContain('select-coverage-proof.mjs restore-latest-release');
+  expect(canonicalProof).toContain('SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof');
+  expect(provenance).toContain('Download exact admitted release coverage');
+  expect(provenance).toContain('verify-main-proof.mjs release');
+  expect(provenance).toContain(
+    'coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329'
+  );
+  expect(provenance).toContain('github-token: ${{ secrets.GITHUB_TOKEN }}');
+  expect(provenance).toContain('git-branch: main');
+  expect(provenance).toContain('git-commit: ${{ github.sha }}');
+  expect(release).toContain(
+    'artifact_prefix="release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-"'
+  );
   expect(release).toContain('verify-main-proof.mjs release');
-  expect(release).toContain('coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329');
-  expect(release).toContain('github-token: ${{ secrets.GITHUB_TOKEN }}');
-  expect(release).toContain('git-branch: main');
-  expect(release).toContain('git-commit: ${{ needs.publish.outputs.release-sha }}');
+  expect(release).not.toContain('coverallsapp/github-action@');
   expect(container).toContain("'SNIPTALE_COVERAGE_PROOF_AUTHORITY=external-only'");
   expect(container).toContain('/opt/sniptale-coverage-proof.json:ro');
   expect(container).toContain('/opt/sniptale-coverage-reports:ro');
   expect(artifacts).toContain("'.tmp/qa/coverage-proof.json'");
   for (const report of [
     'results.filtered.sarif',
-    'results.sarif',
     'lcov.info',
     'coverage-final.json',
     'coverage-summary.json',

@@ -1,4 +1,5 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { translate } from '../../../platform/i18n';
 import {
   ProductModal,
   ProductModalBody,
@@ -66,14 +67,16 @@ function ScenarioDeckExportActions(props: {
   return (
     <>
       <ProductActionButton tone="secondary" onClick={props.onClose} disabled={exporting}>
-        Close
+        {translate('scenario.editor.close')}
       </ProductActionButton>
       <ProductActionButton
         tone="primary"
         onClick={() => void props.onExport()}
         disabled={exporting}
       >
-        {exporting ? 'Exporting...' : 'Export'}
+        {exporting
+          ? translate('scenario.editor.exporting')
+          : translate('scenario.editor.exportAction')}
       </ProductActionButton>
     </>
   );

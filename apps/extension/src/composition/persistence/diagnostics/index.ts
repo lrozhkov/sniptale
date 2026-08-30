@@ -3,6 +3,10 @@ import type {
   DiagnosticEventChunk,
 } from '@sniptale/platform/observability/diagnostics/types';
 import {
+  sanitizeDiagnosticsEvents,
+  sanitizeDiagnosticsMeta,
+} from '@sniptale/platform/observability/diagnostics/sanitizer';
+import {
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   initDB,
@@ -22,6 +26,8 @@ export async function saveDiagnostics(
   entry: Omit<DiagnosticsEntry, 'chunksCount' | 'totalEvents'>,
   events: DiagnosticEventChunk['events']
 ): Promise<void> {
+  const sanitizedEvents = sanitizeDiagnosticsEvents(events);
+  const sanitizedMeta = sanitizeDiagnosticsMeta(entry.meta);
   await runWithIndexedDbMutation(async (db) => {
     if (
       !db.objectStoreNames.contains(DIAGNOSTICS_META_STORE) ||
@@ -31,17 +37,18 @@ export async function saveDiagnostics(
     }
 
     const chunks: DiagnosticEventChunk[] = [];
-    for (let index = 0; index < events.length; index += DIAGNOSTICS_EVENTS_PER_CHUNK) {
+    for (let index = 0; index < sanitizedEvents.length; index += DIAGNOSTICS_EVENTS_PER_CHUNK) {
       chunks.push({
         recordingId: entry.recordingId,
         chunkIndex: Math.floor(index / DIAGNOSTICS_EVENTS_PER_CHUNK),
-        events: events.slice(index, index + DIAGNOSTICS_EVENTS_PER_CHUNK),
+        events: sanitizedEvents.slice(index, index + DIAGNOSTICS_EVENTS_PER_CHUNK),
       });
     }
 
     const metaEntry: DiagnosticsEntry = {
       ...entry,
-      totalEvents: events.length,
+      meta: sanitizedMeta,
+      totalEvents: sanitizedEvents.length,
       chunksCount: chunks.length,
     };
 

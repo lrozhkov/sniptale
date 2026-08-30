@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTempRoot } from '../../core/test-helpers';
+import { createTempRoot } from '../../test-support/test-helpers';
 import { sanitizeBoundedConsoleTail, sanitizeLogText } from './sanitize.mjs';
 import { appendBoundedLog, writeJsonAtomic } from './storage.mjs';
 

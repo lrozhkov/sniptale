@@ -1,6 +1,6 @@
-const runtimeTopology = require('./tooling/qa/core/runtime-topology.data.json');
-const defaultForbiddenRules = require('./tooling/qa/core/dependency-cruiser-default-rules.cjs');
-const dependencyCruiserOptions = require('./tooling/qa/core/dependency-cruiser-options.cjs');
+const runtimeTopology = require('./tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json');
+const defaultForbiddenRules = require('./tooling/qa/analysis/dependency-graph/dependency-cruiser-default-rules.cjs');
+const dependencyCruiserOptions = require('./tooling/qa/analysis/dependency-graph/dependency-cruiser-options.cjs');
 
 const CONTENT_COMPATIBLE_RUNTIME_REUSE = {
   'apps/extension/src/web-snapshot-viewer': ['apps/extension/src/content'],

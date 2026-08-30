@@ -20,6 +20,7 @@
     { "id": "jq", "command": "jq", "args": ["--version"] },
     { "id": "node", "command": "node", "args": ["--version"] },
     { "id": "npm", "command": "npm", "args": ["--version"] },
+    { "id": "npx", "command": "npx", "args": ["--version"] },
     { "id": "tar", "command": "tar", "args": ["--version"] },
     { "id": "zstd", "command": "zstd", "args": ["--version"] },
     { "id": "find", "command": "find", "args": ["--version"] }

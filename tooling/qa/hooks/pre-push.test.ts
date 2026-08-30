@@ -11,7 +11,7 @@ import {
   runPrePushProof,
   withPushedRangeWorkspace,
 } from './pre-push.mjs';
-import { createTempRoot, initGitRepo, runGit, writeFile } from '../core/test-helpers';
+import { createTempRoot, initGitRepo, runGit, writeFile } from '../test-support/test-helpers';
 
 const LOCAL_SHA = '1234567890123456789012345678901234567890';
 const REMOTE_SHA = 'abcdefabcdefabcdefabcdefabcdefabcdefabcd';

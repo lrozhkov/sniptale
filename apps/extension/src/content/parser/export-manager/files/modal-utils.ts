@@ -25,12 +25,12 @@ export const EXPORT_SELECTORS = {
 
 export async function waitForElement(
   selector: string,
-  timeout = 2000,
-  targetDocument: Document = document
+  targetDocument: Document,
+  timeout = 2000
 ): Promise<HTMLElement | null> {
   return waitForVisibleElement(selector, timeout, targetDocument);
 }
 
-export async function closeModal(targetDocument: Document = document): Promise<void> {
+export async function closeModal(targetDocument: Document): Promise<void> {
   await closeFilePreviewPopup(targetDocument);
 }

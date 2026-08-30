@@ -8,6 +8,8 @@ import {
   createCaptureArtifact,
   createCaptureArtifactFromTree,
   createExportArtifact,
+  type ArchiveArtifact,
+  type ExportArtifact,
 } from './artifacts';
 import { MAX_EXPORT_ARCHIVE_INPUT_BYTES } from './generation';
 
@@ -146,5 +148,25 @@ describe('export-manager archive artifact validation', () => {
         },
       })
     ).toThrow('Unsafe export archive path');
+  });
+});
+
+describe('export-manager artifact type authority', () => {
+  it('requires constructors to create branded export and archive artifacts', () => {
+    const rawExport = createExportArtifactInput();
+    const rawArchive = {
+      archiveBaseName: 'raw',
+      entries: [],
+      errors: [],
+      stats: { filesCount: 0, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
+    };
+
+    // @ts-expect-error raw export input does not own the private ExportArtifact brand
+    const exportArtifact: ExportArtifact = rawExport;
+    // @ts-expect-error raw archive package does not own the private ArchiveArtifact brand
+    const archiveArtifact: ArchiveArtifact = rawArchive;
+
+    expect(exportArtifact).toBe(rawExport);
+    expect(archiveArtifact).toBe(rawArchive);
   });
 });

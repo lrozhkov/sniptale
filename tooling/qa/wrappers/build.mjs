@@ -1,26 +1,21 @@
-import { collectBuildStep } from '../core/verify-closeout-step-helpers.mjs';
-import { isExecutedAsScript } from '../core/shared.mjs';
-import { collectBuildCloseoutStepResults } from '../core/verify-build.execution.mjs';
-import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
-import { assertFreshCheckpointState } from '../core/verify-checkpoint.state.helpers.mjs';
-import {
-  assertFreshBuildState,
-  createBuildState,
-  writeBuildState,
-} from '../core/verify-build.state.helpers.mjs';
-import { assertFreshHarnessState } from '../core/verify-harness.state.helpers.mjs';
+import { collectBuildStep } from '../composition/closeout/closeout-step-helpers/check.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { collectBuildCloseoutStepResults } from '../composition/build/execution/check.mjs';
+import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
+import { assertFreshCheckpointState } from '../composition/checkpoint/verify-checkpoint.state.helpers.mjs';
+import { assertFreshHarnessState } from '../composition/harness/execution/state.mjs';
 import {
   PRODUCT_QA_SUITE,
   createScopedQaContext,
   hasHarnessVerificationQaTargets,
-} from '../core/qa-scope.mjs';
-import { assertQaResultContract } from '../core/qa-steps/contract.mjs';
+} from '../composition/scope/qa-scope.mjs';
+import { assertQaResultContract } from '../composition/catalog/contract.mjs';
 import {
   acquireBlockingWrapperLock,
   claimBlockingWrapperLockHandoff,
-} from '../runtime/blocking-wrapper-lock.helpers.mjs';
-import { runBuildForContext } from './build-run.mjs';
-import { parseWrapperArguments } from './cli-contracts.mjs';
+} from '../runtime/locking/blocking-wrapper-lock.helpers.mjs';
+import { runBuildForContext } from './build/build-run.mjs';
+import { parseWrapperArguments } from './contracts/cli-contracts.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
 
 const CLOSEOUT_BUILD_LOCK_ENV = 'SNIPTALE_QA_CLOSEOUT_BUILD_LOCK';
@@ -35,10 +30,12 @@ function assertDiffOnlyBuildRun(files = []) {
 }
 
 export function parseBuildOptions(argv = []) {
+  if (argv.includes('--reuse-build')) {
+    throw new Error('qa:build --reuse-build is unsupported; commit mode requires a fresh build');
+  }
   const parsed = parseWrapperArguments('qa:build', argv);
   const shouldCommit = parsed.values.shouldCommit ?? false;
   const proofOnly = parsed.values.proofOnly ?? false;
-  const reuseBuild = parsed.values.reuseBuild ?? false;
   const commitMessage = parsed.values.commitMessage;
 
   if (shouldCommit && !commitMessage) {
@@ -51,18 +48,10 @@ export function parseBuildOptions(argv = []) {
   if (proofOnly && shouldCommit) {
     throw new Error('qa:build --proof cannot create a commit');
   }
-  if (reuseBuild && !shouldCommit) {
-    throw new Error('qa:build --reuse-build requires --commit');
-  }
-  if (reuseBuild && proofOnly) {
-    throw new Error('qa:build --reuse-build cannot be combined with --proof');
-  }
-
   return {
     files: [],
     shouldCommit,
     proofOnly,
-    reuseBuild,
     commitMessage: commitMessage ?? '',
     ...(parsed.values.help ? { help: true, helpText: parsed.help } : {}),
   };
@@ -70,19 +59,16 @@ export function parseBuildOptions(argv = []) {
 
 export async function runBuildCloseout({
   argv = [],
-  producerRunId,
   closeoutStepCollector = collectBuildCloseoutStepResults,
   contextCollector = collectCurrentDiffContext,
   harnessStateAsserter = assertFreshHarnessState,
   checkpointStateAsserter = assertFreshCheckpointState,
-  buildStateAsserter = assertFreshBuildState,
-  buildStateWriter = writeBuildState,
   commandRunner,
   taskArtifactCheck,
   artifactProofCollector = collectBuildStep,
   executionContractAsserter = assertQaResultContract,
 } = {}) {
-  const { files, shouldCommit, proofOnly, reuseBuild, commitMessage } = parseBuildOptions(argv);
+  const { files, shouldCommit, proofOnly, commitMessage } = parseBuildOptions(argv);
   assertDiffOnlyBuildRun(files);
 
   const context = createScopedQaContext(contextCollector(), { suite: PRODUCT_QA_SUITE });
@@ -91,16 +77,13 @@ export async function runBuildCloseout({
   }
   return runBuildForContext({
     context,
-    options: { shouldCommit, proofOnly, reuseBuild, commitMessage },
+    options: { shouldCommit, proofOnly, commitMessage },
     dependencies: {
       artifactProofCollector,
-      buildStateAsserter,
-      buildStateWriter,
       checkpointStateAsserter,
       closeoutStepCollector,
       commandRunner,
       contextCollector,
-      createBuildState: (input) => createBuildState({ ...input, producerRunId }),
       executionContractAsserter,
       harnessStateAsserter,
       taskArtifactCheck,
@@ -127,7 +110,7 @@ if (isExecutedAsScript(import.meta.url)) {
     argv,
     blocking: true,
     lockFactory,
-    execute: async ({ session }) => runBuildCloseout({ argv, producerRunId: session.runId }),
+    execute: async () => runBuildCloseout({ argv }),
   });
   process.exitCode = outcome.exitCode;
 }

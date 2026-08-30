@@ -75,6 +75,7 @@ it('uses compact non-collapsible navigation and renders only the active logical 
 
   const navigation = container.querySelector('nav');
   expect(navigation?.querySelectorAll('button')).toHaveLength(4);
+  expect(navigation?.className).toContain('border-solid');
   expect(container.querySelector('details')).toBeNull();
   expect(container.querySelector('summary')).toBeNull();
   expect(container.textContent).toContain('Цвет');

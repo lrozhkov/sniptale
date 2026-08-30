@@ -1,4 +1,4 @@
-import { collectQaResultSteps } from '../../core/qa-steps/contract.mjs';
+import { collectQaResultSteps } from '../../composition/catalog/contract.mjs';
 import { normalizeObservedStep } from './output.mjs';
 
 export function createHelpStep() {
@@ -12,7 +12,6 @@ export function createHelpStep() {
 export function resolveInvocationMode(wrapperId, values) {
   if (wrapperId === 'qa:build') {
     if (values.proofOnly) return 'proof';
-    if (values.shouldCommit && values.reuseBuild) return 'reuse-commit';
     if (values.shouldCommit) return 'commit';
   }
   if (wrapperId === 'qa:e2e') {

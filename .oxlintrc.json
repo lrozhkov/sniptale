@@ -1,7 +1,10 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["eslint", "typescript", "react", "vitest", "jsx-a11y"],
-  "jsPlugins": [{ "name": "security", "specifier": "eslint-plugin-security" }],
+  "jsPlugins": [
+    { "name": "security", "specifier": "eslint-plugin-security" },
+    { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }
+  ],
   "categories": {
     "correctness": "off"
   },
@@ -25,11 +28,12 @@
   "rules": {
     "security/detect-bidi-characters": "error",
     "security/detect-buffer-noassert": "error",
-    "security/detect-eval-with-expression": "error",
     "security/detect-new-buffer": "error",
     "security/detect-non-literal-regexp": "off",
     "security/detect-object-injection": "off",
     "security/detect-unsafe-regex": "warn",
+    "no-eval": "error",
+    "no-new-func": "error",
     "react/exhaustive-deps": "warn",
     "react/rules-of-hooks": "error",
     "vitest/no-focused-tests": "error",
@@ -45,6 +49,7 @@
     "react/jsx-no-target-blank": "error",
     "react/jsx-no-script-url": "error",
     "react/no-danger-with-children": "error",
+    "react/no-danger": "error",
     "react/no-children-prop": "error",
     "react/jsx-no-duplicate-props": "error",
     "react/void-dom-elements-no-children": "error"
@@ -155,6 +160,18 @@
       }
     },
     {
+      "files": [
+        "apps/extension/src/**/*.{ts,tsx,js,mjs,cjs}",
+        "packages/*/src/**/*.{ts,tsx,js,mjs,cjs}"
+      ],
+      "rules": {
+        "sonarjs/no-all-duplicated-branches": "error",
+        "sonarjs/no-duplicated-branches": "error",
+        "sonarjs/no-duplicate-in-composite": "error",
+        "sonarjs/no-nested-assignment": "error"
+      }
+    },
+    {
       "files": ["apps/extension/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
       "rules": {
         "typescript/consistent-type-imports": [
@@ -169,7 +186,8 @@
         "typescript/no-unsafe-assignment": "error",
         "typescript/no-unsafe-call": "error",
         "typescript/no-unsafe-member-access": "error",
-        "typescript/no-unsafe-return": "error"
+        "typescript/no-unsafe-return": "error",
+        "no-console": "error"
       }
     },
     {
@@ -188,8 +206,15 @@
       }
     },
     {
-      "files": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "**/*.d.ts"],
+      "files": [
+        "**/*.test.{ts,tsx,js,mjs,cjs}",
+        "**/*.spec.{ts,tsx,js,mjs,cjs}",
+        "**/test-support.{ts,tsx,js,mjs,cjs}",
+        "**/*.test-support.{ts,tsx,js,mjs,cjs}",
+        "**/*.d.ts"
+      ],
       "rules": {
+        "no-console": "off",
         "typescript/consistent-type-imports": "off",
         "typescript/no-explicit-any": "off",
         "typescript/no-floating-promises": "off",
@@ -198,7 +223,33 @@
         "typescript/no-unsafe-call": "off",
         "typescript/no-unsafe-member-access": "off",
         "typescript/no-unsafe-return": "off",
-        "typescript/switch-exhaustiveness-check": "off"
+        "typescript/switch-exhaustiveness-check": "off",
+        "sonarjs/no-all-duplicated-branches": "off",
+        "sonarjs/no-duplicated-branches": "off",
+        "sonarjs/no-duplicate-in-composite": "off",
+        "sonarjs/no-nested-assignment": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/extension/src/**/vendor/**/*.{ts,tsx,js,mjs,cjs}",
+        "apps/extension/src/**/generated/**/*.{ts,tsx,js,mjs,cjs}",
+        "apps/extension/src/**/__generated__/**/*.{ts,tsx,js,mjs,cjs}"
+      ],
+      "rules": {
+        "sonarjs/no-all-duplicated-branches": "off",
+        "sonarjs/no-duplicated-branches": "off",
+        "sonarjs/no-duplicate-in-composite": "off",
+        "sonarjs/no-nested-assignment": "off"
+      }
+    },
+    {
+      "files": [
+        "packages/platform/src/observability/message-tracer/console.ts",
+        "packages/platform/src/observability/message-tracer/index.ts"
+      ],
+      "rules": {
+        "no-console": "off"
       }
     },
     {

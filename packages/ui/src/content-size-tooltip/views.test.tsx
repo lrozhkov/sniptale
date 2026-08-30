@@ -171,11 +171,11 @@ describe('ContentSizeTooltipContent rendering', () => {
     expect(confirmButton?.parentElement?.lastElementChild).toBe(confirmButton);
     expect(cancelButton?.classList).toContain('sniptale-selection-size-cancel-button');
     expect(confirmButton?.style.background).toBe('transparent');
-    expect(confirmButton?.style.border).toBe('0px');
+    expect(confirmButton?.style.borderWidth).toBe('0px');
     expect(confirmButton?.classList).toContain('sniptale-content-size-tooltip-primary-action');
     expect(ratioButton?.style.background).toBe('transparent');
     expect(ratioButton?.style.borderColor).toBe('transparent');
-    expect(increaseHeightButton?.style.border).toBe('0px');
+    expect(increaseHeightButton?.style.borderWidth).toBe('0px');
     expect(container?.querySelector('[data-ui="content-size-tooltip-divider"]')).toBeNull();
 
     const ratioIcon = ratioButton?.querySelector('svg');

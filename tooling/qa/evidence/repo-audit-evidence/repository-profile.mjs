@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { CODE_FILE_PATTERN, IGNORED_ROOT_SEGMENTS } from '../../core/quality.config.mjs';
+import { CODE_FILE_PATTERN, IGNORED_ROOT_SEGMENTS } from '../../policy/quality/quality.config.mjs';
 
 function getTrackedFiles(rootDir) {
   try {

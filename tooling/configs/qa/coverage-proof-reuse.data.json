@@ -12,30 +12,30 @@
     "vitest.config.ts",
     "tooling/test/harness/vitest.setup.ts",
     "tooling/configs/qa/coverage-proof-reuse.data.json",
-    "tooling/qa/core/audit-coverage-step.mjs",
-    "tooling/qa/core/coverage-audit-report.mjs",
-    "tooling/qa/core/coverage-proof.mjs",
-    "tooling/qa/core/verify-unit-tests.mjs",
-    "tooling/qa/core/verify-test-coverage.registry.mjs",
-    "tooling/qa/core/verify-test-coverage.thresholds.mjs",
-    "tooling/qa/core/quality.config.mjs"
+    "tooling/qa/proof/coverage/audit-coverage-step.mjs",
+    "tooling/qa/proof/coverage/coverage-audit-report.mjs",
+    "tooling/qa/proof/coverage/coverage-proof.mjs",
+    "tooling/qa/proof/unit/verify-unit-tests.mjs",
+    "tooling/qa/proof/coverage/test-coverage/registry.mjs",
+    "tooling/qa/proof/coverage/test-coverage/thresholds.mjs",
+    "tooling/qa/policy/quality/quality.config.mjs"
   ],
   "reportFiles": ["coverage-final.json", "coverage-summary.json", "lcov.info", "html/index.html"],
   "owners": {
-    "decision": "tooling/qa/core/coverage-proof.mjs",
-    "execution": "tooling/qa/core/audit-coverage-step.mjs",
+    "decision": "tooling/qa/proof/coverage/coverage-proof.mjs",
+    "execution": "tooling/qa/proof/coverage/audit-coverage-step.mjs",
     "ciTransport": "tooling/ci/select-coverage-proof.mjs",
-    "ciMount": "tooling/ci/coverage-proof-host.mjs"
+    "ciMount": "tooling/ci/proof-host-inputs.mjs"
   },
   "consumers": [
-    "tooling/qa/core/coverage-proof.mjs",
-    "tooling/qa/core/audit-coverage-step.mjs",
-    "tooling/ci/coverage-proof-host.mjs",
+    "tooling/qa/proof/coverage/coverage-proof.mjs",
+    "tooling/qa/proof/coverage/audit-coverage-step.mjs",
+    "tooling/ci/proof-host-inputs.mjs",
     "tooling/ci/select-coverage-proof.mjs",
-    "tooling/ci/validate-coverage-proof.mjs",
     "tooling/ci/container.mjs",
     "tooling/ci/artifacts.mjs",
-    ".github/workflows/quality-gate.yml",
+    ".github/workflows/_canonical-proof.yml",
+    ".github/workflows/provenance.yml",
     ".github/workflows/release.yml"
   ],
   "modes": {

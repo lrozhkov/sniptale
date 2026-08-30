@@ -2,34 +2,119 @@
   "$comment": "Sensitive storage ownership policy. Add entries only for committed security-reviewed storage owners.",
   "secretStorageOwners": [
     {
+      "file": "apps/extension/src/composition/persistence/ai-settings/core.ts",
+      "owner": "shared-ai-storage",
+      "justification": "The public AI settings persistence owner coordinates graph deletion that rewrites the encrypted provider-secret map.",
+      "reviewNote": "Only the canonical encrypted provider-secret storage key is admitted at this sink; generic AI setting writes do not authorize secret-shaped keys.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": ["AI_PROVIDER_SECRETS_KEY"]
+        }
+      ]
+    },
+    {
       "file": "apps/extension/src/composition/persistence/ai-settings/provider-secrets.store.ts",
       "owner": "shared-ai-storage",
       "justification": "Encrypted AI provider secrets and local key material are owned only by the shared AI storage seam.",
-      "reviewNote": "Only encrypted secret envelopes and key material may persist here; plaintext credential fields stay forbidden outside this owner."
+      "reviewNote": "Only encrypted secret envelopes and key material may persist here; plaintext credential fields stay forbidden outside this owner.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "AI_LOCAL_SECRET_KEY_STORAGE_KEY",
+            "AI_PROVIDERS_KEY",
+            "AI_PROVIDER_SECRETS_KEY"
+          ]
+        }
+      ]
     },
     {
       "file": "apps/extension/src/composition/persistence/ai-settings/provider-secret-keys.store.ts",
       "owner": "shared-ai-storage",
       "justification": "The AI provider secret key helper owns transparent local key lookup and in-memory passphrase-derived key resolution.",
-      "reviewNote": "Transparent local key material may persist only for default obfuscation mode; passphrase-derived key material is in-memory only, and the legacy session key constant exists solely for cleanup and never authorizes persistence."
+      "reviewNote": "Transparent local key material may persist only for default obfuscation mode; passphrase-derived key material is in-memory only, and the legacy session key constant exists solely for cleanup and never authorizes persistence.",
+      "storageWrites": []
     },
     {
       "file": "apps/extension/src/composition/persistence/ai-settings/provider-secrets.migration.ts",
       "owner": "shared-ai-storage",
       "justification": "The AI storage migration seam rewrites legacy plaintext provider records into encrypted secret envelopes.",
-      "reviewNote": "Migration may touch legacy secret material only to convert it into the canonical encrypted storage format."
+      "reviewNote": "Migration may touch legacy secret material only to convert it into the canonical encrypted storage format.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "AI_LOCAL_SECRET_KEY_STORAGE_KEY",
+            "AI_PROVIDERS_KEY",
+            "AI_PROVIDER_SECRETS_KEY"
+          ]
+        },
+        {
+          "sink": "browserStorage.sync.set",
+          "keys": ["LEGACY_AI_SETTINGS_STORAGE_KEY"]
+        }
+      ]
     },
     {
       "file": "apps/extension/src/composition/persistence/ai-settings/secret-protection.store.ts",
       "owner": "shared-ai-storage",
       "justification": "The AI passphrase protection seam owns non-secret protection metadata and the in-memory derived-key lifecycle.",
-      "reviewNote": "Passphrase metadata may persist in local storage, but derived decrypt key material and plaintext passphrases must never persist in local, sync, or session storage; the legacy session key is cleanup-only."
+      "reviewNote": "Passphrase metadata may persist in local storage, but derived decrypt key material and plaintext passphrases must never persist in local, sync, or session storage; the legacy session key is cleanup-only.",
+      "storageWrites": []
     },
     {
       "file": "apps/extension/src/composition/persistence/ai-settings/provider-secret-protection.store.ts",
       "owner": "shared-ai-storage",
       "justification": "The AI provider secret protection lifecycle seam migrates provider secrets between transparent and passphrase modes.",
-      "reviewNote": "This owner may rewrite encrypted provider secret envelopes and protection metadata, but it must not persist plaintext passphrases or provider API keys."
+      "reviewNote": "This owner may rewrite encrypted provider secret envelopes and protection metadata, but it must not persist plaintext passphrases or provider API keys.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "AI_LOCAL_SECRET_KEY_STORAGE_KEY",
+            "AI_PROVIDERS_KEY",
+            "AI_PROVIDER_SECRETS_KEY",
+            "AI_SECRET_PROTECTION_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/secret-protection-transition.store.ts",
+      "owner": "shared-ai-storage",
+      "justification": "The protection transition owner persists bounded recovery metadata for encrypted secret-mode changes.",
+      "reviewNote": "Only transition phase metadata may be written; provider credentials and passphrase-derived keys remain forbidden.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": ["AI_SECRET_PROTECTION_TRANSITION_KEY"]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.ts",
+      "owner": "shared-ai-storage",
+      "justification": "The unlock-request owner persists bounded request-status metadata in browser session storage.",
+      "reviewNote": "Only unlock request identifiers and status metadata may be retained; plaintext passphrases, provider credentials, and derived keys are forbidden.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.session.set",
+          "keys": ["AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY"]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/background/storage/video/camera-recorder-grant.ts",
+      "owner": "camera-recorder-grant",
+      "justification": "The camera recorder grant owner retains a bounded capability grant only for the active browser session.",
+      "reviewNote": "Registration tokens may appear only inside the exact session grant record; local and sync retention remain forbidden.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.session.set",
+          "keys": ["CAMERA_RECORDER_GRANT_STORAGE_KEY"]
+        }
+      ]
     }
   ],
   "sensitiveRetentionOwners": [
@@ -37,25 +122,61 @@
       "file": "apps/extension/src/composition/persistence/gallery-saved-views/index.ts",
       "owner": "gallery-saved-views",
       "justification": "The saved Gallery view owner retains bounded user-selected facet identifiers, including tag and source values, as reusable local navigation preferences.",
-      "reviewNote": "Records may contain only a bounded name, category, status, tag labels, and canonical facet identifiers; they are local-only, included in explicit full-library backup, excluded from selected-item packages, sync, diagnostics, and logs, and removed by factory reset."
+      "reviewNote": "Records may contain only a bounded name, category, status, tag labels, and canonical facet identifiers; they are local-only, included in explicit full-library backup, excluded from selected-item packages, sync, diagnostics, and logs, and removed by factory reset.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": ["GALLERY_SAVED_VIEWS_STORAGE_KEY"]
+        }
+      ]
     },
     {
       "file": "apps/extension/src/composition/persistence/content-pin-session/annotation-fork.ts",
       "owner": "annotation-fork-session",
       "justification": "The annotation fork session owner retains unsaved visual template adjustments across reloads for one browser tab.",
-      "reviewNote": "Only text-free frame, callout, and numbering visual settings may persist in session storage; content, titles, labels, instance identities, and manual numbering values are excluded. Records are revisioned, tab-scoped, removed on tab close, and included in verified local-data erasure."
+      "reviewNote": "Only text-free frame, callout, and numbering visual settings may persist in session storage; content, titles, labels, instance identities, and manual numbering values are excluded. Records are revisioned, tab-scoped, removed on tab close, and included in verified local-data erasure.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.session.set",
+          "keys": ["createAnnotationForkSessionStorageKey(tabId)"]
+        }
+      ]
     },
     {
       "file": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs/index.ts",
       "owner": "frame-annotation-raster-jobs",
       "justification": "The frame annotation raster owner temporarily stages bounded page-derived PNG input, sanitized annotation snapshots, and derived PNG output for one local offscreen export.",
-      "reviewNote": "Payloads are local-only, capped at 64 MiB per input/output and three jobs, expire after one hour, are excluded from backup/sync/export/diagnostics, and are removed on consume, cancellation, lease expiry, startup cleanup, and verified local-data erasure. The complete client transition holds the cross-context persistence transition gate across MV3 worker restarts."
+      "reviewNote": "Payloads are local-only, capped at 64 MiB per input/output and three jobs, expire after one hour, are excluded from backup/sync/export/diagnostics, and are removed on consume, cancellation, lease expiry, startup cleanup, and verified local-data erasure. The complete client transition holds the cross-context persistence transition gate across MV3 worker restarts.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": ["FRAME_ANNOTATION_RASTER_JOBS_STORE"]
+        }
+      ]
     },
     {
       "file": "apps/extension/src/composition/persistence/video-preview-cache/mutations.ts",
       "owner": "video-preview-cache",
       "justification": "The video preview cache owner persists bounded local-only derived MP4 segments in its dedicated IndexedDB database.",
-      "reviewNote": "Only validated AVC preview segments may persist here; records remain advisory, excluded from backup/export/diagnostics, bounded by retention policy, and subject to required erasure verification."
+      "reviewNote": "Only validated AVC preview segments may persist here; records remain advisory, excluded from backup/export/diagnostics, bounded by retention policy, and subject to required erasure verification.",
+      "storageWrites": [
+        {
+          "sink": "transaction.putRecord",
+          "keys": ["committed.storageKey", "storageKey"]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/prompt-templates/index.ts",
+      "owner": "prompt-templates",
+      "justification": "The prompt-template persistence owner retains user-authored reusable prompt content in local extension storage.",
+      "reviewNote": "Prompt content may persist only under the exact prompt-template key; sync, session, diagnostics, and unrelated local keys remain forbidden.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": ["PROMPT_TEMPLATES_KEY"]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [
@@ -64,6 +185,30 @@
       "owner": "shared-diagnostic-sanitizer",
       "justification": "Canonical sanitizer owner for persisted or exported diagnostic payloads.",
       "reviewNote": "New diagnostic collectors should import this seam rather than duplicating sanitization logic."
+    },
+    {
+      "file": "packages/platform/src/observability/diagnostics/sanitizer.core.ts",
+      "owner": "shared-diagnostic-sanitizer",
+      "justification": "Behavioral owner for generic structured diagnostic redaction before retention or export.",
+      "reviewNote": "Exact safe metric keys and secret-bearing key fragments must remain distinct."
+    },
+    {
+      "file": "packages/platform/src/observability/diagnostics/sanitizer.typed.ts",
+      "owner": "shared-diagnostic-sanitizer",
+      "justification": "Typed diagnostic event and metadata sanitization owner.",
+      "reviewNote": "Event data must use URL-aware structured sanitization before crossing retention boundaries."
+    },
+    {
+      "file": "packages/platform/src/observability/diagnostics/url-sanitizer.ts",
+      "owner": "diagnostic-url-sanitizer",
+      "justification": "Canonical privacy policy for diagnostic URL query, fragment, credential, and opaque-scheme handling.",
+      "reviewNote": "Stored diagnostic URLs drop query and hash; raw exports only preserve explicitly safe query values."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/index.ts",
+      "owner": "diagnostics-persistence",
+      "justification": "Canonical durable diagnostics sink that reapplies typed sanitization at the final IndexedDB boundary.",
+      "reviewNote": "Both metadata and event payloads must be sanitized inside saveDiagnostics before store writes."
     },
     {
       "file": "packages/platform/src/observability/message-tracer/index.ts",

@@ -15,7 +15,7 @@ export function FeedbackPanelControls(props: {
   query: string;
 }) {
   return (
-    <div className="flex gap-2 border-b border-[color:var(--sniptale-color-border-soft)] px-3 pb-3">
+    <div className="flex gap-2 border-b border-solid border-[color:var(--sniptale-color-border-soft)] px-3 pb-3">
       <label className="relative min-w-0 flex-1">
         <Search className="absolute left-3 top-3 text-[var(--sniptale-color-text-dim)]" size={16} />
         <span className="sr-only">{translate('content.designReview.panelSearch')}</span>

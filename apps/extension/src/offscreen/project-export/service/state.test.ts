@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { vi } from 'vitest';
 
-// State-machine proof: duplicate/replay registration is rejected while a job is active.
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,

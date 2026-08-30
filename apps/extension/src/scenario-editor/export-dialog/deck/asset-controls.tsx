@@ -1,23 +1,23 @@
 import type { ScenarioDeckAssetMode } from '../../project/export/deck/types';
 import { SegmentedRow } from '../../../ui/compact-inspector-controls';
+import { translate } from '../../../platform/i18n';
 import type { ScenarioDeckExportControlProps } from './types';
-
-const ASSET_MODE_OPTIONS: Array<{ label: string; value: ScenarioDeckAssetMode }> = [
-  { label: 'Embed images', value: 'embed' },
-  { label: 'Assets folder', value: 'files' },
-];
 
 export function ScenarioDeckExportAssetControls(props: ScenarioDeckExportControlProps) {
   const markdown = props.options.format === 'markdown';
+  const options: Array<{ label: string; value: ScenarioDeckAssetMode }> = [
+    { label: translate('scenario.editor.exportEmbedImages'), value: 'embed' },
+    { label: translate('scenario.editor.exportAssetsFolder'), value: 'files' },
+  ];
 
   return (
     <div className="grid gap-2">
       <SegmentedRow
-        ariaLabel="Asset mode"
+        ariaLabel={translate('scenario.editor.exportAssetMode')}
         columns={2}
-        label="Assets"
+        label={translate('scenario.editor.exportAssets')}
         value={props.options.assetMode}
-        options={ASSET_MODE_OPTIONS.map((option) => ({
+        options={options.map((option) => ({
           ...option,
           disabled: markdown && option.value === 'embed',
         }))}
@@ -25,7 +25,7 @@ export function ScenarioDeckExportAssetControls(props: ScenarioDeckExportControl
       />
       {markdown ? (
         <p className="px-3 text-xs text-[var(--sniptale-color-text-dim)]">
-          Markdown is exported as a portable ZIP with slide SVG previews and asset files.
+          {translate('scenario.editor.exportMarkdownBundleHint')}
         </p>
       ) : null}
     </div>

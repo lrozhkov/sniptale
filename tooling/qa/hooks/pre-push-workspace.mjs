@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { repoRoot, runCommand } from '../core/shared.mjs';
+import { repoRoot } from '../analysis/repository/shared-paths.mjs';
+import { runCommand } from '../runtime/process/shared-process.mjs';
 
 export const EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 

@@ -1,0 +1,176 @@
+name: Release provenance
+run-name: Release provenance Gate
+
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: Build separate forced candidate images
+        required: false
+        default: false
+        type: boolean
+      force_rebuild_reason:
+        description: Required audit reason for a forced rebuild
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-provenance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canonical-proof:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+      security-events: write
+    uses: ./.github/workflows/_canonical-proof.yml
+    with:
+      gate: release-provenance
+      force_rebuild: ${{ inputs.force_rebuild || false }}
+      force_rebuild_reason: ${{ inputs.force_rebuild_reason || '' }}
+
+  release-provenance-gate:
+    name: Release provenance Gate
+    needs: canonical-proof
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require the exact canonical proof graph
+        env:
+          CANONICAL_PROOF_RESULT: ${{ needs.canonical-proof.result }}
+        run: test "$CANONICAL_PROOF_RESULT" = success
+
+  attest-release:
+    needs: [canonical-proof, release-provenance-gate]
+    if: needs.release-provenance-gate.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - uses: ./.github/actions/setup-locked-node
+      - name: Install locked npm and exact release preparation dependencies
+        run: |
+          npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+          echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+          npm ci --ignore-scripts
+      - name: Download and verify the exact admitted release proof
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          prefix="release-provenance-${GITHUB_SHA}-${GITHUB_RUN_ID}-"
+          artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "$GITHUB_RUN_ID" "$prefix")
+          gh run download "$GITHUB_RUN_ID" --name "$artifact_name" --dir build/release-proof
+          node tooling/ci/verify-main-proof.mjs release build/release-proof "$GITHUB_SHA"
+          node tooling/ci/prepare-release-assets.mjs build/release-proof "$GITHUB_SHA"
+          node tooling/ci/verify-release-assets.mjs build/release-proof "$GITHUB_SHA"
+      - name: Attest the exact validated release subject inventory
+        id: release-attestation
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          create-storage-record: false
+          subject-path: |
+            build/release-proof/release-assets/SHA256SUMS
+            build/release-proof/release-assets/provenance.json
+            build/release-proof/release-assets/sbom.cdx.json
+            build/release-proof/release-assets/sniptale_*.zip
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: '${{ github.actor }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Resolve admitted stable image digests
+        id: images
+        run: |
+          qa=$(docker buildx imagetools inspect "ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}" --format '{{json .Manifest.Digest}}' | jq -er .)
+          controller=$(docker buildx imagetools inspect "ghcr.io/lrozhkov/sniptale-controller:sha-${GITHUB_SHA}" --format '{{json .Manifest.Digest}}' | jq -er .)
+          for digest in "$qa" "$controller"; do
+            printf '%s\n' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$'
+          done
+          echo "qa=$qa" >> "$GITHUB_OUTPUT"
+          echo "controller=$controller" >> "$GITHUB_OUTPUT"
+      - name: Attest the admitted immutable QA image
+        id: qa-attestation
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          create-storage-record: false
+          subject-name: ghcr.io/lrozhkov/sniptale-qa
+          subject-digest: ${{ steps.images.outputs.qa }}
+          push-to-registry: true
+      - name: Attest the admitted immutable controller image
+        id: controller-attestation
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          create-storage-record: false
+          subject-name: ghcr.io/lrozhkov/sniptale-controller
+          subject-digest: ${{ steps.images.outputs.controller }}
+          push-to-registry: true
+      - name: Record attestation identities without OIDC material
+        env:
+          RELEASE_ATTESTATION_URL: ${{ steps.release-attestation.outputs.attestation-url }}
+          QA_ATTESTATION_URL: ${{ steps.qa-attestation.outputs.attestation-url }}
+          CONTROLLER_ATTESTATION_URL: ${{ steps.controller-attestation.outputs.attestation-url }}
+          QA_DIGEST: ${{ steps.images.outputs.qa }}
+          CONTROLLER_DIGEST: ${{ steps.images.outputs.controller }}
+        run: |
+          jq -n --arg commit "$GITHUB_SHA" --arg workflow ".github/workflows/provenance.yml" \
+            --arg release "$RELEASE_ATTESTATION_URL" --arg qa "$QA_ATTESTATION_URL" \
+            --arg controller "$CONTROLLER_ATTESTATION_URL" --arg qaDigest "$QA_DIGEST" \
+            --arg controllerDigest "$CONTROLLER_DIGEST" \
+            '{schemaVersion:1,artifactKind:"sniptale-github-attestations",commit:$commit,workflow:$workflow,releaseAssets:$release,images:{qa:{digest:$qaDigest,url:$qa},controller:{digest:$controllerDigest,url:$controller}}}' \
+            > build/release-proof/attestations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        with:
+          name: release-attested-assets-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/release-proof/release-assets
+            build/release-proof/attestations.json
+          if-no-files-found: error
+          retention-days: 30
+
+  coverage-results:
+    needs: [canonical-proof, release-provenance-gate]
+    if: needs.release-provenance-gate.result == 'success'
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - uses: ./.github/actions/setup-locked-node
+      - name: Download exact admitted release coverage
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          prefix="release-provenance-${GITHUB_SHA}-${GITHUB_RUN_ID}-"
+          artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "$GITHUB_RUN_ID" "$prefix")
+          gh run download "$GITHUB_RUN_ID" --name "$artifact_name" --dir build/release-proof
+          node tooling/ci/verify-main-proof.mjs release build/release-proof "$GITHUB_SHA"
+      - name: Publish release provenance coverage to Coveralls
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/release-proof/.tmp/coverage/canonical/lcov.info
+          format: lcov
+          git-branch: main
+          git-commit: ${{ github.sha }}
+          fail-on-error: true
+          coverage-reporter-version: v0.6.22

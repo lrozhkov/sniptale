@@ -57,27 +57,27 @@
     {
       "path": "tooling/qa/core/feature-persistence-owner-policy.mjs",
       "action": "replace",
-      "target": "tooling/qa/core/app-core-owner-policy.mjs"
+      "target": "tooling/qa/guards/architecture/app-core/app-core-owner-policy.mjs"
     },
     {
       "path": "tooling/qa/core/feature-persistence-owner-policy-validation.mjs",
       "action": "replace",
-      "target": "tooling/qa/core/app-core-owner-policy-validation.mjs"
+      "target": "tooling/qa/guards/architecture/app-core/app-core-owner-policy-validation.mjs"
     },
     {
       "path": "tooling/qa/core/verify-feature-persistence-owners.mjs",
       "action": "replace",
-      "target": "tooling/qa/core/verify-app-core-owners.mjs"
+      "target": "tooling/qa/guards/architecture/app-core/verify-app-core-owners.mjs"
     },
     {
       "path": "tooling/qa/core/verify-feature-persistence-owners.test.ts",
       "action": "replace",
-      "target": "tooling/qa/core/verify-app-core-owners.test.ts"
+      "target": "tooling/qa/guards/architecture/app-core/verify-app-core-owners.test.ts"
     },
     {
       "path": "tooling/qa/core/verify-feature-persistence-owner-test-edges.mjs",
       "action": "replace",
-      "target": "tooling/qa/core/verify-app-core-owner-test-edges.mjs"
+      "target": "tooling/qa/guards/architecture/app-core/verify-app-core-owners.mjs"
     },
     {
       "path": "tooling/qa/core/shared-decomposition-artifacts.mjs",
@@ -93,22 +93,6 @@
     },
     {
       "path": "tooling/qa/wrappers/checkpoint-mechanical-quality-scope.mjs",
-      "action": "remove"
-    },
-    {
-      "path": "tooling/qa/core/canonical-facades.data.mjs",
-      "action": "remove"
-    },
-    {
-      "path": "tooling/qa/core/verify-canonical-facades.frozen.helpers.mjs",
-      "action": "remove"
-    },
-    {
-      "path": "tooling/qa/core/verify-canonical-facades.retired.helpers.mjs",
-      "action": "remove"
-    },
-    {
-      "path": "tooling/qa/core/verify-canonical-facades.frozen-broad.test.ts",
       "action": "remove"
     },
     {
@@ -465,18 +449,16 @@
     "docs/architecture/video-template-packs.md",
     "tooling/qa/core/focused-coverage/maps/video-pack.mjs"
   ],
-  "effectV1RetiredPathsSha256": "4027aaa9417d1968e0cc3a34c5abb95e6babf23da2043ff47522603e716311bb",
   "requiredTargets": [
     "apps/extension/build/extension-html-inputs.ts",
     "tooling/configs/qa/app-core-owner-policy.data.json",
-    "tooling/qa/core/app-core-owner-policy.mjs",
-    "tooling/qa/core/app-core-owner-policy-validation.mjs",
-    "tooling/qa/core/verify-app-core-owner-test-edges.mjs",
-    "tooling/qa/core/verify-app-core-owners.mjs",
-    "tooling/qa/core/verify-app-core-owners.test.ts",
-    "tooling/qa/core/target-only-path-inventory.mjs",
-    "tooling/qa/core/target-only-path-references.mjs",
-    "tooling/qa/core/verify-target-only-paths.mjs",
-    "tooling/qa/core/verify-target-only-paths.test.ts"
+    "tooling/qa/guards/architecture/app-core/app-core-owner-policy.mjs",
+    "tooling/qa/guards/architecture/app-core/app-core-owner-policy-validation.mjs",
+    "tooling/qa/guards/architecture/app-core/verify-app-core-owners.mjs",
+    "tooling/qa/guards/architecture/app-core/verify-app-core-owners.test.ts",
+    "tooling/qa/policy/targets/target-only-path-inventory.mjs",
+    "tooling/qa/policy/targets/target-only-path-references.mjs",
+    "tooling/qa/policy/targets/verify-target-only-paths.mjs",
+    "tooling/qa/policy/targets/verify-target-only-paths.test.ts"
   ]
 }

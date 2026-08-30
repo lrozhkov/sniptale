@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-import { fromRelativePath } from '../../core/shared.mjs';
+import { fromRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import { parseAuditProfiles } from './schema.mjs';
 
 export const AUDIT_PROFILES_PATH = 'tooling/configs/qa/audit-profiles.data.json';

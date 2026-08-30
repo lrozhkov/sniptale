@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
 
-import { createTempRoot, writeFile } from '../qa/core/test-helpers';
+import { createTempRoot, writeFile } from '../qa/test-support/test-helpers';
 import {
   assertEnvironmentPolicySnapshot,
   parseOptionalResourceSnapshot,
@@ -64,7 +64,11 @@ function collectExternalHostImports(entry: string) {
 
 function collectWorkflowNodeEntrypoints() {
   const entrypoints = new Set<string>();
-  for (const workflow of ['.github/workflows/quality-gate.yml', '.github/workflows/release.yml']) {
+  for (const workflow of fs
+    .readdirSync('.github/workflows')
+    .filter((file) => file.endsWith('.yml'))
+    .map((file) => `.github/workflows/${file}`)
+    .sort()) {
     const source = fs.readFileSync(workflow, 'utf8');
     for (const line of source.split('\n')) {
       const commandTokens = line.trim().split(/\s+/u);
@@ -163,14 +167,16 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
   const dockerfile = fs.readFileSync('tooling/ci/Dockerfile', 'utf8');
   const installer = fs.readFileSync('tooling/ci/install-toolchain.mjs', 'utf8');
-  const semgrepLock = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock', 'utf8');
   expect(dockerfile.startsWith(`FROM ${lock.node.image}\n`)).toBe(true);
   expect(CANONICAL_IMAGE_ENVIRONMENT.NODE_VERSION).toBe(lock.node.version);
   expect(dockerfile).toContain('npm ci --ignore-scripts --prefix /opt/sniptale-npm');
-  expect(dockerfile).toContain(`test "$(npm --version)" = ${lock.node.npmVersion}`);
+  expect(dockerfile).toContain(
+    'node /opt/sniptale-ci/runtime-parity.mjs /opt/sniptale-ci/toolchain.lock.json'
+  );
+  expect(dockerfile).toContain('test -s /etc/ssl/certs/ca-certificates.crt');
   expect(dockerfile).toMatch(/apt-get install[^\n]*\bprocps\b/u);
-  expect(semgrepLock).toContain(`semgrep==${lock.semgrep.version}`);
-  expect(installer).toContain("['semgrep', lock.semgrep.version, ['--legacy', '--version']]");
+  expect(lock).not.toHaveProperty('semgrep');
+  expect(installer).not.toContain('semgrep');
   expect(installer).toContain("['npm', lock.node.npmVersion, ['--version']]");
   expect(installer).toContain("run('ps', ['--version'])");
   const playwrightLock = fs.readFileSync('tooling/configs/ci/playwright/package-lock.json');
@@ -275,7 +281,7 @@ it('keeps the residual ESLint TypeScript peer exception explicit and diagnosable
 
 it('binds the CodeQL audit suite to the locked query suite and production-only scope', () => {
   const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
-  const source = fs.readFileSync('tooling/qa/audits/codeql.mjs', 'utf8');
+  const source = fs.readFileSync('tooling/qa/audits/codeql/codeql.mjs', 'utf8');
   const policy = JSON.parse(
     fs.readFileSync('tooling/configs/qa/codeql-proof-reuse.data.json', 'utf8')
   );
@@ -291,6 +297,18 @@ it('keeps Selectel execution profiles environment-scoped and lane-admitted', () 
   expect(source).toContain("selectelProfilesSnapshot('SELECTEL_QA_PROFILES', 'proof')");
   expect(source).toContain("selectelProfilesSnapshot('SELECTEL_RELEASE_PROFILES', 'release')");
   expect(source).toContain('a repository variable would create a shadow authority');
+});
+
+it('keeps vulnerability alerts enabled without Dependabot-authored security fix PRs', () => {
+  const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/github-policy.json', 'utf8'));
+  expect(policy.security).toMatchObject({
+    vulnerabilityAlerts: true,
+    automatedSecurityFixes: false,
+  });
+  const source = fs.readFileSync('tooling/ci/github-policy.mjs', 'utf8');
+  expect(source).toContain(
+    'setToggle(`repos/${repository}/automated-security-fixes`, value.security.automatedSecurityFixes)'
+  );
 });
 
 it('rejects release tag ruleset exclusions and parameter drift', () => {
@@ -566,8 +584,8 @@ it('fails closed on missing or stale canonical reports and refuses artifact over
   const stalePolicy = path.join(staleRoot, 'tooling/configs/ci/proof-semantics.json');
   fs.mkdirSync(path.dirname(stalePolicy), { recursive: true });
   fs.copyFileSync('tooling/configs/ci/proof-semantics.json', stalePolicy);
-  writeFile(staleRoot, '.tmp/qa/build-proof.json', '{}\n');
-  fs.utimesSync(path.join(staleRoot, '.tmp/qa/build-proof.json'), new Date(0), new Date(0));
+  writeFile(staleRoot, '.tmp/qa/unit-proof.json', '{}\n');
+  fs.utimesSync(path.join(staleRoot, '.tmp/qa/unit-proof.json'), new Date(0), new Date(0));
   const stale = spawnSync(
     process.execPath,
     ['--input-type=module', '--eval', invocation('Date.now()', 'passed')],

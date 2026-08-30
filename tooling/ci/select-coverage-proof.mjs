@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import {
   downloadSuccessfulMainProof,
   downloadLatestReleaseProof,

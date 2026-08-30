@@ -1,6 +1,8 @@
+import fs from 'node:fs';
+
 import { expect, it } from 'vitest';
 
-import { createTempRoot, importFresh, withCwd } from '../core/test-helpers';
+import { createTempRoot, importFresh, withCwd } from '../test-support/test-helpers';
 
 const ignoreExecutionContract = () => {};
 
@@ -24,6 +26,7 @@ it('skips release harness when there are no changed harness files', async () => 
     );
     const result = await module.runReleaseHarness({
       producerRunId: 'harness-test-run-1',
+      baselineLoader: () => ({ allowances: [] }),
       executionContractAsserter: ignoreExecutionContract,
       contextCollector: () => ({
         targetFiles: ['src/example.ts'],
@@ -56,6 +59,7 @@ it('records a fresh green release-harness state for changed harness files', asyn
     );
     const result = await module.runReleaseHarness({
       producerRunId: 'harness-test-run-2',
+      baselineLoader: () => ({ allowances: [] }),
       executionContractAsserter: ignoreExecutionContract,
       contextCollector: () => ({
         targetFiles: ['tooling/qa/core/example.test.ts'],
@@ -81,6 +85,42 @@ it('records a fresh green release-harness state for changed harness files', asyn
   });
 });
 
+it('fingerprints the post-format harness content written by the formatter barrier', async () => {
+  const root = createTempRoot('qa-release-harness-format-state-');
+  const target = 'tooling/example.mjs';
+  const writtenStates: Array<{ harnessFingerprint: string }> = [];
+  let preFormatFingerprint = '';
+
+  await withCwd(root, async () => {
+    fs.mkdirSync('tooling', { recursive: true });
+    fs.writeFileSync(target, 'export const value=1;\n');
+    const module = await importFresh<typeof import('./release-harness.mjs')>(
+      './release-harness.mjs',
+      import.meta.url
+    );
+    const contextCollector = () => ({
+      targetFiles: [target],
+      existingTargetFiles: [target],
+    });
+
+    const result = await module.runReleaseHarness({
+      producerRunId: 'harness-format-state-run',
+      baselineLoader: () => ({ allowances: [] }),
+      executionContractAsserter: ignoreExecutionContract,
+      contextCollector,
+      harnessStepCollector: async ({ context }) => {
+        preFormatFingerprint = context.harnessFingerprint;
+        fs.writeFileSync(target, 'export const value = 1;\n');
+        return { skipped: false, steps: [okStep('Format')] };
+      },
+      stateWriter: (state) => writtenStates.push(state),
+    });
+
+    expect(writtenStates[0]?.harnessFingerprint).toBe(result.context.harnessFingerprint);
+    expect(result.context.harnessFingerprint).not.toBe(preFormatFingerprint);
+  });
+});
+
 it('records a failed release-harness state when a harness step fails', async () => {
   const root = createTempRoot('qa-release-harness-fail-');
   const writtenStates: Array<{ success: boolean; errorMessage: string }> = [];
@@ -92,12 +132,13 @@ it('records a failed release-harness state when a harness step fails', async () 
     );
     await module.runReleaseHarness({
       producerRunId: 'harness-test-run-3',
+      baselineLoader: () => ({ allowances: [] }),
       executionContractAsserter: ignoreExecutionContract,
       contextCollector: () => ({
-        targetFiles: ['tooling/release/package-dist.test.ts'],
-        existingTargetFiles: ['tooling/release/package-dist.test.ts'],
-        codeFiles: ['tooling/release/package-dist.test.ts'],
-        jsLikeFiles: ['tooling/release/package-dist.test.ts'],
+        targetFiles: ['tooling/release/package/package-dist.test.ts'],
+        existingTargetFiles: ['tooling/release/package/package-dist.test.ts'],
+        codeFiles: ['tooling/release/package/package-dist.test.ts'],
+        jsLikeFiles: ['tooling/release/package/package-dist.test.ts'],
         fingerprint: 'harness',
       }),
       harnessStepCollector: async () => ({
@@ -121,6 +162,7 @@ it('does not publish harness state when the canonical population rejects the res
   await expect(
     module.runReleaseHarness({
       producerRunId: 'harness-rejected-run',
+      baselineLoader: () => ({ allowances: [] }),
       contextCollector: () => ({
         targetFiles: ['tooling/qa/core/example.test.ts'],
         existingTargetFiles: ['tooling/qa/core/example.test.ts'],

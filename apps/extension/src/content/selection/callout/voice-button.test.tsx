@@ -18,6 +18,8 @@ it('renders the microphone substrate only while the callout is being edited', ()
   expect(markup).toContain('surface-contrast');
   expect(markup).toContain('text-inverse');
   expect(markup).toContain('scale:0.5');
+  expect(markup).toContain('transform:translateY(-50%)');
+  expect(markup).not.toContain('-translate-y-1/2');
 });
 
 it('moves the microphone to the left when the callout is clamped at the right viewport edge', () => {

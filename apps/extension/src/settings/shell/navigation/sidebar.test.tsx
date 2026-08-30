@@ -89,7 +89,11 @@ describe('SettingsSidebar', () => {
     );
     const activeMarker = activeButton?.querySelector('div');
     expect(activeMarker?.className).toContain('left-1');
+    expect(activeMarker?.className).toContain('translate-x-0');
     expect(activeMarker?.className).not.toContain('left-3');
+    expect(container?.querySelector('[data-ui="settings.sidebar.header"]')?.className).toContain(
+      'border-solid'
+    );
   });
 
   it('routes item clicks through the provided tab change handler', () => {

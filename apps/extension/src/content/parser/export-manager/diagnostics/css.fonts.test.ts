@@ -3,20 +3,43 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { buildFontDiagnosticAsset } from './css.fonts';
 
+function createFontFaceRule(family: string, source: string): CSSFontFaceRule {
+  const declarations = `font-family: ${family}; src: ${source};`;
+  const values: Record<string, string> = {
+    'font-family': family,
+    src: source,
+  };
+  return {
+    cssText: `@font-face { ${declarations} }`,
+    style: {
+      cssText: declarations,
+      getPropertyValue(property: string) {
+        return values[property] ?? '';
+      },
+    },
+  } as unknown as CSSFontFaceRule;
+}
+
+function installFontFaceRules(rules: CSSFontFaceRule[]): void {
+  Object.defineProperty(document, 'styleSheets', {
+    configurable: true,
+    value: [{ cssRules: rules }],
+  });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   document.head.replaceChildren();
   document.body.replaceChildren();
+  Reflect.deleteProperty(document, 'styleSheets');
   Reflect.deleteProperty(document, 'fonts');
 });
 
 it('reports bounded font declarations, loaded state, and icon pseudo-element usage', () => {
-  document.head.innerHTML = [
-    '<style>',
-    '@font-face { font-family: Icons; src: url("data:font/woff;base64,d09GRg==") format("woff"); }',
-    '@font-face { font-family: Remote; src: url("https://cdn.test/icons.woff?token=secret"); }',
-    '</style>',
-  ].join('');
+  installFontFaceRules([
+    createFontFaceRule('Icons', 'url("data:font/woff;base64,d09GRg==") format("woff")'),
+    createFontFaceRule('Remote', 'url("https://cdn.test/icons.woff?token=secret")'),
+  ]);
   document.body.innerHTML = '<button class="toolbar-icon"></button>';
   Object.defineProperty(document, 'fonts', {
     configurable: true,
@@ -31,12 +54,15 @@ it('reports bounded font declarations, loaded state, and icon pseudo-element usa
       },
     },
   });
-  vi.spyOn(window, 'getComputedStyle').mockImplementation((_element, pseudo) => {
-    const style = document.createElement('span').style;
-    style.setProperty('font-family', 'Icons');
-    if (pseudo === '::before') style.setProperty('content', '"\\e001"');
-    return style;
-  });
+  vi.spyOn(window, 'getComputedStyle').mockImplementation(
+    (_element, pseudo) =>
+      ({
+        getPropertyValue(property: string) {
+          if (property === 'font-family') return 'Icons';
+          return property === 'content' && pseudo === '::before' ? '"\\e001"' : '';
+        },
+      }) as CSSStyleDeclaration
+  );
 
   const asset = buildFontDiagnosticAsset();
   const payload = JSON.parse(String(asset.content)) as {
@@ -65,11 +91,12 @@ it('reports bounded font declarations, loaded state, and icon pseudo-element usa
 });
 
 it('bounds and redacts page-authored font family evidence', () => {
-  document.head.innerHTML = [
-    '<style>',
-    `@font-face { font-family: "token=private-${'x'.repeat(5_000)}"; src: url("data:font/woff,private-body"); }`,
-    '</style>',
-  ].join('');
+  installFontFaceRules([
+    createFontFaceRule(
+      `"token=private-${'x'.repeat(5_000)}"`,
+      'url("data:font/woff,private-body")'
+    ),
+  ]);
 
   const content = String(buildFontDiagnosticAsset().content);
 

@@ -24,7 +24,60 @@ function readStyleSheetRules(sheet: CSSStyleSheet, documentBaseUrl: string): str
   }
 }
 
-function readAuthoredInlineStyleRules(owner: Element): string[] | null {
+function splitAuthoredStylesheetRules(cssText: string): string[] {
+  const rules: string[] = [];
+  let blockDepth = 0;
+  let inComment = false;
+  let quote: '"' | "'" | null = null;
+  let start = 0;
+  for (let index = 0; index < cssText.length; index += 1) {
+    const character = cssText[index] ?? '';
+    const next = cssText[index + 1] ?? '';
+    if (inComment) {
+      if (character === '*' && next === '/') {
+        inComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '/' && next === '*') {
+      inComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '{') blockDepth += 1;
+    else if (character === '}') blockDepth = Math.max(0, blockDepth - 1);
+    if ((character === '}' || character === ';') && blockDepth === 0) {
+      const rule = cssText.slice(start, index + 1).trim();
+      if (rule) rules.push(rule);
+      start = index + 1;
+    }
+  }
+  const trailingRule = cssText.slice(start).trim();
+  if (trailingRule) rules.push(trailingRule);
+  return rules;
+}
+
+function cssRuleIdentity(cssText: string): string {
+  const boundary = cssText.search(/[;{]/u);
+  return (boundary < 0 ? cssText : cssText.slice(0, boundary)).replace(/\s+/gu, ' ').trim();
+}
+
+interface AuthoredInlineStyleRules {
+  comparison: 'exact' | 'identity';
+  rules: string[];
+}
+
+function readAuthoredInlineStyleRules(owner: Element): AuthoredInlineStyleRules | null {
   const authoredCssText = owner.textContent?.trim() ?? '';
   if (owner.tagName.toLowerCase() !== 'style' || !authoredCssText) return null;
   const parserDocument = owner.ownerDocument.implementation.createHTMLDocument(
@@ -33,9 +86,14 @@ function readAuthoredInlineStyleRules(owner: Element): string[] | null {
   const parserStyle = parserDocument.createElement('style');
   parserStyle.textContent = authoredCssText;
   parserDocument.head.appendChild(parserStyle);
-  const parserSheet = parserStyle.sheet;
-  if (!parserSheet) return null;
-  return Array.from(parserSheet.cssRules, (rule) => rule.cssText);
+  if (parserStyle.sheet) {
+    return {
+      comparison: 'exact',
+      rules: Array.from(parserStyle.sheet.cssRules, (rule) => rule.cssText),
+    };
+  }
+  const rules = splitAuthoredStylesheetRules(authoredCssText);
+  return rules.length > 0 ? { comparison: 'identity', rules } : null;
 }
 
 function readLosslessInlineStyleSheet(
@@ -45,21 +103,28 @@ function readLosslessInlineStyleSheet(
 ): string | null {
   if (!owner || owner.tagName.toLowerCase() !== 'style') return null;
   const authoredCssText = owner.textContent?.trim() ?? '';
-  const authoredRules = readAuthoredInlineStyleRules(owner);
-  if (!authoredCssText || !authoredRules) return null;
+  const authoredRuleSet = readAuthoredInlineStyleRules(owner);
+  if (!authoredCssText || !authoredRuleSet) return null;
+  const { comparison, rules: authoredRules } = authoredRuleSet;
   try {
     const liveRules = Array.from(sheet.cssRules, (rule) => rule.cssText);
-    const authoredRulesRemainPrefix = authoredRules.every(
-      (rule, index) => liveRules[index] === rule
+    const rulesMatch =
+      comparison === 'exact'
+        ? (liveRule: string, authoredRule: string) => liveRule === authoredRule
+        : (liveRule: string, authoredRule: string) =>
+            cssRuleIdentity(liveRule) === cssRuleIdentity(authoredRule);
+    const authoredRulesRemainPrefix = authoredRules.every((rule, index) =>
+      rulesMatch(liveRules[index] ?? '', rule)
     );
-    const authoredRulesRemainSuffix = authoredRules.every(
-      (rule, index) => liveRules[liveRules.length - authoredRules.length + index] === rule
-    );
+    const authoredRulesRemainSuffix = authoredRules.every((rule, index) => {
+      const liveRule = liveRules[liveRules.length - authoredRules.length + index] ?? '';
+      return rulesMatch(liveRule, rule);
+    });
     const stylesheetBaseUrl = sheet.href ?? documentBaseUrl;
-    const sanitizedAuthoredCss = sanitizePreparedSnapshotCapturedCssText(
-      authoredCssText,
-      stylesheetBaseUrl
-    );
+    const sanitizedAuthoredCss = authoredRules
+      .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule, stylesheetBaseUrl))
+      .filter(Boolean)
+      .join('\n');
     if (liveRules.length === authoredRules.length && authoredRulesRemainPrefix) {
       return sanitizedAuthoredCss;
     }
@@ -95,7 +160,7 @@ function appendMaterializedStyle(
   if (!cssText) return;
   const style = snapshot.createElement('style');
   style.setAttribute('data-sniptale-captured-stylesheet', 'true');
-  const media = (sheet.media?.mediaText ?? fallbackOwner?.getAttribute('media') ?? '').trim();
+  const media = (sheet.media?.mediaText || fallbackOwner?.getAttribute('media') || '').trim();
   style.textContent = media ? `@media ${media} {\n${cssText}\n}` : cssText;
   target.appendChild(style);
 }

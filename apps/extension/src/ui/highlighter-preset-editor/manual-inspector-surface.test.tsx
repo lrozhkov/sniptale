@@ -11,5 +11,6 @@ it('provides the shared outline around categorized manual settings', () => {
 
   expect(markup).toContain('shared.highlighter-manual-inspector-surface');
   expect(markup).toContain('rounded-[12px]');
+  expect(markup).toContain('border-solid');
   expect(markup).toContain('border-[var(--sniptale-color-border-soft)]');
 });

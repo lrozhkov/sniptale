@@ -5,7 +5,7 @@ import {
   prepareParsedPageSnapshot,
   type PreparedParsedPageSnapshot,
 } from '../../dom-tree-parser/snapshot';
-import type { ExportDiagnosticsSource } from '../diagnostics/source';
+import { resolveAmbientDiagnosticsView, type ExportDiagnosticsSource } from '../diagnostics/source';
 import { updateExportManagerProgress, type ExportManagerState } from './state';
 
 export function createExportCancelledError(): Error {
@@ -40,7 +40,7 @@ export function createExportDiagnosticsSource(
   }
 
   const sourceDocument = snapshotSource.document;
-  const ambientWindow = typeof window === 'undefined' ? undefined : window;
+  const ambientWindow = resolveAmbientDiagnosticsView();
   const ambientProtocol = ambientWindow?.location.protocol;
   const liveDocumentMatchesSource =
     sourceDocument.defaultView === null &&

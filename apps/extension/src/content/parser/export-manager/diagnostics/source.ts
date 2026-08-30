@@ -8,7 +8,7 @@ export function resolveDiagnosticsDocument(source?: ExportDiagnosticsSource): Do
   return source?.document ?? document;
 }
 
-function resolveAmbientDiagnosticsView(): Window | undefined {
+export function resolveAmbientDiagnosticsView(): Window | undefined {
   return typeof window === 'undefined' ? undefined : window;
 }
 

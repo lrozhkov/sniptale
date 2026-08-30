@@ -4,6 +4,20 @@ import { afterEach, expect, it } from 'vitest';
 import { materializePreparedSnapshotIframeStyles } from './iframe-styles';
 import { mountStyleInAccessibleDocuments } from '../../../platform/frame';
 
+function createFontFaceRule(family: string, source: string): CSSFontFaceRule {
+  const declarations = `font-family: ${family}; src: ${source};`;
+  return {
+    cssText: `@font-face { ${declarations} }`,
+    style: {
+      cssText: declarations,
+      getPropertyValue(property: string) {
+        if (property === 'font-family') return family;
+        return property === 'src' ? source : '';
+      },
+    },
+  } as unknown as CSSFontFaceRule;
+}
+
 function appendVirtualIframe(
   snapshot: Document,
   originalIframe: HTMLIFrameElement,
@@ -69,9 +83,6 @@ it('scopes readable iframe styles to their flattened virtual container', () => {
   iframe.id = 'details-frame';
   const iframeDocument = document.implementation.createHTMLDocument('details');
   const iframeStyleSheet = new CSSStyleSheet();
-  iframeStyleSheet.insertRule(
-    '@font-face { font-family: Icons; src: url("data:font/woff;base64,d09GRgAAAAA="); }'
-  );
   iframeStyleSheet.insertRule('.icon { font: italic 16px Icons; }');
   iframeStyleSheet.insertRule('body.panel .icon::before, .label { color: red; }');
   iframeStyleSheet.insertRule('body.missing .hidden { color: blue; }');
@@ -80,6 +91,13 @@ it('scopes readable iframe styles to their flattened virtual container', () => {
   iframeStyleSheet.insertRule('.card:has(.icon) { border: 1px solid red; }');
   iframeStyleSheet.insertRule('.theme:is(.foo, body) .functional-root { color: black; }');
   iframeStyleSheet.insertRule('.theme:is(.foo, .bar) .functional-safe { color: teal; }');
+  Object.defineProperty(iframeStyleSheet, 'cssRules', {
+    configurable: true,
+    value: [
+      createFontFaceRule('Icons', 'url("data:font/woff;base64,d09GRgAAAAA=")'),
+      ...Array.from(iframeStyleSheet.cssRules),
+    ],
+  });
   Object.defineProperty(iframeDocument, 'styleSheets', {
     configurable: true,
     value: [iframeStyleSheet],

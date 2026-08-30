@@ -1,4 +1,4 @@
-import { harnessReady } from './browser-mocks';
+import { harnessReady } from './browser-mocks/browser-mocks';
 import { createRoot } from 'react-dom/client';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';

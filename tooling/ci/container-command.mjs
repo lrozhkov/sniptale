@@ -2,7 +2,7 @@ const TRUSTED_CONTAINER_WORKDIR = '/workspace';
 const CANONICAL_IMAGE_ENVIRONMENT = Object.freeze({
   DEBIAN_FRONTEND: 'noninteractive',
   NODE_VERSION: '24.18.0',
-  PATH: '/opt/codeql:/opt/semgrep/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
+  PATH: '/opt/codeql:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
   PLAYWRIGHT_BROWSERS_PATH: '/opt/playwright',
   XDG_CACHE_HOME: '/workspace/.tmp/ci-cache',
   YARN_VERSION: '1.22.22',
@@ -42,11 +42,24 @@ export function createTrustedPhaseCommands(lane) {
     throw new Error(`Unsupported trusted container lane: ${String(lane)}`);
   }
   return [
+    [
+      'runtime-parity',
+      'node',
+      [
+        '/opt/sniptale-trusted/tooling/ci/runtime-parity.mjs',
+        '/opt/sniptale-trusted/tooling/configs/ci/toolchain.lock.json',
+      ],
+    ],
     ['install', 'npm', ['ci', '--ignore-scripts']],
     [
       'verify-project-toolchain',
       'node',
       ['/opt/sniptale-trusted/tooling/ci/verify-project-toolchain.mjs'],
+    ],
+    [
+      'validate-workflows',
+      'node',
+      ['/opt/sniptale-trusted/tooling/ci/validate-workflows.mjs', '/usr/local/bin/actionlint'],
     ],
     ['provision-canvas', 'npm', ['rebuild', 'canvas']],
     [

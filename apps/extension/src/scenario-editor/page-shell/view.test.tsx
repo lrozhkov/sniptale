@@ -174,10 +174,13 @@ describe('scenario v3 editor shell toolbar actions', () => {
     const project = createShellProject();
     renderShell(project);
 
-    clickButton('Экспорт');
-    expect(container?.textContent).toContain('Export scenario deck');
+    clickButton(translate('scenario.editor.exportAction'));
+    expect(container?.textContent).toContain(translate('scenario.editor.exportScenarioDeck'));
 
-    await clickButtonText('Export');
+    await clickButtonText(
+      translate('scenario.editor.exportAction'),
+      container?.querySelector('[role="dialog"]')
+    );
 
     expect(scenarioExportMock.buildScenarioDeckExport).toHaveBeenCalledWith({
       getAssetBlob: scenarioStoreMock.getScenarioAssetBlob,
@@ -218,8 +221,8 @@ function setNativeFieldValue(field: HTMLInputElement, value: string) {
   setter?.call(field, value);
 }
 
-async function clickButtonText(text: string) {
-  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+async function clickButtonText(text: string, scope: ParentNode | null | undefined = container) {
+  const buttons = Array.from(scope?.querySelectorAll<HTMLButtonElement>('button') ?? []);
   const button = buttons.find((candidate) => candidate.textContent?.trim() === text);
   expect(button).not.toBeNull();
   await act(async () => button?.click());

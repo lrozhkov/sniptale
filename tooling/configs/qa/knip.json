@@ -13,26 +13,8 @@
     "packages/*/src/**/*.{ts,tsx,js,mjs,cjs}",
     "tooling/**/*.{ts,tsx,js,mjs,cjs}"
   ],
-  "include": [
-    "unresolved",
-    "unlisted",
-    "binaries"
-  ],
-  "ignoreBinaries": [
-    "codeql",
-    "printf",
-    "semgrep"
-  ],
-  "ignoreDependencies": [
-    "@fontsource/marck-script",
-    "@fontsource-variable/manrope"
-  ],
-  "ignore": [
-    ".tmp/**",
-    "coverage/**",
-    "dist/**",
-    "docs/**",
-    "tooling/test/e2e/**",
-    "cases/**"
-  ]
+  "include": ["unresolved", "unlisted", "binaries"],
+  "ignoreBinaries": ["codeql", "gcc", "printf"],
+  "ignoreDependencies": ["@fontsource/marck-script", "@fontsource-variable/manrope"],
+  "ignore": [".tmp/**", "coverage/**", "dist/**", "docs/**", "cases/**"]
 }

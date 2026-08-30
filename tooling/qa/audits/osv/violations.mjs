@@ -1,66 +1,50 @@
-import { classifyCvssEvidence } from './cvss.mjs';
-import { severityFromOsvGroupScore } from './severity.mjs';
+import { normalizeOsvNamedSeverity, severityFromOsvGroupScore } from './schema.mjs';
 
 const BLOCKING_SEVERITIES = new Set(['HIGH', 'CRITICAL']);
-const CLASSIFIED_SEVERITIES = new Set(['LOW', 'MODERATE', 'HIGH', 'CRITICAL']);
+const SEVERITIES = ['LOW', 'MODERATE', 'HIGH', 'CRITICAL'];
 
-function normalizeNamedSeverity(value, vulnerabilityId) {
-  if (value === undefined || value === null || value === '') return null;
-  const normalized = String(value).toUpperCase();
-  const severity = normalized === 'MEDIUM' ? 'MODERATE' : normalized;
-  if (!CLASSIFIED_SEVERITIES.has(severity)) {
+function highestSeverity(evidence) {
+  return evidence.reduce(
+    (highest, severity) =>
+      SEVERITIES.indexOf(severity) > SEVERITIES.indexOf(highest) ? severity : highest,
+    null
+  );
+}
+
+function groupMembers(group, vulnerabilities) {
+  const groupIds = new Set(group.ids);
+  return vulnerabilities.filter((vulnerability) =>
+    [vulnerability.id, ...(vulnerability.aliases ?? [])].some((id) => groupIds.has(id))
+  );
+}
+
+function groupSeverity(group, vulnerabilities) {
+  const evidence = [severityFromOsvGroupScore(group.max_severity)].filter(Boolean);
+  for (const vulnerability of vulnerabilities) {
+    const named = normalizeOsvNamedSeverity(
+      vulnerability.database_specific?.severity,
+      vulnerability.id
+    );
+    if (named) evidence.push(named);
+  }
+  const severity = highestSeverity(evidence);
+  if (!severity) {
     throw new Error(
-      `OSV-Scanner returned vulnerability ${vulnerabilityId} with unknown or unsupported severity ${normalized}`
+      `OSV-Scanner returned group ${group.ids.join(',')} without classifiable native severity`
     );
   }
   return severity;
 }
 
-function vulnerabilitySeverity(vulnerability, groups) {
-  const evidence = [];
-  const direct = normalizeNamedSeverity(
-    vulnerability.database_specific?.severity,
-    vulnerability.id
-  );
-  if (direct) evidence.push(direct);
-  const groupSeverities = [];
-  for (const group of groups) {
-    const severity = severityFromOsvGroupScore(group.max_severity);
-    if (severity) groupSeverities.push(severity);
-  }
-  evidence.push(...groupSeverities);
-  for (const entry of vulnerability.severity ?? []) {
-    const severity = classifyCvssEvidence(entry, groupSeverities);
-    if (!severity) {
-      throw new Error(
-        [
-          `OSV-Scanner returned vulnerability ${vulnerability.id}`,
-          `with unclassifiable ${entry.type} evidence ${entry.score}`,
-        ].join(' ')
-      );
-    }
-    evidence.push(severity);
-  }
-  return evidence.reduce(
-    (highest, severity) =>
-      [...CLASSIFIED_SEVERITIES].indexOf(severity) > [...CLASSIFIED_SEVERITIES].indexOf(highest)
-        ? severity
-        : highest,
-    'UNKNOWN'
-  );
-}
-
-function relatedGroups(vulnerability, groups) {
-  const ids = new Set([vulnerability.id, ...(vulnerability.aliases ?? [])]);
-  return groups.filter((group) => group.ids.some((id) => ids.has(id)));
-}
-
-function toViolation(source, packageEntry, vulnerability, severity) {
+function toViolation(source, packageEntry, group, vulnerabilities, severity) {
   const packageLabel = `${packageEntry.package.name}@${packageEntry.package.version}`;
+  const rule = [...group.ids].sort()[0];
+  const detail =
+    vulnerabilities[0]?.summary ?? vulnerabilities[0]?.details ?? 'vulnerability group';
   return {
-    rule: vulnerability.id,
+    rule,
     file: source.path,
-    message: `${severity}: ${packageLabel}: ${vulnerability.summary ?? vulnerability.details}`,
+    message: `${severity}: ${packageLabel}: ${detail}`,
   };
 }
 
@@ -68,18 +52,13 @@ export function collectOsvViolations(parsed) {
   const violations = [];
   for (const result of parsed.results) {
     for (const packageEntry of result.packages) {
-      for (const vulnerability of packageEntry.vulnerabilities) {
-        const severity = vulnerabilitySeverity(
-          vulnerability,
-          relatedGroups(vulnerability, packageEntry.groups ?? [])
-        );
-        if (!CLASSIFIED_SEVERITIES.has(severity)) {
-          throw new Error(
-            `OSV-Scanner returned vulnerability ${vulnerability.id} with unknown or unsupported severity ${severity}`
-          );
-        }
+      for (const group of packageEntry.groups) {
+        const vulnerabilities = groupMembers(group, packageEntry.vulnerabilities);
+        const severity = groupSeverity(group, vulnerabilities);
         if (BLOCKING_SEVERITIES.has(severity)) {
-          violations.push(toViolation(result.source, packageEntry, vulnerability, severity));
+          violations.push(
+            toViolation(result.source, packageEntry, group, vulnerabilities, severity)
+          );
         }
       }
     }

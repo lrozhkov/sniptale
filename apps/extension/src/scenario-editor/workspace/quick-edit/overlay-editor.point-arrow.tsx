@@ -65,22 +65,22 @@ function ArrowOverlayCoordinateFields(props: {
   return (
     <div className="grid grid-cols-2 gap-3">
       <ScenarioQuickEditNumberField
-        label="Start X"
+        label={translate('scenario.editor.startX')}
         value={props.startX}
         onChange={props.onStartXChange}
       />
       <ScenarioQuickEditNumberField
-        label="Start Y"
+        label={translate('scenario.editor.startY')}
         value={props.startY}
         onChange={props.onStartYChange}
       />
       <ScenarioQuickEditNumberField
-        label="End X"
+        label={translate('scenario.editor.endX')}
         value={props.endX}
         onChange={props.onEndXChange}
       />
       <ScenarioQuickEditNumberField
-        label="End Y"
+        label={translate('scenario.editor.endY')}
         value={props.endY}
         onChange={props.onEndYChange}
       />

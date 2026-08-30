@@ -1,22 +1,25 @@
-import { createOkStep, createSkippedStep } from '../core/focused-qa-results.mjs';
-import { isExecutedAsScript } from '../core/shared.mjs';
-import { assertQaResultContract } from '../core/qa-steps/contract.mjs';
-import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
-import { assertFreshCheckpointState } from '../core/verify-checkpoint.state.helpers.mjs';
-import { readAdvisoryState } from '../core/verify-advisory.state.helpers.mjs';
-import { formatAdvisoryReport } from '../core/verify-advisory.report.helpers.mjs';
-import { assertFreshBuildState } from '../core/verify-build.state.helpers.mjs';
-import { PRODUCT_QA_SUITE, createScopedQaContext, hasHarnessQaTargets } from '../core/qa-scope.mjs';
+import { createOkStep, createSkippedStep } from '../composition/checkpoint/focused-qa-results.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { assertQaResultContract } from '../composition/catalog/contract.mjs';
+import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
+import { assertFreshCheckpointState } from '../composition/checkpoint/verify-checkpoint.state.helpers.mjs';
+import { readAdvisoryState } from '../composition/advisory/execution/state.mjs';
+import { formatAdvisoryReport } from '../composition/advisory/execution/report.mjs';
+import {
+  PRODUCT_QA_SUITE,
+  createScopedQaContext,
+  hasHarnessQaTargets,
+} from '../composition/scope/qa-scope.mjs';
 import { runCheckpoint } from './checkpoint.mjs';
-import { collectBuildStep, runCloseoutBuildStep } from './closeout-build-handoff.mjs';
-import { parseWrapperArguments } from './cli-contracts.mjs';
+import { collectBuildStep, runCloseoutBuildStep } from './closeout/closeout-build-handoff.mjs';
+import { parseWrapperArguments } from './contracts/cli-contracts.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
 export {
   collectBuildStep,
   collectChildRunEvidence,
   createCloseoutBuildHandoffEnv,
   runCloseoutBuildStep,
-} from './closeout-build-handoff.mjs';
+} from './closeout/closeout-build-handoff.mjs';
 
 function assertDiffOnlyCloseoutRun(files = []) {
   if (files.length > 0) {
@@ -100,14 +103,6 @@ function createCloseoutExecutionMode(result, reusableCheckpoint) {
   return `${checkpointMode}-${resolveCheckpointResultMode(result)}-${buildMode}`;
 }
 
-function resolveCloseoutBuildArgs(buildArgs, result, buildStateAsserter) {
-  const reusableBuild = resolveReusableBuild({
-    buildStateAsserter,
-    context: result.context,
-  });
-  return reusableBuild ? [...buildArgs, '--reuse-build'] : buildArgs;
-}
-
 function appendCloseoutBuildStep(result, input) {
   input.executionContractAsserter({
     wrapperId: 'qa:closeout',
@@ -134,7 +129,6 @@ export async function runCloseout({
   producerRunId,
   rootRunId,
   buildStepCollector = collectBuildStep,
-  buildStateAsserter = assertFreshBuildState,
   checkpointStateAsserter = assertFreshCheckpointState,
   contextCollector = collectCurrentDiffContext,
   onBeforeBuild = () => {},
@@ -151,9 +145,8 @@ export async function runCloseout({
   });
   const result = reusableCheckpoint ?? (await checkpointRunner({ argv: [], producerRunId }));
   const executionMode = createCloseoutExecutionMode(result, reusableCheckpoint);
-  let resolvedBuildArgs = buildArgs;
+  const resolvedBuildArgs = buildArgs;
   if (result.readyForBuild) {
-    resolvedBuildArgs = resolveCloseoutBuildArgs(buildArgs, result, buildStateAsserter);
     appendCloseoutBuildStep(result, {
       buildArgs: resolvedBuildArgs,
       buildStepCollector,
@@ -175,15 +168,6 @@ export async function runCloseout({
     buildArgs: resolvedBuildArgs,
     executionMode,
   };
-}
-
-function resolveReusableBuild({ buildStateAsserter, context }) {
-  try {
-    buildStateAsserter(context, 'qa:closeout');
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 if (isExecutedAsScript(import.meta.url)) {

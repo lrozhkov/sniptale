@@ -1,5 +1,5 @@
-import { findObservedQaRule } from '../../core/qa-steps/runtime-registry.mjs';
-import { formatDuration } from '../../runtime/run-metrics.helpers.mjs';
+import { findObservedQaRule } from '../../composition/catalog/runtime-registry.mjs';
+import { formatDuration } from '../../runtime/observability/run-metrics.helpers.mjs';
 import { summarizeTimeline } from '../../runtime/observability/timeline-metrics.mjs';
 
 const SUMMARY_PROBLEM_LIMIT = 6;

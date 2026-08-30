@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process';
 
 import { afterEach, expect, it } from 'vitest';
 
-import { createTempRoot, writeFile } from '../qa/core/test-helpers';
-import { isHarnessInventoryOnlyFile } from '../qa/core/qa-scope.mjs';
+import { createTempRoot, writeFile } from '../qa/test-support/test-helpers';
+import { isHarnessInventoryOnlyFile } from '../qa/composition/scope/qa-scope.mjs';
 import { CONTROL_FILES, CONTROL_ROOTS, createCandidateControlDigest } from './control-digest.mjs';
 import {
   classifyChangedPaths,

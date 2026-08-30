@@ -79,6 +79,6 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/runtime-contracts/src",
-    "typecheck": "node ../../tooling/qa/core/typescript-cli.mjs --noEmit --project tsconfig.json"
+    "typecheck": "node ../../tooling/qa/analysis/source/typescript-cli.mjs --noEmit --project tsconfig.json"
   }
 }

@@ -8,7 +8,7 @@ import {
   createNaumenMvsContainer,
   setPageTitleContext,
   setupCardPageContext,
-} from '../../../../../../../tooling/test/support/content/dom-tree-parser';
+} from '../../../../../../../tooling/test/support/content/dom-tree-parser/index';
 import { applyDirectExtractors } from '.';
 import {
   expectGenericDocsExtraction,

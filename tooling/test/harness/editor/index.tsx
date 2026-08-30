@@ -1,7 +1,7 @@
 import type { FabricObject } from 'fabric';
 import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { harnessReady } from '../browser-mocks';
+import { harnessReady } from '../browser-mocks/browser-mocks';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';

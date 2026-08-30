@@ -15,14 +15,7 @@ export {
   sanitizeDiagnosticUrl,
 } from './url-sanitizer';
 
-const DIAGNOSTIC_SANITIZE_KEYS = createSecretKeyFragmentList([
-  'session',
-  'text',
-  'value',
-  'html',
-  'innerhtml',
-  'outerhtml',
-]);
+const DIAGNOSTIC_SANITIZE_KEYS = createSecretKeyFragmentList();
 
 const DIAGNOSTIC_TRACE_CONFIG: TraceConfig = {
   ...DEFAULT_TRACE_CONFIG,
@@ -34,6 +27,7 @@ const STRUCTURED_EXACT_DIAGNOSTIC_KEYS = new Set([
   'html',
   'innerhtml',
   'outerhtml',
+  'session',
   'text',
   'value',
 ]);
@@ -54,18 +48,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function shouldSanitizeSignedAliasKey(key: string): boolean {
-  const normalized = key.toLowerCase();
-  return (
-    STRUCTURED_EXACT_SECRET_KEYS.has(normalized) ||
-    normalized.startsWith('x-amz-') ||
-    normalized.startsWith('x-goog-')
-  );
-}
-
-function sanitizeSignedAliasKeys(value: unknown): unknown {
+function sanitizeStructuredSensitiveKeys(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map(sanitizeSignedAliasKeys);
+    return value.map(sanitizeStructuredSensitiveKeys);
   }
 
   if (!isRecord(value)) {
@@ -75,7 +60,7 @@ function sanitizeSignedAliasKeys(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value).map(([key, fieldValue]) => [
       key,
-      shouldSanitizeSignedAliasKey(key) ? '***' : sanitizeSignedAliasKeys(fieldValue),
+      shouldSanitizeDiagnosticKey(key) ? '***' : sanitizeStructuredSensitiveKeys(fieldValue),
     ])
   );
 }
@@ -84,7 +69,7 @@ function sanitizeSignedAliasKeys(value: unknown): unknown {
  * Sanitizes arbitrary diagnostic payloads before they are persisted or exported.
  */
 export function sanitizeDiagnosticData(value: unknown): unknown {
-  return sanitizeSignedAliasKeys(sanitizeValue(value, DIAGNOSTIC_TRACE_CONFIG));
+  return sanitizeStructuredSensitiveKeys(sanitizeValue(value, DIAGNOSTIC_TRACE_CONFIG));
 }
 
 type DiagnosticUrlSanitizer = (url: string | undefined) => string | undefined;

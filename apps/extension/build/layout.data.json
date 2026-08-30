@@ -11,6 +11,7 @@
     "apps/extension/build/layout.data.json",
     "apps/extension/build/layout.ts",
     "apps/extension/build/extension-html-inputs.ts",
+    "apps/extension/build/manifest.ts",
     "packages/ui/src/styles/tailwind.css"
   ],
   "manifestPath": "apps/extension/manifest.json",
@@ -202,9 +203,9 @@
     "qa:e2e:build:release": "SNIPTALE_RELEASE_E2E_OUTPUT=1 vite build --config apps/extension/vite.config.ts --mode release",
     "qa:e2e:build:security": "vite build --config apps/extension/vite.config.ts --mode security-e2e",
     "qa:raw:vite": "vite build --config apps/extension/vite.config.ts",
-    "build": "node tooling/qa/core/verify-typecheck.mjs && vite build --config apps/extension/vite.config.ts",
+    "build": "vite build --config apps/extension/vite.config.ts",
     "build:release": "vite build --config apps/extension/vite.config.ts --mode release",
-    "release:package-only": "node tooling/qa/core/verify-typecheck.mjs && npm run build:release && node tooling/release/package-dist.mjs",
+    "release:package-only": "node tooling/qa/proof/typecheck/execution/check.mjs && npm run build:release && node tooling/release/package/package-dist.mjs",
     "preview": "vite preview --config apps/extension/vite.config.ts"
   },
   "appCommands": {

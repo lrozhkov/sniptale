@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u;
@@ -28,7 +28,7 @@ export function writeImageProof(root, { commit, digest, repository, runAttempt, 
     schemaVersion: 2,
     artifactKind: 'sniptale-qa-image-proof',
     repository,
-    workflow: 'quality-gate.yml',
+    workflow: 'provenance.yml',
     workflowRunId: String(runId),
     workflowRunAttempt: String(runAttempt),
     commit,
@@ -65,7 +65,7 @@ export function verifyImageProof(root, { commit, repository, runAttempt, runId }
     proof.schemaVersion !== 2 ||
     proof.artifactKind !== 'sniptale-qa-image-proof' ||
     proof.repository !== repository ||
-    proof.workflow !== 'quality-gate.yml' ||
+    proof.workflow !== 'provenance.yml' ||
     proof.workflowRunId !== String(runId) ||
     proof.workflowRunAttempt !== String(runAttempt) ||
     proof.commit !== commit ||

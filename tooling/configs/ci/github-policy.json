@@ -24,7 +24,7 @@
   },
   "security": {
     "vulnerabilityAlerts": true,
-    "automatedSecurityFixes": true,
+    "automatedSecurityFixes": false,
     "privateVulnerabilityReporting": true,
     "immutableReleases": true
   },

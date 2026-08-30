@@ -170,6 +170,7 @@ function expectSettingsPageShell() {
   const contentClassName = container?.querySelector('[data-ui="settings.page.content"]')?.className;
   expect(contentClassName).toContain('overflow-hidden');
   expect(contentClassName).toContain('rounded-[28px]');
+  expect(contentClassName).toContain('border-solid');
   expect(contentClassName).toContain('border-[var(--sniptale-color-border-soft)]');
   expect(contentClassName).toContain('var(--sniptale-color-surface-panel)');
   expect(container?.querySelector('[data-ui="settings.page.content-scroll"]')?.className).toContain(

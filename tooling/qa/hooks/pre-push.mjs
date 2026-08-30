@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 
+import { collectCodeFiles } from '../analysis/repository/shared-files.mjs';
+import { fromRelativePath, repoRoot } from '../analysis/repository/shared-paths.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { runCommand } from '../runtime/process/shared-process.mjs';
 import {
-  collectCodeFiles,
-  fromRelativePath,
-  isExecutedAsScript,
-  repoRoot,
-  runCommand,
-} from '../core/shared.mjs';
-import { createScopedQaContext, hasHarnessVerificationQaTargets } from '../core/qa-scope.mjs';
-import { runGit } from '../runtime/git-command.helpers.mjs';
+  createScopedQaContext,
+  hasHarnessVerificationQaTargets,
+} from '../composition/scope/qa-scope.mjs';
+import { runGit } from '../runtime/scope/git-command.helpers.mjs';
 import {
   assertWorkspaceMatchesPushedTree,
   EMPTY_TREE_SHA,

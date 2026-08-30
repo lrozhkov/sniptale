@@ -1,0 +1,36 @@
+name: Setup locked Node toolchain
+description: Install and verify the exact repository-owned Node, npm, and npx runtime.
+
+inputs:
+  repository-root:
+    description: Checkout root containing the canonical toolchain lock and parity verifier.
+    required: false
+    default: .
+  cache:
+    description: Optional setup-node package-manager cache.
+    required: false
+    default: ''
+  cache-dependency-path:
+    description: Optional lockfile used by the setup-node cache.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: ${{ inputs.repository-root }}/.nvmrc
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+    - name: Verify exact Node, npm, and npx identities
+      shell: bash
+      env:
+        SNIPTALE_REPOSITORY_ROOT: ${{ inputs.repository-root }}
+      run: |
+        lock="$SNIPTALE_REPOSITORY_ROOT/tooling/configs/ci/toolchain.lock.json"
+        npm_version=$(node -e "process.stdout.write(require('./' + process.argv[1]).node.npmVersion)" "$lock")
+        npm install --global "npm@$npm_version"
+        mkdir -p "$SNIPTALE_REPOSITORY_ROOT/build/runtime-parity"
+        node "$SNIPTALE_REPOSITORY_ROOT/tooling/ci/runtime-parity.mjs" "$lock" \
+          > "$SNIPTALE_REPOSITORY_ROOT/build/runtime-parity/hosted.json"

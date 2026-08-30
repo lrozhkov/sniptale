@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import {
   createAuditToolStep,
   createProfileExcludedAuditStep,
   MAX_AUDIT_FAILURE_PREVIEW,
-} from './audit-tool-step.mjs';
+} from './audit/audit-tool-step.mjs';
 import { normalizeObservedStep } from './observed/output.mjs';
+import { collectAuditProfileResult } from './audit.mjs';
 
 function createViolations(count) {
   return Array.from({ length: count }, (_, index) => ({
@@ -16,6 +17,31 @@ function createViolations(count) {
     message: `finding ${index + 1}`,
   }));
 }
+
+it('collects the internal audit profile with repository context and progress', async () => {
+  const attachRepositoryContext = vi.fn();
+  const onProgress = vi.fn();
+  const progressReporter = vi.fn(() => onProgress);
+  const stepCollector = vi.fn(async () => [{ label: 'Audit control', status: 'ok' }]);
+
+  const result = await collectAuditProfileResult({
+    profileId: 'repository',
+    session: { attachRepositoryContext },
+    progressReporter,
+    stepCollector,
+  });
+
+  expect(result).toEqual({
+    context: { mode: 'profile:repository', scope: 'workspace' },
+    steps: [{ label: 'Audit control', status: 'ok' }],
+  });
+  expect(attachRepositoryContext).toHaveBeenCalledWith(result.context);
+  expect(progressReporter).toHaveBeenCalledOnce();
+  expect(stepCollector).toHaveBeenCalledWith({
+    profile: expect.objectContaining({ id: 'repository', reusedControlIds: new Set() }),
+    onProgress,
+  });
+});
 
 it('fails when a required audit engine is unavailable', () => {
   const step = createAuditToolStep(
@@ -36,24 +62,26 @@ it('fails when a required audit engine is unavailable', () => {
   expect(step.durationMs).toBe(12);
 });
 
-it('allows only an explicit profile-authorized optional engine skip', () => {
+it.each([
+  ['audit.tool-unavailable', 'audit.optional-engine-unavailable'],
+  ['audit.bootstrap-failed', 'audit.optional-engine-bootstrap-failed'],
+  ['audit.no-applicable-targets', 'audit.optional-no-applicable-targets'],
+])('maps optional adapter skip %s to stable profile reason %s', (adapterReason, expectedReason) => {
   const step = createAuditToolStep(
-    'Semgrep',
+    'CodeQL',
     {
       skipped: true,
       violations: [],
-      skipReasonId: 'audit.bootstrap-failed',
-      reason: 'Semgrep bootstrap failed: Could not parse HTTP_PROXY as a URL',
+      skipReasonId: adapterReason,
+      reason: 'optional control did not run',
     },
     18,
     { profileId: 'repository', requirement: 'optional' }
   );
 
   expect(step.status).toBe('skipped');
-  expect(step.detail).toContain('Semgrep bootstrap failed');
-  expect(normalizeObservedStep(step).observation.skipReasonId).toBe(
-    'audit.optional-engine-bootstrap-failed'
-  );
+  expect(step.detail).toContain('optional control did not run');
+  expect(normalizeObservedStep(step).observation.skipReasonId).toBe(expectedReason);
   expect(step.durationMs).toBe(18);
 });
 
@@ -106,7 +134,7 @@ it('caps audit finding previews and keeps the report path', () => {
 });
 
 it('keeps OSV and Gitleaks as required audit tools', () => {
-  const source = fs.readFileSync('tooling/qa/wrappers/audit.steps.mjs', 'utf8');
+  const source = fs.readFileSync('tooling/qa/wrappers/audit/execution/steps.mjs', 'utf8');
 
   expect(source).toContain("createToolCollector(profile, 'osv-scanner'");
   expect(source).toMatch(/createToolCollector\(\s*profile,\s*'gitleaks'/u);
@@ -115,12 +143,18 @@ it('keeps OSV and Gitleaks as required audit tools', () => {
   expect(source).toContain('scopes: profile.gitleaksScopes');
 });
 
-it('keeps full product coverage in qa:audit only', () => {
-  const source = fs.readFileSync('tooling/qa/wrappers/audit.steps.mjs', 'utf8');
-  const coverageSource = fs.readFileSync('tooling/qa/core/audit-coverage-step.mjs', 'utf8');
+it('keeps full product coverage in the audit profile only', () => {
+  const source = fs.readFileSync('tooling/qa/wrappers/audit/execution/steps.mjs', 'utf8');
+  const coverageSource = fs.readFileSync(
+    'tooling/qa/proof/coverage/audit-coverage-step.mjs',
+    'utf8'
+  );
   expect(coverageSource).toContain('resolveQaResourceProfile().vitestMaxWorkers');
-  const releaseSource = fs.readFileSync('tooling/qa/core/verify-all.execution.mjs', 'utf8');
-  const buildSource = fs.readFileSync('tooling/qa/core/verify-build.execution.mjs', 'utf8');
+  const releaseSource = fs.readFileSync(
+    'tooling/qa/composition/repository/full-verification/execution.mjs',
+    'utf8'
+  );
+  const buildSource = fs.readFileSync('tooling/qa/composition/build/execution/check.mjs', 'utf8');
 
   expect(source).toContain('collectFullCoverageAuditStep');
   expect(coverageSource).toContain("createOkStep('Full product coverage'");
@@ -130,11 +164,11 @@ it('keeps full product coverage in qa:audit only', () => {
   expect(buildSource).toContain('coverageEnabled: false');
 });
 
-it('keeps qa:audit under the shared blocking-wrapper lock', () => {
+it('keeps the audit profile as an internal collector without a wrapper CLI', () => {
   const source = fs.readFileSync('tooling/qa/wrappers/audit.mjs', 'utf8');
 
-  expect(source).toContain("wrapperId: 'qa:audit'");
-  expect(source).toContain('runObservedWrapper({');
-  expect(source).toContain('blocking: true');
-  expect(source).toContain('process.exitCode = outcome.exitCode');
+  expect(source).toContain('export async function collectAuditProfileResult');
+  expect(source).not.toContain('isExecutedAsScript');
+  expect(source).not.toContain('runObservedWrapper');
+  expect(source).not.toContain('process.exitCode');
 });

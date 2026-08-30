@@ -63,8 +63,8 @@ jobs:
       - name: Check out signed tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with: { node-version: 24.18.0, cache: npm }
+      - uses: ./.github/actions/setup-locked-node
+        with: { cache: npm, cache-dependency-path: package-lock.json }
       - name: Install locked npm
         run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install exact publication dependencies
@@ -84,7 +84,7 @@ jobs:
           run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}")
           jq -e --arg sha "$release_sha" '
             .head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch" and
-            .status == "completed" and .path == ".github/workflows/quality-gate.yml"
+            .status == "completed" and .path == ".github/workflows/provenance.yml"
             and .display_title == "Release provenance Gate"
           ' <<<"$run" >/dev/null
           jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}/jobs?per_page=100")
@@ -92,7 +92,7 @@ jobs:
             [.[].jobs[] | select(.name == "Release provenance Gate" and .conclusion == "success")] |
             length == 1
           ' <<<"$jobs" >/dev/null
-          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/quality-gate.yml/runs?branch=main&event=workflow_dispatch&status=completed&head_sha=${release_sha}&per_page=100")
+          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/provenance.yml/runs?branch=main&event=workflow_dispatch&status=completed&head_sha=${release_sha}&per_page=100")
           latest=$(jq -s -r --arg sha "$release_sha" '[.[].workflow_runs[] | select(.head_sha == $sha and .display_title == "Release provenance Gate")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
           if [ "$PROVENANCE_RUN_ID" != "$latest" ] && [ "$ALLOW_NON_LATEST" != true ]; then
             echo "Provenance run $PROVENANCE_RUN_ID is not the latest completed run $latest for $release_sha." >&2
@@ -104,6 +104,20 @@ jobs:
             --name "$artifact_name" \
             --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "$release_sha"
+          attested_prefix="release-attested-assets-${release_sha}-${PROVENANCE_RUN_ID}-"
+          attested_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROVENANCE_RUN_ID" "$attested_prefix")
+          gh run download "$PROVENANCE_RUN_ID" \
+            --name "$attested_name" \
+            --dir build/release-proof
+          node tooling/ci/verify-release-assets.mjs build/release-proof "$release_sha"
+          while IFS= read -r subject; do
+            gh attestation verify "build/release-proof/release-assets/$subject" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/provenance.yml" \
+              --source-ref refs/heads/main \
+              --source-digest "$release_sha" \
+              --deny-self-hosted-runners >/dev/null
+          done < <(find build/release-proof/release-assets -maxdepth 1 -type f -printf '%f\n' | sort)
           echo "release-sha=$release_sha" >> "$GITHUB_OUTPUT"
           {
             echo '### Continuous Deployment admission'
@@ -113,9 +127,6 @@ jobs:
             echo "Release provenance run: $PROVENANCE_RUN_ID"
             if [ -n "$BYPASS_REASON" ]; then echo "Bypass note: $BYPASS_REASON"; fi
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Prepare immutable release assets
-        env: { RELEASE_SHA: '${{ steps.admission.outputs.release-sha }}' }
-        run: node tooling/ci/prepare-release-assets.mjs build/release-proof "$RELEASE_SHA"
       - name: Preserve publication input and prepared assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -124,6 +135,7 @@ jobs:
             build/release-proof/proof-manifest.json
             build/release-proof/SHA256SUMS
             build/release-proof/release-assets
+            build/release-proof/attestations.json
             .tmp/ci-release-admission.json
           include-hidden-files: true
           if-no-files-found: error
@@ -201,37 +213,3 @@ jobs:
             gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" -F draft=false -f make_latest=true >/dev/null
             node tooling/ci/verify-published-release.mjs "$asset_root" "$release_id"
           fi
-
-  coverage-results:
-    needs: publish
-    if: needs.publish.result == 'success'
-    continue-on-error: true
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ inputs.release_tag }}', persist-credentials: false }
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with: { node-version: 24.18.0 }
-      - name: Download exact published release proof
-        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
-        run: |
-          artifact_prefix="release-provenance-${{ needs.publish.outputs.release-sha }}-${{ inputs.provenance_run_id }}-"
-          artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "${{ inputs.provenance_run_id }}" "$artifact_prefix")
-          gh run download "${{ inputs.provenance_run_id }}" \
-            --name "$artifact_name" \
-            --dir build/release-proof
-          node tooling/ci/verify-main-proof.mjs release build/release-proof "${{ needs.publish.outputs.release-sha }}"
-      - name: Publish exact release coverage to Coveralls
-        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/release-proof/.tmp/coverage/canonical/lcov.info
-          format: lcov
-          git-branch: main
-          git-commit: ${{ needs.publish.outputs.release-sha }}
-          fail-on-error: true
-          coverage-reporter-version: v0.6.22

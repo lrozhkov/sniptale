@@ -53,6 +53,7 @@ function createTab(overrides?: Partial<chrome.tabs.Tab>): chrome.tabs.Tab {
     id: 42,
     incognito: false,
     index: 0,
+    lastAccessed: 0,
     pinned: false,
     selected: true,
     status: 'complete',

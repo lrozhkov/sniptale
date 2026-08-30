@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { fromRelativePath, repoRoot, runCommand } from '../core/shared.mjs';
-import { executeAuditCommand } from '../audits/execution-error.mjs';
+import { fromRelativePath, repoRoot } from '../analysis/repository/shared-paths.mjs';
+import { runCommand } from '../runtime/process/shared-process.mjs';
+import { executeAuditCommand } from '../audits/contracts/execution-error.mjs';
 
-const SEMGREP_SETTINGS_PATH = fromRelativePath('.tmp/semgrep/settings.yml');
 function resolveNodeBin(name) {
   const suffix = process.platform === 'win32' ? '.cmd' : '';
   const executable = fromRelativePath(`node_modules/.bin/${name}${suffix}`);
@@ -36,58 +36,6 @@ export function resolveAstGrepExecutable() {
 
 export function resolveKnipExecutable() {
   return resolveNodeBin('knip');
-}
-
-export function resolveJscpdExecutable() {
-  return resolveNodeBin('jscpd');
-}
-
-function collectSanitizedProxyOverrides(environment = process.env) {
-  const overrides = {};
-  for (const key of [
-    'HTTP_PROXY',
-    'HTTPS_PROXY',
-    'ALL_PROXY',
-    'http_proxy',
-    'https_proxy',
-    'all_proxy',
-    'NO_PROXY',
-    'no_proxy',
-  ]) {
-    if (typeof environment[key] === 'string' && environment[key].trim().length === 0) {
-      overrides[key] = null;
-    }
-  }
-
-  return overrides;
-}
-
-export function resolveSemgrepCommand({ environment = process.env } = {}) {
-  const env = {
-    ...collectSanitizedProxyOverrides(environment),
-    SEMGREP_ENABLE_VERSION_CHECK: '0',
-    SEMGREP_APP_TOKEN: null,
-    SEMGREP_SEND_METRICS: 'off',
-    SEMGREP_SETTINGS_FILE: SEMGREP_SETTINGS_PATH,
-  };
-  if (environment.SNIPTALE_SEMGREP_BIN) {
-    return {
-      command: environment.SNIPTALE_SEMGREP_BIN,
-      args: [],
-      env,
-    };
-  }
-
-  const executable = resolvePathExecutable('semgrep', environment);
-  if (executable) {
-    return {
-      command: executable,
-      args: [],
-      env,
-    };
-  }
-
-  return null;
 }
 
 export function resolveCodeqlExecutable() {
@@ -129,7 +77,9 @@ export function runToolCommand(command, args, options = {}, runCommandImpl = run
       runCommandImpl(command, args, {
         cwd: options.cwd ?? repoRoot,
         env: options.env ?? {},
+        killSignal: options.killSignal,
         stdio: options.stdio ?? 'pipe',
+        timeout: options.timeout,
       }),
     { tool: path.basename(command) }
   );

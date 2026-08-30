@@ -1,4 +1,4 @@
-import { evaluateSpdxExpression } from '../../policy/spdx-expression.mjs';
+import { evaluateSpdxExpression } from '../../policy/legal/spdx-expression.mjs';
 
 export function normalizeLicense(value) {
   return String(value ?? '').trim() || 'NOASSERTION';
@@ -14,14 +14,14 @@ export function collectComponentLicense(component) {
   return normalizeLicense(expressions.length ? expressions.join(' OR ') : component.license);
 }
 
-export function toComponentName(component) {
-  return component.name ?? component.purl ?? '<unknown>';
+export function toComponentName(component, containment = null) {
+  return containment?.packageName ?? component.name ?? component.purl ?? '<unknown>';
 }
 
 function matchesReviewedDecision(component, license, containment, decision) {
   return (
     containment !== null &&
-    decision.packageName === toComponentName(component) &&
+    decision.packageName === toComponentName(component, containment) &&
     decision.resolvedVersion === component.version &&
     decision.dependencyScope === containment.dependencyScope &&
     decision.artifactInclusion === containment.artifactInclusion &&

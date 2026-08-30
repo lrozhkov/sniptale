@@ -481,7 +481,7 @@ function registerOverlaySnapshotTests(): void {
     });
     cleanupCursor();
 
-    expect(result.html).toContain('#page-link {cursor: wait !important;}');
+    expect(result.html).toMatch(/#page-link\s*\{\s*cursor:\s*wait\s*!important;\s*\}/u);
     expect(result.html).not.toContain('cursor: crosshair');
     expect(runtimeStyle?.isConnected).toBe(false);
     expect(pageStyle.isConnected).toBe(true);
@@ -759,8 +759,8 @@ function registerSanitizerSnapshotTests(): void {
     const result = await buildPreparedSnapshotDocument({ iframeTimeoutMs: 20 });
 
     expect(result.html).toContain(`<${elementName}>Defined content</${elementName}>`);
-    expect(result.html).toContain(
-      `${elementName}:not([data-sniptale-custom-element-undefined]) {display: block;}`
+    expect(result.html.replace(/\s+/gu, ' ')).toContain(
+      `${elementName}:not([data-sniptale-custom-element-undefined]) { display: block; }`
     );
     expect(result.html).not.toContain('<button data-sniptale-custom-element-undefined');
   });

@@ -1,753 +1,157 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "finalOwnerRules": [
-    {
-      "sourcePrefix": "apps/extension/src/composition/archive-transfer",
-      "ownerId": "app-core.archive-transfer",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/frame-annotation-controls",
-      "ownerId": "app-core.frame-annotation-controls",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/frame-annotation-raster-client",
-      "ownerId": "app-core.frame-annotation-raster-client",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/gradient-preset-resources",
-      "ownerId": "app-core.gradient-preset-resources",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/surface-style-preset-resources",
-      "ownerId": "composition.surface-style-preset-resources",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/voice-input",
-      "ownerId": "app-core.voice-input",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/aggregate-promotion.ts",
-      "ownerId": "app-core.aggregate-promotion-contract",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/ai",
-      "ownerId": "app-core.ai-wire-policy",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/full-page-capture",
-      "ownerId": "app-core.full-page-capture-contract",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/messaging",
-      "ownerId": "app-core.runtime-messaging-contracts",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/effect-runtime",
-      "ownerId": "app-core.effect-runtime-wire",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/native-app",
-      "ownerId": "app-core.native-app-wire",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/settings",
-      "ownerId": "app-core.settings-contract",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/settings-transfer",
-      "ownerId": "app-core.settings-transfer-contract",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/contracts/video",
-      "ownerId": "app-core.video-wire",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/ai",
-      "ownerId": "feature.ai",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/drawing",
-      "ownerId": "feature.drawing",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/editor",
-      "ownerId": "feature.editor",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/highlighter",
-      "ownerId": "feature.highlighter",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/keyboard-shortcuts",
-      "ownerId": "feature.keyboard-shortcuts",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/media-hub",
-      "ownerId": "feature.media-hub",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/prompt-templates",
-      "ownerId": "feature.prompt-templates",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/quick-actions-presets",
-      "ownerId": "feature.quick-actions-presets",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/scenario",
-      "ownerId": "feature.scenario",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/tab-capabilities",
-      "ownerId": "feature.tab-capabilities",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/video",
-      "ownerId": "feature.video",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/viewport-presets",
-      "ownerId": "feature.viewport-presets",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/features/web-snapshot",
-      "ownerId": "feature.web-snapshot",
-      "ownerClass": "feature"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/platform/config",
-      "ownerId": "app-core.extension-config",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/platform/i18n",
-      "ownerId": "app-core.i18n",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/platform/media-utils",
-      "ownerId": "app-core.media-adapters",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/platform/navigation",
-      "ownerId": "app-core.extension-navigation",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/platform/runtime-messaging",
-      "ownerId": "app-core.runtime-messaging-transport",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/platform/security-e2e-control",
-      "ownerId": "app-core.security-e2e-control",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/color-selector",
-      "ownerId": "app-core.editor-controls.color",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/drawing-tools",
-      "ownerId": "app-core.editor-controls.drawing",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/paint-selector",
-      "ownerId": "app-core.editor-controls.paint",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/command-palette",
-      "ownerId": "app-core.command-palette-ui",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/compact-inspector-controls",
-      "ownerId": "app-core.editor-controls.compact",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/glass-select",
-      "ownerId": "app-core.editor-controls.select",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/gradient-preset-grid",
-      "ownerId": "app-core.editor-controls.gradient",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/highlighter-preset-editor",
-      "ownerId": "app-core.highlighter-preset-editor-ui",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/annotation-template-query",
-      "ownerId": "app-core.annotation-template-query-ui",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/callout-background-settings",
-      "ownerId": "ui.callout-background-settings",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/surface-style-selector",
-      "ownerId": "ui.surface-style-selector",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/keyboard",
-      "ownerId": "app-core.keyboard-ui",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/page-bootstrap",
-      "ownerId": "app-core.page-bootstrap-ui",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/popup-shell",
-      "ownerId": "app-core.popup-shell-ui",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/ui/theme",
-      "ownerId": "app-core.theme-ui",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/aggregate-editor-presence",
-      "ownerId": "workflow.aggregate-editor-presence",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/ai-session",
-      "ownerId": "workflow.ai-session",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/ai-settings",
-      "ownerId": "workflow.ai-settings",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/editor",
-      "ownerId": "workflow.editor",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/media-hub",
-      "ownerId": "workflow.media-hub",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/media-hub-backup",
-      "ownerId": "workflow.media-hub-backup",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/page-package",
-      "ownerId": "workflow.page-package",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/page-preparation",
-      "ownerId": "workflow.page-preparation",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/scenario-capture-edit",
-      "ownerId": "workflow.scenario-capture-edit",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/scenario-video",
-      "ownerId": "workflow.scenario-video",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/settings-transfer",
-      "ownerId": "workflow.settings-transfer",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/video",
-      "ownerId": "workflow.video",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/workflows/voice-input",
-      "ownerId": "workflow.voice-input",
-      "ownerClass": "workflow"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/annotation-template-tags",
-      "ownerId": "persistence.annotation-template-tags",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/assets",
-      "ownerId": "persistence.assets",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/asset-publication-recovery",
-      "ownerId": "persistence.asset-publication-recovery",
-      "ownerClass": "app-core"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/ai-settings",
-      "ownerId": "persistence.ai-settings",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/callout-presets",
-      "ownerId": "persistence.callout-presets",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/step-badge-presets",
-      "ownerId": "persistence.step-badge-presets",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/command-palette",
-      "ownerId": "persistence.command-palette",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/content-pin-session",
-      "ownerId": "persistence.content-pin-session",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/diagnostics",
-      "ownerId": "persistence.diagnostics",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/drawing-palette",
-      "ownerId": "persistence.drawing-palette",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/document-assets",
-      "ownerId": "persistence.document-assets",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/editor-bootstrap",
-      "ownerId": "persistence.editor-bootstrap",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/editor-presets",
-      "ownerId": "persistence.editor-presets",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/image-workspaces",
-      "ownerId": "persistence.image-workspaces",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/aggregate-presentations",
-      "ownerId": "persistence.aggregate-presentations",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/image-aggregates",
-      "ownerId": "persistence.image-aggregates",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/highlighter",
-      "ownerId": "persistence.highlighter",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/gradient-presets",
-      "ownerId": "persistence.gradient-presets",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/surface-style-presets",
-      "ownerId": "persistence.surface-style-presets",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
-      "ownerId": "persistence.frame-annotation-raster-jobs",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/gallery-saved-views",
-      "ownerId": "persistence.gallery-saved-views",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/infrastructure",
-      "ownerId": "persistence.infrastructure",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/library-lifecycle",
-      "ownerId": "persistence.library-lifecycle",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/managed-preset-order",
-      "ownerId": "persistence.managed-preset-order",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/media-library",
-      "ownerId": "persistence.media-library",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/popup-export-preferences",
-      "ownerId": "persistence.popup-export-preferences",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/privacy-erasure",
-      "ownerId": "persistence.privacy-erasure",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/prompt-templates",
-      "ownerId": "persistence.prompt-templates",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/quick-actions",
-      "ownerId": "persistence.quick-actions",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/recent-colors",
-      "ownerId": "persistence.recent-colors",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/recordings",
-      "ownerId": "persistence.recordings",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/scenario",
-      "ownerId": "persistence.scenario",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/settings",
-      "ownerId": "persistence.settings",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/settings-transfer",
-      "ownerId": "persistence.settings-transfer",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/export-ledger",
-      "ownerId": "persistence.video-export",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/project-export-inputs",
-      "ownerId": "persistence.video-project-export-inputs",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/projects",
-      "ownerId": "persistence.video-projects",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/capture-settings",
-      "ownerId": "persistence.video-settings",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/effect-bundles",
-      "ownerId": "persistence.video-effect-bundles",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/video-editor-preview-preferences",
-      "ownerId": "persistence.video-editor-preview-preferences",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/video-preview-cache",
-      "ownerId": "persistence.video-preview-cache",
-      "ownerClass": "persistence"
-    },
-    {
-      "sourcePrefix": "apps/extension/src/composition/persistence/web-snapshots",
-      "ownerId": "persistence.web-snapshots",
-      "ownerClass": "persistence"
-    }
+    "apps/extension/src/composition/archive-transfer",
+    "apps/extension/src/composition/frame-annotation-controls",
+    "apps/extension/src/composition/frame-annotation-raster-client",
+    "apps/extension/src/composition/gradient-preset-resources",
+    "apps/extension/src/composition/surface-style-preset-resources",
+    "apps/extension/src/composition/voice-input",
+    "apps/extension/src/contracts/aggregate-promotion.ts",
+    "apps/extension/src/contracts/ai",
+    "apps/extension/src/contracts/full-page-capture",
+    "apps/extension/src/contracts/messaging",
+    "apps/extension/src/contracts/effect-runtime",
+    "apps/extension/src/contracts/native-app",
+    "apps/extension/src/contracts/settings",
+    "apps/extension/src/contracts/settings-transfer",
+    "apps/extension/src/contracts/video",
+    "apps/extension/src/features/ai",
+    "apps/extension/src/features/drawing",
+    "apps/extension/src/features/editor",
+    "apps/extension/src/features/highlighter",
+    "apps/extension/src/features/keyboard-shortcuts",
+    "apps/extension/src/features/media-hub",
+    "apps/extension/src/features/prompt-templates",
+    "apps/extension/src/features/quick-actions-presets",
+    "apps/extension/src/features/scenario",
+    "apps/extension/src/features/tab-capabilities",
+    "apps/extension/src/features/video",
+    "apps/extension/src/features/viewport-presets",
+    "apps/extension/src/features/web-snapshot",
+    "apps/extension/src/platform/config",
+    "apps/extension/src/platform/i18n",
+    "apps/extension/src/platform/media-utils",
+    "apps/extension/src/platform/navigation",
+    "apps/extension/src/platform/runtime-messaging",
+    "apps/extension/src/platform/security-e2e-control",
+    "apps/extension/src/ui/color-selector",
+    "apps/extension/src/ui/drawing-tools",
+    "apps/extension/src/ui/paint-selector",
+    "apps/extension/src/ui/command-palette",
+    "apps/extension/src/ui/compact-inspector-controls",
+    "apps/extension/src/ui/glass-select",
+    "apps/extension/src/ui/gradient-preset-grid",
+    "apps/extension/src/ui/highlighter-preset-editor",
+    "apps/extension/src/ui/annotation-template-query",
+    "apps/extension/src/ui/callout-background-settings",
+    "apps/extension/src/ui/surface-style-selector",
+    "apps/extension/src/ui/keyboard",
+    "apps/extension/src/ui/page-bootstrap",
+    "apps/extension/src/ui/popup-shell",
+    "apps/extension/src/ui/theme",
+    "apps/extension/src/workflows/aggregate-editor-presence",
+    "apps/extension/src/workflows/ai-session",
+    "apps/extension/src/workflows/ai-settings",
+    "apps/extension/src/workflows/editor",
+    "apps/extension/src/workflows/media-hub",
+    "apps/extension/src/workflows/media-hub-backup",
+    "apps/extension/src/workflows/page-package",
+    "apps/extension/src/workflows/page-preparation",
+    "apps/extension/src/workflows/scenario-capture-edit",
+    "apps/extension/src/workflows/scenario-video",
+    "apps/extension/src/workflows/settings-transfer",
+    "apps/extension/src/workflows/video",
+    "apps/extension/src/workflows/voice-input",
+    "apps/extension/src/composition/persistence/annotation-template-tags",
+    "apps/extension/src/composition/persistence/assets",
+    "apps/extension/src/composition/persistence/asset-publication-recovery",
+    "apps/extension/src/composition/persistence/ai-settings",
+    "apps/extension/src/composition/persistence/callout-presets",
+    "apps/extension/src/composition/persistence/step-badge-presets",
+    "apps/extension/src/composition/persistence/command-palette",
+    "apps/extension/src/composition/persistence/content-pin-session",
+    "apps/extension/src/composition/persistence/diagnostics",
+    "apps/extension/src/composition/persistence/drawing-palette",
+    "apps/extension/src/composition/persistence/document-assets",
+    "apps/extension/src/composition/persistence/editor-bootstrap",
+    "apps/extension/src/composition/persistence/editor-presets",
+    "apps/extension/src/composition/persistence/image-workspaces",
+    "apps/extension/src/composition/persistence/aggregate-presentations",
+    "apps/extension/src/composition/persistence/image-aggregates",
+    "apps/extension/src/composition/persistence/highlighter",
+    "apps/extension/src/composition/persistence/gradient-presets",
+    "apps/extension/src/composition/persistence/surface-style-presets",
+    "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
+    "apps/extension/src/composition/persistence/gallery-saved-views",
+    "apps/extension/src/composition/persistence/infrastructure",
+    "apps/extension/src/composition/persistence/library-lifecycle",
+    "apps/extension/src/composition/persistence/managed-preset-order",
+    "apps/extension/src/composition/persistence/media-library",
+    "apps/extension/src/composition/persistence/popup-export-preferences",
+    "apps/extension/src/composition/persistence/privacy-erasure",
+    "apps/extension/src/composition/persistence/prompt-templates",
+    "apps/extension/src/composition/persistence/quick-actions",
+    "apps/extension/src/composition/persistence/recent-colors",
+    "apps/extension/src/composition/persistence/recordings",
+    "apps/extension/src/composition/persistence/scenario",
+    "apps/extension/src/composition/persistence/settings",
+    "apps/extension/src/composition/persistence/settings-transfer",
+    "apps/extension/src/composition/persistence/export-ledger",
+    "apps/extension/src/composition/persistence/project-export-inputs",
+    "apps/extension/src/composition/persistence/projects",
+    "apps/extension/src/composition/persistence/capture-settings",
+    "apps/extension/src/composition/persistence/effect-bundles",
+    "apps/extension/src/composition/persistence/video-editor-preview-preferences",
+    "apps/extension/src/composition/persistence/video-preview-cache",
+    "apps/extension/src/composition/persistence/web-snapshots"
   ],
   "authorityOwners": [
-    {
-      "id": "durable-opfs-assets",
-      "path": "apps/extension/src/composition/persistence/assets",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "frame-annotation-raster-jobs",
-      "path": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
-      "stateKind": "authoritative-staging"
-    },
-    {
-      "id": "gallery-saved-views",
-      "path": "apps/extension/src/composition/persistence/gallery-saved-views",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "indexed-db-core",
-      "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "browser-storage-infrastructure",
-      "path": "apps/extension/src/composition/persistence/infrastructure/browser-storage",
-      "stateKind": "authoritative-adapter"
-    },
-    {
-      "id": "state-manager-infrastructure",
-      "path": "apps/extension/src/composition/persistence/infrastructure/state-manager",
-      "stateKind": "authoritative-adapter"
-    },
-    {
-      "id": "annotation-template-tags",
-      "path": "apps/extension/src/composition/persistence/annotation-template-tags",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "ai-settings-secrets",
-      "path": "apps/extension/src/composition/persistence/ai-settings",
-      "stateKind": "authoritative-sensitive"
-    },
-    {
-      "id": "callout-presets",
-      "path": "apps/extension/src/composition/persistence/callout-presets",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "step-badge-presets",
-      "path": "apps/extension/src/composition/persistence/step-badge-presets",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "command-palette",
-      "path": "apps/extension/src/composition/persistence/command-palette",
-      "stateKind": "advisory-durable"
-    },
-    {
-      "id": "content-pin-session",
-      "path": "apps/extension/src/composition/persistence/content-pin-session",
-      "stateKind": "disposable-session"
-    },
-    {
-      "id": "diagnostics",
-      "path": "apps/extension/src/composition/persistence/diagnostics",
-      "stateKind": "recovery-session"
-    },
-    {
-      "id": "document-assets",
-      "path": "apps/extension/src/composition/persistence/document-assets",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "editor-bootstrap-retention",
-      "path": "apps/extension/src/composition/persistence/editor-bootstrap",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "editor-presets",
-      "path": "apps/extension/src/composition/persistence/editor-presets",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "image-workspaces",
-      "path": "apps/extension/src/composition/persistence/image-workspaces",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "aggregate-presentations",
-      "path": "apps/extension/src/composition/persistence/aggregate-presentations",
-      "stateKind": "rebuildable-cache"
-    },
-    {
-      "id": "image-aggregates",
-      "path": "apps/extension/src/composition/persistence/image-aggregates",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "highlighter",
-      "path": "apps/extension/src/composition/persistence/highlighter",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "gradient-presets",
-      "path": "apps/extension/src/composition/persistence/gradient-presets",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "surface-style-presets",
-      "path": "apps/extension/src/composition/persistence/surface-style-presets",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "media-library",
-      "path": "apps/extension/src/composition/persistence/media-library",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "popup-export-preferences",
-      "path": "apps/extension/src/composition/persistence/popup-export-preferences",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "privacy-erasure",
-      "path": "apps/extension/src/composition/persistence/privacy-erasure",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "prompt-templates",
-      "path": "apps/extension/src/composition/persistence/prompt-templates",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "quick-actions",
-      "path": "apps/extension/src/composition/persistence/quick-actions",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "recent-colors",
-      "path": "apps/extension/src/composition/persistence/recent-colors",
-      "stateKind": "advisory-durable"
-    },
-    {
-      "id": "recordings",
-      "path": "apps/extension/src/composition/persistence/recordings",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "scenario",
-      "path": "apps/extension/src/composition/persistence/scenario",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "settings",
-      "path": "apps/extension/src/composition/persistence/settings",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "video-export-ledger",
-      "path": "apps/extension/src/composition/persistence/export-ledger",
-      "stateKind": "authoritative-session"
-    },
-    {
-      "id": "video-project-export-inputs",
-      "path": "apps/extension/src/composition/persistence/project-export-inputs",
-      "stateKind": "authoritative-session"
-    },
-    {
-      "id": "video-projects",
-      "path": "apps/extension/src/composition/persistence/projects",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "video-settings",
-      "path": "apps/extension/src/composition/persistence/capture-settings",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "video-effect-bundles",
-      "path": "apps/extension/src/composition/persistence/effect-bundles",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "video-editor-preview-preferences",
-      "path": "apps/extension/src/composition/persistence/video-editor-preview-preferences",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "video-preview-cache",
-      "path": "apps/extension/src/composition/persistence/video-preview-cache",
-      "stateKind": "advisory-durable"
-    },
-    {
-      "id": "web-snapshots",
-      "path": "apps/extension/src/composition/persistence/web-snapshots",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "scenario-presentation-session",
-      "path": "apps/extension/src/scenario-editor/page-shell/presentation/session",
-      "stateKind": "disposable-session"
-    },
-    {
-      "id": "interaction-diagnostics-active-sessions",
-      "path": "apps/extension/src/background/storage/diagnostics",
-      "stateKind": "recovery-session"
-    },
-    {
-      "id": "llm-request-history",
-      "path": "apps/extension/src/background/storage/llm",
-      "stateKind": "advisory-durable"
-    },
-    {
-      "id": "page-access-activation",
-      "path": "apps/extension/src/background/storage/page-access",
-      "stateKind": "disposable-session"
-    },
-    {
-      "id": "scenario-tab-sessions",
-      "path": "apps/extension/src/background/storage/scenario",
-      "stateKind": "recovery-session"
-    },
-    {
-      "id": "video-runtime-recovery",
-      "path": "apps/extension/src/background/storage/video",
-      "stateKind": "recovery-session"
-    }
+    "apps/extension/src/composition/persistence/assets",
+    "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
+    "apps/extension/src/composition/persistence/gallery-saved-views",
+    "apps/extension/src/composition/persistence/infrastructure/indexed-db",
+    "apps/extension/src/composition/persistence/infrastructure/browser-storage",
+    "apps/extension/src/composition/persistence/infrastructure/state-manager",
+    "apps/extension/src/composition/persistence/annotation-template-tags",
+    "apps/extension/src/composition/persistence/ai-settings",
+    "apps/extension/src/composition/persistence/callout-presets",
+    "apps/extension/src/composition/persistence/step-badge-presets",
+    "apps/extension/src/composition/persistence/command-palette",
+    "apps/extension/src/composition/persistence/content-pin-session",
+    "apps/extension/src/composition/persistence/diagnostics",
+    "apps/extension/src/composition/persistence/document-assets",
+    "apps/extension/src/composition/persistence/editor-bootstrap",
+    "apps/extension/src/composition/persistence/editor-presets",
+    "apps/extension/src/composition/persistence/image-workspaces",
+    "apps/extension/src/composition/persistence/aggregate-presentations",
+    "apps/extension/src/composition/persistence/image-aggregates",
+    "apps/extension/src/composition/persistence/highlighter",
+    "apps/extension/src/composition/persistence/gradient-presets",
+    "apps/extension/src/composition/persistence/surface-style-presets",
+    "apps/extension/src/composition/persistence/media-library",
+    "apps/extension/src/composition/persistence/popup-export-preferences",
+    "apps/extension/src/composition/persistence/privacy-erasure",
+    "apps/extension/src/composition/persistence/prompt-templates",
+    "apps/extension/src/composition/persistence/quick-actions",
+    "apps/extension/src/composition/persistence/recent-colors",
+    "apps/extension/src/composition/persistence/recordings",
+    "apps/extension/src/composition/persistence/scenario",
+    "apps/extension/src/composition/persistence/settings",
+    "apps/extension/src/composition/persistence/export-ledger",
+    "apps/extension/src/composition/persistence/project-export-inputs",
+    "apps/extension/src/composition/persistence/projects",
+    "apps/extension/src/composition/persistence/capture-settings",
+    "apps/extension/src/composition/persistence/effect-bundles",
+    "apps/extension/src/composition/persistence/video-editor-preview-preferences",
+    "apps/extension/src/composition/persistence/video-preview-cache",
+    "apps/extension/src/composition/persistence/web-snapshots",
+    "apps/extension/src/scenario-editor/page-shell/presentation/session",
+    "apps/extension/src/background/storage/diagnostics",
+    "apps/extension/src/background/storage/llm",
+    "apps/extension/src/background/storage/page-access",
+    "apps/extension/src/background/storage/scenario",
+    "apps/extension/src/background/storage/video"
   ],
   "forbiddenSourcePrefixes": [
     "apps/extension/src/composition/persistence/db",
@@ -802,12 +206,7 @@
     "apps/extension/src/workflows/extension-pages",
     "apps/extension/src/workflows/page-style-rules-access"
   ],
-  "forbiddenOwnerEdges": [
-    [
-      "apps/extension/src/features",
-      "apps/extension/src/ui"
-    ]
-  ],
+  "forbiddenOwnerEdges": [["apps/extension/src/features", "apps/extension/src/ui"]],
   "featurePublicEntrypoints": [
     "apps/extension/src/features/ai/schemas/public.ts",
     "apps/extension/src/features/drawing/public.ts",

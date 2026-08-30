@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-// @vitest-environment-options {"url":"file:///tmp/prepared.html"}
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -11,6 +10,17 @@ import { ToolbarLocalSaveControl } from './local-save';
 
 const savePreparedLocalHtmlMock = vi.hoisted(() => vi.fn());
 const showToastMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../../platform/i18n', () => ({
+  translate: (key: string) => key,
+}));
+
+vi.mock('../../../parser/page-preparation/local-save/eligibility', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../parser/page-preparation/local-save/eligibility')
+  >()),
+  isWritableLocalHtmlPage: () => true,
+}));
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-feedback/toast-service')>()),

@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import { createRuntimeParityReceipt } from './runtime-parity.mjs';
+
 function sha256(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
@@ -70,45 +72,21 @@ function validateLock(lock) {
   if (lock?.schemaVersion !== 1 || lock.platform !== 'linux/amd64') {
     throw new Error('Local CI toolchain requires the locked Linux/amd64 toolchain.');
   }
-  const requirements = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock', 'utf8');
-  if (!requirements.includes(`semgrep==${lock.semgrep.version}`)) {
-    throw new Error('Semgrep lock does not match toolchain.lock.json.');
-  }
 }
 
 function validateHostRuntime({ environment, lock }) {
-  if (process.version !== `v${lock.node.version}`) {
-    throw new Error(`Node version drift: expected ${lock.node.version}, got ${process.version}`);
-  }
-  const npmVersion = spawnSync('npm', ['--version'], {
-    encoding: 'utf8',
-    env: normalizedProxyEnvironment(environment),
+  createRuntimeParityReceipt({
+    environment: normalizedProxyEnvironment(environment),
+    lock,
   });
-  const npmOutput = `${npmVersion.stdout ?? ''}${npmVersion.stderr ?? ''}`.trim();
-  if (npmVersion.status !== 0 || npmVersion.stdout.trim() !== lock.node.npmVersion) {
-    throw new Error(`npm version drift: expected ${lock.node.npmVersion}, got ${npmOutput}`);
-  }
 }
 
-async function provisionCommonTools({ bin, downloads, environment, lock, semgrep }) {
+async function provisionCommonTools({ bin, downloads, lock }) {
   await download(lock.osvScanner, path.join(bin, 'osv-scanner'));
   await download(lock.gitleaks, path.join(downloads, 'gitleaks.tar.gz'));
   run('tar', ['-xzf', path.join(downloads, 'gitleaks.tar.gz'), '-C', bin, 'gitleaks']);
   await download(lock.actionlint, path.join(downloads, 'actionlint.tar.gz'));
   run('tar', ['-xzf', path.join(downloads, 'actionlint.tar.gz'), '-C', bin, 'actionlint']);
-  run('python3', ['-m', 'venv', semgrep]);
-  run(
-    path.join(semgrep, 'bin/pip'),
-    [
-      'install',
-      '--disable-pip-version-check',
-      '--require-hashes',
-      '--only-binary=:all:',
-      '--requirement',
-      path.resolve('tooling/configs/ci/semgrep-requirements.lock'),
-    ],
-    { env: normalizedProxyEnvironment(environment) }
-  );
 }
 
 async function provisionReleaseTools({ downloads, environment, lock, mutation, root }) {
@@ -133,7 +111,6 @@ function validateToolchainFiles({
   markerValue,
   mutation,
   mutationVersion,
-  semgrep,
 }) {
   if (
     markerValue.lane !== lane ||
@@ -146,7 +123,6 @@ function validateToolchainFiles({
     path.join(bin, 'osv-scanner'),
     path.join(bin, 'gitleaks'),
     path.join(bin, 'actionlint'),
-    path.join(semgrep, 'bin/semgrep'),
     ...(lane === 'release'
       ? [
           path.join(codeql, 'codeql'),
@@ -158,11 +134,6 @@ function validateToolchainFiles({
     if (!fs.existsSync(executable)) {
       throw new Error(`Local CI toolchain is incomplete: ${executable}`);
     }
-  }
-  const semgrepEntrypoint = path.join(semgrep, 'bin/semgrep');
-  const semgrepPython = path.join(semgrep, 'bin/python3');
-  if (!fs.readFileSync(semgrepEntrypoint, 'utf8').slice(0, 1024).includes(semgrepPython)) {
-    throw new Error('Local CI Semgrep launcher is not bound to its current toolchain root.');
   }
   for (const tool of [
     {
@@ -182,12 +153,6 @@ function validateToolchainFiles({
       executable: path.join(bin, 'actionlint'),
       args: ['-version'],
       expected: lock.actionlint.version,
-    },
-    {
-      name: 'Semgrep',
-      executable: semgrepEntrypoint,
-      args: ['--legacy', '--version'],
-      expected: lock.semgrep.version,
     },
     ...(lane === 'release'
       ? [
@@ -233,27 +198,13 @@ function readToolchainMarker(marker) {
   }
 }
 
-function createToolchainEnvironment({
-  bin,
-  codeql,
-  environment,
-  lane,
-  lockDigest,
-  mutation,
-  semgrep,
-}) {
+function createToolchainEnvironment({ bin, codeql, environment, lane, lockDigest, mutation }) {
   const result = normalizedProxyEnvironment(environment);
-  result.PATH = [
-    bin,
-    ...(lane === 'release' ? [codeql] : []),
-    path.join(semgrep, 'bin'),
-    result.PATH,
-  ]
+  result.PATH = [bin, ...(lane === 'release' ? [codeql] : []), result.PATH]
     .filter(Boolean)
     .join(path.delimiter);
   result.SNIPTALE_OSV_SCANNER_BIN = path.join(bin, 'osv-scanner');
   result.SNIPTALE_GITLEAKS_BIN = path.join(bin, 'gitleaks');
-  result.SNIPTALE_SEMGREP_BIN = path.join(semgrep, 'bin/semgrep');
   if (lane === 'release') {
     result.SNIPTALE_CODEQL_BIN = path.join(codeql, 'codeql');
     result.SNIPTALE_MUTATION_CLI = path.join(
@@ -269,7 +220,6 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
   if (!['proof', 'release'].includes(lane))
     throw new Error(`Unknown local toolchain lane: ${lane}`);
   const lockBytes = fs.readFileSync('tooling/configs/ci/toolchain.lock.json');
-  const requirementsBytes = fs.readFileSync('tooling/configs/ci/semgrep-requirements.lock');
   const mutationPackageBytes = fs.readFileSync('tooling/test/mutation/package.json');
   const mutationLockBytes = fs.readFileSync('tooling/test/mutation/package-lock.json');
   const lock = JSON.parse(lockBytes);
@@ -287,7 +237,6 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
     Buffer.concat([
       Buffer.from(`${lane}\0`),
       lockBytes,
-      requirementsBytes,
       ...(lane === 'release' ? [mutationPackageBytes, mutationLockBytes] : []),
     ])
   );
@@ -301,7 +250,6 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
   const marker = path.join(root, 'ready.json');
   const bin = path.join(root, 'bin');
   const codeql = path.join(root, 'codeql');
-  const semgrep = path.join(root, 'semgrep');
   const mutation = path.join(root, 'mutation');
   let markerValue = readToolchainMarker(marker);
   if (markerValue === null) {
@@ -309,7 +257,7 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
     fs.mkdirSync(bin, { recursive: true, mode: 0o700 });
     const downloads = path.join(root, 'downloads');
     fs.mkdirSync(downloads, { mode: 0o700 });
-    await provisionCommonTools({ bin, downloads, environment, lock, semgrep });
+    await provisionCommonTools({ bin, downloads, lock });
     if (lane === 'release') {
       await provisionReleaseTools({ downloads, environment, lock, mutation, root });
     }
@@ -327,7 +275,6 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
     markerValue,
     mutation,
     mutationVersion: mutationPackage.devDependencies['@stryker-mutator/core'],
-    semgrep,
   };
   validateToolchainFiles(paths);
   return {

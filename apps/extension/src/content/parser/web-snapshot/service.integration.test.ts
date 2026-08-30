@@ -75,6 +75,20 @@ function createReadableIframe(id: string, bodyHtml: string): HTMLIFrameElement {
   return iframe;
 }
 
+function createFontFaceRule(family: string, source: string): CSSFontFaceRule {
+  const declarations = `font-family: ${family}; src: ${source};`;
+  return {
+    cssText: `@font-face { ${declarations} }`,
+    style: {
+      cssText: declarations,
+      getPropertyValue(property: string) {
+        if (property === 'font-family') return family;
+        return property === 'src' ? source : '';
+      },
+    },
+  } as unknown as CSSFontFaceRule;
+}
+
 function createUnreadableIframe(): HTMLIFrameElement {
   const iframe = document.createElement('iframe');
   iframe.src = 'https://external.example/private?token=secret#fragment';
@@ -198,11 +212,15 @@ it('packages an inline icon font used by readable iframe content', async () => {
   if (!iframe.contentDocument) throw new Error('Expected readable iframe document');
   const frameStyleSheet = new CSSStyleSheet();
   frameStyleSheet.insertRule(
-    `@font-face { font-family: EmbeddedIcons; src: url("${fontDataUrl}") format("woff"); }`
-  );
-  frameStyleSheet.insertRule(
     '.expand-icon::before { font-family: EmbeddedIcons; content: "\\f101"; }'
   );
+  Object.defineProperty(frameStyleSheet, 'cssRules', {
+    configurable: true,
+    value: [
+      createFontFaceRule('EmbeddedIcons', `url("${fontDataUrl}") format("woff")`),
+      ...Array.from(frameStyleSheet.cssRules),
+    ],
+  });
   Object.defineProperty(iframe.contentDocument, 'styleSheets', {
     configurable: true,
     value: [frameStyleSheet],

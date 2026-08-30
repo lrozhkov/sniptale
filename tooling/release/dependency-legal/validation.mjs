@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { readOssReleasePolicy, sha256 } from '../oss-release-policy.mjs';
+import { readOssReleasePolicy, sha256 } from '../policy/oss-release-policy.mjs';
 import { formatThirdPartyNotices, generateDependencyLegalClosure } from './index.mjs';
 
 function manropeMetadata(policy) {

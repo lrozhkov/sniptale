@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { expect, it } from 'vitest';
 
-import { createTempRoot, writeFile } from '../qa/core/test-helpers';
+import { createTempRoot, writeFile } from '../qa/test-support/test-helpers';
 import { checkControlAuthority } from './check-control-authority.mjs';
 import { CONTROL_FILES } from './control-digest.mjs';
 

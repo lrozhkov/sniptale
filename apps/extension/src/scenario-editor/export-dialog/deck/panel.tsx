@@ -1,4 +1,5 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { translate } from '../../../platform/i18n';
 import { ScenarioDeckExportAssetControls } from './asset-controls';
 import { ScenarioDeckExportFormatControls } from './format-controls';
 import { ScenarioDeckExportOptionToggles } from './option-toggles';
@@ -41,7 +42,9 @@ function ScenarioDeckExportAction(props: {
 
   return (
     <ProductActionButton tone="primary" onClick={() => void props.onExport()} disabled={exporting}>
-      {exporting ? 'Exporting...' : 'Export'}
+      {exporting
+        ? translate('scenario.editor.exporting')
+        : translate('scenario.editor.exportAction')}
     </ProductActionButton>
   );
 }
