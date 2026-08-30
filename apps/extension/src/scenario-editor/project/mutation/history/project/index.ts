@@ -9,6 +9,8 @@ import {
   type ScenarioProjectHistoryState,
 } from './helpers';
 
+const MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES = 40;
+
 function useProjectSnapshotRefs(args: {
   project: ScenarioProject | null;
   quickEditStepId: string | null;
@@ -63,7 +65,9 @@ function useScenarioEditorProjectHistoryTracking(args: {
 
     setHistoryState((current) => ({
       future: [],
-      past: [...current.past, cloneHistorySnapshot(pendingSnapshot)],
+      past: [...current.past, cloneHistorySnapshot(pendingSnapshot)].slice(
+        -MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES
+      ),
     }));
   }, [pendingMutationRef, project, setHistoryState]);
 }

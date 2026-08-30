@@ -297,3 +297,38 @@ it('stores detached project snapshots across undo and redo history', async () =>
   });
   expect(getHarness().project?.name).toBe('Scenario');
 });
+
+it('bounds full-project snapshots while preserving the newest undo and redo window', async () => {
+  const { project } = createProjectFixture();
+  await renderHarness(project);
+
+  for (let index = 1; index <= 45; index += 1) {
+    await act(async () => {
+      getHarness().trackProjectMutation();
+      getHarness().setProject((current) =>
+        current ? { ...current, name: `Project ${index}`, updatedAt: 10 + index } : current
+      );
+      await flushEffects();
+    });
+  }
+
+  for (let index = 0; index < 40; index += 1) {
+    expect(getHarness().canUndoProject).toBe(true);
+    await act(async () => {
+      getHarness().undoProjectChange();
+      await flushEffects();
+    });
+  }
+  expect(getHarness().canUndoProject).toBe(false);
+  expect(getHarness().project?.name).toBe('Project 5');
+
+  for (let index = 0; index < 40; index += 1) {
+    expect(getHarness().canRedoProject).toBe(true);
+    await act(async () => {
+      getHarness().redoProjectChange();
+      await flushEffects();
+    });
+  }
+  expect(getHarness().canRedoProject).toBe(false);
+  expect(getHarness().project?.name).toBe('Project 45');
+});
