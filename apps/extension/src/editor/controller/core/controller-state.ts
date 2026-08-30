@@ -3,11 +3,7 @@ import type { EditorDocument, EditorTool } from '../../../features/editor/docume
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import type { SourceState } from '../../document/model/source-state';
 import type { CropSelection, DrawSession, PanSession } from './types';
-import {
-  createEditorControllerEventBindings,
-  createEditorControllerPublicApiAdapter,
-} from '../instance/bindings';
-import { createEditorControllerEventHandlers } from '../events';
+import { createEditorControllerPublicApiAdapter } from '../instance/bindings';
 import type { EditorControllerInstance } from '../instance/types';
 import type { EditorSessionAutosaveService } from '../../document/session-autosave';
 import type { EditorMagnetManager } from '../magnet';
@@ -40,10 +36,6 @@ export abstract class ImageEditorControllerState {
   selectionNudgeSession = null;
   lastLayerSelectionAnchorId: string | null = null;
   autosaveService: EditorSessionAutosaveService | null = null;
-  readonly eventHandlers = createEditorControllerEventHandlers(
-    createEditorControllerEventBindings(this.getControllerInstance())
-  );
-
   protected abstract getControllerInstance(): EditorControllerInstance;
 
   protected get instance() {
