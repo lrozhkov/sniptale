@@ -166,10 +166,12 @@ describe('split workflow topology', () => {
       type: 'boolean',
     });
     expect(Object.keys(release.jobs)).toEqual(['admission', 'diagnostic-gate', 'publish']);
+    expect(release.jobs.admission.if).toContain('inputs.diagnostic');
     expect(release.jobs.admission.environment).toBeUndefined();
     expect(release.jobs['diagnostic-gate'].environment).toBeUndefined();
     expect(release.jobs['diagnostic-gate'].if).toContain('inputs.diagnostic');
     expect(release.jobs.publish.environment).toBe('release-publisher');
+    expect(release.jobs.publish.if).toContain("github.ref == 'refs/heads/main'");
     expect(release.jobs.publish.if).toContain('!inputs.diagnostic');
     const admission = (release.jobs.admission.steps ?? []).map((step) => step.run ?? '').join('\n');
     const publication = (release.jobs.publish.steps ?? []).map((step) => step.run ?? '').join('\n');
