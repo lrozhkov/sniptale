@@ -86,6 +86,7 @@ jobs:
         id: admission
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_POLICY_READ_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
           ALLOW_NON_LATEST: ${{ inputs.allow_non_latest_provenance }}
@@ -121,14 +122,15 @@ jobs:
               --argjson provenanceRunId "$PROVENANCE_RUN_ID" \
               '{schemaVersion: 1, artifactKind: "sniptale-branch-diagnostic-release-admission", commit: $commit, tag: $tag, provenanceRunId: $provenanceRunId, remoteAuthorities: "deferred-to-main"}' \
               > .tmp/ci-release-admission.json
+            mkdir -p build/release-deployment
             jq -n \
               --arg commit "$release_sha" \
               '{schemaVersion: 1, artifactKind: "sniptale-branch-diagnostic-attestation-disposition", commit: $commit, status: "deferred-to-main"}' \
-              > build/release-proof/attestations.json
+              > build/release-deployment/attestations.json
           else
             release_sha=$(git rev-list -n 1 "$RELEASE_TAG")
             export GITHUB_SHA="$release_sha"
-            GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs
+            GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs
             run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}")
             control_sha=$(jq -er .head_sha <<<"$run")
             jq -e '
@@ -173,8 +175,8 @@ jobs:
             gh run download "$source_run_id" --name "$proof_name" --dir build/release-proof
             node tooling/ci/verify-main-proof.mjs release build/release-proof "$release_sha"
             cp -R build/release-finalized/release-assets build/release-proof/release-assets
-            cp build/release-finalized/attestations.json build/release-proof/attestations.json
-            cp build/release-finalized/finalizer-admission.json build/release-proof/finalizer-admission.json
+            mkdir -p build/release-deployment
+            cp build/release-finalized/attestations.json build/release-deployment/attestations.json
           fi
           node tooling/ci/verify-release-assets.mjs build/release-proof "$release_sha"
           if [ "$BRANCH_DIAGNOSTIC" != true ]; then
@@ -206,7 +208,7 @@ jobs:
           RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
           asset_root=build/release-proof/release-assets
-          deployment_root=build/release-proof/deployment
+          deployment_root=build/release-deployment
           mkdir -p "$deployment_root"
           version=$(jq -er .version package.json)
           release_name="Sniptale ${version} alpha"
@@ -262,8 +264,7 @@ jobs:
             build/release-proof/proof-manifest.json
             build/release-proof/SHA256SUMS
             build/release-proof/release-assets
-            build/release-proof/attestations.json
-            build/release-proof/deployment
+            build/release-deployment
             .tmp/ci-release-admission.json
           include-hidden-files: true
           if-no-files-found: error
@@ -312,7 +313,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           asset_root=build/release-proof/release-assets
-          deployment_root=build/release-proof/deployment
+          deployment_root=build/release-deployment
           GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs --recheck
           node tooling/ci/verify-release-assets.mjs build/release-proof "$RELEASE_SHA"
           request="$deployment_root/release-request.json"
