@@ -1,7 +1,11 @@
 import { expect, it } from 'vitest';
 
 import { createUnitTestPlan } from './unit-test-plan.mjs';
-import { createUnitTestArgs, createUnitTestEnv } from './verify-unit-tests.mjs';
+import {
+  createUnitTestArgs,
+  createUnitTestEnv,
+  resolveProductUnitTestPool,
+} from './verify-unit-tests.mjs';
 import { requiresRelatedUnitTests } from '../coverage/test-coverage/thresholds.mjs';
 import { createTempRoot, importFresh, withCwd, writeFile } from '../../test-support/test-helpers';
 
@@ -76,6 +80,11 @@ it('adds coverage to the focused related-test command when requested', () => {
 it('adds an explicit pool when requested', () => {
   expect(createUnitTestArgs({ pool: 'threads' })).toContain('--pool=threads');
   expect(createUnitTestArgs({ pool: 'forks' })).toContain('--pool=forks');
+});
+
+it('uses the measured threads pool by default and keeps an explicit rollback override', () => {
+  expect(resolveProductUnitTestPool({})).toBe('threads');
+  expect(resolveProductUnitTestPool({ SNIPTALE_PRODUCT_VITEST_POOL: 'forks' })).toBe('forks');
 });
 
 it('bounds vitest workers when requested and rejects invalid bounds', () => {

@@ -20,6 +20,7 @@ const testEnv = {
 };
 const WRAPPER_TIMEOUT_MODE = 'wrapper';
 const DEFAULT_COVERAGE_MODE = 'diff';
+const DEFAULT_PRODUCT_VITEST_POOL = 'threads';
 const SUPPORTED_POOLS = new Set(['forks', 'threads']);
 
 export { expandRelatedTestScope };
@@ -36,7 +37,7 @@ export function normalizeUnitTestPool(pool = null) {
 }
 
 export function resolveProductUnitTestPool(env = process.env) {
-  return normalizeUnitTestPool(env.SNIPTALE_PRODUCT_VITEST_POOL ?? null);
+  return normalizeUnitTestPool(env.SNIPTALE_PRODUCT_VITEST_POOL ?? DEFAULT_PRODUCT_VITEST_POOL);
 }
 
 export function createUnitTestArgs({
