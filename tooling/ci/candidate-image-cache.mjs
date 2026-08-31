@@ -7,7 +7,8 @@ import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/u;
 const LOWER_HEX = /^[a-f0-9]+$/u;
-const CACHE_TAG = /^candidate-cache-v1-(?:qa|controller)-[a-f0-9]{64}$/u;
+const CACHE_TAG = /^candidate-cache-v2-(?:qa|controller)-[a-f0-9]{64}$/u;
+const SWEEP_TAG = /^candidate-cache-v(?:1|2)-(?:qa|controller)-[a-f0-9]{64}$/u;
 const BUILDX_INSPECTION_FORMAT = '[{{json .}},{{json .Provenance}}]';
 const DAY_SECONDS = 24 * 60 * 60;
 export const CANDIDATE_IMAGE_IDLE_TTL_SECONDS = 7 * DAY_SECONDS;
@@ -153,8 +154,6 @@ export function createCandidateImagePlan({
   const identity = {
     schemaVersion: policy.schemaVersion,
     imageKind: policy.imageKind,
-    candidateTreeDigest,
-    candidateCommitDigest,
     imageInputDigest: closure.imageInputDigest,
     platform: policy.platform,
   };
@@ -168,6 +167,8 @@ export function createCandidateImagePlan({
     cacheKey,
     candidateTree,
     candidateCommit,
+    candidateTreeDigest,
+    candidateCommitDigest,
     repository: policy.repository,
     canonicalTag,
     reference: `${policy.repository}:${canonicalTag}`,
@@ -177,10 +178,8 @@ export function createCandidateImagePlan({
     labels: {
       'dev.sniptale.candidate-cache.schema': String(policy.schemaVersion),
       'dev.sniptale.candidate-cache.key': cacheKey,
-      'dev.sniptale.candidate-tree': candidateTreeDigest,
       'dev.sniptale.image-inputs': closure.imageInputDigest,
       'dev.sniptale.platform': policy.platform,
-      'org.opencontainers.image.revision': candidateCommit,
       'org.opencontainers.image.source': 'https://github.com/lrozhkov/sniptale',
     },
     baseImageDigest: closure.baseImageDigest,
@@ -308,8 +307,8 @@ export function classifyCandidateVersionsForSweep({
   }
   return versions.map((version) => {
     const tags = version.tags ?? [];
-    const candidateTags = tags.filter((tag) => CACHE_TAG.test(tag));
-    const foreignTags = tags.filter((tag) => !CACHE_TAG.test(tag));
+    const candidateTags = tags.filter((tag) => SWEEP_TAG.test(tag));
+    const foreignTags = tags.filter((tag) => !SWEEP_TAG.test(tag));
     let reason = 'eligible';
     if (version.package !== policy.repository) reason = 'foreign-package';
     else if (!SHA256.test(version.digest ?? '')) reason = 'invalid-digest';
@@ -432,7 +431,7 @@ if (isExecutedAsScript(import.meta.url)) {
         .join(',')
     );
     output('cache-key', plan.cacheKey);
-    output('candidate-tree-digest', plan.candidateTreeDigest);
+    output('cache-schema', plan.schemaVersion);
     output('image-input-digest', plan.imageInputDigest);
   } else if (mode === 'lookup') {
     const plan = JSON.parse(fs.readFileSync(path.resolve(planPath), 'utf8'));

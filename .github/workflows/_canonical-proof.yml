@@ -242,12 +242,10 @@ jobs:
           push: true
           tags: ghcr.io/lrozhkov/sniptale-qa:${{ steps.cache-lookup.outputs['qa-tag'] }}
           labels: |
-            dev.sniptale.candidate-cache.schema=1
+            dev.sniptale.candidate-cache.schema=${{ steps.cache.outputs.cache-schema }}
             dev.sniptale.candidate-cache.key=${{ steps.cache.outputs.cache-key }}
-            dev.sniptale.candidate-tree=${{ steps.cache.outputs.candidate-tree-digest }}
             dev.sniptale.image-inputs=${{ steps.cache.outputs.image-input-digest }}
             dev.sniptale.platform=linux/amd64
-            org.opencontainers.image.revision=${{ env.CANDIDATE_SHA }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           sbom: true
           provenance: mode=max
@@ -264,12 +262,10 @@ jobs:
           push: true
           tags: ghcr.io/lrozhkov/sniptale-controller:${{ steps.controller-cache-lookup.outputs['controller-tag'] }}
           labels: |
-            dev.sniptale.candidate-cache.schema=1
+            dev.sniptale.candidate-cache.schema=${{ steps.controller-cache.outputs.cache-schema }}
             dev.sniptale.candidate-cache.key=${{ steps.controller-cache.outputs.cache-key }}
-            dev.sniptale.candidate-tree=${{ steps.controller-cache.outputs.candidate-tree-digest }}
             dev.sniptale.image-inputs=${{ steps.controller-cache.outputs.image-input-digest }}
             dev.sniptale.platform=linux/amd64
-            org.opencontainers.image.revision=${{ env.TRUSTED_CONTROL_SHA }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           sbom: true
           provenance: mode=max

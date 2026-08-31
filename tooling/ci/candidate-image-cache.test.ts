@@ -93,11 +93,11 @@ describe('candidate image cache identity', () => {
       closure,
       policy: controllerPolicy,
     });
-    expect(controller.canonicalTag).toMatch(/^candidate-cache-v1-controller-[a-f0-9]{64}$/u);
+    expect(controller.canonicalTag).toMatch(/^candidate-cache-v2-controller-[a-f0-9]{64}$/u);
     expect(controller.cacheKey).not.toBe(planFor().cacheKey);
   });
 
-  it('invalidates the image digest for copied bytes, tree, build args, platform, and provenance settings', () => {
+  it('keys images by their complete build closure instead of the consuming candidate commit', () => {
     const original = deriveImageInputClosure(root, policy);
     for (const change of [
       { buildArgs: { FEATURE: '1' } },
@@ -110,18 +110,40 @@ describe('candidate image cache identity', () => {
         original.imageInputDigest
       );
     }
-    expect(planFor().cacheKey).not.toBe(
-      createCandidateImagePlan({
-        candidateTree: 'd'.repeat(40),
-        closure: original,
-        policy,
-      }).cacheKey
-    );
-    expect(planFor().cacheKey).not.toBe(
+    const otherCandidate = createCandidateImagePlan({
+      candidateTree: 'd'.repeat(40),
+      candidateCommit: 'e'.repeat(40),
+      closure: original,
+      policy,
+    });
+    expect(planFor().cacheKey).toBe(otherCandidate.cacheKey);
+    expect(planFor().cacheKey).toBe(
       createCandidateImagePlan({
         candidateTree: tree,
         candidateCommit: 'e'.repeat(40),
         closure: original,
+        policy,
+      }).cacheKey
+    );
+    expect(planFor().labels).not.toHaveProperty('dev.sniptale.candidate-tree');
+    expect(planFor().labels).not.toHaveProperty('org.opencontainers.image.revision');
+    expect(
+      createUseReceipt(otherCandidate, `sha256:${'9'.repeat(64)}`, {
+        runId: 1,
+        runAttempt: 1,
+        usedAt: 1,
+      }).candidateCommitDigest
+    ).not.toBe(
+      createUseReceipt(planFor(), `sha256:${'9'.repeat(64)}`, {
+        runId: 1,
+        runAttempt: 1,
+        usedAt: 1,
+      }).candidateCommitDigest
+    );
+    expect(planFor().cacheKey).not.toBe(
+      createCandidateImagePlan({
+        candidateTree: tree,
+        closure: { ...original, imageInputDigest: 'f'.repeat(64) },
         policy,
       }).cacheKey
     );
@@ -167,7 +189,7 @@ describe('candidate image cache identity', () => {
 
   it('uses one schema tag across attempts and requires a reason for a separate forced build', () => {
     const plan = planFor();
-    expect(plan.canonicalTag).toMatch(/^candidate-cache-v1-qa-[a-f0-9]{64}$/u);
+    expect(plan.canonicalTag).toMatch(/^candidate-cache-v2-qa-[a-f0-9]{64}$/u);
     expect(decideCandidateImageSelection(plan)).toEqual({
       action: 'build',
       tag: plan.canonicalTag,
