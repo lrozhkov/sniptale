@@ -40,6 +40,8 @@ To publish, first create and push a GitHub-verifiable annotated signing tag matc
 
 Selecting an older successful provenance run requires `allow_non_latest_provenance` and a non-empty `bypass_reason`. Local PR bypass likewise leaves its proof digest and reason in the PR; merge remains a manual native GitHub bypass. Use bypass only for an external-capacity failure or incident, never as the routine path for QA-control evolution.
 
+Before merge, dispatch Continuous Deployment from the temporary branch with `diagnostic: true`, the intended version tag, release notes, and the exact successful branch provenance diagnostic. Require the `Continuous Deployment diagnostic Gate` to pass and inspect its preserved deployment artifact; this proves the branch proof, asset, notes, release-state, and workflow path without another canonical QA run. After merge, create the signed tag and run the same diagnostic on `main` with the successful main provenance run to add remote-tag and GitHub-attestation admission. Diagnostic mode cannot enter `release-publisher` or mutate GitHub Releases. Publish from `main` with the same inputs only after both applicable diagnostic layers are green.
+
 For the one-time CI bootstrap, open the PR as draft, add `ci-local-proof-bypass`, and only then mark it ready. Confirm that the labeled PR graph has no executing jobs before merge. There is no `push main` gate trigger, so the resulting squash commit cannot reserve the Selectel pool; after merge, remove the label or dispatch `selectel-smoke` as needed.
 
 ## Local WSL setup

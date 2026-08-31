@@ -1,5 +1,5 @@
 name: Release provenance
-run-name: Release provenance Gate
+run-name: ${{ inputs.diagnostic && 'Release pipeline diagnostic' || 'Release provenance Gate' }}
 
 on:
   schedule:
@@ -16,6 +16,11 @@ on:
         required: false
         default: ''
         type: string
+      diagnostic:
+        description: Run the release QA graph on this branch without publication or attestation
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -26,26 +31,42 @@ concurrency:
 
 jobs:
   canonical-proof:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      (github.event_name == 'workflow_dispatch' && inputs.diagnostic)
     permissions:
       actions: read
       contents: read
       packages: write
       security-events: write
     uses: ./.github/workflows/_canonical-proof.yml
+    secrets: inherit
     with:
       gate: release-provenance
+      release_diagnostic: ${{ inputs.diagnostic || false }}
       force_rebuild: ${{ inputs.force_rebuild || false }}
       force_rebuild_reason: ${{ inputs.force_rebuild_reason || '' }}
 
   release-provenance-gate:
     name: Release provenance Gate
     needs: canonical-proof
-    if: always() && github.ref == 'refs/heads/main'
+    if: always() && github.ref == 'refs/heads/main' && !inputs.diagnostic
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
       - name: Require the exact canonical proof graph
+        env:
+          CANONICAL_PROOF_RESULT: ${{ needs.canonical-proof.result }}
+        run: test "$CANONICAL_PROOF_RESULT" = success
+
+  diagnostic-gate:
+    name: Release pipeline diagnostic Gate
+    needs: canonical-proof
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.diagnostic
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require the exact diagnostic proof graph
         env:
           CANONICAL_PROOF_RESULT: ${{ needs.canonical-proof.result }}
         run: test "$CANONICAL_PROOF_RESULT" = success

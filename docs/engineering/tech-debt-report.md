@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=5, tool-noise=10.
-- Enforced source: codeql=4, gitleaks=10, license=1.
+- Classification: accepted-architecture=5, tool-noise=8.
+- Enforced source: codeql=4, gitleaks=8, license=1.
 
 ## Active decisions
 
@@ -17,8 +17,6 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `noise.gitleaks.viewport-capability-token.174` — content-overlay-toolbar-tests: A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly. Action: Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking. Review: 2027-08-18.
 - `noise.gitleaks.viewport-capability-token.181` — content-overlay-toolbar-tests: A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly. Action: Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking. Review: 2027-08-18.
 - `noise.gitleaks.viewport-capability-token.203` — content-overlay-toolbar-tests: A synthetic capability token in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly. Action: Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking. Review: 2027-08-18.
-- `noise.gitleaks.release-source-redacted-example.217` — release-architecture-documentation: A literal redaction example in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly. Action: Keep only this exact immutable-history placeholder fingerprint reviewed; all worktree and new-history findings remain blocking. Review: 2027-08-18.
-- `noise.gitleaks.secret-redaction-test-fixture.11` — shared-security-tests: A synthetic redaction fixture in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly. Action: Keep only this exact immutable-history test-placeholder fingerprint reviewed; all worktree and new-history findings remain blocking. Review: 2027-08-18.
 - `accepted.codeql.locked-toolchain-download-write` — qa-platform: Downloaded tool bytes are written into the QA image and would be executable if their locked digest were incorrectly reviewed. Action: Retain fixed destinations and exact pre-write SHA-256 verification; any content or line drift requires renewed review. Review: 2027-08-18.
 - `accepted.codeql.locked-toolchain-download-url` — qa-platform: A tool URL selected from mutable or candidate-controlled data could turn the QA image build into an unintended outbound request. Action: Keep CI build inputs trusted-control-bound and all downloads exact-digest-verified; any source drift requires renewed review. Review: 2027-08-18.
 - `accepted.codeql.local-toolchain-download-write` — qa-platform: Downloaded tool bytes become executable in the local QA toolchain if the locked digest or destination policy is incorrectly reviewed. Action: Retain the trusted-origin allowlist, exact pre-write SHA-256 verification, exclusive creation, and cache-root confinement; any source drift requires renewed review. Review: 2027-08-23.

@@ -6,6 +6,7 @@ import YAML from 'yaml';
 type Permissions = Record<string, 'none' | 'read' | 'write'>;
 
 interface WorkflowStep {
+  if?: string;
   name?: string;
   run?: string;
   uses?: string;
@@ -13,8 +14,11 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  environment?: string;
+  if?: string;
   name?: string;
   permissions?: Permissions;
+  secrets?: string;
   steps?: WorkflowStep[];
   uses?: string;
   with?: Record<string, unknown>;
@@ -106,18 +110,131 @@ describe('split workflow topology', () => {
     });
     expect(readWorkflow(PROVENANCE).jobs['canonical-proof'].with).toMatchObject({
       gate: 'release-provenance',
+      release_diagnostic: '${{ inputs.diagnostic || false }}',
     });
     expect(readWorkflow(SMOKE).jobs['canonical-smoke'].with).toMatchObject({
       gate: 'selectel-smoke',
     });
   });
 
-  it('forbids inherited secrets and automatic push gates everywhere', () => {
+  it('keeps branch release diagnostics exact and non-publishing', () => {
+    const provenance = readWorkflow(PROVENANCE);
+    const canonical = readWorkflow(CANONICAL);
+    const diagnosticInput = (
+      provenance.on as {
+        workflow_dispatch: { inputs: Record<string, Record<string, unknown>> };
+      }
+    ).workflow_dispatch.inputs.diagnostic;
+    expect(diagnosticInput).toEqual({
+      description: 'Run the release QA graph on this branch without publication or attestation',
+      required: false,
+      default: false,
+      type: 'boolean',
+    });
+    expect(provenance.jobs['canonical-proof'].if).toContain('inputs.diagnostic');
+    expect(provenance.jobs['canonical-proof'].with).toMatchObject({
+      gate: 'release-provenance',
+      release_diagnostic: '${{ inputs.diagnostic || false }}',
+    });
+    expect(provenance.jobs['release-provenance-gate'].if).toContain('!inputs.diagnostic');
+    expect(provenance.jobs['diagnostic-gate'].if).toContain('inputs.diagnostic');
+    expect(provenance.jobs['attest-release'].if).toBe(
+      "needs.release-provenance-gate.result == 'success'"
+    );
+    expect(provenance.jobs['coverage-results'].if).toBe(
+      "needs.release-provenance-gate.result == 'success'"
+    );
+    expect(canonical.jobs['qa-image'].if).toContain(
+      "inputs.release_diagnostic && inputs.gate == 'release-provenance'"
+    );
+    expect(canonical.jobs['security-results'].if).toContain('!inputs.release_diagnostic');
+    expect(canonical.jobs['publish-qa-image'].if).toContain('!inputs.release_diagnostic');
+    expect(canonical.jobs['release-provenance-gate'].if).toContain('!inputs.release_diagnostic');
+    expect(canonical.jobs['release-diagnostic-gate'].if).toContain('inputs.release_diagnostic');
+  });
+
+  it('keeps deployment diagnostics read-only and publication environment-gated', () => {
+    const release = readWorkflow(RELEASE);
+    const diagnosticInput = (
+      release.on as {
+        workflow_dispatch: { inputs: Record<string, Record<string, unknown>> };
+      }
+    ).workflow_dispatch.inputs.diagnostic;
+    expect(diagnosticInput).toEqual({
+      description: 'Admit and prepare the exact release without creating or publishing it',
+      required: false,
+      default: false,
+      type: 'boolean',
+    });
+    expect(Object.keys(release.jobs)).toEqual(['admission', 'diagnostic-gate', 'publish']);
+    expect(release.jobs.admission.if).toContain('inputs.diagnostic');
+    expect(release.jobs.admission.environment).toBeUndefined();
+    expect(release.jobs['diagnostic-gate'].environment).toBeUndefined();
+    expect(release.jobs['diagnostic-gate'].if).toContain('inputs.diagnostic');
+    expect(release.jobs.publish.environment).toBe('release-publisher');
+    expect(release.jobs.publish.if).toContain("github.ref == 'refs/heads/main'");
+    expect(release.jobs.publish.if).toContain('!inputs.diagnostic');
+    const branchCheckout = release.jobs.admission.steps?.find(
+      (step) => step.name === 'Check out diagnostic candidate'
+    );
+    expect(branchCheckout).toMatchObject({
+      if: "github.ref != 'refs/heads/main' && inputs.diagnostic",
+      uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+    });
+    const admission = (release.jobs.admission.steps ?? []).map((step) => step.run ?? '').join('\n');
+    const publication = (release.jobs.publish.steps ?? []).map((step) => step.run ?? '').join('\n');
+    for (const mutation of [
+      '--method POST',
+      '--method PATCH',
+      '--method DELETE',
+      'upload-release-assets.mjs',
+    ]) {
+      expect(admission).not.toContain(mutation);
+      expect(publication).toContain(mutation);
+    }
+    expect(admission).toContain('classify-release-state.mjs');
+    expect(admission).toContain("expected_title='Release pipeline diagnostic'");
+    expect(admission).toContain("expected_gate='Release pipeline diagnostic Gate'");
+    expect(admission).toContain('prepare-release-assets.mjs');
+    expect(admission).toContain('sniptale-branch-diagnostic-release-admission');
+    expect(admission).toContain('deferred-to-main');
+    expect(admission).toContain('release-request.json');
+    expect(admission).toContain('deployment-plan.json');
+  });
+
+  it('inherits secrets only into the environment-gated release proof caller', () => {
     for (const path of WORKFLOW_PATHS) {
       const source = readSource(path);
-      expect(source, path).not.toMatch(/\bsecrets\s*:\s*inherit\b/u);
       expect(source, path).not.toMatch(/^\s{2}push\s*:/mu);
     }
+    expect(readWorkflow(PROVENANCE).jobs['canonical-proof'].secrets).toBe('inherit');
+    expect(readWorkflow(PR).jobs['canonical-proof'].secrets).toBeUndefined();
+    expect(readWorkflow(SMOKE).jobs['canonical-smoke'].secrets).toBeUndefined();
+    for (const path of [CANONICAL, PR, RELEASE, MAINTENANCE, SMOKE]) {
+      expect(readSource(path), path).not.toMatch(/\bsecrets\s*:\s*inherit\b/u);
+    }
+  });
+
+  it('declares only the environment-overridden controller secrets at the reusable boundary', () => {
+    const workflowCall = (
+      readWorkflow(CANONICAL).on as {
+        workflow_call: { secrets: Record<string, { required: boolean }> };
+      }
+    ).workflow_call;
+    expect(workflowCall.secrets).toEqual({
+      SELECTEL_OS_APPLICATION_CREDENTIAL_ID: {
+        description: 'Environment-owned Selectel application credential identifier',
+        required: false,
+      },
+      SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: {
+        description: 'Environment-owned Selectel application credential secret',
+        required: false,
+      },
+      RUNNER_CONTROLLER_TOKEN: {
+        description: 'Environment-owned GitHub runner registration controller token',
+        required: false,
+      },
+    });
   });
 
   it('exposes the exact stable PR required-check boundary', () => {
@@ -179,6 +296,7 @@ describe('workflow supply-chain and privilege contracts', () => {
       'pr-gate': {},
       'fast-gate': {},
       'release-provenance-gate': {},
+      'release-diagnostic-gate': {},
       'infrastructure-smoke-gate': {},
     };
     expect(Object.keys(canonical).sort()).toEqual(Object.keys(canonicalPermissions).sort());
@@ -198,11 +316,17 @@ describe('workflow supply-chain and privilege contracts', () => {
       packages: 'write',
       'security-events': 'write',
     });
+    expectExactPermissions(readWorkflow(PROVENANCE).jobs['diagnostic-gate'], {});
     expectExactPermissions(readWorkflow(SMOKE).jobs['canonical-smoke'], {
       actions: 'read',
       contents: 'read',
       packages: 'write',
     });
+    expectExactPermissions(readWorkflow(RELEASE).jobs.admission, {
+      actions: 'read',
+      contents: 'read',
+    });
+    expectExactPermissions(readWorkflow(RELEASE).jobs['diagnostic-gate'], {});
     expectExactPermissions(readWorkflow(RELEASE).jobs.publish, {
       actions: 'read',
       contents: 'write',
@@ -258,7 +382,7 @@ describe('publication proof ownership', () => {
     expect(source).toContain('--source-ref refs/heads/main');
     expect(source).toContain('--source-digest');
     expect(source).toContain('--deny-self-hosted-runners');
-    expect(source).not.toContain('prepare-release-assets.mjs');
+    expect(source.match(/prepare-release-assets\.mjs/gu)).toHaveLength(1);
     expect(source).not.toContain('coverallsapp/github-action@');
   });
 });
@@ -267,6 +391,7 @@ describe('repository Node entrypoint runtime parity', () => {
   it('verifies the exact locked Node, npm, npx, and paths before every repository entrypoint', () => {
     const action = readSource(LOCKED_NODE_ACTION_PATH);
     expect(action).toContain('node-version-file: ${{ inputs.repository-root }}/.nvmrc');
+    expect(action).toContain('package-manager-cache: false');
     expect(action).toContain('npm install --global "npm@$npm_version"');
     expect(action).toContain('(cd "${RUNNER_TEMP:?}" && npm install --global');
     expect(action).toContain('tooling/ci/runtime-parity.mjs');

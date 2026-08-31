@@ -7,7 +7,9 @@ import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/u;
 const LOWER_HEX = /^[a-f0-9]+$/u;
-const CACHE_TAG = /^candidate-cache-v1-(?:qa|controller)-[a-f0-9]{64}$/u;
+const CACHE_TAG = /^candidate-cache-v2-(?:qa|controller)-[a-f0-9]{64}$/u;
+const SWEEP_TAG = /^candidate-cache-v(?:1|2)-(?:qa|controller)-[a-f0-9]{64}$/u;
+const BUILDX_INSPECTION_FORMAT = '[{{json .}},{{json .Provenance}}]';
 const DAY_SECONDS = 24 * 60 * 60;
 export const CANDIDATE_IMAGE_IDLE_TTL_SECONDS = 7 * DAY_SECONDS;
 
@@ -71,18 +73,24 @@ function repositoryEntry(root, relativePath) {
 function dockerCopySources(source) {
   const logicalLines = source.replace(/\\\r?\n[ \t]*/gu, ' ');
   const sources = [];
-  for (const match of logicalLines.matchAll(/^\s*(?:COPY|ADD)\s+(.+)$/gimu)) {
-    let body = match[1].trim();
+  for (const match of logicalLines.matchAll(/^\s*(COPY|ADD)\s+(.+)$/gimu)) {
+    const instruction = match[1].toUpperCase();
+    let body = match[2].trim();
     while (body.startsWith('--')) body = body.replace(/^--[^\s]+\s+/u, '');
     if (body.startsWith('[')) {
       const entries = JSON.parse(body);
-      sources.push(...entries.slice(0, -1));
+      sources.push(...localDockerSources(instruction, entries.slice(0, -1)));
       continue;
     }
     const entries = body.split(/\s+/u);
-    sources.push(...entries.slice(0, -1));
+    sources.push(...localDockerSources(instruction, entries.slice(0, -1)));
   }
   return [...new Set(sources)];
+}
+
+function localDockerSources(instruction, sources) {
+  if (instruction !== 'ADD') return sources;
+  return sources.filter((source) => !/^[a-z][a-z0-9+.-]*:\/\//iu.test(source));
 }
 
 function baseImageDigest(source) {
@@ -146,8 +154,6 @@ export function createCandidateImagePlan({
   const identity = {
     schemaVersion: policy.schemaVersion,
     imageKind: policy.imageKind,
-    candidateTreeDigest,
-    candidateCommitDigest,
     imageInputDigest: closure.imageInputDigest,
     platform: policy.platform,
   };
@@ -161,6 +167,8 @@ export function createCandidateImagePlan({
     cacheKey,
     candidateTree,
     candidateCommit,
+    candidateTreeDigest,
+    candidateCommitDigest,
     repository: policy.repository,
     canonicalTag,
     reference: `${policy.repository}:${canonicalTag}`,
@@ -170,10 +178,8 @@ export function createCandidateImagePlan({
     labels: {
       'dev.sniptale.candidate-cache.schema': String(policy.schemaVersion),
       'dev.sniptale.candidate-cache.key': cacheKey,
-      'dev.sniptale.candidate-tree': candidateTreeDigest,
       'dev.sniptale.image-inputs': closure.imageInputDigest,
       'dev.sniptale.platform': policy.platform,
-      'org.opencontainers.image.revision': candidateCommit,
       'org.opencontainers.image.source': 'https://github.com/lrozhkov/sniptale',
     },
     baseImageDigest: closure.baseImageDigest,
@@ -185,12 +191,15 @@ function platformName(platform) {
 }
 
 export function normalizeBuildxInspection(value) {
-  const manifest = value.Manifest ?? value.manifest ?? value;
-  const image = value.Image ?? value.image ?? {};
-  const provenance = value.Provenance?.SLSA ?? value.provenance ?? {};
+  const [inspection, explicitProvenance] = Array.isArray(value) ? value : [value, undefined];
+  const manifest = inspection.Manifest ?? inspection.manifest ?? inspection;
+  const image = inspection.Image ?? inspection.image ?? {};
+  const provenance =
+    explicitProvenance?.SLSA ?? inspection.Provenance?.SLSA ?? inspection.provenance ?? {};
+  const manifestEntries = manifest.Manifests ?? manifest.manifests ?? [];
   return {
     digest: manifest.Digest ?? manifest.digest,
-    manifests: (manifest.Manifests ?? manifest.manifests ?? [])
+    manifests: manifestEntries
       .filter((entry) => {
         const platform = entry.Platform ?? entry.platform;
         const annotations = entry.Annotations ?? entry.annotations ?? {};
@@ -209,8 +218,18 @@ export function normalizeBuildxInspection(value) {
       subjects: (provenance.subject ?? provenance.subjects ?? []).map(
         (entry) => entry.digest?.sha256 ?? entry.digest ?? entry
       ),
+      attestedSubjects: manifestEntries
+        .filter((entry) => {
+          const annotations = entry.Annotations ?? entry.annotations ?? {};
+          return annotations['vnd.docker.reference.type'] === 'attestation-manifest';
+        })
+        .map((entry) => {
+          const annotations = entry.Annotations ?? entry.annotations ?? {};
+          return annotations['vnd.docker.reference.digest'];
+        }),
       materials: (
         provenance.predicate?.buildDefinition?.resolvedDependencies ??
+        provenance.buildDefinition?.resolvedDependencies ??
         provenance.materials ??
         []
       ).map((entry) => entry.digest?.sha256 ?? entry.digest ?? entry),
@@ -235,7 +254,13 @@ export function verifyCandidateImageLookup(plan, inspection) {
   const subjectDigests = [inspection.digest, inspection.manifests[0].digest].map((digest) =>
     digest.slice('sha256:'.length)
   );
-  if (!subjectDigests.some((digest) => inspection.provenance.subjects.includes(digest))) {
+  const directSubject = subjectDigests.some((digest) =>
+    inspection.provenance.subjects.includes(digest)
+  );
+  const descriptorSubject = inspection.provenance.attestedSubjects?.includes(
+    inspection.manifests[0].digest
+  );
+  if (!directSubject && !descriptorSubject) {
     throw new Error('Candidate image provenance does not bind the selected OCI digest.');
   }
   if (!inspection.provenance.materials.includes(plan.baseImageDigest.slice('sha256:'.length))) {
@@ -282,8 +307,8 @@ export function classifyCandidateVersionsForSweep({
   }
   return versions.map((version) => {
     const tags = version.tags ?? [];
-    const candidateTags = tags.filter((tag) => CACHE_TAG.test(tag));
-    const foreignTags = tags.filter((tag) => !CACHE_TAG.test(tag));
+    const candidateTags = tags.filter((tag) => SWEEP_TAG.test(tag));
+    const foreignTags = tags.filter((tag) => !SWEEP_TAG.test(tag));
     let reason = 'eligible';
     if (version.package !== policy.repository) reason = 'foreign-package';
     else if (!SHA256.test(version.digest ?? '')) reason = 'invalid-digest';
@@ -343,7 +368,7 @@ function output(name, value) {
 function inspect(reference) {
   const result = spawnSync(
     'docker',
-    ['buildx', 'imagetools', 'inspect', reference, '--format', '{{json .}}'],
+    ['buildx', 'imagetools', 'inspect', reference, '--format', BUILDX_INSPECTION_FORMAT],
     {
       encoding: 'utf8',
     }
@@ -406,7 +431,7 @@ if (isExecutedAsScript(import.meta.url)) {
         .join(',')
     );
     output('cache-key', plan.cacheKey);
-    output('candidate-tree-digest', plan.candidateTreeDigest);
+    output('cache-schema', plan.schemaVersion);
     output('image-input-digest', plan.imageInputDigest);
   } else if (mode === 'lookup') {
     const plan = JSON.parse(fs.readFileSync(path.resolve(planPath), 'utf8'));

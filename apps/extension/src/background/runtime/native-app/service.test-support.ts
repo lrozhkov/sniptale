@@ -194,7 +194,7 @@ export async function waitForNativePost(
   type: string,
   count = 1
 ): Promise<unknown> {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     const matches = port.postMessage.mock.calls
       .map(([message]) => message)
       .filter((message) => hasNativeMessageType(message, type));

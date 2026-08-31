@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "platform": "linux/amd64",
   "builderFrontend": "dockerfile.v1/buildkit",
   "provenanceMode": "max",
@@ -9,13 +9,13 @@
   "images": {
     "qa": {
       "repository": "ghcr.io/lrozhkov/sniptale-qa",
-      "tagPrefix": "candidate-cache-v1-qa",
+      "tagPrefix": "candidate-cache-v2-qa",
       "dockerfile": "tooling/ci/Dockerfile",
       "quarantinedKeys": []
     },
     "controller": {
       "repository": "ghcr.io/lrozhkov/sniptale-controller",
-      "tagPrefix": "candidate-cache-v1-controller",
+      "tagPrefix": "candidate-cache-v2-controller",
       "dockerfile": "tooling/ci/selectel/Dockerfile.controller",
       "quarantinedKeys": []
     }

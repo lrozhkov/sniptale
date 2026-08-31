@@ -28,7 +28,9 @@ function packageEndpoint(repository) {
 }
 
 function inspectVersion(repository, tags) {
-  const candidateTag = tags.find((tag) => /^candidate-cache-v1-(?:qa|controller)-/u.test(tag));
+  const candidateTag = tags.find((tag) =>
+    /^candidate-cache-v(?:1|2)-(?:qa|controller)-/u.test(tag)
+  );
   if (!candidateTag) return { digest: null, labels: {} };
   const source = run('docker', [
     'buildx',

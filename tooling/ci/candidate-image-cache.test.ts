@@ -48,6 +48,7 @@ function validInspection(plan: ReturnType<typeof planFor>) {
     labels: plan.labels,
     provenance: {
       subjects: [digest.slice(7)],
+      attestedSubjects: [],
       materials: [plan.baseImageDigest.slice(7)],
     },
   };
@@ -92,11 +93,11 @@ describe('candidate image cache identity', () => {
       closure,
       policy: controllerPolicy,
     });
-    expect(controller.canonicalTag).toMatch(/^candidate-cache-v1-controller-[a-f0-9]{64}$/u);
+    expect(controller.canonicalTag).toMatch(/^candidate-cache-v2-controller-[a-f0-9]{64}$/u);
     expect(controller.cacheKey).not.toBe(planFor().cacheKey);
   });
 
-  it('invalidates the image digest for copied bytes, tree, build args, platform, and provenance settings', () => {
+  it('keys images by their complete build closure instead of the consuming candidate commit', () => {
     const original = deriveImageInputClosure(root, policy);
     for (const change of [
       { buildArgs: { FEATURE: '1' } },
@@ -109,18 +110,40 @@ describe('candidate image cache identity', () => {
         original.imageInputDigest
       );
     }
-    expect(planFor().cacheKey).not.toBe(
-      createCandidateImagePlan({
-        candidateTree: 'd'.repeat(40),
-        closure: original,
-        policy,
-      }).cacheKey
-    );
-    expect(planFor().cacheKey).not.toBe(
+    const otherCandidate = createCandidateImagePlan({
+      candidateTree: 'd'.repeat(40),
+      candidateCommit: 'e'.repeat(40),
+      closure: original,
+      policy,
+    });
+    expect(planFor().cacheKey).toBe(otherCandidate.cacheKey);
+    expect(planFor().cacheKey).toBe(
       createCandidateImagePlan({
         candidateTree: tree,
         candidateCommit: 'e'.repeat(40),
         closure: original,
+        policy,
+      }).cacheKey
+    );
+    expect(planFor().labels).not.toHaveProperty('dev.sniptale.candidate-tree');
+    expect(planFor().labels).not.toHaveProperty('org.opencontainers.image.revision');
+    expect(
+      createUseReceipt(otherCandidate, `sha256:${'9'.repeat(64)}`, {
+        runId: 1,
+        runAttempt: 1,
+        usedAt: 1,
+      }).candidateCommitDigest
+    ).not.toBe(
+      createUseReceipt(planFor(), `sha256:${'9'.repeat(64)}`, {
+        runId: 1,
+        runAttempt: 1,
+        usedAt: 1,
+      }).candidateCommitDigest
+    );
+    expect(planFor().cacheKey).not.toBe(
+      createCandidateImagePlan({
+        candidateTree: tree,
+        closure: { ...original, imageInputDigest: 'f'.repeat(64) },
         policy,
       }).cacheKey
     );
@@ -139,9 +162,34 @@ describe('candidate image cache identity', () => {
     fs.rmSync(fixture, { recursive: true, force: true });
   });
 
+  it('binds checksum-pinned remote ADD sources through the Dockerfile, not the local closure', () => {
+    const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'candidate-image-remote-add-'));
+    fs.mkdirSync(path.join(fixture, 'tooling/ci'), { recursive: true });
+    const dockerfile = path.join(fixture, 'tooling/ci/Dockerfile');
+    const checksum = '2'.repeat(64);
+    fs.writeFileSync(
+      dockerfile,
+      `FROM image@sha256:${'1'.repeat(64)}\nADD --checksum=sha256:${checksum} https://example.test/tool.deb /tmp/tool.deb\n`
+    );
+    fs.writeFileSync(path.join(fixture, '.dockerignore'), 'ignored\n');
+    const before = deriveImageInputClosure(fixture, policy);
+    expect(before.entries.map((entry) => entry.path)).toEqual([
+      '.dockerignore',
+      'tooling/ci/Dockerfile',
+    ]);
+    fs.writeFileSync(
+      dockerfile,
+      `FROM image@sha256:${'1'.repeat(64)}\nADD --checksum=sha256:${'3'.repeat(64)} https://example.test/tool.deb /tmp/tool.deb\n`
+    );
+    expect(deriveImageInputClosure(fixture, policy).imageInputDigest).not.toBe(
+      before.imageInputDigest
+    );
+    fs.rmSync(fixture, { recursive: true, force: true });
+  });
+
   it('uses one schema tag across attempts and requires a reason for a separate forced build', () => {
     const plan = planFor();
-    expect(plan.canonicalTag).toMatch(/^candidate-cache-v1-qa-[a-f0-9]{64}$/u);
+    expect(plan.canonicalTag).toMatch(/^candidate-cache-v2-qa-[a-f0-9]{64}$/u);
     expect(decideCandidateImageSelection(plan)).toEqual({
       action: 'build',
       tag: plan.canonicalTag,
@@ -207,26 +255,52 @@ describe('candidate image lookup verification', () => {
     }
   });
 
-  it('ignores BuildKit attestation descriptors but rejects a second runnable platform', () => {
-    const normalized = normalizeBuildxInspection({
-      Manifest: {
-        Digest: `sha256:${'a'.repeat(64)}`,
-        Manifests: [
-          {
-            Digest: `sha256:${'b'.repeat(64)}`,
-            Platform: { os: 'linux', architecture: 'amd64' },
-          },
-          {
-            Digest: `sha256:${'c'.repeat(64)}`,
-            Platform: { os: 'unknown', architecture: 'unknown' },
-            Annotations: {
-              'vnd.docker.reference.type': 'attestation-manifest',
+  it('binds Buildx predicate-only provenance through its attestation descriptor', () => {
+    const plan = planFor();
+    const platformDigest = `sha256:${'b'.repeat(64)}`;
+    const normalized = normalizeBuildxInspection([
+      {
+        Manifest: {
+          Digest: `sha256:${'a'.repeat(64)}`,
+          Manifests: [
+            {
+              Digest: platformDigest,
+              Platform: { os: 'linux', architecture: 'amd64' },
             },
-          },
-        ],
+            {
+              Digest: `sha256:${'c'.repeat(64)}`,
+              Platform: { os: 'unknown', architecture: 'unknown' },
+              Annotations: {
+                'vnd.docker.reference.type': 'attestation-manifest',
+                'vnd.docker.reference.digest': platformDigest,
+              },
+            },
+          ],
+        },
+        Image: { Config: { Labels: plan.labels } },
       },
-    });
+      {
+        SLSA: {
+          buildDefinition: {
+            resolvedDependencies: [{ digest: { sha256: plan.baseImageDigest.slice(7) } }],
+          },
+        },
+      },
+    ]);
     expect(normalized.manifests).toHaveLength(1);
+    expect(normalized.provenance.subjects).toEqual([]);
+    expect(normalized.provenance.attestedSubjects).toEqual([platformDigest]);
+    expect(verifyCandidateImageLookup(plan, normalized)).toMatchObject({ action: 'reuse' });
+
+    expect(() =>
+      verifyCandidateImageLookup(plan, {
+        ...normalized,
+        provenance: {
+          ...normalized.provenance,
+          attestedSubjects: [`sha256:${'d'.repeat(64)}`],
+        },
+      })
+    ).toThrow('does not bind');
   });
 
   it('blocks repository-owned quarantine keys instead of silently rebuilding or reusing', () => {

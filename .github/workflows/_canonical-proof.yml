@@ -17,11 +17,26 @@ on:
         required: false
         default: ''
         type: string
+      release_diagnostic:
+        description: Allow the release QA graph on a branch without publishing release outputs
+        required: false
+        default: false
+        type: boolean
       bypass_reason:
         description: Optional operator note recorded in the run summary
         required: false
         default: ''
         type: string
+    secrets:
+      SELECTEL_OS_APPLICATION_CREDENTIAL_ID:
+        description: Environment-owned Selectel application credential identifier
+        required: false
+      SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET:
+        description: Environment-owned Selectel application credential secret
+        required: false
+      RUNNER_CONTROLLER_TOKEN:
+        description: Environment-owned GitHub runner registration controller token
+        required: false
 
 permissions:
   contents: read
@@ -145,9 +160,9 @@ jobs:
       (needs.fast-classifier.result == 'success' || needs.fast-classifier.result == 'skipped') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-connectivity') &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-recovery') &&
-      (github.event_name != 'workflow_dispatch' || inputs.gate != 'release-provenance' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'workflow_dispatch' || inputs.gate != 'release-provenance' || github.ref == 'refs/heads/main' || inputs.release_diagnostic) &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke' || github.ref == 'refs/heads/main') &&
-      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' || (inputs.release_diagnostic && inputs.gate == 'release-provenance')) &&
       (github.event_name != 'schedule' || github.event.schedule != '17 3 * * *') &&
       (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) &&
       (github.event_name != 'pull_request_target' || !contains(github.event.pull_request.labels.*.name, 'ci-local-proof-bypass'))
@@ -227,12 +242,10 @@ jobs:
           push: true
           tags: ghcr.io/lrozhkov/sniptale-qa:${{ steps.cache-lookup.outputs['qa-tag'] }}
           labels: |
-            dev.sniptale.candidate-cache.schema=1
+            dev.sniptale.candidate-cache.schema=${{ steps.cache.outputs.cache-schema }}
             dev.sniptale.candidate-cache.key=${{ steps.cache.outputs.cache-key }}
-            dev.sniptale.candidate-tree=${{ steps.cache.outputs.candidate-tree-digest }}
             dev.sniptale.image-inputs=${{ steps.cache.outputs.image-input-digest }}
             dev.sniptale.platform=linux/amd64
-            org.opencontainers.image.revision=${{ env.CANDIDATE_SHA }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           sbom: true
           provenance: mode=max
@@ -249,12 +262,10 @@ jobs:
           push: true
           tags: ghcr.io/lrozhkov/sniptale-controller:${{ steps.controller-cache-lookup.outputs['controller-tag'] }}
           labels: |
-            dev.sniptale.candidate-cache.schema=1
+            dev.sniptale.candidate-cache.schema=${{ steps.controller-cache.outputs.cache-schema }}
             dev.sniptale.candidate-cache.key=${{ steps.controller-cache.outputs.cache-key }}
-            dev.sniptale.candidate-tree=${{ steps.controller-cache.outputs.candidate-tree-digest }}
             dev.sniptale.image-inputs=${{ steps.controller-cache.outputs.image-input-digest }}
             dev.sniptale.platform=linux/amd64
-            org.opencontainers.image.revision=${{ env.TRUSTED_CONTROL_SHA }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           sbom: true
           provenance: mode=max
@@ -750,7 +761,10 @@ jobs:
 
   security-results:
     needs: [canonical-qa, trusted-admission]
-    if: needs.canonical-qa.result == 'success' && needs.trusted-admission.result == 'success'
+    if: >-
+      !inputs.release_diagnostic &&
+      needs.canonical-qa.result == 'success' &&
+      needs.trusted-admission.result == 'success'
     continue-on-error: true
     runs-on: ubuntu-24.04
     permissions: { actions: read, contents: read, security-events: write }
@@ -805,6 +819,7 @@ jobs:
     needs: [trusted-admission, cleanup, qa-image]
     if: >-
       github.ref == 'refs/heads/main' &&
+      !inputs.release_diagnostic &&
       (inputs.gate == 'release-provenance' ||
       (github.event_name == 'workflow_dispatch' && inputs.gate == 'fast')) &&
       needs.trusted-admission.result == 'success' &&
@@ -896,8 +911,33 @@ jobs:
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
     if: >-
       always() &&
+      !inputs.release_diagnostic &&
       ((github.event_name == 'schedule' && github.event.schedule == '23 4 * * 1') ||
       (github.event_name == 'workflow_dispatch' && inputs.gate == 'release-provenance'))
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
+      - uses: ./.github/actions/setup-locked-node
+      - env:
+          SNIPTALE_ADMISSION_RESULT: ${{ needs.trusted-admission.result }}
+          SNIPTALE_CANONICAL_RESULT: ${{ needs.canonical-qa.result }}
+          SNIPTALE_CLASSIFIER_RESULT: ${{ needs.fast-classifier.result }}
+          SNIPTALE_CLEANUP_RESULT: ${{ needs.cleanup.result }}
+          SNIPTALE_DERIVED_REUSE: 'false'
+          SNIPTALE_EXECUTION_PATH: ${{ needs.trusted-admission.outputs.execution_path }}
+          SNIPTALE_IMAGE_RESULT: ${{ needs.qa-image.result }}
+          SNIPTALE_PROVISION_RESULT: ${{ needs.provision.result }}
+        run: node tooling/ci/admit-gate-graph.mjs
+
+  release-diagnostic-gate:
+    name: Release diagnostic Gate
+    needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.gate == 'release-provenance' &&
+      inputs.release_diagnostic
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
