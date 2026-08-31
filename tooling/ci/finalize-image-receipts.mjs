@@ -13,9 +13,18 @@ function hash(value) {
 }
 
 function readReceipt(file, expected) {
-  const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Image receipt is not regular.');
-  const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+  let descriptor;
+  let value;
+  try {
+    descriptor = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    if (!fs.fstatSync(descriptor).isFile()) throw new Error('Image receipt is not regular.');
+    value = JSON.parse(fs.readFileSync(descriptor, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ELOOP') throw new Error('Image receipt is not regular.', { cause: error });
+    throw error;
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
   if (
     value.schemaVersion !== 1 ||
     value.artifactKind !== 'sniptale-candidate-image-use' ||

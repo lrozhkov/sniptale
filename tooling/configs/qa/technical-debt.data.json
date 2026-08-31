@@ -170,6 +170,48 @@
       "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
     },
     {
+      "id": "noise.gitleaks.secret-redaction.synthetic-authorization",
+      "classification": "tool-noise",
+      "owner": "security-redaction-tests",
+      "risk": "A synthetic authorization value in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret test fixture used to prove canonical redaction of secret-bearing authorization strings.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-31",
+      "source": {
+        "kind": "gitleaks",
+        "key": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11"
+      },
+      "scope": {
+        "commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
+        "file": "src/shared/security/secret-redaction.test.ts",
+        "fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
+        "line": 11,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.release-source-example-placeholder",
+      "classification": "tool-noise",
+      "owner": "release-source-documentation",
+      "risk": "A documentation placeholder in immutable Git history resembles a generic API key and can obscure newly introduced secret findings if reviewed too broadly.",
+      "reason": "The exact historical finding is a non-secret source-fact table placeholder and contains no usable credential.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-08-31",
+      "source": {
+        "kind": "gitleaks",
+        "key": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217"
+      },
+      "scope": {
+        "commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
+        "file": "docs/architecture/release-source-architecture.md",
+        "fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
+        "line": 217,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
       "id": "accepted.codeql.locked-toolchain-download-write",
       "classification": "accepted-architecture",
       "owner": "qa-platform",

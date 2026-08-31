@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { expect, it } from 'vitest';
@@ -49,4 +50,13 @@ it('rejects detached control and image identities', () => {
   expect(() => verifyFinalizerAdmission(fixture({ images: { qa: 'bad' } }), expected)).toThrow(
     'identity is invalid'
   );
+});
+
+it('rejects a symlink instead of following it across the admission trust boundary', () => {
+  const file = fixture();
+  const target = `${file}.target`;
+  fs.renameSync(file, target);
+  fs.symlinkSync(target, file);
+
+  expect(() => verifyFinalizerAdmission(file, expected)).toThrow('not a regular file');
 });

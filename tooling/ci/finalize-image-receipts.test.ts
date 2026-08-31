@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { expect, it } from 'vitest';
@@ -56,4 +57,14 @@ it('rejects a receipt detached from the admitted run', () => {
   expect(() =>
     verifyFinalizerImageReceipts(value.root, { ...value.identity, runId: '43' })
   ).toThrow('does not match');
+});
+
+it('rejects a symlink instead of following it across the receipt trust boundary', () => {
+  const value = fixture();
+  const receipt = path.join(value.root, 'candidate-image', 'use-receipt.json');
+  const target = path.join(value.root, 'candidate-image', 'target.json');
+  fs.renameSync(receipt, target);
+  fs.symlinkSync(target, receipt);
+
+  expect(() => verifyFinalizerImageReceipts(value.root, value.identity)).toThrow('not regular');
 });
