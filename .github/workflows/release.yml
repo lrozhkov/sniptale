@@ -66,15 +66,20 @@ jobs:
             exit 1
           fi
       - name: Check out signed tag
+        if: github.ref == 'refs/heads/main'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
+      - name: Check out diagnostic candidate
+        if: github.ref != 'refs/heads/main' && inputs.diagnostic
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
         with: { cache: npm, cache-dependency-path: package-lock.json }
       - name: Install locked npm
         run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install exact publication dependencies
         run: npm ci --ignore-scripts
-      - name: Admit signed tag and exact provenance run
+      - name: Admit exact provenance source
         id: admission
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -82,26 +87,46 @@ jobs:
           PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
           ALLOW_NON_LATEST: ${{ inputs.allow_non_latest_provenance }}
           BYPASS_REASON: ${{ inputs.bypass_reason }}
+          BRANCH_DIAGNOSTIC: ${{ github.ref != 'refs/heads/main' && inputs.diagnostic }}
+          SOURCE_BRANCH: ${{ github.ref_name }}
         run: |
-          release_sha=$(git rev-list -n 1 "$RELEASE_TAG")
+          if [ "$BRANCH_DIAGNOSTIC" = true ]; then
+            release_sha=$(git rev-parse HEAD)
+            version=$(jq -er .version package.json)
+            test "$RELEASE_TAG" = "v${version}"
+            expected_branch="$SOURCE_BRANCH"
+            expected_title='Release pipeline diagnostic'
+            expected_gate='Release pipeline diagnostic Gate'
+          else
+            release_sha=$(git rev-list -n 1 "$RELEASE_TAG")
+            export GITHUB_SHA="$release_sha"
+            GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs
+            expected_branch=main
+            expected_title='Release provenance Gate'
+            expected_gate='Release provenance Gate'
+          fi
           export GITHUB_SHA="$release_sha"
-          GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs
           run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}")
-          jq -e --arg sha "$release_sha" '
-            .head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch" and
-            .status == "completed" and .path == ".github/workflows/provenance.yml"
-            and .display_title == "Release provenance Gate"
+          jq -e \
+            --arg sha "$release_sha" \
+            --arg branch "$expected_branch" \
+            --arg title "$expected_title" '
+            .head_sha == $sha and .head_branch == $branch and .event == "workflow_dispatch" and
+            .status == "completed" and .conclusion == "success" and
+            .path == ".github/workflows/provenance.yml" and .display_title == $title
           ' <<<"$run" >/dev/null
           jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}/jobs?per_page=100")
-          jq -s -e '
-            [.[].jobs[] | select(.name == "Release provenance Gate" and .conclusion == "success")] |
+          jq -s -e --arg gate "$expected_gate" '
+            [.[].jobs[] | select(.name == $gate and .conclusion == "success")] |
             length == 1
           ' <<<"$jobs" >/dev/null
-          runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/provenance.yml/runs?branch=main&event=workflow_dispatch&status=completed&head_sha=${release_sha}&per_page=100")
-          latest=$(jq -s -r --arg sha "$release_sha" '[.[].workflow_runs[] | select(.head_sha == $sha and .display_title == "Release provenance Gate")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
-          if [ "$PROVENANCE_RUN_ID" != "$latest" ] && [ "$ALLOW_NON_LATEST" != true ]; then
-            echo "Provenance run $PROVENANCE_RUN_ID is not the latest completed run $latest for $release_sha." >&2
-            exit 1
+          if [ "$BRANCH_DIAGNOSTIC" != true ]; then
+            runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/provenance.yml/runs?branch=main&event=workflow_dispatch&status=completed&head_sha=${release_sha}&per_page=100")
+            latest=$(jq -s -r --arg sha "$release_sha" '[.[].workflow_runs[] | select(.head_sha == $sha and .display_title == "Release provenance Gate")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
+            if [ "$PROVENANCE_RUN_ID" != "$latest" ] && [ "$ALLOW_NON_LATEST" != true ]; then
+              echo "Provenance run $PROVENANCE_RUN_ID is not the latest completed run $latest for $release_sha." >&2
+              exit 1
+            fi
           fi
           artifact_prefix="release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-"
           artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROVENANCE_RUN_ID" "$artifact_prefix")
@@ -109,20 +134,37 @@ jobs:
             --name "$artifact_name" \
             --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "$release_sha"
-          attested_prefix="release-attested-assets-${release_sha}-${PROVENANCE_RUN_ID}-"
-          attested_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROVENANCE_RUN_ID" "$attested_prefix")
-          gh run download "$PROVENANCE_RUN_ID" \
-            --name "$attested_name" \
-            --dir build/release-proof
+          if [ "$BRANCH_DIAGNOSTIC" = true ]; then
+            node tooling/ci/prepare-release-assets.mjs build/release-proof "$release_sha"
+            mkdir -p .tmp
+            jq -n \
+              --arg commit "$release_sha" \
+              --arg tag "$RELEASE_TAG" \
+              --argjson provenanceRunId "$PROVENANCE_RUN_ID" \
+              '{schemaVersion: 1, artifactKind: "sniptale-branch-diagnostic-release-admission", commit: $commit, tag: $tag, provenanceRunId: $provenanceRunId, remoteAuthorities: "deferred-to-main"}' \
+              > .tmp/ci-release-admission.json
+            jq -n \
+              --arg commit "$release_sha" \
+              '{schemaVersion: 1, artifactKind: "sniptale-branch-diagnostic-attestation-disposition", commit: $commit, status: "deferred-to-main"}' \
+              > build/release-proof/attestations.json
+          else
+            attested_prefix="release-attested-assets-${release_sha}-${PROVENANCE_RUN_ID}-"
+            attested_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROVENANCE_RUN_ID" "$attested_prefix")
+            gh run download "$PROVENANCE_RUN_ID" \
+              --name "$attested_name" \
+              --dir build/release-proof
+          fi
           node tooling/ci/verify-release-assets.mjs build/release-proof "$release_sha"
-          while IFS= read -r subject; do
-            gh attestation verify "build/release-proof/release-assets/$subject" \
-              --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/provenance.yml" \
-              --source-ref refs/heads/main \
-              --source-digest "$release_sha" \
-              --deny-self-hosted-runners >/dev/null
-          done < <(find build/release-proof/release-assets -maxdepth 1 -type f -printf '%f\n' | sort)
+          if [ "$BRANCH_DIAGNOSTIC" != true ]; then
+            while IFS= read -r subject; do
+              gh attestation verify "build/release-proof/release-assets/$subject" \
+                --repo "$GITHUB_REPOSITORY" \
+                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/provenance.yml" \
+                --source-ref refs/heads/main \
+                --source-digest "$release_sha" \
+                --deny-self-hosted-runners >/dev/null
+            done < <(find build/release-proof/release-assets -maxdepth 1 -type f -printf '%f\n' | sort)
+          fi
           echo "release-sha=$release_sha" >> "$GITHUB_OUTPUT"
           {
             echo '### Continuous Deployment admission'
@@ -130,6 +172,9 @@ jobs:
             echo "Tag: $RELEASE_TAG"
             echo "Commit: $release_sha"
             echo "Release provenance run: $PROVENANCE_RUN_ID"
+            if [ "$BRANCH_DIAGNOSTIC" = true ]; then
+              echo 'Remote tag and GitHub attestation admission: deferred to main diagnostic'
+            fi
             if [ -n "$BYPASS_REASON" ]; then echo "Bypass note: $BYPASS_REASON"; fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Prepare notes and classify existing release state without mutation

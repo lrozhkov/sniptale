@@ -6,6 +6,7 @@ import YAML from 'yaml';
 type Permissions = Record<string, 'none' | 'read' | 'write'>;
 
 interface WorkflowStep {
+  if?: string;
   name?: string;
   run?: string;
   uses?: string;
@@ -173,6 +174,13 @@ describe('split workflow topology', () => {
     expect(release.jobs.publish.environment).toBe('release-publisher');
     expect(release.jobs.publish.if).toContain("github.ref == 'refs/heads/main'");
     expect(release.jobs.publish.if).toContain('!inputs.diagnostic');
+    const branchCheckout = release.jobs.admission.steps?.find(
+      (step) => step.name === 'Check out diagnostic candidate'
+    );
+    expect(branchCheckout).toMatchObject({
+      if: "github.ref != 'refs/heads/main' && inputs.diagnostic",
+      uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+    });
     const admission = (release.jobs.admission.steps ?? []).map((step) => step.run ?? '').join('\n');
     const publication = (release.jobs.publish.steps ?? []).map((step) => step.run ?? '').join('\n');
     for (const mutation of [
@@ -185,6 +193,11 @@ describe('split workflow topology', () => {
       expect(publication).toContain(mutation);
     }
     expect(admission).toContain('classify-release-state.mjs');
+    expect(admission).toContain("expected_title='Release pipeline diagnostic'");
+    expect(admission).toContain("expected_gate='Release pipeline diagnostic Gate'");
+    expect(admission).toContain('prepare-release-assets.mjs');
+    expect(admission).toContain('sniptale-branch-diagnostic-release-admission');
+    expect(admission).toContain('deferred-to-main');
     expect(admission).toContain('release-request.json');
     expect(admission).toContain('deployment-plan.json');
   });
@@ -369,7 +382,7 @@ describe('publication proof ownership', () => {
     expect(source).toContain('--source-ref refs/heads/main');
     expect(source).toContain('--source-digest');
     expect(source).toContain('--deny-self-hosted-runners');
-    expect(source).not.toContain('prepare-release-assets.mjs');
+    expect(source.match(/prepare-release-assets\.mjs/gu)).toHaveLength(1);
     expect(source).not.toContain('coverallsapp/github-action@');
   });
 });
