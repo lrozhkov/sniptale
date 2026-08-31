@@ -315,7 +315,6 @@ jobs:
           asset_root=build/release-proof/release-assets
           deployment_root=build/release-deployment
           GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs --recheck
-          node tooling/ci/verify-release-assets.mjs build/release-proof "$RELEASE_SHA"
           request="$deployment_root/release-request.json"
           release_name=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .prerelease == false and .generate_release_notes == false) | .name' "$request")
           lookup_error=$(mktemp)

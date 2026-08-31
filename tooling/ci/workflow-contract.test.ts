@@ -233,6 +233,9 @@ describe('release workflow topology', () => {
     expect(controlCheckout?.with?.path).toBe('build/release-control');
     const admission = (release.jobs.admission.steps ?? []).map((step) => step.run ?? '').join('\n');
     const publication = (release.jobs.publish.steps ?? []).map((step) => step.run ?? '').join('\n');
+    expect(publication).not.toContain('verify-release-assets.mjs');
+    expect(publication).toContain('verify-draft-release.mjs');
+    expect(publication).toContain('verify-published-release.mjs');
     for (const mutation of [
       '--method POST',
       '--method PATCH',
