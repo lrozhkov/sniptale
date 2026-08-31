@@ -267,6 +267,7 @@ describe('repository Node entrypoint runtime parity', () => {
   it('verifies the exact locked Node, npm, npx, and paths before every repository entrypoint', () => {
     const action = readSource(LOCKED_NODE_ACTION_PATH);
     expect(action).toContain('node-version-file: ${{ inputs.repository-root }}/.nvmrc');
+    expect(action).toContain('package-manager-cache: false');
     expect(action).toContain('npm install --global "npm@$npm_version"');
     expect(action).toContain('(cd "${RUNNER_TEMP:?}" && npm install --global');
     expect(action).toContain('tooling/ci/runtime-parity.mjs');

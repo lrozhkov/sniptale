@@ -71,18 +71,24 @@ function repositoryEntry(root, relativePath) {
 function dockerCopySources(source) {
   const logicalLines = source.replace(/\\\r?\n[ \t]*/gu, ' ');
   const sources = [];
-  for (const match of logicalLines.matchAll(/^\s*(?:COPY|ADD)\s+(.+)$/gimu)) {
-    let body = match[1].trim();
+  for (const match of logicalLines.matchAll(/^\s*(COPY|ADD)\s+(.+)$/gimu)) {
+    const instruction = match[1].toUpperCase();
+    let body = match[2].trim();
     while (body.startsWith('--')) body = body.replace(/^--[^\s]+\s+/u, '');
     if (body.startsWith('[')) {
       const entries = JSON.parse(body);
-      sources.push(...entries.slice(0, -1));
+      sources.push(...localDockerSources(instruction, entries.slice(0, -1)));
       continue;
     }
     const entries = body.split(/\s+/u);
-    sources.push(...entries.slice(0, -1));
+    sources.push(...localDockerSources(instruction, entries.slice(0, -1)));
   }
   return [...new Set(sources)];
+}
+
+function localDockerSources(instruction, sources) {
+  if (instruction !== 'ADD') return sources;
+  return sources.filter((source) => !/^[a-z][a-z0-9+.-]*:\/\//iu.test(source));
 }
 
 function baseImageDigest(source) {

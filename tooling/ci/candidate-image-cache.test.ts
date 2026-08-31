@@ -139,6 +139,31 @@ describe('candidate image cache identity', () => {
     fs.rmSync(fixture, { recursive: true, force: true });
   });
 
+  it('binds checksum-pinned remote ADD sources through the Dockerfile, not the local closure', () => {
+    const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'candidate-image-remote-add-'));
+    fs.mkdirSync(path.join(fixture, 'tooling/ci'), { recursive: true });
+    const dockerfile = path.join(fixture, 'tooling/ci/Dockerfile');
+    const checksum = '2'.repeat(64);
+    fs.writeFileSync(
+      dockerfile,
+      `FROM image@sha256:${'1'.repeat(64)}\nADD --checksum=sha256:${checksum} https://example.test/tool.deb /tmp/tool.deb\n`
+    );
+    fs.writeFileSync(path.join(fixture, '.dockerignore'), 'ignored\n');
+    const before = deriveImageInputClosure(fixture, policy);
+    expect(before.entries.map((entry) => entry.path)).toEqual([
+      '.dockerignore',
+      'tooling/ci/Dockerfile',
+    ]);
+    fs.writeFileSync(
+      dockerfile,
+      `FROM image@sha256:${'1'.repeat(64)}\nADD --checksum=sha256:${'3'.repeat(64)} https://example.test/tool.deb /tmp/tool.deb\n`
+    );
+    expect(deriveImageInputClosure(fixture, policy).imageInputDigest).not.toBe(
+      before.imageInputDigest
+    );
+    fs.rmSync(fixture, { recursive: true, force: true });
+  });
+
   it('uses one schema tag across attempts and requires a reason for a separate forced build', () => {
     const plan = planFor();
     expect(plan.canonicalTag).toMatch(/^candidate-cache-v1-qa-[a-f0-9]{64}$/u);
