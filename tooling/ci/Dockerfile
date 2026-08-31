@@ -6,7 +6,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     XDG_CACHE_HOME=/workspace/.tmp/ci-cache \
     npm_config_cache=/workspace/.tmp/npm-cache
 
+ADD --checksum=sha256:0d5f444f594e48c1e16a41d8fc628a09b24c658916a1274025c2330f2a802bed https://snapshot.debian.org/archive/debian/20260829T000000Z/pool/main/c/ca-certificates/ca-certificates_20230311%2Bdeb12u1_all.deb /tmp/ca-certificates.deb
+
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
+    && dpkg-deb --extract /tmp/ca-certificates.deb /tmp/ca-bootstrap \
+    && mkdir -p /etc/ssl/certs \
+    && find /tmp/ca-bootstrap/usr/share/ca-certificates/mozilla -type f -name '*.crt' -exec cat {} + \
+      > /etc/ssl/certs/ca-certificates.crt \
     && printf '%s\n' \
       'deb https://snapshot.debian.org/archive/debian/20260829T000000Z bookworm main' \
       'deb https://snapshot.debian.org/archive/debian/20260829T000000Z bookworm-updates main' \
@@ -18,9 +24,8 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
       > /etc/apt/apt.conf.d/99sniptale-snapshot \
     && test -s /etc/ssl/certs/ca-certificates.crt \
     && apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends curl git jq procps tar unzip \
+    && apt-get install -y --no-install-recommends ca-certificates curl git jq procps tar unzip \
+    && rm -rf /tmp/ca-certificates.deb /tmp/ca-bootstrap \
     && rm -rf /var/lib/apt/lists/*
 
 COPY tooling/configs/ci/npm /opt/sniptale-npm

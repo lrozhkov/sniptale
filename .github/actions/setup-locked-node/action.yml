@@ -30,7 +30,7 @@ runs:
       run: |
         lock="$SNIPTALE_REPOSITORY_ROOT/tooling/configs/ci/toolchain.lock.json"
         npm_version=$(node -e "process.stdout.write(require('./' + process.argv[1]).node.npmVersion)" "$lock")
-        npm install --global "npm@$npm_version"
+        (cd "${RUNNER_TEMP:?}" && npm install --global "npm@$npm_version")
         mkdir -p "$SNIPTALE_REPOSITORY_ROOT/build/runtime-parity"
         node "$SNIPTALE_REPOSITORY_ROOT/tooling/ci/runtime-parity.mjs" "$lock" \
           > "$SNIPTALE_REPOSITORY_ROOT/build/runtime-parity/hosted.json"
