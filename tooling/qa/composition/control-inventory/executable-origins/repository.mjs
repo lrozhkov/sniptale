@@ -19,6 +19,7 @@ const DOCUMENTED_COMMAND_AUTHORITIES = Object.freeze([
 const WORKFLOW_AUTHORITIES = Object.freeze([
   '.github/workflows/_canonical-proof.yml',
   '.github/workflows/pr.yml',
+  '.github/workflows/provenance-finalize.yml',
   '.github/workflows/provenance.yml',
   '.github/workflows/release.yml',
   '.github/workflows/selectel-maintenance.yml',

@@ -27,7 +27,6 @@ import { assertReleaseTagRuleset } from './release-tag-policy.mjs';
 import { createProofSemanticDigest } from './artifacts.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
-import { verifyImageProof, writeImageProof } from './image-proof.mjs';
 import { CANONICAL_IMAGE_ENVIRONMENT, createTrustedPhaseCommands } from './container-command.mjs';
 import { parseTrustedPhaseReceipt } from './trusted-phase-receipt.mjs';
 
@@ -530,23 +529,6 @@ it('rejects equal but stale main-proof control digests', () => {
   expect(() => verifyMainProof(root, commit)).toThrow(
     'proof identity does not match the release commit'
   );
-});
-
-it('binds the published QA image digest to the exact successful main workflow', () => {
-  const root = path.join(createTempRoot('image-proof-'), 'build', 'proof');
-  const identity = {
-    commit: 'a'.repeat(40),
-    digest: `sha256:${'b'.repeat(64)}`,
-    repository: 'lrozhkov/sniptale',
-    runId: '42',
-    runAttempt: '2',
-  };
-  writeImageProof(root, identity);
-  expect(verifyImageProof(root, identity).reference).toBe(
-    `ghcr.io/lrozhkov/sniptale-qa@${identity.digest}`
-  );
-  writeFile(root, 'extra.json', '{}\n');
-  expect(() => verifyImageProof(root, identity)).toThrow('inventory is not exact');
 });
 
 it('fails closed on missing or stale canonical reports and refuses artifact overwrite', () => {

@@ -815,52 +815,6 @@ jobs:
           ref: ${{ github.event_name == 'pull_request_target' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.ref }}
           sha: ${{ env.CANDIDATE_SHA }}
 
-  publish-qa-image:
-    needs: [trusted-admission, cleanup, qa-image]
-    if: >-
-      github.ref == 'refs/heads/main' &&
-      !inputs.release_diagnostic &&
-      (inputs.gate == 'release-provenance' ||
-      (github.event_name == 'workflow_dispatch' && inputs.gate == 'fast')) &&
-      needs.trusted-admission.result == 'success' &&
-      needs.cleanup.result == 'success'
-    runs-on: ubuntu-24.04
-    permissions: { contents: read, packages: write }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - uses: ./.github/actions/setup-locked-node
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
-        with:
-          {
-            registry: ghcr.io,
-            username: '${{ github.actor }}',
-            password: '${{ secrets.GITHUB_TOKEN }}',
-          }
-      - name: Refuse immutable tag replacement and publish exact tags
-        env:
-          QA_SOURCE: ${{ needs.qa-image.outputs.reference }}
-          CONTROLLER_SOURCE: ${{ needs.qa-image.outputs.controller-reference }}
-        run: |
-          for binding in \
-            "ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}|${QA_SOURCE##*@}" \
-            "ghcr.io/lrozhkov/sniptale-controller:sha-${GITHUB_SHA}|${CONTROLLER_SOURCE##*@}"; do
-            image=${binding%%|*}
-            expected=${binding#*|}
-            disposition=$(node tooling/ci/immutable-image-tag.mjs "$image" "$expected")
-            echo "Immutable image tag admission: $image ($disposition)"
-          done
-          docker buildx imagetools create --tag "ghcr.io/lrozhkov/sniptale-qa:sha-${GITHUB_SHA}" --tag ghcr.io/lrozhkov/sniptale-qa:main "$QA_SOURCE"
-          docker buildx imagetools create --tag "ghcr.io/lrozhkov/sniptale-controller:sha-${GITHUB_SHA}" --tag ghcr.io/lrozhkov/sniptale-controller:main "$CONTROLLER_SOURCE"
-          node tooling/ci/image-proof.mjs write build/qa-image-proof "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "${QA_SOURCE##*@}"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: qa-image-proof-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/qa-image-proof
-          if-no-files-found: error
-          retention-days: 30
-
   pr-gate:
     name: pr-gate
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]

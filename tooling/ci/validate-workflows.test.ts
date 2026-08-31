@@ -6,6 +6,7 @@ it('discovers every current workflow without a manually maintained file list', (
   expect(discoverWorkflowFiles()).toEqual([
     '.github/workflows/_canonical-proof.yml',
     '.github/workflows/pr.yml',
+    '.github/workflows/provenance-finalize.yml',
     '.github/workflows/provenance.yml',
     '.github/workflows/release.yml',
     '.github/workflows/selectel-maintenance.yml',
@@ -20,7 +21,7 @@ it('proves the native analyzer contract before checking the repository workflows
     .mockReturnValueOnce({ status: 1, stdout: '', stderr: 'unexpected key "runz"' })
     .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' });
 
-  expect(validateWorkflows({ actionlint: '/locked/actionlint', run })).toHaveLength(6);
+  expect(validateWorkflows({ actionlint: '/locked/actionlint', run })).toHaveLength(7);
   expect(run).toHaveBeenNthCalledWith(
     1,
     '/locked/actionlint',
