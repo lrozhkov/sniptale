@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Check, ChevronDown, RotateCcw, Search, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { SIDEBAR_FOLDERS } from '../constants';
 import { FOLDER_LABELS, getGalleryFolderIcon } from '../ui';
 import type { GallerySidebarProps } from './types';
+import {
+  readGalleryFacetDisclosurePreferences,
+  writeGalleryFacetDisclosurePreferences,
+} from './disclosure-preferences';
+import { GallerySavedViewActions, GallerySavedViewRows } from './saved-views';
 
 function cx(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
@@ -30,48 +35,83 @@ const facetSearchInputClassName = [
 ].join(' ');
 
 export function GalleryFolderList({
+  activeSavedView = null,
   counts,
   folderFilter,
+  savedViews = [],
+  savedViewsLoadFailed = false,
+  savedViewsLoaded = false,
+  onDeleteSavedView,
   onFolderFilterChange,
-}: Pick<GallerySidebarProps, 'counts' | 'folderFilter' | 'onFolderFilterChange'>) {
+  onMoveSavedView,
+  onSavedViewSelect,
+}: Pick<
+  GallerySidebarProps,
+  | 'activeSavedView'
+  | 'counts'
+  | 'folderFilter'
+  | 'onDeleteSavedView'
+  | 'onFolderFilterChange'
+  | 'onMoveSavedView'
+  | 'onSavedViewSelect'
+  | 'savedViews'
+  | 'savedViewsLoadFailed'
+  | 'savedViewsLoaded'
+>) {
   return (
     <div className="space-y-2">
       {SIDEBAR_FOLDERS.map((folder) => {
         const Icon = getGalleryFolderIcon(folder);
-        const active = folderFilter === folder;
+        const active = folderFilter === folder && activeSavedView === null;
 
         return (
-          <button
-            key={folder}
-            type="button"
-            onClick={() => onFolderFilterChange(folder)}
-            className={cx(
-              'flex h-9 w-full items-center justify-between rounded-[8px] border px-2.5 text-left transition',
-              active
-                ? 'border-[var(--sniptale-color-border-strong)]' +
-                    ' bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]' +
-                    ' text-[var(--sniptale-color-text-primary)]' +
-                    ' shadow-sm'
-                : 'border-transparent text-[var(--sniptale-color-text-secondary)]' +
-                    ' hover:border-[var(--sniptale-color-border-soft)]' +
-                    ' hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_86%,transparent)]' +
-                    ' hover:text-[var(--sniptale-color-text-primary)]'
-            )}
-          >
-            <span className="inline-flex min-w-0 items-center gap-2 text-sm font-medium">
-              <Icon className="h-4 w-4" />
-              <span className="truncate">{FOLDER_LABELS[folder]}</span>
-            </span>
-            <span
-              className="rounded-full border border-[var(--sniptale-color-border-soft)]
-                bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,transparent)]
-                px-2 py-0.5 text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]"
+          <Fragment key={folder}>
+            <button
+              type="button"
+              onClick={() => onFolderFilterChange(folder)}
+              className={cx(
+                'flex h-9 w-full items-center justify-between rounded-[8px] border px-2.5 text-left transition',
+                active
+                  ? 'border-[var(--sniptale-color-border-strong)]' +
+                      ' bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]' +
+                      ' text-[var(--sniptale-color-text-primary)]' +
+                      ' shadow-sm'
+                  : 'border-transparent text-[var(--sniptale-color-text-secondary)]' +
+                      ' hover:border-[var(--sniptale-color-border-soft)]' +
+                      ' hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_86%,transparent)]' +
+                      ' hover:text-[var(--sniptale-color-text-primary)]'
+              )}
             >
-              {counts[folder] ?? 0}
-            </span>
-          </button>
+              <span className="inline-flex min-w-0 items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{FOLDER_LABELS[folder]}</span>
+              </span>
+              <span
+                className="rounded-full border border-[var(--sniptale-color-border-soft)]
+                  bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,transparent)]
+                  px-2 py-0.5 text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]"
+              >
+                {counts[folder] ?? 0}
+              </span>
+            </button>
+            {savedViewsLoaded ? (
+              <GallerySavedViewRows
+                activeSavedView={activeSavedView}
+                folder={folder}
+                savedViews={savedViews}
+                {...(onDeleteSavedView ? { onDeleteSavedView } : {})}
+                {...(onMoveSavedView ? { onMoveSavedView } : {})}
+                {...(onSavedViewSelect ? { onSavedViewSelect } : {})}
+              />
+            ) : null}
+          </Fragment>
         );
       })}
+      {savedViewsLoadFailed ? (
+        <p className="px-2 py-1 text-xs text-[var(--sniptale-color-danger)]">
+          {translate('gallery.app.savedViewLoadFailed')}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -109,14 +149,22 @@ function toggleStatusValue(scope: GallerySidebarProps['scope'], value: string) {
 function GalleryFacetOptionRow(props: {
   checked: boolean;
   count: number;
+  disabled?: boolean;
   label: string;
   onChange: () => void;
 }) {
   return (
-    <label className={facetOptionRowClassName}>
+    <label
+      aria-disabled={props.disabled || undefined}
+      className={cx(
+        facetOptionRowClassName,
+        props.disabled && 'cursor-default opacity-55 hover:bg-transparent'
+      )}
+    >
       <input
         type="checkbox"
         checked={props.checked}
+        disabled={props.disabled}
         onChange={props.onChange}
         className="sr-only"
       />
@@ -143,11 +191,12 @@ function GalleryFacetOptionRow(props: {
 
 function GalleryFacetSection(props: {
   facet: GallerySidebarProps['facets'][number];
+  isOpen: boolean;
   onClear?: () => void;
+  onOpenChange: (open: boolean) => void;
   onToggle: (value: string) => void;
   selected: string[];
 }) {
-  const [isOpen, setIsOpen] = useState(props.facet.id === 'status' || props.facet.id === 'tags');
   const [search, setSearch] = useState('');
   const normalizedSearch = search.trim().toLowerCase();
   const options = props.facet.options.filter((option) =>
@@ -163,8 +212,8 @@ function GalleryFacetSection(props: {
   return (
     <details
       className="group border-b border-[var(--sniptale-color-border-soft)] last:border-b-0"
-      open={isOpen}
-      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+      open={props.isOpen}
+      onToggle={(event) => props.onOpenChange(event.currentTarget.open)}
     >
       <summary className={facetSummaryClassName}>
         <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
@@ -242,6 +291,7 @@ function GalleryFacetSection(props: {
                 key={option.value}
                 checked={props.selected.includes(option.value)}
                 count={option.count}
+                disabled={option.count === 0 && props.selected.includes(option.value)}
                 label={option.label}
                 onChange={() => props.onToggle(option.value)}
               />
@@ -258,6 +308,9 @@ function GalleryFacetSection(props: {
 }
 
 export function GalleryFacetFilters(props: GallerySidebarProps) {
+  const [openFacetIds, setOpenFacetIds] = useState(
+    () => new Set(readGalleryFacetDisclosurePreferences())
+  );
   const visibleFacets = props.facets.filter(
     (facet) => facet.options.length > 0 || facet.id === 'status' || facet.id === 'tags'
   );
@@ -294,10 +347,23 @@ export function GalleryFacetFilters(props: GallerySidebarProps) {
     }
   };
 
-  const hasActiveFilters =
+  const hasFacetedFilters =
     props.scope !== 'all' ||
     props.activeTags.length > 0 ||
     Object.values(props.facetFilters).some((values) => values.length > 0);
+  const hasCustomResult =
+    props.folderFilter !== 'all' || hasFacetedFilters || props.activeSavedView !== null;
+  const showFilterActions = props.activeSavedView ? props.isSavedViewDirty : hasFacetedFilters;
+  const setFacetOpen = (facetId: GallerySidebarProps['facets'][number]['id'], open: boolean) => {
+    setOpenFacetIds((current) => {
+      if (current.has(facetId) === open) return current;
+      const next = new Set(current);
+      if (open) next.add(facetId);
+      else next.delete(facetId);
+      void writeGalleryFacetDisclosurePreferences(Array.from(next));
+      return next;
+    });
+  };
 
   return (
     <div className="mt-3 border-t border-[var(--sniptale-color-border-soft)] pt-1">
@@ -305,29 +371,56 @@ export function GalleryFacetFilters(props: GallerySidebarProps) {
         <GalleryFacetSection
           key={facet.id}
           facet={facet}
+          isOpen={openFacetIds.has(facet.id)}
           selected={getSelected(facet)}
           {...(facet.id !== 'status' && getSelected(facet).length > 0
             ? { onClear: () => clear(facet) }
             : {})}
           onToggle={(value) => toggle(facet, value)}
+          onOpenChange={(open) => setFacetOpen(facet.id, open)}
         />
       ))}
-      {hasActiveFilters ? (
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={props.onResetFilters}
-            className="flex h-8 w-full items-center justify-center gap-2 rounded-[8px] border
-              border-[var(--sniptale-color-border-soft)] px-2.5 text-xs font-medium
-              text-[var(--sniptale-color-text-secondary)] transition-colors
-              hover:border-[var(--sniptale-color-border-strong)]
-              hover:bg-[var(--sniptale-color-surface-canvas)]
-              hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
-              focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
-          >
-            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-            {translate('gallery.app.facetResetAll')}
-          </button>
+      {hasCustomResult ? (
+        <div className="space-y-2 pt-2">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <span className="min-w-0 truncate text-xs text-[var(--sniptale-color-text-muted)]">
+              {translate('gallery.app.facetResults')}:{' '}
+              <span className="font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
+                {props.filteredItemCount}
+              </span>
+            </span>
+            <button
+              type="button"
+              disabled={props.filteredItemCount === 0}
+              onClick={props.onSelectAll}
+              className="shrink-0 rounded-[7px] px-2 py-1 text-xs font-semibold
+                text-[var(--sniptale-color-accent-emphasis)] transition-colors
+                hover:bg-[var(--sniptale-color-accent-soft)] disabled:cursor-default
+                disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2
+                focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
+            >
+              {translate('gallery.app.selectAllResults')}
+            </button>
+          </div>
+          {showFilterActions ? (
+            <div className="flex flex-wrap gap-1.5">
+              <GallerySavedViewActions {...props} hasFacetedFilters={hasFacetedFilters} />
+              <button
+                type="button"
+                onClick={props.onResetFilters}
+                className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] border
+                border-[var(--sniptale-color-border-soft)] px-2.5 text-xs font-medium
+                text-[var(--sniptale-color-text-secondary)] transition-colors
+                hover:border-[var(--sniptale-color-border-strong)]
+                hover:bg-[var(--sniptale-color-surface-canvas)]
+                hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
+                focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">{translate('gallery.app.facetResetAll')}</span>
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

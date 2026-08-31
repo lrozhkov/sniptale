@@ -24,7 +24,7 @@ function DataTypeSummaryRow(props: {
   accentClassName: string;
   icon: ComponentType<{ className?: string }>;
   label: string;
-  onRemove: () => void;
+  onRemove?: (() => void) | undefined;
 }) {
   const Icon = props.icon;
 
@@ -46,7 +46,8 @@ function DataTypeSummaryRow(props: {
 
 export function renderDataTypeSummaryItems(
   items: DataTypeSummaryItem[],
-  toggleProps: ExportOptionToggleProps
+  toggleProps: ExportOptionToggleProps,
+  requiredKeys: ReadonlySet<DataTypeSummaryItem['key']> = new Set()
 ) {
   if (items.length === 0) {
     return (
@@ -64,7 +65,9 @@ export function renderDataTypeSummaryItems(
           accentClassName={item.accentClassName}
           icon={item.icon}
           label={item.label}
-          onRemove={() => setExportOptionActive(item.key, false, toggleProps)}
+          {...(requiredKeys.has(item.key)
+            ? {}
+            : { onRemove: () => setExportOptionActive(item.key, false, toggleProps) })}
         />
       ))}
     </div>

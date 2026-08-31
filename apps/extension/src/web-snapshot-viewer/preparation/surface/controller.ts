@@ -26,8 +26,7 @@ function hasExactDimensions(
   element: HTMLElement,
   viewport: Exclude<ViewerViewport, null>
 ): boolean {
-  const rect = element.getBoundingClientRect();
-  return Math.round(rect.width) === viewport.width && Math.round(rect.height) === viewport.height;
+  return element.clientWidth === viewport.width && element.clientHeight === viewport.height;
 }
 
 function isViewerSurfaceCommitted(iframe: HTMLIFrameElement, viewport: ViewerViewport): boolean {

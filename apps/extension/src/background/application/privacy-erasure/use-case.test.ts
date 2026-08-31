@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 import { acquireDiagnosticsMutationPermit } from '../../diagnostics/lifecycle-gate';
 import { acquireMediaMutationPermit } from '../../mutation-exclusion/media-activity';
 import { acquireNativeIngestionPermit } from '../../capture/native-app/lifecycle-gate';
-import { acquirePopupExportMutationPermit } from '../../capture/popup-export/job/lifecycle-gate';
+import { acquirePopupExportMutationPermit } from '../../capture/page-package/job/lifecycle-gate';
 import { PrivacyErasureUseCase } from './use-case';
 import {
   createErasureRequest,
@@ -19,7 +19,14 @@ it('runs owner cleanup in the explicit order and merges the typed aggregate', as
 
   const result = await useCase.execute(createErasureRequest());
 
-  expect(order).toEqual(['media', 'diagnostics', 'native-ingestion', 'runtime', 'storage']);
+  expect(order).toEqual([
+    'page-package-cancel',
+    'media',
+    'diagnostics',
+    'native-ingestion',
+    'runtime',
+    'storage',
+  ]);
   expect(result).toEqual(
     expect.objectContaining({
       failedRequiredParticipantIds: [],
@@ -60,6 +67,31 @@ it('returns a fixed typed partial result and short-circuits after a media failur
   expect(ports.diagnostics.cleanup).not.toHaveBeenCalled();
   expect(ports.nativeIngestion.cleanup).not.toHaveBeenCalled();
   expect(ports.runtime.cleanup).not.toHaveBeenCalled();
+  expect(ports.storage.cleanup).not.toHaveBeenCalled();
+});
+
+it('short-circuits with a fixed result when active Page Package cancellation fails', async () => {
+  const ports = createPorts();
+  vi.mocked(ports.popupExport.cancelActiveJob).mockRejectedValueOnce(new Error('secret-bearing'));
+  const useCase = new PrivacyErasureUseCase(ports);
+
+  await expect(useCase.execute(createErasureRequest())).resolves.toEqual({
+    failedRequiredParticipantIds: ['page-package-job-runtime-state'],
+    indexedDbStoresCleared: 0,
+    localStorageKeysRemoved: [],
+    participants: [
+      {
+        error: 'page-package-cancel-failed',
+        id: 'page-package-job-runtime-state',
+        severity: 'required',
+        status: 'failed',
+      },
+    ],
+    sessionStorageKeysRemoved: [],
+    success: false,
+    syncStorageKeysRemoved: [],
+  });
+  expect(ports.media.cleanup).not.toHaveBeenCalled();
   expect(ports.storage.cleanup).not.toHaveBeenCalled();
 });
 
@@ -205,6 +237,22 @@ it('drains all mutation owners and rejects late writers through storage', async 
   nextDiagnosticsWriter?.();
   nextNativeWriter?.();
   nextPopupExport?.();
+});
+
+it('cancels the active Page Package before waiting for its mutation permit', async () => {
+  const ports = createPorts();
+  const releasePopupExport = acquirePopupExportMutationPermit();
+  expect(releasePopupExport).not.toBeNull();
+  vi.mocked(ports.popupExport.cancelActiveJob).mockImplementationOnce(async () => {
+    releasePopupExport?.();
+  });
+  const useCase = new PrivacyErasureUseCase(ports);
+
+  const result = await useCase.execute(createErasureRequest());
+
+  expect(ports.popupExport.cancelActiveJob).toHaveBeenCalledOnce();
+  expect(ports.media.cleanup).toHaveBeenCalledOnce();
+  expect(result.success).toBe(true);
 });
 
 it('keeps start admission closed while a second application request is queued', async () => {

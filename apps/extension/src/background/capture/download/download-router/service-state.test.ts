@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { searchMock, warnMock } = vi.hoisted(() => ({
+const { searchAvailability, searchMock, warnMock } = vi.hoisted(() => ({
+  searchAvailability: { value: true },
   searchMock: vi.fn(),
   warnMock: vi.fn(),
 }));
@@ -8,7 +9,9 @@ const { searchMock, warnMock } = vi.hoisted(() => ({
 vi.mock('@sniptale/platform/browser/downloads', () => ({
   BrowserDownloadsAdapter: undefined,
   browserDownloads: {
-    search: searchMock,
+    get search() {
+      return searchAvailability.value ? searchMock : undefined;
+    },
   },
 }));
 
@@ -17,10 +20,11 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   createLogger: () => ({ warn: warnMock }),
 }));
 
-import { readCurrentTerminalDownloadState } from './service-state';
+import { readCurrentTerminalDownloadState, readDownloadInterruptionReason } from './service-state';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  searchAvailability.value = true;
 });
 
 it('reads current terminal download state from the downloads adapter', async () => {
@@ -41,4 +45,22 @@ it('treats failed or malformed download searches as non-terminal', async () => {
     'Failed to reconcile registered download state',
     expect.any(Error)
   );
+});
+
+it('retains only a browser-provided interruption reason', async () => {
+  searchMock
+    .mockResolvedValueOnce([{ error: 'NETWORK_FAILED', id: 11, state: 'interrupted' }])
+    .mockResolvedValueOnce([{ id: 12, state: 'interrupted' }])
+    .mockResolvedValueOnce([{ error: 'SERVER_FAILED', id: 13, state: 'complete' }]);
+
+  await expect(readDownloadInterruptionReason(11)).resolves.toBe('NETWORK_FAILED');
+  await expect(readDownloadInterruptionReason(12)).resolves.toBeNull();
+  await expect(readDownloadInterruptionReason(13)).resolves.toBeNull();
+});
+
+it('treats an unavailable browser search capability as unknown state', async () => {
+  searchAvailability.value = false;
+
+  await expect(readCurrentTerminalDownloadState(14)).resolves.toBeNull();
+  await expect(readDownloadInterruptionReason(14)).resolves.toBeNull();
 });

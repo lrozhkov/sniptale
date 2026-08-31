@@ -2,7 +2,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
   authorizeWebSnapshotCaptureRequestMock,
-  browserScriptingExecuteScriptMock,
   browserTabsGetMock,
   ensureActivePageAccessRuntimeMock,
   loadSettingsMock,
@@ -12,9 +11,9 @@ const {
   cancelWebSnapshotCaptureRequestMock,
   deleteMediaLibraryAssetsBatchSafelyMock,
   assertPopupTabRouteTargetDocumentMock,
+  issueContentGrantMock,
 } = vi.hoisted(() => ({
   authorizeWebSnapshotCaptureRequestMock: vi.fn(),
-  browserScriptingExecuteScriptMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
   isOwnedSnapshotViewerPageMock: vi.fn(),
@@ -24,18 +23,19 @@ const {
   cancelWebSnapshotCaptureRequestMock: vi.fn(),
   deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
   assertPopupTabRouteTargetDocumentMock: vi.fn(),
+  issueContentGrantMock: vi.fn(),
+}));
+
+vi.mock('../../../routing-contracts/capabilities/content-action/route', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../routing-contracts/capabilities/content-action/route')
+  >()),
+  issueContentPrivilegedActionAutoStartGrant: issueContentGrantMock,
 }));
 
 vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../capabilities/popup-tab/route-capabilities')>()),
   assertPopupTabRouteTargetDocument: assertPopupTabRouteTargetDocumentMock,
-}));
-
-vi.mock('@sniptale/platform/browser/scripting', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/scripting')>()),
-  browserScripting: {
-    executeScript: browserScriptingExecuteScriptMock,
-  },
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', async (importOriginal) => ({
@@ -81,23 +81,16 @@ vi.mock('../../../capture/page-preparation/viewer-ports', async (importOriginal)
   sendViewerPopupExportMessage: sendViewerPopupExportMessageMock,
 }));
 
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  CaptureMessageType,
+  MessageType,
+} from '@sniptale/runtime-contracts/messaging/message-types';
 import { createBackgroundRuntimeState } from '../../../application/runtime-state';
-import { routePopupExportMessage } from './popup-export-routing';
-import type { PopupExportViewerMessage } from '../message-guards/guards/shared';
-
-function createSaveMessage(): Extract<
-  PopupExportViewerMessage,
-  { type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT }
-> {
-  return {
-    requestId: 'req-web',
-    tabId: 62,
-    tabRouteCapabilityToken: 'cap-1',
-    tabRouteRequestId: 'req-web',
-    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-  };
-}
+import {
+  cancelPopupExportPagePackage,
+  requestPopupExportPagePackage,
+  routePopupExportMessage,
+} from './popup-export-routing';
 
 async function flushRouteWork(): Promise<void> {
   await Promise.resolve();
@@ -111,10 +104,8 @@ beforeEach(() => {
   loadSettingsMock.mockResolvedValue({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     authenticatedSnapshotAssetsEnabled: false,
+    externalSnapshotAssetRedirectsEnabled: true,
   });
-  browserScriptingExecuteScriptMock.mockResolvedValue([
-    { frameId: 0, result: { assetId: 'snapshot-1', success: true, warnings: [] } },
-  ]);
   sendTabMessageMock.mockResolvedValue({
     error: 'stale listener answered',
     success: false,
@@ -124,65 +115,361 @@ beforeEach(() => {
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);
   browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
-  cancelWebSnapshotCaptureRequestMock.mockReturnValue([]);
+  cancelWebSnapshotCaptureRequestMock.mockReturnValue({
+    committedAssetIds: [],
+    stagingCleanup: Promise.resolve(),
+  });
   deleteMediaLibraryAssetsBatchSafelyMock.mockResolvedValue(undefined);
+  issueContentGrantMock.mockReturnValue({ grantToken: 'grant-full-page' });
 });
 
-it('compensates a committed web snapshot before acknowledging cancellation', async () => {
-  const sendResponse = vi.fn();
-  cancelWebSnapshotCaptureRequestMock.mockReturnValueOnce(['asset-cancelled']);
+it('attaches the canonical full-page capability to staged Page Package production', async () => {
+  sendTabMessageMock.mockResolvedValue({ success: true });
+
+  await requestPopupExportPagePackage({
+    batchRequestId: 'job-1',
+    includeWebCopy: false,
+    intent: 'export',
+    options: {
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: true,
+      includeFullPageScreenshot: true,
+      includeImages: true,
+      includeJson: true,
+      includeMarkdown: true,
+      includePageDiagnostics: false,
+    },
+    ordinal: 0,
+    tabId: 62,
+  });
+
+  expect(issueContentGrantMock).toHaveBeenCalledWith({
+    actionTypes: [MessageType.EXPORT_CAPTURE_FULL_PAGE],
+    tabId: 62,
+  });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    62,
+    expect.objectContaining({
+      batchRequestId: 'job-1',
+      intent: 'export',
+      contentIntentGrant: { grantToken: 'grant-full-page' },
+      fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      options: expect.objectContaining({ includeFullPageScreenshot: true }),
+      ordinal: 0,
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    })
+  );
+});
+
+it('grants data-only visible capture alongside full-page capture', async () => {
+  sendTabMessageMock.mockResolvedValue({ success: true });
+
+  await requestPopupExportPagePackage({
+    batchRequestId: 'job-both-screenshots',
+    includeWebCopy: false,
+    intent: 'export',
+    options: {
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: true,
+      includeViewportScreenshot: true,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+      includePageDiagnostics: false,
+    },
+    ordinal: 0,
+    tabId: 62,
+  });
+
+  expect(issueContentGrantMock).toHaveBeenCalledWith({
+    actionTypes: [
+      MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
+    ],
+    tabId: 62,
+  });
+});
+
+it('terminates an unresponsive Page Package producer and forwards canonical cleanup', async () => {
+  vi.useFakeTimers();
+  try {
+    sendTabMessageMock
+      .mockImplementationOnce(() => new Promise(() => undefined))
+      .mockResolvedValueOnce({ success: true });
+
+    const request = requestPopupExportPagePackage({
+      batchRequestId: 'job-timeout',
+      includeWebCopy: false,
+      intent: 'export',
+      options: {
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: true,
+        includeFullPageScreenshot: true,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+        includePageDiagnostics: false,
+      },
+      ordinal: 0,
+      tabId: 62,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sendTabMessageMock).toHaveBeenCalledTimes(1);
+
+    const rejection = expect(request).rejects.toThrow('Page Package preparation timed out.');
+    await vi.advanceTimersByTimeAsync(180_000);
+    await rejection;
+
+    expect(sendTabMessageMock).toHaveBeenLastCalledWith(62, {
+      exportRunId: 'job-timeout',
+      type: MessageType.EXPORT_POPUP_CANCEL,
+    });
+    expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-timeout');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('applies Web Snapshot consent, resource policy, and capture authority to combined Export', async () => {
+  loadSettingsMock.mockResolvedValueOnce({
+    anonymousCrossOriginSnapshotAssetsEnabled: true,
+    authenticatedSnapshotAssetsEnabled: false,
+    externalSnapshotAssetRedirectsEnabled: true,
+  });
+  sendTabMessageMock.mockResolvedValue({
+    stagedPagePackage: {
+      jobId: 'job-combined',
+      manifestSha256: 'a'.repeat(64),
+      manifestSize: 10,
+      ordinal: 0,
+      pageId: 'page-combined',
+      producerStats: { filesCount: 4, filesFailed: 0, rowsCount: 2, sectionsCount: 2 },
+      stagedBlobId: 'stage-combined',
+      title: 'Page',
+      totalBytes: 20,
+    },
+    success: true,
+  });
+
+  await requestPopupExportPagePackage({
+    batchRequestId: 'job-combined',
+    includeWebCopy: true,
+    intent: 'export',
+    options: {
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: false,
+      includeImages: false,
+      includeJson: true,
+      includeMarkdown: false,
+      includePageDiagnostics: false,
+    },
+    ordinal: 0,
+    tabId: 62,
+  });
+
+  expect(loadSettingsMock).toHaveBeenCalledTimes(1);
+  expect(authorizeWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-combined', {
+    allowAnonymousCrossOriginAssets: true,
+    allowExternalAssetRedirects: true,
+  });
+  expect(issueContentGrantMock).toHaveBeenCalledWith({
+    actionTypes: [MessageType.EXPORT_CAPTURE_FULL_PAGE],
+    tabId: 62,
+  });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    62,
+    expect.objectContaining({
+      allowAnonymousCrossOriginAssets: true,
+      allowAuthenticatedSameOriginAssets: false,
+      includeWebCopy: true,
+      intent: 'export',
+    })
+  );
+  expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-combined');
+});
+
+it('cleans Web-copy authority when combined production returns no staged package', async () => {
+  sendTabMessageMock.mockResolvedValueOnce({ success: false, error: 'capture failed' });
+
+  await expect(
+    requestPopupExportPagePackage({
+      batchRequestId: 'job-failed-copy',
+      includeWebCopy: true,
+      intent: 'export',
+      options: {
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includeImages: false,
+        includeJson: true,
+        includeMarkdown: false,
+        includePageDiagnostics: false,
+      },
+      ordinal: 0,
+      tabId: 62,
+    })
+  ).rejects.toThrow('capture failed');
+
+  expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-failed-copy');
+});
+
+it('rejects and cleans an Export response carrying Save session authority', async () => {
+  sendTabMessageMock.mockResolvedValueOnce({
+    stagedPagePackage: {
+      jobId: 'job-hostile-session',
+      manifestSha256: 'a'.repeat(64),
+      manifestSize: 10,
+      ordinal: 0,
+      pageId: 'page-hostile-session',
+      producerStats: { filesCount: 3, filesFailed: 0, rowsCount: 0, sectionsCount: 1 },
+      snapshotSessionId: 'unexpected-save-session',
+      stagedBlobId: 'stage-hostile-session',
+      title: 'Page',
+      totalBytes: 20,
+    },
+    success: true,
+  });
+
+  await expect(
+    requestPopupExportPagePackage({
+      batchRequestId: 'job-hostile-session',
+      includeWebCopy: true,
+      intent: 'export',
+      options: {
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+        includePageDiagnostics: false,
+      },
+      ordinal: 0,
+      tabId: 62,
+    })
+  ).rejects.toThrow('does not match requested Web-copy authority');
+
+  expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-hostile-session');
+});
+
+it('carries stored Web Snapshot policy through the common Save package request', async () => {
+  sendTabMessageMock.mockResolvedValue({
+    stagedPagePackage: {
+      jobId: 'job-save',
+      manifestSha256: 'a'.repeat(64),
+      manifestSize: 10,
+      ordinal: 0,
+      pageId: 'page-1',
+      producerStats: { filesCount: 3, filesFailed: 0, rowsCount: 0, sectionsCount: 2 },
+      snapshotSessionId: 'session-1',
+      stagedBlobId: 'stage-1',
+      title: 'Page',
+      totalBytes: 20,
+    },
+    success: true,
+  });
+
+  await requestPopupExportPagePackage({
+    batchRequestId: 'job-save',
+    includeWebCopy: true,
+    intent: 'save',
+    options: {
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: true,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+      includePageDiagnostics: false,
+    },
+    ordinal: 0,
+    tabId: 62,
+  });
+
+  expect(authorizeWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-save', {
+    allowAnonymousCrossOriginAssets: false,
+    allowExternalAssetRedirects: false,
+  });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    62,
+    expect.objectContaining({
+      allowAnonymousCrossOriginAssets: false,
+      allowAuthenticatedSameOriginAssets: false,
+      intent: 'save',
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+    })
+  );
+  expect(cancelWebSnapshotCaptureRequestMock).not.toHaveBeenCalled();
+});
+
+it('revokes Save capture authority when package routing fails', async () => {
+  sendTabMessageMock.mockRejectedValueOnce(new Error('content unavailable'));
+
+  await expect(
+    requestPopupExportPagePackage({
+      batchRequestId: 'job-save-failed',
+      includeWebCopy: true,
+      intent: 'save',
+      options: {
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: true,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+        includePageDiagnostics: false,
+      },
+      ordinal: 0,
+      tabId: 62,
+    })
+  ).rejects.toThrow('content unavailable');
+
+  expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-save-failed');
+});
+
+it('canonical job cancellation revokes capture authority and deletes committed snapshots', async () => {
+  cancelWebSnapshotCaptureRequestMock.mockReturnValueOnce({
+    committedAssetIds: ['asset-cancelled'],
+    stagingCleanup: Promise.resolve(),
+  });
   sendTabMessageMock.mockResolvedValueOnce({ success: true });
 
-  routePopupExportMessage({
-    deps: createBackgroundRuntimeState(),
-    message: {
-      exportRunId: 'req-web-cancelled',
-      tabId: 62,
-      tabRouteCapabilityToken: 'cap-cancel',
-      tabRouteRequestId: 'req-cancel',
-      type: MessageType.EXPORT_POPUP_CANCEL,
-    },
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
+  await cancelPopupExportPagePackage({ exportRunId: 'job-save', tabId: 62 });
 
-  expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'req-web-cancelled');
+  expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'job-save');
   expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(['asset-cancelled']);
   expect(sendTabMessageMock).toHaveBeenCalledWith(62, {
-    exportRunId: 'req-web-cancelled',
+    exportRunId: 'job-save',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
-  expect(sendResponse).toHaveBeenCalledWith({ success: true });
 });
 
-it('still forwards content cancellation and reports failed snapshot compensation', async () => {
-  const sendResponse = vi.fn();
-  cancelWebSnapshotCaptureRequestMock.mockReturnValueOnce(['asset-cancelled']);
-  deleteMediaLibraryAssetsBatchSafelyMock.mockRejectedValueOnce(new Error('delete failed'));
+it('still forwards cancellation when capture compensation fails', async () => {
+  cancelWebSnapshotCaptureRequestMock.mockReturnValueOnce({
+    committedAssetIds: ['asset-retained'],
+    stagingCleanup: Promise.resolve(),
+  });
+  deleteMediaLibraryAssetsBatchSafelyMock.mockRejectedValueOnce(new Error('delete unavailable'));
   sendTabMessageMock.mockResolvedValueOnce({ success: true });
 
-  routePopupExportMessage({
-    deps: createBackgroundRuntimeState(),
-    message: {
-      exportRunId: 'req-web-cancelled',
-      tabId: 62,
-      tabRouteCapabilityToken: 'cap-cancel',
-      tabRouteRequestId: 'req-cancel',
-      type: MessageType.EXPORT_POPUP_CANCEL,
-    },
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
+  await expect(
+    cancelPopupExportPagePackage({ exportRunId: 'job-save', tabId: 62 })
+  ).rejects.toThrow('delete unavailable');
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(62, {
-    exportRunId: 'req-web-cancelled',
+    exportRunId: 'job-save',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
-  expect(sendResponse).toHaveBeenCalledWith({ error: 'delete failed', success: false });
 });
 
 it('routes normal popup export preview messages to the content tab', async () => {
@@ -248,107 +535,6 @@ it('rechecks page access before normal popup export side effects', async () => {
   expect(sendViewerPopupExportMessageMock).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith({
     error: 'Page access is required for export.',
-    success: false,
-  });
-});
-
-it('runs content-tab web snapshot saves through the injected runner result', async () => {
-  const sendResponse = vi.fn();
-  browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
-
-  routePopupExportMessage({
-    deps: createBackgroundRuntimeState(),
-    message: createSaveMessage(),
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
-
-  expect(authorizeWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'req-web', {
-    allowAnonymousCrossOriginAssets: false,
-  });
-  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      args: [
-        expect.objectContaining({
-          request: expect.objectContaining({
-            allowAnonymousCrossOriginAssets: false,
-            allowAuthenticatedSameOriginAssets: false,
-            contentIntentGrant: { grantToken: expect.any(String) },
-            requestId: 'req-web',
-          }),
-        }),
-      ],
-      target: { frameIds: [0], tabId: 62 },
-    })
-  );
-  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith({
-    files: ['assets/webSnapshotInjectedRunner.js'],
-    target: { frameIds: [0], tabId: 62 },
-  });
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(sendResponse).toHaveBeenCalledWith({
-    assetId: 'snapshot-1',
-    success: true,
-    warnings: [],
-  });
-});
-
-it('honors existing authenticated same-origin asset opt-ins from stored settings', async () => {
-  const sendResponse = vi.fn();
-  browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
-  loadSettingsMock.mockResolvedValue({
-    anonymousCrossOriginSnapshotAssetsEnabled: false,
-    authenticatedSnapshotAssetsEnabled: true,
-  });
-
-  routePopupExportMessage({
-    deps: createBackgroundRuntimeState(),
-    message: createSaveMessage(),
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
-
-  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      args: [
-        expect.objectContaining({
-          request: expect.objectContaining({ allowAuthenticatedSameOriginAssets: true }),
-        }),
-      ],
-    })
-  );
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-});
-
-it('surfaces injected content export failures with the route stage', async () => {
-  const sendResponse = vi.fn();
-  browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
-  browserScriptingExecuteScriptMock.mockResolvedValue([
-    {
-      frameId: 0,
-      result: {
-        error: 'window is not defined',
-        success: false,
-        warnings: [],
-      },
-    },
-  ]);
-
-  routePopupExportMessage({
-    deps: createBackgroundRuntimeState(),
-    message: createSaveMessage(),
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
-
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'route web snapshot content export: window is not defined',
     success: false,
   });
 });

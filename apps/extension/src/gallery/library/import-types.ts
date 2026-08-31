@@ -3,6 +3,7 @@ import type {
   MediaHubImportConflictStrategy,
   MediaHubImportResult,
 } from '../../workflows/media-hub-backup/index';
+import type { WebSnapshotImportInspection } from '../../workflows/page-package/import';
 
 export interface ActiveImportState {
   file: File;
@@ -27,4 +28,9 @@ export interface MediaFileImportConflict {
 export interface PendingMediaFileImportState {
   conflicts: MediaFileImportConflict[];
   files: File[];
+}
+
+export interface PendingWebSnapshotImportState {
+  file: File;
+  inspection: WebSnapshotImportInspection;
 }

@@ -4,30 +4,29 @@
 
 import fs from 'node:fs';
 
-import { collectFocusedGuardrailReport } from '../core/guardrail-preflight-report.mjs';
-import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
-import { collectAdvisoryFindings } from '../core/verify-advisory.collectors.helpers.mjs';
-import { filterImportOrMockOnlyDiffFiles } from '../core/import-only-diff.mjs';
+import { collectFocusedGuardrailReport } from '../composition/preflight/guardrail-preflight-report/check.mjs';
+import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
+import { collectAdvisoryFindings } from '../composition/advisory/execution/collectors.mjs';
+import { filterImportOrMockOnlyDiffFiles } from '../analysis/imports/import-only-diff/check.mjs';
+import { collectCodeFiles } from '../analysis/repository/shared-files.mjs';
 import {
-  collectCodeFiles,
   fromRelativePath,
-  isExecutedAsScript,
   isIgnoredRelativePath,
   toRelativePath,
-} from '../core/shared.mjs';
-import { createOkStep } from '../core/focused-qa-results.mjs';
-import { PRODUCT_QA_SUITE, createScopedQaContext } from '../core/qa-scope.mjs';
+} from '../analysis/repository/shared-paths.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { createOkStep } from '../composition/checkpoint/focused-qa-results.mjs';
+import { PRODUCT_QA_SUITE, createScopedQaContext } from '../composition/scope/qa-scope.mjs';
 import {
   collectContractChecklist,
   collectTransitiveConsumerHints,
   collectTypecheckBlastRadius,
-} from './preflight-contract-report.mjs';
-import { collectRelevantDocs, isUiFile } from './preflight-docs.mjs';
-import { collectSecurityControlHints } from './preflight-security-hints.mjs';
-import { collectPreflightReportLines } from './preflight-render.mjs';
+} from './preflight/preflight-contract-report.mjs';
+import { collectRelevantDocs, isUiFile } from './preflight/preflight-docs.mjs';
+import { collectPreflightReportLines } from './preflight/preflight-render.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
-import { classifyOwnerGroup } from '../core/structural-risk/owner-classifier.mjs';
-import { runStructuralRiskCheck } from '../core/verify-structural-risk.mjs';
+import { classifyOwnerGroup } from '../analysis/structural-risk/owner-classifier.mjs';
+import { runStructuralRiskCheck } from '../analysis/structural-risk/check.mjs';
 
 const JS_LIKE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
 const SHARED_SOURCE_PATTERNS = [
@@ -38,6 +37,16 @@ const STORAGE_OR_SETTINGS_SOURCE_PATTERN =
   /^apps\/extension\/src\/(?:composition\/persistence|[^/]+\/(?:persistence|state)|settings)\//u;
 const CONTENT_PARSER_SOURCE_PATTERN =
   /^apps\/extension\/src\/content\/(?:parser|application\/.*(?:snapshot|profile|export))/u;
+const SECURITY_CONTROL_FILE =
+  /(?:security-|dependency-|source-sbom|codeql|threat-model|manifest-permissions)/u;
+const SECURITY_CONTROL_PROOF_HINT =
+  'security/dependency policy changes require compact admission and guard fixtures; route review by changed seam';
+
+function collectSecurityControlHints(files) {
+  return files.some((file) => SECURITY_CONTROL_FILE.test(file))
+    ? [SECURITY_CONTROL_PROOF_HINT]
+    : [];
+}
 
 function normalizeExplicitFiles(files) {
   return [

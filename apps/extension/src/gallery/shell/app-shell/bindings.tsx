@@ -10,8 +10,12 @@ import {
   isGalleryMediaItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
+  isGallerySelectableItem,
   isGalleryVideoProjectItem,
 } from '../../library/items';
+import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
+import { translate } from '../../../platform/i18n';
+import { openGalleryConfirmDialog } from '../../library/actions/shared';
 
 function resolvePromotionTarget(item: GalleryItem) {
   if (isGalleryMediaItem(item)) return { kind: 'image' as const, id: item.entityId ?? item.id };
@@ -119,6 +123,14 @@ function buildGallerySelectionHandlers(
     onDeleteMany: (items: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0]) =>
       void actions.selection.deleteMany(items),
     onClearSelection: () => controller.actions.selection.setSelectedIds(new Set()),
+    onSelectAllFiltered: () =>
+      controller.actions.selection.setSelectedIds(
+        new Set(
+          controller.state.derived.filteredItems
+            .filter(isGallerySelectableItem)
+            .map((item) => item.id)
+        )
+      ),
     onToggleSelection: controller.actions.selection.toggleSelection,
   };
 }
@@ -132,15 +144,22 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     importTriggerRef: controller.refs.importTriggerRef,
     mediaImportInputRef: controller.refs.mediaImportInputRef,
     mediaImportTriggerRef: controller.refs.mediaImportTriggerRef,
+    webSnapshotImportInputRef: controller.refs.webSnapshotImportInputRef,
+    webSnapshotImportTriggerRef: controller.refs.webSnapshotImportTriggerRef,
     state: controller.state,
     viewMode: props.viewMode,
     onImportFileChange: (file: File | null) => void actions.importing.importSelectedFile(file),
     onMediaImportFileChange: (files: File[]) => void actions.importing.importMediaFiles(files),
+    onImportFilesDrop: (files: File[]) => void actions.importing.importDroppedFiles(files),
+    onWebSnapshotImportFileChange: (file: File | null) =>
+      void actions.importing.inspectWebSnapshot(file),
     onActiveImportCancel: actions.importing.cancelActiveImport,
     onActiveImportDismiss: actions.importing.dismissActiveImport,
     onConfirmDialogClose: () => controller.actions.surface.setConfirmDialog(null),
     onPendingImportClose: actions.importing.closePendingImport,
     onPendingMediaImportClose: actions.importing.closePendingMediaImport,
+    onPendingWebSnapshotImportClose: actions.importing.closePendingWebSnapshotImport,
+    onWebSnapshotImportConfirm: actions.importing.confirmWebSnapshotImport,
     onMediaImportConfirm: (
       strategy: Parameters<UseGalleryAppActionsResult['importing']['confirmMediaFileImport']>[0]
     ) => void actions.importing.confirmMediaFileImport(strategy),
@@ -156,6 +175,7 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onExportBackup: () => void actions.backup.exportBackup(),
     onImportBackupClick: () => controller.refs.importInputRef.current?.click(),
     onImportMediaClick: () => controller.refs.mediaImportInputRef.current?.click(),
+    onImportWebSnapshotClick: () => controller.refs.webSnapshotImportInputRef.current?.click(),
     onBannerDismiss: () => controller.actions.surface.setBanner(null),
     onFilenameChange: controller.actions.preview.setFilenameDraft,
     onTagDraftChange: controller.actions.preview.setTagDraft,
@@ -165,7 +185,27 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onScopeChange: controller.actions.filters.setScope,
     onActiveTagsChange: controller.actions.filters.setActiveTags,
     onFacetFilterChange: controller.actions.filters.setFacetFilter,
+    onCreateSavedView: controller.actions.filters.createSavedView,
+    onDeleteSavedView: (view: GallerySavedView) =>
+      openGalleryConfirmDialog(controller, {
+        title: translate('gallery.app.savedViewDeleteTitle'),
+        message: translate('gallery.app.savedViewDeleteMessage').replace('{name}', view.name),
+        onConfirm: async () => {
+          try {
+            await controller.actions.filters.deleteSavedView(view.id);
+          } catch (error) {
+            controller.actions.surface.setBanner(translate('gallery.app.savedViewDeleteFailed'));
+            throw error;
+          }
+        },
+      }),
+    onMoveSavedView: (id: string, direction: 'down' | 'up') =>
+      void controller.actions.filters.moveSavedView(id, direction).catch(() => {
+        controller.actions.surface.setBanner(translate('gallery.app.savedViewReorderFailed'));
+      }),
     onResetFilters: controller.actions.filters.resetFilters,
+    onSavedViewSelect: controller.actions.filters.selectSavedView,
+    onUpdateSavedView: controller.actions.filters.updateSavedView,
     onSearchChange: controller.actions.filters.setSearch,
     onSortModeChange: controller.actions.filters.setSortMode,
     onViewModeChange: props.setViewMode,

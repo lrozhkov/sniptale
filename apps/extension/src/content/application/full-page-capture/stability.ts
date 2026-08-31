@@ -1,12 +1,16 @@
 import type { FullPageCaptureGeometry } from '../../../contracts/full-page-capture';
 import { writePageScroll } from '../../platform/page-scroll';
 import type { ScrollCaptureRoot } from './types';
+import { measureCaptureGeometry } from './geometry';
 
 const QUIET_MS = 150;
 const POSITION_TIMEOUT_MS = 1_500;
 const FONT_TIMEOUT_MS = 2_000;
 const WARMUP_TIMEOUT_MS = 20_000;
 const MAX_WARMUP_POSITIONS = 80;
+const WARMUP_PASSES = 2;
+const MAX_WARMUP_POSITIONS_PER_PASS = Math.floor(MAX_WARMUP_POSITIONS / WARMUP_PASSES);
+const WARMUP_TIMEOUT_PER_PASS_MS = Math.floor(WARMUP_TIMEOUT_MS / WARMUP_PASSES);
 const OVERLAP_CSS_PX = 64;
 
 function timeout(ms: number): Promise<void> {
@@ -97,25 +101,34 @@ export async function warmUpLazyContent(
     await Promise.race([document.fonts.ready.then(() => undefined), timeout(FONT_TIMEOUT_MS)]);
     throwIfAborted(signal);
   }
-  const startedAt = Date.now();
-  let visited = 0;
-  const xPositions =
-    root.kind === 'element'
-      ? createPositions(geometry.extentWidth, geometry.rootViewport.width)
-      : [0];
-  const yPositions = createPositions(geometry.extentHeight, geometry.rootViewport.height);
-  for (const y of yPositions) {
-    for (const x of xPositions) {
-      if (visited >= MAX_WARMUP_POSITIONS || Date.now() - startedAt >= WARMUP_TIMEOUT_MS) {
-        return;
+  for (let pass = 0; pass < WARMUP_PASSES; pass += 1) {
+    const passStartedAt = Date.now();
+    let visited = 0;
+    const currentGeometry = pass === 0 ? geometry : measureCaptureGeometry(root);
+    const xPositions =
+      root.kind === 'element'
+        ? createPositions(currentGeometry.extentWidth, currentGeometry.rootViewport.width)
+        : [0];
+    const yPositions = createPositions(
+      currentGeometry.extentHeight,
+      currentGeometry.rootViewport.height
+    );
+    passPositions: for (const y of yPositions) {
+      for (const x of xPositions) {
+        if (
+          visited >= MAX_WARMUP_POSITIONS_PER_PASS ||
+          Date.now() - passStartedAt >= WARMUP_TIMEOUT_PER_PASS_MS
+        ) {
+          break passPositions;
+        }
+        throwIfAborted(signal);
+        writePageScroll(root, x, y);
+        heartbeat?.();
+        visited += 1;
+        await waitForCaptureStability(signal);
+        throwIfAborted(signal);
+        heartbeat?.();
       }
-      throwIfAborted(signal);
-      writePageScroll(root, x, y);
-      heartbeat?.();
-      visited += 1;
-      await waitForCaptureStability(signal);
-      throwIfAborted(signal);
-      heartbeat?.();
     }
   }
 }

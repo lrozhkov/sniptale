@@ -2,10 +2,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 import { EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores.ts';
 
-const { openDB } = vi.hoisted(() => ({ openDB: vi.fn() }));
+const { openDB } = vi.hoisted(() => ({
+  openDB: vi.fn(),
+}));
 
 vi.mock('idb', () => ({ openDB }));
-
 afterEach(() => {
   vi.unstubAllGlobals();
 });

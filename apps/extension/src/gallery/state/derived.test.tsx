@@ -60,7 +60,12 @@ function createProbeProps(
   return {
     filters: {
       actions: {
+        createSavedView: vi.fn(),
+        deleteSavedView: vi.fn(),
+        moveSavedView: vi.fn(),
+        reloadSavedViews: vi.fn(),
         resetFilters: vi.fn(),
+        selectSavedView: vi.fn(),
         setActiveTags: vi.fn(),
         setFolderFilter: vi.fn(),
         setFacetFilter: vi.fn(),
@@ -69,8 +74,10 @@ function createProbeProps(
         setSelectedIds: vi.fn(),
         setSelectionTagDraft: vi.fn(),
         setSortMode: vi.fn(),
+        updateSavedView: vi.fn(),
       },
       state: {
+        activeSavedView: null,
         activeTags: ['alpha'],
         facetFilters: {
           created: [],
@@ -82,6 +89,10 @@ function createProbeProps(
           updated: [],
         },
         folderFilter: 'all',
+        isSavedViewDirty: false,
+        savedViews: [],
+        savedViewsLoadFailed: false,
+        savedViewsLoaded: true,
         search: 'capture',
         scope: 'library',
         selectedIds: new Set(['asset-1']),
@@ -113,6 +124,10 @@ function createProbeProps(
       importTriggerRef: { current: null },
       mediaImportInputRef: { current: null },
       mediaImportTriggerRef: { current: null },
+      webSnapshotImport: {
+        inputRef: { current: null },
+        triggerRef: { current: null },
+      },
       scrollTop: 12,
       viewportHeight: 600,
     },

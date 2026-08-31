@@ -6,9 +6,13 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Подготовка экспорта...',
     en: 'Preparing export...',
   },
+  cancellingMessage: {
+    ru: 'Останавливаем сбор...',
+    en: 'Stopping collection...',
+  },
   screenshotPermissionDeniedWarning: {
-    ru: 'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
-    en: 'All-sites access was not granted; export continued without full-page screenshots.',
+    ru: 'Доступ ко всем страницам не выдан: экспорт продолжен без скриншотов.',
+    en: 'All-sites access was not granted; export continued without screenshots.',
   },
   manualTabConflictWarning: {
     ru: 'Скриншоты больше не снимаются: активная вкладка была переключена вручную.',
@@ -59,8 +63,156 @@ export const popupExportMessages = defineMessageSource({
     en: 'Export finished with errors',
   },
   dataTypesSectionLabel: {
-    ru: 'Состав экспорта',
-    en: 'Export contents',
+    ru: 'Состав пакета',
+    en: 'Package contents',
+  },
+  dataTypesSectionDescription: {
+    ru: 'Выберите веб-копию, данные, файлы и диагностику для пакета.',
+    en: 'Choose the Web copy, data, files, and diagnostics for the package.',
+  },
+  settingsAction: { ru: 'Настройка', en: 'Settings' },
+  packageCaptureSettingsTitle: {
+    ru: 'Настройки снимка',
+    en: 'Snapshot settings',
+  },
+  packageCaptureSettingsDescription: {
+    ru: 'Настройте подготовку страницы и безопасные пределы вложений.',
+    en: 'Configure page preparation and safe attachment limits.',
+  },
+  captureLazyContentLabel: {
+    ru: 'Загружать содержимое при прокрутке',
+    en: 'Load content while scrolling',
+  },
+  captureLazyContentDescription: {
+    ru: 'Предварительно пройти страницу, чтобы появились отложенные изображения и блоки.',
+    en: 'Warm up the page so deferred images and sections can appear.',
+  },
+  captureFreezeMotionLabel: {
+    ru: 'Остановить анимации',
+    en: 'Pause animations',
+  },
+  captureFreezeMotionDescription: {
+    ru: 'Зафиксировать движущиеся элементы на время захвата для ровной склейки.',
+    en: 'Freeze moving elements during capture for consistent stitching.',
+  },
+  captureFloatingElementsLabel: {
+    ru: 'Закреплённые элементы',
+    en: 'Pinned elements',
+  },
+  captureFloatingElementsDescription: {
+    ru: 'Как показывать шапки, чаты и панели, закреплённые поверх страницы.',
+    en: 'How headers, chats, and panels pinned over the page are captured.',
+  },
+  captureFloatingOnce: { ru: 'Один раз', en: 'Once' },
+  captureFloatingHide: { ru: 'Скрыть', en: 'Hide' },
+  captureFloatingRepeat: { ru: 'Повторять', en: 'Repeat' },
+  captureBehaviorHelp: {
+    ru: 'Длинные и динамические страницы захватываются в безопасных пределах приложения. Время загрузки адресов настраивается в разделе «Страницы», а качество — в настройках изображений.',
+    en: 'Long and dynamic pages are captured within the app’s safety limits. Address loading waits are under Pages; image quality is configured in Image settings.',
+  },
+  resourceLimitsTitle: {
+    ru: 'Вложения и изображения',
+    en: 'Attachments and images',
+  },
+  resourceLimitsDescription: {
+    ru: 'Ограничения действуют вместе для файлов, оригиналов из поддерживаемых превью и обычных изображений страницы.',
+    en: 'Limits apply together to files, originals from supported previews, and ordinary page images.',
+  },
+  resourceLimitCountLabel: { ru: 'Не больше файлов', en: 'Maximum files' },
+  resourceLimitFileSizeLabel: { ru: 'Размер одного файла', en: 'Per-file size' },
+  resourceLimitTotalSizeLabel: { ru: 'Общий размер', en: 'Total size' },
+  resourceLimitMiB: { ru: 'МБ', en: 'MiB' },
+  resourceLimitsHelp: {
+    ru: 'Ресурсы сверх лимита пропускаются с предупреждением, а пакет продолжает собираться.',
+    en: 'Resources over a limit are skipped with a warning while package creation continues.',
+  },
+  packageDestinationLabel: {
+    ru: 'Настройки действия',
+    en: 'Action settings',
+  },
+  packageDestinationDownload: {
+    ru: 'Скачать',
+    en: 'Download',
+  },
+  packageDestinationDownloadDescription: {
+    ru: 'Скачать полный пакет страницы как ZIP-архив.',
+    en: 'Download the complete page package as a ZIP archive.',
+  },
+  packageDestinationLibrary: {
+    ru: 'В библиотеку',
+    en: 'To Library',
+  },
+  packageDestinationLibraryDescription: {
+    ru: 'Сохранить веб-копию и открыть веб-снимок.',
+    en: 'Save the Web copy and open the Web Snapshot.',
+  },
+  packagePresetLabel: {
+    ru: 'Быстрый выбор',
+    en: 'Quick selection',
+  },
+  packagePresetCustom: {
+    ru: 'Свой состав',
+    en: 'Custom',
+  },
+  packagePresetWebCopy: {
+    ru: 'Веб-копия',
+    en: 'Web copy',
+  },
+  packagePresetMaterials: {
+    ru: 'Данные и файлы',
+    en: 'Data and files',
+  },
+  packagePreferencesSaveError: {
+    ru: 'Не удалось сохранить состав пакета. Повторите ещё раз.',
+    en: 'Could not save the package contents. Please try again.',
+  },
+  packageWebCopyLabel: {
+    ru: 'Веб-копия страницы',
+    en: 'Page Web copy',
+  },
+  packageWebCopyDescription: {
+    ru: 'Статический документ, стили, изображения и другие ресурсы.',
+    en: 'Static document, styles, images, and other resources.',
+  },
+  webCopyCurrentSiteLabel: {
+    ru: 'Ресурсы текущего сайта',
+    en: 'Current-site resources',
+  },
+  webCopyCurrentSiteDescription: {
+    ru: 'Загружать стили и изображения с доступом текущей вкладки.',
+    en: 'Load styles and images using the current tab’s access.',
+  },
+  webCopyExternalSitesLabel: {
+    ru: 'Ресурсы с других сайтов',
+    en: 'Resources from other sites',
+  },
+  webCopyExternalSitesDescription: {
+    ru: 'Анонимно загружать внешние стили, шрифты и изображения.',
+    en: 'Load external styles, fonts, and images anonymously.',
+  },
+  webCopyExternalRedirectsLabel: {
+    ru: 'Разрешать перенаправления ресурсов',
+    en: 'Allow resource redirects',
+  },
+  webCopyExternalRedirectsDescription: {
+    ru: 'Следовать на другой публичный HTTPS-адрес, если ресурс перенаправляет запрос.',
+    en: 'Follow to another public HTTPS address when an asset redirects the request.',
+  },
+  webCopyExternalLinksLabel: {
+    ru: 'Открывать ссылки из веб-копии',
+    en: 'Open links from the Web copy',
+  },
+  webCopyExternalLinksDescription: {
+    ru: 'Открывать сайт в новой вкладке. При переходе сайт получит обычный сетевой запрос.',
+    en: 'Open the live site in a new tab. Following a link sends a normal network request to it.',
+  },
+  webCopyResourceSettingsError: {
+    ru: 'Не удалось сохранить настройку ресурсов.',
+    en: 'Could not save the resource setting.',
+  },
+  packageWebCopyDisabledDescription: {
+    ru: 'Функция выключена. Откройте настройки, чтобы добавить безопасную автономную копию.',
+    en: 'The feature is off. Open Settings to add a safe self-contained copy.',
   },
   contentGroupLabel: {
     ru: 'Содержимое',
@@ -74,6 +226,52 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Страницы',
     en: 'Pages',
   },
+  tabsSectionDescription: {
+    ru: 'Выберите открытые вкладки или добавьте список веб-адресов.',
+    en: 'Choose open tabs or add a list of web addresses.',
+  },
+  pageSourceModeLabel: { ru: 'Источник страниц', en: 'Page source' },
+  pageSourceTabs: { ru: 'Вкладки', en: 'Tabs' },
+  pageSourceUrls: { ru: 'Адреса', en: 'Addresses' },
+  urlInputLabel: { ru: 'Список веб-адресов', en: 'Web address list' },
+  urlInputPlaceholder: {
+    ru: 'Один адрес на строку\nexample.com\nhttps://example.org/page',
+    en: 'One address per line\nexample.com\nhttps://example.org/page',
+  },
+  urlInputHelp: {
+    ru: 'Можно разделять адреса новой строкой, запятой или точкой с запятой.',
+    en: 'Separate addresses with a new line, comma, or semicolon.',
+  },
+  urlInputInvalid: {
+    ru: 'Не распознано адресов: {{count}}',
+    en: 'Unrecognized addresses: {{count}}',
+  },
+  urlInputLimit: {
+    ru: 'Пропущено адресов сверх лимита: {{count}}',
+    en: 'Addresses over the limit were skipped: {{count}}',
+  },
+  noSelectedUrls: { ru: 'Не добавлены адреса для экспорта', en: 'No addresses added for export' },
+  urlPermissionDenied: {
+    ru: 'Разрешите доступ к сайтам, чтобы открыть и захватить добавленные адреса.',
+    en: 'Allow site access to open and capture the added addresses.',
+  },
+  pageSettingsTitle: { ru: 'Настройки захвата страниц', en: 'Page capture settings' },
+  pageSettingsDescription: {
+    ru: 'Настройте ожидание загрузки для вкладок и добавленных адресов.',
+    en: 'Configure loading waits for tabs and added addresses.',
+  },
+  pageLoadTimeout: { ru: 'Ожидание загрузки', en: 'Page load timeout' },
+  pageSettleDelay: { ru: 'Пауза после загрузки', en: 'Delay after loading' },
+  pageTimingHelp: {
+    ru: 'Если страница не загрузится вовремя, она будет пропущена. Пауза помогает дождаться анимаций и динамического содержимого.',
+    en: 'A page that does not load in time is skipped. The delay lets animations and dynamic content settle.',
+  },
+  noDelay: { ru: 'Без паузы', en: 'No delay' },
+  secondsShort: { ru: 'с', en: 'sec' },
+  temporaryTabsCleanupWarning: {
+    ru: 'Не удалось автоматически закрыть некоторые временные вкладки.',
+    en: 'Some temporary capture tabs could not be closed automatically.',
+  },
   editButton: {
     ru: 'Изменить',
     en: 'Edit',
@@ -81,6 +279,10 @@ export const popupExportMessages = defineMessageSource({
   doneButton: {
     ru: 'Готово',
     en: 'Done',
+  },
+  backButton: {
+    ru: 'Назад',
+    en: 'Back',
   },
   removeFromSelectionAction: {
     ru: 'Убрать из экспорта',
@@ -167,20 +369,20 @@ export const popupExportMessages = defineMessageSource({
     en: 'Text and tables',
   },
   includeFilesLabel: {
-    ru: 'Файлы',
-    en: 'Files',
+    ru: 'Вложения',
+    en: 'Attachments',
   },
   includeFilesDescription: {
-    ru: 'Документы и вложения со страницы',
-    en: 'Documents and attachments from the page',
+    ru: 'Явные ссылки скачивания и поддерживаемые вложения страницы',
+    en: 'Explicit download links and supported page attachments',
   },
   includeImagesLabel: {
     ru: 'Изображения',
     en: 'Images',
   },
   includeImagesDescription: {
-    ru: 'Изображения и превью со страницы',
-    en: 'Images and previews from the page',
+    ru: 'Обычные изображения и оригиналы из поддерживаемых превью',
+    en: 'Ordinary images and originals from supported previews',
   },
   includeBasicLogsLabel: {
     ru: 'Журнал экспорта',
@@ -191,12 +393,12 @@ export const popupExportMessages = defineMessageSource({
     en: 'Page details, collection notes, and export warnings',
   },
   includePageDiagnosticsLabel: {
-    ru: 'Данные страницы для анализа',
-    en: 'Page analysis data',
+    ru: 'Расширенные данные страницы',
+    en: 'Extended page data',
   },
   includePageDiagnosticsDescription: {
-    ru: 'Структура страницы, элементы интерфейса и сведения о загрузке ресурсов',
-    en: 'Page structure, interface elements, and resource loading details',
+    ru: 'Видимый текст, структура, исходные ссылки и метаданные скриптов',
+    en: 'Visible text, structure, original links, and script metadata',
   },
   includeCssDiagnosticsLabel: {
     ru: 'Оформление и стили',
@@ -207,12 +409,20 @@ export const popupExportMessages = defineMessageSource({
     en: 'Colors, fonts, CSS styles, and element properties',
   },
   includeFullPageScreenshotLabel: {
-    ru: 'Скриншот',
-    en: 'Screenshot',
+    ru: 'Скриншот всей страницы',
+    en: 'Full-page screenshot',
   },
   includeFullPageScreenshotDescription: {
     ru: 'Снимок всей страницы целиком',
     en: 'Capture of the entire page',
+  },
+  includeViewportScreenshotLabel: {
+    ru: 'Скриншот видимой части',
+    en: 'Visible-area screenshot',
+  },
+  includeViewportScreenshotDescription: {
+    ru: 'Отдельный снимок области, которая видна перед началом захвата',
+    en: 'A separate capture of the area visible before collection starts',
   },
   copyButton: {
     ru: 'Копировать',

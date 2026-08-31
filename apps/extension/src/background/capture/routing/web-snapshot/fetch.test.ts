@@ -2,10 +2,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   authorizeWebSnapshotCaptureRequest,
+  cancelWebSnapshotCaptureRequest,
   registerWebSnapshotAssetSession,
   resetWebSnapshotAssetSessionsForTests,
 } from './session';
-import { fetchWebSnapshotAssetForSession } from './fetch';
+import { fetchWebSnapshotAssetForSession, fetchWebSnapshotAssetsForSession } from './fetch';
 
 const TEN_MIB = 10 * 1024 * 1024;
 
@@ -16,6 +17,7 @@ function createResponse(args: {
   contentType?: string;
   ok?: boolean;
   status?: number;
+  url?: string;
 }): Response {
   const body =
     args.bodyStream === undefined ? createBodyStream([args.body ?? 'asset']) : args.bodyStream;
@@ -26,6 +28,7 @@ function createResponse(args: {
     },
     status: args.ok === false ? (args.status ?? 500) : (args.status ?? 200),
   });
+  if (args.url) Object.defineProperty(response, 'url', { value: args.url });
   vi.spyOn(response, 'blob');
   return response;
 }
@@ -41,8 +44,14 @@ function createBodyStream(chunks: string[]): ReadableStream<Uint8Array> {
   });
 }
 
-function registerSession(urls: string[] = ['https://cdn.example.com/image.png']): string {
-  authorizeWebSnapshotCaptureRequest(42, 'req-1', { allowAnonymousCrossOriginAssets: true });
+function registerSession(
+  urls: string[] = ['https://cdn.example.com/image.png'],
+  allowExternalAssetRedirects = false
+): string {
+  authorizeWebSnapshotCaptureRequest(42, 'req-1', {
+    allowAnonymousCrossOriginAssets: true,
+    allowExternalAssetRedirects,
+  });
   return registerWebSnapshotAssetSession(42, 'req-1', urls);
 }
 
@@ -59,8 +68,63 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   resetWebSnapshotAssetSessionsForTests();
   vi.unstubAllGlobals();
+});
+
+it('bounds a hostile asset batch by concurrency and the session time budget', async () => {
+  vi.useFakeTimers();
+  const urls = Array.from(
+    { length: 12 },
+    (_, index) => `https://cdn.example.com/hanging-${index}.png`
+  );
+  const sessionId = registerSession(urls);
+  let active = 0;
+  let maxActive = 0;
+  vi.mocked(fetch).mockImplementation((_input, init) => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener(
+        'abort',
+        () => {
+          active -= 1;
+          reject(init.signal?.reason);
+        },
+        { once: true }
+      );
+    });
+  });
+
+  const batch = fetchWebSnapshotAssetsForSession({ sessionId, tabId: 42, urls });
+  for (let wave = 0; wave < 4; wave += 1) {
+    await vi.advanceTimersByTimeAsync(15_001);
+  }
+
+  const results = await batch;
+  expect(results).toHaveLength(urls.length);
+  expect(results.every((result) => result.success === false)).toBe(true);
+  expect(maxActive).toBe(3);
+  expect(active).toBe(0);
+});
+
+it('retains per-item failure results when a batch fetch rejects with a non-Error value', async () => {
+  const urls = ['https://cdn.example.com/ok.png', 'https://cdn.example.com/rejected.png'];
+  const sessionId = registerSession(urls);
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    if (String(input).endsWith('/rejected.png')) throw 'network rejected';
+    return createResponse({ contentType: 'image/png' });
+  });
+
+  await expect(fetchWebSnapshotAssetsForSession({ sessionId, tabId: 42, urls })).resolves.toEqual([
+    expect.objectContaining({ success: true, url: urls[0] }),
+    {
+      error: 'anonymous asset fetch failed',
+      success: false,
+      url: urls[1],
+    },
+  ]);
 });
 
 it('fetches registered public assets anonymously', async () => {
@@ -81,6 +145,52 @@ it('fetches registered public assets anonymously', async () => {
     'https://cdn.example.com/image.png',
     expect.objectContaining({ credentials: 'omit' })
   );
+});
+
+it('captures a binary-verified WOFF2 asset served as generic bytes', async () => {
+  const url = 'https://cdn.example.com/typeface.woff2';
+  const sessionId = registerSession([url]);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({ body: 'wOF2font-data', contentType: 'application/octet-stream' })
+  );
+
+  await expect(fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url })).resolves.toEqual({
+    base64: Buffer.from('wOF2font-data').toString('base64'),
+    mimeType: 'font/woff2',
+  });
+});
+
+it('rejects generic response bytes that only claim a font extension', async () => {
+  const url = 'https://cdn.example.com/typeface.woff2';
+  const sessionId = registerSession([url]);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({ body: 'not-font-data', contentType: 'application/octet-stream' })
+  );
+
+  await expect(fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url })).rejects.toThrow(
+    'unsupported web snapshot asset MIME type'
+  );
+});
+
+it('aborts an in-flight public asset fetch when its capture request is cancelled', async () => {
+  const sessionId = registerSession();
+  vi.mocked(fetch).mockImplementationOnce((_input, init) => {
+    const signal = init?.signal;
+    return new Promise<Response>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  });
+
+  const pendingFetch = fetchWebSnapshotAssetForSession({
+    sessionId,
+    tabId: 42,
+    url: 'https://cdn.example.com/image.png',
+  });
+  await Promise.resolve();
+
+  cancelWebSnapshotCaptureRequest(42, 'req-1');
+
+  await expect(pendingFetch).rejects.toThrow('Web snapshot save was cancelled');
 });
 
 it('rejects private-network asset URLs before fetch', async () => {
@@ -124,6 +234,65 @@ it('rejects public insecure HTTP asset URLs before fetch', async () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 
+it('rejects external asset redirects without following their target', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl]);
+  const redirect = createResponse({ bodyStream: null, status: 302 });
+  redirect.headers.set('location', 'https://redirected.example.com/image.png');
+  vi.mocked(fetch).mockResolvedValueOnce(redirect);
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).rejects.toThrow('web snapshot asset redirects are not allowed');
+  expect(fetch).toHaveBeenCalledWith(
+    sourceUrl,
+    expect.objectContaining({ credentials: 'omit', redirect: 'manual' })
+  );
+});
+
+it('follows an external asset redirect only when the capture session allows it', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl], true);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({
+      contentType: 'image/png',
+      url: 'https://avatars.example.com/image.png',
+    })
+  );
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).resolves.toEqual({
+    base64: Buffer.from('asset').toString('base64'),
+    mimeType: 'image/png',
+  });
+  expect(fetch).toHaveBeenCalledWith(
+    sourceUrl,
+    expect.objectContaining({ credentials: 'omit', redirect: 'follow' })
+  );
+});
+
+it('rejects a redirected response whose final URL is not a public HTTPS target', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl], true);
+  vi.mocked(fetch).mockResolvedValueOnce(
+    createResponse({ contentType: 'image/png', url: 'http://127.0.0.1/image.png' })
+  );
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).rejects.toThrow('private network asset URLs are not allowed');
+});
+
+it('rejects an allowed redirect when the final response URL is unavailable', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl], true);
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).rejects.toThrow('redirected asset response URL is unavailable');
+});
+
 it('rejects URLs that were not registered for the session', async () => {
   const sessionId = registerSession(['https://cdn.example.com/image.png']);
 
@@ -163,7 +332,7 @@ it('rejects unsupported MIME types and HTTP failures', async () => {
   ).rejects.toThrow('HTTP 404');
 });
 
-it('rejects SVG assets before returning anonymous fetch bytes', async () => {
+it('returns registered SVG bytes for mandatory content-side sanitization', async () => {
   const sessionId = registerSession(['https://cdn.example.com/unsafe.svg']);
   vi.mocked(fetch).mockResolvedValueOnce(
     createResponse({
@@ -178,7 +347,10 @@ it('rejects SVG assets before returning anonymous fetch bytes', async () => {
       tabId: 42,
       url: 'https://cdn.example.com/unsafe.svg',
     })
-  ).rejects.toThrow('unsupported web snapshot asset MIME type');
+  ).resolves.toEqual({
+    base64: 'PHN2ZyBvbmxvYWQ9ImFsZXJ0KDEpIj48Zm9yZWlnbk9iamVjdCAvPjwvc3ZnPg==',
+    mimeType: 'image/svg+xml',
+  });
 });
 
 it('rejects oversized assets from content-length before reading the body', async () => {

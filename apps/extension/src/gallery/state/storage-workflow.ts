@@ -14,19 +14,24 @@ type GalleryStorageWorkflowState = Pick<
   | 'pendingExport'
   | 'pendingImport'
   | 'pendingMediaImport'
+  | 'pendingWebSnapshotImport'
   | 'storageInfo'
 >;
 
 type GalleryStorageWorkflowActions = Pick<
   GalleryAppStateController['actions']['storage'] & GalleryAppStateController['actions']['surface'],
   | 'refresh'
+  | 'beginBlockingOperation'
+  | 'cancelActiveBackupExport'
+  | 'releaseActiveBackupExport'
+  | 'replaceActiveBackupExport'
   | 'setActiveImport'
   | 'setBanner'
   | 'setConfirmDialog'
-  | 'setIsBusy'
   | 'setPendingExport'
   | 'setPendingImport'
   | 'setPendingMediaImport'
+  | 'setPendingWebSnapshotImport'
 >;
 
 interface UseGalleryStorageWorkflowOptions {
@@ -47,6 +52,7 @@ function buildGalleryStorageWorkflowState(
     pendingExport: surface.state.pendingExport,
     pendingImport: surface.state.pendingImport,
     pendingMediaImport: surface.state.pendingMediaImport,
+    pendingWebSnapshotImport: surface.state.pendingWebSnapshotImport,
     storageInfo: library.storageInfo,
   };
 }
@@ -56,14 +62,18 @@ function buildGalleryStorageWorkflowActions(
   surface: ReturnType<typeof useGallerySurfaceState>
 ): GalleryStorageWorkflowActions {
   return {
+    beginBlockingOperation: surface.actions.beginBlockingOperation,
+    cancelActiveBackupExport: surface.actions.cancelActiveBackupExport,
+    releaseActiveBackupExport: surface.actions.releaseActiveBackupExport,
+    replaceActiveBackupExport: surface.actions.replaceActiveBackupExport,
     setActiveImport: surface.actions.setActiveImport,
     refresh: library.refresh,
     setBanner: surface.actions.setBanner,
     setConfirmDialog: surface.actions.setConfirmDialog,
-    setIsBusy: surface.actions.setIsBusy,
     setPendingExport: surface.actions.setPendingExport,
     setPendingImport: surface.actions.setPendingImport,
     setPendingMediaImport: surface.actions.setPendingMediaImport,
+    setPendingWebSnapshotImport: surface.actions.setPendingWebSnapshotImport,
   };
 }
 

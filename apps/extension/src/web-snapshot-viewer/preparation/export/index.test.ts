@@ -2,6 +2,7 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 
 const mocks = vi.hoisted(() => ({
   createPreparationPopupExportController: vi.fn(),
@@ -41,29 +42,13 @@ function createSnapshotIframe(): HTMLIFrameElement {
 }
 
 function createManifest(): WebSnapshotManifest {
-  return {
-    captureMode: 'readOnlyNoScripts',
-    capturedAt: '2026-05-13T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: {
-      computedStyles: 'computed-styles.json',
-      domSnapshot: 'dom-snapshot.json',
-      errors: 'errors.json',
-      manifest: 'manifest.json',
-      screenshot: 'screenshot.png',
-      snapshotHtml: 'snapshot.html',
-      stylesheets: 'stylesheets.json',
-      virtualDomSnapshot: 'virtual-dom-snapshot.json',
-    },
-    schemaVersion: 1,
+  return createPagePackageManifestFixture({
     source: {
       faviconUrl: null,
       title: 'Source title',
       url: 'https://example.test/source',
     },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 0 },
-    warnings: [],
-  };
+  });
 }
 
 it('resolves popup export parsing from the displayed snapshot iframe document', () => {

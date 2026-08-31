@@ -178,17 +178,12 @@ async function verifiesDownloadFlows() {
 }
 
 async function verifiesProjectExportStartup() {
-  const sendResponse = createSendResponse();
   const settings = createExportSettings();
 
-  expect(
-    handleStartProjectExport(
-      { input: createInputReference('job-1'), jobId: 'job-1', settings },
-      sendResponse,
-      VIDEO_EDITOR_OWNER
-    )
-  ).toEqual({ handled: true, keepChannelOpen: true });
-  await flushPromises();
+  const response = await handleStartProjectExport(
+    { input: createInputReference('job-1'), jobId: 'job-1', settings },
+    VIDEO_EDITOR_OWNER
+  );
 
   expect(ensureOffscreenDocumentMock).toHaveBeenCalledWith('Rendering video project export');
   expect(waitForOffscreenReadyMock).toHaveBeenCalledTimes(1);
@@ -201,7 +196,7 @@ async function verifiesProjectExportStartup() {
       settings,
     })
   );
-  expect(sendResponse).toHaveBeenCalledWith({
+  expect(response).toEqual({
     success: true,
     capabilityToken: expect.any(String),
     jobId: 'job-1',
@@ -210,41 +205,30 @@ async function verifiesProjectExportStartup() {
 }
 
 async function verifiesProjectExportFailures() {
-  const errorResponse = createSendResponse();
-  const stringResponse = createSendResponse();
   const settings = createExportSettings();
 
   sendRuntimeMessageMock.mockRejectedValueOnce(new Error('transport failed'));
 
-  handleStartProjectExport(
-    { input: createInputReference('job-3'), jobId: 'job-3', settings },
-    errorResponse,
-    VIDEO_EDITOR_OWNER
-  );
-  await flushPromises();
-
-  expect(errorResponse).toHaveBeenCalledWith({
-    success: false,
-    error: 'transport failed',
-  });
+  await expect(
+    handleStartProjectExport(
+      { input: createInputReference('job-3'), jobId: 'job-3', settings },
+      VIDEO_EDITOR_OWNER
+    )
+  ).rejects.toThrow('transport failed');
 
   waitForOffscreenReadyMock.mockClear();
   hasOffscreenDocumentMock.mockReturnValue(false);
   ensureOffscreenDocumentMock.mockResolvedValueOnce(false);
   sendRuntimeMessageMock.mockRejectedValueOnce('offline');
 
-  handleStartProjectExport(
-    { input: createInputReference('job-4'), jobId: 'job-4', settings },
-    stringResponse,
-    VIDEO_EDITOR_OWNER
-  );
-  await flushPromises();
+  await expect(
+    handleStartProjectExport(
+      { input: createInputReference('job-4'), jobId: 'job-4', settings },
+      VIDEO_EDITOR_OWNER
+    )
+  ).rejects.toBe('offline');
 
   expect(waitForOffscreenReadyMock).not.toHaveBeenCalled();
-  expect(stringResponse).toHaveBeenCalledWith({
-    success: false,
-    error: 'offline',
-  });
 }
 
 describe('video-runtime-router-handlers export flows', () => {

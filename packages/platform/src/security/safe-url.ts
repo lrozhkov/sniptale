@@ -7,7 +7,11 @@ export function createSafeExternalHref(value: string | null | undefined): string
 
   try {
     const parsedUrl = new URL(value);
-    return SAFE_EXTERNAL_URL_PROTOCOLS.has(parsedUrl.protocol) ? value : null;
+    return SAFE_EXTERNAL_URL_PROTOCOLS.has(parsedUrl.protocol) &&
+      parsedUrl.username.length === 0 &&
+      parsedUrl.password.length === 0
+      ? parsedUrl.toString()
+      : null;
   } catch {
     return null;
   }

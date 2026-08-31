@@ -120,12 +120,7 @@ describe('iframe-utils listeners DOMContentLoaded flow', () => {
 
     cleanup();
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '[iframe-utils]',
-      '[iframe-utils] Added mousemove listener to iframe:',
-      ''
-    );
-    expect(consoleLogSpy).toHaveBeenCalledWith('[iframe-utils]', 'Cleaning up all event listeners');
+    expect(consoleLogSpy).not.toHaveBeenCalled();
   });
 });
 

@@ -15,9 +15,15 @@ vi.mock('../files/modal-utils', async () => {
 
 import * as modalUtils from '../files/modal-utils';
 import {
+  buildDiagnosticElementPath,
   dismissPreviewModal,
+  getCurrentExportPageUrl,
+  listAccessibleDiagnosticDocuments,
+  listComputedStyleRootTargets,
   listDirectDownloadLinks,
+  listPageImages,
   listPreviewTriggers,
+  queryComputedStyleTargets,
   resolvePreviewDownloadHref,
 } from './dom-driver';
 
@@ -64,6 +70,30 @@ it('lists direct download anchors and preview triggers from the current DOM', ()
 
   expect(listDirectDownloadLinks()).toEqual([directLink]);
   expect(listPreviewTriggers()).toEqual([preview]);
+});
+
+it('exposes the live DOM inputs used by diagnostic collectors', () => {
+  document.body.innerHTML =
+    '<section><span></span><span id="target"></span><img alt="sample"><iframe></iframe></section>';
+  const target = document.querySelector('#target');
+  const iframe = document.querySelector('iframe');
+
+  expect(target).not.toBeNull();
+  expect(iframe).not.toBeNull();
+  expect(listPageImages()).toHaveLength(1);
+  expect(listComputedStyleRootTargets()).toEqual([document.documentElement, document.body]);
+  expect(queryComputedStyleTargets('span')).toHaveLength(2);
+  expect(buildDiagnosticElementPath(target!)).toContain('span:nth-of-type(2)');
+  expect(getCurrentExportPageUrl('https://snapshot.example/page')).toBe(
+    'https://snapshot.example/page'
+  );
+  expect(getCurrentExportPageUrl()).toBe(window.location.href);
+
+  const scopes = listAccessibleDiagnosticDocuments();
+  expect(scopes[0]).toEqual({ document, scope: 'document' });
+  if (iframe!.contentDocument) {
+    expect(scopes).toContainEqual({ document: iframe!.contentDocument, scope: 'iframe-1' });
+  }
 });
 
 it('resolves a preview download href through the modal driver seam', async () => {

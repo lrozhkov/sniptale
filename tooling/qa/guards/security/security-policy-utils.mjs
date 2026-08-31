@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { repoRoot } from '../../core/shared.mjs';
+import { repoRoot } from '../../analysis/repository/shared-paths.mjs';
 
 export function readPolicy(rootDir = repoRoot, policyPath) {
   return JSON.parse(fs.readFileSync(path.join(rootDir, policyPath), 'utf8'));

@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sniptale complex snapshot fixture</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #eef2ff, #f8fafc 42%, #ecfeff);
+        color: #172033;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 24px;
+        align-items: center;
+        padding: 20px 32px;
+        background: rgb(255 255 255 / 92%);
+        border-bottom: 1px solid #cbd5e1;
+        backdrop-filter: blur(12px);
+      }
+      header h1 {
+        margin: 0;
+        font-size: clamp(24px, 4vw, 44px);
+      }
+      header h1::after {
+        content: ' verified';
+        color: #2563eb;
+        font-size: 0.45em;
+        vertical-align: super;
+      }
+      nav {
+        display: flex;
+        gap: 12px;
+      }
+      .inline-mask-icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: #1d4ed8;
+        -webkit-mask: center / contain no-repeat
+          url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20d%3D%22M8%201a7%207%200%201%201%204.2%2012.6l5.5%205.5-1.4%201.4-5.5-5.5A7%207%200%200%201%208%201m0%202a5%205%200%201%200%200%2010A5%205%200%200%200%208%203%22%2F%3E%3C%2Fsvg%3E');
+        mask: center / contain no-repeat
+          url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20d%3D%22M8%201a7%207%200%201%201%204.2%2012.6l5.5%205.5-1.4%201.4-5.5-5.5A7%207%200%200%201%208%201m0%202a5%205%200%201%200%200%2010A5%205%200%200%200%208%203%22%2F%3E%3C%2Fsvg%3E');
+      }
+      .escaped-mask-icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: #0f766e;
+        -webkit-mask: center / contain no-repeat
+          url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M3 3h14v14H3z"/></svg>');
+        mask: center / contain no-repeat
+          url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M3 3h14v14H3z"/></svg>');
+      }
+      nav a {
+        color: #1d4ed8;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .dynamic-panel {
+        min-height: 36px;
+        padding: 8px 32px;
+        background: #dbeafe;
+        transition: none;
+      }
+      .dynamic-panel[data-expanded='true'] {
+        min-height: 84px;
+        padding-block: 32px;
+      }
+      main {
+        width: min(1180px, calc(100% - 40px));
+        margin: 28px auto 80px;
+        display: grid;
+        gap: 28px;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 28px;
+        padding: 34px;
+        border: 1px solid #c7d2fe;
+        border-radius: 28px;
+        background: rgb(255 255 255 / 86%);
+        box-shadow: 0 24px 70px rgb(30 64 175 / 15%);
+      }
+      .hero-copy {
+        align-self: center;
+      }
+      .hero-copy p {
+        font-size: 18px;
+        line-height: 1.7;
+      }
+      .art {
+        min-height: 330px;
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at 30% 30%, #fef3c7 0 11%, transparent 12%),
+          radial-gradient(circle at 68% 35%, #bfdbfe 0 18%, transparent 19%),
+          conic-gradient(from 40deg, #312e81, #0891b2, #0f766e, #312e81);
+        position: relative;
+        overflow: hidden;
+      }
+      .art::before,
+      .art::after {
+        content: '';
+        position: absolute;
+        border: 2px solid rgb(255 255 255 / 65%);
+        border-radius: 999px;
+      }
+      .art::before {
+        width: 190px;
+        height: 190px;
+        left: 32px;
+        bottom: -70px;
+      }
+      .art::after {
+        width: 120px;
+        height: 120px;
+        right: 36px;
+        top: 26px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      article {
+        min-height: 210px;
+        padding: 24px;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid #dbeafe;
+        box-shadow: 0 12px 34px rgb(15 23 42 / 8%);
+      }
+      article:nth-child(2) {
+        transform: translateY(18px);
+      }
+      article h2 {
+        margin-top: 0;
+        color: #1e3a8a;
+      }
+      .table-wrap {
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid #cbd5e1;
+        background: white;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 760px;
+      }
+      th,
+      td {
+        padding: 14px 18px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+      }
+      th {
+        background: #eff6ff;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        padding: 24px;
+        background: #0f172a;
+        color: white;
+        border-radius: 20px;
+      }
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid #94a3b8;
+        font: inherit;
+      }
+      button {
+        background: #2563eb;
+        color: white;
+        border: 0;
+        font-weight: 700;
+      }
+      canvas {
+        width: 100%;
+        height: 160px;
+        border-radius: 18px;
+        background: #fff;
+      }
+      .long-copy {
+        columns: 2 320px;
+        column-gap: 34px;
+        line-height: 1.65;
+      }
+      footer {
+        padding: 40px;
+        text-align: center;
+        background: #111827;
+        color: #dbeafe;
+      }
+      @media (max-width: 760px) {
+        .hero,
+        .cards,
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+        article:nth-child(2) {
+          transform: none;
+        }
+        header {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="/root.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Complex capture fixture</h1>
+      <nav>
+        <span class="inline-mask-icon" aria-label="Round marker"></span
+        ><span class="escaped-mask-icon" aria-label="Square marker"></span><a href="#cards">Cards</a
+        ><a href="#data">Data</a>
+      </nav>
+    </header>
+    <aside class="dynamic-panel" aria-label="Dynamic capture panel">
+      This panel changes its layout after repeated viewport traversal.
+    </aside>
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p>
+            Deterministic gradients, pseudo-elements, sticky layout, responsive grids, form
+            controls, a canvas, a wide table, and long content exercise the saved raster and the
+            sanitized document independently.
+          </p>
+          <ul>
+            <li>Visual authority: full-page screenshot</li>
+            <li>Static authority: no-script HTML</li>
+            <li>Network authority: none in Viewer</li>
+          </ul>
+        </div>
+        <div class="art" aria-label="Decorative gradient"></div>
+      </section>
+      <section class="cards" id="cards">
+        <article>
+          <h2>Grid ownership</h2>
+          <p>Cards retain spacing, borders, shadows, and responsive flow.</p>
+        </article>
+        <article>
+          <h2>Transforms</h2>
+          <p>The middle card uses a deliberate vertical transform.</p>
+        </article>
+        <article>
+          <h2>Pseudo content</h2>
+          <p>The heading badge and artwork rings come from generated content.</p>
+        </article>
+      </section>
+      <snapshot-card></snapshot-card>
+      <section class="table-wrap" id="data">
+        <table>
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Authority</th>
+              <th>Failure mode</th>
+              <th>Proof</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Capture</td>
+              <td>Raster</td>
+              <td>Hard failure</td>
+              <td>Decode and dimensions</td>
+            </tr>
+            <tr>
+              <td>Viewer</td>
+              <td>Object URL</td>
+              <td>Bounded error</td>
+              <td>No network or scripts</td>
+            </tr>
+            <tr>
+              <td>Gallery</td>
+              <td>Derived thumbnail</td>
+              <td>Rebuild</td>
+              <td>Card and preview</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="form-grid">
+        <label>Name<input value="Snapshot fixture" /></label
+        ><label
+          >Mode<select>
+            <option selected>Production verification</option>
+          </select></label
+        ><label
+          >Redaction proof<input
+            id="sensitive-proof"
+            autocomplete="one-time-code"
+            value="123456"
+            style="background: #ff0000; color: #fff" /></label
+        ><label><input type="checkbox" checked /> Retain checked state</label
+        ><button type="button" id="unsafe-action">Inert in static copy</button>
+      </section>
+      <canvas id="chart" width="1100" height="160"></canvas>
+      <section class="long-copy">
+        <p>
+          Long-form content makes the page taller than one viewport and forces the full-page capture
+          path to compose multiple regions while preserving fixed and sticky presentation.
+        </p>
+        <p>
+          Every section has a different layout pressure: responsive columns, minimum table width,
+          generated decoration, controls, and raster-only canvas state.
+        </p>
+        <p>
+          The temporary smoke checks that the saved Gallery thumbnail is non-empty, the full
+          screenshot preview decodes, and the Viewer visual surface uses the authoritative retained
+          raster.
+        </p>
+        <p>
+          The static document is intentionally a different contract. Scripts, event handlers, canvas
+          pixels, active navigation, forms, frames, and network behavior are unavailable there.
+        </p>
+      </section>
+    </main>
+    <footer>Sniptale Web Snapshot production verification fixture</footer>
+    <script>
+      const canvas = document.getElementById('chart');
+      const context = canvas.getContext('2d');
+      const gradient = context.createLinearGradient(0, 0, canvas.width, 0);
+      gradient.addColorStop(0, '#312e81');
+      gradient.addColorStop(0.5, '#0891b2');
+      gradient.addColorStop(1, '#16a34a');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = 'white';
+      context.font = '700 36px Arial';
+      context.fillText('Live canvas state — raster only', 42, 96);
+      window.__fixtureScriptExecuted = true;
+      const shadowHost = document.querySelector('snapshot-card');
+      const shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+      shadowRoot.innerHTML =
+        '<style>:host{display:block;padding:26px;border-radius:18px;background:#312e81;color:white}.shadow-grid{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center}.shadow-badge{padding:8px 12px;border-radius:999px;background:#fef3c7;color:#312e81;font-weight:700}</style><div class="shadow-grid"><strong>Open Shadow DOM remains isolated</strong><span class="shadow-badge">scoped CSS</span></div><inner-snapshot-card></inner-snapshot-card>';
+      const adopted = new CSSStyleSheet();
+      adopted.replaceSync('.shadow-grid { min-height: 54px; }');
+      shadowRoot.adoptedStyleSheets = [adopted];
+      const innerHost = shadowRoot.querySelector('inner-snapshot-card');
+      const innerRoot = innerHost.attachShadow({ mode: 'open' });
+      innerRoot.innerHTML =
+        '<style>:host{display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px;background:url("/fixture-mark.svg") right 10px center/36px no-repeat rgb(255 255 255 / 12%)}input{max-width:220px}</style><img src="/fixture-mark.svg" width="36" height="36" alt="nested asset"><span>Nested shadow asset</span><input value="stale nested value" aria-label="nested state">';
+      innerRoot.querySelector('input').value = 'current nested value';
+      document.getElementById('unsafe-action').addEventListener('click', () => {
+        window.__fixtureActionExecuted = true;
+      });
+      const dynamicPanel = document.querySelector('.dynamic-panel');
+      let highViewportVisits = 0;
+      let viewportWasHigh = false;
+      window.addEventListener('scroll', () => {
+        const viewportIsHigh = window.scrollY > 400;
+        if (viewportIsHigh && !viewportWasHigh) {
+          highViewportVisits += 1;
+          if (highViewportVisits === 3) dynamicPanel.dataset.expanded = 'true';
+        }
+        viewportWasHigh = viewportIsHigh;
+      });
+    </script>
+  </body>
+</html>

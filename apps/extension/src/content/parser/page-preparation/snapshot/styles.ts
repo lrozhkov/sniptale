@@ -1,0 +1,322 @@
+import { collectOpenShadowHosts } from '../../dom-tree-parser/traversal/virtual-dom.helpers';
+import { isAccessibleDocumentRuntimeStyle } from '../../../platform/frame';
+import { sanitizePreparedSnapshotCapturedCssText } from './style-assets';
+
+const SHADOW_STYLE_HOST_ATTRIBUTE = 'data-sniptale-shadow-style-host';
+const SHADOW_BOUNDARY_ATTRIBUTE = 'data-sniptale-shadow-boundary';
+
+interface MarkedShadowStyleHost {
+  host: Element;
+  id: string;
+  previousMarker: string | null;
+  shadowRoot: ShadowRoot;
+}
+
+function readStyleSheetRules(sheet: CSSStyleSheet, documentBaseUrl: string): string | null {
+  try {
+    const stylesheetBaseUrl = sheet.href ?? documentBaseUrl;
+    return Array.from(sheet.cssRules)
+      .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule.cssText, stylesheetBaseUrl))
+      .filter(Boolean)
+      .join('\n');
+  } catch {
+    return null;
+  }
+}
+
+function splitAuthoredStylesheetRules(cssText: string): string[] {
+  const rules: string[] = [];
+  let blockDepth = 0;
+  let inComment = false;
+  let quote: '"' | "'" | null = null;
+  let start = 0;
+  for (let index = 0; index < cssText.length; index += 1) {
+    const character = cssText[index] ?? '';
+    const next = cssText[index + 1] ?? '';
+    if (inComment) {
+      if (character === '*' && next === '/') {
+        inComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '/' && next === '*') {
+      inComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '{') blockDepth += 1;
+    else if (character === '}') blockDepth = Math.max(0, blockDepth - 1);
+    if ((character === '}' || character === ';') && blockDepth === 0) {
+      const rule = cssText.slice(start, index + 1).trim();
+      if (rule) rules.push(rule);
+      start = index + 1;
+    }
+  }
+  const trailingRule = cssText.slice(start).trim();
+  if (trailingRule) rules.push(trailingRule);
+  return rules;
+}
+
+function cssRuleIdentity(cssText: string): string {
+  const boundary = cssText.search(/[;{]/u);
+  return (boundary < 0 ? cssText : cssText.slice(0, boundary)).replace(/\s+/gu, ' ').trim();
+}
+
+interface AuthoredInlineStyleRules {
+  comparison: 'exact' | 'identity';
+  rules: string[];
+}
+
+function readAuthoredInlineStyleRules(owner: Element): AuthoredInlineStyleRules | null {
+  const authoredCssText = owner.textContent?.trim() ?? '';
+  if (owner.tagName.toLowerCase() !== 'style' || !authoredCssText) return null;
+  const parserDocument = owner.ownerDocument.implementation.createHTMLDocument(
+    'web-snapshot-inline-style-parser'
+  );
+  const parserStyle = parserDocument.createElement('style');
+  parserStyle.textContent = authoredCssText;
+  parserDocument.head.appendChild(parserStyle);
+  if (parserStyle.sheet) {
+    return {
+      comparison: 'exact',
+      rules: Array.from(parserStyle.sheet.cssRules, (rule) => rule.cssText),
+    };
+  }
+  const rules = splitAuthoredStylesheetRules(authoredCssText);
+  return rules.length > 0 ? { comparison: 'identity', rules } : null;
+}
+
+function readLosslessInlineStyleSheet(
+  sheet: CSSStyleSheet,
+  owner: Element | undefined,
+  documentBaseUrl: string
+): string | null {
+  if (!owner || owner.tagName.toLowerCase() !== 'style') return null;
+  const authoredCssText = owner.textContent?.trim() ?? '';
+  const authoredRuleSet = readAuthoredInlineStyleRules(owner);
+  if (!authoredCssText || !authoredRuleSet) return null;
+  const { comparison, rules: authoredRules } = authoredRuleSet;
+  try {
+    const liveRules = Array.from(sheet.cssRules, (rule) => rule.cssText);
+    const rulesMatch =
+      comparison === 'exact'
+        ? (liveRule: string, authoredRule: string) => liveRule === authoredRule
+        : (liveRule: string, authoredRule: string) =>
+            cssRuleIdentity(liveRule) === cssRuleIdentity(authoredRule);
+    const authoredRulesRemainPrefix = authoredRules.every((rule, index) =>
+      rulesMatch(liveRules[index] ?? '', rule)
+    );
+    const authoredRulesRemainSuffix = authoredRules.every((rule, index) => {
+      const liveRule = liveRules[liveRules.length - authoredRules.length + index] ?? '';
+      return rulesMatch(liveRule, rule);
+    });
+    const stylesheetBaseUrl = sheet.href ?? documentBaseUrl;
+    const sanitizedAuthoredCss = authoredRules
+      .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule, stylesheetBaseUrl))
+      .filter(Boolean)
+      .join('\n');
+    if (liveRules.length === authoredRules.length && authoredRulesRemainPrefix) {
+      return sanitizedAuthoredCss;
+    }
+    if (liveRules.length > authoredRules.length && authoredRulesRemainPrefix) {
+      const appendedCss = liveRules
+        .slice(authoredRules.length)
+        .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule, stylesheetBaseUrl))
+        .filter(Boolean)
+        .join('\n');
+      return [sanitizedAuthoredCss, appendedCss].filter(Boolean).join('\n');
+    }
+    if (liveRules.length > authoredRules.length && authoredRulesRemainSuffix) {
+      const prependedCss = liveRules
+        .slice(0, liveRules.length - authoredRules.length)
+        .map((rule) => sanitizePreparedSnapshotCapturedCssText(rule, stylesheetBaseUrl))
+        .filter(Boolean)
+        .join('\n');
+      return [prependedCss, sanitizedAuthoredCss].filter(Boolean).join('\n');
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function appendMaterializedStyle(
+  snapshot: Document,
+  sheet: CSSStyleSheet,
+  cssText: string,
+  fallbackOwner: Element | undefined,
+  target: Element = snapshot.head
+): void {
+  if (!cssText) return;
+  const style = snapshot.createElement('style');
+  style.setAttribute('data-sniptale-captured-stylesheet', 'true');
+  const media = (sheet.media?.mediaText || fallbackOwner?.getAttribute('media') || '').trim();
+  style.textContent = media ? `@media ${media} {\n${cssText}\n}` : cssText;
+  target.appendChild(style);
+}
+
+function appendRestrictedStylesheetLink(
+  snapshot: Document,
+  sheet: CSSStyleSheet,
+  fallbackOwner: Element | undefined
+): void {
+  const owner = sheet.ownerNode ?? fallbackOwner;
+  if (!(owner instanceof Element) || owner.tagName.toLowerCase() !== 'link') return;
+  snapshot.head.appendChild(snapshot.importNode(owner, true));
+}
+
+function preserveSourceStylesheetLink(
+  snapshot: Document,
+  sheet: CSSStyleSheet,
+  fallbackOwner: Element | undefined
+): boolean {
+  const owner = sheet.ownerNode ?? fallbackOwner;
+  if (!(owner instanceof Element) || owner.tagName.toLowerCase() !== 'link') return false;
+  appendRestrictedStylesheetLink(snapshot, sheet, fallbackOwner);
+  return true;
+}
+
+function appendCapturedRenderingEnvironmentStyle(
+  sourceDocument: Document,
+  snapshot: Document
+): void {
+  const sourceBody = sourceDocument.body;
+  const sourceWindow = sourceDocument.defaultView;
+  if (!sourceBody || !sourceWindow) return;
+  const computedStyle = sourceWindow.getComputedStyle(sourceBody);
+  const fontSize = computedStyle.fontSize.trim();
+  const fontFamily = computedStyle.fontFamily.trim();
+  const numericFontSize = fontSize.endsWith('px') ? Number(fontSize.slice(0, -2)) : Number.NaN;
+  if (!Number.isFinite(numericFontSize) || numericFontSize <= 0) return;
+  if (!fontFamily) return;
+
+  const style = snapshot.createElement('style');
+  style.setAttribute('data-sniptale-captured-rendering-environment', 'true');
+  style.textContent = `body { font-family: ${fontFamily}; font-size: ${fontSize}; }`;
+  snapshot.head.appendChild(style);
+}
+
+function resolveSourceStylesheetOwner(
+  sheet: CSSStyleSheet,
+  sourceOwners: Element[]
+): Element | undefined {
+  if (sheet.ownerNode instanceof Element) return sheet.ownerNode;
+  return sourceOwners.find(
+    (owner) => (owner as HTMLStyleElement | HTMLLinkElement).sheet === sheet
+  );
+}
+
+/** Materializes the live CSSOM because runtime-inserted rules are not represented by DOM cloning. */
+export function materializePreparedSnapshotStyles(
+  sourceDocument: Document,
+  snapshot: Document
+): void {
+  for (const element of snapshot.head.querySelectorAll('style, link[rel~="stylesheet"]')) {
+    element.remove();
+  }
+
+  const sourceOwners = Array.from(
+    sourceDocument.querySelectorAll('style, link[rel~="stylesheet"]')
+  );
+  for (const sheet of Array.from(sourceDocument.styleSheets)) {
+    if (sheet.disabled) continue;
+    const fallbackOwner = resolveSourceStylesheetOwner(sheet, sourceOwners);
+    const owner = sheet.ownerNode instanceof Element ? sheet.ownerNode : fallbackOwner;
+    if (isAccessibleDocumentRuntimeStyle(owner)) continue;
+    // Preserve authored linked CSS bytes. Chromium's CSSOM serialization can expand shorthands
+    // containing var() into empty longhands, which changes
+    // box geometry when reparsed. The asset pipeline captures and sanitizes this link recursively.
+    if (preserveSourceStylesheetLink(snapshot, sheet, fallbackOwner)) continue;
+    const cssText =
+      readLosslessInlineStyleSheet(sheet, owner, sourceDocument.baseURI) ??
+      readStyleSheetRules(sheet, sourceDocument.baseURI);
+    if (cssText === null) {
+      appendRestrictedStylesheetLink(snapshot, sheet, fallbackOwner);
+      continue;
+    }
+    appendMaterializedStyle(snapshot, sheet, cssText, fallbackOwner);
+  }
+  for (const sheet of sourceDocument.adoptedStyleSheets ?? []) {
+    if (sheet.disabled) continue;
+    const cssText = readStyleSheetRules(sheet, sourceDocument.baseURI);
+    if (cssText !== null) appendMaterializedStyle(snapshot, sheet, cssText, undefined);
+  }
+  appendCapturedRenderingEnvironmentStyle(sourceDocument, snapshot);
+}
+
+export function markPreparedSnapshotShadowStyles(sourceDocument: Document): {
+  cleanup(): void;
+  encapsulate(snapshot: Document): void;
+  materialize(snapshot: Document): void;
+} {
+  const marked = collectOpenShadowHosts(sourceDocument).flatMap(
+    (host, index): MarkedShadowStyleHost[] => {
+      const shadowRoot = host.shadowRoot;
+      if (!shadowRoot) return [];
+      const previousMarker = host.getAttribute(SHADOW_STYLE_HOST_ATTRIBUTE);
+      const id = `sniptale-shadow-style-${index + 1}`;
+      host.setAttribute(SHADOW_STYLE_HOST_ATTRIBUTE, id);
+      return [{ host, id, previousMarker, shadowRoot }];
+    }
+  );
+
+  return {
+    cleanup() {
+      for (const item of marked) {
+        if (item.previousMarker === null) item.host.removeAttribute(SHADOW_STYLE_HOST_ATTRIBUTE);
+        else item.host.setAttribute(SHADOW_STYLE_HOST_ATTRIBUTE, item.previousMarker);
+      }
+    },
+    encapsulate(snapshot) {
+      for (const item of [...marked].reverse()) {
+        const target = snapshot.querySelector(`[${SHADOW_STYLE_HOST_ATTRIBUTE}="${item.id}"]`);
+        if (!target) continue;
+        const boundary = Array.from(target.children).find(
+          (child) => child.getAttribute(SHADOW_BOUNDARY_ATTRIBUTE) === item.id
+        );
+        if (!(boundary instanceof HTMLTemplateElement)) continue;
+        while (boundary.nextSibling) boundary.content.appendChild(boundary.nextSibling);
+        boundary.removeAttribute(SHADOW_BOUNDARY_ATTRIBUTE);
+        boundary.setAttribute('shadowrootmode', 'open');
+        target.removeAttribute(SHADOW_STYLE_HOST_ATTRIBUTE);
+      }
+    },
+    materialize(snapshot) {
+      for (const item of marked) {
+        const target = snapshot.querySelector(`[${SHADOW_STYLE_HOST_ATTRIBUTE}="${item.id}"]`);
+        if (!target) continue;
+        const boundary = snapshot.createElement('template');
+        boundary.setAttribute(SHADOW_BOUNDARY_ATTRIBUTE, item.id);
+        const firstShadowNode = target.childNodes[item.host.childNodes.length] ?? null;
+        target.insertBefore(boundary, firstShadowNode);
+        const sourceOwners = Array.from(
+          item.shadowRoot.querySelectorAll('style, link[rel~="stylesheet"]')
+        );
+        for (const sheet of Array.from(item.shadowRoot.styleSheets ?? [])) {
+          if (sheet.disabled) continue;
+          const owner = resolveSourceStylesheetOwner(sheet, sourceOwners);
+          if (isAccessibleDocumentRuntimeStyle(owner)) continue;
+          const cssText = readStyleSheetRules(sheet, sourceDocument.baseURI);
+          if (cssText !== null)
+            appendMaterializedStyle(snapshot, sheet, cssText, undefined, target);
+        }
+        for (const sheet of item.shadowRoot.adoptedStyleSheets ?? []) {
+          if (sheet.disabled) continue;
+          const cssText = readStyleSheetRules(sheet, sourceDocument.baseURI);
+          if (cssText !== null)
+            appendMaterializedStyle(snapshot, sheet, cssText, undefined, target);
+        }
+      }
+    },
+  };
+}

@@ -18,6 +18,8 @@ export function useGalleryViewportState() {
   const importTriggerRef = useRef<HTMLButtonElement | null>(null);
   const mediaImportInputRef = useRef<HTMLInputElement | null>(null);
   const mediaImportTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const webSnapshotImportInputRef = useRef<HTMLInputElement | null>(null);
+  const webSnapshotImportTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const viewport = gridViewportRef.current;
@@ -49,6 +51,10 @@ export function useGalleryViewportState() {
     importTriggerRef,
     mediaImportInputRef,
     mediaImportTriggerRef,
+    webSnapshotImport: {
+      inputRef: webSnapshotImportInputRef,
+      triggerRef: webSnapshotImportTriggerRef,
+    },
     scrollTop,
     viewportHeight,
   };

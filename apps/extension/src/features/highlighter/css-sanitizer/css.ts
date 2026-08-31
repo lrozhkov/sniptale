@@ -162,12 +162,10 @@ export function validateCssPolicyString(cssString: string): {
 function recognizeCssDeclaration(declaration: CssDeclaration): string | null {
   const probe = document.createElement('div').style;
   probe.setProperty(declaration.name, declaration.value);
-  if (probe.length !== 1 || probe.item(0) !== declaration.name) {
-    return CHROMIUM_VENDOR_PROPERTIES.has(declaration.name) ? declaration.value : null;
-  }
   if (probe.getPropertyPriority(declaration.name)) return null;
   const normalizedValue = probe.getPropertyValue(declaration.name).trim();
-  return normalizedValue || null;
+  if (normalizedValue) return normalizedValue;
+  return CHROMIUM_VENDOR_PROPERTIES.has(declaration.name) ? declaration.value : null;
 }
 
 export function validateCssString(cssString: string): CssValidationResult {

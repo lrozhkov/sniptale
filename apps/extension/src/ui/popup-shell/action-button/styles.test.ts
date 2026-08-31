@@ -25,4 +25,12 @@ describe('popup-action-button.styles', () => {
     expect(disabledClassName).toContain('border-none');
     expect(disabledClassName).not.toContain('bg-transparent');
   });
+
+  it('uses destructive emphasis only when a danger action is hovered or focused', () => {
+    const dangerClassName = getPopupActionButtonRootClassName('danger', false);
+
+    expect(dangerClassName).toContain('bg-transparent');
+    expect(dangerClassName).toContain('hover:text-[var(--sniptale-color-danger)]');
+    expect(dangerClassName).toContain('focus-visible:text-[var(--sniptale-color-danger)]');
+  });
 });

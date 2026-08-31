@@ -2,7 +2,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { cancelActiveProjectExportJob, releaseProjectExportJob, runProjectExport } from './runner';
 import { VideoExportFormat, VideoExportQualityPreset } from '../../../features/video/project/types';
 
-// State-machine proof: cancel/failure cleanup keeps export resources terminal.
 const { loadImagesForProjectMock, renderCompositeExportMock, sendProgressMock, cleanupJobMock } =
   vi.hoisted(() => ({
     loadImagesForProjectMock: vi.fn(),

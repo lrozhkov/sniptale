@@ -1,13 +1,13 @@
 # Repo Root Inventory
 
-Updated: 2026-07-14
+Updated: 2026-08-29
 
 The repository root contains only package entrypoints, externally auto-discovered configuration, canonical human guidance, and explicitly ignored workspace/build artifacts. Tooling implementation belongs under `tooling/**`; extension implementation/build inputs belong under `apps/extension/**`.
 
 ## Required Root Entries
 
 - Package/dependency entrypoints: `package.json`, `package-lock.json`.
-- Auto-discovered configuration: `tsconfig.json`, `tsconfig.node.json`, `vitest.config.ts`, `.oxlintrc.json`, `.oxlintrc.strict.json`, `playwright.config.ts`, `.dependency-cruiser.cjs`, `.oxfmtrc.json`, `.oxfmtignore`, `.editorconfig`, `.npmrc`.
+- Auto-discovered configuration: `tsconfig.json`, `tsconfig.node.json`, `vitest.config.ts`, `.oxlintrc.json`, `.oxlintrc.strict.json`, `playwright.config.ts`, `.dependency-cruiser.cjs`, `.oxfmtrc.json`, `.oxfmtignore`, `.editorconfig`, `.nvmrc`, `.npmrc`.
 - GitHub-owned configuration: `.github/workflows/**` and `.github/pull_request_template.md`.
 - Human and contributor guidance: `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`; installable agent and design guidance is canonical under `docs/agent-tooling/`.
 - Legal/release entrypoints: `LICENSE`, `NOTICE`, `LICENSES/**`, `THIRD_PARTY_DEPENDENCIES.json`, and `THIRD_PARTY_NOTICES.md`. These stay at the conventional root release boundary. `LICENSES/OFL-1.1.txt` is the canonical bundled Manrope license; the dependency generator verifies and references it without creating a versioned duplicate. Other `LICENSES/dependencies/**` files and the two third-party indexes are generator-owned.

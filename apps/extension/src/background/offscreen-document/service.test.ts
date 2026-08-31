@@ -137,6 +137,33 @@ async function verifyReadyTimeoutFailure() {
   expect(manager.hasOffscreenDocument()).toBe(true);
   vi.clearAllTimers();
 }
+async function verifyExplicitWaitAllowsColdBootstrap() {
+  vi.useFakeTimers();
+  const manager = await loadOffscreenManager();
+  await manager.ensureOffscreenDocument('Render an edited draft');
+  const subscription = createMessageSubscription();
+  let outcome: 'failed' | 'pending' | 'ready' = 'pending';
+  const waitPromise = manager.waitForOffscreenReady(30_000).then(
+    () => {
+      outcome = 'ready';
+    },
+    () => {
+      outcome = 'failed';
+    }
+  );
+
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(outcome).toBe('pending');
+  subscription.emit({
+    type: VideoMessageType.OFFSCREEN_READY,
+    offscreenStartupId: 'startup-1',
+  });
+  await waitPromise;
+
+  expect(outcome).toBe('ready');
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  vi.clearAllTimers();
+}
 async function verifyRuntimeStartupFailure() {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
@@ -220,6 +247,20 @@ async function verifyRetryFailsWhenBrokenOffscreenDocumentCannotBeClosed() {
   );
 }
 
+async function verifyCancellableWaitWithoutStartupTimeout() {
+  const manager = await loadOffscreenManager();
+  await manager.ensureOffscreenDocument('Prepare a package download');
+  const subscription = createMessageSubscription();
+  const controller = new AbortController();
+  const wait = manager.waitForOffscreenReady(null, controller.signal);
+
+  controller.abort(new Error('download cancelled'));
+
+  await expect(wait).rejects.toThrow('download cancelled');
+  expect(subscription.unsubscribeMock).toHaveBeenCalledOnce();
+  expect(manager.hasOffscreenDocument()).toBe(true);
+}
+
 describe('offscreen-manager waitForOffscreenReady', () => {
   useOffscreenTestScope();
   it(
@@ -227,6 +268,10 @@ describe('offscreen-manager waitForOffscreenReady', () => {
     verifyWaitForReadySignal
   );
   it('rejects after timeout when the ready signal never arrives', verifyReadyTimeoutFailure);
+  it(
+    'keeps a cold offscreen bootstrap alive beyond five seconds',
+    verifyExplicitWaitAllowsColdBootstrap
+  );
   it(
     'rejects when the offscreen document reports a runtime startup failure',
     verifyRuntimeStartupFailure
@@ -236,6 +281,10 @@ describe('offscreen-manager waitForOffscreenReady', () => {
     verifyRecreateAfterRuntimeStartupFailure
   );
   it('recreates the offscreen document after a ready timeout', verifyRecreateAfterReadyTimeout);
+  it(
+    'allows a package download to wait for cold bootstrap until it is cancelled',
+    verifyCancellableWaitWithoutStartupTimeout
+  );
   it(
     'fails the retry when the broken offscreen document cannot be closed',
     verifyRetryFailsWhenBrokenOffscreenDocumentCannotBeClosed

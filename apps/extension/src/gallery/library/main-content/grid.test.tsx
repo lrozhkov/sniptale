@@ -99,6 +99,7 @@ it('renders visible items and wires preview and selection actions', () => {
 
   renderGrid(props);
 
+  const surface = container?.querySelector('[data-ui="gallery.content.surface"]');
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
   const selectionButton = buttons.find((button) => button.className.includes('h-8 w-8'));
   const previewButton = container?.querySelector<HTMLButtonElement>(
@@ -115,6 +116,7 @@ it('renders visible items and wires preview and selection actions', () => {
   });
 
   expect(props.gridViewportRef.current).toBeInstanceOf(HTMLDivElement);
+  expect(surface?.className).toContain('p-4');
   expect(props.onToggleSelection).toHaveBeenCalledWith('asset-1', { shiftKey: false });
   expect(props.onPreviewOpen).toHaveBeenCalledWith(firstItem);
   expect(container?.textContent).toContain('alpha');
@@ -139,6 +141,7 @@ it('renders scenario items inside the shared grid flow', () => {
 
   renderGrid(props);
 
+  const surface = container?.querySelector('[data-ui="gallery.content.surface"]');
   const button = Array.from(container?.querySelectorAll('button') ?? []).find((element) =>
     element.textContent?.includes('Scenario')
   );
@@ -152,6 +155,8 @@ it('renders scenario items inside the shared grid flow', () => {
   });
 
   expect(props.onPreviewOpen).toHaveBeenCalledWith(scenarioItem);
+  expect(surface?.className).toContain('p-0');
+  expect(surface?.className).not.toContain('p-4');
   expect(container?.textContent).toContain('flow');
   expect(container?.textContent).toContain('date:1');
 });

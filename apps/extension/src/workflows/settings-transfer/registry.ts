@@ -98,7 +98,15 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('capture.viewport-presets', 'items', { kind: 'collection', dynamicItems: true }),
     field('capture.viewport-presets', 'default'),
   ]),
-  ...domain('capture.image', [field('capture.image', 'format'), field('capture.image', 'quality')]),
+  ...domain('capture.image', [
+    field('capture.image', 'format'),
+    field('capture.image', 'quality'),
+    field('capture.image', 'fullPageQuality'),
+  ]),
+  ...domain('capture.pages', [
+    field('capture.pages', 'timing'),
+    field('capture.pages', 'resourceLimits'),
+  ]),
   ...domain('capture.video', [
     field('capture.video', 'profiles', { kind: 'collection', dynamicItems: true }),
     field('capture.video', 'selection'),
@@ -162,12 +170,6 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('system.native', 'tray'),
     field('system.native', 'telemetry'),
     field('system.native', 'connection', { classification: 'action/status' }),
-  ]),
-  ...domain('access.capture-assets', [
-    field('access.capture-assets', 'authenticated'),
-    field('access.capture-assets', 'anonymous'),
-    field('access.capture-assets', 'permissions', { classification: 'action/status' }),
-    field('access.capture-assets', 'reset-actions', { classification: 'action/status' }),
   ]),
 ] as const satisfies readonly SettingsTransferRegistryNode[];
 

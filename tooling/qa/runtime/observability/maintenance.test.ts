@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { createTempRoot, initGitRepo, runGit, writeFile } from '../../core/test-helpers';
+import { createTempRoot, initGitRepo, runGit, writeFile } from '../../test-support/test-helpers';
 import { enforceRetention, recoverStaleRuns } from './maintenance.mjs';
 import { createObservabilityRun } from './run.mjs';
 import { collectRunStatistics } from './statistics.mjs';

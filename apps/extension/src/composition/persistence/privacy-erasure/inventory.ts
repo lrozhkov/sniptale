@@ -23,6 +23,7 @@ import type {
   BrowserStorageErasurePlan,
   LocalExtensionDataErasureOptions,
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
+import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale-theme-preference',
@@ -30,6 +31,8 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale.popup.trace',
   'sniptale.popup.perf',
   'sniptale:trace:namespaces',
+  'sniptale.gallery.filters',
+  'sniptale.gallery.facet-disclosures',
 ] as const;
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [
@@ -43,7 +46,7 @@ const localPreferenceKeys = [
   'sniptale_export_json_spoiler_open',
   'sniptale_export_md_spoiler_open',
   'sniptale_editor_file_menu_save_to_folder_open',
-  'sniptale_popup_export_preferences',
+  POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY,
   'sniptale_popup_startup',
   'sniptale_video_editor_preview_preferences',
   'sniptale_scenario_editor_navigator_collapsed',
@@ -56,6 +59,7 @@ const localPreferenceKeys = [
   'sniptale_drawing_palette',
   'sniptale_quick_actions',
   'sniptale_quick_actions_display_mode',
+  'sniptale_gallery_saved_views',
 ] as const;
 
 const syncPreferenceKeys = [
@@ -117,6 +121,8 @@ const sessionSensitiveKeys = [
   'sniptale_page_access_active_tabs',
   'sniptale_popup_export_tab_selection_session',
   'sniptale_popup_export_job',
+  'sniptale_page_package_job',
+  'sniptale_page_package_temporary_tabs',
   'sniptale_full_page_capture_lease',
   'sniptale_native_full_page_capture_lease',
   'sniptale_project_export_active_job',

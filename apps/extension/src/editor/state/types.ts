@@ -38,7 +38,8 @@ interface EditorCropSelectionState {
 export interface EditorRuntimePatch {
   layers?: EditorLayerItem[];
   selection?: EditorSelectionState;
-  cropSelection?: EditorCropSelectionState | null;
+  cropReady: boolean;
+  cropSelection: EditorCropSelectionState | null;
   history?: EditorHistoryState;
   viewport?: EditorViewportState;
   frame?: EditorFrameSettings;
@@ -95,7 +96,6 @@ interface EditorUiActions {
   setSessionId: (sessionId: string | null) => void;
   setImageData: (imageData: string | null) => void;
   setPageTitle: (pageTitle: string) => void;
-  setCropReady: (cropReady: boolean) => void;
   setRichShapeToolSelection: (selection: EditorRichShapeToolSelection | null) => void;
   hydrateDefaults: (options?: {
     borderPreset?: typeof DEFAULT_BORDER_PRESET;

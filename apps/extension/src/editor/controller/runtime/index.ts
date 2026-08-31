@@ -73,13 +73,13 @@ export function syncEditorRuntimeState(
       selectedObjectWidth: selectedDimensions?.width ?? null,
       selectedObjectHeight: selectedDimensions?.height ?? null,
     },
+    cropReady: Boolean(cropGuide && cropSelection),
     cropSelection,
     history: historyState,
     viewport,
     frame: store.frame,
     browserFrame: store.browserFrame,
   });
-  store.setCropReady(Boolean(cropGuide && cropSelection));
 }
 
 export function scheduleEditorZoomToFit(callback: () => void): void {

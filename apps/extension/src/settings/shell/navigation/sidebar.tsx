@@ -27,7 +27,7 @@ const SETTINGS_ITEM_IDLE_HOVER_CLASS_NAME = [
 ].join(' ');
 
 const SETTINGS_ACTIVE_MARKER_CLASS_NAME =
-  'absolute left-1 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full ' +
+  'absolute left-1 top-1/2 h-5 w-[2px] translate-x-0 -translate-y-1/2 rounded-full ' +
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_84%,transparent)]';
 
 function getSettingsSidebarFooterLabel() {
@@ -91,7 +91,7 @@ export function SettingsSidebar({ activeTab, disabled, onTabChange }: SettingsSi
     >
       <div
         data-ui="settings.sidebar.header"
-        className="border-b border-[var(--sniptale-color-border-soft)] px-4 py-3"
+        className="border-b border-solid border-[var(--sniptale-color-border-soft)] px-4 py-3"
       >
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sniptale-color-text-dim)]">
           {translate('settings.navigation.sidebarEyebrow')}
@@ -133,7 +133,7 @@ export function SettingsSidebar({ activeTab, disabled, onTabChange }: SettingsSi
 
       <div
         data-ui="settings.sidebar.footer"
-        className="border-t border-[var(--sniptale-color-border-soft)] px-4 py-2.5"
+        className="border-t border-solid border-[var(--sniptale-color-border-soft)] px-4 py-2.5"
       >
         <p className="text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
           {getSettingsSidebarFooterLabel()}

@@ -5,6 +5,29 @@ import { buildSettingsTransferTree } from './tree';
 import { SettingsTransferMissingDependencyError } from './tree';
 
 describe('settings transfer selection', () => {
+  it('keeps selected attachment limits in a selective package', () => {
+    const tree = buildSettingsTransferTree();
+    const built = buildSettingsTransferPackage({
+      appVersion: '1.0.0',
+      domains: {
+        'capture.pages': {
+          schemaVersion: 1,
+          data: {
+            resourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+            timing: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+          },
+        },
+      },
+      exportKind: 'selective',
+      selectedNodeIds: ['capture.pages.resourceLimits'],
+      tree,
+    });
+
+    expect(built.package.domains['capture.pages']?.data).toEqual({
+      resourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+    });
+  });
+
   it('adds an item dependency without selecting sibling items', () => {
     const tree = buildSettingsTransferTree([
       {

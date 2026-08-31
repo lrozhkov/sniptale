@@ -28,7 +28,8 @@ export function hasOnlyBrowserAnnotations(options: ExportOptions): boolean {
     !options.includeBasicLogs &&
     !options.includePageDiagnostics &&
     !options.includeCssDiagnostics &&
-    !options.includeFullPageScreenshot
+    !options.includeFullPageScreenshot &&
+    !options.includeViewportScreenshot
   );
 }
 

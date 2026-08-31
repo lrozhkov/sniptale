@@ -24,6 +24,7 @@ vi.mock('@sniptale/platform/browser/runtime', () => ({
 }));
 
 vi.mock('../../contracts/messaging/parsers/boundary', () => ({
+  isKnownNonBackgroundRuntimeMessage: vi.fn(() => false),
   parseBackgroundRuntimeMessage: vi.fn(),
   parseContentTabMessage: vi.fn(),
   parseOffscreenRuntimeMessage: parseOffscreenRuntimeMessageMock,

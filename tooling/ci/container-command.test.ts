@@ -36,8 +36,10 @@ function resolveEffectiveProcess(
 
 it('dispatches every mandatory proof phase from the trusted host plan', () => {
   expect(createTrustedPhaseCommands('proof').map(([id]) => id)).toEqual([
+    'runtime-parity',
     'install',
     'verify-project-toolchain',
+    'validate-workflows',
     'provision-canvas',
     'verify-canvas',
     'provision-ast-grep',
@@ -48,6 +50,11 @@ it('dispatches every mandatory proof phase from the trusted host plan', () => {
     'release',
     'node',
     ['--max-old-space-size=12288', 'tooling/ci/release-wrapper.mjs'],
+  ]);
+  expect(createTrustedPhaseCommands('proof')[3]).toEqual([
+    'validate-workflows',
+    'node',
+    ['/opt/sniptale-trusted/tooling/ci/validate-workflows.mjs', '/usr/local/bin/actionlint'],
   ]);
 });
 

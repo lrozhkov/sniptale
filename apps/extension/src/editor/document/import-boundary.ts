@@ -80,8 +80,10 @@ function hasValidRotation(value: UnknownRecord): boolean {
 }
 
 function isShapeObject(value: UnknownRecord): boolean {
+  const kind = value['kind'];
   return (
-    SHAPE_KINDS.has(String(value['kind'])) &&
+    typeof kind === 'string' &&
+    SHAPE_KINDS.has(kind) &&
     isBounds(value['bounds']) &&
     isColor(value['color']) &&
     (value['fillColor'] === undefined ||
@@ -111,7 +113,7 @@ function isFreehandObject(value: UnknownRecord): boolean {
   );
 }
 
-function isDrawingObject(value: unknown): value is UnknownRecord {
+function isDrawingObject(value: unknown): value is DrawingObject {
   if (!isRecord(value) || typeof value['id'] !== 'string' || value['id'].length === 0) return false;
   if (isFreehandObject(value) || isShapeObject(value)) return true;
   if (value['kind'] === 'arrow') {
@@ -162,7 +164,7 @@ export function parseEditorDrawingMetadata(value: unknown): DrawingObject | null
   if (!isRecord(metadata) || metadata['version'] !== 1 || !isDrawingObject(metadata['object'])) {
     return null;
   }
-  return metadata['object'] as unknown as DrawingObject;
+  return metadata['object'];
 }
 
 function assertDrawingFabricObject(value: UnknownRecord): void {

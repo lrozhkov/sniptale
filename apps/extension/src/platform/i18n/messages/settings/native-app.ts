@@ -11,6 +11,30 @@ export const settingsNativeAppMessages = defineMessageSource({
     ru: 'Подключение приложения Sniptale для записи, снимков экрана и горячих клавиш.',
     en: 'Connect the Sniptale app for recording, screenshots, and hotkeys.',
   },
+  permissionRequiredTitle: {
+    ru: 'Разрешите доступ к приложению Sniptale',
+    en: 'Allow access to the Sniptale app',
+  },
+  permissionRequiredDescription: {
+    ru: 'Подключение, захват, команды и данные действий скрыты, пока вы явно не разрешите расширению связь с установленным приложением.',
+    en: 'Connection, capture, commands, and action data stay hidden until you explicitly allow the extension to communicate with the installed app.',
+  },
+  permissionEnable: {
+    ru: 'Разрешить доступ',
+    en: 'Allow access',
+  },
+  permissionChecking: {
+    ru: 'Проверка доступа…',
+    en: 'Checking access…',
+  },
+  permissionDenied: {
+    ru: 'Доступ к приложению Sniptale не был разрешён.',
+    en: 'Access to the Sniptale app was not allowed.',
+  },
+  permissionRequestError: {
+    ru: 'Не удалось запросить доступ к приложению Sniptale.',
+    en: 'Failed to request access to the Sniptale app.',
+  },
   statusTitle: {
     ru: 'Состояние подключения',
     en: 'Connection status',

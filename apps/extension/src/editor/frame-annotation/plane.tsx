@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { resolveThemeSafePortalTarget } from '@sniptale/ui/theme/safe-portal';
 import {
   FrameAnnotationDistortionFilter,
   FrameAnnotationFocusSurface,
@@ -173,7 +174,7 @@ export function EditorFrameAnnotationPlane(props: {
             zIndex: 2_147_483_600,
           }}
         />,
-        document.body
+        resolveThemeSafePortalTarget(null)
       )}
     </div>
   );

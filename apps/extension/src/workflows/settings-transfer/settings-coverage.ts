@@ -4,7 +4,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'interface-browser': ['interface.preferences'],
   'quick-actions': ['capture.quick-actions'],
   'screen-sizes': ['capture.viewport-presets'],
-  'media-quality': ['capture.image', 'capture.video'],
+  'media-quality': ['capture.image', 'capture.video', 'capture.pages'],
   saving: ['capture.after-capture', 'capture.saving', 'capture.retention'],
   annotations: ['styles.borders', 'styles.callouts', 'styles.numbering', 'styles.tags'],
   'editor-resources': [
@@ -17,11 +17,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'ai-prompts': ['ai.prompts', 'ai.prompt-templates'],
   'voice-input': ['system.voice', 'system.voice.microphone'],
   'native-app': ['system.native', 'system.native.connection'],
-  'access-data': [
-    'access.capture-assets',
-    'access.capture-assets.permissions',
-    'access.capture-assets.reset-actions',
-  ],
+  'access-data': ['action/status'],
   'settings-transfer': ['action/status'],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
 
@@ -40,10 +36,15 @@ export const SETTINGS_TRANSFER_VIEW_COVERAGE = {
   },
 } as const;
 
+export const SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE = {} as const;
+
+type SettingsTransferExcludedControlId = keyof typeof SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE;
+
 type PersistenceMutationCoverage = {
   sourceFile: string;
   mutations: readonly string[];
   transferIds?: readonly string[];
+  excludedControlIds?: readonly SettingsTransferExcludedControlId[];
   classification?: 'secret' | 'action/status';
 };
 
@@ -217,11 +218,6 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     ],
     ['styles.tool-presets']
   ),
-  transferable(
-    'system/access-data/capture-resources/controller.ts',
-    ['updateSettings'],
-    ['access.capture-assets']
-  ),
   excluded(
     'system/access-data/permissions/useSettingsPermissions/requests/request-actions/request-origin.ts',
     ['setLocalFileAccessOptIn'],
@@ -254,9 +250,15 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
 function transferable(
   sourceFile: string,
   mutations: readonly string[],
-  transferIds: readonly string[]
+  transferIds: readonly string[],
+  excludedControlIds?: readonly SettingsTransferExcludedControlId[]
 ): PersistenceMutationCoverage {
-  return { sourceFile, mutations, transferIds };
+  return {
+    sourceFile,
+    mutations,
+    transferIds,
+    ...(excludedControlIds ? { excludedControlIds } : {}),
+  };
 }
 
 function excluded(

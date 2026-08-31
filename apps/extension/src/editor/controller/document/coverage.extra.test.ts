@@ -21,7 +21,6 @@ const storeState = {
     paddingLeft: 48,
   },
   setBrowserFrame: vi.fn(),
-  setCropReady: vi.fn(),
   setImageData: vi.fn(),
   setInspector: vi.fn(),
   setPageTitle: vi.fn(),

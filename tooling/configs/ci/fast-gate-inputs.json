@@ -14,6 +14,7 @@
     ".dockerignore",
     ".editorconfig",
     ".npmrc",
+    ".nvmrc",
     ".oxfmtignore",
     ".oxfmtrc.json",
     ".oxlintrc.json",

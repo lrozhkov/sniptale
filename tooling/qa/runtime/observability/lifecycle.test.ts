@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTempRoot, initGitRepo, runGit, writeFile } from '../../core/test-helpers';
+import { createTempRoot, initGitRepo, runGit, writeFile } from '../../test-support/test-helpers';
 import { createObservabilityRun } from './run.mjs';
 import { parseRunRecord } from './schema.mjs';
 import { withObservabilityTimeline } from './timeline-context.mjs';
-import { runBoundedTasks } from '../task-scheduler.mjs';
+import { runBoundedTasks } from '../scheduling/task-scheduler.mjs';
 
 function createRepository(prefix: string) {
   const root = createTempRoot(prefix);
@@ -156,9 +156,9 @@ describe('observability repeated control execution', () => {
       rootDir: root,
       createId: () => 'e18f68b2-6e52-7cb0-bdb7-7f0a901c94de',
     });
-    run.addStep({ stepId: 'qa.rule.storage-write-patterns', outcome: 'passed' });
+    run.addStep({ stepId: 'qa.rule.persistence-ownership', outcome: 'passed' });
     run.addStep({
-      stepId: 'qa.rule.storage-write-patterns',
+      stepId: 'qa.rule.persistence-ownership',
       outcome: 'skipped',
       skipReasonId: 'no-applicable-targets',
     });

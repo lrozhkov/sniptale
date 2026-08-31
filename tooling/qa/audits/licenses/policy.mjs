@@ -1,4 +1,4 @@
-import { isAuditObject, parseRequiredAuditJson } from '../result-contract.mjs';
+import { isAuditObject, parseRequiredAuditJson } from '../contracts/result-contract.mjs';
 
 const POLICY_FIELDS = new Set([
   '$comment',

@@ -19,6 +19,9 @@ async function reportFullPageCaptureWarning(
     ...(capture.metadata.frozenExtentWarning
       ? [translate('content.runtime.captureFullPageFrozenExtentWarning')]
       : []),
+    ...(capture.metadata.viewportFallback
+      ? [translate('content.runtime.captureFullPageViewportFallbackWarning')]
+      : []),
   ];
   if (warnings.length === 0) return;
   await getBackgroundRuntimeMessaging()

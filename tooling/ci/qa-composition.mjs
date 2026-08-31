@@ -1,15 +1,17 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 
-import { createOkStep, createProcessStep } from '../qa/core/focused-qa-results.mjs';
+import {
+  createOkStep,
+  createProcessStep,
+} from '../qa/composition/checkpoint/focused-qa-results.mjs';
 import { collectAuditProfileResult } from '../qa/wrappers/audit.mjs';
 import {
   collectFullVerifyStepResults,
   collectReleaseDeltaStepResults,
-} from '../qa/core/verify-all.execution.mjs';
-import { resolveRepositoryVerifyScope } from '../qa/core/verify-all.scope.mjs';
+} from '../qa/composition/repository/full-verification/execution.mjs';
+import { resolveRepositoryVerifyScope } from '../qa/composition/repository/full-verification/scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
-import { MUTATION_PROFILES, resolveMutationRunLabel } from './mutation-policy.mjs';
+import { runNpm } from '../qa/runtime/process/shared-process.mjs';
 import {
   ciExcludedControlLabels,
   createCiProductControlOccurrences,
@@ -33,28 +35,31 @@ export async function collectCiProofResults({
   session,
   productProofCollector = () =>
     collectFullVerifyStepResults({
+      includeArtifactSteps: false,
       includeTests: true,
       releaseMode: true,
       excludedControlLabels: ciExcludedControlLabels('proof'),
       verifyScope: resolveCiScope(),
     }),
   auditCollector = collectAuditProfileResult,
+  productionBuildCollector = collectFreshProductionBuildStep,
 } = {}) {
   capability('proof');
   const product = await productProofCollector();
   const productSteps = product.steps.filter(({ label }) => label !== 'Test coverage');
   const audit = await auditCollector({ profileId: 'pr', session });
+  const productionBuild = productionBuildCollector();
   return {
     context: { mode: 'ci:proof', scope: 'commit' },
-    steps: [...productSteps, ...audit.steps],
+    steps: [...productSteps, productionBuild, ...audit.steps],
   };
 }
 
-function runMutationProfile(profile) {
+export function collectFreshProductionBuildStep({ commandRunner = runNpm } = {}) {
   return runTimelineActivitySync(
     {
-      activityId: `mutation-profile.${profile}`,
-      kind: 'mutation-profile',
+      activityId: 'production-build',
+      kind: 'build',
       executionProfile: {
         cpuTokens: 1,
         memoryMiB: null,
@@ -63,18 +68,7 @@ function runMutationProfile(profile) {
         workerId: `process-${process.pid}`,
       },
     },
-    () => {
-      const runner = process.env.SNIPTALE_TRUSTED_CI_ROOT
-        ? '/opt/sniptale-trusted/tooling/test/mutation/run-profile.mjs'
-        : 'tooling/test/mutation/run-profile.mjs';
-      const result = spawnSync(process.execPath, [runner, profile, resolveMutationRunLabel()], {
-        encoding: 'utf8',
-        env: process.env,
-      });
-      return createProcessStep(`Mutation ${profile}`, result, {
-        advice: `Inspect .tmp/mutation/${profile}/${process.env.GITHUB_RUN_ID ?? 'local'}/summary.json`,
-      });
-    }
+    () => createProcessStep('Production build', commandRunner(['run', 'build:release']))
   );
 }
 
@@ -85,13 +79,8 @@ function resolveCiScope() {
 }
 
 const RELEASE_DELTA_LABELS = new Set(['SonarJS', 'Build', 'Release archive']);
-const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze([
-  'audit-evidence',
-  'npm-audit',
-  'npm-audit-signatures',
-  'osv-scanner',
-  'semgrep',
-]);
+const FRESH_RELEASE_AUDIT_REUSED_CONTROL_IDS = Object.freeze(['npm-audit']);
+const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze([]);
 
 function createReusedFastControlStep({ id, label }) {
   return runTimelineActivitySync(
@@ -125,23 +114,17 @@ async function collectVerifiedFastProofReleaseSteps(releaseDeltaCollector) {
   ];
 }
 
-async function collectFreshFastProofReleaseSteps(productProofCollector, releaseDeltaCollector) {
-  const fast = await productProofCollector();
+async function collectFreshReleaseControlSteps(productProofCollector, releaseDeltaCollector) {
+  const prerequisite = await productProofCollector();
   const delta = await releaseDeltaCollector();
   const byLabel = new Map();
-  for (const step of [...fast.steps, ...delta.steps]) {
+  for (const step of [...prerequisite.steps, ...delta.steps]) {
     if (byLabel.has(step.label) && !RELEASE_DELTA_LABELS.has(step.label)) {
-      throw new Error(`Fresh Fast prerequisite repeats a control result: ${String(step.label)}`);
+      throw new Error(`Fresh release prerequisite repeats a control result: ${String(step.label)}`);
     }
     byLabel.set(step.label, step);
   }
-  const occurrences = [
-    ...createCiProductControlOccurrences('proof'),
-    ...createCiProductControlOccurrences('release').filter(
-      ({ label }) =>
-        !createCiProductControlOccurrences('proof').some((step) => step.label === label)
-    ),
-  ];
+  const occurrences = createCiProductControlOccurrences('release');
   return occurrences.map(({ label }) => {
     const step = byLabel.get(label);
     if (!step) throw new Error(`Missing release product control result: ${label}`);
@@ -155,8 +138,10 @@ export async function collectCiReleaseResults({
   scopeResolver = resolveCiScope,
   productProofCollector = (verifyScope) =>
     collectFullVerifyStepResults({
+      includeTests: false,
+      includeArtifactSteps: false,
       releaseMode: true,
-      excludedControlLabels: ciExcludedControlLabels('proof'),
+      excludedControlLabels: [...ciExcludedControlLabels('proof'), 'Unit tests'],
       verifyScope,
     }),
   releaseDeltaCollector = (verifyScope, { includeArtifactSteps }) =>
@@ -166,7 +151,7 @@ export async function collectCiReleaseResults({
       verifyScope,
     }),
   auditCollector = collectAuditProfileResult,
-  mutationCollector = runMutationProfile,
+  productionBuildCollector = collectFreshProductionBuildStep,
 } = {}) {
   capability('release');
   const verifyScope = scopeResolver();
@@ -175,21 +160,20 @@ export async function collectCiReleaseResults({
     releaseDeltaCollector(verifyScope, { includeArtifactSteps });
   const productSteps = reuseFastProof
     ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta(true))
-    : await collectFreshFastProofReleaseSteps(collectProductProof, collectReleaseDelta(false));
+    : await collectFreshReleaseControlSteps(collectProductProof, collectReleaseDelta(true));
+  const productionBuild = reuseFastProof
+    ? createReusedFastControlStep({ id: 'qa.rule.production-build', label: 'Production build' })
+    : productionBuildCollector();
   const audit = await auditCollector({
     profileId: 'release',
-    reusedControlIds: reuseFastProof ? REUSED_FAST_AUDIT_CONTROL_IDS : [],
+    reusedControlIds: reuseFastProof
+      ? REUSED_FAST_AUDIT_CONTROL_IDS
+      : FRESH_RELEASE_AUDIT_REUSED_CONTROL_IDS,
     session,
   });
   return {
     context: { mode: 'ci:release', scope: 'commit' },
-    executionMode: reuseFastProof ? 'reuse-fast-proof' : 'fresh-fast-proof',
-    steps: [
-      ...productSteps,
-      ...audit.steps,
-      ...MUTATION_PROFILES.map((profile) => mutationCollector(profile)),
-    ],
+    executionMode: reuseFastProof ? 'reuse-fast-proof' : 'fresh-release-controls',
+    steps: [...productSteps, productionBuild, ...audit.steps],
   };
 }
-
-export { MUTATION_PROFILES };

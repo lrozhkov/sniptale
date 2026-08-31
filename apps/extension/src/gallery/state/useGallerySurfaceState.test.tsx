@@ -61,7 +61,6 @@ it('updates app-shell surface state without URL-driven modal state', () => {
 
   act(() => {
     value.actions.setBanner('warning');
-    value.actions.setIsBusy(true);
     value.actions.setPendingImport({
       file: new File(['backup'], 'backup.zip', { type: 'application/zip' }),
       summary: {
@@ -96,8 +95,54 @@ it('updates app-shell surface state without URL-driven modal state', () => {
 
   const next = latestValue;
   expect(next?.state.banner).toBe('warning');
-  expect(next?.state.isBusy).toBe(true);
   expect(next?.state.pendingImport?.file.name).toBe('backup.zip');
   expect(next?.state.pendingMediaImport?.conflicts).toHaveLength(1);
   expect(next?.state.confirmDialog?.title).toBe('Delete item');
+});
+
+it('keeps busy state until every exact blocking operation releases', () => {
+  const value = renderHook();
+  let releaseFirst: () => void = () => undefined;
+  let releaseSecond: () => void = () => undefined;
+
+  act(() => {
+    releaseFirst = value.actions.beginBlockingOperation();
+    releaseSecond = value.actions.beginBlockingOperation();
+  });
+  expect(latestValue?.state.isBusy).toBe(true);
+
+  act(() => releaseFirst());
+  expect(latestValue?.state.isBusy).toBe(true);
+
+  act(() => {
+    releaseFirst();
+    releaseSecond();
+  });
+  expect(latestValue?.state.isBusy).toBe(false);
+});
+
+it('owns replacement, exact release, and cancellation of the active backup export', () => {
+  const value = renderHook();
+  const first = new AbortController();
+  const second = new AbortController();
+
+  value.actions.replaceActiveBackupExport(first);
+  value.actions.replaceActiveBackupExport(second);
+  expect(first.signal.aborted).toBe(true);
+  expect(second.signal.aborted).toBe(false);
+
+  value.actions.releaseActiveBackupExport(first);
+  value.actions.cancelActiveBackupExport();
+  expect(second.signal.aborted).toBe(true);
+});
+
+it('does not cancel a backup export after its exact terminal release', () => {
+  const value = renderHook();
+  const active = new AbortController();
+
+  value.actions.replaceActiveBackupExport(active);
+  value.actions.releaseActiveBackupExport(active);
+  value.actions.cancelActiveBackupExport();
+
+  expect(active.signal.aborted).toBe(false);
 });

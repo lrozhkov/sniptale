@@ -2,6 +2,7 @@ export {
   requestChromePermission,
   requestOriginPermission,
   requestOriginPermissions,
+  removeChromePermission,
   removeOriginPermissions,
 } from './browser-permissions';
 export { requestCameraPermission } from './camera';

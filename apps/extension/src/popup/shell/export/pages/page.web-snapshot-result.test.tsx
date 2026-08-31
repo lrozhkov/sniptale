@@ -87,9 +87,8 @@ async function renderPage(controller: ReturnType<typeof createController>) {
     root?.render(<ExportPage isActive activeTabCapabilities={createActiveTabCapabilities()} />);
   });
   return mocks.exportFooterActionsMock.mock.calls.at(-1)?.[0] as {
-    onOpenWebSnapshotResult: () => void;
-    openWebSnapshotResultMode: 'gallery' | 'open';
-    openWebSnapshotResultTitle: string;
+    onOpenLibraryResult: () => void;
+    openLibraryResultTitle: string;
   };
 }
 
@@ -107,31 +106,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('adds a result action that opens a single saved web snapshot', async () => {
+it('opens the Viewer for a single saved web snapshot', async () => {
   const footerProps = await renderPage(createController(['snapshot-1']));
 
-  footerProps.onOpenWebSnapshotResult();
+  footerProps.onOpenLibraryResult();
 
-  expect(footerProps.openWebSnapshotResultMode).toBe('open');
-  expect(footerProps.openWebSnapshotResultTitle).toBe('Открыть Веб-снимок');
+  expect(footerProps.openLibraryResultTitle).toBe('Открыть веб-снимок');
   expect(mocks.openWebSnapshotViewerPageMock).toHaveBeenCalledWith('snapshot-1');
+  expect(mocks.openGalleryWebSnapshotsPageMock).not.toHaveBeenCalled();
 });
 
 it('opens the saved snapshot when a batch produces one snapshot with warnings', async () => {
   const footerProps = await renderPage(createController(['snapshot-1'], 2));
 
-  footerProps.onOpenWebSnapshotResult();
+  footerProps.onOpenLibraryResult();
 
-  expect(footerProps.openWebSnapshotResultMode).toBe('open');
   expect(mocks.openWebSnapshotViewerPageMock).toHaveBeenCalledWith('snapshot-1');
+  expect(mocks.openGalleryWebSnapshotsPageMock).not.toHaveBeenCalled();
 });
 
 it('adds a result action that opens the web snapshots gallery for multiple saved snapshots', async () => {
   const footerProps = await renderPage(createController(['snapshot-1', 'snapshot-2'], 2));
 
-  footerProps.onOpenWebSnapshotResult();
+  footerProps.onOpenLibraryResult();
 
-  expect(footerProps.openWebSnapshotResultMode).toBe('gallery');
-  expect(footerProps.openWebSnapshotResultTitle).toBe('Открыть Веб-снимки в Библиотеке');
+  expect(footerProps.openLibraryResultTitle).toBe('Открыть в Библиотеке');
   expect(mocks.openGalleryWebSnapshotsPageMock).toHaveBeenCalledTimes(1);
 });

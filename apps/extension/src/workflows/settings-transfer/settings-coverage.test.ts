@@ -8,6 +8,7 @@ import {
 import { SETTINGS_TRANSFER_REGISTRY_BY_ID } from './registry';
 import {
   SETTINGS_TRANSFER_SECTION_COVERAGE,
+  SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE,
   SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE,
   SETTINGS_TRANSFER_VIEW_COVERAGE,
 } from './settings-coverage';
@@ -21,6 +22,7 @@ describe('visible Settings transfer coverage guard', () => {
       expect(ids.length).toBeGreaterThan(0);
       for (const id of ids) {
         if (id === 'action/status') continue;
+        if (id in SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE) continue;
         expect(SETTINGS_TRANSFER_REGISTRY_BY_ID.has(id), id).toBe(true);
       }
     }
@@ -47,6 +49,9 @@ describe('visible Settings transfer coverage guard', () => {
       expect(Boolean(entry.classification) !== Boolean(entry.transferIds)).toBe(true);
       for (const transferId of entry.transferIds ?? []) {
         expect(SETTINGS_TRANSFER_REGISTRY_BY_ID.has(transferId), transferId).toBe(true);
+      }
+      for (const excludedControlId of entry.excludedControlIds ?? []) {
+        expect(SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE).toHaveProperty(excludedControlId);
       }
     }
   });

@@ -1,6 +1,5 @@
 import { translate } from '../../../../platform/i18n';
 import { SettingsSubpageTabs } from '../../../section-surface';
-import { CaptureResourcesSettings } from './capture-resources';
 import { PermissionsSection } from './permissions';
 import { PrivacySection } from './privacy';
 
@@ -17,14 +16,7 @@ export function AccessDataSection(props: { onViewChange?: (view: string) => void
         ]}
         onChange={props.onViewChange}
       />
-      {view === 'privacy' ? (
-        <div className="space-y-5">
-          <CaptureResourcesSettings />
-          <PrivacySection />
-        </div>
-      ) : (
-        <PermissionsSection />
-      )}
+      {view === 'privacy' ? <PrivacySection /> : <PermissionsSection />}
     </div>
   );
 }

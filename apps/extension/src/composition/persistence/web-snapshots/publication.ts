@@ -21,6 +21,7 @@ import {
 import { createWebSnapshotThumbnailEntry } from './media-entry';
 import { parseStoredWebSnapshotRecord } from './guards';
 import type { StoredWebSnapshotRecord } from './contracts';
+import { validateWebSnapshotScreenshotBlob } from '../../../features/web-snapshot/screenshot-validation';
 
 export const WEB_SNAPSHOT_PUBLICATION_DOMAIN = 'web-snapshot-assets';
 export const WEB_SNAPSHOT_OWNER_KIND = 'web-snapshot';
@@ -105,6 +106,7 @@ export async function publishWebSnapshotJournal(journal: AssetReadyJournal): Pro
     refs.screenshotRef,
     `${payload.snapshot.id}-screenshot`
   );
+  await validateWebSnapshotScreenshotBlob(screenshotFile);
   const thumbnail = await createWebSnapshotThumbnailEntry({
     assetId: payload.snapshot.id,
     createdAt: payload.snapshot.createdAt,

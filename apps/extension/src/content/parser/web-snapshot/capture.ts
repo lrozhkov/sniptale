@@ -2,16 +2,196 @@ import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diag
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { getContentRuntimeServices } from '../../platform/runtime-services/services';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { translate } from '../../../platform/i18n';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../contracts/full-page-capture';
+import type { FullPageCaptureGeometry } from '../../../contracts/full-page-capture';
+import { shouldExcludeWebSnapshotFormControlValue } from '../../../features/web-snapshot/public';
+import { isContentOwnedElement, resolveContentShadowRoot } from '../../platform/dom-host';
+import { collectOpenShadowQueryRoots } from '../dom-tree-parser/traversal/virtual-dom.helpers';
+import { createLogger } from '@sniptale/platform/observability/logger';
 
-export async function captureWebSnapshotScreenshot(
-  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
-  captureIdentity?: FullPageExportCaptureIdentity | undefined
-): Promise<Blob> {
-  return (await captureWebSnapshotScreenshotWithWarnings(contentIntentSource, captureIdentity))
-    .blob;
+const SENSITIVE_CONTROL_MASK_ATTRIBUTE = 'data-sniptale-sensitive-screenshot-mask';
+const SENSITIVE_CONTROL_SELECTOR = 'input, select, textarea';
+const OPEN_SHADOW_DISCOVERY_INTERVAL_MS = 250;
+const logger = createLogger({ namespace: 'ContentWebSnapshot' });
+
+function waitForCaptureUiToHide(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function hideCaptureUi(): () => void {
+  const body = document.body;
+  const contentHost = resolveContentShadowRoot()?.host;
+  const bodyWasHidden = body?.classList.contains('sniptale-capture-ui-hidden') ?? false;
+  const hostWasHidden = contentHost?.classList.contains('sniptale-capture-ui-hidden') ?? false;
+  body?.classList.add('sniptale-capture-ui-hidden');
+  contentHost?.classList.add('sniptale-capture-ui-hidden');
+  return () => {
+    if (!bodyWasHidden) body?.classList.remove('sniptale-capture-ui-hidden');
+    if (!hostWasHidden) contentHost?.classList.remove('sniptale-capture-ui-hidden');
+  };
+}
+
+function waitForCaptureResponse<T>(request: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return request;
+  if (signal.aborted) {
+    return Promise.reject(signal.reason ?? new Error('Web snapshot save was cancelled'));
+  }
+  let removeAbortListener = () => {};
+  const cancellation = new Promise<never>((_, reject) => {
+    const cancel = () => reject(signal.reason ?? new Error('Web snapshot save was cancelled'));
+    signal.addEventListener('abort', cancel, { once: true });
+    removeAbortListener = () => signal.removeEventListener('abort', cancel);
+  });
+  void request.catch(() => undefined);
+  return Promise.race([request, cancellation]).finally(removeAbortListener);
+}
+
+interface SensitiveControlMask {
+  element: HTMLElement;
+  priorMarker: string | null;
+  styles: SensitiveControlStyleMask[];
+}
+
+interface SensitiveControlStyleMask {
+  appliedValue: string;
+  priorPriority: string;
+  priorValue: string;
+  property: 'animation' | 'opacity' | 'transition';
+}
+
+function maskSensitiveControlsForScreenshot(): () => void {
+  const marker = crypto.randomUUID();
+  const masks = new Map<HTMLElement, SensitiveControlMask>();
+  const observedRoots = new Set<ParentNode>();
+  let active = true;
+
+  const createStyleMask = (
+    element: HTMLElement,
+    property: SensitiveControlStyleMask['property'],
+    appliedValue: string
+  ): SensitiveControlStyleMask => ({
+    appliedValue,
+    priorPriority: element.style.getPropertyPriority(property),
+    priorValue: element.style.getPropertyValue(property),
+    property,
+  });
+
+  const maskControl = (element: HTMLElement) => {
+    if (!shouldExcludeWebSnapshotFormControlValue(element)) return;
+    if (!masks.has(element)) {
+      masks.set(element, {
+        element,
+        priorMarker: element.getAttribute(SENSITIVE_CONTROL_MASK_ATTRIBUTE),
+        styles: [
+          createStyleMask(element, 'animation', 'none'),
+          createStyleMask(element, 'transition', 'none'),
+          createStyleMask(element, 'opacity', '0'),
+        ],
+      });
+    }
+    if (element.getAttribute(SENSITIVE_CONTROL_MASK_ATTRIBUTE) !== marker) {
+      element.setAttribute(SENSITIVE_CONTROL_MASK_ATTRIBUTE, marker);
+    }
+    for (const style of masks.get(element)?.styles ?? []) {
+      if (
+        element.style.getPropertyValue(style.property) !== style.appliedValue ||
+        element.style.getPropertyPriority(style.property) !== 'important'
+      ) {
+        element.style.setProperty(style.property, style.appliedValue, 'important');
+      }
+    }
+  };
+
+  const scanControls = (root: ParentNode) => {
+    if (root instanceof HTMLElement && root.matches(SENSITIVE_CONTROL_SELECTOR)) maskControl(root);
+    for (const control of root.querySelectorAll<HTMLElement>(SENSITIVE_CONTROL_SELECTOR)) {
+      maskControl(control);
+    }
+  };
+
+  const observer = new MutationObserver((records) => {
+    if (!active) return;
+    for (const record of records) {
+      if (record.type === 'attributes') {
+        if (
+          record.target instanceof HTMLElement &&
+          record.target.matches(SENSITIVE_CONTROL_SELECTOR)
+        ) {
+          maskControl(record.target);
+        }
+        continue;
+      }
+      for (const addedNode of record.addedNodes) {
+        if (!(addedNode instanceof Element)) continue;
+        observeTree(addedNode);
+      }
+    }
+  });
+
+  const observeRoot = (root: ParentNode) => {
+    if (observedRoots.has(root)) return;
+    observer.observe(root, {
+      attributeFilter: [SENSITIVE_CONTROL_MASK_ATTRIBUTE, 'autocomplete', 'style', 'type'],
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+    observedRoots.add(root);
+  };
+
+  function observeTree(root: ParentNode, observeContainer = false): void {
+    if (observeContainer) observeRoot(root);
+    scanControls(root);
+    const queryRoots = collectOpenShadowQueryRoots(root);
+    for (const queryRoot of queryRoots.slice(1)) {
+      observeRoot(queryRoot);
+      scanControls(queryRoot);
+    }
+    if (root instanceof HTMLElement && root.shadowRoot && !isContentOwnedElement(root)) {
+      for (const queryRoot of collectOpenShadowQueryRoots(root.shadowRoot)) {
+        observeRoot(queryRoot);
+        scanControls(queryRoot);
+      }
+    }
+  }
+
+  observeTree(document, true);
+  const shadowDiscoveryInterval = setInterval(() => {
+    if (!active) return;
+    for (const queryRoot of collectOpenShadowQueryRoots(document).slice(1)) {
+      if (observedRoots.has(queryRoot)) continue;
+      observeRoot(queryRoot);
+      scanControls(queryRoot);
+    }
+  }, OPEN_SHADOW_DISCOVERY_INTERVAL_MS);
+
+  return () => {
+    active = false;
+    clearInterval(shadowDiscoveryInterval);
+    observer.disconnect();
+    for (const { element, priorMarker, styles } of masks.values()) {
+      if (element.getAttribute(SENSITIVE_CONTROL_MASK_ATTRIBUTE) === marker) {
+        if (priorMarker === null) element.removeAttribute(SENSITIVE_CONTROL_MASK_ATTRIBUTE);
+        else element.setAttribute(SENSITIVE_CONTROL_MASK_ATTRIBUTE, priorMarker);
+      }
+      for (const style of styles) {
+        if (
+          element.style.getPropertyValue(style.property) !== style.appliedValue ||
+          element.style.getPropertyPriority(style.property) !== 'important'
+        ) {
+          continue;
+        }
+        if (style.priorValue) {
+          element.style.setProperty(style.property, style.priorValue, style.priorPriority);
+        } else element.style.removeProperty(style.property);
+      }
+    }
+  };
 }
 
 export async function captureWebSnapshotScreenshotWithWarnings(
@@ -19,27 +199,48 @@ export async function captureWebSnapshotScreenshotWithWarnings(
   captureIdentity: FullPageExportCaptureIdentity = {
     action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
     exportRunId: crypto.randomUUID(),
-  }
-): Promise<{ blob: Blob; warnings: string[] }> {
+  },
+  abortSignal?: AbortSignal | undefined
+): Promise<{
+  blob: Blob;
+  captureGeometry: FullPageCaptureGeometry;
+  coverage: 'full-page' | 'viewport';
+  warnings: string[];
+}> {
   const services = getContentRuntimeServices();
-  const response = await services.messaging.sendRuntimeMessage(
-    await services.contentActionIntent.attachContentActionIntent(
+  const restoreSensitiveControls = maskSensitiveControlsForScreenshot();
+  let response;
+  try {
+    const message = await services.contentActionIntent.attachContentActionIntent(
       {
         type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
         exportRunId: captureIdentity.exportRunId,
       },
       contentIntentSource,
       captureIdentity.exportRunId
-    )
-  );
-  if (!response.success || !response.dataUrl) {
+    );
+    response = await waitForCaptureResponse(
+      services.messaging.sendRuntimeMessage(message),
+      abortSignal
+    );
+  } finally {
+    restoreSensitiveControls();
+  }
+  if (!response.success || !response.dataUrl || !response.captureGeometry) {
     const message = sanitizeDiagnosticMessage(
       response.error ?? translate('content.runtime.captureFullPageScreenshotFailed')
     );
     throw new Error(message || translate('content.runtime.captureFullPageScreenshotFailed'));
   }
+  logger.log('Full-page capture response received', {
+    dataUrlBytes: response.dataUrl.length,
+  });
+  const blob = await dataUrlToBlob(response.dataUrl, abortSignal);
+  logger.log('Full-page capture response decoded', { screenshotBytes: blob.size });
   return {
-    blob: await dataUrlToBlob(response.dataUrl),
+    blob,
+    captureGeometry: response.captureGeometry,
+    coverage: response.viewportFallback ? ('viewport' as const) : ('full-page' as const),
     warnings: [
       ...(response.downscaled
         ? [translate('content.runtime.captureFullPageDownscaledWarning')]
@@ -47,6 +248,40 @@ export async function captureWebSnapshotScreenshotWithWarnings(
       ...(response.frozenExtentWarning
         ? [translate('content.runtime.captureFullPageFrozenExtentWarning')]
         : []),
+      ...(response.viewportFallback
+        ? [translate('content.runtime.captureFullPageViewportFallbackWarning')]
+        : []),
     ],
   };
+}
+
+export async function captureWebSnapshotViewportScreenshot(
+  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
+  abortSignal?: AbortSignal | undefined
+): Promise<Blob> {
+  const services = getContentRuntimeServices();
+  const restoreSensitiveControls = maskSensitiveControlsForScreenshot();
+  const restoreCaptureUi = hideCaptureUi();
+  let response;
+  try {
+    await waitForCaptureUiToHide();
+    const message = await services.contentActionIntent.attachContentActionIntent(
+      { type: CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP },
+      contentIntentSource
+    );
+    response = await waitForCaptureResponse(
+      services.messaging.sendRuntimeMessage(message),
+      abortSignal
+    );
+  } finally {
+    restoreCaptureUi();
+    restoreSensitiveControls();
+  }
+  if (!response.success || !response.dataUrl) {
+    const message = sanitizeDiagnosticMessage(
+      response.error ?? translate('content.runtime.captureVisibleScreenshotFailed')
+    );
+    throw new Error(message || translate('content.runtime.captureVisibleScreenshotFailed'));
+  }
+  return dataUrlToBlob(response.dataUrl, abortSignal);
 }

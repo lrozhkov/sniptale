@@ -148,6 +148,9 @@ it('rejects unauthorized content action proof issuance before routing', () => {
     {
       reason: 'Unauthorized content action capability sender',
       routeName: `background-owned:${MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY}`,
+      senderDocumentIdPresent: false,
+      senderFrameId: 0,
+      senderTabIdPresent: false,
     }
   );
   const serializedLogs = JSON.stringify(vi.mocked(action.context.logger.warn).mock.calls);

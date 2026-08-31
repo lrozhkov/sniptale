@@ -8,6 +8,7 @@ export {
   requestMicrophonePermission,
   requestOriginPermission,
   requestOriginPermissions,
+  removeChromePermission,
   removeOriginPermissions,
 } from './request';
 export {

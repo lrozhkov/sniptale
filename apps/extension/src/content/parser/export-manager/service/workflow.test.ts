@@ -7,6 +7,7 @@ const fileMocks = vi.hoisted(() => ({
   collectDirectLinks: vi.fn(),
   collectDynamicLinks: vi.fn(),
   collectFroalaImageResources: vi.fn(),
+  collectPageImageResources: vi.fn(),
   downloadFileResources: vi.fn(),
 }));
 
@@ -47,6 +48,7 @@ function configureImageCollectionMocks(args: {
   directFiles: FileResource[];
   dynamicFiles: FileResource[];
   froalaFiles: FileResource[];
+  pageImages?: FileResource[];
   previewToDownloadMap: Map<string, string>;
 }) {
   fileMocks.collectDirectLinks.mockReturnValue(args.directFiles);
@@ -58,6 +60,7 @@ function configureImageCollectionMocks(args: {
     onProgress(2, 2, 'froala pass');
     return { resources: args.froalaFiles, previewToDownloadMap: args.previewToDownloadMap };
   });
+  fileMocks.collectPageImageResources.mockReturnValue(args.pageImages ?? []);
 }
 
 function expectImageCollectionProgress(updateProgress: ReturnType<typeof vi.fn>) {
@@ -88,6 +91,13 @@ function expectImageCollectionProgress(updateProgress: ReturnType<typeof vi.fn>)
     message: 'froala pass',
     current: 2,
     total: 2,
+  });
+  expect(updateProgress).toHaveBeenNthCalledWith(6, {
+    activeStepKey: 'images',
+    phase: 'scanning',
+    message: 'translated:content.runtime.scanPageImages',
+    current: 0,
+    total: 0,
   });
 }
 
@@ -120,6 +130,13 @@ function expectImagesOnlyCollectionProgress(updateProgress: ReturnType<typeof vi
     current: 2,
     total: 2,
   });
+  expect(updateProgress).toHaveBeenNthCalledWith(5, {
+    activeStepKey: 'images',
+    phase: 'scanning',
+    message: 'translated:content.runtime.scanPageImages',
+    current: 0,
+    total: 0,
+  });
 }
 
 beforeEach(() => {
@@ -130,6 +147,7 @@ beforeEach(() => {
     resources: [],
     previewToDownloadMap: new Map<string, string>(),
   });
+  fileMocks.collectPageImageResources.mockReturnValue([]);
   fileMocks.downloadFileResources.mockResolvedValue({
     files: new Map<string, Blob>(),
     errors: [],
@@ -216,12 +234,17 @@ it('collects direct, dynamic, and Froala resources when image export is enabled'
   const dynamicFiles = [createFile('https://example.test/preview.png', 'preview.png', 'dynamic')];
   const froalaFiles = [createFile('https://example.test/froala.png', 'froala.png', 'dynamic')];
   const previewToDownloadMap = new Map([['preview-1', 'download-1']]);
+  const pageImages = [
+    createFile('https://example.test/preview.png', 'duplicate.png', 'page-image'),
+    createFile('https://example.test/page.png', 'page.png', 'page-image'),
+  ];
   const updateProgress = vi.fn();
 
   configureImageCollectionMocks({
     directFiles,
     dynamicFiles,
     froalaFiles,
+    pageImages,
     previewToDownloadMap,
   });
 
@@ -233,7 +256,7 @@ it('collects direct, dynamic, and Froala resources when image export is enabled'
   );
 
   expect(result).toEqual({
-    files: [...directFiles, ...dynamicFiles, ...froalaFiles],
+    files: [...directFiles, ...dynamicFiles, ...froalaFiles, pageImages[1]],
     previewToDownloadMap,
   });
   expectImageCollectionProgress(updateProgress);

@@ -1,455 +1,511 @@
 {
-  "$comment": "Exact jscpd detector owner-family identity/scope. Disposition metadata is owned only by technical-debt.data.json.",
+  "$comment": "Exact current jscpd detector owner-family inventory after complete finding triage; intentional and deferred findings remain admitted.",
   "version": 3,
-  "description": "Constrained ci:release jscpd inventory for the current repository tree.",
+  "description": "Complete blocking ci:release jscpd baseline for the current repository tree.",
   "families": [
     {
+      "family": "packages/ui/src",
+      "count": 46,
+      "lines": 435,
+      "sampleFingerprint": "9f7b4a05411f4b0c97a3c669733c5ed0026c3f83c1a657b58c011fc7193cd8d4"
+    },
+    {
       "family": "apps/extension/src/settings/sections/styles",
-      "count": 17,
-      "lines": 347,
-      "sampleFingerprint": "589894b8bf0c95f3c33f1d9bdd5efa64b2ccffadea7c54d5c01dda3884ec20f7",
-      "debtId": "accepted.jscpd.settings-sections-styles.3ea4a5d66567"
+      "count": 18,
+      "lines": 271,
+      "sampleFingerprint": "00c9b0f45db0cfb8e5b4bac6f73709a72fa60fe35be50fa98c17d0571d30cdf0"
     },
     {
       "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
-      "count": 5,
-      "lines": 100,
-      "sampleFingerprint": "4df61b2df3fc8f1beb4427dc174956c686a4bff72506dff6bdfd98084b787d2e",
-      "debtId": "accepted.jscpd.composition-frame-annotation-controls-callout-apps-extension-src-composition-frame-annotation-co.842751ee8be7"
+      "count": 6,
+      "lines": 99,
+      "sampleFingerprint": "37dbccc26f013f67d7c4ea5293462f8472395d431092cf9e3b04c79cdbe7586f"
     },
     {
       "family": "apps/extension/src/workflows/media-hub-backup/v6",
       "count": 5,
-      "lines": 100,
-      "sampleFingerprint": "88b2b0ce8a93c3bf079e6659fad731895a07065b103754f60fe406072ca0d703",
-      "debtId": "accepted.jscpd.media-hub-backup-v6.88b2b0ce8a93"
-    },
-    {
-      "family": "packages/ui/src",
-      "count": 5,
-      "lines": 89,
-      "sampleFingerprint": "6454ec8a1e84850236136ad0c6558752c292b32be82baa782fc264fd3fb44c80",
-      "debtId": "accepted.jscpd.shared-ui-styles.baff6188de2b"
+      "lines": 70,
+      "sampleFingerprint": "d9b2422c546164f66cade64b525f791291c3b963971c7cfe233368cfad2fd897"
     },
     {
       "family": "apps/extension/src/offscreen/recording/encoding",
       "count": 5,
-      "lines": 55,
-      "sampleFingerprint": "2025fc821b7331fb7917b29949989ae587f9c78c9af41517a65f28df8eaaeb28",
-      "debtId": "accepted.jscpd.offscreen-recording-encoding.2025fc821b73"
+      "lines": 53,
+      "sampleFingerprint": "b98ad403a6d055b4b379bc67c13479357b00f6eff9f3301d94f5c561a70039f8"
     },
     {
-      "family": "apps/extension/src/features/highlighter/frame-annotation",
-      "count": 5,
-      "lines": 45,
-      "sampleFingerprint": "f4b61eaa1cbe98486dd5ec8e84ec52d47edeaf27f3fa6e003313a4d61ad871a3",
-      "debtId": "accepted.jscpd.features-highlighter-frame-annotation.42dc97543f07"
+      "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/frame",
+      "count": 4,
+      "lines": 61,
+      "sampleFingerprint": "aa041c528a7e3bf15bfb5ac9cbff39fa375dc4775ff8663f6ba29bb783b0720d"
     },
     {
       "family": "apps/extension/src/features/highlighter",
       "count": 4,
-      "lines": 43,
-      "sampleFingerprint": "506407403875f4660d155aab8d327e2342e60c920a54ea6b05ceaf4160ab4c1d",
-      "debtId": "accepted.jscpd.features-highlighter.506407403875"
+      "lines": 44,
+      "sampleFingerprint": "01ecdcdd88308281a5eb88c8026e3a5d0c476ed33a47ea3dc24999f5258bd471"
     },
     {
-      "family": "apps/extension/src/ui/highlighter-preset-editor/callout <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
+      "family": "apps/extension/src/content/parser/export-manager",
       "count": 3,
-      "lines": 138,
-      "sampleFingerprint": "8fecb6e30e2055574268370aae971b2590f3607e049c1f5f3d3d6908ec659992",
-      "debtId": "accepted.jscpd.ui-highlighter-preset-editor-callout-apps-extension-src-ui-highlighter-preset-editor-step-badge.8fecb6e30e20"
+      "lines": 47,
+      "sampleFingerprint": "3576795f7b61c4dbdc04a54ee2fb685eea82e8eba221e2383317dcec0083367b"
+    },
+    {
+      "family": "apps/extension/src/composition/frame-annotation-controls/frame",
+      "count": 3,
+      "lines": 44,
+      "sampleFingerprint": "33af2488a8d46f3cc4e4374492fa4adc23db838ddc892cf8e48d2a6467cedab8"
+    },
+    {
+      "family": "apps/extension/src/content/public/preparation-surface",
+      "count": 3,
+      "lines": 43,
+      "sampleFingerprint": "790157ef24930145618f75bd370c1d1dfbee7533da791a9eb7f724ae0a979724"
+    },
+    {
+      "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/scenario",
+      "count": 2,
+      "lines": 21,
+      "sampleFingerprint": "aea771a89ad4b6e962139c5abf0eccdec32e7485b5662d456f30199af7c33e90"
     },
     {
       "family": "apps/extension/src/composition/persistence/scenario",
       "count": 3,
       "lines": 28,
-      "sampleFingerprint": "3621c71be0f637b5bd3f932d680580e20b5a867e3a32a904ade0bca2562fc1b3",
-      "debtId": "accepted.jscpd.composition-persistence-scenario.c6fc6038ef1d"
+      "sampleFingerprint": "3621c71be0f637b5bd3f932d680580e20b5a867e3a32a904ade0bca2562fc1b3"
     },
     {
       "family": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets",
       "count": 3,
-      "lines": 26,
-      "sampleFingerprint": "26f2f07d3ea597408fcb935c65bf3e837d21a509adc9da4e8973681904577b5f",
-      "debtId": "accepted.jscpd.composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl.bc2c20338af1"
+      "lines": 25,
+      "sampleFingerprint": "31b4bd4ba24fc9e2422a498bddf941c7eda97c707c05813840757906cda0e566"
     },
     {
-      "family": "apps/extension/src/settings/sections/capture",
+      "family": "apps/extension/src/ui/highlighter-preset-editor/callout <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
       "count": 2,
-      "lines": 81,
-      "sampleFingerprint": "ece3f933fd1572d135baeb4d2d71077fe93e906a4b9bce6a8207b4a9ae8eda0d",
-      "debtId": "noise.jscpd.settings-sections-capture.ece3f933fd15"
+      "lines": 37,
+      "sampleFingerprint": "8fecb6e30e2055574268370aae971b2590f3607e049c1f5f3d3d6908ec659992"
     },
     {
-      "family": "apps/extension/src/composition/frame-annotation-controls/frame",
+      "family": "apps/extension/src/design-system/parity",
       "count": 2,
-      "lines": 31,
-      "sampleFingerprint": "8d96f1d36cc9feb24ef56ca5361d7145b70d0c41698cfadbd4a38f8bc28c608f",
-      "debtId": "noise.jscpd.composition-frame-annotation-controls-frame.8d96f1d36cc9"
+      "lines": 36,
+      "sampleFingerprint": "219b55e5934d4368f80dd68a2af97dfb668a59b8293d2f661a317160c99b1dfb"
+    },
+    {
+      "family": "tooling/web-snapshot-smoke/runtime",
+      "count": 2,
+      "lines": 29,
+      "sampleFingerprint": "8d2489da48f8ea5b9fb73c920310dc1bd5aa9cfca767c68a85b30cc8fa672be8"
     },
     {
       "family": "apps/extension/src/composition/persistence/callout-presets",
       "count": 2,
       "lines": 26,
-      "sampleFingerprint": "b273515ad5b3c4fe12d8bab876401e2051e318f7a689199b9bd7925236583312",
-      "debtId": "noise.jscpd.composition-persistence-callout-presets.b273515ad5b3"
+      "sampleFingerprint": "b273515ad5b3c4fe12d8bab876401e2051e318f7a689199b9bd7925236583312"
     },
     {
       "family": "apps/extension/src/features/media-hub",
       "count": 2,
       "lines": 24,
-      "sampleFingerprint": "cfec7dd03af566fb9a745004f2212301dfd53d0b7483b9b1e043d6584349543f",
-      "debtId": "noise.jscpd.src-features-media-hub.c7ffa0eb4285"
+      "sampleFingerprint": "3a844eea6bbb57ac92a575602781cb9fbdd94f9da425d2f91e99875adb6bfe70"
     },
     {
-      "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/scenario",
+      "family": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src",
       "count": 2,
-      "lines": 23,
-      "sampleFingerprint": "4dd67eaf74c8135d0c97142fcb404e455086416c1357a5424f41444098acde7f",
-      "debtId": "accepted.jscpd.projects-scenario.4dd67eaf74c8"
+      "lines": 22,
+      "sampleFingerprint": "70636e36b3eb9f51d5631fcef76d7bc7df35eccbc13f14056e4692edb4db219a"
     },
     {
       "family": "apps/extension/src/content/drawing",
       "count": 2,
-      "lines": 20,
-      "sampleFingerprint": "2129255a612ed6ecd2c1f0c03879c5bf772be844fa53427741fc6e3441c0913a",
-      "debtId": "noise.jscpd.content-drawing.2129255a612e"
+      "lines": 18,
+      "sampleFingerprint": "878856cc904cd69340c08b7e08569e4ef2515b82581ba1627984ed64f9be80a0"
+    },
+    {
+      "family": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
+      "count": 2,
+      "lines": 16,
+      "sampleFingerprint": "ca2defe32d4ffe96e851e5dbf534a9c651285055678415df810a20f9fb169898"
+    },
+    {
+      "family": "apps/extension/src/features/highlighter/frame-annotation",
+      "count": 2,
+      "lines": 16,
+      "sampleFingerprint": "876beceb717eee532e449f08daf85209fd3e9191c469b134ff2781e9f2a86c65"
     },
     {
       "family": "apps/extension/src/editor/controller/instance",
       "count": 2,
       "lines": 13,
-      "sampleFingerprint": "70c48226805eba8ae39955c617f852e6b20aec3397001cfefc0bd3046bfe1331",
-      "debtId": "accepted.jscpd.editor-controller-instance.70c48226805e"
+      "sampleFingerprint": "70c48226805eba8ae39955c617f852e6b20aec3397001cfefc0bd3046bfe1331"
     },
     {
-      "family": "apps/extension/src/content/overlay/toolbar",
-      "count": 1,
-      "lines": 128,
-      "sampleFingerprint": "e114d9ebc15d10229d65fc372e7b336e5a7b8e172965bc0a241817a1dd829fef",
-      "debtId": "noise.jscpd.content-overlay-toolbar.e114d9ebc15d"
-    },
-    {
-      "family": "apps/extension/src/scenario-editor/workspace/quick-edit",
-      "count": 1,
-      "lines": 35,
-      "sampleFingerprint": "e48ed701389c6e4b063d0e56be271e0354c015d0abd6852a2d97187fc59d9df6",
-      "debtId": "accepted.jscpd.scenario-editor-workspace-quick-edit.4ea1649b146d"
-    },
-    {
-      "family": "apps/extension/src/content/parser/export-manager",
-      "count": 1,
-      "lines": 23,
-      "sampleFingerprint": "a844b3c0f09f82f2d30ba8328625b9206185569d633b49d9cc31be6d2665772a",
-      "debtId": "noise.jscpd.content-parser-export-manager.a844b3c0f09f"
-    },
-    {
-      "family": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
-      "count": 1,
-      "lines": 22,
-      "sampleFingerprint": "36f20556aaf0a79b94f366ebe9ae5915c568a0da7dd7be7977ac282e382e59a1",
-      "debtId": "accepted.jscpd.composition-frame-annotation-controls-frame-apps-extension-src-composition-frame-annotation-cont.239116b5b15c"
-    },
-    {
-      "family": "apps/extension/src/content/public/preparation-surface",
-      "count": 1,
-      "lines": 22,
-      "sampleFingerprint": "79af704f37cc515dc3c80d356e52b02b0816643e3d52f13d439234cfa280aa7f",
-      "debtId": "noise.jscpd.content-public-preparation-surface.79af704f37cc"
-    },
-    {
-      "family": "apps/extension/src/design-system/previews/product-glass-controls",
+      "family": "apps/extension/src/editor/workspace/floating",
       "count": 1,
       "lines": 21,
-      "sampleFingerprint": "8383ea741d5fdf0ee09caa1deff26b87d6ed4d742302410fcd0e9505b1d1ad29",
-      "debtId": "accepted.jscpd.design-system-previews-product-glass-controls.8383ea741d5f"
+      "sampleFingerprint": "e1e5adba31044f3d5f34d55f7747c36bc3ca95e202e5a93958cc8844781930c0"
     },
     {
       "family": "apps/extension/src/background/capture/quick-actions",
       "count": 1,
       "lines": 19,
-      "sampleFingerprint": "95db4768f15f7a170c78ead212849a29df2ef36c537016c6fc1e3d642b6ccdf7",
-      "debtId": "noise.jscpd.background-capture-quick-actions.95db4768f15f"
+      "sampleFingerprint": "95db4768f15f7a170c78ead212849a29df2ef36c537016c6fc1e3d642b6ccdf7"
     },
     {
-      "family": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input",
+      "family": "apps/extension/src/contracts/messaging/contracts",
       "count": 1,
       "lines": 19,
-      "sampleFingerprint": "33a0a7c573cf63e198e5fed40f2149cd79181dc2ea179d78032a09171e6482b2",
-      "debtId": "accepted.jscpd.composition-frame-annotation-controls-voice-apps-extension-src-content-voice-input.33a0a7c573cf"
+      "sampleFingerprint": "5e0cf769b80479a90ca72c65e54a20264c2dc614a6f80b7009729d63ef759fc0"
+    },
+    {
+      "family": "apps/extension/src/background/capture/page-package",
+      "count": 1,
+      "lines": 18,
+      "sampleFingerprint": "5276fd13e7baf3f3965fdd7dcb00d93b5581b4a0f2d3427b957c741cf3b6152e"
+    },
+    {
+      "family": "apps/extension/src/popup/recording/video <-> apps/extension/src/popup/shell/home",
+      "count": 1,
+      "lines": 18,
+      "sampleFingerprint": "669971f1581f6682edc39d5d697f940cf2de0e3e1688d60668d3dc46499b5e64"
     },
     {
       "family": "apps/extension/src/background/runtime/tab-mode-router-screenshot",
       "count": 1,
-      "lines": 18,
-      "sampleFingerprint": "48ab9b9ed8f8f1d35b10afe8a6f8c6630e66597975816006f6ad738f9bf207e6",
-      "debtId": "noise.jscpd.background-runtime-tab-mode-router-screenshot.48ab9b9ed8f8"
+      "lines": 17,
+      "sampleFingerprint": "48ab9b9ed8f8f1d35b10afe8a6f8c6630e66597975816006f6ad738f9bf207e6"
+    },
+    {
+      "family": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input",
+      "count": 1,
+      "lines": 17,
+      "sampleFingerprint": "7693b63eee184d3e300e57a75e0fc7b7fbc3f50ba8f67d53dd2da22bd765ed95"
     },
     {
       "family": "apps/extension/src/editor/controller/document <-> apps/extension/src/editor/drawing/object",
       "count": 1,
       "lines": 17,
-      "sampleFingerprint": "ea03b4a8b7ceb3932a9b52cd34623c7d44532cb31d2f5155ee53014bef436320",
-      "debtId": "accepted.jscpd.editor-controller-document-apps-extension-src-editor-drawing-object.ea03b4a8b7ce"
+      "sampleFingerprint": "ea03b4a8b7ceb3932a9b52cd34623c7d44532cb31d2f5155ee53014bef436320"
     },
     {
-      "family": "apps/extension/src/offscreen/recording/encoding <-> apps/extension/src/offscreen/recording/stream",
+      "family": "apps/extension/src/features/video/project",
       "count": 1,
       "lines": 16,
-      "sampleFingerprint": "cd8f19a3476fcd9297c47149eabca3fb46ca6197198a7c9c163cac8eacf6e1bf",
-      "debtId": "accepted.jscpd.encoding-stream.cd8f19a3476f"
+      "sampleFingerprint": "9ccff1f2f85cc8e7da3082cabd82ff73daf94e9f5800e33687b901d1f3a6dcdc"
     },
     {
       "family": "apps/extension/src/composition/persistence/callout-presets <-> apps/extension/src/composition/persistence/highlighter",
       "count": 1,
       "lines": 15,
-      "sampleFingerprint": "13549feb0b14ed535c357a568052ec11cb3e06e29a942b9e7e6b7540f629dcaf",
-      "debtId": "accepted.jscpd.composition-persistence-callout-presets-apps-extension-src-composition-persistence-highlighter.13549feb0b14"
+      "sampleFingerprint": "13549feb0b14ed535c357a568052ec11cb3e06e29a942b9e7e6b7540f629dcaf"
     },
     {
-      "family": "apps/extension/src/composition/persistence/document-assets",
+      "family": "apps/extension/src/design-system/previews/product-glass-controls",
       "count": 1,
       "lines": 15,
-      "sampleFingerprint": "6d2625312ff54bf02b27508aa8efc17443314e8de754a9c6e73059a433aaaa98",
-      "debtId": "noise.jscpd.document-assets.6d2625312ff5"
+      "sampleFingerprint": "8383ea741d5fdf0ee09caa1deff26b87d6ed4d742302410fcd0e9505b1d1ad29"
     },
     {
       "family": "packages/foundation/src",
       "count": 1,
       "lines": 15,
-      "sampleFingerprint": "9d198a6afa62cd728183e12f42c6a5211cf3ae3539c2f1163dedf2cbd68531f8",
-      "debtId": "noise.jscpd.package-foundation-src.9d198a6afa62"
+      "sampleFingerprint": "9d198a6afa62cd728183e12f42c6a5211cf3ae3539c2f1163dedf2cbd68531f8"
     },
     {
       "family": "apps/extension/src/background/page-access",
       "count": 1,
       "lines": 14,
-      "sampleFingerprint": "93aae628d9a8ef5eb2785434c31e68cd4cfa454a49cd0240001e323674bb10a6",
-      "debtId": "accepted.jscpd.background-page-access-actions.fee50b3f97f5"
+      "sampleFingerprint": "93aae628d9a8ef5eb2785434c31e68cd4cfa454a49cd0240001e323674bb10a6"
     },
     {
       "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document",
       "count": 1,
       "lines": 14,
-      "sampleFingerprint": "3418f5388ea01b2c64f34d33ab6e419b08ab0bb409a30ecc6b31f47cf2adfdde",
-      "debtId": "accepted.jscpd.content-parser-web-snapshot-src-editor-controller-document.e8dcd333035b"
+      "sampleFingerprint": "3418f5388ea01b2c64f34d33ab6e419b08ab0bb409a30ecc6b31f47cf2adfdde"
     },
     {
-      "family": "apps/extension/src/features/editor/document",
+      "family": "apps/extension/src/offscreen/recording/encoding <-> apps/extension/src/offscreen/recording/stream",
       "count": 1,
       "lines": 14,
-      "sampleFingerprint": "c331c4d4b537aea2b43cfb1ad8abc8058c5fd2296a3f0ad1ebfe32821392a971",
-      "debtId": "noise.jscpd.features-editor-document.1680e8d9ddfd"
+      "sampleFingerprint": "cd8f19a3476fcd9297c47149eabca3fb46ca6197198a7c9c163cac8eacf6e1bf"
     },
     {
       "family": "apps/extension/src/settings/sections/capture <-> apps/extension/src/settings/sections/styles",
       "count": 1,
       "lines": 14,
-      "sampleFingerprint": "6dbdf80b6bc30cad798084d8ca51af675ab8d4f40f4f1c5293abf84f8b624d6a",
-      "debtId": "accepted.jscpd.settings-sections-capture-apps-extension-src-settings-sections-styles.6dbdf80b6bc3"
+      "sampleFingerprint": "6dbdf80b6bc30cad798084d8ca51af675ab8d4f40f4f1c5293abf84f8b624d6a"
     },
     {
-      "family": "apps/extension/src/content/selection/frame-runtime",
+      "family": "apps/extension/src/composition/persistence/document-assets",
       "count": 1,
       "lines": 13,
-      "sampleFingerprint": "a8aecc935edd218370b3b23d9da63ce6207d6e35bce73568774aad6a769be5cd",
-      "debtId": "noise.jscpd.content-selection-frame-runtime.a8aecc935edd"
+      "sampleFingerprint": "6d2625312ff54bf02b27508aa8efc17443314e8de754a9c6e73059a433aaaa98"
+    },
+    {
+      "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/content/parser/web-snapshot",
+      "count": 1,
+      "lines": 13,
+      "sampleFingerprint": "e76fa0d533b0ed90b001fff7907b625cb41a948447eec4f35f47c904b79e1048"
+    },
+    {
+      "family": "apps/extension/src/features/editor/document",
+      "count": 1,
+      "lines": 13,
+      "sampleFingerprint": "c331c4d4b537aea2b43cfb1ad8abc8058c5fd2296a3f0ad1ebfe32821392a971"
     },
     {
       "family": "apps/extension/src/features/video/composition",
       "count": 1,
       "lines": 13,
-      "sampleFingerprint": "8c12a1f8d543eb643732a6ae309bb8ea64053dde9edbddac26526ece30d853b8",
-      "debtId": "noise.jscpd.features-video-composition.99cdaed32ae2"
+      "sampleFingerprint": "8c12a1f8d543eb643732a6ae309bb8ea64053dde9edbddac26526ece30d853b8"
     },
     {
-      "family": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
+      "family": "apps/extension/src/ui/popup-shell/inline-curtain",
       "count": 1,
       "lines": 13,
-      "sampleFingerprint": "f0e723f15aabf6b34ff32474fd0bce3ea2244f4e6bc4233858956622a078560a",
-      "debtId": "accepted.jscpd.ui-highlighter-preset-editor-apps-extension-src-ui-surface-style-selector.f0e723f15aab"
+      "sampleFingerprint": "71ff67ee1e4de430be5cf7990b347eaec372a51e3227674cac977ab216d0dced"
+    },
+    {
+      "family": "packages/runtime-contracts/src",
+      "count": 1,
+      "lines": 13,
+      "sampleFingerprint": "00cf332cf45c3131fa2742a05c8120d12873d86fb5981329154516c377ea3e9d"
     },
     {
       "family": "apps/extension/src/background/ai/settings",
       "count": 1,
       "lines": 12,
-      "sampleFingerprint": "e8205b5199489dfba25eb4efbf2dfa795839c7dbc56daf2d1cbfd962b7318ece",
-      "debtId": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6"
+      "sampleFingerprint": "e8205b5199489dfba25eb4efbf2dfa795839c7dbc56daf2d1cbfd962b7318ece"
     },
     {
       "family": "apps/extension/src/composition/persistence/annotation-template-tags",
       "count": 1,
       "lines": 12,
-      "sampleFingerprint": "40b1ab177da1a1f7c6615a656d887a2f4513fc43c1a3b26730f4097e97921a5f",
-      "debtId": "noise.jscpd.composition-persistence-annotation-template-tags.40b1ab177da1"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/web-snapshots",
-      "count": 1,
-      "lines": 12,
-      "sampleFingerprint": "b0b43316f3fc853388bdff64499f522cc277615b2baebe36addd902d7d55596f",
-      "debtId": "accepted.jscpd.projects-web-snapshots.b0b43316f3fc"
+      "sampleFingerprint": "40b1ab177da1a1f7c6615a656d887a2f4513fc43c1a3b26730f4097e97921a5f"
     },
     {
       "family": "apps/extension/src/content/drawing <-> apps/extension/src/content/overlay/toolbar",
       "count": 1,
       "lines": 12,
-      "sampleFingerprint": "65bb61ab8424ce5da3b8634a9a6404ff21cc5e8266e8cce28c24ab780a9235ea",
-      "debtId": "accepted.jscpd.content-drawing-apps-extension-src-content-overlay-toolbar.65bb61ab8424"
+      "sampleFingerprint": "65bb61ab8424ce5da3b8634a9a6404ff21cc5e8266e8cce28c24ab780a9235ea"
+    },
+    {
+      "family": "apps/extension/src/content/selection/frame-runtime",
+      "count": 1,
+      "lines": 12,
+      "sampleFingerprint": "a8aecc935edd218370b3b23d9da63ce6207d6e35bce73568774aad6a769be5cd"
     },
     {
       "family": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging",
       "count": 1,
       "lines": 11,
-      "sampleFingerprint": "beb07016e16ddaca52c6b77564fc110c6d7dca2267a35409ebdb173218338b5b",
-      "debtId": "accepted.jscpd.background-routing-contracts-runtime-messaging-apps-extension-src-background-runtime-page-access.693f682864be"
+      "sampleFingerprint": "beb07016e16ddaca52c6b77564fc110c6d7dca2267a35409ebdb173218338b5b"
     },
     {
       "family": "apps/extension/src/composition/persistence/projects",
       "count": 1,
       "lines": 11,
-      "sampleFingerprint": "0e5caf98581912b48e3bc724cc5e6e127f3bca439d164a6985fa061de8f8952b",
-      "debtId": "noise.jscpd.projects.0e5caf985819"
+      "sampleFingerprint": "0e5caf98581912b48e3bc724cc5e6e127f3bca439d164a6985fa061de8f8952b"
     },
     {
-      "family": "apps/extension/src/offscreen/recording/geometry <-> packages/runtime-contracts/src",
+      "family": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
       "count": 1,
       "lines": 11,
-      "sampleFingerprint": "9966528f66d82e80dfd1e44fd5eb6d725b1ed277540f3c5c8b9a7538b7066a60",
-      "debtId": "accepted.jscpd.geometry-runtime-contracts.9966528f66d8"
+      "sampleFingerprint": "f0e723f15aabf6b34ff32474fd0bce3ea2244f4e6bc4233858956622a078560a"
     },
     {
-      "family": "apps/extension/src/background/capture/native-app",
+      "family": "tooling/qa/composition",
       "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "d26fd7f0a04f51d993f5c37ebe210fdb929b8b87faad162b910a1dfaabb8d22b",
-      "debtId": "noise.jscpd.background-capture-native-app.bffd5da0ae9d"
+      "lines": 11,
+      "sampleFingerprint": "58619c0401dca8d3631caa3f3995f036ef3c14754625802ff115eff002ad2f1b"
     },
     {
-      "family": "apps/extension/src/composition/persistence/document-assets <-> apps/extension/src/composition/persistence/scenario",
+      "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/web-snapshots",
       "count": 1,
       "lines": 10,
-      "sampleFingerprint": "6206ce2a9782c8564cf3f6f1a45e5f77f27344819f0fda0585288d6736c155f0",
-      "debtId": "accepted.jscpd.document-assets-scenario.6206ce2a9782"
+      "sampleFingerprint": "b0b43316f3fc853388bdff64499f522cc277615b2baebe36addd902d7d55596f"
     },
     {
-      "family": "apps/extension/src/composition/persistence/image-workspaces <-> apps/extension/src/composition/persistence/scenario",
+      "family": "apps/extension/src/content/overlay/scenario-recorder",
       "count": 1,
       "lines": 10,
-      "sampleFingerprint": "fc42f20ece5a038a279d617f1cff42e421b386eeda1d9c78f5f3ed3d535d6e6b",
-      "debtId": "accepted.jscpd.image-workspaces-scenario.fc42f20ece5a"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/scenario <-> apps/extension/src/composition/persistence/web-snapshots",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "1d81fcf132d6a21e0e6ac9322da2425d25bc60fad391d93a591eed93ed3c1bba",
-      "debtId": "accepted.jscpd.scenario-web-snapshots.1d81fcf132d6"
+      "sampleFingerprint": "42a8e14a6ae84d9603229a66585c2982f497e23175846978710c2a1ed112ea40"
     },
     {
       "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/highlighter/frame-annotation",
       "count": 1,
       "lines": 10,
-      "sampleFingerprint": "e4e5c1e14803f609b5e7358b292cd1e5abf113eb9fcfe04611c4be681d340d9a",
-      "debtId": "accepted.jscpd.content-parser-page-preparation-apps-extension-src-features-highlighter-frame-annotation.e4e5c1e14803"
+      "sampleFingerprint": "e4e5c1e14803f609b5e7358b292cd1e5abf113eb9fcfe04611c4be681d340d9a"
+    },
+    {
+      "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/features/web-snapshot",
+      "count": 1,
+      "lines": 10,
+      "sampleFingerprint": "7cfaa00a1d239a816e3ace5461b3a283347d2d8b4a5a905bf7d16e2c924a352b"
     },
     {
       "family": "apps/extension/src/content/selection/highlighter-hover-preview",
       "count": 1,
       "lines": 10,
-      "sampleFingerprint": "36ffb7157235d388604558677040ff6d4e6356fdf4474a9dcfdfad32241a56bf",
-      "debtId": "noise.jscpd.content-selection-highlighter-hover-preview.36ffb7157235"
+      "sampleFingerprint": "36ffb7157235d388604558677040ff6d4e6356fdf4474a9dcfdfad32241a56bf"
     },
     {
-      "family": "tooling/qa/runtime",
+      "family": "apps/extension/src/offscreen/recording/geometry <-> packages/runtime-contracts/src",
       "count": 1,
       "lines": 10,
-      "sampleFingerprint": "976c2c57fd5f47f808f0e4626433d12b9e63749c6ecdd5acf2ee4df7a13494a1",
-      "debtId": "noise.jscpd.runtime.976c2c57fd5f"
+      "sampleFingerprint": "9966528f66d82e80dfd1e44fd5eb6d725b1ed277540f3c5c8b9a7538b7066a60"
+    },
+    {
+      "family": "apps/extension/src/popup/shell/export",
+      "count": 1,
+      "lines": 10,
+      "sampleFingerprint": "14212d998303ef4c205224c4ef04e7e4532b6d9dce7bbcee5b7760c8afac5bad"
+    },
+    {
+      "family": "apps/extension/src/video-editor/project/state",
+      "count": 1,
+      "lines": 10,
+      "sampleFingerprint": "4414b41209bb2f2bbeb99debbcde0f1665bc38269d867e950057bb546de71380"
+    },
+    {
+      "family": "apps/extension/src/video-editor/workspace/sidebar",
+      "count": 1,
+      "lines": 10,
+      "sampleFingerprint": "c0857d37ce5239fbc53636fe141ec856e4647e6bc16eef66e0aebf710081eea5"
+    },
+    {
+      "family": "apps/extension/src/background/capture/native-app",
+      "count": 1,
+      "lines": 9,
+      "sampleFingerprint": "d26fd7f0a04f51d993f5c37ebe210fdb929b8b87faad162b910a1dfaabb8d22b"
     },
     {
       "family": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client",
       "count": 1,
       "lines": 9,
-      "sampleFingerprint": "00bf41e729769acfd5bac208081927b0a3cba7037d9409ac7cc62ab6a42a461e",
-      "debtId": "accepted.jscpd.background-frame-annotation-raster-apps-extension-src-composition-frame-annotation-raster-client.00bf41e72976"
+      "sampleFingerprint": "00bf41e729769acfd5bac208081927b0a3cba7037d9409ac7cc62ab6a42a461e"
     },
     {
       "family": "apps/extension/src/composition/persistence/capture-settings <-> packages/runtime-contracts/src",
       "count": 1,
       "lines": 9,
-      "sampleFingerprint": "6f5a9cc811a3fdf921142e846001017fcd6125328dca5784dedb5b4a282939eb",
-      "debtId": "accepted.jscpd.composition-persistence-capture-settings-packages-runtime-contracts-src.6f5a9cc811a3"
+      "sampleFingerprint": "6f5a9cc811a3fdf921142e846001017fcd6125328dca5784dedb5b4a282939eb"
     },
     {
-      "family": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
+      "family": "apps/extension/src/composition/persistence/document-assets <-> apps/extension/src/composition/persistence/scenario",
       "count": 1,
       "lines": 9,
-      "sampleFingerprint": "ea4e62de7d6f811ccc777dee730580e485b11e90e68549a5ee4875512d1bad54",
-      "debtId": "accepted.jscpd.composition-persistence-library-lifecycle-apps-extension-src-features-highlighter-frame-annotati.ea4e62de7d6f"
+      "sampleFingerprint": "6206ce2a9782c8564cf3f6f1a45e5f77f27344819f0fda0585288d6736c155f0"
+    },
+    {
+      "family": "apps/extension/src/composition/persistence/image-workspaces <-> apps/extension/src/composition/persistence/scenario",
+      "count": 1,
+      "lines": 9,
+      "sampleFingerprint": "fc42f20ece5a038a279d617f1cff42e421b386eeda1d9c78f5f3ed3d535d6e6b"
     },
     {
       "family": "apps/extension/src/content/selection/frame-runtime <-> apps/extension/src/features/highlighter/step-badge-presets",
       "count": 1,
       "lines": 9,
-      "sampleFingerprint": "ed1abff696763297002260de5b1574227b4607dfdbcb6f19456887d4f4067a9d",
-      "debtId": "accepted.jscpd.content-selection-frame-runtime-apps-extension-src-features-highlighter-step-badge-presets.ed1abff69676"
+      "sampleFingerprint": "f78c3096bdc9e68684dee383142ffc35fceaee259c56bf210da788ed94d3134b"
     },
     {
-      "family": "apps/extension/src/content/selection/interactive-frame",
+      "family": "apps/extension/src/editor/inspector/compact <-> apps/extension/src/editor/inspector/environment",
       "count": 1,
       "lines": 9,
-      "sampleFingerprint": "85a688ed4566b1e12c6ce161610d7eaa0ce96d3bd7d2aa8023c68fea26dfd52f",
-      "debtId": "noise.jscpd.content-selection-interactive-frame.85a688ed4566"
+      "sampleFingerprint": "62f86acde98a62c0f4154f4bc11d11c90bf48e320c6e62ccbbfef989b8adfcfb"
     },
     {
-      "family": "apps/extension/src/video-editor/project/state",
+      "family": "tooling/qa/runtime",
       "count": 1,
       "lines": 9,
-      "sampleFingerprint": "4414b41209bb2f2bbeb99debbcde0f1665bc38269d867e950057bb546de71380",
-      "debtId": "noise.jscpd.video-editor-project-state.13ea06eb0f26"
+      "sampleFingerprint": "4c3aa8433d2dce7d78c40f05880a6e84f9552d863d056800f3574e54a12863cd"
     },
     {
       "family": "apps/extension/src/background/capture/routing",
       "count": 1,
       "lines": 8,
-      "sampleFingerprint": "753a87f9cd4bcf566f5bfc7094535d80cd0c4bc7c4277c876302eabfbf4ec099",
-      "debtId": "noise.jscpd.background-capture-routing.753a87f9cd4b"
+      "sampleFingerprint": "753a87f9cd4bcf566f5bfc7094535d80cd0c4bc7c4277c876302eabfbf4ec099"
+    },
+    {
+      "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/web-snapshot",
+      "count": 1,
+      "lines": 8,
+      "sampleFingerprint": "98354b6f2984f7c995115828845f84c1c203ebcfdf1f7363c7f160fd4f1f162e"
+    },
+    {
+      "family": "apps/extension/src/content/selection/interactive-frame",
+      "count": 1,
+      "lines": 8,
+      "sampleFingerprint": "85a688ed4566b1e12c6ce161610d7eaa0ce96d3bd7d2aa8023c68fea26dfd52f"
+    },
+    {
+      "family": "apps/extension/src/editor/drawing/object",
+      "count": 1,
+      "lines": 8,
+      "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379"
+    },
+    {
+      "family": "apps/extension/src/editor/workspace/toolbar",
+      "count": 1,
+      "lines": 8,
+      "sampleFingerprint": "0e787c2c91536b98cc6cb0a8c74bc63e3cd7eea01ab13386622bd81e0276f672"
+    },
+    {
+      "family": "apps/extension/src/popup/shell/app",
+      "count": 1,
+      "lines": 8,
+      "sampleFingerprint": "b466f1206c0a34fa99e90d641e04c459f948892d3e48e23af0f6fbb66570a630"
+    },
+    {
+      "family": "apps/extension/src/background/capture/page-package <-> apps/extension/src/content/parser/web-snapshot",
+      "count": 1,
+      "lines": 7,
+      "sampleFingerprint": "e96bc1ed6dfd6aaf9eef6c65574c576b65cae8d18be043bba58ec7b114d9ebce"
+    },
+    {
+      "family": "apps/extension/src/background/runtime/routing",
+      "count": 1,
+      "lines": 7,
+      "sampleFingerprint": "7ed58cb681a5b250d4bf5cec328d3777eb584e93d91a6261d85db6254d602775"
+    },
+    {
+      "family": "apps/extension/src/content/parser/web-snapshot",
+      "count": 1,
+      "lines": 7,
+      "sampleFingerprint": "ac63f1c7b9febf80816af71373e6a597f936224e44cc77f9533e171754bc2549"
     },
     {
       "family": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
       "count": 1,
-      "lines": 7,
-      "sampleFingerprint": "9ac5372f642fbf73d885691eebd7ec8759892eeefc8c63aed1c67ec03efc9884",
-      "debtId": "accepted.jscpd.composition-frame-annotation-controls-step-badge-apps-extension-src-ui-highlighter-preset-editor.9ac5372f642f"
-    },
-    {
-      "family": "apps/extension/src/editor/controller/instance <-> apps/extension/src/editor/controller/magnet",
-      "count": 1,
-      "lines": 7,
-      "sampleFingerprint": "b2d3ad96f305a3ebb11c04b8aa2a42a41114e5a998daeb5d55ee57f3a9055067",
-      "debtId": "accepted.jscpd.editor-controller-instance-apps-extension-src-editor-controller-magnet.b2d3ad96f305"
+      "lines": 6,
+      "sampleFingerprint": "9ac5372f642fbf73d885691eebd7ec8759892eeefc8c63aed1c67ec03efc9884"
     },
     {
       "family": "apps/extension/src/composition/persistence/assets",
       "count": 1,
       "lines": 6,
-      "sampleFingerprint": "a56a4e79cc2032f882f4309b7ff2ab0b1d5a24eb8a1b7e0112afbdfac53d0a57",
-      "debtId": "noise.jscpd.persistence-assets.a56a4e79cc20"
+      "sampleFingerprint": "a56a4e79cc2032f882f4309b7ff2ab0b1d5a24eb8a1b7e0112afbdfac53d0a57"
     },
     {
       "family": "apps/extension/src/content/selection/frame-settings-popover",
       "count": 1,
       "lines": 6,
-      "sampleFingerprint": "bca3231afbeca5290ff719e3f95e7d9ec61c7494b31a48140ed5cfa9167c9b3a",
-      "debtId": "noise.jscpd.content-selection-frame-settings-popover.0f926c027424"
+      "sampleFingerprint": "bca3231afbeca5290ff719e3f95e7d9ec61c7494b31a48140ed5cfa9167c9b3a"
     },
     {
-      "family": "apps/extension/src/editor/drawing/object",
+      "family": "apps/extension/src/editor/controller/instance <-> apps/extension/src/editor/controller/magnet",
       "count": 1,
       "lines": 6,
-      "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379",
-      "debtId": "noise.jscpd.editor-drawing-object.31e2a1681484"
+      "sampleFingerprint": "2eba018f1db2797c1d3e1096b04b7647578f7122a145be3c222b83ed13170bd6"
+    },
+    {
+      "family": "apps/extension/src/gallery/library/sidebar <-> apps/extension/src/gallery/shell/app-shell",
+      "count": 1,
+      "lines": 6,
+      "sampleFingerprint": "1d0585948e68b9ba47ce6228265f59d135c8b91424b31ccb6eae1276cb26a990"
     }
   ]
 }

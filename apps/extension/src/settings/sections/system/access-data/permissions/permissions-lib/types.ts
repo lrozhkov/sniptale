@@ -1,4 +1,4 @@
-import { Camera, FolderOpen, Globe, Mic } from 'lucide-react';
+import { Camera, Cable, FolderOpen, Globe, Mic } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   PAGE_ACCESS_ALL_SITES_ORIGIN_PATTERNS,
@@ -13,7 +13,7 @@ export interface PermissionInfo {
   icon: LucideIcon;
   state: PermissionState;
   type: PermissionType;
-  chromePermission?: chrome.runtime.ManifestPermissions;
+  chromePermission?: chrome.runtime.ManifestPermission;
   originPattern?: string;
   originPatterns?: string[];
 }
@@ -52,5 +52,12 @@ export const initialPermissions: PermissionInfo[] = [
     originPattern: PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN,
     state: 'unknown',
     type: 'file',
+  },
+  {
+    chromePermission: 'nativeMessaging',
+    id: 'nativeApp',
+    icon: Cable,
+    state: 'unknown',
+    type: 'chrome',
   },
 ];

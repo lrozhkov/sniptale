@@ -186,7 +186,6 @@ function expectSceneSelectionAfterProjectUpdate(
         currentTime: 0,
         project,
         projectHistory: resetVideoEditorProjectHistory(project.id),
-        selectedClipId: null,
         selectedTrackId,
         selection,
       } as VideoEditorProjectState,

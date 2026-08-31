@@ -100,7 +100,7 @@ it('shows a compact section status in the navigation instead of consuming header
   const status = container.querySelector('[data-ui="shared.categorized-inspector.section-status"]');
   expect(status?.textContent).toBe('Unsaved');
   expect(status?.getAttribute('title')).toBe('Unsaved');
-  expect(status?.closest('nav')).not.toBeNull();
+  expect(status?.closest('nav')?.className).toContain('border-solid');
 });
 
 it('wraps arrow navigation and ignores unrelated keys', () => {

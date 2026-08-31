@@ -173,7 +173,7 @@ it('loads tabs from the current window and auto-selects the current exportable t
   ]);
 });
 
-it('includes web snapshot viewer tabs and excludes restricted extension pages', async () => {
+it('excludes all extension-owned pages from export targets', async () => {
   const viewerUrl =
     'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1';
   mocks.browserTabsQuery.mockResolvedValue([
@@ -186,7 +186,7 @@ it('includes web snapshot viewer tabs and excludes restricted extension pages', 
       reason: null,
       supported: true,
     },
-    isRestrictedPage: tab.id === 12,
+    isRestrictedPage: tab.id === 11 || tab.id === 12,
   }));
 
   await renderHarness();
@@ -194,8 +194,26 @@ it('includes web snapshot viewer tabs and excludes restricted extension pages', 
 
   expect(latestValue?.filteredTabs.map((tab) => [tab.tabId, tab.title])).toEqual([
     [7, 'Current tab'],
-    [11, 'Source page - Sniptale Web Snapshot'],
   ]);
+});
+
+it('never exposes the current extension page, including the initial fallback state', async () => {
+  mocks.browserTabsQuery.mockResolvedValue([
+    { id: 7, title: 'Sniptale', url: 'chrome-extension://test/popup.html' },
+  ]);
+
+  await renderHarness({
+    capabilities: createCapabilities({
+      isRestrictedPage: true,
+      title: 'Sniptale',
+      url: 'chrome-extension://test/popup.html',
+    }),
+  });
+
+  expect(latestValue?.availableTabs).toEqual([]);
+  await flushEffects();
+  expect(latestValue?.availableTabs).toEqual([]);
+  expect(latestValue?.selectedTabIds).toEqual([]);
 });
 
 it('includes granted local-file tabs through the explicit file origin scope', async () => {
@@ -334,6 +352,24 @@ it('toggles every exportable tab on and off when the list is unfiltered', async 
   });
 
   expect(latestValue?.selectedTabIds).toEqual([]);
+});
+
+it('caps select-all and individual additions at the export job tab maximum', async () => {
+  mocks.browserTabsQuery.mockResolvedValue(
+    Array.from({ length: 260 }, (_, index) => ({
+      id: index + 100,
+      title: `Tab ${index + 1}`,
+      url: `https://example.test/${index + 1}`,
+    }))
+  );
+
+  await renderHarness();
+  await flushEffects();
+  await act(async () => latestValue?.toggleSelectAllTabs());
+  expect(latestValue?.selectedTabIds).toHaveLength(256);
+
+  await act(async () => latestValue?.toggleTabSelection(359));
+  expect(latestValue?.selectedTabIds).toHaveLength(256);
 });
 
 it('replaces selection with filtered exportable tabs when bulk-selecting a filtered list', async () => {

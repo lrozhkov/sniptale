@@ -1,4 +1,6 @@
-import { sanitizeWebSnapshotCssText } from './sanitize-css';
+import { sanitizeWebSnapshotCssText, sanitizeWebSnapshotStylesheetText } from './sanitize-css';
+import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
+import { isWebSnapshotCaptureFontMimeType } from './asset-manifest';
 
 const SAFE_WEB_SNAPSHOT_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const SAFE_WEB_SNAPSHOT_DATA_MIME_TYPES = new Set([
@@ -20,10 +22,49 @@ const EXECUTABLE_ELEMENT_SELECTORS = [
   'meta[http-equiv="refresh" i]',
 ];
 const FORM_ATTRIBUTE_NAMES = ['action', 'method', 'target'] as const;
+export const WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE = 'data-sniptale-external-href';
 
 interface WebSnapshotHtmlSanitizeOptions {
   allowedObjectUrls?: readonly string[];
   offlineOnly?: boolean;
+  removeForms?: boolean;
+}
+
+const WEB_SNAPSHOT_XHTML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
+
+export function collectWebSnapshotQueryRoots(root: ParentNode): ParentNode[] {
+  const roots: ParentNode[] = [root];
+  for (let index = 0; index < roots.length; index += 1) {
+    const current = roots[index];
+    if (!current) continue;
+    for (const template of current.querySelectorAll<HTMLTemplateElement>(
+      'template[shadowrootmode]'
+    )) {
+      roots.push(template.content);
+    }
+  }
+  return roots;
+}
+
+function createOfflineCssUrlRewriter(
+  options: WebSnapshotHtmlSanitizeOptions
+): ((url: string) => string | null) | undefined {
+  if (!options.offlineOnly) return undefined;
+  const allowedObjectUrls = new Set(options.allowedObjectUrls ?? []);
+  return (value) => {
+    const trimmedValue = value.trim();
+    if (
+      trimmedValue.startsWith('#') ||
+      isAllowedOfflineAssetReference(trimmedValue, allowedObjectUrls)
+    ) {
+      return trimmedValue;
+    }
+    try {
+      return isSafeWebSnapshotDataUrl(new URL(trimmedValue)) ? trimmedValue : null;
+    } catch {
+      return null;
+    }
+  };
 }
 
 function isSafeWebSnapshotDataUrl(url: URL): boolean {
@@ -47,6 +88,47 @@ export function isSafeWebSnapshotUrl(value: string, baseUrl: string | null): boo
   } catch {
     return false;
   }
+}
+
+/**
+ * Capture-only URL policy. Inline SVG is admitted here so it can be decoded, sanitized, and
+ * rewritten to an inert local asset; it remains forbidden in the final HTML URL policy.
+ */
+export function isSafeWebSnapshotCaptureAssetUrl(value: string, baseUrl: string | null): boolean {
+  if (isSafeWebSnapshotUrl(value, baseUrl)) return true;
+  try {
+    const url = new URL(value.trim(), baseUrl ?? 'https://sniptale.invalid/');
+    if (url.protocol !== 'data:') return false;
+    if (/^data:image\/svg\+xml(?:[;,])/iu.test(url.href)) return true;
+    return isWebSnapshotCaptureFontMimeType(url.pathname.split(';', 1)[0]);
+  } catch {
+    return false;
+  }
+}
+
+const SENSITIVE_AUTOCOMPLETE_FIELD_TOKENS = new Set([
+  'current-password',
+  'new-password',
+  'one-time-code',
+  'transaction-amount',
+  'transaction-currency',
+]);
+
+export function shouldExcludeWebSnapshotFormControlValue(element: Element): boolean {
+  if (element.tagName.toLowerCase() === 'input') {
+    const type = element.getAttribute('type')?.trim().toLowerCase() ?? 'text';
+    if (type === 'file' || type === 'hidden' || type === 'password') return true;
+  }
+  const autocompleteTokens =
+    element
+      .getAttribute('autocomplete')
+      ?.trim()
+      .toLowerCase()
+      .split(/[\t\n\f\r ]+/u)
+      .filter(Boolean) ?? [];
+  return autocompleteTokens.some(
+    (token) => token.startsWith('cc-') || SENSITIVE_AUTOCOMPLETE_FIELD_TOKENS.has(token)
+  );
 }
 
 function isSafeWebSnapshotSrcset(value: string, baseUrl: string | null): boolean {
@@ -100,6 +182,14 @@ function sanitizeElementAttributes(
   options: WebSnapshotHtmlSanitizeOptions
 ): void {
   const allowedObjectUrls = new Set(options.allowedObjectUrls ?? []);
+  const rewriteCssUrl = createOfflineCssUrlRewriter(options);
+  const externalHref = options.offlineOnly
+    ? resolveOfflineExternalAnchorHref(element, baseUrl)
+    : null;
+
+  // Never trust a page-authored capability attribute. Viewer navigation is projected only from
+  // the real href after URL validation below.
+  element.removeAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE);
 
   for (const attribute of Array.from(element.attributes)) {
     const normalizedName = attribute.name.toLowerCase();
@@ -120,7 +210,10 @@ function sanitizeElementAttributes(
     }
 
     if (normalizedName === 'style') {
-      element.setAttribute(attribute.name, sanitizeWebSnapshotCssText(attribute.value));
+      element.setAttribute(
+        attribute.name,
+        sanitizeWebSnapshotCssText(attribute.value, rewriteCssUrl)
+      );
       continue;
     }
 
@@ -133,6 +226,22 @@ function sanitizeElementAttributes(
     if (sanitized !== attribute.value) {
       element.setAttribute(attribute.name, sanitized);
     }
+  }
+
+  if (externalHref !== null) {
+    element.setAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE, externalHref);
+  }
+}
+
+function resolveOfflineExternalAnchorHref(element: Element, baseUrl: string | null): string | null {
+  if (element.tagName.toLowerCase() !== 'a') return null;
+  const href = element.getAttribute('href');
+  if (href === null || baseUrl === null) return null;
+
+  try {
+    return createSafeExternalHref(new URL(href, baseUrl).toString());
+  } catch {
+    return null;
   }
 }
 
@@ -184,7 +293,7 @@ function isSafeOfflineWebSnapshotUrl(value: string, allowedObjectUrls: Set<strin
   if (trimmedValue.length === 0 || trimmedValue.startsWith('#')) {
     return true;
   }
-  if (allowedObjectUrls.has(trimmedValue)) {
+  if (isAllowedOfflineAssetReference(trimmedValue, allowedObjectUrls)) {
     return true;
   }
 
@@ -196,17 +305,71 @@ function isSafeOfflineWebSnapshotUrl(value: string, allowedObjectUrls: Set<strin
   }
 }
 
-function sanitizeStyleElements(document: Document): void {
-  for (const styleElement of document.querySelectorAll('style')) {
-    styleElement.textContent = sanitizeWebSnapshotCssText(styleElement.textContent ?? '');
+function isAllowedOfflineAssetReference(
+  value: string,
+  allowedObjectUrls: ReadonlySet<string>
+): boolean {
+  if (allowedObjectUrls.has(value)) return true;
+  const fragmentIndex = value.indexOf('#');
+  return fragmentIndex > 0 && allowedObjectUrls.has(value.slice(0, fragmentIndex));
+}
+
+function sanitizeStyleElements(root: ParentNode, options: WebSnapshotHtmlSanitizeOptions): void {
+  const rewriteCssUrl = createOfflineCssUrlRewriter(options);
+  for (const styleElement of root.querySelectorAll('style')) {
+    styleElement.textContent = sanitizeWebSnapshotStylesheetText(
+      styleElement.textContent ?? '',
+      rewriteCssUrl
+    );
   }
 }
 
-function disableFormSubmissions(document: Document): void {
-  for (const form of document.querySelectorAll('form')) {
+function disableFormSubmissions(root: ParentNode): void {
+  for (const form of root.querySelectorAll('form')) {
     form.setAttribute('data-sniptale-disabled-form', 'true');
     for (const attribute of FORM_ATTRIBUTE_NAMES) {
       form.removeAttribute(attribute);
+    }
+  }
+}
+
+function removeFormElements(root: ParentNode): void {
+  for (const form of root.querySelectorAll('form')) {
+    form.replaceWith(...Array.from(form.childNodes));
+  }
+}
+
+export function removeWebSnapshotSensitiveControlState(root: ParentNode): void {
+  for (const control of root.querySelectorAll('input, select, textarea')) {
+    if (!shouldExcludeWebSnapshotFormControlValue(control)) continue;
+    if (control.tagName.toLowerCase() === 'input') {
+      control.removeAttribute('checked');
+      control.removeAttribute('value');
+    } else if (control.tagName.toLowerCase() === 'textarea') {
+      control.removeAttribute('value');
+      control.textContent = '';
+    } else {
+      control.removeAttribute('value');
+      control.replaceChildren();
+    }
+  }
+}
+
+function sanitizeWebSnapshotDocument(
+  document: Document,
+  baseUrl: string | null,
+  options: WebSnapshotHtmlSanitizeOptions = {}
+): void {
+  for (const root of collectWebSnapshotQueryRoots(document)) {
+    for (const element of root.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
+      element.remove();
+    }
+    if (options.removeForms) removeFormElements(root);
+    else disableFormSubmissions(root);
+    removeWebSnapshotSensitiveControlState(root);
+    sanitizeStyleElements(root, options);
+    for (const element of root.querySelectorAll('*')) {
+      sanitizeElementAttributes(element, baseUrl, options);
     }
   }
 }
@@ -217,19 +380,31 @@ export function sanitizeWebSnapshotHtml(
   options: WebSnapshotHtmlSanitizeOptions = {}
 ): string {
   const document = new DOMParser().parseFromString(html, 'text/html');
-
-  for (const element of document.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
-    element.remove();
-  }
-
-  disableFormSubmissions(document);
-  sanitizeStyleElements(document);
-
-  for (const element of document.querySelectorAll('*')) {
-    sanitizeElementAttributes(element, baseUrl, options);
-  }
+  sanitizeWebSnapshotDocument(document, baseUrl, options);
 
   return `<!doctype html>${document.documentElement.outerHTML}`;
+}
+
+export function isWebSnapshotXhtml(value: string): boolean {
+  return value.trimStart().startsWith('<?xml');
+}
+
+export function serializeWebSnapshotXhtmlDocument(document: Document): string {
+  const serialized = new XMLSerializer().serializeToString(document.documentElement);
+  return `${WEB_SNAPSHOT_XHTML_DECLARATION}${serialized.replaceAll('\r', '&#13;')}`;
+}
+
+export function sanitizeWebSnapshotXhtml(
+  xhtml: string,
+  baseUrl: string | null,
+  options: WebSnapshotHtmlSanitizeOptions = {}
+): string {
+  const document = new DOMParser().parseFromString(xhtml, 'application/xhtml+xml');
+  if (document.querySelector('parsererror')) {
+    throw new Error('Web snapshot XHTML is invalid.');
+  }
+  sanitizeWebSnapshotDocument(document, baseUrl, options);
+  return serializeWebSnapshotXhtmlDocument(document);
 }
 
 export function sanitizeWebSnapshotFilename(value: string, fallback = 'web-snapshot'): string {

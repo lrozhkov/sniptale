@@ -1,4 +1,9 @@
-import type { DocumentBlock, SectionNode, TableNode } from '@sniptale/runtime-contracts/dom-tree';
+import type {
+  DocumentBlock,
+  DocumentInlineNode,
+  SectionNode,
+  TableNode,
+} from '@sniptale/runtime-contracts/dom-tree';
 import { appendMarkdownField, ensureTrailingBlankLine } from './fields';
 
 type MarkdownTextRenderer = (text: string) => string;
@@ -17,6 +22,50 @@ function renderIdentity(text: string): string {
 
 function escapeMarkdownTableCell(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+}
+
+function escapeInlineText(text: string): string {
+  return text.replace(/([\\`*_[\]<>])/gu, '\\$1');
+}
+
+function renderMarkdownUrl(url: string): string {
+  return `<${url.replace(/\\/gu, '%5C').replace(/>/gu, '%3E')}>`;
+}
+
+function renderInlineContent(
+  content: DocumentInlineNode[] | undefined,
+  fallback: string,
+  renderText: MarkdownTextRenderer
+): string {
+  if (!content || content.length === 0) return renderText(fallback);
+  return content
+    .map((node) => {
+      if (node.kind === 'text') return escapeInlineText(renderText(node.text));
+      if (node.kind === 'line-break') return '  \n';
+      if (node.kind === 'link') {
+        return `[${escapeInlineText(renderText(node.text))}](${renderMarkdownUrl(node.url)})`;
+      }
+      const image = `![${escapeInlineText(node.alt)}](${renderMarkdownUrl(node.sourceUrl)})`;
+      return node.linkUrl ? `[${image}](${renderMarkdownUrl(node.linkUrl)})` : image;
+    })
+    .join('');
+}
+
+function neutralizeMarkdownBlockStart(line: string): string {
+  return line
+    .replace(/^(\s{0,3})([#\-+=~])/u, '$1\\$2')
+    .replace(/^(\s{0,3}\d+)([.)])(?=\s)/u, '$1\\$2');
+}
+
+function renderParagraphContent(
+  content: DocumentInlineNode[] | undefined,
+  fallback: string,
+  renderText: MarkdownTextRenderer
+): string {
+  return renderInlineContent(content, fallback, renderText)
+    .split('\n')
+    .map(neutralizeMarkdownBlockStart)
+    .join('\n');
 }
 
 function isBlockAwareSection(section: SectionNode): boolean {
@@ -43,8 +92,15 @@ function appendQuoteLikeBlock(
   block: DocumentBlock,
   renderText: MarkdownTextRenderer
 ): void {
-  if (block.text) {
-    lines.push(`> ${renderText(block.text)}`, '');
+  if (block.text || block.inlineContent?.length) {
+    const rendered = renderParagraphContent(block.inlineContent, block.text ?? '', renderText);
+    lines.push(
+      rendered
+        .split('\n')
+        .map((line) => `> ${line}`)
+        .join('\n'),
+      ''
+    );
   }
 }
 
@@ -123,17 +179,37 @@ function appendMarkdownBlock(
   switch (block.kind) {
     case 'heading':
       if (block.text) {
-        lines.push(`### ${block.text}`, '');
+        const level = Math.min(6, Math.max(3, block.headingLevel ?? 3));
+        lines.push(
+          `${'#'.repeat(level)} ${renderInlineContent(block.inlineContent, block.text, renderText)}`,
+          ''
+        );
       }
       return;
     case 'paragraph':
-      if (block.text) {
-        lines.push(renderText(block.text), '');
+      if (block.text || block.inlineContent?.length) {
+        lines.push(renderParagraphContent(block.inlineContent, block.text ?? '', renderText), '');
       }
       return;
     case 'list':
       if (block.items) {
-        block.items.forEach((item) => lines.push(`- ${renderText(item)}`));
+        block.items.forEach((item, index) => {
+          const marker = block.listStyle === 'ordered' ? `${index + 1}.` : '-';
+          const rendered = renderParagraphContent(
+            block.itemInlineContent?.[index],
+            item,
+            renderText
+          );
+          const continuationIndent = ' '.repeat(marker.length + 1);
+          lines.push(
+            rendered
+              .split('\n')
+              .map((line, lineIndex) =>
+                lineIndex === 0 ? `${marker} ${line}` : `${continuationIndent}${line}`
+              )
+              .join('\n')
+          );
+        });
         lines.push('');
       }
       return;

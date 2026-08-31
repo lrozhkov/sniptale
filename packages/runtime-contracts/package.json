@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/runtime-contracts",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -34,6 +34,7 @@
     "./native-app/status-types": "./src/native-app/status-types.ts",
     "./page-style": "./src/page-style/index.ts",
     "./page-style/limits": "./src/page-style/limits.ts",
+    "./page-package": "./src/page-package/index.ts",
     "./protocol/ai-privacy": "./src/protocol/ai-privacy.ts",
     "./protocol/content-privileged-action": "./src/protocol/content-privileged-action.ts",
     "./protocol/digest": "./src/protocol/digest.ts",
@@ -70,14 +71,14 @@
     "./web-snapshot": "./src/web-snapshot/index.ts"
   },
   "dependencies": {
-    "@sniptale/foundation": "0.3.3",
-    "zod": "^4.3.6"
+    "@sniptale/foundation": "0.4.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "vitest": "^4.1.10"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/runtime-contracts/src",
-    "typecheck": "node ../../tooling/qa/core/typescript-cli.mjs --noEmit --project tsconfig.json"
+    "typecheck": "node ../../tooling/qa/analysis/source/typescript-cli.mjs --noEmit --project tsconfig.json"
   }
 }

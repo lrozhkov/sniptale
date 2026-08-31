@@ -2,11 +2,13 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { closeModal, delay, EXPORT_SELECTORS, waitForElement } from '../files/modal-utils';
 import { isValidDownloadUrl } from '../files/download-utils';
 import { clickHostPageElement } from '../../host-page-click';
+import { getIframeDocument } from '../../../platform/frame';
+import { resolveAmbientDiagnosticsView, resolveDiagnosticsDocument } from './source';
 
 const logger = createLogger({ namespace: 'ContentExportManager' });
 
 function resolveAmbientWindow(): Window | undefined {
-  return typeof window === 'undefined' ? undefined : window;
+  return resolveAmbientDiagnosticsView();
 }
 
 function resolveElementWindow(element: Element): Window | undefined {
@@ -33,18 +35,69 @@ function isSafePreviewTriggerElement(element: HTMLElement): boolean {
   return element.getAttribute('role') === 'button' && !element.closest('a[href]');
 }
 
-export function listDirectDownloadLinks(documentRoot: Document = document): HTMLAnchorElement[] {
+export function listDirectDownloadLinks(
+  documentRoot: Document = resolveDiagnosticsDocument()
+): HTMLAnchorElement[] {
   return Array.from(
     documentRoot.querySelectorAll<HTMLAnchorElement>(EXPORT_SELECTORS.cellDownload)
   );
 }
 
-export function listPreviewTriggers(documentRoot: Document = document): HTMLElement[] {
+export function listPreviewTriggers(
+  documentRoot: Document = resolveDiagnosticsDocument()
+): HTMLElement[] {
   return Array.from(documentRoot.querySelectorAll<HTMLElement>(EXPORT_SELECTORS.previewTrigger));
 }
 
-export function listComputedStyleRootTargets(documentRoot: Document = document): Element[] {
+export function listPageImages(
+  documentRoot: Document = resolveDiagnosticsDocument()
+): HTMLImageElement[] {
+  return Array.from(documentRoot.querySelectorAll<HTMLImageElement>('img'));
+}
+
+export function listComputedStyleRootTargets(
+  documentRoot: Document = resolveDiagnosticsDocument()
+): Element[] {
   return [documentRoot.documentElement, documentRoot.body];
+}
+
+export interface DiagnosticDocumentScope {
+  document: Document;
+  scope: string;
+}
+
+export function listAccessibleDiagnosticDocuments(
+  documentRoot: Document = resolveDiagnosticsDocument()
+): DiagnosticDocumentScope[] {
+  const scopes: DiagnosticDocumentScope[] = [{ document: documentRoot, scope: 'document' }];
+  for (let index = 0; index < scopes.length && scopes.length <= 32; index += 1) {
+    const current = scopes[index];
+    if (!current) continue;
+    for (const iframe of current.document.querySelectorAll('iframe')) {
+      const frameDocument = getIframeDocument(iframe);
+      if (!frameDocument || scopes.some((entry) => entry.document === frameDocument)) continue;
+      scopes.push({ document: frameDocument, scope: `iframe-${scopes.length}` });
+      if (scopes.length >= 32) break;
+    }
+  }
+  return scopes;
+}
+
+export function buildDiagnosticElementPath(element: Element): string {
+  const segments: string[] = [];
+  let current: Element | null = element;
+  while (current && segments.length < 6) {
+    const tagName = current.tagName.toLowerCase();
+    let siblingIndex = 1;
+    let previous = current.previousElementSibling;
+    while (previous) {
+      if (previous.tagName === current.tagName) siblingIndex += 1;
+      previous = previous.previousElementSibling;
+    }
+    segments.unshift(siblingIndex > 1 ? `${tagName}:nth-of-type(${siblingIndex})` : tagName);
+    current = current.parentElement;
+  }
+  return segments.join(' > ');
 }
 
 export function getCurrentExportPageUrl(pageUrl?: string): string {
@@ -53,7 +106,7 @@ export function getCurrentExportPageUrl(pageUrl?: string): string {
 
 export function queryComputedStyleTargets(
   selector: string,
-  documentRoot: Document = document
+  documentRoot: Document = resolveDiagnosticsDocument()
 ): Element[] {
   return Array.from(documentRoot.querySelectorAll(selector));
 }
@@ -78,7 +131,7 @@ export async function resolvePreviewDownloadHref(
 
   // The host page opens its preview modal only through its DOM click handler.
   const targetDocument = element.ownerDocument;
-  const modal = await waitForElement(EXPORT_SELECTORS.modal, 2000, targetDocument);
+  const modal = await waitForElement(EXPORT_SELECTORS.modal, targetDocument, 2000);
   if (!modal) {
     logger.warn('Modal did not appear for preview', element);
     return null;
@@ -101,7 +154,9 @@ export async function resolvePreviewDownloadHref(
   return downloadLink.href;
 }
 
-export async function dismissPreviewModal(targetDocument: Document = document): Promise<void> {
+export async function dismissPreviewModal(
+  targetDocument: Document = resolveDiagnosticsDocument()
+): Promise<void> {
   await closeModal(targetDocument);
   await delay(200);
 }

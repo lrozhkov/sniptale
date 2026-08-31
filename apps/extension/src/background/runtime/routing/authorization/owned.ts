@@ -274,9 +274,14 @@ function authorizeContentRuntimeWakeupRoute(
   request: BackgroundOwnedAuthorizationRequest,
   routeEntry: BackgroundOwnedRouteInventoryEntry
 ): IpcAuthorizationResult {
-  const senderDecision = authorizeContentSender(request.sender);
+  // Passive wake-up has no privileged effect by itself. Chrome can identify dynamically injected
+  // isolated-world code by this extension's generated script URL instead of the page URL; admit
+  // only this extension's origin here. Pin activation still requires its one-shot capability.
+  const senderDecision = authorizeContentSender(request.sender, undefined, {
+    allowOwnedExtensionSender: true,
+  });
   if (!senderDecision.allowed) {
-    return reject('Unauthorized content runtime wake-up sender');
+    return reject(`Unauthorized content runtime wake-up sender: ${senderDecision.reason}`);
   }
   if (
     request.message['pinToTab'] === true &&

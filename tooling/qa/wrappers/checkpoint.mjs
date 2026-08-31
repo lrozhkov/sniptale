@@ -2,39 +2,42 @@
  * Deterministic focused QA seam gate for the current uncommitted diff.
  */
 
-import { isExecutedAsScript, loadBaseline } from '../core/shared.mjs';
-import { collectAndPersistAdvisoryReport } from '../core/advisory-report.helpers.mjs';
-import { formatAdvisoryReport } from '../core/verify-advisory.report.helpers.mjs';
-import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
-import { collectFocusedStepResults } from '../core/verify-focused.execution.mjs';
-import { FOCUSED_CODE_VIOLATION_STEPS } from '../core/verify-focused.code-steps.mjs';
-import { createOkStep, createSkippedStep } from '../core/focused-qa-results.mjs';
-import { runFormatterWrite } from '../core/verify-oxfmt.mjs';
-import { PRODUCT_QA_SUITE, createScopedQaContext, hasHarnessQaTargets } from '../core/qa-scope.mjs';
-import { collectHarnessFreshnessStep } from '../core/harness-freshness-step.mjs';
-import { assertFreshHarnessState } from '../core/verify-harness.state.helpers.mjs';
+import { loadBaseline } from '../policy/baselines/shared-baseline.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { collectAndPersistAdvisoryReport } from '../composition/advisory/advisory-report.helpers.mjs';
+import { formatAdvisoryReport } from '../composition/advisory/execution/report.mjs';
+import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
+import { collectFocusedStepResults } from '../composition/checkpoint/focused/execution.mjs';
+import { FOCUSED_CODE_VIOLATION_STEPS } from '../composition/checkpoint/focused/code-steps.mjs';
+import { createOkStep, createSkippedStep } from '../composition/checkpoint/focused-qa-results.mjs';
+import { runFormatterWrite } from '../guards/quality/verify-oxfmt.mjs';
+import {
+  PRODUCT_QA_SUITE,
+  createScopedQaContext,
+  hasHarnessQaTargets,
+} from '../composition/scope/qa-scope.mjs';
+import { collectHarnessFreshnessStep } from '../composition/harness/harness-freshness-step.mjs';
+import { assertFreshHarnessState } from '../composition/harness/execution/state.mjs';
 import {
   createCheckpointPrerequisiteResult,
   createReadyCheckpointResult,
   persistCheckpointResult,
-} from '../core/checkpoint-result.helpers.mjs';
+} from '../composition/checkpoint/checkpoint-result.helpers.mjs';
 export {
   collectFocusedI18nFiles,
-  collectFocusedStorageWritePatternFiles,
   FOCUSED_TRIGGERED_STEP_DEFINITIONS,
-  shouldRunCanonicalFacades,
   shouldRunDependencyGraph,
   shouldRunFocusedTypecheck,
-} from '../core/verify-focused-triggered.mjs';
+} from '../composition/checkpoint/focused-triggered/helpers.mjs';
 import {
   MANIFEST_PERMISSION_TRIGGER_FILES,
   RUNTIME_SOURCE_PATTERN,
   RUNTIME_TOPOLOGY_TRIGGER_FILES,
-} from '../core/verify-focused.config.mjs';
-import { resolveFocusedCoverageTargetFiles } from '../core/verify-focused.test-steps.mjs';
-import { timeAsyncStep, timeSyncStep } from '../core/step-timing.helpers.mjs';
-import { runCheckpointCli } from './checkpoint-cli.mjs';
-import { parseWrapperArguments } from './cli-contracts.mjs';
+} from '../composition/checkpoint/focused/config.mjs';
+import { resolveFocusedCoverageTargetFiles } from '../composition/checkpoint/focused/test-steps.mjs';
+import { timeAsyncStep, timeSyncStep } from '../runtime/observability/step-timing.helpers.mjs';
+import { runCheckpointCli } from './checkpoint/checkpoint-cli.mjs';
+import { parseWrapperArguments } from './contracts/cli-contracts.mjs';
 
 export { FOCUSED_CODE_VIOLATION_STEPS };
 export { resolveFocusedCoverageTargetFiles };
@@ -127,9 +130,7 @@ async function collectCheckpointVerificationSteps({
   focusedStepCollector,
   formatStep,
 }) {
-  if (formatStep.status === 'failed' || advisoryStep.status === 'failed') {
-    return [formatStep, advisoryStep];
-  }
+  if (formatStep.status === 'failed') return [formatStep, advisoryStep];
   const focusedSteps = await focusedStepCollector({
     ...context,
     shouldRunManifestPermissions,
@@ -141,6 +142,26 @@ async function collectCheckpointVerificationSteps({
     advisoryStep,
     ...deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps),
   ];
+}
+
+function normalizeAdvisoryStep(advisoryStep) {
+  if (advisoryStep.status !== 'failed') return advisoryStep;
+  return {
+    ...createSkippedStep('Advisory report', 'non-blocking advisory collection failed'),
+    ...(advisoryStep.consoleOutput ? { consoleOutput: advisoryStep.consoleOutput } : {}),
+  };
+}
+
+function collectFailSoftAdvisoryStep(advisoryStepCollector, context, producerRunId) {
+  try {
+    return normalizeAdvisoryStep(advisoryStepCollector(context, { producerRunId }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return createSkippedStep(
+      'Advisory report',
+      `non-blocking advisory collection failed: ${message}`
+    );
+  }
 }
 
 function createCheckpointContext(contextCollector) {
@@ -183,9 +204,11 @@ async function collectCheckpointPrerequisites({
 
 async function collectProductCheckpointResult(prerequisites, dependencies) {
   const { context, formatStep, harnessFreshnessStep } = prerequisites;
-  const advisoryStep = dependencies.advisoryStepCollector(context, {
-    producerRunId: dependencies.producerRunId,
-  });
+  const advisoryStep = collectFailSoftAdvisoryStep(
+    dependencies.advisoryStepCollector,
+    context,
+    dependencies.producerRunId
+  );
   const verificationSteps = await collectCheckpointVerificationSteps({
     advisoryStep,
     context,

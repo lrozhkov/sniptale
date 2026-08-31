@@ -2,39 +2,38 @@ import { type PreviewFormat } from '../selection/utils';
 import { footerActionGridClassName, footerSurfaceClassName } from './tokens';
 import { ExportFooterCopyButtons } from './copy-buttons';
 import { ExportFooterPrimaryActionButton } from './primary-action';
-import { ExportFooterSnapshotButton } from './snapshot-button';
+import { Library } from 'lucide-react';
+import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 
 type ExportFooterLayoutProps = {
   canCopyJson: boolean;
   canCopyMarkdown: boolean;
   canExport: boolean;
-  canSaveWebSnapshot?: boolean | undefined;
   copyJsonTitle: string;
   copyMarkdownTitle: string;
   copiedFormat: PreviewFormat | null;
   exportTitle: string;
   isExporting: boolean;
-  isSavingWebSnapshot?: boolean | undefined;
   isResultReady: boolean;
-  onOpenWebSnapshotResult?: (() => void) | undefined;
+  onOpenLibraryResult?: (() => void) | undefined;
   onCancelExport: () => void;
   onCopyJson: () => void;
   onCopyMarkdown: () => void;
   onResetExportView: () => void;
-  onSaveWebSnapshot?: (() => void) | undefined;
-  openWebSnapshotResultMode?: 'gallery' | 'open' | undefined;
-  openWebSnapshotResultTitle?: string | undefined;
+  openLibraryResultTitle?: string | undefined;
   onStartExport: () => void;
-  saveWebSnapshotTitle?: string | undefined;
 };
 
 export function ExportFooterLayout(props: ExportFooterLayoutProps) {
-  const snapshotActionDisabled =
-    props.onOpenWebSnapshotResult === undefined && !props.canSaveWebSnapshot;
-
   return (
     <div className={footerSurfaceClassName}>
-      <div className={footerActionGridClassName}>
+      <div
+        className={footerActionGridClassName(
+          props.isResultReady,
+          Boolean(props.onOpenLibraryResult),
+          props.isExporting
+        )}
+      >
         <ExportFooterPrimaryActionButton
           canExport={props.canExport}
           exportTitle={props.exportTitle}
@@ -44,22 +43,28 @@ export function ExportFooterLayout(props: ExportFooterLayoutProps) {
           onResetExportView={props.onResetExportView}
           onStartExport={props.onStartExport}
         />
-        <ExportFooterCopyButtons
-          canCopyJson={props.canCopyJson}
-          canCopyMarkdown={props.canCopyMarkdown}
-          copyJsonTitle={props.copyJsonTitle}
-          copyMarkdownTitle={props.copyMarkdownTitle}
-          copiedFormat={props.copiedFormat}
-          onCopyJson={props.onCopyJson}
-          onCopyMarkdown={props.onCopyMarkdown}
-        />
-        <ExportFooterSnapshotButton
-          disabled={snapshotActionDisabled}
-          isSaving={props.isSavingWebSnapshot === true}
-          mode={props.openWebSnapshotResultMode ?? 'save'}
-          onClick={props.onOpenWebSnapshotResult ?? props.onSaveWebSnapshot ?? (() => {})}
-          title={props.openWebSnapshotResultTitle ?? props.saveWebSnapshotTitle ?? ''}
-        />
+        {props.isResultReady || props.isExporting ? null : (
+          <ExportFooterCopyButtons
+            canCopyJson={props.canCopyJson}
+            canCopyMarkdown={props.canCopyMarkdown}
+            copyJsonTitle={props.copyJsonTitle}
+            copyMarkdownTitle={props.copyMarkdownTitle}
+            copiedFormat={props.copiedFormat}
+            onCopyJson={props.onCopyJson}
+            onCopyMarkdown={props.onCopyMarkdown}
+          />
+        )}
+        {props.isResultReady && props.onOpenLibraryResult && props.openLibraryResultTitle ? (
+          <PopupActionButton
+            icon={Library}
+            iconClassName="text-[var(--sniptale-color-text-primary)]"
+            label={props.openLibraryResultTitle}
+            centered
+            tone="secondary"
+            title={props.openLibraryResultTitle}
+            onClick={props.onOpenLibraryResult}
+          />
+        ) : null}
       </div>
     </div>
   );

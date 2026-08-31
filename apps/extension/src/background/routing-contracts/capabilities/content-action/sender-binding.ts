@@ -1,4 +1,5 @@
 import type { ContentSenderBinding } from './capability-store';
+import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 
 type ContentSenderAuthorizationDenial =
   | 'extension-sender'
@@ -15,7 +16,8 @@ type ContentSenderAuthorizationDecision =
 
 export function authorizeContentSender(
   sender: chrome.runtime.MessageSender | undefined,
-  resolvedTabId?: number | undefined
+  resolvedTabId?: number | undefined,
+  options: { allowOwnedExtensionSender?: boolean } = {}
 ): ContentSenderAuthorizationDecision {
   if (sender?.tab?.id === undefined) {
     return { allowed: false, reason: 'missing-tab-id' };
@@ -36,10 +38,48 @@ export function authorizeContentSender(
     return { allowed: false, reason: 'invalid-sender-url' };
   }
 
+  let senderUrl = sender.url;
   try {
-    const senderUrl = new URL(sender.url);
-    if (senderUrl.protocol === 'chrome-extension:' || senderUrl.protocol === 'moz-extension:') {
-      return { allowed: false, reason: 'extension-sender' };
+    const parsedSenderUrl = new URL(sender.url);
+    if (
+      parsedSenderUrl.protocol === 'chrome-extension:' ||
+      parsedSenderUrl.protocol === 'moz-extension:'
+    ) {
+      if (options.allowOwnedExtensionSender) {
+        try {
+          const ownedExtensionUrl = new URL(runtimeInfo.getURL(''));
+          if (
+            parsedSenderUrl.protocol === ownedExtensionUrl.protocol &&
+            parsedSenderUrl.host === ownedExtensionUrl.host
+          ) {
+            senderUrl = parsedSenderUrl.href;
+            return {
+              allowed: true,
+              principal: {
+                documentId: sender.documentId,
+                frameId: sender.frameId,
+                senderUrl,
+                tabId: sender.tab.id,
+              },
+            };
+          }
+        } catch {
+          // Fall through to the strict page-URL projection below.
+        }
+      }
+      const contentDocumentUrl = [sender.tab.url, sender.origin].find((candidate) => {
+        if (typeof candidate !== 'string') return false;
+        try {
+          const protocol = new URL(candidate).protocol;
+          return protocol === 'http:' || protocol === 'https:' || protocol === 'file:';
+        } catch {
+          return false;
+        }
+      });
+      if (!contentDocumentUrl) {
+        return { allowed: false, reason: 'extension-sender' };
+      }
+      senderUrl = contentDocumentUrl;
     }
   } catch {
     return { allowed: false, reason: 'invalid-sender-url' };
@@ -50,7 +90,7 @@ export function authorizeContentSender(
     principal: {
       documentId: sender.documentId,
       frameId: sender.frameId,
-      senderUrl: sender.url,
+      senderUrl,
       tabId: sender.tab.id,
     },
   };

@@ -18,6 +18,7 @@ function createExportOptions() {
 function createRuntime() {
   return {
     exportRunner: {
+      buildBlobPackage: vi.fn().mockResolvedValue({}),
       buildPackage: vi.fn().mockResolvedValue({}),
       cancel: vi.fn(),
     },
@@ -33,6 +34,25 @@ it('does not load content-only web snapshot capture code for package routes', as
   vi.doMock('../web-snapshot-runtime', () => {
     throw new Error('content-only snapshot branch loaded');
   });
+  vi.doMock('../../../web-snapshot/service', () => {
+    throw new Error('web snapshot producer loaded');
+  });
+  vi.doMock('../../../../page-package', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../../../page-package')>()),
+    buildExportPagePackage: vi.fn().mockResolvedValue({
+      entries: [],
+      manifest: { id: 'page-1', source: { title: 'Page' }, stats: { totalBytes: 0 } },
+      manifestBytes: new Uint8Array(),
+      manifestSha256: 'a'.repeat(64),
+    }),
+  }));
+  vi.doMock('../../../../page-package/staged-transfer', () => ({
+    createPagePackageJobStagedSink: () => ({ sink: {}, stagedBlobId: 'stage-1' }),
+  }));
+  vi.doMock('../../../../../workflows/page-package/archive', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../../../../workflows/page-package/archive')>()),
+    writePagePackageArchive: vi.fn().mockResolvedValue(undefined),
+  }));
 
   const { dispatchPopupExportRequest } = await import('./dispatch');
   const runtime = createRuntime();
@@ -44,10 +64,14 @@ it('does not load content-only web snapshot capture code for package routes', as
       request: {
         options: createExportOptions(),
         batchRequestId: 'req-1',
+        includeWebCopy: false,
+        intent: 'export',
+        ordinal: 0,
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
       },
       sendResponse,
     })
   ).toBe(true);
-  expect(runtime.exportRunner.buildPackage).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+  expect(runtime.exportRunner.buildPackage).not.toHaveBeenCalled();
 });

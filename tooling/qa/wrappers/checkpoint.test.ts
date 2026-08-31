@@ -1,10 +1,10 @@
 import { expect, it, vi } from 'vitest';
 
-import { createTempRoot, importFresh, withCwd, writeJson } from '../core/test-helpers';
+import { createTempRoot, importFresh, withCwd, writeJson } from '../test-support/test-helpers';
 import { parseCheckpointOptions } from './checkpoint.mjs';
 
 const ignoreExecutionContract = () => {};
-const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
+const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/proof/coverage/test-coverage/rollout-files.data.mjs';
 
 function createCheckpointTempRoot(prefix: string) {
   const root = createTempRoot(prefix);
@@ -146,7 +146,7 @@ it('awaits the asynchronous formatter barrier before collecting verification con
   expect(calls).toEqual(['format', 'advisory', 'focused:src/after-format.ts']);
 });
 
-it('does not start focused verification when advisory collection reports failure', async () => {
+it('keeps focused verification blocking when advisory collection reports failure', async () => {
   const root = createCheckpointTempRoot('qa-checkpoint-advisory-fail-');
   const calls: string[] = [];
 
@@ -177,12 +177,51 @@ it('does not start focused verification when advisory collection reports failure
 
     expect(result.steps.map((step) => [step.label, step.status])).toEqual([
       ['Format', 'ok'],
-      ['Advisory report', 'failed'],
+      ['Advisory report', 'skipped'],
+      ['Oxlint', 'ok'],
     ]);
-    expect(result.readyForBuild).toBe(false);
+    expect(result.readyForBuild).toBe(true);
   });
 
-  expect(calls).toEqual(['advisory']);
+  expect(calls).toEqual(['advisory', 'focused']);
+});
+
+it('keeps focused verification blocking when advisory collection throws', async () => {
+  const root = createCheckpointTempRoot('qa-checkpoint-advisory-throw-');
+  const calls: string[] = [];
+
+  await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./checkpoint.mjs')>(
+      './checkpoint.mjs',
+      import.meta.url
+    );
+    const result = await module.runCheckpoint({
+      producerRunId: 'checkpoint-test-advisory-throw',
+      executionContractAsserter: ignoreExecutionContract,
+      contextCollector: () => context('same-diff'),
+      formatStepCollector: () => okStep('Format'),
+      advisoryStepCollector: () => {
+        throw new Error('report storage unavailable');
+      },
+      focusedStepCollector: async () => {
+        calls.push('focused');
+        return [okStep('Oxlint')];
+      },
+    });
+
+    expect(result.steps).toEqual([
+      expect.objectContaining({ label: 'Format', status: 'ok' }),
+      expect.objectContaining({
+        label: 'Advisory report',
+        status: 'skipped',
+        detail: expect.stringContaining('report storage unavailable'),
+      }),
+      expect.objectContaining({ label: 'Oxlint', status: 'ok' }),
+    ]);
+    expect(result.readyForBuild).toBe(true);
+  });
+
+  expect(calls).toEqual(['focused']);
 });
 
 it('does not run qa:build when focused checks fail', async () => {
@@ -335,7 +374,7 @@ it.each([
   const harnessStateAsserter = vi.fn(() => {
     throw new Error('inventory-only scope must not consult harness state');
   });
-  vi.doMock('../core/verify-test-coverage.rollout-files.data.mjs', () => ({
+  vi.doMock('../proof/coverage/test-coverage/rollout-files.data.mjs', () => ({
     COVERAGE_ROLLOUT_EXACT_FILES: scenario.exactFiles,
   }));
 

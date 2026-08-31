@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
+import DOMPurify from 'dompurify';
 
 import { sanitizeHtmlFragment, writeSanitizedInnerHtml } from './html';
 
@@ -40,5 +41,15 @@ describe('html-sanitizer', () => {
 
     expect(written).toBe('<strong>safe</strong>');
     expect(element.innerHTML).toBe('<strong>safe</strong>');
+  });
+
+  it('removes case-preserved event attributes from DOM-node input', () => {
+    const image = document.createElement('img');
+    image.setAttribute('src', 'x');
+    image.setAttributeNS(null, 'ONERROR', 'alert(1)');
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(image);
+
+    expect(String(DOMPurify.sanitize(wrapper))).not.toMatch(/onerror/iu);
   });
 });

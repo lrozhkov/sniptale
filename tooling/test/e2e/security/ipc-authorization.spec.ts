@@ -144,34 +144,31 @@ test('popup capability rejects replay, cross-tab reuse, and use after navigation
 
   const crossTabRequestId = 'security-cross-tab';
   const crossTabToken = await issuePopupTabRouteCapability({
-    operation: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    operation: 'EXPORT_POPUP_PREVIEW',
     popup,
     requestId: crossTabRequestId,
     tabId: ownerTabId,
   });
   const crossTab = await sendRuntimeMessage(popup, {
-    requestId: crossTabRequestId,
     tabId: strangerTabId,
     tabRouteCapabilityToken: crossTabToken,
     tabRouteRequestId: crossTabRequestId,
-    type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    type: 'EXPORT_POPUP_PREVIEW',
   });
   expect(crossTab).toMatchObject({ success: false });
   const consumedAfterMismatch = await sendRuntimeMessage(popup, {
-    requestId: crossTabRequestId,
     tabId: ownerTabId,
     tabRouteCapabilityToken: crossTabToken,
     tabRouteRequestId: crossTabRequestId,
-    type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    type: 'EXPORT_POPUP_PREVIEW',
   });
   expect(consumedAfterMismatch).toMatchObject({ success: false });
   expect(await collectRetentionText(popup)).toBe(initialPersistence);
 
   const replayRequestId = 'security-replay';
   const replayToken = await issuePopupTabRouteCapability({
-    operation: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    operation: 'EXPORT_POPUP_PREVIEW',
     popup,
-    requestId: replayRequestId,
     tabId: ownerTabId,
   });
   const replayPayload = {
@@ -179,7 +176,7 @@ test('popup capability rejects replay, cross-tab reuse, and use after navigation
     tabId: ownerTabId,
     tabRouteCapabilityToken: replayToken,
     tabRouteRequestId: replayRequestId,
-    type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    type: 'EXPORT_POPUP_PREVIEW',
   };
   expect(await sendRuntimeMessage(popup, replayPayload)).toMatchObject({ success: true });
   const afterFirstUse = await collectRetentionText(popup);
@@ -188,9 +185,8 @@ test('popup capability rejects replay, cross-tab reuse, and use after navigation
 
   const navigationRequestId = 'security-navigation';
   const navigationToken = await issuePopupTabRouteCapability({
-    operation: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    operation: 'EXPORT_POPUP_PREVIEW',
     popup,
-    requestId: navigationRequestId,
     tabId: ownerTabId,
   });
   await owner.goto(`${hostOrigin}/fixtures/host-page.html?navigated=1`);
@@ -199,7 +195,7 @@ test('popup capability rejects replay, cross-tab reuse, and use after navigation
     tabId: ownerTabId,
     tabRouteCapabilityToken: navigationToken,
     tabRouteRequestId: navigationRequestId,
-    type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    type: 'EXPORT_POPUP_PREVIEW',
   });
   expect(afterNavigation).toMatchObject({ success: false });
 

@@ -237,35 +237,6 @@ describe('runtime message bridge passive image validation', () => {
   });
 });
 
-describe('runtime message bridge passive popup export', () => {
-  it('keeps the response channel open for web snapshot export requests', async () => {
-    const handleRequest = vi.fn(() => true);
-
-    vi.doMock('../../../parser/popup-export', () => ({
-      createPopupExportController: () => ({
-        handleRequest,
-      }),
-    }));
-
-    const handler = createPassiveRuntimeMessageHandler(createBridgeParams());
-    const request = {
-      allowAnonymousCrossOriginAssets: false,
-      allowAuthenticatedSameOriginAssets: true,
-      requestId: 'snapshot-request',
-      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    };
-    const sendResponse = vi.fn();
-
-    expect(handler(request, sendResponse)).toBe(true);
-
-    await vi.waitFor(() => {
-      expect(handleRequest).toHaveBeenCalledWith(request, sendResponse);
-    });
-
-    vi.doUnmock('../../../parser/popup-export');
-  });
-});
-
 describe('runtime message bridge passive diagnostics', () => {
   it(
     'routes diagnostic logger ownership through injected controller controls',

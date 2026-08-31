@@ -19,6 +19,7 @@ function createTab(id: number): chrome.tabs.Tab {
     id,
     incognito: false,
     index: 0,
+    lastAccessed: 0,
     pinned: false,
     selected: true,
     windowId: 1,

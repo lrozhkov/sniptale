@@ -4,6 +4,8 @@ import {
 } from '../document-commands';
 import { ImageEditorControllerSceneActions } from './controller-scene-actions';
 import type { EditorControllerInstance } from '../instance/types';
+import { createEditorControllerEventBindings } from '../instance/bindings';
+import { createEditorControllerEventHandlers, type EditorControllerEventHandlers } from '../events';
 
 export interface ImageEditorControllerServices {
   documentCommands?: EditorDocumentCommandService;
@@ -11,10 +13,14 @@ export interface ImageEditorControllerServices {
 
 export class ImageEditorController extends ImageEditorControllerSceneActions {
   private readonly documentCommands: EditorDocumentCommandService;
+  readonly eventHandlers: EditorControllerEventHandlers;
 
   constructor(services: ImageEditorControllerServices = {}) {
     super();
     this.documentCommands = services.documentCommands ?? createEditorDocumentCommandService();
+    this.eventHandlers = createEditorControllerEventHandlers(
+      createEditorControllerEventBindings(this)
+    );
   }
 
   protected getControllerInstance(): EditorControllerInstance {

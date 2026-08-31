@@ -114,13 +114,9 @@ export function verifyReusableFastProof(
     throw new Error('Fast proof contains an incomplete phase.');
   }
   const declared = validateFastProofFiles(resolvedRoot, manifest, manifestPath, checksumsPath);
-  const buildProofPath = path.join(resolvedRoot, '.tmp/qa/build-proof.json');
-  if (!fs.existsSync(buildProofPath)) throw new Error('Fast proof build receipt is missing.');
   const archives = declared.filter((file) => /^build\/sniptale_.+\.zip$/u.test(file));
-  if (archives.length !== 1) throw new Error('Fast proof must contain exactly one release ZIP.');
+  if (archives.length !== 0) throw new Error('Fast proof must not contain a release ZIP.');
   return {
-    archivePath: path.join(resolvedRoot, archives[0]),
-    buildProofPath,
     manifest,
     manifestPath,
   };

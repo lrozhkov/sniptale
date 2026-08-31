@@ -119,6 +119,7 @@ describe('ImageEditorControllerBase', () => {
           deleteSelection: vi.fn(),
           dispose: vi.fn(),
           duplicateSelection: vi.fn(async () => undefined),
+          eventHandlers: {} as EditorControllerInstance['eventHandlers'],
           finalizeSelectionNudge: vi.fn(),
           insertImage: vi.fn(async () => undefined),
           insertTechnicalData: vi.fn(),
@@ -233,7 +234,7 @@ describe('ImageEditorControllerBase', () => {
     controller.nextLabelIndex('shape');
     controller.advanceStepValue();
 
-    expect(helperMocks.createEditorControllerEventBindings).toHaveBeenCalledOnce();
+    expect(helperMocks.createEditorControllerEventBindings).not.toHaveBeenCalled();
     expect(helperMocks.createEditorControllerPublicApiAdapter).toHaveBeenCalledOnce();
     expect(helperMocks.applyGridSnapForController).toHaveBeenCalledWith(controller, object);
     expect(helperMocks.buildViewportStateForController).toHaveBeenCalledWith(controller);

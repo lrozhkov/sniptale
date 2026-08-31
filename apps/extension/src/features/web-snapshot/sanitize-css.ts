@@ -17,12 +17,125 @@ interface CopiedCssQuotedCharacter {
   value: string;
 }
 
+type WebSnapshotCssUrlRewriter = (url: string) => string | null;
+
+export const WEB_SNAPSHOT_UNDEFINED_CUSTOM_ELEMENT_ATTRIBUTE =
+  'data-sniptale-custom-element-undefined';
+
+interface ParsedCssUrlFunction {
+  nextIndex: number;
+  url: string;
+}
+
+interface ParsedCssString {
+  nextIndex: number;
+  url: string;
+}
+
+function decodeCssStringEscapes(value: string): string {
+  let decoded = '';
+  for (let index = 0; index < value.length;) {
+    const char = value[index] ?? '';
+    if (char !== '\\') {
+      const codePoint = value.codePointAt(index);
+      if (codePoint === undefined) break;
+      const character = String.fromCodePoint(codePoint);
+      decoded += character;
+      index += character.length;
+      continue;
+    }
+
+    const next = value[index + 1] ?? '';
+    if (next === '\r' && value[index + 2] === '\n') {
+      index += 3;
+      continue;
+    }
+    if (next === '\n' || next === '\r' || next === '\f') {
+      index += 2;
+      continue;
+    }
+
+    let cursor = index + 1;
+    let hex = '';
+    while (hex.length < 6 && /[0-9a-f]/iu.test(value[cursor] ?? '')) {
+      hex += value[cursor];
+      cursor += 1;
+    }
+    if (hex) {
+      decoded += normalizeCssEscapeCodePoint(Number.parseInt(hex, 16));
+      if (value[cursor] === '\r' && value[cursor + 1] === '\n') cursor += 2;
+      else if (/[\t\n\f\r ]/u.test(value[cursor] ?? '')) cursor += 1;
+      index = cursor;
+      continue;
+    }
+
+    const escapedCodePoint = value.codePointAt(index + 1);
+    if (escapedCodePoint === undefined) {
+      index += 1;
+      continue;
+    }
+    const escapedCharacter = String.fromCodePoint(escapedCodePoint);
+    decoded += escapedCharacter;
+    index += 1 + escapedCharacter.length;
+  }
+  return decoded;
+}
+
 function skipCssImport(value: string, index: number): number {
   let cursor = index;
-  while (cursor < value.length && value[cursor] !== ';') {
+  let inBlockComment = false;
+  let parenthesisDepth = 0;
+  let quote: '"' | "'" | null = null;
+
+  while (cursor < value.length) {
+    const char = value[cursor] ?? '';
+    const nextChar = value[cursor + 1] ?? '';
+    if (inBlockComment) {
+      if (char === '*' && nextChar === '/') {
+        inBlockComment = false;
+        cursor += 2;
+        continue;
+      }
+      cursor += 1;
+      continue;
+    }
+    if (quote) {
+      if (char === '\\') {
+        cursor += 2;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      cursor += 1;
+      continue;
+    }
+    if (char === '/' && nextChar === '*') {
+      inBlockComment = true;
+      cursor += 2;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      cursor += 1;
+      continue;
+    }
+    if (char === '(') {
+      parenthesisDepth += 1;
+      cursor += 1;
+      continue;
+    }
+    if (char === ')') {
+      parenthesisDepth = Math.max(0, parenthesisDepth - 1);
+      cursor += 1;
+      continue;
+    }
+    if (char === ';' && parenthesisDepth === 0) {
+      return cursor + 1;
+    }
     cursor += 1;
   }
-  return cursor < value.length ? cursor + 1 : cursor;
+  return cursor;
 }
 
 function skipCssUrlFunction(value: string, index: number): number {
@@ -64,6 +177,69 @@ function skipCssUrlFunction(value: string, index: number): number {
   return cursor;
 }
 
+function parseCssUrlFunction(value: string, index: number): ParsedCssUrlFunction | null {
+  let cursor = index + 'url'.length;
+  while (/\s/u.test(value[cursor] ?? '')) {
+    cursor += 1;
+  }
+  cursor += 1;
+  while (/\s/u.test(value[cursor] ?? '')) {
+    cursor += 1;
+  }
+  const quote = value[cursor] === '"' || value[cursor] === "'" ? value[cursor] : null;
+  if (quote) cursor += 1;
+  const start = cursor;
+
+  while (cursor < value.length) {
+    const char = value[cursor] ?? '';
+    if (char === '\\') {
+      cursor += 2;
+      continue;
+    }
+    if (quote ? char === quote : char === ')') {
+      const url = decodeCssStringEscapes(value.slice(start, cursor).trim());
+      cursor += 1;
+      if (quote) {
+        while (/\s/u.test(value[cursor] ?? '')) cursor += 1;
+        if (value[cursor] !== ')') return null;
+        cursor += 1;
+      }
+      return { nextIndex: cursor, url };
+    }
+    cursor += 1;
+  }
+
+  return null;
+}
+
+function parseCssString(value: string, index: number): ParsedCssString | null {
+  const quote = value[index];
+  if (quote !== '"' && quote !== "'") return null;
+  let cursor = index + 1;
+  const start = cursor;
+  while (cursor < value.length) {
+    const char = value[cursor] ?? '';
+    if (char === '\\') {
+      cursor += 2;
+      continue;
+    }
+    if (char === quote) {
+      return { nextIndex: cursor + 1, url: decodeCssStringEscapes(value.slice(start, cursor)) };
+    }
+    if (char === '\n' || char === '\r' || char === '\f') return null;
+    cursor += 1;
+  }
+  return null;
+}
+
+function serializeCssUrl(url: string): string {
+  const escaped = url
+    .replace(/\\/gu, '\\\\')
+    .replace(/"/gu, '\\"')
+    .replace(/[\n\r\f]/gu, '');
+  return `url("${escaped}")`;
+}
+
 function copyCssQuotedCharacter(
   value: string,
   index: number,
@@ -86,16 +262,6 @@ function copyCssQuotedCharacter(
   };
 }
 
-function skipLiteralCssFetch(value: string, index: number): number | null {
-  if (startsCssKeyword(value, index, '@import')) {
-    return skipCssImport(value, index);
-  }
-  if (startsCssUrlFunction(value, index)) {
-    return skipCssUrlFunction(value, index);
-  }
-  return null;
-}
-
 function advanceCssBlockComment(value: string, index: number, state: CssScanState): number | null {
   const char = value[index] ?? '';
   const nextChar = value[index + 1] ?? '';
@@ -109,8 +275,148 @@ function advanceCssBlockComment(value: string, index: number, state: CssScanStat
   return index + 1;
 }
 
-function stripLiteralCssFetchSyntax(value: string): string {
+type CssResourceScan = {
+  nextIndex: number;
+  safetyProjection: string;
+  sanitized: string;
+};
+
+function rewriteCssImportAt(
+  value: string,
+  index: number,
+  rewriteUrl?: WebSnapshotCssUrlRewriter
+): CssResourceScan | null {
+  if (!startsCssKeyword(value, index, '@import')) return null;
+  const importEnd = skipCssImport(value, index);
+  let cursor = index + '@import'.length;
+  while (/\s/u.test(value[cursor] ?? '')) cursor += 1;
+  const parsed = startsCssUrlFunction(value, cursor)
+    ? parseCssUrlFunction(value, cursor)
+    : parseCssString(value, cursor);
+  const rewritten = parsed ? (rewriteUrl?.(parsed.url) ?? null) : null;
+  if (!parsed || rewritten === null || parsed.nextIndex > importEnd) {
+    return { nextIndex: importEnd, safetyProjection: '', sanitized: '' };
+  }
+
+  const suffixEnd = value[importEnd - 1] === ';' ? importEnd - 1 : importEnd;
+  const suffix = value.slice(parsed.nextIndex, suffixEnd);
+  return {
+    nextIndex: importEnd,
+    safetyProjection: `resource-token${suffix};`,
+    sanitized: `@import ${serializeCssUrl(rewritten)}${suffix};`,
+  };
+}
+
+function rewriteCssUrlAt(
+  value: string,
+  index: number,
+  rewriteUrl?: WebSnapshotCssUrlRewriter
+): CssResourceScan | null {
+  if (!startsCssUrlFunction(value, index)) return null;
+  const parsed = parseCssUrlFunction(value, index);
+  if (!parsed) {
+    return {
+      nextIndex: skipCssUrlFunction(value, index),
+      safetyProjection: '',
+      sanitized: '',
+    };
+  }
+  const rewritten = rewriteUrl?.(parsed.url) ?? null;
+  return {
+    nextIndex: parsed.nextIndex,
+    safetyProjection: rewritten === null ? '' : 'resource-token',
+    sanitized: rewritten === null ? '' : serializeCssUrl(rewritten),
+  };
+}
+
+function rewriteCssResourceAt(
+  value: string,
+  index: number,
+  rewriteUrl?: WebSnapshotCssUrlRewriter
+): CssResourceScan | null {
+  return rewriteCssImportAt(value, index, rewriteUrl) ?? rewriteCssUrlAt(value, index, rewriteUrl);
+}
+
+interface CssIdentifierScan {
+  decoded: string;
+  nextIndex: number;
+}
+
+function normalizeCssEscapeCodePoint(codePoint: number): string {
+  if (codePoint === 0 || codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
+    return '\uFFFD';
+  }
+  return String.fromCodePoint(codePoint);
+}
+
+function consumeEscapedCssIdentifierCharacter(
+  value: string,
+  index: number
+): { decoded: string; nextIndex: number } | null {
+  const escaped = value[index + 1];
+  if (!escaped || escaped === '\n' || escaped === '\r' || escaped === '\f') return null;
+  let nextIndex = index + 1;
+  let hex = '';
+  while (hex.length < 6 && /[0-9a-f]/iu.test(value[nextIndex] ?? '')) {
+    hex += value[nextIndex];
+    nextIndex += 1;
+  }
+  if (hex) {
+    if (value[nextIndex] === '\r' && value[nextIndex + 1] === '\n') nextIndex += 2;
+    else if (/[\t\n\f\r ]/u.test(value[nextIndex] ?? '')) nextIndex += 1;
+    return { decoded: normalizeCssEscapeCodePoint(Number.parseInt(hex, 16)), nextIndex };
+  }
+  const codePoint = escaped.codePointAt(0);
+  if (codePoint === undefined) return null;
+  return { decoded: escaped, nextIndex: index + 1 + escaped.length };
+}
+
+function scanCssIdentifier(value: string, index: number): CssIdentifierScan | null {
+  let decoded = '';
+  let nextIndex = index;
+  while (nextIndex < value.length) {
+    if (value[nextIndex] === '\\') {
+      const escaped = consumeEscapedCssIdentifierCharacter(value, nextIndex);
+      if (!escaped) break;
+      decoded += escaped.decoded;
+      nextIndex = escaped.nextIndex;
+      continue;
+    }
+    const codePoint = value.codePointAt(nextIndex);
+    if (codePoint === undefined) break;
+    const character = String.fromCodePoint(codePoint);
+    if (!/[a-z0-9_-]/iu.test(character) && codePoint < 0x80) break;
+    decoded += character;
+    nextIndex += character.length;
+  }
+  return decoded ? { decoded, nextIndex } : null;
+}
+
+function rewriteDefinedPseudoClassAt(
+  value: string,
+  index: number
+): { replacement: string; nextIndex: number } | null {
+  if (value[index] !== ':') return null;
+  let identifierIndex = index + 1;
+  while (value.startsWith('/*', identifierIndex)) {
+    const commentEnd = value.indexOf('*/', identifierIndex + 2);
+    if (commentEnd === -1) return null;
+    identifierIndex = commentEnd + 2;
+  }
+  const identifier = scanCssIdentifier(value, identifierIndex);
+  if (!identifier || identifier.decoded.toLowerCase() !== 'defined') return null;
+  return {
+    replacement: `:not([${WEB_SNAPSHOT_UNDEFINED_CUSTOM_ELEMENT_ATTRIBUTE}])`,
+    nextIndex: identifier.nextIndex,
+  };
+}
+
+function stripOrRewriteLiteralCssFetchSyntax(
+  value: string,
+  rewriteUrl?: WebSnapshotCssUrlRewriter
+): { sanitized: string; safetyProjection: string } {
   let sanitized = '';
+  let safetyProjection = '';
   const state: CssScanState = { inBlockComment: false, quote: null };
 
   for (let index = 0; index < value.length;) {
@@ -132,6 +438,7 @@ function stripLiteralCssFetchSyntax(value: string): string {
     if (state.quote) {
       const copied = copyCssQuotedCharacter(value, index, state.quote);
       sanitized += copied.value;
+      safetyProjection += copied.value;
       state.quote = copied.quote;
       index = copied.nextIndex;
       continue;
@@ -140,24 +447,98 @@ function stripLiteralCssFetchSyntax(value: string): string {
     if (char === '"' || char === "'") {
       state.quote = char;
       sanitized += char;
+      safetyProjection += char;
       index += 1;
       continue;
     }
 
-    const nextIndex = skipLiteralCssFetch(value, index);
-    if (nextIndex !== null) {
-      index = nextIndex;
+    const resource = rewriteCssResourceAt(value, index, rewriteUrl);
+    if (resource) {
+      sanitized += resource.sanitized;
+      safetyProjection += resource.safetyProjection;
+      index = resource.nextIndex;
+      continue;
+    }
+
+    const definedState = rewriteDefinedPseudoClassAt(value, index);
+    if (definedState) {
+      sanitized += definedState.replacement;
+      safetyProjection += definedState.replacement;
+      index = definedState.nextIndex;
       continue;
     }
 
     sanitized += char;
+    safetyProjection += char;
     index += 1;
   }
 
-  return sanitized;
+  return { sanitized, safetyProjection };
 }
 
-export function sanitizeWebSnapshotCssText(value: string): string {
-  const sanitized = stripLiteralCssFetchSyntax(value);
-  return containsUnsafeCssSyntax(sanitized) ? '' : sanitized;
+function removeLiteralVarFunctionNames(value: string): string {
+  return value.replace(/\bvar\s*\(/giu, '(');
+}
+
+function splitStylesheetRules(cssText: string): string[] {
+  const rules: string[] = [];
+  let blockDepth = 0;
+  let inComment = false;
+  let quote: '"' | "'" | null = null;
+  let start = 0;
+  for (let index = 0; index < cssText.length; index += 1) {
+    const char = cssText[index] ?? '';
+    const next = cssText[index + 1] ?? '';
+    if (inComment) {
+      if (char === '*' && next === '/') {
+        inComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (char === '\\') index += 1;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      inComment = true;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === '{') blockDepth += 1;
+    else if (char === '}') blockDepth = Math.max(0, blockDepth - 1);
+    if ((char === '}' || char === ';') && blockDepth === 0) {
+      rules.push(cssText.slice(start, index + 1));
+      start = index + 1;
+    }
+  }
+  if (start < cssText.length) rules.push(cssText.slice(start));
+  return rules;
+}
+
+export function sanitizeWebSnapshotCssText(
+  value: string,
+  rewriteUrl?: WebSnapshotCssUrlRewriter
+): string {
+  const transformed = stripOrRewriteLiteralCssFetchSyntax(value, rewriteUrl);
+  const sanitized = transformed.sanitized;
+  const safetyProjection = rewriteUrl
+    ? removeLiteralVarFunctionNames(transformed.safetyProjection)
+    : sanitized;
+  return containsUnsafeCssSyntax(safetyProjection) ? '' : sanitized;
+}
+
+export function sanitizeWebSnapshotStylesheetText(
+  value: string,
+  rewriteUrl?: WebSnapshotCssUrlRewriter
+): string {
+  return splitStylesheetRules(value)
+    .map((rule) => sanitizeWebSnapshotCssText(rule, rewriteUrl))
+    .filter(Boolean)
+    .join('\n');
 }

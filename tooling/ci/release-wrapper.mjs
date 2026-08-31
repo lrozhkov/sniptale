@@ -1,4 +1,4 @@
-import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import { runObservedWrapper } from '../qa/wrappers/observed/runner.mjs';
 import { collectCiReleaseResults } from './qa-composition.mjs';
 

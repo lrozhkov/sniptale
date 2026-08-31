@@ -171,34 +171,6 @@ async function expectScreenshotTeardownKeepsResponseChannelOpen() {
   }
 }
 
-async function expectWebSnapshotExportRoutesThroughPopupExportController() {
-  const handleRequest = vi.fn(() => true);
-
-  vi.doMock('../../../parser/popup-export', () => ({
-    createPopupExportController: () => ({
-      handleRequest,
-    }),
-  }));
-
-  const params = createBridgeParams();
-  const sendResponse = vi.fn();
-  const handleMessage = createRuntimeMessageHandler(params);
-  const request = {
-    allowAnonymousCrossOriginAssets: false,
-    allowAuthenticatedSameOriginAssets: true,
-    requestId: 'snapshot-request',
-    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-  };
-
-  expect(handleMessage(request, {} as chrome.runtime.MessageSender, sendResponse)).toBe(true);
-
-  await vi.waitFor(() => {
-    expect(handleRequest).toHaveBeenCalledWith(request, sendResponse);
-  });
-
-  vi.doUnmock('../../../parser/popup-export');
-}
-
 describe('createRuntimeMessageHandler', () => {
   it(
     'ignores invalid raw payloads before branching on runtime message fields',
@@ -223,9 +195,5 @@ describe('createRuntimeMessageHandler', () => {
   it(
     'keeps the runtime response channel open until screenshot teardown completes',
     expectScreenshotTeardownKeepsResponseChannelOpen
-  );
-  it(
-    'routes web snapshot export requests through the popup export controller',
-    expectWebSnapshotExportRoutesThroughPopupExportController
   );
 });

@@ -1,6 +1,5 @@
 import type { VideoProject } from '../../../features/video/project/types';
-import { getVideoProject, saveVideoProject } from './index';
-import { resolveVideoProjectReadResult } from './contracts';
+import { saveVideoProject } from './index';
 import { loadSettings } from '../settings';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle';
 import type { LibraryStorageClass } from '../library-lifecycle';
@@ -20,10 +19,10 @@ export function commitVideoProjectMutation(
   project: VideoProject,
   options: CommitVideoProjectMutationOptions = {}
 ): Promise<VideoProject> {
-  return commitVideoProjectMutationAndReadBack(project, options);
+  return commitVideoProjectMutationWithPlacement(project, options);
 }
 
-async function commitVideoProjectMutationAndReadBack(
+async function commitVideoProjectMutationWithPlacement(
   project: VideoProject,
   options: CommitVideoProjectMutationOptions
 ): Promise<VideoProject> {
@@ -31,7 +30,7 @@ async function commitVideoProjectMutationAndReadBack(
     options.storageClass === undefined && options.baseRevision == null
       ? await loadSettings().catch(() => null)
       : null;
-  await saveVideoProject(project, {
+  const entry = await saveVideoProject(project, {
     baseUpdatedAt: options.baseRevision ?? null,
     ...(options.expectedWorkspaceRevision === undefined
       ? {}
@@ -41,9 +40,7 @@ async function commitVideoProjectMutationAndReadBack(
       settings?.localStoragePolicy.defaultDestination ??
       DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
   });
-  const result = await getVideoProject(project.id);
-  const savedProject = resolveVideoProjectReadResult(result);
-  return savedProject ?? project;
+  return entry.project;
 }
 
 export async function commitVideoProjectWorkspaceMutation(

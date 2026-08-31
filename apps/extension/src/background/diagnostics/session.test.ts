@@ -99,7 +99,7 @@ function expectSanitizedDiagnosticsSaved() {
         kind: 'error',
         message: 'Interaction failed token=***',
         data: expect.objectContaining({
-          url: 'https://example.com/app?token=***',
+          url: 'https://example.com/app',
           detail: 'Failed token=***',
           error: 'Bearer ***',
         }),

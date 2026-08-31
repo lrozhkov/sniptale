@@ -4,36 +4,36 @@
  */
 
 import fs from 'node:fs';
+import ts from 'typescript';
+import { collectCodeFiles } from '../../analysis/repository/shared-files.mjs';
+import { isIgnoredRelativePath, toRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import {
-  collectCodeFiles,
-  isCodeFile,
   isExecutedAsScript,
-  isIgnoredRelativePath,
   parseFilesArgument,
   printViolations,
-  toRelativePath,
-} from '../../core/shared.mjs';
-import { isProductSourcePath } from '../../core/src-production-targets.mjs';
-import { collectChangedTargets } from '../../runtime/changed-targets.helpers.mjs';
+} from '../../runtime/process/shared-cli.mjs';
+import { isProductSourcePath } from '../../analysis/repository/src-production-targets.mjs';
+import { collectChangedTargets } from '../../runtime/scope/changed-targets.helpers.mjs';
 
-const SUPPRESSION_RULES = [
-  {
-    message:
-      'introduces an ESLint suppression directive in changed code. Fix the rule violation instead of muting it inline.',
-    pattern: /(^|\s)(?:\/\/|\/\*|\*)\s*eslint-(?:disable(?:-next-line|-line)?|enable)\b/u,
-    rule: 'eslint-suppression-directive',
-  },
-  {
-    message:
-      'introduces a TypeScript suppression directive in changed code. ' +
-      'Narrow the type locally or refactor the seam instead.',
-    pattern: /(^|\s)(?:\/\/|\/\*|\*)\s*@ts-(?:ignore|expect-error|nocheck)\b/u,
-    rule: 'typescript-suppression-directive',
-  },
-];
+const JS_TS_FILE_PATTERN = /\.[cm]?[jt]sx?$/u;
+const ESLINT_SUPPRESSION_PATTERN = /^eslint-disable(?:-next-line|-line)?\b/u;
+const TYPESCRIPT_SUPPRESSION_PATTERN = /^@ts-(?:ignore|expect-error)\b/u;
+const TYPESCRIPT_NOCHECK_PATTERN = /^@ts-nocheck\b/u;
+const ESLINT_SUPPRESSION = {
+  message:
+    'introduces an ESLint suppression directive in production code. ' +
+    'Fix the rule violation instead of muting it inline.',
+  rule: 'eslint-suppression-directive',
+};
+const TYPESCRIPT_SUPPRESSION = {
+  message:
+    'introduces a TypeScript suppression directive in production code. ' +
+    'Narrow the type locally or refactor the seam instead.',
+  rule: 'typescript-suppression-directive',
+};
 
 function isSuppressionTarget(relativePath) {
-  return isCodeFile(relativePath) && !isIgnoredRelativePath(relativePath);
+  return JS_TS_FILE_PATTERN.test(relativePath) && !isIgnoredRelativePath(relativePath);
 }
 
 function isProductionSuppressionTarget(relativePath) {
@@ -52,6 +52,63 @@ function createViolation(relativePath, line, suppressionRule) {
     line,
     message: suppressionRule.message,
   };
+}
+
+function normalizeCommentLine(line, lineIndex, lineCount, tokenKind) {
+  let payload = line;
+  if (tokenKind === ts.SyntaxKind.SingleLineCommentTrivia) {
+    payload = payload.replace(/^\/\//u, '');
+  } else {
+    if (lineIndex === 0) payload = payload.replace(/^\/\*/u, '');
+    if (lineIndex === lineCount - 1) payload = payload.replace(/\*\/$/u, '');
+    payload = payload.replace(/^\s*\*/u, '');
+  }
+  return payload.trim();
+}
+
+function collectCommentSuppressions(relativePath, sourceText) {
+  const sourceFile = ts.createSourceFile(relativePath, sourceText, ts.ScriptTarget.Latest, false);
+  const firstStatementStart =
+    sourceFile.statements[0]?.getStart(sourceFile) ?? Number.POSITIVE_INFINITY;
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    ts.LanguageVariant.Standard,
+    sourceText
+  );
+  const violations = [];
+
+  for (
+    let tokenKind = scanner.scan();
+    tokenKind !== ts.SyntaxKind.EndOfFileToken;
+    tokenKind = scanner.scan()
+  ) {
+    if (
+      tokenKind !== ts.SyntaxKind.SingleLineCommentTrivia &&
+      tokenKind !== ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      continue;
+    }
+
+    const tokenText = scanner.getTokenText();
+    const startLine = sourceFile.getLineAndCharacterOfPosition(scanner.getTokenPos()).line + 1;
+    const lines = tokenText.split(/\r?\n/u);
+    for (const [lineIndex, line] of lines.entries()) {
+      const payload = normalizeCommentLine(line, lineIndex, lines.length, tokenKind);
+      const lineNumber = startLine + lineIndex;
+      if (ESLINT_SUPPRESSION_PATTERN.test(payload)) {
+        violations.push(createViolation(relativePath, lineNumber, ESLINT_SUPPRESSION));
+      } else if (
+        tokenKind === ts.SyntaxKind.SingleLineCommentTrivia &&
+        (TYPESCRIPT_SUPPRESSION_PATTERN.test(payload) ||
+          (TYPESCRIPT_NOCHECK_PATTERN.test(payload) && scanner.getTokenPos() < firstStatementStart))
+      ) {
+        violations.push(createViolation(relativePath, lineNumber, TYPESCRIPT_SUPPRESSION));
+      }
+    }
+  }
+
+  return violations;
 }
 
 /**
@@ -76,20 +133,16 @@ export function collectSuppressionDirectiveViolations(
     const changedLineNumbers = untrackedFiles.has(relativePath)
       ? null
       : (changedLineMap.get(relativePath) ?? null);
-    const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/u);
-
-    for (const [index, lineText] of lines.entries()) {
-      const lineNumber = index + 1;
+    const fileViolations = collectCommentSuppressions(
+      relativePath,
+      fs.readFileSync(filePath, 'utf8')
+    );
+    for (const violation of fileViolations) {
+      const lineNumber = violation.line;
       if (changedLineNumbers != null && !changedLineNumbers.has(lineNumber)) {
         continue;
       }
-
-      for (const suppressionRule of SUPPRESSION_RULES) {
-        if (suppressionRule.pattern.test(lineText)) {
-          violations.push(createViolation(relativePath, lineNumber, suppressionRule));
-          break;
-        }
-      }
+      violations.push(violation);
     }
   }
 
@@ -126,7 +179,7 @@ export function runSuppressionDirectiveCheck({ files = [], scope = 'workspace' }
   }
 
   const targets = collectChangedTargets({ scope });
-  const codeFiles = targets.changedFiles.filter(isSuppressionTarget);
+  const codeFiles = targets.changedFiles.filter(isProductionSuppressionTarget);
 
   return {
     files: codeFiles,

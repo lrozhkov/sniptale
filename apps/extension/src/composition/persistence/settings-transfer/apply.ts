@@ -15,6 +15,8 @@ import type { SurfaceStylePresetCatalog } from '../surface-style-presets/contrac
 import { browserStorage } from '../infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { loadSettings } from '../settings';
+import { parsePagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
+import { parseExportResourceLimits } from '@sniptale/runtime-contracts/export';
 
 const SYNC_KEYS = [
   'sniptale_settings',
@@ -170,6 +172,22 @@ function applySettingsWrites(context: WriteBuildContext): void {
   if (image?.['format'] !== undefined)
     nextSettings.imageFormat = image['format'] as NormalizedSettings['imageFormat'];
   if (image?.['quality'] !== undefined) nextSettings.imageQuality = image['quality'] as number;
+  if (image?.['fullPageQuality'] !== undefined) {
+    nextSettings.fullPageQuality = image[
+      'fullPageQuality'
+    ] as NormalizedSettings['fullPageQuality'];
+  }
+  const pages = data('capture.pages');
+  if (pages?.['timing'] !== undefined) {
+    const timing = parsePagePackageCaptureTimingPolicy(pages['timing']);
+    if (!timing) throw new Error('Imported page capture timing settings are invalid');
+    nextSettings.pagePackageCaptureTiming = timing;
+  }
+  if (pages?.['resourceLimits'] !== undefined) {
+    const resourceLimits = parseExportResourceLimits(pages['resourceLimits']);
+    if (!resourceLimits) throw new Error('Imported export resource limits are invalid');
+    nextSettings.exportResourceLimits = resourceLimits;
+  }
   const afterCapture = data('capture.after-capture');
   if (afterCapture?.['action'] !== undefined)
     nextSettings.captureAction = afterCapture['action'] as NormalizedSettings['captureAction'];
@@ -198,12 +216,7 @@ function applySettingsWrites(context: WriteBuildContext): void {
       microphoneDeviceId: null,
     };
   }
-  const access = data('access.capture-assets');
-  if (access?.['authenticated'] !== undefined)
-    nextSettings.authenticatedSnapshotAssetsEnabled = access['authenticated'] as boolean;
-  if (access?.['anonymous'] !== undefined)
-    nextSettings.anonymousCrossOriginSnapshotAssetsEnabled = access['anonymous'] as boolean;
-  if (preferences || viewports || image || afterCapture || saving || retention || voice || access)
+  if (preferences || viewports || image || pages || afterCapture || saving || retention || voice)
     syncWrites['sniptale_settings'] = nextSettings;
 }
 

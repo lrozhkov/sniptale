@@ -1,6 +1,18 @@
 // policyStateId: full-page-capture-leases - export-run cancellation is an in-memory facet of
 // the active durable capture lease.
 const activeExportRuns = new Map<string, AbortController>();
+const cancelledExportRuns = new Set<string>();
+const MAX_CANCELLED_EXPORT_RUNS = 256;
+
+function retainCancelledExportRun(exportRunId: string): void {
+  cancelledExportRuns.delete(exportRunId);
+  cancelledExportRuns.add(exportRunId);
+  while (cancelledExportRuns.size > MAX_CANCELLED_EXPORT_RUNS) {
+    const oldestExportRunId = cancelledExportRuns.values().next().value;
+    if (oldestExportRunId === undefined) return;
+    cancelledExportRuns.delete(oldestExportRunId);
+  }
+}
 
 export function registerFullPageExportRun(exportRunId: string | undefined): {
   release(): void;
@@ -10,7 +22,12 @@ export function registerFullPageExportRun(exportRunId: string | undefined): {
     throw new Error('A full-page capture already owns this export run');
   }
   const controller = new AbortController();
-  if (exportRunId !== undefined) activeExportRuns.set(exportRunId, controller);
+  if (exportRunId !== undefined) {
+    activeExportRuns.set(exportRunId, controller);
+    if (cancelledExportRuns.delete(exportRunId)) {
+      controller.abort(new Error('Full-page capture cancelled'));
+    }
+  }
   return {
     release() {
       if (exportRunId !== undefined && activeExportRuns.get(exportRunId) === controller) {
@@ -23,7 +40,10 @@ export function registerFullPageExportRun(exportRunId: string | undefined): {
 
 export function cancelFullPageCaptureByExportRunId(exportRunId: string): boolean {
   const controller = activeExportRuns.get(exportRunId);
-  if (!controller) return false;
+  if (!controller) {
+    retainCancelledExportRun(exportRunId);
+    return false;
+  }
   controller.abort(new Error('Full-page capture cancelled'));
   return true;
 }

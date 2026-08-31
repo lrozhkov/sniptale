@@ -275,6 +275,8 @@ it('always installs capture chrome while freezing motion only when requested', (
   preparePageMutations(session);
 
   expect(session.styleElement?.textContent).toContain('::-webkit-scrollbar');
+  expect(session.styleElement?.textContent).toContain('scrollbar-color: transparent transparent');
+  expect(session.styleElement?.textContent).not.toContain('display: none');
   expect(session.styleElement?.textContent).not.toContain('animation-play-state');
   restorePageMutations(session);
   expect(session.styleElement?.isConnected).toBe(false);

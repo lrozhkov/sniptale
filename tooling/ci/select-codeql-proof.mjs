@@ -1,6 +1,5 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import {
   downloadSuccessfulMainProof,
   downloadLatestReleaseProof,
@@ -8,22 +7,10 @@ import {
   runGitHubCli,
 } from './main-proof-transport.mjs';
 import { verifyMainProof, verifyReleaseProof } from './verify-main-proof.mjs';
+import { sealVerifiedProofFiles } from './proof-artifact-seal.mjs';
 
 const CODEQL_PROOF_FILE = '.tmp/qa/codeql-proof.json';
 const CODEQL_SARIF_FILE = '.tmp/codeql/results.filtered.sarif';
-
-function copyVerifiedFile(root, manifest, relativePath, destination) {
-  if (!manifest.files.some(({ file }) => file === relativePath)) {
-    throw new Error(`Successful main proof does not contain ${relativePath}.`);
-  }
-  const source = path.join(root, relativePath);
-  const stat = fs.lstatSync(source);
-  if (!stat.isFile() || stat.isSymbolicLink()) {
-    throw new Error(`Unsafe CodeQL proof input: ${relativePath}.`);
-  }
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.copyFileSync(source, destination, fs.constants.COPYFILE_EXCL);
-}
 
 export function selectVerifiedCodeqlProof(
   artifactRoot,
@@ -34,14 +21,11 @@ export function selectVerifiedCodeqlProof(
 ) {
   const root = path.resolve(artifactRoot);
   const { manifest } = verifier(root, commit);
-  copyVerifiedFile(root, manifest, CODEQL_PROOF_FILE, path.resolve(proofDestination));
-  try {
-    copyVerifiedFile(root, manifest, CODEQL_SARIF_FILE, path.resolve(sarifDestination));
-  } catch (error) {
-    fs.rmSync(path.resolve(proofDestination), { force: true });
-    throw error;
-  }
-  return { proofPath: path.resolve(proofDestination), sarifPath: path.resolve(sarifDestination) };
+  const [proofPath, sarifPath] = sealVerifiedProofFiles(root, manifest, [
+    { destination: proofDestination, relativePath: CODEQL_PROOF_FILE },
+    { destination: sarifDestination, relativePath: CODEQL_SARIF_FILE },
+  ]);
+  return { proofPath, sarifPath };
 }
 
 export function restoreLatestReleaseCodeqlProof(

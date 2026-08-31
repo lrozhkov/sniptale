@@ -15,6 +15,8 @@ import { actionRouteMetadata, getActionRouteMetadata } from './routes';
 import {
   handleBackgroundOwnedAction,
   handleInternalSignalAction,
+  handleProjectExportCapabilitiesAction,
+  handleProjectExportRuntimeAction,
   handleTabAction,
   handleUnknownAction,
   handleVideoRuntimeAction,
@@ -45,6 +47,8 @@ export const actionRouteHandlerBindings = {
   'popup-export': routeTabAction,
   'popup-export-job': routeBackgroundOwnedAction,
   'popup-tab-route-capability-issuance': routeBackgroundOwnedAction,
+  'project-export-capabilities': routeProjectExportCapabilitiesAction,
+  'project-export-runtime': routeProjectExportRuntimeAction,
   scenario: routeTabAction,
   'settings-transfer': routeBackgroundOwnedAction,
   'tab-mode': routeTabAction,
@@ -88,6 +92,18 @@ function routeTabAction(action: Action): ActionResult {
 
 function routeVideoRuntimeAction(action: Action): ActionResult {
   return isVideoRuntimeAction(action) ? handleVideoRuntimeAction(action) : { handled: false };
+}
+
+function routeProjectExportRuntimeAction(action: Action): ActionResult {
+  return isVideoRuntimeAction(action)
+    ? handleProjectExportRuntimeAction(action)
+    : { handled: false };
+}
+
+function routeProjectExportCapabilitiesAction(action: Action): ActionResult {
+  return isVideoRuntimeAction(action)
+    ? handleProjectExportCapabilitiesAction(action)
+    : { handled: false };
 }
 
 function isInternalSignalAction(action: Action): action is InternalSignalAction {

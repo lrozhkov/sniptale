@@ -221,3 +221,42 @@ it('revokes blob URLs immediately when download creation fails', async () => {
 
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:download-url');
 });
+
+it('downloads an externally owned URL and registers terminal observation', async () => {
+  const { executeDownloadUrl } = await import('./execute');
+  const onTerminal = vi.fn();
+  browserDownloadsDownloadMock.mockResolvedValue(44);
+
+  await expect(
+    executeDownloadUrl({
+      filename: 'page.zip',
+      onTerminal,
+      presetId: 'preset-1',
+      url: 'blob:offscreen-lease',
+    })
+  ).resolves.toBe(44);
+
+  expect(browserDownloadsDownloadMock).toHaveBeenCalledWith({
+    filename: 'captures/page.zip',
+    saveAs: false,
+    url: 'blob:offscreen-lease',
+  });
+  expect(rememberPendingDownloadMock).toHaveBeenCalledWith(
+    44,
+    onTerminal,
+    'generic',
+    undefined,
+    true
+  );
+});
+
+it('leaves missing external URL download ids for operation-identity recovery', async () => {
+  const { executeDownloadUrl } = await import('./execute');
+  browserDownloadsDownloadMock.mockResolvedValue(undefined);
+
+  await expect(
+    executeDownloadUrl({ filename: 'page.zip', onTerminal: vi.fn(), url: 'blob:offscreen-lease' })
+  ).resolves.toBeUndefined();
+
+  expect(rememberPendingDownloadMock).not.toHaveBeenCalled();
+});

@@ -56,7 +56,11 @@ import {
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function renderThumb(kind: Parameters<typeof MediaThumb>[0]['kind'], assetId = 'asset-1') {
+function renderThumb(
+  kind: Parameters<typeof MediaThumb>[0]['kind'],
+  assetId = 'asset-1',
+  fit?: Parameters<typeof MediaThumb>[0]['fit']
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -64,7 +68,13 @@ function renderThumb(kind: Parameters<typeof MediaThumb>[0]['kind'], assetId = '
   }
 
   act(() => {
-    root?.render(<MediaThumb assetId={assetId} {...(kind === undefined ? {} : { kind })} />);
+    root?.render(
+      <MediaThumb
+        assetId={assetId}
+        {...(kind === undefined ? {} : { kind })}
+        {...(fit === undefined ? {} : { fit })}
+      />
+    );
   });
 }
 
@@ -150,6 +160,19 @@ async function verifyGalleryHelpersAndLoadedThumb() {
   const image = container?.querySelector('img');
   expect(image?.getAttribute('src')).toBe('blob:thumb');
   expect(image?.className).toContain('pointer-events-none');
+  expect(image?.className).toContain('object-cover');
+  expect(image?.getAttribute('data-fit')).toBe('cover');
+}
+
+async function verifyContainedThumb() {
+  getMediaThumbnailMock.mockResolvedValue({ blob: new Blob(['thumb']) });
+  renderThumb('image', 'asset-contained', 'contain');
+  await flushEffects();
+
+  const image = container?.querySelector('img');
+  expect(image?.className).toContain('object-contain');
+  expect(image?.className).not.toContain('object-cover');
+  expect(image?.getAttribute('data-fit')).toBe('contain');
 }
 
 async function verifyFallbackThumbAndCleanup() {
@@ -222,6 +245,7 @@ function runGalleryUiSuite() {
     'keeps real item thumbnail loads stable across metadata-only rerenders',
     verifyStableItemThumbRerendersDoNotReload
   );
+  it('can contain thumbnails without changing the default cover behavior', verifyContainedThumb);
 }
 
 describe('gallery-ui', runGalleryUiSuite);

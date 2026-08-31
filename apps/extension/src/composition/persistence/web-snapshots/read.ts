@@ -27,7 +27,7 @@ export async function getWebSnapshotPackageFile(id: string): Promise<File | unde
   await recoverWebSnapshotPublications();
   const record = await readStoredRecord(id);
   return record
-    ? readRecordAsset(record.packageAssetId, `${record.id}.sniptale-web-snapshot.zip`)
+    ? readRecordAsset(record.packageAssetId, `${record.id}.sniptale-page-package.zip`)
     : undefined;
 }
 
@@ -43,7 +43,7 @@ export async function getWebSnapshotRecord(id: string): Promise<WebSnapshotRecor
   if (!record) return undefined;
   const packageFile = await readRecordAsset(
     record.packageAssetId,
-    `${record.id}.sniptale-web-snapshot.zip`
+    `${record.id}.sniptale-page-package.zip`
   );
   const {
     packageAssetId: _packageAssetId,

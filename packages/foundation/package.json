@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/foundation",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -26,6 +26,6 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/foundation/src",
-    "typecheck": "node ../../tooling/qa/core/typescript-cli.mjs --noEmit --project tsconfig.json"
+    "typecheck": "node ../../tooling/qa/analysis/source/typescript-cli.mjs --noEmit --project tsconfig.json"
   }
 }

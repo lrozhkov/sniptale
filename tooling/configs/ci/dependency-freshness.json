@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "npmLockRoots": [
+    "package-lock.json",
+    "tooling/configs/ci/npm/package-lock.json",
+    "tooling/configs/ci/playwright/package-lock.json",
+    "tooling/test/mutation/package-lock.json"
+  ],
+  "toolchainAuthorities": [
+    {
+      "id": "node-runtime-and-qa-image",
+      "kind": "container-image",
+      "owner": "tooling/configs/ci/toolchain.lock.json#node",
+      "projection": "tooling/ci/Dockerfile"
+    },
+    {
+      "id": "openstack-controller-image-and-python-lock",
+      "kind": "container-image",
+      "owner": "tooling/configs/ci/toolchain.lock.json#openstackController",
+      "projection": "tooling/ci/selectel/Dockerfile.controller"
+    },
+    {
+      "id": "debian-snapshot",
+      "kind": "distribution-snapshot",
+      "owner": "tooling/configs/ci/toolchain.lock.json#debian",
+      "projection": "tooling/ci/Dockerfile"
+    },
+    {
+      "id": "playwright-and-browser-assets",
+      "kind": "download-lock",
+      "owner": "tooling/configs/ci/toolchain.lock.json#playwright",
+      "projection": "tooling/configs/ci/playwright/package-lock.json"
+    },
+    {
+      "id": "codeql-bundle",
+      "kind": "download-lock",
+      "owner": "tooling/configs/ci/toolchain.lock.json#codeql"
+    },
+    {
+      "id": "osv-scanner",
+      "kind": "download-lock",
+      "owner": "tooling/configs/ci/toolchain.lock.json#osvScanner"
+    },
+    {
+      "id": "gitleaks",
+      "kind": "download-lock",
+      "owner": "tooling/configs/ci/toolchain.lock.json#gitleaks"
+    },
+    {
+      "id": "actionlint",
+      "kind": "download-lock",
+      "owner": "tooling/configs/ci/toolchain.lock.json#actionlint"
+    },
+    {
+      "id": "github-actions-runner",
+      "kind": "download-lock",
+      "owner": "tooling/configs/ci/selectel-runner.json#runner"
+    },
+    {
+      "id": "openstack-controller-requirements",
+      "kind": "python-lock",
+      "owner": "tooling/configs/ci/openstack-controller-requirements.lock",
+      "projection": "tooling/configs/ci/toolchain.lock.json#openstackController.requirementsSha256"
+    }
+  ]
+}

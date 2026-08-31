@@ -1,135 +1,262 @@
 import JSZip from 'jszip';
 import {
-  assertSafeWebSnapshotPackagePath,
   isWebSnapshotManifest,
   WEB_SNAPSHOT_PACKAGE_PATHS,
 } from '../../features/web-snapshot/manifest';
-import { sanitizeWebSnapshotHtml } from '../../features/web-snapshot/public';
-import { getWebSnapshotRecord } from '../../composition/persistence/web-snapshots';
+import { assertSafeArchivePath } from '../../composition/archive-transfer/path';
+import {
+  collectWebSnapshotQueryRoots,
+  isWebSnapshotXhtml,
+  sanitizeWebSnapshotCssText,
+  sanitizeWebSnapshotFilename,
+  sanitizeWebSnapshotHtml,
+  sanitizeWebSnapshotXhtml,
+  serializeWebSnapshotXhtmlDocument,
+  appendWebSnapshotAssetFragment,
+  resolveWebSnapshotLocalAssetReference,
+} from '../../features/web-snapshot/public';
+import {
+  getWebSnapshotRecord,
+  getWebSnapshotScreenshotFile,
+} from '../../composition/persistence/web-snapshots';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import {
+  MAX_PAGE_PACKAGE_ENTRIES,
+  resolvePagePackageScreenshotEntry,
+  type PagePackageScreenshotCoverage,
+} from '@sniptale/runtime-contracts/page-package';
 import { assertZipPackageInflationProfile } from '@sniptale/platform/data/zip-profile';
 import { createViewerAssetObjectUrls } from './asset-objects';
+import type { LoadedWebSnapshotAsset } from './asset-objects';
+import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
+import { withOfflineSnapshotPolicy } from './document-policy';
+import { hashWebSnapshotAssetBytes } from '../../features/web-snapshot/asset-manifest';
+import {
+  resolveWebSnapshotEntryByteLimit,
+  WEB_SNAPSHOT_PACKAGE_POLICY,
+} from '../../features/web-snapshot/package-policy';
+import {
+  createViewerPackageFileCatalog,
+  createViewerPackageFileExtractor,
+  type ViewerPackageFile,
+} from './package-files';
 
 export interface LoadedWebSnapshotPackage {
+  archiveFilename: string;
+  archiveSize: number;
+  archiveUrl: string;
+  assets: LoadedWebSnapshotAsset[];
+  documentUrl: string | null;
   html: string;
   manifest: WebSnapshotManifest;
   objectUrls: string[];
+  packageFiles: ViewerPackageFile[];
+  extractPackageFile: (path: string) => Promise<Blob>;
+  screenshotFilename: string;
+  screenshotUrl: string;
+  screenshotCoverage: PagePackageScreenshotCoverage;
 }
 
-const MAX_VIEWER_FILE_COUNT = 500;
-const MAX_VIEWER_COMPRESSED_PACKAGE_BYTES = 100 * 1024 * 1024;
-const MAX_VIEWER_TOTAL_INFLATED_BYTES = 250 * 1024 * 1024;
-const MAX_VIEWER_ASSET_BYTES = 25 * 1024 * 1024;
-const MAX_VIEWER_TEXT_ENTRY_BYTES = 10 * 1024 * 1024;
-const URL_ATTRIBUTES = ['href', 'poster', 'src'] as const;
+function createViewerScreenshotFilename(manifest: WebSnapshotManifest): string {
+  const sourceName = manifest.source.title ?? manifest.source.url ?? 'web-snapshot';
+  return `${sanitizeWebSnapshotFilename(sourceName, 'web-snapshot')}.png`;
+}
+
+function createViewerArchiveFilename(manifest: WebSnapshotManifest): string {
+  const sourceName = manifest.source.title ?? manifest.source.url ?? 'web-snapshot';
+  return `${sanitizeWebSnapshotFilename(sourceName, 'web-snapshot')}.sniptale-page-package.zip`;
+}
+
+const MAX_VIEWER_FILE_COUNT = MAX_PAGE_PACKAGE_ENTRIES + 1;
+const URL_ATTRIBUTES = ['href', 'poster', 'src', 'xlink:href'] as const;
 const REQUIRED_VIEWER_PACKAGE_PATHS = new Set([
   WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
   WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
-  WEB_SNAPSHOT_PACKAGE_PATHS.screenshot,
+  WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail,
 ]);
 
-function normalizeSnapshotAssetPath(value: string): string {
-  return value.replace(/^\.\.\//, '');
+function resolveViewerAssetReference(
+  value: string,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): string | null {
+  const reference = resolveWebSnapshotLocalAssetReference(
+    value,
+    WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
+    assetPaths
+  );
+  if (!reference) return null;
+  const objectUrl = urlsByPath.get(reference.path);
+  return objectUrl ? appendWebSnapshotAssetFragment(objectUrl, reference.fragment) : null;
 }
 
-function rewriteSrcset(value: string, urlsByPath: Map<string, string>): string {
+function rewriteSrcset(
+  value: string,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): string {
   return value
     .split(',')
     .map((candidate) => candidate.trim())
     .filter(Boolean)
     .flatMap((candidate) => {
       const [url = '', ...descriptorParts] = candidate.split(/\s+/);
-      const objectUrl = urlsByPath.get(normalizeSnapshotAssetPath(url));
+      const objectUrl = resolveViewerAssetReference(url, urlsByPath, assetPaths);
       return objectUrl ? [`${objectUrl} ${descriptorParts.join(' ')}`.trim()] : [];
     })
     .join(', ');
 }
 
-function rewriteAssetReferences(html: string, urlsByPath: Map<string, string>): string {
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  for (const element of Array.from(
-    document.querySelectorAll('[src], [srcset], [href], [poster]')
-  )) {
-    for (const attribute of URL_ATTRIBUTES) {
-      const value = element.getAttribute(attribute);
-      const objectUrl = value ? urlsByPath.get(normalizeSnapshotAssetPath(value)) : undefined;
-      if (objectUrl) {
-        element.setAttribute(attribute, objectUrl);
-      }
-    }
-
-    const srcset = element.getAttribute('srcset');
-    if (srcset) {
-      const rewritten = rewriteSrcset(srcset, urlsByPath);
-      if (rewritten) {
-        element.setAttribute('srcset', rewritten);
-      } else {
-        element.removeAttribute('srcset');
-      }
-    }
+function rewriteElementUrlAttributes(
+  element: Element,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): void {
+  for (const attribute of URL_ATTRIBUTES) {
+    if (attribute === 'href' && element.tagName.toLowerCase() === 'a') continue;
+    const value = element.getAttribute(attribute);
+    const objectUrl = value ? resolveViewerAssetReference(value, urlsByPath, assetPaths) : null;
+    if (objectUrl) element.setAttribute(attribute, objectUrl);
   }
 
-  return `<!doctype html>${document.documentElement.outerHTML}`;
+  const srcset = element.getAttribute('srcset');
+  if (!srcset) return;
+  const rewritten = rewriteSrcset(srcset, urlsByPath, assetPaths);
+  if (rewritten) element.setAttribute('srcset', rewritten);
+  else element.removeAttribute('srcset');
+}
+
+function rewriteDocumentStyleAssetReferences(
+  document: Document,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): void {
+  for (const root of collectWebSnapshotQueryRoots(document)) {
+    for (const styleElement of root.querySelectorAll('style')) {
+      styleElement.textContent = rewriteCssAssetReferences(
+        styleElement.textContent ?? '',
+        urlsByPath,
+        assetPaths
+      );
+    }
+    for (const element of root.querySelectorAll('[style]')) {
+      element.setAttribute(
+        'style',
+        rewriteCssAssetReferences(element.getAttribute('style') ?? '', urlsByPath, assetPaths)
+      );
+    }
+  }
+}
+
+function rewriteAssetReferences(
+  source: string,
+  urlsByPath: Map<string, string>,
+  xhtml: boolean
+): string {
+  const document = new DOMParser().parseFromString(
+    source,
+    xhtml ? 'application/xhtml+xml' : 'text/html'
+  );
+  if (xhtml && document.querySelector('parsererror')) {
+    throw new Error('Web snapshot XHTML is invalid.');
+  }
+  const assetPaths = new Set(urlsByPath.keys());
+  for (const root of collectWebSnapshotQueryRoots(document)) {
+    for (const element of root.querySelectorAll('*')) {
+      rewriteElementUrlAttributes(element, urlsByPath, assetPaths);
+    }
+  }
+  rewriteDocumentStyleAssetReferences(document, urlsByPath, assetPaths);
+
+  return xhtml
+    ? serializeWebSnapshotXhtmlDocument(document)
+    : `<!doctype html>${document.documentElement.outerHTML}`;
+}
+
+function rewriteCssAssetReferences(
+  cssText: string,
+  urlsByPath: Map<string, string>,
+  assetPaths: ReadonlySet<string>
+): string {
+  return sanitizeWebSnapshotCssText(cssText, (url) => {
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.startsWith('#') || trimmedUrl.startsWith('data:')) return trimmedUrl;
+    return resolveViewerAssetReference(trimmedUrl, urlsByPath, assetPaths);
+  });
 }
 
 function getViewerEntryPath(file: JSZip.JSZipObject): string {
   const originalPath = file.unsafeOriginalName ?? file.name;
-  assertSafeWebSnapshotPackagePath(originalPath);
-  assertSafeWebSnapshotPackagePath(file.name);
+  assertSafeArchivePath(originalPath);
+  assertSafeArchivePath(file.name);
   return file.name;
 }
 
 function resolveViewerEntryByteLimit(path: string): number {
-  return path === WEB_SNAPSHOT_PACKAGE_PATHS.manifest ||
-    path === WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml ||
-    path.startsWith('logs/')
-    ? MAX_VIEWER_TEXT_ENTRY_BYTES
-    : MAX_VIEWER_ASSET_BYTES;
+  return resolveWebSnapshotEntryByteLimit(path);
 }
 
-async function readViewerPackageEntries(zip: JSZip): Promise<Map<string, Uint8Array>> {
+function inspectViewerPackageEntries(zip: JSZip): Map<string, JSZip.JSZipObject> {
   const files = Object.values(zip.files).filter((file) => !file.dir);
   assertZipPackageInflationProfile(files, {
-    assertPath: assertSafeWebSnapshotPackagePath,
+    assertPath: assertSafeArchivePath,
     createEntryError: () => new Error('Web snapshot package entry is too large.'),
     createFileCountError: () => new Error('Web snapshot package contains too many files.'),
     createTotalError: () => new Error('Web snapshot package inflated content is too large.'),
     maxFileCount: MAX_VIEWER_FILE_COUNT,
-    maxTotalBytes: MAX_VIEWER_TOTAL_INFLATED_BYTES,
+    maxTotalBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxTotalInflatedBytes,
     resolveEntryMaxBytes: resolveViewerEntryByteLimit,
   });
 
-  const bytesByPath = new Map<string, Uint8Array>();
-  let totalBytes = 0;
+  const filesByPath = new Map<string, JSZip.JSZipObject>();
   for (const file of files) {
     const path = getViewerEntryPath(file);
-    const bytes = await file.async('uint8array');
-    const entryLimit = resolveViewerEntryByteLimit(path);
-    if (bytes.byteLength > entryLimit) {
-      throw new Error('Web snapshot package entry is too large.');
+    if (filesByPath.has(path)) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
     }
-
-    totalBytes += bytes.byteLength;
-    if (totalBytes > MAX_VIEWER_TOTAL_INFLATED_BYTES) {
-      throw new Error('Web snapshot package inflated content is too large.');
-    }
-
-    bytesByPath.set(path, bytes);
+    filesByPath.set(path, file);
   }
 
   for (const requiredPath of REQUIRED_VIEWER_PACKAGE_PATHS) {
-    if (!bytesByPath.has(requiredPath)) {
+    if (!filesByPath.has(requiredPath)) {
       throw new Error('Web snapshot package is missing a required entry.');
     }
   }
 
-  return bytesByPath;
+  return filesByPath;
 }
 
-function readViewerPackageManifest(bytesByPath: Map<string, Uint8Array>): WebSnapshotManifest {
-  const manifestText = new TextDecoder().decode(
-    readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)
+async function readViewerEntry(
+  filesByPath: Map<string, JSZip.JSZipObject>,
+  path: string
+): Promise<Uint8Array> {
+  const file = filesByPath.get(path);
+  if (!file) throw new Error('Web snapshot package is missing a required entry.');
+  const bytes = await file.async('uint8array');
+  if (bytes.byteLength > resolveViewerEntryByteLimit(path)) {
+    throw new Error('Web snapshot package entry is too large.');
+  }
+  return bytes;
+}
+
+async function readViewerWebCopyEntries(
+  filesByPath: Map<string, JSZip.JSZipObject>,
+  manifest: WebSnapshotManifest
+): Promise<Map<string, Uint8Array>> {
+  const selectedPaths = manifest.entries
+    .filter(
+      (entry) =>
+        entry.component === 'webCopy' && entry.path !== WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail
+    )
+    .map((entry) => entry.path);
+  const entries = await Promise.all(
+    selectedPaths.map(async (path) => [path, await readViewerEntry(filesByPath, path)] as const)
   );
+  return new Map(entries);
+}
+
+function parseViewerPackageManifest(manifestBytes: Uint8Array): WebSnapshotManifest {
+  const manifestText = new TextDecoder().decode(manifestBytes);
   let manifest: unknown;
   try {
     manifest = JSON.parse(manifestText) as unknown;
@@ -154,21 +281,63 @@ function readRequiredViewerEntry(bytesByPath: Map<string, Uint8Array>, path: str
 }
 
 function assertCompressedViewerPackageSize(packageBlob: Blob): void {
-  if (packageBlob.size > MAX_VIEWER_COMPRESSED_PACKAGE_BYTES) {
+  if (packageBlob.size > WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes) {
     throw new Error('Web snapshot package archive is too large.');
   }
+}
+
+async function readViewerScreenshot(snapshotId: string): Promise<Blob> {
+  const screenshot = await getWebSnapshotScreenshotFile(snapshotId);
+  if (!screenshot || screenshot.size === 0) {
+    throw new Error('Web snapshot screenshot is missing.');
+  }
+  return screenshot;
 }
 
 function assertManifestMatchesRecord(args: {
   packageManifest: WebSnapshotManifest;
   recordManifest: WebSnapshotManifest;
 }): void {
-  if (
-    args.packageManifest.id !== args.recordManifest.id ||
-    args.packageManifest.schemaVersion !== args.recordManifest.schemaVersion ||
-    args.packageManifest.captureMode !== args.recordManifest.captureMode
-  ) {
+  if (JSON.stringify(args.packageManifest) !== JSON.stringify(args.recordManifest)) {
     throw new Error('Web snapshot package manifest does not match the saved record.');
+  }
+}
+
+function assertViewerInventory(
+  filesByPath: Map<string, JSZip.JSZipObject>,
+  manifest: WebSnapshotManifest
+): void {
+  if (filesByPath.size !== manifest.entries.length + 1) {
+    throw new Error('Page Package archive inventory does not match its manifest.');
+  }
+  const expectedPaths = new Set(manifest.entries.map((entry) => entry.path));
+  for (const path of filesByPath.keys()) {
+    if (path === WEB_SNAPSHOT_PACKAGE_PATHS.manifest) continue;
+    if (!expectedPaths.delete(path)) {
+      throw new Error('Page Package archive inventory does not match its manifest.');
+    }
+  }
+  if (expectedPaths.size > 0) {
+    throw new Error('Page Package archive inventory does not match its manifest.');
+  }
+}
+
+async function assertViewerWebCopyDigests(
+  bytesByPath: Map<string, Uint8Array>,
+  manifest: WebSnapshotManifest
+): Promise<void> {
+  for (const entry of manifest.entries.filter(
+    (candidate) =>
+      candidate.component === 'webCopy' && candidate.path !== WEB_SNAPSHOT_PACKAGE_PATHS.thumbnail
+  )) {
+    const bytes = bytesByPath.get(entry.path);
+    if (
+      !bytes ||
+      bytes.byteLength !== entry.size ||
+      (await hashWebSnapshotAssetBytes(bytes)) !== entry.sha256
+    ) {
+      throw new Error(`Page Package entry metadata does not match: ${entry.path}.`);
+    }
   }
 }
 
@@ -182,28 +351,76 @@ export async function loadWebSnapshotPackage(
 
   assertCompressedViewerPackageSize(record.packageFile);
   const zip = await JSZip.loadAsync(record.packageFile);
-  const bytesByPath = await readViewerPackageEntries(zip);
-  const packageManifest = readViewerPackageManifest(bytesByPath);
-  assertManifestMatchesRecord({ packageManifest, recordManifest: record.manifest });
+  const filesByPath = inspectViewerPackageEntries(zip);
+  const packageManifest = parseViewerPackageManifest(
+    await readViewerEntry(filesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)
+  );
+  const screenshotSelection = resolvePagePackageScreenshotEntry(packageManifest.entries);
+  if (!screenshotSelection || !filesByPath.has(screenshotSelection.path)) {
+    throw new Error('Web snapshot package is missing a required screenshot entry.');
+  }
+  assertManifestMatchesRecord({
+    packageManifest,
+    recordManifest: record.manifest,
+  });
+  assertViewerInventory(filesByPath, packageManifest);
+  const packageFiles = createViewerPackageFileCatalog(packageManifest);
+  const extractPackageFile = createViewerPackageFileExtractor({
+    manifest: packageManifest,
+    readEntry: (path) => readViewerEntry(filesByPath, path),
+  });
+  const bytesByPath = await readViewerWebCopyEntries(filesByPath, packageManifest);
+  await assertViewerWebCopyDigests(bytesByPath, packageManifest);
+  const screenshot = await readViewerScreenshot(snapshotId);
+  await validateRetainedWebSnapshotScreenshot({
+    packageBytes: readRequiredViewerEntry(bytesByPath, screenshotSelection.path),
+    screenshotBlob: screenshot,
+  });
 
   const assetEntries = Array.from(bytesByPath).filter(([path]) => path.startsWith('assets/'));
   const htmlBytes = readRequiredViewerEntry(bytesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml);
   const html = new TextDecoder().decode(htmlBytes);
-  const { objectUrls, urlsByPath } = await createViewerAssetObjectUrls(
+  const { assets, objectUrls, urlsByPath } = await createViewerAssetObjectUrls(
     assetEntries,
     packageManifest
   );
 
   try {
-    const sanitizedHtml = sanitizeWebSnapshotHtml(html, record.manifest.source.url);
-    const rewrittenHtml = rewriteAssetReferences(sanitizedHtml, urlsByPath);
+    const xhtml = isWebSnapshotXhtml(html);
+    const rewrittenHtml = rewriteAssetReferences(html, urlsByPath, xhtml);
+    const sanitizedDocument = xhtml
+      ? sanitizeWebSnapshotXhtml(rewrittenHtml, record.manifest.source.url, {
+          allowedObjectUrls: objectUrls,
+          offlineOnly: true,
+        })
+      : sanitizeWebSnapshotHtml(rewrittenHtml, record.manifest.source.url, {
+          allowedObjectUrls: objectUrls,
+          offlineOnly: true,
+        });
+    const documentUrl = URL.createObjectURL(
+      new Blob([withOfflineSnapshotPolicy(sanitizedDocument, xhtml)], {
+        type: xhtml ? 'application/xhtml+xml' : 'text/html',
+      })
+    );
+    objectUrls.push(documentUrl);
+    const screenshotUrl = URL.createObjectURL(screenshot);
+    objectUrls.push(screenshotUrl);
+    const archiveUrl = URL.createObjectURL(record.packageFile);
+    objectUrls.push(archiveUrl);
     return {
-      html: sanitizeWebSnapshotHtml(rewrittenHtml, record.manifest.source.url, {
-        allowedObjectUrls: objectUrls,
-        offlineOnly: true,
-      }),
+      archiveFilename: createViewerArchiveFilename(record.manifest),
+      archiveSize: record.packageFile.size,
+      archiveUrl,
+      assets,
+      documentUrl,
+      html: sanitizedDocument,
       manifest: record.manifest,
       objectUrls,
+      packageFiles,
+      extractPackageFile,
+      screenshotFilename: createViewerScreenshotFilename(record.manifest),
+      screenshotUrl,
+      screenshotCoverage: screenshotSelection.coverage,
     };
   } catch (error) {
     revokeWebSnapshotObjectUrls(objectUrls);

@@ -55,9 +55,7 @@ const popupCaptureRoutes = new Set<string>([
 const viewerCaptureRoutes = new Set<string>([
   MessageType.FETCH_WEB_SNAPSHOT_ASSET,
   MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
-  MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
-  MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
-  MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+  MessageType.STAGE_PAGE_PACKAGE_JOB_CHUNK,
   MessageType.TRIGGER_QUICK_ACTION,
 ]);
 

@@ -5,18 +5,19 @@ import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { crx } from '@crxjs/vite-plugin';
-import manifest from './manifest.json';
+import tailwindcss from '@tailwindcss/vite';
+import manifest from './manifest.json' with { type: 'json' };
 import {
   buildContentRuntime,
   buildContentRuntimeShim,
-  buildWebSnapshotInjectedRunner,
   getTraceWsUrlForMode,
   isTraceMessagesEnabledForMode,
-} from './build/injected-build';
-import { createContentRuntimeBuildId } from './build/content-runtime-build-id';
-import { extensionHtmlInputs } from './build/extension-html-inputs';
-import { createExtensionBuildLayout, extensionRollupInputs, layoutPolicy } from './build/layout';
-import { buildManifestForMode } from './build/manifest';
+  shouldEmitBuildSourcemaps,
+} from './build/injected-build.ts';
+import { createContentRuntimeBuildId } from './build/content-runtime-build-id.ts';
+import { extensionHtmlInputs } from './build/extension-html-inputs.ts';
+import { createExtensionBuildLayout, extensionRollupInputs, layoutPolicy } from './build/layout.ts';
+import { buildManifestForMode } from './build/manifest.ts';
 
 const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
 const BUILD_LAYOUT = createExtensionBuildLayout(APP_ROOT);
@@ -152,11 +153,11 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
+    tailwindcss(),
     createReactTransformPlugins(),
     crx({ manifest: buildManifestForMode(manifest, mode) }),
     buildContentRuntime(mode),
     buildContentRuntimeShim(mode),
-    buildWebSnapshotInjectedRunner(mode),
   ],
   define: buildDefines(mode),
   build: {
@@ -172,7 +173,7 @@ export default defineConfig(({ mode }) => ({
     // Vite's preload helper resolves chunk URLs against the host page inside content scripts.
     modulePreload: false,
     target: 'chrome140',
-    sourcemap: mode !== 'release',
+    sourcemap: shouldEmitBuildSourcemaps(mode),
     rollupOptions: createRollupOptions(mode),
   },
   worker: {

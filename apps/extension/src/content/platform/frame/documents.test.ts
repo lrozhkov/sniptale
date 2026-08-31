@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { mountStyleInAccessibleDocuments } from './documents';
+import { isAccessibleDocumentRuntimeStyle, mountStyleInAccessibleDocuments } from './documents';
 
 function createIframeDocument() {
   const iframe = document.createElement('iframe');
@@ -32,6 +32,9 @@ describe('mountStyleInAccessibleDocuments', () => {
 
     expect(document.getElementById('sniptale-test-style')).not.toBeNull();
     expect(iframeDoc.getElementById('sniptale-test-style')).not.toBeNull();
+    expect(
+      isAccessibleDocumentRuntimeStyle(document.getElementById('sniptale-test-style') ?? undefined)
+    ).toBe(true);
 
     cleanup();
 
@@ -52,7 +55,43 @@ describe('mountStyleInAccessibleDocuments', () => {
 
     expect(document.querySelectorAll('#sniptale-test-style')).toHaveLength(1);
     expect(existingStyle.textContent).toBe('.existing { color: blue; }');
+    expect(isAccessibleDocumentRuntimeStyle(existingStyle)).toBe(false);
 
     cleanup();
+
+    expect(document.getElementById('sniptale-test-style')).toBe(existingStyle);
+    existingStyle.remove();
+  });
+
+  it('removes the exact runtime style after a page inserts a same-ID style', () => {
+    const cleanup = mountStyleInAccessibleDocuments({
+      styleId: 'sniptale-test-style',
+      textContent: '.runtime { cursor: crosshair; }',
+    });
+    const runtimeStyle = document.getElementById('sniptale-test-style');
+    const pageStyle = document.createElement('style');
+    pageStyle.id = 'sniptale-test-style';
+    pageStyle.textContent = '.page { cursor: wait; }';
+    document.head.prepend(pageStyle);
+
+    cleanup();
+
+    expect(runtimeStyle?.isConnected).toBe(false);
+    expect(pageStyle.isConnected).toBe(true);
+    pageStyle.remove();
+  });
+
+  it('removes the exact runtime style after its ID changes', () => {
+    const cleanup = mountStyleInAccessibleDocuments({
+      styleId: 'sniptale-test-style',
+      textContent: '.runtime { cursor: crosshair; }',
+    });
+    const runtimeStyle = document.getElementById('sniptale-test-style');
+    if (!runtimeStyle) throw new Error('Expected mounted runtime style');
+    runtimeStyle.id = 'page-mutated-runtime-style';
+
+    cleanup();
+
+    expect(runtimeStyle.isConnected).toBe(false);
   });
 });

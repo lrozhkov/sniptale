@@ -104,8 +104,6 @@ export const backgroundIngressTabRouteGroups = [
     messageTypes: [
       'EXPORT_POPUP_PREVIEW',
       'EXPORT_POPUP_BUILD_PACKAGE',
-      'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-      'EXPORT_POPUP_CANCEL',
       'CONSUME_POPUP_EXPORT_LAUNCH_INTENT',
     ],
   },
@@ -231,7 +229,7 @@ export const backgroundIngressTabRouteGroups = [
     alternateAuthorizationPolicyIds: [],
     alternateAuthorityFamilies: [],
     authorizationPolicyId: 'privileged-tab-route:capture',
-    boundary: 'legacy-unreachable',
+    boundary: 'background-runtime',
     errorShape: 'tab route error response through capture/background router',
     freshnessReplayPolicy: 'resolved tab, frame, document, or capability must match',
     handlerId: 'capture',
@@ -305,11 +303,10 @@ export const backgroundIngressTabRouteGroups = [
       'screenshot capture, editor open, annotation or staged download, popup launch, gallery, or web snapshot',
     transitiveStateOwner: 'capture routing and media-hub storage owners',
     messageTypes: [
-      'SAVE_WEB_SNAPSHOT_TO_GALLERY',
       'REGISTER_WEB_SNAPSHOT_ASSETS',
       'FETCH_WEB_SNAPSHOT_ASSET',
-      'STAGE_WEB_SNAPSHOT_BLOB_CHUNK',
-      'RELEASE_WEB_SNAPSHOT_STAGED_BLOBS',
+      'STAGE_PAGE_PACKAGE_JOB_CHUNK',
+      'WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED',
     ],
   },
   {

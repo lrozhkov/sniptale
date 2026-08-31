@@ -1,6 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import { routeCaptureMessage } from './index';
 import { createScenarioSessionServiceStub } from '../../../../../../tooling/test/support/scenario-session-service.stub';
 
@@ -13,14 +12,11 @@ const {
   handleFullCaptureMock,
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
-  handleReleaseWebSnapshotStagedBlobsMock,
   handleRequestExportHarStartCapabilityMock,
   handleReleaseRecordingDownloadMock,
   handleSaveRecordingForDownloadMock,
   handleSaveScreenshotToGalleryMock,
-  handleSaveWebSnapshotToGalleryMock,
   handleStageRecordingDownloadChunkMock,
-  handleStageWebSnapshotBlobChunkMock,
   handleTriggerQuickActionMock,
   handleVisibleCaptureForCropMock,
   handleVisibleCaptureMock,
@@ -33,14 +29,11 @@ const {
   handleFullCaptureMock: vi.fn(),
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
-  handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
   handleRequestExportHarStartCapabilityMock: vi.fn(),
   handleReleaseRecordingDownloadMock: vi.fn(),
   handleSaveRecordingForDownloadMock: vi.fn(),
   handleSaveScreenshotToGalleryMock: vi.fn(),
-  handleSaveWebSnapshotToGalleryMock: vi.fn(),
   handleStageRecordingDownloadChunkMock: vi.fn(),
-  handleStageWebSnapshotBlobChunkMock: vi.fn(),
   handleTriggerQuickActionMock: vi.fn(),
   handleVisibleCaptureForCropMock: vi.fn(),
   handleVisibleCaptureMock: vi.fn(),
@@ -85,9 +78,6 @@ vi.mock('./actions.quick-action', () => ({
 vi.mock('./actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
   handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
-  handleReleaseWebSnapshotStagedBlobs: handleReleaseWebSnapshotStagedBlobsMock,
-  handleSaveWebSnapshotToGallery: handleSaveWebSnapshotToGalleryMock,
-  handleStageWebSnapshotBlobChunk: handleStageWebSnapshotBlobChunkMock,
 }));
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: browserTabsGetMock },
@@ -115,28 +105,6 @@ function routeMessage(
   return { routed, sendResponse };
 }
 
-function createWebSnapshotManifest(): WebSnapshotManifest {
-  return {
-    captureMode: 'readOnlyNoScripts',
-    capturedAt: '2026-06-08T00:00:00.000Z',
-    id: 'snapshot-session-1',
-    paths: {
-      computedStyles: 'logs/css/computed-styles.json',
-      domSnapshot: 'logs/dom.html',
-      errors: 'logs/errors.log',
-      manifest: 'manifest.json',
-      screenshot: 'page-screenshot.png',
-      snapshotHtml: 'snapshot/index.html',
-      stylesheets: 'logs/css/stylesheets.json',
-      virtualDomSnapshot: 'logs/virtual-dom.html',
-    },
-    schemaVersion: 1,
-    source: { faviconUrl: null, title: 'Example', url: 'https://example.test' },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 1 },
-    warnings: [],
-  };
-}
-
 function mockRoutesAsHandled(...mocks: Array<ReturnType<typeof vi.fn>>) {
   mocks.forEach((mock) => mock.mockReturnValue(true));
 }
@@ -155,9 +123,8 @@ beforeEach(() => {
     handleExportStopHarMock
   );
   mockRoutesAsHandled(handleFetchWebSnapshotAssetMock, handleOpenEditorWithImageMock);
-  mockRoutesAsHandled(handleRegisterWebSnapshotAssetsMock, handleReleaseWebSnapshotStagedBlobsMock);
+  mockRoutesAsHandled(handleRegisterWebSnapshotAssetsMock);
   mockRoutesAsHandled(handleSaveRecordingForDownloadMock, handleSaveScreenshotToGalleryMock);
-  mockRoutesAsHandled(handleSaveWebSnapshotToGalleryMock, handleStageWebSnapshotBlobChunkMock);
   mockRoutesAsHandled(handleTriggerQuickActionMock);
   mockRoutesAsHandled(handleVisibleCaptureForCropMock, handleVisibleCaptureMock);
 });
@@ -166,7 +133,7 @@ it('routes registered web snapshot asset fetches to the capture action owner', (
   const { routed, sendResponse } = routeMessage({
     type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
     snapshotSessionId: 'snapshot-session-1',
-    url: 'https://upload.wikimedia.org/example.svg',
+    urls: ['https://assets.example.test/example.svg'],
   });
 
   expect(routed).toBe(true);
@@ -174,24 +141,7 @@ it('routes registered web snapshot asset fetches to the capture action owner', (
     {
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
       snapshotSessionId: 'snapshot-session-1',
-      url: 'https://upload.wikimedia.org/example.svg',
-    },
-    42,
-    sendResponse
-  );
-});
-
-it('routes owner-bound staged blob release to the capture action owner', () => {
-  const { routed, sendResponse } = routeMessage({
-    type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
-    snapshotSessionId: 'snapshot-session-1',
-  });
-
-  expect(routed).toBe(true);
-  expect(handleReleaseWebSnapshotStagedBlobsMock).toHaveBeenCalledWith(
-    {
-      type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
-      snapshotSessionId: 'snapshot-session-1',
+      urls: ['https://assets.example.test/example.svg'],
     },
     42,
     sendResponse
@@ -223,28 +173,14 @@ it('routes editor and screenshot gallery messages through the shared helper bran
   );
 });
 
-it('routes web snapshot messages through the shared helper branch', () => {
-  const saveSnapshot = routeMessage({
-    type: MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
-    manifest: createWebSnapshotManifest(),
-    packageStagedBlobId: 'package-stage-1',
-    screenshotMimeType: 'image/png',
-    screenshotStagedBlobId: 'screenshot-stage-1',
-    snapshotSessionId: 'snapshot-session-1',
-  });
+it('routes Web-copy asset registration through the shared helper branch', () => {
   const registerAssets = routeMessage({
     type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
     assetUrls: ['https://cdn.example.com/image.png'],
     requestId: 'req-web',
   });
 
-  expect(saveSnapshot.routed).toBe(true);
   expect(registerAssets.routed).toBe(true);
-  expect(handleSaveWebSnapshotToGalleryMock).toHaveBeenCalledWith(
-    expect.objectContaining({ packageStagedBlobId: 'package-stage-1' }),
-    42,
-    saveSnapshot.sendResponse
-  );
   expect(handleRegisterWebSnapshotAssetsMock).toHaveBeenCalledWith(
     expect.objectContaining({ assetUrls: ['https://cdn.example.com/image.png'] }),
     42,

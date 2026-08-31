@@ -183,5 +183,9 @@ function configureGalleryOwnerMocks(
     setScrollTop: vi.fn(),
     setViewportHeight: vi.fn(),
     viewportHeight: 768,
+    webSnapshotImport: {
+      inputRef: { current: null },
+      triggerRef: { current: null },
+    },
   });
 }

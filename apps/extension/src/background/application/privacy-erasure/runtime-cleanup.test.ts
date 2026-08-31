@@ -2,11 +2,17 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   disableScreenshotMode: vi.fn(),
+  erasePagePackageJobState: vi.fn(),
   getQuickActionTabIds: vi.fn(),
   getSessionTabIds: vi.fn(),
   hasOwnerLease: vi.fn(),
   readJournal: vi.fn(),
   releaseOwners: vi.fn(),
+}));
+
+vi.mock('../../capture/page-package/job', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/page-package/job')>()),
+  erasePopupExportJobState: mocks.erasePagePackageJobState,
 }));
 
 vi.mock('../../capture/quick-actions/flow/surface', async (importOriginal) => ({
@@ -38,6 +44,7 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.disableScreenshotMode.mockResolvedValue(undefined);
+  mocks.erasePagePackageJobState.mockResolvedValue(undefined);
   mocks.getQuickActionTabIds.mockReturnValue([]);
   mocks.getSessionTabIds.mockReturnValue([]);
   mocks.hasOwnerLease.mockReturnValue(false);

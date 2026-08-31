@@ -5,6 +5,12 @@ import type { GallerySurfaceController } from './controller-types';
 
 export type GalleryBusyAction = (action: () => Promise<void>) => Promise<void>;
 
+class GalleryUserFacingActionError extends Error {}
+
+export function createGalleryUserFacingActionError(message: string): Error {
+  return new GalleryUserFacingActionError(message);
+}
+
 type GalleryConfirmDialogController = {
   actions: {
     surface: Pick<GallerySurfaceController['actions']['surface'], 'setConfirmDialog'>;
@@ -35,15 +41,26 @@ export function openGalleryConfirmDialog(
 
 export function createBusyActionRunner({ actions }: Pick<GallerySurfaceController, 'actions'>) {
   return async (action: () => Promise<void>) => {
-    actions.surface.setIsBusy(true);
+    const releaseOperation = actions.surface.beginBlockingOperation();
     try {
       await action();
     } catch (error) {
-      actions.surface.setBanner(error instanceof Error ? error.message : String(error));
+      if (isUserCancellation(error)) return;
+      actions.surface.setBanner(
+        error instanceof GalleryUserFacingActionError
+          ? error.message
+          : translate('gallery.app.actionFailed')
+      );
     } finally {
-      actions.surface.setIsBusy(false);
+      releaseOperation();
     }
   };
+}
+
+function isUserCancellation(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : error instanceof Error && error.name === 'AbortError';
 }
 
 export function downloadBlob(
@@ -82,10 +99,8 @@ function trackBlobDownloadCleanup(
         .then(release)
         .catch((error: unknown) => onReleaseError?.(error));
   };
-  if (!tracksTerminalState) {
-    timeoutId = window.setTimeout(cleanup, 1000);
-    return;
-  }
+  timeoutId = window.setTimeout(cleanup, tracksTerminalState ? 24 * 60 * 60 * 1000 : 1000);
+  if (!tracksTerminalState) return;
 
   unsubscribeCreated = browserDownloads.subscribeToCreated((item) => {
     if (item.url !== url && item.finalUrl !== url) return;
@@ -110,5 +125,7 @@ export async function copyImageBlob(blob: Blob): Promise<void> {
 }
 
 export function createMissingBlobError(filename: string): Error {
-  return new Error(`${translate('gallery.app.missingBlobPrefix')} ${filename}.`);
+  return new GalleryUserFacingActionError(
+    `${translate('gallery.app.missingBlobPrefix')} ${filename}.`
+  );
 }

@@ -54,12 +54,36 @@ it('uses one viewport tile when neither axis overflows', () => {
 
 it('rejects an oversized raster before allocating a tile plan', () => {
   expect(() => createFullPageTilePlan(geometry(70_000, 600))).toThrow(
-    'Full-page screenshot exceeds raster memory or dimension limits'
+    'Full-page screenshot exceeds the configured quality limits'
   );
 });
 
+it('applies a custom minimum scale and raster size to the same tile planner', () => {
+  expect(() =>
+    createFullPageTilePlan(geometry(50_000, 600), {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 75,
+      profile: 'custom',
+    })
+  ).toThrow('Full-page screenshot exceeds the configured quality limits');
+  expect(() =>
+    createFullPageTilePlan(geometry(50_000, 600), {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'custom',
+    })
+  ).not.toThrow();
+});
+
 it('rejects hostile 2D geometry before materializing its cartesian product', () => {
-  expect(() => createFullPageTilePlan(geometry(10_000, 10_000, 65, 65))).toThrow(
-    'Full-page screenshot requires too many raster tiles'
-  );
+  expect(() =>
+    createFullPageTilePlan(geometry(10_000, 10_000, 65, 65), {
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 50,
+      profile: 'custom',
+    })
+  ).toThrow('Full-page screenshot requires too many raster tiles');
 });

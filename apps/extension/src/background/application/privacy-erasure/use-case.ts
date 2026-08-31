@@ -36,6 +36,16 @@ export class PrivacyErasureUseCase {
     const popupExportExclusion = this.ports.popupExport.reserveErasureExclusion();
     const execution = this.executionQueue.then(async () => {
       try {
+        try {
+          await this.ports.popupExport.cancelActiveJob();
+        } catch {
+          return createShortCircuitedErasureResult([
+            createFailedCleanupParticipant(
+              'page-package-job-runtime-state',
+              'page-package-cancel-failed'
+            ),
+          ]);
+        }
         await Promise.all([
           mediaExclusion.waitForActiveMutations(),
           diagnosticsExclusion.waitForActiveMutations(),

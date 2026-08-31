@@ -14,7 +14,15 @@ build/
 !tooling/build/shims/**
 !apps/extension/build/
 !apps/extension/build/**
+!tooling/qa/composition/build/
+!tooling/qa/composition/build/**
+!tooling/qa/proof/build/
+!tooling/qa/proof/build/**
+!tooling/qa/wrappers/build/
+!tooling/qa/wrappers/build/**
 coverage/
+!tooling/qa/proof/coverage/
+!tooling/qa/proof/coverage/**
 
 
 # Logs

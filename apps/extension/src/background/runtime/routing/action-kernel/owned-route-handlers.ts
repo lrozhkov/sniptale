@@ -10,7 +10,7 @@ import { routeAiSettingsNavigationMessage } from '../../../ai/settings/navigatio
 import { routePageAccessMessage } from '../../../page-access/route';
 import { routeNativeAppRuntimeMessage } from '../../native-app/route';
 import { routeContentRuntimeWakeupMessage } from '../../page-access/wakeup-route';
-import { routePopupExportJobMessage } from '../../../capture/popup-export/job/route';
+import { routePagePackageJobMessage } from '../../../capture/page-package/job/route';
 import { routeLocalDataErasureMessage } from '../../../application/privacy-erasure/route';
 import { routeSettingsTransferMessage } from '../../../application/settings-transfer/route';
 import { routePopupTabRouteCapabilityRequest } from '../capabilities/popup-tab/route-capabilities';
@@ -90,7 +90,7 @@ export function dispatchBackgroundOwnedRoute(
 
 function routePopupExportJobAction(action: BackgroundOwnedAction): ActionResult | null {
   return keepOpen(
-    routePopupExportJobMessage(action.message, action.context.sendResponse, {
+    routePagePackageJobMessage(action.message, action.context.sendResponse, {
       cancelPagePackage: cancelPopupExportPagePackage,
       requestPagePackage: requestPopupExportPagePackage,
     })

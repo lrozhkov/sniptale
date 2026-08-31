@@ -3,7 +3,14 @@ import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
 import { translate } from '../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type { GalleryItem } from '../library/items';
+import {
+  isGalleryMediaItem,
+  isGalleryScenarioExportItem,
+  isGalleryScenarioItem,
+  isGalleryVideoProjectItem,
+  type GalleryItem,
+  type GalleryMediaItem,
+} from '../library/items';
 import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
 
 interface UseGalleryLibraryStateOptions {
@@ -100,7 +107,153 @@ function areGalleryItemsEquivalent(left: GalleryItem[], right: GalleryItem[]): b
     return false;
   }
 
-  return left.every((item, index) => JSON.stringify(item) === JSON.stringify(right[index]));
+  return left.every((item, index) => areGalleryItemsUiEquivalent(item, right[index]));
+}
+
+function areStringArraysEqual(
+  left: readonly string[] | undefined,
+  right: readonly string[] | undefined
+) {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function areLifecyclesEqual(left: GalleryItem['lifecycle'], right: GalleryItem['lifecycle']) {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      left.savedAt === right.savedAt &&
+      left.storageClass === right.storageClass &&
+      left.updatedAt === right.updatedAt)
+  );
+}
+
+function areRecordingGroupMembersEqual(
+  left: GalleryMediaItem['recordingGroup'],
+  right: GalleryMediaItem['recordingGroup']
+) {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      left.groupId === right.groupId &&
+      left.order === right.order &&
+      left.role === right.role &&
+      left.sourceFavicon === right.sourceFavicon &&
+      left.sourceLabel === right.sourceLabel &&
+      left.sourceUrl === right.sourceUrl &&
+      left.dimensions?.height === right.dimensions?.height &&
+      left.dimensions?.width === right.dimensions?.width)
+  );
+}
+
+function areRecordingGroupViewsEqual(
+  left: GalleryMediaItem['recordingGroupView'],
+  right: GalleryMediaItem['recordingGroupView']
+) {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      areRecordingGroupMembersEqual(left, right) &&
+      left.memberCount === right.memberCount &&
+      left.projectId === right.projectId &&
+      left.projectName === right.projectName)
+  );
+}
+
+function areMediaSourcesEqual(left: GalleryMediaItem['source'], right: GalleryMediaItem['source']) {
+  if (left.kind !== right.kind) return false;
+  switch (left.kind) {
+    case 'recording':
+      return right.kind === left.kind && left.recordingId === right.recordingId;
+    case 'project-export':
+      return (
+        right.kind === left.kind &&
+        left.exportId === right.exportId &&
+        left.projectId === right.projectId
+      );
+    case 'project-asset':
+      return right.kind === left.kind && left.projectAssetId === right.projectAssetId;
+    case 'web-snapshot':
+      return right.kind === left.kind && left.snapshotId === right.snapshotId;
+    case 'screenshot':
+      return true;
+  }
+}
+
+function areGalleryItemBaseFieldsEqual(left: GalleryItem, right: GalleryItem) {
+  return (
+    left.id === right.id &&
+    left.entityId === right.entityId &&
+    left.type === right.type &&
+    left.kind === right.kind &&
+    left.filename === right.filename &&
+    left.originalFilename === right.originalFilename &&
+    left.createdAt === right.createdAt &&
+    left.updatedAt === right.updatedAt &&
+    left.expiresAt === right.expiresAt &&
+    left.size === right.size &&
+    left.mimeType === right.mimeType &&
+    left.width === right.width &&
+    left.height === right.height &&
+    left.duration === right.duration &&
+    left.hasThumbnail === right.hasThumbnail &&
+    left.imageContentState === right.imageContentState &&
+    left.presentationRevision === right.presentationRevision &&
+    left.workspaceRevision === right.workspaceRevision &&
+    left.sourceUrl === right.sourceUrl &&
+    left.sourceTitle === right.sourceTitle &&
+    left.sourceFavicon === right.sourceFavicon &&
+    areStringArraysEqual(left.tags, right.tags) &&
+    areLifecyclesEqual(left.lifecycle, right.lifecycle)
+  );
+}
+
+function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | undefined): boolean {
+  if (!right || !areGalleryItemBaseFieldsEqual(left, right)) return false;
+  if (isGalleryMediaItem(left)) {
+    return (
+      isGalleryMediaItem(right) &&
+      areMediaSourcesEqual(left.source, right.source) &&
+      areRecordingGroupMembersEqual(left.recordingGroup, right.recordingGroup) &&
+      areRecordingGroupViewsEqual(left.recordingGroupView, right.recordingGroupView)
+    );
+  }
+  if (isGalleryScenarioItem(left)) {
+    return (
+      isGalleryScenarioItem(right) &&
+      left.project.id === right.project.id &&
+      left.project.name === right.project.name &&
+      left.project.updatedAt === right.project.updatedAt &&
+      left.project.workspaceRevision === right.project.workspaceRevision
+    );
+  }
+  if (isGalleryScenarioExportItem(left)) {
+    return (
+      isGalleryScenarioExportItem(right) &&
+      left.format === right.format &&
+      left.exportEntry.id === right.exportEntry.id &&
+      left.exportEntry.projectId === right.exportEntry.projectId &&
+      left.exportEntry.createdAt === right.exportEntry.createdAt &&
+      left.project.id === right.project.id &&
+      left.project.updatedAt === right.project.updatedAt
+    );
+  }
+  return (
+    isGalleryVideoProjectItem(left) &&
+    isGalleryVideoProjectItem(right) &&
+    left.thumbnailSourceMediaId === right.thumbnailSourceMediaId &&
+    left.unavailableReason === right.unavailableReason &&
+    left.project.id === right.project.id &&
+    left.project.updatedAt === right.project.updatedAt &&
+    left.project.clipCount === right.project.clipCount &&
+    left.project.trackCount === right.project.trackCount &&
+    left.project.retentionKind === right.project.retentionKind &&
+    areStringArraysEqual(left.project.recordingIds, right.project.recordingIds)
+  );
 }
 
 function useGalleryLibrarySubscriptions({

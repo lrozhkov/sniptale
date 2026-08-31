@@ -104,7 +104,7 @@ export const backgroundIngressVideoRouteGroups = [
     boundary: 'background-runtime',
     errorShape: 'project export authorization or route error response',
     freshnessReplayPolicy: 'capability binds job, project, owner document/url, purpose, and TTL',
-    handlerId: 'video-runtime',
+    handlerId: 'project-export-runtime',
     keepChannelBehaviorSource: 'video-runtime-project-export-authority',
     ownerModule:
       'apps/extension/src/background/media/video/runtime/handlers/export/project-export.ts',
@@ -126,7 +126,7 @@ export const backgroundIngressVideoRouteGroups = [
     boundary: 'background-runtime',
     errorShape: 'project export capability issuance error response',
     freshnessReplayPolicy: 'active ledger owner and requested project/job identity gate issuance',
-    handlerId: 'video-runtime',
+    handlerId: 'project-export-capabilities',
     keepChannelBehaviorSource: 'video-runtime-router-result',
     ownerModule:
       'apps/extension/src/background/media/video/runtime/handlers/export/project-export.ts',

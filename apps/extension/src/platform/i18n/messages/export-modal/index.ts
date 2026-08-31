@@ -126,7 +126,7 @@ export const exportModalMessages = defineMessageSource({
     en: 'Cancelled',
   },
   cancelledByUserError: {
-    ru: 'Экспорт отменён пользователем',
-    en: 'Export was cancelled by the user',
+    ru: 'Экспорт отменён',
+    en: 'Export cancelled',
   },
 });

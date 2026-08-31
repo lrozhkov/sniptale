@@ -7,57 +7,106 @@ vi.mock('../infrastructure/browser-storage', () => ({
 }));
 
 import {
-  DEFAULT_POPUP_EXPORT_PREFERENCES,
+  DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES,
   loadPopupExportPreferences,
-  savePopupExportPreferences,
+  loadPopupPagePackagePreferences,
+  savePopupPagePackagePreferences,
 } from './index';
 
 beforeEach(() => vi.clearAllMocks());
 
-it('parses partial preferences and falls back on read failure', async () => {
+it('uses independent current defaults and does not read the legacy key', async () => {
+  getMock.mockResolvedValueOnce({
+    sniptale_popup_export_preferences: { includeJson: false },
+  });
+
+  await expect(loadPopupPagePackagePreferences()).resolves.toEqual(
+    DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES
+  );
+  expect(getMock).toHaveBeenCalledWith(['sniptale_popup_page_package_preferences']);
+});
+
+it('round-trips the exact current schema and projects download artifacts for context menu', async () => {
+  const preferences = {
+    export: {
+      ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export,
+      includeFullPageScreenshot: true,
+      includeWebCopy: true,
+    },
+    save: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save, includeJson: true },
+  };
   getMock
     .mockResolvedValueOnce({
-      sniptale_popup_export_preferences: {
-        includeAnnotations: true,
-        includeFiles: false,
-        includeMarkdown: false,
+      sniptale_popup_page_package_preferences: {
+        schemaVersion: 1,
+        ...preferences,
       },
     })
-    .mockRejectedValueOnce(new Error('unavailable'));
-
-  await expect(loadPopupExportPreferences()).resolves.toEqual({
-    ...DEFAULT_POPUP_EXPORT_PREFERENCES,
-    includeAnnotations: true,
-    includeFiles: false,
-    includeMarkdown: false,
-  });
-  await expect(loadPopupExportPreferences()).resolves.toEqual(DEFAULT_POPUP_EXPORT_PREFERENCES);
-});
-
-it('persists preferences and rejects failed writes', async () => {
-  const preferences = { ...DEFAULT_POPUP_EXPORT_PREFERENCES, includeBasicLogs: true };
-  setMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('quota'));
-
-  await expect(savePopupExportPreferences(preferences)).resolves.toBeUndefined();
-  await expect(savePopupExportPreferences(preferences)).rejects.toThrow('quota');
-  expect(setMock).toHaveBeenCalledWith({ sniptale_popup_export_preferences: preferences });
-});
-
-it('drops invalid stored roots and fields without mutating defaults', async () => {
-  getMock
-    .mockResolvedValueOnce({ sniptale_popup_export_preferences: undefined })
-    .mockResolvedValueOnce({ sniptale_popup_export_preferences: null })
     .mockResolvedValueOnce({
-      sniptale_popup_export_preferences: {
-        includeFiles: 'yes',
-        includeImages: false,
+      sniptale_popup_page_package_preferences: {
+        schemaVersion: 1,
+        ...preferences,
       },
     });
 
-  await expect(loadPopupExportPreferences()).resolves.toEqual(DEFAULT_POPUP_EXPORT_PREFERENCES);
-  await expect(loadPopupExportPreferences()).resolves.toEqual(DEFAULT_POPUP_EXPORT_PREFERENCES);
-  await expect(loadPopupExportPreferences()).resolves.toEqual({
-    ...DEFAULT_POPUP_EXPORT_PREFERENCES,
-    includeImages: false,
+  await expect(loadPopupPagePackagePreferences()).resolves.toEqual(preferences);
+  await expect(loadPopupExportPreferences()).resolves.toEqual(
+    expect.not.objectContaining({ includeWebCopy: expect.anything() })
+  );
+});
+
+it('rejects malformed, partial, and incomplete Library Web-copy selections', async () => {
+  getMock
+    .mockResolvedValueOnce({ sniptale_popup_page_package_preferences: { schemaVersion: 1 } })
+    .mockResolvedValueOnce({
+      sniptale_popup_page_package_preferences: {
+        schemaVersion: 1,
+        export: DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export,
+        save: { ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save, includeWebCopy: false },
+      },
+    })
+    .mockResolvedValueOnce({
+      sniptale_popup_page_package_preferences: {
+        schemaVersion: 1,
+        export: DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.export,
+        save: {
+          ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save,
+          includeFullPageScreenshot: false,
+        },
+      },
+    });
+
+  await expect(loadPopupPagePackagePreferences()).resolves.toEqual(
+    DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES
+  );
+  await expect(loadPopupPagePackagePreferences()).resolves.toEqual(
+    DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES
+  );
+  await expect(loadPopupPagePackagePreferences()).resolves.toEqual(
+    DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES
+  );
+});
+
+it('persists the versioned schema and surfaces write failures', async () => {
+  const preferences = DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES;
+  setMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('quota'));
+
+  await expect(savePopupPagePackagePreferences(preferences)).resolves.toBeUndefined();
+  expect(setMock).toHaveBeenCalledWith({
+    sniptale_popup_page_package_preferences: { schemaVersion: 1, ...preferences },
   });
+  await expect(savePopupPagePackagePreferences(preferences)).rejects.toThrow('quota');
+});
+
+it('refuses to persist a Library selection without its required screenshot', async () => {
+  await expect(
+    savePopupPagePackagePreferences({
+      ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES,
+      save: {
+        ...DEFAULT_POPUP_PAGE_PACKAGE_PREFERENCES.save,
+        includeFullPageScreenshot: false,
+      },
+    })
+  ).rejects.toThrow('must include the full-page screenshot');
+  expect(setMock).not.toHaveBeenCalled();
 });

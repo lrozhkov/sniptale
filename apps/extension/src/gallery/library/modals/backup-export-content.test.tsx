@@ -64,6 +64,7 @@ function createLocalSummary(): MediaHubLocalBackupSummary {
       drafts: false,
       mediaAssets: true,
       recordings: true,
+      savedViews: true,
       scenarioProjects: true,
       sourceMetadata: true,
       telemetry: true,
@@ -72,6 +73,7 @@ function createLocalSummary(): MediaHubLocalBackupSummary {
       webSnapshots: true,
     },
     recordingCount: 3,
+    savedViewCount: 2,
     scenarioProjectCount: 1,
     selectedCount: 0,
     sourceMetadataCount: 4,
@@ -156,6 +158,7 @@ it('renders backup disclosure counts and requires an explicit export click', asy
   );
   expect(container?.textContent).toContain('gallery.backupExportModal.classMedia');
   expect(container?.textContent).toContain('gallery.backupExportModal.classTelemetry');
+  expect(container?.textContent).toContain('gallery.backupExportModal.classSavedViews');
   expect(container?.textContent).toContain('5');
   expect(container?.textContent).toContain('4');
   expect(container?.textContent).toContain('3');

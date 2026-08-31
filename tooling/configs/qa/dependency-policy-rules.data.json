@@ -6,10 +6,10 @@
   "installScriptApprovals": [
     {
       "packageName": "@ast-grep/cli",
-      "resolvedVersion": "0.42.1",
+      "resolvedVersion": "0.45.1",
       "dependencyScope": "direct-development",
       "artifactInclusion": "development-only",
-      "reason": "Pinned AST analysis CLI installs its platform binary during local QA setup.",
+      "reason": "Pinned AST analysis CLI links or copies its locked optional platform binary during local QA setup without downloading or executing another process.",
       "approvalOwner": "repository-owner",
       "expiresOn": "2027-07-12"
     },
@@ -24,8 +24,8 @@
     },
     {
       "packageName": "esbuild",
-      "resolvedVersion": "0.28.1",
-      "dependencyScope": "transitive-development",
+      "resolvedVersion": "0.28.2",
+      "dependencyScope": "direct-development",
       "artifactInclusion": "development-only",
       "reason": "Pinned build tool installs its platform binary during local development setup.",
       "approvalOwner": "repository-owner",
@@ -59,7 +59,5 @@
       "approvalOwner": "repository-owner",
       "expiresOn": "2027-07-12"
     }
-  ],
-  "licensePolicyPath": "tooling/configs/qa/licenses.json",
-  "workspaceIdentity": "root:sniptale"
+  ]
 }

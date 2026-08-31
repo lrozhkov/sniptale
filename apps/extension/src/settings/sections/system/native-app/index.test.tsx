@@ -8,9 +8,20 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import type { NativeAppRuntimeStatus } from '../../../../contracts/native-app/runtime';
 
 const mocks = vi.hoisted(() => ({
+  containsPermission: vi.fn(),
   loadVideoSettings: vi.fn(),
   mutateVideoSettings: vi.fn(),
+  requestPermission: vi.fn(),
   sendRuntimeMessage: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: {
+    contains: mocks.containsPermission,
+    request: mocks.requestPermission,
+    subscribeToAdded: () => vi.fn(),
+    subscribeToRemoved: () => vi.fn(),
+  },
 }));
 
 vi.mock('../../../../composition/persistence/capture-settings', async (importOriginal) => ({
@@ -33,6 +44,8 @@ let root: Root | null = null;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
+  mocks.containsPermission.mockResolvedValue(true);
+  mocks.requestPermission.mockResolvedValue(true);
   mocks.mutateVideoSettings.mockImplementation(async (mutation) =>
     mutation(DEFAULT_VIDEO_SETTINGS)
   );
@@ -134,6 +147,29 @@ it('sends native runtime actions from the status panel', async () => {
     button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ operation: 'reconnect' })
+  );
+});
+
+it('hides native tabs and actions until optional access is granted', async () => {
+  mocks.containsPermission.mockResolvedValueOnce(false);
+  await renderSection('telemetry');
+
+  expect(container?.textContent).toContain('Разрешите доступ к приложению Sniptale');
+  expect(container?.textContent).not.toContain('Данные действий');
+  expect(container?.querySelector('[role="tablist"]')).toBeNull();
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+
+  const allowButton = [...(container?.querySelectorAll('button') ?? [])].find((item) =>
+    item.textContent?.includes('Разрешить доступ')
+  );
+  await act(async () => {
+    allowButton?.click();
+    await Promise.resolve();
+  });
+
+  expect(mocks.requestPermission).toHaveBeenCalledWith({ permissions: ['nativeMessaging'] });
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
     expect.objectContaining({ operation: 'reconnect' })
   );

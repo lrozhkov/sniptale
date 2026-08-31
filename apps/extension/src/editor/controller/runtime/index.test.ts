@@ -7,7 +7,6 @@ import type { EditorViewportState } from '../../../features/editor/document/type
 const storeState = {
   browserFrame: { title: 'Browser frame' },
   frame: { padding: 12 },
-  setCropReady: vi.fn(),
   syncRuntime: vi.fn(),
 };
 
@@ -92,6 +91,7 @@ it('syncs runtime state with selected object details and history metadata', () =
   );
   expect(storeState.syncRuntime).toHaveBeenCalledWith({
     browserFrame: storeState.browserFrame,
+    cropReady: true,
     cropSelection: { height: 10, left: 0, top: 0, width: 10 },
     frame: storeState.frame,
     history: { canRedo: true, canUndo: true, index: 2, size: 5 },
@@ -110,7 +110,6 @@ it('syncs runtime state with selected object details and history metadata', () =
     },
     viewport,
   });
-  expect(storeState.setCropReady).toHaveBeenCalledWith(true);
 });
 
 it('syncs the selected rich shape source label for toolbar and inspector metadata', () => {
@@ -149,6 +148,7 @@ it('falls back to empty history state and schedules zoom via nested animation fr
 
   expect(storeState.syncRuntime).toHaveBeenCalledWith(
     expect.objectContaining({
+      cropReady: false,
       history: { canRedo: false, canUndo: false, index: 0, size: 1 },
       selection: {
         hasSelection: false,
@@ -164,7 +164,6 @@ it('falls back to empty history state and schedules zoom via nested animation fr
       },
     })
   );
-  expect(storeState.setCropReady).toHaveBeenCalledWith(false);
   expect(requestAnimationFrameMock).toHaveBeenCalledTimes(2);
   expect(callback).toHaveBeenCalledOnce();
 

@@ -4,11 +4,6 @@ import path from 'node:path';
 
 import { parseRunRecord } from '../qa/runtime/observability/schema.mjs';
 import { createFastGateInputDigest, FAST_GATE_INPUT_POLICY_PATH } from './fast-gate-inputs.mjs';
-import {
-  MUTATION_EVIDENCE_FILES,
-  MUTATION_PROFILES,
-  resolveMutationRunLabel,
-} from './mutation-policy.mjs';
 
 const root = process.cwd();
 const OUTPUT_ROOT = 'build/ci-artifacts';
@@ -56,8 +51,9 @@ function readProofSemanticsPolicy(repositoryRoot) {
     policy.invariants?.resourceProfileAffectsReuseCompatibility !== false ||
     policy.reuseCompatibility?.authority !== 'environment-profile' ||
     policy.invariants?.fastGateNeverClaimsReleaseReadiness !== true ||
-    policy.invariants?.fullVitestOwnedByFastGate !== true ||
-    policy.invariants?.releaseProvenanceRequiresFastProof !== true ||
+    policy.invariants?.fastGateFullVitestOwner !== 'unit-tests' ||
+    policy.invariants?.releaseGateFullVitestOwner !== 'full-product-coverage' ||
+    policy.invariants?.releaseProvenanceAcceptsFastProofReuse !== true ||
     JSON.stringify(policy.invariants?.diffAwareWrappersExactly) !==
       JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout']) ||
     policy.invariants?.ciGatesAreRepositoryWide !== true ||
@@ -155,30 +151,6 @@ function copyTree(source, destinationRoot, options = {}) {
   return copied;
 }
 
-export function collectMutationEvidence({
-  destinationRoot,
-  environment = process.env,
-  notBeforeMs,
-  repositoryRoot = root,
-  required,
-}) {
-  const runLabel = resolveMutationRunLabel(environment);
-  let copied = 0;
-  for (const profile of MUTATION_PROFILES) {
-    for (const file of MUTATION_EVIDENCE_FILES) {
-      const source = `.tmp/mutation/${profile}/${runLabel}/${file}`;
-      const present = copyFile(source, destinationRoot, source, {
-        ignoreStale: !required,
-        notBeforeMs,
-        repositoryRoot,
-      });
-      if (present) copied += 1;
-      else if (required) throw new Error(`Required mutation evidence is missing: ${source}`);
-    }
-  }
-  return copied;
-}
-
 function copyExternalFile(source, destinationRoot, destination) {
   const details = fs.lstatSync(source);
   if (!details.isFile() || details.isSymbolicLink()) throw new Error(`Unsafe artifact: ${source}`);
@@ -249,25 +221,18 @@ function newestReleaseArchive(startedAtMs, repositoryRoot = root) {
 
 const LANE_FILES = {
   proof: [
-    '.tmp/qa/build-proof.json',
     '.tmp/qa/unit-proof.json',
-    '.tmp/semgrep/results.json',
-    '.tmp/semgrep/results.sarif',
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
-    '.tmp/npm-audit/results.json',
     '.tmp/npm-audit/signatures.json',
   ],
   release: [
     '.tmp/qa/build-proof.json',
-    '.tmp/qa/unit-proof.json',
     '.tmp/qa/codeql-proof.json',
     '.tmp/qa/coverage-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
     '.tmp/coverage/canonical/coverage-summary.json',
     '.tmp/coverage/canonical/lcov.info',
-    '.tmp/semgrep/results.json',
-    '.tmp/semgrep/results.sarif',
     '.tmp/codeql/results.filtered.sarif',
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
@@ -278,14 +243,7 @@ const LANE_FILES = {
   ],
 };
 
-const REUSABLE_FAST_REPORTS = new Set([
-  '.tmp/qa/unit-proof.json',
-  '.tmp/npm-audit/results.json',
-  '.tmp/npm-audit/signatures.json',
-  '.tmp/osv/results.json',
-  '.tmp/semgrep/results.json',
-  '.tmp/semgrep/results.sarif',
-]);
+const REUSABLE_FAST_REPORTS = new Set(['.tmp/npm-audit/signatures.json']);
 
 export function copyReusableFastReport(
   file,
@@ -358,13 +316,6 @@ function collectLaneReports({
     if (required && !copied) {
       throw new Error('Required coverage HTML is missing.');
     }
-    collectMutationEvidence({
-      destinationRoot,
-      environment: process.env,
-      notBeforeMs: startedAtMs,
-      repositoryRoot,
-      required,
-    });
     if (process.env.SNIPTALE_REUSE_FAST_PROOF === '1') {
       const proofPath = path.join(
         process.env.SNIPTALE_FAST_PROOF_PATH ?? '',
@@ -374,7 +325,7 @@ function collectLaneReports({
       copyExternalFile(proofPath, destinationRoot, 'fast-proof/proof-manifest.json');
     }
   }
-  if ((lane === 'release' || lane === 'proof') && required) {
+  if (lane === 'release' && required) {
     copyFile(newestReleaseArchive(startedAtMs, repositoryRoot), destinationRoot, undefined, {
       repositoryRoot,
     });

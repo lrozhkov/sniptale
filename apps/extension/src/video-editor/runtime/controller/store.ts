@@ -13,8 +13,28 @@ import type {
   VideoEditorProjectStorageStatus,
 } from '../../contracts/controller-store';
 import { useVideoEditorStore, type VideoEditorState } from '../../state/store';
+import { resolveSelectedClipId } from '../../contracts/selection';
 
 type PortSelector<Port, Selection> = (port: Port) => Selection;
+
+const projectHistoryStatusByState = new WeakMap<
+  VideoEditorState['projectHistory'],
+  HistoryPort['projectHistoryStatus']
+>();
+
+function selectProjectHistoryStatus(
+  projectHistory: VideoEditorState['projectHistory']
+): HistoryPort['projectHistoryStatus'] {
+  const cached = projectHistoryStatusByState.get(projectHistory);
+  if (cached) return cached;
+  const status = {
+    canUndo: projectHistory.transaction === null && projectHistory.past.length > 0,
+    canRedo: projectHistory.transaction === null && projectHistory.future.length > 0,
+    error: projectHistory.error,
+  };
+  projectHistoryStatusByState.set(projectHistory, status);
+  return status;
+}
 
 function usePort<Port, Selection>(
   selectPort: (state: VideoEditorState) => Port,
@@ -92,7 +112,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
 
 function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
   return {
-    selectedClipId: state.selectedClipId,
+    selectedClipId: resolveSelectedClipId(state.selection),
     selectedTrackId: state.selectedTrackId,
     selection: state.selection,
     selectActionSegment: state.selectActionSegment,
@@ -139,11 +159,7 @@ function selectHistoryPort(state: VideoEditorState): HistoryPort {
     endProjectHistoryTransaction: state.endProjectHistoryTransaction,
     isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
     projectHistoryTransactionActive: state.projectHistory.transaction !== null,
-    projectHistoryStatus: {
-      canUndo: state.projectHistory.transaction === null && state.projectHistory.past.length > 0,
-      canRedo: state.projectHistory.transaction === null && state.projectHistory.future.length > 0,
-      error: state.projectHistory.error,
-    },
+    projectHistoryStatus: selectProjectHistoryStatus(state.projectHistory),
     redoProject: state.redoProject,
     undoProject: state.undoProject,
   };
@@ -286,7 +302,7 @@ export function getCurrentVideoEditorCurrentTime(): number {
 }
 
 export function getCurrentVideoEditorSelectedClipId(): string | null {
-  return useVideoEditorStore.getState().selectedClipId;
+  return resolveSelectedClipId(useVideoEditorStore.getState().selection);
 }
 
 export function getCurrentVideoEditorExportStateSnapshot() {

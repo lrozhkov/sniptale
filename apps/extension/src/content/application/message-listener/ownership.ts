@@ -18,7 +18,6 @@ type UiRuntimeBridgeMessageType =
   | MessageType.COPY_TEXT_TO_CLIPBOARD
   | MessageType.EXPORT_POPUP_PREVIEW
   | MessageType.EXPORT_POPUP_BUILD_PACKAGE
-  | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
   | MessageType.EXPORT_POPUP_CANCEL
   | VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER
   | VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
@@ -65,7 +64,6 @@ const uiRuntimeBridgeMessageTypes = new Set<UiRuntimeBridgeMessageType>([
   MessageType.COPY_TEXT_TO_CLIPBOARD,
   MessageType.EXPORT_POPUP_PREVIEW,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-  MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,
   VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER,
   VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER,

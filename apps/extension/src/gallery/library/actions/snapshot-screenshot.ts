@@ -5,6 +5,7 @@ import { buildEditorUrl } from '../../../platform/navigation/extension-pages/edi
 import type { GalleryPreviewController } from './controller-types';
 import { isGalleryMediaItem } from '../items';
 import { createMissingBlobError, type GalleryBusyAction } from './shared';
+import { validateWebSnapshotScreenshotBlob } from '../../../features/web-snapshot/screenshot-validation';
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,6 +32,7 @@ export async function openSnapshotScreenshotInEditor(
     if (!screenshotBlob) {
       throw createMissingBlobError(previewItem.filename);
     }
+    await validateWebSnapshotScreenshotBlob(screenshotBlob);
     const bootstrapId = await persistPendingEditorBootstrapPayload({
       dataUrl: await blobToDataUrl(screenshotBlob),
       sourceFaviconUrl: previewItem.sourceFavicon,

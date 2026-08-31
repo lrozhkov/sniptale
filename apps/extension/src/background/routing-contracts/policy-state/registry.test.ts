@@ -31,6 +31,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'offscreen-command-capability-generations',
   'offscreen-media-activity-lease',
   'page-access-tab-activation',
+  'page-package-download-leases',
   'persistent-data-erasure-lease',
   'popup-export-erasure-exclusion',
   'popup-export-jobs',
@@ -45,7 +46,6 @@ const EXPECTED_POLICY_STATE_IDS = [
   'video-recording-control-lease',
   'video-recording-surface-lease',
   'voice-input-port-session-authority',
-  'web-snapshot-staged-blobs',
 ] as const satisfies readonly PolicyStateId[];
 
 function collectDuplicateIds(): PolicyStateId[] {

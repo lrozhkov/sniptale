@@ -103,11 +103,11 @@ function parseCoreDomain(
     }
     case 'capture.viewport-presets':
     case 'capture.image':
+    case 'capture.pages':
     case 'capture.after-capture':
     case 'capture.saving':
     case 'capture.retention':
-    case 'system.voice':
-    case 'access.capture-assets': {
+    case 'system.voice': {
       const storageShape = mainSettingsStorageShape(domainId, value);
       const parsed = parseStoredSettings(storageShape);
       if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)
@@ -278,7 +278,16 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
     case 'capture.viewport-presets':
       return { viewportPresets: value['items'], defaultViewportPresetId: value['defaultId'] };
     case 'capture.image':
-      return { imageFormat: value['format'], imageQuality: value['quality'] };
+      return {
+        imageFormat: value['format'],
+        imageQuality: value['quality'],
+        fullPageQuality: value['fullPageQuality'],
+      };
+    case 'capture.pages':
+      return {
+        exportResourceLimits: value['resourceLimits'],
+        pagePackageCaptureTiming: value['timing'],
+      };
     case 'capture.after-capture':
       return { captureAction: value['action'] };
     case 'capture.saving':
@@ -293,11 +302,6 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
     case 'system.voice':
       return {
         voiceInput: { language: value['language'], mode: value['mode'], microphoneDeviceId: null },
-      };
-    case 'access.capture-assets':
-      return {
-        authenticatedSnapshotAssetsEnabled: value['authenticated'],
-        anonymousCrossOriginSnapshotAssetsEnabled: value['anonymous'],
       };
     default:
       return value;
@@ -319,6 +323,16 @@ function coreSettingsTransferData(
       return {
         ...(source['format'] === undefined ? {} : { format: parsed.imageFormat }),
         ...(source['quality'] === undefined ? {} : { quality: parsed.imageQuality }),
+        ...(source['fullPageQuality'] === undefined
+          ? {}
+          : { fullPageQuality: parsed.fullPageQuality }),
+      };
+    case 'capture.pages':
+      return {
+        ...(source['resourceLimits'] === undefined
+          ? {}
+          : { resourceLimits: parsed.exportResourceLimits }),
+        ...(source['timing'] === undefined ? {} : { timing: parsed.pagePackageCaptureTiming }),
       };
     case 'capture.after-capture':
       return source['action'] === undefined ? {} : { action: parsed.captureAction };
@@ -344,15 +358,6 @@ function coreSettingsTransferData(
             ...(source['language'] === undefined ? {} : { language: parsed.voiceInput?.language }),
             ...(source['mode'] === undefined ? {} : { mode: parsed.voiceInput?.mode }),
           };
-    case 'access.capture-assets':
-      return {
-        ...(source['authenticated'] === undefined
-          ? {}
-          : { authenticated: parsed.authenticatedSnapshotAssetsEnabled }),
-        ...(source['anonymous'] === undefined
-          ? {}
-          : { anonymous: parsed.anonymousCrossOriginSnapshotAssetsEnabled }),
-      };
     default:
       return failSettingsTransferDomain(domainId);
   }

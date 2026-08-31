@@ -16,6 +16,8 @@ it('preserves locale and theme preferences in preserve mode', () => {
   window.localStorage.setItem('sniptale-locale-preference', 'en');
   window.localStorage.setItem('sniptale.popup.trace', '1');
   window.localStorage.setItem('sniptale:trace:namespaces', 'ContentToolbarEventDelivery');
+  window.localStorage.setItem('sniptale.gallery.filters', '{"version":1}');
+  window.localStorage.setItem('sniptale.gallery.facet-disclosures', '[]');
 
   const removed = eraseExtensionPageLocalStorage(window.localStorage, {
     preservePreferences: true,
@@ -26,6 +28,8 @@ it('preserves locale and theme preferences in preserve mode', () => {
   );
   expect(window.localStorage.getItem('sniptale-theme-preference')).toBe('dark');
   expect(window.localStorage.getItem('sniptale-locale-preference')).toBe('en');
+  expect(window.localStorage.getItem('sniptale.gallery.filters')).toBe('{"version":1}');
+  expect(window.localStorage.getItem('sniptale.gallery.facet-disclosures')).toBe('[]');
   expect(
     verifyExtensionPageLocalStorageErased(window.localStorage, { preservePreferences: true })
   ).toBe(true);
@@ -34,11 +38,15 @@ it('preserves locale and theme preferences in preserve mode', () => {
 it('removes locale and theme preferences in factory reset mode', () => {
   window.localStorage.setItem('sniptale-theme-preference', 'dark');
   window.localStorage.setItem('sniptale-locale-preference', 'en');
+  window.localStorage.setItem('sniptale.gallery.filters', '{"version":1}');
+  window.localStorage.setItem('sniptale.gallery.facet-disclosures', '[]');
 
   eraseExtensionPageLocalStorage(window.localStorage, { preservePreferences: false });
 
   expect(window.localStorage.getItem('sniptale-theme-preference')).toBeNull();
   expect(window.localStorage.getItem('sniptale-locale-preference')).toBeNull();
+  expect(window.localStorage.getItem('sniptale.gallery.filters')).toBeNull();
+  expect(window.localStorage.getItem('sniptale.gallery.facet-disclosures')).toBeNull();
   expect(
     verifyExtensionPageLocalStorageErased(window.localStorage, { preservePreferences: false })
   ).toBe(true);

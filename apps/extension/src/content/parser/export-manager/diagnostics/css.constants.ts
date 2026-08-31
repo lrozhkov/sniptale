@@ -21,20 +21,32 @@ export const COMPUTED_STYLE_TARGET_SELECTORS = [
   'textarea',
   'select',
   'img',
+  'svg',
+  '[class*="icon" i]',
+  '[class*="glyph" i]',
+  '[data-sniptale-annotation]',
 ] as const;
 
 export type StylesheetMetadata = {
   disabled: boolean;
   href: string | null;
+  id: string;
   media: string[];
   owner: Record<string, unknown> | null;
-  path: string;
   restricted: boolean;
   ruleCount: number | null;
   source: 'document' | 'adopted';
+  scope?: string;
 };
 
 export type ComputedStyleSnapshot = {
+  matchedRules?: Array<{
+    active: boolean | null;
+    media: string | null;
+    properties: Record<string, { important: boolean; value: string }>;
+    selector: string;
+    stylesheet: string | null;
+  }>;
   elementRef: string;
   path: string;
   rect: {
@@ -44,5 +56,6 @@ export type ComputedStyleSnapshot = {
     y: number;
   };
   styles: Record<string, string>;
+  pseudoElements?: Partial<Record<'after' | 'before', Record<string, string>>>;
   tagName: string;
 };

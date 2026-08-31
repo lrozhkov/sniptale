@@ -72,6 +72,7 @@ function listUuidMappings(result: Awaited<ReturnType<typeof downloadFileResource
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -83,7 +84,7 @@ it('downloads files, deduplicates inferred filenames, and tracks available uuids
     if (url === firstResource.url) {
       expect(init).toEqual({
         credentials: 'include',
-        signal: undefined,
+        signal: expect.any(AbortSignal),
       });
 
       return createResponse('alpha', {
@@ -125,7 +126,7 @@ it('falls back to binary extensions and forwards the abort signal', async () => 
   installFetchMock(async (url, init) => {
     expect(init).toEqual({
       credentials: 'include',
-      signal: controller.signal,
+      signal: expect.any(AbortSignal),
     });
 
     if (url === imageResource.url) {
@@ -233,6 +234,33 @@ it('blocks cross-origin credentialed downloads before issuing the request', asyn
   ]);
 });
 
+it('prevents passive page images from automatically following redirects', async () => {
+  const resource: FileResource = {
+    filename: 'image.png',
+    source: 'page-image',
+    url: 'https://example.com/redirect-to-cdn',
+  };
+  const fetchMock = installFetchMock(async (_url, init) => {
+    expect(init).toEqual({
+      credentials: 'include',
+      redirect: 'manual',
+      signal: expect.any(AbortSignal),
+    });
+    return new Response(null, { status: 302, statusText: 'Found' });
+  });
+
+  const result = await downloadFileResources(
+    [resource],
+    undefined,
+    () => false,
+    () => undefined
+  );
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.files.size).toBe(0);
+  expect(result.errors).toEqual(['Failed to download image.png: HTTP 302: Found']);
+});
+
 it('returns empty collections when the input queue is empty', async () => {
   const progress = vi.fn();
 
@@ -244,6 +272,48 @@ it('returns empty collections when the input queue is empty', async () => {
     urlUuidToFilename: new Map(),
   });
   expect(progress).not.toHaveBeenCalled();
+});
+
+it('admits only the configured number of resources before starting downloads', async () => {
+  const fetchMock = installFetchMock(async () => createResponse('ok'));
+  const resources = [
+    createResource('https://example.com/first.bin', 'first.bin'),
+    createResource('https://example.com/second.bin', 'second.bin'),
+  ];
+
+  const result = await downloadFileResources(
+    resources,
+    undefined,
+    () => false,
+    () => undefined,
+    undefined,
+    { maxFileCount: 1, maxFileSizeMiB: 10, maxTotalSizeMiB: 10 }
+  );
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(listFileNames(result)).toEqual(['first.bin']);
+  expect(result.errors).toEqual(['Skipped 1 files: attachment count limit exceeded']);
+});
+
+it('skips a downloaded resource that would exceed the configured total', async () => {
+  installFetchMock(async () => new Response('x'.repeat(6 * 1024 * 1024)));
+  const resources = [
+    createResource('https://example.com/first.bin', 'first.bin'),
+    createResource('https://example.com/second.bin', 'second.bin'),
+  ];
+
+  const result = await downloadFileResources(
+    resources,
+    undefined,
+    () => false,
+    () => undefined,
+    undefined,
+    { maxFileCount: 10, maxFileSizeMiB: 10, maxTotalSizeMiB: 10 }
+  );
+
+  expect(result.files.size).toBe(1);
+  expect(result.errors).toHaveLength(1);
+  expect(result.errors[0]).toContain('Total attachment size limit exceeded');
 });
 
 it('does not start a new queued download after cancellation flips in flight', async () => {
@@ -285,4 +355,50 @@ it('does not start a new queued download after cancellation flips in flight', as
   expect(fetchMock).not.toHaveBeenCalledWith(fourthResource.url, expect.anything());
   expect(listFileNames(result)).toEqual(['first.txt', 'second.txt', 'third.txt']);
   expect(progress).toHaveBeenCalledTimes(3);
+});
+
+it('bounds an unresponsive file request and continues the export with a warning', async () => {
+  vi.useFakeTimers();
+  const hangingResource = createResource('https://example.com/hanging', 'hanging.bin');
+  const progress = vi.fn();
+  installFetchMock(
+    async (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      })
+  );
+
+  const resultPromise = downloadFileResources([hangingResource], undefined, () => false, progress);
+  await vi.advanceTimersByTimeAsync(15_000);
+  const result = await resultPromise;
+
+  expect(result.files.size).toBe(0);
+  expect(result.errors).toEqual(['Failed to download hanging.bin: Download timed out']);
+  expect(progress).toHaveBeenCalledWith(1, 1);
+});
+
+it('settles the complete file collection when several worker queues remain unresponsive', async () => {
+  vi.useFakeTimers();
+  const resources = Array.from({ length: 12 }, (_, index) =>
+    createResource(`https://example.com/hanging-${index}`, `hanging-${index}.bin`)
+  );
+  installFetchMock(
+    async (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      })
+  );
+
+  const resultPromise = downloadFileResources(
+    resources,
+    undefined,
+    () => false,
+    () => undefined
+  );
+  await vi.advanceTimersByTimeAsync(45_000);
+  const result = await resultPromise;
+
+  expect(result.files.size).toBe(0);
+  expect(result.errors.join(' ')).toContain('export file time budget exceeded');
+  expect(result.errors).toHaveLength(10);
 });

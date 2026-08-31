@@ -8,6 +8,8 @@ import {
 } from './helpers';
 import type { ScenarioProject } from '../../../../../features/scenario/contracts/types/project';
 
+const MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES = 40;
+
 type ScenarioProjectHistoryActionArgs = {
   latestSnapshotRef: MutableRefObject<ScenarioProjectHistorySnapshot | null>;
   setHistoryState: Dispatch<SetStateAction<ScenarioProjectHistoryState>>;
@@ -33,7 +35,10 @@ function useScenarioEditorProjectUndoAction(args: ScenarioProjectHistoryActionAr
       });
 
       return {
-        future: [cloneHistorySnapshot(currentSnapshot), ...current.future],
+        future: [cloneHistorySnapshot(currentSnapshot), ...current.future].slice(
+          0,
+          MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES
+        ),
         past: current.past.slice(0, -1),
       };
     });
@@ -58,7 +63,9 @@ function useScenarioEditorProjectRedoAction(args: ScenarioProjectHistoryActionAr
 
       return {
         future: current.future.slice(1),
-        past: [...current.past, cloneHistorySnapshot(currentSnapshot)],
+        past: [...current.past, cloneHistorySnapshot(currentSnapshot)].slice(
+          -MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES
+        ),
       };
     });
   }, [args]);

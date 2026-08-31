@@ -2,6 +2,7 @@ import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dial
 import { BackupExportModalContent } from '../../library/modals/backup-export-content';
 import { ImportConflictModalContent } from '../../library/modals/import-conflict-content';
 import { MediaImportConflictModalContent } from '../../library/modals/media-import-conflict-content';
+import { WebSnapshotImportModalContent } from '../../library/modals/web-snapshot-import-content';
 import { PreviewPanel } from '../../library/preview';
 import { isGalleryMediaItem } from '../../library/items';
 import type { GalleryAppLayoutProps } from './types';
@@ -53,6 +54,23 @@ function GalleryMediaImportOverlay(
       fileCount={pending.files.length}
       onClose={props.onPendingMediaImportClose}
       onImport={props.onMediaImportConfirm}
+    />
+  );
+}
+
+function GalleryWebSnapshotImportOverlay(
+  props: Pick<
+    GalleryAppLayoutProps,
+    'onPendingWebSnapshotImportClose' | 'onWebSnapshotImportConfirm' | 'state'
+  >
+) {
+  const pending = props.state.storage.pendingWebSnapshotImport;
+  if (!pending) return null;
+  return (
+    <WebSnapshotImportModalContent
+      pending={pending}
+      onClose={props.onPendingWebSnapshotImportClose ?? (() => undefined)}
+      onImport={props.onWebSnapshotImportConfirm ?? (async () => undefined)}
     />
   );
 }
@@ -211,6 +229,7 @@ export function GalleryOverlays(props: GalleryAppLayoutProps) {
       <GalleryBackupExportOverlay {...props} />
       <GalleryImportOverlay {...props} />
       <GalleryMediaImportOverlay {...props} />
+      <GalleryWebSnapshotImportOverlay {...props} />
       <GalleryPreviewOverlay {...props} />
     </>
   );

@@ -1,18 +1,27 @@
 import { formatWebSnapshotWarningUrl } from './asset-session';
 import { fetchAssetUrl } from './asset-fetch';
+import { sanitizeWebSnapshotCssText } from '../../../features/web-snapshot/public';
 import { MAX_WEB_SNAPSHOT_ASSET_BYTES, MAX_WEB_SNAPSHOT_ASSETS_BYTES } from './limits';
 import { parseSrcset, serializeSrcset, type AssetTarget } from './asset-targets';
 import type { WebSnapshotAssetEntry } from './types';
+import {
+  createWebSnapshotLocalAssetReference,
+  resolveWebSnapshotAssetRequestUrl,
+} from './asset-url';
 
 interface AssetByteBudget {
   totalBytes: number;
 }
+
+export type CapturedAssetCache = Map<string, WebSnapshotAssetEntry | null>;
+export type DeferredCssAssetRewrites = Map<Element, Map<string, string | null>>;
 
 export type WebSnapshotAssetContext = {
   baseUrl: string;
   pageOrigin: string;
 };
 type FetchSameOriginAssetBlob = (resolved: URL) => Promise<Blob>;
+type AnonymousCrossOriginAssets = ReadonlyMap<string, Blob | Error>;
 
 function throwIfAssetCaptureAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -41,9 +50,10 @@ function pushAssetBudgetWarning(
 function skipAssetBecauseBudgetExceeded(
   target: AssetTarget,
   warnings: string[],
-  baseUrl: string
+  baseUrl: string,
+  deferredCssAssetRewrites?: DeferredCssAssetRewrites
 ): void {
-  removeFailedAssetReference(target);
+  removeFailedAssetReference(target, deferredCssAssetRewrites);
   pushAssetBudgetWarning(warnings, target.url, 'web snapshot asset budget exceeded', baseUrl);
 }
 
@@ -67,6 +77,7 @@ function acceptAssetWithinBudget(
 
 async function fetchSnapshotAsset(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: AnonymousCrossOriginAssets;
   assetIndex: number;
   context: WebSnapshotAssetContext;
   fetchSameOriginAssetBlob: FetchSameOriginAssetBlob;
@@ -75,6 +86,7 @@ async function fetchSnapshotAsset(args: {
 }): Promise<WebSnapshotAssetEntry> {
   return fetchAssetUrl({
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
+    anonymousCrossOriginAssets: args.anonymousCrossOriginAssets,
     baseUrl: args.context.baseUrl,
     fetchSameOriginAssetBlob: args.fetchSameOriginAssetBlob,
     index: args.assetIndex,
@@ -99,6 +111,7 @@ function pushAssetCaptureWarning(
 
 async function captureSrcsetAssets(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: AnonymousCrossOriginAssets;
   budget: AssetByteBudget;
   context: WebSnapshotAssetContext;
   fetchSameOriginAssetBlob: FetchSameOriginAssetBlob;
@@ -132,7 +145,11 @@ async function captureSrcsetAssets(args: {
       if (!acceptAssetWithinBudget(asset, args.budget, args.warnings)) {
         continue;
       }
-      candidate.url = `../${asset.localPath}`;
+      candidate.url = createWebSnapshotLocalAssetReference(
+        asset.localPath,
+        candidate.url,
+        args.context.baseUrl
+      );
       assets.push(asset);
     } catch (error) {
       throwIfAssetCaptureAborted(args.abortSignal);
@@ -149,7 +166,57 @@ async function captureSrcsetAssets(args: {
   return { assets, nextIndex: args.startIndex + candidates.length };
 }
 
-function removeFailedAssetReference(target: AssetTarget): void {
+function rewriteCssAssetReference(target: AssetTarget, replacement: string | null): void {
+  const isStyleElement = target.element.tagName.toLowerCase() === 'style';
+  const cssText = isStyleElement
+    ? (target.element.textContent ?? '')
+    : (target.element.getAttribute('style') ?? '');
+  const rewritten = sanitizeWebSnapshotCssText(cssText, (url) =>
+    url === target.url ? replacement : url
+  );
+  if (isStyleElement) target.element.textContent = rewritten;
+  else target.element.setAttribute('style', rewritten);
+}
+
+function deferCssAssetReference(
+  target: AssetTarget,
+  replacement: string | null,
+  deferredCssAssetRewrites?: DeferredCssAssetRewrites
+): boolean {
+  if (target.attribute !== 'css-url' || !deferredCssAssetRewrites) return false;
+  const replacements =
+    deferredCssAssetRewrites.get(target.element) ?? new Map<string, string | null>();
+  replacements.set(target.url, replacement);
+  deferredCssAssetRewrites.set(target.element, replacements);
+  return true;
+}
+
+export function flushDeferredCssAssetRewrites(
+  deferredCssAssetRewrites: DeferredCssAssetRewrites
+): void {
+  for (const [element, replacements] of deferredCssAssetRewrites) {
+    const isStyleElement = element.tagName.toLowerCase() === 'style';
+    const cssText = isStyleElement
+      ? (element.textContent ?? '')
+      : (element.getAttribute('style') ?? '');
+    const rewritten = sanitizeWebSnapshotCssText(cssText, (url) =>
+      replacements.has(url) ? (replacements.get(url) ?? null) : url
+    );
+    if (isStyleElement) element.textContent = rewritten;
+    else element.setAttribute('style', rewritten);
+  }
+  deferredCssAssetRewrites.clear();
+}
+
+function removeFailedAssetReference(
+  target: AssetTarget,
+  deferredCssAssetRewrites?: DeferredCssAssetRewrites
+): void {
+  if (deferCssAssetReference(target, null, deferredCssAssetRewrites)) return;
+  if (target.attribute === 'css-url') {
+    rewriteCssAssetReference(target, null);
+    return;
+  }
   const linkConstructor = target.element.ownerDocument.defaultView?.HTMLLinkElement;
   const isLinkElement = linkConstructor
     ? target.element instanceof linkConstructor
@@ -163,8 +230,35 @@ function removeFailedAssetReference(target: AssetTarget): void {
   target.element.removeAttribute(target.attribute);
 }
 
+function applyCapturedAssetReference(
+  target: AssetTarget,
+  asset: WebSnapshotAssetEntry,
+  baseUrl: string,
+  deferredCssAssetRewrites?: DeferredCssAssetRewrites
+): void {
+  const replacement = createWebSnapshotLocalAssetReference(asset.localPath, target.url, baseUrl);
+  if (deferCssAssetReference(target, replacement, deferredCssAssetRewrites)) return;
+  if (target.attribute === 'css-url') {
+    rewriteCssAssetReference(target, replacement);
+  } else {
+    target.element.setAttribute(target.attribute, replacement);
+  }
+}
+
+function applyRejectedAsset(args: {
+  capturedAssetsByUrl: CapturedAssetCache;
+  deferredCssAssetRewrites?: DeferredCssAssetRewrites;
+  resolvedUrl: string;
+  target: AssetTarget;
+}): null {
+  args.capturedAssetsByUrl.set(args.resolvedUrl, null);
+  removeFailedAssetReference(args.target, args.deferredCssAssetRewrites);
+  return null;
+}
+
 async function captureSingleAsset(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: AnonymousCrossOriginAssets;
   assetIndex: number;
   budget: AssetByteBudget;
   context: WebSnapshotAssetContext;
@@ -173,26 +267,60 @@ async function captureSingleAsset(args: {
   target: AssetTarget;
   warnings: string[];
   abortSignal?: AbortSignal | undefined;
+  capturedAssetsByUrl: CapturedAssetCache;
+  deferredCssAssetRewrites?: DeferredCssAssetRewrites;
 }): Promise<WebSnapshotAssetEntry | null> {
   throwIfAssetCaptureAborted(args.abortSignal);
+  const resolvedUrl = resolveWebSnapshotAssetRequestUrl(args.target.url, args.context.baseUrl);
+  if (args.capturedAssetsByUrl.has(resolvedUrl)) {
+    const cachedAsset = args.capturedAssetsByUrl.get(resolvedUrl) ?? null;
+    if (cachedAsset) {
+      applyCapturedAssetReference(
+        args.target,
+        cachedAsset,
+        args.context.baseUrl,
+        args.deferredCssAssetRewrites
+      );
+    } else {
+      applyRejectedAsset({
+        capturedAssetsByUrl: args.capturedAssetsByUrl,
+        resolvedUrl,
+        target: args.target,
+      });
+    }
+    return null;
+  }
   try {
     const asset = await fetchSnapshotAsset({ ...args, url: args.target.url });
     if (!acceptAssetWithinBudget(asset, args.budget, args.warnings)) {
-      removeFailedAssetReference(args.target);
-      return null;
+      return applyRejectedAsset({
+        capturedAssetsByUrl: args.capturedAssetsByUrl,
+        resolvedUrl,
+        target: args.target,
+      });
     }
-    args.target.element.setAttribute(args.target.attribute, `../${asset.localPath}`);
+    args.capturedAssetsByUrl.set(resolvedUrl, asset);
+    applyCapturedAssetReference(
+      args.target,
+      asset,
+      args.context.baseUrl,
+      args.deferredCssAssetRewrites
+    );
     return asset;
   } catch (error) {
     throwIfAssetCaptureAborted(args.abortSignal);
-    removeFailedAssetReference(args.target);
     pushAssetCaptureWarning(args.warnings, args.target.url, args.context.baseUrl, error);
-    return null;
+    return applyRejectedAsset({
+      capturedAssetsByUrl: args.capturedAssetsByUrl,
+      resolvedUrl,
+      target: args.target,
+    });
   }
 }
 
 export async function captureAssetTarget(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: AnonymousCrossOriginAssets;
   assets: WebSnapshotAssetEntry[];
   budget: AssetByteBudget;
   context: WebSnapshotAssetContext;
@@ -202,6 +330,8 @@ export async function captureAssetTarget(args: {
   target: AssetTarget;
   warnings: string[];
   abortSignal?: AbortSignal | undefined;
+  capturedAssetsByUrl: CapturedAssetCache;
+  deferredCssAssetRewrites?: DeferredCssAssetRewrites;
 }): Promise<number> {
   throwIfAssetCaptureAborted(args.abortSignal);
   if (args.target.attribute === 'srcset') {
@@ -214,11 +344,19 @@ export async function captureAssetTarget(args: {
   }
 
   if (!hasAssetBudgetCapacity(args.budget)) {
-    skipAssetBecauseBudgetExceeded(args.target, args.warnings, args.context.baseUrl);
+    skipAssetBecauseBudgetExceeded(
+      args.target,
+      args.warnings,
+      args.context.baseUrl,
+      args.deferredCssAssetRewrites
+    );
     return args.nextAssetIndex + 1;
   }
 
-  const asset = await captureSingleAsset({ ...args, assetIndex: args.nextAssetIndex });
+  const asset = await captureSingleAsset({
+    ...args,
+    assetIndex: args.nextAssetIndex,
+  });
   if (asset) {
     args.assets.push(asset);
   }

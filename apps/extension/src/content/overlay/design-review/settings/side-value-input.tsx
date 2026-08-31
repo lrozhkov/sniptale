@@ -181,7 +181,7 @@ function SideLengthUnit({ unit }: { unit: string }) {
     <span
       aria-hidden="true"
       className={[
-        'pointer-events-none absolute right-7 top-1/2 -translate-y-1/2',
+        'pointer-events-none absolute right-7 top-1/2 translate-x-0 -translate-y-1/2',
         'text-[10px] font-semibold text-[var(--sniptale-color-text-dim)]',
       ].join(' ')}
     >
@@ -200,7 +200,7 @@ function SideLengthStepper(props: {
   return (
     <div
       className={[
-        'absolute right-1 top-1/2 grid h-6 w-4 -translate-y-1/2 overflow-hidden rounded-[6px]',
+        'absolute right-1 top-1/2 grid h-6 w-4 translate-x-0 -translate-y-1/2 overflow-hidden rounded-[6px]',
         'border border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
         'opacity-0 transition-opacity',
         'group-hover/side-number:opacity-100 group-focus-within/side-number:opacity-100',

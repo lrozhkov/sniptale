@@ -5,11 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveReusableCodeqlProofHostPaths } from './codeql-proof-host.mjs';
-import { resolveReusableCoverageProofHostPaths } from './coverage-proof-host.mjs';
 import { selectReusableFastProof } from './fast-proof-reuse.mjs';
-import { resolveReusableUnitProofHostPath } from './unit-proof-host.mjs';
-import { resolveReusableBuildProofHostPaths } from './build-proof-host.mjs';
+import {
+  resolveReusableBuildProofHostPaths,
+  resolveReusableCodeqlProofHostPaths,
+  resolveReusableCoverageProofHostPaths,
+  resolveReusableUnitProofHostPath,
+} from './proof-host-inputs.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 import { validateCandidateImageEnvironment } from './container-command.mjs';
 import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
@@ -155,26 +157,16 @@ if (reuseAllowed && process.env.SNIPTALE_FAST_PROOF_PATH && !reusableFastProof) 
     'Reusable Fast proof is incompatible; running the complete Fast prerequisite on this runner.\n'
   );
 }
-if (reusableFastProof) {
-  const destination = path.join(root, 'build', path.basename(reusableFastProof.archivePath));
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.copyFileSync(reusableFastProof.archivePath, destination, fs.constants.COPYFILE_EXCL);
-}
-
-const unitProofHostPath = reuseAllowed
-  ? resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH)
-  : null;
-const buildProofHostPaths = reusableFastProof
-  ? {
-      proof: reusableFastProof.buildProofPath,
-      archive: reusableFastProof.archivePath,
-    }
-  : reuseAllowed
-    ? resolveReusableBuildProofHostPaths({
-        proofPath: process.env.SNIPTALE_BUILD_PROOF_PATH,
-        archivePath: process.env.SNIPTALE_BUILD_ARCHIVE_PATH,
-      })
+const unitProofHostPath =
+  lane === 'proof' && reuseAllowed
+    ? resolveReusableUnitProofHostPath(process.env.SNIPTALE_UNIT_PROOF_PATH)
     : null;
+const buildProofHostPaths = reuseAllowed
+  ? resolveReusableBuildProofHostPaths({
+      proofPath: process.env.SNIPTALE_BUILD_PROOF_PATH,
+      archivePath: process.env.SNIPTALE_BUILD_ARCHIVE_PATH,
+    })
+  : null;
 const codeqlProofHostPaths = reuseAllowed
   ? resolveReusableCodeqlProofHostPaths({
       proofPath: process.env.SNIPTALE_CODEQL_PROOF_PATH,
@@ -187,7 +179,12 @@ const coverageProofHostPaths = reuseAllowed
       reportsPath: process.env.SNIPTALE_COVERAGE_REPORTS_PATH,
     })
   : null;
-if (reuseAllowed && process.env.SNIPTALE_UNIT_PROOF_PATH && !unitProofHostPath) {
+if (
+  lane === 'proof' &&
+  reuseAllowed &&
+  process.env.SNIPTALE_UNIT_PROOF_PATH &&
+  !unitProofHostPath
+) {
   process.stderr.write('Reusable unit proof is unavailable; running the complete unit suite.\n');
 }
 if (

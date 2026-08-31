@@ -2,8 +2,8 @@
  * Deterministic dependency-boundary gate powered by dependency-cruiser.
  */
 
-import { runDependencyGraphCheck } from '../../core/dependency-graph-runner.mjs';
-import { isExecutedAsScript } from '../../core/shared.mjs';
+import { runDependencyGraphCheck } from '../../analysis/dependency-graph/dependency-graph-runner.mjs';
+import { isExecutedAsScript } from '../../runtime/process/shared-cli.mjs';
 
 export async function runBoundaryCheck(options = {}) {
   const result = await runDependencyGraphCheck(options);

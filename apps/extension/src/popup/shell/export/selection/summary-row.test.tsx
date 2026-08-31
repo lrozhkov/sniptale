@@ -28,3 +28,10 @@ it('uses the visible label as the title fallback', () => {
 
   expect(markup).toContain('title="Images"');
 });
+
+it('does not expose a remove action for required summary values', () => {
+  const markup = renderToStaticMarkup(<SelectionSummaryRow icon={<svg />} label="Web copy" />);
+
+  expect(markup).not.toContain('<button');
+  expect(markup).not.toContain('popup.export.removeFromSelectionAction');
+});

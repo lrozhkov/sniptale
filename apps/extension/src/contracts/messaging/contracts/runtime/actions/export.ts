@@ -7,27 +7,24 @@ import {
   isNumber,
   isString,
 } from '../../../validators/index';
-import { isWebSnapshotManifest } from '../../../../../features/web-snapshot/manifest';
 import {
   isExportOptions,
+  isPopupExportJobId,
   isPopupExportPackageResponse,
   isPopupExportPreviewResponse,
-  isPopupExportJobStatus,
-  isPopupExportJobTab,
+  isPagePackageJobStatus,
+  isPagePackageCaptureSources,
+  isPagePackageCaptureTiming,
+  isPopupExportJobWarnings,
 } from '../../../validators/export';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
+import type { RuntimePopupExportRequestByType } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/popup-export';
 
 const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_PREVIEW,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-  MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-  MessageType.EXPORT_POPUP_CANCEL,
   MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
 ]);
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every(isString);
-}
 
 function isPopupTabRouteOperation(value: unknown): value is string {
   return typeof value === 'string' && popupTabRouteOperations.has(value);
@@ -42,78 +39,155 @@ const popupTabRouteCapabilityFields = {
   tabRouteRequestId: isString,
 };
 
+const isRuntimePopupExportBuildPackageBase = createMessageGuard<
+  typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+  RuntimePopupExportRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
+>({
+  type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+  required: {
+    includeWebCopy: (value) => typeof value === 'boolean',
+    intent: (value) => value === 'export' || value === 'save',
+    batchRequestId: isString,
+    ordinal: (value) => isNumber(value) && Number.isSafeInteger(value) && value >= 0,
+    tabId: isNumber,
+    options: isExportOptions,
+    ...popupTabRouteCapabilityFields,
+  },
+  optional: {
+    allowAnonymousCrossOriginAssets: (value) => typeof value === 'boolean',
+    allowAuthenticatedSameOriginAssets: (value) => typeof value === 'boolean',
+  },
+});
+
+function isRuntimePopupExportBuildPackageRequest(
+  value: unknown
+): value is RuntimePopupExportRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE] {
+  if (!isRuntimePopupExportBuildPackageBase(value)) return false;
+  const hasAnonymousPolicy = Object.prototype.hasOwnProperty.call(
+    value,
+    'allowAnonymousCrossOriginAssets'
+  );
+  const hasAuthenticatedPolicy = Object.prototype.hasOwnProperty.call(
+    value,
+    'allowAuthenticatedSameOriginAssets'
+  );
+  return value.includeWebCopy
+    ? hasAnonymousPolicy && hasAuthenticatedPolicy
+    : !hasAnonymousPolicy && !hasAuthenticatedPolicy;
+}
+
 export const runtimeActionExportMessageContracts = {
-  [MessageType.START_POPUP_EXPORT_JOB]: {
+  [MessageType.START_PAGE_PACKAGE_JOB]: {
     parseRequest: createGuardParser(
-      'runtime START_POPUP_EXPORT_JOB message',
+      'runtime START_PAGE_PACKAGE_JOB message',
       createMessageGuard({
-        type: MessageType.START_POPUP_EXPORT_JOB,
+        type: MessageType.START_PAGE_PACKAGE_JOB,
         required: {
-          jobId: isString,
-          orderedTabs: (value) => Array.isArray(value) && value.every(isPopupExportJobTab),
+          includeWebCopy: (value) => typeof value === 'boolean',
+          intent: (value) => value === 'export' || value === 'save',
+          jobId: isPopupExportJobId,
+          captureTiming: isPagePackageCaptureTiming,
+          sources: isPagePackageCaptureSources,
           options: isExportOptions,
-          warnings: isStringArray,
+          warnings: isPopupExportJobWarnings,
         },
       })
     ),
     parseResponse: createGuardParser(
-      'runtime START_POPUP_EXPORT_JOB response',
-      createRuntimeResponseGuard({ optional: { status: isPopupExportJobStatus } })
-    ),
-  },
-  [MessageType.GET_POPUP_EXPORT_JOB_STATUS]: {
-    parseRequest: createGuardParser(
-      'runtime GET_POPUP_EXPORT_JOB_STATUS message',
-      createMessageGuard({
-        type: MessageType.GET_POPUP_EXPORT_JOB_STATUS,
-        optional: { jobId: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime GET_POPUP_EXPORT_JOB_STATUS response',
+      'runtime START_PAGE_PACKAGE_JOB response',
       createRuntimeResponseGuard({
-        optional: { status: isNullable(isPopupExportJobStatus) },
+        optional: { status: isPagePackageJobStatus },
       })
     ),
   },
-  [MessageType.CANCEL_POPUP_EXPORT_JOB]: {
+  [MessageType.GET_PAGE_PACKAGE_JOB_STATUS]: {
     parseRequest: createGuardParser(
-      'runtime CANCEL_POPUP_EXPORT_JOB message',
+      'runtime GET_PAGE_PACKAGE_JOB_STATUS message',
       createMessageGuard({
-        type: MessageType.CANCEL_POPUP_EXPORT_JOB,
-        required: { jobId: isString },
+        type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS,
+        optional: { jobId: isPopupExportJobId },
       })
     ),
     parseResponse: createGuardParser(
-      'runtime CANCEL_POPUP_EXPORT_JOB response',
-      createRuntimeResponseGuard({ optional: { status: isPopupExportJobStatus } })
-    ),
-  },
-  [MessageType.ACK_POPUP_EXPORT_JOB_STATUS]: {
-    parseRequest: createGuardParser(
-      'runtime ACK_POPUP_EXPORT_JOB_STATUS message',
-      createMessageGuard({
-        type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
-        optional: { jobId: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime ACK_POPUP_EXPORT_JOB_STATUS response',
+      'runtime GET_PAGE_PACKAGE_JOB_STATUS response',
       createRuntimeResponseGuard({
-        required: { status: isNullable(isPopupExportJobStatus) },
+        optional: { status: isNullable(isPagePackageJobStatus) },
       })
     ),
   },
-  [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: {
+  [MessageType.CANCEL_PAGE_PACKAGE_JOB]: {
     parseRequest: createGuardParser(
-      'runtime POPUP_EXPORT_JOB_STATUS_UPDATED message',
+      'runtime CANCEL_PAGE_PACKAGE_JOB message',
       createMessageGuard({
-        type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED,
-        required: { status: isPopupExportJobStatus },
+        type: MessageType.CANCEL_PAGE_PACKAGE_JOB,
+        required: { jobId: isPopupExportJobId },
       })
     ),
     parseResponse: createGuardParser(
-      'runtime POPUP_EXPORT_JOB_STATUS_UPDATED response',
+      'runtime CANCEL_PAGE_PACKAGE_JOB response',
+      createRuntimeResponseGuard({
+        optional: { status: isPagePackageJobStatus },
+      })
+    ),
+  },
+  [MessageType.ACK_PAGE_PACKAGE_JOB_STATUS]: {
+    parseRequest: createGuardParser(
+      'runtime ACK_PAGE_PACKAGE_JOB_STATUS message',
+      createMessageGuard({
+        type: MessageType.ACK_PAGE_PACKAGE_JOB_STATUS,
+        optional: { jobId: isPopupExportJobId },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime ACK_PAGE_PACKAGE_JOB_STATUS response',
+      createRuntimeResponseGuard({
+        required: { status: isNullable(isPagePackageJobStatus) },
+      })
+    ),
+  },
+  [MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED]: {
+    parseRequest: createGuardParser(
+      'runtime PAGE_PACKAGE_JOB_STATUS_UPDATED message',
+      createMessageGuard({
+        type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+        required: { status: isPagePackageJobStatus },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime PAGE_PACKAGE_JOB_STATUS_UPDATED response',
+      createRuntimeResponseGuard({ allowUndefined: true })
+    ),
+  },
+  [MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED]: {
+    parseRequest: createGuardParser(
+      'runtime WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED message',
+      createMessageGuard({
+        type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
+        required: {
+          requestId: isString,
+          activeStepKey: (value) =>
+            value === 'annotations' ||
+            value === 'basicLogs' ||
+            value === 'cssDiagnostics' ||
+            value === 'files' ||
+            value === 'fullPageScreenshot' ||
+            value === 'viewportScreenshot' ||
+            value === 'images' ||
+            value === 'json' ||
+            value === 'markdown' ||
+            value === 'pageDiagnostics' ||
+            value === 'webSnapshotAssets' ||
+            value === 'webSnapshotDom' ||
+            value === 'webSnapshotPreview' ||
+            value === 'webSnapshotStyles' ||
+            value === 'webSnapshotWarnings',
+          current: (value) => isNumber(value) && Number.isSafeInteger(value) && value >= 0,
+          total: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED response',
       createRuntimeResponseGuard({ allowUndefined: true })
     ),
   },
@@ -127,7 +201,9 @@ export const runtimeActionExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime CONSUME_POPUP_EXPORT_LAUNCH_INTENT response',
-      createRuntimeResponseGuard({ required: { page: isNullable(isPopupExportLaunchPage) } })
+      createRuntimeResponseGuard({
+        required: { page: isNullable(isPopupExportLaunchPage) },
+      })
     ),
   },
   [MessageType.EXPORT_POPUP_PREVIEW]: {
@@ -146,55 +222,11 @@ export const runtimeActionExportMessageContracts = {
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
     parseRequest: createGuardParser(
       'runtime EXPORT_POPUP_BUILD_PACKAGE message',
-      createMessageGuard({
-        type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-        required: {
-          batchRequestId: isString,
-          tabId: isNumber,
-          options: isExportOptions,
-          ...popupTabRouteCapabilityFields,
-        },
-      })
+      isRuntimePopupExportBuildPackageRequest
     ),
     parseResponse: createGuardParser(
       'runtime EXPORT_POPUP_BUILD_PACKAGE response',
       isPopupExportPackageResponse
-    ),
-  },
-  [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_POPUP_SAVE_WEB_SNAPSHOT message',
-      createMessageGuard({
-        type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-        required: {
-          tabId: isNumber,
-          requestId: isString,
-          ...popupTabRouteCapabilityFields,
-        },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_POPUP_SAVE_WEB_SNAPSHOT response',
-      createRuntimeResponseGuard({
-        optional: { assetId: isString, manifest: isWebSnapshotManifest, warnings: isStringArray },
-      })
-    ),
-  },
-  [MessageType.EXPORT_POPUP_CANCEL]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_POPUP_CANCEL message',
-      createMessageGuard({
-        type: MessageType.EXPORT_POPUP_CANCEL,
-        required: {
-          exportRunId: isString,
-          tabId: isNumber,
-          ...popupTabRouteCapabilityFields,
-        },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_POPUP_CANCEL response',
-      createRuntimeResponseGuard()
     ),
   },
   [MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY]: {

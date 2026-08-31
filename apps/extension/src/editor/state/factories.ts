@@ -27,7 +27,6 @@ export type EditorStoreSetters = Pick<
   | 'setSessionId'
   | 'setImageData'
   | 'setPageTitle'
-  | 'setCropReady'
   | 'setRichShapeToolSelection'
 >;
 export type EditorStoreToolActions = Pick<
@@ -64,7 +63,6 @@ export function createEditorStoreSetterActions(set: EditorStoreSet): EditorStore
     setSessionId: (sessionId) => set({ sessionId }),
     setImageData: (imageData) => set({ imageData }),
     setPageTitle: (pageTitle) => set({ pageTitle }),
-    setCropReady: (cropReady) => set({ cropReady }),
     setRichShapeToolSelection: (richShapeToolSelection) => set({ richShapeToolSelection }),
   };
 }

@@ -10,11 +10,14 @@ function createRuntimeSessionState(): Pick<
   | 'copyResetTimeoutRef'
   | 'progress'
   | 'requestIdRef'
+  | 'terminalRequestIdRef'
   | 'result'
   | 'setCopiedFormat'
   | 'setCopyingFormat'
   | 'setProgress'
   | 'setResult'
+  | 'launchedPlan'
+  | 'setLaunchedPlan'
 > {
   return {
     copiedFormat: null,
@@ -24,11 +27,14 @@ function createRuntimeSessionState(): Pick<
     copyResetTimeoutRef: { current: null },
     progress: { activeStepKey: null, current: 0, errors: [], message: '', phase: 'idle', total: 0 },
     requestIdRef: { current: null },
+    terminalRequestIdRef: { current: null },
     result: null,
+    launchedPlan: null,
     setCopiedFormat: vi.fn(),
     setCopyingFormat: vi.fn(),
     setProgress: vi.fn(),
     setResult: vi.fn(),
+    setLaunchedPlan: vi.fn(),
   };
 }
 
@@ -44,6 +50,8 @@ function createRuntimeToggleState(): Pick<
   | 'includeImages'
   | 'includeJson'
   | 'includeMarkdown'
+  | 'includeWebCopy'
+  | 'saveSelection'
   | 'setIncludeBasicLogs'
   | 'setIncludeAnnotations'
   | 'setIncludeCssDiagnostics'
@@ -65,6 +73,19 @@ function createRuntimeToggleState(): Pick<
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
+    includeWebCopy: false,
+    saveSelection: {
+      includeAnnotations: false,
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: false,
+      includePageDiagnostics: false,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+      includeWebCopy: true,
+    },
     setIncludeBasicLogs: vi.fn(),
     setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
@@ -80,17 +101,26 @@ function createRuntimeToggleState(): Pick<
 function createRuntimeTabState(): Pick<
   PopupExportRuntimeContract,
   | 'availableTabs'
+  | 'activeSourceMode'
   | 'filterQuery'
   | 'filteredTabs'
   | 'isFilterActive'
   | 'selectedCount'
   | 'selectedTabIds'
   | 'selectedTabIdsInOrder'
+  | 'selectedUrls'
+  | 'setActiveSourceMode'
   | 'setFilterQuery'
+  | 'setUrlInput'
   | 'toggleSelectAllTabs'
   | 'toggleTabSelection'
+  | 'removeSelectedUrl'
+  | 'urlInput'
+  | 'urlInputInvalid'
+  | 'urlInputOverflow'
 > {
   return {
+    activeSourceMode: 'tabs',
     availableTabs: [],
     filterQuery: '',
     filteredTabs: [],
@@ -98,9 +128,16 @@ function createRuntimeTabState(): Pick<
     selectedCount: 1,
     selectedTabIds: [11],
     selectedTabIdsInOrder: [11],
+    selectedUrls: [],
+    setActiveSourceMode: vi.fn(),
     setFilterQuery: vi.fn(),
+    setUrlInput: vi.fn(),
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
+    removeSelectedUrl: vi.fn(),
+    urlInput: '',
+    urlInputInvalid: [],
+    urlInputOverflow: 0,
   };
 }
 

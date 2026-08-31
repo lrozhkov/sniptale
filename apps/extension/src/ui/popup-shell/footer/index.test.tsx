@@ -8,6 +8,14 @@ import { PopupFooter, type PopupFooterProps } from './index';
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 let mediaQueryMatches = false;
+const GITHUB_ICON_PATH = [
+  'M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2',
+  'c2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2',
+  'a4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3',
+  'a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1',
+  'a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5',
+  'c0 4.6 2.7 5.7 5.5 6c-.6.6-.6 1.2-.5 2V21',
+].join('');
 
 function installMatchMedia() {
   Object.defineProperty(window, 'matchMedia', {
@@ -174,9 +182,13 @@ it('wires the retained GitHub and Settings actions', async () => {
   });
 
   const githubButton = footerAction('popup.footer.github-button');
+  const githubIcon = githubButton?.querySelector('svg');
   expect(onOpenGithub).toHaveBeenCalledTimes(1);
   expect(githubButton?.getAttribute('title')).toBe('GitHub');
-  expect(githubButton?.querySelector('svg')?.classList.contains('lucide-github')).toBe(true);
+  expect(githubIcon?.getAttribute('aria-hidden')).toBe('true');
+  expect(githubIcon?.classList.contains('h-3.5')).toBe(true);
+  expect(githubIcon?.getAttribute('viewBox')).toBe('0 0 24 24');
+  expect(githubIcon?.querySelector('path')?.getAttribute('d')).toBe(GITHUB_ICON_PATH);
   expect(onOpenSettings).toHaveBeenCalledTimes(1);
 });
 

@@ -53,6 +53,8 @@ async function collectExportManagerFiles(
 
 async function downloadExportManagerFiles(
   files: Awaited<ReturnType<typeof collectExportFiles>>['files'],
+  activeStepKey: 'files' | 'images',
+  options: ExportOptions,
   control: ExportManagerTransferControl,
   tools: ExportManagerTransferTools
 ) {
@@ -62,8 +64,9 @@ async function downloadExportManagerFiles(
           files,
           control.abortSignal,
           () => control.isCancelled(),
-          (progress) => control.updateProgress(progress),
-          control.diagnosticsSource
+          (progress) => control.updateProgress({ ...progress, activeStepKey }),
+          control.diagnosticsSource,
+          options.resourceLimits
         )
       : {
           files: new Map<string, Blob>(),
@@ -87,7 +90,13 @@ export async function collectFilesForExportManager(
   tools: ExportManagerTransferTools = DEFAULT_TRANSFER_TOOLS
 ) {
   const collectedFiles = await collectExportManagerFiles(treeData, options, control, tools);
-  const downloadResult = await downloadExportManagerFiles(collectedFiles.files, control, tools);
+  const downloadResult = await downloadExportManagerFiles(
+    collectedFiles.files,
+    options.includeImages ? 'images' : 'files',
+    options,
+    control,
+    tools
+  );
   warnings.push(...downloadResult.errors);
 
   return { collectedFiles, downloadResult };

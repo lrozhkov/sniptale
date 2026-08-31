@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createTempRoot, writeJson, writeFile } from '../../core/test-helpers';
+import { createTempRoot, writeJson, writeFile } from '../../test-support/test-helpers';
 import { collectDiagnosticSanitizationViolations } from './verify-diagnostic-sanitization.mjs';
 
 function writeEmptySecurityPolicy(root: string, policyPath: string) {
@@ -20,8 +20,8 @@ function verifyDiagnosticWriterViolation() {
     root,
     'apps/extension/src/background/diagnostic-writer.ts',
     [
-      'export async function persist(entry, events) {',
-      '  await saveDiagnostics(entry, events);',
+      'export async function send(rawDiagnostics) {',
+      '  await sendRuntimeMessage({ type: "DIAGNOSTIC_EVENT_FROM_CS", rawDiagnostics });',
       '}',
       '',
     ].join('\n')
@@ -34,7 +34,7 @@ function verifyDiagnosticWriterViolation() {
     })
   ).toEqual([
     expect.objectContaining({
-      rule: 'diagnostic-sanitizer-missing',
+      rule: 'diagnostic-sink-sanitizer-missing',
       file: 'apps/extension/src/background/diagnostic-writer.ts',
     }),
   ]);
@@ -63,7 +63,7 @@ function verifyDiagnosticSessionWriterViolation() {
     })
   ).toEqual([
     expect.objectContaining({
-      rule: 'diagnostic-sanitizer-missing',
+      rule: 'diagnostic-sink-sanitizer-missing',
       file: 'apps/extension/src/background/diagnostic-writer.ts',
     }),
   ]);
@@ -79,8 +79,11 @@ function verifyDiagnosticWriterWithSanitizer() {
     'apps/extension/src/background/diagnostic-writer.ts',
     [
       'import { sanitizeDiagnosticData } from "../shared/diagnostics/sanitizer";',
-      'export async function persist(entry, events) {',
-      '  await saveDiagnostics(sanitizeDiagnosticData(entry), events);',
+      'export async function send(rawDiagnostics) {',
+      '  await sendRuntimeMessage({',
+      '    type: "DIAGNOSTIC_EVENT_FROM_CS",',
+      '    rawDiagnostics: sanitizeDiagnosticData(rawDiagnostics),',
+      '  });',
       '}',
       '',
     ].join('\n')
@@ -92,6 +95,145 @@ function verifyDiagnosticWriterWithSanitizer() {
       rootDir: root,
     })
   ).toEqual([]);
+}
+
+function verifyPartiallySanitizedWriterViolation() {
+  const root = createTempRoot('verify-diagnostic-sanitization-partial-');
+  const policyPath = 'tooling/configs/qa/security-storage-ownership.data.json';
+  writeEmptySecurityPolicy(root, policyPath);
+  const file = writeFile(
+    root,
+    'apps/extension/src/background/writer.ts',
+    [
+      'import { sanitizeDiagnosticData } from "../shared/diagnostics/sanitizer";',
+      'export async function send(entry, events) {',
+      '  await sendRuntimeMessage({',
+      '    type: "DIAGNOSTIC_EVENT_FROM_CS",',
+      '    entry: sanitizeDiagnosticData(entry),',
+      '    rawDiagnostics: events,',
+      '  });',
+      '}',
+      '',
+    ].join('\n')
+  );
+
+  expect(collectDiagnosticSanitizationViolations([file], { policyPath, rootDir: root })).toEqual([
+    expect.objectContaining({ rule: 'diagnostic-sink-sanitizer-missing' }),
+  ]);
+}
+
+function verifyAliasedSanitizerAndDerivedPayload() {
+  const root = createTempRoot('verify-diagnostic-sanitization-alias-');
+  const policyPath = 'tooling/configs/qa/security-storage-ownership.data.json';
+  writeEmptySecurityPolicy(root, policyPath);
+  const file = writeFile(
+    root,
+    'apps/extension/src/background/writer.ts',
+    [
+      'import { sanitizeDiagnosticData as clean } from "../shared/diagnostics/sanitizer";',
+      'export async function persist(entry) {',
+      '  const sanitized = clean(entry);',
+      '  await browserStorage.session.set({ diagnostic_entry: sanitized });',
+      '}',
+      '',
+    ].join('\n')
+  );
+
+  expect(collectDiagnosticSanitizationViolations([file], { policyPath, rootDir: root })).toEqual(
+    []
+  );
+}
+
+function verifyUnrelatedSanitizerDoesNotProveRuntimePayload() {
+  const root = createTempRoot('verify-diagnostic-sanitization-provenance-');
+  const policyPath = 'tooling/configs/qa/security-storage-ownership.data.json';
+  writeEmptySecurityPolicy(root, policyPath);
+  const file = writeFile(
+    root,
+    'apps/extension/src/background/writer.ts',
+    [
+      'import { sanitizeDiagnosticData } from "../shared/diagnostics/sanitizer";',
+      'export function send(entry, rawResponse) {',
+      '  sanitizeDiagnosticData(entry);',
+      '  return sendRuntimeMessage({ type: "DIAGNOSTIC_EVENT_FROM_CS", rawResponse });',
+      '}',
+      '',
+    ].join('\n')
+  );
+
+  expect(collectDiagnosticSanitizationViolations([file], { policyPath, rootDir: root })).toEqual([
+    expect.objectContaining({ rule: 'diagnostic-sink-sanitizer-missing' }),
+  ]);
+}
+
+function verifyCommentImportDoesNotProveSanitization() {
+  const root = createTempRoot('verify-diagnostic-sanitization-comment-');
+  const policyPath = 'tooling/configs/qa/security-storage-ownership.data.json';
+  writeEmptySecurityPolicy(root, policyPath);
+  const file = writeFile(
+    root,
+    'apps/extension/src/background/writer.ts',
+    [
+      '// import { sanitizeDiagnosticData } from "diagnostics/sanitizer";',
+      'export function send(rawDiagnostics) {',
+      '  return sendRuntimeMessage({ type: "DIAGNOSTIC_EVENT_FROM_CS", rawDiagnostics });',
+      '}',
+      '',
+    ].join('\n')
+  );
+
+  expect(collectDiagnosticSanitizationViolations([file], { policyPath, rootDir: root })).toEqual([
+    expect.objectContaining({ rule: 'diagnostic-sink-sanitizer-missing' }),
+  ]);
+}
+
+function verifyDiagnosticArchiveArguments() {
+  const root = createTempRoot('verify-diagnostic-sanitization-archive-');
+  const policyPath = 'tooling/configs/qa/security-storage-ownership.data.json';
+  writeEmptySecurityPolicy(root, policyPath);
+  const bad = writeFile(
+    root,
+    'apps/extension/src/export/archive.ts',
+    "export function write(zip, events) { zip.file('events.json', JSON.stringify(events)); }\n"
+  );
+  const good = writeFile(
+    root,
+    'apps/extension/src/export/diagnostic-archive.ts',
+    [
+      'import { sanitizeDiagnosticData } from "diagnostics/sanitizer";',
+      "export function write(zip, events) { zip.file('events.json', JSON.stringify(sanitizeDiagnosticData(events))); }",
+      '',
+    ].join('\n')
+  );
+
+  expect(
+    collectDiagnosticSanitizationViolations([bad, good], { policyPath, rootDir: root })
+  ).toEqual([expect.objectContaining({ file: 'apps/extension/src/export/archive.ts' })]);
+}
+
+function verifyPersistenceOwnerFinalBoundary() {
+  const root = createTempRoot('verify-diagnostic-sanitization-persistence-');
+  const policyPath = 'tooling/configs/qa/security-storage-ownership.data.json';
+  writeEmptySecurityPolicy(root, policyPath);
+  const file = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/diagnostics/index.ts',
+    [
+      'import { sanitizeDiagnosticsMeta } from "diagnostics/sanitizer";',
+      'export function saveDiagnostics(entry, events) {',
+      '  const meta = sanitizeDiagnosticsMeta(entry.meta);',
+      '  return [meta, events];',
+      '}',
+      '',
+    ].join('\n')
+  );
+
+  expect(collectDiagnosticSanitizationViolations([file], { policyPath, rootDir: root })).toEqual([
+    expect.objectContaining({
+      rule: 'diagnostic-persistence-final-sanitizer-missing',
+      message: expect.stringContaining('sanitizeDiagnosticsEvents'),
+    }),
+  ]);
 }
 
 function verifyLoggerOnlyDiagnosticFile() {
@@ -126,7 +268,7 @@ function verifyAllowlistedTracerOwner() {
     sensitiveRetentionOwners: [],
     diagnosticSanitizerOwners: [
       {
-        file: 'packages/platform/src/observability/message-tracer/index.ts',
+        file: 'packages/platform/src/observability/message-tracer/transport.ts',
         owner: 'shared-message-tracer',
         justification: 'Canonical tracer seam.',
         reviewNote: 'Keep trace sanitization centralized here.',
@@ -136,8 +278,12 @@ function verifyAllowlistedTracerOwner() {
 
   const file = writeFile(
     root,
-    'packages/platform/src/observability/message-tracer/index.ts',
-    'export function trace(payload) { logger.debug("trace", payload); }\n'
+    'packages/platform/src/observability/message-tracer/transport.ts',
+    [
+      "import { safeStringify } from './utils';",
+      'export function trace(ws, payload, config) { ws.send(safeStringify({ event: payload }, config)); }',
+      '',
+    ].join('\n')
   );
 
   expect(
@@ -156,7 +302,7 @@ function verifyAllowlistedTracerOwnerSinkLevelProof() {
     sensitiveRetentionOwners: [],
     diagnosticSanitizerOwners: [
       {
-        file: 'packages/platform/src/observability/message-tracer/index.ts',
+        file: 'packages/platform/src/observability/message-tracer/transport.ts',
         owner: 'shared-message-tracer',
         justification: 'Canonical tracer seam.',
         reviewNote: 'Keep trace sanitization centralized here.',
@@ -166,13 +312,8 @@ function verifyAllowlistedTracerOwnerSinkLevelProof() {
 
   const file = writeFile(
     root,
-    'packages/platform/src/observability/message-tracer/index.ts',
-    [
-      'export function trace(rawResponse) {',
-      '  sendRuntimeMessage({ rawResponse });',
-      '}',
-      '',
-    ].join('\n')
+    'packages/platform/src/observability/message-tracer/transport.ts',
+    ['export function trace(ws, rawResponse) {', '  ws.send(rawResponse);', '}', ''].join('\n')
   );
 
   expect(
@@ -183,7 +324,7 @@ function verifyAllowlistedTracerOwnerSinkLevelProof() {
   ).toEqual([
     expect.objectContaining({
       rule: 'diagnostic-sink-sanitizer-missing',
-      file: 'packages/platform/src/observability/message-tracer/index.ts',
+      file: 'packages/platform/src/observability/message-tracer/transport.ts',
     }),
   ]);
 }
@@ -200,6 +341,24 @@ describe('verify-diagnostic-sanitization', () => {
   it(
     'allows diagnostic writers that import the canonical sanitizer',
     verifyDiagnosticWriterWithSanitizer
+  );
+  it('rejects partially sanitized multi-argument sinks', verifyPartiallySanitizedWriterViolation);
+  it(
+    'tracks aliased sanitizer imports and derived payloads',
+    verifyAliasedSanitizerAndDerivedPayload
+  );
+  it(
+    'does not accept an unrelated nearby sanitizer call as sink provenance',
+    verifyUnrelatedSanitizerDoesNotProveRuntimePayload
+  );
+  it(
+    'does not accept canonical imports embedded in comments',
+    verifyCommentImportDoesNotProveSanitization
+  );
+  it('checks diagnostic ZIP entry payload arguments', verifyDiagnosticArchiveArguments);
+  it(
+    'requires both typed sanitizers inside the durable persistence owner',
+    verifyPersistenceOwnerFinalBoundary
   );
   it('does not flag diagnostic files that only write local logs', verifyLoggerOnlyDiagnosticFile);
   it('allows canonical tracer owners from the registry', verifyAllowlistedTracerOwner);

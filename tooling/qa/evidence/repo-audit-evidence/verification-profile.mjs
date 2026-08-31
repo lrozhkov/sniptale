@@ -43,7 +43,7 @@ function getQualityScriptEntries(packageJson) {
     .sort((left, right) => left.script.localeCompare(right.script));
 }
 
-function collectVerificationArrays(packageJson, validationManifest, wrappers) {
+function collectVerificationArrays(packageJson, wrappers) {
   const fullWrapperTools = collectWrapperTools(wrappers.full);
   const focusedWrapperTools = collectWrapperTools(wrappers.focused);
   const focusedTriggerCoveredTools = collectWrapperTools(wrappers.focusedTriggered);
@@ -59,8 +59,6 @@ function collectVerificationArrays(packageJson, validationManifest, wrappers) {
   const focusedCoverageTools = [
     ...new Set([...focusedWrapperTools, ...focusedTriggerCoveredTools]),
   ].sort();
-  const validationEntries = validationManifest.tools ?? [];
-  const validatedTools = new Map(validationEntries.map((entry) => [entry.tool, entry]));
   const qualityScripts = getQualityScriptEntries(packageJson);
   const advisoryScripts = qualityScripts.filter((entry) => entry.entryKind === 'advisory');
   const repoAuditReportTools = REPO_AUDIT_REPORT_DEFINITIONS.map(({ tool }) => tool).sort();
@@ -90,8 +88,6 @@ function collectVerificationArrays(packageJson, validationManifest, wrappers) {
     toolCoverage,
     ownerScopedToolProof: OWNER_SCOPED_LIFECYCLE_PROOF,
     ownerScopedTools: OWNER_SCOPED_LIFECYCLE_TOOLS,
-    unvalidatedQualityScripts: qualityScripts.filter(({ tool }) => !validatedTools.has(tool)),
-    validationEntries,
   };
 }
 
@@ -102,7 +98,6 @@ function collectLoopholes({
   qualityScripts,
   repoAuditReportTools,
   skipCapableTools,
-  unvalidatedQualityScripts,
 }) {
   const checkScriptForTool = (tool) =>
     qualityScripts.find((entry) => entry.tool === tool && entry.entryKind === 'check')?.script ??
@@ -135,24 +130,7 @@ function collectLoopholes({
         script,
         summary: 'Advisory-only in full verify.',
       })),
-    ...unvalidatedQualityScripts.map(({ script, tool }) => ({
-      kind: 'unvalidated-script',
-      tool,
-      script,
-      summary: 'No manifest validation coverage.',
-    })),
   ];
-}
-
-function collectSkipCapableTools(validationEntries) {
-  return validationEntries
-    .filter((entry) => entry.states.includes('skip'))
-    .map((entry) => ({
-      tool: entry.tool,
-      validationMode: entry.validationMode,
-      states: entry.states,
-    }))
-    .sort((left, right) => left.tool.localeCompare(right.tool));
 }
 
 function createLaneEvidence(input) {
@@ -200,14 +178,12 @@ function createVerificationPayload(input) {
     toolCoverage: input.toolCoverage,
     ownerScopedToolProof: input.ownerScopedToolProof,
     ownerScopedTools: input.ownerScopedTools,
-    unvalidatedQualityScripts: input.unvalidatedQualityScripts,
-    validationManifestEntries: input.validationEntries.length,
   };
 }
 
-export function collectVerificationProfile(packageJson, validationManifest) {
+export function collectVerificationProfile(packageJson) {
   const wrappers = collectWrapperStepDefinitions();
-  const arrays = collectVerificationArrays(packageJson, validationManifest, wrappers);
+  const arrays = collectVerificationArrays(packageJson, wrappers);
   const fullOnlyTools = arrays.fullWrapperTools.filter(
     (tool) => !arrays.focusedCoverageTools.includes(tool) && !arrays.ownerScopedTools.includes(tool)
   );
@@ -217,7 +193,7 @@ export function collectVerificationProfile(packageJson, validationManifest) {
       script.startsWith('check:') &&
       !arrays.fullWrapperTools.includes(tool)
   );
-  const skipCapableTools = collectSkipCapableTools(arrays.validationEntries);
+  const skipCapableTools = [];
 
   return {
     verification: createVerificationPayload({
@@ -234,7 +210,6 @@ export function collectVerificationProfile(packageJson, validationManifest) {
       qualityScripts: arrays.qualityScripts,
       repoAuditReportTools: arrays.repoAuditReportTools,
       skipCapableTools,
-      unvalidatedQualityScripts: arrays.unvalidatedQualityScripts,
     }),
   };
 }

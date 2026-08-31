@@ -3,17 +3,9 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   cancelEditorCropDrawSessionMock: vi.fn(),
   clearEditorCropGuideMock: vi.fn(),
-  getEditorStoreStateMock: vi.fn(),
   applyCropGuideSelectionMock: vi.fn(),
   createCropGuideRectMock: vi.fn(),
   normalizeEditorCropSelectionMock: vi.fn(),
-  setCropReadyMock: vi.fn(),
-}));
-
-vi.mock('../../state/useEditorStore', () => ({
-  useEditorStore: {
-    getState: mocks.getEditorStoreStateMock,
-  },
 }));
 
 vi.mock('../tools/crop', async (importOriginal) => ({
@@ -38,11 +30,6 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getEditorStoreStateMock.mockReturnValue({
-    browserFrame: { enabled: false },
-    frame: { mode: 'frame' },
-    setCropReady: mocks.setCropReadyMock,
-  });
   mocks.clearEditorCropGuideMock.mockReturnValue({ cropGuide: null, cropSelection: null });
   mocks.cancelEditorCropDrawSessionMock.mockReturnValue({ drawSession: null, cropSelection: null });
   mocks.createCropGuideRectMock.mockReturnValue({ id: 'preview-guide' });
@@ -59,7 +46,6 @@ function expectCropGuideCleared(
   cropGuide: { id: string }
 ) {
   expect(mocks.clearEditorCropGuideMock).toHaveBeenCalledWith({ canvas, cropGuide });
-  expect(mocks.setCropReadyMock).toHaveBeenCalledWith(false);
   expect(canvas.requestRenderAll).toHaveBeenCalledOnce();
 }
 
@@ -104,7 +90,6 @@ it('previews canvas size without making crop apply ready until a selection exist
     'preview'
   );
   expect(canvas.add).toHaveBeenCalledWith(previewGuide);
-  expect(mocks.setCropReadyMock).toHaveBeenCalledWith(false);
   expect(nextState).toEqual({ cropGuide: previewGuide, cropSelection: null });
 });
 
@@ -127,7 +112,6 @@ it('does not create a canvas size preview for the current canvas size', () => {
   expect(nextState).toBeNull();
   expect(mocks.createCropGuideRectMock).not.toHaveBeenCalled();
   expect(canvas.add).not.toHaveBeenCalled();
-  expect(mocks.setCropReadyMock).not.toHaveBeenCalled();
 });
 
 it('updates an existing crop selection from the canvas size preview owner', () => {
@@ -163,7 +147,6 @@ it('updates an existing crop selection from the canvas size preview owner', () =
     'selection'
   );
   expect(canvas.add).not.toHaveBeenCalled();
-  expect(mocks.setCropReadyMock).toHaveBeenCalledWith(true);
   expect(nextState).toEqual({
     cropGuide,
     cropSelection: { left: 10, top: 20, width: 640, height: 360 },
@@ -195,7 +178,6 @@ it('does not resync the same crop selection preview', () => {
 
   expect(nextState).toBeNull();
   expect(mocks.applyCropGuideSelectionMock).not.toHaveBeenCalled();
-  expect(mocks.setCropReadyMock).not.toHaveBeenCalled();
 });
 
 it('clears only preview canvas size guides', () => {
@@ -221,7 +203,6 @@ it('clears only preview canvas size guides', () => {
   });
 
   expect(canvas.remove).toHaveBeenCalledWith(cropGuide);
-  expect(mocks.setCropReadyMock).toHaveBeenCalledWith(false);
   expect(nextState).toEqual({ cropGuide: null, cropSelection: null });
 });
 

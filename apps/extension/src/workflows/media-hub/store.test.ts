@@ -141,14 +141,21 @@ describe('media-hub-store web snapshot save flow', () => {
       packageBlob: new Blob(['zip']),
       screenshotBlob: new Blob(['png']),
     };
+    const assertPersistenceAllowed = vi.fn().mockResolvedValue(undefined);
 
-    await expect(saveWebSnapshotMediaAssetSafely(input as never)).resolves.toEqual({
+    await expect(
+      saveWebSnapshotMediaAssetSafely(input as never, assertPersistenceAllowed)
+    ).resolves.toEqual({
       assetId: 'asset-web',
     });
 
     expect(mediaHubStoreMocks.withMediaHubWriteGuardMock).toHaveBeenCalledWith(
       'сохранение Веб-снимка в Библиотеку',
       expect.any(Function)
+    );
+    expect(assertPersistenceAllowed).toHaveBeenCalledOnce();
+    expect(assertPersistenceAllowed.mock.invocationCallOrder[0]).toBeLessThan(
+      mediaHubStoreMocks.saveWebSnapshotMediaAssetMock.mock.invocationCallOrder[0] ?? Infinity
     );
     expect(mediaHubStoreMocks.saveWebSnapshotMediaAssetMock).toHaveBeenCalledWith(input);
     expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('create', [

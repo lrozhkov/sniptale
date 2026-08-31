@@ -13,6 +13,7 @@ export function toPopupExportSelection(
     includeCssDiagnostics: preferences.includeCssDiagnostics,
     includeFiles: preferences.includeFiles,
     includeFullPageScreenshot: preferences.includeFullPageScreenshot,
+    includeViewportScreenshot: preferences.includeViewportScreenshot === true,
     includePageDiagnostics: preferences.includePageDiagnostics,
     includeImages: preferences.includeImages,
     includeJson: preferences.includeJson,
@@ -29,6 +30,7 @@ export function applyPopupExportSelection(
   preferences.setIncludeCssDiagnostics(selection.includeCssDiagnostics);
   preferences.setIncludeFiles(selection.includeFiles);
   preferences.setIncludeFullPageScreenshot(selection.includeFullPageScreenshot);
+  preferences.setIncludeViewportScreenshot?.(selection.includeViewportScreenshot === true);
   preferences.setIncludePageDiagnostics(selection.includePageDiagnostics);
   preferences.setIncludeImages(selection.includeImages);
   preferences.setIncludeJson(selection.includeJson);
@@ -45,6 +47,7 @@ export function arePopupExportSelectionsEqual(
     left.includeCssDiagnostics === right.includeCssDiagnostics &&
     left.includeFiles === right.includeFiles &&
     left.includeFullPageScreenshot === right.includeFullPageScreenshot &&
+    left.includeViewportScreenshot === right.includeViewportScreenshot &&
     left.includePageDiagnostics === right.includePageDiagnostics &&
     left.includeImages === right.includeImages &&
     left.includeJson === right.includeJson &&

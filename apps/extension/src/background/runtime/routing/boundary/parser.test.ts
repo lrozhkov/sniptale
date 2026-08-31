@@ -1,6 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { attachRuntimeMessageFreshness } from '@sniptale/platform/security/runtime-message-freshness';
+import { isKnownNonBackgroundRuntimeMessage } from '../../../../contracts/messaging/parsers/boundary';
 import { parseRuntimeMessage } from './parser';
 import { resetRuntimeMessageFreshnessForTests } from './freshness';
 
@@ -18,6 +20,27 @@ function sender(): chrome.runtime.MessageSender {
 afterEach(() => {
   logger.warn.mockReset();
   resetRuntimeMessageFreshnessForTests();
+});
+
+it('recognizes valid popup broadcasts and offscreen commands as non-background fan-out', () => {
+  expect(
+    isKnownNonBackgroundRuntimeMessage({
+      type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+      status: {},
+    })
+  ).toBe(true);
+  expect(
+    isKnownNonBackgroundRuntimeMessage({
+      type: MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
+    })
+  ).toBe(true);
+  expect(
+    isKnownNonBackgroundRuntimeMessage({
+      type: VideoMessageType.OFFSCREEN_READY,
+      offscreenStartupId: 'startup-1',
+    })
+  ).toBe(false);
+  expect(isKnownNonBackgroundRuntimeMessage({ type: 'UNKNOWN_RUNTIME_MESSAGE' })).toBe(false);
 });
 
 it('strips runtime freshness before contract parsing', () => {

@@ -69,10 +69,13 @@ export function GalleryGrid(
     <div
       ref={props.gridViewportRef as Ref<HTMLDivElement>}
       data-ui="gallery.content.surface"
-      className="min-h-0 flex-1 overflow-auto rounded-[var(--sniptale-radius-lg)]
-        border border-[var(--sniptale-color-border-soft)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,transparent)]
-        p-4 shadow-sm"
+      className={[
+        'min-h-0 flex-1 overflow-auto rounded-[var(--sniptale-radius-lg)]',
+        'border border-[var(--sniptale-color-border-soft)]',
+        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,transparent)]',
+        'shadow-sm',
+        props.viewMode === 'list' ? 'p-0' : 'p-4',
+      ].join(' ')}
     >
       {renderGalleryGridContent(props)}
     </div>

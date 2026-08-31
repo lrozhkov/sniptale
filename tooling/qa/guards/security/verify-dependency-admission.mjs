@@ -4,13 +4,14 @@ import { dirname, resolve } from 'node:path';
 import {
   classifyDependencyScope,
   resolveLockPackageName,
-} from '../../core/dependency-lock-identity.mjs';
+} from '../../analysis/dependencies/dependency-lock-identity.mjs';
 import {
   admittedDependencySource,
   admittedInstallScript,
+  dependencyPolicyRuleErrors,
   dependencyPolicyRules,
   rootLifecyclePolicyStatus,
-} from '../../policy/dependency-policy-rules.mjs';
+} from '../../policy/dependencies/dependency-policy-rules.mjs';
 
 const REPORT_PATH = '.tmp/security/dependency-admission.json';
 const LIFECYCLE_SCRIPTS = new Set([
@@ -30,13 +31,17 @@ const LIFECYCLE_SCRIPTS = new Set([
 const INPUT_PATHS = new Set([
   'package.json',
   'package-lock.json',
-  'apps/extension/package.json',
   'tooling/configs/qa/dependency-policy-rules.data.json',
   'tooling/configs/qa/licenses.json',
-  'tooling/qa/core/dependency-lock-identity.mjs',
+  'tooling/qa/analysis/dependencies/dependency-lock-identity.mjs',
   'tooling/qa/guards/security/verify-dependency-admission.mjs',
-  'tooling/qa/policy/dependency-policy-rules.mjs',
+  'tooling/qa/policy/dependencies/dependency-policy-rules.mjs',
 ]);
+const WORKSPACE_PACKAGE_PATH_PATTERN = /^(?:apps|packages)\/[^/]+\/package\.json$/u;
+
+export function isDependencyAdmissionInputPath(file) {
+  return INPUT_PATHS.has(file) || WORKSPACE_PACKAGE_PATH_PATTERN.test(file);
+}
 
 function sourceProtocol(sourceUrl) {
   try {
@@ -46,21 +51,62 @@ function sourceProtocol(sourceUrl) {
   }
 }
 
-function admissionRow(packageJson, lockPath, entry, rules) {
+function bundledOwner(lock, lockPath, entry) {
+  if (entry.inBundle !== true) return null;
+  const packageName = resolveLockPackageName(lockPath, entry);
+  if (!packageName) return null;
+  return (
+    Object.entries(lock.packages ?? {})
+      .filter(
+        ([candidatePath, candidate]) =>
+          candidatePath &&
+          lockPath.startsWith(`${candidatePath}/node_modules/`) &&
+          Array.isArray(candidate.bundleDependencies) &&
+          candidate.bundleDependencies.every((dependency) => typeof dependency === 'string') &&
+          candidate.bundleDependencies.includes(packageName)
+      )
+      .sort(([leftPath], [rightPath]) => rightPath.length - leftPath.length)[0] ?? null
+  );
+}
+
+function directScope(packageManifests, lockPath, name, entry) {
+  if (lockPath !== `node_modules/${name}`) return null;
+  const runtime = packageManifests.some(
+    (manifest) =>
+      Object.hasOwn(manifest.dependencies ?? {}, name) ||
+      Object.hasOwn(manifest.optionalDependencies ?? {}, name)
+  );
+  const development = packageManifests.some((manifest) =>
+    Object.hasOwn(manifest.devDependencies ?? {}, name)
+  );
+  if (runtime === development) return null;
+  const developmentEntry = entry.dev === true || entry.devOptional === true;
+  if (runtime) return developmentEntry ? null : 'direct-runtime';
+  return developmentEntry ? 'direct-development' : null;
+}
+
+function admissionRow(packageJson, workspacePackages, lock, lockPath, entry, rules) {
   const name = resolveLockPackageName(lockPath, entry);
-  const scope = name && classifyDependencyScope(packageJson, lockPath, name, entry);
+  const packageManifests = [packageJson, ...workspacePackages];
+  const scope =
+    name &&
+    (directScope(packageManifests, lockPath, name, entry) ??
+      classifyDependencyScope(packageJson, lockPath, name, entry));
   const artifactInclusion = scope?.includes('development')
     ? 'development-only'
     : 'source-runtime-candidate';
+  const owner = bundledOwner(lock, lockPath, entry);
+  const ownerEntry = owner?.[1];
   const row = {
     packageName: name,
     resolvedVersion: entry.version,
     dependencyScope: scope,
     artifactInclusion,
-    sourceUrl: entry.resolved,
-    sourceProtocol: sourceProtocol(entry.resolved),
-    integrity: entry.integrity,
+    sourceUrl: entry.resolved ?? ownerEntry?.resolved,
+    sourceProtocol: sourceProtocol(entry.resolved ?? ownerEntry?.resolved),
+    integrity: entry.integrity ?? ownerEntry?.integrity,
     hasInstallScript: Boolean(entry.hasInstallScript),
+    bundledBy: owner ? resolveLockPackageName(owner[0], ownerEntry) : null,
   };
   return {
     ...row,
@@ -70,7 +116,90 @@ function admissionRow(packageJson, lockPath, entry, rules) {
 }
 
 function isWorkspaceLockEntry(lockPath, entry) {
-  return Boolean(entry.link || lockPath.startsWith('apps/') || lockPath.startsWith('packages/'));
+  return Boolean(entry.link || !lockPath.includes('node_modules/'));
+}
+
+function policyIdentity(entry, keys) {
+  return keys.map((key) => entry[key]).join('\0');
+}
+
+function collectApprovalClosureViolations(rows, lifecycle, rules) {
+  const sourceIdentities = new Set(
+    rows.map((row) =>
+      policyIdentity(row, [
+        'packageName',
+        'resolvedVersion',
+        'dependencyScope',
+        'artifactInclusion',
+        'sourceUrl',
+      ])
+    )
+  );
+  const installIdentities = new Set(
+    rows
+      .filter((row) => row.hasInstallScript)
+      .map((row) =>
+        policyIdentity(row, [
+          'packageName',
+          'resolvedVersion',
+          'dependencyScope',
+          'artifactInclusion',
+        ])
+      )
+  );
+  const lifecycleIdentities = new Set(
+    lifecycle.map((row) => policyIdentity(row, ['scriptName', 'command', 'ownerId']))
+  );
+  return [
+    ...rules.sourceExceptions.flatMap((entry) =>
+      sourceIdentities.has(
+        policyIdentity(entry, [
+          'packageName',
+          'resolvedVersion',
+          'dependencyScope',
+          'artifactInclusion',
+          'sourceUrl',
+        ])
+      )
+        ? []
+        : [
+            {
+              rule: 'dependency-source-approval-stale',
+              file: 'tooling/configs/qa/dependency-policy-rules.data.json',
+              message: `${entry.packageName}@${entry.resolvedVersion} source exception matches no lock entry`,
+            },
+          ]
+    ),
+    ...rules.installScriptApprovals.flatMap((entry) =>
+      installIdentities.has(
+        policyIdentity(entry, [
+          'packageName',
+          'resolvedVersion',
+          'dependencyScope',
+          'artifactInclusion',
+        ])
+      )
+        ? []
+        : [
+            {
+              rule: 'dependency-install-approval-stale',
+              file: 'tooling/configs/qa/dependency-policy-rules.data.json',
+              message: `${entry.packageName}@${entry.resolvedVersion} install approval matches no scripted lock entry`,
+            },
+          ]
+    ),
+    ...rules.rootLifecycleApprovals.flatMap((entry) =>
+      lifecycleIdentities.has(policyIdentity(entry, ['scriptName', 'command', 'ownerId']))
+        ? []
+        : [
+            {
+              rule: 'dependency-root-lifecycle-approval-stale',
+              file: 'tooling/configs/qa/dependency-policy-rules.data.json',
+              message: `${entry.scriptName} lifecycle approval matches no root script`,
+            },
+          ]
+    ),
+  ];
 }
 
 function lifecycleRows(packageJson, rules) {
@@ -91,10 +220,24 @@ function violation(rule, message) {
 }
 
 /** Validate source, integrity and install-time admission directly from the current lockfile. */
-export function collectDependencyAdmission({ packageJson, lock, rules }) {
+export function collectDependencyAdmission({ packageJson, lock, rules, workspacePackages = [] }) {
+  const policyErrors = dependencyPolicyRuleErrors(rules);
+  if (policyErrors.length > 0) {
+    return {
+      rows: [],
+      lifecycle: [],
+      violations: policyErrors.map((message) => ({
+        rule: 'dependency-policy-schema',
+        file: 'tooling/configs/qa/dependency-policy-rules.data.json',
+        message,
+      })),
+    };
+  }
   const rows = Object.entries(lock.packages ?? {})
     .filter(([lockPath, entry]) => lockPath && !isWorkspaceLockEntry(lockPath, entry))
-    .map(([lockPath, entry]) => admissionRow(packageJson, lockPath, entry, rules))
+    .map(([lockPath, entry]) =>
+      admissionRow(packageJson, workspacePackages, lock, lockPath, entry, rules)
+    )
     .sort((left, right) =>
       `${left.packageName}@${left.resolvedVersion}`.localeCompare(
         `${right.packageName}@${right.resolvedVersion}`
@@ -105,7 +248,13 @@ export function collectDependencyAdmission({ packageJson, lock, rules }) {
     ...rows.flatMap((row) => {
       const label = `${row.packageName ?? '<unknown>'}@${row.resolvedVersion ?? '<unknown>'}`;
       const rowViolations = [];
-      if (!row.packageName || !row.resolvedVersion || !row.sourceUrl || !row.integrity) {
+      if (
+        !row.packageName ||
+        !row.resolvedVersion ||
+        !row.dependencyScope ||
+        !row.sourceUrl ||
+        !row.integrity
+      ) {
         rowViolations.push(
           violation('dependency-lock-metadata', `${label} is missing lock source or integrity`)
         );
@@ -133,6 +282,7 @@ export function collectDependencyAdmission({ packageJson, lock, rules }) {
             },
           ]
     ),
+    ...collectApprovalClosureViolations(rows, lifecycle, rules),
   ];
   return { rows, lifecycle, violations };
 }
@@ -140,7 +290,12 @@ export function collectDependencyAdmission({ packageJson, lock, rules }) {
 function readInputs(root) {
   const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
   const lock = JSON.parse(readFileSync(resolve(root, 'package-lock.json'), 'utf8'));
-  return { packageJson, lock, rules: dependencyPolicyRules(root) };
+  const workspacePackages = Object.entries(lock.packages ?? {})
+    .filter(([lockPath, entry]) =>
+      Boolean(lockPath && !lockPath.includes('node_modules/') && entry && !entry.link)
+    )
+    .map(([, entry]) => entry);
+  return { packageJson, workspacePackages, lock, rules: dependencyPolicyRules(root) };
 }
 
 function writeReport(root, result) {
@@ -169,8 +324,7 @@ export function runDependencyAdmissionCheck({
   root = process.cwd(),
 } = {}) {
   const relevantFiles = targetFiles.length > 0 ? targetFiles : files;
-  const relevant =
-    relevantFiles.length === 0 || relevantFiles.some((file) => INPUT_PATHS.has(file));
+  const relevant = relevantFiles.length === 0 || relevantFiles.some(isDependencyAdmissionInputPath);
   if (!relevant) return { skipped: true, violations: [] };
   const result = collectDependencyAdmission(readInputs(root));
   writeReport(root, result);

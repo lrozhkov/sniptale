@@ -167,6 +167,19 @@ it('reads every visible domain while removing secret and device-bound state', as
     ],
   });
   expect(snapshot.domains['system.voice']?.data).not.toHaveProperty('microphoneDeviceId');
+  expect(snapshot.domains['capture.image']?.data).toMatchObject({
+    fullPageQuality: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
+  });
+  expect(snapshot.domains['capture.pages']?.data).toEqual({
+    resourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
+    timing: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+  });
+  expect(snapshot.domains).not.toHaveProperty('access.capture-assets');
   expect(JSON.stringify(snapshot.domains['ai.models']?.data)).not.toContain('authorization');
   expect(snapshot.dynamicItems).toEqual(
     expect.arrayContaining([
@@ -357,8 +370,16 @@ function settingsFixture() {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    fullPageQuality: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
+    exportResourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
+    pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
     voiceInput: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: 'device-secret' },
   };
 }

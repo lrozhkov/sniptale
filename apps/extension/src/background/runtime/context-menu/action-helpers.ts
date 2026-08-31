@@ -12,12 +12,13 @@ import { loadVideoSettings } from '../../../composition/persistence/capture-sett
 import type { Settings } from '../../../contracts/settings';
 import type { ViewportPresetAvailability } from '../../../features/viewport-presets/contracts';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { normalizePopupExportTabTitle } from '@sniptale/runtime-contracts/export';
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { CaptureSurfaceError, getCaptureSurfaceService } from '../../capture-surface';
 import { startRecording } from '../../media/lifecycle';
-import { startPopupExportJob } from '../../capture/popup-export/job';
+import { startPagePackageJob } from '../../capture/page-package/job';
 import {
   cancelPopupExportPagePackage,
   requestPopupExportPagePackage,
@@ -49,7 +50,8 @@ function buildContextMenuExportOptions() {
     includeCssDiagnostics: preferences.includeCssDiagnostics,
     includeFiles: preferences.includeFiles,
     includeFullPageScreenshot: preferences.includeFullPageScreenshot,
-    includePageDiagnostics: preferences.includePageDiagnostics,
+    // Context-menu Export has no point-of-action disclosure for extended live-page evidence.
+    includePageDiagnostics: false,
     includeImages: preferences.includeImages,
     includeJson: preferences.includeJson,
     includeMarkdown: preferences.includeMarkdown,
@@ -131,13 +133,17 @@ export async function startContextMenuExport(tabId: number): Promise<void> {
     }
   }
   const tab = await browserTabs.get(tabId);
-  await startPopupExportJob({
+  await startPagePackageJob({
     contentPort: {
       cancelPagePackage: cancelPopupExportPagePackage,
       requestPagePackage: requestPopupExportPagePackage,
     },
+    includeWebCopy: false,
+    intent: 'export',
     jobId: crypto.randomUUID(),
-    orderedTabs: [{ tabId, title: tab.title ?? tab.url ?? `Tab ${tabId}` }],
+    orderedTabs: [
+      { tabId, title: normalizePopupExportTabTitle(tab.title ?? tab.url ?? `Tab ${tabId}`) },
+    ],
     options,
     warnings,
   });

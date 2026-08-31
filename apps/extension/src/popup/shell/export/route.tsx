@@ -17,5 +17,14 @@ export function ExportRoute({ startup }: { startup: PopupStartupDescriptor }) {
       stagePopupExportLaunchSelection(startup.launchSelection);
     }
   }, [startup]);
-  return <ExportPage isActive activeTabCapabilities={capabilities} pageAccess={pageAccess} />;
+  return (
+    <ExportPage
+      isActive
+      activeTabCapabilities={capabilities}
+      pageAccess={pageAccess}
+      {...(startup.page === 'export' && startup.destination
+        ? { initialDestination: startup.destination }
+        : {})}
+    />
+  );
 }

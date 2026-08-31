@@ -88,7 +88,7 @@ it('keeps only edit, guide preview, and zoom workspace controls', () => {
 });
 
 it('keeps save failure and retry visible in the document bar', () => {
-  const retrySave = vi.fn(async () => undefined);
+  const retrySave = vi.fn(async () => null);
   renderChrome(
     createFloatingProps({ saveStatus: { error: 'Quota exceeded', retrySave, state: 'error' } })
   );

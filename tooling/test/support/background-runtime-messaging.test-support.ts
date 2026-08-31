@@ -14,6 +14,7 @@ const {
   ensureActivePageAccessRuntimeMock,
   hasActivePageAccessMock,
   isBackgroundInternalSignalMessageMock,
+  isKnownNonBackgroundRuntimeMessageMock,
   isBackgroundTabMessageMock,
   isPopupExportViewerMessageMock,
   isRouteCaptureMessageMock,
@@ -49,6 +50,7 @@ const {
   ensureActivePageAccessRuntimeMock: vi.fn(),
   hasActivePageAccessMock: vi.fn(),
   isBackgroundInternalSignalMessageMock: vi.fn(),
+  isKnownNonBackgroundRuntimeMessageMock: vi.fn(),
   isBackgroundTabMessageMock: vi.fn(),
   isPopupExportViewerMessageMock: vi.fn(),
   isRouteCaptureMessageMock: vi.fn(),
@@ -96,6 +98,7 @@ vi.mock('../../../apps/extension/src/background/page-access/service', async (imp
   hasActivePageAccess: hasActivePageAccessMock,
 }));
 vi.mock('../../../apps/extension/src/contracts/messaging/parsers/boundary', () => ({
+  isKnownNonBackgroundRuntimeMessage: isKnownNonBackgroundRuntimeMessageMock,
   parseBackgroundRuntimeMessage: parseBackgroundRuntimeMessageMock,
 }));
 vi.mock(
@@ -189,6 +192,7 @@ export {
   browserTabsQueryMock,
   browserTabsGetMock,
   isBackgroundInternalSignalMessageMock,
+  isKnownNonBackgroundRuntimeMessageMock,
   isBackgroundTabMessageMock,
   isPopupExportViewerMessageMock,
   isRouteCaptureMessageMock,
@@ -280,6 +284,7 @@ export function resetRuntimeMessagingMocks() {
   vi.clearAllMocks();
   assertPopupTabRouteTargetDocumentMock.mockResolvedValue(undefined);
   mockRoutesAsUnhandled(isBackgroundInternalSignalMessageMock, isBackgroundTabMessageMock);
+  isKnownNonBackgroundRuntimeMessageMock.mockReturnValue(false);
   mockRoutesAsUnhandled(isPopupExportViewerMessageMock, isRouteCaptureMessageMock);
   mockRoutesAsUnhandled(isScenarioMessageMock, isTabModeMessageMock);
   mockRoutesAsUnhandled(

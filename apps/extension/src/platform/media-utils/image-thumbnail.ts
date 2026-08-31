@@ -3,7 +3,8 @@ import { translate } from '../i18n';
 export async function createImageThumbnailBlob(
   blob: Blob,
   width = 320,
-  height = 180
+  height = 180,
+  options: { verticalAnchor?: 'center' | 'top' } = {}
 ): Promise<Blob> {
   const bitmap = await createImageBitmap(blob);
 
@@ -22,7 +23,7 @@ export async function createImageThumbnailBlob(
     const drawWidth = bitmap.width * scale;
     const drawHeight = bitmap.height * scale;
     const offsetX = (width - drawWidth) / 2;
-    const offsetY = (height - drawHeight) / 2;
+    const offsetY = options.verticalAnchor === 'top' ? 0 : (height - drawHeight) / 2;
 
     context.drawImage(bitmap, offsetX, offsetY, drawWidth, drawHeight);
 

@@ -85,11 +85,43 @@ function createReadyProps(
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
+    includeWebCopy: false,
     isFilterActive: false,
     selectedCount: 1,
     selectedTabIds: [7],
     setFilterQuery: vi.fn(),
     ...defaultToggleSetters,
+    setIncludeWebCopy: vi.fn(),
+    savePreferences: {
+      actions: { ...defaultToggleSetters },
+      includeWebCopy: true,
+      setIncludeWebCopy: vi.fn(),
+      values: {
+        includeAnnotations: false,
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includePageDiagnostics: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+      },
+    },
+    destination: 'export',
+    onDestinationChange: vi.fn(),
+    webCopyResources: {
+      anonymousCrossOriginAssetsEnabled: true,
+      authenticatedSameOriginAssetsEnabled: true,
+      externalAssetRedirectsEnabled: true,
+      externalLinksEnabled: false,
+      error: null,
+      pending: null,
+      setAnonymousCrossOriginAssetsEnabled: vi.fn(),
+      setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+      setExternalAssetRedirectsEnabled: vi.fn(),
+      setExternalLinksEnabled: vi.fn(),
+    },
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
     ...overrides,
@@ -115,11 +147,13 @@ async function dismissByEscape() {
 }
 
 async function openDrawer(index: number) {
-  const editButtons = [...(container?.querySelectorAll('button') ?? [])].filter(
-    (button) => button.textContent === 't:popup.export.editButton'
-  );
-  expect(editButtons).toHaveLength(2);
-  await clickButton(editButtons[index]);
+  const triggers = [
+    ...(container?.querySelectorAll<HTMLButtonElement>(
+      '[data-ui="popup.export.selection-trigger"]'
+    ) ?? []),
+  ];
+  expect(triggers).toHaveLength(2);
+  await clickButton(triggers[index]);
 }
 
 async function verifyDataTypeDrawerCanOpenAndClose() {
@@ -129,13 +163,13 @@ async function verifyDataTypeDrawerCanOpenAndClose() {
     't:popup.export.dataTypesFilterPlaceholder'
   );
   expect(container?.textContent).toContain('t:popup.export.includeBasicLogsLabel');
-  expect(container?.textContent).toContain('t:popup.export.doneButton');
+  expect(container?.querySelector('[data-ui="popup.export.selection-curtain"]')).not.toBeNull();
 
   await dismissByOutsideClick();
 
   expect(container?.textContent).toContain('t:popup.export.includeJsonLabel');
   expect(container?.textContent).toContain('t:popup.export.tabsSectionLabel');
-  expect(container?.textContent).not.toContain('t:popup.export.doneButton');
+  expect(container?.querySelector('[data-ui="popup.export.selection-curtain"]')).toBeNull();
 }
 
 async function verifyTabsDrawerCanOpenAndClose() {

@@ -1,22 +1,19 @@
 import path from 'node:path';
 
-import { createOkStep } from '../core/focused-qa-results.mjs';
-import {
-  collectCodeFiles,
-  fromRelativePath,
-  isExecutedAsScript,
-  readText,
-} from '../core/shared.mjs';
-import { JAVASCRIPT_FILE_PATTERN } from '../core/structural-risk/config.mjs';
+import { createOkStep } from '../composition/checkpoint/focused-qa-results.mjs';
+import { collectCodeFiles } from '../analysis/repository/shared-files.mjs';
+import { fromRelativePath, readText } from '../analysis/repository/shared-paths.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { JAVASCRIPT_FILE_PATTERN } from '../analysis/structural-risk/config.mjs';
 import {
   createStructuralRiskReport,
   formatStructuralRiskConsole,
-} from '../core/structural-risk/report.mjs';
+} from '../analysis/structural-risk/report.mjs';
 import {
   collectTopologyFragmentationReport,
   formatTopologyFragmentationConsole,
   interleaveTopologyClusters,
-} from '../core/topology-fragmentation.mjs';
+} from '../guards/architecture/topology-fragmentation/check.mjs';
 import {
   collectSensitiveEnvironmentValues,
   sanitizeLogText,

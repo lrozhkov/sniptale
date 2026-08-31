@@ -18,7 +18,6 @@ function createMutableState() {
     currentTime: 0,
     project,
     projectHistory: resetVideoEditorProjectHistory(project.id),
-    selectedClipId: null,
     selectedTrackId: null,
     selection: { kind: 'scene' },
   } as VideoEditorProjectState;
@@ -93,7 +92,6 @@ function seedSingleClipState(runtime: ReturnType<typeof createMutableState>, loc
       tracks: project.tracks.map((track) => (track.id === trackId ? { ...track, locked } : track)),
       clips: [createVideoClip(trackId, asset.id)],
     },
-    selectedClipId: 'clip-1',
     selectedTrackId: trackId,
     selection: { kind: 'clip', clipId: 'clip-1' },
   });

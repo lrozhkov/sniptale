@@ -12,7 +12,6 @@ function createState(): VideoEditorProjectState {
     currentTime: 0,
     project,
     projectHistory: resetVideoEditorProjectHistory(project.id),
-    selectedClipId: null,
     selectedTrackId: project.tracks[0]?.id ?? null,
     selection: { kind: 'scene' },
   } as VideoEditorProjectState;

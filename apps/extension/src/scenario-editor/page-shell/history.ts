@@ -1,6 +1,8 @@
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { ScenarioV3ProjectHistory } from './types';
 
+const MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES = 40;
+
 export function pushProjectHistory(
   history: ScenarioV3ProjectHistory,
   currentProject: ScenarioProjectV3,
@@ -12,7 +14,7 @@ export function pushProjectHistory(
 
   return {
     future: [],
-    past: [...history.past, currentProject],
+    past: [...history.past, currentProject].slice(-MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES),
   };
 }
 
@@ -27,7 +29,10 @@ export function undoProjectHistory(args: {
 
   return {
     history: {
-      future: [args.currentProject, ...args.history.future],
+      future: [args.currentProject, ...args.history.future].slice(
+        0,
+        MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES
+      ),
       past: args.history.past.slice(0, -1),
     },
     project: previous,
@@ -46,7 +51,9 @@ export function redoProjectHistory(args: {
   return {
     history: {
       future: args.history.future.slice(1),
-      past: [...args.history.past, args.currentProject],
+      past: [...args.history.past, args.currentProject].slice(
+        -MAX_SCENARIO_FULL_PROJECT_HISTORY_ENTRIES
+      ),
     },
     project: next,
   };

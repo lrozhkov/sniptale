@@ -1,6 +1,6 @@
 # Runtime contexts
 
-`tooling/qa/core/runtime-topology.data.json` is the machine authority for runtime roots, manifest ownership, entrypoint files, and documentation markers. This document interprets those boundaries and records the coordination rules that code review must preserve.
+`tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json` is the machine authority for runtime roots, manifest ownership, entrypoint files, and documentation markers. This document interprets those boundaries and records the coordination rules that code review must preserve.
 
 ## Coordination model
 

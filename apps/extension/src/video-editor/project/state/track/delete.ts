@@ -72,17 +72,3 @@ export function resolveSelectionAfterTrackDelete(
 
   return resolveRemovedSelectedClip(state, trackId) ? createSceneSelection() : state.selection;
 }
-
-export function resolveSelectedClipIdAfterTrackDelete(
-  state: VideoEditorProjectState,
-  trackId: string
-) {
-  if (
-    state.selectedClipId &&
-    state.project?.clips.find((clip) => clip.id === state.selectedClipId)?.trackId === trackId
-  ) {
-    return null;
-  }
-
-  return state.selectedClipId;
-}

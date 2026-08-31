@@ -165,6 +165,9 @@
   height: 0;
 }
 
+:host(.sniptale-capture-ui-hidden) .sniptale-app,
+:host(.sniptale-capture-ui-hidden) .sniptale-toolbar,
+:host(.sniptale-capture-ui-hidden) .sniptale-show-toolbar-button,
 :host(.sniptale-capture-ui-hidden) .sniptale-action-toolbar,
 :host(.sniptale-capture-ui-hidden) .sniptale-toolbar-portal-wrapper,
 :host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-trigger,

@@ -11,6 +11,7 @@ export type {
   AssetRef,
   PreparedAssetObject,
 } from './contracts';
+export { createPreparedAssetArchiveSink, type PreparedAssetArchiveSink } from './archive-sink';
 export {
   parseAssetOwner,
   parseAssetReadyJournal,

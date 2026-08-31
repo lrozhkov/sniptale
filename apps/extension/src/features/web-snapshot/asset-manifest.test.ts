@@ -5,12 +5,21 @@ import {
   hashWebSnapshotAssetBlob,
   hashWebSnapshotAssetBytes,
   isWebSnapshotAssetMimeType,
+  isAllowedWebSnapshotAssetMimeType,
   normalizeWebSnapshotAssetMimeType,
-  resolveAllowedWebSnapshotAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeTypeFromBytes,
 } from './asset-manifest';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+it('recognizes only the bounded capture MIME profile for raw attachment downloads', () => {
+  expect(isAllowedWebSnapshotAssetMimeType('image/svg+xml')).toBe(true);
+  expect(isAllowedWebSnapshotAssetMimeType('text/css')).toBe(true);
+  expect(isAllowedWebSnapshotAssetMimeType('image/bmp')).toBe(false);
+  expect(isAllowedWebSnapshotAssetMimeType('application/javascript')).toBe(false);
 });
 
 it('normalizes and validates web snapshot asset MIME types', () => {
@@ -22,18 +31,60 @@ it('normalizes and validates web snapshot asset MIME types', () => {
   expect(normalizeWebSnapshotAssetMimeType(' IMAGE/PNG ')).toBe('image/png');
 });
 
-it('resolves allowed HTTP content types without widening the owner allow-list', () => {
-  const allowedMimeTypes = new Set(['image/png', 'text/css']);
+it('resolves HTTP content types through the canonical capture MIME profile', () => {
+  expect(resolveWebSnapshotCaptureAssetMimeType(' IMAGE/PNG; charset=binary ')).toBe('image/png');
+  expect(resolveWebSnapshotCaptureAssetMimeType('image/gif')).toBe('image/gif');
+  expect(() => resolveWebSnapshotCaptureAssetMimeType('image/bmp')).toThrow(
+    'unsupported web snapshot asset MIME type'
+  );
+  expect(() => resolveWebSnapshotCaptureAssetMimeType(null)).toThrow(
+    'unsupported web snapshot asset MIME type'
+  );
+});
+
+it('admits a mislabeled WOFF2 response only when its URL and binary signature agree', () => {
+  const woff2 = new Uint8Array([0x77, 0x4f, 0x46, 0x32, 0, 0, 0, 0]);
 
   expect(
-    resolveAllowedWebSnapshotAssetMimeType(' IMAGE/PNG; charset=binary ', allowedMimeTypes)
-  ).toBe('image/png');
-  expect(() => resolveAllowedWebSnapshotAssetMimeType('image/gif', allowedMimeTypes)).toThrow(
-    'unsupported web snapshot asset MIME type'
-  );
-  expect(() => resolveAllowedWebSnapshotAssetMimeType(null, allowedMimeTypes)).toThrow(
-    'unsupported web snapshot asset MIME type'
-  );
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: woff2,
+      contentType: 'application/octet-stream',
+      url: 'https://assets.example.test/typeface.woff2?version=1',
+    })
+  ).toBe('font/woff2');
+  expect(() =>
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: new TextEncoder().encode('not a font'),
+      contentType: 'application/octet-stream',
+      url: 'https://assets.example.test/typeface.woff2',
+    })
+  ).toThrow('unsupported web snapshot asset MIME type');
+  expect(() =>
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: woff2,
+      contentType: 'application/octet-stream',
+      url: 'https://assets.example.test/typeface.woff',
+    })
+  ).toThrow('unsupported web snapshot asset MIME type');
+});
+
+it('normalizes an inline font MIME alias only when its WOFF signature is valid', () => {
+  const woff = new Uint8Array([0x77, 0x4f, 0x46, 0x46, 0, 0, 0, 0]);
+
+  expect(
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: woff,
+      contentType: 'application/font-woff;charset=utf-8',
+      url: 'data:application/font-woff;base64,d09GRgAAAAA=',
+    })
+  ).toBe('font/woff');
+  expect(() =>
+    resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+      bytes: new TextEncoder().encode('not a font'),
+      contentType: 'font/woff',
+      url: 'data:font/woff;base64,bm90IGEgZm9udA==',
+    })
+  ).toThrow('unsupported web snapshot asset MIME type');
 });
 
 it('hashes web snapshot asset bytes and blobs consistently', async () => {

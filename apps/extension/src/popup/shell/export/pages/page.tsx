@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { translate } from '../../../../platform/i18n/popup';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { PopupPageAccessRuntime } from '../../runtime/page-access';
@@ -8,41 +9,35 @@ import {
 import { ExportFooterActions } from '../footer/actions';
 import { ExportPageContent } from './content';
 import { type PopupExportController, usePopupExportController } from '../controller';
-import { WebSnapshotConfirmationDialog, type WebSnapshotDisclosure } from './snapshot-confirmation';
-import { useWebSnapshotConfirmationState } from './snapshot-confirmation-state';
+import { useWebCopyResourcePreferences } from './snapshot-availability';
+import type { PopupPackageDestination } from '../data-type/package-controls';
+import { savePopupLastExportDestination } from '../../../../composition/persistence/capture-settings/popup-startup';
 
 type ExportController = PopupExportController;
 type ExportFooterActionsProps = Parameters<typeof ExportFooterActions>[0];
 
-function getWebSnapshotResultAction(controller: ExportController) {
+function getLibraryResultAction(controller: ExportController) {
   const { result } = controller.state.session.transfer;
   const snapshotIds = result?.kind === 'webSnapshot' ? (result.snapshotIds ?? []) : [];
   if (result?.success !== true || snapshotIds.length === 0) {
     return {};
   }
 
-  const mode: 'gallery' | 'open' = snapshotIds.length > 1 ? 'gallery' : 'open';
-
-  return {
-    onOpenWebSnapshotResult: () => {
-      if (mode === 'open') {
-        void openWebSnapshotViewerPage(snapshotIds[0]!);
-        return;
+  return snapshotIds.length === 1
+    ? {
+        onOpenLibraryResult: () => void openWebSnapshotViewerPage(snapshotIds[0]!),
+        openLibraryResultTitle: translate('popup.export.openWebSnapshot'),
       }
-
-      void openGalleryWebSnapshotsPage();
-    },
-    openWebSnapshotResultMode: mode,
-    openWebSnapshotResultTitle: translate(
-      mode === 'open' ? 'popup.export.openWebSnapshot' : 'popup.export.openWebSnapshotsGallery'
-    ),
-  };
+    : {
+        onOpenLibraryResult: () => void openGalleryWebSnapshotsPage(),
+        openLibraryResultTitle: translate('popup.export.openWebSnapshotsGallery'),
+      };
 }
 
 function getExportFooterCallbacks(args: {
   controller: ExportController;
-  webSnapshotDisclosure: WebSnapshotDisclosure;
-  onRequestWebSnapshotConfirmation: () => void;
+  onRequestExport: () => void;
+  onRequestWebSnapshotSave?: (() => void) | undefined;
 }) {
   return {
     onCancelExport: () => {
@@ -54,56 +49,47 @@ function getExportFooterCallbacks(args: {
     onCopyMarkdown: () => {
       void args.controller.actions.handleCopyMarkdown();
     },
-    ...getWebSnapshotResultAction(args.controller),
+    ...getLibraryResultAction(args.controller),
     onResetExportView: () => {
       void args.controller.actions.handleResetExportView();
     },
-    onSaveWebSnapshot: () => {
-      if (args.webSnapshotDisclosure.requiresConfirmation) {
-        args.onRequestWebSnapshotConfirmation();
-        return;
-      }
-      void args.controller.actions.handleSaveWebSnapshot();
-    },
     onStartExport: () => {
-      void args.controller.actions.handleStartExport();
+      if (args.onRequestWebSnapshotSave) {
+        args.onRequestWebSnapshotSave();
+      } else {
+        args.onRequestExport();
+      }
     },
   };
 }
 
 function getExportFooterProps(args: {
-  activeTabCapabilities: ActiveTabCapabilities;
-  pageAccess: PopupPageAccessRuntime;
+  canExport?: boolean | undefined;
   controller: ExportController;
   exportDisabledTitle: string | null;
-  onRequestWebSnapshotConfirmation: () => void;
-  webSnapshotDisclosure: WebSnapshotDisclosure;
+  onRequestExport: () => void;
+  onRequestWebSnapshotSave?: (() => void) | undefined;
 }) {
   const { derived, session } = args.controller.state;
   const isResultReady =
-    Boolean(session.transfer.result) || session.transfer.progress.phase === 'error';
+    Boolean(session.transfer.result) ||
+    session.transfer.progress.phase === 'cancelled' ||
+    session.transfer.progress.phase === 'error';
 
   return {
-    canExport: derived.canExport,
+    canExport: args.canExport ?? derived.canExport,
     canCopyJson: derived.canCopyJson,
     canCopyMarkdown: derived.canCopyMarkdown,
-    canSaveWebSnapshot:
-      !args.activeTabCapabilities.export.reason &&
-      !args.pageAccess.disabledReason &&
-      !derived.isExporting,
     copiedFormat: session.copy.copiedFormat,
     copyJsonTitle: translate('popup.export.copyJsonCurrentTabTitle'),
     copyMarkdownTitle: translate('popup.export.copyMarkdownCurrentTabTitle'),
     isExporting: derived.isExporting,
-    isSavingWebSnapshot:
-      session.transfer.progress.message === translate('popup.export.webSnapshotSaving'),
     isResultReady,
     ...getExportFooterCallbacks({
       controller: args.controller,
-      onRequestWebSnapshotConfirmation: args.onRequestWebSnapshotConfirmation,
-      webSnapshotDisclosure: args.webSnapshotDisclosure,
+      onRequestExport: args.onRequestExport,
+      onRequestWebSnapshotSave: args.onRequestWebSnapshotSave,
     }),
-    saveWebSnapshotTitle: translate('popup.export.saveWebSnapshotTitle'),
     ...(derived.canExport || args.exportDisabledTitle === null
       ? {}
       : { disabledTitle: args.exportDisabledTitle }),
@@ -111,7 +97,7 @@ function getExportFooterProps(args: {
 }
 
 const exportPageContentSectionClassName = [
-  'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border',
+  'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
   [
     'bg-[color:color-mix(',
@@ -122,44 +108,30 @@ const exportPageContentSectionClassName = [
 
 function ExportPageLayout({
   controller,
+  destination,
   footerProps,
-  onCancelWebSnapshotConfirmation,
-  onConfirmWebSnapshotConfirmation,
-  onRememberWebSnapshotChoiceChange,
-  preferenceError,
-  rememberWebSnapshotChoice,
-  savingPreference,
-  webSnapshotConfirmation,
+  onDestinationChange,
+  webCopyResources,
 }: {
   controller: ExportController;
+  destination: PopupPackageDestination;
   footerProps: ExportFooterActionsProps;
-  onCancelWebSnapshotConfirmation: () => void;
-  onConfirmWebSnapshotConfirmation: () => void;
-  onRememberWebSnapshotChoiceChange: (rememberChoice: boolean) => void;
-  preferenceError: string | null;
-  rememberWebSnapshotChoice: boolean;
-  savingPreference: boolean;
-  webSnapshotConfirmation: WebSnapshotDisclosure | null;
+  onDestinationChange: (destination: PopupPackageDestination) => void;
+  webCopyResources: ReturnType<typeof useWebCopyResourcePreferences>;
 }) {
   return (
     <div className="flex h-full flex-col gap-3">
       <section className={exportPageContentSectionClassName}>
-        <ExportPageContent controller={controller} />
+        <ExportPageContent
+          controller={controller}
+          destination={destination}
+          onDestinationChange={onDestinationChange}
+          webCopyResources={webCopyResources}
+        />
         <div className="mt-auto shrink-0 pt-3" data-ui="popup.export.actions">
           <ExportFooterActions {...footerProps} />
         </div>
       </section>
-      {webSnapshotConfirmation ? (
-        <WebSnapshotConfirmationDialog
-          disclosure={webSnapshotConfirmation}
-          isSavingPreference={savingPreference}
-          onCancel={onCancelWebSnapshotConfirmation}
-          onConfirm={onConfirmWebSnapshotConfirmation}
-          onRememberChoiceChange={onRememberWebSnapshotChoiceChange}
-          preferenceError={preferenceError}
-          rememberChoice={rememberWebSnapshotChoice}
-        />
-      ) : null}
     </div>
   );
 }
@@ -167,10 +139,12 @@ function ExportPageLayout({
 export function ExportPage({
   isActive,
   activeTabCapabilities,
+  initialDestination = 'export',
   pageAccess = defaultPageAccessRuntime,
 }: {
   isActive: boolean;
   activeTabCapabilities: ActiveTabCapabilities;
+  initialDestination?: PopupPackageDestination;
   pageAccess?: PopupPageAccessRuntime;
 }) {
   const controller = usePopupExportController({
@@ -178,33 +152,41 @@ export function ExportPage({
     isActive,
     pageAccess,
   });
-  const webSnapshotConfirmation = useWebSnapshotConfirmationState(controller);
+  const webCopyResources = useWebCopyResourcePreferences();
+  const [destination, setDestination] = useState<PopupPackageDestination>(initialDestination);
   const restrictedPageFeaturesTitle = activeTabCapabilities.isRestrictedPage
     ? translate('popup.common.restrictedPageFeatures')
     : null;
-  const exportDisabledTitle = controller.state.derived.canExport
+  const canExport =
+    destination === 'save'
+      ? controller.state.preferences.hasLoadedPreferences &&
+        controller.state.tabs.selectedCount > 0 &&
+        controller.state.derived.exportDisabledReason === null &&
+        !controller.state.derived.isExporting
+      : controller.state.derived.canExport;
+  const exportDisabledTitle = canExport
     ? null
     : (restrictedPageFeaturesTitle ?? controller.state.derived.exportDisabledReason);
   const footerProps = getExportFooterProps({
-    activeTabCapabilities,
-    pageAccess,
+    canExport,
     controller,
     exportDisabledTitle,
-    onRequestWebSnapshotConfirmation: webSnapshotConfirmation.requestConfirmation,
-    webSnapshotDisclosure: webSnapshotConfirmation.disclosure,
+    onRequestExport: () => void controller.actions.handleStartExport(),
+    ...(destination === 'save'
+      ? { onRequestWebSnapshotSave: () => void controller.actions.handleSaveWebSnapshot() }
+      : {}),
   });
 
   return (
     <ExportPageLayout
       controller={controller}
+      destination={destination}
       footerProps={footerProps}
-      onCancelWebSnapshotConfirmation={webSnapshotConfirmation.cancelConfirmation}
-      onConfirmWebSnapshotConfirmation={webSnapshotConfirmation.confirm}
-      onRememberWebSnapshotChoiceChange={webSnapshotConfirmation.setRememberChoice}
-      preferenceError={webSnapshotConfirmation.preferenceError}
-      rememberWebSnapshotChoice={webSnapshotConfirmation.rememberChoice}
-      savingPreference={webSnapshotConfirmation.preferenceSaving}
-      webSnapshotConfirmation={webSnapshotConfirmation.confirmation}
+      onDestinationChange={(nextDestination) => {
+        setDestination(nextDestination);
+        void savePopupLastExportDestination(nextDestination);
+      }}
+      webCopyResources={webCopyResources}
     />
   );
 }

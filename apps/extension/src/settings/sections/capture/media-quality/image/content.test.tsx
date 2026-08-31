@@ -53,6 +53,18 @@ async function renderWithState(state: ImageSettingsState) {
 
 function createState(overrides: Partial<ImageSettingsState> = {}): ImageSettingsState {
   return {
+    fullPage: {
+      error: null,
+      policy: {
+        maxFileSizeMiB: 64,
+        maxMegapixels: 64,
+        minScalePercent: 50,
+        profile: 'safe',
+      },
+      handleProfileChange: vi.fn(),
+      handleValueCommit: vi.fn(),
+      handleValuePreview: vi.fn(),
+    },
     imageFormat: 'webp',
     imageQuality: 85,
     isLoading: false,
@@ -84,6 +96,8 @@ describe('ImageSettingsSectionContent', () => {
     expect(container?.firstElementChild?.className).not.toContain('!max-w-[560px]');
     expect(container?.textContent).toContain('imageSettings.section.formatWebpLabel');
     expect(container?.querySelector('ul')).toBeNull();
+    expect(container?.textContent).toContain('imageSettings.section.fullPageProfileMaximum');
+    expect(container?.textContent).not.toContain('imageSettings.section.fullPageReset');
 
     const buttons = Array.from(container?.querySelectorAll('button') ?? []);
     await act(async () => {
@@ -91,14 +105,16 @@ describe('ImageSettingsSectionContent', () => {
     });
 
     await act(async () => {
-      const lastNumericProps = numericRowPropsMock.mock.lastCall?.[0] as
+      const qualityNumericProps = numericRowPropsMock.mock.calls.find(
+        ([props]) => props.label === 'imageSettings.section.qualityLabel'
+      )?.[0] as
         | {
             onCommitValue(value: number): void;
             onPreviewValue(value: number): void;
           }
         | undefined;
-      lastNumericProps?.onPreviewValue(91);
-      lastNumericProps?.onCommitValue(91);
+      qualityNumericProps?.onPreviewValue(91);
+      qualityNumericProps?.onCommitValue(91);
     });
 
     expect(state.handleFormatChange).toHaveBeenCalledWith('png');
@@ -117,14 +133,14 @@ describe('ImageSettingsSectionContent quality states', () => {
       })
     );
 
-    expect(numericRowPropsMock).toHaveBeenLastCalledWith(
+    expect(numericRowPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({ disabled: true, value: 100 })
     );
   });
 
   it('passes the current lossy quality to the numeric scrubber', async () => {
     await renderWithState(createState({ imageQuality: 73 }));
-    expect(numericRowPropsMock).toHaveBeenLastCalledWith(
+    expect(numericRowPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({ disabled: false, value: 73, unit: '%' })
     );
   });

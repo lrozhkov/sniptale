@@ -1,0 +1,160 @@
+name: Selectel maintenance
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Exact maintenance operation
+        required: true
+        default: sweep
+        type: choice
+        options: [sweep, recover, dependency-freshness]
+      recovery_run_id:
+        description: Exact GitHub run ID to recover
+        required: false
+        default: ''
+        type: string
+      recovery_run_attempt:
+        description: Exact GitHub run attempt to recover
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selectel-maintenance-${{ inputs.operation || 'sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  candidate-image-sweeper:
+    if: github.event_name == 'schedule' || inputs.operation == 'sweep'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: selectel-runner-controller
+    permissions: { actions: read, contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - uses: ./.github/actions/setup-locked-node
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - name: Authenticate the bounded GHCR maintenance owner
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: echo "$GH_TOKEN" | docker login ghcr.io --username '${{ github.actor }}' --password-stdin
+      - name: Delete only candidate images idle for seven days
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: node tooling/ci/candidate-image-maintenance.mjs apply
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        if: always()
+        with:
+          name: candidate-image-sweep-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/candidate-image-maintenance/report.json
+          if-no-files-found: error
+          retention-days: 30
+
+  scheduled-sweeper:
+    if: github.event_name == 'schedule' || inputs.operation == 'sweep'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: selectel-runner-controller
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - name: Build the controller from the exact scheduled main commit
+        run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .
+      - name: Delete expired managed Selectel resources
+        env:
+          CONTROLLER_IMAGE: sniptale-controller:${{ github.sha }}
+          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
+          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
+        run: |
+          status=0
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            --env RUNNER_CONTROLLER_TOKEN "$CONTROLLER_IMAGE" sweep || status=$?
+          if [ ! -f build/selectel-controller/sweep.json ]; then
+            mkdir -p build/selectel-controller
+            if [ "$status" -eq 0 ]; then status=1; fi
+            jq -n --argjson exitCode "$status" '{
+              schemaVersion: 3,
+              artifactKind: "sniptale-selectel-sweep-proof",
+              status: "failed",
+              failure: {kind: "ControllerExit", exitCode: $exitCode}
+            }' > build/selectel-controller/sweep.json
+          fi
+          exit "$status"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: selectel-sweep-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/selectel-controller/sweep.json
+          if-no-files-found: error
+          retention-days: 30
+
+  selectel-recovery:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.operation == 'recover'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: selectel-runner-controller
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - name: Build the controller from the exact dispatched main commit
+        run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .
+      - name: Recover one exact Selectel run attempt without provisioning
+        env:
+          CONTROLLER_IMAGE: sniptale-controller:${{ github.sha }}
+          RECOVERY_RUN_ID: ${{ inputs.recovery_run_id }}
+          RECOVERY_RUN_ATTEMPT: ${{ inputs.recovery_run_attempt }}
+          SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
+          SELECTEL_OS_REGION_NAME: ${{ vars.SELECTEL_OS_REGION_NAME }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_ID: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_ID }}
+          SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: ${{ secrets.SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET }}
+          RUNNER_CONTROLLER_TOKEN: ${{ secrets.RUNNER_CONTROLLER_TOKEN }}
+        run: |
+          printf '%s\n' "$RECOVERY_RUN_ID" | grep -Eq '^[1-9][0-9]*$'
+          printf '%s\n' "$RECOVERY_RUN_ATTEMPT" | grep -Eq '^[1-9][0-9]*$'
+          mkdir -p build/selectel-controller
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --env SELECTEL_OS_AUTH_URL --env SELECTEL_OS_REGION_NAME \
+            --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
+            --env RUNNER_CONTROLLER_TOKEN \
+            --env GITHUB_RUN_ID="$RECOVERY_RUN_ID" --env GITHUB_RUN_ATTEMPT="$RECOVERY_RUN_ATTEMPT" \
+            "$CONTROLLER_IMAGE" recover-cleanup /workspace/build/selectel-controller/recovery.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: selectel-recovery-${{ inputs.recovery_run_id }}-${{ inputs.recovery_run_attempt }}-${{ github.run_id }}
+          path: build/selectel-controller/recovery.json
+          if-no-files-found: error
+          retention-days: 30
+
+  dependency-freshness:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'dependency-freshness'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ github.sha }}', persist-credentials: false }
+      - uses: ./.github/actions/setup-locked-node
+      - name: Generate the read-only dependency refresh plan
+        run: node tooling/ci/dependency-freshness.mjs > build/dependency-freshness.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        with:
+          name: dependency-freshness-${{ github.sha }}-${{ github.run_id }}
+          path: build/dependency-freshness.json
+          if-no-files-found: error
+          retention-days: 30

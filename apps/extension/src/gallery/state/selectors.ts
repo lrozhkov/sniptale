@@ -3,10 +3,10 @@ import { formatBytes } from '../../platform/i18n/format-bytes';
 import type { ScenarioProjectSummary } from '../../features/scenario/contracts/types/project';
 import {
   FOLDER_FILTER_KIND_MAP,
+  getGalleryGridCardLayout,
   GRID_CARD_MIN_WIDTH_BY_MODE,
   GRID_GAP,
   GRID_OVERSCAN_ROWS,
-  GRID_ROW_HEIGHT_BY_MODE,
 } from '../library/constants';
 import type {
   FolderFilter,
@@ -137,10 +137,12 @@ function getFacetOptionLabel(id: GalleryFacetFilterId, value: string): string {
 
 function createFacetDefinition(
   id: GalleryFacetFilterId,
-  counts: Map<string, number>
+  counts: Map<string, number>,
+  selectedValues: string[] = []
 ): GalleryFacetDefinition {
-  const options = Array.from(counts, ([value, count]) => ({
-    count,
+  const values = new Set([...counts.keys(), ...selectedValues]);
+  const options = Array.from(values, (value) => ({
+    count: counts.get(value) ?? 0,
     label: getFacetOptionLabel(id, value),
     value,
   })).sort((left, right) => {
@@ -169,7 +171,13 @@ function createFacetDefinition(
 
 export function getGalleryFacets(
   items: GalleryItem[],
-  context: { folderFilter?: FolderFilter; now?: number; scope?: GalleryScope } = {}
+  context: {
+    activeTags?: string[];
+    facetFilters?: GalleryFacetFilters;
+    folderFilter?: FolderFilter;
+    now?: number;
+    scope?: GalleryScope;
+  } = {}
 ): GalleryFacetDefinition[] {
   const facetIds: GalleryFacetFilterId[] = [
     'created',
@@ -219,11 +227,18 @@ export function getGalleryFacets(
     {
       id: 'tags',
       searchable: tagCounts.size > 10,
-      options: Array.from(tagCounts, ([value, count]) => ({ count, label: value, value })).sort(
-        (left, right) => compareStrings(left.label, right.label)
-      ),
+      options: Array.from(
+        new Set([...tagCounts.keys(), ...(context.activeTags ?? [])]),
+        (value) => ({
+          count: tagCounts.get(value) ?? 0,
+          label: value,
+          value,
+        })
+      ).sort((left, right) => compareStrings(left.label, right.label)),
     },
-    ...facetIds.map((id) => createFacetDefinition(id, counts.get(id)!)),
+    ...facetIds.map((id) =>
+      createFacetDefinition(id, counts.get(id)!, context.facetFilters?.[id] ?? [])
+    ),
   ];
 }
 
@@ -427,11 +442,15 @@ export function getGalleryGridMetrics(args: {
   }
 
   const cardMinWidth = GRID_CARD_MIN_WIDTH_BY_MODE[args.viewMode];
-  const rowHeight = GRID_ROW_HEIGHT_BY_MODE[args.viewMode];
   const columnCount = Math.max(
     1,
     Math.floor((args.gridWidth + GRID_GAP) / (cardMinWidth + GRID_GAP))
   );
+  const { rowHeight } = getGalleryGridCardLayout({
+    columnCount,
+    gridWidth: args.gridWidth,
+    viewMode: args.viewMode,
+  });
   const totalRows = Math.ceil(displayItems.length / columnCount);
   const startRow = Math.max(0, Math.floor(args.scrollTop / rowHeight) - GRID_OVERSCAN_ROWS);
   const endRow = Math.min(

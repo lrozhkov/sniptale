@@ -80,6 +80,46 @@ function effectBundleRoot() {
 }
 
 describe('media backup v6 export', () => {
+  it('round-trips bounded saved Gallery views through the manifest', async () => {
+    const plan = buildMediaHubBackupExportPlanV6({
+      archiveId: 'archive-views',
+      exportedAt: '2026-08-20T00:00:00.000Z',
+      galleryViews: [
+        {
+          createdAt: 1,
+          filters: {
+            activeTags: ['review'],
+            facetFilters: {
+              created: [],
+              duration: [],
+              format: ['png'],
+              resolution: [],
+              size: [],
+              source: ['example.com'],
+              updated: [],
+            },
+            scope: 'library',
+          },
+          folderFilter: 'screenshot',
+          id: 'view-1',
+          name: 'Review',
+          updatedAt: 1,
+        },
+      ],
+      privacy: {
+        includeSourceMetadata: false,
+        includeTelemetry: false,
+        includeWebSnapshots: false,
+      },
+      roots: [],
+    });
+    const output = createArchiveMemorySink();
+    await exportMediaHubBackupV6({ plan, sink: output.sink });
+
+    const inspected = await inspectMediaHubBackupV6(output.blob());
+    expect(inspected.manifest.galleryViews).toEqual(plan.manifest.galleryViews);
+  });
+
   it('writes a sequential closed archive without loading roots during preflight', async () => {
     const item = root();
     const plan = buildMediaHubBackupExportPlanV6({

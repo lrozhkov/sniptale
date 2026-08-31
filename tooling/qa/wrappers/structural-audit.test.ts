@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, it } from 'vitest';
 
-import { QA_WRAPPER_CLI_CONTRACTS } from './cli-contracts.mjs';
-import { STRUCTURAL_AUDIT_STEPS } from '../core/qa-steps/definitions.data.mjs';
-import { resolveQaLanePolicy } from '../core/qa-steps/policy/lane.mjs';
-import { formatStructuralRiskConsole } from '../core/structural-risk/report.mjs';
-import { createTempRoot } from '../core/test-helpers';
+import { QA_WRAPPER_CLI_CONTRACTS } from './contracts/cli-contracts.mjs';
+import { STRUCTURAL_AUDIT_STEPS } from '../composition/catalog/definitions.data.mjs';
+import { resolveQaLanePolicy } from '../composition/catalog/policy/lane.mjs';
+import { formatStructuralRiskConsole } from '../analysis/structural-risk/report.mjs';
+import { createTempRoot } from '../test-support/test-helpers';
 import {
   runStructuralAuditWrapper,
   STRUCTURAL_AUDIT_MAX_BYTES,
@@ -29,7 +29,6 @@ it('registers structural audit as a distinct manual report-only wrapper', () => 
   for (const file of [
     'tooling/qa/wrappers/checkpoint.mjs',
     'tooling/qa/wrappers/closeout.mjs',
-    'tooling/qa/wrappers/release.mjs',
     'tooling/qa/wrappers/audit.mjs',
   ]) {
     expect(fs.readFileSync(file, 'utf8')).not.toContain('topology-fragmentation');

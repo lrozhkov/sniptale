@@ -1,63 +1,71 @@
 // @vitest-environment jsdom
 
-import JSZip from 'jszip';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+  PAGE_PACKAGE_ARCHIVE_PATHS,
+  PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+} from '@sniptale/runtime-contracts/page-package';
 import type { WebSnapshotRecord } from '../../composition/persistence/web-snapshots/contracts';
-import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../features/web-snapshot/manifest';
+import {
+  createPagePackageArchiveFixture,
+  readPagePackageTestBlobText,
+  type PagePackageFixtureEntry,
+} from '../../features/web-snapshot/package.test-support';
 
 const NativeURL = URL;
-
 const mocks = vi.hoisted(() => ({
   getWebSnapshotRecord: vi.fn(),
+  getWebSnapshotScreenshotFile: vi.fn(),
+  validateRetainedWebSnapshotScreenshot: vi.fn(),
 }));
 
+vi.mock('../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/web-snapshot/screenshot-validation')>()),
+  validateRetainedWebSnapshotScreenshot: mocks.validateRetainedWebSnapshotScreenshot,
+}));
 vi.mock('../../composition/persistence/web-snapshots', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/web-snapshots')>()),
   getWebSnapshotRecord: mocks.getWebSnapshotRecord,
+  getWebSnapshotScreenshotFile: mocks.getWebSnapshotScreenshotFile,
 }));
 
 import { loadWebSnapshotPackage } from './assets';
 
-function createManifest(): WebSnapshotManifest {
-  return {
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    capturedAt: '2026-05-12T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: WEB_SNAPSHOT_PACKAGE_PATHS,
-    schemaVersion: 1,
-    source: {
-      faviconUrl: null,
-      title: 'Example Page',
-      url: 'https://example.com/page',
-    },
-    stats: { assetCount: 1, failedAssetCount: 0, packageSize: 10 },
-    warnings: [],
-  };
-}
-
-async function createPackageBlob(
+async function stubRecord(
   html: string,
-  extras: Record<string, string | Uint8Array> = {}
-): Promise<Blob> {
-  const zip = new JSZip();
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(createManifest()));
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, html);
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, 'png');
-  zip.file('assets/image.png', 'png');
-  for (const [path, value] of Object.entries(extras)) {
-    zip.file(path, value);
-  }
-  return zip.generateAsync({ type: 'blob' });
+  extras: Array<{ content: string; mimeType: string; path: string }> = []
+): Promise<void> {
+  const base = await createPagePackageArchiveFixture();
+  const entries: PagePackageFixtureEntry[] = [
+    ...base.entries.filter((entry) => entry.path !== PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml),
+    {
+      blob: new Blob([html], { type: 'text/html' }),
+      component: 'webCopy',
+      path: PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml,
+    },
+    ...extras.map((asset) => ({
+      blob: new Blob([asset.content], { type: asset.mimeType }),
+      component: 'webCopy' as const,
+      path: asset.path,
+    })),
+  ];
+  const fixture = await createPagePackageArchiveFixture({ entries });
+  mocks.getWebSnapshotRecord.mockResolvedValue({
+    createdAt: 1,
+    id: 'snapshot-1',
+    manifest: fixture.manifest,
+    packageFile: new File([fixture.packageBlob], 'snapshot.sniptale-page-package.zip', {
+      type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+    }),
+    size: fixture.packageBlob.size,
+    updatedAt: 1,
+  } satisfies WebSnapshotRecord);
 }
-
-type CreateObjectUrlMock = ReturnType<typeof vi.fn<(blob: Blob) => string>>;
 
 function stubObjectUrlStatics(
-  createObjectURL: CreateObjectUrlMock = vi.fn(() => 'blob:snapshot-image')
+  createObjectURL: ReturnType<typeof vi.fn<(blob: Blob) => string>> = vi.fn(
+    () => 'blob:snapshot-image'
+  )
 ): void {
   class MockURL extends NativeURL {}
   Object.defineProperties(MockURL, {
@@ -67,27 +75,19 @@ function stubObjectUrlStatics(
   vi.stubGlobal('URL', MockURL);
 }
 
-function readBlobText(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read blob.'));
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.readAsText(blob);
-  });
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getWebSnapshotScreenshotFile.mockResolvedValue(
+    new File(['png'], 'snapshot.png', { type: 'image/png' })
+  );
+  mocks.validateRetainedWebSnapshotScreenshot.mockResolvedValue({ height: 720, width: 1280 });
   stubObjectUrlStatics();
 });
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.unstubAllGlobals());
 
-it('re-sanitizes restored snapshot HTML before returning viewer srcdoc', async () => {
-  const recordManifest = createManifest();
-  const packageBlob = await createPackageBlob(
+it('re-sanitizes restored static HTML before returning Viewer content', async () => {
+  await stubRecord(
     [
       '<main>',
       '<script>window.evil = true</script>',
@@ -97,16 +97,9 @@ it('re-sanitizes restored snapshot HTML before returning viewer srcdoc', async (
       '<a href="https://tracker.example/page">External</a>',
       '<style>.hero { background: u\\72l("https://tracker.example/pixel.png"); }</style>',
       '</main>',
-    ].join('')
+    ].join(''),
+    [{ content: 'png', mimeType: 'image/png', path: 'assets/image.png' }]
   );
-  mocks.getWebSnapshotRecord.mockResolvedValue({
-    createdAt: 1,
-    id: 'snapshot-1',
-    manifest: recordManifest,
-    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
-    size: packageBlob.size,
-    updatedAt: 1,
-  } satisfies WebSnapshotRecord);
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
 
@@ -115,13 +108,12 @@ it('re-sanitizes restored snapshot HTML before returning viewer srcdoc', async (
   expect(loaded.html).not.toContain('http-equiv="refresh"');
   expect(loaded.html).not.toContain('<iframe');
   expect(loaded.html).not.toContain('onerror');
-  expect(loaded.html).not.toContain('href="https://tracker.example/page"');
-  expect(loaded.html).not.toContain('https://tracker.example/pixel.png');
+  expect(loaded.html).toContain('data-sniptale-external-href="https://tracker.example/page"');
+  expect(loaded.html).not.toContain('tracker.example/pixel.png');
 });
 
-it('keeps safe navigation links while stripping unresolved offline resource links', async () => {
-  const recordManifest = createManifest();
-  const packageBlob = await createPackageBlob(
+it('blocks all unresolved navigation and resource links in offline Viewer content', async () => {
+  await stubRecord(
     [
       '<a href="https://example.com/details">Details</a>',
       '<link rel="stylesheet" href="https://tracker.example/style.css">',
@@ -130,85 +122,44 @@ it('keeps safe navigation links while stripping unresolved offline resource link
       '<img src="https://tracker.example/pixel.png">',
     ].join('')
   );
-  mocks.getWebSnapshotRecord.mockResolvedValue({
-    createdAt: 1,
-    id: 'snapshot-1',
-    manifest: recordManifest,
-    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
-    size: packageBlob.size,
-    updatedAt: 1,
-  } satisfies WebSnapshotRecord);
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const restored = new DOMParser().parseFromString(loaded.html, 'text/html');
 
-  expect(loaded.html).not.toContain('href="https://example.com/details"');
-  expect(loaded.html).not.toContain('https://tracker.example/style.css');
-  expect(loaded.html).not.toContain('https://tracker.example/map');
-  expect(loaded.html).not.toContain('https://tracker.example/icon.svg');
-  expect(loaded.html).not.toContain('https://tracker.example/pixel.png');
-});
-
-it('sanitizes restored CSS package assets before object URL creation', async () => {
-  const createdBlobs: Blob[] = [];
-  const createObjectURL = vi.fn((blob: Blob) => {
-    createdBlobs.push(blob);
-    return blob.type === 'text/css' ? 'blob:snapshot-css' : 'blob:snapshot-image';
-  });
-  stubObjectUrlStatics(createObjectURL);
-  const recordManifest = createManifest();
-  const packageBlob = await createPackageBlob(
-    '<link rel="stylesheet" href="../assets/style.css"><main>Page</main>',
-    {
-      'assets/style.css': [
-        '@im/* hidden */port "https://tracker.example/style.css";',
-        '.hero { background: u\\72l("https://tracker.example/pixel.png"); color: red; }',
-      ].join('\n'),
-    }
+  expect(restored.querySelector('a')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('a')?.getAttribute('data-sniptale-external-href')).toBe(
+    'https://example.com/details'
   );
-  mocks.getWebSnapshotRecord.mockResolvedValue({
-    createdAt: 1,
-    id: 'snapshot-1',
-    manifest: recordManifest,
-    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
-    size: packageBlob.size,
-    updatedAt: 1,
-  } satisfies WebSnapshotRecord);
-
-  const loaded = await loadWebSnapshotPackage('snapshot-1');
-  const cssBlob = createdBlobs.find((blob) => blob.type === 'text/css');
-
-  expect(loaded.html).toContain('href="blob:snapshot-css"');
-  expect(cssBlob).toBeDefined();
-  await expect(readBlobText(cssBlob as Blob)).resolves.toBe('');
+  expect(restored.querySelector('link')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('area')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('use')?.getAttribute('href')).toBeNull();
+  expect(restored.querySelector('img')?.getAttribute('src')).toBeNull();
+  expect(loaded.html).not.toContain('tracker.example');
 });
 
-it('sanitizes restored CSS package assets with non-lowercase extensions', async () => {
+it('sanitizes restored CSS assets before creating preview object URLs', async () => {
   const createdBlobs: Blob[] = [];
   stubObjectUrlStatics(
-    vi.fn((blob: Blob) => {
+    vi.fn((blob) => {
       createdBlobs.push(blob);
       return blob.type === 'text/css' ? 'blob:snapshot-css' : 'blob:snapshot-image';
     })
   );
-  const recordManifest = createManifest();
-  const packageBlob = await createPackageBlob(
-    '<link rel="stylesheet" href="../assets/style.CSS"><main>Page</main>',
+  await stubRecord('<link rel="stylesheet" href="../assets/style.css"><main>Page</main>', [
     {
-      'assets/style.CSS': '.hero { background: u\\72l("https://tracker.example/pixel.png"); }',
-    }
-  );
-  mocks.getWebSnapshotRecord.mockResolvedValue({
-    createdAt: 1,
-    id: 'snapshot-1',
-    manifest: recordManifest,
-    packageFile: new File([packageBlob], 'snapshot.zip', { type: packageBlob.type }),
-    size: packageBlob.size,
-    updatedAt: 1,
-  } satisfies WebSnapshotRecord);
+      content: [
+        '@im/* hidden */port "https://tracker.example/style.css";',
+        '.hero { background: u\\72l("https://tracker.example/pixel.png"); color: red; }',
+      ].join('\n'),
+      mimeType: 'text/css',
+      path: 'assets/style.css',
+    },
+  ]);
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
-  const cssBlob = createdBlobs.find((blob) => blob.type === 'text/css');
+  const cssBlob = createdBlobs.filter((blob) => blob.type === 'text/css').at(-1);
 
   expect(loaded.html).toContain('href="blob:snapshot-css"');
-  await expect(readBlobText(cssBlob as Blob)).resolves.toBe('');
+  expect(cssBlob).toBeDefined();
+  await expect(readPagePackageTestBlobText(cssBlob!)).resolves.toBe('');
 });

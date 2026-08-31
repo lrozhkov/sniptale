@@ -5,7 +5,8 @@ const { createDownloadRouterServiceMock, service } = vi.hoisted(() => ({
   service: { rememberPendingDownload: vi.fn() },
 }));
 
-vi.mock('./service', () => ({
+vi.mock('./service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./service')>()),
   createDownloadRouterService: createDownloadRouterServiceMock.mockReturnValue(service),
 }));
 

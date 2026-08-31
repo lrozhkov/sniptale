@@ -1,5 +1,13 @@
-import type { FieldContentRole } from '../dom-tree';
+import type { DocumentInlineNode, FieldContentRole } from '../dom-tree';
 import { estimateUtf8Bytes } from '../validation/base64';
+import { MAX_PAGE_PACKAGE_TITLE_BYTES } from '../page-package/contracts';
+import type { ExportResourceLimits } from './resource-limits';
+export {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  EXPORT_RESOURCE_LIMITS_ABSOLUTE,
+  parseExportResourceLimits,
+  type ExportResourceLimits,
+} from './resource-limits';
 
 export const MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES = 5 * 1024 * 1024;
 
@@ -28,6 +36,7 @@ export type ExportProgressStepKey =
   | 'pageDiagnostics'
   | 'cssDiagnostics'
   | 'fullPageScreenshot'
+  | 'viewportScreenshot'
   | 'webSnapshotPreview'
   | 'webSnapshotDom'
   | 'webSnapshotStyles'
@@ -36,7 +45,9 @@ export type ExportProgressStepKey =
 
 export interface ExportProgress {
   activeStepKey?: ExportProgressStepKey | null;
-  phase: 'idle' | 'scanning' | 'downloading' | 'zipping' | 'done' | 'error';
+  completedStepKeys?: ExportProgressStepKey[];
+  failedStepKeys?: ExportProgressStepKey[];
+  phase: 'idle' | 'scanning' | 'downloading' | 'zipping' | 'done' | 'cancelled' | 'error';
   message: string;
   current: number; // текущий элемент
   total: number; // всего элементов
@@ -56,6 +67,8 @@ export interface ExportOptions {
   includePageDiagnostics: boolean;
   includeCssDiagnostics: boolean; // включить stylesheets/computed-styles bundle
   includeFullPageScreenshot: boolean; // включить full-page screenshot в корень архива
+  includeViewportScreenshot?: boolean; // включить отдельный screenshot видимой области
+  resourceLimits?: ExportResourceLimits; // ограничить скачиваемые вложения и изображения
 }
 
 /**
@@ -64,7 +77,8 @@ export interface ExportOptions {
 export interface FileResource {
   url: string;
   filename: string;
-  source: 'direct' | 'dynamic'; // прямая ссылка или из модального окна
+  // Прямая ссылка, поддерживаемое превью или стандартное изображение страницы.
+  source: 'direct' | 'dynamic' | 'page-image';
   rowId?: string; // ID строки таблицы (для связи с JSON)
   columnName?: string; // Имя колонки
   tableName?: string; // Название таблицы/секции
@@ -94,6 +108,7 @@ export interface ExportSection {
     type: 'string' | 'link' | 'number' | 'boolean' | 'image' | 'status';
     contentRole?: FieldContentRole;
     linkRef?: string;
+    inlineContent?: DocumentInlineNode[];
   }>;
   tables?: Array<{
     title: string;
@@ -152,7 +167,18 @@ export interface ExportPagePackage {
 
 export interface PopupExportPackageResponse {
   success: boolean;
-  pagePackage?: ExportPagePackage;
+  stagedPagePackage?: {
+    jobId: string;
+    manifestSha256: string;
+    manifestSize: number;
+    ordinal: number;
+    pageId: string;
+    producerStats: ExportResult['stats'];
+    snapshotSessionId?: string;
+    stagedBlobId: string;
+    title: string | null;
+    totalBytes: number;
+  };
   error?: string;
 }
 
@@ -167,28 +193,39 @@ export interface PopupExportResult {
   warnings?: string[];
 }
 
-export type PopupExportJobPhase =
-  | 'running'
-  | 'cancelling'
-  | 'cancelled'
-  | 'completed'
-  | 'failed'
-  | 'interrupted';
+export const MAX_POPUP_EXPORT_JOB_ID_BYTES = 128;
+export const MAX_POPUP_EXPORT_JOB_TABS = 256;
+export const MAX_POPUP_EXPORT_STATUS_TEXT_BYTES = 16 * 1024;
+export const MAX_POPUP_EXPORT_TAB_TITLE_BYTES = MAX_PAGE_PACKAGE_TITLE_BYTES;
+export const MAX_POPUP_EXPORT_WARNINGS_TOTAL_BYTES = 512 * 1024;
+const POPUP_EXPORT_JOB_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
-export type PopupExportJobTab = {
-  tabId: number;
-  title: string;
-};
+export function isCanonicalPopupExportJobId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    estimateUtf8Bytes(value, MAX_POPUP_EXPORT_JOB_ID_BYTES) <= MAX_POPUP_EXPORT_JOB_ID_BYTES &&
+    POPUP_EXPORT_JOB_ID_PATTERN.test(value)
+  );
+}
 
-export type PopupExportJobStatus = {
-  jobId: string;
-  revision: number;
-  phase: PopupExportJobPhase;
-  orderedTabs: PopupExportJobTab[];
-  effectiveOptions: ExportOptions;
-  progress: ExportProgress;
-  warnings: string[];
-  originalActiveTabs: Array<{ windowId: number; tabId: number }>;
-  activatedTabIds: number[];
-  result?: PopupExportResult;
-};
+function truncateUtf8Text(value: string, maxBytes: number): string {
+  let bytes = 0;
+  let result = '';
+  for (const character of value) {
+    const characterBytes = estimateUtf8Bytes(character, maxBytes);
+    if (bytes + characterBytes > maxBytes) break;
+    result += character;
+    bytes += characterBytes;
+  }
+  return result;
+}
+
+export function normalizePopupExportTabTitle(value: string): string {
+  const bounded = truncateUtf8Text(value, MAX_POPUP_EXPORT_TAB_TITLE_BYTES).normalize('NFC');
+  return truncateUtf8Text(bounded, MAX_POPUP_EXPORT_TAB_TITLE_BYTES);
+}
+
+export function truncatePopupExportStatusText(value: string): string {
+  return truncateUtf8Text(value, MAX_POPUP_EXPORT_STATUS_TEXT_BYTES);
+}

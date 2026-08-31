@@ -6,6 +6,7 @@
     "tsBuildInfoFile": ".tsconfig.node.tsbuildinfo",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "rewriteRelativeImportExtensions": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "noUncheckedSideEffectImports": true,

@@ -25,7 +25,7 @@ export type GalleryFacetFilterId =
   | 'source'
   | GalleryDateFacetFilterId;
 
-type GalleryFacetId = 'status' | 'tags' | GalleryFacetFilterId;
+export type GalleryFacetId = 'status' | 'tags' | GalleryFacetFilterId;
 
 export type GalleryFacetFilters = Record<GalleryFacetFilterId, string[]>;
 

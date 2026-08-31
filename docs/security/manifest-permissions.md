@@ -15,11 +15,11 @@ This document explains high-impact grants and manifest topology. `tooling/config
 | Browser-window size presets | `system.display` | display adapter and capture-surface owner | Read display bounds and work areas only; presets that do not fit are disabled, and display settings are never changed. |
 | Tab recording | `tabCapture` | tab-capture adapter, capture mode | Required for tab and tab-crop recording modes. |
 | Screen/window recording and one-shot screenshots | `desktopCapture` | desktop-capture adapter and source picker | Background policy filters browser-selected sources. Screenshot quick actions expose only `window` and `screen`, prepare offscreen before selection, and consume the one-shot stream ID immediately. |
-| Native companion | `nativeMessaging` | native adapter and background native-app owners | Channel/protocol/settings validation; browser-only behavior survives absence or denial. |
+| Native companion | optional `nativeMessaging` | Settings grant UI, native adapter, background permission lifecycle, and native-app owners | No native connection or controls before a user grant; revocation disconnects the active port. Channel/protocol/settings validation remains mandatory after grant, and browser-only behavior survives absence or denial. |
 | Exports | `downloads` | downloads adapter and download owners | Leading optionalization candidate after every sink has request-before-use and failure UI. |
 | Content runtime delivery | generated injected bundles, no source static content scripts | injected build and page-access owners | Shim may register dynamically; full runtime uses explicit scripting injection. |
 | Content fonts | exact `fonts/manrope-*.woff2`, `use_dynamic_url: true` | manifest, public fonts, runtime styles, Vite | Only exact OFL-licensed font files are web-accessible; runtime JavaScript is not. |
-| Web-snapshot runner | not web-accessible | injected build and background routing | Delivered only through scripting-owned execution. |
+| Web-copy production | no runtime bundle is web-accessible | content runtime, page-access service, and background routing | Runs only inside the scripting-delivered content runtime; Page Package staging remains sender- and active-job-bound. |
 | Browser baseline | Manifest-owned minimum Chrome version and JSON-safe bounded or content-addressed extension messaging | manifest, runtime-message contracts, tab-capture output, and browser adapters | The current version is generated in [project facts](../engineering/project-facts.md); lowering it or opting into a different global message serializer requires compatibility and owner proof. |
 | Browser action | popup HTML and title | popup runtime | Privileged work routes through background owners. |
 | Context menu | `contextMenus` | context-menu runtime | User entrypoint, not blanket authority; route policy still applies. |
@@ -35,6 +35,7 @@ This document explains high-impact grants and manifest topology. `tooling/config
 5. Optionalize `downloads` only after all sinks have request and failure behavior; then evaluate `desktopCapture` and `tabCapture` independently.
 6. Keep web-accessible resources exact. Never use `assets/*`, `fonts/*`, or expose injected runtime bundles.
 7. Keep the local-file permission scope as Chrome's special `file:///` grant, but use the origin-only `file:///*` match required by `web_accessible_resources`.
+8. Native Messaging remains optional. Background connection and mutation owners must verify the live grant, and permission removal must disconnect the native port before further native work.
 
 ## Review rule
 

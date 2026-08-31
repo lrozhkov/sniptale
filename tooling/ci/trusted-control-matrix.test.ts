@@ -25,32 +25,35 @@ it('requires base-owned fast and release control matrices while permitting decla
   expect(proof.requiredPassed).toEqual(
     expect.arrayContaining([
       'qa.rule.typecheck',
-      'qa.rule.release-archive',
-      'qa.rule.semgrep',
+      'qa.rule.osv-scanner',
       'qa.rule.gitleaks',
       'qa.rule.unit-tests',
     ])
   );
+  expect(proof.requiredPassed).not.toContain('qa.rule.build');
+  expect(proof.requiredPassed).not.toContain('qa.rule.release-archive');
   expect(proof.allowedSkipped).toEqual(
     expect.arrayContaining([
       'qa.rule.parser-snapshot-purity',
       'qa.rule.codeql',
       'qa.rule.full-product-coverage',
+      'qa.rule.npm-audit',
     ])
   );
   expect(release.requiredPassed).toEqual(
     expect.arrayContaining([
       'qa.rule.sonarjs',
+      'qa.rule.build',
+      'qa.rule.release-archive',
       'qa.rule.codeql',
       'qa.rule.full-product-coverage',
-      'qa.rule.mutation-persistence',
-      'qa.rule.mutation-secrets',
+      'qa.rule.npm-audit',
+      'qa.rule.production-build',
     ])
   );
   expect(release.requiredPassed).not.toContain('qa.rule.unit-tests');
   for (const id of [
     'qa.rule.changed-line-readability',
-    'qa.rule.interface-surfaces',
     'qa.rule.structural-risk',
     'qa.rule.ui-automation-seams',
   ]) {
@@ -65,9 +68,9 @@ it('requires base-owned fast and release control matrices while permitting decla
 
 it('rejects missing, skipped, failed, or duplicated mandatory candidate results', () => {
   const missing = recordFor('proof');
-  missing.steps = missing.steps.filter(({ stepId }) => stepId !== 'qa.rule.semgrep');
+  missing.steps = missing.steps.filter(({ stepId }) => stepId !== 'qa.rule.osv-scanner');
   expect(() => validateTrustedControlResults(missing, 'proof')).toThrow(
-    'did not pass mandatory trusted control: qa.rule.semgrep'
+    'did not pass mandatory trusted control: qa.rule.osv-scanner'
   );
   const skipped = recordFor('proof');
   skipped.steps.find(({ stepId }) => stepId === 'qa.rule.unit-tests')!.outcome = 'skipped';
@@ -82,9 +85,9 @@ it('rejects missing, skipped, failed, or duplicated mandatory candidate results'
     'did not pass mandatory trusted control: qa.rule.full-product-coverage'
   );
   const duplicated = recordFor('proof');
-  duplicated.steps.push({ stepId: 'qa.rule.semgrep', outcome: 'passed' });
+  duplicated.steps.push({ stepId: 'qa.rule.osv-scanner', outcome: 'passed' });
   expect(() => validateTrustedControlResults(duplicated, 'proof')).toThrow(
-    'repeats a trusted control result: qa.rule.semgrep'
+    'repeats a trusted control result: qa.rule.osv-scanner'
   );
 });
 

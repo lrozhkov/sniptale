@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createWebSnapshotManifest } from '../../../features/web-snapshot/manifest';
+import { createPagePackageManifestFixture as createWebSnapshotManifest } from '../../../features/web-snapshot/manifest.test-support';
 import type { AssetReadyJournal } from '../assets';
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   readAssetFile: vi.fn(),
   recoverStandalone: vi.fn(),
   runMutation: vi.fn(),
+  validateScreenshot: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
@@ -24,6 +25,13 @@ vi.mock('./media-entry', async (importOriginal) => ({
   createWebSnapshotThumbnailEntry: mocks.createThumbnail,
 }));
 
+vi.mock('../../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../features/web-snapshot/screenshot-validation')
+  >()),
+  validateWebSnapshotScreenshotBlob: mocks.validateScreenshot,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.readAssetFile.mockResolvedValue(new File(['png'], 'screenshot.png', { type: 'image/png' }));
@@ -35,6 +43,7 @@ beforeEach(() => {
     updatedAt: 2,
     width: 320,
   });
+  mocks.validateScreenshot.mockResolvedValue({ height: 720, width: 1280 });
 });
 
 it('publishes both refs, both owners, metadata, mirror, and thumbnail in one transaction', async () => {
@@ -90,6 +99,22 @@ it('fails closed on an invalid existing ref instead of overwriting it', async ()
   );
 });
 
+it.each([
+  'Web snapshot screenshot is invalid.',
+  'Web snapshot screenshot dimensions exceed safe limits.',
+])(
+  'rejects an unsafe recovery screenshot before thumbnail decode or publication: %s',
+  async (message) => {
+    mocks.validateScreenshot.mockRejectedValue(new Error(message));
+    const { publishWebSnapshotJournal } = await import('./publication');
+
+    await expect(publishWebSnapshotJournal(createJournal())).rejects.toThrow(message);
+
+    expect(mocks.createThumbnail).not.toHaveBeenCalled();
+    expect(mocks.runMutation).not.toHaveBeenCalled();
+  }
+);
+
 it('registers only standalone web snapshot journals for recovery', async () => {
   mocks.recoverStandalone.mockResolvedValue(1);
   const { recoverWebSnapshotPublications, WEB_SNAPSHOT_PUBLICATION_DOMAIN } =
@@ -118,7 +143,7 @@ function createJournal(): AssetReadyJournal {
   };
   return {
     assetRefs: [
-      createRef('package-asset', 'application/x-sniptale-web-snapshot+zip', 5),
+      createRef('package-asset', 'application/x-sniptale-page-package+zip', 5),
       createRef('screenshot-asset', 'image/png', 3),
     ],
     createdAt: 2,
@@ -132,7 +157,7 @@ function createJournal(): AssetReadyJournal {
         height: 720,
         id: 'snapshot-1',
         kind: 'web-archive',
-        mimeType: 'application/x-sniptale-web-snapshot+zip',
+        mimeType: 'application/x-sniptale-page-package+zip',
         originalFilename: 'snapshot.zip',
         size: 5,
         source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },

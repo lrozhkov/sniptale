@@ -60,10 +60,22 @@ export interface ArchiveReader {
   close(): Promise<void>;
 }
 
+export interface ArchiveResourceProfile {
+  maxArchiveBytes: number;
+  maxEntries: number;
+  maxEntryBytes: number;
+  maxInflatedBytes: number;
+}
+
 export interface ArchiveWriter {
   addBlob(
     path: string,
     blob: Blob,
+    options?: { compress?: boolean; signal?: AbortSignal }
+  ): Promise<void>;
+  addSource(
+    path: string,
+    source: ArchiveEntrySource,
     options?: { compress?: boolean; signal?: AbortSignal }
   ): Promise<void>;
   addText(path: string, text: string, options?: { signal?: AbortSignal }): Promise<void>;

@@ -76,8 +76,6 @@ export type VideoRecordingSurfaceMessage =
 export type PopupExportViewerMessage =
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
-  | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]
-  | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL]
   | RuntimeRequestByType[typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT];
 
 export type RuntimeMessageEnvelope = {

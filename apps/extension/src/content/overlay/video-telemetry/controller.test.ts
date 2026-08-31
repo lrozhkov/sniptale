@@ -4,7 +4,8 @@ import { VideoProjectActionEventKind } from '../../../features/video/project/typ
 import { createVideoTelemetryController } from './controller';
 
 function createPointerLikeEvent(clientX: number, clientY: number): MouseEvent {
-  return new MouseEvent('pointermove', { bubbles: true, clientX, clientY });
+  const eventName = 'onpointerrawupdate' in window ? 'pointerrawupdate' : 'pointermove';
+  return new MouseEvent(eventName, { bubbles: true, clientX, clientY });
 }
 
 beforeEach(() => {

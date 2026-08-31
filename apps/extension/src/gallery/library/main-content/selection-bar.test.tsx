@@ -87,12 +87,16 @@ it('renders selected-state actions and forwards callbacks', () => {
 
   renderSelectionBar(props);
 
-  const input = container?.querySelector('input');
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
+  const addTagsButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.addTags'
+  );
   const backupButton = buttons.find(
     (button) => button.getAttribute('aria-label') === 'gallery.app.selectionBackup'
   );
-  const zipButton = buttons.find((button) => button.getAttribute('aria-label') === 'ZIP');
+  const zipButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.selectionZip'
+  );
   const deleteButton = buttons.find(
     (button) => button.getAttribute('aria-label') === 'common.actions.delete'
   );
@@ -100,17 +104,33 @@ it('renders selected-state actions and forwards callbacks', () => {
     (button) => button.getAttribute('aria-label') === 'gallery.app.clearSelection'
   );
 
-  if (!input || !backupButton || !zipButton || !deleteButton || !clearButton) {
+  if (!addTagsButton || !backupButton || !zipButton || !deleteButton || !clearButton) {
     throw new Error('Expected selection bar controls');
   }
 
+  expect(container?.querySelector('input')).toBeNull();
+  act(() => addTagsButton.click());
+  const input = container?.querySelector('input');
+  if (!(input instanceof HTMLInputElement)) throw new Error('Expected expanded tag input');
   const selectionBar = input.closest('.flex-nowrap');
   expect(selectionBar?.className).toContain('flex-nowrap');
   expect(backupButton.className).toContain('!h-8');
   expect(backupButton.className).toContain('!min-h-8');
   expect(backupButton.className).toContain('!rounded-[8px]');
+  expect(backupButton.className).toContain('!text-xs');
+  expect(deleteButton.className).toContain('!text-xs');
+  const summary = container?.querySelector('[data-ui="gallery.selection.summary"]');
+  expect(summary?.className).toContain('text-xs');
+  expect(summary?.textContent).toContain('gallery.app.selectedPrefix 2');
+  expect(summary?.textContent).toContain('·');
   expect(Array.from(selectionBar?.children ?? []).indexOf(clearButton)).toBeLessThan(
     Array.from(selectionBar?.children ?? []).indexOf(backupButton)
+  );
+  expect(Array.from(selectionBar?.children ?? []).indexOf(zipButton)).toBeLessThan(
+    Array.from(selectionBar?.children ?? []).indexOf(backupButton)
+  );
+  expect(Array.from(selectionBar?.children ?? []).indexOf(backupButton)).toBeLessThan(
+    Array.from(selectionBar?.children ?? []).indexOf(deleteButton)
   );
 
   act(() => updateInputValue(input, 'updated-tag'));
@@ -142,12 +162,18 @@ it('renders selected-state actions and forwards callbacks', () => {
 
   expect(props.onSelectionTagDraftChange).toHaveBeenCalled();
   expect(props.onApplySelectionTag).toHaveBeenCalledWith('updated-tag');
+  expect(container?.querySelector('input')).toBeNull();
+  const reopenButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.addTags'
+  );
+  act(() => reopenButton?.click());
+  expect(container?.querySelector('input')).not.toBeNull();
   expect(props.onSelectionBackup).toHaveBeenCalledTimes(1);
   expect(props.onSelectionZip).toHaveBeenCalledTimes(1);
   expect(props.onDeleteMany).toHaveBeenCalledWith(selectedItems);
   expect(props.onClearSelection).toHaveBeenCalledTimes(1);
   expect(container?.textContent).toContain('gallery.app.selectedPrefix 2');
-  expect(container?.textContent).toContain('gallery.app.sizePrefix');
+  expect(container?.textContent).not.toContain('gallery.app.sizePrefix');
 });
 
 it('supports missing tag catalog while keeping selection actions available', () => {
@@ -159,12 +185,12 @@ it('supports missing tag catalog while keeping selection actions available', () 
 
   renderSelectionBar(props);
 
-  const zipButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-    button.textContent?.includes('ZIP')
+  const zipButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.getAttribute('aria-label') === 'gallery.preview.downloadOriginal'
   );
 
   if (!(zipButton instanceof HTMLButtonElement)) {
-    throw new Error('Expected ZIP action');
+    throw new Error('Expected original download action');
   }
 
   act(() => {
@@ -172,5 +198,10 @@ it('supports missing tag catalog while keeping selection actions available', () 
   });
 
   expect(props.onSelectionZip).toHaveBeenCalledTimes(1);
+  expect(container?.querySelector('input')).toBeNull();
+  const addTagsButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.addTags'
+  );
+  act(() => addTagsButton?.click());
   expect(container?.querySelector('input')).not.toBeNull();
 });

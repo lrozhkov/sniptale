@@ -12,6 +12,7 @@ import { parseScenarioProjectEntry } from '../../../../composition/persistence/s
 import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
 import { collectVideoProjectReferences } from '../../../../composition/persistence/library-lifecycle/references';
 import { createRecordingMediaId } from '../../../../features/media-hub/media-id';
+import { listGallerySavedViews } from '../../../../composition/persistence/gallery-saved-views';
 import { buildMediaHubBackupExportPlanV6 } from '../export';
 import type { MediaHubBackupExportOptions } from '../contracts';
 import { buildEffectBundleRootInventory } from './effect-bundles';
@@ -106,6 +107,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     paths,
   });
   return buildMediaHubBackupExportPlanV6({
+    ...(options.scope === 'all' ? { galleryViews: await listGallerySavedViews() } : {}),
     privacy: {
       includeSourceMetadata: options.includeSourceMetadata,
       includeTelemetry: options.includeTelemetry,

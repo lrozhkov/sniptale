@@ -1,11 +1,15 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "generatedDocument": "docs/engineering/project-facts.md",
   "facts": [
     {
       "id": "product-version",
       "authority": "package.json#/version",
-      "consumers": ["workspace package versions", "extension manifest version", "release tag admission"]
+      "consumers": [
+        "workspace package versions",
+        "extension manifest version",
+        "release tag admission"
+      ]
     },
     {
       "id": "minimum-browser-version",
@@ -29,18 +33,27 @@
     },
     {
       "id": "runtime-topology",
-      "authority": "tooling/qa/core/runtime-topology.data.json",
+      "authority": "tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json",
       "consumers": ["runtime architecture", "entrypoint guards", "build inputs"]
     },
     {
       "id": "background-route-owners",
       "authority": "apps/extension/src/contracts/messaging/contracts/runtime/background-ingress*.data.ts",
-      "consumers": ["background handler bindings", "authorization bindings", "runtime documentation"]
+      "consumers": [
+        "background handler bindings",
+        "authorization bindings",
+        "runtime documentation"
+      ]
     },
     {
       "id": "release-policy",
       "authority": "tooling/configs/ci/github-policy.json",
       "consumers": ["GitHub rulesets", "release admission", "CI badge"]
+    },
+    {
+      "id": "qa-control-catalog",
+      "authority": "tooling/qa/composition/catalog/catalog.mjs#QA_CONTROL_CATALOG",
+      "consumers": ["generated project facts", "tooling documentation", "wrapper projections"]
     }
   ],
   "consumerAssertions": [
@@ -59,7 +72,10 @@
     {
       "factId": "security-reporting",
       "file": "docs/security/threat-model.md",
-      "mustContain": ["[generated project facts](../engineering/project-facts.md)", "[SECURITY.md](../../.github/SECURITY.md)"],
+      "mustContain": [
+        "[generated project facts](../engineering/project-facts.md)",
+        "[SECURITY.md](../../.github/SECURITY.md)"
+      ],
       "forbiddenKinds": ["security-reporting-contradiction"]
     },
     {
@@ -71,7 +87,10 @@
     {
       "factId": "security-reporting",
       "file": "docs/oss/release.md",
-      "mustContain": ["[generated project facts](../engineering/project-facts.md)", "[SECURITY.md](../../.github/SECURITY.md)"],
+      "mustContain": [
+        "[generated project facts](../engineering/project-facts.md)",
+        "[SECURITY.md](../../.github/SECURITY.md)"
+      ],
       "forbiddenKinds": ["security-reporting-contradiction"]
     },
     {

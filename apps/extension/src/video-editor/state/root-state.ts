@@ -22,7 +22,6 @@ export function createVideoEditorTimelineState(set: VideoEditorStoreSet) {
     placementMode: null,
     selection: createSceneSelection(),
     selectedTrackId: null,
-    selectedClipId: null,
     diagnosticsOpen: false,
     exportState: createInitialExportState(),
     recordingTelemetry: null,

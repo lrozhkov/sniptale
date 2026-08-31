@@ -1,21 +1,55 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getContentRuntimeServices } from '../../platform/runtime-services/services';
 import {
-  isSafeWebSnapshotUrl,
-  resolveAllowedWebSnapshotAssetMimeType,
-  sanitizeWebSnapshotCssText,
+  isSafeWebSnapshotCaptureAssetUrl,
+  isAllowedWebSnapshotAssetMimeType,
+  resolveWebSnapshotCaptureAssetMimeTypeFromBytes,
   sanitizeWebSnapshotFilename,
+  sanitizeWebSnapshotSvgText,
 } from '../../../features/web-snapshot/public';
 import { MAX_WEB_SNAPSHOT_ASSET_BYTES } from './limits';
 import type { WebSnapshotAssetEntry } from './types';
+import { resolveWebSnapshotAssetRequestUrl } from './asset-url';
 
 const EXTENSION_BY_TYPE: Record<string, string> = {
+  'font/woff': 'woff',
+  'font/woff2': 'woff2',
+  'image/avif': 'avif',
+  'image/gif': 'gif',
   'image/jpeg': 'jpg',
   'image/png': 'png',
+  'image/svg+xml': 'svg',
   'image/webp': 'webp',
   'text/css': 'css',
 };
-const ALLOWED_ASSET_MIME_TYPES = new Set(Object.keys(EXTENSION_BY_TYPE));
+
+function readBlobText(blob: Blob): Promise<string> {
+  if (typeof blob.text === 'function') return blob.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read web snapshot asset.'));
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(blob);
+  });
+}
+
+function readBlobBytes(blob: Blob): Promise<Uint8Array> {
+  if (typeof blob.arrayBuffer === 'function') {
+    return blob.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read web snapshot asset.'));
+    reader.onload = () => {
+      if (!(reader.result instanceof ArrayBuffer)) {
+        reject(new Error('Failed to read web snapshot asset.'));
+        return;
+      }
+      resolve(new Uint8Array(reader.result));
+    };
+    reader.readAsArrayBuffer(blob);
+  });
+}
 
 function getExtension(blob: Blob, url: string): string {
   const byType = EXTENSION_BY_TYPE[blob.type];
@@ -28,17 +62,22 @@ function getExtension(blob: Blob, url: string): string {
   return match?.[1]?.toLowerCase() ?? 'bin';
 }
 
-async function sanitizeCssAssetBlob(blob: Blob): Promise<Blob> {
-  if (blob.type !== 'text/css') {
-    return blob;
-  }
+function applyCanonicalExtension(filename: string, extension: string): string {
+  const stem = filename.replace(/\.[a-z0-9]{1,8}$/iu, '');
+  return `${stem || filename}.${extension}`;
+}
 
-  const css = await blob.text();
-  return new Blob([sanitizeWebSnapshotCssText(css)], { type: 'text/css' });
+async function sanitizeAssetBlob(blob: Blob): Promise<Blob> {
+  if (blob.type === 'image/svg+xml') {
+    return new Blob([sanitizeWebSnapshotSvgText(await readBlobText(blob))], {
+      type: 'image/svg+xml',
+    });
+  }
+  return blob;
 }
 
 function assertAllowedAssetBlobType(blob: Blob): void {
-  if (!ALLOWED_ASSET_MIME_TYPES.has(blob.type)) {
+  if (!isAllowedWebSnapshotAssetMimeType(blob.type)) {
     throw new Error('unsupported web snapshot asset MIME type');
   }
 }
@@ -62,13 +101,6 @@ function readContentLength(response: Response): number | null {
 
   const value = Number(rawValue);
   return Number.isSafeInteger(value) && value >= 0 ? value : null;
-}
-
-function resolveAllowedAssetMimeType(response: Response): string {
-  return resolveAllowedWebSnapshotAssetMimeType(
-    response.headers.get('content-type'),
-    ALLOWED_ASSET_MIME_TYPES
-  );
 }
 
 async function readStreamingResponseWithLimit(
@@ -119,48 +151,82 @@ async function readBlobFallbackWithLimit(
   return blob;
 }
 
-export async function readSameOriginAssetBlob(response: Response): Promise<Blob> {
-  const mimeType = resolveAllowedAssetMimeType(response);
+export async function readSameOriginAssetBlob(
+  response: Response,
+  sourceUrl?: string
+): Promise<Blob> {
   const contentLength = readContentLength(response);
   if (contentLength !== null && contentLength > MAX_WEB_SNAPSHOT_ASSET_BYTES) {
     throw new Error('web snapshot asset is too large');
   }
 
-  const chunks = response.body
+  const chunks: BlobPart[] = response.body
     ? await readStreamingResponseWithLimit(response.body)
     : [await readBlobFallbackWithLimit(response, contentLength)];
 
-  return new Blob(chunks, { type: mimeType });
+  const bytes = await readBlobBytes(new Blob(chunks));
+  const mimeType = resolveWebSnapshotCaptureAssetMimeTypeFromBytes({
+    bytes,
+    contentType: response.headers.get('content-type'),
+    url: sourceUrl ?? response.url,
+  });
+  const ownedBytes = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+  ownedBytes.set(bytes);
+
+  return new Blob([ownedBytes], { type: mimeType });
 }
 
 async function fetchAssetBlob(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: ReadonlyMap<string, Blob | Error>;
   fetchSameOriginAssetBlob: (resolved: URL) => Promise<Blob>;
   pageOrigin: string;
   resolved: URL;
   snapshotSessionId: string;
 }): Promise<Blob> {
+  const prefetched = args.anonymousCrossOriginAssets.get(args.resolved.href);
+  if (prefetched) {
+    if (prefetched instanceof Error) throw prefetched;
+    return prefetched;
+  }
+  if (args.resolved.protocol === 'data:') {
+    return readSameOriginAssetBlob(await fetch(args.resolved.href), args.resolved.href);
+  }
   if (args.resolved.origin === args.pageOrigin) {
     return args.fetchSameOriginAssetBlob(args.resolved);
   }
   if (!args.allowAnonymousCrossOriginAssets) {
     throw new Error('anonymous cross-origin asset fetch is disabled');
   }
+  throw new Error('anonymous asset fetch result is unavailable');
+}
 
+export async function fetchAnonymousCrossOriginAssetBlobs(
+  urls: string[],
+  snapshotSessionId: string
+): Promise<Map<string, Blob | Error>> {
+  if (urls.length === 0) return new Map();
   const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
     type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-    snapshotSessionId: args.snapshotSessionId,
-    url: args.resolved.href,
+    snapshotSessionId,
+    urls,
   });
-  if (!response.success || !response.base64) {
+  if (!response.success || !response.assets) {
     throw new Error(response.error || 'anonymous asset fetch failed');
   }
-
-  return base64ToBlob(response.base64, response.mimeType || 'application/octet-stream');
+  return new Map(
+    response.assets.map((asset) => [
+      asset.url,
+      asset.success && asset.base64
+        ? base64ToBlob(asset.base64, asset.mimeType || 'application/octet-stream')
+        : new Error(asset.error || 'anonymous asset fetch failed'),
+    ])
+  );
 }
 
 export async function fetchAssetUrl(args: {
   allowAnonymousCrossOriginAssets: boolean;
+  anonymousCrossOriginAssets: ReadonlyMap<string, Blob | Error>;
   baseUrl: string;
   fetchSameOriginAssetBlob: (resolved: URL) => Promise<Blob>;
   index: number;
@@ -168,28 +234,30 @@ export async function fetchAssetUrl(args: {
   snapshotSessionId: string;
   url: string;
 }): Promise<WebSnapshotAssetEntry> {
-  if (!isSafeWebSnapshotUrl(args.url, args.baseUrl)) {
+  if (!isSafeWebSnapshotCaptureAssetUrl(args.url, args.baseUrl)) {
     throw new Error('unsafe URL');
   }
 
-  const resolved = new URL(args.url, args.baseUrl);
+  const resolved = new URL(resolveWebSnapshotAssetRequestUrl(args.url, args.baseUrl));
   const resolvedUrl = resolved.href;
   const fetchedBlob = await fetchAssetBlob({
     allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
+    anonymousCrossOriginAssets: args.anonymousCrossOriginAssets,
     fetchSameOriginAssetBlob: args.fetchSameOriginAssetBlob,
     pageOrigin: args.pageOrigin,
     resolved,
     snapshotSessionId: args.snapshotSessionId,
   });
   assertAllowedAssetBlobType(fetchedBlob);
-  const blob = await sanitizeCssAssetBlob(fetchedBlob);
+  const blob = await sanitizeAssetBlob(fetchedBlob);
   const basename = sanitizeWebSnapshotFilename(
     new URL(resolvedUrl).pathname.split('/').pop() ?? '',
     `asset-${args.index}`
   );
+  const filename = applyCanonicalExtension(basename, getExtension(blob, resolvedUrl));
   return {
     blob,
-    localPath: `assets/${args.index}-${basename}.${getExtension(blob, resolvedUrl)}`,
+    localPath: `assets/${args.index}-${filename}`,
     originalUrl: resolvedUrl,
   };
 }

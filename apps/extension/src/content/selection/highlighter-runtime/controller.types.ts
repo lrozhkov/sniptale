@@ -3,7 +3,7 @@ import type { HoverController } from '../highlighter-hover-preview';
 import type { HighlighterRuntimeState } from './state';
 
 export type { HoverController };
-export type HighlighterLogger = Pick<ReturnType<typeof createLogger>, 'log' | 'warn'>;
+export type HighlighterLogger = Pick<ReturnType<typeof createLogger>, 'debug' | 'log' | 'warn'>;
 
 export interface HighlighterControllerDeps {
   createHoverController?: (

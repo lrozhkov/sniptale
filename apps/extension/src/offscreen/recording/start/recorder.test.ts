@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// State-machine proof: terminal recorder lifecycle emits start/failure/cancel events through owners.
 const {
   createLiveRecordingArtifactSessionMock,
   loggerDebugMock,

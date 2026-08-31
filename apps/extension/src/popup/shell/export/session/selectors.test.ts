@@ -19,6 +19,34 @@ function createToggleState(
       setIncludeMarkdown: vi.fn(),
     },
     hasLoadedPreferences: true,
+    includeWebCopy: false,
+    setIncludeWebCopy: vi.fn(),
+    save: {
+      actions: {
+        setIncludeAnnotations: vi.fn(),
+        setIncludeBasicLogs: vi.fn(),
+        setIncludeCssDiagnostics: vi.fn(),
+        setIncludeFiles: vi.fn(),
+        setIncludeFullPageScreenshot: vi.fn(),
+        setIncludePageDiagnostics: vi.fn(),
+        setIncludeImages: vi.fn(),
+        setIncludeJson: vi.fn(),
+        setIncludeMarkdown: vi.fn(),
+      },
+      includeWebCopy: true,
+      setIncludeWebCopy: vi.fn(),
+      values: {
+        includeAnnotations: false,
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: false,
+        includeFullPageScreenshot: false,
+        includePageDiagnostics: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+      },
+    },
     values: {
       includeAnnotations: false,
       includeBasicLogs: false,
@@ -35,6 +63,9 @@ function createToggleState(
   return {
     actions: { ...defaults.actions, ...overrides.actions },
     hasLoadedPreferences: overrides.hasLoadedPreferences ?? defaults.hasLoadedPreferences,
+    includeWebCopy: overrides.includeWebCopy ?? defaults.includeWebCopy,
+    save: overrides.save ?? defaults.save,
+    setIncludeWebCopy: overrides.setIncludeWebCopy ?? defaults.setIncludeWebCopy,
     values: { ...defaults.values, ...overrides.values, ...overrides },
   };
 }
@@ -48,6 +79,7 @@ function createSessionState(
       setCopyingFormat: vi.fn(),
       setProgress: vi.fn(),
       setResult: vi.fn(),
+      setLaunchedPlan: vi.fn(),
     },
     copy: {
       copiedFormat: null,
@@ -58,8 +90,10 @@ function createSessionState(
       copyRequestIdRef: { current: 0 },
       copyResetTimeoutRef: { current: null },
       requestIdRef: { current: null },
+      terminalRequestIdRef: { current: null },
     },
     transfer: {
+      launchedPlan: null,
       progress: {
         current: 0,
         errors: [],
@@ -84,6 +118,7 @@ function createTabSelectionState(
   overrides: Partial<PopupExportTabSelectionState> = {}
 ): PopupExportTabSelectionState {
   return {
+    activeSourceMode: 'tabs',
     availableTabs: [],
     filterQuery: '',
     filteredTabs: [],
@@ -91,9 +126,16 @@ function createTabSelectionState(
     selectedCount: 1,
     selectedTabIds: [1],
     selectedTabIdsInOrder: [1],
+    selectedUrls: [],
+    setActiveSourceMode: vi.fn(),
     setFilterQuery: vi.fn(),
+    setUrlInput: vi.fn(),
     toggleSelectAllTabs: vi.fn(),
     toggleTabSelection: vi.fn(),
+    removeSelectedUrl: vi.fn(),
+    urlInput: '',
+    urlInputInvalid: [],
+    urlInputOverflow: 0,
     ...overrides,
   };
 }
@@ -126,6 +168,7 @@ function createBlockedActiveTabSelectionState(): Partial<PopupExportTabSelection
 
 function createDerivationInput(
   overrides: {
+    activeTabUrl?: string | null;
     capability?: { reason: string | null; supported: boolean };
     session?: Partial<PopupExportSessionState>;
     tabSelection?: Partial<PopupExportTabSelectionState>;
@@ -135,6 +178,7 @@ function createDerivationInput(
   return {
     activeTabCapabilities: {
       export: overrides.capability ?? { reason: null, supported: true },
+      url: overrides.activeTabUrl ?? 'https://example.test',
     } as never,
     session: createSessionState(overrides.session),
     tabSelection: createTabSelectionState(overrides.tabSelection),
@@ -174,6 +218,14 @@ describe('popup export derived state', () => {
     expect(derived.canExport).toBe(true);
   });
 
+  it('keeps export unavailable until preferences hydrate', () => {
+    const derived = getPopupExportDerivedState({
+      ...createDerivationInput({ toggles: { hasLoadedPreferences: false } }),
+    });
+
+    expect(derived.canExport).toBe(false);
+  });
+
   it('derives copy availability from session, toggles, and tab selection', () => {
     const derived = getPopupExportDerivedState({
       ...createDerivationInput(),
@@ -181,6 +233,19 @@ describe('popup export derived state', () => {
 
     expect(derived.canCopyJson).toBe(true);
     expect(derived.canCopyMarkdown).toBe(true);
+  });
+
+  it('disables active-tab copy on extension pages even when batch export remains supported', () => {
+    const derived = getPopupExportDerivedState({
+      ...createDerivationInput({
+        activeTabUrl:
+          'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1',
+      }),
+    });
+
+    expect(derived.canExport).toBe(true);
+    expect(derived.canCopyJson).toBe(false);
+    expect(derived.canCopyMarkdown).toBe(false);
   });
 
   it('keeps copy actions available when json and markdown export toggles are disabled', () => {

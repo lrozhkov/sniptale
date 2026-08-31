@@ -1,5 +1,4 @@
 import type { Canvas, FabricObject, Point, Rect } from 'fabric';
-import { useEditorStore } from '../../../state/useEditorStore';
 import type { CropSelection, DrawSession } from '../../core/types';
 import { getActiveEditorCropRect } from '../../tools/crop';
 import { startEditorDrawSession } from '../../transient';
@@ -30,10 +29,6 @@ export function startEditorControllerDrawSession(options: {
     pointerId: options.pointerId ?? null,
     cropGuide,
   });
-  if (nextState.clearedExistingCropGuide) {
-    useEditorStore.getState().setCropReady(false);
-  }
-
   prepareObject(object);
   canvas.add(object);
   canvas.requestRenderAll();

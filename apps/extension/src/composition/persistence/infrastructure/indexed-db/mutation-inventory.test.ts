@@ -15,7 +15,6 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/effect-bundles/backup-restore.ts',
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
-  'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/web-snapshot-lease.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
@@ -84,6 +83,8 @@ it('keeps the complete extension-page localStorage writer inventory behind the s
   expect(localStorageMutationFiles).toEqual([
     pageLocalStorageErasureFile,
     'apps/extension/src/editor/inspector/presets/view-mode.ts',
+    'apps/extension/src/gallery/library/sidebar/disclosure-preferences.ts',
+    'apps/extension/src/gallery/state/filter-preferences.ts',
     'apps/extension/src/platform/i18n/locale/state.ts',
     'apps/extension/src/ui/theme/preference-service.ts',
   ]);

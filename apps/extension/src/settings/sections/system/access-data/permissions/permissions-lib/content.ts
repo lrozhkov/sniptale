@@ -22,6 +22,11 @@ function getPermissionDetails(id: PermissionInfo['id']) {
         name: t('settings.permissions.localFilesName'),
         description: t('settings.permissions.localFilesDescription'),
       };
+    case 'nativeApp':
+      return {
+        name: t('settings.permissions.nativeAppName'),
+        description: t('settings.permissions.nativeAppDescription'),
+      };
     case 'camera':
       return {
         name: t('settings.permissions.cameraName'),

@@ -20,7 +20,8 @@ describe('applyIsolatedContentRootStyle', () => {
 
     expect(element.style.all).toBe('initial');
     expect(element.style.display).toBe('block');
-    expect(element.style.background).toBe('transparent');
+    document.body.append(element);
+    expect(getComputedStyle(element).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     expect(element.style.opacity).toBe('1');
     expect(element.style.position).toBe('fixed');
     expect(element.style.top).toBe('0px');

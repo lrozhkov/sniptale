@@ -9,7 +9,11 @@ import type {
   ViewportPreset,
 } from '../../../contracts/settings';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
-import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../contracts/full-page-capture';
+import {
+  DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+  DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  parseFullPageQualityPolicy,
+} from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -19,6 +23,15 @@ import {
   createSystemViewportPresetCatalog,
 } from '../../../features/viewport-presets/catalog';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
+import {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  parseExportResourceLimits,
+  type ExportResourceLimits,
+} from '@sniptale/runtime-contracts/export';
+import {
+  DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
+  parsePagePackageCaptureTimingPolicy,
+} from '@sniptale/runtime-contracts/page-package';
 
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
@@ -65,10 +78,14 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
-  authenticatedSnapshotAssetsEnabled: false,
-  anonymousCrossOriginSnapshotAssetsEnabled: false,
-  skipWebSnapshotSaveDisclosure: false,
+  fullPageQuality: DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  authenticatedSnapshotAssetsEnabled: true,
+  anonymousCrossOriginSnapshotAssetsEnabled: true,
+  externalSnapshotAssetRedirectsEnabled: true,
+  externalSnapshotLinksEnabled: false,
+  exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+  pagePackageCaptureTiming: { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
   voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
 };
 
@@ -95,6 +112,10 @@ function cloneFullPageCapturePreferences(
   return { ...settings };
 }
 
+function cloneExportResourceLimits(settings: ExportResourceLimits): ExportResourceLimits {
+  return { ...settings };
+}
+
 export function createDefaultSettings(): NormalizedSettings {
   return {
     ...DEFAULT_SETTINGS,
@@ -102,6 +123,9 @@ export function createDefaultSettings(): NormalizedSettings {
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
     localStoragePolicy: { ...DEFAULT_LOCAL_STORAGE_POLICY },
     fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
+    exportResourceLimits: cloneExportResourceLimits(DEFAULT_EXPORT_RESOURCE_LIMITS),
+    fullPageQuality: { ...DEFAULT_FULL_PAGE_QUALITY_POLICY },
+    pagePackageCaptureTiming: { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
     voiceInput: { ...DEFAULT_VOICE_INPUT_SETTINGS },
     presets: [],
     viewportPresets: cloneViewportPresets(DEFAULT_VIEWPORT_PRESETS),
@@ -118,12 +142,31 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
 }
 
 /**
- * Settings storage authority lives in this owner and persists the whole normalized record.
+ * Settings storage authority lives in this owner. Transferable preferences are synchronized,
  * Callers that change one field should use patchSettings so queued read-modify-write merges
  * against the latest persisted payload.
  */
 export async function saveSettings(settings: Settings): Promise<void> {
+  if (
+    settings.exportResourceLimits !== undefined &&
+    !parseExportResourceLimits(settings.exportResourceLimits)
+  ) {
+    throw new Error('Export resource limits are invalid');
+  }
+  if (
+    settings.fullPageQuality !== undefined &&
+    !parseFullPageQualityPolicy(settings.fullPageQuality)
+  ) {
+    throw new Error('Full-page screenshot quality settings are invalid');
+  }
+  if (
+    settings.pagePackageCaptureTiming !== undefined &&
+    !parsePagePackageCaptureTimingPolicy(settings.pagePackageCaptureTiming)
+  ) {
+    throw new Error('Page capture timing settings are invalid');
+  }
   await browserStorage.sync.set({ [STORAGE_KEY]: settings });
+
   logger.debug('Saved settings payload');
 }
 
@@ -151,6 +194,14 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSett
     fullPageCapture: {
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
       ...parsedValue.fullPageCapture,
+    },
+    exportResourceLimits: {
+      ...DEFAULT_EXPORT_RESOURCE_LIMITS,
+      ...parsedValue.exportResourceLimits,
+    },
+    fullPageQuality: { ...(parsedValue.fullPageQuality ?? DEFAULT_FULL_PAGE_QUALITY_POLICY) },
+    pagePackageCaptureTiming: {
+      ...(parsedValue.pagePackageCaptureTiming ?? DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING),
     },
     voiceInput: {
       ...DEFAULT_VOICE_INPUT_SETTINGS,
@@ -245,6 +296,14 @@ function applySettingsPatch(
       ...currentSettings.fullPageCapture,
       ...settingsPatch.fullPageCapture,
     },
+    exportResourceLimits: {
+      ...DEFAULT_EXPORT_RESOURCE_LIMITS,
+      ...currentSettings.exportResourceLimits,
+      ...settingsPatch.exportResourceLimits,
+    },
+    fullPageQuality: settingsPatch.fullPageQuality ?? currentSettings.fullPageQuality,
+    pagePackageCaptureTiming:
+      settingsPatch.pagePackageCaptureTiming ?? currentSettings.pagePackageCaptureTiming,
     localStoragePolicy: {
       ...currentSettings.localStoragePolicy,
       ...settingsPatch.localStoragePolicy,
@@ -279,17 +338,22 @@ export async function resetSettingsToDefaults(): Promise<NormalizedSettings> {
   });
 }
 
-/** Removes only the retired diagnostics field while preserving every other stored property. */
-export async function removeRetiredDiagnosticsSetting(): Promise<void> {
+/** Removes retired synchronized fields while preserving every current stored property. */
+export async function removeRetiredSynchronizedSettings(): Promise<void> {
   await queueSettingsMutation(async () => {
     const stored = await browserStorage.sync.get([STORAGE_KEY]);
     const raw = stored[STORAGE_KEY];
     const retiredField = ['raw', 'Diagnostics', 'Enabled'].join('');
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !(retiredField in raw)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return loadSettings();
     }
 
     const nextRaw = { ...(raw as Record<string, unknown>) };
+    const removedDiagnostics = retiredField in nextRaw;
+    if (!removedDiagnostics) {
+      return loadSettings();
+    }
+
     delete nextRaw[retiredField];
     await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw });
     return loadSettings();

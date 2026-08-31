@@ -74,15 +74,22 @@ function createPreviewDraftSetter<Key extends keyof GalleryAppState['preview']['
 function createControllerActions(
   stateRef: ReturnType<typeof createGalleryStateRef>
 ): GalleryAppStateController['actions'] {
+  let activeBackupExport: AbortController | null = null;
   return {
     filters: {
+      createSavedView: async () => Promise.reject(new Error('Not implemented in test controller.')),
+      deleteSavedView: async () => undefined,
+      moveSavedView: async () => undefined,
+      reloadSavedViews: vi.fn(async () => undefined),
       resetFilters: () => undefined,
+      selectSavedView: () => undefined,
       setActiveTags: () => undefined,
       setFolderFilter: () => undefined,
       setFacetFilter: () => undefined,
       setSearch: () => undefined,
       setScope: () => undefined,
       setSortMode: () => undefined,
+      updateSavedView: async () => Promise.reject(new Error('Not implemented in test controller.')),
     },
     preview: {
       setFilenameDraft: createPreviewDraftSetter(stateRef, 'filename'),
@@ -103,15 +110,31 @@ function createControllerActions(
       refresh: vi.fn(async () => undefined),
     },
     surface: {
+      beginBlockingOperation: () => () => undefined,
+      cancelActiveBackupExport: () => {
+        activeBackupExport?.abort();
+        activeBackupExport = null;
+      },
+      releaseActiveBackupExport: (abortController) => {
+        if (activeBackupExport === abortController) activeBackupExport = null;
+      },
+      replaceActiveBackupExport: (abortController) => {
+        activeBackupExport?.abort();
+        activeBackupExport = abortController;
+      },
       setActiveImport: createNestedSetter({ area: 'storage', key: 'activeImport', stateRef }),
-      setBanner: () => undefined,
+      setBanner: createNestedSetter({ area: 'storage', key: 'banner', stateRef }),
       setConfirmDialog: createNestedSetter({ area: 'storage', key: 'confirmDialog', stateRef }),
-      setIsBusy: () => undefined,
       setPendingExport: createNestedSetter({ area: 'storage', key: 'pendingExport', stateRef }),
       setPendingImport: createNestedSetter({ area: 'storage', key: 'pendingImport', stateRef }),
       setPendingMediaImport: createNestedSetter({
         area: 'storage',
         key: 'pendingMediaImport',
+        stateRef,
+      }),
+      setPendingWebSnapshotImport: createNestedSetter({
+        area: 'storage',
+        key: 'pendingWebSnapshotImport',
         stateRef,
       }),
     },
@@ -129,6 +152,8 @@ export function createController(overrides: GalleryStateOverride = {}) {
       importTriggerRef: { current: document.createElement('button') },
       mediaImportInputRef: { current: document.createElement('input') },
       mediaImportTriggerRef: { current: document.createElement('button') },
+      webSnapshotImportInputRef: { current: document.createElement('input') },
+      webSnapshotImportTriggerRef: { current: document.createElement('button') },
     },
     get state() {
       return stateRef.getState();

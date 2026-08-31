@@ -7,6 +7,7 @@ import type { FullPageCaptureOptions } from './types';
 import { throwIfFullPageCaptureAborted } from './cancellation';
 
 const GEOMETRY_EPSILON_CSS_PX = 1;
+export const FULL_PAGE_EXTENT_GREW_ERROR = 'Full-page capture extent grew during capture';
 
 function createTileIdentity(identity: FullPageCaptureSessionIdentity, plan: FullPageTilePlan) {
   return {
@@ -64,56 +65,75 @@ export async function captureAndStitchFullPageTiles(args: {
   plans: FullPageTilePlan[];
   raster: FullPageRasterBackend;
   renewLease(): Promise<void>;
+  restartOnExtentGrowth?: boolean | undefined;
   warnings: string[];
 }): Promise<StreamingStitchResult> {
   let stitcher: Awaited<ReturnType<typeof createStreamingFullPageStitcher>> | null = null;
   let previousColumnX: number | null = null;
   let previousRowY: number | null = null;
 
-  for (let index = 0; index < args.plans.length; index += 1) {
-    throwIfFullPageCaptureAborted(args.abortSignal);
-    const plan = args.plans[index];
-    if (!plan) continue;
-    await args.renewLease();
-    throwIfFullPageCaptureAborted(args.abortSignal);
-    const identity = createTileIdentity(args.identity, plan);
-    const prepared = await args.agent.prepareTile(identity);
-    throwIfFullPageCaptureAborted(args.abortSignal);
-    assertTileProgress({
-      actualX: prepared.actualX,
-      actualY: prepared.actualY,
-      plan,
-      previousColumnX,
-      previousRowY,
-    });
-    const frame = await args.raster.captureFrame(args.abortSignal);
-    throwIfFullPageCaptureAborted(args.abortSignal);
-    const verified = await args.agent.verifyTile(identity, args.layoutGeneration);
-    throwIfFullPageCaptureAborted(args.abortSignal);
-    if (
-      Math.abs(verified.actualX - prepared.actualX) > GEOMETRY_EPSILON_CSS_PX ||
-      Math.abs(verified.actualY - prepared.actualY) > GEOMETRY_EPSILON_CSS_PX ||
-      verified.layoutGeneration !== args.layoutGeneration
-    ) {
-      throw new Error('Full-page capture tile changed while the frame was being captured');
+  try {
+    for (let index = 0; index < args.plans.length; index += 1) {
+      throwIfFullPageCaptureAborted(args.abortSignal);
+      const plan = args.plans[index];
+      if (!plan) continue;
+      await args.renewLease();
+      throwIfFullPageCaptureAborted(args.abortSignal);
+      const identity = createTileIdentity(args.identity, plan);
+      const prepared = await args.agent.prepareTile(identity, args.abortSignal);
+      throwIfFullPageCaptureAborted(args.abortSignal);
+      assertTileProgress({
+        actualX: prepared.actualX,
+        actualY: prepared.actualY,
+        plan,
+        previousColumnX,
+        previousRowY,
+      });
+      if (prepared.frozenExtentWarning && args.restartOnExtentGrowth !== false) {
+        throw new Error(FULL_PAGE_EXTENT_GREW_ERROR);
+      }
+      const frame = await args.raster.captureFrame(args.abortSignal);
+      throwIfFullPageCaptureAborted(args.abortSignal);
+      const verified = await args.agent.verifyTile(
+        identity,
+        args.layoutGeneration,
+        args.abortSignal
+      );
+      throwIfFullPageCaptureAborted(args.abortSignal);
+      if (
+        Math.abs(verified.actualX - prepared.actualX) > GEOMETRY_EPSILON_CSS_PX ||
+        Math.abs(verified.actualY - prepared.actualY) > GEOMETRY_EPSILON_CSS_PX ||
+        verified.layoutGeneration !== args.layoutGeneration
+      ) {
+        throw new Error('Full-page capture tile changed while the frame was being captured');
+      }
+      if (verified.frozenExtentWarning && args.restartOnExtentGrowth !== false) {
+        throw new Error(FULL_PAGE_EXTENT_GREW_ERROR);
+      }
+      stitcher ??= await createStreamingFullPageStitcher({
+        firstFrameDataUrl: frame,
+        frozenExtentWarning: verified.frozenExtentWarning,
+        geometry: verified.geometry,
+        ...(args.options.qualityPolicy === undefined
+          ? {}
+          : { qualityPolicy: args.options.qualityPolicy }),
+        warnings: args.warnings,
+      });
+      await stitcher.drawFrame(frame, plan, verified);
+      throwIfFullPageCaptureAborted(args.abortSignal);
+      previousColumnX = verified.actualX;
+      if (plan.firstColumn) previousRowY = verified.actualY;
+      args.onProgress?.(index + 1, args.plans.length);
     }
-    stitcher ??= await createStreamingFullPageStitcher({
-      firstFrameDataUrl: frame,
-      frozenExtentWarning: verified.frozenExtentWarning,
-      geometry: verified.geometry,
-      warnings: args.warnings,
-    });
-    await stitcher.drawFrame(frame, plan, verified);
-    throwIfFullPageCaptureAborted(args.abortSignal);
-    previousColumnX = verified.actualX;
-    if (plan.firstColumn) previousRowY = verified.actualY;
-    args.onProgress?.(index + 1, args.plans.length);
-  }
 
-  if (!stitcher) throw new Error('Full-page capture produced no raster tiles');
-  throwIfFullPageCaptureAborted(args.abortSignal);
-  await args.beforeFinish?.();
-  throwIfFullPageCaptureAborted(args.abortSignal);
-  throwIfFullPageCaptureAborted(args.finalizationAbortSignal);
-  return stitcher.finish(args.options, args.finalizationAbortSignal);
+    if (!stitcher) throw new Error('Full-page capture produced no raster tiles');
+    throwIfFullPageCaptureAborted(args.abortSignal);
+    await args.beforeFinish?.();
+    throwIfFullPageCaptureAborted(args.abortSignal);
+    throwIfFullPageCaptureAborted(args.finalizationAbortSignal);
+    return await stitcher.finish(args.options, args.finalizationAbortSignal);
+  } catch (error) {
+    stitcher?.dispose();
+    throw error;
+  }
 }

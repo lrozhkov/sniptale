@@ -1,10 +1,10 @@
 import { attachIframeDocumentTree } from './document-tree';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
-const logger = createLogger({ namespace: 'iframe-utils', traceEnabled: true });
+const logger = createLogger({ namespace: 'iframe-utils' });
 
 function createIframeEventLogger(prefix: string, iframe: HTMLIFrameElement): void {
-  logger.log(prefix, iframe.id || iframe.src?.substring(0, 50));
+  logger.debug(prefix, iframe.id || iframe.src?.substring(0, 50));
 }
 
 type DynamicListenerRootOptions = {
@@ -46,7 +46,7 @@ function attachToAccessibleDocumentsDynamic(
   attachDocumentTree(rootDocument, rootOptions?.rootIframe);
 
   return () => {
-    logger.log('Cleaning up all event listeners');
+    logger.debug('Cleaning up all event listeners');
     cleanupFns.forEach((cleanup) => cleanup());
   };
 }

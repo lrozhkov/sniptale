@@ -160,7 +160,10 @@ it('wires compact search, sort, and centered view-mode controls without manual r
   expect(controls?.className).toContain('shrink-0');
   expect(workspace?.className).toContain('flex-nowrap');
   expect(container?.querySelector('[aria-label="gallery.app.refresh"]')).toBeNull();
-  expect(input.parentElement?.className).not.toContain('focus-within:w-');
+  expect(input.parentElement?.className).toContain('focus-within:w-48');
+  expect(input.parentElement?.className).toContain(
+    'transition-[width,border-color,background-color]'
+  );
   expect(input.parentElement?.className).toContain('w-36');
   expect(listModeButton.className).toContain('h-full');
   expect(listModeButton.querySelector('svg')?.classList.contains('block')).toBe(true);
@@ -238,10 +241,37 @@ it('opens compact storage actions without a separate cleanup workflow', () => {
 
   expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(4);
   expect(menu?.textContent).toContain('gallery.app.importMediaFiles');
+  const dangerSeparator = menu?.querySelector(
+    '[data-ui="gallery.header.storage-menu-danger-separator"]'
+  );
+  expect(dangerSeparator?.getAttribute('role')).toBe('separator');
+  expect(dangerSeparator?.previousElementSibling?.textContent).toContain(
+    'gallery.app.importBackup'
+  );
+  expect(dangerSeparator?.nextElementSibling?.textContent).toContain('gallery.app.deleteAll');
   clickButton(exportButton);
 
   expect(props.onExportBackup).toHaveBeenCalledTimes(1);
   expect(container?.querySelector('[data-ui="gallery.header.storage-menu"]')).toBeNull();
+});
+
+it('exposes Web Snapshot as a distinct action in the Library import section', () => {
+  const onImportWebSnapshotClick = vi.fn();
+  renderHeader({
+    onImportWebSnapshotClick,
+    webSnapshotImportTriggerRef: { current: null },
+  });
+  clickButton(
+    container?.querySelector<HTMLButtonElement>('[data-ui="gallery.header.storage"] > button')
+  );
+  const menu = container?.querySelector('[data-ui="gallery.header.storage-menu"]');
+  const action = Array.from(menu?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('gallery.app.importWebSnapshot')
+  );
+  expect(menu?.textContent).toContain('gallery.app.importSection');
+  expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(5);
+  clickButton(action);
+  expect(onImportWebSnapshotClick).toHaveBeenCalledOnce();
 });
 
 it('removes low-usage storage progress from layout and centers the usage label', () => {

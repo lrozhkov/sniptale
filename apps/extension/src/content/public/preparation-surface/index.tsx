@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useAiPickController } from '../../../content/overlay/ai/pick/controller';
 import { preloadAIModal } from '../../../content/overlay/ai/modal/shell/lazy';
 import { disableAiPickModeIfLoaded } from '../../../content/overlay/ai/pick/runtime/lazy';
@@ -66,51 +66,34 @@ function usePreparationFrameCallbacks(
   acceptsElement: (element: HTMLElement) => boolean,
   frameManager: FrameManager
 ): void {
-  const addFrame = useCallback(
-    (element: HTMLElement) => {
-      if (acceptsElement(element)) {
-        frameManager.addFrame(element);
-      }
-    },
-    [acceptsElement, frameManager]
-  );
-  const hasFrameForElement = useCallback(
-    (element: HTMLElement) => {
-      if (!acceptsElement(element)) {
-        return true;
-      }
-
-      return frameManager.hasFrameForElement(element);
-    },
-    [acceptsElement, frameManager]
-  );
-  const addFreeFrame = useCallback(
-    (
-      input: import('../../../features/highlighter/contracts').FreeFrameInput,
-      sourceElement: HTMLElement
-    ) => {
-      if (acceptsElement(sourceElement)) {
-        frameManager.addFreeFrame(input);
-      }
-    },
-    [acceptsElement, frameManager]
-  );
+  const acceptsElementRef = useRef(acceptsElement);
+  const frameManagerRef = useRef(frameManager);
+  acceptsElementRef.current = acceptsElement;
+  frameManagerRef.current = frameManager;
 
   useEffect(() => {
     registerFrameCallbacks(
-      addFrame,
-      addFreeFrame,
-      frameManager.removeFrame,
-      frameManager.clearFrames,
-      hasFrameForElement
+      (element) => {
+        if (acceptsElementRef.current(element)) {
+          frameManagerRef.current.addFrame(element);
+        }
+      },
+      (input, sourceElement) => {
+        if (acceptsElementRef.current(sourceElement)) {
+          frameManagerRef.current.addFreeFrame(input);
+        }
+      },
+      (...args) => frameManagerRef.current.removeFrame(...args),
+      () => frameManagerRef.current.clearFrames(),
+      (element) => {
+        if (!acceptsElementRef.current(element)) {
+          return true;
+        }
+
+        return frameManagerRef.current.hasFrameForElement(element);
+      }
     );
-  }, [
-    addFrame,
-    addFreeFrame,
-    frameManager.clearFrames,
-    frameManager.removeFrame,
-    hasFrameForElement,
-  ]);
+  }, []);
 }
 
 function usePreparationFrameManager(modeState: ContentAppModeState): FrameManager {

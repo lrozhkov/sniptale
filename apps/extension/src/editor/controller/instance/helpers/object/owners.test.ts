@@ -87,6 +87,7 @@ it('adapts transient and draw session state back onto the controller instance', 
   expect(controller.drawSession).toEqual({ id: 'next-draw' });
   expect(controller.cropGuide).toEqual({ id: 'next-guide' });
   expect(controller.cropSelection).toEqual({ id: 'next-selection' });
+  expect(controller.syncRuntimeState).toHaveBeenCalledTimes(2);
   expect(mocks.startDrawSessionMock).toHaveBeenCalledWith(
     expect.objectContaining({ pointerId: 7 })
   );

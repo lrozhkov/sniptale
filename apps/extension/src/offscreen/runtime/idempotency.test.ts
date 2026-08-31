@@ -13,6 +13,9 @@ const handledCommandTypes = [
   MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
+  MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE,
+  MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE,
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,
@@ -27,6 +30,7 @@ const handledCommandTypes = [
 it('declares idempotency policy for every offscreen side-effect route', () => {
   expect(OFFSCREEN_COMMAND_CORRELATION_KEYS).toEqual([
     'jobId',
+    'downloadOperationId',
     'recordingId',
     'desktopMediaRequestId',
     'requestId',
@@ -77,6 +81,31 @@ it('tracks job-correlated export commands and shares duplicate completion', asyn
 
   await expect(first.completeWith(Promise.resolve())).resolves.toBeUndefined();
   await expect(duplicate.completion).resolves.toBeUndefined();
+});
+
+it('namespaces project export replay by command, job, and authority generation', () => {
+  const start = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'generation-export-scope',
+    message: { jobId: 'job-export-scope', type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT },
+  });
+  const cancel = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'generation-export-scope',
+    message: { jobId: 'job-export-scope', type: VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT },
+  });
+  const nextGeneration = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'generation-export-scope-next',
+    message: { jobId: 'job-export-scope', type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT },
+  });
+
+  expect(start).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+  expect(cancel).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+  expect(nextGeneration).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+  expect(() =>
+    markOffscreenSideEffectCommand({
+      capabilityGeneration: 'generation-export-missing-job',
+      message: { type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT },
+    })
+  ).toThrow('Missing OFFSCREEN_START_PROJECT_EXPORT job identity');
 });
 
 it('shares one camera negotiation per peer without replaying it across peers', async () => {

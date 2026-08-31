@@ -12,11 +12,7 @@ import { VideoTrackKind } from '../../../../features/video/project/types/index';
 import type { VideoProject } from '../../../../features/video/project/types/index';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import { applyProjectUpdate } from '../helpers';
-import {
-  deleteProjectTrack,
-  resolveSelectedClipIdAfterTrackDelete,
-  resolveSelectionAfterTrackDelete,
-} from './delete';
+import { deleteProjectTrack, resolveSelectionAfterTrackDelete } from './delete';
 import {
   createUtilityLaneClearAction,
   createUtilityLaneLockToggle,
@@ -175,7 +171,6 @@ function createAddTrackAction(set: VideoEditorStoreSet): VideoEditorProjectState
       return {
         ...applyProjectUpdate(state, () => nextProject),
         selectedTrackId: nextTrackId,
-        selectedClipId: null,
         selection: nextTrackId ? { kind: 'track', trackId: nextTrackId } : state.selection,
       };
     });
@@ -204,7 +199,6 @@ function createDeleteTrackAction(set: VideoEditorStoreSet): VideoEditorProjectSt
 
       return {
         ...applyProjectUpdate(state, () => nextProject),
-        selectedClipId: resolveSelectedClipIdAfterTrackDelete(state, trackId),
         selectedTrackId:
           state.selectedTrackId === trackId ? selectedTrackId : state.selectedTrackId,
         selection: resolveSelectionAfterTrackDelete(state, trackId, selectedTrackId),

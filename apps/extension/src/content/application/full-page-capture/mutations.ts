@@ -121,7 +121,13 @@ function resolveAnchor(rect: DOMRect): FloatingAnchor {
   let right = window.innerWidth - rect.right <= xThreshold && rect.width < window.innerWidth * 0.75;
   if (top && bottom) top = bottom = false;
   if (left && right) left = right = false;
-  return { bottom, center: !top && !bottom && !left && !right, left, right, top };
+  return {
+    bottom,
+    center: !top && !bottom && !left && !right,
+    left,
+    right,
+    top,
+  };
 }
 
 function isOutsideInternalScrollerShell(
@@ -207,8 +213,23 @@ export function preparePageMutations(session: FullPageAgentSession): void {
   const style = document.createElement('style');
   style.id = CAPTURE_STYLE_ID;
   style.textContent = `
-    .${SCROLLBAR_CLASS}, .${SCROLLBAR_CLASS} * { caret-color: transparent !important; }
-    .${SCROLLBAR_CLASS}::-webkit-scrollbar, .${SCROLLBAR_CLASS} *::-webkit-scrollbar { display: none !important; }
+    .${SCROLLBAR_CLASS}, .${SCROLLBAR_CLASS} * {
+      caret-color: transparent !important;
+      scrollbar-color: transparent transparent !important;
+    }
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-track,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-track,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-thumb,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-thumb,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-button,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-button,
+    .${SCROLLBAR_CLASS}::-webkit-scrollbar-corner,
+    .${SCROLLBAR_CLASS} *::-webkit-scrollbar-corner {
+      background: transparent !important;
+      border-color: transparent !important;
+    }
     ${
       session.preferences.freezeMotion
         ? `
@@ -226,7 +247,11 @@ export function preparePageMutations(session: FullPageAgentSession): void {
 }
 
 function snapshotVideo(video: HTMLVideoElement): VideoSnapshot {
-  const snapshot = { currentTime: video.currentTime, video, wasPlaying: !video.paused };
+  const snapshot = {
+    currentTime: video.currentTime,
+    video,
+    wasPlaying: !video.paused,
+  };
   if (snapshot.wasPlaying) video.pause();
   return snapshot;
 }

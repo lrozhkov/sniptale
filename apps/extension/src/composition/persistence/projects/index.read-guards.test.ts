@@ -266,7 +266,10 @@ it('fails closed for malformed persisted project asset rows', async () => {
       { id: 'project-asset:asset-2', filename: 'broken.png' },
     ]);
 
-  await expect(getProjectAsset('asset-1')).resolves.toBeUndefined();
+  await expect(getProjectAsset('asset-1')).resolves.toEqual({
+    reason: 'invalid-asset-entry',
+    status: 'invalid',
+  });
   await expect(listProjectAssets()).resolves.toEqual([
     {
       assetId: 'asset-object-1',

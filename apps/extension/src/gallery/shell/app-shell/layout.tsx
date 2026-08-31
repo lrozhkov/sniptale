@@ -6,6 +6,7 @@ import { GallerySidebar } from '../../library/sidebar';
 import { GalleryImportProgressCard } from '../../library/import-progress-card';
 import type { GalleryAppLayoutProps } from './types';
 import { GALLERY_MEDIA_IMPORT_ACCEPT } from '../../library/media-import-profile';
+import { GalleryImportDropTarget } from './import-drop-target';
 
 function GalleryImportInput(props: GalleryAppLayoutProps) {
   return (
@@ -32,23 +33,47 @@ function GalleryMediaImportInput(props: GalleryAppLayoutProps) {
   );
 }
 
+function GalleryWebSnapshotImportInput(props: GalleryAppLayoutProps) {
+  return (
+    <input
+      ref={props.webSnapshotImportInputRef as Ref<HTMLInputElement> | undefined}
+      type="file"
+      accept=".sniptale-page-package.zip,application/zip"
+      className="hidden"
+      onChange={(event) => props.onWebSnapshotImportFileChange?.(event.target.files?.[0] ?? null)}
+    />
+  );
+}
+
 function GallerySidebarSection(props: GalleryAppLayoutProps) {
   const { state } = props;
 
   return (
     <GallerySidebar
+      activeSavedView={state.filters.activeSavedView}
       activeTags={state.filters.activeTags}
       allTags={state.derived.allTags}
       counts={state.derived.counts}
       facetFilters={state.filters.facetFilters}
       facets={state.derived.facets}
+      filteredItemCount={state.derived.filteredItems.length}
       folderFilter={state.filters.folderFilter}
+      isSavedViewDirty={state.filters.isSavedViewDirty}
+      savedViews={state.filters.savedViews}
+      savedViewsLoadFailed={state.filters.savedViewsLoadFailed}
+      savedViewsLoaded={state.filters.savedViewsLoaded}
       scope={state.filters.scope}
       onActiveTagsChange={props.onActiveTagsChange}
       onFacetFilterChange={props.onFacetFilterChange ?? (() => undefined)}
+      {...(props.onCreateSavedView ? { onCreateSavedView: props.onCreateSavedView } : {})}
+      {...(props.onDeleteSavedView ? { onDeleteSavedView: props.onDeleteSavedView } : {})}
+      {...(props.onMoveSavedView ? { onMoveSavedView: props.onMoveSavedView } : {})}
       onFolderFilterChange={props.onFolderFilterChange}
       onResetFilters={props.onResetFilters}
+      {...(props.onSavedViewSelect ? { onSavedViewSelect: props.onSavedViewSelect } : {})}
+      onSelectAll={props.onSelectAllFiltered}
       onScopeChange={props.onScopeChange ?? (() => undefined)}
+      {...(props.onUpdateSavedView ? { onUpdateSavedView: props.onUpdateSavedView } : {})}
     />
   );
 }
@@ -95,15 +120,13 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
 
 export function GalleryAppLayout(props: GalleryAppLayoutProps) {
   return (
-    <div
-      data-ui="gallery.page.root"
-      className={
-        'sniptale-extension-surface flex h-screen overflow-hidden bg-[var(--sniptale-color-surface-canvas)] p-4 ' +
-        'text-[var(--sniptale-color-text-primary)]'
-      }
+    <GalleryImportDropTarget
+      disabled={props.state.storage.isBusy}
+      {...(props.onImportFilesDrop ? { onFilesDrop: props.onImportFilesDrop } : {})}
     >
       <GalleryImportInput {...props} />
       <GalleryMediaImportInput {...props} />
+      <GalleryWebSnapshotImportInput {...props} />
       <GalleryOverlays {...props} />
       {props.state.storage.activeImport ? (
         <GalleryImportProgressCard
@@ -120,6 +143,9 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           isBusy={props.state.storage.isBusy}
           importTriggerRef={props.importTriggerRef}
           mediaImportTriggerRef={props.mediaImportTriggerRef}
+          {...(props.webSnapshotImportTriggerRef
+            ? { webSnapshotImportTriggerRef: props.webSnapshotImportTriggerRef }
+            : {})}
           onApplySelectionTag={props.onApplySelectionTag}
           onClearSelection={props.onClearSelection}
           onDeleteMany={props.onDeleteMany}
@@ -128,6 +154,9 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onSearchChange={props.onSearchChange}
           onImportBackupClick={props.onImportBackupClick}
           onImportMediaClick={props.onImportMediaClick}
+          {...(props.onImportWebSnapshotClick
+            ? { onImportWebSnapshotClick: props.onImportWebSnapshotClick }
+            : {})}
           onSelectionTagDraftChange={props.onSelectionTagDraftChange}
           onSelectionBackup={props.onSelectionBackup}
           onSelectionZip={props.onSelectionZip}
@@ -146,6 +175,6 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           <GalleryMainSection {...props} />
         </div>
       </div>
-    </div>
+    </GalleryImportDropTarget>
   );
 }

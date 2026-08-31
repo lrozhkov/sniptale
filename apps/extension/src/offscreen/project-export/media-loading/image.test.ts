@@ -78,7 +78,10 @@ it('loads project images once per asset id and fails for missing assets', async 
     }
     return null;
   });
-  getProjectAssetMock.mockResolvedValue({ file: new Blob(['image']) });
+  getProjectAssetMock.mockResolvedValue({
+    entry: { file: new Blob(['image']) },
+    status: 'ready',
+  });
 
   const images = await loadImagesForProject(project as never, job as never);
 
@@ -116,7 +119,10 @@ it('includes the scene background image asset in the preload set', async () => {
 
     return null;
   });
-  getProjectAssetMock.mockResolvedValue({ file: new Blob(['background']) });
+  getProjectAssetMock.mockResolvedValue({
+    entry: { file: new Blob(['background']) },
+    status: 'ready',
+  });
 
   const images = await loadImagesForProject(project as never, job as never);
 
@@ -143,7 +149,10 @@ it('includes embedded shape image assets in the preload set', async () => {
     }
     return null;
   });
-  getProjectAssetMock.mockResolvedValue({ file: new Blob(['badge']) });
+  getProjectAssetMock.mockResolvedValue({
+    entry: { file: new Blob(['badge']) },
+    status: 'ready',
+  });
 
   const images = await loadImagesForProject(project as never, job as never);
 
@@ -172,7 +181,10 @@ it('stops image preload when the export aborts before image readiness', async ()
   getAssetByIdMock.mockReturnValue({
     source: { kind: 'project-asset', projectAssetId: 'image-1' },
   });
-  getProjectAssetMock.mockResolvedValue({ file: new Blob(['image']) });
+  getProjectAssetMock.mockResolvedValue({
+    entry: { file: new Blob(['image']) },
+    status: 'ready',
+  });
 
   const loadPromise = loadImagesForProject(project as never, job as never, controller.signal);
   await Promise.resolve();

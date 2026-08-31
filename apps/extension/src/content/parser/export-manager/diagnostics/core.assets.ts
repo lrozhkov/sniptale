@@ -8,6 +8,7 @@ import { collectFieldDiagnostics, countRows } from './core.field-diagnostics';
 import { buildCoreJsonAsset } from './core.json.ts';
 import { resolveExportManagerPageMetadata } from '../../../platform/page-context/page-metadata';
 import { resolveOptionalDiagnosticsView, type ExportDiagnosticsSource } from './source';
+import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
 
 export type CoreLogAssetsParams = {
   downloadedFilesCount: number;
@@ -83,6 +84,32 @@ export function buildMetaAsset(params: CoreLogAssetsParams): ArchiveAsset {
 
 export function buildParserReportAsset(params: CoreLogAssetsParams): ArchiveAsset {
   return buildCoreJsonAsset('logs/parser-report.json', buildParserReportFile(params));
+}
+
+export function buildIssuesAsset(params: CoreLogAssetsParams): ArchiveAsset {
+  const issues = params.warnings.map((warning) => ({
+    code: 'CAPTURE_WARNING',
+    explanation: sanitizeDiagnosticMessage(warning),
+    severity: 'warning',
+    stage: 'capture',
+    target: 'page-package',
+  }));
+  if (params.iframeReadiness.timedOut) {
+    issues.push({
+      code: 'IFRAME_READINESS_TIMEOUT',
+      explanation: 'One or more accessible frames did not become ready before the capture limit.',
+      severity: 'warning',
+      stage: 'readiness',
+      target: 'iframe',
+    });
+  }
+  return buildCoreJsonAsset('logs/issues.json', {
+    issues,
+    summary: {
+      error: issues.filter((issue) => issue.severity === 'error').length,
+      warning: issues.filter((issue) => issue.severity === 'warning').length,
+    },
+  });
 }
 
 export function buildProfileTraceAssets(treeData: ParsedDOMTree): ArchiveAsset[] {

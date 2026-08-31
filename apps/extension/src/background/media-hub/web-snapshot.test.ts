@@ -1,31 +1,18 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import JSZip from 'jszip';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
-import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../features/web-snapshot/manifest';
+import type { PagePackageManifest } from '@sniptale/runtime-contracts/page-package';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageArchiveFixture } from '../../features/web-snapshot/package.test-support';
 import { saveWebSnapshotToMediaHub } from './web-snapshot';
 
 const mocks = vi.hoisted(() => ({
   ensureHeadroom: vi.fn(),
   saveWebSnapshot: vi.fn(),
+  validateRetainedScreenshot: vi.fn(),
 }));
 
 vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/media-hub/store')>()),
-  deleteMediaLibraryAssetsBatchSafely: vi.fn(),
-  deleteOrphanedRawRecordingsSafely: vi.fn(),
-  deleteStorageCleanupCandidatesSafely: vi.fn(),
-  filterMediaItemsByTags: vi.fn(),
-  getStorageCleanupReport: vi.fn(),
-  saveProjectAssetSafely: vi.fn(),
-  saveProjectExportSafely: vi.fn(),
-  saveRecordingSafely: vi.fn(),
-  saveRecordingTelemetrySafely: vi.fn(),
-  saveScreenshotMediaAssetSafely: vi.fn(),
   saveWebSnapshotMediaAssetSafely: mocks.saveWebSnapshot,
-  updateMediaLibraryEntrySafely: vi.fn(),
 }));
 
 vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => ({
@@ -34,249 +21,127 @@ vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => (
   getStorageEstimateInfo: vi.fn(),
 }));
 
-function createManifest(): WebSnapshotManifest {
-  return {
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    capturedAt: '2026-05-12T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: {
-      computedStyles: 'logs/css/computed-styles.json',
-      domSnapshot: 'logs/dom.html',
-      errors: 'logs/errors.log',
-      manifest: 'manifest.json',
-      screenshot: 'page-screenshot.png',
-      snapshotHtml: 'snapshot/index.html',
-      stylesheets: 'logs/css/stylesheets.json',
-      virtualDomSnapshot: 'logs/virtual-dom.html',
-    },
-    schemaVersion: 1,
-    source: {
-      faviconUrl: 'https://example.com/favicon.ico',
-      title: 'Example Page',
-      url: 'https://example.com/page',
-    },
-    stats: { assetCount: 1, failedAssetCount: 0, packageSize: 10 },
-    warnings: [],
-  };
-}
-
-async function createPackageBase64(
-  manifest: WebSnapshotManifest,
-  extras: Record<string, string> = {}
-): Promise<string> {
-  const zip = new JSZip();
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest, JSON.stringify(manifest));
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml, '<!doctype html><main>Snapshot</main>');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.screenshot, 'png');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.computedStyles, '{}');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot, '<main>Snapshot</main>');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.errors, '');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.stylesheets, '[]');
-  zip.file(WEB_SNAPSHOT_PACKAGE_PATHS.virtualDomSnapshot, '{}');
-  for (const [path, content] of Object.entries(extras)) {
-    zip.file(path, content);
-  }
-
-  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
-  return buffer.toString('base64');
-}
+vi.mock('../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/web-snapshot/screenshot-validation')>()),
+  validateRetainedWebSnapshotScreenshot: mocks.validateRetainedScreenshot,
+}));
 
 async function createPayload(
-  overrides: {
-    manifest?: unknown;
-    packageChunkBase64?: string;
-    screenshotMimeType?: string;
-  } = {}
-) {
-  const manifest = createManifest();
-  const packageBase64 = overrides.packageChunkBase64 ?? (await createPackageBase64(manifest));
-  const screenshotBase64 = Buffer.from('png').toString('base64');
+  manifest: Partial<PagePackageManifest> = {}
+): Promise<Parameters<typeof saveWebSnapshotToMediaHub>[0]> {
+  const fixture = await createPagePackageArchiveFixture({ manifest });
   return {
-    packageBlob: new Blob([Buffer.from(packageBase64, 'base64')], {
-      type: 'application/x-sniptale-web-snapshot+zip',
-    }),
+    assertPersistenceAllowed: vi.fn().mockResolvedValue(undefined),
+    packageBlob: fixture.packageBlob,
     payload: {
-      manifest: (overrides.manifest ?? manifest) as WebSnapshotManifest,
+      manifest: fixture.manifest,
       packageStagedBlobId: 'package-stage-1',
-      screenshotMimeType: overrides.screenshotMimeType ?? 'image/png',
+      screenshotMimeType: 'image/png' as const,
       screenshotStagedBlobId: 'screenshot-stage-1',
       snapshotSessionId: 'snapshot-session-1',
     },
-    screenshotBlob: new Blob([Buffer.from(screenshotBase64, 'base64')], {
-      type: overrides.screenshotMimeType ?? 'image/png',
-    }),
+    screenshotBlob: fixture.screenshotBlob,
   };
-}
-
-function createProfiledPackageEntry(path: string, content = '{}') {
-  return {
-    _data: {
-      compressedSize: Buffer.byteLength(content),
-      uncompressedSize: Buffer.byteLength(content),
-    },
-    async: vi.fn(async () => new TextEncoder().encode(content)),
-    dir: false,
-    name: path,
-  };
-}
-
-function mockPackageZipWithLargeAsset(
-  manifest: WebSnapshotManifest,
-  readLargeEntry: ReturnType<typeof vi.fn>
-) {
-  const entries = {
-    [WEB_SNAPSHOT_PACKAGE_PATHS.manifest]: createProfiledPackageEntry(
-      WEB_SNAPSHOT_PACKAGE_PATHS.manifest,
-      JSON.stringify(manifest)
-    ),
-    [WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml]: createProfiledPackageEntry(
-      WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml,
-      '<!doctype html><main>Snapshot</main>'
-    ),
-    [WEB_SNAPSHOT_PACKAGE_PATHS.screenshot]: createProfiledPackageEntry(
-      WEB_SNAPSHOT_PACKAGE_PATHS.screenshot,
-      'png'
-    ),
-    'assets/large.bin': {
-      _data: { compressedSize: 32, uncompressedSize: 26 * 1024 * 1024 },
-      async: readLargeEntry,
-      dir: false,
-      name: 'assets/large.bin',
-    },
-  };
-  const zip = Object.assign(new JSZip(), {
-    file: (path: string) => entries[path as keyof typeof entries] ?? null,
-    files: entries,
-  });
-  return vi.spyOn(JSZip, 'loadAsync').mockResolvedValue(zip);
 }
 
 beforeEach(() => {
   vi.restoreAllMocks();
   mocks.ensureHeadroom.mockReset();
   mocks.saveWebSnapshot.mockReset();
-  vi.stubGlobal('atob', (value: string) => Buffer.from(value, 'base64').toString('binary'));
+  mocks.validateRetainedScreenshot.mockReset();
+  mocks.validateRetainedScreenshot.mockResolvedValue({ height: 1, width: 1 });
 });
 
-it('persists a web snapshot package through the media hub safe API', async () => {
+it('persists a verified Page Package through the existing media-hub authority', async () => {
   mocks.saveWebSnapshot.mockResolvedValue({ assetId: 'asset-1' });
-  const manifest = createManifest();
+  const input = await createPayload({
+    source: {
+      faviconUrl: 'https://example.com/favicon.ico',
+      title: 'Example Page',
+      url: 'https://example.com/page',
+    },
+  });
+  input.assetId = 'asset-1';
 
-  await expect(saveWebSnapshotToMediaHub(await createPayload({ manifest }))).resolves.toBe(
-    'asset-1'
-  );
-
+  await expect(saveWebSnapshotToMediaHub(input)).resolves.toBe('asset-1');
   expect(mocks.ensureHeadroom).toHaveBeenCalledOnce();
   expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
     expect.objectContaining({
-      filename: 'Example_Page.sniptale-web-snapshot.zip',
+      filename: 'Example_Page.sniptale-page-package.zip',
+      id: 'asset-1',
+      packageBlob: input.packageBlob,
       sourceTitle: 'Example Page',
       sourceUrl: 'https://example.com/page',
-    })
+    }),
+    expect.any(Function)
   );
 });
 
-it('sanitizes source provenance in saved web snapshot metadata and package manifest', async () => {
-  mocks.saveWebSnapshot.mockResolvedValue({ assetId: 'asset-sensitive' });
-  const manifest = createManifest();
-  manifest.source = {
-    faviconUrl: 'https://user:pass@example.com/favicon.ico?token=secret#hash',
-    title: 'Sensitive Page',
-    url: 'https://user:pass@example.com/invite/abc?token=secret#access_token=abc',
-  };
-
-  await saveWebSnapshotToMediaHub(await createPayload({ manifest }));
-
-  const savedInput = mocks.saveWebSnapshot.mock.calls[0]?.[0];
-  expect(savedInput).toEqual(
-    expect.objectContaining({
-      sourceFavicon: 'https://example.com/favicon.ico',
-      sourceTitle: 'Sensitive Page',
-      sourceUrl: 'https://example.com/',
-    })
+it('rechecks persistence permission after deferred headroom admission', async () => {
+  let releaseHeadroom: () => void = () => undefined;
+  let persistenceEnabled = true;
+  const durableSave = vi.fn().mockResolvedValue({ assetId: 'asset-race' });
+  mocks.ensureHeadroom.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseHeadroom = resolve;
+      })
   );
-  if (!savedInput) {
-    throw new Error('Expected web snapshot to be saved');
-  }
-
-  const savedPackage = await JSZip.loadAsync(await savedInput.packageBlob.arrayBuffer());
-  const savedManifestText = await savedPackage
-    .file(WEB_SNAPSHOT_PACKAGE_PATHS.manifest)
-    ?.async('string');
-
-  expect(JSON.parse(savedManifestText ?? '{}').source).toEqual({
-    faviconUrl: 'https://example.com/favicon.ico',
-    title: 'Example Page',
-    url: 'https://example.com/',
+  mocks.saveWebSnapshot.mockImplementationOnce(
+    async (input: unknown, assertPersistenceAllowed: () => Promise<void>) => {
+      await assertPersistenceAllowed();
+      return durableSave(input);
+    }
+  );
+  const input = await createPayload();
+  input.assertPersistenceAllowed = vi.fn(async () => {
+    if (!persistenceEnabled) throw new Error('Web Snapshots were disabled before commit');
   });
+
+  const save = saveWebSnapshotToMediaHub(input);
+  await vi.waitFor(() => expect(mocks.ensureHeadroom).toHaveBeenCalledOnce());
+  persistenceEnabled = false;
+  releaseHeadroom();
+
+  await expect(save).rejects.toThrow('disabled before commit');
+  expect(durableSave).not.toHaveBeenCalled();
 });
 
-it('falls back to safe snapshot filenames when source title is unavailable', async () => {
+it('rejects unsanitized provenance instead of rewriting the active archive', async () => {
+  const input = await createPayload({
+    source: {
+      faviconUrl: null,
+      title: 'Sensitive',
+      url: 'https://user:secret@example.com/path?token=secret',
+    },
+  });
+  await expect(saveWebSnapshotToMediaHub(input)).rejects.toThrow('provenance is not sanitized');
+  expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
+});
+
+it('uses a safe fallback filename when Page Package provenance is absent', async () => {
   mocks.saveWebSnapshot.mockResolvedValue({ assetId: 'asset-2' });
-  const manifest = createManifest();
-  manifest.source = { faviconUrl: null, title: null, url: null };
-
-  await saveWebSnapshotToMediaHub(await createPayload({ manifest }));
-
+  await saveWebSnapshotToMediaHub(
+    await createPayload({ source: { faviconUrl: null, title: null, url: null } })
+  );
   expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
-    expect.objectContaining({
-      filename: 'web-snapshot.sniptale-web-snapshot.zip',
-      sourceFavicon: null,
-      sourceTitle: null,
-      sourceUrl: null,
-    })
+    expect.objectContaining({ filename: 'web-snapshot.sniptale-page-package.zip' }),
+    expect.any(Function)
   );
 });
 
-it('rejects invalid manifests before persisting snapshot packages', async () => {
-  await expect(
-    saveWebSnapshotToMediaHub(await createPayload({ manifest: { id: 'snapshot-1' } }))
-  ).rejects.toThrow('Web snapshot manifest is invalid');
+it('rejects an invalid payload manifest and non-PNG retained screenshot', async () => {
+  const invalidManifest = await createPayload();
+  invalidManifest.payload.manifest = { id: 'snapshot-1' } as WebSnapshotManifest;
+  await expect(saveWebSnapshotToMediaHub(invalidManifest)).rejects.toThrow(
+    'Page Package manifest is invalid'
+  );
 
-  expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
-});
-
-it('rejects disallowed screenshot MIME types before decoding packages', async () => {
-  await expect(
-    saveWebSnapshotToMediaHub(await createPayload({ screenshotMimeType: 'image/svg+xml' }))
-  ).rejects.toThrow('Web snapshot screenshot MIME type is not allowed');
-
-  expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
-});
-
-it('rejects unexpected ZIP package entries before persisting snapshot packages', async () => {
-  const manifest = createManifest();
-
-  await expect(
-    saveWebSnapshotToMediaHub(
-      await createPayload({
-        manifest,
-        packageChunkBase64: await createPackageBase64(manifest, {
-          'snapshot/extra.html': '<script></script>',
-        }),
-      })
-    )
-  ).rejects.toThrow('Web snapshot package contains an unexpected path');
-
-  expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
-});
-
-it('rejects oversized ZIP entry metadata before inflating web snapshot packages', async () => {
-  const manifest = createManifest();
-  const readLargeEntry = vi.fn(() => {
-    throw new Error('Rejected ZIP entry was inflated.');
-  });
-  mockPackageZipWithLargeAsset(manifest, readLargeEntry);
-
-  await expect(
-    saveWebSnapshotToMediaHub(
-      await createPayload({
-        manifest,
-        packageChunkBase64: Buffer.from('zip').toString('base64'),
-      })
-    )
-  ).rejects.toThrow('Web snapshot package entry is too large');
-
-  expect(readLargeEntry).not.toHaveBeenCalled();
+  const invalidScreenshot = await createPayload();
+  Reflect.set(invalidScreenshot.payload, 'screenshotMimeType', 'image/webp');
+  invalidScreenshot.screenshotBlob = new Blob(['webp'], { type: 'image/webp' });
+  await expect(saveWebSnapshotToMediaHub(invalidScreenshot)).rejects.toThrow(
+    'screenshot is invalid'
+  );
   expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
 });

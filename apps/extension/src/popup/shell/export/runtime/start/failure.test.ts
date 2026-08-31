@@ -5,8 +5,9 @@ import { reportStartExportFailure } from './failure';
 function createState() {
   return {
     cancelRetryRef: {
-      current: { exportRunId: 'req-1', tabIds: [42] } as {
+      current: { exportRunId: 'req-1', owner: 'job', tabIds: [42] } as {
         exportRunId: string;
+        owner: 'job' | 'snapshot';
         tabIds: number[];
       } | null,
     },

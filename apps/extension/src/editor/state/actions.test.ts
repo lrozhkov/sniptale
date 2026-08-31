@@ -10,6 +10,15 @@ afterEach(() => {
 });
 
 function registerDocumentDefaultsTests() {
+  it('exposes crop state only as a runtime projection', () => {
+    expect('setCropReady' in useEditorStore.getState()).toBe(false);
+
+    const cropSelection = { height: 60, left: 10, top: 20, width: 100 };
+    useEditorStore.getState().syncRuntime({ cropReady: true, cropSelection });
+
+    expect(useEditorStore.getState()).toMatchObject({ cropReady: true, cropSelection });
+  });
+
   it('starts and resets on the file inspector', () => {
     expect(useEditorStore.getState().inspector).toBe('file');
 

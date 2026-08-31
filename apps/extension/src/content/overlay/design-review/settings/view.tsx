@@ -64,7 +64,10 @@ export function DesignReviewSettings(props: {
   return (
     <div className="grid min-h-40 grid-cols-[3rem_minmax(0,1fr)]">
       <nav
-        className="grid content-start gap-1 border-r border-[color:var(--sniptale-color-border-soft)] p-1.5"
+        className={[
+          'grid content-start gap-1 border-r border-solid p-1.5',
+          'border-[color:var(--sniptale-color-border-soft)]',
+        ].join(' ')}
         aria-label={translate('content.designReview.settingsNavigation')}
       >
         {sections.map((option) => {

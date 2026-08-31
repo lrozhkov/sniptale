@@ -1,7 +1,11 @@
-import { isExecutedAsScript, runCommand, runNpm } from '../../qa/core/shared.mjs';
-import { createBlockedStep, createProcessStep } from '../../qa/core/focused-qa-results.mjs';
-import { timeSyncStep } from '../../qa/core/step-timing.helpers.mjs';
-import { parseWrapperArguments } from '../../qa/wrappers/cli-contracts.mjs';
+import { isExecutedAsScript } from '../../qa/runtime/process/shared-cli.mjs';
+import { runCommand, runNpm } from '../../qa/runtime/process/shared-process.mjs';
+import {
+  createBlockedStep,
+  createProcessStep,
+} from '../../qa/composition/checkpoint/focused-qa-results.mjs';
+import { timeSyncStep } from '../../qa/runtime/observability/step-timing.helpers.mjs';
+import { parseWrapperArguments } from '../../qa/wrappers/contracts/cli-contracts.mjs';
 import { runObservedWrapper } from '../../qa/wrappers/observed/runner.mjs';
 
 const SECURITY_SPECS = [
@@ -13,16 +17,16 @@ const SECURITY_SPECS = [
   'tooling/test/e2e/security/privacy-erasure.spec.ts',
   'tooling/test/e2e/security/hostile-page.spec.ts',
 ];
-const SMOKE_SPECS = ['tooling/test/e2e/extension-smoke.spec.ts'];
+const SMOKE_SPECS = ['tooling/test/e2e/extension-smoke/extension-smoke.spec.ts'];
 const CRITICAL_SPECS = [
-  'tooling/test/e2e/extension-critical-full-page.spec.ts',
-  'tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts',
-  'tooling/test/e2e/extension-critical-media.spec.ts',
-  'tooling/test/e2e/extension-critical-offscreen.spec.ts',
-  'tooling/test/e2e/extension-critical-popup.spec.ts',
-  'tooling/test/e2e/extension-critical-recording-restart.spec.ts',
-  'tooling/test/e2e/extension-critical-video.spec.ts',
-  'tooling/test/e2e/extension-critical-video-effects.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-full-page.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-media.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-offscreen.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-popup.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-recording-restart.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-video.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-video-effects.spec.ts',
 ];
 const E2E_BUILD_DIRS = {
   release: '.tmp/e2e-builds/release',

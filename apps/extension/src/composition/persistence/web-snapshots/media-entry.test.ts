@@ -1,13 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import type { SaveWebSnapshotMediaAssetInput } from '../media-library/contracts';
 import type { StoredWebSnapshotRecord } from './contracts';
 
 const mediaMocks = vi.hoisted(() => ({
-  measureImageBlobMock: vi.fn(),
+  createImageThumbnailBlobMock: vi.fn(),
 }));
 
 vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -18,7 +16,7 @@ vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
 
 vi.mock('../../../platform/media-utils/image-thumbnail', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/media-utils/image-thumbnail')>()),
-  createImageThumbnailBlob: vi.fn(),
+  createImageThumbnailBlob: mediaMocks.createImageThumbnailBlobMock,
 }));
 
 vi.mock('../../../platform/media-utils/video-thumbnails', async (importOriginal) => ({
@@ -31,40 +29,38 @@ vi.mock('@sniptale/platform/browser/media/image-load', async (importOriginal) =>
   loadImageFromBlob: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/media/image-dimensions')>()),
-  measureImageBlob: mediaMocks.measureImageBlobMock,
-}));
-
 beforeEach(() => {
   vi.clearAllMocks();
-  mediaMocks.measureImageBlobMock.mockResolvedValue({ height: 720, width: 1280 });
+  mediaMocks.createImageThumbnailBlobMock.mockResolvedValue(
+    new Blob(['thumbnail'], { type: 'image/webp' })
+  );
+});
+
+it('creates Web Snapshot thumbnails from the top of the retained page raster', async () => {
+  const { createWebSnapshotThumbnailEntry } = await import('./media-entry');
+  const screenshotBlob = new Blob(['png'], { type: 'image/png' });
+
+  await expect(
+    createWebSnapshotThumbnailEntry({
+      assetId: 'snapshot-1',
+      createdAt: 100,
+      screenshotBlob,
+      updatedAt: 200,
+    })
+  ).resolves.toMatchObject({ assetId: 'snapshot-1', height: 180, width: 320 });
+  expect(mediaMocks.createImageThumbnailBlobMock).toHaveBeenCalledWith(screenshotBlob, 320, 180, {
+    verticalAnchor: 'top',
+  });
 });
 
 function createManifest(): WebSnapshotManifest {
-  return {
-    capturedAt: '2026-06-10T00:00:00.000Z',
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    id: 'snapshot-1',
-    paths: {
-      computedStyles: 'computed.css',
-      domSnapshot: 'dom.json',
-      errors: 'errors.json',
-      manifest: 'manifest.json',
-      screenshot: 'screenshot.png',
-      snapshotHtml: 'index.html',
-      stylesheets: 'styles.css',
-      virtualDomSnapshot: 'virtual.json',
-    },
-    schemaVersion: 1,
+  return createPagePackageManifestFixture({
     source: {
       faviconUrl: 'https://user:pass@example.com/favicon.ico?token=secret#hash',
       title: 'Sensitive page',
       url: 'https://user:pass@example.com/invite/abc?token=secret#access_token=abc',
     },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 1 },
-    warnings: [],
-  };
+  });
 }
 
 it('sanitizes web snapshot provenance before creating the media entry', async () => {
@@ -89,7 +85,13 @@ it('sanitizes web snapshot provenance before creating the media entry', async ()
   };
 
   await expect(
-    createWebSnapshotMediaEntry({ assetId: 'asset-1', input, now: 200, snapshot })
+    createWebSnapshotMediaEntry({
+      assetId: 'asset-1',
+      input,
+      now: 200,
+      screenshotDimensions: { height: 720, width: 1280 },
+      snapshot,
+    })
   ).resolves.toEqual(
     expect.objectContaining({
       sourceFavicon: 'https://example.com/favicon.ico',

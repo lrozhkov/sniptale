@@ -4,6 +4,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { getLastSaveAsDirectory } from '../save-directory';
 import { transitionCaptureJob } from '../../jobs/state-machine';
 import { defaultDownloadRouterService } from './service-singleton';
+import type { DownloadTerminalHandler } from './service';
 import { buildDownloadFilename, resolvePresetPath } from './path';
 
 const logger = createLogger({ namespace: 'BackgroundDownloadRouter' });
@@ -162,4 +163,30 @@ export async function executeDownloadBlob(
     downloadUrl.cleanup?.();
     throw error;
   }
+}
+
+export async function executeDownloadUrl(args: {
+  filename: string;
+  onTerminal: DownloadTerminalHandler;
+  presetId?: string | null | undefined;
+  url: string;
+}): Promise<number | undefined> {
+  const path = await resolvePresetPath(args.presetId ?? undefined);
+  const finalFilename = buildDownloadFilename(path, args.filename);
+  const downloadId = await browserDownloads.download({
+    url: args.url,
+    filename: finalFilename,
+    saveAs: false,
+  });
+  if (typeof downloadId === 'number') {
+    await defaultDownloadRouterService.rememberPendingDownload(
+      downloadId,
+      args.onTerminal,
+      'generic',
+      undefined,
+      true
+    );
+  }
+  logger.log('External URL saved', finalFilename);
+  return downloadId;
 }

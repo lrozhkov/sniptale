@@ -20,11 +20,12 @@ vi.mock('../../../composition/persistence/scenario/store/v3', async (importOrigi
 
 import { createScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import { useScenarioV3ProjectSaver } from './use-save';
-import type { ScenarioV3PageSaveState } from './types';
+import type { ScenarioV3PageSaveState, ScenarioV3SaveOutcome } from './types';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-let currentSaveProject: ((project: ScenarioProjectV3) => Promise<void>) | null = null;
+let currentSaveProject: ((project: ScenarioProjectV3) => Promise<ScenarioV3SaveOutcome>) | null =
+  null;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -51,6 +52,9 @@ describe('useScenarioV3ProjectSaver', () => {
     verifyStaleSaveFailureIgnoredAfterNewerSuccess
   );
   it('surfaces the latest save failure', verifyLatestSaveFailureSurfaced);
+  it('returns a failed terminal outcome for persistence rejection', verifyFailedSaveOutcome);
+  it('returns the exact persisted project in a saved terminal outcome', verifySavedOutcome);
+  it('returns a superseded terminal outcome for a replaced queued save', verifySupersededOutcome);
   it(
     'queues a newer local save on the prior persisted revision',
     verifyQueuedSaveUsesPersistedRevision
@@ -92,6 +96,51 @@ async function verifyLatestSaveFailureSurfaced() {
 
   expect(setError).toHaveBeenCalledWith('Quota exceeded');
   expect(setSaveState).toHaveBeenLastCalledWith('error');
+}
+
+async function verifyFailedSaveOutcome() {
+  saveScenarioProjectRecordV3Mock.mockRejectedValue(new Error('Quota exceeded'));
+  renderSaver();
+
+  await expect(requestSave(createScenarioProjectV3('Failed'))).resolves.toEqual({
+    status: 'failed',
+  });
+}
+
+async function verifySavedOutcome() {
+  const persisted = withUpdatedAt(createScenarioProjectV3('Persisted'), 20);
+  saveScenarioProjectRecordV3Mock.mockResolvedValue(persisted);
+  renderSaver();
+
+  await expect(requestSave(createScenarioProjectV3('Local'))).resolves.toEqual({
+    project: persisted,
+    status: 'saved',
+  });
+}
+
+async function verifySupersededOutcome() {
+  const firstSave = createDeferred<ScenarioProjectV3>();
+  const finalSave = createDeferred<ScenarioProjectV3>();
+  saveScenarioProjectRecordV3Mock
+    .mockReturnValueOnce(firstSave.promise)
+    .mockReturnValueOnce(finalSave.promise);
+  renderSaver();
+  const firstProject = createScenarioProjectV3('First');
+  const supersededProject = createScenarioProjectV3('Superseded');
+  const finalProject = createScenarioProjectV3('Final');
+
+  const firstPromise = requestSave(firstProject);
+  const supersededPromise = requestSave(supersededProject);
+  const finalPromise = requestSave(finalProject);
+  await expect(supersededPromise).resolves.toEqual({ status: 'superseded' });
+
+  await act(async () => {
+    firstSave.resolve(firstProject);
+    await firstPromise;
+    await flushMicrotasks();
+    finalSave.resolve(finalProject);
+    await finalPromise;
+  });
 }
 
 async function verifyQueuedSaveUsesPersistedRevision() {
@@ -213,7 +262,7 @@ async function clickSave() {
 
 function requestSave(project: ScenarioProjectV3) {
   expect(currentSaveProject).not.toBeNull();
-  let savePromise!: Promise<void>;
+  let savePromise!: Promise<ScenarioV3SaveOutcome>;
   act(() => {
     savePromise = currentSaveProject?.(project) ?? Promise.reject(new Error('missing saver'));
   });

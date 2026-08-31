@@ -1,4 +1,4 @@
-import { evaluateSpdxExpression } from '../../policy/spdx-expression.mjs';
+import { evaluateSpdxExpression } from '../../policy/legal/spdx-expression.mjs';
 import { collectDecisionContainment } from './containment.mjs';
 import {
   collectComponentLicense,
@@ -36,7 +36,7 @@ function collectDeniedCandidates(components, containmentByComponent, policy) {
         policy
       );
       return {
-        packageName: toComponentName(component),
+        packageName: toComponentName(component, containment),
         version: component.version ?? null,
         license,
         dependencyScope: containment?.dependencyScope ?? null,
@@ -47,16 +47,16 @@ function collectDeniedCandidates(components, containmentByComponent, policy) {
     .filter(Boolean);
 }
 
-function isWorkspaceComponent(component) {
-  const packagePath = (component.properties ?? []).find(
-    (property) => property.name === 'cdx:npm:package:path'
-  )?.value;
-  return typeof packagePath === 'string' && !packagePath.startsWith('node_modules/');
+function isFirstPartyComponent(component) {
+  const markers = (component?.properties ?? []).filter(
+    (property) => property?.name === 'cdx:npm:package:private'
+  );
+  return markers.length === 1 && markers[0].value === 'true';
 }
 
 function collectFirstPartyViolations(components, policy) {
   return components
-    .filter(isWorkspaceComponent)
+    .filter(isFirstPartyComponent)
     .filter((component) => collectComponentLicense(component) !== policy.firstPartyLicense)
     .map((component) => ({
       packageName: toComponentName(component),
@@ -67,7 +67,9 @@ function collectFirstPartyViolations(components, policy) {
 
 function createSummary(lock, sbom, policy) {
   const components = sbom.components ?? [];
-  const dependencyComponents = components.filter((component) => !isWorkspaceComponent(component));
+  const metadataComponent = sbom.metadata?.component;
+  const firstPartyComponents = [metadataComponent, ...components].filter(isFirstPartyComponent);
+  const dependencyComponents = components.filter((component) => !isFirstPartyComponent(component));
   const containmentByComponent = new Map(
     dependencyComponents.map((component) => [
       component,
@@ -91,12 +93,12 @@ function createSummary(lock, sbom, policy) {
       mode: policy.mode,
       componentCount: components.length,
       dependencyComponentCount: dependencyComponents.length,
-      firstPartyComponents: components.filter(isWorkspaceComponent).map((component) => ({
+      firstPartyComponents: firstPartyComponents.map((component) => ({
         packageName: toComponentName(component),
         version: component.version ?? null,
         license: collectComponentLicense(component),
       })),
-      firstPartyViolations: collectFirstPartyViolations(components, policy),
+      firstPartyViolations: collectFirstPartyViolations(firstPartyComponents, policy),
       licenseCounts: summarizeLicenses(dependencyComponents),
       deniedCandidates: collectDeniedCandidates(
         dependencyComponents,

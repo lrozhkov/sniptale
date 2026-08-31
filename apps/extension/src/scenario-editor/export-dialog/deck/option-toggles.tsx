@@ -1,4 +1,5 @@
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { translate } from '../../../platform/i18n';
 import type { ScenarioDeckExportControlProps } from './types';
 
 export function ScenarioDeckExportOptionToggles(props: ScenarioDeckExportControlProps) {
@@ -6,22 +7,22 @@ export function ScenarioDeckExportOptionToggles(props: ScenarioDeckExportControl
     <div className="grid gap-3">
       <ScenarioDeckToggleRow
         checked={props.options.includeNotes}
-        label="Include speaker notes"
-        hint="Adds per-slide notes blocks to HTML and Markdown exports."
+        label={translate('scenario.editor.exportIncludeSpeakerNotes')}
+        hint={translate('scenario.editor.exportIncludeSpeakerNotesHint')}
         onChange={(includeNotes) => props.onChange({ ...props.options, includeNotes })}
       />
       <ScenarioDeckToggleRow
         checked={props.options.includeMissingPlaceholders}
-        label="Show missing asset placeholders"
-        hint="Keeps export diagnostics visible when an image asset cannot be resolved."
+        label={translate('scenario.editor.exportShowMissingPlaceholders')}
+        hint={translate('scenario.editor.exportShowMissingPlaceholdersHint')}
         onChange={(includeMissingPlaceholders) =>
           props.onChange({ ...props.options, includeMissingPlaceholders })
         }
       />
       <ScenarioDeckToggleRow
         checked={props.options.includeSourceJson}
-        label="Include slide source JSON"
-        hint="Adds the editable scenario document for AI/API round trips."
+        label={translate('scenario.editor.exportIncludeSourceJson')}
+        hint={translate('scenario.editor.exportIncludeSourceJsonHint')}
         onChange={(includeSourceJson) => props.onChange({ ...props.options, includeSourceJson })}
       />
     </div>

@@ -8,6 +8,7 @@ export function buildPopupExportOptions(selection: PopupExportSelection): Export
     includeCssDiagnostics: selection.includeCssDiagnostics,
     includeFiles: selection.includeFiles,
     includeFullPageScreenshot: selection.includeFullPageScreenshot,
+    ...(selection.includeViewportScreenshot === true ? { includeViewportScreenshot: true } : {}),
     includePageDiagnostics: selection.includePageDiagnostics,
     includeImages: selection.includeImages,
     includeJson: selection.includeJson,

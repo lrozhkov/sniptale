@@ -27,6 +27,12 @@ const wrapperCoverageTargets = parseWrapperCoverageTargets();
 const isWrapperCoverageMode = wrapperCoverageMode !== 'manual';
 const isWrapperTimeoutMode = process.env.SNIPTALE_VITEST_TIMEOUT_MODE === 'wrapper';
 const vitestSuite = resolveVitestSuite(process.env.SNIPTALE_VITEST_SUITE);
+const TOOLING_COVERAGE_THRESHOLDS = {
+  statements: 70,
+  branches: 67,
+  functions: 78,
+  lines: 70,
+};
 
 function resolveVitestSuite(value: string | undefined): SniptaleVitestSuite {
   if (value == null || value === '') {
@@ -59,14 +65,14 @@ function resolveSuiteInclude() {
 
 function resolveCoverageInclude() {
   if (vitestSuite === 'harness') {
-    return ['tooling/**/*.{ts,tsx}'];
+    return ['tooling/**/*.{mjs,cjs,js,ts,tsx}'];
   }
 
   if (!isWrapperCoverageMode && vitestSuite === 'all') {
     return [
       'apps/extension/src/**/*.{ts,tsx}',
       'packages/*/src/**/*.{ts,tsx}',
-      'tooling/**/*.{ts,tsx}',
+      'tooling/**/*.{mjs,cjs,js,ts,tsx}',
     ];
   }
 
@@ -86,10 +92,20 @@ export default defineConfig({
     hookTimeout: isWrapperTimeoutMode ? 15000 : undefined,
     coverage: {
       provider: 'v8',
-      all: !isWrapperCoverageMode,
-      reportsDirectory: './.tmp/coverage/unit',
-      reporter: isWrapperCoverageMode ? ['json'] : ['text', 'json-summary', 'json', 'html'],
+      all: vitestSuite === 'harness' || !isWrapperCoverageMode,
+      reportsDirectory:
+        vitestSuite === 'harness' ? './.tmp/coverage/tooling' : './.tmp/coverage/unit',
+      reporter:
+        vitestSuite === 'harness' || !isWrapperCoverageMode
+          ? ['text', 'json-summary', 'json', 'html']
+          : ['json'],
       include: resolveCoverageInclude(),
+      ...(vitestSuite === 'harness'
+        ? {
+            reportOnFailure: true,
+            thresholds: TOOLING_COVERAGE_THRESHOLDS,
+          }
+        : {}),
       exclude: [
         'cases/**',
         'dist/**',
@@ -99,8 +115,12 @@ export default defineConfig({
         'apps/extension/src/**/*.spec.{ts,tsx}',
         'packages/*/src/**/*.test.{ts,tsx}',
         'packages/*/src/**/*.spec.{ts,tsx}',
-        'tooling/**/*.test.{ts,tsx}',
-        'tooling/**/*.spec.{ts,tsx}',
+        'tooling/**/*.{test,spec}.{mjs,cjs,js,ts,tsx}',
+        'tooling/**/*.test-support.{mjs,cjs,js,ts,tsx}',
+        'tooling/**/test-support/**',
+        'tooling/**/fixtures/**',
+        'tooling/test/harness/**',
+        'tooling/test/e2e/support/**',
       ],
     },
   },

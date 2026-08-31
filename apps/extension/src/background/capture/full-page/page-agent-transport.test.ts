@@ -123,3 +123,116 @@ it('uses stage-specific fallback errors and rejects failed restore responses', a
   sendTabMessage.mockResolvedValueOnce({ success: false });
   await expect(agent.restore(identity)).rejects.toThrow('page restore failed');
 });
+
+it('rejects an unresolved page-agent request when capture is cancelled', async () => {
+  sendTabMessage.mockReturnValue(new Promise(() => undefined));
+  const agent = createFullPagePageAgentTransport(
+    { documentId: 'document-active', tabId: 7 },
+    { sendTabMessage }
+  );
+  const controller = new AbortController();
+  const pending = agent.prepare(
+    identity,
+    {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    },
+    controller.signal
+  );
+
+  controller.abort(new Error('capture cancelled'));
+
+  await expect(pending).rejects.toThrow('capture cancelled');
+});
+
+it('uses the canonical cancellation error when an already-aborted signal has no reason', async () => {
+  const agent = createFullPagePageAgentTransport(
+    { documentId: 'document-active', tabId: 7 },
+    { sendTabMessage }
+  );
+  const controller = new AbortController();
+  controller.abort();
+  Object.defineProperty(controller.signal, 'reason', { value: undefined });
+
+  await expect(
+    agent.prepare(
+      identity,
+      {
+        floatingElements: 'once',
+        freezeMotion: true,
+        preloadLazyContent: true,
+      },
+      controller.signal
+    )
+  ).rejects.toThrow('Full-page capture cancelled');
+  expect(sendTabMessage).not.toHaveBeenCalled();
+});
+
+it('uses the canonical cancellation error when an active signal aborts without a reason', async () => {
+  sendTabMessage.mockReturnValue(new Promise(() => undefined));
+  const controller = new AbortController();
+  Object.defineProperty(controller.signal, 'reason', { value: undefined });
+  const removeEventListener = vi.spyOn(controller.signal, 'removeEventListener');
+  const agent = createFullPagePageAgentTransport(
+    { documentId: 'document-active', tabId: 7 },
+    { sendTabMessage }
+  );
+  const pending = agent.prepare(
+    identity,
+    {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    },
+    controller.signal
+  );
+
+  controller.abort();
+
+  await expect(pending).rejects.toThrow('Full-page capture cancelled');
+  expect(removeEventListener).toHaveBeenCalled();
+});
+
+it('propagates a page-agent transport rejection without leaving its timeout active', async () => {
+  const failure = new Error('content script disconnected');
+  sendTabMessage.mockRejectedValue(failure);
+  const agent = createFullPagePageAgentTransport(
+    { documentId: 'document-active', tabId: 7 },
+    { sendTabMessage }
+  );
+
+  await expect(
+    agent.prepare(identity, {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    })
+  ).rejects.toBe(failure);
+});
+
+it('bounds an unresolved tile response by the page-agent operation timeout', async () => {
+  vi.useFakeTimers();
+  sendTabMessage.mockReturnValue(new Promise(() => undefined));
+  const agent = createFullPagePageAgentTransport(
+    { documentId: 'document-active', tabId: 7 },
+    { sendTabMessage }
+  );
+  const pending = agent.prepareTile({
+    ...identity,
+    column: 0,
+    firstColumn: true,
+    firstRow: true,
+    lastColumn: true,
+    lastRow: true,
+    row: 0,
+    targetX: 0,
+    targetY: 0,
+  });
+  const rejection = expect(pending).rejects.toThrow('timed out during tile preparation');
+
+  await vi.advanceTimersByTimeAsync(5_001);
+
+  await rejection;
+  vi.useRealTimers();
+});

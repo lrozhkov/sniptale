@@ -24,7 +24,7 @@ type ProjectExportRuntimeMessage = Extract<
 export async function handleProjectExportRuntimeMessage(
   message: ProjectExportRuntimeMessage,
   sendResponse?: ResponseSender
-): Promise<void> {
+): Promise<'accepted' | void> {
   switch (message.type) {
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT: {
       if (message.jobId !== message.input.jobId) {
@@ -32,11 +32,11 @@ export async function handleProjectExportRuntimeMessage(
       }
       const project = await consumeProjectExportInput(message.input);
       await startProjectExport(message.jobId, project, message.settings);
-      return;
+      return 'accepted';
     }
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
       await cancelProjectExport(message.jobId);
-      return;
+      return 'accepted';
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES: {
       await reconcileProjectExportJobs();
       const capabilities = await getProjectExportCapabilities(message.settings);

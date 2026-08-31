@@ -16,7 +16,6 @@ function createState(): VideoEditorProjectState {
     project,
     projectHistory: resetVideoEditorProjectHistory(project.id),
     selection: { kind: 'scene' },
-    selectedClipId: null,
     selectedTrackId: project.tracks[0]?.id ?? null,
   } as VideoEditorProjectState;
 }
@@ -141,7 +140,6 @@ function buildOverlaySelectionState(
         } as never,
       ],
     },
-    selectedClipId: clipId,
     selection: { kind: 'clip', clipId },
   } as VideoEditorProjectState;
 }
@@ -166,7 +164,6 @@ function verifyTrackDeleteSelectionCleanup() {
   expect(runtime.getState().project?.tracks.some((track) => track.id === extraOverlayTrackId)).toBe(
     false
   );
-  expect(runtime.getState().selectedClipId).toBeNull();
   expect(runtime.getState().selection).toEqual({ kind: 'scene' });
 }
 

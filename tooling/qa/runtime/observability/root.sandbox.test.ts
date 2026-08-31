@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { createTempRoot, initGitRepo } from '../../core/test-helpers';
+import { createTempRoot, initGitRepo } from '../../test-support/test-helpers';
 import { resolveObservabilityRoot } from './root.mjs';
 
 it('uses an integer-status git result when a sandbox also reports EPERM', () => {

@@ -170,7 +170,7 @@ test('worker termination drops admitted tab authority before any side effect', a
   const baseline = await collectRetentionText(popup);
   const requestId = 'security-worker-restart-stale-capability';
   const staleToken = await issuePopupTabRouteCapability({
-    operation: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+    operation: 'EXPORT_POPUP_PREVIEW',
     popup,
     requestId,
     tabId,
@@ -179,11 +179,10 @@ test('worker termination drops admitted tab authority before any side effect', a
   await terminateExtensionServiceWorker(context);
   expect(
     await sendRuntimeMessage(popup, {
-      requestId,
       tabId,
       tabRouteCapabilityToken: staleToken,
       tabRouteRequestId: requestId,
-      type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
+      type: 'EXPORT_POPUP_PREVIEW',
     })
   ).toMatchObject({ success: false });
   expect(await collectRetentionText(popup)).toBe(baseline);

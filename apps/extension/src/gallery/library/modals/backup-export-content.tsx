@@ -138,6 +138,10 @@ function BackupDataClassesPanel({ summary }: Pick<BackupExportModalProps, 'summa
           count={summary.webSnapshotCount}
           label={translate('gallery.backupExportModal.classWebSnapshots')}
         />
+        <DataClassRow
+          count={summary.savedViewCount}
+          label={translate('gallery.backupExportModal.classSavedViews')}
+        />
       </div>
     </section>
   );

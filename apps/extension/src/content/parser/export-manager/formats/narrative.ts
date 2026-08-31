@@ -5,7 +5,9 @@ import { getSectionBlocks, getSectionFields } from '../../ir/document-helpers';
 
 type ExportField = NonNullable<ExportSection['fields']>[number];
 type NarrativeBlock = ReturnType<typeof getSectionBlocks>[number];
-type PlainNarrativeTextBlock = NarrativeBlock & { kind: 'quote' | 'callout' | 'code' };
+type PlainNarrativeTextBlock = NarrativeBlock & {
+  kind: 'quote' | 'callout' | 'code';
+};
 
 function createExportField(args: {
   label: string;
@@ -13,6 +15,7 @@ function createExportField(args: {
   type: ExportField['type'];
   contentRole: ExportField['contentRole'] | undefined;
   linkRef: ExportField['linkRef'] | undefined;
+  inlineContent: ExportField['inlineContent'] | undefined;
 }): ExportField {
   return {
     label: args.label,
@@ -20,6 +23,7 @@ function createExportField(args: {
     type: args.type,
     ...(args.contentRole === undefined ? {} : { contentRole: args.contentRole }),
     ...(args.linkRef === undefined ? {} : { linkRef: args.linkRef }),
+    ...(args.inlineContent === undefined ? {} : { inlineContent: args.inlineContent }),
   };
 }
 
@@ -37,21 +41,27 @@ function appendNarrativeBlockFields(
   fields: NonNullable<ExportSection['fields']>,
   block: NarrativeBlock
 ): boolean {
-  if (block.kind === 'paragraph' && block.text) {
+  if (block.kind === 'paragraph' && (block.text || block.inlineContent?.length)) {
+    const firstImage = block.inlineContent?.find((node) => node.kind === 'image');
     fields.push(
       createExportField({
-        label: translate('content.runtime.exportParagraphLabel'),
-        value: block.text,
-        type: 'string',
+        label: translate(
+          firstImage && !block.text
+            ? 'content.runtime.exportImageLabel'
+            : 'content.runtime.exportParagraphLabel'
+        ),
+        value: block.text || firstImage?.sourceUrl || '',
+        type: firstImage && !block.text ? 'image' : 'string',
         contentRole: 'paragraph',
         linkRef: undefined,
+        inlineContent: block.inlineContent,
       })
     );
     return true;
   }
 
   if (block.kind === 'list' && block.items) {
-    block.items.forEach((item) => {
+    block.items.forEach((item, index) => {
       fields.push(
         createExportField({
           label: translate('content.runtime.exportListItemLabel'),
@@ -59,6 +69,7 @@ function appendNarrativeBlockFields(
           type: 'string',
           contentRole: 'list-item',
           linkRef: undefined,
+          inlineContent: block.itemInlineContent?.[index],
         })
       );
     });
@@ -73,6 +84,7 @@ function appendNarrativeBlockFields(
         type: 'string',
         contentRole: 'paragraph',
         linkRef: undefined,
+        inlineContent: block.inlineContent,
       })
     );
     return true;
@@ -109,6 +121,7 @@ export function buildSectionFields(
         type: field.valueType,
         contentRole: field.contentRole,
         linkRef: field.linkRef,
+        inlineContent: undefined,
       })
     )
   );

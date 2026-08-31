@@ -9,9 +9,8 @@ import {
   type PhysicalDeleteAssetOperation,
 } from '../../../../composition/persistence/assets';
 import { putAggregatePresentationBackupRestore } from '../../../../composition/persistence/aggregate-presentations/backup-restore';
-import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
-import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
+import { preparePortableAggregatePresentation } from './presentation';
 import { decodePortableEditorDocument } from '../root-codecs/editor-document';
 import { putImageWorkspaceBackupRestore } from '../../../../composition/persistence/image-workspaces/backup-restore';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
@@ -43,7 +42,10 @@ import type {
 import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../../../../composition/persistence/recordings/telemetry.guards';
 import { createRecordingMediaId } from '../../../../features/media-hub/media-id';
-import { sanitizeWebSnapshotPackageProvenance } from '../../../../features/web-snapshot/provenance';
+import {
+  readWebSnapshotPackageScreenshotBytes,
+  sanitizeWebSnapshotPackageProvenance,
+} from '../../../../features/web-snapshot/provenance';
 import { isWebSnapshotManifest } from '../../../../features/web-snapshot/manifest';
 import { putWebSnapshotBackupRestore } from '../../../../composition/persistence/web-snapshots/backup-restore';
 import { parseStoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots';
@@ -54,6 +56,9 @@ import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import type { MediaHubBackupRootEnvelope } from '../contracts';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
+import { validateRetainedWebSnapshotScreenshot } from '../../../../features/web-snapshot/screenshot-validation';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 
 type MutableStore = {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -201,13 +206,51 @@ function remapMediaIdentity(
 
 type PortableMedia = ReturnType<typeof parsePortableMediaMetadata>;
 
-const WEB_SNAPSHOT_SCREENSHOT_MIME_TYPES: readonly string[] = [
-  'image/avif',
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-];
+const PAGE_PACKAGE_FILENAME_SUFFIX = '.sniptale-page-package.zip';
+
+function assertRestoredWebSnapshotMediaProfile(args: {
+  metadata: PortableMedia;
+  packageObject: StagedArchiveObject;
+  screenshotObject: StagedArchiveObject;
+}): void {
+  const snapshot = args.metadata.webSnapshot;
+  if (!snapshot) return;
+  const entry = args.metadata.entry;
+  if (
+    entry.id !== snapshot.entry.id ||
+    entry.kind !== 'web-archive' ||
+    entry.mimeType !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE ||
+    entry.source.kind !== 'web-snapshot' ||
+    entry.source.snapshotId !== snapshot.entry.id ||
+    args.metadata.originalObjectId !== snapshot.packageObjectId ||
+    entry.filename.length <= PAGE_PACKAGE_FILENAME_SUFFIX.length ||
+    !entry.filename.endsWith(PAGE_PACKAGE_FILENAME_SUFFIX) ||
+    entry.originalFilename !== entry.filename ||
+    entry.size !== args.packageObject.ref.size ||
+    snapshot.entry.size !== args.packageObject.ref.size ||
+    snapshot.entry.screenshotMimeType !== 'image/png' ||
+    snapshot.entry.screenshotSize !== args.screenshotObject.ref.size
+  ) {
+    throw new Error('Restored Page Package Library metadata is invalid.');
+  }
+  if (args.packageObject.ref.mimeType !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE) {
+    throw new Error('Restored web snapshot package MIME type is invalid.');
+  }
+  if (args.screenshotObject.ref.mimeType !== 'image/png') {
+    throw new Error('Restored web snapshot screenshot MIME type is invalid.');
+  }
+}
+
+async function validateRestoredWebSnapshotScreenshot(args: {
+  manifest: WebSnapshotManifest;
+  packageBlob: Blob;
+  screenshotBlob: Blob;
+}): Promise<void> {
+  await validateRetainedWebSnapshotScreenshot({
+    packageBytes: await readWebSnapshotPackageScreenshotBytes(args.packageBlob, args.manifest),
+    screenshotBlob: args.screenshotBlob,
+  });
+}
 
 async function replaceSanitizedSnapshotPackage(args: {
   envelope: MediaHubBackupRootEnvelope;
@@ -218,21 +261,28 @@ async function replaceSanitizedSnapshotPackage(args: {
   if (!isWebSnapshotManifest(metadata.webSnapshot.entry.manifest)) {
     throw new Error('Restored web snapshot manifest is invalid.');
   }
+  if (metadata.webSnapshot.entry.manifest.intent !== 'save') {
+    throw new Error('Restored Page Package uses a non-Library profile.');
+  }
   const objects = objectMap(args.staged);
   const packageObject = requireObject(objects, metadata.webSnapshot.packageObjectId);
   const screenshotObject = requireObject(objects, metadata.webSnapshot.screenshotObjectId);
-  if (packageObject.ref.mimeType.toLowerCase() !== 'application/zip') {
-    throw new Error('Restored web snapshot package MIME type is invalid.');
-  }
-  if (!WEB_SNAPSHOT_SCREENSHOT_MIME_TYPES.includes(screenshotObject.ref.mimeType.toLowerCase())) {
-    throw new Error('Restored web snapshot screenshot MIME type is invalid.');
-  }
+  assertRestoredWebSnapshotMediaProfile({ metadata, packageObject, screenshotObject });
   const packageFile = await readAssetFile(packageObject.ref, `${metadata.entry.id}-snapshot.zip`);
   const sanitized = await sanitizeWebSnapshotPackageProvenance(
     packageFile,
     metadata.webSnapshot.entry.manifest,
     { requireManifestMatch: true }
   );
+  const screenshotFile = await readAssetFile(
+    screenshotObject.ref,
+    `${metadata.entry.id}-screenshot`
+  );
+  await validateRestoredWebSnapshotScreenshot({
+    manifest: sanitized.manifest,
+    packageBlob: sanitized.packageBlob,
+    screenshotBlob: screenshotFile,
+  });
   let staged = args.staged;
   if (sanitized.changed) {
     const replacement = await writeBlobToAsset(sanitized.packageBlob);
@@ -256,6 +306,7 @@ async function replaceSanitizedSnapshotPackage(args: {
   }
   const nextMetadata = {
     ...metadata,
+    entry: { ...metadata.entry, size: sanitized.size },
     webSnapshot: {
       ...metadata.webSnapshot,
       entry: {
@@ -403,32 +454,6 @@ function prepareWorkspace(args: {
   return { refs, workspace };
 }
 
-async function preparePresentation(args: {
-  mediaId: string;
-  metadata: PortableMedia;
-  objects: StagedObjectMap;
-}): Promise<AggregatePresentationEntry | null> {
-  if (!args.metadata.presentation) return null;
-  const thumbnailBlob = await readAssetFile(
-    requireObject(args.objects, args.metadata.presentation.thumbnailObjectId).ref,
-    `${args.mediaId}-presentation-thumbnail`
-  );
-  const previewBlob = args.metadata.presentation.previewObjectId
-    ? await readAssetFile(
-        requireObject(args.objects, args.metadata.presentation.previewObjectId).ref,
-        `${args.mediaId}-preview`
-      )
-    : undefined;
-  const presentation = parseAggregatePresentationEntry({
-    ...args.metadata.presentation.entry,
-    aggregateId: args.mediaId,
-    thumbnailBlob,
-    ...(previewBlob ? { previewBlob } : {}),
-  });
-  if (!presentation) throw new Error('Restored aggregate presentation is invalid.');
-  return presentation;
-}
-
 async function prepareMediaRoot(args: {
   metadata: PortableMedia;
   objects: StagedObjectMap;
@@ -461,10 +486,11 @@ async function prepareMediaRoot(args: {
   });
   const [thumbnail, presentation] = await Promise.all([
     prepareThumbnail({ mediaId: restoredEntry.id, metadata: args.metadata, objects: args.objects }),
-    preparePresentation({
-      mediaId: restoredEntry.id,
-      metadata: args.metadata,
-      objects: args.objects,
+    preparePortableAggregatePresentation({
+      getObjectRef: (objectId) => requireObject(args.objects, objectId).ref,
+      invalidMessage: 'Restored aggregate presentation is invalid.',
+      metadata: args.metadata.presentation,
+      targetId: restoredEntry.id,
     }),
   ]);
   const workspace = prepareWorkspace({

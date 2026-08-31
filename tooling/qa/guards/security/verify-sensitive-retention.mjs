@@ -3,31 +3,32 @@
  * outside explicit policy owners.
  */
 
-import {
-  collectCodeFiles,
-  isExecutedAsScript,
-  printViolations,
-  repoRoot,
-} from '../../core/shared.mjs';
+import { collectCodeFiles } from '../../analysis/repository/shared-files.mjs';
+import { repoRoot } from '../../analysis/repository/shared-paths.mjs';
+import { isExecutedAsScript, printViolations } from '../../runtime/process/shared-cli.mjs';
 import { collectPolicyBackedStorageFieldViolations } from './helpers/policy-scan.mjs';
 import { readPolicy, toRootRelativePath } from './security-policy-utils.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/security-storage-ownership.data.json';
-const CONTENT_RETENTION_PATTERN =
-  /\b(?:prompt|markdownData|jsonData|rawResponse|html)\b(?:\s*:|\s*[,}])/u;
-const PRIVATE_RETENTION_PATTERN =
-  /\b(?:innerHtml|outerHtml|cookie|authorization)\b(?:\s*:|\s*[,}])/u;
-const VIDEO_PREVIEW_RETENTION_PATTERN =
-  /\b(?:VideoPreviewCacheRecord|contentRevision|fingerprint|segments)\b/u;
-const RETENTION_FIELD_PATTERN = {
-  test(source) {
-    return (
-      CONTENT_RETENTION_PATTERN.test(source) ||
-      PRIVATE_RETENTION_PATTERN.test(source) ||
-      VIDEO_PREVIEW_RETENTION_PATTERN.test(source)
-    );
-  },
-};
+const RETENTION_FIELDS = [
+  'prompt',
+  'markdownData',
+  'jsonData',
+  'rawResponse',
+  'html',
+  'innerHtml',
+  'outerHtml',
+  'cookie',
+  'authorization',
+  'VideoPreviewCacheRecord',
+  'contentRevision',
+  'fingerprint',
+  'segments',
+  'gallerySavedView',
+  'annotationForkSession',
+  'frameAnnotationRaster',
+  'outputSha256',
+];
 
 export function collectSensitiveRetentionViolations(
   files,
@@ -35,7 +36,8 @@ export function collectSensitiveRetentionViolations(
 ) {
   const policy = readPolicy(rootDir, policyPath);
   return collectPolicyBackedStorageFieldViolations(files, {
-    fieldPattern: RETENTION_FIELD_PATTERN,
+    canonicalFields: RETENTION_FIELDS,
+    exactOwnerStoragePolicy: true,
     includeSessionStorage: true,
     message:
       'persists prompt/content-bearing payload fields through browser storage outside the approved policy owners',

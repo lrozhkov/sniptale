@@ -8,9 +8,19 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import type { NativeAppRuntimeStatus } from '../../../../contracts/native-app/runtime';
 
 const mocks = vi.hoisted(() => ({
+  containsPermission: vi.fn(),
   loadVideoSettings: vi.fn(),
   mutateVideoSettings: vi.fn(),
   sendRuntimeMessage: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: {
+    contains: mocks.containsPermission,
+    request: vi.fn(),
+    subscribeToAdded: () => vi.fn(),
+    subscribeToRemoved: () => vi.fn(),
+  },
 }));
 
 function createDeferred<T>() {
@@ -43,6 +53,7 @@ let root: Root | null = null;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
+  mocks.containsPermission.mockResolvedValue(true);
   mocks.mutateVideoSettings.mockImplementation(async (mutation) =>
     mutation(DEFAULT_VIDEO_SETTINGS)
   );

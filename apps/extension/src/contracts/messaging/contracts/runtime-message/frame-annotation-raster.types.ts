@@ -16,6 +16,11 @@ export type RuntimeFrameAnnotationRasterRequestByType = {
       }
     | {
         type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
+        operation: 'confirm';
+        leaseId: string;
+      }
+    | {
+        type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
         operation: 'cancel';
         leaseId: string;
       }

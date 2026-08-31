@@ -4,6 +4,7 @@ import { createContentRuntimeBuildId } from '../../../apps/extension/build/conte
 import {
   getTraceWsUrlForMode,
   isTraceMessagesEnabledForMode,
+  shouldEmitBuildSourcemaps,
 } from '../../../apps/extension/build/injected-build';
 
 it('forces tracing off for release builds even when the environment requests tracing', () => {
@@ -17,6 +18,14 @@ it('keeps tracing opt-in for non-release builds', () => {
     false
   );
   expect(getTraceWsUrlForMode('development')).toBe('ws://localhost');
+});
+
+it('emits build sourcemaps only for explicit diagnostic modes', () => {
+  expect(shouldEmitBuildSourcemaps('production')).toBe(false);
+  expect(shouldEmitBuildSourcemaps('release')).toBe(false);
+  expect(shouldEmitBuildSourcemaps('test-e2e')).toBe(true);
+  expect(shouldEmitBuildSourcemaps('security-e2e')).toBe(true);
+  expect(shouldEmitBuildSourcemaps('development')).toBe(true);
 });
 
 it('uses a deterministic content runtime build id for release bundles', () => {

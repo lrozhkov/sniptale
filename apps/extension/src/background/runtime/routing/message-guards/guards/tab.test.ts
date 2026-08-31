@@ -11,41 +11,11 @@ import {
   isVideoControlMessage,
 } from './tab';
 
-it('classifies web snapshot gallery saves as background capture messages', () => {
-  const message = {
-    type: MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
-    manifest: {},
-    packageStagedBlobId: 'package-stage-1',
-    screenshotMimeType: 'image/png',
-    screenshotStagedBlobId: 'screenshot-stage-1',
-    snapshotSessionId: 'snapshot-session-1',
-  };
-
-  expect(isRouteCaptureMessage(message)).toBe(true);
-  expect(isBackgroundTabMessage(message)).toBe(true);
-});
-
 it('classifies registered web snapshot asset fetches as background capture messages', () => {
   const message = {
     type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
     snapshotSessionId: 'snapshot-session-1',
     url: 'https://upload.wikimedia.org/example.svg',
-  };
-
-  expect(isRouteCaptureMessage(message)).toBe(true);
-  expect(isBackgroundTabMessage(message)).toBe(true);
-});
-
-it('classifies staged web snapshot chunks as background capture messages', () => {
-  const message = {
-    base64: 'emlw',
-    blobKind: 'package',
-    chunkIndex: 0,
-    snapshotSessionId: 'snapshot-session-1',
-    stagedBlobId: 'stage-package-1',
-    totalBytes: 3,
-    totalChunks: 1,
-    type: MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
   };
 
   expect(isRouteCaptureMessage(message)).toBe(true);

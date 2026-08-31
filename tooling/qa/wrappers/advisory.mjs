@@ -1,10 +1,10 @@
-import { isExecutedAsScript } from '../core/shared.mjs';
-import { createOkStep } from '../core/focused-qa-results.mjs';
-import { collectAndPersistAdvisoryReport } from '../core/advisory-report.helpers.mjs';
-import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
-import { assertDiffOnlyAdvisoryRun } from '../core/verify-advisory.state.helpers.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { createOkStep } from '../composition/checkpoint/focused-qa-results.mjs';
+import { collectAndPersistAdvisoryReport } from '../composition/advisory/advisory-report.helpers.mjs';
+import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
+import { assertDiffOnlyAdvisoryRun } from '../composition/advisory/execution/state.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
-import { formatAdvisoryReport } from '../core/verify-advisory.report.helpers.mjs';
+import { formatAdvisoryReport } from '../composition/advisory/execution/report.mjs';
 
 export function runAdvisoryVerification({ files = [] } = {}) {
   assertDiffOnlyAdvisoryRun(files);

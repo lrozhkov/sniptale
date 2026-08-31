@@ -74,8 +74,33 @@ it('parses project export lifecycle messages across popup and offscreen seams', 
   expect(
     runtimeVideoExportMessageContracts[
       VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT
-    ].parseResponse(undefined)
-  ).toBeUndefined();
+    ].parseResponse({ success: true, result: 'accepted' })
+  ).toEqual({ success: true, result: 'accepted' });
+
+  expect(() =>
+    runtimeVideoExportMessageContracts[
+      VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT
+    ].parseResponse({ success: true, result: 'unexpected' })
+  ).toThrow(/OFFSCREEN_CANCEL_PROJECT_EXPORT/);
+
+  for (const malformedResponse of [
+    {},
+    { success: false },
+    { error: 'failed' },
+    { success: true, result: 'accepted', error: 'contradictory' },
+  ]) {
+    expect(() =>
+      runtimeVideoExportMessageContracts[
+        VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT
+      ].parseResponse(malformedResponse)
+    ).toThrow(/OFFSCREEN_CANCEL_PROJECT_EXPORT/);
+  }
+
+  expect(
+    runtimeVideoExportMessageContracts[
+      VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT
+    ].parseResponse({ success: false, error: 'cancel failed' })
+  ).toEqual({ success: false, error: 'cancel failed' });
 
   expect(
     runtimeVideoExportMessageContracts[VideoMessageType.PROJECT_EXPORT_COMPLETED].parseRequest(

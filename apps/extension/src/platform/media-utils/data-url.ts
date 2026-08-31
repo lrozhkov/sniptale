@@ -61,15 +61,48 @@ function parseDataUrl(dataUrl: string): ParsedDataUrl {
   };
 }
 
-function decodeBase64Payload(payload: string): Uint8Array {
-  try {
-    return Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
-  } catch {
-    throw new Error(translate('shared.runtime.readBlobFailed'));
+const BASE64_DECODE_CHUNK_CHARACTERS = 1024 * 1024;
+
+function decodeBase64Chunk(payload: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
   }
+  return bytes;
 }
 
-function decodePlainPayload(payload: string): Uint8Array {
+function throwIfDataUrlDecodeAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error(translate('shared.runtime.readBlobFailed'));
+}
+
+async function decodeBase64Payload(
+  payload: string,
+  signal?: AbortSignal
+): Promise<Uint8Array<ArrayBuffer>[]> {
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  try {
+    for (let offset = 0; offset < payload.length; offset += BASE64_DECODE_CHUNK_CHARACTERS) {
+      throwIfDataUrlDecodeAborted(signal);
+      chunks.push(
+        decodeBase64Chunk(payload.slice(offset, offset + BASE64_DECODE_CHUNK_CHARACTERS))
+      );
+      if (offset + BASE64_DECODE_CHUNK_CHARACTERS < payload.length) {
+        await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+        throwIfDataUrlDecodeAborted(signal);
+      }
+    }
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new Error(translate('shared.runtime.readBlobFailed'), { cause: error });
+  }
+  return chunks;
+}
+
+function decodePlainPayload(payload: string): Uint8Array<ArrayBuffer> {
   try {
     return new TextEncoder().encode(decodeURIComponent(payload));
   } catch {
@@ -77,14 +110,14 @@ function decodePlainPayload(payload: string): Uint8Array {
   }
 }
 
-export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+export async function dataUrlToBlob(dataUrl: string, signal?: AbortSignal): Promise<Blob> {
+  throwIfDataUrlDecodeAborted(signal);
   const parsed = parseDataUrl(dataUrl);
-  const bytes = parsed.isBase64
-    ? decodeBase64Payload(parsed.payload)
-    : decodePlainPayload(parsed.payload);
-  const buffer = Uint8Array.from(bytes).buffer;
-
-  return new Blob([buffer], { type: parsed.mimeType });
+  const parts = parsed.isBase64
+    ? await decodeBase64Payload(parsed.payload, signal)
+    : [decodePlainPayload(parsed.payload)];
+  throwIfDataUrlDecodeAborted(signal);
+  return new Blob(parts, { type: parsed.mimeType });
 }
 
 function normalizeMimeTypeForDataUrl(mimeType: string): string {

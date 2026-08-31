@@ -4,6 +4,7 @@ import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
 import type { AppLocale } from '../../../platform/i18n/types';
 import type { PopupPage } from '../navigation/actions';
+import { preloadPopupPage } from '../startup/resource';
 import { usePopupRouteController } from '../startup/use-route-controller';
 import { usePopupStartupReconciliation } from './use-startup-reconciliation';
 
@@ -201,7 +202,7 @@ function PopupRouteSkeleton() {
 }
 
 function preload(page: PopupPage): void {
-  void import('../startup/resource').then(({ preloadPopupPage }) =>
-    preloadPopupPage(page).catch(() => undefined)
-  );
+  void Promise.resolve()
+    .then(() => preloadPopupPage(page))
+    .catch(() => undefined);
 }

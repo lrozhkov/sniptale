@@ -14,6 +14,26 @@ type MessageContract<TRequest, TResponse> = {
   parseResponse: MessageParser<TResponse>;
 };
 
+type OptionalKeys<TValue extends object> = {
+  [TKey in keyof TValue]-?: Record<never, never> extends Pick<TValue, TKey> ? TKey : never;
+}[keyof TValue];
+
+type ZodContractValue<TValue> = TValue extends object
+  ? Omit<TValue, OptionalKeys<TValue>> & {
+      [TKey in OptionalKeys<TValue>]?: TValue[TKey] | undefined;
+    }
+  : TValue;
+
+type ExactOptionalProperties<TValue, TSchema extends z.ZodType> = TValue extends object
+  ? z.output<TSchema> extends object
+    ? [OptionalKeys<TValue>] extends [OptionalKeys<z.output<TSchema>>]
+      ? [OptionalKeys<z.output<TSchema>>] extends [OptionalKeys<TValue>]
+        ? TSchema
+        : never
+      : never
+    : never
+  : TSchema;
+
 export type MessageContractRegistry<
   TRequestMap extends Record<string, unknown>,
   TResponseMap extends Record<keyof TRequestMap, unknown>,
@@ -56,7 +76,9 @@ export function createZodParser<TValue>(
 }
 
 export function defineZodSchema<TValue>() {
-  return <TSchema extends z.ZodType<TValue>>(schema: TSchema): TSchema => schema;
+  return <TSchema extends z.ZodType<ZodContractValue<TValue>>>(
+    schema: ExactOptionalProperties<TValue, TSchema>
+  ): TSchema => schema;
 }
 
 export function defineMessageContractRegistry<

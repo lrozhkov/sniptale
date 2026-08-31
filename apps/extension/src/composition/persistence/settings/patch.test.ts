@@ -11,6 +11,11 @@ const { browserStorageSyncGetMock, browserStorageSyncSetMock, loggerDebugMock, l
 vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
   ...(await importOriginal()),
   browserStorage: {
+    local: {
+      get: vi.fn().mockResolvedValue({}),
+      remove: vi.fn(),
+      set: vi.fn(),
+    },
     sync: {
       get: browserStorageSyncGetMock,
       remove: vi.fn(),
@@ -87,27 +92,6 @@ describe('settings patch persistence', () => {
     });
     expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(2, {
       sniptale_settings: secondCommittedSettings,
-    });
-  });
-});
-
-describe('web snapshot disclosure settings patch', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    browserStorageSyncGetMock.mockResolvedValue({});
-    browserStorageSyncSetMock.mockResolvedValue(undefined);
-  });
-
-  it('persists skip preference through the settings patch seam', async () => {
-    const committedSettings = { ...DEFAULT_SETTINGS, skipWebSnapshotSaveDisclosure: true };
-
-    browserStorageSyncGetMock.mockResolvedValueOnce({ sniptale_settings: DEFAULT_SETTINGS });
-
-    await expect(patchSettings({ skipWebSnapshotSaveDisclosure: true })).resolves.toEqual(
-      committedSettings
-    );
-    expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-      sniptale_settings: committedSettings,
     });
   });
 });

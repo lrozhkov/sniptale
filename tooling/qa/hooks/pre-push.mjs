@@ -1,14 +1,9 @@
 import fs from 'node:fs';
 
-import {
-  collectCodeFiles,
-  fromRelativePath,
-  isExecutedAsScript,
-  repoRoot,
-  runCommand,
-} from '../core/shared.mjs';
-import { createScopedQaContext, hasHarnessVerificationQaTargets } from '../core/qa-scope.mjs';
-import { runGit } from '../runtime/git-command.helpers.mjs';
+import { repoRoot } from '../analysis/repository/shared-paths.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { runCommand } from '../runtime/process/shared-process.mjs';
+import { runGit } from '../runtime/scope/git-command.helpers.mjs';
 import {
   assertWorkspaceMatchesPushedTree,
   EMPTY_TREE_SHA,
@@ -17,7 +12,6 @@ import {
 
 const ZERO_SHA_PATTERN = /^0+$/u;
 const OBJECT_ID_PATTERN = /^[0-9a-f]{40,64}$/iu;
-const JS_LIKE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
 const FULL_CHECKPOINT_NODE_OPTIONS = '--max-old-space-size=8192';
 
 function splitOutput(stdout) {
@@ -76,43 +70,8 @@ function readPrePushInput() {
   return fs.readFileSync(0, 'utf8');
 }
 
-function createEmptyContext() {
-  return {
-    targetFiles: [],
-    existingTargetFiles: [],
-    addedFiles: [],
-    untrackedFiles: [],
-  };
-}
-
-export function createPrePushContext({
-  baseContext = createEmptyContext(),
-  pushedFiles = [],
-} = {}) {
-  const targetFiles = [
-    ...new Set([...(baseContext.allTargetFiles ?? baseContext.targetFiles ?? []), ...pushedFiles]),
-  ].sort();
-  const existingTargetFiles = targetFiles.filter((file) => fs.existsSync(fromRelativePath(file)));
-
-  return createScopedQaContext({
-    ...baseContext,
-    targetFiles,
-    existingTargetFiles,
-    codeFiles: collectCodeFiles(existingTargetFiles),
-    jsLikeFiles: existingTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file)),
-  });
-}
-
-export function resolvePrePushCommands({ prePushInput = '', gitRunner = runGit } = {}) {
-  const context = createPrePushContext({
-    pushedFiles: collectPushedFiles(prePushInput, gitRunner),
-  });
-
-  return [
-    ...(hasHarnessVerificationQaTargets(context) ? ['qa:release-harness'] : []),
-    'qa:checkpoint',
-    'qa:internal:build',
-  ];
+export function resolvePrePushCommands() {
+  return ['qa:checkpoint'];
 }
 
 export function resolvePrePushNodeOptions(

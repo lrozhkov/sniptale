@@ -42,6 +42,7 @@ import type {
   FullPageCaptureGeometry,
   FullPageCaptureTileState,
 } from '../../../contracts/full-page-capture';
+import { FULL_PAGE_QUALITY_PROFILES } from '../../../contracts/full-page-capture';
 import type { FullPageTilePlan } from './planner';
 
 const documentGeometry: FullPageCaptureGeometry = {
@@ -141,6 +142,7 @@ it('draws and releases each decoded tile before encoding one final image', async
   expect(result.dataUrl).toBe('data:image/png;base64,stitched');
   expect(result.metadata).toEqual(
     expect.objectContaining({
+      captureGeometry: documentGeometry,
       cssHeight: 1_100,
       cssWidth: 800,
       frozenExtentWarning: true,
@@ -150,6 +152,84 @@ it('draws and releases each decoded tile before encoding one final image', async
     })
   );
   expect(mocks.drawImage).toHaveBeenCalledTimes(2);
+});
+
+it('keeps a long 1280px page at native scale within the production memory budget', async () => {
+  const longPageGeometry: FullPageCaptureGeometry = {
+    ...documentGeometry,
+    extentHeight: 26_878,
+    extentWidth: 1_280,
+    outputHeight: 26_878,
+    outputWidth: 1_280,
+    rootViewport: { height: 800, width: 1_280, x: 0, y: 0 },
+    viewportHeight: 800,
+    viewportWidth: 1_280,
+  };
+  enqueueBitmap(1_280, 800);
+  const stitcher = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-long-page',
+    frozenExtentWarning: false,
+    geometry: longPageGeometry,
+    warnings: [],
+  });
+  await stitcher.drawFrame('tile-long-page', tilePlan(), tileState(longPageGeometry));
+
+  const result = await stitcher.finish({ format: 'png' });
+
+  expect(result.metadata).toMatchObject({
+    downscaled: false,
+    outputHeight: 26_878,
+    outputScale: 1,
+    outputWidth: 1_280,
+  });
+});
+
+it('changes the output dimensions when the selected full-page profile changes', async () => {
+  const geometry: FullPageCaptureGeometry = {
+    ...documentGeometry,
+    extentHeight: 20_000,
+    extentWidth: 4_000,
+    outputHeight: 20_000,
+    outputWidth: 4_000,
+    rootViewport: { height: 600, width: 4_000, x: 0, y: 0 },
+    viewportHeight: 600,
+    viewportWidth: 4_000,
+  };
+  enqueueBitmap(4_000, 600);
+  const safe = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-safe',
+    frozenExtentWarning: false,
+    geometry,
+    qualityPolicy: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
+    warnings: [],
+  });
+  await safe.drawFrame('tile-safe', tilePlan(), tileState(geometry));
+  const safeResult = await safe.finish({ format: 'png' });
+
+  enqueueBitmap(4_000, 600);
+  const high = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-high',
+    frozenExtentWarning: false,
+    geometry,
+    qualityPolicy: {
+      maxFileSizeMiB: 96,
+      maxMegapixels: 80,
+      minScalePercent: 75,
+      profile: 'high-quality',
+    },
+    warnings: [],
+  });
+  await high.drawFrame('tile-high', tilePlan(), tileState(geometry));
+  const highResult = await high.finish({ format: 'png' });
+
+  expect(safeResult.metadata.outputWidth).toBeLessThan(highResult.metadata.outputWidth);
+  expect(safeResult.metadata.outputHeight).toBeLessThan(highResult.metadata.outputHeight);
+  expect(highResult.metadata).toMatchObject({ outputHeight: 20_000, outputWidth: 4_000 });
 });
 
 it('draws the outer shell once and replaces only the internal scroller viewport', async () => {
@@ -212,8 +292,37 @@ it('rejects a raster whose minimum safe output scale would exceed budgets', asyn
       geometry: oversizedGeometry,
       warnings: [],
     })
-  ).rejects.toThrow('raster memory or dimension limits');
+  ).rejects.toThrow('configured quality limits');
   expect(bitmap.close).toHaveBeenCalledOnce();
+});
+
+it('classifies an over-budget downscale working set as a quality-limit failure', async () => {
+  const geometry: FullPageCaptureGeometry = {
+    ...documentGeometry,
+    extentHeight: 8_000,
+    extentWidth: 8_000,
+    outputHeight: 8_000,
+    outputWidth: 8_000,
+  };
+  enqueueBitmap();
+  const stitcher = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'tile-working-set',
+    frozenExtentWarning: false,
+    geometry,
+    qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
+    warnings: [],
+  });
+  await stitcher.drawFrame('tile-working-set', tilePlan(), tileState(geometry));
+  class OversizedEncoding extends Blob {
+    override get size(): number {
+      return 65 * 1024 * 1024;
+    }
+  }
+  mocks.convertToBlob.mockResolvedValueOnce(new OversizedEncoding([], { type: 'image/png' }));
+
+  await expect(
+    stitcher.finish({ format: 'png', qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe })
+  ).rejects.toThrow('configured quality limits');
 });
 
 it('fails closed when a tile cannot be decoded or an output context cannot be created', async () => {

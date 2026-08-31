@@ -3,7 +3,10 @@ import path from 'node:path';
 
 import JSZip from 'jszip';
 
-import { readProofInput, sha256ProofInput as sha256Bytes } from '../qa/core/proof-input.mjs';
+import {
+  readProofInput,
+  sha256ProofInput as sha256Bytes,
+} from '../qa/proof/contracts/proof-input.mjs';
 import { verifyReleaseProof } from './verify-main-proof.mjs';
 import { collectProofEvidenceSources } from './release-evidence.mjs';
 

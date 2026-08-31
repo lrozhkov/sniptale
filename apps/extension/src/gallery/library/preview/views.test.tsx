@@ -410,9 +410,10 @@ it('renders metadata cards, fallback values, and tag editor states', () => {
   expect(metadataMarkup).toContain('1280×720');
   expect(metadataMarkup).toContain('3.4 gallery.preview.durationSuffix');
   expect(fallbackMetadataMarkup).toContain('—');
-  expect(emptyTagMarkup).toContain('gallery.preview.tagsEmpty');
-  expect(tagMarkup).toContain('alpha ×');
-  expect(tagMarkup).toContain('beta ×');
+  expect(emptyTagMarkup).toContain('gallery.app.addTags');
+  expect(emptyTagMarkup).not.toContain('gallery.preview.tagsEmpty');
+  expect(tagMarkup).toContain('title="alpha"');
+  expect(tagMarkup).toContain('title="beta"');
 });
 
 it('renders image-only actions conditionally', () => {
@@ -497,6 +498,9 @@ it('wires interactive preview actions and tag editing handlers', () => {
     onRemoveTag,
     onResetChanges,
     onTagDraftChange,
+  });
+  act(() => {
+    container?.querySelector<HTMLButtonElement>('[aria-label="gallery.app.addTags"]')?.click();
   });
   const input = container?.querySelector('input');
   if (!input) {

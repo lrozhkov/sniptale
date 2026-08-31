@@ -7,11 +7,12 @@ import {
 } from '../support/security-helpers';
 import {
   grantAllSitesAccessFromSettings,
-  issuePopupTabRouteCapability,
   openRealExtensionPage,
   POPUP_PATH,
   revokeAllSitesAccessFromSettings,
   SETTINGS_PATH,
+  startPagePackageSave,
+  waitForPagePackageSave,
 } from './support';
 
 test('optional all-sites access is absent, grantable by gesture, and revoked durably', async ({
@@ -75,54 +76,19 @@ test('revoking all-sites access during persistence prevents a late snapshot comm
     return tab.id;
   }, target.url());
   const requestId = 'security-permission-revoke-race';
-  const token = await issuePopupTabRouteCapability({
-    operation: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-    popup,
-    requestId,
-    tabId,
+  await popup.evaluate(async () => {
+    await chrome.storage.local.set({ sniptale_web_snapshot_local_consent: true });
   });
   const baseline = await collectRetentionText(popup);
   const control = await openSecurityControl(context, extensionId);
   await controlCheckpoint(control, 'pause', 'persistence-before-commit');
-  await popup.evaluate(
-    ({ capabilityToken, requestId: routeRequestId, targetTabId }) => {
-      Object.assign(window, {
-        securityPermissionRace: chrome.runtime.sendMessage({
-          __sniptaleRuntimeFreshness: {
-            issuedAtEpochMs: Date.now(),
-            nonce: crypto.randomUUID(),
-          },
-          requestId: routeRequestId,
-          tabId: targetTabId,
-          tabRouteCapabilityToken: capabilityToken,
-          tabRouteRequestId: routeRequestId,
-          type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-        }),
-      });
-    },
-    { capabilityToken: token, requestId, targetTabId: tabId }
-  );
-  const checkpointOrResult = await Promise.race([
-    controlCheckpoint(control, 'waitUntilPaused', 'persistence-before-commit').then(() => ({
-      kind: 'checkpoint' as const,
-    })),
-    popup.evaluate(async () => {
-      const result = await Promise.race([
-        (window as typeof window & { securityPermissionRace: Promise<unknown> })
-          .securityPermissionRace,
-        new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 10_000)),
-      ]);
-      return { kind: 'route' as const, result };
-    }),
-  ]);
-  expect(checkpointOrResult).toEqual({ kind: 'checkpoint' });
+  await expect(startPagePackageSave({ popup, requestId, tabId })).resolves.toMatchObject({
+    success: true,
+  });
+  await controlCheckpoint(control, 'waitUntilPaused', 'persistence-before-commit');
   await revokeAllSitesAccessFromSettings(settings);
   await controlCheckpoint(control, 'release', 'persistence-before-commit');
-  const result = await popup.evaluate(
-    () =>
-      (window as typeof window & { securityPermissionRace: Promise<unknown> })
-        .securityPermissionRace
-  );
+  const result = await waitForPagePackageSave(popup, requestId);
   expect(result).toMatchObject({ success: false });
   expect(await collectRetentionText(popup)).toBe(baseline);
   await expect(

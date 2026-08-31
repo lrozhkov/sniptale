@@ -40,6 +40,11 @@ import { openSnapshotScreenshotInEditor } from './snapshot-screenshot';
 import type { UseGalleryAppActionsResult } from './useGalleryAppActions.types';
 import { createImportMediaFilesAction } from './media-file-import';
 import type { MediaFileImportConflictStrategy } from '../import-types';
+import {
+  createConfirmWebSnapshotImportAction,
+  createImportDroppedLibraryFilesAction,
+  createInspectWebSnapshotImportAction,
+} from './web-snapshot-import';
 
 function createGalleryBackupActions(
   controller: GalleryBackupExportController,
@@ -76,6 +81,7 @@ function buildGalleryAppActionsResult(args: {
   withBusy: ReturnType<typeof createBusyActionRunner>;
 }): UseGalleryAppActionsResult {
   const { controller, withBusy } = args;
+  const inspectWebSnapshot = createInspectWebSnapshotImportAction(controller, withBusy);
 
   return {
     backup: args.backupActions,
@@ -83,11 +89,20 @@ function buildGalleryAppActionsResult(args: {
       cancelActiveImport: createCancelActiveImportAction(controller),
       closePendingImport: createClosePendingImportAction(controller),
       closePendingMediaImport: () => controller.actions.surface.setPendingMediaImport(null),
+      closePendingWebSnapshotImport: () =>
+        controller.actions.surface.setPendingWebSnapshotImport(null),
+      confirmWebSnapshotImport: createConfirmWebSnapshotImportAction(controller, withBusy),
       confirmMediaFileImport: args.handleConfirmMediaFileImport,
       dismissActiveImport: createDismissActiveImportAction(controller),
       importBackup: args.handleImport,
       importSelectedFile: args.handleImportSelectedFile,
       importMediaFiles: args.handleImportMediaFiles,
+      importDroppedFiles: createImportDroppedLibraryFilesAction(
+        controller,
+        inspectWebSnapshot,
+        args.handleImportMediaFiles
+      ),
+      inspectWebSnapshot,
     },
     preview: {
       close: args.handlePreviewClose,

@@ -16,6 +16,7 @@ export {
   extractImageText,
   extractLinkText,
   extractNarrativeText,
+  resolveOriginalElement,
   setGetOriginalElementFn,
   setSniptaleId,
 } from './dom-helpers-text';

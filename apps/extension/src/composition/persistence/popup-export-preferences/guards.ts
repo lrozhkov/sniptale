@@ -1,7 +1,11 @@
 import { isBoolean, isRecord } from '../infrastructure/guards/primitives';
-import type { PopupExportPreferences } from './contracts';
+import type {
+  PopupExportPreferences,
+  PopupPagePackagePreferences,
+  PopupPagePackageSelection,
+} from './contracts';
 
-export function parseStoredPopupExportPreferences(value: unknown): {
+function parseStoredPopupExportPreferences(value: unknown): {
   hasInvalidRoot: boolean;
   invalidFieldCount: number;
   value: Partial<PopupExportPreferences>;
@@ -28,8 +32,54 @@ const POPUP_EXPORT_PREFERENCE_KEYS = [
   'includeCssDiagnostics',
   'includeFiles',
   'includeFullPageScreenshot',
+  'includeViewportScreenshot',
   'includePageDiagnostics',
   'includeImages',
   'includeJson',
   'includeMarkdown',
 ] as const;
+
+function parsePagePackageSelection(value: unknown): PopupPagePackageSelection | null {
+  if (!isRecord(value) || !isBoolean(value['includeWebCopy'])) {
+    return null;
+  }
+
+  const parsed = parseStoredPopupExportPreferences(value);
+  if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0) {
+    return null;
+  }
+  parsed.value.includeViewportScreenshot ??= false;
+  if (POPUP_EXPORT_PREFERENCE_KEYS.some((key) => parsed.value[key] === undefined)) {
+    return null;
+  }
+
+  return {
+    ...(parsed.value as PopupExportPreferences),
+    includeWebCopy: value['includeWebCopy'],
+  };
+}
+
+export function parseStoredPopupPagePackagePreferences(
+  value: unknown
+): PopupPagePackagePreferences | null {
+  if (!isRecord(value) || value['schemaVersion'] !== 1) {
+    return null;
+  }
+
+  const exportSelection = parsePagePackageSelection(value['export']);
+  const saveSelection = parsePagePackageSelection(value['save']);
+  if (
+    !exportSelection ||
+    !saveSelection ||
+    (exportSelection.includeWebCopy && !exportSelection.includeFullPageScreenshot) ||
+    saveSelection.includeWebCopy !== true ||
+    saveSelection.includeFullPageScreenshot !== true
+  ) {
+    return null;
+  }
+
+  return {
+    export: exportSelection,
+    save: saveSelection,
+  };
+}

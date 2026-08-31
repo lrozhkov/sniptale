@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 import { expect, it } from 'vitest';
 
-import { createTempRoot } from '../qa/core/test-helpers';
+import { createTempRoot } from '../qa/test-support/test-helpers';
 import { resolveCiArtifactSession } from './artifact-observability.mjs';
 
 it('routes local and trusted-container sealing through one artifact lifecycle owner', () => {

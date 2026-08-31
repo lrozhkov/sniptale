@@ -16,6 +16,17 @@ function assertContainedSourcePath(sourcePath) {
   }
 }
 
+function assertContainedPackageMetadataPath(metadataPath) {
+  if (
+    typeof metadataPath !== 'string' ||
+    !metadataPath ||
+    path.isAbsolute(metadataPath) ||
+    metadataPath.split(/[\\/]/u).includes('..')
+  ) {
+    throw new Error(`Pinned dependency metadata path is outside its package: ${metadataPath}`);
+  }
+}
+
 function assertVersionedOrigin(source) {
   let upstreamUrl;
   try {
@@ -33,8 +44,7 @@ function assertVersionedOrigin(source) {
   }
 }
 
-function assertPinnedIdentity(record, selectedLicense, source) {
-  const iconSet = record.installedMetadata.iconSetInfo;
+function assertPinnedIdentity(record, selectedLicense, source, iconSet) {
   const matches =
     record.packageName === source.packageName &&
     record.version === source.packageVersion &&
@@ -53,6 +63,36 @@ function assertPinnedIdentity(record, selectedLicense, source) {
   }
 }
 
+async function readPinnedIconSetMetadata(record, source) {
+  assertContainedPackageMetadataPath(source.upstreamMetadataPath);
+  let contents;
+  try {
+    contents = await fs.readFile(
+      path.resolve(record.packageDirectory, source.upstreamMetadataPath),
+      'utf8'
+    );
+  } catch {
+    throw new Error(
+      `Pinned dependency upstream metadata is missing: ${record.packagePath}/${source.upstreamMetadataPath}`
+    );
+  }
+  const match = /^const iconSetInfo = (\{[\s\S]*\});\nexport default iconSetInfo;\n?$/u.exec(
+    contents
+  );
+  if (!match) {
+    throw new Error(
+      `Pinned dependency upstream metadata drift for ${record.packageName}@${record.version}.`
+    );
+  }
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    throw new Error(
+      `Pinned dependency upstream metadata drift for ${record.packageName}@${record.version}.`
+    );
+  }
+}
+
 /** Reads a reviewed version-tagged, byte-pinned license source without network access. */
 export async function selectPinnedLicenseSource(record, selectedLicense, pinnedSources) {
   const source = pinnedSources.find(
@@ -62,7 +102,8 @@ export async function selectPinnedLicenseSource(record, selectedLicense, pinnedS
   if (!source) return undefined;
   assertContainedSourcePath(source.sourcePath);
   assertVersionedOrigin(source);
-  assertPinnedIdentity(record, selectedLicense, source);
+  const iconSet = await readPinnedIconSetMetadata(record, source);
+  assertPinnedIdentity(record, selectedLicense, source, iconSet);
   let contents;
   try {
     contents = await fs.readFile(path.resolve(record.repoRoot, source.sourcePath), 'utf8');

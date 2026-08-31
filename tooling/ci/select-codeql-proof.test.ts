@@ -3,15 +3,21 @@ import path from 'node:path';
 
 import { expect, it, vi } from 'vitest';
 
-import { createTempRoot, writeFile } from '../qa/core/test-helpers';
+import { createTempRoot, writeFile } from '../qa/test-support/test-helpers';
 import { verifyMainProof } from './verify-main-proof.mjs';
 
 vi.mock('./verify-main-proof.mjs', () => ({
   verifyMainProof: vi.fn(() => ({
     manifest: {
       files: [
-        { file: '.tmp/qa/codeql-proof.json', sha256: 'a'.repeat(64) },
-        { file: '.tmp/codeql/results.filtered.sarif', sha256: 'b'.repeat(64) },
+        {
+          file: '.tmp/qa/codeql-proof.json',
+          sha256: '5c5ce2fdd3156a954f60b61cab4f1cfb4e789c3d14e91794324ce7e3fc390ba9',
+        },
+        {
+          file: '.tmp/codeql/results.filtered.sarif',
+          sha256: '539ba24b9e8fe96285a81d59b05d091b093f25cb38595b414962b1a9cf30379c',
+        },
       ],
     },
   })),

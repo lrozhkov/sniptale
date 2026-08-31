@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { translate } from '../../../platform/i18n';
 import type {
   ScenarioDeckExportOptions,
   ScenarioDeckExportResult,
@@ -23,7 +24,9 @@ export function useScenarioDeckExportDialogState(
       setLastResult(result);
       setStatus('done');
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Export failed');
+      setError(
+        nextError instanceof Error ? nextError.message : translate('scenario.editor.exportFailed')
+      );
       setStatus('error');
     }
   };

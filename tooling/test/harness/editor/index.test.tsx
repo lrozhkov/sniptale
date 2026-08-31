@@ -20,7 +20,7 @@ vi.mock('react-dom/client', () => ({
   createRoot: harnessMocks.createRootMock,
 }));
 
-vi.mock('../browser-mocks', () => ({
+vi.mock('../browser-mocks/browser-mocks', () => ({
   harnessReady: harnessMocks.ready,
 }));
 

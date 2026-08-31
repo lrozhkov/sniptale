@@ -1,7 +1,6 @@
 import { IMAGE_WORKSPACES_STORE, MEDIA_LIBRARY_STORE } from '../core.stores.ts';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { patchRecord } from './record-patch';
-import { sanitizeWebSnapshotStoreProvenanceUrls } from '../../../web-snapshots/maintenance/provenance';
 import type { MaintenanceCandidate, MaintenanceDatabase } from './contracts';
 
 type MaintenanceSanitizeResult = {
@@ -13,7 +12,6 @@ type MaintenanceSanitizeResult = {
 export async function runProvenanceUrlMaintenance(db: MaintenanceDatabase): Promise<void> {
   await sanitizeStoreProvenanceUrls(db, MEDIA_LIBRARY_STORE, sanitizeMediaLibraryRecord);
   await sanitizeStoreProvenanceUrls(db, IMAGE_WORKSPACES_STORE, sanitizeImageWorkspaceRecord);
-  await sanitizeWebSnapshotStoreProvenanceUrls(db);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

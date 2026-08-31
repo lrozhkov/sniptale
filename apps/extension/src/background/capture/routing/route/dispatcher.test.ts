@@ -9,10 +9,9 @@ const {
   handleFetchWebSnapshotAssetMock,
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
-  handleReleaseWebSnapshotStagedBlobsMock,
   handleSaveScreenshotToGalleryMock,
-  handleSaveWebSnapshotToGalleryMock,
-  handleStageWebSnapshotBlobChunkMock,
+  handleStagePagePackageJobChunkMock,
+  handleWebSnapshotSaveProgressMock,
   handleTriggerQuickActionMock,
   browserTabsGetMock,
   ensureActivePageAccessRuntimeMock,
@@ -27,10 +26,9 @@ const {
   handleFetchWebSnapshotAssetMock: vi.fn(),
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
-  handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
   handleSaveScreenshotToGalleryMock: vi.fn(),
-  handleSaveWebSnapshotToGalleryMock: vi.fn(),
-  handleStageWebSnapshotBlobChunkMock: vi.fn(),
+  handleStagePagePackageJobChunkMock: vi.fn(),
+  handleWebSnapshotSaveProgressMock: vi.fn(),
   handleTriggerQuickActionMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
@@ -83,16 +81,19 @@ vi.mock('../actions.quick-action', () => ({
 vi.mock('../actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
   handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
-  handleReleaseWebSnapshotStagedBlobs: handleReleaseWebSnapshotStagedBlobsMock,
-  handleSaveWebSnapshotToGallery: handleSaveWebSnapshotToGalleryMock,
-  handleStageWebSnapshotBlobChunk: handleStageWebSnapshotBlobChunkMock,
+  handleWebSnapshotSaveProgress: handleWebSnapshotSaveProgressMock,
+}));
+
+vi.mock('../../page-package/job/stage-route', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-package/job/stage-route')>()),
+  handleStagePagePackageJobChunk: handleStagePagePackageJobChunkMock,
 }));
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createScenarioSessionServiceStub } from '../../../../../../../tooling/test/support/scenario-session-service.stub';
 import { routeCaptureMessage } from './dispatcher';
-import { createWebSnapshotManifest, flushRouteAsync } from './dispatcher.test-support';
+import { flushRouteAsync } from './dispatcher.test-support';
 import type { RouteCaptureMessage } from '../types';
 import { markPreauthorizedContentActionRouteMessage } from '../authorization/content-action';
 import {
@@ -131,10 +132,9 @@ beforeEach(() => {
   handleFetchWebSnapshotAssetMock.mockReturnValue(true);
   handleOpenEditorWithImageMock.mockReturnValue(true);
   handleRegisterWebSnapshotAssetsMock.mockReturnValue(true);
-  handleReleaseWebSnapshotStagedBlobsMock.mockReturnValue(true);
   handleSaveScreenshotToGalleryMock.mockReturnValue(true);
-  handleSaveWebSnapshotToGalleryMock.mockReturnValue(true);
-  handleStageWebSnapshotBlobChunkMock.mockReturnValue(true);
+  handleStagePagePackageJobChunkMock.mockReturnValue(true);
+  handleWebSnapshotSaveProgressMock.mockReturnValue(true);
   handleTriggerQuickActionMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
@@ -231,6 +231,18 @@ it('routes capture requests through handler contexts', async () => {
 });
 
 const routeCases: Array<[RouteCaptureMessage, Mock]> = [
+  [
+    {
+      base64: 'YQ==',
+      final: true,
+      jobId: 'job-1',
+      ordinal: 0,
+      sequence: 0,
+      stagedBlobId: 'stage-1',
+      type: MessageType.STAGE_PAGE_PACKAGE_JOB_CHUNK,
+    },
+    handleStagePagePackageJobChunkMock,
+  ],
   [{ type: CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP }, handleVisibleCaptureForCropMock],
   [{ type: CaptureMessageType.CAPTURE_FULL }, handleFullCaptureMock],
   [
@@ -251,30 +263,6 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
   ],
   [
     {
-      type: MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
-      manifest: createWebSnapshotManifest(),
-      packageStagedBlobId: 'package-stage-1',
-      screenshotMimeType: 'image/png',
-      screenshotStagedBlobId: 'screenshot-stage-1',
-      snapshotSessionId: 'snapshot-session-1',
-    },
-    handleSaveWebSnapshotToGalleryMock,
-  ],
-  [
-    {
-      type: MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
-      base64: 'emlw',
-      blobKind: 'package',
-      chunkIndex: 0,
-      snapshotSessionId: 'snapshot-session-1',
-      stagedBlobId: 'stage-package-1',
-      totalBytes: 3,
-      totalChunks: 1,
-    },
-    handleStageWebSnapshotBlobChunkMock,
-  ],
-  [
-    {
       type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
       assetUrls: ['https://example.test/a.png'],
       requestId: 'req-web',
@@ -283,18 +271,21 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
   ],
   [
     {
-      type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+      type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
       snapshotSessionId: 'snapshot-session-1',
+      urls: ['https://example.test/a.png'],
     },
-    handleReleaseWebSnapshotStagedBlobsMock,
+    handleFetchWebSnapshotAssetMock,
   ],
   [
     {
-      type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-      snapshotSessionId: 'snapshot-session-1',
-      url: 'https://example.test/a.png',
+      activeStepKey: 'files',
+      current: 1,
+      requestId: 'req-web',
+      total: 2,
+      type: MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED,
     },
-    handleFetchWebSnapshotAssetMock,
+    handleWebSnapshotSaveProgressMock,
   ],
 ];
 

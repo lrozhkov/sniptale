@@ -91,7 +91,9 @@ it('rejects oversized response bodies before saving downloaded files', async () 
     [createResource('https://example.com/large.bin', 'large.bin')],
     undefined,
     () => false,
-    () => undefined
+    () => undefined,
+    undefined,
+    { maxFileCount: 100, maxFileSizeMiB: 100, maxTotalSizeMiB: 200 }
   );
 
   expect(result.files.size).toBe(0);

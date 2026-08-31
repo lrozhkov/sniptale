@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { collectFilesForExportManager } from './transfer';
+import { downloadExportFiles } from '../service/workflow';
 
 const treeData: ParsedDOMTree = { context: '', title: 'Demo', structure: [] };
 
@@ -111,5 +112,41 @@ describe('export-manager transfer', () => {
       urlUuidToFilename: new Map(),
     });
     expect(tools.downloadFiles).not.toHaveBeenCalled();
+  });
+
+  it('keeps mixed resource transfer on the final images row instead of jumping back to files', async () => {
+    const warnings: string[] = [];
+    const control = createTransferControl();
+    const options = { ...createExportOptions(), includeImages: true };
+    const tools = {
+      collectFiles: vi.fn(async () => ({
+        files: [
+          {
+            url: 'https://example.com/file.png',
+            filename: 'file.png',
+            source: 'direct' as const,
+          },
+        ],
+        previewToDownloadMap: new Map<string, string>(),
+      })),
+      downloadFiles: vi.fn(async (...args: Parameters<typeof downloadExportFiles>) => {
+        const updateProgress = args[3];
+        updateProgress({ activeStepKey: 'files', current: 1, total: 1 });
+        return {
+          files: new Map<string, Blob>(),
+          errors: [],
+          urlUuidToFilename: new Map<string, string>(),
+        };
+      }),
+    };
+
+    await collectFilesForExportManager(treeData, options, warnings, control, tools);
+
+    expect(control.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ activeStepKey: 'images' })
+    );
+    expect(control.updateProgress).not.toHaveBeenCalledWith(
+      expect.objectContaining({ activeStepKey: 'files' })
+    );
   });
 });

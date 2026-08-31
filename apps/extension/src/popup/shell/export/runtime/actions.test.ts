@@ -30,6 +30,8 @@ type PopupExportPreferenceFixture = Pick<
   | 'includeImages'
   | 'includeJson'
   | 'includeMarkdown'
+  | 'includeWebCopy'
+  | 'saveSelection'
   | 'setIncludeBasicLogs'
   | 'setIncludeAnnotations'
   | 'setIncludeCssDiagnostics'
@@ -81,6 +83,19 @@ function createPreferenceState(): PopupExportPreferenceFixture {
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
+    includeWebCopy: false,
+    saveSelection: {
+      includeAnnotations: false,
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: true,
+      includePageDiagnostics: false,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+      includeWebCopy: true,
+    },
     setIncludeBasicLogs: vi.fn(),
     setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
@@ -95,11 +110,19 @@ function createPreferenceState(): PopupExportPreferenceFixture {
 
 function createSessionState(): PopupExportSessionFixture {
   return {
+    activeSourceMode: 'tabs',
     canCopyJson: true,
     canCopyMarkdown: true,
     canExport: true,
     copiedFormat: null,
     copyingFormat: null,
+    selectedUrls: [],
+    setActiveSourceMode: vi.fn(),
+    setUrlInput: vi.fn(),
+    removeSelectedUrl: vi.fn(),
+    urlInput: '',
+    urlInputInvalid: [],
+    urlInputOverflow: 0,
     cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 0 },
     copyResetTimeoutRef: { current: null as number | null },
@@ -115,11 +138,14 @@ function createSessionState(): PopupExportSessionFixture {
     },
     progressSteps: [],
     requestIdRef: { current: null as string | null },
+    terminalRequestIdRef: { current: null as string | null },
     result: null,
+    launchedPlan: null,
     setCopiedFormat: vi.fn(),
     setCopyingFormat: vi.fn(),
     setProgress: vi.fn(),
     setResult: vi.fn(),
+    setLaunchedPlan: vi.fn(),
   };
 }
 
@@ -224,9 +250,9 @@ it('starts single-tab export through injected runtime deps', async () => {
   expect(state.setProgress).toHaveBeenCalledWith(expect.objectContaining({ phase: 'scanning' }));
   expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
     expect.objectContaining({
-      type: MessageType.START_POPUP_EXPORT_JOB,
+      type: MessageType.START_PAGE_PACKAGE_JOB,
       jobId: 'req-1',
-      orderedTabs: [{ tabId: 12, title: 'Current tab' }],
+      sources: [{ kind: 'tab', tabId: 12, title: 'Current tab' }],
       options: expect.objectContaining({
         includeCssDiagnostics: true,
         includeJson: true,
@@ -313,9 +339,7 @@ it('keeps the saved screenshot preference and starts without captures when host 
   expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
     expect.objectContaining({
       options: expect.objectContaining({ includeFullPageScreenshot: false }),
-      warnings: [
-        'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
-      ],
+      warnings: ['Доступ ко всем страницам не выдан: экспорт продолжен без скриншотов.'],
     })
   );
 });

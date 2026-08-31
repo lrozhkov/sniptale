@@ -11,6 +11,7 @@ vi.mock('./dispatch', () => ({
 function createRuntime() {
   return {
     exportRunner: {
+      buildBlobPackage: vi.fn(),
       buildPackage: vi.fn(),
       cancel: vi.fn(),
     },

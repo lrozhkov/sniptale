@@ -8,6 +8,8 @@ import {
   sanitizeRawDiagnosticExportData,
   sanitizeStructuredDiagnosticExportData,
   sanitizeDiagnosticUrl,
+  sanitizeDiagnosticsEvents,
+  sanitizeDiagnosticsMeta,
 } from './sanitizer';
 
 describe('diagnostic sanitizer', () => {
@@ -56,6 +58,9 @@ describe('diagnostic sanitizer', () => {
     'redacts structured signed url alias keys without over-redacting signals',
     verifySignedAliasKeys
   );
+  it('strips nested event URL query and hash data before retention', verifyEventUrlSanitization);
+  it('sanitizes complete typed diagnostic metadata', verifyTypedMetadataSanitization);
+  it('preserves privacy-safe diagnostic metric keys', verifySafeDiagnosticMetrics);
 });
 
 function verifyNestedRedaction() {
@@ -286,5 +291,69 @@ function verifySignedAliasKeys() {
     sig: '***',
     xGoogSignature: 'kept because it is not a header/query key',
     'x-goog-signature': '***',
+  });
+}
+
+function verifyEventUrlSanitization() {
+  expect(
+    sanitizeDiagnosticsEvents([
+      {
+        id: 'event-1',
+        recordingId: 'recording-1',
+        tsMs: 1,
+        kind: 'action',
+        level: 'info',
+        message: 'navigation',
+        data: {
+          nested: { requestUrl: '/search?q=private-patient-name#frag' },
+          url: 'https://example.test/search?q=private-patient-name#frag',
+        },
+      },
+    ])[0]?.data
+  ).toEqual({
+    nested: { requestUrl: '/search' },
+    url: 'https://example.test/search',
+  });
+}
+
+function verifyTypedMetadataSanitization() {
+  expect(
+    sanitizeDiagnosticsMeta({
+      interrupted: true,
+      recordingEndedAt: 'ended with token=secret',
+      recordingStartedAt: 'started with token=secret',
+      url: 'https://example.test/page?token=secret#private',
+      userAgent: 'Browser token=secret',
+      viewportHeight: 720,
+      viewportWidth: 1280,
+    })
+  ).toEqual({
+    interrupted: true,
+    recordingEndedAt: 'ended with token=***',
+    recordingStartedAt: 'started with token=***',
+    url: 'https://example.test/page',
+    userAgent: 'Browser token=***',
+    viewportHeight: 720,
+    viewportWidth: 1280,
+  });
+}
+
+function verifySafeDiagnosticMetrics() {
+  expect(
+    sanitizeDiagnosticData({
+      context: 'content-action',
+      session: 'secret session payload',
+      sessionCount: 2,
+      text: 'user text',
+      value: 'user value',
+      valueLength: 12,
+    })
+  ).toEqual({
+    context: 'content-action',
+    session: '***',
+    sessionCount: 2,
+    text: '***',
+    value: '***',
+    valueLength: 12,
   });
 }

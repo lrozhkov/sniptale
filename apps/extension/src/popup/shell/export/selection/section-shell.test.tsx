@@ -10,6 +10,7 @@ vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
 }));
 
 import { ExportSelectionSectionShell } from './section-shell';
+import { PopupSelect } from '../../../../ui/popup-shell/select';
 
 type ShellProps = ComponentProps<typeof ExportSelectionSectionShell>;
 
@@ -19,6 +20,7 @@ let root: Root | null = null;
 async function renderShell(overrides: Partial<ShellProps> = {}) {
   const props: ShellProps = {
     children: <div data-testid="drawer-child">content</div>,
+    drawerDescription: 'Choose export options',
     drawerLabel: 'Export options',
     isOpen: false,
     onClose: vi.fn(),
@@ -51,8 +53,19 @@ afterEach(() => {
 
 describe('ExportSelectionSectionShell', () => {
   it('renders the closed shell and delegates opening', async () => {
-    const props = await renderShell({ bodyClassName: 'drawer-body', className: 'owner-shell' });
-    const button = container?.querySelector('button') as HTMLButtonElement;
+    const onOpenSettings = vi.fn();
+    const props = await renderShell({
+      bodyClassName: 'drawer-body',
+      className: 'owner-shell',
+      onOpenSettings,
+      settingsAriaLabel: 'Selection settings',
+    });
+    const button = container?.querySelector(
+      '[data-ui="popup.export.selection-trigger"]'
+    ) as HTMLButtonElement;
+    const settingsButton = container?.querySelector(
+      '[data-ui="popup.export.selection-settings"]'
+    ) as HTMLButtonElement;
     const drawer = container?.querySelector('[aria-label="Export options"]');
     const heading = container?.querySelector<HTMLElement>(
       '[data-ui="popup.export.selection-heading"]'
@@ -63,10 +76,20 @@ describe('ExportSelectionSectionShell', () => {
     expect(heading?.className).toContain('font-semibold');
     expect(heading?.className).toContain('tracking-[0.08em]');
     expect(heading?.className).toContain('var(--sniptale-color-text-muted-strong)');
+    expect(button.getAttribute('data-ui')).toBe('popup.export.selection-trigger');
+    expect(button.textContent).not.toContain('t:popup.export.editButton');
+    expect(button.parentElement?.querySelector('svg')?.className.baseVal).toContain(
+      'group-hover:opacity-100'
+    );
+    expect(settingsButton.parentElement).toBe(button.parentElement);
+    expect(settingsButton.getAttribute('aria-label')).toBe('Selection settings');
     expect(drawer?.className).toContain('drawer-body');
     expect(container?.querySelector('section')?.className).toContain('owner-shell');
 
     await act(async () => button.click());
+    expect(props.onOpen).toHaveBeenCalledOnce();
+    await act(async () => settingsButton.click());
+    expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(props.onOpen).toHaveBeenCalledOnce();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -75,11 +98,18 @@ describe('ExportSelectionSectionShell', () => {
 
   it('closes from the action, Escape, and outside pointer events only', async () => {
     const props = await renderShell({ isExpanded: true, isOpen: true });
-    const button = container?.querySelector('button') as HTMLButtonElement;
+    const button = container?.querySelector(
+      '[data-ui="popup.inline-curtain.header"] button'
+    ) as HTMLButtonElement;
     const child = container?.querySelector('[data-testid="drawer-child"]') as HTMLElement;
 
-    expect(button.textContent).toBe('t:popup.export.doneButton');
-    expect(container?.querySelector('section')?.className).toContain('flex-1');
+    expect(button.getAttribute('aria-label')).toBe('t:popup.export.backButton');
+    const curtain = container?.querySelector('[data-ui="popup.export.selection-curtain"]');
+    expect(curtain?.className).toContain('!w-[90%]');
+    expect(curtain?.textContent).toContain('Choose export options');
+    expect(curtain?.getAttribute('aria-modal')).toBe('true');
+    await act(async () => Promise.resolve());
+    expect(document.activeElement).toBe(button);
 
     await act(async () => button.click());
     child.dispatchEvent(new Event('pointerdown', { bubbles: true }));
@@ -95,5 +125,80 @@ describe('ExportSelectionSectionShell', () => {
 
     expect(escapeEvent.defaultPrevented).toBe(true);
     expect(props.onClose).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      root?.render(<ExportSelectionSectionShell {...props} isOpen={false} />);
+      await Promise.resolve();
+    });
+    expect(document.activeElement?.getAttribute('data-ui')).toBe('popup.export.selection-trigger');
+  });
+
+  it('keeps the curtain open while a portaled product select commits an option', async () => {
+    const onChange = vi.fn();
+    const props = await renderShell({
+      isOpen: true,
+      children: (
+        <PopupSelect
+          aria-label="Capture policy"
+          onChange={onChange}
+          options={[
+            { label: 'First', value: 'first' },
+            { label: 'Second', value: 'second' },
+          ]}
+          value="first"
+        />
+      ),
+    });
+    const select = container?.querySelector('[aria-label="Capture policy"]') as HTMLButtonElement;
+    await act(async () => select.click());
+    const option = [...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (candidate) => candidate.textContent === 'Second'
+    );
+
+    await act(async () => {
+      option?.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+      option?.click();
+    });
+
+    expect(onChange).toHaveBeenCalledWith('second');
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps keyboard focus inside the open curtain', async () => {
+    await renderShell({
+      children: (
+        <>
+          <button type="button">Middle</button>
+          <button type="button" data-testid="last-action">
+            Last
+          </button>
+        </>
+      ),
+      isOpen: true,
+    });
+    await act(async () => Promise.resolve());
+    const back = container?.querySelector(
+      '[data-ui="popup.inline-curtain.header"] button'
+    ) as HTMLButtonElement;
+    const last = container?.querySelector('[data-testid="last-action"]') as HTMLButtonElement;
+
+    const backwards = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+      shiftKey: true,
+    });
+    document.dispatchEvent(backwards);
+    expect(backwards.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(last);
+
+    const forwards = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+    });
+    document.dispatchEvent(forwards);
+    expect(forwards.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(back);
   });
 });

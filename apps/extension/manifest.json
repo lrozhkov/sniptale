@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Sniptale",
-  "version": "0.3.3",
-  "version_name": "0.3.3 alpha",
+  "version": "0.4.0",
+  "version_name": "0.4.0 alpha",
   "minimum_chrome_version": "148",
   "description": "Workspace for capturing, understanding, annotating, recording, editing, and exporting the web.",
   "default_locale": "en",
@@ -20,9 +20,9 @@
     "offscreen",
     "tabCapture",
     "desktopCapture",
-    "nativeMessaging",
     "clipboardWrite"
   ],
+  "optional_permissions": ["nativeMessaging"],
   "optional_host_permissions": ["<all_urls>", "file:///"],
   "web_accessible_resources": [
     {

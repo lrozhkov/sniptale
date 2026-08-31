@@ -3,10 +3,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import type { PreparationSurfaceProps } from '../../../content/public/preparation-surface';
 
 const mocks = vi.hoisted(() => ({
@@ -74,23 +72,7 @@ it('does not expose viewer-local viewport mutation for window-only presets', () 
 });
 
 function createManifest(): WebSnapshotManifest {
-  return {
-    capturedAt: '2026-08-13T00:00:00.000Z',
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    id: 'snapshot-1',
-    paths: {
-      computedStyles: 'snapshot/computed-styles.css',
-      domSnapshot: 'snapshot/dom.json',
-      errors: 'snapshot/errors.json',
-      manifest: 'manifest.json',
-      screenshot: 'screenshot.png',
-      snapshotHtml: 'snapshot/index.html',
-      stylesheets: 'snapshot/stylesheets.css',
-      virtualDomSnapshot: 'snapshot/virtual-dom.json',
-    },
-    schemaVersion: 1,
+  return createPagePackageManifestFixture({
     source: { faviconUrl: null, title: 'Snapshot', url: 'https://example.test' },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 1 },
-    warnings: [],
-  };
+  });
 }

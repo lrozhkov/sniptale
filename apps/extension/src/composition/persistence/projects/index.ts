@@ -17,7 +17,7 @@ import {
   syncProjectAssetMirrorLifecycles,
 } from './asset-references';
 import {
-  type HydratedProjectAssetEntry,
+  type ProjectAssetReadResult,
   type StoredProjectAssetEntry,
   type VideoProjectEntry,
   type VideoProjectReadResult,
@@ -259,16 +259,31 @@ export async function saveProjectAsset(
   }
 }
 
-export async function getProjectAsset(id: string): Promise<HydratedProjectAssetEntry | undefined> {
-  const db = await initDB();
-  const entry = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
-  if (!entry) return undefined;
-  const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, entry.assetId));
-  if (!ref) return undefined;
+export async function getProjectAsset(id: string): Promise<ProjectAssetReadResult> {
+  let db: Awaited<ReturnType<typeof initDB>>;
+  let storedEntry: unknown;
   try {
-    return { ...entry, file: await readAssetFile(ref, id) };
+    db = await initDB();
+    storedEntry = await db.get(PROJECT_ASSETS_STORE, id);
   } catch {
-    return undefined;
+    return { reason: 'asset-entry-unavailable', status: 'unavailable' };
+  }
+  if (storedEntry === undefined) return { status: 'not-found' };
+  const entry = parseProjectAssetEntry(storedEntry);
+  if (!entry) return { reason: 'invalid-asset-entry', status: 'invalid' };
+
+  let storedRef: unknown;
+  try {
+    storedRef = await db.get(ASSET_REFS_STORE, entry.assetId);
+  } catch {
+    return { reason: 'asset-reference-unavailable', status: 'unavailable' };
+  }
+  const ref = parseAssetRef(storedRef);
+  if (!ref) return { reason: 'invalid-asset-reference', status: 'invalid' };
+  try {
+    return { entry: { ...entry, file: await readAssetFile(ref, id) }, status: 'ready' };
+  } catch {
+    return { reason: 'asset-file-unavailable', status: 'unavailable' };
   }
 }
 

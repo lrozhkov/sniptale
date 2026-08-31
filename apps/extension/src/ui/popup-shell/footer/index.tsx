@@ -1,8 +1,9 @@
-import { Github, Settings2 } from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 import { translate } from '../../../platform/i18n/popup';
 import { PopupFooterAction } from './action';
 import { PopupFooterThemeToggle } from './theme-toggle';
 import { PopupFooterLanguageToggle } from './language-toggle';
+import { GitHubIcon } from './github-icon';
 
 export interface PopupFooterProps {
   onOpenGithub: () => void;
@@ -14,7 +15,7 @@ function PopupFooterActions({ onOpenGithub }: Pick<PopupFooterProps, 'onOpenGith
     <div className="flex items-center justify-end gap-2">
       <PopupFooterAction
         onClick={onOpenGithub}
-        icon={Github}
+        icon={GitHubIcon}
         label={translate('popup.common.footerGithub')}
         iconOnly
         dataUi="popup.footer.github-button"

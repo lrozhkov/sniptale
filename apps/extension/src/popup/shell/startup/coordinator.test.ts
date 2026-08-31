@@ -86,3 +86,18 @@ it('routes the new top-level menu and tools startup destinations directly', asyn
   mocks.startup.mockResolvedValue({ selection: 'tools', lastPage: 'video' });
   expect(await resolvePopupStartupRoute()).toEqual({ page: 'tools' });
 });
+
+it('restores unified Export for both fixed and remember-last startup choices', async () => {
+  mocks.startup.mockResolvedValue({ selection: 'export:download', lastPage: 'menu' });
+  expect(await resolvePopupStartupRoute()).toEqual({ page: 'export', destination: 'export' });
+
+  mocks.startup.mockResolvedValue({ selection: 'export:library', lastPage: 'menu' });
+  expect(await resolvePopupStartupRoute()).toEqual({ page: 'export', destination: 'save' });
+
+  mocks.startup.mockResolvedValue({
+    selection: 'remember-last',
+    lastPage: 'export',
+    lastExportDestination: 'save',
+  });
+  expect(await resolvePopupStartupRoute()).toEqual({ page: 'export', destination: 'save' });
+});

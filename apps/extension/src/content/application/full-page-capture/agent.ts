@@ -6,6 +6,7 @@ import type {
   FullPageCaptureTileState,
 } from '../../../contracts/full-page-capture';
 import { createLayoutGeneration, measureCaptureGeometry } from './geometry';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { readPageScroll, resolvePageScrollRoot, writePageScroll } from '../../platform/page-scroll';
 import {
   applyFloatingPolicyForTile,
@@ -19,6 +20,7 @@ import type { FullPageAgentSession } from './types';
 
 const WATCHDOG_TIMEOUT_MS = 15_000;
 const GEOMETRY_EPSILON_CSS_PX = 1;
+const logger = createLogger({ namespace: 'ContentFullPageCapture' });
 
 type FullPageAgentMessage =
   | TabRequestByType[typeof MessageType.PREPARE_FULL_PAGE_CAPTURE]
@@ -82,14 +84,24 @@ function createTileState(session: FullPageAgentSession): FullPageCaptureTileStat
       GEOMETRY_EPSILON_CSS_PX ||
     Math.abs(currentGeometry.rootViewport.height - session.geometry.rootViewport.height) >
       GEOMETRY_EPSILON_CSS_PX ||
-    Math.abs(currentGeometry.outputWidth - session.geometry.outputWidth) >
-      GEOMETRY_EPSILON_CSS_PX ||
-    Math.abs(currentGeometry.outputHeight - session.geometry.outputHeight) >
-      GEOMETRY_EPSILON_CSS_PX ||
     Math.abs(currentGeometry.devicePixelRatio - session.geometry.devicePixelRatio) /
       session.geometry.devicePixelRatio >
       0.005
   ) {
+    logger.warn('Full-page capture viewport changed', {
+      current: {
+        devicePixelRatio: currentGeometry.devicePixelRatio,
+        rootViewport: currentGeometry.rootViewport,
+        viewportHeight: currentGeometry.viewportHeight,
+        viewportWidth: currentGeometry.viewportWidth,
+      },
+      prepared: {
+        devicePixelRatio: session.geometry.devicePixelRatio,
+        rootViewport: session.geometry.rootViewport,
+        viewportHeight: session.geometry.viewportHeight,
+        viewportWidth: session.geometry.viewportWidth,
+      },
+    });
     throw new Error('Full-page capture viewport changed during capture');
   }
   const scroll = readPageScroll(session.root);

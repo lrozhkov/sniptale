@@ -1,102 +1,96 @@
 import JSZip from 'jszip';
-import { expect, it, vi } from 'vitest';
-import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../features/web-snapshot/manifest';
+import { expect, it } from 'vitest';
+import {
+  PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+  PAGE_PACKAGE_ARCHIVE_PATHS,
+} from '@sniptale/runtime-contracts/page-package';
+import {
+  createPagePackageArchiveFixture,
+  createPagePackageTestBlobFromBytes,
+  readPagePackageTestBlobBytes,
+  type PagePackageFixtureEntry,
+} from '../../features/web-snapshot/package.test-support';
 import { loadWebSnapshotScreenshotBlob } from './package';
 
-async function createPackageBlob(entries: Record<string, string | Uint8Array>): Promise<Blob> {
+it('loads the verified full-page screenshot from a Page Package', async () => {
+  const fixture = await createPagePackageArchiveFixture();
+
+  const screenshot = await loadWebSnapshotScreenshotBlob(fixture.packageBlob);
+
+  expect(screenshot.type).toBe('image/png');
+  expect(await readPagePackageTestBlobBytes(screenshot)).toEqual(
+    await readPagePackageTestBlobBytes(fixture.screenshotBlob)
+  );
+});
+
+it('loads an explicitly declared visible-area preview without treating it as page-screenshot.png', async () => {
+  const base = await createPagePackageArchiveFixture();
+  const entries = base.entries.map((entry) =>
+    entry.path === PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+      ? { ...entry, path: PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot }
+      : entry
+  );
+  const fixture = await createPagePackageArchiveFixture({ entries });
+
+  await expect(loadWebSnapshotScreenshotBlob(fixture.packageBlob)).resolves.toBeInstanceOf(Blob);
+  expect(fixture.manifest.entries.map((entry) => entry.path)).not.toContain(
+    PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+  );
+});
+
+it('accepts declared nested assets and diagnostic entries', async () => {
+  const base = await createPagePackageArchiveFixture();
+  const entries: PagePackageFixtureEntry[] = [
+    ...base.entries,
+    {
+      blob: new Blob(['body { color: red; }'], { type: 'text/css' }),
+      component: 'webCopy',
+      path: 'assets/styles/document.css',
+    },
+    {
+      blob: new Blob(['diagnostic'], { type: 'text/plain' }),
+      component: 'diagnostics',
+      path: 'diagnostics/standard/styles/document.css.txt',
+    },
+  ];
+  const fixture = await createPagePackageArchiveFixture({ entries });
+
+  await expect(loadWebSnapshotScreenshotBlob(fixture.packageBlob)).resolves.toBeInstanceOf(Blob);
+});
+
+it('rejects packages without a valid manifest and screenshot declaration', async () => {
   const zip = new JSZip();
-  for (const [path, content] of Object.entries(entries)) {
-    zip.file(path, content);
-  }
-
-  return zip.generateAsync({ type: 'blob' });
-}
-
-it('loads the full page screenshot from a web snapshot package', async () => {
-  const packageBlob = await createPackageBlob({ [WEB_SNAPSHOT_PACKAGE_PATHS.screenshot]: 'png' });
-
-  const screenshot = await loadWebSnapshotScreenshotBlob(packageBlob);
-
-  expect(await screenshot.text()).toBe('png');
-});
-
-it('loads screenshots from packages with stylesheet diagnostic entries', async () => {
-  const packageBlob = await createPackageBlob({
-    [WEB_SNAPSHOT_PACKAGE_PATHS.screenshot]: 'png',
-    [WEB_SNAPSHOT_PACKAGE_PATHS.stylesheets]: '[]',
-    'logs/css/stylesheets/document-stylesheet-01.css': 'body { color: red; }',
-  });
-
-  const screenshot = await loadWebSnapshotScreenshotBlob(packageBlob);
-
-  expect(await screenshot.text()).toBe('png');
-});
-
-it('reports packages without a screenshot entry', async () => {
-  const packageBlob = await new JSZip().generateAsync({ type: 'blob' });
+  zip.file(PAGE_PACKAGE_ARCHIVE_PATHS.screenshot, 'png');
+  const raw = await zip.generateAsync({ type: 'uint8array' });
+  const packageBlob = createPagePackageTestBlobFromBytes(raw, PAGE_PACKAGE_ARCHIVE_MIME_TYPE);
 
   await expect(loadWebSnapshotScreenshotBlob(packageBlob)).rejects.toThrow(
-    'Web snapshot screenshot is missing.'
+    'Page Package manifest is missing.'
   );
 });
 
-it('rejects unsafe package paths before reading the screenshot', async () => {
-  const packageBlob = await createPackageBlob({
-    '../escape.png': 'png',
-    [WEB_SNAPSHOT_PACKAGE_PATHS.screenshot]: 'png',
-  });
+it('rejects undeclared archive entries', async () => {
+  const fixture = await createPagePackageArchiveFixture();
+  const zip = await JSZip.loadAsync(await readPagePackageTestBlobBytes(fixture.packageBlob));
+  zip.file('assets/undeclared.png', 'png', { createFolders: false });
+  const raw = await zip.generateAsync({ type: 'uint8array' });
 
-  await expect(loadWebSnapshotScreenshotBlob(packageBlob)).rejects.toThrow(
-    'Web snapshot package contains an unsafe path.'
-  );
+  await expect(
+    loadWebSnapshotScreenshotBlob(
+      createPagePackageTestBlobFromBytes(raw, PAGE_PACKAGE_ARCHIVE_MIME_TYPE)
+    )
+  ).rejects.toThrow('Page Package archive inventory does not match its manifest.');
 });
 
-it('rejects packages with too many entries before reading the screenshot', async () => {
-  const entries: Record<string, string> = {
-    [WEB_SNAPSHOT_PACKAGE_PATHS.screenshot]: 'png',
-  };
-  for (let index = 0; index < 500; index += 1) {
-    entries[`assets/${index}.png`] = 'png';
-  }
+it('rejects screenshot content whose digest differs from the manifest', async () => {
+  const fixture = await createPagePackageArchiveFixture();
+  const zip = await JSZip.loadAsync(await readPagePackageTestBlobBytes(fixture.packageBlob));
+  zip.file(PAGE_PACKAGE_ARCHIVE_PATHS.screenshot, 'different');
+  const raw = await zip.generateAsync({ type: 'uint8array' });
 
-  const packageBlob = await createPackageBlob(entries);
-
-  await expect(loadWebSnapshotScreenshotBlob(packageBlob)).rejects.toThrow(
-    'Web snapshot package contains too many files.'
-  );
-});
-
-it('rejects oversized screenshots after bounded preview package validation', async () => {
-  const packageBlob = await createPackageBlob({
-    [WEB_SNAPSHOT_PACKAGE_PATHS.screenshot]: new Uint8Array(25 * 1024 * 1024 + 1),
-  });
-
-  await expect(loadWebSnapshotScreenshotBlob(packageBlob)).rejects.toThrow(
-    'Web snapshot screenshot is too large.'
-  );
-});
-
-it('rejects oversized screenshot metadata before inflating preview entries', async () => {
-  const readScreenshot = vi.fn(() => {
-    throw new Error('Rejected ZIP entry was inflated.');
-  });
-  const screenshotEntry = {
-    _data: { compressedSize: 32, uncompressedSize: 25 * 1024 * 1024 + 1 },
-    async: readScreenshot,
-    dir: false,
-    name: WEB_SNAPSHOT_PACKAGE_PATHS.screenshot,
-    unsafeOriginalName: WEB_SNAPSHOT_PACKAGE_PATHS.screenshot,
-  };
-  const zip = Object.assign(new JSZip(), {
-    file: (path: string) =>
-      path === WEB_SNAPSHOT_PACKAGE_PATHS.screenshot ? screenshotEntry : null,
-    files: { [WEB_SNAPSHOT_PACKAGE_PATHS.screenshot]: screenshotEntry },
-  });
-  vi.spyOn(JSZip, 'loadAsync').mockResolvedValue(zip);
-
-  await expect(loadWebSnapshotScreenshotBlob(new Blob(['zip']))).rejects.toThrow(
-    'Web snapshot screenshot is too large.'
-  );
-
-  expect(readScreenshot).not.toHaveBeenCalled();
+  await expect(
+    loadWebSnapshotScreenshotBlob(
+      createPagePackageTestBlobFromBytes(raw, PAGE_PACKAGE_ARCHIVE_MIME_TYPE)
+    )
+  ).rejects.toThrow(/inventory does not match|metadata does not match/u);
 });

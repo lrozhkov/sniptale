@@ -3,15 +3,14 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  WebSnapshotCaptureMode,
-  type WebSnapshotManifest,
-} from '@sniptale/runtime-contracts/web-snapshot';
-import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manifest';
+import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
+import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 
 const mocks = vi.hoisted(() => ({
+  browserTabsCreate: vi.fn(),
   latestFrameLoad: null as (() => void) | null,
+  loadSettings: vi.fn(),
   loadWebSnapshotPackage: vi.fn(),
   readSnapshotIdFromLocation: vi.fn(),
   SnapshotPreparationHost: vi.fn(
@@ -25,8 +24,18 @@ const mocks = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock('./route', () => ({ readSnapshotIdFromLocation: mocks.readSnapshotIdFromLocation }));
-vi.mock('../../viewer/frame-navigation', () => ({ blockSnapshotFrameNavigation: vi.fn() }));
+vi.mock('./route', () => ({
+  readSnapshotIdFromLocation: mocks.readSnapshotIdFromLocation,
+}));
+vi.mock('../../viewer/frame-navigation', () => ({
+  blockSnapshotFrameNavigation: vi.fn(),
+}));
+vi.mock('../../../composition/persistence/settings', () => ({
+  loadSettings: mocks.loadSettings,
+}));
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { create: mocks.browserTabsCreate },
+}));
 vi.mock('../../preparation/host', () => ({
   SnapshotPreparationHost: mocks.SnapshotPreparationHost,
 }));
@@ -53,25 +62,34 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 function createViewerManifest(overrides: Partial<WebSnapshotManifest> = {}): WebSnapshotManifest {
-  const { source, stats, ...rootOverrides } = overrides;
-
-  return {
-    captureMode: WebSnapshotCaptureMode.ReadOnlyNoScripts,
-    capturedAt: '2026-06-14T00:00:00.000Z',
-    id: 'snapshot-1',
-    paths: WEB_SNAPSHOT_PACKAGE_PATHS,
-    schemaVersion: 1,
-    source: { faviconUrl: null, title: 'Page title', url: 'https://example.com/page', ...source },
-    stats: { assetCount: 0, failedAssetCount: 0, packageSize: 0, ...stats },
-    warnings: [],
-    ...rootOverrides,
-  };
+  return createPagePackageManifestFixture({
+    ...overrides,
+    source: overrides.source ?? {
+      faviconUrl: null,
+      title: 'Page title',
+      url: 'https://example.com/page',
+    },
+  });
 }
 
 function createLoadedPackage(
   manifest: Partial<WebSnapshotManifest> = {}
 ): LoadedWebSnapshotPackage {
-  return { html: '<p>Snapshot</p>', manifest: createViewerManifest(manifest), objectUrls: [] };
+  return {
+    archiveFilename: 'Page_title.sniptale-page-package.zip',
+    archiveSize: 5_000_000,
+    archiveUrl: 'blob:snapshot-archive',
+    assets: [],
+    documentUrl: null,
+    extractPackageFile: vi.fn(async () => new Blob(['file'])),
+    html: '<p>Snapshot</p>',
+    manifest: createViewerManifest(manifest),
+    objectUrls: [],
+    packageFiles: [],
+    screenshotCoverage: 'full-page',
+    screenshotFilename: 'Page_title.png',
+    screenshotUrl: 'blob:snapshot-screenshot',
+  };
 }
 
 async function renderViewer(): Promise<void> {
@@ -81,6 +99,11 @@ async function renderViewer(): Promise<void> {
 }
 
 async function loadSnapshotIframe(): Promise<void> {
+  if (!container?.querySelector('iframe')) {
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
+    });
+  }
   await act(async () => {
     mocks.latestFrameLoad?.();
   });
@@ -94,6 +117,8 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   mocks.readSnapshotIdFromLocation.mockReturnValue('snapshot-1');
+  mocks.loadSettings.mockResolvedValue({ externalSnapshotLinksEnabled: false });
+  mocks.browserTabsCreate.mockResolvedValue({});
   mocks.SnapshotPreparationHost.mockClear();
 });
 
@@ -118,16 +143,178 @@ it('resizes the snapshot iframe surface when viewer viewport state changes', asy
   expect(viewport?.style.height).toBe('844px');
 });
 
-it('uses the saved capture viewport as the default snapshot iframe surface', async () => {
+it('keeps the saved width and expands a reduced default viewport downward', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
-    createLoadedPackage({ viewport: { height: 1440, width: 2560 } })
+    createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
   );
 
   await renderViewer();
 
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('2560px');
-  expect(viewport?.style.height).toBe('1440px');
+  expect(viewport?.style.height).toBe('1920px');
+  const scaledViewport = container?.querySelector<HTMLElement>(
+    '[data-testid="snapshot-frame-scaled-viewport"]'
+  );
+  expect(scaledViewport?.style.width).toBe('1024px');
+  expect(scaledViewport?.style.height).toBe('768px');
+  expect(viewport?.style.transform).toBe('scale(0.4)');
+});
+
+it('uses a true 100% scale instead of blurring a near-width capture by a few pixels', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
+  );
+
+  await renderViewer();
+
+  const scaledViewport = container?.querySelector<HTMLElement>(
+    '[data-testid="snapshot-frame-scaled-viewport"]'
+  );
+  const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
+  const actualSizeButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === '100%'
+  );
+
+  expect(scaledViewport?.style.width).toBe('1030px');
+  expect(viewport?.style.transform).toBe('scale(1)');
+  expect(actualSizeButton).toBeDefined();
+});
+
+it('does not expose horizontal scrolling caused only by the vertical scrollbar gutter', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
+  );
+
+  await renderViewer();
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  Object.defineProperties(surface!, {
+    clientWidth: { configurable: true, value: 1020 },
+    offsetWidth: { configurable: true, value: 1030 },
+  });
+  act(() => window.dispatchEvent(new Event('resize')));
+
+  const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
+  expect(viewport?.style.transform).toBe('scale(1)');
+  expect(surface?.className).toContain('overflow-x-hidden');
+  expect(surface?.className).toContain('overflow-y-auto');
+});
+
+it('does not let grab navigation consume the collapsed toolbar button pointer gesture', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
+  );
+
+  await renderViewer();
+  const collapseButton = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+    (button) => button.querySelector('.lucide-panel-top-close') !== null
+  );
+  expect(collapseButton).toBeTruthy();
+  act(() => collapseButton?.click());
+  const expandButton = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+    (button) => button.querySelector('.lucide-panel-top-open') !== null
+  );
+  expect(expandButton).toBeTruthy();
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  Object.defineProperties(surface!, {
+    clientHeight: { configurable: true, value: 700 },
+    clientWidth: { configurable: true, value: 1020 },
+    scrollHeight: { configurable: true, value: 800 },
+    scrollWidth: { configurable: true, value: 1030 },
+  });
+  const pointerDown = new MouseEvent('pointerdown', {
+    bubbles: true,
+    button: 0,
+    cancelable: true,
+  });
+
+  act(() => expandButton?.dispatchEvent(pointerDown));
+  expect(pointerDown.defaultPrevented).toBe(false);
+  act(() => expandButton?.click());
+  expect(container?.querySelector('header')).not.toBeNull();
+});
+
+it('keeps captured layout dimensions while switching between fit and manual zoom', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
+  );
+
+  await renderViewer();
+
+  const scaledViewport = () =>
+    container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-scaled-viewport"]');
+  const viewport = () =>
+    container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
+  expect(scaledViewport()?.style.width).toBe('1024px');
+  expect(scaledViewport()?.className).toContain('overflow-hidden');
+  expect(viewport()?.style.width).toBe('2560px');
+  expect(viewport()?.style.height).toBe('1920px');
+  expect(scaledViewport()?.style.height).toBe('768px');
+
+  const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === '40%'
+  );
+  act(() => {
+    percentButton?.click();
+  });
+  expect(scaledViewport()?.style.width).toBe('2560px');
+  expect(viewport()?.style.transform).toBe('scale(1)');
+  expect(viewport()?.style.height).toBe('1440px');
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  expect(surface?.className).toContain('overflow-x-auto');
+  expect(surface?.className).toContain('overflow-y-auto');
+  expect(surface?.style.scrollbarGutter).toBe('stable');
+  expect(surface?.className).toContain('cursor-grab');
+
+  const zoomButtons = percentButton?.parentElement?.querySelectorAll('button');
+  act(() => {
+    zoomButtons?.item(2).click();
+  });
+  expect(scaledViewport()?.style.width).toBe('2816px');
+  expect(percentButton?.textContent).toBe('110%');
+
+  act(() => {
+    zoomButtons?.item(0).click();
+  });
+  expect(scaledViewport()?.style.width).toBe('2560px');
+  expect(percentButton?.textContent).toBe('100%');
+
+  act(() => {
+    zoomButtons?.item(zoomButtons.length - 1).click();
+  });
+  expect(scaledViewport()?.style.width).toBe('1024px');
+  expect(viewport()?.style.transform).toBe('scale(0.4)');
+});
+
+it('pans an enlarged snapshot with primary-button grab navigation', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
+  );
+  await renderViewer();
+  const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === '40%'
+  );
+  act(() => percentButton?.click());
+  const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  Object.defineProperties(surface!, {
+    clientHeight: { configurable: true, value: 600 },
+    clientWidth: { configurable: true, value: 1024 },
+    scrollHeight: { configurable: true, value: 1440 },
+    scrollWidth: { configurable: true, value: 2560 },
+  });
+
+  act(() => {
+    surface?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 500, clientY: 400 })
+    );
+    surface?.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 350, clientY: 250 })
+    );
+    surface?.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+  });
+
+  expect(surface?.scrollLeft).toBe(150);
+  expect(surface?.scrollTop).toBe(150);
 });
 
 it('keeps the fluid viewer surface for legacy snapshots without viewport metadata', async () => {

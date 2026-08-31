@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-import { stableStringify } from '../../qa/core/proof-input.mjs';
+import { stableStringify } from '../../qa/proof/contracts/proof-input.mjs';
 
 export const SELECTEL_POLICY_PATH = 'tooling/configs/ci/selectel-runner.json';
 

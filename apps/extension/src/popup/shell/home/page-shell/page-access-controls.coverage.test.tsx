@@ -83,6 +83,9 @@ it('renders a standalone status error when page access is unavailable', async ()
 
   expect(getContainer()?.querySelector('[role="alert"]')?.textContent).toBe('Status unavailable');
   expect(getContainer()?.querySelector('button')).toBeNull();
+  const replacement = getContainer()?.querySelector('[data-ui="popup.page-access.controls"]');
+  expect(replacement?.classList.contains('h-[88px]')).toBe(true);
+  expect(replacement?.classList.contains('min-h-[88px]')).toBe(true);
 });
 
 it('renders the normal action labels when no request is pending', async () => {
@@ -98,4 +101,23 @@ it('renders the normal action labels when no request is pending', async () => {
 
   expect(getContainer()?.textContent).toContain('popup.home.enableForTab');
   expect(getContainer()?.textContent).not.toContain('popup.home.pageAccessWorking');
+});
+
+it('renders only the dedicated local-file grant on file pages', async () => {
+  const onRequest = vi.fn();
+  await renderNode(
+    <PageAccessControls
+      disabled={false}
+      error={null}
+      onRequest={onRequest}
+      pendingOperation={null}
+      status={{ ...inactiveStatus, currentTabOrigin: 'file:///' }}
+    />
+  );
+
+  const buttons = Array.from(getContainer()?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]?.textContent).toContain('popup.home.enableLocalFiles');
+  act(() => buttons[0]?.click());
+  expect(onRequest).toHaveBeenCalledWith(PageAccessOperation.GRANT_SITE);
 });

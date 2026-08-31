@@ -49,6 +49,11 @@ import {
 import { listVideoRecordingMediaDevices } from '../recording/camera-source/device-catalog';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import { probeOffscreenRuntimeReadiness } from './bootstrap';
+import {
+  confirmPagePackageDownloadLease,
+  createPagePackageDownloadLease,
+  releasePagePackageDownloadLease,
+} from '../page-package-download/lease';
 
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
 
@@ -104,6 +109,9 @@ export function resolveOffscreenErrorPhase(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+    case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
+    case MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
@@ -140,6 +148,9 @@ export function resolveOffscreenRuntimeResponseMode(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+    case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
+    case MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
@@ -187,12 +198,20 @@ export async function handleOffscreenRuntimeMessage(
   | CameraSourcePeerAnswer
   | { mediaDevices: VideoRecordingMediaDevice[] }
   | { challenge: string; offscreenStartupId: string; state: 'failed' | 'ready' }
+  | { leaseId: string; result: 'leased'; url: string }
+  | { result: 'confirmed' | 'released' | 'stale' }
   | 'accepted'
   | 'applied'
   | 'copied'
   | 'stale'
 > {
   switch (message.type) {
+    case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+      return createPagePackageDownloadLease(message);
+    case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
+      return confirmPagePackageDownloadLease(message);
+    case MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+      return releasePagePackageDownloadLease(message);
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
       return probeOffscreenRuntimeReadiness(message);
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER:
@@ -276,8 +295,7 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
-      await handleProjectExportRuntimeMessage(message, sendResponse);
-      return;
+      return await handleProjectExportRuntimeMessage(message, sendResponse);
   }
 }
 

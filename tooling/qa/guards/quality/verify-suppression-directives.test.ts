@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { toRelativePath } from '../../core/shared.mjs';
+import { toRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import {
   collectSuppressionDirectiveViolations,
   runSuppressionDirectiveCheck,
@@ -111,6 +111,77 @@ it('flags TypeScript suppression directives in untracked files', () => {
   ]);
 });
 
+it('detects every active ESLint suppression comment form without requiring leading whitespace', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'src/example.ts',
+    [
+      'run();// eslint-disable-line no-console',
+      'run();/* eslint-disable */',
+      '// eslint-disable-next-line no-console',
+      'run();',
+    ].join('\n')
+  );
+  const relativeFile = toRelativePath(file);
+
+  expect(
+    collectSuppressionDirectiveViolations([file], {
+      untrackedFiles: new Set([relativeFile]),
+    }).map(({ line, rule }) => ({ line, rule }))
+  ).toEqual([
+    { line: 1, rule: 'eslint-suppression-directive' },
+    { line: 2, rule: 'eslint-suppression-directive' },
+    { line: 3, rule: 'eslint-suppression-directive' },
+  ]);
+});
+
+it('detects active TypeScript line directives including header nocheck', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'src/example.ts',
+    [
+      '// @ts-nocheck',
+      '// @ts-ignore',
+      'brokenCall();',
+      '// @ts-expect-error deliberate fixture',
+      'brokenCall();',
+    ].join('\n')
+  );
+  const relativeFile = toRelativePath(file);
+
+  expect(
+    collectSuppressionDirectiveViolations([file], {
+      untrackedFiles: new Set([relativeFile]),
+    }).map(({ line, rule }) => ({ line, rule }))
+  ).toEqual([
+    { line: 1, rule: 'typescript-suppression-directive' },
+    { line: 2, rule: 'typescript-suppression-directive' },
+    { line: 4, rule: 'typescript-suppression-directive' },
+  ]);
+});
+
+it('ignores directive text outside active JS/TS suppression comments', () => {
+  const root = createTempRoot();
+  const sourceFile = writeFile(
+    root,
+    'src/example.ts',
+    [
+      'const fixture = `// eslint-disable-next-line no-console`;',
+      '/* @ts-nocheck */',
+      'const stable = true;',
+      '// @ts-nocheck',
+      '// eslint-enable no-console',
+      '// mentions @ts-ignore without activating it',
+    ].join('\n')
+  );
+  const cssFile = writeFile(root, 'src/example.css', '/* eslint-disable color-no-invalid-hex */\n');
+  const pythonFile = writeFile(root, 'src/example.py', '"// @ts-ignore"\n');
+
+  expect(collectSuppressionDirectiveViolations([sourceFile, cssFile, pythonFile])).toEqual([]);
+});
+
 it('flags legacy production suppressions while ignoring tests and test harness files', async () => {
   const root = createTempRoot();
 
@@ -154,4 +225,22 @@ it('ignores explicit test files in focused/manual file mode', () => {
     files: [],
     violations: [],
   });
+});
+
+it('checks explicit production files in focused/manual mode', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'apps/extension/src/runtime.ts',
+    '// eslint-disable-next-line no-console\nexport const value = 1;\n'
+  );
+  const previous = process.cwd();
+  process.chdir(root);
+  try {
+    expect(runSuppressionDirectiveCheck({ files: [file] }).violations).toEqual([
+      expect.objectContaining({ line: 1, rule: 'eslint-suppression-directive' }),
+    ]);
+  } finally {
+    process.chdir(previous);
+  }
 });

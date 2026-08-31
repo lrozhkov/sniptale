@@ -1,0 +1,36 @@
+import {
+  COVERAGE_THRESHOLDS,
+  findCoverageRolloutGroup,
+  isCoverageExcluded,
+  isCoverageTargetFile,
+} from './registry.mjs';
+
+export function resolveCoverageThreshold(relativePath, { isNew = false } = {}) {
+  if (!isCoverageTargetFile(relativePath)) {
+    return null;
+  }
+
+  const exactRolloutGroup = findCoverageRolloutGroup(relativePath, { exactOnly: true });
+  if (exactRolloutGroup) {
+    return COVERAGE_THRESHOLDS[exactRolloutGroup.threshold];
+  }
+
+  if (isCoverageExcluded(relativePath)) {
+    return null;
+  }
+
+  const rolloutGroup = findCoverageRolloutGroup(relativePath);
+  if (rolloutGroup) {
+    return COVERAGE_THRESHOLDS[rolloutGroup.threshold];
+  }
+
+  if (isNew) {
+    return COVERAGE_THRESHOLDS.ui;
+  }
+
+  return null;
+}
+
+export function requiresRelatedUnitTests(relativeFiles) {
+  return relativeFiles.some((file) => resolveCoverageThreshold(file) !== null);
+}

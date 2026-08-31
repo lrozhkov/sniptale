@@ -10,9 +10,7 @@ const actionKernelProofFiles = [
 
 const directRouterAdapterTests = [
   'apps/extension/src/background/runtime/routing/tab-dispatch/adapter.test.ts',
-  'apps/extension/src/background/media/video/runtime/router.export.test.ts',
   'apps/extension/src/background/media/video/runtime/router.extended.test.ts',
-  'apps/extension/src/background/media/video/runtime/handlers/export/route.authorization.test.ts',
 ] as const;
 
 function repoPath(relativePath: string): string {
@@ -58,7 +56,6 @@ it('keeps direct router tests named as adapter or owner-local boundary proof', (
     'page-access.test.ts',
     'sender-policy.test.ts',
     'video-control.test.ts',
-    'web-snapshot.test.ts',
   ]);
 });
 
@@ -67,10 +64,20 @@ it('keeps action-kernel tests as primary project-export authorization proof', ()
     expect(existsSync(repoPath(relativePath)), relativePath).toBe(true);
   }
 
-  const projectExportAdapterTest = readRepoFile(
-    'apps/extension/src/background/media/video/runtime/handlers/export/route.authorization.test.ts'
+  expect(
+    existsSync(
+      repoPath('apps/extension/src/background/media/video/runtime/handlers/export/route.ts')
+    )
+  ).toBe(false);
+
+  const executorSource = readRepoFile(
+    'apps/extension/src/background/runtime/routing/boundary/executor.ts'
   );
-  expect(projectExportAdapterTest).toContain('without boundary preauthorization');
-  expect(projectExportAdapterTest).not.toContain('issueProjectExportStartCapability');
-  expect(projectExportAdapterTest).not.toContain('issueProjectExportCancelCapability');
+  expect(executorSource).toContain("descriptor.handlerId === 'project-export-runtime'");
+  expect(executorSource).toContain("descriptor.handlerId === 'project-export-capabilities'");
+
+  const legacyAdapterSource = readRepoFile(
+    'apps/extension/src/background/runtime/routing/action-kernel/legacy-adapter.ts'
+  );
+  expect(legacyAdapterSource).not.toMatch(/PROJECT_EXPORT|project-export/);
 });

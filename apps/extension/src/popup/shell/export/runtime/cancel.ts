@@ -10,61 +10,93 @@ type PopupExportCancellationState = Pick<
   | 'cancelRetryRef'
   | 'exportDisabledReason'
   | 'requestIdRef'
+  | 'terminalRequestIdRef'
   | 'selectedTabIdsInOrder'
   | 'setProgress'
+  | 'setResult'
 >;
 type PopupExportCancellationDeps = Pick<PopupExportRuntimeDeps, 'sendCancelJobMessage'>;
+
+async function cancelOwnedExport(
+  cancellation: NonNullable<PopupExportCancellationState['cancelRetryRef']['current']>,
+  deps: PopupExportCancellationDeps
+) {
+  if (!deps.sendCancelJobMessage) {
+    throw new Error('Popup export job cancellation transport is unavailable');
+  }
+  return deps.sendCancelJobMessage({
+    type: MessageType.CANCEL_PAGE_PACKAGE_JOB,
+    jobId: cancellation.exportRunId,
+  });
+}
+
+function reportCancellationFailure(state: PopupExportCancellationState, error: unknown): void {
+  logPopupExportCancelFailure(error);
+  const message = translate('content.runtime.exportCancelFailed');
+  state.setProgress({
+    activeStepKey: null,
+    phase: 'error',
+    message,
+    current: 0,
+    total: 0,
+    errors: [message],
+  });
+}
+
+function isOwnedCancellingStatus(
+  response: Awaited<ReturnType<typeof cancelOwnedExport>>,
+  exportRunId: string
+) {
+  return (
+    response?.success === true &&
+    response.status?.jobId === exportRunId &&
+    response.status.phase === 'cancelling'
+  );
+}
 
 export async function cancelPopupExport(
   state: PopupExportCancellationState,
   deps: PopupExportCancellationDeps = getDefaultPopupExportRuntimeDeps()
 ): Promise<void> {
-  if (state.exportDisabledReason) {
-    return;
-  }
-
   try {
     const activeExportRunId = state.requestIdRef.current;
     const cancellation =
       state.cancelRetryRef.current ??
       (activeExportRunId
-        ? { exportRunId: activeExportRunId, tabIds: [...state.selectedTabIdsInOrder] }
+        ? {
+            exportRunId: activeExportRunId,
+            owner: 'job' as const,
+            tabIds: [...state.selectedTabIdsInOrder],
+          }
         : null);
     if (!cancellation) {
       return;
     }
-    state.requestIdRef.current = null;
-    state.cancelRetryRef.current = cancellation;
-    if (!deps.sendCancelJobMessage) {
-      throw new Error('Popup export job cancellation transport is unavailable');
-    }
-    const response = await deps.sendCancelJobMessage({
-      type: MessageType.CANCEL_POPUP_EXPORT_JOB,
-      jobId: cancellation.exportRunId,
-    });
-    if (response?.success !== true) {
-      logPopupExportCancelFailure(response?.error || 'Popup export cancellation was rejected');
-      const message = translate('content.runtime.exportCancelFailed');
-      state.setProgress({
-        activeStepKey: null,
-        phase: 'error',
-        message,
-        current: 0,
-        total: 0,
-        errors: [message],
-      });
+    if (cancellation.cancellationPending === true) return;
+    state.cancelRetryRef.current = { ...cancellation, cancellationPending: true };
+    state.setProgress((current) => ({
+      ...current,
+      message: translate('popup.export.cancellingMessage'),
+    }));
+    const response = await cancelOwnedExport(cancellation, deps);
+    if (!isOwnedCancellingStatus(response, cancellation.exportRunId)) {
+      state.cancelRetryRef.current = { ...cancellation };
+      reportCancellationFailure(state, response?.error || 'Popup export cancellation was rejected');
       return;
     }
-    state.cancelRetryRef.current = null;
+    const status = response.status;
+    if (!status) throw new Error('Popup export cancellation status is unavailable');
     state.setProgress({
-      activeStepKey: null,
-      phase: 'error',
-      message: translate('content.runtime.exportCancelled'),
-      current: 0,
-      total: 0,
-      errors: [translate('content.runtime.exportCancelled')],
+      ...status.progress,
+      activeStepKey: status.progress.activeStepKey ?? null,
+      message: translate('popup.export.cancellingMessage'),
     });
   } catch (error) {
-    logPopupExportCancelFailure(error);
+    const cancellation = state.cancelRetryRef.current;
+    if (cancellation) {
+      const { cancellationPending: _pending, ...retryable } = cancellation;
+      state.cancelRetryRef.current = retryable;
+    }
+    reportCancellationFailure(state, error);
   }
 }

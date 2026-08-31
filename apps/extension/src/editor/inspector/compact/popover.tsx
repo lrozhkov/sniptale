@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { resolveThemeSafePortalTarget } from '@sniptale/ui/theme/safe-portal';
 import { X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import {
@@ -84,6 +85,6 @@ export function EditorInspectorCompactPopover({
       />
       <div className="max-h-[min(34rem,calc(100vh-3rem))] overflow-y-auto pr-1">{children}</div>
     </div>,
-    document.body
+    resolveThemeSafePortalTarget(null)
   );
 }

@@ -69,6 +69,10 @@ export const galleryBackupExportModalMessages = defineMessageSource({
     ru: 'Сохранённые копии веб-страниц',
     en: 'Saved copies of web pages',
   },
+  classSavedViews: {
+    ru: 'Сохранённые виды',
+    en: 'Saved views',
+  },
   includeTelemetry: {
     ru: 'Данные действий во время записи',
     en: 'Recording activity data',

@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { translate } from '../../../platform/i18n';
 import type { ScenarioDeckExportOptions } from '../../project/export/deck/types';
 import { ScenarioDeckExportOptionToggles } from './option-toggles';
 
@@ -29,11 +30,13 @@ describe('ScenarioDeckExportOptionToggles', () => {
     const onChange = vi.fn();
     renderToggles(onChange);
 
-    clickToggle('Include speaker notes');
-    clickToggle('Show missing asset placeholders');
-    clickToggle('Include slide source JSON');
+    clickToggle(translate('scenario.editor.exportIncludeSpeakerNotes'));
+    clickToggle(translate('scenario.editor.exportShowMissingPlaceholders'));
+    clickToggle(translate('scenario.editor.exportIncludeSourceJson'));
 
-    expect(container?.textContent).toContain('Adds per-slide notes blocks');
+    expect(container?.textContent).toContain(
+      translate('scenario.editor.exportIncludeSpeakerNotesHint')
+    );
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ includeNotes: false }));
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ includeMissingPlaceholders: false })

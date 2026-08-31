@@ -184,6 +184,20 @@ it('falls back to the default doctype label when the document doctype is unavail
   expect(buildDomSnapshotHtml().startsWith('<!DOCTYPE html>')).toBe(true);
 });
 
+it('uses valid redacted dimensions for detached SVG diagnostics', () => {
+  resetDocumentTree();
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '24');
+  svg.setAttribute('height', '16');
+  document.body.append(svg);
+
+  const snapshot = buildDomSnapshotHtml();
+
+  expect(snapshot).toContain('<svg width="0" height="0"');
+  expect(snapshot).not.toContain('width="[present]"');
+  expect(snapshot).not.toContain('height="[present]"');
+});
+
 it('replaces or appends virtual body snapshots and redacts the replacement content', () => {
   resetDocumentTree();
   appendElement(document.body, 'main', { id: 'original-main', textContent: 'Original Body' });

@@ -17,19 +17,23 @@ function createProps(overrides: Partial<ExportOptionToggleProps> = {}): ExportOp
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
+    includeViewportScreenshot: false,
     includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
+    includeWebCopy: false,
     setIncludeAnnotations: vi.fn(),
     setIncludeBasicLogs: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
+    setIncludeViewportScreenshot: vi.fn(),
     setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
+    setIncludeWebCopy: vi.fn(),
     ...overrides,
   };
 }
@@ -65,6 +69,7 @@ describe('popup export option metadata', () => {
 
   it('returns the full canonical option list for the unified data-type section', () => {
     expect(getExportOptionConfigs().map((option) => option.key)).toEqual([
+      'webCopy',
       'annotations',
       'json',
       'markdown',
@@ -74,6 +79,7 @@ describe('popup export option metadata', () => {
       'pageDiagnostics',
       'cssDiagnostics',
       'fullPageScreenshot',
+      'viewportScreenshot',
     ]);
   });
 
@@ -82,8 +88,9 @@ describe('popup export option metadata', () => {
       (option) => option.key === 'pageDiagnostics'
     );
 
-    expect(pageDiagnostics?.label).toBe('Данные страницы для анализа');
-    expect(pageDiagnostics?.description).toContain('сведения о загрузке ресурсов');
+    expect(pageDiagnostics?.label).toBe('Расширенные данные страницы');
+    expect(pageDiagnostics?.description.toLowerCase()).toContain('видимый текст');
+    expect(pageDiagnostics?.description).toContain('исходные ссылки');
     expect(pageDiagnostics?.description).not.toContain('DOM');
     expect(pageDiagnostics?.description).not.toContain('Resource Timing');
   });
@@ -102,6 +109,7 @@ describe('popup export option toggles', () => {
     toggleExportOption('images', props);
     toggleExportOption('pageDiagnostics', props);
     toggleExportOption('fullPageScreenshot', props);
+    toggleExportOption('viewportScreenshot', props);
 
     expect(props.setIncludeBasicLogs).toHaveBeenCalledTimes(1);
     expect(props.setIncludeAnnotations).toHaveBeenCalledTimes(1);
@@ -112,6 +120,16 @@ describe('popup export option toggles', () => {
     expect(props.setIncludeImages).toHaveBeenCalledTimes(1);
     expect(props.setIncludePageDiagnostics).toHaveBeenCalledTimes(1);
     expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledTimes(1);
+    expect(props.setIncludeViewportScreenshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables the full-page screenshot whenever Web copy is enabled', () => {
+    const props = createProps();
+
+    setExportOptionActive('webCopy', true, props);
+
+    expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledWith(true);
+    expect(props.setIncludeWebCopy).toHaveBeenCalledWith(true);
   });
 
   it('sets explicit export option values for bulk selection flows', () => {

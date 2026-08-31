@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createAgent: vi.fn(),
   createJob: vi.fn(),
   createNative: vi.fn(),
+  admitFallback: vi.fn(),
   cleanupStoredLease: vi.fn(),
   loadSettings: vi.fn(),
   releaseLease: vi.fn(),
@@ -31,12 +32,18 @@ vi.mock('../visible/coordinator', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../visible/coordinator')>()),
   runNativeVisibleCaptureExclusive: mocks.runNativeExclusive,
 }));
-vi.mock('./capture-parts', () => ({ captureAndStitchFullPageTiles: mocks.captureTiles }));
+vi.mock('./capture-parts', () => ({
+  captureAndStitchFullPageTiles: mocks.captureTiles,
+  FULL_PAGE_EXTENT_GREW_ERROR: 'Full-page capture extent grew during capture',
+}));
 vi.mock('./lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./lifecycle')>()),
   cleanupStoredFullPageCaptureLease: mocks.cleanupStoredLease,
 }));
 vi.mock('./native-backend', () => ({ createNativeFullPageRasterBackend: mocks.createNative }));
+vi.mock('./fallback-admission', () => ({
+  assertFullPageViewportFallbackWithinPolicy: mocks.admitFallback,
+}));
 vi.mock('./page-agent-transport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./page-agent-transport')>()),
   createFullPagePageAgentTransport: mocks.createAgent,
@@ -85,6 +92,7 @@ beforeEach(() => {
     captureFrame: vi.fn(),
     release: vi.fn().mockResolvedValue(undefined),
   });
+  mocks.admitFallback.mockResolvedValue({ height: 500, width: 800 });
   mocks.releaseLease.mockResolvedValue(undefined);
   mocks.renewLease.mockResolvedValue(undefined);
 });
@@ -141,12 +149,312 @@ it('runs native scroll-and-stitch behind the shared visible-capture coordinator 
   expect(mocks.releaseLease).toHaveBeenCalledTimes(1);
 });
 
+it('respects the shared lazy-content preference for export capture', async () => {
+  mocks.loadSettings.mockResolvedValueOnce({
+    fullPageCapture: {
+      floatingElements: 'hide',
+      freezeMotion: false,
+      preloadLazyContent: false,
+    },
+  });
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.captureTiles.mockResolvedValueOnce({
+    dataUrl: 'data:image/png;base64,export',
+    metadata: {},
+  });
+
+  await captureFullPageTransaction(42, undefined, {
+    backendKind: 'native',
+    documentId: 'document-2',
+    exportRunId: 'export-2',
+  });
+
+  expect(agent.prepare).toHaveBeenCalledWith(
+    expect.any(Object),
+    expect.objectContaining({
+      floatingElements: 'hide',
+      freezeMotion: false,
+      preloadLazyContent: false,
+    }),
+    expect.any(Object)
+  );
+});
+
+it('retries once when the viewport changes before the first raster tile is committed', async () => {
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.captureTiles
+    .mockRejectedValueOnce(new Error('Full-page capture viewport changed during capture'))
+    .mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,stabilized',
+      metadata: {},
+    });
+
+  await expect(
+    captureFullPageTransaction(152, undefined, {
+      backendKind: 'native',
+      documentId: 'document-152',
+      exportRunId: 'viewport-stabilization-retry',
+    })
+  ).resolves.toEqual(expect.objectContaining({ dataUrl: 'data:image/png;base64,stabilized' }));
+
+  expect(agent.prepare).toHaveBeenCalledTimes(2);
+  expect(agent.restore).toHaveBeenCalledTimes(2);
+  expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+});
+
+it('falls back to a visible viewport after persistent viewport changes', async () => {
+  const failure = 'Full-page capture viewport changed during capture';
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  const raster = {
+    captureFrame: vi.fn().mockResolvedValue('data:image/png;base64,viewport'),
+    release: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.createNative.mockResolvedValue(raster);
+  mocks.captureTiles
+    .mockImplementationOnce(
+      async (args: { onProgress?: (current: number, total: number) => void }) => {
+        args.onProgress?.(1, 3);
+        throw new Error(failure);
+      }
+    )
+    .mockRejectedValueOnce(new Error(failure));
+
+  await expect(
+    captureFullPageTransaction(153, undefined, {
+      backendKind: 'native',
+      documentId: 'document-153',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,viewport',
+      metadata: expect.objectContaining({
+        cssHeight: 500,
+        cssWidth: 800,
+        warnings: expect.arrayContaining([expect.stringContaining('visible viewport')]),
+      }),
+    })
+  );
+
+  expect(agent.prepare).toHaveBeenCalledTimes(3);
+  expect(agent.restore).toHaveBeenCalledTimes(3);
+  expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+  expect(raster.captureFrame).toHaveBeenCalledOnce();
+});
+
+it('returns an explicit visible-area fallback when the configured single-image budget is exceeded', async () => {
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  const raster = {
+    captureFrame: vi.fn().mockResolvedValue('data:image/png;base64,limited'),
+    release: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.createNative.mockResolvedValue(raster);
+  mocks.captureTiles.mockRejectedValueOnce(
+    new Error('Full-page screenshot exceeds the configured quality limits')
+  );
+
+  await expect(
+    captureFullPageTransaction(154, undefined, {
+      backendKind: 'native',
+      documentId: 'document-154',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,limited',
+      metadata: expect.objectContaining({
+        viewportFallback: true,
+        warnings: expect.arrayContaining([expect.stringContaining('configured full-page')]),
+      }),
+    })
+  );
+  expect(mocks.captureTiles).toHaveBeenCalledOnce();
+  expect(raster.captureFrame).toHaveBeenCalledOnce();
+});
+
+it('retries an export as a reduced full-page image before considering a visible-area fallback', async () => {
+  mocks.loadSettings.mockResolvedValueOnce({
+    fullPageCapture: {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    },
+    fullPageQuality: {
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 100,
+      profile: 'maximum',
+    },
+  });
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.captureTiles
+    .mockRejectedValueOnce(new Error('Full-page screenshot exceeds the configured quality limits'))
+    .mockImplementationOnce(async (args: { options: { qualityPolicy: unknown } }) => ({
+      dataUrl: 'data:image/png;base64,reduced-full-page',
+      metadata: { downscaled: true, qualityPolicy: args.options.qualityPolicy },
+    }));
+
+  await expect(
+    captureFullPageTransaction(156, undefined, {
+      backendKind: 'native',
+      documentId: 'document-156',
+      exportRunId: 'reduced-export',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,reduced-full-page',
+      metadata: expect.objectContaining({
+        qualityPolicy: expect.objectContaining({ minScalePercent: 10, profile: 'custom' }),
+      }),
+    })
+  );
+
+  expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+});
+
+it('returns an explicit visible-area fallback when reduced export geometry remains unstable', async () => {
+  mocks.loadSettings.mockResolvedValueOnce({
+    fullPageCapture: {
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    },
+    fullPageQuality: {
+      maxFileSizeMiB: 128,
+      maxMegapixels: 80,
+      minScalePercent: 100,
+      profile: 'maximum',
+    },
+  });
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  const raster = {
+    captureFrame: vi.fn().mockResolvedValue('data:image/png;base64,viewport-after-retry'),
+    release: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.createNative.mockResolvedValue(raster);
+  mocks.captureTiles
+    .mockRejectedValueOnce(new Error('Full-page screenshot exceeds the configured quality limits'))
+    .mockRejectedValueOnce(new Error('Full-page capture viewport changed during capture'));
+
+  await expect(
+    captureFullPageTransaction(157, undefined, {
+      backendKind: 'native',
+      documentId: 'document-157',
+      exportRunId: 'unstable-reduced-export',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,viewport-after-retry',
+      metadata: expect.objectContaining({ viewportFallback: true }),
+    })
+  );
+  expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+  expect(raster.captureFrame).toHaveBeenCalledOnce();
+});
+
+it('keeps the complete frozen plan when page extent continues growing after restart', async () => {
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.captureTiles
+    .mockRejectedValueOnce(new Error('Full-page capture extent grew during capture'))
+    .mockImplementationOnce(async (args: { restartOnExtentGrowth?: boolean }) => {
+      expect(args.restartOnExtentGrowth).toBe(false);
+      return {
+        dataUrl: 'data:image/png;base64,frozen-full-page',
+        metadata: { frozenExtentWarning: true },
+      };
+    });
+
+  await expect(
+    captureFullPageTransaction(155, undefined, {
+      backendKind: 'native',
+      documentId: 'document-155',
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({ dataUrl: 'data:image/png;base64,frozen-full-page' })
+  );
+
+  expect(agent.prepare).toHaveBeenCalledTimes(2);
+  expect(agent.restore).toHaveBeenCalledTimes(2);
+  expect(mocks.captureTiles).toHaveBeenCalledTimes(2);
+});
+
+it('restarts once after extent growth while keeping published progress monotonic', async () => {
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  const onProgress = vi.fn();
+  mocks.createAgent.mockReturnValue(agent);
+  mocks.captureTiles
+    .mockImplementationOnce(
+      async (args: { onProgress?: (current: number, total: number) => void }) => {
+        args.onProgress?.(1, 3);
+        throw new Error('Full-page capture extent grew during capture');
+      }
+    )
+    .mockImplementationOnce(
+      async (args: { onProgress?: (current: number, total: number) => void }) => {
+        args.onProgress?.(1, 4);
+        args.onProgress?.(2, 4);
+        return { dataUrl: 'data:image/png;base64,restabilized', metadata: {} };
+      }
+    );
+
+  await expect(
+    captureFullPageTransaction(154, onProgress, {
+      backendKind: 'native',
+      documentId: 'document-154',
+    })
+  ).resolves.toEqual(expect.objectContaining({ dataUrl: 'data:image/png;base64,restabilized' }));
+
+  expect(onProgress.mock.calls).toEqual([
+    [1, 3],
+    [2, 4],
+  ]);
+  expect(agent.prepare).toHaveBeenCalledTimes(2);
+  expect(agent.restore).toHaveBeenCalledTimes(2);
+});
+
 it('releases the storage lease and marks the job failed when page preparation rejects', async () => {
   const error = new Error('prepare failed');
   const agent = {
     heartbeat: vi.fn().mockResolvedValue(undefined),
     prepare: vi.fn().mockRejectedValue(error),
-    restore: vi.fn(),
+    restore: vi.fn().mockResolvedValue(undefined),
   };
   mocks.createAgent.mockReturnValue(agent);
 
@@ -157,11 +465,99 @@ it('releases the storage lease and marks the job failed when page preparation re
     })
   ).rejects.toBe(error);
 
-  expect(agent.restore).not.toHaveBeenCalled();
+  expect(agent.restore).toHaveBeenCalledOnce();
   expect(mocks.releaseLease).toHaveBeenCalledTimes(1);
   expect(mocks.transition).toHaveBeenCalledWith('job-1', 'failed', {
     error: 'prepare failed',
   });
+});
+
+it('restores an in-flight page preparation immediately when the export is cancelled', async () => {
+  const agent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn(() => new Promise(() => undefined)),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValue(agent);
+
+  const capture = captureFullPageTransaction(149, undefined, {
+    backendKind: 'native',
+    documentId: 'document-149',
+    exportRunId: 'batch-preparation-cancelled',
+  });
+  await vi.waitFor(() => expect(agent.prepare).toHaveBeenCalledOnce());
+
+  expect(cancelFullPageCaptureByExportRunId('batch-preparation-cancelled')).toBe(true);
+
+  await expect(capture).rejects.toThrow('Full-page capture cancelled');
+  expect(agent.restore).toHaveBeenCalledOnce();
+  expect(mocks.releaseLease).toHaveBeenCalledOnce();
+  expect(mocks.transition).toHaveBeenCalledWith('job-1', 'cancelled', {});
+});
+
+it('allows a new capture after cancelling and restoring an in-flight preparation', async () => {
+  const cancelledAgent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn(() => new Promise(() => undefined)),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  const restartedAgent = {
+    heartbeat: vi.fn().mockResolvedValue(undefined),
+    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-2', warnings: [] }),
+    restore: vi.fn().mockResolvedValue(undefined),
+  };
+  mocks.createAgent.mockReturnValueOnce(cancelledAgent).mockReturnValueOnce(restartedAgent);
+  mocks.captureTiles.mockResolvedValueOnce({
+    dataUrl: 'data:image/png;base64,restarted',
+    metadata: {},
+  });
+
+  const cancelled = captureFullPageTransaction(150, undefined, {
+    backendKind: 'native',
+    documentId: 'document-150',
+    exportRunId: 'batch-before-restart',
+  });
+  await vi.waitFor(() => expect(cancelledAgent.prepare).toHaveBeenCalledOnce());
+  cancelFullPageCaptureByExportRunId('batch-before-restart');
+  await expect(cancelled).rejects.toThrow('Full-page capture cancelled');
+
+  await expect(
+    captureFullPageTransaction(150, undefined, {
+      backendKind: 'native',
+      documentId: 'document-150',
+      exportRunId: 'batch-after-restart',
+    })
+  ).resolves.toEqual(expect.objectContaining({ dataUrl: 'data:image/png;base64,restarted' }));
+  expect(restartedAgent.prepare).toHaveBeenCalledOnce();
+  expect(mocks.releaseLease).toHaveBeenCalledTimes(2);
+});
+
+it('bounds page preparation and restores the page when the content agent does not reply', async () => {
+  vi.useFakeTimers();
+  try {
+    const agent = {
+      heartbeat: vi.fn().mockResolvedValue(undefined),
+      prepare: vi.fn(() => new Promise(() => undefined)),
+      restore: vi.fn().mockResolvedValue(undefined),
+    };
+    mocks.createAgent.mockReturnValue(agent);
+
+    const capture = captureFullPageTransaction(151, undefined, {
+      backendKind: 'native',
+      documentId: 'document-151',
+    });
+    const rejection = expect(capture).rejects.toThrow(
+      'Full-page capture page preparation timed out'
+    );
+    await vi.waitFor(() => expect(agent.prepare).toHaveBeenCalledOnce());
+    await vi.advanceTimersByTimeAsync(35_000);
+
+    await rejection;
+    expect(agent.restore).toHaveBeenCalledOnce();
+    expect(mocks.releaseLease).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it('reconciles a retained durable lease before acquiring a new full-page owner', async () => {
@@ -218,9 +614,7 @@ it('registers export cancellation before a queued capture starts', async () => {
 
   await expect(capture).rejects.toThrow('Full-page capture cancelled');
   expect(mocks.acquireLease).not.toHaveBeenCalled();
-  expect(mocks.transition).toHaveBeenCalledWith('job-1', 'failed', {
-    error: 'Full-page capture cancelled',
-  });
+  expect(mocks.transition).toHaveBeenCalledWith('job-1', 'cancelled', {});
 });
 
 it('registers export cancellation before asynchronous job creation', async () => {
@@ -245,9 +639,7 @@ it('registers export cancellation before asynchronous job creation', async () =>
   await expect(capture).rejects.toThrow('Full-page capture cancelled');
   expect(mocks.runExclusive).toHaveBeenCalledOnce();
   expect(mocks.acquireLease).not.toHaveBeenCalled();
-  expect(mocks.transition).toHaveBeenCalledWith('job-delayed', 'failed', {
-    error: 'Full-page capture cancelled',
-  });
+  expect(mocks.transition).toHaveBeenCalledWith('job-delayed', 'cancelled', {});
 });
 
 it('restores the page before final background encoding begins', async () => {
@@ -362,7 +754,5 @@ it('rejects cancellation that arrives during the final rendering transition', as
   resolveRendering();
 
   await expect(capture).rejects.toThrow('Full-page capture cancelled');
-  expect(mocks.transition).toHaveBeenCalledWith('job-1', 'failed', {
-    error: 'Full-page capture cancelled',
-  });
+  expect(mocks.transition).toHaveBeenCalledWith('job-1', 'cancelled', {});
 });

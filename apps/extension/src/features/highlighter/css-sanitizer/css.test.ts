@@ -24,6 +24,18 @@ describe('css-sanitizer validateCssString', () => {
     });
   });
 
+  it('recognizes shorthands that CSSOM expands into multiple longhand entries', async () => {
+    const { validateCssString } = await import('./css');
+
+    expect(validateCssString('border: 20px dashed blue; box-shadow: 0 0 4px red;')).toMatchObject({
+      rawError: null,
+      styles: {
+        border: '20px dashed blue',
+        boxShadow: '0 0 4px red',
+      },
+    });
+  });
+
   it.each([
     'made-up: 1; color: red;',
     'color: red; broken',

@@ -4,7 +4,6 @@ import {
   completePhysicalDeleteOperation,
   readAssetFile,
 } from '../../../../composition/persistence/assets';
-import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
@@ -31,6 +30,7 @@ import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
+import { preparePortableAggregatePresentation } from './presentation';
 
 function newId() {
   if (typeof crypto.randomUUID !== 'function')
@@ -252,26 +252,12 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
       : null;
     if (metadata.thumbnail && !thumbnail)
       throw new Error('Restored scenario project thumbnail is invalid.');
-    const presentation = metadata.presentation
-      ? parseAggregatePresentationEntry({
-          ...metadata.presentation.entry,
-          aggregateId: targetProjectId,
-          thumbnailBlob: await readAssetFile(
-            required(objects, metadata.presentation.thumbnailObjectId).ref,
-            `${targetProjectId}-presentation-thumbnail`
-          ),
-          ...(metadata.presentation.previewObjectId
-            ? {
-                previewBlob: await readAssetFile(
-                  required(objects, metadata.presentation.previewObjectId).ref,
-                  `${targetProjectId}-preview`
-                ),
-              }
-            : {}),
-        })
-      : null;
-    if (metadata.presentation && !presentation)
-      throw new Error('Restored scenario presentation is invalid.');
+    const presentation = await preparePortableAggregatePresentation({
+      getObjectRef: (objectId) => required(objects, objectId).ref,
+      invalidMessage: 'Restored scenario presentation is invalid.',
+      metadata: metadata.presentation,
+      targetId: targetProjectId,
+    });
     const operation = buildPhysicalDeleteOperation([]);
     let conflicted = false;
     let imported = false;

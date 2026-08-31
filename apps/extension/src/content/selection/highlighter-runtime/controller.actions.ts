@@ -66,7 +66,7 @@ export function createHighlighterFrameActions(props: {
         clearFrames,
         ...(hasFrameForElement === undefined ? {} : { hasFrameForElement }),
       });
-      props.logger.log('Frame callbacks registered');
+      props.logger.debug('Frame callbacks registered');
     },
     removeHighlight: (id: string) => {
       if (!removeHighlighterFrame(props.state, id)) {

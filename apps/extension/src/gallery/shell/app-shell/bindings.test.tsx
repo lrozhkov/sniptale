@@ -40,6 +40,7 @@ type TestLayoutProps = {
   onImportFileChange: (file: File | null) => void;
   onMediaImportFileChange: (files: File[]) => void;
   onImportMediaClick: () => void;
+  onImportFilesDrop: (files: File[]) => void;
   onPendingExportClose: () => void;
   onPendingImportClose: () => void;
   onPendingMediaImportClose: () => void;
@@ -54,6 +55,7 @@ type TestLayoutProps = {
   onPreviewResetChanges: () => void;
   onRemoveTag: (tag: string) => void;
   onResetFilters: () => void;
+  onSelectAllFiltered: () => void;
   onSelectionBackup: () => void;
   onSelectionZip: () => void;
   onViewModeChange: (mode: string) => void;
@@ -90,11 +92,15 @@ function createActions(): UseGalleryAppActionsResult {
       cancelActiveImport: vi.fn(),
       closePendingImport: vi.fn(),
       closePendingMediaImport: vi.fn(),
+      closePendingWebSnapshotImport: vi.fn(),
+      confirmWebSnapshotImport: vi.fn(async () => undefined),
       confirmMediaFileImport: vi.fn(async () => undefined),
       dismissActiveImport: vi.fn(),
       importBackup: vi.fn(async () => undefined),
       importSelectedFile: vi.fn(async () => undefined),
       importMediaFiles: vi.fn(async () => undefined),
+      importDroppedFiles: vi.fn(async () => undefined),
+      inspectWebSnapshot: vi.fn(async () => undefined),
     },
     preview: {
       close: vi.fn(async () => undefined),
@@ -119,8 +125,10 @@ function createActions(): UseGalleryAppActionsResult {
 }
 
 function createControllerState() {
+  const selectableItem = createMediaItem({ id: 'asset-1' });
   const state = createController({
-    previewItem: createMediaItem({ id: 'asset-1' }),
+    filteredItems: [selectableItem],
+    previewItem: selectableItem,
     previewInspectorCollapsed: false,
     tagDraft: 'beta',
     tagDrafts: ['alpha'],
@@ -174,6 +182,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
   act(() => {
     layoutProps.onImportFileChange(null);
     layoutProps.onMediaImportFileChange([]);
+    layoutProps.onImportFilesDrop([new File(['image'], 'photo.png', { type: 'image/png' })]);
     layoutProps.onConfirmDialogClose();
     layoutProps.onPendingExportClose();
     layoutProps.onBackupExportConfirm({ scope: 'all' });
@@ -198,6 +207,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
     layoutProps.onSelectionZip();
     layoutProps.onDeleteMany([{ id: 'asset-2' }]);
     layoutProps.onClearSelection();
+    layoutProps.onSelectAllFiltered();
     layoutProps.onPreviewOpen({ id: 'asset-3' }, { inspectorCollapsed: true });
     layoutProps.onViewModeChange('list');
   });
@@ -216,10 +226,14 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
   expect(importInputRef.current?.click).toHaveBeenCalledTimes(1);
   expect(mediaImportInputRef.current?.click).toHaveBeenCalledTimes(1);
   expect(actions.importing.importMediaFiles).toHaveBeenCalledWith([]);
+  expect(actions.importing.importDroppedFiles).toHaveBeenCalledWith([
+    expect.objectContaining({ name: 'photo.png', type: 'image/png' }),
+  ]);
   expect(actions.importing.closePendingMediaImport).toHaveBeenCalledTimes(1);
   expect(actions.importing.confirmMediaFileImport).toHaveBeenCalledWith('skip');
   expect(actions.selection.downloadBackup).toHaveBeenCalledTimes(1);
   expect(actions.selection.downloadZip).toHaveBeenCalledTimes(1);
+  expect(Array.from(getState().selection.selectedIds)).toEqual(['asset-1']);
 });
 
 it('deduplicates tags when the add-tag action runs repeatedly', () => {

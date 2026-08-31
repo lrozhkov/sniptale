@@ -66,6 +66,36 @@ async function cancelLease(leaseId: string): Promise<void> {
   );
 }
 
+async function confirmLease(
+  leaseId: string
+): Promise<{ error?: string; result?: string; success: boolean }> {
+  const sendResponse = vi.fn();
+  routeFrameAnnotationRasterMessage(
+    { type: MessageType.FRAME_ANNOTATION_RASTERIZE, operation: 'confirm', leaseId },
+    sendResponse
+  );
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+  return sendResponse.mock.calls[0]?.[0] as {
+    error?: string;
+    result?: string;
+    success: boolean;
+  };
+}
+
+it('confirms only the current prepared lease without restarting offscreen', async () => {
+  const leaseId = await prepareLease();
+
+  await expect(confirmLease(leaseId)).resolves.toEqual({ success: true, result: leaseId });
+  expect(mocks.ensure).toHaveBeenCalledOnce();
+  expect(mocks.wait).toHaveBeenCalledWith(30_000);
+
+  await cancelLease(leaseId);
+  await expect(confirmLease(leaseId)).resolves.toEqual({
+    success: false,
+    error: 'Frame annotation raster lease is no longer active',
+  });
+});
+
 it('routes a valid bounded reference through the offscreen owner', async () => {
   const leaseId = await prepareLease();
   const sendResponse = vi.fn();
@@ -83,6 +113,7 @@ it('routes a valid bounded reference through the offscreen owner', async () => {
     expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'completed' })
   );
   expect(mocks.ensure).toHaveBeenCalledTimes(2);
+  expect(mocks.wait).toHaveBeenLastCalledWith(30_000);
   expect(mocks.send).toHaveBeenCalledOnce();
 });
 
@@ -248,7 +279,7 @@ it('bounds a preparation even when offscreen initialization never settles', asyn
     },
     prepareResponse
   );
-  await vi.advanceTimersByTimeAsync(10_000);
+  await vi.advanceTimersByTimeAsync(35_000);
   expect(prepareResponse).toHaveBeenCalledWith({
     success: false,
     error: 'Frame annotation raster preparation timed out',
@@ -257,6 +288,30 @@ it('bounds a preparation even when offscreen initialization never settles', asyn
 
   const nextLeaseId = await prepareLease();
   await cancelLease(nextLeaseId);
+});
+
+it('allows frame annotation preparation to wait for a cold offscreen bootstrap', async () => {
+  vi.useFakeTimers();
+  mocks.wait.mockImplementationOnce(
+    () => new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 32_000))
+  );
+  const prepareResponse = vi.fn();
+  routeFrameAnnotationRasterMessage(
+    {
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      operation: 'prepare',
+      leaseId: 'cold-start-lease',
+    },
+    prepareResponse
+  );
+
+  await vi.advanceTimersByTimeAsync(32_000);
+  expect(prepareResponse).toHaveBeenCalledWith({
+    success: true,
+    result: 'cold-start-lease',
+  });
+  vi.useRealTimers();
+  await cancelLease('cold-start-lease');
 });
 
 it('bounds a running offscreen command and admits the next export without a stale lease', async () => {

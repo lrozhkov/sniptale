@@ -1,12 +1,11 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import type {
-  FullPageCaptureGeometry,
   FullPageCapturePreferences,
   FullPageCapturePrepareResult,
-  FullPageCaptureRect,
   FullPageCaptureTileState,
 } from '../../../full-page-capture';
+import { isFullPageCaptureGeometry } from '../../../full-page-capture';
 import type { TabRequestByType, TabResponseByType } from '../index';
 import {
   createMessageGuard,
@@ -25,10 +24,6 @@ function isFiniteNonNegativeNumber(value: unknown): value is number {
   return isNumber(value) && Number.isFinite(value) && value >= 0;
 }
 
-function isFinitePositiveNumber(value: unknown): value is number {
-  return isNumber(value) && Number.isFinite(value) && value > 0;
-}
-
 function isFullPageCapturePreferences(value: unknown): value is FullPageCapturePreferences {
   return (
     isRecord(value) &&
@@ -37,33 +32,6 @@ function isFullPageCapturePreferences(value: unknown): value is FullPageCaptureP
       value['floatingElements'] === 'repeat') &&
     isBoolean(value['freezeMotion']) &&
     isBoolean(value['preloadLazyContent'])
-  );
-}
-
-function isFullPageCaptureRect(value: unknown): value is FullPageCaptureRect {
-  return (
-    isRecord(value) &&
-    isFiniteNonNegativeNumber(value['height']) &&
-    isFiniteNonNegativeNumber(value['width']) &&
-    isFiniteNonNegativeNumber(value['x']) &&
-    isFiniteNonNegativeNumber(value['y'])
-  );
-}
-
-function isFullPageCaptureGeometry(value: unknown): value is FullPageCaptureGeometry {
-  return (
-    isRecord(value) &&
-    isFinitePositiveNumber(value['devicePixelRatio']) &&
-    isFiniteNonNegativeNumber(value['extentHeight']) &&
-    isFiniteNonNegativeNumber(value['extentWidth']) &&
-    isFiniteNonNegativeNumber(value['outputHeight']) &&
-    isFiniteNonNegativeNumber(value['outputWidth']) &&
-    (value['rootKind'] === 'document' ||
-      value['rootKind'] === 'element' ||
-      value['rootKind'] === 'viewport') &&
-    isFullPageCaptureRect(value['rootViewport']) &&
-    isFiniteNonNegativeNumber(value['viewportHeight']) &&
-    isFiniteNonNegativeNumber(value['viewportWidth'])
   );
 }
 

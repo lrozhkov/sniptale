@@ -206,17 +206,13 @@ describe('collectAdvancedLogAssets', () => {
     ).resolves.toEqual([]);
   });
 
-  it('emits only DOM, virtual DOM, and Resource Timing artifacts', async () => {
+  it('emits only DOM and virtual DOM artifacts', async () => {
     const assets = await collectAdvancedLogAssets(
       { ...buildCoreLogOptionsFixture(), includePageDiagnostics: true },
       buildCoreLogTreeFixture()
     );
 
-    expect(assets.map((asset) => asset.path)).toEqual([
-      'logs/dom.html',
-      'logs/virtual-dom.html',
-      'logs/resource-timing.json',
-    ]);
+    expect(assets.map((asset) => asset.path)).toEqual(['logs/dom.html', 'logs/virtual-dom.html']);
   });
 });
 

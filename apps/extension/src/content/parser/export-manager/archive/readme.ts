@@ -87,6 +87,13 @@ export function createExportArchiveReadme(
       path: 'page-screenshot.png',
     });
   }
+  if (paths.includes('page-viewport-preview.png')) {
+    documentedPaths.add('page-viewport-preview.png');
+    mediaItems.push({
+      description: translate('content.exportReadme.partialScreenshotDescription', locale),
+      path: 'page-viewport-preview.png',
+    });
+  }
   if (paths.some((path) => path.startsWith('files/'))) {
     paths.filter((path) => path.startsWith('files/')).forEach((path) => documentedPaths.add(path));
     mediaItems.push({

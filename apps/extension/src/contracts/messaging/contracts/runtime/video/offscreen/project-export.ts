@@ -10,7 +10,7 @@ import {
   isVideoProjectExportSettings,
 } from '../../../../validators/index';
 import type { RuntimeRequestByType, RuntimeResponseByType } from '../../../runtime-message/index';
-import { offscreenAcceptedAckResponseGuard } from './ack';
+import { offscreenProjectExportAcceptedResponseGuard } from './ack';
 
 type PartialRuntimeRegistry = Partial<
   MessageContractRegistry<RuntimeRequestByType, RuntimeResponseByType>
@@ -32,7 +32,7 @@ export const runtimeVideoOffscreenProjectExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_START_PROJECT_EXPORT response',
-      offscreenAcceptedAckResponseGuard
+      offscreenProjectExportAcceptedResponseGuard
     ),
   },
   [VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT]: {
@@ -45,7 +45,7 @@ export const runtimeVideoOffscreenProjectExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_CANCEL_PROJECT_EXPORT response',
-      offscreenAcceptedAckResponseGuard
+      offscreenProjectExportAcceptedResponseGuard
     ),
   },
 } satisfies PartialRuntimeRegistry;

@@ -33,7 +33,7 @@ import { useVideoEditorAssetUrls } from './asset-urls';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function createProjectWithSingleAsset() {
+function createProjectWithSingleAsset(projectAssetId = 'project-asset-1') {
   return createVideoProject({
     assets: [
       {
@@ -51,7 +51,7 @@ function createProjectWithSingleAsset() {
         name: 'Asset',
         source: {
           kind: 'project-asset',
-          projectAssetId: 'project-asset-1',
+          projectAssetId,
         },
         type: VideoProjectAssetType.IMAGE,
       },
@@ -112,7 +112,10 @@ it('keeps existing asset urls when the project rerenders without asset-list chan
   const onUrlsChange = vi.fn();
   const project = createProjectWithSingleAsset();
 
-  assetUrlMocks.getProjectAssetMock.mockResolvedValue(createProjectAssetEntry());
+  assetUrlMocks.getProjectAssetMock.mockResolvedValue({
+    entry: createProjectAssetEntry(),
+    status: 'ready',
+  });
 
   await renderHarness({
     onUrlsChange,
@@ -134,4 +137,62 @@ it('keeps existing asset urls when the project rerenders without asset-list chan
 
   expect(assetUrlMocks.getProjectAssetMock).toHaveBeenCalledTimes(1);
   expect(onUrlsChange).toHaveBeenLastCalledWith({ 'asset-1': 'blob:asset-1' });
+});
+
+it('replaces a cached URL when the source changes under the same asset id', async () => {
+  const onUrlsChange = vi.fn();
+  vi.mocked(URL.createObjectURL)
+    .mockReturnValueOnce('blob:old-source')
+    .mockReturnValueOnce('blob:new-source');
+  assetUrlMocks.getProjectAssetMock.mockResolvedValue({
+    entry: createProjectAssetEntry(),
+    status: 'ready',
+  });
+
+  await renderHarness({ onUrlsChange, project: createProjectWithSingleAsset('source-1') });
+  await renderHarness({ onUrlsChange, project: createProjectWithSingleAsset('source-2') });
+
+  expect(assetUrlMocks.getProjectAssetMock).toHaveBeenCalledTimes(2);
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:old-source');
+  expect(onUrlsChange).toHaveBeenLastCalledWith({ 'asset-1': 'blob:new-source' });
+});
+
+it('handles a rejected asset load without publishing a stale URL', async () => {
+  const onUrlsChange = vi.fn();
+  assetUrlMocks.getProjectAssetMock.mockRejectedValue(new Error('OPFS unavailable'));
+
+  await renderHarness({ onUrlsChange, project: createProjectWithSingleAsset() });
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(onUrlsChange).toHaveBeenLastCalledWith({});
+});
+
+it('revokes a URL produced by a cancelled stale load exactly once', async () => {
+  const onUrlsChange = vi.fn();
+  let resolveOld!: (value: ReturnType<typeof createProjectAssetEntry>) => void;
+  const oldLoad = new Promise<ReturnType<typeof createProjectAssetEntry>>((resolve) => {
+    resolveOld = resolve;
+  });
+  assetUrlMocks.getProjectAssetMock
+    .mockImplementationOnce(async () => ({ entry: await oldLoad, status: 'ready' }))
+    .mockResolvedValueOnce({ entry: createProjectAssetEntry(), status: 'ready' });
+  vi.mocked(URL.createObjectURL)
+    .mockReturnValueOnce('blob:new-source')
+    .mockReturnValueOnce('blob:old-source');
+
+  await renderHarness({ onUrlsChange, project: createProjectWithSingleAsset('source-1') });
+  await renderHarness({ onUrlsChange, project: createProjectWithSingleAsset('source-2') });
+  await act(async () => {
+    resolveOld(createProjectAssetEntry());
+    await oldLoad;
+    await Promise.resolve();
+  });
+
+  expect(onUrlsChange).toHaveBeenLastCalledWith({ 'asset-1': 'blob:new-source' });
+  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:old-source');
 });

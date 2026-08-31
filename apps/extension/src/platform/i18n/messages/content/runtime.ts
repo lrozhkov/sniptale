@@ -73,6 +73,10 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Извлечение изображений из Froala редакторов...',
     en: 'Extracting images from Froala editors...',
   },
+  scanPageImages: {
+    ru: 'Поиск изображений страницы...',
+    en: 'Finding page images...',
+  },
   exportParagraphLabel: {
     ru: 'Абзац',
     en: 'Paragraph',
@@ -89,6 +93,10 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Текст',
     en: 'Text',
   },
+  exportImageLabel: {
+    ru: 'Изображение',
+    en: 'Image',
+  },
   captureFullPageScreenshot: {
     ru: 'Снимаем скриншот всей страницы...',
     en: 'Capturing the full-page screenshot...',
@@ -96,6 +104,14 @@ export const contentRuntimeMessages = defineMessageSource({
   captureFullPageScreenshotFailed: {
     ru: 'Не удалось снять скриншот всей страницы',
     en: 'Failed to capture the full-page screenshot',
+  },
+  captureVisibleScreenshot: {
+    ru: 'Снимаем видимую область',
+    en: 'Capturing the visible area',
+  },
+  captureVisibleScreenshotFailed: {
+    ru: 'Не удалось снять видимую область страницы',
+    en: 'Could not capture the visible page area',
   },
   captureFullPageDownscaledWarning: {
     ru: 'Снимок всей страницы уменьшен, чтобы сохранить его одним изображением',
@@ -105,13 +121,17 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Размер страницы изменился после прогрева; снимок использует зафиксированную область',
     en: 'The page grew after warm-up; the screenshot uses the frozen capture extent',
   },
+  captureFullPageViewportFallbackWarning: {
+    ru: 'Страница превышает выбранные пределы. Сохранена видимая область; измените профиль качества и повторите захват.',
+    en: 'The page exceeds the selected limits. The visible area was saved; adjust the quality profile and capture again.',
+  },
   screenshotCaptureTimedOut: {
     ru: 'Скриншот не был завершён. Попробуйте снова.',
     en: 'Screenshot did not finish. Try again.',
   },
   exportCancelled: {
-    ru: 'Экспорт отменён пользователем',
-    en: 'Export was cancelled by the user',
+    ru: 'Экспорт отменён',
+    en: 'Export cancelled',
   },
   exportCancelFailed: {
     ru: 'Не удалось отменить экспорт и очистить сохранённые данные. Повторите отмену.',

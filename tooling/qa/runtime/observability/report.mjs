@@ -1,6 +1,6 @@
-import { isExecutedAsScript } from '../../core/shared.mjs';
-import { parseStrictArguments } from '../../core/shared-cli.mjs';
-import { getRecentRunStats } from '../run-metrics.helpers.mjs';
+import { isExecutedAsScript } from '../process/shared-cli.mjs';
+import { parseStrictArguments } from '../process/shared-cli.mjs';
+import { getRecentRunStats } from './run-metrics.helpers.mjs';
 import { resolveObservabilityRoot } from './root.mjs';
 import { collectRunStatistics } from './statistics.mjs';
 

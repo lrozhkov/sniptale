@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTempRoot, initGitRepo, withCwd } from '../../core/test-helpers';
+import { createTempRoot, initGitRepo, withCwd } from '../../test-support/test-helpers';
 import { runObservedWrapper } from './runner.mjs';
 
 function createTestLockFactory() {

@@ -22,7 +22,6 @@ function syncPreparedEditorDocumentStore(
 
   store.updateFrame(prepared.frame);
   store.setBrowserFrame(prepared.browserFrame);
-  store.setCropReady(false);
   if (nextStepValue !== store.toolSettings.step.value) {
     store.updateStepSettings({ value: nextStepValue });
   }

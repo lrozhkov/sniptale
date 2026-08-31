@@ -10,7 +10,7 @@ import {
 import type {
   SniptaleHarnessApiBehaviorOverrides,
   SniptaleHarnessBootstrap,
-} from '../harness/browser-mocks.types';
+} from '../harness/browser-mocks/browser-mocks.types';
 
 export const POPUP_HARNESS_PATH = '/tooling/test/harness/popup.html';
 export const EDITOR_HARNESS_PATH = '/tooling/test/harness/editor.html';

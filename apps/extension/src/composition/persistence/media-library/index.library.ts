@@ -113,7 +113,9 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
   }
 
   const projectAsset = await getProjectAsset(entry.source.projectAssetId);
-  return projectAsset?.file;
+  if (projectAsset.status === 'ready') return projectAsset.entry.file;
+  if (projectAsset.status === 'not-found') return undefined;
+  throw new Error(`Project asset ${entry.source.projectAssetId} ${projectAsset.status}.`);
 }
 
 export async function updateMediaLibraryEntry(

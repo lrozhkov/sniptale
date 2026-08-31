@@ -19,7 +19,10 @@ stroke-dasharray: 6 3;
   expect(resolved.error).toBeNull();
   expect(resolved.styles.card).toEqual({ boxShadow: '0 3px 12px rgba(0, 0, 0, .2)' });
   expect(resolved.styles.title).toMatchObject({ letterSpacing: '1px', textTransform: 'uppercase' });
-  expect(resolved.styles.connector).toEqual({ stroke: '#ff0000', strokeDasharray: '6 3' });
+  expect(resolved.styles.connector).toEqual({
+    stroke: 'rgb(255, 0, 0)',
+    strokeDasharray: '6 3',
+  });
 });
 
 it('projects canonical backdrop-filter to the React property without losing other sections', () => {

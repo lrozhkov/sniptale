@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   buildScenarios: vi.fn(),
   buildVideoProjects: vi.fn(),
   db: { getAll: vi.fn() },
+  listGalleryViews: vi.fn(),
 }));
 
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
@@ -21,6 +22,12 @@ vi.mock('./scenario-projects', () => ({
 }));
 vi.mock('./video-projects', () => ({
   buildVideoProjectRootInventory: mocks.buildVideoProjects,
+}));
+vi.mock('../../../../composition/persistence/gallery-saved-views', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../composition/persistence/gallery-saved-views')
+  >()),
+  listGallerySavedViews: mocks.listGalleryViews,
 }));
 
 import {
@@ -52,9 +59,44 @@ beforeEach(() => {
   mocks.buildMedia.mockResolvedValue([]);
   mocks.buildScenarios.mockResolvedValue([]);
   mocks.buildVideoProjects.mockResolvedValue([]);
+  mocks.listGalleryViews.mockResolvedValue([]);
 });
 
 describe('media backup v6 dependency admission', () => {
+  it('includes saved Gallery views only in a full-library backup', async () => {
+    const view = {
+      createdAt: 1,
+      filters: {
+        activeTags: [],
+        facetFilters: {
+          created: [],
+          duration: [],
+          format: ['png'],
+          resolution: [],
+          size: [],
+          source: [],
+          updated: [],
+        },
+        scope: 'all' as const,
+      },
+      folderFilter: 'screenshot' as const,
+      id: 'view-1',
+      name: 'PNG',
+      updatedAt: 1,
+    };
+    mocks.listGalleryViews.mockResolvedValue([view]);
+    mocks.db.getAll.mockResolvedValue([]);
+
+    const full = await buildMediaHubBackupExportPlanFromLibraryV6(
+      createMediaHubBackupExportOptions({ scope: 'all' })
+    );
+    const selected = await buildMediaHubBackupExportPlanFromLibraryV6(options());
+
+    expect(full.manifest.galleryViews).toEqual([view]);
+    expect(selected.manifest.galleryViews).toBeUndefined();
+    expect(mocks.listGalleryViews).toHaveBeenCalledOnce();
+  });
+
   it('does not export dependencies of a selected draft project after draft opt-out', async () => {
     const project = createVideoProjectEntry(
       { baseRecordingId: 'recording-1' },

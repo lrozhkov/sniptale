@@ -23,18 +23,29 @@ vi.mock('./pages/page', () => ({
   },
 }));
 
-it('owns Export launch selection and route-local capability state', async () => {
-  const { ExportRoute } = await import('./route');
+import { ExportRoute } from './route';
+
+it('owns Export launch selection and route-local capability state', () => {
   const container = document.createElement('div');
   const root = createRoot(container);
   act(() =>
     root.render(
-      <ExportRoute startup={{ page: 'export', launchSelection: { includeAnnotations: true } }} />
+      <ExportRoute
+        startup={{
+          page: 'export',
+          destination: 'save',
+          launchSelection: { includeAnnotations: true },
+        }}
+      />
     )
   );
   expect(mocks.stage).toHaveBeenCalledWith({ includeAnnotations: true });
   expect(mocks.exportPage).toHaveBeenCalledWith(
-    expect.objectContaining({ activeTabCapabilities: { tabId: 7 }, isActive: true })
+    expect.objectContaining({
+      activeTabCapabilities: { tabId: 7 },
+      initialDestination: 'save',
+      isActive: true,
+    })
   );
   act(() => root.unmount());
 });

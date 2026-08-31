@@ -10,6 +10,7 @@ import {
   openInEditor,
 } from './preview';
 import { createBusyActionRunner } from './shared';
+import { translate } from '../../../platform/i18n';
 import {
   createController,
   createMediaItem,
@@ -131,9 +132,12 @@ function createRunBusy(setBanner = vi.fn(), setIsBusy = vi.fn()) {
   return createBusyActionRunner({
     actions: {
       surface: {
+        beginBlockingOperation: () => {
+          setIsBusy(true);
+          return () => setIsBusy(false);
+        },
         setBanner,
         setConfirmDialog: vi.fn(),
-        setIsBusy,
         setPendingExport: vi.fn(),
       },
     },
@@ -174,8 +178,22 @@ async function verifyPreviewErrorBannerFlow() {
   await flushMicrotasks();
 
   expect(setBanner).toHaveBeenNthCalledWith(1, expect.stringContaining('broken.png'));
-  expect(setBanner).toHaveBeenNthCalledWith(2, 'copy failed');
+  expect(setBanner).toHaveBeenNthCalledWith(2, translate('gallery.app.actionFailed'));
 }
+
+it('treats a cancelled system file picker as a completed no-op', async () => {
+  const setBanner = vi.fn();
+  const setIsBusy = vi.fn();
+  const runBusy = createRunBusy(setBanner, setIsBusy);
+
+  await runBusy(async () => {
+    throw new DOMException('The user aborted a request.', 'AbortError');
+  });
+
+  expect(setBanner).not.toHaveBeenCalled();
+  expect(setIsBusy).toHaveBeenNthCalledWith(1, true);
+  expect(setIsBusy).toHaveBeenLastCalledWith(false);
+});
 
 async function verifyOriginalAndCopyActions() {
   const { controller, getState } = createController({
@@ -271,7 +289,7 @@ async function verifyBusyActionRunnerFlow() {
   });
 
   expect(setIsBusy).toHaveBeenNthCalledWith(1, true);
-  expect(setBanner).toHaveBeenCalledWith('boom');
+  expect(setBanner).toHaveBeenCalledWith(translate('gallery.app.actionFailed'));
   expect(setIsBusy).toHaveBeenLastCalledWith(false);
 }
 

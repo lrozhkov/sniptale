@@ -55,11 +55,8 @@ export function createSmellInventory(findings, topCount) {
 export function collectRepoAuditEvidence({ rootDir = process.cwd(), topCount = 10 } = {}) {
   const root = path.resolve(rootDir);
   const packageJson = safeReadJson(path.join(root, 'package.json'));
-  const validationManifest = safeReadJson(
-    path.join(root, 'tooling/configs/qa/validation-manifest.json')
-  );
   const { profile } = collectRepositoryProfile(root, topCount);
-  const { verification, loopholes } = collectVerificationProfile(packageJson, validationManifest);
+  const { verification, loopholes } = collectVerificationProfile(packageJson);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -75,7 +72,6 @@ export function collectRepoAuditEvidence({ rootDir = process.cwd(), topCount = 1
     verification,
     loopholes,
     recommendedAuditCommands: [
-      'node tooling/qa/audits/evidence.mjs --json',
       'npm run ci:release',
       'npm run qa:structural-audit',
       'npm run qa:release-harness',

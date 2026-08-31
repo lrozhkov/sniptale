@@ -19,7 +19,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
-function runSmoke(metadataReachable = false, nodeFailure = false) {
+function runSmoke(metadataReachable = false, nodeFailure = false, staleHostNpx = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-infrastructure-smoke-'));
   roots.push(root);
   fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
@@ -44,11 +44,16 @@ function runSmoke(metadataReachable = false, nodeFailure = false) {
 browser_json='{"revision":"1234",'\
 '"browserVersion":"151.0.7922.34",'\
 '"assets":[{"exists":true},{"exists":true},{"exists":true}]}'
+runtime_json='{"schemaVersion":1,"artifactKind":"sniptale-runtime-parity",'\
+'"platform":"linux/amd64","runtimeRoot":"/usr/local",'\
+'"packageManagerRoot":"/opt/sniptale-npm/node_modules/npm","commands":{'\
+'"node":{"realPath":"/usr/local/bin/node","version":"v24.18.0"},'\
+'"npm":{"realPath":"/opt/sniptale-npm/node_modules/npm/bin/npm-cli.js","version":"11.19.1"},'\
+'"npx":{"realPath":"/opt/sniptale-npm/node_modules/npm/bin/npx-cli.js","version":"11.19.1"}}}'
 case "$*" in
   --version) printf '%s\n' 'Docker version 28.0.0' ;;
   *"image inspect"*) printf '%s\n' '["${image}"]' ;;
-  *"node --version"*) [ "$MOCK_NODE_FAILURE" = 1 ] && exit 124 || printf '%s\n' 'v22.22.1' ;;
-  *"semgrep --legacy --version"*) printf '%s\n' '1.173.0' ;;
+  *"runtime-parity.mjs"*) [ "$MOCK_NODE_FAILURE" = 1 ] && exit 124 || printf '%s\n' "$runtime_json" ;;
   *"codeql --version"*) printf '%s\n' '2.26.3' ;;
   *"osv-scanner --version"*) printf '%s\n' '2.5.1' ;;
   *"gitleaks --version"*) printf '%s\n' '8.30.1' ;;
@@ -66,7 +71,7 @@ esac
 `,
     { mode: 0o755 }
   );
-  for (const command of ['git', 'gh', 'jq', 'node', 'npm', 'tar', 'zstd', 'find']) {
+  for (const command of ['git', 'gh', 'jq', 'tar', 'zstd', 'find']) {
     fs.writeFileSync(
       path.join(root, 'bin', command),
       `#!/bin/sh\nprintf '%s\\n' '${command} test-version'\n`,
@@ -74,6 +79,19 @@ esac
         mode: 0o755,
       }
     );
+  }
+  for (const command of ['node', 'npm', 'npx']) {
+    if (command === 'npx' && staleHostNpx) {
+      fs.writeFileSync(path.join(root, 'bin', command), "#!/bin/sh\nprintf '%s\\n' '11.19.1'\n", {
+        mode: 0o755,
+      });
+      continue;
+    }
+    const source =
+      command === 'node'
+        ? process.execPath
+        : fs.realpathSync(path.join(path.dirname(process.execPath), command));
+    fs.symlinkSync(source, path.join(root, 'bin', command));
   }
   const script = path.resolve('tooling/ci/infrastructure-smoke.mjs');
   const result = spawnSync(process.execPath, [script, image], {
@@ -94,19 +112,12 @@ esac
 
 describe('Selectel infrastructure smoke', () => {
   it('bounds only the immutable image cold start above the default smoke timeout', () => {
-    expect(getInfrastructureSmokeTimeoutMs('node')).toBe(180_000);
-    expect(getInfrastructureSmokeTimeoutMs('semgrep')).toBe(30_000);
+    expect(getInfrastructureSmokeTimeoutMs('container-runtime-parity')).toBe(180_000);
     expect(getInfrastructureSmokeTimeoutMs('codeql')).toBe(30_000);
     expect(getInfrastructureSmokeTimeoutMs('playwright-asset-chromium-1234')).toBe(30_000);
   });
 
-  it('runs the Semgrep version check with the canonical offline environment', () => {
-    expect(getInfrastructureSmokeEnvironment('semgrep')).toEqual([
-      'SEMGREP_ENABLE_VERSION_CHECK=0',
-      'SEMGREP_SEND_METRICS=off',
-      'SEMGREP_APP_TOKEN=',
-      'SEMGREP_SETTINGS_FILE=/tmp/sniptale-infrastructure-smoke-semgrep.yml',
-    ]);
+  it('does not inject tool-specific network environment into offline checks', () => {
     expect(getInfrastructureSmokeEnvironment('codeql')).toEqual([]);
   });
 
@@ -121,12 +132,13 @@ describe('Selectel infrastructure smoke', () => {
       'host-jq',
       'host-node',
       'host-npm',
+      'host-npx',
       'host-tar',
       'host-zstd',
       'host-find',
+      'host-runtime-parity',
       'immutable-image-present',
-      'node',
-      'semgrep',
+      'container-runtime-parity',
       'codeql',
       'osv-scanner',
       'gitleaks',
@@ -140,6 +152,16 @@ describe('Selectel infrastructure smoke', () => {
       'playwright-asset-ffmpeg-1011',
       'container-metadata-denied',
     ]);
+    expect(receipt.runtimeParity).toMatchObject({
+      host: {
+        surface: 'selectel-host',
+        commands: { node: { version: 'v24.18.0' }, npx: { version: '11.19.1' } },
+      },
+      container: {
+        surface: 'qa-container',
+        commands: { node: { version: 'v24.18.0' }, npx: { version: '11.19.1' } },
+      },
+    });
   });
 
   it('fails before image checks when a required host transport is unavailable', () => {
@@ -182,12 +204,20 @@ describe('Selectel infrastructure smoke', () => {
     expect(receipt.checks.at(-1)).toEqual({ id: 'container-metadata-denied', status: 'failed' });
   });
 
+  it('blocks the external run when one host package-manager path is stale', () => {
+    const { receipt, result } = runSmoke(false, false, true);
+    expect(result.status).toBe(1);
+    expect(receipt.status).toBe('failed');
+    expect(receipt.failure).toContain('host-runtime-parity failed: npx path drift');
+    expect(receipt.checks.at(-1)).toEqual({ id: 'host-runtime-parity', status: 'failed' });
+  });
+
   it('records the failing container exit instead of a generic tool failure', () => {
     const { receipt, result } = runSmoke(false, true);
     expect(result.status).toBe(1);
     expect(receipt.status).toBe('failed');
-    expect(receipt.failure).toBe('node failed (exit 124)');
-    expect(receipt.checks.at(-1)).toEqual({ id: 'node', status: 'failed' });
+    expect(receipt.failure).toBe('container-runtime-parity failed (exit 124)');
+    expect(receipt.checks.at(-1)).toEqual({ id: 'container-runtime-parity', status: 'failed' });
   });
 
   it('accepts only concrete curl denial exits and rejects process failures', () => {

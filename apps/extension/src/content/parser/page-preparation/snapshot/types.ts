@@ -1,4 +1,5 @@
 export const PreparedSnapshotWarningKind = {
+  CanvasUnreadable: 'canvas-unreadable',
   IframeTimeout: 'iframe-timeout',
   IframeUnreadable: 'iframe-unreadable',
   SanitizerDrop: 'sanitizer-drop',
@@ -14,10 +15,13 @@ export interface PreparedSnapshotWarning {
 }
 
 export interface BuildPreparedSnapshotDocumentOptions {
+  abortSignal?: AbortSignal;
   contextLabel?: string;
   iframeTimeoutMs?: number;
+  preserveAssetUrls?: boolean;
   root?: HTMLElement;
   rootDocument?: Document;
+  serializeHtml?: boolean;
 }
 
 export interface PreparedSnapshotDocumentResult {

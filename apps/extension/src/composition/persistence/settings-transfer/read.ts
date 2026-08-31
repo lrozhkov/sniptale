@@ -94,7 +94,15 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
       items: settings.viewportPresets,
       defaultId: settings.defaultViewportPresetId,
     }),
-    'capture.image': payload({ format: settings.imageFormat, quality: settings.imageQuality }),
+    'capture.image': payload({
+      format: settings.imageFormat,
+      quality: settings.imageQuality,
+      fullPageQuality: settings.fullPageQuality,
+    }),
+    'capture.pages': payload({
+      resourceLimits: settings.exportResourceLimits,
+      timing: settings.pagePackageCaptureTiming,
+    }),
     'capture.video': payload({
       profiles: video.qualityProfiles,
       qualityProfileId: video.qualityProfileId,
@@ -146,10 +154,6 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
         : undefined,
       tray: video.native?.trayActions,
       telemetry: video.native?.video.telemetry,
-    }),
-    'access.capture-assets': payload({
-      authenticated: settings.authenticatedSnapshotAssetsEnabled,
-      anonymous: settings.anonymousCrossOriginSnapshotAssetsEnabled,
     }),
   };
 

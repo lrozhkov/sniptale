@@ -3,9 +3,15 @@ import type {
   ContentToolbarDisplayMode,
   ContentToolbarPreferences,
   FullPageCapturePreferences,
+  FullPageQualityPolicy,
   LocalStoragePolicy,
   Settings,
 } from '../../../contracts/settings';
+import { parseFullPageQualityPolicy } from '../../../contracts/full-page-capture';
+import {
+  parseExportResourceLimits,
+  type ExportResourceLimits,
+} from '@sniptale/runtime-contracts/export';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { parseVoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
@@ -13,6 +19,10 @@ import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guard
 import { parseSavePresets, parseViewportPresets } from './array.guards.ts';
 import { assignParsedContextMenuSettings } from './context-menu.guards.ts';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
+import {
+  parsePagePackageCaptureTimingPolicy,
+  type PagePackageCaptureTimingPolicy,
+} from '@sniptale/runtime-contracts/page-package';
 
 interface ParsedSettingsStorageValue {
   hasInvalidRoot: boolean;
@@ -145,6 +155,23 @@ function parseOptionalFullPageCapture(
   };
 }
 
+function parseOptionalFullPageQuality(value: unknown): ParsedFieldValue<FullPageQualityPolicy> {
+  if (value === undefined) return undefined;
+  return parseFullPageQualityPolicy(value) ?? INVALID_FIELD;
+}
+
+function parseOptionalExportResourceLimits(value: unknown): ParsedFieldValue<ExportResourceLimits> {
+  if (value === undefined) return undefined;
+  return parseExportResourceLimits(value) ?? INVALID_FIELD;
+}
+
+function parseOptionalPagePackageCaptureTiming(
+  value: unknown
+): ParsedFieldValue<PagePackageCaptureTimingPolicy> {
+  if (value === undefined) return undefined;
+  return parsePagePackageCaptureTimingPolicy(value) ?? INVALID_FIELD;
+}
+
 function parseOptionalVoiceInput(value: unknown): ParsedFieldValue<VoiceInputPreferences> {
   if (value === undefined) {
     return undefined;
@@ -237,8 +264,13 @@ function parsePrivacySettingsFields(
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,
-    'skipWebSnapshotSaveDisclosure',
-    parseOptionalBoolean(value['skipWebSnapshotSaveDisclosure'])
+    'externalSnapshotAssetRedirectsEnabled',
+    parseOptionalBoolean(value['externalSnapshotAssetRedirectsEnabled'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'externalSnapshotLinksEnabled',
+    parseOptionalBoolean(value['externalSnapshotLinksEnabled'])
   );
   return invalidFieldCount;
 }
@@ -263,6 +295,21 @@ function parseScalarSettingsFields(
     nextValue,
     'fullPageCapture',
     parseOptionalFullPageCapture(value['fullPageCapture'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'exportResourceLimits',
+    parseOptionalExportResourceLimits(value['exportResourceLimits'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'fullPageQuality',
+    parseOptionalFullPageQuality(value['fullPageQuality'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'pagePackageCaptureTiming',
+    parseOptionalPagePackageCaptureTiming(value['pagePackageCaptureTiming'])
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,

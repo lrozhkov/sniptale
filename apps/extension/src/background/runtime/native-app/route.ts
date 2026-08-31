@@ -7,6 +7,7 @@ import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/messa
 import { loadVideoSettings } from '../../../composition/persistence/capture-settings';
 import { getNativeAppRuntimeService } from './service-singleton';
 import { normalizeNativeCaptureSettings } from './settings-snapshot';
+import { hasNativeMessagingPermission } from './permission-lifecycle';
 
 function isNativeQueryMessage(
   message: unknown
@@ -38,8 +39,11 @@ async function buildResponse(): Promise<NativeAppRuntimeResponse> {
   };
 }
 
-function sendAsyncResponse(sendResponse: ResponseSender<NativeAppRuntimeResponse>): void {
-  buildResponse().then(sendResponse, (error) => {
+function sendAsyncResponse(
+  operation: () => Promise<NativeAppRuntimeResponse>,
+  sendResponse: ResponseSender<NativeAppRuntimeResponse>
+): void {
+  operation().then(sendResponse, (error) => {
     sendResponse({
       error: error instanceof Error ? error.message : 'Native app runtime failed',
       success: false,
@@ -47,18 +51,14 @@ function sendAsyncResponse(sendResponse: ResponseSender<NativeAppRuntimeResponse
   });
 }
 
-export function routeNativeAppRuntimeMessage(
-  message: unknown,
-  _sender: chrome.runtime.MessageSender,
-  sendResponse: ResponseSender<NativeAppRuntimeResponse>
-): boolean {
-  if (isNativeQueryMessage(message)) {
-    sendAsyncResponse(sendResponse);
-    return true;
-  }
-
-  if (!isNativeMutationMessage(message)) {
-    return false;
+async function runNativeMutation(
+  message: NativeAppMutationMessage
+): Promise<NativeAppRuntimeResponse> {
+  if (!(await hasNativeMessagingPermission())) {
+    return {
+      error: 'Native app access is required.',
+      success: false,
+    };
   }
 
   const service = getNativeAppRuntimeService();
@@ -67,8 +67,25 @@ export function routeNativeAppRuntimeMessage(
   } else if (message.operation === 'take-controller') {
     service.takeController();
   } else {
-    void service.syncSettings();
+    await service.syncSettings();
   }
-  sendAsyncResponse(sendResponse);
+  return buildResponse();
+}
+
+export function routeNativeAppRuntimeMessage(
+  message: unknown,
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: ResponseSender<NativeAppRuntimeResponse>
+): boolean {
+  if (isNativeQueryMessage(message)) {
+    sendAsyncResponse(buildResponse, sendResponse);
+    return true;
+  }
+
+  if (!isNativeMutationMessage(message)) {
+    return false;
+  }
+
+  sendAsyncResponse(() => runNativeMutation(message), sendResponse);
   return true;
 }

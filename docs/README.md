@@ -34,7 +34,7 @@ Active documentation is organized by ownership. This tree contains current autho
 - [Implementation rules](engineering/implementation-rules.md) owns engineering decision guidance.
 - [Technical debt](engineering/tech-debt-report.md) is the generated human view of the machine debt registry.
 - [Project facts](engineering/project-facts.md) is the generated projection of changeable product, browser, permission, persistence, runtime, security-reporting, and release-policy values.
-- [Canonical CI/CD](tooling/ci-cd.md) owns external execution and release admission; [operator handbook](tooling/operator-handbook.md) routes commands; [wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior; [code quality](tooling/code-quality.md) owns gate and exception policy.
+- [Canonical CI/CD](tooling/ci-cd.md) owns external execution and release admission; [operator handbook](tooling/operator-handbook.md) routes commands; [wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior; [code quality](tooling/code-quality.md) owns gate and exception policy; [Web Snapshot Smoke](tooling/web-snapshot-smoke.md) owns local snapshot fidelity verification.
 - [WSL setup](tooling/wsl-setup.md) owns environment setup, and [repository root inventory](tooling/repo-root-inventory.md) owns required root entries.
 - [Optional agent tooling](agent-tooling/README.md) owns opt-in installation and removal for local agent instructions and skills.
 - [Data handling](security/data-handling.md), [manifest permissions](security/manifest-permissions.md), and [threat model](security/threat-model.md) own security policy.

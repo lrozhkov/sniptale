@@ -6,10 +6,12 @@ import type {
   PopupExportSessionState,
   PopupExportToggleState,
 } from './types';
+import type { PopupPagePackageSelection } from '../../../../composition/persistence/popup-export-preferences';
 import type { PopupExportTabSelectionState } from '../selection/tabs/types';
+import { isRestrictedBrowserPage } from '../../../../features/tab-capabilities/url';
 
 export function getPopupExportSelection(
-  toggles: PopupExportToggleState | PopupExportSelection
+  toggles: { values: PopupExportSelection } | PopupExportSelection
 ): PopupExportSelection {
   const values = 'values' in toggles ? toggles.values : toggles;
 
@@ -19,10 +21,20 @@ export function getPopupExportSelection(
     includeCssDiagnostics: values.includeCssDiagnostics,
     includeFiles: values.includeFiles,
     includeFullPageScreenshot: values.includeFullPageScreenshot,
+    includeViewportScreenshot: values.includeViewportScreenshot === true,
     includePageDiagnostics: values.includePageDiagnostics,
     includeImages: values.includeImages,
     includeJson: values.includeJson,
     includeMarkdown: values.includeMarkdown,
+  };
+}
+
+export function getPopupPagePackageSelection(
+  preferenceState: Pick<PopupExportToggleState, 'includeWebCopy' | 'values'>
+): PopupPagePackageSelection {
+  return {
+    ...getPopupExportSelection(preferenceState),
+    includeWebCopy: preferenceState.includeWebCopy,
   };
 }
 
@@ -39,25 +51,37 @@ export function getPopupExportDerivedState(args: {
     activeTabExportDisabledReason,
     args.tabSelection
   );
-  const isExporting = getIsExporting(args.session.transfer.progress, args.session.transfer.result);
+  const isExporting =
+    args.session.refs.cancelRetryRef.current?.cancellationPending === true ||
+    getIsExporting(args.session.transfer.progress, args.session.transfer.result);
   const selection = getPopupExportSelection(args.toggles);
-  const canExport = getCanExport({
-    exportDisabledReason,
-    ...selection,
-    isExporting,
-    selectedCount: args.tabSelection.selectedCount,
-  });
+  const canCopyActiveTabPreview =
+    !isRestrictedBrowserPage(args.activeTabCapabilities.url) &&
+    !activeTabExportDisabledReason &&
+    !args.session.copy.copyingFormat;
+  const canExport =
+    args.toggles.hasLoadedPreferences &&
+    getCanExport({
+      exportDisabledReason,
+      ...selection,
+      includeWebCopy: args.toggles.includeWebCopy,
+      isExporting,
+      selectedCount: args.tabSelection.selectedCount,
+    });
 
   return {
-    canCopyJson: !activeTabExportDisabledReason && !args.session.copy.copyingFormat,
-    canCopyMarkdown: !activeTabExportDisabledReason && !args.session.copy.copyingFormat,
+    canCopyJson: canCopyActiveTabPreview,
+    canCopyMarkdown: canCopyActiveTabPreview,
     canExport,
     exportDisabledReason,
     isExporting,
     progressSteps: buildPopupExportProgressSteps({
       progress: args.session.transfer.progress,
       result: args.session.transfer.result,
-      selection,
+      selection: args.session.transfer.launchedPlan ?? {
+        ...selection,
+        includeWebCopy: args.toggles.includeWebCopy,
+      },
     }),
   };
 }
@@ -69,10 +93,12 @@ export function getCanExport({
   includeCssDiagnostics,
   includeFiles,
   includeFullPageScreenshot,
+  includeViewportScreenshot,
   includePageDiagnostics,
   includeImages,
   includeJson,
   includeMarkdown,
+  includeWebCopy,
   isExporting,
   selectedCount,
 }: {
@@ -82,10 +108,12 @@ export function getCanExport({
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
+  includeViewportScreenshot?: boolean;
   includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;
+  includeWebCopy?: boolean;
   isExporting: boolean;
   selectedCount: number;
 }): boolean {
@@ -98,7 +126,9 @@ export function getCanExport({
     includeBasicLogs ||
     includeCssDiagnostics ||
     includePageDiagnostics ||
-    includeFullPageScreenshot;
+    includeFullPageScreenshot ||
+    includeViewportScreenshot ||
+    includeWebCopy === true;
 
   return !exportDisabledReason && hasSelectedArtifacts && !isExporting && selectedCount > 0;
 }
@@ -107,6 +137,9 @@ function getExportDisabledReason(
   activeTabExportDisabledReason: string | null,
   tabSelection: PopupExportTabSelectionState
 ): string | null {
+  if (tabSelection.activeSourceMode === 'urls' && tabSelection.selectedUrls.length > 0) {
+    return null;
+  }
   if (hasSelectedExportableTabs(tabSelection)) {
     return null;
   }
@@ -115,6 +148,7 @@ function getExportDisabledReason(
 }
 
 function hasSelectedExportableTabs(tabSelection: PopupExportTabSelectionState): boolean {
+  if (tabSelection.activeSourceMode === 'urls') return tabSelection.selectedUrls.length > 0;
   if (tabSelection.selectedTabIds.length === 0) {
     return false;
   }
@@ -134,6 +168,7 @@ function getIsExporting(
   return (
     progress.phase !== 'idle' &&
     progress.phase !== 'done' &&
+    progress.phase !== 'cancelled' &&
     progress.phase !== 'error' &&
     result === null
   );

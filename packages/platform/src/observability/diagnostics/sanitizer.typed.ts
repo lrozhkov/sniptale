@@ -1,5 +1,5 @@
 import {
-  sanitizeDiagnosticData,
+  sanitizeDiagnosticExportData,
   sanitizeDiagnosticMessage,
   sanitizeDiagnosticUrl,
 } from './sanitizer.core.ts';
@@ -37,7 +37,7 @@ function sanitizeDiagnosticsEvent(event: DiagnosticEvent): DiagnosticEvent {
     sanitizedEvent.level = event.level;
   }
   if (event.data !== undefined) {
-    sanitizedEvent.data = sanitizeDiagnosticData(event.data);
+    sanitizedEvent.data = sanitizeDiagnosticExportData(event.data);
   }
 
   return sanitizedEvent;

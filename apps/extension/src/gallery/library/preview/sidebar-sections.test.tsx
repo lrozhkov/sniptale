@@ -69,6 +69,11 @@ it('applies the exact tag selected from the filtered suggestion list', async () 
     )
   );
 
+  expect(container.querySelector('input')).toBeNull();
+  const addTagsButton = [...container.querySelectorAll('button')].find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.addTags'
+  );
+  await act(async () => addTagsButton?.click());
   const input = container.querySelector('input');
   await act(async () => input?.focus());
   const alphaSuggestion = [...container.querySelectorAll('button')].find((button) =>
@@ -79,6 +84,58 @@ it('applies the exact tag selected from the filtered suggestion list', async () 
   );
 
   expect(onAddTag).toHaveBeenCalledWith('alpha');
+  expect(container.querySelector('input')).toBeNull();
+  const reopenButton = [...container.querySelectorAll('button')].find(
+    (button) => button.getAttribute('aria-label') === 'gallery.app.addTags'
+  );
+  await act(async () => reopenButton?.click());
+  expect(container.querySelector('input')).not.toBeNull();
+  await act(async () => root.unmount());
+});
+
+it('uses compact tag layouts for empty, populated, and editing states', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const commonProps = {
+    allTags: ['alpha', 'beta'],
+    item: createMediaItem(),
+    onAddTag: vi.fn(),
+    onRemoveTag: vi.fn(),
+    onTagDraftChange: vi.fn(),
+    tagDraft: '',
+  };
+
+  await act(async () => root.render(<PreviewTagEditor {...commonProps} tagDrafts={[]} />));
+  const emptyAction = container.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.app.addTags"]'
+  );
+  expect(container.textContent).not.toContain('gallery.preview.tagsEmpty');
+  expect(
+    Array.from(container.querySelectorAll('div')).some((element) =>
+      element.className.includes('min-h-[40px]')
+    )
+  ).toBe(false);
+  expect(emptyAction?.className).toContain('w-full');
+  expect(emptyAction?.className).toContain('border-dashed');
+
+  await act(async () => root.render(<PreviewTagEditor {...commonProps} tagDrafts={['alpha']} />));
+  const populatedAction = container.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.app.addTags"]'
+  );
+  expect(container.querySelector('[data-ui="gallery.preview.tags-list"]')?.textContent).toContain(
+    'alpha'
+  );
+  expect(populatedAction?.className).not.toContain('w-full');
+  expect(populatedAction?.className).toContain('text-[var(--sniptale-color-text-muted)]');
+  expect(populatedAction?.className).not.toContain('text-[var(--sniptale-color-accent-emphasis)]');
+  expect(populatedAction?.textContent).toBe('');
+  expect(populatedAction?.getAttribute('title')).toBe('gallery.app.addTags');
+
+  await act(async () => populatedAction?.click());
+  expect(container.querySelector('input')).not.toBeNull();
+  expect(container.querySelector('[aria-label="gallery.app.addTags"]')).toBeNull();
+  expect(container.querySelector('[aria-label="gallery.app.closeTagEditor"]')).not.toBeNull();
   await act(async () => root.unmount());
 });
 

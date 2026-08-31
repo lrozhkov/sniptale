@@ -15,6 +15,7 @@ export interface NativeAppRuntimeServiceDeps {
 
 export interface NativeAppRuntimeService {
   connect(reason?: NativeControllerAcquireReason): void;
+  disconnectForPermissionRevocation(): void;
   getStatus(): Promise<NativeAppRuntimeStatus>;
   quiesceForPrivacyErasure(): void;
   reconnect(): void;

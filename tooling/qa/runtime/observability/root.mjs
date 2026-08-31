@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { normalizeSyncProcessResult } from '../sync-process-result.mjs';
+import { normalizeSyncProcessResult } from '../process/sync-process-result.mjs';
 import { OBSERVABILITY_ROOT_ENV } from './constants.mjs';
 
 function resolveGitTopLevel(directoryPath, spawnSyncImpl) {

@@ -98,10 +98,6 @@ import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-co
 const VIDEO_EDITOR_URL = 'chrome-extension://test/apps/extension/src/video-editor/index.html';
 const VIDEO_EDITOR_OWNER = { documentId: 'editor-doc-1', senderUrl: VIDEO_EDITOR_URL };
 
-function createSendResponse() {
-  return vi.fn<(response?: unknown) => void>();
-}
-
 function createProject(): VideoProject {
   return {
     version: 2,
@@ -147,12 +143,6 @@ function createExportSettings(): VideoProjectExportSettings {
   };
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   loadProjectExportInputMock.mockResolvedValue(createProject());
@@ -169,17 +159,12 @@ beforeEach(() => {
 });
 
 it('starts project export through the offscreen transport', async () => {
-  const sendResponse = createSendResponse();
   const settings = createExportSettings();
 
-  expect(
-    handleStartProjectExport(
-      { input: createInputReference(), jobId: 'job-1', settings },
-      sendResponse,
-      VIDEO_EDITOR_OWNER
-    )
-  ).toEqual({ handled: true, keepChannelOpen: true });
-  await flushPromises();
+  const response = await handleStartProjectExport(
+    { input: createInputReference(), jobId: 'job-1', settings },
+    VIDEO_EDITOR_OWNER
+  );
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -197,8 +182,7 @@ it('starts project export through the offscreen transport', async () => {
     projectId: 'project-1',
   });
   expect(waitForOffscreenReadyMock).toHaveBeenCalledTimes(1);
-  const response = sendResponse.mock.calls[0]?.[0] as { capabilityToken?: string };
-  expect(sendResponse).toHaveBeenCalledWith({
+  expect(response).toEqual({
     success: true,
     jobId: 'job-1',
     capabilityToken: expect.any(String),
@@ -215,13 +199,7 @@ it('starts project export through the offscreen transport', async () => {
 });
 
 it('acks project export cancellation through the offscreen transport', async () => {
-  const sendResponse = createSendResponse();
-
-  expect(handleCancelProjectExport({ jobId: 'job-2' }, sendResponse)).toEqual({
-    handled: true,
-    keepChannelOpen: true,
-  });
-  await flushPromises();
+  const response = await handleCancelProjectExport({ jobId: 'job-2' });
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -231,7 +209,7 @@ it('acks project export cancellation through the offscreen transport', async () 
     })
   );
   expect(requestCancelMock).toHaveBeenCalledWith('job-2');
-  expect(sendResponse).toHaveBeenCalledWith({
+  expect(response).toEqual({
     success: true,
     jobId: 'job-2',
     result: 'accepted',

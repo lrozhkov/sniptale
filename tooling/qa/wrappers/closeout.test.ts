@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { createTempRoot, importFresh, initGitRepo, withCwd } from '../core/test-helpers';
+import { createTempRoot, importFresh, initGitRepo, withCwd } from '../test-support/test-helpers';
 import { createObservabilityRun } from '../runtime/observability/run.mjs';
 import { createCloseoutBuildHandoffEnv, parseCloseoutOptions } from './closeout.mjs';
 
@@ -222,7 +222,7 @@ it('skips checkpoint before build when the current diff has fresh green checkpoi
   expect(calls).toEqual(['checkpoint-state', 'handoff', 'build:--commit -m Closeout commit']);
 });
 
-it('reuses a fresh artifact build instead of invoking a second build during closeout', async () => {
+it('runs a fresh commit build even when a legacy local build state would match', async () => {
   const module = await import('./closeout.mjs');
   const calls: string[] = [];
 
@@ -242,13 +242,8 @@ it('reuses a fresh artifact build instead of invoking a second build during clos
     },
   });
 
-  expect(result.buildArgs).toEqual(['--commit', '-m', 'Closeout commit', '--reuse-build']);
-  expect(calls).toEqual([
-    'checkpoint-state',
-    'build-state',
-    'handoff',
-    'build:--commit -m Closeout commit --reuse-build',
-  ]);
+  expect(result.buildArgs).toEqual(['--commit', '-m', 'Closeout commit']);
+  expect(calls).toEqual(['checkpoint-state', 'handoff', 'build:--commit -m Closeout commit']);
 });
 
 it('does not run build when checkpoint fails', async () => {

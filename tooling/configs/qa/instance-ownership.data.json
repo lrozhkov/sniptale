@@ -6,14 +6,16 @@
       "files": [
         "apps/extension/src/content/overlay/ai/pick/runtime/index.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/runtime.ts",
-        "apps/extension/src/content/logic/diagnostic-logger.ts",
-        "apps/extension/src/content/parser/export-manager-diagnostics.ts",
-        "apps/extension/src/content/parser/export-manager-dom-driver.ts",
+        "apps/extension/src/content/overlay/video-telemetry/index.ts",
+        "apps/extension/src/content/application/diagnostics/runtime/logger.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/source.ts",
+        "apps/extension/src/content/parser/export-manager/diagnostics/dom-driver.ts",
         "apps/extension/src/content/selection/highlighter-runtime/index.ts",
+        "apps/extension/src/content/selection/highlighter-runtime/runtime-cursor-style.ts",
         "apps/extension/src/content/selection/highlighter/index.ts",
-        "apps/extension/src/content/selection/locker.ts",
-        "apps/extension/src/content/selection/quick-edit.ts",
-        "apps/extension/src/content/selection/selection-mode.ts",
+        "apps/extension/src/content/selection/locker/index.ts",
+        "apps/extension/src/content/selection/quick-edit/index.ts",
+        "apps/extension/src/content/selection/selection-mode/index.ts",
         "apps/extension/src/content/parser/dom-utils/dom-helpers-text.ts",
         "apps/extension/src/content/overlay/video-clicks/index.ts"
       ],
@@ -25,7 +27,7 @@
         "apps/extension/src/content/overlay/ai/pick/runtime/mode.controller.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/overlay.controller.ts",
         "apps/extension/src/content/selection/area-selector/controller.ts",
-        "apps/extension/src/content/logic/crop-tool.ts",
+        "apps/extension/src/content/drawing/controller.ts",
         "apps/extension/src/content/application/diagnostics/runtime/logger.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
         "apps/extension/src/content/parser/export-manager/files/index.ts",
@@ -35,11 +37,11 @@
         "apps/extension/src/content/selection/highlighter-runtime/mode.ts",
         "apps/extension/src/content/selection/highlighter-runtime/runtime-listeners.ts",
         "apps/extension/src/content/selection/highlighter-runtime/state.ts",
-        "apps/extension/src/content/selection/highlighter-cursor-style.controller.ts",
-        "apps/extension/src/content/parser/popup-export/controller.ts",
-        "apps/extension/src/content/selection/quick-edit.controller.ts",
+        "apps/extension/src/content/selection/highlighter-cursor-style/controller.ts",
+        "apps/extension/src/content/parser/popup-export/controller/index/create.ts",
+        "apps/extension/src/content/selection/quick-edit/controller.ts",
         "apps/extension/src/content/selection/region-selector/index.ts",
-        "apps/extension/src/content/selection/selection-mode.controller.ts",
+        "apps/extension/src/content/selection/selection-mode/controller/index.ts",
         "apps/extension/src/content/parser/dom-utils/dom-helpers-text-resolver.controller.ts",
         "apps/extension/src/content/parser/dom-utils/dom-helpers-text.ts",
         "apps/extension/src/content/overlay/video-clicks/index.ts"
@@ -59,10 +61,13 @@
     {
       "id": "shared-runtime-facades",
       "files": [
+        "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.ts",
+        "apps/extension/src/features/media-hub/events/index.ts",
         "apps/extension/src/ui/theme/index.ts",
         "apps/extension/src/ui/theme/runtime.ts",
         "apps/extension/src/platform/i18n/locale/state.ts",
-        "@sniptale/ui/product-feedback/toast-service"
+        "@sniptale/ui/product-feedback/toast-service",
+        "packages/platform/src/observability/message-tracer/index.ts"
       ],
       "rule": "facade-default-owner"
     },
@@ -96,11 +101,9 @@
       "id": "background-runtime-facades",
       "files": [
         "apps/extension/src/background/media/video/capture-source/index.ts",
-        "apps/extension/src/background/diagnostics/diagnostic-collector-state.ts",
         "apps/extension/src/background/diagnostics/state.ts",
-        "apps/extension/src/background/capture/download/download-router/download.ts",
+        "apps/extension/src/background/capture/download/download-router/service-singleton.ts",
         "apps/extension/src/background/capture/download/download-router/index.ts",
-        "apps/extension/src/background/offscreen-manager.ts",
         "apps/extension/src/background/media/video/manager/session.ts",
         "apps/extension/src/background/offscreen-document/service.ts",
         "apps/extension/src/background/media/video/runtime/export-capabilities.ts",
@@ -115,9 +118,9 @@
     {
       "id": "scenario-editor-owner-seams",
       "files": [
-        "apps/extension/src/scenario-editor/useScenarioEditorController.ts",
-        "apps/extension/src/scenario-editor/scenario-editor-controller.state.ts",
-        "apps/extension/src/scenario-editor/scenario-editor-controller.ui-state.ts"
+        "apps/extension/src/scenario-editor/project/state/index.ts",
+        "apps/extension/src/scenario-editor/project/state/values.ts",
+        "apps/extension/src/scenario-editor/project/state/ui.ts"
       ],
       "rule": "no-top-level-mutable-runtime-state"
     }

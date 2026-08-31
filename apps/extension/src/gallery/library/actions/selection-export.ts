@@ -8,7 +8,7 @@ import { exportMediaHubBackup } from '../../../workflows/media-hub-backup';
 import { translate } from '../../../platform/i18n';
 import { isGalleryMediaItem } from '../items';
 import type { GallerySelectionController } from './controller-types';
-import { createMissingBlobError, type GalleryBusyAction } from './shared';
+import { createMissingBlobError, downloadBlob, type GalleryBusyAction } from './shared';
 import { createSelectedBackupExportOptions } from './backup';
 
 function getSelectedMediaItems(controller: GallerySelectionController) {
@@ -34,6 +34,15 @@ export function createSelectionZipAction(controller: GallerySelectionController)
     if (mediaItems.length === 0) return;
 
     await withBusy(async () => {
+      if (mediaItems.length === 1) {
+        const item = mediaItems[0]!;
+        const filename = item.originalFilename ?? item.filename;
+        const blob = await getMediaAssetBlob(item.entityId ?? item.id);
+        if (!blob) throw createMissingBlobError(filename);
+        downloadBlob(blob, filename);
+        return;
+      }
+
       const sink = await createDirectFileSink({
         description: translate('gallery.app.selectionAssetsArchiveDescription'),
         extension: '.zip',

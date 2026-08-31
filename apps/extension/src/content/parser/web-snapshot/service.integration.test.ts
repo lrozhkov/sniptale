@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
 
-import JSZip from 'jszip';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { initializeContentUiRoots } from '../../platform/dom-host';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manifest';
+import { readPagePackageTestBlobText } from '../../../features/web-snapshot/package.test-support';
 import { installContentRuntimeMessagingMock } from '../../platform/runtime-services/services.test-support';
+import type { WebSnapshotBuildResult } from './types';
 
-const { captureWebSnapshotScreenshotWithWarningsMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
+const {
+  captureWebSnapshotScreenshotWithWarningsMock,
+  createImageThumbnailBlobMock,
+  sendRuntimeMessageMock,
+} = vi.hoisted(() => ({
   captureWebSnapshotScreenshotWithWarningsMock: vi.fn(),
+  createImageThumbnailBlobMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
 }));
 
@@ -22,27 +28,22 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
 
+vi.mock('../../../platform/media-utils/image-thumbnail', () => ({
+  createImageThumbnailBlob: createImageThumbnailBlobMock,
+}));
+
 import { buildCurrentPageWebSnapshot } from './service';
 
-function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read package blob.'));
-    reader.onload = () => resolve(reader.result as ArrayBuffer);
-    reader.readAsArrayBuffer(blob);
-  });
-}
-
-async function readSnapshotPackage(packageBlob: Blob) {
-  const zip = await JSZip.loadAsync(await blobToArrayBuffer(packageBlob));
-
+async function readSnapshotPackage(result: WebSnapshotBuildResult) {
+  const readText = async (path: string): Promise<string> => {
+    const entry = result.pagePackage.entries.find((candidate) => candidate.path === path);
+    if (!entry) throw new Error(`Missing Page Package entry: ${path}`);
+    return readPagePackageTestBlobText(entry.source);
+  };
   return {
-    domDiagnostics: await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot),
-    html: await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml),
-    manifest: JSON.parse(await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)) as {
-      viewport?: { height: number; width: number };
-      warnings: string[];
-    },
+    domDiagnostics: await readText('diagnostics/standard/dom.html.txt'),
+    html: await readText(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml),
+    manifest: result.manifest,
   };
 }
 
@@ -55,15 +56,6 @@ function setCurrentSrc(element: Element | null, value: string): void {
     configurable: true,
     value,
   });
-}
-
-async function readZipText(zip: JSZip, path: string): Promise<string> {
-  const file = zip.file(path);
-  if (!file) {
-    throw new Error(`Missing zip entry: ${path}`);
-  }
-
-  return file.async('string');
 }
 
 function attachIframeDocument(iframe: HTMLIFrameElement, iframeDocument: Document): void {
@@ -81,6 +73,20 @@ function createReadableIframe(id: string, bodyHtml: string): HTMLIFrameElement {
   iframeDocument.body.innerHTML = bodyHtml;
   attachIframeDocument(iframe, iframeDocument);
   return iframe;
+}
+
+function createFontFaceRule(family: string, source: string): CSSFontFaceRule {
+  const declarations = `font-family: ${family}; src: ${source};`;
+  return {
+    cssText: `@font-face { ${declarations} }`,
+    style: {
+      cssText: declarations,
+      getPropertyValue(property: string) {
+        if (property === 'font-family') return family;
+        return property === 'src' ? source : '';
+      },
+    },
+  } as unknown as CSSFontFaceRule;
 }
 
 function createUnreadableIframe(): HTMLIFrameElement {
@@ -129,8 +135,21 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/snapshot');
   captureWebSnapshotScreenshotWithWarningsMock.mockResolvedValue({
     blob: new Blob(['png'], { type: 'image/png' }),
+    captureGeometry: {
+      devicePixelRatio: 1,
+      extentHeight: 768,
+      extentWidth: 1024,
+      outputHeight: 768,
+      outputWidth: 1024,
+      rootKind: 'viewport',
+      rootViewport: { height: 768, width: 1024, x: 0, y: 0 },
+      viewportHeight: 768,
+      viewportWidth: 1024,
+    },
+    coverage: 'full-page',
     warnings: [],
   });
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('asset', { headers: { 'content-type': 'image/png' } }))
@@ -157,20 +176,77 @@ it('packages prepared iframe and overlay markup into viewer HTML and diagnostics
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(packageEntries.html).toContain('data-virtual-iframe="true"');
+  expect(packageEntries.html).toMatch(
+    /data-sniptale-iframe-style-scope="sniptale-frame-[a-f0-9]{32}-1"/u
+  );
   expect(packageEntries.html).toContain('Iframe body content');
   expect(packageEntries.html).toContain('sniptale-frames-container');
   expect(packageEntries.html).toContain('sniptale-highlight-container');
   expect(packageEntries.html).toContain('Prepared callout');
   expect(packageEntries.html).not.toContain('<iframe');
   expect(packageEntries.html).not.toContain(CONTENT_ROOT_ID);
-  expect(packageEntries.domDiagnostics).toBe(packageEntries.html);
+  expect(packageEntries.domDiagnostics).not.toBe(packageEntries.html);
+  expect(packageEntries.domDiagnostics).toContain('data-virtual-iframe="true"');
+  expect(packageEntries.domDiagnostics).toContain('[text:19]');
+  expect(packageEntries.domDiagnostics).not.toContain('Iframe body content');
+  expect(packageEntries.domDiagnostics).not.toContain('Prepared callout');
   expect(packageEntries.manifest.viewport).toEqual({
+    deviceScaleFactor: window.devicePixelRatio,
     height: window.innerHeight,
     width: window.innerWidth,
   });
+});
+
+it('packages an inline icon font used by readable iframe content', async () => {
+  const fontBytes = new Uint8Array([0x77, 0x4f, 0x46, 0x46, 0, 0, 0, 0]);
+  const fontDataUrl = `data:application/font-woff;base64,${btoa(
+    String.fromCharCode(...fontBytes)
+  )}`;
+  const iframe = createReadableIframe(
+    'details-frame',
+    '<section class="dynamic-fields"><span class="expand-icon"></span>Additional details</section>'
+  );
+  if (!iframe.contentDocument) throw new Error('Expected readable iframe document');
+  const frameStyleSheet = new CSSStyleSheet();
+  frameStyleSheet.insertRule(
+    '.expand-icon::before { font-family: EmbeddedIcons; content: "\\f101"; }'
+  );
+  Object.defineProperty(frameStyleSheet, 'cssRules', {
+    configurable: true,
+    value: [
+      createFontFaceRule('EmbeddedIcons', `url("${fontDataUrl}") format("woff")`),
+      ...Array.from(frameStyleSheet.cssRules),
+    ],
+  });
+  Object.defineProperty(iframe.contentDocument, 'styleSheets', {
+    configurable: true,
+    value: [frameStyleSheet],
+  });
+  document.body.append(iframe);
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    if (String(input) === fontDataUrl) {
+      return new Response(fontBytes, { headers: { 'content-type': 'application/font-woff' } });
+    }
+    return new Response('asset', { headers: { 'content-type': 'image/png' } });
+  });
+
+  const result = await buildCurrentPageWebSnapshot({
+    allowAnonymousCrossOriginAssets: false,
+    allowAuthenticatedSameOriginAssets: true,
+    requestId: 'req-web',
+  });
+  const packageEntries = await readSnapshotPackage(result);
+
+  expect(packageEntries.html).toContain('data-virtual-iframe="true"');
+  expect(packageEntries.html).toContain('dynamic-fields');
+  expect(packageEntries.html).toMatch(/src: url\("\.\.\/assets\/\d+-[^"/]+\.woff"\)/u);
+  expect(packageEntries.html).not.toContain('data:application/font-woff');
+  expect(result.manifest.entries).toEqual(
+    expect.arrayContaining([expect.objectContaining({ mimeType: 'font/woff' })])
+  );
 });
 
 it('keeps unreadable iframe warnings in the manifest without failing package creation', async () => {
@@ -181,7 +257,7 @@ it('keeps unreadable iframe warnings in the manifest without failing package cre
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(packageEntries.html).toContain('data-iframe-unreadable="true"');
   expect(packageEntries.html).not.toContain('token=secret');
@@ -203,14 +279,15 @@ it('keeps only the selected responsive image candidate through prepared snapshot
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(fetch).toHaveBeenCalledWith(`${window.location.origin}/large.png`, {
     credentials: 'include',
     redirect: 'manual',
     signal: expect.any(AbortSignal),
   });
-  expect(packageEntries.html).toContain('srcset="../assets/1-');
+  expect(packageEntries.html).toContain('src="../assets/1-large.png"');
+  expect(packageEntries.html).not.toContain('srcset=');
   expect(packageEntries.html).not.toContain('/small.png');
   expect(packageEntries.html).not.toContain('/large.png');
   expect(packageEntries.manifest.warnings).toEqual(
@@ -234,14 +311,15 @@ it('keeps selected picture source candidates through prepared snapshot cloning',
     allowAuthenticatedSameOriginAssets: true,
     requestId: 'req-web',
   });
-  const packageEntries = await readSnapshotPackage(result.packageBlob);
+  const packageEntries = await readSnapshotPackage(result);
 
   expect(fetch).toHaveBeenCalledWith(`${window.location.origin}/wide@2x.png`, {
     credentials: 'include',
     redirect: 'manual',
     signal: expect.any(AbortSignal),
   });
-  expect(packageEntries.html).toContain('srcset="../assets/1-');
+  expect(packageEntries.html).toContain('src="../assets/1-wide@2x.png"');
+  expect(packageEntries.html).not.toContain('srcset=');
   expect(packageEntries.html).not.toContain('/wide.png');
   expect(packageEntries.html).not.toContain('/wide@2x.png');
   expect(packageEntries.manifest.warnings).toEqual(
@@ -249,4 +327,40 @@ it('keeps selected picture source candidates through prepared snapshot cloning',
       'Asset skipped: http://localhost:3000/wide.png (web snapshot srcset candidate was not selected)',
     ])
   );
+});
+
+it('clones the live DOM after full-page capture reveals lazy page sections', async () => {
+  document.body.innerHTML = [
+    '<section class="visible">First</section>',
+    '<section>Second</section>',
+    '<section>Third</section>',
+  ].join('');
+  captureWebSnapshotScreenshotWithWarningsMock.mockImplementationOnce(async () => {
+    document.querySelectorAll('section').forEach((section) => section.classList.add('visible'));
+    return {
+      blob: new Blob(['png'], { type: 'image/png' }),
+      captureGeometry: {
+        devicePixelRatio: 1,
+        extentHeight: 768,
+        extentWidth: 1024,
+        outputHeight: 768,
+        outputWidth: 1024,
+        rootKind: 'viewport',
+        rootViewport: { height: 768, width: 1024, x: 0, y: 0 },
+        viewportHeight: 768,
+        viewportWidth: 1024,
+      },
+      coverage: 'full-page',
+      warnings: [],
+    };
+  });
+
+  const result = await buildCurrentPageWebSnapshot({
+    allowAnonymousCrossOriginAssets: false,
+    allowAuthenticatedSameOriginAssets: true,
+    requestId: 'req-web',
+  });
+  const packageEntries = await readSnapshotPackage(result);
+
+  expect(packageEntries.html.match(/class="visible"/gu)).toHaveLength(3);
 });

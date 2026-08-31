@@ -121,8 +121,88 @@ export const galleryAppMessages = defineMessageSource({
     en: 'Clear',
   },
   facetResetAll: {
-    ru: 'Сбросить все фильтры',
-    en: 'Reset all filters',
+    ru: 'Сбросить',
+    en: 'Reset',
+  },
+  savedViewSave: {
+    ru: 'Сохранить вид',
+    en: 'Save view',
+  },
+  savedViewUpdate: {
+    ru: 'Обновить вид',
+    en: 'Update view',
+  },
+  savedViewName: {
+    ru: 'Название вида',
+    en: 'View name',
+  },
+  savedViewConfirm: {
+    ru: 'Сохранить вид',
+    en: 'Save view',
+  },
+  savedViewDelete: {
+    ru: 'Удалить вид',
+    en: 'Delete view',
+  },
+  savedViewMoveUp: {
+    ru: 'Переместить выше',
+    en: 'Move up',
+  },
+  savedViewMoveDown: {
+    ru: 'Переместить ниже',
+    en: 'Move down',
+  },
+  savedViewShowMore: {
+    ru: 'Показать ещё',
+    en: 'Show more',
+  },
+  savedViewReorderFailed: {
+    ru: 'Не удалось изменить порядок видов.',
+    en: 'Could not reorder saved views.',
+  },
+  actionFailed: {
+    ru: 'Не удалось выполнить действие. Попробуйте ещё раз.',
+    en: 'Could not complete the action. Please try again.',
+  },
+  savedViewDeleteTitle: {
+    ru: 'Удалить сохранённый вид?',
+    en: 'Delete saved view?',
+  },
+  savedViewDeleteMessage: {
+    ru: 'Вид «{name}» будет удалён. Объекты библиотеки останутся без изменений.',
+    en: 'The “{name}” view will be deleted. Library items will not be affected.',
+  },
+  savedViewDeleteFailed: {
+    ru: 'Не удалось удалить сохранённый вид.',
+    en: 'Could not delete the saved view.',
+  },
+  savedViewNameConflict: {
+    ru: 'В этой категории уже есть вид с таким названием.',
+    en: 'A view with this name already exists in this category.',
+  },
+  savedViewLimit: {
+    ru: 'Достигнут лимит сохранённых видов.',
+    en: 'The saved view limit has been reached.',
+  },
+  savedViewNotFound: {
+    ru: 'Этот вид больше недоступен.',
+    en: 'This view is no longer available.',
+  },
+  savedViewSaveFailed: {
+    ru: 'Не удалось сохранить вид. Попробуйте ещё раз.',
+    en: 'Could not save the view. Try again.',
+  },
+  savedViewLoadFailed: {
+    ru: 'Не удалось загрузить сохранённые виды.',
+    en: 'Could not load saved views.',
+  },
+  facetResults: {
+    ru: 'Найдено',
+    en: 'Found',
+  },
+  selectAllResults: {
+    ru: 'Выбрать все',
+    en: 'Select all',
   },
   facetNoMatches: {
     ru: 'Ничего не найдено',
@@ -171,6 +251,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Резервная копия',
     en: 'Backup',
   },
+  selectionZip: {
+    ru: 'ZIP оригиналов',
+    en: 'Originals ZIP',
+  },
   selectionAssetsArchiveDescription: {
     ru: 'Оригинальные файлы без метаданных Sniptale',
     en: 'Original files without Sniptale metadata',
@@ -182,6 +266,14 @@ export const galleryAppMessages = defineMessageSource({
   importMediaFiles: {
     ru: 'Импортировать фото и видео',
     en: 'Import images and videos',
+  },
+  importSection: {
+    ru: 'Импортировать',
+    en: 'Import',
+  },
+  importWebSnapshot: {
+    ru: 'Web Snapshot',
+    en: 'Web Snapshot',
   },
   searchPlaceholder: {
     ru: 'Поиск',
@@ -275,6 +367,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Выбрано:',
     en: 'Selected:',
   },
+  selectionActions: {
+    ru: 'Действия с выбранными элементами',
+    en: 'Selected item actions',
+  },
   sizePrefix: {
     ru: 'Объём:',
     en: 'Size:',
@@ -298,6 +394,14 @@ export const galleryAppMessages = defineMessageSource({
   apply: {
     ru: 'Применить',
     en: 'Apply',
+  },
+  addTags: {
+    ru: 'Добавить теги',
+    en: 'Add tags',
+  },
+  closeTagEditor: {
+    ru: 'Закрыть добавление тегов',
+    en: 'Close tag editor',
   },
   clearSelection: {
     ru: 'Снять выделение',
@@ -342,6 +446,10 @@ export const galleryAppMessages = defineMessageSource({
   listColumnPreview: {
     ru: 'Превью',
     en: 'Preview',
+  },
+  listColumnSource: {
+    ru: 'Источник',
+    en: 'Source',
   },
   listColumnName: {
     ru: 'Название',

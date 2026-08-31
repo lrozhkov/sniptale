@@ -1,16 +1,82 @@
 import type {
   ExportOptions,
-  ExportPagePackageEntry,
   ExportProgress,
   ExportProgressStepKey,
   PopupExportPackageResponse,
   PopupExportPreviewResponse,
   PopupExportResult,
-  PopupExportJobStatus,
-  PopupExportJobPhase,
-  PopupExportJobTab,
 } from '@sniptale/runtime-contracts/export';
+import {
+  MAX_POPUP_EXPORT_JOB_TABS,
+  MAX_POPUP_EXPORT_STATUS_TEXT_BYTES,
+  MAX_POPUP_EXPORT_TAB_TITLE_BYTES,
+  MAX_POPUP_EXPORT_WARNINGS_TOTAL_BYTES,
+  isCanonicalPopupExportJobId,
+  parseExportResourceLimits,
+} from '@sniptale/runtime-contracts/export';
+import {
+  MAX_PAGE_COLLECTION_PAGES,
+  MAX_PAGE_PACKAGE_ID_BYTES,
+  MAX_PAGE_PACKAGE_TITLE_BYTES,
+  MAX_PAGE_PACKAGE_TOTAL_BYTES,
+  PAGE_PACKAGE_COMPONENT_IDS,
+  type PagePackageJobPhaseV1,
+  type PagePackageJobStatusV1,
+  type PagePackageJobTab,
+  type PagePackageCaptureSource,
+  parsePagePackageCaptureTimingPolicy,
+  normalizePagePackageCaptureUrl,
+  MAX_PAGE_PACKAGE_URL_SOURCES,
+} from '@sniptale/runtime-contracts/page-package';
+import { estimateUtf8Bytes } from '@sniptale/runtime-contracts/validation/base64';
 import { hasOptionalField, isBoolean, isNumber, isRecord, isString } from './index';
+
+const MAX_POPUP_PACKAGE_ERROR_BYTES = 4 * 1024;
+const MAX_POPUP_PACKAGE_IDENTIFIER_BYTES = 512;
+const MAX_POPUP_PACKAGE_MANIFEST_BYTES = 1024 * 1024;
+
+function isUtf8BoundedString(
+  value: unknown,
+  maxBytes: number,
+  allowEmpty = false
+): value is string {
+  return (
+    typeof value === 'string' &&
+    (allowEmpty || value.length > 0) &&
+    estimateUtf8Bytes(value, maxBytes) <= maxBytes
+  );
+}
+
+function hasExactKeys(
+  value: unknown,
+  required: readonly string[],
+  optional: readonly string[] = []
+): value is Record<string, unknown> {
+  if (!isRecord(value)) return false;
+  const allowed = new Set([...required, ...optional]);
+  return (
+    required.every((key) => key in value) && Object.keys(value).every((key) => allowed.has(key))
+  );
+}
+
+function isBoundedStatusTextArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_POPUP_EXPORT_JOB_TABS &&
+    value.every((entry) => isUtf8BoundedString(entry, MAX_POPUP_EXPORT_STATUS_TEXT_BYTES, true))
+  );
+}
+
+function isExportStats(value: unknown): value is PopupExportResult['stats'] {
+  return (
+    hasExactKeys(value, ['sectionsCount', 'rowsCount', 'filesCount', 'filesFailed']) &&
+    Object.values(value).every(isNonNegativeInteger)
+  );
+}
+
+function isNfcUtf8BoundedString(value: unknown, maxBytes: number): value is string {
+  return isUtf8BoundedString(value, maxBytes, true) && value.normalize('NFC') === value;
+}
 
 const exportProgressStepKeys = new Set<ExportProgressStepKey>([
   'annotations',
@@ -18,10 +84,16 @@ const exportProgressStepKeys = new Set<ExportProgressStepKey>([
   'cssDiagnostics',
   'files',
   'fullPageScreenshot',
+  'viewportScreenshot',
   'pageDiagnostics',
   'images',
   'json',
   'markdown',
+  'webSnapshotPreview',
+  'webSnapshotDom',
+  'webSnapshotStyles',
+  'webSnapshotAssets',
+  'webSnapshotWarnings',
 ]);
 
 const exportProgressPhases = new Set<ExportProgress['phase']>([
@@ -30,10 +102,11 @@ const exportProgressPhases = new Set<ExportProgress['phase']>([
   'downloading',
   'zipping',
   'done',
+  'cancelled',
   'error',
 ]);
 
-const popupExportJobPhases = new Set<PopupExportJobPhase>([
+const popupExportJobPhases = new Set<PagePackageJobPhaseV1>([
   'running',
   'cancelling',
   'cancelled',
@@ -50,34 +123,37 @@ function isExportProgressPhase(value: unknown): value is ExportProgress['phase']
   return isString(value) && exportProgressPhases.has(value as ExportProgress['phase']);
 }
 
-function isPopupExportJobPhase(value: unknown): value is PopupExportJobPhase {
-  return isString(value) && popupExportJobPhases.has(value as PopupExportJobPhase);
+function isPopupExportJobPhase(value: unknown): value is PagePackageJobPhaseV1 {
+  return isString(value) && popupExportJobPhases.has(value as PagePackageJobPhaseV1);
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
   return isNumber(value) && Number.isSafeInteger(value) && value >= 0;
 }
 
-function isExportPagePackageEntry(value: unknown): value is ExportPagePackageEntry {
-  if (
-    !isRecord(value) ||
-    !isString(value['path']) ||
-    !hasOptionalField(value, 'textContent', isString) ||
-    !hasOptionalField(value, 'binaryBase64', isString) ||
-    !hasOptionalField(value, 'mimeType', isString)
-  ) {
-    return false;
-  }
-
-  const hasTextContent = isString(value['textContent']);
-  const hasBinaryContent = isString(value['binaryBase64']);
-  return hasTextContent !== hasBinaryContent;
-}
-
 export function isExportOptions(value: unknown): value is ExportOptions {
   return (
-    isRecord(value) &&
+    hasExactKeys(
+      value,
+      [
+        'includeJson',
+        'includeMarkdown',
+        'includeFiles',
+        'includeImages',
+        'includeBasicLogs',
+        'includePageDiagnostics',
+        'includeCssDiagnostics',
+        'includeFullPageScreenshot',
+      ],
+      ['includeAnnotations', 'includeViewportScreenshot', 'resourceLimits']
+    ) &&
     hasOptionalField(value, 'includeAnnotations', isBoolean) &&
+    hasOptionalField(value, 'includeViewportScreenshot', isBoolean) &&
+    hasOptionalField(
+      value,
+      'resourceLimits',
+      (entry) => parseExportResourceLimits(entry) !== null
+    ) &&
     isBoolean(value['includeJson']) &&
     isBoolean(value['includeMarkdown']) &&
     isBoolean(value['includeFiles']) &&
@@ -91,59 +167,212 @@ export function isExportOptions(value: unknown): value is ExportOptions {
 
 export function isExportProgress(value: unknown): value is ExportProgress {
   return (
-    isRecord(value) &&
+    hasExactKeys(
+      value,
+      ['phase', 'message', 'current', 'total', 'errors'],
+      ['activeStepKey', 'completedStepKeys', 'failedStepKeys']
+    ) &&
     hasOptionalField(
       value,
       'activeStepKey',
       (entry) => entry === null || isExportProgressStepKey(entry)
     ) &&
+    hasOptionalField(
+      value,
+      'completedStepKeys',
+      (entry) => Array.isArray(entry) && entry.every(isExportProgressStepKey)
+    ) &&
+    hasOptionalField(
+      value,
+      'failedStepKeys',
+      (entry) => Array.isArray(entry) && entry.every(isExportProgressStepKey)
+    ) &&
     isExportProgressPhase(value['phase']) &&
-    isString(value['message']) &&
+    isUtf8BoundedString(value['message'], MAX_POPUP_EXPORT_STATUS_TEXT_BYTES, true) &&
     isNonNegativeInteger(value['current']) &&
     isNonNegativeInteger(value['total']) &&
-    Array.isArray(value['errors']) &&
-    value['errors'].every(isString)
+    isBoundedStatusTextArray(value['errors'])
   );
 }
 
 export function isPopupExportResult(value: unknown): value is PopupExportResult {
   return (
-    isRecord(value) &&
+    hasExactKeys(
+      value,
+      ['success', 'errors', 'stats'],
+      ['filename', 'kind', 'snapshotBatchSize', 'snapshotIds', 'warnings']
+    ) &&
     isBoolean(value['success']) &&
-    hasOptionalField(value, 'filename', isString) &&
-    Array.isArray(value['errors']) &&
-    value['errors'].every(isString) &&
-    isRecord(value['stats']) &&
-    isNumber(value['stats']['sectionsCount']) &&
-    isNumber(value['stats']['rowsCount']) &&
-    isNumber(value['stats']['filesCount']) &&
-    isNumber(value['stats']['filesFailed'])
+    hasOptionalField(value, 'filename', (entry) =>
+      isUtf8BoundedString(entry, MAX_POPUP_EXPORT_STATUS_TEXT_BYTES, true)
+    ) &&
+    isBoundedStatusTextArray(value['errors']) &&
+    isExportStats(value['stats']) &&
+    (value['kind'] === undefined ||
+      value['kind'] === 'archive' ||
+      value['kind'] === 'webSnapshot') &&
+    (value['snapshotBatchSize'] === undefined ||
+      isNonNegativeInteger(value['snapshotBatchSize'])) &&
+    (value['snapshotIds'] === undefined ||
+      (Array.isArray(value['snapshotIds']) &&
+        value['snapshotIds'].length <= MAX_POPUP_EXPORT_JOB_TABS &&
+        value['snapshotIds'].every((entry) =>
+          isUtf8BoundedString(entry, MAX_POPUP_EXPORT_STATUS_TEXT_BYTES)
+        ))) &&
+    (value['warnings'] === undefined || isPopupExportJobWarnings(value['warnings']))
   );
 }
 
-export function isPopupExportJobTab(value: unknown): value is PopupExportJobTab {
-  return isRecord(value) && isNumber(value['tabId']) && isString(value['title']);
-}
-
-export function isPopupExportJobStatus(value: unknown): value is PopupExportJobStatus {
+export function isPagePackageJobTab(value: unknown): value is PagePackageJobTab {
   return (
     isRecord(value) &&
-    isString(value['jobId']) &&
+    Object.keys(value).length === 2 &&
+    isNonNegativeInteger(value['tabId']) &&
+    isUtf8BoundedString(value['title'], MAX_POPUP_EXPORT_TAB_TITLE_BYTES, true)
+  );
+}
+
+export function isPopupExportJobId(value: unknown): value is string {
+  return isCanonicalPopupExportJobId(value);
+}
+
+export function isPagePackageJobTabs(value: unknown): value is PagePackageJobTab[] {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_POPUP_EXPORT_JOB_TABS ||
+    !value.every(isPagePackageJobTab)
+  ) {
+    return false;
+  }
+  return new Set(value.map((tab) => tab.tabId)).size === value.length;
+}
+
+export function isPagePackageCaptureSources(value: unknown): value is PagePackageCaptureSource[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_POPUP_EXPORT_JOB_TABS) {
+    return false;
+  }
+  const kinds = new Set<string>();
+  const identities = new Set<string>();
+  for (const source of value) {
+    if (!isRecord(source) || typeof source['kind'] !== 'string') return false;
+    kinds.add(source['kind']);
+    if (source['kind'] === 'tab') {
+      if (
+        Object.keys(source).length !== 3 ||
+        !isNonNegativeInteger(source['tabId']) ||
+        !isUtf8BoundedString(source['title'], MAX_POPUP_EXPORT_TAB_TITLE_BYTES, true)
+      ) {
+        return false;
+      }
+      identities.add(String(source['tabId']));
+    } else if (source['kind'] === 'url') {
+      if (Object.keys(source).length !== 2 || typeof source['url'] !== 'string') return false;
+      const normalized = normalizePagePackageCaptureUrl(source['url']);
+      if (!normalized || normalized !== source['url']) return false;
+      identities.add(normalized);
+    } else {
+      return false;
+    }
+  }
+  return (
+    kinds.size === 1 &&
+    identities.size === value.length &&
+    (!kinds.has('url') || value.length <= MAX_PAGE_PACKAGE_URL_SOURCES)
+  );
+}
+
+export function isPagePackageCaptureTiming(value: unknown): boolean {
+  return parsePagePackageCaptureTimingPolicy(value) !== null;
+}
+
+export function isPopupExportJobWarnings(value: unknown): value is string[] {
+  if (!Array.isArray(value) || value.length > MAX_POPUP_EXPORT_JOB_TABS) return false;
+  let totalBytes = 0;
+  for (const warning of value) {
+    if (!isUtf8BoundedString(warning, MAX_POPUP_EXPORT_STATUS_TEXT_BYTES, true)) return false;
+    totalBytes += estimateUtf8Bytes(warning, MAX_POPUP_EXPORT_STATUS_TEXT_BYTES);
+    if (totalBytes > MAX_POPUP_EXPORT_WARNINGS_TOTAL_BYTES) return false;
+  }
+  return true;
+}
+
+function isPagePackageEffectiveComponentPlan(value: unknown): boolean {
+  if (
+    !hasExactKeys(value, ['components', 'diagnosticsLevel', 'includeScreenshot']) ||
+    !hasExactKeys(value['components'], [...PAGE_PACKAGE_COMPONENT_IDS])
+  ) {
+    return false;
+  }
+  const components = value['components'];
+  return (
+    PAGE_PACKAGE_COMPONENT_IDS.every((component) => isBoolean(components[component])) &&
+    (value['diagnosticsLevel'] === 'none' ||
+      value['diagnosticsLevel'] === 'standard' ||
+      value['diagnosticsLevel'] === 'extended') &&
+    isBoolean(value['includeScreenshot'])
+  );
+}
+
+function isPagePackagePageOutcomes(value: unknown, tabs: unknown): boolean {
+  if (!Array.isArray(value) || !isPagePackageJobTabs(tabs) || value.length !== tabs.length) {
+    return false;
+  }
+  return value.every(
+    (outcome, ordinal) =>
+      hasExactKeys(outcome, ['ordinal', 'status', 'tabId'], ['error']) &&
+      outcome['ordinal'] === ordinal &&
+      outcome['tabId'] === tabs[ordinal]?.tabId &&
+      (outcome['status'] === 'failed' ||
+        outcome['status'] === 'pending' ||
+        outcome['status'] === 'succeeded') &&
+      (outcome['error'] === undefined ||
+        isUtf8BoundedString(outcome['error'], MAX_POPUP_EXPORT_STATUS_TEXT_BYTES))
+  );
+}
+
+export function isPagePackageJobStatus(value: unknown): value is PagePackageJobStatusV1 {
+  return (
+    hasExactKeys(
+      value,
+      [
+        'jobId',
+        'revision',
+        'phase',
+        'orderedTabs',
+        'effectiveOptions',
+        'effectiveComponentPlan',
+        'intent',
+        'pageOutcomes',
+        'progress',
+        'warnings',
+        'originalActiveTabs',
+        'activatedTabIds',
+      ],
+      ['result']
+    ) &&
+    isPopupExportJobId(value['jobId']) &&
     isNonNegativeInteger(value['revision']) &&
     value['revision'] > 0 &&
     isPopupExportJobPhase(value['phase']) &&
-    Array.isArray(value['orderedTabs']) &&
-    value['orderedTabs'].every(isPopupExportJobTab) &&
+    (value['intent'] === 'save' || value['intent'] === 'export') &&
+    isPagePackageJobTabs(value['orderedTabs']) &&
     isExportOptions(value['effectiveOptions']) &&
+    isPagePackageEffectiveComponentPlan(value['effectiveComponentPlan']) &&
+    isPagePackagePageOutcomes(value['pageOutcomes'], value['orderedTabs']) &&
     isExportProgress(value['progress']) &&
-    Array.isArray(value['warnings']) &&
-    value['warnings'].every(isString) &&
+    isPopupExportJobWarnings(value['warnings']) &&
     Array.isArray(value['originalActiveTabs']) &&
+    value['originalActiveTabs'].length <= MAX_POPUP_EXPORT_JOB_TABS &&
     value['originalActiveTabs'].every(
-      (entry) => isRecord(entry) && isNumber(entry['windowId']) && isNumber(entry['tabId'])
+      (entry) =>
+        hasExactKeys(entry, ['windowId', 'tabId']) &&
+        isNonNegativeInteger(entry['windowId']) &&
+        isNonNegativeInteger(entry['tabId'])
     ) &&
     Array.isArray(value['activatedTabIds']) &&
-    value['activatedTabIds'].every(isNumber) &&
+    value['activatedTabIds'].length <= MAX_POPUP_EXPORT_JOB_TABS &&
+    value['activatedTabIds'].every(isNonNegativeInteger) &&
     hasOptionalField(value, 'result', isPopupExportResult)
   );
 }
@@ -165,21 +394,47 @@ export function isPopupExportPreviewResponse(value: unknown): value is PopupExpo
 }
 
 export function isPopupExportPackageResponse(value: unknown): value is PopupExportPackageResponse {
+  const staged = isRecord(value) ? value['stagedPagePackage'] : undefined;
+  const error = isRecord(value) ? value['error'] : undefined;
   return (
     isRecord(value) &&
+    Object.keys(value).every((key) => ['error', 'stagedPagePackage', 'success'].includes(key)) &&
     isBoolean(value['success']) &&
-    hasOptionalField(value, 'error', isString) &&
-    (value['pagePackage'] === undefined ||
-      (isRecord(value['pagePackage']) &&
-        isString(value['pagePackage']['archiveBaseName']) &&
-        Array.isArray(value['pagePackage']['entries']) &&
-        value['pagePackage']['entries'].every(isExportPagePackageEntry) &&
-        Array.isArray(value['pagePackage']['errors']) &&
-        value['pagePackage']['errors'].every(isString) &&
-        isRecord(value['pagePackage']['stats']) &&
-        isNumber(value['pagePackage']['stats']['sectionsCount']) &&
-        isNumber(value['pagePackage']['stats']['rowsCount']) &&
-        isNumber(value['pagePackage']['stats']['filesCount']) &&
-        isNumber(value['pagePackage']['stats']['filesFailed'])))
+    (error === undefined || isUtf8BoundedString(error, MAX_POPUP_PACKAGE_ERROR_BYTES)) &&
+    ((value['success'] === false && staged === undefined) ||
+      (value['success'] === true &&
+        error === undefined &&
+        isRecord(staged) &&
+        Object.keys(staged).every((key) =>
+          [
+            'jobId',
+            'manifestSha256',
+            'manifestSize',
+            'ordinal',
+            'pageId',
+            'producerStats',
+            'snapshotSessionId',
+            'stagedBlobId',
+            'title',
+            'totalBytes',
+          ].includes(key)
+        ) &&
+        isPopupExportJobId(staged['jobId']) &&
+        isString(staged['manifestSha256']) &&
+        /^[a-f0-9]{64}$/.test(staged['manifestSha256']) &&
+        isNonNegativeInteger(staged['manifestSize']) &&
+        staged['manifestSize'] > 0 &&
+        staged['manifestSize'] <= MAX_POPUP_PACKAGE_MANIFEST_BYTES &&
+        isNonNegativeInteger(staged['ordinal']) &&
+        staged['ordinal'] < MAX_PAGE_COLLECTION_PAGES &&
+        isUtf8BoundedString(staged['pageId'], MAX_PAGE_PACKAGE_ID_BYTES) &&
+        isExportStats(staged['producerStats']) &&
+        hasOptionalField(staged, 'snapshotSessionId', isPopupExportJobId) &&
+        isUtf8BoundedString(staged['stagedBlobId'], MAX_POPUP_PACKAGE_IDENTIFIER_BYTES) &&
+        (staged['title'] === null ||
+          isNfcUtf8BoundedString(staged['title'], MAX_PAGE_PACKAGE_TITLE_BYTES)) &&
+        isNonNegativeInteger(staged['totalBytes']) &&
+        staged['totalBytes'] >= staged['manifestSize'] &&
+        staged['totalBytes'] <= MAX_PAGE_PACKAGE_TOTAL_BYTES + MAX_POPUP_PACKAGE_MANIFEST_BYTES))
   );
 }

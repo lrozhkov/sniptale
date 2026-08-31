@@ -12,7 +12,6 @@ vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
 }));
 
 import { ExportPagesDrawerList, ExportPagesHeader } from './drawer';
-import { WebSnapshotConfirmationDialog } from './snapshot-confirmation';
 import { ExportPagesSummary } from './summary';
 
 let container: HTMLDivElement | null = null;
@@ -148,63 +147,6 @@ describe('export pages owner components', () => {
     );
     expect(toggleTabSelection).toHaveBeenCalledWith(7);
     expect(toggleTabSelection).toHaveBeenCalledWith(9);
-  });
-
-  it('renders confirmation states and routes dialog actions', async () => {
-    const onCancel = vi.fn();
-    const onConfirm = vi.fn();
-    const onRememberChoiceChange = vi.fn();
-    const disclosure = {
-      body: 'Body',
-      requiresConfirmation: true,
-      title: 'Confirm snapshot',
-      warning: 'Warning',
-    };
-
-    await renderNode(
-      <WebSnapshotConfirmationDialog
-        disclosure={disclosure}
-        isSavingPreference
-        preferenceError="Could not save"
-        rememberChoice
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-        onRememberChoiceChange={onRememberChoiceChange}
-      />
-    );
-
-    const dialog = container?.querySelector('[role="alertdialog"]');
-    await act(async () => {
-      dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-      dialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-    });
-
-    expect(container?.textContent).toContain('Could not save');
-    expect(onCancel).not.toHaveBeenCalled();
-
-    await renderNode(
-      <WebSnapshotConfirmationDialog
-        disclosure={disclosure}
-        isSavingPreference={false}
-        preferenceError={null}
-        rememberChoice={false}
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-        onRememberChoiceChange={onRememberChoiceChange}
-      />
-    );
-
-    const checkbox = container?.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    await click(checkbox);
-    const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
-    await click(buttons[0]);
-    await click(buttons[1]);
-    await click(buttons[2]);
-
-    expect(onRememberChoiceChange).toHaveBeenCalledWith(true);
-    expect(onCancel).toHaveBeenCalledTimes(2);
-    expect(onConfirm).toHaveBeenCalledOnce();
-    expect(container?.textContent).not.toContain('Could not save');
   });
 
   it('renders empty and populated summaries and ignores fallback removal', async () => {

@@ -4,7 +4,7 @@ import { selectelInfrastructureFromEnvironment } from './artifacts.mjs';
 import {
   resolveQaReleaseResourceProfile,
   resolveQaResourceProfile,
-} from '../qa/runtime/resource-profile.mjs';
+} from '../qa/runtime/scheduling/resource-profile.mjs';
 import { sealLaneArtifacts } from './seal-lane-artifacts.mjs';
 import { parseTrustedPhaseReceipt } from './trusted-phase-receipt.mjs';
 

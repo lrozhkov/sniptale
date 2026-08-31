@@ -9,7 +9,7 @@
 ## Tooling And Workflow
 
 - `AGENTS.md`, active docs, package scripts, wrappers, QA policy, and active skills teach the same workflow and product/harness split.
-- Diff-scoped structural enforcement, the four-ID advisory catalog, visible sanitized output, advisory state, validation manifest, step registry, control dispositions, and manual report-only structural/topology-audit labeling remain synchronized. The topology section remains a complement to structural pressure, not a fifth advisory family or a blocking guard.
+- Diff-scoped structural enforcement, the four-ID advisory catalog, visible sanitized output, advisory state, canonical catalog, derived control inventory, control dispositions, and manual report-only structural/topology-audit labeling remain synchronized. The topology section remains a complement to structural pressure, not a fifth advisory family or a blocking guard.
 - No enforcement, advisory, preflight, repository evidence, dependency, or skill path reintroduces model-token limits or token-hotspot inventories. Do not run a repository-wide structural detector to establish this; inspect policy and supplied artifacts.
 - Required review follows green proof, remains independent/read-only, and receives no inherited context.
 - Baselines, allowlists, dispositions, and policy registries are narrow, justified, consumed, and validated.

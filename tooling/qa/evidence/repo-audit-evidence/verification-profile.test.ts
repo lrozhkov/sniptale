@@ -14,8 +14,7 @@ import {
 
 it('classifies trigger-covered and advisory scripts separately from focused blind spots', () => {
   const packageJson = readJson('package.json');
-  const validationManifest = readJson('tooling/configs/qa/validation-manifest.json');
-  const { verification, loopholes } = collectVerificationProfile(packageJson, validationManifest);
+  const { verification, loopholes } = collectVerificationProfile(packageJson);
 
   expectWrapperCoverage(verification);
   expectManualOnlySeparation(verification);
@@ -24,6 +23,5 @@ it('classifies trigger-covered and advisory scripts separately from focused blin
   expectBaseWrapperToolCoverageScopes(verification);
   expectHybridWrapperToolCoverageScopes(verification);
   expectAdvisoryToolCoverageScopes(verification);
-  expect(loopholes).not.toContainEqual(expect.objectContaining({ kind: 'unvalidated-script' }));
   expect(loopholes).not.toContainEqual(expect.objectContaining({ kind: 'focused-blind-spot' }));
 });

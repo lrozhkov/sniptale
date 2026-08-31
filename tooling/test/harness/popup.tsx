@@ -1,4 +1,4 @@
-import { harnessReady } from './browser-mocks';
+import { harnessReady } from './browser-mocks/browser-mocks';
 import { createRoot } from 'react-dom/client';
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
 

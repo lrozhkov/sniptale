@@ -6,7 +6,10 @@ import {
 import type { GalleryImportController } from './controller-types';
 import { registerGalleryImportAbortController } from './backup';
 import type { GalleryBusyAction } from './shared';
-import { resolveGalleryMediaImportMimeType } from '../media-import-profile';
+import {
+  resolveGalleryMediaImportCreatedAt,
+  resolveGalleryMediaImportMimeType,
+} from '../media-import-profile';
 import type { MediaFileImportConflictStrategy } from '../import-types';
 import { hasPotentialMediaFileConflicts, inspectMediaFileConflicts } from './media-file-conflicts';
 
@@ -101,9 +104,15 @@ async function importMediaFile(file: File, signal: AbortSignal): Promise<void> {
   const mimeType = resolveGalleryMediaImportMimeType(file);
   if (!mimeType) throw new Error('Unsupported media file.');
   assertSafeProjectAssetStorageInput(file, mimeType);
+  const createdAt = resolveGalleryMediaImportCreatedAt(file);
   const typedBlob = file.type === mimeType ? file : file.slice(0, file.size, mimeType);
   if (mimeType.startsWith('image/')) {
-    await saveScreenshotMediaAssetSafely({ blob: typedBlob, filename: file.name, kind: 'image' });
+    await saveScreenshotMediaAssetSafely({
+      blob: typedBlob,
+      createdAt,
+      filename: file.name,
+      kind: 'image',
+    });
     return;
   }
   const metadata = await loadVideoFileMetadata(file, signal);
@@ -111,6 +120,7 @@ async function importMediaFile(file: File, signal: AbortSignal): Promise<void> {
   await saveRecordingsBatchSafely([
     {
       blob: typedBlob,
+      createdAt,
       filename: file.name,
       id: crypto.randomUUID(),
       mediaMetadata: { ...metadata, kind: 'video' },

@@ -1,25 +1,19 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
-  authorizeWebSnapshotCaptureRequestMock,
-  browserScriptingExecuteScriptMock,
+  assertPopupTabRouteTargetDocumentMock,
   browserTabsGetMock,
   ensureActivePageAccessRuntimeMock,
   isOwnedSnapshotViewerPageMock,
-  loadSettingsMock,
   sendTabMessageMock,
   sendViewerPopupExportMessageMock,
-  assertPopupTabRouteTargetDocumentMock,
 } = vi.hoisted(() => ({
-  authorizeWebSnapshotCaptureRequestMock: vi.fn(),
-  browserScriptingExecuteScriptMock: vi.fn(),
+  assertPopupTabRouteTargetDocumentMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
   isOwnedSnapshotViewerPageMock: vi.fn(),
-  loadSettingsMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   sendViewerPopupExportMessageMock: vi.fn(),
-  assertPopupTabRouteTargetDocumentMock: vi.fn(),
 }));
 
 vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) => ({
@@ -27,18 +21,9 @@ vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) =
   assertPopupTabRouteTargetDocument: assertPopupTabRouteTargetDocumentMock,
 }));
 
-vi.mock('@sniptale/platform/browser/scripting', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/scripting')>()),
-  browserScripting: {
-    executeScript: browserScriptingExecuteScriptMock,
-  },
-}));
-
 vi.mock('@sniptale/platform/browser/tabs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/tabs')>()),
-  browserTabs: {
-    get: browserTabsGetMock,
-  },
+  browserTabs: { get: browserTabsGetMock },
 }));
 
 vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
@@ -51,19 +36,9 @@ vi.mock('../../../page-access/service', async (importOriginal) => ({
   ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
 }));
 
-vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
-  loadSettings: loadSettingsMock,
-}));
-
 vi.mock('../../../../features/tab-capabilities/url', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../features/tab-capabilities/url')>()),
   isOwnedSnapshotViewerPage: isOwnedSnapshotViewerPageMock,
-}));
-
-vi.mock('../../../capture/routing/web-snapshot/session', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../capture/routing/web-snapshot/session')>()),
-  authorizeWebSnapshotCaptureRequest: authorizeWebSnapshotCaptureRequestMock,
 }));
 
 vi.mock('../../../capture/page-preparation/viewer-ports', async (importOriginal) => ({
@@ -77,62 +52,22 @@ import { routePopupExportMessage } from './popup-export-routing';
 
 async function flushRouteWork(): Promise<void> {
   await Promise.resolve();
-  await Promise.resolve();
   await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   assertPopupTabRouteTargetDocumentMock.mockResolvedValue(undefined);
-  sendViewerPopupExportMessageMock.mockResolvedValue({ success: true });
-  isOwnedSnapshotViewerPageMock.mockReturnValue(false);
-  browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
-  ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
-});
-
-it('routes viewer-owned popup export messages without content asset authorization', async () => {
-  const ports = new Map();
-  const sendResponse = vi.fn();
-  isOwnedSnapshotViewerPageMock.mockReturnValue(true);
-  browserTabsGetMock.mockResolvedValue({
-    id: 62,
-    url: 'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html',
-  });
-
-  routePopupExportMessage({
-    deps: { ...createBackgroundRuntimeState(), webSnapshotViewerPorts: ports },
-    message: {
-      requestId: 'req-web',
-      tabId: 62,
-      tabRouteCapabilityToken: 'cap-1',
-      tabRouteRequestId: 'req-web',
-      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    },
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
-
-  expect(loadSettingsMock).not.toHaveBeenCalled();
-  expect(authorizeWebSnapshotCaptureRequestMock).not.toHaveBeenCalled();
-  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(sendViewerPopupExportMessageMock).toHaveBeenCalledWith(ports, 62, {
-    requestId: 'req-web',
-    type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-  });
-  expect(sendResponse).toHaveBeenCalledWith({ success: true });
-});
-
-it('routes non-save popup export messages directly to the viewer port', async () => {
-  const sendResponse = vi.fn();
-  isOwnedSnapshotViewerPageMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({
     id: 62,
     url: 'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1',
   });
+  isOwnedSnapshotViewerPageMock.mockReturnValue(true);
+  sendViewerPopupExportMessageMock.mockResolvedValue({ success: true });
+});
 
+it('routes Viewer-owned package preview through the existing Viewer port', async () => {
+  const sendResponse = vi.fn();
   routePopupExportMessage({
     deps: createBackgroundRuntimeState(),
     message: {
@@ -147,11 +82,10 @@ it('routes non-save popup export messages directly to the viewer port', async ()
   });
   await flushRouteWork();
 
-  expect(browserTabsGetMock).toHaveBeenCalledWith(62);
   expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
-  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
   expect(sendTabMessageMock).not.toHaveBeenCalled();
   expect(sendViewerPopupExportMessageMock).toHaveBeenCalledWith(expect.any(Map), 62, {
     type: MessageType.EXPORT_POPUP_PREVIEW,
   });
+  expect(sendResponse).toHaveBeenCalledWith({ success: true });
 });

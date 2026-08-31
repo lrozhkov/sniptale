@@ -48,7 +48,7 @@ beforeEach(() => {
 });
 
 describe('settings transfer AI owner transaction', () => {
-  it('applies visible settings across storage owners and preserves matching AI secrets', async () => {
+  it('applies transferable settings while preserving local consent and matching AI secrets', async () => {
     const summary = emptySummary();
     mocks.localGet.mockResolvedValue({
       sniptale_ai_providers: [
@@ -79,6 +79,10 @@ describe('settings transfer AI owner transaction', () => {
       expect.objectContaining({
         sniptale_settings: expect.objectContaining({
           imageFormat: 'webp',
+          authenticatedSnapshotAssetsEnabled: false,
+          anonymousCrossOriginSnapshotAssetsEnabled: false,
+          exportResourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+          pagePackageCaptureTiming: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 },
           voiceInput: expect.objectContaining({ microphoneDeviceId: null }),
         }),
         sniptale_callout_presets: expect.any(Object),
@@ -213,6 +217,39 @@ describe('settings transfer storage transaction', () => {
     await applySettingsTransferDomains({ domains: {}, summary: emptySummary() });
     expect(mocks.syncSet).not.toHaveBeenCalled();
     expect(mocks.localSet).not.toHaveBeenCalled();
+  });
+
+  it('applies the parsed full-page quality policy through the canonical settings payload', async () => {
+    await applySettingsTransferDomains({
+      domains: {
+        'capture.image': {
+          schemaVersion: 1,
+          data: {
+            fullPageQuality: {
+              maxFileSizeMiB: 72,
+              maxMegapixels: 70,
+              minScalePercent: 40,
+              profile: 'custom',
+            },
+          },
+        },
+      },
+      summary: emptySummary(),
+    });
+
+    expect(mocks.syncSet).toHaveBeenCalledWith(
+      {
+        sniptale_settings: expect.objectContaining({
+          fullPageQuality: {
+            maxFileSizeMiB: 72,
+            maxMegapixels: 70,
+            minScalePercent: 40,
+            profile: 'custom',
+          },
+        }),
+      },
+      undefined
+    );
   });
 
   it('rejects an oversized sync item before any write', async () => {
@@ -410,6 +447,13 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
       data: { items: [{ id: 'viewport-a', width: 1280, height: 720 }], defaultId: 'viewport-a' },
     },
     'capture.image': { schemaVersion: 1, data: { format: 'webp', quality: 80 } },
+    'capture.pages': {
+      schemaVersion: 1,
+      data: {
+        resourceLimits: { maxFileCount: 50, maxFileSizeMiB: 20, maxTotalSizeMiB: 100 },
+        timing: { loadTimeoutMs: 60_000, settleDelayMs: 3_000 },
+      },
+    },
     'capture.after-capture': { schemaVersion: 1, data: { action: 'copy' } },
     'capture.saving': {
       schemaVersion: 1,
@@ -425,10 +469,6 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
       data: { policy: settingsFixture().localStoragePolicy },
     },
     'system.voice': { schemaVersion: 1, data: { language: 'en-US', mode: 'browser' } },
-    'access.capture-assets': {
-      schemaVersion: 1,
-      data: { authenticated: true, anonymous: true },
-    },
     'capture.video': {
       schemaVersion: 1,
       data: {
@@ -514,8 +554,17 @@ function settingsFixture(): NormalizedSettings {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    fullPageQuality: {
+      maxFileSizeMiB: 64,
+      maxMegapixels: 64,
+      minScalePercent: 50,
+      profile: 'safe',
+    },
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: false,
+    externalSnapshotAssetRedirectsEnabled: true,
+    externalSnapshotLinksEnabled: false,
+    exportResourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
+    pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
   };
 }

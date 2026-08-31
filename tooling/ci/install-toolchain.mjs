@@ -22,9 +22,8 @@ for (const expectedSource of [
     throw new Error(`Dockerfile Debian snapshot drift: ${expectedSource}`);
   }
 }
-const semgrepRequirements = fs.readFileSync('/tmp/semgrep-requirements.lock', 'utf8');
-if (!semgrepRequirements.includes(`semgrep==${lock.semgrep.version}`)) {
-  throw new Error('Semgrep requirements drifted from toolchain.lock.json.');
+if (sha256File('/opt/sniptale-npm/package-lock.json') !== lock.node.npmLockSha256) {
+  throw new Error('npm package lock drifted from toolchain.lock.json.');
 }
 
 function run(command, args) {
@@ -58,16 +57,6 @@ run('tar', [
   '-C',
   '/usr/local/bin',
   'actionlint',
-]);
-run('python3', ['-m', 'venv', '/opt/semgrep']);
-run('/opt/semgrep/bin/pip', [
-  'install',
-  '--disable-pip-version-check',
-  '--no-cache-dir',
-  '--require-hashes',
-  '--only-binary=:all:',
-  '--requirement',
-  '/tmp/semgrep-requirements.lock',
 ]);
 if (sha256File('/tmp/playwright-package/package-lock.json') !== lock.playwright.npmLockSha256) {
   throw new Error('Playwright npm lock drifted from toolchain.lock.json.');
@@ -144,16 +133,15 @@ if (
 
 const expected = [
   ['node', lock.node.version, ['--version']],
+  ['npm', lock.node.npmVersion, ['--version']],
   ['codeql', lock.codeql.version, ['--version']],
   ['osv-scanner', lock.osvScanner.version, ['--version']],
   ['gitleaks', lock.gitleaks.version, ['--version']],
   ['actionlint', lock.actionlint.version, ['--version']],
-  ['semgrep', lock.semgrep.version, ['--legacy', '--version']],
   ['playwright', lock.playwright.version, ['--version']],
 ];
 for (const [command, version, args] of expected) {
-  const executable = command === 'semgrep' ? '/opt/semgrep/bin/semgrep' : command;
-  const result = spawnSync(executable, args, { encoding: 'utf8' });
+  const result = spawnSync(command, args, { encoding: 'utf8' });
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   if (result.status !== 0 || !output.includes(version)) {
     throw new Error(`${command} version drift: expected ${version}, got ${output.trim()}`);

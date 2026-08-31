@@ -158,7 +158,6 @@ function verifyInsertionResults() {
   expectDefaultInsertionCalls();
   expect(set).toHaveBeenCalledTimes(12);
   expect(set).toHaveBeenLastCalledWith({
-    selectedClipId: 'clip-1',
     selectedTrackId: 'track-2',
     selection: { kind: 'clip', clipId: 'clip-1' },
   });

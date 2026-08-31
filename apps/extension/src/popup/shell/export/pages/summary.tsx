@@ -34,3 +34,28 @@ export function ExportPagesSummary(props: {
     </div>
   );
 }
+
+export function ExportUrlsSummary(props: { onRemove: (url: string) => void; urls: string[] }) {
+  if (props.urls.length === 0) {
+    return (
+      <div className="py-1 text-[11px] text-[var(--sniptale-color-text-dim)]">
+        {translate('popup.export.noSelectedUrls')}
+      </div>
+    );
+  }
+  return (
+    <div
+      data-testid="export-pages-summary"
+      className="h-full space-y-1 overflow-y-auto pl-1.5 pr-1"
+    >
+      {props.urls.map((url) => (
+        <PagesSummaryRow
+          key={url}
+          onRemove={() => props.onRemove(url)}
+          title={new URL(url).hostname}
+          url={url}
+        />
+      ))}
+    </div>
+  );
+}

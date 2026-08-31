@@ -1,11 +1,15 @@
 import { translate } from '../../../../platform/i18n/popup';
 import { ExportPagesDrawerList, ExportPagesHeader } from './drawer';
 import { getSelectedTabs, getShouldShowClearAll, useScrollCurrentRowIntoView } from './helpers';
-import { ExportPagesSummary } from './summary';
+import { ExportPagesSummary, ExportUrlsSummary } from './summary';
 import { ExportSelectionSectionShell } from '../selection/section-shell';
 import type { PopupExportTabItem } from '../selection/tabs/types';
+import { ExportPageSourceSwitch, ExportUrlsEditor } from './url-editor';
+import { PageCaptureTimingSettings } from './capture-timing';
+import type { PagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
 
 type ExportPagesSectionProps = {
+  activeSourceMode: 'tabs' | 'urls';
   availableTabs: PopupExportTabItem[];
   className?: string;
   filterQuery: string;
@@ -15,11 +19,22 @@ type ExportPagesSectionProps = {
   isOpen: boolean;
   onClose: () => void;
   onOpen: () => void;
+  onOpenSettings?: () => void;
+  isSettingsOpen?: boolean;
   selectedCount: number;
   selectedTabIds: number[];
+  selectedUrls: string[];
+  setActiveSourceMode: (mode: 'tabs' | 'urls') => void;
   setFilterQuery: (value: string) => void;
   toggleSelectAllTabs: () => void;
   toggleTabSelection: (tabId: number) => void;
+  removeSelectedUrl: (url: string) => void;
+  setUrlInput: (value: string) => void;
+  timing: PagePackageCaptureTimingPolicy;
+  onTimingChange: (timing: PagePackageCaptureTimingPolicy) => void;
+  urlInput: string;
+  urlInputInvalid: string[];
+  urlInputOverflow: number;
 };
 
 export function ExportPagesSection(props: ExportPagesSectionProps) {
@@ -33,31 +48,59 @@ export function ExportPagesSection(props: ExportPagesSectionProps) {
 
   return (
     <ExportSelectionSectionShell
-      title={translate('popup.export.tabsSectionLabel')}
+      title={translate(
+        props.isSettingsOpen ? 'popup.export.pageSettingsTitle' : 'popup.export.tabsSectionLabel'
+      )}
       drawerLabel={translate('popup.export.tabsSectionLabel')}
+      drawerDescription={translate(
+        props.isSettingsOpen
+          ? 'popup.export.pageSettingsDescription'
+          : 'popup.export.tabsSectionDescription'
+      )}
       isExpanded={props.isExpanded}
       isOpen={props.isOpen}
       onOpen={props.onOpen}
+      {...(props.onOpenSettings ? { onOpenSettings: props.onOpenSettings } : {})}
       onClose={props.onClose}
       bodyClassName="flex min-h-0 flex-1 flex-col pt-1"
       {...(props.className === undefined ? {} : { className: props.className })}
     >
-      {props.isOpen ? (
+      {props.isSettingsOpen ? (
+        <PageCaptureTimingSettings timing={props.timing} onChange={props.onTimingChange} />
+      ) : props.isOpen ? (
         <>
-          <ExportPagesHeader
-            filterQuery={props.filterQuery}
-            selectedCount={props.selectedCount}
-            setFilterQuery={props.setFilterQuery}
-            shouldShowClearAll={shouldShowClearAll}
-            toggleSelectAllTabs={props.toggleSelectAllTabs}
+          <ExportPageSourceSwitch
+            mode={props.activeSourceMode}
+            onChange={props.setActiveSourceMode}
           />
-          <ExportPagesDrawerList
-            currentRowRef={currentRowRef}
-            filteredTabs={props.filteredTabs}
-            selectedTabIds={props.selectedTabIds}
-            toggleTabSelection={props.toggleTabSelection}
-          />
+          {props.activeSourceMode === 'tabs' ? (
+            <>
+              <ExportPagesHeader
+                filterQuery={props.filterQuery}
+                selectedCount={props.selectedCount}
+                setFilterQuery={props.setFilterQuery}
+                shouldShowClearAll={shouldShowClearAll}
+                toggleSelectAllTabs={props.toggleSelectAllTabs}
+              />
+              <ExportPagesDrawerList
+                currentRowRef={currentRowRef}
+                filteredTabs={props.filteredTabs}
+                selectedTabIds={props.selectedTabIds}
+                toggleTabSelection={props.toggleTabSelection}
+              />
+            </>
+          ) : (
+            <ExportUrlsEditor
+              invalid={props.urlInputInvalid}
+              overflow={props.urlInputOverflow}
+              selectedCount={props.selectedUrls.length}
+              text={props.urlInput}
+              onChange={props.setUrlInput}
+            />
+          )}
         </>
+      ) : props.activeSourceMode === 'urls' ? (
+        <ExportUrlsSummary urls={props.selectedUrls} onRemove={props.removeSelectedUrl} />
       ) : (
         <ExportPagesSummary selectedTabs={selectedTabs} onRemove={props.toggleTabSelection} />
       )}

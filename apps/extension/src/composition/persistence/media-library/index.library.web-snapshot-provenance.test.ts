@@ -28,6 +28,8 @@ vi.mock('../web-snapshots', async (importOriginal) => ({
   getWebSnapshotPackageFile: dbMocks.getWebSnapshotPackageFileMock,
 }));
 
+import { getMediaAssetBlob } from './index.library';
+
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.getMock.mockResolvedValue(createWebSnapshotMediaEntry());
@@ -39,8 +41,6 @@ beforeEach(() => {
 it('returns the already-sanitized OPFS package file through the snapshot owner', async () => {
   const packageFile = new File(['zip'], 'snapshot.zip', { type: 'application/zip' });
   dbMocks.getWebSnapshotPackageFileMock.mockResolvedValue(packageFile);
-  const { getMediaAssetBlob } = await import('./index.library.ts');
-
   const result = await getMediaAssetBlob('asset-1');
 
   expect(result).toBe(packageFile);
@@ -55,7 +55,7 @@ function createWebSnapshotMediaEntry(): MediaLibraryEntry {
     height: null,
     id: 'asset-1',
     kind: 'web-archive',
-    mimeType: 'application/x-sniptale-web-snapshot+zip',
+    mimeType: 'application/x-sniptale-page-package+zip',
     originalFilename: 'snapshot.zip',
     size: 10,
     source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },

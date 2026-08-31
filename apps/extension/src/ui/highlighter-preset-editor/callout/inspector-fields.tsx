@@ -196,7 +196,7 @@ export function AdditionalSettings(props: {
 
   return (
     <details
-      className="group mt-1 border-t border-[color:var(--sniptale-color-border-soft)] pt-1.5"
+      className="group mt-1 border-t border-solid border-[color:var(--sniptale-color-border-soft)] pt-1.5"
       onToggle={handleToggle}
       open={isOpen}
     >

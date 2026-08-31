@@ -1,18 +1,12 @@
-/**
- * Requires diagnostic and tracer seams to import the canonical diagnostic
- * sanitizer unless they are explicit canonical tracer owners.
- */
+/** Enforces sanitizer provenance at diagnostic persistence, export, and transport sinks. */
 
-import fs from 'node:fs';
+import ts from 'typescript';
 
-import {
-  collectCodeFiles,
-  isExecutedAsScript,
-  printViolations,
-  repoRoot,
-} from '../../core/shared.mjs';
-import { isProductSourcePath } from '../../core/src-production-targets.mjs';
-import { forEachPolicySourceFile } from './helpers/policy-scan.mjs';
+import { collectCodeFiles } from '../../analysis/repository/shared-files.mjs';
+import { repoRoot } from '../../analysis/repository/shared-paths.mjs';
+import { isExecutedAsScript, printViolations } from '../../runtime/process/shared-cli.mjs';
+import { isProductSourcePath } from '../../analysis/repository/src-production-targets.mjs';
+import { forEachPolicySourceFile, getNodeLine, visitSourceNodes } from './helpers/policy-scan.mjs';
 import {
   collectPolicyRegistryViolations,
   readPolicy,
@@ -20,86 +14,334 @@ import {
 } from './security-policy-utils.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/security-storage-ownership.data.json';
-const DIAGNOSTIC_FILE_PATTERN = /(diagnostic|message-tracer)/u;
-const DIAGNOSTIC_SINK_PATTERNS = [
-  /browserStorage\.(?:local|sync)\.set/u,
-  /browserStorage\.session\.set/u,
-  /chrome\.storage\.session\.set/u,
-  /\bsendRuntimeMessage\s*\(/u,
-  /(?<!function\s)\b(?:downloadBlob|saveDiagnostics)\s*\(/u,
-  /\bcreateTraceTransport\s*\(/u,
-];
-const SANITIZER_IMPORT_PATTERN =
-  /from\s+['"][^'"]*(?:diagnostic-sanitizer|diagnostics\/sanitizer)['"]/u;
-const SINK_SANITIZER_PATTERN = /\b(?:sanitize|redact|stringifyOffscreenError)\w*\s*\(/u;
-const TAINTED_SOURCE_TOKENS = [
-  'Error.message',
-  'Error.stack',
-  'statusText',
-  'errorText',
-  'rawResponse',
-  'rawDiagnostics',
-  'rawHar',
-  'outerHTML',
-  'innerHTML',
-  'cssText',
-  'providerResponse',
-  'responseText',
-];
-const STORAGE_SINK_PATTERN =
-  /browserStorage\.(?:local|sync|session)\.set|chrome\.storage\.(?:local|sync|session)\.set/u;
-const DIAGNOSTIC_SEND_SINK_PATTERN =
-  /\b(?:logger\.(?:log|warn|error|debug)|sendRuntimeMessage|sendRuntimeMessageBestEffort)\s*\(/u;
-const DIAGNOSTIC_SAVE_SINK_PATTERN = /\b(?:saveDiagnostics|createTraceTransport)\s*\(/u;
+const DIAGNOSTICS_PERSISTENCE_OWNER =
+  'apps/extension/src/composition/persistence/diagnostics/index.ts';
+const CANONICAL_SANITIZER_MODULE_PATTERN =
+  /(?:@sniptale\/platform\/observability\/diagnostics\/sanitizer|diagnostics\/sanitizer)$/u;
+const SAFE_DIAGNOSTIC_IDENTIFIER_PATTERN =
+  /^(?:.*(?:At|Count|Height|Id|Index|Length|Ms|Time|Width)|createdAt|duration|kind|level|recordingId|schemaVersion|stats|type)$/u;
+const SAFE_DIAGNOSTIC_PROPERTY_PATTERN =
+  /^(?:.*(?:At|Count|Height|Id|Index|Length|Ms|Time|Width)|chunksCount|createdAt|duration|exportedAt|isPaused|kind|level|recordingId|schemaVersion|stats|tabId|totalEvents|type)$/u;
+const DIAGNOSTIC_ARCHIVE_ENTRY_PATTERN = /^(?:events|meta)\.json$|^README\.md$/u;
+const DIAGNOSTIC_PAYLOAD_SIGNAL_PATTERN =
+  /(?:diagnostic|rawHar|rawResponse|outerHTML|innerHTML|providerResponse|responseText)/iu;
 
-function hasTaintedDiagnosticSource(sourceText) {
-  return TAINTED_SOURCE_TOKENS.some((token) => sourceText.includes(token));
+function getCallName(expression) {
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+  return null;
 }
 
-function isSinkLine(line) {
+function unwrapExpression(expression) {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isAwaitExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function getPropertyNameText(name) {
+  if (!name) return null;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return name.text;
+  }
+  return null;
+}
+
+function collectImportBindings(sourceFile) {
+  const importedNames = new Map();
+  const sanitizerBindings = new Set();
+  const safeStringifyBindings = new Set();
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
+      continue;
+    }
+    const sanitizerModule = CANONICAL_SANITIZER_MODULE_PATTERN.test(statement.moduleSpecifier.text);
+    const namedBindings = statement.importClause?.namedBindings;
+    if (!namedBindings || !ts.isNamedImports(namedBindings)) continue;
+    for (const element of namedBindings.elements) {
+      const importedName = element.propertyName?.text ?? element.name.text;
+      importedNames.set(element.name.text, importedName);
+      if (sanitizerModule && /^(?:sanitize|stringifyDiagnostic)/u.test(importedName)) {
+        sanitizerBindings.add(element.name.text);
+      }
+      if (importedName === 'safeStringify') safeStringifyBindings.add(element.name.text);
+    }
+  }
+
+  return { importedNames, safeStringifyBindings, sanitizerBindings };
+}
+
+function expressionContainsKnownCall(expression, knownNames) {
+  let found = false;
+  const visit = (node) => {
+    if (found) return;
+    if (ts.isCallExpression(node) && knownNames.has(getCallName(node.expression))) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(expression);
+  return found;
+}
+
+function collectFunctionReturnExpressions(node) {
+  if (!node.body) return [];
+  if (!ts.isBlock(node.body)) return [node.body];
+  const expressions = [];
+  const visit = (current) => {
+    if (current !== node.body && ts.isFunctionLike(current)) return;
+    if (ts.isReturnStatement(current) && current.expression) expressions.push(current.expression);
+    ts.forEachChild(current, visit);
+  };
+  visit(node.body);
+  return expressions;
+}
+
+function collectSanitizerWrappers(sourceFile, sanitizerBindings) {
+  const candidates = [];
+  visitSourceNodes(sourceFile, (node) => {
+    if (ts.isFunctionDeclaration(node) && node.name) {
+      candidates.push({ name: node.name.text, node });
+    } else if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      candidates.push({ name: node.name.text, node: node.initializer });
+    }
+  });
+
+  const wrappers = new Set();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const knownNames = new Set([...sanitizerBindings, ...wrappers]);
+    for (const candidate of candidates) {
+      if (wrappers.has(candidate.name)) continue;
+      const returns = collectFunctionReturnExpressions(candidate.node);
+      if (
+        returns.length > 0 &&
+        returns.every((expression) => expressionContainsKnownCall(expression, knownNames))
+      ) {
+        wrappers.add(candidate.name);
+        changed = true;
+      }
+    }
+  }
+  return wrappers;
+}
+
+function isSafeLiteral(expression) {
   return (
-    STORAGE_SINK_PATTERN.test(line) ||
-    DIAGNOSTIC_SEND_SINK_PATTERN.test(line) ||
-    DIAGNOSTIC_SAVE_SINK_PATTERN.test(line)
+    ts.isStringLiteralLike(expression) ||
+    ts.isNumericLiteral(expression) ||
+    expression.kind === ts.SyntaxKind.TrueKeyword ||
+    expression.kind === ts.SyntaxKind.FalseKeyword ||
+    expression.kind === ts.SyntaxKind.NullKeyword
   );
 }
 
-function reachesDiagnosticSink(sourceText) {
-  return DIAGNOSTIC_SINK_PATTERNS.some((pattern) => pattern.test(sourceText));
-}
-
-function hasNearbySanitizer(lines, index) {
-  const start = Math.max(0, index - 4);
-  const end = Math.min(lines.length - 1, index + 4);
-  for (let current = start; current <= end; current += 1) {
-    if (SINK_SANITIZER_PATTERN.test(lines[current] ?? '')) {
-      return true;
+function isSanitizedExpression(expression, context) {
+  const current = unwrapExpression(expression);
+  if (isSafeLiteral(current)) return true;
+  if (ts.isIdentifier(current)) {
+    return (
+      current.text === 'undefined' ||
+      context.sanitizedIdentifiers.has(current.text) ||
+      SAFE_DIAGNOSTIC_IDENTIFIER_PATTERN.test(current.text)
+    );
+  }
+  if (ts.isPropertyAccessExpression(current)) {
+    return SAFE_DIAGNOSTIC_PROPERTY_PATTERN.test(current.name.text);
+  }
+  if (ts.isTemplateExpression(current)) {
+    return current.templateSpans.every((span) => isSanitizedExpression(span.expression, context));
+  }
+  if (ts.isConditionalExpression(current)) {
+    return (
+      isSanitizedExpression(current.whenTrue, context) &&
+      isSanitizedExpression(current.whenFalse, context)
+    );
+  }
+  if (ts.isCallExpression(current)) {
+    const callName = getCallName(current.expression);
+    if (context.sanitizerFunctions.has(callName)) return true;
+    if (
+      ts.isPropertyAccessExpression(current.expression) &&
+      current.expression.name.text === 'stringify' &&
+      current.expression.expression.getText() === 'JSON'
+    ) {
+      return current.arguments[0] ? isSanitizedExpression(current.arguments[0], context) : false;
     }
+    if (
+      ts.isPropertyAccessExpression(current.expression) &&
+      current.expression.name.text === 'map' &&
+      current.arguments[0]
+    ) {
+      const callback = unwrapExpression(current.arguments[0]);
+      return (
+        (ts.isIdentifier(callback) && context.sanitizerFunctions.has(callback.text)) ||
+        expressionContainsKnownCall(callback, context.sanitizerFunctions)
+      );
+    }
+    return false;
+  }
+  if (ts.isObjectLiteralExpression(current)) {
+    return current.properties.every((property) => {
+      if (ts.isSpreadAssignment(property)) {
+        return isSanitizedExpression(property.expression, context);
+      }
+      if (ts.isShorthandPropertyAssignment(property)) {
+        return isSanitizedExpression(property.name, context);
+      }
+      if (ts.isPropertyAssignment(property)) {
+        const propertyName = getPropertyNameText(property.name);
+        return (
+          (propertyName != null && SAFE_DIAGNOSTIC_PROPERTY_PATTERN.test(propertyName)) ||
+          isSanitizedExpression(property.initializer, context)
+        );
+      }
+      return false;
+    });
+  }
+  if (ts.isArrayLiteralExpression(current)) {
+    return current.elements.every((element) => isSanitizedExpression(element, context));
   }
   return false;
 }
 
-function collectSinkLevelViolations(relativePath, sourceText) {
-  const lines = sourceText.split(/\r?\n/u);
-  const hasTaintedSource = hasTaintedDiagnosticSource(sourceText);
-  if (!hasTaintedSource) {
-    return [];
-  }
-
-  return lines.flatMap((line, index) => {
-    if (!isSinkLine(line) || hasNearbySanitizer(lines, index)) {
-      return [];
+function collectSanitizedIdentifiers(sourceFile, context) {
+  const declarations = [];
+  visitSourceNodes(sourceFile, (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      declarations.push(node);
     }
-    return [
-      {
-        rule: 'diagnostic-sink-sanitizer-missing',
-        file: relativePath,
-        line: index + 1,
-        message:
-          'diagnostic/tracing sink writes tainted diagnostic data without a sanitizer/redactor call at the final sink',
-      },
-    ];
   });
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const declaration of declarations) {
+      if (
+        !context.sanitizedIdentifiers.has(declaration.name.text) &&
+        isSanitizedExpression(declaration.initializer, context)
+      ) {
+        context.sanitizedIdentifiers.add(declaration.name.text);
+        changed = true;
+      }
+    }
+  }
+}
+
+function isDiagnosticStorageSetCall(node, sourceFile) {
+  return (
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === 'set' &&
+    /(?:browserStorage|chrome\.storage)/u.test(node.expression.expression.getText()) &&
+    DIAGNOSTIC_PAYLOAD_SIGNAL_PATTERN.test(node.arguments[0]?.getText(sourceFile) ?? '')
+  );
+}
+
+function isDiagnosticArchiveFileCall(node) {
+  if (!ts.isPropertyAccessExpression(node.expression) || node.expression.name.text !== 'file') {
+    return false;
+  }
+  const entryName = node.arguments[0];
+  return ts.isStringLiteral(entryName) && DIAGNOSTIC_ARCHIVE_ENTRY_PATTERN.test(entryName.text);
+}
+
+function findIdentifierInitializer(sourceFile, identifierName) {
+  let initializer = null;
+  visitSourceNodes(sourceFile, (node) => {
+    if (
+      initializer == null &&
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === identifierName
+    ) {
+      initializer = node.initializer ?? null;
+    }
+  });
+  return initializer;
+}
+
+function isDiagnosticRuntimePayload(expression, sourceFile) {
+  const current = unwrapExpression(expression);
+  if (DIAGNOSTIC_PAYLOAD_SIGNAL_PATTERN.test(current.getText(sourceFile))) return true;
+  if (!ts.isIdentifier(current)) return false;
+  const initializer = findIdentifierInitializer(sourceFile, current.text);
+  return initializer
+    ? DIAGNOSTIC_PAYLOAD_SIGNAL_PATTERN.test(initializer.getText(sourceFile))
+    : false;
+}
+
+function collectSinkArguments(node, sourceFile, relativePath) {
+  const callName = getCallName(node.expression);
+  if (
+    (callName === 'sendRuntimeMessage' || callName === 'sendRuntimeMessageBestEffort') &&
+    node.arguments[0] &&
+    isDiagnosticRuntimePayload(node.arguments[0], sourceFile)
+  ) {
+    return node.arguments;
+  }
+  if (isDiagnosticStorageSetCall(node, sourceFile)) return node.arguments.slice(0, 1);
+  if (isDiagnosticArchiveFileCall(node)) return node.arguments.slice(1, 2);
+  if (
+    relativePath.endsWith('/message-tracer/transport.ts') &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === 'send'
+  ) {
+    return node.arguments;
+  }
+  return [];
+}
+
+function createSinkViolation(relativePath, sourceFile, node) {
+  return {
+    rule: 'diagnostic-sink-sanitizer-missing',
+    file: relativePath,
+    line: getNodeLine(sourceFile, node),
+    message:
+      'diagnostic persistence/export/transport sink receives payload data without canonical sanitizer provenance',
+  };
+}
+
+function collectPersistenceOwnerViolations(relativePath, sourceFile, importedNames) {
+  if (relativePath !== DIAGNOSTICS_PERSISTENCE_OWNER) return [];
+  const requiredCalls = new Map([
+    ['sanitizeDiagnosticsEvents', /\bevents\b/u],
+    ['sanitizeDiagnosticsMeta', /\bentry\.meta\b/u],
+  ]);
+  const found = new Set();
+  visitSourceNodes(sourceFile, (node) => {
+    if (!ts.isCallExpression(node)) return;
+    const localName = getCallName(node.expression);
+    const importedName = importedNames.get(localName);
+    const argumentText = node.arguments[0]?.getText(sourceFile) ?? '';
+    if (importedName && requiredCalls.get(importedName)?.test(argumentText)) {
+      found.add(importedName);
+    }
+  });
+  return [...requiredCalls.keys()].flatMap((requiredName) =>
+    found.has(requiredName)
+      ? []
+      : [
+          {
+            rule: 'diagnostic-persistence-final-sanitizer-missing',
+            file: relativePath,
+            message: `diagnostics persistence owner must call ${requiredName} at the final durable boundary`,
+          },
+        ]
+  );
 }
 
 export function collectDiagnosticSanitizationViolations(
@@ -107,7 +349,6 @@ export function collectDiagnosticSanitizationViolations(
   { policyPath = POLICY_PATH, rootDir = repoRoot } = {}
 ) {
   const policy = readPolicy(rootDir, policyPath);
-  const allowlistedFiles = new Set(policy.diagnosticSanitizerOwners.map((entry) => entry.file));
   const violations = collectPolicyRegistryViolations(
     policy.diagnosticSanitizerOwners,
     policyPath,
@@ -119,25 +360,34 @@ export function collectDiagnosticSanitizationViolations(
     files,
     {
       rootDir,
-      shouldIncludeRelativePath: (relativePath) =>
-        isProductSourcePath(relativePath) && DIAGNOSTIC_FILE_PATTERN.test(relativePath),
+      shouldIncludeRelativePath: isProductSourcePath,
     },
-    ({ filePath, relativePath }) => {
-      const sourceText = fs.readFileSync(filePath, 'utf8');
-      if (!reachesDiagnosticSink(sourceText)) {
-        return;
-      }
-      violations.push(...collectSinkLevelViolations(relativePath, sourceText));
-      if (allowlistedFiles.has(relativePath) || SANITIZER_IMPORT_PATTERN.test(sourceText)) {
-        return;
-      }
+    ({ relativePath, sourceFile }) => {
+      const { importedNames, safeStringifyBindings, sanitizerBindings } =
+        collectImportBindings(sourceFile);
+      const sanitizerFunctions = new Set([
+        ...sanitizerBindings,
+        ...collectSanitizerWrappers(sourceFile, sanitizerBindings),
+      ]);
+      const context = { sanitizedIdentifiers: new Set(), sanitizerFunctions };
+      collectSanitizedIdentifiers(sourceFile, context);
+      violations.push(
+        ...collectPersistenceOwnerViolations(relativePath, sourceFile, importedNames)
+      );
 
-      violations.push({
-        rule: 'diagnostic-sanitizer-missing',
-        file: relativePath,
-        message:
-          'diagnostic/tracing seam reaches a persistence/export/transport sink ' +
-          'without importing the canonical diagnostic sanitizer',
+      visitSourceNodes(sourceFile, (node) => {
+        if (!ts.isCallExpression(node)) return;
+        const sinkArguments = collectSinkArguments(node, sourceFile, relativePath);
+        if (sinkArguments.length === 0) return;
+        const tracerSend = relativePath.endsWith('/message-tracer/transport.ts');
+        const safe = tracerSend
+          ? sinkArguments.every(
+              (argument) =>
+                ts.isCallExpression(unwrapExpression(argument)) &&
+                safeStringifyBindings.has(getCallName(unwrapExpression(argument).expression))
+            )
+          : sinkArguments.every((argument) => isSanitizedExpression(argument, context));
+        if (!safe) violations.push(createSinkViolation(relativePath, sourceFile, node));
       });
     }
   );
@@ -159,11 +409,9 @@ export function runDiagnosticSanitizationCheck({
 
 if (isExecutedAsScript(import.meta.url)) {
   const result = runDiagnosticSanitizationCheck();
-
   if (result.violations.length > 0) {
     printViolations('Diagnostic sanitization violations found:', result.violations);
     process.exit(1);
   }
-
   process.stdout.write('Diagnostic sanitization passed\n');
 }

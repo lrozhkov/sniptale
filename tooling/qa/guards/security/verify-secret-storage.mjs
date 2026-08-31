@@ -3,18 +3,14 @@
  * outside the explicit encrypted secret-owner seam.
  */
 
-import {
-  collectCodeFiles,
-  isExecutedAsScript,
-  printViolations,
-  repoRoot,
-} from '../../core/shared.mjs';
+import { collectCodeFiles } from '../../analysis/repository/shared-files.mjs';
+import { repoRoot } from '../../analysis/repository/shared-paths.mjs';
+import { isExecutedAsScript, printViolations } from '../../runtime/process/shared-cli.mjs';
 import { collectPolicyBackedStorageFieldViolations } from './helpers/policy-scan.mjs';
 import { readPolicy, toRootRelativePath } from './security-policy-utils.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/security-storage-ownership.data.json';
-const SECRET_FIELD_PATTERN =
-  /\b(?:apiKey|token|secret|authorization|cookie)\b(?:\s*:|\s*(?:,|\}))/u;
+const SECRET_FIELDS = ['apiKey', 'token', 'secret', 'authorization', 'cookie'];
 
 export function collectSecretStorageViolations(
   files,
@@ -22,7 +18,9 @@ export function collectSecretStorageViolations(
 ) {
   const policy = readPolicy(rootDir, policyPath);
   return collectPolicyBackedStorageFieldViolations(files, {
-    fieldPattern: SECRET_FIELD_PATTERN,
+    canonicalFields: SECRET_FIELDS,
+    exactOwnerStoragePolicy: true,
+    includeSessionStorage: true,
     message:
       'persists secret-like fields through browser storage outside the approved encrypted secret owner',
     ownerEntries: policy.secretStorageOwners,

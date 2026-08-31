@@ -1,129 +1,10 @@
 import { expect, it } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { createWebSnapshotManifest } from '../../../../../features/web-snapshot/manifest';
 import {
   runtimeActionWebSnapshotSaveMessageContracts,
   WEB_SNAPSHOT_MAX_ASSET_URL_LENGTH,
   WEB_SNAPSHOT_MAX_ASSET_URLS,
-  WEB_SNAPSHOT_MAX_STAGE_CHUNK_BASE64_LENGTH,
-  WEB_SNAPSHOT_MAX_SESSION_ID_LENGTH,
 } from './save.web-snapshot.ts';
-
-function createWebSnapshotSaveRequest() {
-  return {
-    manifest: createWebSnapshotManifest({
-      id: 'snapshot-1',
-      source: { faviconUrl: null, title: 'Example', url: 'https://example.com' },
-    }),
-    packageStagedBlobId: 'stage-package-1',
-    screenshotMimeType: 'image/png',
-    screenshotStagedBlobId: 'stage-screenshot-1',
-    snapshotSessionId: 'snapshot-session-1',
-    type: MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
-  };
-}
-
-it('parses web snapshot gallery save runtime messages and responses', () => {
-  const contract =
-    runtimeActionWebSnapshotSaveMessageContracts[MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY];
-  const request = createWebSnapshotSaveRequest();
-
-  expect(contract.parseRequest(request)).toEqual(request);
-  expect(contract.parseResponse({ success: true, assetId: 'asset-1' })).toEqual({
-    success: true,
-    assetId: 'asset-1',
-  });
-  expect(() => contract.parseRequest({ ...request, manifest: { id: 'snapshot-1' } })).toThrow(
-    'runtime SAVE_WEB_SNAPSHOT_TO_GALLERY message'
-  );
-});
-
-it('rejects direct web snapshot gallery save transfers', () => {
-  const contract =
-    runtimeActionWebSnapshotSaveMessageContracts[MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY];
-  const request = createWebSnapshotSaveRequest();
-
-  expect(() => contract.parseRequest({ ...request, packageBase64: 'emlw' })).toThrow(
-    'runtime SAVE_WEB_SNAPSHOT_TO_GALLERY message'
-  );
-  expect(() => contract.parseRequest({ ...request, screenshotBase64: 'cG5n' })).toThrow(
-    'runtime SAVE_WEB_SNAPSHOT_TO_GALLERY message'
-  );
-  expect(() => {
-    const { packageStagedBlobId: _packageStagedBlobId, ...missingPackage } = request;
-    contract.parseRequest(missingPackage);
-  }).toThrow('runtime SAVE_WEB_SNAPSHOT_TO_GALLERY message');
-});
-
-it('rejects oversized or malformed web snapshot gallery save payloads', () => {
-  const contract =
-    runtimeActionWebSnapshotSaveMessageContracts[MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY];
-  const request = createWebSnapshotSaveRequest();
-
-  expect(() => contract.parseRequest({ ...request, screenshotMimeType: 'text/html' })).toThrow(
-    'runtime SAVE_WEB_SNAPSHOT_TO_GALLERY message'
-  );
-  expect(() =>
-    contract.parseRequest({
-      ...request,
-      snapshotSessionId: 'x'.repeat(WEB_SNAPSHOT_MAX_SESSION_ID_LENGTH + 1),
-    })
-  ).toThrow('runtime SAVE_WEB_SNAPSHOT_TO_GALLERY message');
-});
-
-it('parses staged web snapshot blob chunk messages and responses', () => {
-  const contract =
-    runtimeActionWebSnapshotSaveMessageContracts[MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK];
-  const request = {
-    base64: 'emlw',
-    blobKind: 'package',
-    chunkIndex: 0,
-    snapshotSessionId: 'snapshot-session-1',
-    stagedBlobId: 'stage-package-1',
-    totalBytes: 3,
-    totalChunks: 1,
-    type: MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
-  };
-
-  expect(contract.parseRequest(request)).toEqual(request);
-  expect(
-    contract.parseResponse({ success: true, complete: true, stagedBlobId: 'stage-package-1' })
-  ).toEqual({
-    complete: true,
-    stagedBlobId: 'stage-package-1',
-    success: true,
-  });
-  expect(() => contract.parseRequest({ ...request, blobKind: 'archive' })).toThrow(
-    'runtime STAGE_WEB_SNAPSHOT_BLOB_CHUNK message'
-  );
-  expect(() => contract.parseRequest({ ...request, chunkIndex: 1, totalChunks: 1 })).toThrow(
-    'runtime STAGE_WEB_SNAPSHOT_BLOB_CHUNK message'
-  );
-  expect(() =>
-    contract.parseRequest({
-      ...request,
-      base64: 'A'.repeat(WEB_SNAPSHOT_MAX_STAGE_CHUNK_BASE64_LENGTH + 1),
-    })
-  ).toThrow('runtime STAGE_WEB_SNAPSHOT_BLOB_CHUNK message');
-});
-
-it('parses owner-bound staged web snapshot release messages', () => {
-  const contract =
-    runtimeActionWebSnapshotSaveMessageContracts[MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS];
-  const request = {
-    snapshotSessionId: 'snapshot-session-1',
-    type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
-  };
-
-  expect(contract.parseRequest(request)).toEqual(request);
-  expect(contract.parseResponse({ success: true, result: 'released' })).toEqual({
-    result: 'released',
-    success: true,
-  });
-  expect(() => contract.parseRequest({ ...request, snapshotSessionId: '../other' })).toThrow(
-    'runtime RELEASE_WEB_SNAPSHOT_STAGED_BLOBS message'
-  );
-});
 
 it('parses registered web snapshot asset fetch messages and responses', () => {
   const fetchContract =
@@ -132,15 +13,29 @@ it('parses registered web snapshot asset fetch messages and responses', () => {
     runtimeActionWebSnapshotSaveMessageContracts[MessageType.REGISTER_WEB_SNAPSHOT_ASSETS];
 
   expect(
+    registerContract.parseRequest({
+      assetUrls: ['https://fonts.example.com/demo.woff2'],
+      requestId: 'req-web',
+      snapshotSessionId: 'snapshot-session-1',
+      type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
+    })
+  ).toEqual({
+    assetUrls: ['https://fonts.example.com/demo.woff2'],
+    requestId: 'req-web',
+    snapshotSessionId: 'snapshot-session-1',
+    type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
+  });
+
+  expect(
     fetchContract.parseRequest({
       snapshotSessionId: 'snapshot-session-1',
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-      url: 'https://upload.wikimedia.org/example.svg',
+      urls: ['https://assets.example.test/example.svg'],
     })
   ).toEqual({
     snapshotSessionId: 'snapshot-session-1',
     type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-    url: 'https://upload.wikimedia.org/example.svg',
+    urls: ['https://assets.example.test/example.svg'],
   });
   expect(() =>
     registerContract.parseRequest({
@@ -155,7 +50,45 @@ it('parses registered web snapshot asset fetch messages and responses', () => {
     fetchContract.parseRequest({
       snapshotSessionId: 'snapshot-session-1',
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-      url: `https://cdn.example.com/${'a'.repeat(WEB_SNAPSHOT_MAX_ASSET_URL_LENGTH)}`,
+      urls: [`https://cdn.example.com/${'a'.repeat(WEB_SNAPSHOT_MAX_ASSET_URL_LENGTH)}`],
     })
   ).toThrow('runtime FETCH_WEB_SNAPSHOT_ASSET message');
+});
+
+it('accepts bounded per-asset batch outcomes and rejects malformed response fields', () => {
+  const fetchContract =
+    runtimeActionWebSnapshotSaveMessageContracts[MessageType.FETCH_WEB_SNAPSHOT_ASSET];
+  const validAssets = [
+    {
+      base64: 'YQ==',
+      mimeType: 'image/png',
+      success: true,
+      url: 'https://cdn.example.com/a.png',
+    },
+    {
+      error: 'fetch failed',
+      success: false,
+      url: 'https://cdn.example.com/b.png',
+    },
+  ];
+
+  expect(fetchContract.parseResponse({ assets: validAssets, success: true })).toEqual({
+    assets: validAssets,
+    success: true,
+  });
+
+  for (const assets of [
+    'not-an-array',
+    Array.from({ length: 501 }, () => validAssets[0]),
+    [{ ...validAssets[0], extra: true }],
+    [{ ...validAssets[0], success: 'yes' }],
+    [{ ...validAssets[0], url: '' }],
+    [{ ...validAssets[0], base64: 42 }],
+    [{ ...validAssets[1], error: 42 }],
+    [{ ...validAssets[0], mimeType: 42 }],
+  ]) {
+    expect(() => fetchContract.parseResponse({ assets, success: true })).toThrow(
+      'runtime FETCH_WEB_SNAPSHOT_ASSET response'
+    );
+  }
 });

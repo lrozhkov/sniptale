@@ -16,6 +16,7 @@ import {
   type MediaHubBackupRootEnvelope,
 } from './contracts';
 import { CATALOG_ROOT, MANIFEST_PATH, MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export interface ArchiveRootObjectSource {
   blob: Blob;
@@ -89,6 +90,7 @@ function createArchiveId(): string {
 export function buildMediaHubBackupExportPlanV6(args: {
   archiveId?: string;
   exportedAt?: string;
+  galleryViews?: GallerySavedView[];
   privacy: MediaHubBackupPrivacyFlags;
   roots: MediaHubBackupRootInventoryItem[];
 }): MediaHubBackupExportPlanV6 {
@@ -150,6 +152,7 @@ export function buildMediaHubBackupExportPlanV6(args: {
     catalogs: catalogs.map((catalog) => catalog.descriptor),
     exportedAt: args.exportedAt ?? new Date().toISOString(),
     format: MEDIA_HUB_BACKUP_FORMAT,
+    ...(args.galleryViews ? { galleryViews: structuredClone(args.galleryViews) } : {}),
     layout: MEDIA_HUB_BACKUP_LAYOUT,
     privacy: args.privacy,
     totals: {

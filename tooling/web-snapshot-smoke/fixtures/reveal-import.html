@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Reveal and import regression fixture</title>
+    <style>
+      @import url('/reveal-theme.css?weights=400;600;700');
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: #172554;
+        background: #eff6ff;
+      }
+      main {
+        width: min(960px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0;
+      }
+      section {
+        min-height: 620px;
+        margin-bottom: 32px;
+        padding: 40px;
+        opacity: 0;
+        transform: translateY(28px);
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease;
+      }
+      section.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .reveal-card {
+        border: 6px solid #ef4444;
+        border-radius: 28px;
+        background-color: white;
+        background-position: right 32px top 32px;
+        background-repeat: no-repeat;
+        background-size: 96px;
+        box-shadow: 0 24px 80px rgb(30 64 175 / 15%);
+      }
+      h1 {
+        max-width: 700px;
+        font-size: 48px;
+      }
+      p {
+        max-width: 620px;
+        font-size: 21px;
+        line-height: 1.7;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="reveal-card">
+        <h1>First viewport section</h1>
+        <p>The initial section appears immediately.</p>
+      </section>
+      <section class="reveal-card">
+        <h1>Second lazy section</h1>
+        <p>Full-page capture must reveal this section before static DOM cloning.</p>
+      </section>
+      <section class="reveal-card">
+        <h1>Third lazy section</h1>
+        <p>The quoted import URL contains semicolons and must remain a complete CSS rule.</p>
+      </section>
+      <section class="reveal-card">
+        <h1>Fourth lazy section</h1>
+        <p>The saved no-script document must retain every revealed class.</p>
+      </section>
+    </main>
+    <script>
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+      });
+      document.querySelectorAll('section').forEach((section) => observer.observe(section));
+    </script>
+  </body>
+</html>

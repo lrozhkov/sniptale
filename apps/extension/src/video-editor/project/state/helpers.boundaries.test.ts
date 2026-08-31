@@ -25,7 +25,6 @@ function createProjectState(): VideoEditorProjectState {
     project,
     projectHistory: resetVideoEditorProjectHistory(project.id),
     selection: { kind: VideoEditorSelectionKind.SCENE },
-    selectedClipId: null,
     selectedTrackId: project.tracks[0]?.id ?? null,
   } as VideoEditorProjectState;
 }
@@ -84,7 +83,6 @@ it('returns an empty patch when applying a project update without an active proj
         currentTime: 1,
         project: null,
         selection: { kind: VideoEditorSelectionKind.SCENE },
-        selectedClipId: null,
         selectedTrackId: null,
       } as VideoEditorProjectState,
       (project) => project

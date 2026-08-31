@@ -1,5 +1,4 @@
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
-import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensions';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type {
   MediaLibraryEntry,
@@ -7,6 +6,7 @@ import type {
   SaveWebSnapshotMediaAssetInput,
 } from '../media-library/contracts';
 import type { StoredWebSnapshotRecord } from './contracts';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 
 export async function createWebSnapshotThumbnailEntry(args: {
   assetId: string;
@@ -14,7 +14,9 @@ export async function createWebSnapshotThumbnailEntry(args: {
   screenshotBlob: Blob;
   updatedAt: number;
 }): Promise<MediaThumbnailEntry> {
-  const blob = await createImageThumbnailBlob(args.screenshotBlob);
+  const blob = await createImageThumbnailBlob(args.screenshotBlob, 320, 180, {
+    verticalAnchor: 'top',
+  });
 
   return {
     assetId: args.assetId,
@@ -30,10 +32,9 @@ export async function createWebSnapshotMediaEntry(args: {
   assetId: string;
   input: SaveWebSnapshotMediaAssetInput;
   now: number;
+  screenshotDimensions: { height: number; width: number };
   snapshot: StoredWebSnapshotRecord;
 }): Promise<MediaLibraryEntry> {
-  const dimensions = await measureImageBlob(args.input.screenshotBlob);
-
   return {
     id: args.assetId,
     kind: 'web-archive',
@@ -43,9 +44,9 @@ export async function createWebSnapshotMediaEntry(args: {
     createdAt: args.snapshot.createdAt,
     updatedAt: args.now,
     size: args.snapshot.size,
-    mimeType: 'application/x-sniptale-web-snapshot+zip',
-    width: dimensions.width,
-    height: dimensions.height,
+    mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+    width: args.screenshotDimensions.width,
+    height: args.screenshotDimensions.height,
     duration: null,
     sourceUrl: sanitizeProvenanceUrl(args.input.sourceUrl ?? args.input.manifest.source.url),
     sourceTitle: args.input.sourceTitle ?? args.input.manifest.source.title,

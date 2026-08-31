@@ -5,19 +5,16 @@ import {
   writeBlobToAsset,
   type PreparedAssetObject,
 } from '../assets';
-import {
-  sanitizeWebSnapshotManifestProvenance,
-  sanitizeWebSnapshotPackageProvenance,
-} from '../../../features/web-snapshot/provenance';
+import { sanitizeWebSnapshotManifestProvenance } from '../../../features/web-snapshot/provenance';
 import type { SaveWebSnapshotMediaAssetInput } from '../media-library/contracts';
 import type { StoredWebSnapshotRecord } from './contracts';
 import { createWebSnapshotMediaEntry } from './media-entry';
-import { markWebSnapshotProvenanceSanitized } from './provenance-state';
 import {
   publishWebSnapshotJournal,
   recoverWebSnapshotPublications,
   WEB_SNAPSHOT_PUBLICATION_DOMAIN,
 } from './publication';
+import { validateWebSnapshotScreenshotBlob } from '../../../features/web-snapshot/screenshot-validation';
 
 function stageMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error ?? 'Unknown error');
@@ -78,30 +75,34 @@ async function writeSnapshotObjects(
 export async function saveWebSnapshotMediaAsset(
   input: SaveWebSnapshotMediaAssetInput
 ): Promise<{ assetId: string; snapshot: StoredWebSnapshotRecord }> {
+  const screenshotDimensions = await runStage('validate web snapshot screenshot', () =>
+    validateWebSnapshotScreenshotBlob(input.screenshotBlob)
+  );
   await recoverWebSnapshotPublications();
   const assetId = input.id ?? crypto.randomUUID();
   const now = Date.now();
-  const sanitizedPackage = await runStage('sanitize saved web snapshot package', () =>
-    sanitizeWebSnapshotPackageProvenance(input.packageBlob, input.manifest)
-  );
+  const sanitizedManifest = sanitizeWebSnapshotManifestProvenance(input.manifest);
+  if (JSON.stringify(sanitizedManifest) !== JSON.stringify(input.manifest)) {
+    throw new Error('validate saved Page Package provenance: source metadata is not sanitized');
+  }
   const [packageObject, screenshotObject] = await runStage('write web snapshot objects', () =>
-    writeSnapshotObjects(sanitizedPackage.packageBlob, input.screenshotBlob)
+    writeSnapshotObjects(input.packageBlob, input.screenshotBlob)
   );
-  const snapshot = markWebSnapshotProvenanceSanitized({
+  const snapshot: StoredWebSnapshotRecord = {
     id: assetId,
     packageAssetId: packageObject.ref.assetId,
     screenshotAssetId: screenshotObject.ref.assetId,
     screenshotMimeType: screenshotObject.ref.mimeType,
     screenshotSize: screenshotObject.ref.size,
-    manifest: sanitizeWebSnapshotManifestProvenance(sanitizedPackage.manifest),
+    manifest: sanitizedManifest,
     createdAt: input.createdAt ?? now,
     updatedAt: now,
     size: packageObject.ref.size,
-  });
+  };
   let journalCreated = false;
   try {
     const mediaEntry = await runStage('create web snapshot media entry', () =>
-      createWebSnapshotMediaEntry({ assetId, input, now, snapshot })
+      createWebSnapshotMediaEntry({ assetId, input, now, screenshotDimensions, snapshot })
     );
     const journal = await createAssetPublicationJournal({
       assetRefs: [packageObject.ref, screenshotObject.ref],

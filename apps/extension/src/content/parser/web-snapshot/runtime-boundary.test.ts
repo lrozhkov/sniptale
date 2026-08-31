@@ -4,9 +4,7 @@ import { expect, it } from 'vitest';
 const CONTENT_WEB_SNAPSHOT_RUNTIME_FILES = [
   new URL('./asset-fetch.ts', import.meta.url),
   new URL('./asset-targets.ts', import.meta.url),
-  new URL('./injected-runner.ts', import.meta.url),
   new URL('./package.ts', import.meta.url),
-  new URL('./save.ts', import.meta.url),
   new URL('./service.ts', import.meta.url),
   new URL('../../../features/web-snapshot/asset-manifest.ts', import.meta.url),
   new URL('../../../features/web-snapshot/manifest.ts', import.meta.url),

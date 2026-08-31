@@ -38,12 +38,18 @@ export function measureCaptureGeometry(root: ScrollCaptureRoot): FullPageCapture
   const y = Math.max(0, rect.top + root.element.clientTop);
   const width = Math.max(1, Math.min(root.element.clientWidth, viewportWidth - x));
   const height = Math.max(1, Math.min(root.element.clientHeight, viewportHeight - y));
+  // Application shells commonly keep the document itself fixed and put their workspace in one
+  // dominant internal scroller. A full-page screenshot is a vertical capture at the current
+  // viewport width: expanding an internal table/carousel horizontally can turn a modest page into
+  // a hostile-width raster and incorrectly force a visible-area fallback. The static Web Copy
+  // retains horizontal navigation for that off-screen content.
+  const captureExtentWidth = width;
   return {
     devicePixelRatio,
     extentHeight: scrollGeometry.extentHeight,
-    extentWidth: scrollGeometry.extentWidth,
+    extentWidth: captureExtentWidth,
     outputHeight: y + scrollGeometry.extentHeight + Math.max(0, viewportHeight - (y + height)),
-    outputWidth: x + scrollGeometry.extentWidth + Math.max(0, viewportWidth - (x + width)),
+    outputWidth: x + captureExtentWidth + Math.max(0, viewportWidth - (x + width)),
     rootKind: root.kind,
     rootViewport: { height, width, x, y },
     viewportHeight,

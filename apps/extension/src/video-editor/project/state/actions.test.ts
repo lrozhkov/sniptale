@@ -45,7 +45,6 @@ describe('video editor store project track and asset actions', () => {
       false
     );
     expect(store.getState().selection).toEqual({ kind: 'scene' });
-    expect(store.getState().selectedClipId).toBeNull();
   });
 });
 

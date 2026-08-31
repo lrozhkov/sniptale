@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { translate } from '../../../platform/i18n';
 import { createScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import type {
   ScenarioDeckExportOptions,
@@ -40,13 +41,17 @@ async function verifyDefaultHtmlOptions(): Promise<void> {
   const onExport = vi.fn(async () => createExportResult());
   renderDialog(onExport);
 
-  expect(findButtonByText('HTML deck')?.getAttribute('aria-pressed')).toBe('true');
-  expect(findButtonByText('Embed images')?.getAttribute('aria-pressed')).toBe('true');
+  expect(
+    findButtonByText(translate('scenario.editor.exportHtmlDeck'))?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(
+    findButtonByText(translate('scenario.editor.exportEmbedImages'))?.getAttribute('aria-pressed')
+  ).toBe('true');
   expect(
     container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.segmented-field"]')
   ).toHaveLength(2);
 
-  await clickButtonText('Export');
+  await clickButtonText(translate('scenario.editor.exportAction'));
 
   expect(onExport).toHaveBeenCalledWith({
     assetMode: 'embed',
@@ -55,18 +60,18 @@ async function verifyDefaultHtmlOptions(): Promise<void> {
     includeNotes: true,
     includeSourceJson: false,
   });
-  expect(container?.textContent).toContain('Export created.');
+  expect(container?.textContent).toContain(translate('scenario.editor.exportCreated'));
 }
 
 async function verifyToggledApiOptions(): Promise<void> {
   const onExport = vi.fn(async () => createExportResult());
   renderDialog(onExport);
 
-  await clickButton('Markdown bundle');
-  await clickButton('Include speaker notes');
-  await clickButton('Show missing asset placeholders');
-  await clickButton('Include slide source JSON');
-  await clickButtonText('Export');
+  await clickButton(translate('scenario.editor.exportMarkdownBundle'));
+  await clickButton(translate('scenario.editor.exportIncludeSpeakerNotes'));
+  await clickButton(translate('scenario.editor.exportShowMissingPlaceholders'));
+  await clickButton(translate('scenario.editor.exportIncludeSourceJson'));
+  await clickButtonText(translate('scenario.editor.exportAction'));
 
   expect(onExport).toHaveBeenCalledWith({
     assetMode: 'files',
@@ -85,14 +90,16 @@ async function verifyExportDiagnostics(): Promise<void> {
     .mockResolvedValueOnce(createExportResult(['asset-1']));
   renderDialog(onExport);
 
-  await clickButtonText('Export');
-  expect(container?.textContent).toContain('Export failed');
+  await clickButtonText(translate('scenario.editor.exportAction'));
+  expect(container?.textContent).toContain(translate('scenario.editor.exportFailed'));
 
-  await clickButtonText('Export');
+  await clickButtonText(translate('scenario.editor.exportAction'));
   expect(container?.textContent).toContain('Asset backend unavailable');
 
-  await clickButtonText('Export');
-  expect(container?.textContent).toContain('Exported with missing assets: asset-1');
+  await clickButtonText(translate('scenario.editor.exportAction'));
+  expect(container?.textContent).toContain(
+    `${translate('scenario.editor.exportedWithMissingAssets')}: asset-1`
+  );
 }
 
 function renderDialog(

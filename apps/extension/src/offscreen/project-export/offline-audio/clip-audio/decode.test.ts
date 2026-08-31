@@ -77,7 +77,10 @@ it('decodes clip audio once per asset and reuses the cached buffer', async () =>
     metadata: { hasAudio: true },
     source: { kind: 'project-asset', projectAssetId: 'project-asset-1' },
   });
-  getProjectAssetMock.mockResolvedValue({ file: new Blob(['audio']) });
+  getProjectAssetMock.mockResolvedValue({
+    entry: { file: new Blob(['audio']) },
+    status: 'ready',
+  });
 
   const first = await decodeClipAudioBuffer(project, clip, decodedBuffers, decodeContext);
   const second = await decodeClipAudioBuffer(project, clip, decodedBuffers, decodeContext);

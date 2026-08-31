@@ -30,13 +30,11 @@ export function createVideoEditorProjectTestStore() {
     placementMode: null,
     selection: createSceneSelection(),
     selectedTrackId: null,
-    selectedClipId: null,
     clearPlacementMode: () => set({ placementMode: null }),
     selectActionSegment: (actionEventId) =>
       set({ selection: { kind: 'action-segment', actionEventId } }),
     selectClip: (clipId) =>
       set({
-        selectedClipId: clipId,
         selection: clipId ? { kind: 'clip', clipId } : createSceneSelection(),
       }),
     selectCursorSegment: (sampleId) => set({ selection: { kind: 'cursor-segment', sampleId } }),
@@ -44,11 +42,9 @@ export function createVideoEditorProjectTestStore() {
       set({ selection: { kind: 'motion-region', motionRegionId } }),
     selectObjectTrack: (objectTrackId) =>
       set({ selection: { kind: 'object-track', objectTrackId } }),
-    selectScene: () =>
-      set({ selectedClipId: null, selectedTrackId: null, selection: createSceneSelection() }),
+    selectScene: () => set({ selectedTrackId: null, selection: createSceneSelection() }),
     selectTrack: (trackId) =>
       set({
-        selectedClipId: null,
         selectedTrackId: trackId,
         selection: trackId ? { kind: 'track', trackId } : createSceneSelection(),
       }),
@@ -63,7 +59,6 @@ export function createVideoEditorProjectTestStore() {
       set({
         project: hydratedProject,
         projectHistory: resetVideoEditorProjectHistory(hydratedProject.id),
-        selectedClipId: selection.kind === 'clip' ? selection.clipId : null,
         selectedTrackId: hydratedProject.tracks[0]?.id ?? null,
         selection,
       });

@@ -104,6 +104,7 @@ it('keeps reusable GitHub credentials out of user-data and denies candidate meta
     'jq',
     'node',
     'npm',
+    'npx',
     'tar',
     'zstd',
     'find',

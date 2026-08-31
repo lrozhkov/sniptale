@@ -1,6 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-// State-machine proof: cancel/failure fallbacks stay terminal for hybrid export spans.
 const encodeCleanSourceMp4SpanMock = vi.hoisted(() => vi.fn());
 const planMp4VideoRenderSpansMock = vi.hoisted(() => vi.fn());
 const renderAcceleratedCompositeWebmSpanMock = vi.hoisted(() => vi.fn());

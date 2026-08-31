@@ -11,11 +11,22 @@ import {
   PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN,
   PageAccessOperation as PageAccessOperationValue,
 } from '@sniptale/runtime-contracts/messaging/page-access';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
+import { openExtensionDetailsPage } from '../../../platform/navigation/extension-pages';
+import {
+  hasLocalFileAccessOptIn,
+  setLocalFileAccessOptIn,
+} from '../../../composition/persistence/settings/file-scheme-consent';
 
-export type UiGrantResolution = {
-  operation: PageAccessOperation;
-  rollbackOrigins?: string[];
-};
+export type UiGrantResolution =
+  | { kind: 'external-file-setting-required' }
+  | {
+      kind: 'granted';
+      operation: PageAccessOperation;
+      rollbackFileOptIn?: boolean;
+      rollbackOrigins?: string[];
+    };
 
 function createOriginPattern(origin: string | null): string | null {
   if (!origin) {
@@ -43,7 +54,7 @@ async function requestOriginGrant(origins: string[]): Promise<string[] | null> {
   return rollbackOrigins;
 }
 
-export async function rollbackOriginGrant(origins: string[] | undefined): Promise<void> {
+async function rollbackOriginGrant(origins: string[] | undefined): Promise<void> {
   if (!origins || origins.length === 0) {
     return;
   }
@@ -55,7 +66,20 @@ export async function rollbackOriginGrant(origins: string[] | undefined): Promis
   }
 }
 
-export async function resolveBackgroundOperationAfterUiGrant(args: {
+export async function rollbackUiGrant(resolution: UiGrantResolution | null): Promise<void> {
+  if (!resolution || resolution.kind !== 'granted') return;
+  await rollbackOriginGrant(resolution.rollbackOrigins);
+  if (!resolution.rollbackFileOptIn) return;
+  await setLocalFileAccessOptIn(false).catch(() => undefined);
+  await createRuntimeMessagingTransport()
+    .sendRuntimeMessage({
+      operation: PageAccessOperationValue.REGISTER_GRANTED_FILE_SCHEME,
+      type: MessageType.PAGE_ACCESS,
+    })
+    .catch(() => undefined);
+}
+
+export async function applyUiPageAccessGrant(args: {
   activeTabId: number | null;
   operation: PageAccessOperation;
   status: PageAccessStatus | null;
@@ -64,7 +88,11 @@ export async function resolveBackgroundOperationAfterUiGrant(args: {
     const origins = [...PAGE_ACCESS_ALL_SITES_ORIGIN_PATTERNS];
     const rollbackOrigins = await requestOriginGrant(origins);
     return rollbackOrigins
-      ? { operation: PageAccessOperationValue.REGISTER_GRANTED_ALL_SITES, rollbackOrigins }
+      ? {
+          kind: 'granted',
+          operation: PageAccessOperationValue.REGISTER_GRANTED_ALL_SITES,
+          rollbackOrigins,
+        }
       : null;
   }
 
@@ -78,11 +106,32 @@ export async function resolveBackgroundOperationAfterUiGrant(args: {
       return null;
     }
 
+    const isFileScheme = originPattern === PAGE_ACCESS_FILE_SCHEME_ORIGIN_PATTERN;
+    if (isFileScheme && !(await browserPermissions.isFileSchemeAccessAllowed())) {
+      await openExtensionDetailsPage();
+      return { kind: 'external-file-setting-required' };
+    }
+
     const rollbackOrigins = await requestOriginGrant([originPattern]);
+    if (!rollbackOrigins) return null;
+    const rollbackFileOptIn = isFileScheme && !(await hasLocalFileAccessOptIn());
+    if (isFileScheme) {
+      try {
+        await setLocalFileAccessOptIn(true);
+      } catch (error) {
+        await rollbackOriginGrant(rollbackOrigins);
+        throw error;
+      }
+    }
     return rollbackOrigins
-      ? { operation: PageAccessOperationValue.REGISTER_GRANTED_SITE, rollbackOrigins }
+      ? {
+          kind: 'granted',
+          operation: PageAccessOperationValue.REGISTER_GRANTED_SITE,
+          rollbackFileOptIn,
+          rollbackOrigins,
+        }
       : null;
   }
 
-  return { operation: args.operation };
+  return { kind: 'granted', operation: args.operation };
 }

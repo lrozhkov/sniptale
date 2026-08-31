@@ -35,7 +35,7 @@ const {
   resizeBrowserWindowFromContextMenuMock,
   runtimeGetUrlMock,
   sendTabMessageMock,
-  startPopupExportJobMock,
+  startPagePackageJobMock,
   permissionsRequestMock,
   tabsGetMock,
   startRecordingMock,
@@ -52,7 +52,7 @@ const {
   resizeBrowserWindowFromContextMenuMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   sendTabMessageMock: vi.fn(),
-  startPopupExportJobMock: vi.fn(),
+  startPagePackageJobMock: vi.fn(),
   permissionsRequestMock: vi.fn(),
   tabsGetMock: vi.fn(),
   startRecordingMock: vi.fn(),
@@ -66,9 +66,9 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: tabsGetMock },
 }));
 
-vi.mock('../../capture/popup-export/job', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../capture/popup-export/job')>()),
-  startPopupExportJob: startPopupExportJobMock,
+vi.mock('../../capture/page-package/job', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/page-package/job')>()),
+  startPagePackageJob: startPagePackageJobMock,
 }));
 
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -209,7 +209,7 @@ function seedContextMenuActionMocks() {
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   permissionsRequestMock.mockResolvedValue(true);
   tabsGetMock.mockResolvedValue(createTab());
-  startPopupExportJobMock.mockResolvedValue({ success: true });
+  startPagePackageJobMock.mockResolvedValue({ success: true });
 }
 
 async function verifyPresetRecordingRouting() {
@@ -235,11 +235,13 @@ async function verifyExportStartRouting() {
     tab: createTab(),
   });
 
-  expect(startPopupExportJobMock).toHaveBeenCalledWith({
+  expect(startPagePackageJobMock).toHaveBeenCalledWith({
     contentPort: expect.objectContaining({
       cancelPagePackage: expect.any(Function),
       requestPagePackage: expect.any(Function),
     }),
+    includeWebCopy: false,
+    intent: 'export',
     jobId: expect.any(String),
     options: contextMenuPopupExportPreferencesFixture,
     orderedTabs: [{ tabId: 11, title: 'Tab title' }],

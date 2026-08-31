@@ -1,105 +1,141 @@
 // @vitest-environment jsdom
 
-import JSZip from 'jszip';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manifest';
+import { afterEach, expect, it, vi } from 'vitest';
+import {
+  MAX_PAGE_PACKAGE_URL_BYTES,
+  MAX_PAGE_PACKAGE_WARNING_BYTES,
+  PAGE_PACKAGE_ARCHIVE_PATHS,
+} from '@sniptale/runtime-contracts/page-package';
+import { MAX_POPUP_EXPORT_TAB_TITLE_BYTES } from '@sniptale/runtime-contracts/export';
+import { readPagePackageTestBlobText } from '../../../features/web-snapshot/package.test-support';
 import { buildWebSnapshotPackage } from './package';
 import type { WebSnapshotPageSource } from './types';
 
-function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read package blob.'));
-    reader.onload = () => resolve(reader.result as ArrayBuffer);
-    reader.readAsArrayBuffer(blob);
-  });
-}
+const { createImageThumbnailBlobMock } = vi.hoisted(() => ({
+  createImageThumbnailBlobMock: vi.fn(),
+}));
 
-async function readPackageEntries(packageBlob: Blob) {
-  const zip = await JSZip.loadAsync(await blobToArrayBuffer(packageBlob));
-
-  return {
-    domSnapshot: await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.domSnapshot),
-    manifest: JSON.parse(await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)) as {
-      assets?: Array<{ mimeType: string; path: string; sha256: string; size: number }>;
-      source: {
-        title: string | null;
-        url: string | null;
-      };
-      stats: {
-        failedAssetCount: number;
-        networkWarningCount: number;
-        sanitizerWarningCount: number;
-        warningCount: number;
-      };
-      viewport?: { height: number; width: number };
-      warnings: string[];
-    },
-    snapshotHtml: await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml),
-    virtualDomSnapshot: await readZipText(zip, WEB_SNAPSHOT_PACKAGE_PATHS.virtualDomSnapshot),
-  };
-}
-
-async function readZipText(zip: JSZip, path: string): Promise<string> {
-  const file = zip.file(path);
-  if (!file) {
-    throw new Error(`Missing zip entry: ${path}`);
-  }
-
-  return file.async('string');
-}
+vi.mock('../../../platform/media-utils/image-thumbnail', () => ({
+  createImageThumbnailBlob: createImageThumbnailBlobMock,
+}));
 
 function createSource(): WebSnapshotPageSource {
   return {
     title: 'Prepared page',
     url: 'http://localhost:3000/prepared',
+    viewport: { deviceScaleFactor: 1, height: 720, width: 1280 },
   };
 }
 
-beforeEach(() => {
-  document.title = 'Prepared page';
-  window.history.replaceState(null, '', '/prepared');
-});
+function findEntry(
+  result: Awaited<ReturnType<typeof buildWebSnapshotPackage>>,
+  path: string
+): Blob {
+  const entry = result.pagePackage.entries.find((candidate) => candidate.path === path);
+  if (!entry) throw new Error(`Missing Page Package entry: ${path}`);
+  return entry.source;
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
+  createImageThumbnailBlobMock.mockReset();
 });
 
-it('writes snapshot HTML, DOM diagnostics, and manifest warnings from the same artifact', async () => {
-  const preparedHtml = [
-    '<!doctype html>',
-    '<html><body>',
-    '<main data-virtual-iframe="true">Iframe body</main>',
-    '<div class="sniptale-frames-container">Static frame</div>',
-    '</body></html>',
-  ].join('');
+it('composes one safe static document, standard diagnostics, screenshot, and top thumbnail', async () => {
+  const html = '<!doctype html><html><body><main>Static page</main></body></html>';
+  const diagnosticsDocument = document.implementation.createHTMLDocument('Private title');
+  diagnosticsDocument.body.innerHTML =
+    '<main data-token="private-token">Sensitive diagnostic text</main>';
   const screenshotBlob = new Blob(['png'], { type: 'image/png' });
+  const thumbnailBlob = new Blob(['webp'], { type: 'image/webp' });
+  createImageThumbnailBlobMock.mockResolvedValue(thumbnailBlob);
 
   const result = await buildWebSnapshotPackage({
     assets: [],
-    html: preparedHtml,
+    diagnosticsSource: { document: diagnosticsDocument },
+    html,
     screenshotBlob,
     source: createSource(),
-    warnings: ['Iframe snapshot timed out before content was ready: #slow-frame'],
+    warnings: ['Iframe content was unavailable'],
   });
-  const entries = await readPackageEntries(result.packageBlob);
 
-  expect(entries.snapshotHtml).toBe(preparedHtml);
-  expect(entries.domSnapshot).toBe(preparedHtml);
-  expect(entries.virtualDomSnapshot).toBe(preparedHtml);
-  expect(entries.manifest.warnings).toEqual([
-    'Iframe snapshot timed out before content was ready: #slow-frame',
-  ]);
-  expect(result.manifest.warnings).toEqual(entries.manifest.warnings);
+  expect(
+    await readPagePackageTestBlobText(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml))
+  ).toBe(html);
+  expect(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.screenshot)).toBe(screenshotBlob);
+  expect(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.thumbnail)).toBe(thumbnailBlob);
+  const readme = await readPagePackageTestBlobText(
+    findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.readme)
+  );
+  expect(readme).toContain('Safe Web copy');
+  expect(readme).toContain('Scripts and inline event handlers are removed');
+  expect(readme).toContain('Diagnostics level: `standard`');
+  const domDiagnostics = await readPagePackageTestBlobText(
+    findEntry(result, 'diagnostics/standard/dom.html.txt')
+  );
+  const virtualDomDiagnostics = await readPagePackageTestBlobText(
+    findEntry(result, 'diagnostics/standard/virtual-dom.html.txt')
+  );
+  expect(domDiagnostics).not.toBe(html);
+  expect(domDiagnostics).toContain('[text:25]');
+  expect(domDiagnostics).not.toContain('Sensitive diagnostic text');
+  expect(domDiagnostics).not.toContain('private-token');
+  expect(virtualDomDiagnostics).not.toBe(html);
+  expect(virtualDomDiagnostics).not.toContain('Sensitive diagnostic text');
+  expect(virtualDomDiagnostics).not.toContain('private-token');
+  expect(
+    await readPagePackageTestBlobText(findEntry(result, 'diagnostics/standard/errors.log'))
+  ).toBe('Iframe content was unavailable');
+  expect(createImageThumbnailBlobMock).toHaveBeenCalledWith(screenshotBlob, 320, 180, {
+    verticalAnchor: 'top',
+  });
+  expect(result.manifest).toBe(result.pagePackage.manifest);
+  expect(result.manifest.entries).toEqual(
+    result.pagePackage.entries.map(({ source: _source, ...entry }) => entry)
+  );
 });
 
-it('writes structured warning counters without treating every warning as a failed asset', async () => {
-  const screenshotBlob = new Blob(['png'], { type: 'image/png' });
+it('publishes a viewport fallback only as an explicit partial preview', async () => {
+  const screenshotBlob = new Blob(['partial'], { type: 'image/png' });
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
 
   const result = await buildWebSnapshotPackage({
     assets: [],
-    html: '<!doctype html><html><body>Snapshot</body></html>',
+    html: '<!doctype html><html><body>Static page</body></html>',
     screenshotBlob,
+    screenshotCoverage: 'viewport',
+    source: createSource(),
+    warnings: ['Only the visible area was retained'],
+  });
+
+  expect(result.manifest.entries.map((entry) => entry.path)).toContain(
+    PAGE_PACKAGE_ARCHIVE_PATHS.partialScreenshot
+  );
+  expect(result.manifest.entries.map((entry) => entry.path)).not.toContain(
+    PAGE_PACKAGE_ARCHIVE_PATHS.screenshot
+  );
+  expect(result.manifest.components.find((component) => component.id === 'webCopy')?.status).toBe(
+    'partial'
+  );
+  expect(
+    await readPagePackageTestBlobText(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.readme))
+  ).toContain('not a full-page screenshot');
+});
+
+it('records asset metadata and structured capture status in the canonical manifest', async () => {
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
+  const asset = new Blob(['body { color: red; }'], { type: 'text/css' });
+
+  const result = await buildWebSnapshotPackage({
+    assets: [
+      {
+        blob: asset,
+        localPath: 'assets/style.css',
+        originalUrl: 'https://example.test/style.css',
+      },
+    ],
+    html: '<!doctype html><html><body>Snapshot</body></html>',
+    screenshotBlob: new Blob(['png'], { type: 'image/png' }),
     source: createSource(),
     warningStats: {
       failedAssetCount: 1,
@@ -107,110 +143,112 @@ it('writes structured warning counters without treating every warning as a faile
       sanitizerWarningCount: 1,
       warningCount: 2,
     },
-    warnings: ['Iframe skipped', 'Asset skipped'],
+    warnings: ['Asset skipped', 'Frame skipped'],
   });
-  const entries = await readPackageEntries(result.packageBlob);
 
-  expect(entries.manifest.stats).toMatchObject({
-    failedAssetCount: 1,
-    networkWarningCount: 1,
-    sanitizerWarningCount: 1,
-    warningCount: 2,
+  expect(result.manifest.entries).toContainEqual({
+    component: 'webCopy',
+    mimeType: 'text/css',
+    path: 'assets/style.css',
+    sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    size: asset.size,
   });
   expect(result.manifest.stats).toMatchObject({
-    failedAssetCount: entries.manifest.stats.failedAssetCount,
-    networkWarningCount: entries.manifest.stats.networkWarningCount,
-    sanitizerWarningCount: entries.manifest.stats.sanitizerWarningCount,
-    warningCount: entries.manifest.stats.warningCount,
+    entryCount: result.pagePackage.entries.length,
+    failedResourceCount: 1,
+    warningCount: 2,
   });
+  expect(result.manifest.components).toContainEqual(
+    expect.objectContaining({ id: 'webCopy', status: 'partial' })
+  );
 });
 
-it('writes asset MIME, size, and hash metadata into the package manifest', async () => {
-  const screenshotBlob = new Blob(['png'], { type: 'image/png' });
-
+it('sanitizes source provenance and preserves capture viewport metadata', async () => {
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
   const result = await buildWebSnapshotPackage({
-    assets: [
-      {
-        blob: new Blob(['body { color: red; }'], { type: 'text/css' }),
-        localPath: 'assets/style.css',
-        originalUrl: 'https://example.test/style.css',
-      },
-    ],
+    assets: [],
     html: '<!doctype html><html><body>Snapshot</body></html>',
-    screenshotBlob,
-    source: createSource(),
+    screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    source: {
+      title: 'Detached snapshot',
+      url: 'https://user:secret@source.example/path?token=secret#hash',
+      viewport: { deviceScaleFactor: 2, height: 720, width: 1280 },
+    },
     warnings: [],
   });
-  const entries = await readPackageEntries(result.packageBlob);
 
-  expect(entries.manifest.assets).toEqual([
-    {
-      mimeType: 'text/css',
-      path: 'assets/style.css',
-      sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
-      size: 20,
-    },
-  ]);
-  expect(result.manifest.assets).toEqual(entries.manifest.assets);
+  expect(result.manifest.source).toEqual({
+    faviconUrl: null,
+    title: 'Detached snapshot',
+    url: 'https://source.example/path',
+  });
+  expect(result.manifest.viewport).toEqual({ deviceScaleFactor: 2, height: 720, width: 1280 });
 });
 
-it('writes explicit source metadata without ambient window location', async () => {
-  const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  const originalLocationDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'location');
-  Reflect.deleteProperty(globalThis, 'window');
-  Reflect.deleteProperty(globalThis, 'location');
-
-  try {
-    const result = await buildWebSnapshotPackage({
-      assets: [],
-      html: '<!doctype html><html><body>Snapshot</body></html>',
-      screenshotBlob: new Blob(['png'], { type: 'image/png' }),
-      source: {
-        title: 'Detached snapshot',
-        url: 'https://source.example/path?token=secret#hash',
-      },
-      warnings: [],
-    });
-    const entries = await readPackageEntries(result.packageBlob);
-
-    expect(entries.manifest).toMatchObject({
-      source: {
-        title: 'Detached snapshot',
-        url: 'https://source.example/path',
-      },
-    });
-    expect(result.manifest.source).toEqual(entries.manifest.source);
-  } finally {
-    if (originalWindowDescriptor) {
-      Object.defineProperty(globalThis, 'window', originalWindowDescriptor);
-    }
-    if (originalLocationDescriptor) {
-      Object.defineProperty(globalThis, 'location', originalLocationDescriptor);
-    }
-  }
-});
-
-it('writes capture viewport metadata into the package manifest', async () => {
+it('keeps direct callers inside the canonical Page Package title contract', async () => {
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
   const result = await buildWebSnapshotPackage({
     assets: [],
     html: '<!doctype html><html><body>Snapshot</body></html>',
     screenshotBlob: new Blob(['png'], { type: 'image/png' }),
     source: {
       ...createSource(),
-      viewport: { height: 720, width: 1280 },
+      title: 'e\u0301'.repeat(MAX_POPUP_EXPORT_TAB_TITLE_BYTES),
     },
     warnings: [],
   });
-  const entries = await readPackageEntries(result.packageBlob);
 
-  expect(entries.manifest).toMatchObject({
-    viewport: { height: 720, width: 1280 },
-  });
-  expect(result.manifest.viewport).toEqual(entries.manifest.viewport);
+  const title = result.manifest.source.title;
+  expect(typeof title).toBe('string');
+  expect(title).toBe(title?.normalize('NFC'));
+  expect(new TextEncoder().encode(title ?? '').byteLength).toBeLessThanOrEqual(
+    MAX_POPUP_EXPORT_TAB_TITLE_BYTES
+  );
 });
 
-it('rejects oversized package inputs before generating a zip archive', async () => {
-  const generateAsyncSpy = vi.spyOn(JSZip.prototype, 'generateAsync');
+it('closes direct source URLs and warnings under the manifest contract', async () => {
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
+  const result = await buildWebSnapshotPackage({
+    assets: [],
+    html: '<!doctype html><html><body>Snapshot</body></html>',
+    screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    source: {
+      ...createSource(),
+      url: `https://page.test/${'u'.repeat(MAX_PAGE_PACKAGE_URL_BYTES)}`,
+    },
+    warnings: ['e\u0301'.repeat(MAX_PAGE_PACKAGE_WARNING_BYTES)],
+  });
+
+  expect(result.manifest.source.url).toBeNull();
+  expect(new TextEncoder().encode(result.manifest.warnings[0] ?? '').byteLength).toBe(
+    MAX_PAGE_PACKAGE_WARNING_BYTES
+  );
+});
+
+it('keeps a large canonical static document without duplicating it into diagnostics', async () => {
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
+  const html = `<!doctype html><html><body>${'x'.repeat(4 * 1024 * 1024)}</body></html>`;
+
+  const result = await buildWebSnapshotPackage({
+    assets: [],
+    html,
+    screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    source: createSource(),
+    warnings: [],
+  });
+
+  expect(
+    await readPagePackageTestBlobText(findEntry(result, PAGE_PACKAGE_ARCHIVE_PATHS.snapshotHtml))
+  ).toBe(html);
+  const diagnostics = await readPagePackageTestBlobText(
+    findEntry(result, 'diagnostics/standard/dom.html.txt')
+  );
+  expect(diagnostics).not.toBe(html);
+  expect(diagnostics.length).toBeLessThan(1024);
+});
+
+it('rejects unsafe or oversized inputs before composition', async () => {
+  createImageThumbnailBlobMock.mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
 
   await expect(
     buildWebSnapshotPackage({
@@ -222,20 +260,13 @@ it('rejects oversized package inputs before generating a zip archive', async () 
     })
   ).rejects.toThrow('Web snapshot HTML is too large.');
 
-  expect(generateAsyncSpy).not.toHaveBeenCalled();
-});
-
-it('generates the snapshot package once instead of rebuilding it for package-size metadata', async () => {
-  const generateAsyncSpy = vi.spyOn(JSZip.prototype, 'generateAsync');
-
-  const result = await buildWebSnapshotPackage({
-    assets: [],
-    html: '<!doctype html><html><body>Snapshot</body></html>',
-    screenshotBlob: new Blob(['png'], { type: 'image/png' }),
-    source: createSource(),
-    warnings: [],
-  });
-
-  expect(generateAsyncSpy).toHaveBeenCalledTimes(1);
-  expect(result.manifest.stats.packageSize).toBeGreaterThan(0);
+  await expect(
+    buildWebSnapshotPackage({
+      assets: [],
+      html: '<main>Snapshot</main>',
+      screenshotBlob: new Blob(['webp'], { type: 'image/webp' }),
+      source: createSource(),
+      warnings: [],
+    })
+  ).rejects.toThrow('Page Package screenshot must use image/png.');
 });

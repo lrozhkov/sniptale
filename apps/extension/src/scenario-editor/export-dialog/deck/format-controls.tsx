@@ -1,21 +1,21 @@
 import type { ScenarioDeckExportFormat } from '../../project/export/deck/types';
 import { SegmentedRow } from '../../../ui/compact-inspector-controls';
+import { translate } from '../../../platform/i18n';
 import { setScenarioDeckExportFormat } from './state';
 import type { ScenarioDeckExportControlProps } from './types';
 
-const FORMAT_OPTIONS: Array<{ label: string; value: ScenarioDeckExportFormat }> = [
-  { label: 'HTML deck', value: 'html' },
-  { label: 'Markdown bundle', value: 'markdown' },
-];
-
 export function ScenarioDeckExportFormatControls(props: ScenarioDeckExportControlProps) {
+  const options: Array<{ label: string; value: ScenarioDeckExportFormat }> = [
+    { label: translate('scenario.editor.exportHtmlDeck'), value: 'html' },
+    { label: translate('scenario.editor.exportMarkdownBundle'), value: 'markdown' },
+  ];
   return (
     <SegmentedRow
-      ariaLabel="Export format"
+      ariaLabel={translate('scenario.editor.exportFormat')}
       columns={2}
-      label="Format"
+      label={translate('scenario.editor.format')}
       value={props.options.format}
-      options={FORMAT_OPTIONS}
+      options={options}
       onChange={(format) => props.onChange(setScenarioDeckExportFormat(props.options, format))}
     />
   );

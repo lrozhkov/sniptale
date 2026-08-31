@@ -4,7 +4,6 @@ const actionMocks = vi.hoisted(() => ({
   cancelPopupExportMock: vi.fn(),
   copyPopupExportPreviewMock: vi.fn(),
   resetPopupExportViewMock: vi.fn(),
-  saveWebSnapshotFromPopupMock: vi.fn(),
   startPopupExportMock: vi.fn(),
 }));
 
@@ -18,10 +17,6 @@ vi.mock('./copy', () => ({
 
 vi.mock('./start/execute', () => ({
   startPopupExport: actionMocks.startPopupExportMock,
-}));
-
-vi.mock('./snapshot', () => ({
-  saveWebSnapshotFromPopup: actionMocks.saveWebSnapshotFromPopupMock,
 }));
 
 vi.mock('./reset', () => ({
@@ -52,7 +47,6 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
     sendCancelJobMessage: vi.fn(),
     sendAckJobStatusMessage: vi.fn(),
     sendGetJobStatusMessage: vi.fn(),
-    sendSaveWebSnapshotMessage: vi.fn(),
     sendStartJobMessage: vi.fn(),
     writeClipboardText: vi.fn(),
   };
@@ -73,8 +67,8 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
     'markdown',
     deps
   );
-  expect(actionMocks.startPopupExportMock).toHaveBeenCalledWith(state, deps);
-  expect(actionMocks.saveWebSnapshotFromPopupMock).toHaveBeenCalledWith(state, deps);
+  expect(actionMocks.startPopupExportMock).toHaveBeenNthCalledWith(1, state, deps);
+  expect(actionMocks.startPopupExportMock).toHaveBeenNthCalledWith(2, state, deps, 'save');
   expect(actionMocks.cancelPopupExportMock).toHaveBeenCalledWith(state, deps);
   expect(actionMocks.resetPopupExportViewMock).toHaveBeenCalledWith(state, deps);
 });

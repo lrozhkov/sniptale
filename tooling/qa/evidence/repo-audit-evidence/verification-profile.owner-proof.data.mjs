@@ -1,26 +1,26 @@
 export const OWNER_SCOPED_LIFECYCLE_PROOF = [
   {
     lane: 'audit',
-    sourceFile: 'tooling/qa/core/verify-audit.mjs',
-    testFiles: ['tooling/qa/core/verify-audit.test.ts'],
+    sourceFile: 'tooling/qa/audits/supply-chain/npm-audit.mjs',
+    testFiles: ['tooling/qa/audits/supply-chain/npm-audit.test.ts'],
     tool: 'verify-audit.mjs',
   },
   {
     lane: 'build',
-    sourceFile: 'tooling/qa/core/verify-build.mjs',
-    testFiles: ['tooling/qa/core/verify-build.test.ts'],
-    tool: 'verify-build.mjs',
+    sourceFile: 'tooling/qa/composition/build/build-step.mjs',
+    testFiles: ['tooling/qa/composition/build/build-step.test.ts'],
+    tool: 'build-step.mjs',
   },
   {
     lane: 'build',
-    sourceFile: 'tooling/release/package-dist.mjs',
-    testFiles: ['tooling/release/package-dist.test.ts'],
+    sourceFile: 'tooling/release/package/package-dist.mjs',
+    testFiles: ['tooling/release/package/package-dist.test.ts'],
     tool: 'package-dist.mjs',
   },
   {
     lane: 'build',
-    sourceFile: 'tooling/qa/core/verify-architecture-guardrails.mjs',
-    testFiles: ['tooling/qa/core/verify-architecture-guardrails.test.ts'],
+    sourceFile: 'tooling/qa/guards/architecture/architecture-guardrails/check.mjs',
+    testFiles: ['tooling/qa/guards/architecture/architecture-guardrails/check.test.ts'],
     tool: 'verify-architecture-guardrails.mjs',
   },
 ];

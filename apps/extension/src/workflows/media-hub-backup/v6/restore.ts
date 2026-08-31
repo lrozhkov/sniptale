@@ -17,6 +17,7 @@ import {
   type ArchiveTransferProgress,
   type ArchiveRootDescriptor,
 } from '../../../composition/archive-transfer';
+import { restoreGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 import { parseCatalog } from './catalog';
 import { parseBoundedJson, parseRootEnvelope } from './codec';
 import {
@@ -219,6 +220,13 @@ export async function restoreMediaHubBackupV6(args: {
             ...(args.signal ? { signal: args.signal } : {}),
           });
         }
+      }
+      if (inspection.manifest.galleryViews) {
+        await restoreGallerySavedViews(
+          inspection.manifest.galleryViews,
+          session.strategy,
+          inspection.manifest.archiveId
+        );
       }
       return completeArchiveRestoreSession(session.operationId);
     } finally {

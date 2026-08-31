@@ -1,4 +1,4 @@
-import { harnessReady } from './browser-mocks';
+import { harnessReady } from './browser-mocks/browser-mocks';
 import { recordingContext } from '../../../apps/extension/src/offscreen/recording/context';
 import { stageProjectExportInput } from '../../../apps/extension/src/composition/persistence/project-export-inputs';
 import type { ProjectExportInputReference } from '../../../apps/extension/src/contracts/video/types/messages.export';

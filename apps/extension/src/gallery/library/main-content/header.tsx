@@ -3,6 +3,7 @@ import {
   AlignJustify,
   Download,
   Grid2X2,
+  Globe2,
   HardDrive,
   Images,
   LayoutGrid,
@@ -38,11 +39,13 @@ interface GalleryHeaderStorageProps {
   activeStorageBarClass: string;
   importTriggerRef: RefObject<HTMLButtonElement | null>;
   mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
+  webSnapshotImportTriggerRef?: RefObject<HTMLButtonElement | null>;
   isBusy: boolean;
   onDeleteAll: () => void;
   onExportBackup: () => void;
   onImportBackupClick: () => void;
   onImportMediaClick: () => void;
+  onImportWebSnapshotClick?: () => void;
   storageInfo: StorageEstimateInfo | null;
 }
 
@@ -181,6 +184,12 @@ function GalleryStorageMenu(
           label={translate('gallery.app.exportBackup')}
           onClick={() => props.closeAndRun(props.onExportBackup)}
         />
+        <div
+          className="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.1em]
+          text-[var(--sniptale-color-text-muted)]"
+        >
+          {translate('gallery.app.importSection')}
+        </div>
         <GalleryStorageMenuAction
           buttonRef={props.mediaImportTriggerRef}
           disabled={props.isBusy}
@@ -188,12 +197,28 @@ function GalleryStorageMenu(
           label={translate('gallery.app.importMediaFiles')}
           onClick={() => props.closeAndRun(props.onImportMediaClick)}
         />
+        {props.onImportWebSnapshotClick ? (
+          <GalleryStorageMenuAction
+            {...(props.webSnapshotImportTriggerRef
+              ? { buttonRef: props.webSnapshotImportTriggerRef }
+              : {})}
+            disabled={props.isBusy}
+            icon={Globe2}
+            label={translate('gallery.app.importWebSnapshot')}
+            onClick={() => props.closeAndRun(() => props.onImportWebSnapshotClick?.())}
+          />
+        ) : null}
         <GalleryStorageMenuAction
           buttonRef={props.importTriggerRef}
           disabled={props.isBusy}
           icon={Upload}
           label={translate('gallery.app.importBackup')}
           onClick={() => props.closeAndRun(props.onImportBackupClick)}
+        />
+        <div
+          role="separator"
+          data-ui="gallery.header.storage-menu-danger-separator"
+          className="mx-2.5 my-1.5 border-t border-[var(--sniptale-color-border-soft)]"
         />
         <GalleryStorageMenuAction
           danger
@@ -293,9 +318,13 @@ function GalleryHeaderSearchField(props: {
       className="flex min-w-0 items-center gap-2.5 border
         border-[var(--sniptale-color-border-soft)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_78%,transparent)]
-        h-8 w-36 shrink-0 rounded-[8px] px-2.5 transition-colors"
+        h-8 w-36 shrink-0 rounded-[8px] px-2.5
+        transition-[width,border-color,background-color] duration-200 ease-out
+        focus-within:w-48 focus-within:border-[var(--sniptale-color-border-accent-strong)]
+        motion-reduce:transition-none"
+      data-ui="gallery.header.search"
     >
-      <Search className="h-4 w-4 text-[var(--sniptale-color-text-muted)]" />
+      <Search className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]" />
       <input
         aria-label={translate('gallery.app.searchLabel')}
         value={props.search}

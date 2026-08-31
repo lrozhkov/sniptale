@@ -11,6 +11,7 @@ import { getWebSnapshotScreenshotFile } from '../../../composition/persistence/w
 import { isGalleryMediaItem } from '../items';
 import type { GalleryPreviewSessionState } from '../types';
 import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
+import { validateWebSnapshotScreenshotBlob } from '../../../features/web-snapshot/screenshot-validation';
 
 const EMPTY_PREVIEW_STATE: GalleryPreviewSessionState = {
   inspectorCollapsed: false,
@@ -79,7 +80,11 @@ async function loadPreviewBlob(
     return (await getAggregatePreviewBlob({ id: assetId, kind: 'image' })) ?? null;
   }
   if (previewItem.kind === 'web-archive') {
-    return (await getWebSnapshotScreenshotFile(assetId)) ?? null;
+    const screenshot = (await getWebSnapshotScreenshotFile(assetId)) ?? null;
+    if (screenshot) {
+      await validateWebSnapshotScreenshotBlob(screenshot);
+    }
+    return screenshot;
   }
 
   return (await getMediaAssetBlob(assetId)) ?? null;

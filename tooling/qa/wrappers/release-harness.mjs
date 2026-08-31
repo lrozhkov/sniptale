@@ -1,20 +1,30 @@
-import { createScopedQaContext, HARNESS_QA_SUITE } from '../core/qa-scope.mjs';
-import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
-import { collectHarnessStepResults } from '../core/verify-harness.execution.mjs';
-import { createHarnessState, writeHarnessState } from '../core/verify-harness.state.helpers.mjs';
-import { isExecutedAsScript } from '../core/shared.mjs';
-import { assertQaResultContract } from '../core/qa-steps/contract.mjs';
+import { createScopedQaContext, HARNESS_QA_SUITE } from '../composition/scope/qa-scope.mjs';
+import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
+import { collectHarnessStepResults } from '../composition/harness/execution/execution.mjs';
+import { createHarnessState, writeHarnessState } from '../composition/harness/execution/state.mjs';
+import { loadBaseline } from '../policy/baselines/shared-baseline.mjs';
+import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
+import { assertQaResultContract } from '../composition/catalog/contract.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
 
 export async function runReleaseHarness({
   producerRunId,
   contextCollector = collectCurrentDiffContext,
   harnessStepCollector = collectHarnessStepResults,
+  baselineLoader = loadBaseline,
   stateWriter = writeHarnessState,
   executionContractAsserter = assertQaResultContract,
 } = {}) {
-  const context = createScopedQaContext(contextCollector(), { suite: HARNESS_QA_SUITE });
-  const result = await harnessStepCollector({ context });
+  const baseline = baselineLoader();
+  const collectContext = () => ({
+    ...createScopedQaContext(contextCollector(), { suite: HARNESS_QA_SUITE }),
+    baseline,
+  });
+  const executionContext = collectContext();
+  const result = await harnessStepCollector({ context: executionContext });
+  // Formatting is a write barrier. Publish proof for the resulting diff, not
+  // the pre-format content that entered the wrapper.
+  const context = collectContext();
   const failedStep = result.steps.find((step) => step.status === 'failed');
 
   const observedResult = {

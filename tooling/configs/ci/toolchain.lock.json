@@ -2,9 +2,11 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "22.22.1",
-    "image": "node:22.22.1-bookworm-slim@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d",
-    "baseDebianSnapshot": "20260316T000000Z"
+    "version": "24.18.0",
+    "npmVersion": "11.19.1",
+    "npmLockSha256": "932f17ca169077779515e713010cc23effdca443305ba77096fe17360c3ad298",
+    "image": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
+    "baseDebianSnapshot": "20260829T000000Z"
   },
   "projectToolchain": {
     "oxfmt": { "packagePath": "node_modules/oxfmt", "version": "0.64.0" },
@@ -35,15 +37,15 @@
     "version": "18.2.0"
   },
   "openstackController": {
-    "pythonVersion": "3.12.11",
-    "image": "python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
-    "openstacksdkVersion": "4.17.0",
-    "requirementsSha256": "22eb51c3ee8b0ef5f2c10c10989e07ea10bb7d90c10e77c7eaacdfeb0c6fd8c5"
+    "pythonVersion": "3.12.13",
+    "image": "python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2",
+    "openstacksdkVersion": "4.18.0",
+    "requirementsSha256": "df86d7f1ea14e50e1fbabdfdfb8efc4af76bb9ab8c91955f04707f97e350a7f4"
   },
   "debian": {
-    "snapshot": "20260316T000000Z",
-    "archiveUrl": "https://snapshot.debian.org/archive/debian/20260316T000000Z",
-    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20260316T000000Z",
+    "snapshot": "20260829T000000Z",
+    "archiveUrl": "https://snapshot.debian.org/archive/debian/20260829T000000Z",
+    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20260829T000000Z",
     "suites": ["bookworm", "bookworm-updates", "bookworm-security"]
   },
   "playwright": {
@@ -73,7 +75,6 @@
       }
     ]
   },
-  "semgrep": { "version": "1.173.0" },
   "codeql": {
     "version": "2.26.3",
     "url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.26.3/codeql-bundle-linux64.tar.gz",
@@ -96,7 +97,7 @@
     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
   },
   "mutationRunner": {
-    "packageJsonSha256": "6daf99b028772fe29b6a3a530e3c6b968fa57a551e30c2e0be10b9675c8f1770",
-    "packageLockSha256": "b4d726999eef958f7257e790ede029459fa41476c79f4ea630c1312167d6c3ac"
+    "packageJsonSha256": "05deb61af130e3c1ef441d91f1c07b0f1ca1e5b5dc642286c912ddf8bb9d82b9",
+    "packageLockSha256": "776566966623d74eb57d3290d6224b7c1f3e99a071edcc2c11d1488888fe7b0d"
   }
 }

@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { harnessReady } from './browser-mocks';
+import { harnessReady } from './browser-mocks/browser-mocks';
 import {
   createScenarioVisualBaselineAssets,
   createScenarioVisualBaselineProject,

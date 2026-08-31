@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/platform",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -76,9 +76,9 @@
     "./data/state-manager/types": "./src/data/state-manager/types.ts"
   },
   "dependencies": {
-    "@sniptale/foundation": "0.3.3",
-    "@sniptale/runtime-contracts": "0.3.3",
-    "dompurify": "^3.4.12",
+    "@sniptale/foundation": "0.4.0",
+    "@sniptale/runtime-contracts": "0.4.0",
+    "dompurify": "^3.4.14",
     "jszip": "^3.10.1"
   },
   "devDependencies": {
@@ -86,6 +86,6 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/platform/src",
-    "typecheck": "node ../../tooling/qa/core/typescript-cli.mjs --noEmit --project tsconfig.json"
+    "typecheck": "node ../../tooling/qa/analysis/source/typescript-cli.mjs --noEmit --project tsconfig.json"
   }
 }

@@ -52,7 +52,10 @@ import type { VideoRuntimeMessage } from '../../../../contracts/video/types/mess
 import { createBackgroundRuntimeState } from '../../../application/runtime-state';
 import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 import { createActionContext } from './context';
-import { handleVideoRuntimeAction } from './handlers';
+import {
+  handleProjectExportCapabilitiesAction,
+  handleProjectExportRuntimeAction,
+} from './handlers';
 import type { VideoRuntimeAction } from './types';
 import {
   issueProjectExportCancelCapability,
@@ -160,7 +163,12 @@ function routeProjectExportMessage(
   sendResponse: SendResponseMock,
   message: VideoRuntimeMessage
 ): void {
-  handleVideoRuntimeAction(createVideoRuntimeAction(message, sendResponse));
+  const action = createVideoRuntimeAction(message, sendResponse);
+  if (message.type === VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES) {
+    handleProjectExportCapabilitiesAction(action);
+    return;
+  }
+  handleProjectExportRuntimeAction(action);
 }
 
 function createVideoRuntimeAction(

@@ -11,6 +11,7 @@ describe('safe url display helper', () => {
     expect(createSafeExternalHref('javascript:alert(1)')).toBeNull();
     expect(createSafeExternalHref('data:text/html,<script>alert(1)</script>')).toBeNull();
     expect(createSafeExternalHref('chrome://extensions')).toBeNull();
+    expect(createSafeExternalHref('https://user:secret@example.test/private')).toBeNull();
     expect(createSafeExternalHref('/relative')).toBeNull();
     expect(createSafeExternalHref(null)).toBeNull();
   });

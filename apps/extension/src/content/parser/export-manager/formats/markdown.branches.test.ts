@@ -52,6 +52,44 @@ function createNarrativeBlocks(): NonNullable<ParsedDOMTree['blocks']> {
       text: 'Narrative',
     },
     {
+      id: 'block-rich-paragraph',
+      sectionId: 'section-narrative',
+      kind: 'paragraph',
+      text: 'Read the guide and inspect its diagram.',
+      inlineContent: [
+        { kind: 'text', text: 'Read ' },
+        {
+          kind: 'link',
+          text: 'the guide',
+          url: 'https://example.test/guide?q=1',
+        },
+        { kind: 'text', text: ' and inspect ' },
+        {
+          kind: 'image',
+          alt: 'Diagram',
+          sourceUrl: 'https://cdn.example.test/diagram.png',
+          linkUrl: 'https://example.test/diagram',
+        },
+        { kind: 'text', text: '.' },
+      ],
+    },
+    {
+      id: 'block-ordered-list',
+      sectionId: 'section-narrative',
+      kind: 'list',
+      items: ['First reference'],
+      itemInlineContent: [
+        [
+          {
+            kind: 'link',
+            text: 'First reference',
+            url: 'https://example.test/first',
+          },
+        ],
+      ],
+      listStyle: 'ordered',
+    },
+    {
       id: 'block-attachment',
       sectionId: 'section-narrative',
       kind: 'attachment',
@@ -125,6 +163,11 @@ describe('export-manager markdown branches', () => {
     expect(markdown).toContain('# Block aware page');
     expect(markdown.match(/## Narrative/g)).toHaveLength(1);
     expect(markdown).toContain('- ![preview-image.png](files/preview-image.png)');
+    expect(markdown).toContain('[the guide](<https://example.test/guide?q=1>)');
+    expect(markdown).toContain(
+      '[![Diagram](<https://cdn.example.test/diagram.png>)](<https://example.test/diagram>)'
+    );
+    expect(markdown).toContain('1. [First reference](<https://example.test/first>)');
     expect(markdown).toContain('| [manual.pdf](files/manual.pdf) |');
     expect(markdown).toContain('- **Empty value:** ');
   });

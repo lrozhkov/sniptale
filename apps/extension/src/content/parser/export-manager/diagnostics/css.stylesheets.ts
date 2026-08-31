@@ -2,6 +2,11 @@ import type { ArchiveAsset } from '../archive';
 import { sanitizeDiagnosticUrl } from '@sniptale/platform/observability/diagnostics/sanitizer';
 import type { StylesheetMetadata } from './css.constants';
 import { resolveDiagnosticsDocument, type ExportDiagnosticsSource } from './source';
+import { listAccessibleDiagnosticDocuments } from './dom-driver';
+import { sanitizeCssDiagnosticScalar } from './css.sanitizer';
+
+const MAX_STYLESHEET_RECORDS = 512;
+const MAX_STYLESHEET_MEDIA_VALUES = 32;
 
 function getOwnerNodeMetadata(sheet: CSSStyleSheet): Record<string, unknown> | null {
   const ownerNode = sheet.ownerNode;
@@ -14,10 +19,16 @@ function getOwnerNodeMetadata(sheet: CSSStyleSheet): Record<string, unknown> | n
   }
 
   return {
-    dataUi: ownerNode.getAttribute('data-ui'),
-    id: ownerNode.id || null,
-    media: ownerNode.getAttribute('media'),
-    rel: ownerNode.getAttribute('rel'),
+    dataUi: ownerNode.getAttribute('data-ui')
+      ? sanitizeCssDiagnosticScalar(ownerNode.getAttribute('data-ui') ?? '')
+      : null,
+    id: ownerNode.id ? sanitizeCssDiagnosticScalar(ownerNode.id) : null,
+    media: ownerNode.getAttribute('media')
+      ? sanitizeCssDiagnosticScalar(ownerNode.getAttribute('media') ?? '')
+      : null,
+    rel: ownerNode.getAttribute('rel')
+      ? sanitizeCssDiagnosticScalar(ownerNode.getAttribute('rel') ?? '')
+      : null,
     tagName: ownerNode.tagName.toLowerCase(),
   };
 }
@@ -35,7 +46,9 @@ function getStylesheetMediaValues(sheet: CSSStyleSheet): string[] {
     return [];
   }
 
-  return Array.from(sheet.media);
+  return Array.from(sheet.media)
+    .slice(0, MAX_STYLESHEET_MEDIA_VALUES)
+    .map(sanitizeCssDiagnosticScalar);
 }
 
 function serializeStylesheetRules(sheet: CSSStyleSheet): {
@@ -57,64 +70,46 @@ function serializeStylesheetRules(sheet: CSSStyleSheet): {
   }
 }
 
-function buildRedactedStylesheetContent(params: {
-  restricted: boolean;
-  ruleCount: number | null;
-  source: string;
-}): string {
-  const ruleCount = params.ruleCount === null ? 'unknown' : String(params.ruleCount);
-
-  return [
-    '/* Sniptale stylesheet diagnostic: CSS text redacted. */',
-    `/* source=${params.source}; restricted=${params.restricted}; ruleCount=${ruleCount} */`,
-  ].join('\n');
-}
-
 export function buildStylesheetDiagnosticAssets(source?: ExportDiagnosticsSource): ArchiveAsset[] {
   const documentRoot = resolveDiagnosticsDocument(source);
   const metadata: StylesheetMetadata[] = [];
-  const assets: ArchiveAsset[] = [];
-  const sheets = [...Array.from(documentRoot.styleSheets), ...getAdoptedStyleSheets(documentRoot)];
-
-  sheets.forEach((sheet, index) => {
-    const sourceLabel = index < documentRoot.styleSheets.length ? 'document' : 'adopted';
-    const fileName = `${sourceLabel}-stylesheet-${String(index + 1).padStart(2, '0')}.css`;
-    const filePath = `logs/css/stylesheets/${fileName}`;
-    const serialized = serializeStylesheetRules(sheet);
-
-    metadata.push({
-      disabled: sheet.disabled,
-      href: sanitizeDiagnosticUrl(sheet.href ?? undefined) ?? null,
-      media: getStylesheetMediaValues(sheet),
-      owner: getOwnerNodeMetadata(sheet),
-      path: filePath,
-      restricted: serialized.restricted,
-      ruleCount: serialized.ruleCount,
-      source: sourceLabel,
-    });
-
-    assets.push({
-      path: filePath,
-      content: buildRedactedStylesheetContent({
+  for (const documentScope of listAccessibleDiagnosticDocuments(documentRoot)) {
+    const sheets = [
+      ...Array.from(documentScope.document.styleSheets),
+      ...getAdoptedStyleSheets(documentScope.document),
+    ];
+    sheets.forEach((sheet, index) => {
+      if (metadata.length >= MAX_STYLESHEET_RECORDS) return;
+      const sourceLabel =
+        index < documentScope.document.styleSheets.length ? 'document' : 'adopted';
+      const serialized = serializeStylesheetRules(sheet);
+      const scopePrefix = documentScope.scope === 'document' ? '' : `${documentScope.scope}-`;
+      metadata.push({
+        disabled: sheet.disabled,
+        href: sanitizeDiagnosticUrl(sheet.href ?? undefined) ?? null,
+        id: `${scopePrefix}${sourceLabel}-stylesheet-${String(index + 1).padStart(2, '0')}`,
+        media: getStylesheetMediaValues(sheet),
+        owner: getOwnerNodeMetadata(sheet),
         restricted: serialized.restricted,
         ruleCount: serialized.ruleCount,
         source: sourceLabel,
-      }),
+        ...(documentScope.scope === 'document' ? {} : { scope: documentScope.scope }),
+      });
     });
-  });
+  }
 
-  assets.unshift({
-    path: 'logs/css/stylesheets.json',
-    content: JSON.stringify(
-      {
-        exportedAt: new Date().toISOString(),
-        totalStylesheets: metadata.length,
-        stylesheets: metadata,
-      },
-      null,
-      2
-    ),
-  });
-
-  return assets;
+  return [
+    {
+      path: 'logs/css/stylesheets.json',
+      content: JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          totalStylesheets: metadata.length,
+          stylesheets: metadata,
+        },
+        null,
+        2
+      ),
+    },
+  ];
 }

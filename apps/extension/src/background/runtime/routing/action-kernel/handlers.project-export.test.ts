@@ -3,12 +3,18 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const {
   authorizeIPCMessageMock,
   authorizeProjectExportRuntimeMessageMock,
+  handleGetProjectExportCapabilitiesMock,
+  handleStartProjectExportMock,
   isOffscreenOnlyVideoRuntimeMessageMock,
+  resolveTrustedVideoEditorRuntimeSenderMock,
   routeVideoRuntimeMessageMock,
 } = vi.hoisted(() => ({
   authorizeIPCMessageMock: vi.fn(),
   authorizeProjectExportRuntimeMessageMock: vi.fn(),
+  handleGetProjectExportCapabilitiesMock: vi.fn(),
+  handleStartProjectExportMock: vi.fn(),
   isOffscreenOnlyVideoRuntimeMessageMock: vi.fn(),
+  resolveTrustedVideoEditorRuntimeSenderMock: vi.fn(),
   routeVideoRuntimeMessageMock: vi.fn(),
 }));
 
@@ -21,9 +27,17 @@ vi.mock('../authorization/index', async (importOriginal) => ({
 vi.mock('../../../media/video/runtime/router', () => ({
   routeVideoRuntimeMessage: routeVideoRuntimeMessageMock,
 }));
+vi.mock('../../../media/video/runtime/handlers/export/project-export', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../media/video/runtime/handlers/export/project-export')
+  >()),
+  handleGetProjectExportCapabilities: handleGetProjectExportCapabilitiesMock,
+  handleStartProjectExport: handleStartProjectExportMock,
+}));
 vi.mock('../../../media/video/runtime/sender-policy', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../media/video/runtime/sender-policy')>()),
   isOffscreenOnlyVideoRuntimeMessage: isOffscreenOnlyVideoRuntimeMessageMock,
+  resolveTrustedVideoEditorRuntimeSender: resolveTrustedVideoEditorRuntimeSenderMock,
 }));
 import {
   VideoExportFormat,
@@ -34,8 +48,13 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../contracts/video/types/messages';
 import { createBackgroundRuntimeState } from '../../../application/runtime-state';
 import { createActionContext } from './context';
-import { handleVideoRuntimeAction } from './handlers';
-import type { VideoRuntimeAction } from './types';
+import {
+  handleProjectExportCapabilitiesAction,
+  handleProjectExportRuntimeAction,
+  handleVideoRuntimeAction,
+} from './handlers';
+import { getActionRouteHandler } from './registry';
+import type { UnknownAction, VideoRuntimeAction } from './types';
 
 function createExportSettings(): VideoProjectExportSettings {
   return {
@@ -91,9 +110,15 @@ beforeEach(() => {
   authorizeIPCMessageMock.mockReturnValue({ authorized: true });
   isOffscreenOnlyVideoRuntimeMessageMock.mockReturnValue(false);
   routeVideoRuntimeMessageMock.mockReturnValue({ handled: true, keepChannelOpen: true });
+  handleStartProjectExportMock.mockResolvedValue({ jobId: 'job-1', success: true });
+  handleGetProjectExportCapabilitiesMock.mockResolvedValue({ capabilities: {}, success: true });
+  resolveTrustedVideoEditorRuntimeSenderMock.mockReturnValue({
+    documentId: 'video-doc-1',
+    senderUrl: 'chrome-extension://test/apps/extension/src/video-editor/index.html',
+  });
 });
 
-it('passes project export preauthorization from authorization to the video router', async () => {
+it('passes descriptor-bound project export preauthorization directly to the owner', async () => {
   const sendResponse = vi.fn();
   const owner = {
     documentId: 'video-doc-1',
@@ -105,18 +130,13 @@ it('passes project export preauthorization from authorization to the video route
     preauthorization: owner,
   });
 
-  expect(handleVideoRuntimeAction(createVideoRuntimeAction(sendResponse))).toEqual({
+  const action = createVideoRuntimeAction(sendResponse);
+  expect(handleProjectExportRuntimeAction(action)).toEqual({
     handled: true,
     keepChannelOpen: true,
   });
   await vi.waitFor(() => {
-    expect(routeVideoRuntimeMessageMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: VideoMessageType.START_PROJECT_EXPORT }),
-      sendResponse,
-      undefined,
-      expect.objectContaining({ documentId: 'video-doc-1' }),
-      owner
-    );
+    expect(handleStartProjectExportMock).toHaveBeenCalledWith(action.message, owner);
   });
 });
 
@@ -126,7 +146,7 @@ it('responds when project export authorization rejects before owner side effects
     new Error('capability storage unavailable')
   );
 
-  expect(handleVideoRuntimeAction(createVideoRuntimeAction(sendResponse))).toEqual({
+  expect(handleProjectExportRuntimeAction(createVideoRuntimeAction(sendResponse))).toEqual({
     handled: true,
     keepChannelOpen: true,
   });
@@ -136,7 +156,7 @@ it('responds when project export authorization rejects before owner side effects
       success: false,
     });
   });
-  expect(routeVideoRuntimeMessageMock).not.toHaveBeenCalled();
+  expect(handleStartProjectExportMock).not.toHaveBeenCalled();
 });
 
 it('responds when project export authorization denies before owner side effects', async () => {
@@ -146,7 +166,7 @@ it('responds when project export authorization denies before owner side effects'
     reason: 'Unauthorized project export capability',
   });
 
-  expect(handleVideoRuntimeAction(createVideoRuntimeAction(sendResponse))).toEqual({
+  expect(handleProjectExportRuntimeAction(createVideoRuntimeAction(sendResponse))).toEqual({
     handled: true,
     keepChannelOpen: true,
   });
@@ -156,7 +176,42 @@ it('responds when project export authorization denies before owner side effects'
       success: false,
     });
   });
-  expect(routeVideoRuntimeMessageMock).not.toHaveBeenCalled();
+  expect(handleStartProjectExportMock).not.toHaveBeenCalled();
+});
+
+it('routes capability queries through the descriptor-bound owner projection', () => {
+  const action = createVideoRuntimeAction();
+  action.message = {
+    jobId: 'job-1',
+    settings: createExportSettings(),
+    type: VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES,
+  };
+
+  expect(handleProjectExportCapabilitiesAction(action)).toEqual({
+    handled: true,
+    keepChannelOpen: true,
+  });
+  expect(handleGetProjectExportCapabilitiesMock).toHaveBeenCalledWith(
+    action.message,
+    expect.objectContaining({ documentId: 'video-doc-1' })
+  );
+});
+
+it('fails closed when descriptor-bound project export handlers receive another action kind', () => {
+  const source = createVideoRuntimeAction();
+  const wrongAction: UnknownAction = {
+    actionKind: 'unknown',
+    context: source.context,
+    message: { type: 'UNKNOWN' },
+    routeName: 'unknown',
+  };
+
+  for (const routeName of [
+    `video-runtime:${VideoMessageType.START_PROJECT_EXPORT}`,
+    `video-runtime:${VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES}`,
+  ] as const) {
+    expect(getActionRouteHandler(routeName)?.(wrongAction)).toEqual({ handled: false });
+  }
 });
 
 it('rejects offscreen-only video runtime actions before routing owner side effects', () => {
@@ -206,7 +261,6 @@ it('routes authorized offscreen-only actions and propagates unhandled owner resu
     action.message,
     action.context.sendResponse,
     undefined,
-    action.context.sender,
-    undefined
+    action.context.sender
   );
 });

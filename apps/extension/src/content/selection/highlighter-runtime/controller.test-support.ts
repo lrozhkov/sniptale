@@ -73,6 +73,7 @@ export function createHoverControllerStub() {
 
 export function createLoggerStub() {
   return {
+    debug: vi.fn(),
     log: vi.fn(),
     warn: vi.fn(),
   };

@@ -37,7 +37,7 @@ it('loads blobs for recording, scenario, and project asset sources', async () =>
 
   getRecordingMock.mockResolvedValue({ file: recordingBlob });
   getScenarioAssetMock.mockResolvedValue({ file: scenarioBlob });
-  getProjectAssetMock.mockResolvedValue({ file: projectBlob });
+  getProjectAssetMock.mockResolvedValue({ entry: { file: projectBlob }, status: 'ready' });
 
   await expect(loadBlobForSource({ kind: 'recording', recordingId: 'rec-1' })).resolves.toBe(
     recordingBlob
@@ -53,7 +53,7 @@ it('loads blobs for recording, scenario, and project asset sources', async () =>
 it('throws clear errors when a referenced blob source is missing', async () => {
   getRecordingMock.mockResolvedValue(undefined);
   getScenarioAssetMock.mockResolvedValue(undefined);
-  getProjectAssetMock.mockResolvedValue(undefined);
+  getProjectAssetMock.mockResolvedValue({ status: 'not-found' });
 
   await expect(loadBlobForSource({ kind: 'recording', recordingId: 'missing' })).rejects.toThrow(
     'Recording missing not found.'
@@ -64,4 +64,15 @@ it('throws clear errors when a referenced blob source is missing', async () => {
   await expect(
     loadBlobForSource({ kind: 'project-asset', projectAssetId: 'missing' })
   ).rejects.toThrow('Project asset missing not found.');
+});
+
+it('does not report an unavailable project asset as not found', async () => {
+  getProjectAssetMock.mockResolvedValue({
+    reason: 'asset-file-unavailable',
+    status: 'unavailable',
+  });
+
+  await expect(
+    loadBlobForSource({ kind: 'project-asset', projectAssetId: 'asset-1' })
+  ).rejects.toThrow('Project asset asset-1 unavailable.');
 });

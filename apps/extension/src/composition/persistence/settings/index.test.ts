@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  browserStorageLocalGetMock,
+  browserStorageLocalRemoveMock,
+  browserStorageLocalSetMock,
   browserStorageSyncGetMock,
   browserStorageSyncRemoveMock,
   browserStorageSyncSetMock,
   loggerDebugMock,
   loggerWarnMock,
 } = vi.hoisted(() => ({
+  browserStorageLocalGetMock: vi.fn(),
+  browserStorageLocalRemoveMock: vi.fn(),
+  browserStorageLocalSetMock: vi.fn(),
   browserStorageSyncGetMock: vi.fn(),
   browserStorageSyncRemoveMock: vi.fn(),
   browserStorageSyncSetMock: vi.fn(),
@@ -17,6 +23,11 @@ const {
 vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/browser-storage')>()),
   browserStorage: {
+    local: {
+      get: browserStorageLocalGetMock,
+      remove: browserStorageLocalRemoveMock,
+      set: browserStorageLocalSetMock,
+    },
     sync: {
       get: browserStorageSyncGetMock,
       remove: browserStorageSyncRemoveMock,
@@ -33,7 +44,12 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   })),
 }));
 
-import { clearSettings, loadSettings, saveSettings } from './index';
+import {
+  clearSettings,
+  loadSettings,
+  removeRetiredSynchronizedSettings,
+  saveSettings,
+} from './index';
 import { createSystemViewportPresetCatalog } from '../../../features/viewport-presets/catalog';
 import { normalizeViewportPresetOrder } from '../../../features/viewport-presets/operations';
 
@@ -56,14 +72,30 @@ const DEFAULT_CONTEXT_MENU = {
 };
 const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
 const PRIVACY_DEFAULTS = {
-  anonymousCrossOriginSnapshotAssetsEnabled: false,
-  authenticatedSnapshotAssetsEnabled: false,
-  skipWebSnapshotSaveDisclosure: false,
+  anonymousCrossOriginSnapshotAssetsEnabled: true,
+  authenticatedSnapshotAssetsEnabled: true,
+  externalSnapshotAssetRedirectsEnabled: true,
+  externalSnapshotLinksEnabled: false,
 };
 const DEFAULT_FULL_PAGE_CAPTURE = {
   floatingElements: 'once' as const,
   freezeMotion: true,
   preloadLazyContent: true,
+};
+const DEFAULT_FULL_PAGE_QUALITY = {
+  maxFileSizeMiB: 128,
+  maxMegapixels: 80,
+  minScalePercent: 100,
+  profile: 'maximum' as const,
+};
+const DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING = {
+  loadTimeoutMs: 30_000,
+  settleDelayMs: 2_000,
+};
+const DEFAULT_EXPORT_RESOURCE_LIMITS = {
+  maxFileCount: 30,
+  maxFileSizeMiB: 30,
+  maxTotalSizeMiB: 150,
 };
 const DEFAULT_VOICE_INPUT = {
   language: 'ru-RU' as const,
@@ -81,8 +113,35 @@ const LIBRARY_STORAGE_POLICY = {
   defaultDestination: 'library' as const,
 };
 
+it('does not rewrite synchronized settings when the retired field is absent', async () => {
+  resetSettingsStorageMocks();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: { imageFormat: 'webp' },
+  });
+
+  await removeRetiredSynchronizedSettings();
+
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+});
+
+it('removes only the retired synchronized diagnostics field', async () => {
+  resetSettingsStorageMocks();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: { imageFormat: 'webp', rawDiagnosticsEnabled: true },
+  });
+
+  await removeRetiredSynchronizedSettings();
+
+  expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
+    sniptale_settings: { imageFormat: 'webp' },
+  });
+});
+
 function resetSettingsStorageMocks() {
   vi.clearAllMocks();
+  browserStorageLocalGetMock.mockResolvedValue({});
+  browserStorageLocalRemoveMock.mockResolvedValue(undefined);
+  browserStorageLocalSetMock.mockResolvedValue(undefined);
   browserStorageSyncGetMock.mockResolvedValue({});
   browserStorageSyncRemoveMock.mockResolvedValue(undefined);
   browserStorageSyncSetMock.mockResolvedValue(undefined);
@@ -155,6 +214,9 @@ async function verifyLoadMigration() {
     imageQuality: 75,
     localStoragePolicy: LIBRARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
+    pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });
@@ -205,9 +267,13 @@ async function verifyStoredSettings() {
     imageQuality: 100,
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
+    pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: true,
+    externalSnapshotAssetRedirectsEnabled: false,
+    externalSnapshotLinksEnabled: false,
     voiceInput: {
       language: 'en-US' as const,
       microphoneDeviceId: null,
@@ -216,6 +282,9 @@ async function verifyStoredSettings() {
   };
 
   browserStorageSyncGetMock.mockResolvedValue({ sniptale_settings: storedSettings });
+  browserStorageLocalGetMock.mockResolvedValue({
+    sniptale_web_snapshot_local_consent: true,
+  });
   await expect(loadSettings()).resolves.toEqual(storedSettings);
 }
 
@@ -263,7 +332,8 @@ const invalidStoredSettingsFixture = {
   imageQuality: 'high',
   anonymousCrossOriginSnapshotAssetsEnabled: 'yes',
   authenticatedSnapshotAssetsEnabled: 'yes',
-  skipWebSnapshotSaveDisclosure: 'yes',
+  externalSnapshotAssetRedirectsEnabled: 'yes',
+  externalSnapshotLinksEnabled: 'yes',
   rawDiagnosticsEnabled: 'sometimes',
   voiceInput: { language: 'fr-FR', mode: 'always-local' },
 };
@@ -294,6 +364,9 @@ const expectedInvalidStoredSettingsResult = {
   imageQuality: 100,
   localStoragePolicy: LIBRARY_STORAGE_POLICY,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+  fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+  exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
+  pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
   voiceInput: DEFAULT_VOICE_INPUT,
   ...PRIVACY_DEFAULTS,
 };
@@ -329,6 +402,9 @@ async function verifyInvalidRootFallback() {
     imageQuality: 100,
     localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    exportResourceLimits: DEFAULT_EXPORT_RESOURCE_LIMITS,
+    pagePackageCaptureTiming: DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });
@@ -351,6 +427,27 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toMatchObject({
       defaultViewportPresetId: null,
       imageFormat: 'png',
+    });
+  });
+
+  it('drops an excessive or non-finite full-page policy from storage without repairing it', async () => {
+    browserStorageSyncGetMock.mockResolvedValueOnce({
+      sniptale_settings: {
+        fullPageQuality: {
+          maxFileSizeMiB: Infinity,
+          maxMegapixels: 81,
+          minScalePercent: 0,
+          profile: 'custom',
+        },
+      },
+    });
+
+    await expect(loadSettings()).resolves.toMatchObject({
+      fullPageQuality: DEFAULT_FULL_PAGE_QUALITY,
+    });
+    expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith('Dropped invalid settings fields from storage', {
+      invalidFieldCount: 1,
     });
   });
 

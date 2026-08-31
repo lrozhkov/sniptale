@@ -1,7 +1,6 @@
-import { collectWebSnapshotAssets } from './assets';
+import { collectWebSnapshotAssets, finalizeWebSnapshotDiagnosticAssetLedger } from './assets';
 import { captureWebSnapshotScreenshotWithWarnings } from './capture';
 import { buildWebSnapshotPackage } from './package';
-import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../contracts/full-page-capture';
 import {
@@ -13,13 +12,14 @@ import type {
   WebSnapshotPageSource,
   WebSnapshotWarningStats,
 } from './types';
+import type { WebSnapshotSaveProgressUpdate } from './progress';
+import { materializeUnreadableIframeRasters } from './iframe-raster';
+import { PreparedSnapshotWarningKind } from '../page-preparation/snapshot';
+import { normalizePopupExportTabTitle } from '@sniptale/runtime-contracts/export';
+import { normalizePagePackageWarnings } from '@sniptale/runtime-contracts/page-package';
+import { createLogger } from '@sniptale/platform/observability/logger';
 
-const FALLBACK_SCREENSHOT_BYTES = Uint8Array.from([
-  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0,
-  0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 1, 98, 98, 96, 96, 96, 0, 0, 0, 0, 255,
-  255, 93, 23, 41, 205, 0, 0, 0, 6, 73, 68, 65, 84, 3, 0, 0, 15, 0, 3, 36, 55, 125, 233, 0, 0, 0, 0,
-  73, 69, 78, 68, 174, 66, 96, 130,
-]);
+const logger = createLogger({ namespace: 'ContentWebSnapshot' });
 
 function throwIfWebSnapshotBuildAborted(signal?: AbortSignal | undefined): void {
   if (!signal?.aborted) return;
@@ -47,10 +47,12 @@ function createWarningStats(args: {
 }
 
 function normalizeWebSnapshotWarnings(warnings: unknown[]): string[] {
-  return warnings
-    .map((warning) => (typeof warning === 'string' ? warning : String(warning ?? '')))
-    .map((warning) => warning.trim())
-    .filter(Boolean);
+  return normalizePagePackageWarnings(
+    warnings
+      .map((warning) => (typeof warning === 'string' ? warning : String(warning ?? '')))
+      .map((warning) => warning.trim())
+      .filter(Boolean)
+  );
 }
 
 function createNormalizedWarningSummary(args: {
@@ -85,7 +87,7 @@ function resolveCurrentPageSource(): WebSnapshotPageSource {
   const viewport = resolveCurrentPageViewport(document);
 
   return {
-    title: document.title || null,
+    title: document.title ? normalizePopupExportTabTitle(document.title) : null,
     url: document.location.href,
     ...(viewport === undefined ? {} : { viewport }),
   };
@@ -103,39 +105,40 @@ function resolveCurrentPageViewport(
   }
 
   return {
+    deviceScaleFactor:
+      Number.isFinite(view?.devicePixelRatio) && (view?.devicePixelRatio ?? 0) > 0
+        ? view!.devicePixelRatio
+        : 1,
     height: Math.round(height),
     width: Math.round(width),
   };
 }
 
-async function captureWebSnapshotScreenshotOrFallback(
+async function captureRequiredWebSnapshotScreenshot(
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
   captureIdentity?: FullPageExportCaptureIdentity | undefined,
   abortSignal?: AbortSignal | undefined
 ): Promise<{
+  captureGeometry: Awaited<
+    ReturnType<typeof captureWebSnapshotScreenshotWithWarnings>
+  >['captureGeometry'];
+  coverage: Awaited<ReturnType<typeof captureWebSnapshotScreenshotWithWarnings>>['coverage'];
   screenshotBlob: Blob;
   warnings: string[];
 }> {
   throwIfWebSnapshotBuildAborted(abortSignal);
-  try {
-    const screenshot = await captureWebSnapshotScreenshotWithWarnings(
-      contentIntentSource,
-      captureIdentity
-    );
-    throwIfWebSnapshotBuildAborted(abortSignal);
-    return {
-      screenshotBlob: screenshot.blob,
-      warnings: screenshot.warnings,
-    };
-  } catch (error) {
-    throwIfWebSnapshotBuildAborted(abortSignal);
-    const message =
-      error instanceof Error ? sanitizeDiagnosticMessage(error.message) : 'unknown error';
-    return {
-      screenshotBlob: new Blob([FALLBACK_SCREENSHOT_BYTES], { type: 'image/png' }),
-      warnings: [`Full-page web snapshot screenshot failed: ${message}`],
-    };
-  }
+  const screenshot = await captureWebSnapshotScreenshotWithWarnings(
+    contentIntentSource,
+    captureIdentity,
+    abortSignal
+  );
+  throwIfWebSnapshotBuildAborted(abortSignal);
+  return {
+    captureGeometry: screenshot.captureGeometry,
+    coverage: screenshot.coverage,
+    screenshotBlob: screenshot.blob,
+    warnings: screenshot.warnings,
+  };
 }
 
 export async function buildCurrentPageWebSnapshot(args: {
@@ -145,38 +148,99 @@ export async function buildCurrentPageWebSnapshot(args: {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   requestId: string;
+  onProgress?: ((update: WebSnapshotSaveProgressUpdate) => void) | undefined;
 }): Promise<WebSnapshotBuildResult> {
+  const startedAt = Date.now();
+  logger.log('Web snapshot preparation started');
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const source = resolveCurrentPageSource();
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotPreview',
+    current: 0,
+    total: 4,
+  });
+  const screenshotResult = await captureRequiredWebSnapshotScreenshot(
+    args.contentIntentSource,
+    args.fullPageCaptureIdentity,
+    args.abortSignal
+  );
+  logger.log('Web snapshot screenshot received', {
+    elapsedMs: Date.now() - startedAt,
+    screenshotBytes: screenshotResult.screenshotBlob.size,
+  });
+  args.onProgress?.({ activeStepKey: 'webSnapshotDom', current: 1, total: 4 });
   const preparedSnapshot = await buildPreparedSnapshotDocument({
+    ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
     contextLabel: 'web-snapshot',
+    preserveAssetUrls: true,
+    serializeHtml: false,
+  });
+  logger.log('Web snapshot DOM prepared', {
+    elapsedMs: Date.now() - startedAt,
+    elementCount: preparedSnapshot.document.querySelectorAll('*').length,
   });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const snapshotDocument = preparedSnapshot.document;
-  const [assetResult, screenshotResult] = await Promise.all([
-    collectWebSnapshotAssets(snapshotDocument, {
-      allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
-      allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
-      requestId: args.requestId,
-      sourceUrl: source.url,
-      ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
-    }),
-    captureWebSnapshotScreenshotOrFallback(
-      args.contentIntentSource,
-      args.fullPageCaptureIdentity,
-      args.abortSignal
-    ),
-  ]);
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotStyles',
+    current: 2,
+    total: 4,
+  });
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotAssets',
+    current: 2,
+    total: 4,
+  });
+  const assetResult = await collectWebSnapshotAssets(snapshotDocument, {
+    allowAnonymousCrossOriginAssets: args.allowAnonymousCrossOriginAssets,
+    allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
+    requestId: args.requestId,
+    sourceUrl: source.url,
+    ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
+  });
+  logger.log('Web snapshot assets collected', {
+    assetCount: assetResult.assets.length,
+    elapsedMs: Date.now() - startedAt,
+    warningCount: assetResult.warnings.length,
+  });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
   const { assets, privacyWarnings, snapshotSessionId, warnings } = assetResult;
+  const iframeRasters =
+    screenshotResult.coverage === 'full-page'
+      ? await materializeUnreadableIframeRasters(
+          snapshotDocument,
+          screenshotResult.screenshotBlob,
+          screenshotResult.captureGeometry
+        )
+      : { assets: [], rasterizedTargets: [] };
+  assets.push(...iframeRasters.assets);
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
+  const rasterizedIframeTargets = new Set(iframeRasters.rasterizedTargets);
+  const preparedWarnings = preparedSnapshot.warnings.map((warning) =>
+    warning.kind === PreparedSnapshotWarningKind.IframeUnreadable &&
+    warning.target &&
+    rasterizedIframeTargets.has(warning.target)
+      ? {
+          ...warning,
+          message: `Iframe content was preserved as a static image: ${warning.target}`,
+        }
+      : warning
+  );
   const warningSummary = createNormalizedWarningSummary({
     networkWarnings: warnings,
-    preparedWarnings: preparedSnapshot.warnings,
+    preparedWarnings,
     privacyWarnings,
     screenshotWarnings: screenshotResult.warnings,
   });
-  const html = serializePreparedSnapshotDocument(snapshotDocument);
+  const html = serializePreparedSnapshotDocument(snapshotDocument, {
+    preferParseStableHtml: true,
+  });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotAssets',
+    current: 3,
+    total: 4,
+  });
   const packaged = await buildWebSnapshotPackage({
     assets,
     diagnosticsSource: {
@@ -186,14 +250,28 @@ export async function buildCurrentPageWebSnapshot(args: {
     },
     html,
     screenshotBlob: screenshotResult.screenshotBlob,
+    screenshotCoverage: screenshotResult.coverage,
     source,
     warnings: warningSummary.warnings,
     warningStats: warningSummary.warningStats,
   });
+  logger.log('Web snapshot package prepared', {
+    elapsedMs: Date.now() - startedAt,
+  });
   throwIfWebSnapshotBuildAborted(args.abortSignal);
+  args.onProgress?.({
+    activeStepKey: 'webSnapshotAssets',
+    current: 4,
+    total: 4,
+  });
 
   return {
     ...packaged,
+    diagnosticAssetLedger: finalizeWebSnapshotDiagnosticAssetLedger({
+      assets,
+      manifest: packaged.manifest,
+      targets: assetResult.diagnosticAssetTargets,
+    }),
     snapshotSessionId,
     warnings: warningSummary.warnings,
   };

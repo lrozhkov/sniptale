@@ -10,8 +10,16 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   const proof = fs.readFileSync('tooling/ci/proof.mjs', 'utf8');
   expect(packageJson.scripts['ci:proof']).toBe('node tooling/ci/proof.mjs');
   expect(packageJson.scripts['ci:release']).toBe('node tooling/ci/local.mjs release');
+  expect(packageJson.scripts['ci:proof:container']).toBe(
+    'node tooling/ci/local-container.mjs proof'
+  );
+  expect(packageJson.scripts['ci:release:container']).toBe(
+    'node tooling/ci/local-container.mjs release'
+  );
   expect(packageJson.scripts['ci:build']).toBe('npm run build');
+  expect(packageJson.scripts.build).toBe('vite build --config apps/extension/vite.config.ts');
   expect(local).toContain('tooling/ci/${lane}-wrapper.mjs');
+  expect(local).toContain("path.join(process.cwd(), 'tooling/ci/validate-workflows.mjs')");
   expect(local).toContain("['playwright-smoke', process.execPath");
   expect(local).toContain("kind: 'host-wsl'");
   expect(local).not.toContain("spawnSync('docker'");
@@ -23,10 +31,15 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(toolchain).toContain("url.origin !== 'https://github.com'");
   expect(toolchain).toContain("!/^[a-f0-9]{64}$/u.test(tool?.sha256 ?? '')");
   expect(toolchain).toContain("{ flag: 'wx', mode: 0o755 }");
-  expect(toolchain).toContain('includes(semgrepPython)');
-  expect(toolchain).toContain("args: ['--legacy', '--version']");
+  expect(toolchain).not.toContain('semgrep');
+  expect(toolchain).toContain('createRuntimeParityReceipt({');
+  const runtimeParity = fs.readFileSync('tooling/ci/runtime-parity.mjs', 'utf8');
+  expect(runtimeParity).toContain("{ id: 'node'");
+  expect(runtimeParity).toContain("{ id: 'npm'");
+  expect(runtimeParity).toContain("{ id: 'npx'");
+  expect(runtimeParity).toContain('path drift');
   expect(toolchain).toContain('delete result[name]');
-  for (const tool of ['OSV Scanner', 'Gitleaks', 'actionlint', 'Semgrep', 'CodeQL', 'Stryker']) {
+  for (const tool of ['OSV Scanner', 'Gitleaks', 'actionlint', 'CodeQL', 'Stryker']) {
     expect(toolchain).toContain(`name: '${tool}'`);
   }
   expect(playwrightSmoke).toContain('installed.version !== lock.playwright.version');
@@ -46,8 +59,9 @@ it('fixes resource profiles as planning-only metadata and rejects ci:build prove
       resourceProfileExcludedFromSemanticDigest: true,
       resourceProfileAffectsReuseCompatibility: false,
       fastGateNeverClaimsReleaseReadiness: true,
-      fullVitestOwnedByFastGate: true,
-      releaseProvenanceRequiresFastProof: true,
+      fastGateFullVitestOwner: 'unit-tests',
+      releaseGateFullVitestOwner: 'full-product-coverage',
+      releaseProvenanceAcceptsFastProofReuse: true,
       ciBuildIsNonProof: true,
       ciBuildArtifactAdmissibleForProvenance: false,
     },

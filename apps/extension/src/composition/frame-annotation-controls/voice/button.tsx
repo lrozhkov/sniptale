@@ -36,13 +36,14 @@ export function CalloutVoiceButton(props: {
   if (!props.isEditing) return null;
   return (
     <div
-      className="absolute top-1/2 -translate-y-1/2"
+      className="absolute top-1/2"
       data-ui={
         props.dataUi ? `${props.dataUi}-control` : 'content.highlighter.callout-voice-control'
       }
       style={{
         left: props.leftOffset,
         scale: props.visualScale ?? 1,
+        transform: 'translateY(-50%)',
         transformOrigin: 'center left',
       }}
       onClick={(event) => event.stopPropagation()}

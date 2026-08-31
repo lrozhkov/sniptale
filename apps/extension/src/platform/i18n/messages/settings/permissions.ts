@@ -29,6 +29,14 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Разрешает использовать инструменты Sniptale на локальных файлах. Сначала включите доступ к URL файлов в Chrome, затем подтвердите его здесь.',
     en: 'Allows Sniptale tools on local files. First enable file URL access in Chrome, then confirm it here.',
   },
+  nativeAppName: {
+    ru: 'Приложение Sniptale',
+    en: 'Sniptale app',
+  },
+  nativeAppDescription: {
+    ru: 'Разрешает подключаться к установленному приложению Sniptale. Пока доступ выключен, расширение не запускает native-подключение.',
+    en: 'Allows connections to the installed Sniptale app. While disabled, the extension does not start a native connection.',
+  },
   microphoneName: {
     ru: 'Микрофон',
     en: 'Microphone',
@@ -68,11 +76,11 @@ export const settingsPermissionsMessages = defineMessageSource({
   requiredGrantsDescription: {
     ru: sentence(
       'Эти разрешения включены при установке, потому что без них основные функции Sniptale не смогут работать.',
-      'Доступ к сайтам остается отдельным опциональным разрешением.'
+      'Доступ к сайтам и приложению Sniptale остаётся отдельным опциональным разрешением.'
     ),
     en: sentence(
       'These permissions are enabled at install time because core Sniptale features need them to work.',
-      'Site access remains a separate optional permission.'
+      'Site access and the Sniptale app remain separate optional permissions.'
     ),
   },
   requiredGrantPermission: {
@@ -90,6 +98,10 @@ export const settingsPermissionsMessages = defineMessageSource({
   statusChecksTitle: {
     ru: 'Опциональные разрешения',
     en: 'Optional permissions',
+  },
+  permissionKindTabsLabel: {
+    ru: 'Тип разрешений',
+    en: 'Permission type',
   },
   statusChecksDescription: {
     ru: 'Эти разрешения можно включать только тогда, когда вам нужны соответствующие функции.',
@@ -207,6 +219,18 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Копирует скриншоты и экспортированные материалы в буфер обмена, когда вы нажимаете «копировать».',
     en: 'Copies screenshots and exported content to the clipboard when you choose copy.',
   },
+  requiredCategoryCore: {
+    ru: 'Основа расширения',
+    en: 'Extension core',
+  },
+  requiredCategoryPage: {
+    ru: 'Работа со страницей',
+    en: 'Page interaction',
+  },
+  requiredCategoryCapture: {
+    ru: 'Захват и экспорт',
+    en: 'Capture and export',
+  },
   statusGranted: {
     ru: 'Разрешено',
     en: 'Granted',
@@ -234,6 +258,10 @@ export const settingsPermissionsMessages = defineMessageSource({
   siteAccessAskMode: {
     ru: 'Спрашивать',
     en: 'Ask per site',
+  },
+  siteAccessModeLabel: {
+    ru: 'Режим доступа к сайтам',
+    en: 'Site access mode',
   },
   siteAccessAllSitesMode: {
     ru: 'Все сайты',

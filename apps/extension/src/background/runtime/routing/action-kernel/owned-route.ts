@@ -33,6 +33,11 @@ function routeAuthorizedBackgroundOwnedAction(
     action.context.logger.warn('Rejected background-owned runtime message', {
       reason: authorization.reason,
       routeName: action.routeName,
+      senderDocumentIdPresent:
+        typeof action.context.sender.documentId === 'string' &&
+        action.context.sender.documentId.length > 0,
+      senderFrameId: action.context.sender.frameId ?? null,
+      senderTabIdPresent: action.context.sender.tab?.id !== undefined,
     });
     action.context.sendResponse(createRouteErrorResponse(authorization.reason));
     return { handled: true, keepChannelOpen: false };

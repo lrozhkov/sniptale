@@ -4,28 +4,36 @@
   "description": "Constrained ci:release CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
   "findings": [
     {
-      "contentHash": "db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e",
+      "contentHash": "01fa9164592dc859f5b7685197d5e406d221c084d523518a1055e7c55eef9085",
       "debtId": "accepted.codeql.locked-toolchain-download-write",
       "file": "tooling/ci/install-toolchain.mjs",
-      "line": 45,
+      "line": 44,
       "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
       "rule": "js/http-to-file-access"
     },
     {
-      "contentHash": "db6652d5bc9417352b327711be8554e75258d27bfdfd1d7a2e5d4752eb678a8e",
+      "contentHash": "01fa9164592dc859f5b7685197d5e406d221c084d523518a1055e7c55eef9085",
       "debtId": "accepted.codeql.locked-toolchain-download-url",
       "file": "tooling/ci/install-toolchain.mjs",
-      "line": 40,
+      "line": 39,
       "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
       "rule": "js/file-access-to-http"
     },
     {
-      "contentHash": "bde065a7fd378a21b22a1b17fa0ac57a7d9319f90ef236c703eb425682d0d38b",
+      "contentHash": "4e2437f8286b15875ad1a2364486fb8a1d3c1c968dedc6dc064a8ee070bb802d",
       "debtId": "accepted.codeql.local-toolchain-download-write",
       "file": "tooling/ci/local-toolchain.mjs",
-      "line": 66,
+      "line": 68,
       "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
       "rule": "js/http-to-file-access"
+    },
+    {
+      "contentHash": "f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f",
+      "debtId": "accepted.codeql.transform-stream-transformer-constructor",
+      "file": "apps/extension/src/composition/archive-transfer/writer.ts",
+      "line": 38,
+      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+      "rule": "js/superfluous-trailing-arguments"
     }
   ]
 }

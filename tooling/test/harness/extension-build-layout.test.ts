@@ -26,9 +26,9 @@ it('resolves one app root, repository output and exact external inputs', () => {
       'tooling/test/harness',
     ].map((entry) => path.resolve(entry))
   );
-  expect(isDeclaredExtensionBuildInput(layout, path.resolve('tooling/qa/core/shared.mjs'))).toBe(
-    false
-  );
+  expect(
+    isDeclaredExtensionBuildInput(layout, path.resolve('tooling/qa/runtime/process/shared-cli.mjs'))
+  ).toBe(false);
 });
 
 it('maps physical app and harness sources to stable legacy output ids', () => {

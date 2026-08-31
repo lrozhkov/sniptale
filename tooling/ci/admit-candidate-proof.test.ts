@@ -44,6 +44,31 @@ function resealArtifact(root: string, manifest: Record<string, any>) {
   write(root, 'SHA256SUMS', `${sums.join('\n')}\n`);
 }
 
+function refreshDeclaredFile(root: string, manifest: Record<string, any>, relative: string) {
+  const file = manifest.files.find((entry: { file: string }) => entry.file === relative);
+  file.sha256 = sha256(fs.readFileSync(path.join(root, relative)));
+  resealArtifact(root, manifest);
+}
+
+function rebuildDeclaredFiles(root: string, manifest: Record<string, any>) {
+  const files = [] as Array<{ file: string; sha256: string }>;
+  const visit = (directory: string) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else {
+        const file = path.relative(root, absolute).replaceAll(path.sep, '/');
+        if (!['proof-manifest.json', 'SHA256SUMS'].includes(file)) {
+          files.push({ file, sha256: sha256(fs.readFileSync(absolute)) });
+        }
+      }
+    }
+  };
+  visit(root);
+  manifest.files = files.sort((left, right) => left.file.localeCompare(right.file));
+  resealArtifact(root, manifest);
+}
+
 function fixture({ candidateControl = 'export {};\n' } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-admission-'));
   roots.push(root);
@@ -55,6 +80,8 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     'tooling/configs/ci/trusted-admission-policy.json',
     'tooling/configs/ci/proof-semantics.json',
     'tooling/configs/qa/audit-profiles.data.json',
+    'tooling/configs/qa/codeql-proof-reuse.data.json',
+    'tooling/configs/qa/coverage-proof-reuse.data.json',
   ])
     write(trusted, relative, fs.readFileSync(relative, 'utf8'));
   const fastPolicy = JSON.parse(
@@ -73,6 +100,8 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     'tooling/configs/ci/trusted-admission-policy.json',
     'tooling/configs/ci/proof-semantics.json',
     'tooling/configs/qa/audit-profiles.data.json',
+    'tooling/configs/qa/codeql-proof-reuse.data.json',
+    'tooling/configs/qa/coverage-proof-reuse.data.json',
   ]) {
     write(candidate, relative, fs.readFileSync(path.join(trusted, relative), 'utf8'));
   }
@@ -90,30 +119,22 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
   const controlDigest = createCandidateControlDigest({ cwd: candidate });
   const trustedControlDigest = createCandidateControlDigest({ cwd: trusted });
   const baseSha = '1'.repeat(40);
-  const archive = 'build/sniptale_0.3.3_test.zip';
-  write(artifact, archive, 'zip');
-  const build = sealReceipt({
-    schemaVersion: 1,
-    artifactKind: 'sniptale-build-zip-proof',
-    outcome: 'passed',
-    inputDigest: '2'.repeat(64),
-    archive: { file: path.basename(archive), sha256: sha256('zip') },
-    producer: { id: 'qa-release-archive-owner', controlDigest },
-  });
-  write(artifact, '.tmp/qa/build-proof.json', `${JSON.stringify(build)}\n`);
   const unit = sealReceipt({
     schemaVersion: 1,
     artifactKind: 'sniptale-full-unit-proof',
     outcome: 'passed',
+    inputDigest: '4'.repeat(64),
+    execution: { suite: 'product' },
+    planning: { maxWorkers: 1 },
+    fileDigests: [],
+    testFiles: [],
     producer: { controlDigest },
+    reusedFrom: null,
   });
   write(artifact, '.tmp/qa/unit-proof.json', `${JSON.stringify(unit)}\n`);
   for (const file of [
-    '.tmp/semgrep/results.json',
-    '.tmp/semgrep/results.sarif',
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
-    '.tmp/npm-audit/results.json',
     '.tmp/npm-audit/signatures.json',
   ])
     write(artifact, file, '{}\n');
@@ -133,7 +154,10 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
       repository: { head: commit },
       log: { path: log },
       steps: [
-        ...controlMatrix.requiredPassed.map((stepId) => ({ stepId, outcome: 'passed' })),
+        ...controlMatrix.requiredPassed.map((stepId) => ({
+          stepId,
+          outcome: 'passed',
+        })),
         ...controlMatrix.allowedSkipped.map((stepId) => ({
           stepId,
           outcome: 'skipped',
@@ -156,8 +180,14 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
   };
   visit(artifact);
   files.sort((a, b) => a.file.localeCompare(b.file));
-  const gateInputDigest = createFastGateInputDigest({ cwd: candidate, policyRoot: trusted });
-  const executionEnvironment = { kind: 'locked-container', digest: `sha256:${'3'.repeat(64)}` };
+  const gateInputDigest = createFastGateInputDigest({
+    cwd: candidate,
+    policyRoot: trusted,
+  });
+  const executionEnvironment = {
+    kind: 'locked-container',
+    digest: `sha256:${'3'.repeat(64)}`,
+  };
   const semantics = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
   const executionProfile = {
     cpuTokens: 12,
@@ -205,8 +235,10 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
       executionEnvironment,
     }),
     phases: [
+      'runtime-parity',
       'install',
       'verify-project-toolchain',
+      'validate-workflows',
       'provision-canvas',
       'verify-canvas',
       'provision-ast-grep',
@@ -214,7 +246,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
       'proof',
     ].map((id) => ({ id, status: 'passed' })),
     proofReuse: {
-      build: 'fresh',
+      build: 'unavailable',
       unit: 'fresh',
       codeql: 'unavailable',
       coverage: 'unavailable',
@@ -223,6 +255,114 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
   };
   resealArtifact(artifact, manifest);
   return { artifact, baseSha, candidate, commit, manifest, trusted };
+}
+
+function releaseFixture({ reused = false } = {}) {
+  const value = fixture();
+  const { artifact, commit, manifest } = value;
+  fs.rmSync(path.join(artifact, '.tmp/qa/unit-proof.json'));
+  const archive = 'build/sniptale_0.3.3_test.zip';
+  write(artifact, archive, 'zip');
+  const build = sealReceipt({
+    schemaVersion: 1,
+    artifactKind: 'sniptale-build-zip-proof',
+    outcome: 'passed',
+    inputDigest: '2'.repeat(64),
+    archive: { file: path.basename(archive), sha256: sha256('zip') },
+    producer: { id: 'qa-release-archive-owner', controlDigest: manifest.controlDigest },
+  });
+  write(artifact, '.tmp/qa/build-proof.json', `${JSON.stringify(build)}\n`);
+  const sarif = '.tmp/codeql/results.filtered.sarif';
+  write(artifact, sarif, '{"version":"2.1.0","runs":[{"results":[]}]}\n');
+  const codeql = sealReceipt({
+    schemaVersion: 1,
+    artifactKind: 'sniptale-codeql-proof',
+    outcome: 'passed',
+    inputDigest: '5'.repeat(64),
+    sarifSha256: sha256(fs.readFileSync(path.join(artifact, sarif))),
+    producer: { controlDigest: manifest.controlDigest },
+    reusedFrom: reused ? { source: 'main-release' } : null,
+  });
+  write(artifact, '.tmp/qa/codeql-proof.json', `${JSON.stringify(codeql)}\n`);
+
+  const reportFiles = [
+    'coverage-final.json',
+    'coverage-summary.json',
+    'html/index.html',
+    'lcov.info',
+  ];
+  for (const file of reportFiles) write(artifact, `.tmp/coverage/canonical/${file}`, `${file}\n`);
+  const coverage = sealReceipt({
+    schemaVersion: 1,
+    artifactKind: 'sniptale-coverage-proof',
+    outcome: 'passed',
+    inputDigest: '6'.repeat(64),
+    reports: reportFiles.map((file) => ({
+      file,
+      sha256: sha256(fs.readFileSync(path.join(artifact, '.tmp/coverage/canonical', file))),
+    })),
+    producer: { controlDigest: manifest.controlDigest },
+    reusedFrom: reused ? { source: 'main-release' } : null,
+  });
+  write(artifact, '.tmp/qa/coverage-proof.json', `${JSON.stringify(coverage)}\n`);
+  for (const file of [
+    '.tmp/npm-audit/results.json',
+    '.tmp/licenses/summary.json',
+    '.tmp/licenses/sbom.cdx.json',
+    '.tmp/mutation/persistence/results.json',
+    '.tmp/mutation/secrets/results.json',
+  ])
+    write(artifact, file, '{}\n');
+
+  const recordPath = '.tmp/qa-observability/runs/2026-08-23/run.json';
+  const record = JSON.parse(fs.readFileSync(path.join(artifact, recordPath), 'utf8'));
+  const controlMatrix = createTrustedControlMatrix('release');
+  record.wrapperId = 'ci:release';
+  record.steps = [
+    ...controlMatrix.requiredPassed.map((stepId) => ({
+      stepId,
+      outcome: 'passed',
+    })),
+    ...controlMatrix.allowedSkipped.map((stepId) => ({
+      stepId,
+      outcome: 'skipped',
+      skipReasonId: controlMatrix.allowedSkippedReasons[stepId],
+    })),
+  ];
+  write(artifact, recordPath, `${JSON.stringify(record)}\n`);
+
+  manifest.lane = 'release';
+  manifest.gateClaim = 'release-provenance';
+  manifest.releaseReady = true;
+  manifest.phases = [
+    'runtime-parity',
+    'install',
+    'verify-project-toolchain',
+    'validate-workflows',
+    'provision-canvas',
+    'verify-canvas',
+    'provision-ast-grep',
+    'verify-ast-grep',
+    'release',
+  ].map((id) => ({ id, status: 'passed' }));
+  manifest.proofReuse = {
+    build: 'fresh',
+    unit: 'unavailable',
+    codeql: reused ? 'reused' : 'fresh',
+    coverage: reused ? 'reused' : 'fresh',
+  };
+  manifest.proofSemanticDigest = createProofSemanticDigest({
+    lane: 'release',
+    commit,
+    candidateTree: manifest.candidateTree,
+    trustedControlSha: commit,
+    trustedControlDigest: manifest.trustedControlDigest,
+    controlDigest: manifest.controlDigest,
+    gateInputDigest: manifest.gateInputDigest,
+    executionEnvironment: manifest.executionEnvironment,
+  });
+  rebuildDeclaredFiles(artifact, manifest);
+  return value;
 }
 
 afterEach(() => {
@@ -290,7 +430,9 @@ it('rejects missing phases or profile authority without imposing resource minimu
 });
 
 it('admits candidate control drift once and records the explicit authority disposition', () => {
-  const value = fixture({ candidateControl: 'export const candidateGeneration = true;\n' });
+  const value = fixture({
+    candidateControl: 'export const candidateGeneration = true;\n',
+  });
   expect(
     admitCandidateProof({
       artifactRoot: value.artifact,
@@ -309,7 +451,9 @@ it('admits candidate control drift once and records the explicit authority dispo
 });
 
 it('rejects a candidate-control proof that conceals its control drift', () => {
-  const value = fixture({ candidateControl: 'export const candidateGeneration = true;\n' });
+  const value = fixture({
+    candidateControl: 'export const candidateGeneration = true;\n',
+  });
   value.manifest.controlsChanged = false;
   value.manifest.controlDisposition = 'trusted-controls';
   resealArtifact(value.artifact, value.manifest);
@@ -327,7 +471,7 @@ it('rejects a candidate-control proof that conceals its control drift', () => {
 });
 
 it('rejects proof reuse across candidate control digests', () => {
-  const value = fixture();
+  const value = releaseFixture();
   const relative = '.tmp/qa/build-proof.json';
   const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
   receipt.producer.controlDigest = `sha256:${'f'.repeat(64)}`;
@@ -344,8 +488,163 @@ it('rejects proof reuse across candidate control digests', () => {
       candidateRoot: value.candidate,
       commit: value.commit,
       expectedTrustedControlSha: value.commit,
-      lane: 'proof',
+      lane: 'release',
       trustedRoot: value.trusted,
     })
   ).toThrow(/does not bind/u);
+});
+
+it('rejects a malformed unit receipt in the Fast proof lane', () => {
+  const value = fixture();
+  const relative = '.tmp/qa/unit-proof.json';
+  const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
+  delete receipt.inputDigest;
+  delete receipt.proofDigest;
+  write(value.artifact, relative, `${JSON.stringify(sealReceipt(receipt))}\n`);
+  refreshDeclaredFile(value.artifact, value.manifest, relative);
+
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: value.artifact,
+      baseSha: value.baseSha,
+      candidateRoot: value.candidate,
+      commit: value.commit,
+      expectedTrustedControlSha: value.commit,
+      lane: 'proof',
+      trustedRoot: value.trusted,
+    })
+  ).toThrow(/Malformed candidate receipt: \.tmp\/qa\/unit-proof\.json/u);
+});
+
+it('derives unit reuse status from the validated receipt', () => {
+  const value = fixture();
+  const relative = '.tmp/qa/unit-proof.json';
+  const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
+  receipt.reusedFrom = { source: 'main-proof' };
+  delete receipt.proofDigest;
+  write(value.artifact, relative, `${JSON.stringify(sealReceipt(receipt))}\n`);
+  refreshDeclaredFile(value.artifact, value.manifest, relative);
+
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: value.artifact,
+      baseSha: value.baseSha,
+      candidateRoot: value.candidate,
+      commit: value.commit,
+      expectedTrustedControlSha: value.commit,
+      lane: 'proof',
+      trustedRoot: value.trusted,
+    })
+  ).toThrow(/unit reuse status does not match its receipt/u);
+});
+
+it('rejects a unit receipt from a different QA control digest', () => {
+  const value = fixture();
+  const relative = '.tmp/qa/unit-proof.json';
+  const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
+  receipt.producer.controlDigest = 'f'.repeat(64);
+  delete receipt.proofDigest;
+  write(value.artifact, relative, `${JSON.stringify(sealReceipt(receipt))}\n`);
+  refreshDeclaredFile(value.artifact, value.manifest, relative);
+
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: value.artifact,
+      baseSha: value.baseSha,
+      candidateRoot: value.candidate,
+      commit: value.commit,
+      expectedTrustedControlSha: value.commit,
+      lane: 'proof',
+      trustedRoot: value.trusted,
+    })
+  ).toThrow(/crosses QA control digests/u);
+});
+
+it('admits a complete release proof whose receipts bind the admitted SARIF and reports', () => {
+  for (const reused of [false, true]) {
+    const value = releaseFixture({ reused });
+    expect(
+      admitCandidateProof({
+        artifactRoot: value.artifact,
+        baseSha: value.baseSha,
+        candidateRoot: value.candidate,
+        commit: value.commit,
+        expectedTrustedControlSha: value.commit,
+        lane: 'release',
+        trustedRoot: value.trusted,
+      })
+    ).toMatchObject({ outcome: 'passed', lane: 'release', derived: false });
+  }
+});
+
+it('rejects missing or tampered physical release evidence after manifest admission', () => {
+  const missing = releaseFixture();
+  fs.rmSync(path.join(missing.artifact, '.tmp/codeql/results.filtered.sarif'));
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: missing.artifact,
+      baseSha: missing.baseSha,
+      candidateRoot: missing.candidate,
+      commit: missing.commit,
+      expectedTrustedControlSha: missing.commit,
+      lane: 'release',
+      trustedRoot: missing.trusted,
+    })
+  ).toThrow(/file digest mismatch/u);
+
+  const tampered = releaseFixture();
+  const sarif = '.tmp/codeql/results.filtered.sarif';
+  fs.appendFileSync(path.join(tampered.artifact, sarif), 'tampered\n');
+  refreshDeclaredFile(tampered.artifact, tampered.manifest, sarif);
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: tampered.artifact,
+      baseSha: tampered.baseSha,
+      candidateRoot: tampered.candidate,
+      commit: tampered.commit,
+      expectedTrustedControlSha: tampered.commit,
+      lane: 'release',
+      trustedRoot: tampered.trusted,
+    })
+  ).toThrow(/CodeQL receipt does not bind the admitted SARIF/u);
+});
+
+it('rejects an admitted coverage report outside the receipt inventory', () => {
+  const value = releaseFixture();
+  write(value.artifact, '.tmp/coverage/canonical/html/extra.html', 'extra\n');
+  rebuildDeclaredFiles(value.artifact, value.manifest);
+  expect(() =>
+    admitCandidateProof({
+      artifactRoot: value.artifact,
+      baseSha: value.baseSha,
+      candidateRoot: value.candidate,
+      commit: value.commit,
+      expectedTrustedControlSha: value.commit,
+      lane: 'release',
+      trustedRoot: value.trusted,
+    })
+  ).toThrow(/coverage receipt does not bind the admitted report inventory/u);
+});
+
+it('derives CodeQL and coverage fresh or reused polarity from each release receipt', () => {
+  for (const proofName of ['codeql', 'coverage']) {
+    const value = releaseFixture();
+    const relative = `.tmp/qa/${proofName}-proof.json`;
+    const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
+    receipt.reusedFrom = { source: 'main-release' };
+    delete receipt.proofDigest;
+    write(value.artifact, relative, `${JSON.stringify(sealReceipt(receipt))}\n`);
+    refreshDeclaredFile(value.artifact, value.manifest, relative);
+    expect(() =>
+      admitCandidateProof({
+        artifactRoot: value.artifact,
+        baseSha: value.baseSha,
+        candidateRoot: value.candidate,
+        commit: value.commit,
+        expectedTrustedControlSha: value.commit,
+        lane: 'release',
+        trustedRoot: value.trusted,
+      })
+    ).toThrow(`${proofName} reuse status does not match its receipt`);
+  }
 });

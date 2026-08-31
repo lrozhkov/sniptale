@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import layoutPolicy from './layout.data.json';
+import layoutPolicy from './layout.data.json' with { type: 'json' };
 
 export type ExtensionHtmlInput = (typeof layoutPolicy.htmlInputs)[number];
 

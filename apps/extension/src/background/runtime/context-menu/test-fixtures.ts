@@ -20,7 +20,6 @@ export const contextMenuSettingsFixture = {
   imageQuality: 100,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
-  skipWebSnapshotSaveDisclosure: false,
   presets: [],
   saveCapturesToGallery: false,
   viewportPresets: [

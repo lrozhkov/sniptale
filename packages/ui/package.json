@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/ui",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -129,17 +129,17 @@
     "./voice-input/use-push-to-talk": "./src/voice-input/use-push-to-talk.ts"
   },
   "dependencies": {
-    "@sniptale/foundation": "0.3.3",
-    "@sniptale/runtime-contracts": "0.3.3",
-    "lucide-react": "^0.575.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "@sniptale/foundation": "0.4.0",
+    "@sniptale/runtime-contracts": "0.4.0",
+    "lucide-react": "^1.33.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "vitest": "^4.1.10"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/ui/src",
-    "typecheck": "node ../../tooling/qa/core/typescript-cli.mjs --noEmit --project tsconfig.json"
+    "typecheck": "node ../../tooling/qa/analysis/source/typescript-cli.mjs --noEmit --project tsconfig.json"
   }
 }

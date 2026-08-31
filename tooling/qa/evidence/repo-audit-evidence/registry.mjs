@@ -1,4 +1,4 @@
-import { collectQaStepDefinitionsByLane } from '../../core/qa-steps/definitions.mjs';
+import { collectQaStepDefinitionsByLane } from '../../composition/catalog/definitions.mjs';
 
 export {
   ADVISORY_SCRIPT_IDS,

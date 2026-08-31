@@ -93,6 +93,18 @@ export function parseBackgroundRuntimeMessage(
   return message;
 }
 
+export function isKnownNonBackgroundRuntimeMessage(input: unknown): boolean {
+  if (typeof input !== 'object' || input === null || !('type' in input)) return false;
+  const type = (input as { type?: unknown }).type;
+  if (typeof type !== 'string' || backgroundRuntimeTypes.has(type as RuntimeMessageType)) {
+    return false;
+  }
+  return (
+    popupRuntimeTypes.has(type as RuntimeMessageType) ||
+    offscreenRuntimeTypes.has(type as RuntimeMessageType)
+  );
+}
+
 export function parsePopupRuntimeMessage(input: unknown): RuntimeRequestByType[RuntimeMessageType] {
   const message = parseRuntimeRequestMessage(input);
   assertRuntimeBoundaryType(message.type, popupRuntimeTypes, 'Popup runtime boundary');

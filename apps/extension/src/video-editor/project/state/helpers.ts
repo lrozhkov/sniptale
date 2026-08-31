@@ -15,7 +15,6 @@ import {
   resolvePlacementModeAfterProjectUpdate,
   resolvePlacementModeAfterSelectionChange,
 } from '../selection/placement';
-import { VideoEditorSelectionKind } from '../../contracts/selection';
 import { isSourceTimedClip, updateSourceTimedClipTiming } from '../operations/source-timed-clips';
 import type { VideoEditorProjectState } from './contracts';
 import {
@@ -94,14 +93,10 @@ export function applyProjectSnapshot(
   nextProject: VideoProject
 ): Partial<VideoEditorProjectState> {
   const nextTime = clampNumber(state.currentTime, 0, Math.max(0, nextProject.duration));
-  const selectedClipStillExists = state.selectedClipId
-    ? nextProject.clips.some((clip) => clip.id === state.selectedClipId)
-    : false;
   const selectedTrackStillExists = state.selectedTrackId
     ? nextProject.tracks.some((track) => track.id === state.selectedTrackId)
     : false;
   const selection = resolveSelectionAfterProjectUpdate(nextProject, state.selection);
-  const selectedClipId = resolveSelectedClipId(selection);
   const selectedTrackId =
     resolveSelectedTrackIdFromSelection(nextProject, selection) ??
     (selectedTrackStillExists ? state.selectedTrackId : (nextProject.tracks[0]?.id ?? null));
@@ -115,13 +110,8 @@ export function applyProjectSnapshot(
     currentTime: nextTime,
     placementMode,
     selection,
-    selectedClipId: selectedClipStillExists ? selectedClipId : null,
     selectedTrackId,
   };
-}
-
-function resolveSelectedClipId(selection: VideoEditorProjectState['selection']): string | null {
-  return selection.kind === VideoEditorSelectionKind.CLIP ? selection.clipId : null;
 }
 
 export function getClipOperationIds(project: VideoProject, clipId: string): string[] {

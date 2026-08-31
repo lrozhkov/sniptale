@@ -68,7 +68,6 @@ function createSettings(): Settings {
     imageQuality: 100,
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: false,
     presets: [createPreset('used'), createPreset('unused')],
     viewportPresets: [],
     saveCapturesToGallery: false,

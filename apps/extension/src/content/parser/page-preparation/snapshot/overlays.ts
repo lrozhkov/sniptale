@@ -11,6 +11,29 @@ const STATIC_OVERLAY_SELECTORS = [
 ];
 
 const STATIC_OVERLAY_STYLE_ID = 'sniptale-prepared-snapshot-overlay-style';
+const STATIC_OVERLAY_LAYER_ATTRIBUTE = 'data-sniptale-static-overlay-layer';
+const TRANSIENT_OVERLAY_SELECTORS = [
+  '.sniptale-app',
+  '.sniptale-toolbar-portal-wrapper',
+  '.sniptale-frame-toolbar-trigger',
+  '.sniptale-frame-toolbar-bridge',
+  '.sniptale-frame-quick-action',
+  '.sniptale-action-toolbar',
+  '.sniptale-content-size-tooltip',
+  '.sniptale-resize-handle',
+  '.sniptale-callout-drag-handle',
+  '.sniptale-callout-adjacent-controls',
+  '.sniptale-callout-tail-handle',
+  '.sniptale-callout-settings-handle',
+  '.sniptale-step-badge-controls',
+  '.sniptale-frame-settings-popover',
+  '.sniptale-step-badge-popover',
+  '.sniptale-callout-settings-popover',
+  '.sniptale-callout-format-toolbar',
+  '.sniptale-glass-popover',
+  '.sniptale-blocking-overlay',
+  '.sniptale-editing-blocking-overlay',
+];
 
 const STATIC_OVERLAY_STYLE = `
   :root {
@@ -26,6 +49,19 @@ const STATIC_OVERLAY_STYLE = `
   .sniptale-callout {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  [data-sniptale-static-overlay-layer='true'],
+  [data-sniptale-static-overlay-layer='true'] * {
+    pointer-events: none !important;
+  }
+
+  [data-sniptale-static-overlay-layer='true'] .sniptale-callout,
+  [data-sniptale-static-overlay-layer='true'] .sniptale-callout * {
+    cursor: text !important;
+    pointer-events: auto !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
   }
 `;
 
@@ -47,10 +83,43 @@ function appendStaticOverlayStyle(snapshot: Document): void {
 function cloneStaticOverlayNodes(sourceRoot: HTMLElement, snapshot: Document): Node[] {
   return Array.from(sourceRoot.children)
     .filter((child) => child.matches(STATIC_OVERLAY_SELECTORS.join(',')))
-    .map((child) => snapshot.importNode(child, true));
+    .map((child) => {
+      const clone = snapshot.importNode(child, true);
+      for (const transient of clone.querySelectorAll(TRANSIENT_OVERLAY_SELECTORS.join(','))) {
+        transient.remove();
+      }
+      return clone;
+    });
 }
 
-export function appendStaticPagePreparationOverlays(snapshot: Document): void {
+function createStaticOverlayLayer(
+  snapshot: Document,
+  sourceDocument: Document,
+  overlayNodes: Node[]
+): HTMLElement {
+  const sourceWindow = sourceDocument.defaultView;
+  const viewportWidth = sourceWindow?.innerWidth ?? sourceDocument.documentElement.clientWidth;
+  const viewportHeight = sourceWindow?.innerHeight ?? sourceDocument.documentElement.clientHeight;
+  const layer = snapshot.createElement('div');
+  layer.setAttribute(STATIC_OVERLAY_LAYER_ATTRIBUTE, 'true');
+  Object.assign(layer.style, {
+    height: `${viewportHeight}px`,
+    left: `${sourceWindow?.scrollX ?? 0}px`,
+    pointerEvents: 'none',
+    position: 'absolute',
+    top: `${sourceWindow?.scrollY ?? 0}px`,
+    transform: 'translateZ(0px)',
+    width: `${viewportWidth}px`,
+    zIndex: '2147483647',
+  });
+  layer.append(...overlayNodes);
+  return layer;
+}
+
+export function appendStaticPagePreparationOverlays(
+  snapshot: Document,
+  sourceDocument: Document = document
+): void {
   const overlayRoot = resolveShadowOverlayRoot();
   if (!overlayRoot) {
     return;
@@ -62,5 +131,5 @@ export function appendStaticPagePreparationOverlays(snapshot: Document): void {
   }
 
   appendStaticOverlayStyle(snapshot);
-  snapshot.body.append(...overlayNodes);
+  snapshot.body.append(createStaticOverlayLayer(snapshot, sourceDocument, overlayNodes));
 }

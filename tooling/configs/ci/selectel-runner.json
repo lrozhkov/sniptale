@@ -8,7 +8,11 @@
     "controller": "tooling/ci/selectel/sdk-controller.py",
     "controllerImage": "tooling/ci/selectel/Dockerfile.controller",
     "canonicalSemantics": "tooling/ci/container.mjs",
-    "qualityWorkflow": ".github/workflows/quality-gate.yml",
+    "canonicalProofWorkflow": ".github/workflows/_canonical-proof.yml",
+    "prWorkflow": ".github/workflows/pr.yml",
+    "provenanceWorkflow": ".github/workflows/provenance.yml",
+    "smokeWorkflow": ".github/workflows/selectel-smoke.yml",
+    "maintenanceWorkflow": ".github/workflows/selectel-maintenance.yml",
     "releaseWorkflow": ".github/workflows/release.yml"
   },
   "infrastructureSmoke": {

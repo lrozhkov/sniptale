@@ -95,6 +95,7 @@ function createLayoutProps() {
     onPreviewSaveCopy: vi.fn(),
     onRemoveTag: vi.fn(),
     onResetFilters: vi.fn(),
+    onSelectAllFiltered: vi.fn(),
     onSearchChange: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
@@ -108,6 +109,25 @@ function createLayoutProps() {
     viewMode: 'compact-grid' as const,
   };
 }
+
+it('keeps a distinct Page Package picker separate from backup ZIP restore', () => {
+  const props = {
+    ...createLayoutProps(),
+    webSnapshotImportInputRef: { current: null },
+    webSnapshotImportTriggerRef: { current: null },
+    onWebSnapshotImportFileChange: vi.fn(),
+    onPendingWebSnapshotImportClose: vi.fn(),
+    onWebSnapshotImportConfirm: vi.fn(async () => undefined),
+    onImportWebSnapshotClick: vi.fn(),
+  };
+  act(() => {
+    root?.render(<GalleryAppLayout {...props} />);
+  });
+  const inputs = Array.from(container?.querySelectorAll('input[type="file"]') ?? []);
+  expect(inputs).toHaveLength(3);
+  expect(inputs[0]?.getAttribute('accept')).toBe('.zip,application/zip');
+  expect(inputs[2]?.getAttribute('accept')).toBe('.sniptale-page-package.zip,application/zip');
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -194,6 +214,12 @@ it('passes all selected local media files to the dedicated import action', () =>
 });
 
 function expectLayoutSections(withStorage: ReturnType<typeof createLayoutProps>): void {
+  const pageRoot = container?.querySelector<HTMLElement>('[data-ui="gallery.page.root"]');
+  expect(pageRoot?.className).toContain('h-full');
+  expect(pageRoot?.className).toContain('min-h-0');
+  expect(pageRoot?.className).toContain('overflow-hidden');
+  expect(pageRoot?.className).not.toContain('fixed inset-0');
+  expect(pageRoot?.className).not.toContain('h-screen');
   expect(sidebarPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       counts: expect.objectContaining({ scenario: 1 }),

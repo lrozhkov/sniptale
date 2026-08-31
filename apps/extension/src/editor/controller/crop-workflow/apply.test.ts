@@ -2,19 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   clearEditorCropGuideMock: vi.fn(),
-  getEditorStoreStateMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   normalizeEditorCropSelectionMock: vi.fn(),
-  setCropReadyMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
   createLogger: () => ({ error: mocks.loggerErrorMock }),
-}));
-
-vi.mock('../../state/useEditorStore', () => ({
-  useEditorStore: { getState: mocks.getEditorStoreStateMock },
 }));
 
 vi.mock('../tools/crop', async (importOriginal) => ({
@@ -31,11 +25,6 @@ import { applyEditorControllerCropSelection } from './';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getEditorStoreStateMock.mockReturnValue({
-    browserFrame: { enabled: false },
-    frame: { mode: 'frame' },
-    setCropReady: mocks.setCropReadyMock,
-  });
   mocks.clearEditorCropGuideMock.mockReturnValue({ cropGuide: null, cropSelection: null });
   mocks.normalizeEditorCropSelectionMock.mockReturnValue({
     left: 10,

@@ -17,7 +17,7 @@ describe('export-manager file modal utils', () => {
     Object.defineProperty(modal, 'offsetHeight', { configurable: true, value: 10 });
     document.body.appendChild(modal);
 
-    const result = await waitForElement(EXPORT_SELECTORS.modal, 50);
+    const result = await waitForElement(EXPORT_SELECTORS.modal, document, 50);
 
     expect(result).toBe(modal);
   });
@@ -28,7 +28,7 @@ describe('export-manager file modal utils', () => {
     const clickSpy = vi.spyOn(closeButton, 'click');
     document.body.appendChild(closeButton);
 
-    await closeModal();
+    await closeModal(document);
 
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
@@ -37,7 +37,7 @@ describe('export-manager file modal utils', () => {
     const keydownHandler = vi.fn();
     document.addEventListener('keydown', keydownHandler);
 
-    await closeModal();
+    await closeModal(document);
 
     expect(keydownHandler).toHaveBeenCalledTimes(1);
     const event = keydownHandler.mock.calls[0]?.[0] as KeyboardEvent;

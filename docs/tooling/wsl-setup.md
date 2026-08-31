@@ -31,26 +31,35 @@ sudo apt-get install -y build-essential curl git python3 python3-pip xvfb
 
 `xvfb` supports headless extension smoke when WSL has no `DISPLAY`.
 
-## Install Linux Node.js 22
+## Install Linux Node.js 24
 
 Install through the current supported `nvm` bootstrap, then:
 
 ```bash
 source ~/.bashrc
-nvm install 22
-nvm use 22
+nvm install 24.18.0
+nvm use 24.18.0
+npm install --global npm@11.19.1 --ignore-scripts --min-release-age-exclude=npm
 hash -r
 ```
 
-Verify `which node`, `which npm`, `node --version`, `npm --version`, and `npm config list` before installing repository dependencies.
+The repository `.nvmrc` pins the same exact Node `24.18.0` developer runtime and is checked against package, CI, container, and toolchain authorities. npm remains pinned separately to `11.19.1` by `packageManager`, `devEngines`, and the CI npm lock.
 
-If non-interactive tools cannot see Node, expose the active Linux binaries through `~/.local/bin`:
+Run `node tooling/ci/runtime-parity.mjs` before installing repository dependencies. The blocking receipt checks `node`, `npm`, and `npx` versions, their PATH entries and canonical real paths, and requires npm/npx to resolve from one npm package root. The expected package-manager identity is declared by `packageManager` and enforced by `devEngines`; do not update the lock with another npm version. For manual diagnosis, inspect `which node npm npx` and `readlink -f "$(which node)" "$(which npm)" "$(which npx)"` together rather than checking only the Node version.
+
+`npm@11.19.1` is an intentional urgent-security exception to the seven-day age window: it fixes the high-severity `tar` advisory still present in npm 12.0.2. CI obtains the same package through `tooling/configs/ci/npm/package-lock.json`, verifies its registry integrity, and retains no permanent age exclusion.
+
+If non-interactive tools cannot see Node, expose the complete pinned runtime through `~/.local/bin`:
 
 ```bash
 mkdir -p ~/.local/bin
-ln -sf "$(dirname "$(which node)")/node" ~/.local/bin/node
-ln -sf "$(dirname "$(which npm)")/npm" ~/.local/bin/npm
+SNIPTALE_NODE_BIN="$(dirname "$(nvm which 24.18.0)")"
+ln -sf "$SNIPTALE_NODE_BIN/node" ~/.local/bin/node
+ln -sf "$SNIPTALE_NODE_BIN/npm" ~/.local/bin/npm
+ln -sf "$SNIPTALE_NODE_BIN/npx" ~/.local/bin/npx
 ```
+
+Never update only one of these links. A stale `node`, `npm`, or `npx` path is a blocking runtime-parity failure even when the other two commands report the expected versions.
 
 Ensure login and interactive shells export:
 
@@ -64,7 +73,7 @@ export TEMP=/tmp
 Verify non-interactive resolution:
 
 ```bash
-bash -lc 'which node && which npm && node --version && npm --version'
+bash -lc 'which node npm npx && node --version && npm --version && npx --version && node tooling/ci/runtime-parity.mjs'
 ```
 
 ## Place The Repository In WSL
@@ -90,7 +99,10 @@ From the repository root:
 
 ```bash
 rm -rf node_modules
-npm ci
+npm ci --ignore-scripts
+npm rebuild canvas
+node node_modules/@ast-grep/cli/postinstall.js
+npm run prepare
 ```
 
 Repository-local agent instructions and skills are separate from dependency installation. Install them explicitly with `npm run agents:install` only when wanted; see [Optional agent tooling](../agent-tooling/README.md).
@@ -102,6 +114,14 @@ ls node_modules/@esbuild
 ```
 
 If only a Windows artifact exists, recheck Node/npm resolution, remove `node_modules`, and run `npm ci` again.
+
+Repository resolution keeps ordinary package releases behind a seven-day admission window. Do not disable `min-release-age` to take a routine update early. When a published upstream security fix is both reachable in Sniptale and too young for the window, admit only that exact package for the one install command:
+
+```bash
+npm install '<package>@<exact-version>' --min-release-age-exclude='<package>'
+```
+
+Record the upstream security evidence in the task manifest, verify that no `min-release-age-exclude` line was added to `.npmrc`, and run the dependency wave through its normal review and closeout. The exclusion applies only to the named package; its transitive dependencies remain subject to the seven-day window.
 
 ## Verify The Environment
 
@@ -121,7 +141,7 @@ Use `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`, or `SNIPTALE_QA_VITEST_M
 
 `ci:proof` and `ci:release` run directly in WSL without Docker and use the same resource-profile owner as their GitHub container execution. The release gate deliberately saturates the visible ceiling only during exclusive full-product work. Windows still shares the physical processor and RAM, so lower the explicit CPU, memory, or worker overrides when interactive host work must remain responsive.
 
-`ci:release` owns live npm audit, supply-chain inventory, full coverage, external engines, and mutation profiles. If it fails because the registry or a configured external binary is unavailable, repair DNS/proxy/TLS/registry/toolchain access rather than treating the result as a product defect.
+`ci:release` owns live npm audit, supply-chain inventory, full coverage, and external engines. CI runs mutation profiles afterward in the isolated non-blocking advisory-artifact job. If a blocking control fails because the registry or a configured external binary is unavailable, repair DNS/proxy/TLS/registry/toolchain access rather than treating the result as a product defect.
 
 ## Extension Smoke
 
@@ -144,11 +164,11 @@ The runner builds `dist/`, starts under `xvfb-run` when needed, loads the unpack
 
 ### Windows npm leaked into WSL
 
-Symptoms include `WSL 1 is not supported`, Windows paths in `npm config list`, or Windows native packages. Fix shell configuration until `which node` and `which npm` resolve inside WSL, then run `rm -rf node_modules && npm ci`.
+Symptoms include `WSL 1 is not supported`, Windows paths in `npm config list`, or Windows native packages. Fix shell configuration until `which node npm npx` resolves inside WSL, then run `rm -rf node_modules && npm ci`.
 
 ### Node missing from non-interactive shells
 
-Run `bash -lc 'which node && which npm'`. If interactive resolution works but this fails, add the `~/.local/bin` links and login-shell `PATH` export above.
+Run `bash -lc 'which node npm npx && readlink -f "$(which node)" "$(which npm)" "$(which npx)"'`. If interactive resolution works but this fails, replace all three `~/.local/bin` links and the login-shell `PATH` export above.
 
 ### Temporary-directory permissions fail
 

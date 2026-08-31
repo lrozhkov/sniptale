@@ -4,6 +4,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
+import { GallerySavedViewError } from '../../../composition/persistence/gallery-saved-views';
 import { GalleryFacetFilters, GalleryFolderList } from './sections';
 
 let container: HTMLDivElement | null = null;
@@ -42,6 +43,7 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -85,6 +87,109 @@ it('renders folder actions, highlights the active folder, and forwards selection
 
   expect(findButton(translate('gallery.preview.folderWebSnapshot'))?.textContent).toContain('5');
   expect(translate('gallery.preview.kindWebSnapshot')).toBe('Веб-снимок');
+});
+
+it('renders saved views under their category without icons or counters and requests deletion', () => {
+  const onSavedViewSelect = vi.fn();
+  const onDeleteSavedView = vi.fn();
+  const onMoveSavedView = vi.fn();
+  const view = {
+    createdAt: 1,
+    filters: {
+      activeTags: [],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: ['png'],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
+      scope: 'all' as const,
+    },
+    folderFilter: 'screenshot' as const,
+    id: 'view-1',
+    name: 'PNG review',
+    updatedAt: 1,
+  };
+
+  render(
+    <GalleryFolderList
+      activeSavedView={view}
+      counts={{ all: 7, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
+      folderFilter="screenshot"
+      savedViews={[view]}
+      savedViewsLoaded
+      onDeleteSavedView={onDeleteSavedView}
+      onFolderFilterChange={vi.fn()}
+      onMoveSavedView={onMoveSavedView}
+      onSavedViewSelect={onSavedViewSelect}
+    />
+  );
+
+  const viewButton = findButton('PNG review');
+  expect(viewButton?.querySelector('svg')).toBeNull();
+  expect(viewButton?.className).toContain('h-full w-full');
+  expect(viewButton?.parentElement?.querySelector('div')?.className).toContain('opacity-0');
+  click(viewButton);
+  expect(onSavedViewSelect).toHaveBeenCalledWith('view-1');
+  click(
+    container?.querySelector(
+      `[aria-label="${translate('gallery.app.savedViewDelete')} PNG review"]`
+    )
+  );
+  expect(onDeleteSavedView).toHaveBeenCalledWith(view);
+});
+
+it('reveals saved views in batches and requests sibling reordering', () => {
+  const onMoveSavedView = vi.fn();
+  const views = Array.from({ length: 6 }, (_, index) => ({
+    createdAt: index + 1,
+    filters: {
+      activeTags: [],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
+      scope: 'all' as const,
+    },
+    folderFilter: 'screenshot' as const,
+    id: `view-${index + 1}`,
+    name: `View ${index + 1}`,
+    updatedAt: index + 1,
+  }));
+
+  render(
+    <GalleryFolderList
+      counts={{ all: 6, export: 0, recording: 0, scenario: 0, screenshot: 6 }}
+      folderFilter="screenshot"
+      savedViews={views}
+      savedViewsLoaded
+      onFolderFilterChange={vi.fn()}
+      onMoveSavedView={onMoveSavedView}
+      onSavedViewSelect={vi.fn()}
+    />
+  );
+
+  expect(findButton('View 5')).toBeDefined();
+  expect(findButton('View 6')).toBeUndefined();
+  click(findButton(translate('gallery.app.savedViewShowMore')));
+  expect(findButton('View 6')).toBeDefined();
+
+  const moveButton = container?.querySelector<HTMLButtonElement>(
+    `[aria-label="${translate('gallery.app.savedViewMoveUp')} View 6"]`
+  );
+  moveButton?.focus();
+  expect(document.activeElement).toBe(moveButton);
+  click(moveButton);
+  expect(onMoveSavedView).toHaveBeenCalledWith('view-6', 'up');
+  expect(document.activeElement).not.toBe(moveButton);
 });
 
 it('renders searchable facet groups and forwards tag, status, and range selections', () => {
@@ -131,10 +236,12 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
         },
       ]}
       folderFilter="all"
+      filteredItemCount={2}
       scope="all"
       onActiveTagsChange={onActiveTagsChange}
       onFacetFilterChange={onFacetFilterChange}
       onFolderFilterChange={vi.fn()}
+      onSelectAll={vi.fn()}
       onResetFilters={onResetFilters}
       onScopeChange={onScopeChange}
     />
@@ -160,6 +267,8 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   expect(onScopeChange).toHaveBeenCalledWith('temporary');
   expect(onFacetFilterChange).toHaveBeenCalledWith('size', ['small']);
   expect(container?.textContent).toContain(`${translate('gallery.app.facetSelected')} 2`);
+  expect(container?.textContent).toContain(`${translate('gallery.app.facetResults')}: 2`);
+  expect(findButton(translate('gallery.app.selectAllResults'))).toBeDefined();
 
   click(
     container?.querySelector(
@@ -175,6 +284,183 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
       `[aria-label="${translate('gallery.app.facetClear')} ${translate('gallery.app.facetTitle.status')}"]`
     )
   ).toBeNull();
+});
+
+it('opens a compact saved-view name field, reports a conflict, and confirms creation', async () => {
+  const createdView = (name: string) => ({
+    createdAt: 1,
+    filters: {
+      activeTags: [],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: ['png'],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
+      scope: 'all' as const,
+    },
+    folderFilter: 'screenshot' as const,
+    id: 'view-1',
+    name,
+    updatedAt: 1,
+  });
+  const onCreateSavedView = vi
+    .fn()
+    .mockRejectedValueOnce(new GallerySavedViewError('conflict', 'duplicate'))
+    .mockImplementation(async (name: string) => createdView(name));
+  render(
+    <GalleryFacetFilters
+      activeSavedView={null}
+      activeTags={[]}
+      allTags={[]}
+      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      facetFilters={{
+        created: [],
+        duration: [],
+        format: ['png'],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      }}
+      facets={[]}
+      filteredItemCount={1}
+      folderFilter="screenshot"
+      scope="all"
+      onActiveTagsChange={vi.fn()}
+      onCreateSavedView={onCreateSavedView}
+      onFacetFilterChange={vi.fn()}
+      onFolderFilterChange={vi.fn()}
+      onResetFilters={vi.fn()}
+      onScopeChange={vi.fn()}
+      onSelectAll={vi.fn()}
+    />
+  );
+
+  click(findButton(translate('gallery.app.savedViewSave')));
+  const input = container?.querySelector<HTMLInputElement>(
+    `[aria-label="${translate('gallery.app.savedViewName')}"]`
+  );
+  expect(input).not.toBeNull();
+  act(() => updateInputValue(input!, 'Review PNG'));
+  click(container?.querySelector(`[aria-label="${translate('gallery.app.savedViewConfirm')}"]`));
+
+  await vi.waitFor(() => expect(onCreateSavedView).toHaveBeenCalledWith('Review PNG'));
+  await vi.waitFor(() =>
+    expect(container?.textContent).toContain(translate('gallery.app.savedViewNameConflict'))
+  );
+  click(container?.querySelector(`[aria-label="${translate('gallery.app.savedViewConfirm')}"]`));
+  await vi.waitFor(() => expect(onCreateSavedView).toHaveBeenCalledTimes(2));
+});
+
+it('updates a changed active saved view instead of opening the name field', async () => {
+  const onUpdateSavedView = vi.fn(async () => undefined);
+  const view = {
+    createdAt: 1,
+    filters: {
+      activeTags: [],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: ['png'],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
+      scope: 'all' as const,
+    },
+    folderFilter: 'screenshot' as const,
+    id: 'view-1',
+    name: 'PNG',
+    updatedAt: 1,
+  };
+  render(
+    <GalleryFacetFilters
+      activeSavedView={view}
+      activeTags={[]}
+      allTags={[]}
+      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      facetFilters={{
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      }}
+      facets={[]}
+      filteredItemCount={1}
+      folderFilter="screenshot"
+      isSavedViewDirty
+      scope="all"
+      onActiveTagsChange={vi.fn()}
+      onFacetFilterChange={vi.fn()}
+      onFolderFilterChange={vi.fn()}
+      onResetFilters={vi.fn()}
+      onScopeChange={vi.fn()}
+      onSelectAll={vi.fn()}
+      onUpdateSavedView={onUpdateSavedView}
+    />
+  );
+
+  click(findButton(translate('gallery.app.savedViewUpdate')));
+  await vi.waitFor(() => expect(onUpdateSavedView).toHaveBeenCalledOnce());
+  expect(
+    container?.querySelector(`[aria-label="${translate('gallery.app.savedViewName')}"]`)
+  ).toBeNull();
+});
+
+it('hides reset and update actions while the active saved view matches its baseline', () => {
+  const view = {
+    createdAt: 1,
+    filters: {
+      activeTags: ['review'],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: ['png'],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
+      scope: 'library' as const,
+    },
+    folderFilter: 'screenshot' as const,
+    id: 'view-1',
+    name: 'Review PNG',
+    updatedAt: 1,
+  };
+
+  render(
+    <GalleryFacetFilters
+      activeSavedView={view}
+      activeTags={view.filters.activeTags}
+      allTags={['review']}
+      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      facetFilters={view.filters.facetFilters}
+      facets={[]}
+      filteredItemCount={1}
+      folderFilter="screenshot"
+      isSavedViewDirty={false}
+      scope={view.filters.scope}
+      onActiveTagsChange={vi.fn()}
+      onFacetFilterChange={vi.fn()}
+      onFolderFilterChange={vi.fn()}
+      onResetFilters={vi.fn()}
+      onScopeChange={vi.fn()}
+      onSelectAll={vi.fn()}
+      onUpdateSavedView={vi.fn()}
+    />
+  );
+
+  expect(findButton(translate('gallery.app.facetResetAll'))).toBeUndefined();
+  expect(findButton(translate('gallery.app.savedViewUpdate'))).toBeUndefined();
 });
 
 it('shows search and scrolling only for facet lists with more than ten values', () => {
@@ -199,12 +485,14 @@ it('shows search and scrolling only for facet lists with more than ten values', 
         updated: [],
       }}
       facets={[{ id: 'tags', searchable: true, options }]}
+      filteredItemCount={11}
       folderFilter="all"
       scope="all"
       onActiveTagsChange={vi.fn()}
       onFacetFilterChange={vi.fn()}
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
+      onSelectAll={vi.fn()}
       onScopeChange={vi.fn()}
     />
   );
@@ -227,4 +515,137 @@ it('shows search and scrolling only for facet lists with more than ten values', 
 
   expect(searchInput.value).toBe('');
   expect(container?.querySelectorAll('input[type="checkbox"]')).toHaveLength(11);
+});
+
+it('shows result selection for a non-default section without a redundant filter reset', () => {
+  const onSelectAll = vi.fn();
+  render(
+    <GalleryFacetFilters
+      activeTags={[]}
+      allTags={[]}
+      counts={{ all: 3, export: 0, recording: 0, scenario: 0, screenshot: 3 }}
+      facetFilters={{
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      }}
+      facets={[]}
+      filteredItemCount={3}
+      folderFilter="screenshot"
+      scope="all"
+      onActiveTagsChange={vi.fn()}
+      onFacetFilterChange={vi.fn()}
+      onFolderFilterChange={vi.fn()}
+      onResetFilters={vi.fn()}
+      onScopeChange={vi.fn()}
+      onSelectAll={onSelectAll}
+    />
+  );
+
+  click(findButton(translate('gallery.app.selectAllResults')));
+
+  expect(onSelectAll).toHaveBeenCalledOnce();
+  expect(container?.textContent).toContain(`${translate('gallery.app.facetResults')}: 3`);
+  expect(findButton(translate('gallery.app.facetResetAll'))).toBeUndefined();
+});
+
+it('keeps a selected unavailable facet visible and allows only clearing it', () => {
+  const onFacetFilterChange = vi.fn();
+  render(
+    <GalleryFacetFilters
+      activeTags={[]}
+      allTags={[]}
+      counts={{ all: 1, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
+      facetFilters={{
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: ['shots.example'],
+        updated: [],
+      }}
+      facets={[
+        {
+          id: 'source',
+          searchable: false,
+          options: [
+            { count: 0, label: 'shots.example', value: 'shots.example' },
+            { count: 1, label: 'video.example', value: 'video.example' },
+          ],
+        },
+      ]}
+      filteredItemCount={0}
+      folderFilter="recording"
+      scope="all"
+      onActiveTagsChange={vi.fn()}
+      onFacetFilterChange={onFacetFilterChange}
+      onFolderFilterChange={vi.fn()}
+      onResetFilters={vi.fn()}
+      onScopeChange={vi.fn()}
+      onSelectAll={vi.fn()}
+    />
+  );
+
+  click(container?.querySelector('summary'));
+  const unavailableInput = Array.from(
+    container?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []
+  ).find((input) => input.closest('label')?.textContent?.includes('shots.example'));
+  expect(unavailableInput?.disabled).toBe(true);
+  expect(unavailableInput?.closest('label')?.getAttribute('aria-disabled')).toBe('true');
+
+  click(
+    container?.querySelector(
+      `[aria-label="${translate('gallery.app.facetClear')} ${translate('gallery.app.facetTitle.source')}"]`
+    )
+  );
+  expect(onFacetFilterChange).toHaveBeenCalledWith('source', []);
+});
+
+it('restores expanded facet sections after remounting the sidebar', async () => {
+  const facetProps = {
+    activeTags: [],
+    allTags: [],
+    counts: { all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 },
+    facetFilters: {
+      created: [],
+      duration: [],
+      format: [],
+      resolution: [],
+      size: [],
+      source: [],
+      updated: [],
+    },
+    facets: [
+      {
+        id: 'format' as const,
+        searchable: false,
+        options: [{ count: 1, label: 'PNG', value: 'png' }],
+      },
+    ],
+    filteredItemCount: 1,
+    folderFilter: 'screenshot' as const,
+    scope: 'all' as const,
+    onActiveTagsChange: vi.fn(),
+    onFacetFilterChange: vi.fn(),
+    onFolderFilterChange: vi.fn(),
+    onResetFilters: vi.fn(),
+    onScopeChange: vi.fn(),
+    onSelectAll: vi.fn(),
+  };
+
+  render(<GalleryFacetFilters {...facetProps} />);
+  click(container?.querySelector('summary'));
+  await vi.waitFor(() =>
+    expect(window.localStorage.getItem('sniptale.gallery.facet-disclosures')).toContain('format')
+  );
+
+  act(() => root?.unmount());
+  root = createRoot(container!);
+  render(<GalleryFacetFilters {...facetProps} />);
+  expect(container?.querySelector('details')?.open).toBe(true);
 });

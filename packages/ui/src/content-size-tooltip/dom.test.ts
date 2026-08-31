@@ -107,7 +107,7 @@ function registerPositionTest() {
     expect(tooltip.style.getPropertyValue('left')).toBe('24px');
     expect(tooltip.style.getPropertyValue('top')).toBe('48px');
     expect(tooltip.style.getPropertyValue('width')).toBe('max-content');
-    expect(tooltip.style.getPropertyValue('min-width')).toBe('0');
+    expect(tooltip.style.getPropertyValue('min-width')).toBe('0px');
   });
 }
 

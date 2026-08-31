@@ -34,6 +34,7 @@ function createTab(tabId: number): chrome.tabs.Tab {
     id: tabId,
     incognito: false,
     index: 0,
+    lastAccessed: 0,
     pinned: false,
     selected: true,
     status: 'complete',
@@ -254,7 +255,7 @@ it('allows owned snapshot viewer routes and rejects unrelated extension pages', 
       {
         snapshotSessionId: 'snapshot-session-1',
         type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-        url: 'https://example.test/asset.png',
+        urls: ['https://example.test/asset.png'],
       },
       createSender({ url: VIEWER_URL })
     )

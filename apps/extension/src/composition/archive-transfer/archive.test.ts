@@ -1,4 +1,4 @@
-import { BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
+import { BlobWriter, TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { describe, expect, it } from 'vitest';
 import { createBoundedArchiveBlobReader, openArchiveReader } from './reader';
 import { createArchiveMemorySink } from './test-support';
@@ -30,6 +30,74 @@ describe('archive transfer', () => {
     );
     expect(new TextDecoder().decode(chunks[0])).toBe('media');
     await reader.close();
+  });
+
+  it('streams a validated archive entry source into a new archive', async () => {
+    const sourceOutput = createArchiveMemorySink();
+    const sourceWriter = createArchiveWriter(sourceOutput.sink);
+    await sourceWriter.addBlob('source.bin', new Blob(['streamed-source']));
+    await sourceWriter.close();
+    const sourceReader = await openArchiveReader(sourceOutput.blob());
+    const source = sourceReader.entry('source.bin');
+    expect(source).not.toBeNull();
+
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    await writer.addSource('copy/source.bin', source!);
+    await writer.close();
+
+    const reader = await openArchiveReader(output.blob());
+    await expect(reader.entry('copy/source.bin')?.text()).resolves.toBe('streamed-source');
+    await reader.close();
+    await sourceReader.close();
+  });
+
+  it('rejects a streamed source that does not emit its declared size', async () => {
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    const source = {
+      compressedSize: 2,
+      crc32: 0,
+      directory: false,
+      path: 'source.bin',
+      size: 3,
+      pipeTo: (writable: WritableStream<Uint8Array>, signal?: AbortSignal) =>
+        new Blob(['ab']).stream().pipeTo(writable, signal ? { signal } : {}),
+      text: async () => 'ab',
+    };
+
+    await expect(writer.addSource('copy.bin', source)).rejects.toThrow('declared size');
+    await writer.abort();
+    expect(output.aborted).toBe(true);
+  });
+
+  it('cancels an in-flight streamed source through the caller signal', async () => {
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    const controller = new AbortController();
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const source = {
+      compressedSize: 0,
+      crc32: 0,
+      directory: false,
+      path: 'pending.bin',
+      size: 1,
+      pipeTo: (writable: WritableStream<Uint8Array>, signal?: AbortSignal) => {
+        markStarted?.();
+        return new ReadableStream<Uint8Array>().pipeTo(writable, signal ? { signal } : {});
+      },
+      text: async () => '',
+    };
+    const write = writer.addSource('pending.bin', source, { signal: controller.signal });
+    await started;
+    controller.abort(new DOMException('Stopped', 'AbortError'));
+
+    await expect(write).rejects.toMatchObject({ name: 'AbortError' });
+    await writer.abort();
+    expect(output.aborted).toBe(true);
   });
 
   it('rejects duplicate writer paths', async () => {
@@ -126,6 +194,22 @@ describe('archive transfer', () => {
 
     const reader = await openArchiveReader(new Blob([bytes]));
     await expect(reader.entry('media.bin')?.pipeTo(new WritableStream())).rejects.toThrow();
+    await reader.close();
+  });
+
+  it('rejects entry data declared beyond the archive boundary', async () => {
+    const zip = new ZipWriter(new Uint8ArrayWriter(), { dataDescriptor: false });
+    await zip.add('media.bin', new TextReader('media'), { compressionMethod: 0 });
+    const bytes = await zip.close();
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const localHeaderOffset = findSignatureFromEnd(bytes, [0x50, 0x4b, 0x03, 0x04]);
+    const centralHeaderOffset = findSignatureFromEnd(bytes, [0x50, 0x4b, 0x01, 0x02]);
+    const declaredSize = bytes.byteLength + 1;
+    view.setUint32(localHeaderOffset + 18, declaredSize, true);
+    view.setUint32(centralHeaderOffset + 20, declaredSize, true);
+
+    const reader = await openArchiveReader(new Blob([bytes]));
+    await expect(reader.entry('media.bin')?.text()).rejects.toThrow('Entry data out of bounds');
     await reader.close();
   });
 

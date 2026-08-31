@@ -6,9 +6,10 @@ import { resolveCompletedSaveAsDirectory } from './save-as-directory';
 import { readCurrentTerminalDownloadState, type DownloadTerminalState } from './service-state';
 
 const DEFAULT_DOWNLOAD_TERMINAL_TIMEOUT_MS = 5 * 60 * 1000;
+const EXACT_URL_RECONCILIATION_WINDOW_MS = 30_000;
 const logger = createLogger({ namespace: 'BackgroundDownloadRouterService' });
 
-type DownloadTerminalHandler = (state: DownloadTerminalState) => void | Promise<void>;
+export type DownloadTerminalHandler = (state: DownloadTerminalState) => void | Promise<void>;
 type PendingDownload = {
   id: number;
   jobId?: string | undefined;
@@ -25,9 +26,19 @@ type SaveAsDownloadAttempt = {
   register(downloadId: number | null | undefined): Promise<void>;
 };
 type DownloadReconciliationResult = 'completed' | 'failed' | 'missing' | 'pending' | 'rebound';
+export type ExactUrlDownloadMatch = {
+  downloadId: number;
+  state: chrome.downloads.DownloadItem['state'];
+};
+type BrowserDownloadTerminalState = Extract<DownloadTerminalState, 'complete' | 'interrupted'>;
 export type DownloadRouterService = {
   beginSaveAsDownloadAttempt(jobId?: string | undefined): SaveAsDownloadAttempt;
+  cancelDownloadAndWait(downloadId: number): Promise<BrowserDownloadTerminalState>;
   dispose(): void;
+  findDownloadsByExactUrl(args: {
+    requestedAt: number;
+    url: string;
+  }): Promise<ExactUrlDownloadMatch[]>;
   reconcileCaptureJobDownload(
     downloadId: number,
     jobId: string
@@ -36,7 +47,8 @@ export type DownloadRouterService = {
     downloadId: number,
     onTerminal: DownloadTerminalHandler,
     kind?: PendingDownload['kind'],
-    jobId?: string | undefined
+    jobId?: string | undefined,
+    reconcileCurrent?: boolean
   ): Promise<void>;
   rememberPendingSaveAsDownload(downloadId: number | null): void;
 };
@@ -112,7 +124,8 @@ class DownloadRouterServiceController {
     downloadId: number,
     onTerminal: DownloadTerminalHandler,
     kind: PendingDownload['kind'] = 'generic',
-    jobId?: string | undefined
+    jobId?: string | undefined,
+    reconcileCurrent = jobId !== undefined
   ): Promise<void> {
     this.clearPendingDownload(downloadId);
     if (jobId) {
@@ -139,10 +152,59 @@ class DownloadRouterServiceController {
         this.terminalTimeoutMs
       ),
     });
-    if (jobId) {
+    if (reconcileCurrent) {
       const terminalState = await readCurrentTerminalDownloadState(downloadId);
       if (terminalState) this.completePendingDownload(downloadId, terminalState);
     }
+  }
+
+  async cancelDownloadAndWait(downloadId: number): Promise<BrowserDownloadTerminalState> {
+    const existingTerminalState = await readCurrentTerminalDownloadState(downloadId);
+    if (existingTerminalState) return existingTerminalState;
+
+    return new Promise<BrowserDownloadTerminalState>((resolve, reject) => {
+      const handleTerminal = (state: DownloadTerminalState): void => {
+        if (state === 'complete' || state === 'interrupted') resolve(state);
+        else
+          reject(
+            new Error(`Download cancellation did not reach a browser terminal state: ${state}.`)
+          );
+      };
+      void this.rememberPendingDownload(downloadId, handleTerminal, 'generic', undefined, true)
+        .then(async () => {
+          const terminalBeforeCancel = await readCurrentTerminalDownloadState(downloadId);
+          if (terminalBeforeCancel) {
+            this.completePendingDownload(downloadId, terminalBeforeCancel);
+            return;
+          }
+          await browserDownloads.cancel(downloadId);
+          const terminalState = await readCurrentTerminalDownloadState(downloadId);
+          if (terminalState) this.completePendingDownload(downloadId, terminalState);
+        })
+        .catch((error: unknown) => {
+          this.clearPendingDownload(downloadId);
+          this.closeSubscription();
+          reject(error);
+        });
+    });
+  }
+
+  async findDownloadsByExactUrl(args: {
+    requestedAt: number;
+    url: string;
+  }): Promise<ExactUrlDownloadMatch[]> {
+    if (!Number.isSafeInteger(args.requestedAt) || args.requestedAt < 0 || args.url.length === 0) {
+      throw new Error('Invalid exact download reconciliation identity.');
+    }
+    const downloads = await browserDownloads.search({
+      startedAfter: new Date(Math.max(0, args.requestedAt - 1_000)).toISOString(),
+      startedBefore: new Date(args.requestedAt + EXACT_URL_RECONCILIATION_WINDOW_MS).toISOString(),
+    });
+    return downloads.flatMap((download) =>
+      download.url === args.url || download.finalUrl === args.url
+        ? [{ downloadId: download.id, state: download.state }]
+        : []
+    );
   }
 
   private clearSaveAsDownloads(): void {

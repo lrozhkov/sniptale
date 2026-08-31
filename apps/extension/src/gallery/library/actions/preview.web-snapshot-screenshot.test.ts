@@ -8,10 +8,12 @@ const {
   browserTabsCreateMock,
   getWebSnapshotScreenshotFileMock,
   persistPendingEditorBootstrapPayloadMock,
+  validateWebSnapshotScreenshotBlobMock,
 } = vi.hoisted(() => ({
   browserTabsCreateMock: vi.fn(),
   getWebSnapshotScreenshotFileMock: vi.fn(),
   persistPendingEditorBootstrapPayloadMock: vi.fn(),
+  validateWebSnapshotScreenshotBlobMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -21,6 +23,13 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
 vi.mock('../../../composition/persistence/web-snapshots', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/web-snapshots')>()),
   getWebSnapshotScreenshotFile: getWebSnapshotScreenshotFileMock,
+}));
+
+vi.mock('../../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../features/web-snapshot/screenshot-validation')
+  >()),
+  validateWebSnapshotScreenshotBlob: validateWebSnapshotScreenshotBlobMock,
 }));
 
 vi.mock('../../../workflows/editor/bootstrap/index', async (importOriginal) => ({
@@ -42,6 +51,7 @@ vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   persistPendingEditorBootstrapPayloadMock.mockResolvedValue('bootstrap-1');
+  validateWebSnapshotScreenshotBlobMock.mockResolvedValue({ height: 720, width: 1280 });
 });
 
 afterEach(() => {
@@ -52,7 +62,7 @@ it('opens web snapshot screenshots in the image editor', async () => {
   const screenshotBlob = new File(['png'], 'screenshot.png', { type: 'image/png' });
   const previewItem = createMediaItem({
     entityId: 'snapshot-1',
-    filename: 'snapshot.zip',
+    filename: 'snapshot.sniptale-page-package.zip',
     kind: 'web-archive',
     source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
     sourceTitle: 'Snapshot page',
@@ -65,6 +75,7 @@ it('opens web snapshot screenshots in the image editor', async () => {
   await openSnapshotScreenshotInEditor(controller, runBusyAction);
 
   expect(getWebSnapshotScreenshotFileMock).toHaveBeenCalledWith('snapshot-1');
+  expect(validateWebSnapshotScreenshotBlobMock).toHaveBeenCalledWith(screenshotBlob);
   expect(persistPendingEditorBootstrapPayloadMock).toHaveBeenCalledWith(
     expect.objectContaining({
       sourceFaviconUrl: null,
@@ -75,6 +86,30 @@ it('opens web snapshot screenshots in the image editor', async () => {
   expect(browserTabsCreateMock).toHaveBeenCalledWith({
     url: expect.stringContaining('session=session-1'),
   });
+});
+
+it.each([
+  ['corrupt', 'Web snapshot screenshot is invalid.'],
+  ['over-dimension', 'Web snapshot screenshot dimensions exceed safe limits.'],
+])('rejects %s web snapshot screenshots before editor bootstrap', async (_case, message) => {
+  const screenshotBlob = new File(['unsafe'], 'screenshot.png', { type: 'image/png' });
+  const previewItem = createMediaItem({
+    entityId: 'snapshot-1',
+    kind: 'web-archive',
+    source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
+  });
+  const { controller } = createController({ previewItem });
+  const runBusy = vi.fn(async (task: () => Promise<void>) => {
+    await expect(task()).rejects.toThrow(message);
+  });
+  getWebSnapshotScreenshotFileMock.mockResolvedValue(screenshotBlob);
+  validateWebSnapshotScreenshotBlobMock.mockRejectedValue(new Error(message));
+
+  await openSnapshotScreenshotInEditor(controller, runBusy);
+
+  expect(validateWebSnapshotScreenshotBlobMock).toHaveBeenCalledWith(screenshotBlob);
+  expect(persistPendingEditorBootstrapPayloadMock).not.toHaveBeenCalled();
+  expect(browserTabsCreateMock).not.toHaveBeenCalled();
 });
 
 it('ignores non-web-snapshot preview items and reports missing packages', async () => {

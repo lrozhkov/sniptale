@@ -19,10 +19,9 @@ function write(root: string, relative: string, contents: string) {
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-fast-proof-'));
   roots.push(root);
-  const archive = 'build/sniptale_0.3.3_test.zip';
-  write(root, archive, 'zip');
-  write(root, '.tmp/qa/build-proof.json', '{}\n');
-  const files = [archive, '.tmp/qa/build-proof.json'].map((file) => ({
+  const report = '.tmp/qa/unit-proof.json';
+  write(root, report, '{}\n');
+  const files = [report].map((file) => ({
     file,
     sha256: sha256(fs.readFileSync(path.join(root, file))),
   }));
@@ -78,7 +77,7 @@ it('accepts only an exact content-addressed fast proof', () => {
 
 it('rejects a modified proof payload even when the manifest still claims success', () => {
   const value = fixture();
-  write(value.root, '.tmp/qa/build-proof.json', '{"modified":true}\n');
+  write(value.root, '.tmp/qa/unit-proof.json', '{"modified":true}\n');
   expect(() => verifyReusableFastProof(value.root, value.identity)).toThrow(/digest mismatch/u);
 });
 

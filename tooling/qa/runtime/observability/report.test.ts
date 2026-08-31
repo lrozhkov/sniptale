@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { createTempRoot } from '../../core/test-helpers';
+import { createTempRoot } from '../../test-support/test-helpers';
 import { collectQaStatisticsReport, parseQaStatisticsArguments } from './report.mjs';
 
 it('provides strict help and filtering arguments', () => {

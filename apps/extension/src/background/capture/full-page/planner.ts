@@ -1,4 +1,7 @@
-import type { FullPageCaptureGeometry } from '../../../contracts/full-page-capture';
+import type {
+  FullPageCaptureGeometry,
+  FullPageQualityPolicy,
+} from '../../../contracts/full-page-capture';
 import { assertFullPageGeometryBudget } from './budgets';
 
 const FULL_PAGE_TILE_OVERLAP_CSS_PX = 64;
@@ -36,8 +39,11 @@ function countAxisPositions(extent: number, viewport: number): number {
   return Math.ceil((extent - viewport) / step) + 1;
 }
 
-export function createFullPageTilePlan(geometry: FullPageCaptureGeometry): FullPageTilePlan[] {
-  assertFullPageGeometryBudget(geometry);
+export function createFullPageTilePlan(
+  geometry: FullPageCaptureGeometry,
+  qualityPolicy?: FullPageQualityPolicy
+): FullPageTilePlan[] {
+  assertFullPageGeometryBudget(geometry, qualityPolicy);
   const columnCount = countAxisPositions(geometry.extentWidth, geometry.rootViewport.width);
   const rowCount = countAxisPositions(geometry.extentHeight, geometry.rootViewport.height);
   if (

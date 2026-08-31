@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { isExecutedAsScript } from '../qa/core/shared.mjs';
+import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import { createProofSemanticDigest } from './artifacts.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 
@@ -150,15 +150,11 @@ export function verifyReleaseProof(root, commit, options) {
     '.tmp/licenses/sbom.cdx.json',
     '.tmp/qa/codeql-proof.json',
     '.tmp/qa/coverage-proof.json',
-    '.tmp/mutation/persistence',
-    '.tmp/mutation/secrets',
   ]) {
     if (
       required.endsWith('/')
         ? ![...files].some((file) => file.startsWith(required))
-        : required.includes('/mutation/')
-          ? ![...files].some((file) => file.startsWith(`${required}/`))
-          : !files.has(required)
+        : !files.has(required)
     ) {
       throw new Error(`Release proof is missing required evidence: ${required}`);
     }

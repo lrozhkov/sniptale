@@ -4,41 +4,57 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isBoolean,
+  isRecord,
   isString,
 } from '../../../validators/index';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 import {
-  isSaveWebSnapshotToGalleryMessage,
-  isStageWebSnapshotBlobChunkMessage,
   isWebSnapshotAssetUrl,
   isWebSnapshotAssetUrlArray,
   isWebSnapshotSessionId,
-  isWebSnapshotStagedBlobId,
 } from './save.web-snapshot.validators.ts';
 export {
   WEB_SNAPSHOT_MAX_ASSET_URL_LENGTH,
   WEB_SNAPSHOT_MAX_ASSET_URLS,
   WEB_SNAPSHOT_MAX_SESSION_ID_LENGTH,
-  WEB_SNAPSHOT_MAX_STAGE_CHUNK_BASE64_LENGTH,
 } from './save.web-snapshot.validators.ts';
 
+function isWebSnapshotAssetFetchResults(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= 500 &&
+    value.every(
+      (item) =>
+        isRecord(item) &&
+        Object.keys(item).every((key) =>
+          ['base64', 'error', 'mimeType', 'success', 'url'].includes(key)
+        ) &&
+        isBoolean(item['success']) &&
+        isWebSnapshotAssetUrl(item['url']) &&
+        (item['base64'] === undefined || isString(item['base64'])) &&
+        (item['error'] === undefined || isString(item['error'])) &&
+        (item['mimeType'] === undefined || isString(item['mimeType']))
+    )
+  );
+}
+
+function isWebSnapshotAssetFetchUrls(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= 500 &&
+    value.every(isWebSnapshotAssetUrl)
+  );
+}
+
 export const runtimeActionWebSnapshotSaveMessageContracts = {
-  [MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY]: {
-    parseRequest: createGuardParser(
-      'runtime SAVE_WEB_SNAPSHOT_TO_GALLERY message',
-      isSaveWebSnapshotToGalleryMessage
-    ),
-    parseResponse: createGuardParser(
-      'runtime SAVE_WEB_SNAPSHOT_TO_GALLERY response',
-      createRuntimeResponseGuard({ optional: { assetId: isString } })
-    ),
-  },
   [MessageType.REGISTER_WEB_SNAPSHOT_ASSETS]: {
     parseRequest: createGuardParser(
       'runtime REGISTER_WEB_SNAPSHOT_ASSETS message',
       createMessageGuard({
         type: MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
         required: { assetUrls: isWebSnapshotAssetUrlArray, requestId: isString },
+        optional: { snapshotSessionId: isWebSnapshotSessionId },
       })
     ),
     parseResponse: createGuardParser(
@@ -51,37 +67,15 @@ export const runtimeActionWebSnapshotSaveMessageContracts = {
       'runtime FETCH_WEB_SNAPSHOT_ASSET message',
       createMessageGuard({
         type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
-        required: { snapshotSessionId: isWebSnapshotSessionId, url: isWebSnapshotAssetUrl },
+        required: {
+          snapshotSessionId: isWebSnapshotSessionId,
+          urls: isWebSnapshotAssetFetchUrls,
+        },
       })
     ),
     parseResponse: createGuardParser(
       'runtime FETCH_WEB_SNAPSHOT_ASSET response',
-      createRuntimeResponseGuard({ optional: { base64: isString, mimeType: isString } })
-    ),
-  },
-  [MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK]: {
-    parseRequest: createGuardParser(
-      'runtime STAGE_WEB_SNAPSHOT_BLOB_CHUNK message',
-      isStageWebSnapshotBlobChunkMessage
-    ),
-    parseResponse: createGuardParser(
-      'runtime STAGE_WEB_SNAPSHOT_BLOB_CHUNK response',
-      createRuntimeResponseGuard({
-        optional: { complete: isBoolean, stagedBlobId: isWebSnapshotStagedBlobId },
-      })
-    ),
-  },
-  [MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS]: {
-    parseRequest: createGuardParser(
-      'runtime RELEASE_WEB_SNAPSHOT_STAGED_BLOBS message',
-      createMessageGuard({
-        type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
-        required: { snapshotSessionId: isWebSnapshotSessionId },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime RELEASE_WEB_SNAPSHOT_STAGED_BLOBS response',
-      createRuntimeResponseGuard({ optional: { result: isString } })
+      createRuntimeResponseGuard({ optional: { assets: isWebSnapshotAssetFetchResults } })
     ),
   },
 } satisfies PartialRuntimeRegistry;

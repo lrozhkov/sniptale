@@ -40,7 +40,25 @@ async function renderContent(controller: ReturnType<typeof createPopupExportCont
   }
 
   await act(async () => {
-    root?.render(<ExportPageContent controller={controller} />);
+    root?.render(
+      <ExportPageContent
+        controller={controller}
+        destination="export"
+        onDestinationChange={vi.fn()}
+        webCopyResources={{
+          anonymousCrossOriginAssetsEnabled: true,
+          authenticatedSameOriginAssetsEnabled: true,
+          externalAssetRedirectsEnabled: true,
+          externalLinksEnabled: false,
+          error: null,
+          pending: null,
+          setAnonymousCrossOriginAssetsEnabled: vi.fn(),
+          setAuthenticatedSameOriginAssetsEnabled: vi.fn(),
+          setExternalAssetRedirectsEnabled: vi.fn(),
+          setExternalLinksEnabled: vi.fn(),
+        }}
+      />
+    );
   });
 }
 
@@ -129,8 +147,16 @@ it('renders the ready state with selection props and disabled state', async () =
       derived: { exportDisabledReason: 'blocked' },
       preferences: { hasLoadedPreferences: false },
       tabs: {
+        activeSourceMode: 'urls',
         selectedCount: 0,
         selectedTabIds: [],
+        selectedUrls: ['https://example.test/'],
+        setActiveSourceMode: vi.fn(),
+        setUrlInput: vi.fn(),
+        removeSelectedUrl: vi.fn(),
+        urlInput: 'example.test',
+        urlInputInvalid: [],
+        urlInputOverflow: 0,
       },
     })
   );
@@ -142,6 +168,9 @@ it('renders the ready state with selection props and disabled state', async () =
       hasLoadedPreferences: false,
       selectedCount: 0,
       selectedTabIds: [],
+      selectedUrls: ['https://example.test/'],
+      includeWebCopy: false,
+      savePreferences: expect.objectContaining({ includeWebCopy: true }),
     })
   );
 });

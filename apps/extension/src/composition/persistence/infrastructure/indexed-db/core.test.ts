@@ -66,14 +66,24 @@ function createMockDb(
       }
       indexes.delete(name);
     }),
+    delete: vi.fn().mockResolvedValue(undefined),
+    get: vi.fn().mockResolvedValue(undefined),
     objectStoreNames: storeNames,
     transaction: vi.fn((storeName: string | string[]) => {
       return {
+        done: Promise.resolve(),
         objectStore: vi.fn((requestedStoreName = storeName) => {
           const name = Array.isArray(requestedStoreName)
             ? requestedStoreName[0]
             : requestedStoreName;
-          return { indexNames: createIndexNames(indexes.get(name) ?? []) };
+          return {
+            delete: vi.fn().mockResolvedValue(undefined),
+            get: vi.fn().mockResolvedValue(undefined),
+            index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
+            indexNames: createIndexNames(indexes.get(name) ?? []),
+            openCursor: vi.fn().mockResolvedValue(null),
+            put: vi.fn().mockResolvedValue(undefined),
+          };
         }),
       };
     }),
@@ -258,6 +268,24 @@ describe('shared db core initDB recovery', () => {
     expect(dbMocks.openDB).toHaveBeenCalledOnce();
   });
 
+  it('closes a database that resolves after opening was already blocked', async () => {
+    stubPersistentStorage();
+    const blockedDb = createCompleteDb();
+    dbMocks.openDB.mockImplementation(
+      (_name: string, _version: number, options: { blocked(): void }) => {
+        options.blocked();
+        return Promise.resolve(blockedDb);
+      }
+    );
+
+    const module = await importDbModule();
+
+    await expect(module.initDB()).rejects.toMatchObject({
+      admission: { reason: 'connection-blocked', status: 'blocked' },
+    });
+    await vi.waitFor(() => expect(blockedDb.close).toHaveBeenCalledOnce());
+  });
+
   it('resets the cache after termination and failed initialization', async () => {
     stubPersistentStorage();
     const firstDb = createCompleteDb();
@@ -330,6 +358,24 @@ describe('shared db core privacy erasure', () => {
       'sniptale-db',
       'sniptale-video-db',
     ]);
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(true);
+  });
+
+  it('reports unverifiable storage APIs and detects owned databases without rejecting unnamed rows', async () => {
+    const module = await importDbModule();
+    vi.stubGlobal('indexedDB', undefined);
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(false);
+
+    vi.stubGlobal('indexedDB', {});
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(false);
+
+    vi.stubGlobal('indexedDB', {
+      databases: vi
+        .fn()
+        .mockResolvedValueOnce([{ name: undefined }, { name: 'sniptale-db' }])
+        .mockResolvedValueOnce([{ name: undefined }, { name: 'other-db' }]),
+    });
+    await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(false);
     await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(true);
   });
 });

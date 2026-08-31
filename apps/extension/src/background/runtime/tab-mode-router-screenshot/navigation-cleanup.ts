@@ -34,7 +34,7 @@ export async function cleanupScreenshotModeAfterNavigation(
       capability,
       ports: webSnapshotViewerPorts,
       tabId,
-    }).catch((error) => logger.warn('Failed to disable preparation after navigation', error));
+    }).catch((error) => logger.debug('Preparation receiver disappeared during navigation', error));
     await releaseQuickActionSurface(tabId, viewportState);
     if (capability === TabRuntimeCapability.Regular) {
       await getCaptureSurfaceService().releaseTabOwners(tabId, ['quick-action', 'screenshot']);

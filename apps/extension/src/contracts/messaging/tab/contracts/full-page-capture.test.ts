@@ -2,7 +2,6 @@ import { expect, it } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { tabFullPageCaptureMessageContracts } from './full-page-capture';
 import { tabUiExportMessageContracts } from './ui-export';
-import { tabWebSnapshotMessageContracts } from './web-snapshot';
 
 const identity = {
   jobId: 'job-1',
@@ -118,19 +117,6 @@ it('parses a verified tile state only after checking every DOM-derived field', (
       success: true,
     })
   ).toEqual(expect.objectContaining({ success: true }));
-});
-
-it('accepts the native full-page action at the web-snapshot boundary', () => {
-  const fullPageCaptureAction = MessageType.EXPORT_CAPTURE_FULL_PAGE;
-  expect(
-    tabWebSnapshotMessageContracts[MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT].parseRequest({
-      allowAnonymousCrossOriginAssets: false,
-      allowAuthenticatedSameOriginAssets: true,
-      fullPageCaptureAction,
-      requestId: 'export-run-1',
-      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-    })
-  ).toEqual(expect.objectContaining({ fullPageCaptureAction }));
 });
 
 it('parses the direct popup launch-intent consume contract narrowly', () => {

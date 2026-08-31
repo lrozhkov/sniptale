@@ -7,8 +7,8 @@ import { createProofSemanticDigest } from './artifacts.mjs';
 import { createCandidateControlDigest } from './control-digest.mjs';
 import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
 import { verifyMainProof } from './verify-main-proof.mjs';
-import { collectDocumentationFactViolations } from '../qa/core/documentation-facts.mjs';
-import { collectOssReleaseSurfaceErrors } from '../qa/core/verify-oss-release-surface.mjs';
+import { collectDocumentationFactViolations } from '../qa/policy/documentation/documentation-facts/check.mjs';
+import { collectOssReleaseSurfaceErrors } from '../qa/audits/licenses/oss-release-surface/check.mjs';
 
 const [sourceValue, outputValue, baseCommit] = process.argv.slice(2);
 if (!sourceValue || !outputValue || !/^[a-f0-9]{40}$/u.test(baseCommit ?? '')) {

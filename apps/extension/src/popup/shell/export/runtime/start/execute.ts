@@ -5,17 +5,28 @@ import { reportStartExportFailure } from './failure';
 import { getPopupExportSelection } from '../../session/selectors';
 import { buildPopupExportOptions } from '../options';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  DEFAULT_EXPORT_RESOURCE_LIMITS,
+  MAX_POPUP_EXPORT_JOB_TABS,
+  normalizePopupExportTabTitle,
+} from '@sniptale/runtime-contracts/export';
 import { translate } from '../../../../../platform/i18n/popup';
+import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
 
 export async function startPopupExport(
   state: PopupExportRuntimeContract,
-  deps: PopupExportRuntimeDeps = getDefaultPopupExportRuntimeDeps()
+  deps: PopupExportRuntimeDeps = getDefaultPopupExportRuntimeDeps(),
+  intent: 'export' | 'save' = 'export'
 ): Promise<void> {
+  if (!state.hasLoadedPreferences) {
+    return;
+  }
+
   if (state.exportDisabledReason) {
     return;
   }
 
-  if (!state.canExport) {
+  if (intent === 'export' && !state.canExport) {
     return;
   }
 
@@ -26,51 +37,92 @@ export async function startPopupExport(
   try {
     const jobId = deps.createRequestId();
     const selectedIds = new Set(state.selectedTabIdsInOrder);
-    const orderedTabs = state.selectedTabIdsInOrder.flatMap((tabId) => {
-      const tab = state.availableTabs.find((candidate) => candidate.tabId === tabId);
-      return tab && tab.disabledReason === null && selectedIds.has(tabId)
-        ? [{ tabId, title: tab.title }]
-        : [];
-    });
-    if (orderedTabs.length === 0) return;
+    const orderedTabs = state.selectedTabIdsInOrder
+      .flatMap((tabId) => {
+        const tab = state.availableTabs.find((candidate) => candidate.tabId === tabId);
+        return tab && tab.disabledReason === null && selectedIds.has(tabId)
+          ? [{ tabId, title: normalizePopupExportTabTitle(tab.title) }]
+          : [];
+      })
+      .slice(0, MAX_POPUP_EXPORT_JOB_TABS);
+    const sources =
+      state.activeSourceMode === 'urls'
+        ? state.selectedUrls.map((url) => ({ kind: 'url' as const, url }))
+        : orderedTabs.map((tab) => ({ kind: 'tab' as const, ...tab }));
+    if (sources.length === 0) return;
 
-    const options = buildPopupExportOptions(getPopupExportSelection(state));
+    const plan =
+      intent === 'save'
+        ? {
+            ...state.saveSelection,
+            includeFullPageScreenshot: true,
+            includeWebCopy: true,
+          }
+        : {
+            ...getPopupExportSelection(state),
+            includeWebCopy: state.includeWebCopy,
+          };
+    const resourceLimits = deps.loadExportResourceLimits
+      ? await deps.loadExportResourceLimits()
+      : { ...DEFAULT_EXPORT_RESOURCE_LIMITS };
+    const options = { ...buildPopupExportOptions(plan), resourceLimits };
     const warnings: string[] = [];
-    if (options.includeFullPageScreenshot) {
+    if (
+      state.activeSourceMode === 'urls' ||
+      (intent === 'export' &&
+        (options.includeFullPageScreenshot || options.includeViewportScreenshot === true))
+    ) {
       const granted = await (deps.requestAllUrlsPermission?.() ?? Promise.resolve(true));
       if (!granted) {
-        options.includeFullPageScreenshot = false;
-        warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+        if (state.activeSourceMode === 'urls')
+          throw new Error(translate('popup.export.urlPermissionDenied'));
+        else {
+          options.includeFullPageScreenshot = false;
+          options.includeViewportScreenshot = false;
+          warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+        }
       }
     }
+    const captureTiming = deps.loadPageCaptureTiming
+      ? await deps.loadPageCaptureTiming()
+      : { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING };
 
     state.requestIdRef.current = jobId;
+    state.terminalRequestIdRef.current = null;
     state.cancelRetryRef.current = {
       exportRunId: jobId,
-      tabIds: orderedTabs.map((tab) => tab.tabId),
+      owner: 'job',
+      tabIds: state.activeSourceMode === 'urls' ? [] : orderedTabs.map((tab) => tab.tabId),
+    };
+    const effectivePlan = {
+      ...plan,
+      includeFullPageScreenshot: options.includeFullPageScreenshot,
+      includeViewportScreenshot: options.includeViewportScreenshot === true,
     };
     state.setResult(null);
+    state.setLaunchedPlan(effectivePlan);
     state.setProgress({
-      activeStepKey: null,
+      activeStepKey: effectivePlan.includeWebCopy ? 'webSnapshotDom' : null,
       current: 0,
-      total: orderedTabs.length,
+      total: sources.length,
       errors: [],
       message: translate('popup.export.preparingPreview'),
       phase: 'scanning',
     });
     if (!deps.sendStartJobMessage) throw new Error('Popup export job transport is unavailable');
     const response = await deps.sendStartJobMessage({
-      type: MessageType.START_POPUP_EXPORT_JOB,
+      type: MessageType.START_PAGE_PACKAGE_JOB,
+      includeWebCopy: effectivePlan.includeWebCopy,
+      intent,
       jobId,
-      orderedTabs,
+      captureTiming,
+      sources,
       options,
       warnings,
     });
     if (!response?.success || !response.status) {
       throw new Error(response?.error || translate('popup.export.startExportError'));
     }
-    state.setProgress(response.status.progress);
-    if (response.status.result) state.setResult(response.status.result);
   } catch (error) {
     reportStartExportFailure(state, error);
   }

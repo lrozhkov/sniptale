@@ -1,7 +1,5 @@
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
-import { parseAggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/parser';
-import { createAggregatePresentationKey } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
 import type {
   MediaLibraryEntry,
@@ -13,7 +11,6 @@ import { parseRecordingEntry } from '../../../../composition/persistence/recordi
 import { parseRecordingTelemetryEntry } from '../../../../composition/persistence/recordings/telemetry.guards';
 import { parseStoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots';
 import {
-  AGGREGATE_PRESENTATIONS_STORE,
   ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
@@ -24,11 +21,7 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../../features/web-snapshot/provenance';
 import { encodePortableEditorDocument } from '../root-codecs/editor-document';
-import {
-  encodePortablePresentation,
-  encodePortableThumbnail,
-  type PortableMediaMetadata,
-} from '../root-codecs/media';
+import { encodePortableThumbnail, type PortableMediaMetadata } from '../root-codecs/media';
 import {
   projectImageWorkspacePrivacy,
   projectMediaEntryPrivacy,
@@ -37,6 +30,8 @@ import {
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { ArchiveRootObjectSource, MediaHubBackupRootInventoryItem } from '../export';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
+import { buildPortableAggregatePresentation } from './presentation';
 
 interface MediaInventoryDatabase {
   get(store: string, key: unknown): Promise<unknown>;
@@ -207,7 +202,7 @@ async function buildWebSnapshotSource(args: {
     throw new Error(`Web snapshot backup metadata is missing: ${args.snapshotId}.`);
   }
   const [packageFile, screenshotFile] = await Promise.all([
-    readRefFile(args.db, stored.packageAssetId, `${stored.id}.sniptale-web-snapshot.zip`),
+    readRefFile(args.db, stored.packageAssetId, `${stored.id}.sniptale-page-package.zip`),
     readRefFile(args.db, stored.screenshotAssetId, `${stored.id}-screenshot`),
   ]);
   const sanitized = await sanitizeWebSnapshotPackageProvenance(packageFile, stored.manifest, {
@@ -215,8 +210,8 @@ async function buildWebSnapshotSource(args: {
   });
   const packageObjectId = args.collector.add(
     sanitized.packageBlob,
-    `${stored.id}.sniptale-web-snapshot.zip`,
-    'application/zip',
+    `${stored.id}.sniptale-page-package.zip`,
+    PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
     mediaObjectDirectory(args.entry, args.options)
   );
   const screenshotObjectId = args.collector.add(
@@ -229,7 +224,7 @@ async function buildWebSnapshotSource(args: {
   );
   const { packageAssetId: _package, screenshotAssetId: _screenshot, ...portable } = stored;
   return {
-    originalObjectId: screenshotObjectId,
+    originalObjectId: packageObjectId,
     webSnapshot: {
       entry: {
         ...portable,
@@ -315,39 +310,6 @@ async function buildWorkspace(args: {
   };
 }
 
-async function buildPresentation(args: {
-  collector: MediaObjectCollector;
-  db: MediaInventoryDatabase;
-  entry: MediaLibraryEntry;
-  isImageAggregate: boolean;
-}) {
-  if (!args.isImageAggregate) return undefined;
-  const presentation = parseAggregatePresentationEntry(
-    await args.db.get(
-      AGGREGATE_PRESENTATIONS_STORE,
-      createAggregatePresentationKey({ id: args.entry.id, kind: 'image' })
-    )
-  );
-  if (!presentation) return undefined;
-  return encodePortablePresentation({
-    entry: presentation,
-    ...(presentation.previewBlob
-      ? {
-          previewObjectId: args.collector.add(
-            presentation.previewBlob,
-            `${args.entry.id}-preview`,
-            presentation.previewBlob.type || 'image/png'
-          ),
-        }
-      : {}),
-    thumbnailObjectId: args.collector.add(
-      presentation.thumbnailBlob,
-      `${args.entry.id}-presentation-thumbnail`,
-      presentation.thumbnailBlob.type || 'image/png'
-    ),
-  });
-}
-
 function buildRootSummary(args: {
   entry: MediaLibraryEntry;
   options: MediaHubBackupExportOptions;
@@ -392,19 +354,21 @@ async function buildMediaRoot(args: {
     isImageAggregate,
     options: args.options,
   });
-  const presentation = await buildPresentation({
-    collector,
-    db: args.db,
-    entry,
-    isImageAggregate,
-  });
+  const presentation = isImageAggregate
+    ? await buildPortableAggregatePresentation({
+        addObject: (blob, filename, mimeType) => collector.add(blob, filename, mimeType),
+        aggregateId: entry.id,
+        aggregateKind: 'image',
+        db: args.db,
+      })
+    : undefined;
   const { blob: _blob, ...entryWithoutBlob } = entry;
   const portableEntry =
     entry.source.kind === 'web-snapshot' && !args.options.includeSourceMetadata
       ? {
           ...entryWithoutBlob,
-          filename: 'snapshot.sniptale-web-snapshot.zip',
-          originalFilename: 'snapshot.sniptale-web-snapshot.zip',
+          filename: 'snapshot.sniptale-page-package.zip',
+          originalFilename: 'snapshot.sniptale-page-package.zip',
         }
       : entryWithoutBlob;
   const metadata: PortableMediaMetadata = {

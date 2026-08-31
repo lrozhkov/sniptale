@@ -254,9 +254,10 @@ it('registers marker projection and note as passive while keeping its tooltip in
   expect(isContentOwnedPassiveChrome(markerNote)).toBe(true);
   expect(isContentOwnedPassiveChrome(tooltip)).toBe(false);
   expect(markerNote?.querySelector('svg')?.getAttribute('class')).toContain('pointer-events-none');
-  expect(markerNote?.querySelector(':scope > span')?.getAttribute('class')).toContain(
-    'pointer-events-none'
+  const noteText = Array.from(markerNote?.children ?? []).find(
+    (element) => element.tagName === 'SPAN'
   );
+  expect(noteText?.getAttribute('class')).toContain('pointer-events-none');
 });
 
 it('keeps text and internal focus geometry above theme contrast on an accent host', async () => {

@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { createStitcherMock, drawFrameMock, finishMock } = vi.hoisted(() => ({
+const { createStitcherMock, disposeMock, drawFrameMock, finishMock } = vi.hoisted(() => ({
   createStitcherMock: vi.fn(),
+  disposeMock: vi.fn(),
   drawFrameMock: vi.fn(),
   finishMock: vi.fn(),
 }));
@@ -32,7 +33,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   drawFrameMock.mockResolvedValue(undefined);
   finishMock.mockResolvedValue({ dataUrl: 'data:image/png;base64,result', metadata: {} });
-  createStitcherMock.mockResolvedValue({ drawFrame: drawFrameMock, finish: finishMock });
+  createStitcherMock.mockResolvedValue({
+    dispose: disposeMock,
+    drawFrame: drawFrameMock,
+    finish: finishMock,
+  });
 });
 
 it('scrolls, verifies, and streams row-major tiles without retaining raster frames', async () => {
@@ -343,6 +348,119 @@ it('rejects a tile whose verified geometry changed during raster capture', async
       warnings: [],
     })
   ).rejects.toThrow('tile changed');
+});
+
+it('restarts the capture plan instead of stitching against an extent that grew', async () => {
+  const state = {
+    actualX: 0,
+    actualY: 0,
+    frozenExtentWarning: true,
+    geometry,
+    layoutGeneration: 'layout-1',
+  };
+  const captureFrame = vi.fn();
+
+  await expect(
+    captureAndStitchFullPageTiles({
+      agent: {
+        heartbeat: vi.fn(),
+        prepare: vi.fn(),
+        prepareTile: vi.fn().mockResolvedValue(state),
+        restore: vi.fn(),
+        verifyTile: vi.fn(),
+      },
+      identity: {
+        jobId: 'job-growth',
+        ownerToken: 'owner-growth',
+        runtimeGeneration: 'generation-1',
+      },
+      layoutGeneration: 'layout-1',
+      options: {},
+      plans: [
+        {
+          column: 0,
+          firstColumn: true,
+          firstRow: true,
+          lastColumn: true,
+          lastRow: true,
+          row: 0,
+          sourceInsetX: 0,
+          sourceInsetY: 0,
+          targetX: 0,
+          targetY: 0,
+        },
+      ],
+      raster: { captureFrame, release: vi.fn() },
+      renewLease: vi.fn(),
+      warnings: [],
+    })
+  ).rejects.toThrow('Full-page capture extent grew during capture');
+
+  expect(captureFrame).not.toHaveBeenCalled();
+  expect(createStitcherMock).not.toHaveBeenCalled();
+});
+
+it('finishes the frozen prepared extent when growth persists after a plan restart', async () => {
+  const state = {
+    actualX: 0,
+    actualY: 0,
+    frozenExtentWarning: true,
+    geometry,
+    layoutGeneration: 'layout-1',
+  };
+  const captureFrame = vi.fn().mockResolvedValue('data:image/png;base64,tile');
+  const finish = vi.fn().mockResolvedValue({
+    dataUrl: 'data:image/png;base64,full-page',
+    metadata: { frozenExtentWarning: true },
+  });
+  createStitcherMock.mockResolvedValueOnce({
+    dispose: vi.fn(),
+    drawFrame: vi.fn(),
+    finish,
+  });
+
+  await expect(
+    captureAndStitchFullPageTiles({
+      agent: {
+        heartbeat: vi.fn(),
+        prepare: vi.fn(),
+        prepareTile: vi.fn().mockResolvedValue(state),
+        restore: vi.fn(),
+        verifyTile: vi.fn().mockResolvedValue(state),
+      },
+      identity: {
+        jobId: 'job-persistent-growth',
+        ownerToken: 'owner-persistent-growth',
+        runtimeGeneration: 'generation-1',
+      },
+      layoutGeneration: 'layout-1',
+      options: {},
+      plans: [
+        {
+          column: 0,
+          firstColumn: true,
+          firstRow: true,
+          lastColumn: true,
+          lastRow: true,
+          row: 0,
+          sourceInsetX: 0,
+          sourceInsetY: 0,
+          targetX: 0,
+          targetY: 0,
+        },
+      ],
+      raster: { captureFrame, release: vi.fn() },
+      renewLease: vi.fn(),
+      restartOnExtentGrowth: false,
+      warnings: [],
+    })
+  ).resolves.toEqual(expect.objectContaining({ dataUrl: 'data:image/png;base64,full-page' }));
+
+  expect(captureFrame).toHaveBeenCalledOnce();
+  expect(createStitcherMock).toHaveBeenCalledWith(
+    expect.objectContaining({ frozenExtentWarning: true })
+  );
+  expect(finish).toHaveBeenCalledOnce();
 });
 
 it('rejects an empty sparse tile plan without constructing a stitcher', async () => {

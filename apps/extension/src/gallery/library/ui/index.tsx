@@ -171,6 +171,7 @@ function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
 
 type MediaThumbProps = {
   assetId?: string;
+  fit?: 'contain' | 'cover';
   item?: GalleryItem;
   kind?: GalleryItemKind;
 };
@@ -215,7 +216,10 @@ export function MediaThumb(props: MediaThumbProps) {
       <img
         src={thumbUrl}
         alt={translate('gallery.preview.thumbnailAlt')}
-        className="pointer-events-none h-full w-full object-cover"
+        className={`pointer-events-none h-full w-full object-center ${
+          props.fit === 'contain' ? 'object-contain' : 'object-cover'
+        }`}
+        data-fit={props.fit ?? 'cover'}
       />
     );
   }

@@ -79,6 +79,7 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
       drafts: false,
       mediaAssets: true,
       recordings: true,
+      savedViews: true,
       scenarioProjects: true,
       sourceMetadata: true,
       telemetry: true,
@@ -87,6 +88,7 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
       webSnapshots: true,
     },
     recordingCount: 1,
+    savedViewCount: 2,
     scenarioProjectCount: 0,
     selectedCount: 0,
     sourceMetadataCount: 2,
@@ -233,6 +235,31 @@ async function verifyResolvedCancelledExportSkipsRefresh() {
   expect(getState().storage.pendingExport).toBeNull();
 }
 
+async function verifyRerenderedControllerCancelsCurrentExport() {
+  const { controller } = createController();
+  const pendingOptions = createAllBackupOptions();
+  let exportSignal = new AbortController().signal;
+  let rejectExport: (error: Error) => void = () => undefined;
+
+  inspectLocalMediaHubBackupMock.mockResolvedValue(createLocalBackupSummary());
+  exportMediaHubBackupMock.mockImplementation((_options, runtimeOptions) => {
+    exportSignal = runtimeOptions?.signal ?? exportSignal;
+    return new Promise<void>((_resolve, reject) => {
+      rejectExport = reject;
+    });
+  });
+
+  const exportPromise = createConfirmExportBackupAction(controller)(pendingOptions, runBusyAction);
+  await Promise.resolve();
+  await Promise.resolve();
+  const rerenderedController = { ...controller };
+  createClosePendingExportAction(rerenderedController)();
+  rejectExport(new Error('cancelled'));
+  await expect(exportPromise).rejects.toThrow('cancelled');
+
+  expect(exportSignal.aborted).toBe(true);
+}
+
 async function verifySelectedExportScope() {
   const { controller } = createController({
     selectedItems: [
@@ -377,6 +404,7 @@ async function verifyBackupImportFlow() {
     expect.objectContaining({ signal: expect.any(AbortSignal) })
   );
   expect(getState().storage.pendingImport).toBeNull();
+  expect(controller.actions.filters.reloadSavedViews).toHaveBeenCalledTimes(1);
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 }
 
@@ -417,6 +445,7 @@ async function verifyResumableBackupImportFlow() {
   });
   expect(importMediaHubBackupMock).not.toHaveBeenCalled();
   expect(getState().storage.pendingImport).toBeNull();
+  expect(controller.actions.filters.reloadSavedViews).toHaveBeenCalledTimes(1);
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 }
 
@@ -525,6 +554,10 @@ describe('gallery backup actions', () => {
   it(
     'skips refresh when cancellation wins after direct export completion',
     verifyResolvedCancelledExportSkipsRefresh
+  );
+  it(
+    'cancels the current export after the render controller DTO is recreated',
+    verifyRerenderedControllerCancelsCurrentExport
   );
   it('opens backup disclosure with the selected item scope', verifySelectedExportScope);
   it(

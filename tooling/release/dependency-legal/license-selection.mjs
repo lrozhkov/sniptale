@@ -14,7 +14,7 @@ const REVIEWED_TEXT_MARKERS = new Map([
 
 /** Exact legal choices reviewed for the disjunctive expressions in the current production tree. */
 export const DEFAULT_REVIEWED_LICENSE_SELECTIONS = [
-  { packageName: 'dompurify', selectedLicense: 'Apache-2.0', version: '3.4.13' },
+  { packageName: 'dompurify', selectedLicense: 'Apache-2.0', version: '3.4.14' },
   { packageName: 'jszip', selectedLicense: 'MIT', version: '3.10.1' },
 ];
 
@@ -165,9 +165,9 @@ function canonicalAlias(record, aliases) {
 async function createLegalMaterial(record, selections, pinnedSources, canonicalLicenseAliases) {
   const selectedLicense = resolveSelectedLicense(record, selections);
   const selectedText =
+    (await selectPinnedLicenseSource(record, selectedLicense, pinnedSources)) ??
     (await selectLicenseFile(record)) ??
-    (await selectReadmeLicense(record)) ??
-    (await selectPinnedLicenseSource(record, selectedLicense, pinnedSources));
+    (await selectReadmeLicense(record));
   if (!selectedText) {
     throw new Error(`Installed package has no redistributable license text: ${record.packagePath}`);
   }

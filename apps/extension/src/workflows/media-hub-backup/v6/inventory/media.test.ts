@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 
 const mocks = vi.hoisted(() => ({ readFile: vi.fn(), sanitizeSnapshot: vi.fn() }));
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
@@ -18,7 +19,7 @@ import type {
 } from '../../../../composition/persistence/media-library/contracts';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import { createCleanupWebSnapshotRecord } from '../../../media-hub/cleanup.test-support';
-import { createWebSnapshotManifest } from '../../../../features/web-snapshot/manifest';
+import { createPagePackageManifestFixture as createWebSnapshotManifest } from '../../../../features/web-snapshot/manifest.test-support';
 import { buildMediaRootInventory } from './media';
 import { createMediaHubBackupExportOptions } from '../options';
 import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
@@ -254,11 +255,13 @@ describe('media v6 root inventory', () => {
     mocks.sanitizeSnapshot.mockResolvedValue({
       changed: true,
       manifest: sanitizedManifest,
-      packageBlob: new Blob(['safe-package'], { type: 'application/zip' }),
+      packageBlob: new Blob(['safe-package'], { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE }),
       size: 12,
     });
     mocks.readFile
-      .mockResolvedValueOnce(new File(['package'], 'snapshot.zip', { type: 'application/zip' }))
+      .mockResolvedValueOnce(
+        new File(['package'], 'snapshot.zip', { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE })
+      )
       .mockResolvedValueOnce(new File(['image'], 'snapshot.png', { type: 'image/png' }));
     const db = {
       get: vi.fn(async (store: string) => {
@@ -279,13 +282,18 @@ describe('media v6 root inventory', () => {
       paths: createArchivePathAllocator(),
     });
     const payload = await root!.load();
+    const packageObject = payload.objects.find((object) =>
+      object.ref.path.endsWith('.sniptale-page-package.zip')
+    );
 
     expect(payload.objects.map((object) => object.ref.path)).toEqual([
-      'Web snapshots/Snapshot/snapshot.sniptale-web-snapshot.zip',
+      'Web snapshots/Snapshot/snapshot.sniptale-page-package.zip',
       'Web snapshots/Snapshot/screenshot.png',
     ]);
 
     expect(payload.metadata).toMatchObject({
+      entry: { size: 12 },
+      originalObjectId: packageObject?.ref.objectId,
       webSnapshot: { entry: { manifest: { source: sanitizedManifest.source }, size: 12 } },
     });
     expect(JSON.stringify(payload.metadata)).not.toContain('Private title');

@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { translate } from '../../../platform/i18n';
 import { createScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import type { ScenarioDeckExportResult } from '../../project/export/deck/types';
 import { ScenarioDeckExportPanel } from './panel';
@@ -41,11 +42,13 @@ it('renders embedded export controls as compact inspector rows and exports curre
   expect(
     container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.segmented-field"]')
   ).toHaveLength(2);
-  expect(findButtonByText('HTML deck')?.getAttribute('aria-pressed')).toBe('true');
+  expect(
+    findButtonByText(translate('scenario.editor.exportHtmlDeck'))?.getAttribute('aria-pressed')
+  ).toBe('true');
 
-  await clickButton('Markdown bundle');
-  await clickButton('Include speaker notes');
-  await clickButton('Export');
+  await clickButton(translate('scenario.editor.exportMarkdownBundle'));
+  await clickButton(translate('scenario.editor.exportIncludeSpeakerNotes'));
+  await clickButton(translate('scenario.editor.exportAction'));
 
   expect(onExport).toHaveBeenCalledWith({
     assetMode: 'files',

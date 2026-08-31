@@ -173,7 +173,8 @@ it('loads and persists the popup startup destination', async () => {
     'video:camera',
     'video:screen',
     'tools',
-    'export',
+    'export:download',
+    'export:library',
   ]);
 
   await act(async () => {
@@ -197,7 +198,7 @@ it('rolls back the startup destination when persistence fails', async () => {
   savePopupStartupSelectionMock.mockRejectedValueOnce(new Error('write failed'));
 
   await act(async () => {
-    await latestState?.popupStartup.updateSelection('export');
+    await latestState?.popupStartup.updateSelection('export:download');
   });
 
   expect(latestState?.popupStartup.selection).toBe('remember-last');
@@ -216,14 +217,14 @@ it('rolls a failed latest startup write back to the last successful queued choic
   let secondUpdate: Promise<void> | undefined;
   act(() => {
     firstUpdate = latestState?.popupStartup.updateSelection('video:screen');
-    secondUpdate = latestState?.popupStartup.updateSelection('export');
+    secondUpdate = latestState?.popupStartup.updateSelection('export:download');
   });
   await act(async () => first.resolve(undefined));
   await act(async () => second.reject(new Error('latest write failed')));
   await act(async () => Promise.all([firstUpdate, secondUpdate]));
 
   expect(savePopupStartupSelectionMock).toHaveBeenNthCalledWith(1, 'video:screen');
-  expect(savePopupStartupSelectionMock).toHaveBeenNthCalledWith(2, 'export');
+  expect(savePopupStartupSelectionMock).toHaveBeenNthCalledWith(2, 'export:download');
   expect(latestState?.popupStartup.selection).toBe('video:screen');
 });
 

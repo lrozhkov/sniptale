@@ -230,6 +230,41 @@ it('fails when the frozen capture extent shrinks', async () => {
   agent.dispose();
 });
 
+it('keeps the frozen output plan when dynamic content grows the document extent', async () => {
+  const agent = createFullPageCaptureAgent();
+  await agent.handle({
+    ...identity,
+    preferences: { ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES, preloadLazyContent: false },
+    type: MessageType.PREPARE_FULL_PAGE_CAPTURE,
+  });
+  mocks.geometry.extentHeight = 1_260;
+  mocks.geometry.outputHeight = 1_260;
+
+  await expect(
+    agent.handle({
+      ...identity,
+      column: 0,
+      firstColumn: true,
+      firstRow: true,
+      lastColumn: true,
+      lastRow: true,
+      row: 0,
+      targetX: 0,
+      targetY: 0,
+      type: MessageType.PREPARE_FULL_PAGE_TILE,
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      success: true,
+      result: expect.objectContaining({
+        frozenExtentWarning: true,
+        geometry: expect.objectContaining({ extentHeight: 1_200, outputHeight: 1_200 }),
+      }),
+    })
+  );
+  agent.dispose();
+});
+
 it('fails closed when an internal scroller shell moves without changing its extent', async () => {
   const agent = createFullPageCaptureAgent();
   await agent.handle({

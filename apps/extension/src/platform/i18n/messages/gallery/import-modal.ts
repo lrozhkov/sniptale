@@ -165,4 +165,80 @@ export const galleryImportModalMessages = defineMessageSource({
     ru: 'Продолжить импорт',
     en: 'Continue import',
   },
+  webSnapshotTitle: {
+    ru: 'Импортировать Web Snapshot',
+    en: 'Import Web Snapshot',
+  },
+  webSnapshotDescription: {
+    ru: 'Проверьте снимок перед добавлением в Библиотеку. Он будет повторно обработан и сохранён как независимая копия.',
+    en: 'Review the snapshot before adding it to your Library. It will be processed again and saved as an independent copy.',
+  },
+  webSnapshotName: {
+    ru: 'Название',
+    en: 'Name',
+  },
+  webSnapshotSource: {
+    ru: 'Исходный адрес',
+    en: 'Source address',
+  },
+  webSnapshotCreated: {
+    ru: 'Создан',
+    en: 'Created',
+  },
+  webSnapshotSize: {
+    ru: 'Размер файла',
+    en: 'File size',
+  },
+  webSnapshotResources: {
+    ru: 'Ресурсы страницы',
+    en: 'Page resources',
+  },
+  webSnapshotWarnings: {
+    ru: 'Предупреждения снимка',
+    en: 'Snapshot warnings',
+  },
+  webSnapshotSafety: {
+    ru: 'Перед сохранением Sniptale заново проверит архив, удалит активный код и сетевые загрузки и пересоберёт безопасную веб-копию.',
+    en: 'Before saving, Sniptale will validate the archive again, remove active code and network loads, and rebuild a safe Web copy.',
+  },
+  webSnapshotImport: {
+    ru: 'Импортировать',
+    en: 'Import',
+  },
+  webSnapshotImporting: {
+    ru: 'Импортируем…',
+    en: 'Importing…',
+  },
+  webSnapshotUnsupported: {
+    ru: 'Этот файл не является актуальным стандартным Web Snapshot. Поддерживаются только Page Package, созданные для сохранения в Библиотеку.',
+    en: 'This file is not a current standard Web Snapshot. Only Page Packages created for Library saving are supported.',
+  },
+  webSnapshotLimits: {
+    ru: 'Снимок превышает безопасные ограничения по размеру или количеству файлов и не может быть импортирован.',
+    en: 'The snapshot exceeds safe size or file-count limits and cannot be imported.',
+  },
+  webSnapshotInvalid: {
+    ru: 'Не удалось безопасно проверить Web Snapshot. Файл повреждён, изменён или содержит неподдерживаемые данные.',
+    en: 'The Web Snapshot could not be validated safely. The file is damaged, modified, or contains unsupported data.',
+  },
+  libraryDropTitle: {
+    ru: 'Отпустите файлы для импорта',
+    en: 'Drop files to import',
+  },
+  libraryDropDescription: {
+    ru: 'Фото, видео или один файл Web Snapshot',
+    en: 'Photos, videos, or one Web Snapshot file',
+  },
+  libraryDropUnsupported: {
+    ru: 'Перетащите фото и видео либо один файл Web Snapshot отдельно.',
+    en: 'Drop photos and videos, or one Web Snapshot file separately.',
+  },
+  webSnapshotImportedRefreshFailed: {
+    ru: 'Снимок импортирован, но список библиотеки не обновился. Перезагрузите библиотеку, чтобы увидеть его.',
+    en: 'The snapshot was imported, but the Library list did not refresh. Reload the Library to see it.',
+  },
+  webSnapshotImportedOpenFailed: {
+    ru: 'Снимок импортирован, но открыть его не удалось. Он сохранён в библиотеке.',
+    en: 'The snapshot was imported, but it could not be opened. It is saved in your Library.',
+  },
 });

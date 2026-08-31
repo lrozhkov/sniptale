@@ -1,4 +1,4 @@
-import { harnessReady } from './browser-mocks';
+import { harnessReady } from './browser-mocks/browser-mocks';
 import { createRoot } from 'react-dom/client';
 import { SettingsPage } from '../../../apps/extension/src/settings/shell/page';
 import '@sniptale/ui/styles';

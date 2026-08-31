@@ -6,7 +6,5 @@ it('parses web snapshot manifest JSON as an unknown boundary value', () => {
 });
 
 it('throws a stable package manifest error for malformed JSON', () => {
-  expect(() => parseWebSnapshotManifestJson('{')).toThrow(
-    'Web snapshot package manifest is invalid.'
-  );
+  expect(() => parseWebSnapshotManifestJson('{')).toThrow('Page Package manifest is invalid.');
 });

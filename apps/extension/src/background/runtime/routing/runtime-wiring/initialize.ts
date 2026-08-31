@@ -7,6 +7,7 @@ import {
 import { initializePageAccessLifecycle } from '../../../page-access/lifecycle';
 import { nativeIngestionPrivacyErasureCleanupAdapter } from '../../native-app/privacy-erasure';
 import { getNativeAppRuntimeService } from '../../native-app/service-singleton';
+import { initializeNativeAppPermissionLifecycle } from '../../native-app/permission-lifecycle';
 import {
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
@@ -56,7 +57,7 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
       ),
   });
   configureNativeIngestionPrivacyErasureCleanupPort(nativeIngestionPrivacyErasureCleanupAdapter);
-  getNativeAppRuntimeService().connect();
+  initializeNativeAppPermissionLifecycle(getNativeAppRuntimeService());
   registerWebSnapshotViewerPorts(state.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts());
   initializeBackgroundContextMenus({
     captureGuardState: state.captureGuardState,

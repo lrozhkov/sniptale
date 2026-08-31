@@ -4,12 +4,17 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { getAggregatePreviewBlobMock, getMediaAssetBlobMock, getWebSnapshotScreenshotFileMock } =
-  vi.hoisted(() => ({
-    getAggregatePreviewBlobMock: vi.fn(),
-    getMediaAssetBlobMock: vi.fn(),
-    getWebSnapshotScreenshotFileMock: vi.fn(),
-  }));
+const {
+  getAggregatePreviewBlobMock,
+  getMediaAssetBlobMock,
+  getWebSnapshotScreenshotFileMock,
+  validateWebSnapshotScreenshotBlobMock,
+} = vi.hoisted(() => ({
+  getAggregatePreviewBlobMock: vi.fn(),
+  getMediaAssetBlobMock: vi.fn(),
+  getWebSnapshotScreenshotFileMock: vi.fn(),
+  validateWebSnapshotScreenshotBlobMock: vi.fn(),
+}));
 
 vi.mock('../../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
   ...(await importOriginal<
@@ -29,6 +34,13 @@ vi.mock(
 vi.mock('../../../composition/persistence/web-snapshots', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/web-snapshots')>()),
   getWebSnapshotScreenshotFile: getWebSnapshotScreenshotFileMock,
+}));
+
+vi.mock('../../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../features/web-snapshot/screenshot-validation')
+  >()),
+  validateWebSnapshotScreenshotBlob: validateWebSnapshotScreenshotBlobMock,
 }));
 
 import { useGalleryPreviewState } from './useGalleryPreviewState';
@@ -73,6 +85,7 @@ function HookProbe(props: { onValue: (value: ReturnType<typeof useGalleryPreview
 
 beforeEach(() => {
   vi.clearAllMocks();
+  validateWebSnapshotScreenshotBlobMock.mockResolvedValue({ height: 720, width: 1280 });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('URL', {
     createObjectURL: vi.fn(() => 'blob:preview'),
@@ -99,9 +112,10 @@ it('uses the durable screenshot object for web snapshot previews', async () => {
       item: {
         ...createItem(),
         entityId: 'snapshot-1',
+        filename: 'snapshot.sniptale-page-package.zip',
         id: 'asset-web',
         kind: 'web-archive',
-        mimeType: 'application/zip',
+        mimeType: 'application/x-sniptale-page-package+zip',
         source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
       },
       url: null,
@@ -110,9 +124,47 @@ it('uses the durable screenshot object for web snapshot previews', async () => {
   await flushEffects();
 
   expect(getWebSnapshotScreenshotFileMock).toHaveBeenCalledWith('snapshot-1');
+  expect(validateWebSnapshotScreenshotBlobMock).toHaveBeenCalledWith(thumbnail);
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
   expect(URL.createObjectURL).toHaveBeenCalledWith(thumbnail);
   expect(latest()?.state.session.url).toBe('blob:preview');
+});
+
+it.each([
+  ['corrupt', 'Web snapshot screenshot is invalid.'],
+  ['over-dimension', 'Web snapshot screenshot dimensions exceed safe limits.'],
+])('rejects %s web snapshot previews before creating an object url', async (_case, message) => {
+  const screenshot = new File(['unsafe'], 'screenshot.png', { type: 'image/png' });
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  getWebSnapshotScreenshotFileMock.mockResolvedValue(screenshot);
+  validateWebSnapshotScreenshotBlobMock.mockRejectedValue(new Error(message));
+
+  act(() => {
+    root?.render(<HookProbe onValue={(value) => values.push(value)} />);
+  });
+
+  const latest = () => values.at(-1);
+  act(() => {
+    latest()?.actions.setPreview({
+      inspectorCollapsed: false,
+      item: {
+        ...createItem(),
+        entityId: 'snapshot-1',
+        filename: 'snapshot.sniptale-page-package.zip',
+        id: 'asset-web',
+        kind: 'web-archive',
+        mimeType: 'application/x-sniptale-page-package+zip',
+        source: { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
+      },
+      url: null,
+    });
+  });
+  await flushEffects();
+
+  expect(validateWebSnapshotScreenshotBlobMock).toHaveBeenCalledWith(screenshot);
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  expect(latest()?.state.session.url).toBeNull();
 });
 
 afterEach(() => {

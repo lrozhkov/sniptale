@@ -307,8 +307,49 @@ describe('projects-db asset save and read flows', () => {
       })
     );
     await expect(getProjectAsset('asset-1')).resolves.toEqual({
-      ...entry,
-      file: expect.any(File),
+      entry: {
+        ...entry,
+        file: expect.any(File),
+      },
+      status: 'ready',
+    });
+  });
+
+  it('distinguishes logical absence, invalid references, and unavailable asset files', async () => {
+    const { getProjectAsset } = await importProjectsDbModule();
+    const entry = createProjectAssetEntry();
+
+    projectsDbMocks.dbGetMock.mockResolvedValueOnce(undefined);
+    await expect(getProjectAsset('missing')).resolves.toEqual({ status: 'not-found' });
+
+    projectsDbMocks.dbGetMock.mockResolvedValueOnce(entry).mockResolvedValueOnce(undefined);
+    await expect(getProjectAsset('invalid-ref')).resolves.toEqual({
+      reason: 'invalid-asset-reference',
+      status: 'invalid',
+    });
+
+    projectsDbMocks.dbGetMock.mockResolvedValueOnce(entry).mockResolvedValueOnce({
+      assetId: entry.assetId,
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: `objects/${entry.assetId}` },
+      mimeType: entry.mimeType,
+      sha256: null,
+      size: entry.size,
+    });
+    projectsDbMocks.readAssetFileMock.mockRejectedValueOnce(new Error('OPFS unavailable'));
+    await expect(getProjectAsset('unavailable-file')).resolves.toEqual({
+      reason: 'asset-file-unavailable',
+      status: 'unavailable',
+    });
+  });
+
+  it('reports IndexedDB failures as unavailable instead of logical absence', async () => {
+    const { getProjectAsset } = await importProjectsDbModule();
+    projectsDbMocks.dbGetMock.mockRejectedValueOnce(new Error('IndexedDB unavailable'));
+
+    await expect(getProjectAsset('asset-1')).resolves.toEqual({
+      reason: 'asset-entry-unavailable',
+      status: 'unavailable',
     });
   });
 });

@@ -57,6 +57,7 @@ import { isScreenshotImageFormat } from '@sniptale/runtime-contracts/capture/act
 import type { SettingsTransferMessage } from '../../../../settings-transfer';
 import { SETTINGS_TRANSFER_MAX_BYTES } from '../../../../settings-transfer';
 import { isSettingsTransferResponse } from './settings-transfer-response-guard';
+import { isFullPageCaptureGeometry } from '../../../../full-page-capture';
 
 function isSettingsTransferMessage(value: unknown): value is SettingsTransferMessage {
   if (!isRecord(value) || value['type'] !== MessageType.SETTINGS_TRANSFER) return false;
@@ -325,6 +326,11 @@ export const runtimeActionCoreMessageContracts = {
           }
         | {
             type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
+            operation: 'confirm';
+            leaseId: string;
+          }
+        | {
+            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
             operation: 'cancel';
             leaseId: string;
           }
@@ -335,7 +341,8 @@ export const runtimeActionCoreMessageContracts = {
           } =>
         isRecord(value) &&
         value['type'] === MessageType.FRAME_ANNOTATION_RASTERIZE &&
-        ((value['operation'] === 'prepare' && isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
+        (((value['operation'] === 'prepare' || value['operation'] === 'confirm') &&
+          isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
           (value['operation'] === 'cancel' && isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
           (value['operation'] === 'rasterize' &&
             isFrameAnnotationRasterReference(value['reference'])))
@@ -575,9 +582,11 @@ export const runtimeActionCoreMessageContracts = {
       'runtime EXPORT_CAPTURE_FULL_PAGE response',
       createRuntimeResponseGuard({
         optional: {
+          captureGeometry: isFullPageCaptureGeometry,
           dataUrl: isString,
           downscaled: isBoolean,
           frozenExtentWarning: isBoolean,
+          viewportFallback: isBoolean,
         },
       })
     ),

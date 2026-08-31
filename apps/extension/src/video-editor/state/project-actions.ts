@@ -52,7 +52,6 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
           selectedClip?.trackId ??
           hydratedProject.tracks.find(isVideoEditorPresentedTrack)?.id ??
           null,
-        selectedClipId: selectedClip?.id ?? null,
         telemetryLaneVisible: false,
         exportState: {
           ...createInitialExportState(),
