@@ -13,6 +13,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  if?: string;
   name?: string;
   permissions?: Permissions;
   steps?: WorkflowStep[];
@@ -106,10 +107,47 @@ describe('split workflow topology', () => {
     });
     expect(readWorkflow(PROVENANCE).jobs['canonical-proof'].with).toMatchObject({
       gate: 'release-provenance',
+      release_diagnostic: '${{ inputs.diagnostic || false }}',
     });
     expect(readWorkflow(SMOKE).jobs['canonical-smoke'].with).toMatchObject({
       gate: 'selectel-smoke',
     });
+  });
+
+  it('keeps branch release diagnostics exact and non-publishing', () => {
+    const provenance = readWorkflow(PROVENANCE);
+    const canonical = readWorkflow(CANONICAL);
+    const diagnosticInput = (
+      provenance.on as {
+        workflow_dispatch: { inputs: Record<string, Record<string, unknown>> };
+      }
+    ).workflow_dispatch.inputs.diagnostic;
+    expect(diagnosticInput).toEqual({
+      description: 'Run the release QA graph on this branch without publication or attestation',
+      required: false,
+      default: false,
+      type: 'boolean',
+    });
+    expect(provenance.jobs['canonical-proof'].if).toContain('inputs.diagnostic');
+    expect(provenance.jobs['canonical-proof'].with).toMatchObject({
+      gate: 'release-provenance',
+      release_diagnostic: '${{ inputs.diagnostic || false }}',
+    });
+    expect(provenance.jobs['release-provenance-gate'].if).toContain('!inputs.diagnostic');
+    expect(provenance.jobs['diagnostic-gate'].if).toContain('inputs.diagnostic');
+    expect(provenance.jobs['attest-release'].if).toBe(
+      "needs.release-provenance-gate.result == 'success'"
+    );
+    expect(provenance.jobs['coverage-results'].if).toBe(
+      "needs.release-provenance-gate.result == 'success'"
+    );
+    expect(canonical.jobs['qa-image'].if).toContain(
+      "inputs.release_diagnostic && inputs.gate == 'release-provenance'"
+    );
+    expect(canonical.jobs['security-results'].if).toContain('!inputs.release_diagnostic');
+    expect(canonical.jobs['publish-qa-image'].if).toContain('!inputs.release_diagnostic');
+    expect(canonical.jobs['release-provenance-gate'].if).toContain('!inputs.release_diagnostic');
+    expect(canonical.jobs['release-diagnostic-gate'].if).toContain('inputs.release_diagnostic');
   });
 
   it('forbids inherited secrets and automatic push gates everywhere', () => {
@@ -179,6 +217,7 @@ describe('workflow supply-chain and privilege contracts', () => {
       'pr-gate': {},
       'fast-gate': {},
       'release-provenance-gate': {},
+      'release-diagnostic-gate': {},
       'infrastructure-smoke-gate': {},
     };
     expect(Object.keys(canonical).sort()).toEqual(Object.keys(canonicalPermissions).sort());
@@ -198,6 +237,7 @@ describe('workflow supply-chain and privilege contracts', () => {
       packages: 'write',
       'security-events': 'write',
     });
+    expectExactPermissions(readWorkflow(PROVENANCE).jobs['diagnostic-gate'], {});
     expectExactPermissions(readWorkflow(SMOKE).jobs['canonical-smoke'], {
       actions: 'read',
       contents: 'read',
