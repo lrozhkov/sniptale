@@ -46,7 +46,11 @@
     "snapshot": "20260829T000000Z",
     "archiveUrl": "https://snapshot.debian.org/archive/debian/20260829T000000Z",
     "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20260829T000000Z",
-    "suites": ["bookworm", "bookworm-updates", "bookworm-security"]
+    "suites": ["bookworm", "bookworm-updates", "bookworm-security"],
+    "caCertificatesBootstrap": {
+      "url": "https://snapshot.debian.org/archive/debian/20260829T000000Z/pool/main/c/ca-certificates/ca-certificates_20230311%2Bdeb12u1_all.deb",
+      "sha256": "0d5f444f594e48c1e16a41d8fc628a09b24c658916a1274025c2330f2a802bed"
+    }
   },
   "playwright": {
     "version": "1.62.1",

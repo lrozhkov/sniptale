@@ -22,6 +22,17 @@ for (const expectedSource of [
     throw new Error(`Dockerfile Debian snapshot drift: ${expectedSource}`);
   }
 }
+const caBootstrap = lock.debian.caCertificatesBootstrap;
+if (
+  typeof caBootstrap?.url !== 'string' ||
+  !/^https:\/\//u.test(caBootstrap.url) ||
+  !/^[a-f0-9]{64}$/u.test(caBootstrap.sha256) ||
+  !dockerfile.includes(
+    `ADD --checksum=sha256:${caBootstrap.sha256} ${caBootstrap.url} /tmp/ca-certificates.deb`
+  )
+) {
+  throw new Error('Dockerfile CA bootstrap drifted from the canonical Debian lock.');
+}
 if (sha256File('/opt/sniptale-npm/package-lock.json') !== lock.node.npmLockSha256) {
   throw new Error('npm package lock drifted from toolchain.lock.json.');
 }

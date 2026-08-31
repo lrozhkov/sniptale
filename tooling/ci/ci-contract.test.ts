@@ -255,6 +255,13 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(lock.node.baseDebianSnapshot).toBe(lock.debian.snapshot);
   expect(dockerfile).toContain(`${lock.debian.archiveUrl} bookworm main`);
   expect(dockerfile).toContain(`${lock.debian.securityArchiveUrl} bookworm-security main`);
+  expect(lock.debian.caCertificatesBootstrap.url).toContain(`${lock.debian.archiveUrl}/pool/`);
+  expect(lock.debian.caCertificatesBootstrap.sha256).toMatch(/^[a-f0-9]{64}$/u);
+  expect(dockerfile).toContain(
+    `ADD --checksum=sha256:${lock.debian.caCertificatesBootstrap.sha256} ${lock.debian.caCertificatesBootstrap.url} /tmp/ca-certificates.deb`
+  );
+  expect(dockerfile).toContain('dpkg-deb --extract /tmp/ca-certificates.deb');
+  expect(dockerfile).toContain('find /tmp/ca-bootstrap/usr/share/ca-certificates/mozilla');
   expect(dockerfile).not.toContain('deb.debian.org');
   expect(lock.codeql.url).toContain(`codeql-bundle-v${lock.codeql.version}`);
   expect(lock.codeql.sha256).toMatch(/^[a-f0-9]{64}$/u);
