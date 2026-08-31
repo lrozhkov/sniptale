@@ -158,6 +158,28 @@ describe('split workflow topology', () => {
     }
   });
 
+  it('declares only the environment-overridden controller secrets at the reusable boundary', () => {
+    const workflowCall = (
+      readWorkflow(CANONICAL).on as {
+        workflow_call: { secrets: Record<string, { required: boolean }> };
+      }
+    ).workflow_call;
+    expect(workflowCall.secrets).toEqual({
+      SELECTEL_OS_APPLICATION_CREDENTIAL_ID: {
+        description: 'Environment-owned Selectel application credential identifier',
+        required: false,
+      },
+      SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET: {
+        description: 'Environment-owned Selectel application credential secret',
+        required: false,
+      },
+      RUNNER_CONTROLLER_TOKEN: {
+        description: 'Environment-owned GitHub runner registration controller token',
+        required: false,
+      },
+    });
+  });
+
   it('exposes the exact stable PR required-check boundary', () => {
     const workflow = readWorkflow(PR);
     expect(Object.keys(workflow.jobs)).toEqual(['canonical-proof', 'pr-gate']);
