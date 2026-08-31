@@ -89,9 +89,32 @@ it('routes enabled row and add interactions through controller actions', async (
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => root.render(<StepBadgePresetsPanel controller={value} />));
-  for (const button of host.querySelectorAll<HTMLButtonElement>('button')) {
-    if (!button.disabled) await act(async () => button.click());
-  }
+  const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')];
+  const addButton = buttons.find((button) =>
+    button.textContent?.includes('highlighter.stepBadgePresets.add')
+  );
+  const newSessionButton = host.querySelector<HTMLButtonElement>(
+    '[aria-label="highlighter.stepBadgePresets.newSession.enabledLabel"]'
+  );
+  const userRow = host.querySelector<HTMLElement>(
+    '[data-settings-collection-item="user-interactive"]'
+  );
+  const editButton = userRow?.querySelector<HTMLButtonElement>(
+    '[aria-label="settings.collection.actions.edit"]'
+  );
+  const toggleButton = userRow?.querySelector<HTMLButtonElement>(
+    '[aria-label="settings.collection.actions.disable"]'
+  );
+  const deleteButton = userRow?.querySelector<HTMLButtonElement>(
+    '[aria-label="settings.collection.actions.delete"]'
+  );
+  await act(async () => {
+    addButton?.click();
+    newSessionButton?.click();
+    editButton?.click();
+    toggleButton?.click();
+    deleteButton?.click();
+  });
   expect(value.actions.add).toHaveBeenCalled();
   expect(value.actions.setNewSessionEnabled).toHaveBeenCalledWith(true);
   expect(value.actions.edit).toHaveBeenCalled();
