@@ -20,7 +20,7 @@ const originalProofEnvironment = new Map(
 );
 
 it('reserves host memory while giving CodeQL the selected QA budget', () => {
-  expect(resolveCodeqlRamMiB({ memoryMiB: 14_336 })).toBe(12_288);
+  expect(resolveCodeqlRamMiB({ memoryMiB: 14_336 })).toBe(8192);
   expect(resolveCodeqlRamMiB({ memoryMiB: 6144 })).toBe(4096);
 });
 

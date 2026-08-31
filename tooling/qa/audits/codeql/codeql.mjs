@@ -135,7 +135,7 @@ function createCodeqlDatabase({
 }
 
 export function resolveCodeqlRamMiB(profile = resolveQaResourceProfile()) {
-  return Math.max(4096, profile.memoryMiB - 2048);
+  return Math.min(8192, Math.max(4096, profile.memoryMiB - 2048));
 }
 
 function analyzeCodeqlDatabase({ executable, databasePath, ramMiB, sarifPath, runCommandImpl }) {
