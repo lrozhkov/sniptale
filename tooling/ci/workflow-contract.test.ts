@@ -6,6 +6,7 @@ import YAML from 'yaml';
 type Permissions = Record<string, 'none' | 'read' | 'write'>;
 
 interface WorkflowStep {
+  env?: Record<string, unknown>;
   if?: string;
   name?: string;
   run?: string;
@@ -236,6 +237,20 @@ describe('split workflow topology', () => {
       expect(publication).toContain(mutation);
     }
     expect(admission).toContain('classify-release-state.mjs');
+    expect(admission).not.toContain(
+      'cp build/release-finalized/finalizer-admission.json build/release-proof/finalizer-admission.json'
+    );
+    expect(admission).not.toContain('build/release-proof/attestations.json');
+    expect(admission).toContain(
+      'cp build/release-finalized/attestations.json build/release-deployment/attestations.json'
+    );
+    const provenanceAdmission = release.jobs.admission.steps?.find(
+      (step) => step.name === 'Admit exact provenance source'
+    );
+    expect(provenanceAdmission?.env?.RELEASE_POLICY_READ_TOKEN).toBe(
+      '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}'
+    );
+    expect(provenanceAdmission?.run).toContain('GH_TOKEN="$RELEASE_POLICY_READ_TOKEN"');
     expect(admission).toContain('.display_title == "Release pipeline diagnostic"');
     expect(admission).toContain('.name == "Release pipeline diagnostic Gate"');
     expect(admission).toContain('prepare-release-assets.mjs');
