@@ -27,6 +27,7 @@ const wrapperCoverageTargets = parseWrapperCoverageTargets();
 const isWrapperCoverageMode = wrapperCoverageMode !== 'manual';
 const isWrapperTimeoutMode = process.env.SNIPTALE_VITEST_TIMEOUT_MODE === 'wrapper';
 const vitestSuite = resolveVitestSuite(process.env.SNIPTALE_VITEST_SUITE);
+const useBatchedProductCoverage = vitestSuite === 'product';
 const TOOLING_COVERAGE_THRESHOLDS = {
   statements: 70,
   branches: 67,
@@ -91,15 +92,18 @@ export default defineConfig({
     testTimeout: isWrapperTimeoutMode ? 15000 : undefined,
     hookTimeout: isWrapperTimeoutMode ? 15000 : undefined,
     coverage: {
-      provider: 'v8',
+      provider: useBatchedProductCoverage ? 'custom' : 'v8',
+      ...(useBatchedProductCoverage
+        ? {
+            customProviderModule: './tooling/qa/proof/coverage/profile-v8-coverage-provider.mjs',
+          }
+        : {}),
       all: vitestSuite === 'harness' || !isWrapperCoverageMode,
       reportsDirectory:
         vitestSuite === 'harness' ? './.tmp/coverage/tooling' : './.tmp/coverage/unit',
-      reporter:
-        vitestSuite === 'harness' || !isWrapperCoverageMode
-          ? ['text', 'json-summary', 'json', 'html']
-          : ['json'],
+      reporter: vitestSuite === 'product' ? ['json'] : ['text', 'json-summary', 'json', 'html'],
       include: resolveCoverageInclude(),
+      ...(useBatchedProductCoverage ? { processingConcurrency: 8 } : {}),
       ...(vitestSuite === 'harness'
         ? {
             reportOnFailure: true,

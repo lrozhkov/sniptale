@@ -18,8 +18,11 @@ it('uses the wrapper coverage profile when the wrapper env is set', async () => 
 
   expect(module.default.test?.coverage).toMatchObject({
     all: false,
+    customProviderModule: './tooling/qa/proof/coverage/profile-v8-coverage-provider.mjs',
     reporter: ['json'],
     include: ['src/shared/example.ts', 'apps/extension/src/background/example.ts'],
+    processingConcurrency: 8,
+    provider: 'custom',
   });
   expect(module.default.test?.testTimeout).toBe(15000);
   expect(module.default.test?.hookTimeout).toBe(15000);
@@ -49,6 +52,7 @@ it('uses the full wrapper coverage profile when full wrapper coverage is request
 
 it('uses harness includes when the harness suite is requested', async () => {
   process.env.SNIPTALE_VITEST_SUITE = 'harness';
+  process.env.SNIPTALE_COVERAGE_PROFILE = '1';
   delete process.env.SNIPTALE_VITEST_COVERAGE_MODE;
   delete process.env.SNIPTALE_VITEST_COVERAGE_TARGETS;
   delete process.env.SNIPTALE_VITEST_TIMEOUT_MODE;
@@ -61,6 +65,7 @@ it('uses harness includes when the harness suite is requested', async () => {
   expect(module.default.test?.include).toEqual(['tooling/**/*.{test,spec}.{ts,tsx}']);
   expect(module.default.test?.exclude).toContain('tooling/test/e2e/**/*.spec.ts');
   expect(module.default.test?.coverage).toMatchObject({
+    provider: 'v8',
     all: true,
     reportsDirectory: './.tmp/coverage/tooling',
     reporter: ['text', 'json-summary', 'json', 'html'],
@@ -83,6 +88,7 @@ it('uses harness includes when the harness suite is requested', async () => {
       'tooling/test/e2e/support/**',
     ])
   );
+  delete process.env.SNIPTALE_COVERAGE_PROFILE;
 });
 
 it('keeps the rich manual coverage profile by default', async () => {
@@ -90,6 +96,7 @@ it('keeps the rich manual coverage profile by default', async () => {
   delete process.env.SNIPTALE_VITEST_COVERAGE_MODE;
   delete process.env.SNIPTALE_VITEST_COVERAGE_TARGETS;
   delete process.env.SNIPTALE_VITEST_TIMEOUT_MODE;
+  delete process.env.SNIPTALE_COVERAGE_PROFILE;
 
   const module = await importFresh<typeof import('../../../../vitest.config.ts')>(
     '../../../../vitest.config.ts',
@@ -98,6 +105,7 @@ it('keeps the rich manual coverage profile by default', async () => {
 
   expect(module.default.test?.coverage).toMatchObject({
     all: true,
+    provider: 'v8',
     reporter: ['text', 'json-summary', 'json', 'html'],
     include: [
       'apps/extension/src/**/*.{ts,tsx}',

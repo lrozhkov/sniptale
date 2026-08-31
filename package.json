@@ -43,6 +43,7 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
+    "test:unit:coverage:profile": "node tooling/qa/proof/coverage/profile-full-coverage.mjs",
     "format": "node tooling/qa/guards/quality/verify-oxfmt.mjs",
     "format:write": "node tooling/qa/guards/quality/verify-oxfmt.mjs --write",
     "docs:generate": "node tooling/qa/policy/documentation/generate-documentation-facts.mjs",

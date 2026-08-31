@@ -59,9 +59,10 @@ describe('Fabric drawing adapter', () => {
     expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
     const topOffset = (object as Textbox)._getTopOffset();
     applyEditorDrawingTextVisuals(object as Textbox);
+    (object as Textbox)._renderTextLinesBackground(context as unknown as CanvasRenderingContext2D);
     expect((object as Textbox)._getTopOffset()).toBe(topOffset);
     expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
-    expect(context.fill).toHaveBeenCalledTimes(2);
+    expect(context.fill).toHaveBeenCalledTimes(4);
   });
 
   it('expands a new text box while typing until the shared working-area limit', () => {

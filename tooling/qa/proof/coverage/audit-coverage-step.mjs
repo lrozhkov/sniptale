@@ -9,7 +9,7 @@ import {
 import { PRODUCT_QA_SUITE } from '../../composition/scope/qa-scope.mjs';
 import { fromRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import { measureAsyncStep } from '../../runtime/observability/step-timing.helpers.mjs';
-import { runUnitTests } from '../unit/verify-unit-tests.mjs';
+import { resolveProductUnitTestPool, runUnitTests } from '../unit/verify-unit-tests.mjs';
 import {
   collectCoverageAuditReport,
   formatCoverageAuditReport,
@@ -59,6 +59,7 @@ export async function collectFullCoverageAuditStep({
       coverage: true,
       coverageMode: 'manual',
       maxWorkers,
+      pool: resolveProductUnitTestPool(),
       suite: PRODUCT_QA_SUITE,
     })
   );
