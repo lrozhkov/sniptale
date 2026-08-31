@@ -5,6 +5,8 @@ import {
   createUnitTestArgs,
   createUnitTestEnv,
   resolveProductUnitTestPool,
+  resolveProductUnitTestPartitions,
+  runUnitTests,
 } from './verify-unit-tests.mjs';
 import { requiresRelatedUnitTests } from '../coverage/test-coverage/thresholds.mjs';
 import { createTempRoot, importFresh, withCwd, writeFile } from '../../test-support/test-helpers';
@@ -82,9 +84,63 @@ it('adds an explicit pool when requested', () => {
   expect(createUnitTestArgs({ pool: 'forks' })).toContain('--pool=forks');
 });
 
-it('uses the measured threads pool by default and keeps an explicit rollback override', () => {
-  expect(resolveProductUnitTestPool({})).toBe('threads');
+it('uses config-owned projects by default and keeps an explicit rollback override', () => {
+  expect(resolveProductUnitTestPool({})).toBeNull();
   expect(resolveProductUnitTestPool({ SNIPTALE_PRODUCT_VITEST_POOL: 'forks' })).toBe('forks');
+});
+
+it('splits only the config-owned product suite into sequential partitions', () => {
+  expect(resolveProductUnitTestPartitions()).toEqual(['jsdom-vm', 'threads']);
+  expect(resolveProductUnitTestPartitions({ coverage: true })).toEqual([null]);
+  expect(resolveProductUnitTestPartitions({ pool: 'threads' })).toEqual([null]);
+  expect(resolveProductUnitTestPartitions({ suite: 'harness' })).toEqual([null]);
+  expect(createUnitTestEnv({ productPartition: 'jsdom-vm' })).toMatchObject({
+    SNIPTALE_PRODUCT_VITEST_PARTITION: 'jsdom-vm',
+  });
+  expect(createUnitTestEnv({ pool: 'threads' })).toMatchObject({
+    SNIPTALE_PRODUCT_VITEST_POOL: 'threads',
+  });
+});
+
+it('collapses an inherited product pool rollback to one canonical runner invocation', () => {
+  const invocations: Array<{
+    args: string[];
+    options: { env: Record<string, string | null> };
+  }> = [];
+  const result = runUnitTests({
+    directFiles: ['apps/extension/src/content/parser/export-manager/service/assets.test.ts'],
+    env: { SNIPTALE_PRODUCT_VITEST_POOL: 'threads' },
+    execute: (_entry, args, options) => {
+      invocations.push({ args, options });
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  expect(result.status).toBe(0);
+  expect(invocations).toHaveLength(1);
+  expect(invocations[0]?.args).toContain('--pool=threads');
+  expect(invocations[0]?.options.env).toMatchObject({
+    SNIPTALE_PRODUCT_VITEST_PARTITION: null,
+    SNIPTALE_PRODUCT_VITEST_POOL: 'threads',
+  });
+
+  const harnessInvocations: typeof invocations = [];
+  runUnitTests({
+    directFiles: ['tooling/qa/proof/unit/unit-test-plan.test.ts'],
+    env: { SNIPTALE_PRODUCT_VITEST_POOL: 'threads' },
+    suite: 'harness',
+    execute: (_entry, args, options) => {
+      harnessInvocations.push({ args, options });
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  expect(harnessInvocations).toHaveLength(1);
+  expect(harnessInvocations[0]?.args).not.toContain('--pool=threads');
+  expect(harnessInvocations[0]?.options.env).toMatchObject({
+    SNIPTALE_PRODUCT_VITEST_PARTITION: null,
+    SNIPTALE_PRODUCT_VITEST_POOL: null,
+  });
 });
 
 it('bounds vitest workers when requested and rejects invalid bounds', () => {

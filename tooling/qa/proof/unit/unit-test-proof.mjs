@@ -139,7 +139,7 @@ function createExecutionIdentity({ pool, suite }) {
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     node: process.version,
     platform: process.platform,
-    pool,
+    pool: pool ?? 'config-partitions',
     suite,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };

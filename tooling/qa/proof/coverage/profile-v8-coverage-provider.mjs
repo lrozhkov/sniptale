@@ -117,10 +117,6 @@ export function mergeRawProcessCoverages(processCoverages) {
       ) {
         throw new Error(`Invalid V8 coverage startOffset for ${script.url}.`);
       }
-      const previous = offsets.get(script.url);
-      if (previous != null && previous !== script.startOffset) {
-        throw new Error(`Conflicting V8 coverage startOffset values for ${script.url}.`);
-      }
       offsets.set(script.url, script.startOffset);
     }
   }

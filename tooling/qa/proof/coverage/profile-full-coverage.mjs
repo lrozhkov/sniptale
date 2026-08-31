@@ -53,7 +53,7 @@ const unitResult = runUnitTests({
   coverage: true,
   coverageMode: 'manual',
   maxWorkers,
-  pool: resolveProductUnitTestPool(),
+  pool: resolveProductUnitTestPool() ?? 'threads',
   suite: PRODUCT_QA_SUITE,
 });
 const vitestWallMs = roundDuration(performance.now() - runStartedAt);

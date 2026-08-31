@@ -199,9 +199,17 @@ it('records resource planning without changing semantic unit proof inputs', asyn
     process.env.SNIPTALE_QA_CPU_TOKENS = '16';
     process.env.SNIPTALE_QA_MEMORY_MIB = '16384';
     const second = module.createFullUnitProofInputs({ cwd: root, maxWorkers: 6 });
+    const overridden = module.createFullUnitProofInputs({
+      cwd: root,
+      maxWorkers: 6,
+      pool: 'threads',
+    });
 
     expect(second.inputDigest).toBe(first.inputDigest);
     expect(second.planning).not.toEqual(first.planning);
+    expect(first.execution.pool).toBe('config-partitions');
+    expect(overridden.execution.pool).toBe('threads');
+    expect(overridden.inputDigest).not.toBe(first.inputDigest);
   });
 });
 

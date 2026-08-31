@@ -14,14 +14,16 @@ import { createUnitTestPlan, expandRelatedTestScope } from './unit-test-plan.mjs
 
 const testEnv = {
   SNIPTALE_QA_LANE_PROCESS: null,
+  SNIPTALE_PRODUCT_VITEST_PARTITION: null,
+  SNIPTALE_PRODUCT_VITEST_POOL: null,
   TMPDIR: '/tmp',
   TMP: '/tmp',
   TEMP: '/tmp',
 };
 const WRAPPER_TIMEOUT_MODE = 'wrapper';
 const DEFAULT_COVERAGE_MODE = 'diff';
-const DEFAULT_PRODUCT_VITEST_POOL = 'threads';
 const SUPPORTED_POOLS = new Set(['forks', 'threads']);
+const PRODUCT_PARTITIONS = ['jsdom-vm', 'threads'];
 
 export { expandRelatedTestScope };
 
@@ -37,7 +39,7 @@ export function normalizeUnitTestPool(pool = null) {
 }
 
 export function resolveProductUnitTestPool(env = process.env) {
-  return normalizeUnitTestPool(env.SNIPTALE_PRODUCT_VITEST_POOL ?? DEFAULT_PRODUCT_VITEST_POOL);
+  return normalizeUnitTestPool(env.SNIPTALE_PRODUCT_VITEST_POOL);
 }
 
 export function createUnitTestArgs({
@@ -88,6 +90,8 @@ export function createUnitTestEnv({
   coverage = false,
   coverageMode = DEFAULT_COVERAGE_MODE,
   coverageTargets = [],
+  pool = null,
+  productPartition = null,
   suite = PRODUCT_QA_SUITE,
 } = {}) {
   const normalizedSuite = normalizeQaSuite(suite);
@@ -95,6 +99,8 @@ export function createUnitTestEnv({
     ...testEnv,
     SNIPTALE_VITEST_TIMEOUT_MODE: WRAPPER_TIMEOUT_MODE,
     SNIPTALE_VITEST_SUITE: normalizedSuite,
+    ...(pool ? { SNIPTALE_PRODUCT_VITEST_POOL: pool } : {}),
+    ...(productPartition ? { SNIPTALE_PRODUCT_VITEST_PARTITION: productPartition } : {}),
   };
 
   if (!coverage || coverageMode === 'manual') {
@@ -112,6 +118,26 @@ export function createUnitTestEnv({
   };
 }
 
+export function resolveProductUnitTestPartitions({
+  coverage = false,
+  pool = null,
+  suite = PRODUCT_QA_SUITE,
+} = {}) {
+  return normalizeQaSuite(suite) === PRODUCT_QA_SUITE && pool == null && !coverage
+    ? PRODUCT_PARTITIONS
+    : [null];
+}
+
+function combineUnitTestResults(results) {
+  const failed = results.find((result) => result.status !== 0);
+  return {
+    ...results.at(-1),
+    status: failed?.status ?? 0,
+    stderr: results.map((result) => result.stderr ?? '').join(''),
+    stdout: results.map((result) => result.stdout ?? '').join(''),
+  };
+}
+
 export function runUnitTests({
   coverage = false,
   coverageMode,
@@ -123,22 +149,51 @@ export function runUnitTests({
   requireTests = false,
   suite = PRODUCT_QA_SUITE,
   cwd,
+  env = process.env,
+  execute = runRepoNodeEntry,
 } = {}) {
   const normalizedSuite = normalizeQaSuite(suite);
+  const inheritedProductPool =
+    normalizedSuite === PRODUCT_QA_SUITE ? env.SNIPTALE_PRODUCT_VITEST_POOL : null;
+  const effectivePool = normalizeUnitTestPool(pool ?? inheritedProductPool);
+  const partitions = resolveProductUnitTestPartitions({
+    coverage,
+    pool: effectivePool,
+    suite: normalizedSuite,
+  });
+  const run = (args, productPartition) =>
+    execute(args[0], args.slice(1), {
+      cwd,
+      env: createUnitTestEnv({
+        coverage,
+        coverageMode,
+        coverageTargets,
+        pool: effectivePool,
+        productPartition,
+        suite: normalizedSuite,
+      }),
+      stdio: 'pipe',
+    });
+  const runPartitions = (args) => {
+    const results = [];
+    for (const partition of partitions) {
+      const result = run(args, partition);
+      results.push(result);
+      if (result.status !== 0) break;
+    }
+    const combined = combineUnitTestResults(results);
+    return combined;
+  };
   if (directFiles.length > 0) {
     const args = createUnitTestArgs({
       allowNoTests: true,
       coverage,
       directFiles,
       maxWorkers,
-      pool,
+      pool: effectivePool,
     });
 
-    return runRepoNodeEntry(args[0], args.slice(1), {
-      cwd,
-      env: createUnitTestEnv({ coverage, coverageMode, coverageTargets, suite: normalizedSuite }),
-      stdio: 'pipe',
-    });
+    return runPartitions(args);
   }
 
   const plan = createUnitTestPlan({ relatedFiles, coverage, requireTests });
@@ -146,15 +201,11 @@ export function runUnitTests({
     allowNoTests: plan.allowNoTests,
     coverage: plan.coverage,
     maxWorkers,
-    pool,
+    pool: effectivePool,
     relatedFiles: plan.expandedRelatedFiles,
   });
 
-  return runRepoNodeEntry(args[0], args.slice(1), {
-    cwd,
-    env: createUnitTestEnv({ coverage, coverageMode, coverageTargets, suite: normalizedSuite }),
-    stdio: 'pipe',
-  });
+  return runPartitions(args);
 }
 
 if (isExecutedAsScript(import.meta.url)) {

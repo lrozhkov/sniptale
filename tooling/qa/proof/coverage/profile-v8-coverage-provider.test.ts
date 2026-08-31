@@ -143,9 +143,22 @@ it('batch-merges raw V8 results identically to iterative accumulation', () => {
   const batched = mergeRawProcessCoverages(structuredClone(inputs));
   expect(batched.result).toEqual(iterative.result);
   expect(batched.result[0].startOffset).toBe(7);
-  expect(() =>
-    mergeRawProcessCoverages([createProcessCoverage(1, 7), createProcessCoverage(2, 8)])
-  ).toThrow('Conflicting V8 coverage startOffset');
+  const mixedOffsets = [createProcessCoverage(1, 7), createProcessCoverage(2, 8)];
+  let iterativeMixed = { result: [] };
+  for (const input of structuredClone(mixedOffsets)) {
+    iterativeMixed = mergeProcessCovs([iterativeMixed, input]);
+    for (const script of iterativeMixed.result) {
+      if (!script.startOffset) {
+        script.startOffset = input.result.find(
+          (candidate) => candidate.url === script.url
+        )?.startOffset;
+      }
+    }
+  }
+  expect(mergeRawProcessCoverages(structuredClone(mixedOffsets)).result).toEqual(
+    iterativeMixed.result
+  );
+  expect(iterativeMixed.result[0].startOffset).toBe(8);
   const missingOffset = createProcessCoverage(1);
   delete missingOffset.result[0].startOffset;
   expect(() => mergeRawProcessCoverages([missingOffset])).toThrow(
