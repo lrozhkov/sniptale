@@ -236,33 +236,35 @@ describe('candidate image lookup verification', () => {
   it('binds Buildx predicate-only provenance through its attestation descriptor', () => {
     const plan = planFor();
     const platformDigest = `sha256:${'b'.repeat(64)}`;
-    const normalized = normalizeBuildxInspection({
-      Manifest: {
-        Digest: `sha256:${'a'.repeat(64)}`,
-        Manifests: [
-          {
-            Digest: platformDigest,
-            Platform: { os: 'linux', architecture: 'amd64' },
-          },
-          {
-            Digest: `sha256:${'c'.repeat(64)}`,
-            Platform: { os: 'unknown', architecture: 'unknown' },
-            Annotations: {
-              'vnd.docker.reference.type': 'attestation-manifest',
-              'vnd.docker.reference.digest': platformDigest,
+    const normalized = normalizeBuildxInspection([
+      {
+        Manifest: {
+          Digest: `sha256:${'a'.repeat(64)}`,
+          Manifests: [
+            {
+              Digest: platformDigest,
+              Platform: { os: 'linux', architecture: 'amd64' },
             },
-          },
-        ],
+            {
+              Digest: `sha256:${'c'.repeat(64)}`,
+              Platform: { os: 'unknown', architecture: 'unknown' },
+              Annotations: {
+                'vnd.docker.reference.type': 'attestation-manifest',
+                'vnd.docker.reference.digest': platformDigest,
+              },
+            },
+          ],
+        },
+        Image: { Config: { Labels: plan.labels } },
       },
-      Image: { Config: { Labels: plan.labels } },
-      Provenance: {
+      {
         SLSA: {
           buildDefinition: {
             resolvedDependencies: [{ digest: { sha256: plan.baseImageDigest.slice(7) } }],
           },
         },
       },
-    });
+    ]);
     expect(normalized.manifests).toHaveLength(1);
     expect(normalized.provenance.subjects).toEqual([]);
     expect(normalized.provenance.attestedSubjects).toEqual([platformDigest]);

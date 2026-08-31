@@ -8,6 +8,7 @@ import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 const SHA256 = /^sha256:[a-f0-9]{64}$/u;
 const LOWER_HEX = /^[a-f0-9]+$/u;
 const CACHE_TAG = /^candidate-cache-v1-(?:qa|controller)-[a-f0-9]{64}$/u;
+const BUILDX_INSPECTION_FORMAT = '[{{json .}},{{json .Provenance}}]';
 const DAY_SECONDS = 24 * 60 * 60;
 export const CANDIDATE_IMAGE_IDLE_TTL_SECONDS = 7 * DAY_SECONDS;
 
@@ -191,9 +192,11 @@ function platformName(platform) {
 }
 
 export function normalizeBuildxInspection(value) {
-  const manifest = value.Manifest ?? value.manifest ?? value;
-  const image = value.Image ?? value.image ?? {};
-  const provenance = value.Provenance?.SLSA ?? value.provenance ?? {};
+  const [inspection, explicitProvenance] = Array.isArray(value) ? value : [value, undefined];
+  const manifest = inspection.Manifest ?? inspection.manifest ?? inspection;
+  const image = inspection.Image ?? inspection.image ?? {};
+  const provenance =
+    explicitProvenance?.SLSA ?? inspection.Provenance?.SLSA ?? inspection.provenance ?? {};
   const manifestEntries = manifest.Manifests ?? manifest.manifests ?? [];
   return {
     digest: manifest.Digest ?? manifest.digest,
@@ -366,7 +369,7 @@ function output(name, value) {
 function inspect(reference) {
   const result = spawnSync(
     'docker',
-    ['buildx', 'imagetools', 'inspect', reference, '--format', '{{json .}}'],
+    ['buildx', 'imagetools', 'inspect', reference, '--format', BUILDX_INSPECTION_FORMAT],
     {
       encoding: 'utf8',
     }
