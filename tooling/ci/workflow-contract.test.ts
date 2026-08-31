@@ -16,6 +16,7 @@ interface WorkflowJob {
   if?: string;
   name?: string;
   permissions?: Permissions;
+  secrets?: string;
   steps?: WorkflowStep[];
   uses?: string;
   with?: Record<string, unknown>;
@@ -150,11 +151,16 @@ describe('split workflow topology', () => {
     expect(canonical.jobs['release-diagnostic-gate'].if).toContain('inputs.release_diagnostic');
   });
 
-  it('forbids inherited secrets and automatic push gates everywhere', () => {
+  it('inherits secrets only into the environment-gated release proof caller', () => {
     for (const path of WORKFLOW_PATHS) {
       const source = readSource(path);
-      expect(source, path).not.toMatch(/\bsecrets\s*:\s*inherit\b/u);
       expect(source, path).not.toMatch(/^\s{2}push\s*:/mu);
+    }
+    expect(readWorkflow(PROVENANCE).jobs['canonical-proof'].secrets).toBe('inherit');
+    expect(readWorkflow(PR).jobs['canonical-proof'].secrets).toBeUndefined();
+    expect(readWorkflow(SMOKE).jobs['canonical-smoke'].secrets).toBeUndefined();
+    for (const path of [CANONICAL, PR, RELEASE, MAINTENANCE, SMOKE]) {
+      expect(readSource(path), path).not.toMatch(/\bsecrets\s*:\s*inherit\b/u);
     }
   });
 

@@ -40,6 +40,7 @@ jobs:
       packages: write
       security-events: write
     uses: ./.github/workflows/_canonical-proof.yml
+    secrets: inherit
     with:
       gate: release-provenance
       release_diagnostic: ${{ inputs.diagnostic || false }}
