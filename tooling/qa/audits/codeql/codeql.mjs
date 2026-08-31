@@ -8,6 +8,7 @@ import {
   CODEQL_CONFIG_PATH,
 } from '../../policy/external-tools/external-tools.mjs';
 import { resolveCodeqlExecutable, runToolCommand } from '../../tools/tool-cli.mjs';
+import { resolveQaResourceProfile } from '../../runtime/scheduling/resource-profile.mjs';
 import { applyCodeqlBaseline, formatCodeqlBaselineSummary } from './codeql-baseline.mjs';
 import { violationsToSarif, writeCanonicalSarifFile } from '../contracts/canonical-sarif.mjs';
 import { AUDIT_ADAPTER_SKIP_REASONS } from '../profiles/index.mjs';
@@ -133,7 +134,11 @@ function createCodeqlDatabase({
   );
 }
 
-function analyzeCodeqlDatabase({ executable, databasePath, sarifPath, runCommandImpl }) {
+export function resolveCodeqlRamMiB(profile = resolveQaResourceProfile()) {
+  return Math.max(4096, profile.memoryMiB - 2048);
+}
+
+function analyzeCodeqlDatabase({ executable, databasePath, ramMiB, sarifPath, runCommandImpl }) {
   return runCodeqlCommand(
     executable,
     [
@@ -145,6 +150,7 @@ function analyzeCodeqlDatabase({ executable, databasePath, sarifPath, runCommand
       '--output',
       sarifPath,
       '--threads=0',
+      `--ram=${ramMiB}`,
     ],
     runCommandImpl
   );
@@ -188,6 +194,7 @@ function collectFreshCodeqlResult({
   outputRoot,
   paths,
   proofReuseEnabled,
+  ramMiB,
   runCommandImpl,
   sourceRoot,
 }) {
@@ -206,6 +213,7 @@ function collectFreshCodeqlResult({
   const analyzeResult = analyzeCodeqlDatabase({
     executable,
     databasePath,
+    ramMiB,
     sarifPath,
     runCommandImpl,
   });
@@ -242,6 +250,7 @@ export function runCodeqlCheck({
   outputRoot = '.tmp/codeql',
   sourceRoot = repoRoot,
   proofReuse,
+  ramMiB = resolveCodeqlRamMiB(),
   runCommandImpl,
 } = {}) {
   if (!executable) {
@@ -275,6 +284,7 @@ export function runCodeqlCheck({
       outputRoot,
       paths,
       proofReuseEnabled,
+      ramMiB,
       runCommandImpl,
       sourceRoot,
     })

@@ -177,6 +177,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(dockerfile).toMatch(/apt-get install[^\n]*\bprocps\b/u);
   expect(lock).not.toHaveProperty('semgrep');
   expect(installer).not.toContain('semgrep');
+  expect(installer).toContain("run('chmod', ['-R', 'a+rX', '/opt/codeql'])");
   expect(installer).toContain("['npm', lock.node.npmVersion, ['--version']]");
   expect(installer).toContain("run('ps', ['--version'])");
   const playwrightLock = fs.readFileSync('tooling/configs/ci/playwright/package-lock.json');

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { generateCodeqlConfig, readCodeqlProofPolicy } from './config.mjs';
-import { runCodeqlCheck } from './codeql.mjs';
+import { resolveCodeqlRamMiB, runCodeqlCheck } from './codeql.mjs';
 import { createTempRoot, writeFile } from '../../test-support/test-helpers';
 
 const proofEnvironmentKeys = [
@@ -18,6 +18,11 @@ const proofEnvironmentKeys = [
 const originalProofEnvironment = new Map(
   proofEnvironmentKeys.map((key) => [key, process.env[key]])
 );
+
+it('reserves host memory while giving CodeQL the selected QA budget', () => {
+  expect(resolveCodeqlRamMiB({ memoryMiB: 14_336 })).toBe(12_288);
+  expect(resolveCodeqlRamMiB({ memoryMiB: 6144 })).toBe(4096);
+});
 
 beforeEach(() => {
   for (const key of proofEnvironmentKeys) delete process.env[key];
@@ -202,9 +207,11 @@ it('publishes a fresh passing receipt and skips the engine on an exact reuse', (
   process.env.SNIPTALE_TRUSTED_CI_ROOT = root;
   const outputRoot = path.join(root, '.tmp/codeql');
   let commands = 0;
+  let analyzeArgs: string[] = [];
   const runner = (_command: string, args: string[]) => {
     commands += 1;
     if (args[1] === 'analyze') {
+      analyzeArgs = args;
       writeFile(root, '.tmp/codeql/results.sarif', '{"version":"2.1.0","runs":[{"results":[]}]}\n');
     }
     return { status: 0, stdout: '', stderr: '' };
@@ -213,12 +220,14 @@ it('publishes a fresh passing receipt and skips the engine on an exact reuse', (
     executable: 'codeql',
     outputRoot,
     proofReuse: true,
+    ramMiB: 8192,
     runCommandImpl: runner,
     sourceRoot: root,
   });
   expect(first.violations).toEqual([]);
   expect('reused' in first).toBe(false);
   expect(commands).toBe(2);
+  expect(analyzeArgs).toContain('--ram=8192');
 
   const second = runCodeqlCheck({
     executable: 'codeql',
