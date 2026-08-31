@@ -155,7 +155,9 @@ describe('split workflow topology', () => {
     expect(canonical.jobs['release-provenance-gate'].if).toContain('!inputs.release_diagnostic');
     expect(canonical.jobs['release-diagnostic-gate'].if).toContain('inputs.release_diagnostic');
   });
+});
 
+describe('release workflow topology', () => {
   it('finalizes admitted proof without repeating canonical QA', () => {
     const finalizer = readWorkflow(FINALIZE);
     expect(Object.keys(finalizer.jobs)).toEqual(['finalize']);
@@ -225,6 +227,10 @@ describe('split workflow topology', () => {
       if: "github.ref != 'refs/heads/main' && inputs.diagnostic",
       uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
     });
+    const controlCheckout = release.jobs.admission.steps?.find(
+      (step) => step.name === 'Check out release control'
+    );
+    expect(controlCheckout?.with?.path).toBe('build/release-control');
     const admission = (release.jobs.admission.steps ?? []).map((step) => step.run ?? '').join('\n');
     const publication = (release.jobs.publish.steps ?? []).map((step) => step.run ?? '').join('\n');
     for (const mutation of [

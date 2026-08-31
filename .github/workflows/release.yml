@@ -76,7 +76,7 @@ jobs:
       - name: Check out release control
         if: github.ref == 'refs/heads/main'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { ref: '${{ github.sha }}', path: release-control, persist-credentials: false }
+        with: { ref: '${{ github.sha }}', path: build/release-control, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
       - name: Install locked npm
         run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
@@ -155,7 +155,7 @@ jobs:
             gh run download "$PROVENANCE_RUN_ID" \
               --name "$finalized_name" \
               --dir build/release-finalized
-            finalizer=$(node release-control/tooling/ci/verify-finalizer-admission.mjs \
+            finalizer=$(node build/release-control/tooling/ci/verify-finalizer-admission.mjs \
               build/release-finalized/finalizer-admission.json "$release_sha" "$control_sha" "$PROVENANCE_RUN_ID")
             source_run_id=$(jq -er .sourceProofRunId <<<"$finalizer")
             source_attempt=$(jq -er .sourceProofRunAttempt <<<"$finalizer")
