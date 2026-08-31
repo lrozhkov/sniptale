@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { createTempRoot, writeFile } from '../qa/test-support/test-helpers';
 import { verifyPreparedReleaseAssets } from './verify-release-assets.mjs';
@@ -42,7 +42,7 @@ function fixture() {
       .map(([name, bytes]) => `${digest(bytes)}  ${name}`)
       .join('\n')}\n`
   );
-  const verifyProof = () => ({ manifest: {}, zipFile: 'build/sniptale_0.4.0.zip' });
+  const verifyProof = vi.fn(() => ({ manifest: {}, zipFile: 'build/sniptale_0.4.0.zip' }));
   return { assetRoot, commit, root, verifyProof };
 }
 
@@ -56,6 +56,9 @@ it('accepts only the exact proof-bound release asset and checksum inventory', ()
       'sniptale_0.4.0-qa-evidence.zip',
       'sniptale_0.4.0.zip',
     ],
+  });
+  expect(value.verifyProof).toHaveBeenCalledWith(value.root, value.commit, {
+    allowPreparedReleaseAssets: true,
   });
 });
 

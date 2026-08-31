@@ -31,7 +31,7 @@ export function verifyPreparedReleaseAssets({
   commit,
   verifyProof = verifyReleaseProof,
 }) {
-  const verified = verifyProof(releaseRoot, commit);
+  const verified = verifyProof(releaseRoot, commit, { allowPreparedReleaseAssets: true });
   const assetRoot = path.join(releaseRoot, 'release-assets');
   const zipName = path.basename(verified.zipFile);
   const evidenceName = `${path.basename(zipName, '.zip')}-qa-evidence.zip`;
