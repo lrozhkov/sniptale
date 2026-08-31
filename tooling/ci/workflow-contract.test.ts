@@ -17,6 +17,7 @@ interface WorkflowJob {
   environment?: string;
   if?: string;
   name?: string;
+  needs?: string | string[];
   permissions?: Permissions;
   secrets?: string;
   steps?: WorkflowStep[];
@@ -34,6 +35,7 @@ const WORKFLOW_PATHS = [
   '.github/workflows/_canonical-proof.yml',
   '.github/workflows/pr.yml',
   '.github/workflows/provenance.yml',
+  '.github/workflows/provenance-finalize.yml',
   '.github/workflows/release.yml',
   '.github/workflows/selectel-maintenance.yml',
   '.github/workflows/selectel-smoke.yml',
@@ -42,6 +44,7 @@ const WORKFLOW_PATHS = [
 const CANONICAL = '.github/workflows/_canonical-proof.yml';
 const PR = '.github/workflows/pr.yml';
 const PROVENANCE = '.github/workflows/provenance.yml';
+const FINALIZE = '.github/workflows/provenance-finalize.yml';
 const RELEASE = '.github/workflows/release.yml';
 const MAINTENANCE = '.github/workflows/selectel-maintenance.yml';
 const SMOKE = '.github/workflows/selectel-smoke.yml';
@@ -84,6 +87,7 @@ describe('split workflow topology', () => {
       [CANONICAL]: ['workflow_call'],
       [PR]: ['pull_request_target'],
       [PROVENANCE]: ['schedule', 'workflow_dispatch'],
+      [FINALIZE]: ['workflow_dispatch'],
       [RELEASE]: ['workflow_dispatch'],
       [MAINTENANCE]: ['schedule', 'workflow_dispatch'],
       [SMOKE]: ['workflow_dispatch'],
@@ -138,9 +142,7 @@ describe('split workflow topology', () => {
     });
     expect(provenance.jobs['release-provenance-gate'].if).toContain('!inputs.diagnostic');
     expect(provenance.jobs['diagnostic-gate'].if).toContain('inputs.diagnostic');
-    expect(provenance.jobs['attest-release'].if).toBe(
-      "needs.release-provenance-gate.result == 'success'"
-    );
+    expect(provenance.jobs['attest-release']).toBeUndefined();
     expect(provenance.jobs['coverage-results'].if).toBe(
       "needs.release-provenance-gate.result == 'success'"
     );
@@ -148,10 +150,46 @@ describe('split workflow topology', () => {
       "inputs.release_diagnostic && inputs.gate == 'release-provenance'"
     );
     expect(canonical.jobs['security-results'].if).toContain('!inputs.release_diagnostic');
-    expect(canonical.jobs['publish-qa-image'].if).toContain('!inputs.release_diagnostic');
-    expect(canonical.jobs['publish-qa-image'].if).toContain('always()');
+    expect(canonical.jobs['publish-qa-image']).toBeUndefined();
     expect(canonical.jobs['release-provenance-gate'].if).toContain('!inputs.release_diagnostic');
     expect(canonical.jobs['release-diagnostic-gate'].if).toContain('inputs.release_diagnostic');
+  });
+
+  it('finalizes admitted proof without repeating canonical QA', () => {
+    const finalizer = readWorkflow(FINALIZE);
+    expect(Object.keys(finalizer.jobs)).toEqual(['finalize']);
+    expect(finalizer.jobs.finalize.if).toBe("github.ref == 'refs/heads/main'");
+    const steps = finalizer.jobs.finalize.steps ?? [];
+    const publication = steps.map((step) => step.run ?? '').join('\n');
+    expect(publication).toContain('post-proof-classifier.mjs');
+    expect(publication).toContain('finalize-image-receipts.mjs');
+    expect(publication).toContain('sniptale-qa:sha-${SOURCE_SHA}');
+    expect(publication).toContain('sniptale-controller:sha-${SOURCE_SHA}');
+    expect(publication.match(/immutable-image-tag\.mjs/gu)).toHaveLength(2);
+    const releaseSubjects = steps.find(
+      (step) => step.name === 'Attest the exact validated release subject inventory'
+    );
+    expect(releaseSubjects?.with).toMatchObject({
+      'create-storage-record': false,
+    });
+    expect(String(releaseSubjects?.with?.['subject-path'])).toContain(
+      'build/release-proof/release-assets/sniptale_*.zip'
+    );
+    for (const name of [
+      'Attest the admitted immutable QA image',
+      'Attest the admitted immutable controller image',
+    ]) {
+      expect(steps.find((step) => step.name === name)?.with).toMatchObject({
+        'create-storage-record': false,
+        'push-to-registry': true,
+      });
+    }
+    const upload = steps.find((step) => step.uses?.startsWith('actions/upload-artifact@'));
+    expect(upload?.with).toMatchObject({
+      name: 'release-finalized-assets-${{ steps.source.outputs.source-sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+      'if-no-files-found': 'error',
+    });
+    expect(String(upload?.with?.path)).toContain('finalizer-admission.json');
   });
 
   it('keeps deployment diagnostics read-only and publication environment-gated', () => {
@@ -194,8 +232,8 @@ describe('split workflow topology', () => {
       expect(publication).toContain(mutation);
     }
     expect(admission).toContain('classify-release-state.mjs');
-    expect(admission).toContain("expected_title='Release pipeline diagnostic'");
-    expect(admission).toContain("expected_gate='Release pipeline diagnostic Gate'");
+    expect(admission).toContain('.display_title == "Release pipeline diagnostic"');
+    expect(admission).toContain('.name == "Release pipeline diagnostic Gate"');
     expect(admission).toContain('prepare-release-assets.mjs');
     expect(admission).toContain('sniptale-branch-diagnostic-release-admission');
     expect(admission).toContain('deferred-to-main');
@@ -211,7 +249,7 @@ describe('split workflow topology', () => {
     expect(readWorkflow(PROVENANCE).jobs['canonical-proof'].secrets).toBe('inherit');
     expect(readWorkflow(PR).jobs['canonical-proof'].secrets).toBeUndefined();
     expect(readWorkflow(SMOKE).jobs['canonical-smoke'].secrets).toBeUndefined();
-    for (const path of [CANONICAL, PR, RELEASE, MAINTENANCE, SMOKE]) {
+    for (const path of [CANONICAL, PR, FINALIZE, RELEASE, MAINTENANCE, SMOKE]) {
       expect(readSource(path), path).not.toMatch(/\bsecrets\s*:\s*inherit\b/u);
     }
   });
@@ -293,7 +331,6 @@ describe('workflow supply-chain and privilege contracts', () => {
         contents: 'read',
         'security-events': 'write',
       },
-      'publish-qa-image': { contents: 'read', packages: 'write' },
       'pr-gate': {},
       'fast-gate': {},
       'release-provenance-gate': {},
@@ -318,6 +355,13 @@ describe('workflow supply-chain and privilege contracts', () => {
       'security-events': 'write',
     });
     expectExactPermissions(readWorkflow(PROVENANCE).jobs['diagnostic-gate'], {});
+    expectExactPermissions(readWorkflow(FINALIZE).jobs.finalize, {
+      actions: 'read',
+      attestations: 'write',
+      contents: 'read',
+      'id-token': 'write',
+      packages: 'write',
+    });
     expectExactPermissions(readWorkflow(SMOKE).jobs['canonical-smoke'], {
       actions: 'read',
       contents: 'read',
@@ -339,7 +383,7 @@ describe('workflow supply-chain and privilege contracts', () => {
     });
   });
 
-  it('grants OIDC and attestation writes only to the provenance attestation job', () => {
+  it('grants OIDC and attestation writes only to the provenance finalizer', () => {
     const privileged: Array<{ job: string; path: string }> = [];
     for (const path of WORKFLOW_PATHS) {
       for (const [job, definition] of Object.entries(readWorkflow(path).jobs)) {
@@ -348,25 +392,22 @@ describe('workflow supply-chain and privilege contracts', () => {
           privileged.push({ path, job });
       }
     }
-    expect(privileged).toEqual([{ path: PROVENANCE, job: 'attest-release' }]);
-    expectExactPermissions(readWorkflow(PROVENANCE).jobs['attest-release'], {
-      actions: 'read',
-      attestations: 'write',
-      contents: 'read',
-      'id-token': 'write',
-      packages: 'write',
-    });
+    expect(privileged).toEqual([{ path: FINALIZE, job: 'finalize' }]);
   });
 });
 
 describe('publication proof ownership', () => {
-  it('keeps coverage publication and subject attestation in provenance only', () => {
+  it('separates coverage publication from post-proof subject attestation', () => {
     for (const path of WORKFLOW_PATHS) {
       const source = readSource(path);
       if (path === PROVENANCE) {
         expect(source).toContain('coverallsapp/github-action@');
+        expect(source).toContain('verify-main-proof.mjs release');
+        expect(source).not.toContain('actions/attest@');
+      } else if (path === FINALIZE) {
         expect(source).toContain('actions/attest@');
         expect(source).toContain('verify-main-proof.mjs release');
+        expect(source).not.toContain('coverallsapp/github-action@');
       } else {
         expect(source, path).not.toContain('coverallsapp/github-action@');
         expect(source, path).not.toContain('actions/attest@');
@@ -377,6 +418,7 @@ describe('publication proof ownership', () => {
   it('requires deployment to consume verified assets and verify their attestations', () => {
     const source = readSource(RELEASE);
     expect(source).toContain('.github/workflows/provenance.yml');
+    expect(source).toContain('.github/workflows/provenance-finalize.yml');
     expect(source).toContain('verify-release-assets.mjs');
     expect(source).toContain('gh attestation verify');
     expect(source).toContain('--signer-workflow');

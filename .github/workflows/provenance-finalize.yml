@@ -1,0 +1,200 @@
+name: Release provenance finalize
+run-name: Release provenance Finalize Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      proof_run_id:
+        description: Canonical release proof run to finalize without repeating QA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-provenance-finalize-${{ inputs.proof_run_id }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Release provenance Finalize Gate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: ./.github/actions/setup-locked-node
+      - name: Install exact finalizer dependencies
+        run: |
+          npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+          echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+          npm ci --ignore-scripts
+      - name: Admit the canonical proof and classify intervening controls
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROOF_RUN_ID: ${{ inputs.proof_run_id }}
+        run: |
+          printf '%s\n' "$PROOF_RUN_ID" | grep -Eq '^[1-9][0-9]*$'
+          run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROOF_RUN_ID}")
+          source_sha=$(jq -er '.head_sha' <<<"$run")
+          jq -e '
+            .head_branch == "main" and .event == "workflow_dispatch" and
+            .status == "completed" and .path == ".github/workflows/provenance.yml" and
+            .display_title == "Release provenance Gate"
+          ' <<<"$run" >/dev/null
+          jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROOF_RUN_ID}/jobs?filter=all&per_page=100")
+          jq -s -e '
+            ([.[].jobs[] | select(.name == "canonical-proof / Release provenance Gate" and .conclusion == "success")] | length >= 1) and
+            ([.[].jobs[] | select(.name == "Release provenance Gate" and .conclusion == "success")] | length >= 1)
+          ' <<<"$jobs" >/dev/null
+          classification=$(node tooling/ci/post-proof-classifier.mjs "$source_sha" "$GITHUB_SHA")
+          test "$(jq -er .classification <<<"$classification")" = post-proof-only
+          source_tree=$(git rev-parse "${source_sha}^{tree}")
+          echo "source-sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "source-tree=$source_tree" >> "$GITHUB_OUTPUT"
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+      - name: Download exact canonical proof and image receipts
+        id: artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROOF_RUN_ID: ${{ inputs.proof_run_id }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+        run: |
+          proof_prefix="release-provenance-${SOURCE_SHA}-${PROOF_RUN_ID}-"
+          proof_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROOF_RUN_ID" "$proof_prefix")
+          image_prefix="candidate-image-use-${PROOF_RUN_ID}-"
+          image_name=$(node tooling/ci/resolve-run-artifact.mjs "$PROOF_RUN_ID" "$image_prefix")
+          proof_attempt=${proof_name##*-}
+          image_attempt=${image_name##*-}
+          test "$proof_attempt" = "$image_attempt"
+          echo "producer-attempt=$proof_attempt" >> "$GITHUB_OUTPUT"
+          gh run download "$PROOF_RUN_ID" --name "$proof_name" --dir build/release-proof
+          gh run download "$PROOF_RUN_ID" --name "$image_name" --dir build/image-use
+      - name: Check out the exact canonical proof source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.source.outputs.source-sha }}
+          path: proof-source
+          persist-credentials: false
+      - name: Install exact proof preparation dependencies
+        run: npm ci --ignore-scripts --prefix proof-source
+      - name: Verify proof, prepare assets, and bind cached image receipts
+        id: images
+        env:
+          PROOF_RUN_ID: ${{ inputs.proof_run_id }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+          SOURCE_TREE: ${{ steps.source.outputs.source-tree }}
+          SOURCE_ATTEMPT: ${{ steps.artifacts.outputs.producer-attempt }}
+        run: |
+          (cd proof-source && node tooling/ci/verify-main-proof.mjs release "$GITHUB_WORKSPACE/build/release-proof" "$SOURCE_SHA")
+          (cd proof-source && node tooling/ci/prepare-release-assets.mjs "$GITHUB_WORKSPACE/build/release-proof" "$SOURCE_SHA")
+          (cd proof-source && node tooling/ci/verify-release-assets.mjs "$GITHUB_WORKSPACE/build/release-proof" "$SOURCE_SHA")
+          images=$(node tooling/ci/finalize-image-receipts.mjs build/image-use "$SOURCE_SHA" "$SOURCE_TREE" "$PROOF_RUN_ID" "$SOURCE_ATTEMPT")
+          echo "qa=$(jq -er .qaDigest <<<"$images")" >> "$GITHUB_OUTPUT"
+          echo "controller=$(jq -er .controllerDigest <<<"$images")" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish and verify exact immutable image aliases without rebuilding
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+          QA_DIGEST: ${{ steps.images.outputs.qa }}
+          CONTROLLER_DIGEST: ${{ steps.images.outputs.controller }}
+        run: |
+          for binding in \
+            "ghcr.io/lrozhkov/sniptale-qa:sha-${SOURCE_SHA}|${QA_DIGEST}" \
+            "ghcr.io/lrozhkov/sniptale-controller:sha-${SOURCE_SHA}|${CONTROLLER_DIGEST}"; do
+            image=${binding%%|*}
+            expected=${binding#*|}
+            disposition=$(node tooling/ci/immutable-image-tag.mjs "$image" "$expected")
+            echo "Immutable image tag admission: $image ($disposition)"
+          done
+          docker buildx imagetools create \
+            --tag "ghcr.io/lrozhkov/sniptale-qa:sha-${SOURCE_SHA}" \
+            --tag ghcr.io/lrozhkov/sniptale-qa:main \
+            "ghcr.io/lrozhkov/sniptale-qa@${QA_DIGEST}"
+          docker buildx imagetools create \
+            --tag "ghcr.io/lrozhkov/sniptale-controller:sha-${SOURCE_SHA}" \
+            --tag ghcr.io/lrozhkov/sniptale-controller:main \
+            "ghcr.io/lrozhkov/sniptale-controller@${CONTROLLER_DIGEST}"
+          for binding in \
+            "ghcr.io/lrozhkov/sniptale-qa:sha-${SOURCE_SHA}|${QA_DIGEST}" \
+            "ghcr.io/lrozhkov/sniptale-controller:sha-${SOURCE_SHA}|${CONTROLLER_DIGEST}"; do
+            image=${binding%%|*}
+            expected=${binding#*|}
+            test "$(node tooling/ci/immutable-image-tag.mjs "$image" "$expected")" = exact
+          done
+      - name: Attest the exact validated release subject inventory
+        id: release-attestation
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          create-storage-record: false
+          subject-path: |
+            build/release-proof/release-assets/SHA256SUMS
+            build/release-proof/release-assets/provenance.json
+            build/release-proof/release-assets/sbom.cdx.json
+            build/release-proof/release-assets/sniptale_*.zip
+      - name: Attest the admitted immutable QA image
+        id: qa-attestation
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          create-storage-record: false
+          subject-name: ghcr.io/lrozhkov/sniptale-qa
+          subject-digest: ${{ steps.images.outputs.qa }}
+          push-to-registry: true
+      - name: Attest the admitted immutable controller image
+        id: controller-attestation
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          create-storage-record: false
+          subject-name: ghcr.io/lrozhkov/sniptale-controller
+          subject-digest: ${{ steps.images.outputs.controller }}
+          push-to-registry: true
+      - name: Seal finalizer admission and attestation identities
+        env:
+          CLASSIFICATION: ${{ steps.source.outputs.classification }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+          SOURCE_ATTEMPT: ${{ steps.artifacts.outputs.producer-attempt }}
+          PROOF_RUN_ID: ${{ inputs.proof_run_id }}
+          QA_DIGEST: ${{ steps.images.outputs.qa }}
+          CONTROLLER_DIGEST: ${{ steps.images.outputs.controller }}
+          RELEASE_ATTESTATION_URL: ${{ steps.release-attestation.outputs.attestation-url }}
+          QA_ATTESTATION_URL: ${{ steps.qa-attestation.outputs.attestation-url }}
+          CONTROLLER_ATTESTATION_URL: ${{ steps.controller-attestation.outputs.attestation-url }}
+        run: |
+          jq -n --arg commit "$SOURCE_SHA" --arg controlCommit "$GITHUB_SHA" \
+            --arg workflow ".github/workflows/provenance-finalize.yml" \
+            --arg release "$RELEASE_ATTESTATION_URL" --arg qa "$QA_ATTESTATION_URL" \
+            --arg controller "$CONTROLLER_ATTESTATION_URL" --arg qaDigest "$QA_DIGEST" \
+            --arg controllerDigest "$CONTROLLER_DIGEST" \
+            '{schemaVersion:1,artifactKind:"sniptale-github-attestations",commit:$commit,controlCommit:$controlCommit,workflow:$workflow,releaseAssets:$release,images:{qa:{digest:$qaDigest,url:$qa},controller:{digest:$controllerDigest,url:$controller}}}' \
+            > build/release-proof/attestations.json
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg releaseCommit "$SOURCE_SHA" \
+            --arg controlCommit "$GITHUB_SHA" --arg finalizerRunId "$GITHUB_RUN_ID" \
+            --arg sourceProofRunId "$PROOF_RUN_ID" --arg sourceProofRunAttempt "$SOURCE_ATTEMPT" \
+            --arg qa "$QA_DIGEST" --arg controller "$CONTROLLER_DIGEST" \
+            --arg classification "$(jq -er .classification <<<"$CLASSIFICATION")" \
+            '{schemaVersion:1,artifactKind:"sniptale-release-finalizer-admission",classification:$classification,repository:$repository,releaseCommit:$releaseCommit,controlCommit:$controlCommit,finalizerRunId:$finalizerRunId,sourceProofRunId:$sourceProofRunId,sourceProofRunAttempt:$sourceProofRunAttempt,images:{qa:$qa,controller:$controller}}' \
+            > build/release-proof/finalizer-admission.json
+          node tooling/ci/verify-finalizer-admission.mjs build/release-proof/finalizer-admission.json "$SOURCE_SHA" "$GITHUB_SHA" "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+        with:
+          name: release-finalized-assets-${{ steps.source.outputs.source-sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/release-proof/release-assets
+            build/release-proof/attestations.json
+            build/release-proof/finalizer-admission.json
+          if-no-files-found: error
+          retention-days: 30
