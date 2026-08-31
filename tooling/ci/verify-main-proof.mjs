@@ -17,12 +17,16 @@ function readGit(args, cwd = process.cwd()) {
   return result.stdout.trim();
 }
 
-function collectArtifactFiles(root) {
+function collectArtifactFiles(root, { allowPreparedReleaseAssets = false } = {}) {
   const files = [];
   function walk(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const absolute = path.join(directory, entry.name);
       if (entry.isSymbolicLink()) throw new Error(`Unsafe main proof symlink: ${absolute}`);
+      const relative = path.relative(root, absolute).replaceAll(path.sep, '/');
+      if (entry.isDirectory() && allowPreparedReleaseAssets && relative === 'release-assets') {
+        continue;
+      }
       if (entry.isDirectory()) walk(absolute);
       else if (entry.isFile()) files.push(path.relative(root, absolute).replaceAll(path.sep, '/'));
       else throw new Error(`Unsafe main proof entry: ${absolute}`);
@@ -75,7 +79,13 @@ function validateMainProofIdentity(manifest, { commit, controlDigest, expectedTr
   }
 }
 
-function validateMainProofChecksums(root, manifest, manifestPath, sumsPath) {
+function validateMainProofChecksums(
+  root,
+  manifest,
+  manifestPath,
+  sumsPath,
+  { allowPreparedReleaseAssets = false } = {}
+) {
   const expected = new Map(
     fs
       .readFileSync(sumsPath, 'utf8')
@@ -104,13 +114,21 @@ function validateMainProofChecksums(root, manifest, manifestPath, sumsPath) {
     if (sha256(absolute) !== digest) throw new Error(`Main proof digest mismatch: ${file}`);
   }
   const admittedFiles = [...listed, 'SHA256SUMS'].sort();
-  if (JSON.stringify(collectArtifactFiles(root)) !== JSON.stringify(admittedFiles)) {
+  if (
+    JSON.stringify(collectArtifactFiles(root, { allowPreparedReleaseAssets })) !==
+    JSON.stringify(admittedFiles)
+  ) {
     throw new Error('Main proof physical artifact inventory is not exact.');
   }
   return expected;
 }
 
-function verifyProof(root, commit, lane, { repositoryRoot = process.cwd() } = {}) {
+function verifyProof(
+  root,
+  commit,
+  lane,
+  { repositoryRoot = process.cwd(), allowPreparedReleaseAssets = false } = {}
+) {
   if (!/^[a-f0-9]{40}$/u.test(commit ?? '')) throw new Error('Expected a full main commit SHA.');
   const manifestPath = path.join(root, 'proof-manifest.json');
   const sumsPath = path.join(root, 'SHA256SUMS');
@@ -131,7 +149,9 @@ function verifyProof(root, commit, lane, { repositoryRoot = process.cwd() } = {}
   if (manifest.proofSemanticDigest !== expectedSemanticDigest) {
     throw new Error(`${lane} proof semantic identity drifted.`);
   }
-  const expected = validateMainProofChecksums(root, manifest, manifestPath, sumsPath);
+  const expected = validateMainProofChecksums(root, manifest, manifestPath, sumsPath, {
+    allowPreparedReleaseAssets,
+  });
   const zipFiles = [...expected.keys()].filter((file) => /^build\/sniptale_.+\.zip$/u.test(file));
   if (zipFiles.length !== 1) {
     throw new Error(`${lane} proof must contain exactly one release ZIP.`);
