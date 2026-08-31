@@ -9,6 +9,7 @@ import {
   createNativeLease,
   createNativeTestPort,
   installChromeRuntimeInfo,
+  waitForNativePost,
   waitForNativeSettingsSync,
   type NativeTestPort,
 } from './service.test-support';
@@ -84,6 +85,24 @@ function acceptSettings(
     warnings: [],
   });
 }
+
+it('waits through delayed native posts under scheduler contention', async () => {
+  const port = createNativeTestPort();
+  let remainingTurns = 20;
+  const postAfterTurn = () => {
+    if (remainingTurns > 0) {
+      remainingTurns -= 1;
+      setTimeout(postAfterTurn, 0);
+      return;
+    }
+    port.postMessage({ type: 'extension.test.delayed' });
+  };
+  postAfterTurn();
+
+  await expect(waitForNativePost(port, 'extension.test.delayed')).resolves.toEqual({
+    type: 'extension.test.delayed',
+  });
+});
 
 it('ignores settings accepted messages for stale revisions', async () => {
   const { port, service } = await createConnectedService();
