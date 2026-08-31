@@ -213,6 +213,10 @@ describe('split workflow topology', () => {
     expect(release.jobs.publish.environment).toBe('release-publisher');
     expect(release.jobs.publish.if).toContain("github.ref == 'refs/heads/main'");
     expect(release.jobs.publish.if).toContain('!inputs.diagnostic');
+    for (const job of [release.jobs.admission, release.jobs.publish]) {
+      const setup = job.steps?.find((step) => step.uses === `.${LOCKED_NODE_ACTION}`);
+      expect(setup?.with).toBeUndefined();
+    }
     const branchCheckout = release.jobs.admission.steps?.find(
       (step) => step.name === 'Check out diagnostic candidate'
     );

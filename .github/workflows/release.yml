@@ -78,7 +78,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', path: release-control, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-        with: { cache: npm, cache-dependency-path: package-lock.json }
       - name: Install locked npm
         run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install exact publication dependencies
@@ -296,7 +295,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-        with: { cache: npm, cache-dependency-path: package-lock.json }
       - name: Install locked npm
         run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install exact publication dependencies
