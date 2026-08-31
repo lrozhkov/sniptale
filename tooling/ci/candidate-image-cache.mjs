@@ -194,9 +194,10 @@ export function normalizeBuildxInspection(value) {
   const manifest = value.Manifest ?? value.manifest ?? value;
   const image = value.Image ?? value.image ?? {};
   const provenance = value.Provenance?.SLSA ?? value.provenance ?? {};
+  const manifestEntries = manifest.Manifests ?? manifest.manifests ?? [];
   return {
     digest: manifest.Digest ?? manifest.digest,
-    manifests: (manifest.Manifests ?? manifest.manifests ?? [])
+    manifests: manifestEntries
       .filter((entry) => {
         const platform = entry.Platform ?? entry.platform;
         const annotations = entry.Annotations ?? entry.annotations ?? {};
@@ -215,8 +216,18 @@ export function normalizeBuildxInspection(value) {
       subjects: (provenance.subject ?? provenance.subjects ?? []).map(
         (entry) => entry.digest?.sha256 ?? entry.digest ?? entry
       ),
+      attestedSubjects: manifestEntries
+        .filter((entry) => {
+          const annotations = entry.Annotations ?? entry.annotations ?? {};
+          return annotations['vnd.docker.reference.type'] === 'attestation-manifest';
+        })
+        .map((entry) => {
+          const annotations = entry.Annotations ?? entry.annotations ?? {};
+          return annotations['vnd.docker.reference.digest'];
+        }),
       materials: (
         provenance.predicate?.buildDefinition?.resolvedDependencies ??
+        provenance.buildDefinition?.resolvedDependencies ??
         provenance.materials ??
         []
       ).map((entry) => entry.digest?.sha256 ?? entry.digest ?? entry),
@@ -241,7 +252,13 @@ export function verifyCandidateImageLookup(plan, inspection) {
   const subjectDigests = [inspection.digest, inspection.manifests[0].digest].map((digest) =>
     digest.slice('sha256:'.length)
   );
-  if (!subjectDigests.some((digest) => inspection.provenance.subjects.includes(digest))) {
+  const directSubject = subjectDigests.some((digest) =>
+    inspection.provenance.subjects.includes(digest)
+  );
+  const descriptorSubject = inspection.provenance.attestedSubjects?.includes(
+    inspection.manifests[0].digest
+  );
+  if (!directSubject && !descriptorSubject) {
     throw new Error('Candidate image provenance does not bind the selected OCI digest.');
   }
   if (!inspection.provenance.materials.includes(plan.baseImageDigest.slice('sha256:'.length))) {
