@@ -149,6 +149,7 @@ describe('split workflow topology', () => {
     );
     expect(canonical.jobs['security-results'].if).toContain('!inputs.release_diagnostic');
     expect(canonical.jobs['publish-qa-image'].if).toContain('!inputs.release_diagnostic');
+    expect(canonical.jobs['publish-qa-image'].if).toContain('always()');
     expect(canonical.jobs['release-provenance-gate'].if).toContain('!inputs.release_diagnostic');
     expect(canonical.jobs['release-diagnostic-gate'].if).toContain('inputs.release_diagnostic');
   });

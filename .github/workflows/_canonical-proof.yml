@@ -818,6 +818,7 @@ jobs:
   publish-qa-image:
     needs: [trusted-admission, cleanup, qa-image]
     if: >-
+      always() &&
       github.ref == 'refs/heads/main' &&
       !inputs.release_diagnostic &&
       (inputs.gate == 'release-provenance' ||
