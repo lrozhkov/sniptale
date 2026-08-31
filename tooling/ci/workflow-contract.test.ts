@@ -13,6 +13,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  environment?: string;
   if?: string;
   name?: string;
   permissions?: Permissions;
@@ -151,6 +152,41 @@ describe('split workflow topology', () => {
     expect(canonical.jobs['release-diagnostic-gate'].if).toContain('inputs.release_diagnostic');
   });
 
+  it('keeps deployment diagnostics read-only and publication environment-gated', () => {
+    const release = readWorkflow(RELEASE);
+    const diagnosticInput = (
+      release.on as {
+        workflow_dispatch: { inputs: Record<string, Record<string, unknown>> };
+      }
+    ).workflow_dispatch.inputs.diagnostic;
+    expect(diagnosticInput).toEqual({
+      description: 'Admit and prepare the exact release without creating or publishing it',
+      required: false,
+      default: false,
+      type: 'boolean',
+    });
+    expect(Object.keys(release.jobs)).toEqual(['admission', 'diagnostic-gate', 'publish']);
+    expect(release.jobs.admission.environment).toBeUndefined();
+    expect(release.jobs['diagnostic-gate'].environment).toBeUndefined();
+    expect(release.jobs['diagnostic-gate'].if).toContain('inputs.diagnostic');
+    expect(release.jobs.publish.environment).toBe('release-publisher');
+    expect(release.jobs.publish.if).toContain('!inputs.diagnostic');
+    const admission = (release.jobs.admission.steps ?? []).map((step) => step.run ?? '').join('\n');
+    const publication = (release.jobs.publish.steps ?? []).map((step) => step.run ?? '').join('\n');
+    for (const mutation of [
+      '--method POST',
+      '--method PATCH',
+      '--method DELETE',
+      'upload-release-assets.mjs',
+    ]) {
+      expect(admission).not.toContain(mutation);
+      expect(publication).toContain(mutation);
+    }
+    expect(admission).toContain('classify-release-state.mjs');
+    expect(admission).toContain('release-request.json');
+    expect(admission).toContain('deployment-plan.json');
+  });
+
   it('inherits secrets only into the environment-gated release proof caller', () => {
     for (const path of WORKFLOW_PATHS) {
       const source = readSource(path);
@@ -271,6 +307,11 @@ describe('workflow supply-chain and privilege contracts', () => {
       contents: 'read',
       packages: 'write',
     });
+    expectExactPermissions(readWorkflow(RELEASE).jobs.admission, {
+      actions: 'read',
+      contents: 'read',
+    });
+    expectExactPermissions(readWorkflow(RELEASE).jobs['diagnostic-gate'], {});
     expectExactPermissions(readWorkflow(RELEASE).jobs.publish, {
       actions: 'read',
       contents: 'write',

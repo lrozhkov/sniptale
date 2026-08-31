@@ -1,4 +1,5 @@
 name: Continuous Deployment
+run-name: ${{ inputs.diagnostic && 'Continuous Deployment diagnostic' || 'Continuous Deployment' }}
 
 on:
   workflow_dispatch:
@@ -15,6 +16,11 @@ on:
         description: Successful Release provenance Gate run for the tagged commit
         required: true
         type: string
+      diagnostic:
+        description: Admit and prepare the exact release without creating or publishing it
+        required: false
+        default: false
+        type: boolean
       allow_non_latest_provenance:
         description: Publish from an older successful provenance run
         required: false
@@ -34,14 +40,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  admission:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    environment: release-publisher
     permissions:
       actions: read
-      contents: write
+      contents: read
     outputs:
       release-sha: ${{ steps.admission.outputs.release-sha }}
     steps:
@@ -72,7 +77,7 @@ jobs:
       - name: Admit signed tag and exact provenance run
         id: admission
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           PROVENANCE_RUN_ID: ${{ inputs.provenance_run_id }}
           ALLOW_NON_LATEST: ${{ inputs.allow_non_latest_provenance }}
@@ -127,6 +132,61 @@ jobs:
             echo "Release provenance run: $PROVENANCE_RUN_ID"
             if [ -n "$BYPASS_REASON" ]; then echo "Bypass note: $BYPASS_REASON"; fi
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Prepare notes and classify existing release state without mutation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          asset_root=build/release-proof/release-assets
+          deployment_root=build/release-proof/deployment
+          mkdir -p "$deployment_root"
+          version=$(jq -er .version package.json)
+          release_name="Sniptale ${version} alpha"
+          mapfile -t zip_assets < <(find "$asset_root" -maxdepth 1 -type f -name 'sniptale_*.zip' ! -name '*-qa-evidence.zip' -print)
+          test "${#zip_assets[@]}" -eq 1 && test -f "${zip_assets[0]}"
+          zip_name=$(basename "${zip_assets[0]}")
+          notes="$deployment_root/release-notes.md"
+          cat > "$notes" <<EOF
+          Snip the web. Tell the story.
+
+          Alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
+          EOF
+          printf '\n%s\n\n' "$RELEASE_NOTES" >> "$notes"
+          cat >> "$notes" <<EOF
+          ## Install
+
+          Download **${zip_name}**, unpack it, open **chrome://extensions**, enable Developer mode, choose Load unpacked, and select the unpacked directory.
+
+          This is an alpha preview (**v${version}-alpha**). Formats, workflows, and browser compatibility may change without backward compatibility; keep separate backups of important data.
+          EOF
+          jq -n --arg tag "$RELEASE_TAG" --arg name "$release_name" --rawfile body "$notes" \
+            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false, generate_release_notes: false}' \
+            > "$deployment_root/release-request.json"
+          lookup_error=$(mktemp)
+          existing_release=$(mktemp)
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >"$existing_release" 2>"$lookup_error"; then
+            node tooling/ci/classify-release-state.mjs "$asset_root" "$RELEASE_TAG" "$release_name" \
+              <"$existing_release" > "$deployment_root/existing-release-state.json"
+          elif grep -q '(HTTP 404)' "$lookup_error"; then
+            jq -n '{action: "create-release"}' > "$deployment_root/existing-release-state.json"
+          else
+            cat "$lookup_error" >&2
+            exit 1
+          fi
+          jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg name "$release_name" \
+            --arg zip "$zip_name" \
+            --slurpfile state "$deployment_root/existing-release-state.json" \
+            '{schemaVersion: 1, tag: $tag, name: $name, extensionArchive: $zip, existingRelease: $state[0]}' \
+            > "$deployment_root/deployment-plan.json"
+          {
+            echo
+            echo "Mode: ${{ inputs.diagnostic && 'diagnostic (no publication)' || 'publication' }}"
+            echo "Prepared extension archive: $zip_name"
+            echo "Existing release action: $(jq -er .action "$deployment_root/existing-release-state.json")"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve publication input and prepared assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -136,22 +196,61 @@ jobs:
             build/release-proof/SHA256SUMS
             build/release-proof/release-assets
             build/release-proof/attestations.json
+            build/release-proof/deployment
             .tmp/ci-release-admission.json
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
+
+  diagnostic-gate:
+    name: Continuous Deployment diagnostic Gate
+    needs: admission
+    if: always() && inputs.diagnostic
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require read-only release admission and preparation
+        env:
+          ADMISSION_RESULT: ${{ needs.admission.result }}
+        run: test "$ADMISSION_RESULT" = success
+
+  publish:
+    needs: admission
+    if: needs.admission.result == 'success' && !inputs.diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release-publisher
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out signed tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
+      - uses: ./.github/actions/setup-locked-node
+        with: { cache: npm, cache-dependency-path: package-lock.json }
+      - name: Install locked npm
+        run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Install exact publication dependencies
+        run: npm ci --ignore-scripts
+      - name: Download exact admitted deployment artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v6.0.0
+        with:
+          name: deployment-${{ needs.admission.outputs.release-sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .
       - name: Create draft, attach verified assets, and publish immutable release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_POLICY_READ_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_SHA: ${{ steps.admission.outputs.release-sha }}
+          RELEASE_SHA: ${{ needs.admission.outputs.release-sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
           asset_root=build/release-proof/release-assets
+          deployment_root=build/release-proof/deployment
           GH_TOKEN="$RELEASE_POLICY_READ_TOKEN" GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node tooling/ci/release-policy.mjs --recheck
-          version=$(jq -er .version package.json)
-          release_name="Sniptale ${version} alpha"
+          node tooling/ci/verify-release-assets.mjs build/release-proof "$RELEASE_SHA"
+          request="$deployment_root/release-request.json"
+          release_name=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .prerelease == false and .generate_release_notes == false) | .name' "$request")
           lookup_error=$(mktemp)
           existing_release=$(mktemp)
           already_published=false
@@ -186,24 +285,6 @@ jobs:
           trap cleanup_owned_release ERR
           mapfile -t zip_assets < <(find "$asset_root" -maxdepth 1 -type f -name 'sniptale_*.zip' ! -name '*-qa-evidence.zip' -print)
           test "${#zip_assets[@]}" -eq 1 && test -f "${zip_assets[0]}"
-          zip_name=$(basename "${zip_assets[0]}")
-          notes=$(mktemp)
-          cat > "$notes" <<EOF
-          Snip the web. Tell the story.
-
-          Alpha preview of Sniptale — a local-first Chromium MV3 workspace for capturing, annotating, recording, reviewing, editing, and exporting the web.
-          EOF
-          printf '\n%s\n\n' "$RELEASE_NOTES" >> "$notes"
-          cat >> "$notes" <<EOF
-          ## Install
-
-          Download **${zip_name}**, unpack it, open **chrome://extensions**, enable Developer mode, choose Load unpacked, and select the unpacked directory.
-
-          This is an alpha preview (**v${version}-alpha**). Formats, workflows, and browser compatibility may change without backward compatibility; keep separate backups of important data.
-          EOF
-          request=$(mktemp)
-          jq -n --arg tag "$RELEASE_TAG" --arg name "$release_name" --rawfile body "$notes" \
-            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false, generate_release_notes: false}' > "$request"
           if [ "$already_published" = false ]; then
             release=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" --input "$request")
             release_id=$(jq -er --arg tag "$RELEASE_TAG" 'select(.tag_name == $tag and .draft == true and .immutable != true) | .id | tostring' <<<"$release")

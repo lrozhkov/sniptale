@@ -35,7 +35,7 @@ The extension zip is not a stand-alone source distribution. Conveyance must make
 
 ## Hosted publication
 
-Publish only a commit already present on `main` with a successful Release provenance Gate. Create and push a GitHub-verifiable annotated tag matching the package version, then dispatch Continuous Deployment with the tag and exact provenance run ID. Deployment creates no VM and does not rebuild. It verifies repository immutability, the tag ruleset, proof hashes, draft assets, and published immutable identity. GitHub's source archives at that tag provide the Corresponding Source alongside the extension archive.
+Publish only a commit already present on `main` with a successful Release provenance Gate. Create and push a GitHub-verifiable annotated tag matching the package version, then dispatch Continuous Deployment in diagnostic mode with the tag and exact provenance run ID. Diagnostic deployment creates no release: it verifies repository immutability, the tag ruleset, proof hashes, attestations, release state, notes, and prepared assets, then preserves the deployment artifact. After that gate is green, dispatch publication with the same inputs. Deployment creates no VM and does not rebuild. Publication verifies the admitted assets again, verifies the mutable draft, and checks the published immutable identity. GitHub's source archives at that tag provide the Corresponding Source alongside the extension archive.
 
 The full audit inside `ci:release` generates `.tmp/licenses/sbom.cdx.json` and `.tmp/licenses/summary.json`, scans history for credentials, and runs configured static and supply-chain audits. Ignored evidence does not replace Git state or command status.
 
