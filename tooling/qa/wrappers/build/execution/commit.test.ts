@@ -39,14 +39,6 @@ it('commits staged changes only after a successful build in commit mode', async 
     });
 
     expect(result.steps.map((step) => step.label)).toEqual([
-      'Naming',
-      'HTML sanitizer ownership',
-      'Architecture guardrails',
-      'Dependency boundaries',
-      'Cycles',
-      'Root side effects',
-      'Typecheck',
-      'Unit tests',
       'Build',
       'Stage changes',
       'Task artifacts',
@@ -118,14 +110,6 @@ it('blocks commit mode when task artifacts were auto-staged', async () => {
     });
 
     expect(result.steps.map((step) => step.label)).toEqual([
-      'Naming',
-      'HTML sanitizer ownership',
-      'Architecture guardrails',
-      'Dependency boundaries',
-      'Cycles',
-      'Root side effects',
-      'Typecheck',
-      'Unit tests',
       'Build',
       'Stage changes',
       'Task artifacts',

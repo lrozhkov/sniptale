@@ -131,8 +131,9 @@ it('merges shared controls by stable id without losing lane evidence', () => {
   const typecheck = QA_RULE_DEFINITIONS.find(({ id }) => id === 'qa.rule.typecheck');
 
   expect(typecheck?.lanes).toEqual(
-    expect.arrayContaining(['release-direct', 'focused-triggered', 'harness', 'build'])
+    expect.arrayContaining(['release-direct', 'focused-triggered', 'harness'])
   );
+  expect(typecheck?.lanes).not.toContain('build');
   expect(new Set(QA_RULE_DEFINITIONS.map(({ id }) => id)).size).toBe(QA_RULE_DEFINITIONS.length);
 });
 
