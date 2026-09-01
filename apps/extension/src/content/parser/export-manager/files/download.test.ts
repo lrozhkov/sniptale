@@ -215,6 +215,29 @@ it('rejects same-origin intermediary HTML page responses instead of saving them 
   expect(result.errors[0]).toContain('Skipped intermediary HTML page');
 });
 
+it('uses the admitted MIME extension when a page URL looks like an image filename', async () => {
+  installFetchMock(async () => {
+    return createResponse('<html><title>Wikipedia file page</title></html>', {
+      contentType: 'text/html; charset=UTF-8',
+    });
+  });
+
+  const result = await downloadFileResources(
+    [
+      createResource(
+        'https://example.com/wiki/File:Panorama_of_Anfield_(29676137824).jpg',
+        'FilePanorama_of_Anfield_(29676137824).jpg'
+      ),
+    ],
+    undefined,
+    () => false,
+    () => undefined
+  );
+
+  expect(listFileNames(result)).toEqual(['FilePanorama_of_Anfield_(29676137824).html']);
+  expect(result.errors).toEqual([]);
+});
+
 it('blocks cross-origin credentialed downloads before issuing the request', async () => {
   const fetchMock = installFetchMock(async () => {
     throw new Error('fetch should not be called for blocked urls');

@@ -166,10 +166,17 @@ function finalizeDownloadedResource(args: {
   if (shouldSkipHtmlDownloadResponse({ url: args.resolvedUrl, contentType, filename })) {
     throw new Error(`Skipped intermediary HTML page (${contentType ?? 'unknown content type'})`);
   }
-  if (!/\.[a-zA-Z0-9]{2,5}$/.test(filename)) {
-    const extension =
-      getExtensionFromMimeType(args.blob.type) || getFileExtension(args.resolvedUrl) || 'bin';
-    filename = `${filename}.${extension}`;
+  const admittedMimeExtension =
+    getExtensionFromMimeType(args.blob.type) ||
+    (contentType?.toLowerCase().startsWith('text/html') ? 'html' : null);
+  if (admittedMimeExtension) {
+    const existingExtension = getFileExtension(filename);
+    const baseName = existingExtension
+      ? filename.slice(0, -(existingExtension.length + 1))
+      : filename;
+    filename = `${baseName}.${admittedMimeExtension}`;
+  } else if (!/\.[a-zA-Z0-9]{2,5}$/.test(filename)) {
+    filename = `${filename}.${getFileExtension(args.resolvedUrl) || 'bin'}`;
   }
   const sanitizedFilename = sanitizeArchiveEntryFilename(filename) ?? 'file.bin';
   const lastDot = sanitizedFilename.lastIndexOf('.');
