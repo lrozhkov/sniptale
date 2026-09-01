@@ -113,13 +113,18 @@ export function createAuditToolStep(
     if (summaryLine) {
       detailParts.push(summaryLine);
     }
-    return toTimedStep(createOkStep(label, detailParts.join('; ')), durationMs);
+    const step = createOkStep(label, detailParts.join('; '));
+    if (result.advisories?.length > 0) {
+      step.advisories = result.advisories;
+    }
+    return toTimedStep(step, durationMs);
   }
 
-  return toTimedStep(
-    createFailureStep(label, `findings (${result.violations.length})`, {
-      stderr: summarizeAuditFindings(result),
-    }),
-    durationMs
-  );
+  const step = createFailureStep(label, `findings (${result.violations.length})`, {
+    stderr: summarizeAuditFindings(result),
+  });
+  if (result.advisories?.length > 0) {
+    step.advisories = result.advisories;
+  }
+  return toTimedStep(step, durationMs);
 }

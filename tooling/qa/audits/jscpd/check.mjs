@@ -16,6 +16,7 @@ import {
   resolveJscpdNativeRuntime,
 } from './jscpd-detector.mjs';
 import {
+  collectJscpdBaselineAdvisories,
   collectJscpdBaselineViolations,
   formatJscpdBaselineSummary,
   readJscpdBaseline,
@@ -36,6 +37,7 @@ export const JSCPD_TIMEOUT_MS = 120_000;
 
 function createSkippedJscpdResult() {
   return {
+    advisories: [],
     skipped: true,
     violations: [],
     skipReasonId: AUDIT_ADAPTER_SKIP_REASONS.toolUnavailable,
@@ -189,13 +191,15 @@ function createJscpdResult({ absoluteReportPath, baselinePath, detector, duplica
   const familySummary = summarizeJscpdFamilies(findings);
   const baseline = readJscpdBaseline(baselinePath, { root });
   const violations = collectJscpdBaselineViolations(findings, baseline);
+  const advisories = collectJscpdBaselineAdvisories(findings, baseline);
   return {
+    advisories,
     skipped: false,
     reportPath: absoluteReportPath,
     detector,
     findings,
     familySummary,
-    summaryText: formatJscpdBaselineSummary(familySummary, violations),
+    summaryText: formatJscpdBaselineSummary(familySummary, violations, advisories),
     violations,
   };
 }
@@ -285,5 +289,8 @@ if (isExecutedAsScript(import.meta.url)) {
   }
 
   process.stdout.write(`${result.summaryText}; report=${result.reportPath}\n`);
+  for (const advisory of result.advisories) {
+    process.stdout.write(`Advisory: ${advisory.file} ${advisory.message}\n`);
+  }
   if (result.violations.length > 0) process.exit(1);
 }

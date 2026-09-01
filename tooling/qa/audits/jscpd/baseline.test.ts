@@ -102,17 +102,22 @@ it('admits supplemental target action and serialization-independent endpoint key
   expect(runFixture({ allowances: [allowance] }).violations).toEqual([]);
 });
 
-it('blocks an unreviewed live finding and a stale reviewed allowance', () => {
+it('blocks an unreviewed live finding and reports a stale allowance as advisory', () => {
   const finding = normalizeJscpdClones([duplicate()], { root: process.cwd() })[0]!;
   const stale = allowanceFor(finding);
   stale.id = 'a'.repeat(64);
   const result = runFixture({ allowances: [stale] });
-  expect(result.violations).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ rule: 'jscpd-unreviewed-clone' }),
-      expect.objectContaining({ rule: 'jscpd-baseline-stale' }),
-    ])
-  );
+  expect(result.violations).toEqual([expect.objectContaining({ rule: 'jscpd-unreviewed-clone' })]);
+  expect(result.advisories).toEqual([expect.objectContaining({ rule: 'jscpd-baseline-stale' })]);
+  expect(result.summaryText).toContain('advisories=1');
+});
+
+it('does not block a release when the only mismatch is an extra stale allowance', () => {
+  const finding = normalizeJscpdClones([duplicate()], { root: process.cwd() })[0]!;
+  const stale = { ...allowanceFor(finding), id: 'b'.repeat(64) };
+  const result = runFixture({ allowances: [allowanceFor(finding), stale] });
+  expect(result.violations).toEqual([]);
+  expect(result.advisories).toEqual([expect.objectContaining({ rule: 'jscpd-baseline-stale' })]);
 });
 
 it('blocks endpoint drift and an expired review', () => {

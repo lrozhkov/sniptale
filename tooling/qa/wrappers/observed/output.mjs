@@ -61,6 +61,15 @@ function renderViolations(violations = []) {
   });
 }
 
+function renderAdvisories(advisories = []) {
+  return advisories.map((advisory) => {
+    const id = advisory.id ?? advisory.family ?? advisory.rule ?? 'advisory';
+    const reason = advisory.reason ?? advisory.message ?? 'review requested';
+    const line = advisory.line == null ? '' : `:${advisory.line}`;
+    return `- advisory ${id}: ${advisory.file ?? '<repository>'}${line} ${reason}`;
+  });
+}
+
 function structuredLocations(step) {
   const violations = (step.violations ?? []).map((violation) =>
     typeof violation === 'string'
@@ -77,7 +86,7 @@ function structuredLocations(step) {
     message: String(failure),
   }));
   const advisories = (step.advisories ?? []).map((finding) => {
-    const id = finding.id ?? finding.family ?? 'advisory';
+    const id = finding.id ?? finding.family ?? finding.rule ?? 'advisory';
     const reason = finding.reason ?? finding.message ?? 'review requested';
     return {
       file: finding.file ?? '<repository>',
@@ -108,6 +117,7 @@ export function renderObservedStepLog(step, definition) {
     step.summary ? `summary: ${step.summary}` : '',
     step.detail ? `detail: ${step.detail}` : '',
     ...renderViolations(step.violations),
+    ...renderAdvisories(step.advisories),
     ...(step.failures ?? []).map((failure) => `- ${failure}`),
     step.stdout ? `stdout:\n${step.stdout}` : '',
     step.stderr ? `stderr:\n${step.stderr}` : '',

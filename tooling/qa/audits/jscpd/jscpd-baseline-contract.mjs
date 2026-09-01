@@ -197,7 +197,6 @@ export function collectJscpdBaselineViolations(
     }));
   }
   const expected = new Map(baseline.allowances.map((entry) => [entry.id, entry]));
-  const live = new Set(findings.map((entry) => entry.id));
   const violations = [];
   for (const finding of findings) {
     const allowance = expected.get(finding.id);
@@ -216,13 +215,6 @@ export function collectJscpdBaselineViolations(
     }
   }
   for (const allowance of baseline.allowances) {
-    if (!live.has(allowance.id)) {
-      violations.push({
-        rule: 'jscpd-baseline-stale',
-        file: `${allowance.firstFile.path}:${allowance.firstFile.start}`,
-        message: `Reviewed tool noise ${allowance.id} is absent from the current report`,
-      });
-    }
     if (allowance.reviewBy < today) {
       violations.push({
         rule: 'jscpd-baseline-review-expired',
@@ -234,11 +226,23 @@ export function collectJscpdBaselineViolations(
   return violations;
 }
 
-export function formatJscpdBaselineSummary(familySummary, violations) {
+export function collectJscpdBaselineAdvisories(findings, baseline) {
+  if (!baseline) return [];
+  const live = new Set(findings.map((entry) => entry.id));
+  return baseline.allowances
+    .filter((allowance) => !live.has(allowance.id))
+    .map((allowance) => ({
+      rule: 'jscpd-baseline-stale',
+      file: `${allowance.firstFile.path}:${allowance.firstFile.start}`,
+      message: `Reviewed tool noise ${allowance.id} is absent from the current report; remove the stale allowance`,
+    }));
+}
+
+export function formatJscpdBaselineSummary(familySummary, violations, advisories = []) {
   const cloneCount = familySummary.reduce((total, entry) => total + entry.count, 0);
   const lineCount = familySummary.reduce((total, entry) => total + entry.lines, 0);
   return [
-    `Baseline: ${cloneCount} clone(s) / ${lineCount} duplicated lines across ${familySummary.length} families`,
+    `Baseline: ${cloneCount} clone(s) / ${lineCount} duplicated lines across ${familySummary.length} families${advisories.length > 0 ? `; advisories=${advisories.length}` : ''}`,
     violations.length > 0 ? `Baseline violations: ${violations.length}` : '',
   ]
     .filter(Boolean)

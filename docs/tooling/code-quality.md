@@ -69,7 +69,7 @@ Security syntax and ownership rules use the smallest capable engine. Global data
 
 Repository-derived consumer inventories are validated from the live tree and are not checked in as SHA or count snapshots. A digest stored beside the complete data it hashes is not an independent authority. Baselines contain only measured legacy findings or confirmed tool noise; they never self-update during a blocking run.
 
-The pinned jscpd 5 release audit admits only exact findings reviewed as `tool-noise`. Every allowance records normalized endpoints, an owner, an evidence-backed reason, a removal condition, and a review date. New or shifted findings, stale allowances, malformed metadata, and expired reviews fail closed; owner-family summaries are display-only and never authorize a clone. Checkpoint, closeout, and `ci:proof` do not run jscpd.
+The pinned jscpd 5 release audit admits only exact findings reviewed as `tool-noise`. Every allowance records normalized endpoints, an owner, an evidence-backed reason, a removal condition, and a review date. New or shifted findings, malformed metadata, and expired reviews fail closed. Allowances absent from the live report are safe, non-blocking cleanup advisories because an absent exact ID cannot authorize another clone. Owner-family summaries are display-only and never authorize a clone. Checkpoint, closeout, and `ci:proof` do not run jscpd.
 
 ## Coverage
 

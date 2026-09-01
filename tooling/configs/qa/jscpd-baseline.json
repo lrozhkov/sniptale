@@ -1,5 +1,5 @@
 {
-  "$comment": "Every entry is an exact reviewed jscpd finding classified as tool noise. New, changed, stale, malformed, or expired entries fail closed.",
+  "$comment": "Every entry is an exact reviewed jscpd finding classified as tool noise. New, changed, malformed, or expired entries fail closed; absent exact findings are cleanup advisories.",
   "version": 4,
   "description": "Complete exact-finding jscpd tool-noise baseline after repository-wide triage and justified consolidation.",
   "allowances": [
