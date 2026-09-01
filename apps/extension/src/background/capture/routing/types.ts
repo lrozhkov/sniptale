@@ -8,6 +8,7 @@ import type {
 import type { ScenarioSessionService } from '../../scenario/session-service/index';
 import type { PageAccessPort } from '../../routing-contracts/page-access-port';
 import type { WebSnapshotViewerPorts } from '../page-preparation/viewer-ports';
+import type { PreauthorizedContentActionBinding } from '../../routing-contracts/capabilities/content-action/route';
 
 export type ViewportState = import('../../routing-contracts/tab-mode-state').ViewportState;
 
@@ -16,6 +17,7 @@ export type CaptureGuardState = { isCapturing: boolean };
 export type SendResponse = ResponseSender;
 
 export type CaptureRouteContext = {
+  contentPreauthorization?: PreauthorizedContentActionBinding | undefined;
   message?: Partial<RouteCaptureMessage> &
     Record<string, unknown> & {
       actionType?: CaptureActionType;

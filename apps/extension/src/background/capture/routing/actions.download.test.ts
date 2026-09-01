@@ -6,23 +6,17 @@ const {
   openEditorWithImageMock,
   transitionCaptureJobMock,
   consumeRecentCaptureEditorAssetCapabilityMock,
-  getPreauthorizedContentActionRouteMessageMock,
 } = vi.hoisted(() => ({
   executeDownloadMock: vi.fn(),
   createRenderedCaptureJobMock: vi.fn(),
   openEditorWithImageMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
   consumeRecentCaptureEditorAssetCapabilityMock: vi.fn(),
-  getPreauthorizedContentActionRouteMessageMock: vi.fn(),
 }));
 
 vi.mock('../editor/recent-asset-capability', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../editor/recent-asset-capability')>()),
   consumeRecentCaptureEditorAssetCapability: consumeRecentCaptureEditorAssetCapabilityMock,
-}));
-
-vi.mock('./authorization/content-action', () => ({
-  getPreauthorizedContentActionRouteMessage: getPreauthorizedContentActionRouteMessageMock,
 }));
 
 vi.mock('../download/download-router/index', () => ({
@@ -56,14 +50,15 @@ beforeEach(() => {
   createRenderedCaptureJobMock.mockResolvedValue('capture-job-route');
   transitionCaptureJobMock.mockResolvedValue(undefined);
   consumeRecentCaptureEditorAssetCapabilityMock.mockReturnValue(true);
-  getPreauthorizedContentActionRouteMessageMock.mockReturnValue({
-    documentId: 'document-1',
-    frameId: 0,
-    requestId: 'open-request-1',
-    senderUrl: 'https://example.test/page',
-    tabId: 42,
-  });
 });
+
+const senderBinding = {
+  documentId: 'document-1',
+  frameId: 0,
+  requestId: 'open-request-1',
+  senderUrl: 'https://example.test/page',
+  tabId: 42,
+};
 
 async function flushPromises(): Promise<void> {
   await Promise.resolve();
@@ -125,7 +120,8 @@ it('links editor requests to an existing draft asset when provided', async () =>
         editorAssetCapability: { requestId: 'capture-request-1', token: 'editor-token-1' },
       },
       42,
-      sendResponse
+      sendResponse,
+      senderBinding
     )
   ).toBe(true);
   await flushPromises();
@@ -153,7 +149,8 @@ it('rejects arbitrary editor asset ids that are not bound to the latest capture'
         editorAssetCapability: { requestId: 'capture-request-1', token: 'editor-token-1' },
       },
       42,
-      sendResponse
+      sendResponse,
+      senderBinding
     )
   ).toBe(true);
   expect(openEditorWithImageMock).not.toHaveBeenCalled();

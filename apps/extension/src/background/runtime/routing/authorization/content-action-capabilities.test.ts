@@ -35,6 +35,19 @@ const CONTENT_SENDER_BINDING = {
   tabId: 7,
 } as const;
 
+function expectedPrivilegedTabPreauthorization() {
+  return {
+    authorized: true,
+    preauthorization: {
+      kind: 'privileged-tab-route',
+      senderBinding: {
+        ...CONTENT_SENDER_BINDING,
+        requestId: 'content-request-1',
+      },
+    },
+  };
+}
+
 function sender(props: {
   documentId?: string;
   frameId?: number;
@@ -268,7 +281,7 @@ it('authorizes content capture routes with a matching one-shot capability', () =
       resolvedTabId: 7,
       sender: contentSender(),
     })
-  ).toEqual({ authorized: true });
+  ).toEqual(expectedPrivilegedTabPreauthorization());
   expect(
     authorizeIPCMessage({
       family: 'capture',
@@ -314,7 +327,7 @@ it('binds full-page export identity before consuming its one-shot capability', (
       resolvedTabId: 7,
       sender: contentSender(),
     })
-  ).toEqual({ authorized: true });
+  ).toEqual(expectedPrivilegedTabPreauthorization());
 });
 
 it('requires a document-bound one-shot intent for content-originated screenshot enable', () => {
@@ -365,7 +378,7 @@ it('requires a document-bound one-shot intent for content-originated screenshot 
       resolvedTabId: 7,
       sender: contentSender(),
     })
-  ).toEqual({ authorized: true });
+  ).toEqual(expectedPrivilegedTabPreauthorization());
   expect(
     authorizeIPCMessage({
       family: 'tab-mode',
@@ -419,7 +432,7 @@ it('requires a matching trusted user intent to renew a screenshot surface sessio
       resolvedTabId: 7,
       sender: contentSender(),
     })
-  ).toEqual({ authorized: true });
+  ).toEqual(expectedPrivilegedTabPreauthorization());
   expect(
     authorizeIPCMessage({
       family: 'capture',

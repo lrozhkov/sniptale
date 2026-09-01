@@ -1,12 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
-  getPreauthorizedContentActionRouteMessageMock,
   issueRecentCaptureEditorAssetCapabilityMock,
   loadSettingsMock,
   saveScreenshotToMediaHubFromDataUrlMock,
 } = vi.hoisted(() => ({
-  getPreauthorizedContentActionRouteMessageMock: vi.fn(),
   issueRecentCaptureEditorAssetCapabilityMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
@@ -19,11 +17,6 @@ vi.mock('../../media-hub/assets', () => ({
 vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
   loadSettings: loadSettingsMock,
-}));
-
-vi.mock('./authorization/content-action', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./authorization/content-action')>()),
-  getPreauthorizedContentActionRouteMessage: getPreauthorizedContentActionRouteMessageMock,
 }));
 
 vi.mock('../editor/recent-asset-capability', async (importOriginal) => ({
@@ -55,10 +48,9 @@ it('issues an exact editor asset capability after an authorized save succeeds', 
     senderUrl: 'https://example.test/page',
     tabId: 42,
   };
-  getPreauthorizedContentActionRouteMessageMock.mockReturnValue(authorization);
   const sendResponse = vi.fn();
 
-  expect(handleSaveScreenshotToGallery(message, 42, sendResponse)).toBe(true);
+  expect(handleSaveScreenshotToGallery(message, 42, sendResponse, authorization)).toBe(true);
   await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
 
   expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
@@ -80,7 +72,6 @@ it('issues an exact editor asset capability after an authorized save succeeds', 
 });
 
 it('does not issue content-bound editor authority for a save without content preauthorization', async () => {
-  getPreauthorizedContentActionRouteMessageMock.mockReturnValue(undefined);
   const sendResponse = vi.fn();
 
   handleSaveScreenshotToGallery(

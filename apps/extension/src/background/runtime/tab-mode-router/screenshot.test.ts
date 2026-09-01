@@ -55,7 +55,6 @@ vi.mock('../../media/video/session-state', async (importOriginal) => ({
 }));
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { markPreauthorizedContentActionRouteMessage } from '../../capture/routes';
 import { routeScreenshotModeMessage, routeViewportMessage } from './screenshot';
 import type { TabModeContext } from './shared';
 
@@ -277,13 +276,13 @@ it('rolls back screenshot preparation when popup video-surface activation fails'
 it('binds content-originated screenshot enable to its preauthorized document', async () => {
   const context = createContext();
   const message = { type: MessageType.ENABLE_SCREENSHOT_MODE } as const;
-  markPreauthorizedContentActionRouteMessage(message, {
+  context.contentPreauthorization = {
     documentId: 'content-document-7',
     frameId: 0,
     requestId: 'screenshot-enable-1',
     senderUrl: 'https://example.test/page',
     tabId: 7,
-  });
+  };
 
   expect(routeScreenshotModeMessage(message, context)).toBe(true);
   await flushPromises();

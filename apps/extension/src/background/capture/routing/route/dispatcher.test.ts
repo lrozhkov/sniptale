@@ -95,7 +95,6 @@ import { createScenarioSessionServiceStub } from '../../../../../../../tooling/t
 import { routeCaptureMessage } from './dispatcher';
 import { flushRouteAsync } from './dispatcher.test-support';
 import type { RouteCaptureMessage } from '../types';
-import { markPreauthorizedContentActionRouteMessage } from '../authorization/content-action';
 import {
   getScreenshotSurfaceSession,
   resetScreenshotSurfaceSessionsForTests,
@@ -147,15 +146,17 @@ it('renews a screenshot surface only for its preauthorized content document', as
     contentIntent: { requestId: 'renew-request-1', token: 'renew-token-1' },
     type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
   } as const;
-  markPreauthorizedContentActionRouteMessage(message, {
+  const contentPreauthorization = {
     documentId: 'content-document-42',
     frameId: 0,
     requestId: 'renew-request-1',
     senderUrl: 'https://example.test/page',
     tabId: 42,
-  });
+  };
 
-  expect(routeCaptureMessage({ ...args, message })).toBe(true);
+  expect(routeCaptureMessage({ ...args, contentPreauthorization, message: { ...message } })).toBe(
+    true
+  );
   await flushRouteAsync();
 
   expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(42);

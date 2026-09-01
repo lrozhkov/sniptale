@@ -3,6 +3,9 @@ import type { RouteCaptureMessageArgs } from './types';
 
 export function createCaptureRouteContext(args: RouteCaptureMessageArgs): CaptureRouteContext {
   return {
+    ...(args.contentPreauthorization
+      ? { contentPreauthorization: args.contentPreauthorization }
+      : {}),
     message: args.message as NonNullable<CaptureRouteContext['message']>,
     resolvedTabId: args.resolvedTabId,
     sendResponse: args.sendResponse,

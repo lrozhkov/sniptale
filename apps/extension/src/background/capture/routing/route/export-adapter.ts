@@ -8,7 +8,13 @@ export function routeExportMessage(args: RouteCaptureMessageArgs): boolean {
     return false;
   }
   if (message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE) {
-    return handleExportCaptureFullPage(message, resolvedTabId, sendResponse, args.pageAccessPort);
+    return handleExportCaptureFullPage(
+      message,
+      resolvedTabId,
+      sendResponse,
+      args.pageAccessPort,
+      args.contentPreauthorization
+    );
   }
   return false;
 }

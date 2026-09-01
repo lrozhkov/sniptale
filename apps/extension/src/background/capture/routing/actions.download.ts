@@ -7,7 +7,7 @@ import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { SendResponse } from './types';
 import type { RecentCaptureEditorAssetCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import { consumeRecentCaptureEditorAssetCapability } from '../editor/recent-asset-capability';
-import { getPreauthorizedContentActionRouteMessage } from './authorization/content-action';
+import type { PreauthorizedContentActionBinding } from '../../routing-contracts/capabilities/content-action/route';
 
 function isDownloadAction(actionType: CaptureActionType): boolean {
   return actionType !== 'copy' && actionType !== 'edit' && actionType !== 'scenario';
@@ -74,9 +74,10 @@ export function handleOpenEditorWithImage(
     editorAssetCapability?: RecentCaptureEditorAssetCapability;
   },
   resolvedTabId: number,
-  sendResponse: SendResponse
+  sendResponse: SendResponse,
+  contentPreauthorization?: PreauthorizedContentActionBinding
 ): boolean {
-  const senderBinding = getPreauthorizedContentActionRouteMessage(message);
+  const senderBinding = contentPreauthorization;
   if (
     message.assetId &&
     (!message.editorAssetCapability ||

@@ -4,7 +4,6 @@ import {
   getScreenshotSurfaceBinding,
   renewScreenshotSurfaceCapability,
 } from '../../../capture-surface/screenshot-session';
-import { getPreauthorizedContentActionRouteMessage } from '../authorization/content-action';
 import { handleFullCapture } from '../handlers.full';
 import { handleVisibleCapture, handleVisibleCaptureForCrop } from '../handlers.visible';
 import type { CaptureRouteAdapterContext } from './types';
@@ -35,7 +34,7 @@ export function routeScreenshotCaptureMessage(args: CaptureRouteAdapterContext):
 
 async function renewScreenshotSurfaceSession(args: CaptureRouteAdapterContext): Promise<void> {
   await authorizeScreenshotCapture(args);
-  const senderBinding = getPreauthorizedContentActionRouteMessage(args.routeArgs.message);
+  const senderBinding = args.routeArgs.contentPreauthorization;
   if (!senderBinding || senderBinding.tabId !== args.context.resolvedTabId) {
     throw new Error('Unauthorized screenshot surface renewal');
   }

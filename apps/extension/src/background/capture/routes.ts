@@ -1,9 +1,5 @@
 export { routeCaptureMessage, type RouteCaptureMessage } from './routing';
 export {
-  getPreauthorizedContentActionRouteMessage,
-  markPreauthorizedContentActionRouteMessage,
-} from './routing/authorization/content-action';
-export {
   authorizeWebSnapshotCaptureRequest,
   cancelWebSnapshotCaptureRequest,
 } from './routing/web-snapshot/session';

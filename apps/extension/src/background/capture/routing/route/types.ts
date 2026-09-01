@@ -8,8 +8,10 @@ import type {
   SendResponse,
   ViewportState,
 } from '../types';
+import type { PreauthorizedContentActionBinding } from '../../../routing-contracts/capabilities/content-action/route';
 
 export type RouteCaptureMessageArgs = {
+  contentPreauthorization?: PreauthorizedContentActionBinding | undefined;
   message: RouteCaptureMessage;
   resolvedTabId: number;
   sender?: chrome.runtime.MessageSender | undefined;

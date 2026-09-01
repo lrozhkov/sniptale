@@ -8,7 +8,12 @@ export function routeDownloadMessage(args: RouteCaptureMessageArgs): boolean {
     return handleExecuteSave(message, resolvedTabId, sendResponse);
   }
   if (message.type === MessageType.OPEN_EDITOR_WITH_IMAGE) {
-    return handleOpenEditorWithImage(message, resolvedTabId, sendResponse);
+    return handleOpenEditorWithImage(
+      message,
+      resolvedTabId,
+      sendResponse,
+      args.contentPreauthorization
+    );
   }
   return false;
 }

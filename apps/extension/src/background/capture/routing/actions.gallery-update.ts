@@ -3,15 +3,16 @@ import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { SendResponse } from './types';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../../composition/persistence/library-lifecycle';
-import { getPreauthorizedContentActionRouteMessage } from './authorization/content-action';
 import { issueRecentCaptureEditorAssetCapability } from '../editor/recent-asset-capability';
+import type { PreauthorizedContentActionBinding } from '../../routing-contracts/capabilities/content-action/route';
 
 export function handleSaveScreenshotToGallery(
   payload: { dataUrl: string; filename: string },
   resolvedTabId: number,
-  sendResponse: SendResponse
+  sendResponse: SendResponse,
+  contentPreauthorization?: PreauthorizedContentActionBinding
 ): boolean {
-  const authorization = getPreauthorizedContentActionRouteMessage(payload);
+  const authorization = contentPreauthorization;
   const authorizedDestination: 'library' | null = authorization?.libraryDestinationAuthorized
     ? 'library'
     : null;
