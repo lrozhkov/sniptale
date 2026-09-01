@@ -232,6 +232,23 @@ it('routes capture requests through handler contexts', async () => {
   );
 });
 
+it('normalizes omitted execute-save actions once before dispatch', () => {
+  const args = createRouteArgs();
+  const message = {
+    type: MessageType.EXECUTE_SAVE,
+    dataUrl: 'data:image/png;base64,default',
+    filename: 'capture.png',
+  } as const;
+
+  expect(routeCaptureMessage({ ...args, message })).toBe(true);
+
+  expect(handleExecuteSaveMock).toHaveBeenCalledWith(
+    { ...message, actionType: 'download_default' },
+    42,
+    args.sendResponse
+  );
+});
+
 const routeCases: Array<[RouteCaptureMessage, Mock]> = [
   [
     {

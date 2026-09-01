@@ -9,6 +9,13 @@ import type {
   ViewportState,
 } from '../types';
 import type { PreauthorizedContentActionBinding } from '../../../routing-contracts/capabilities/content-action/route';
+import type { CaptureActionType } from '../../../../contracts/settings';
+
+type ExecuteSaveMessage = Extract<RouteCaptureMessage, { type: 'EXECUTE_SAVE' }>;
+
+type CaptureRouteCommand =
+  | Exclude<RouteCaptureMessage, ExecuteSaveMessage>
+  | (Omit<ExecuteSaveMessage, 'actionType'> & { actionType: CaptureActionType });
 
 export type RouteCaptureMessageArgs = {
   contentPreauthorization?: PreauthorizedContentActionBinding | undefined;
@@ -24,7 +31,11 @@ export type RouteCaptureMessageArgs = {
   webSnapshotViewerPorts?: WebSnapshotViewerPorts | undefined;
 };
 
-export type CaptureRouteAdapterContext = {
+export type CaptureRouteCommandArgs = Omit<RouteCaptureMessageArgs, 'message'> & {
+  message: CaptureRouteCommand;
+};
+
+export type CaptureRouteCommandContext = {
   context: CaptureRouteContext;
-  routeArgs: RouteCaptureMessageArgs;
+  routeArgs: CaptureRouteCommandArgs;
 };

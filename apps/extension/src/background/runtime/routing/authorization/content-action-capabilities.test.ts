@@ -410,7 +410,10 @@ it('requires a matching trusted user intent to renew a screenshot surface sessio
     authorizeIPCMessage({
       family: 'capture',
       kind: 'privileged-tab-route',
-      message: { type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION },
+      message: {
+        contentIntent: { requestId: 'missing-request', token: 'missing-token' },
+        type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+      },
       resolvedTabId: 7,
       sender: contentSender(),
     })
