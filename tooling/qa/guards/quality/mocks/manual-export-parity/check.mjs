@@ -294,6 +294,7 @@ export function runRepositoryManualMockExportParityCheck() {
     files: candidateTestFiles,
     scope: 'repo-wide',
     violations: baseline.violations,
+    advisories: baseline.advisories,
   };
 }
 

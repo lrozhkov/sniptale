@@ -274,8 +274,13 @@ export function copyAdmittedReleaseInput({
   const relativeSource = relativePath(file, repositoryRoot);
   assertNoSymlinkComponents(relativeSource, repositoryRoot);
   const source = path.join(repositoryRoot, relativeSource);
-  if (!fs.existsSync(source) && !required) return false;
-  const details = fs.lstatSync(source);
+  let details;
+  try {
+    details = fs.lstatSync(source);
+  } catch (error) {
+    if (!required && error?.code === 'ENOENT') return false;
+    throw error;
+  }
   if (!details.isFile() || details.isSymbolicLink()) {
     throw new Error(`Unsafe artifact: ${file}`);
   }

@@ -205,6 +205,7 @@ export function runDomainFixtureRealismCheck({ files = [], scope = 'workspace' }
     skipped: targetFiles.length === 0,
     files: relativeFiles,
     violations: baseline?.violations ?? currentViolations,
+    ...(baseline?.advisories.length > 0 ? { advisories: baseline.advisories } : {}),
   };
 }
 

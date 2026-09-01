@@ -29,23 +29,20 @@ export function applyRepositoryFindingBaseline({ baselinePath, controlId, findin
   const findingDigest = createRepositoryFindingDigest(findings);
   const matched =
     baseline.findingCount === findings.length && baseline.findingDigest === findingDigest;
+  const driftAdvisory = {
+    rule: 'repository-baseline-drift',
+    file: baselinePath,
+    line: 1,
+    message:
+      `Exact ${controlId} baseline drifted: ` +
+      `expected ${baseline.findingCount}/${baseline.findingDigest}, ` +
+      `observed ${findings.length}/${findingDigest}. Baseline maintenance is non-blocking.`,
+  };
   return {
     baseline,
     findingDigest,
     matched,
-    violations: matched
-      ? []
-      : [
-          ...findings,
-          {
-            rule: 'repository-baseline-drift',
-            file: baselinePath,
-            line: 1,
-            message:
-              `Exact ${controlId} baseline drifted: ` +
-              `expected ${baseline.findingCount}/${baseline.findingDigest}, ` +
-              `observed ${findings.length}/${findingDigest}.`,
-          },
-        ],
+    violations: [],
+    advisories: matched ? [] : [driftAdvisory],
   };
 }

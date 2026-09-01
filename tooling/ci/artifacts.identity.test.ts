@@ -122,3 +122,23 @@ it('seals an exact admitted prerequisite without misclassifying its pre-lane tim
     candidateTree: 'candidate-tree',
   });
 });
+
+it('ignores only a missing admitted prerequisite when failed-lane artifacts are optional', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-admitted-release-input-optional-'));
+  temporaryRoots.push(root);
+  const destinationRoot = path.join(root, 'artifact');
+  const relative = '.tmp/ci/fast-proof-admission.json';
+  fs.mkdirSync(destinationRoot);
+
+  expect(
+    copyAdmittedReleaseInput({
+      destinationRoot,
+      file: relative,
+      repositoryRoot: root,
+      required: false,
+    })
+  ).toBe(false);
+  expect(() =>
+    copyAdmittedReleaseInput({ destinationRoot, file: relative, repositoryRoot: root })
+  ).toThrow('ENOENT');
+});

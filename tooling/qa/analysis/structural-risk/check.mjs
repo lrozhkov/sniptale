@@ -89,7 +89,7 @@ export function runStructuralRiskCheck({
     files: targetFiles,
     report,
     violations: repositoryBaseline?.violations ?? report.violations,
-    advisories: report.advisories,
+    advisories: [...report.advisories, ...(repositoryBaseline?.advisories ?? [])],
     consoleOutput: formatStructuralRiskConsole(report),
   };
 }

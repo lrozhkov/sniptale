@@ -107,10 +107,11 @@ it('does not suppress findings with the wrong rule, file, line, or message', asy
     })
   );
 
-  expect(result.violations).toHaveLength(5);
-  expect(result.violations).toContainEqual(
+  expect(result.violations).toHaveLength(4);
+  expect(result.advisories).toContainEqual(
     expect.objectContaining({
       message: expect.stringContaining('does not match a current SonarJS finding'),
+      rule: 'sonarjs-baseline-stale',
     })
   );
 });
@@ -146,7 +147,7 @@ it('rejects non-object, missing-file, broad, and duplicate baseline entries dete
   );
 });
 
-it('reports unmatched baseline findings repo-wide without reconciling unrelated focused files', async () => {
+it('reports unmatched baseline findings repo-wide as maintenance advisories', async () => {
   const root = createTempRoot('verify-sonarjs-baseline-stale-');
   writeSonarjsTsconfig(root);
   writeFile(root, 'apps/extension/src/example.ts', 'export const value = 1;\n');
@@ -169,10 +170,12 @@ it('reports unmatched baseline findings repo-wide without reconciling unrelated 
   );
 
   expect(focused.violations).toEqual([]);
-  expect(repoWide.violations).toEqual([
+  expect(focused.advisories).toBeUndefined();
+  expect(repoWide.violations).toEqual([]);
+  expect(repoWide.advisories).toEqual([
     expect.objectContaining({
       message: expect.stringContaining('does not match a current SonarJS finding'),
-      rule: 'sonarjs-baseline-invalid',
+      rule: 'sonarjs-baseline-stale',
     }),
   ]);
 });

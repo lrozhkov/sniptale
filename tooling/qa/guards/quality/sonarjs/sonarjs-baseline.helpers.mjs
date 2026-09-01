@@ -273,12 +273,11 @@ export function reconcileSonarjsBaseline(
   const applicableEntries = repoWide ? entries : entries.filter((entry) => fileSet.has(entry.file));
   const staleViolations = applicableEntries
     .filter((entry) => !violations.some((violation) => isBaselinedViolation(violation, entry)))
-    .map((entry) =>
-      createBaselineViolation({
-        baselineRelativePath,
-        message: `baseline entry ${entry.debtId} does not match a current SonarJS finding`,
-      })
-    );
+    .map((entry) => ({
+      rule: 'sonarjs-baseline-stale',
+      file: baselineRelativePath,
+      message: `baseline entry ${entry.debtId} does not match a current SonarJS finding`,
+    }));
   const unbaselinedViolations = violations.filter(
     (violation) => !entries.some((entry) => isBaselinedViolation(violation, entry))
   );

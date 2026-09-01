@@ -140,6 +140,7 @@ export function collectPolicyStateDescriptorViolations(files, options = {}) {
     ];
   }
   return collectPolicyStateDescriptorViolationsForFiles(files, {
+    advisories: options.advisories,
     enforceAll: options.enforceAll === true,
     knownPolicyStateIds: new Set(inventory.ids),
     newFiles: options.newFiles ?? new Set(),
@@ -149,7 +150,7 @@ export function collectPolicyStateDescriptorViolations(files, options = {}) {
 
 function collectPolicyStateDescriptorViolationsForFiles(
   files,
-  { enforceAll, knownPolicyStateIds, newFiles, root }
+  { advisories, enforceAll, knownPolicyStateIds, newFiles, root }
 ) {
   const violations = files
     .map(toRelativePath)
@@ -172,6 +173,7 @@ function collectPolicyStateDescriptorViolationsForFiles(
     controlId: 'qa.rule.policy-state-descriptor',
     findings: baselineCandidates,
   });
+  advisories?.push(...baseline.advisories);
   return [
     ...violations.filter(({ rule }) => rule !== 'policy-state-descriptor-required'),
     ...baseline.violations,

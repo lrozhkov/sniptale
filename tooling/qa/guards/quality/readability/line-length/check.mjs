@@ -77,6 +77,7 @@ export function runRepositoryReadabilityCheck() {
     files,
     scope: 'repo-wide',
     violations: repositoryBaseline.violations,
+    advisories: repositoryBaseline.advisories,
   };
 }
 

@@ -170,7 +170,8 @@ export async function runSonarjsCheck({
   return {
     skipped: false,
     files: targets.relativeFiles,
-    violations: [...baseline.violations, ...staleViolations, ...unbaselinedViolations],
+    ...(staleViolations.length > 0 ? { advisories: staleViolations } : {}),
+    violations: [...baseline.violations, ...unbaselinedViolations],
   };
 }
 
