@@ -35,8 +35,8 @@ it('installs extension-scoped session rules that block unsafe GET redirect targe
 
   const options = updateSessionRules.mock.calls[0]?.[0];
   expect(options).toBeDefined();
-  expect(options?.removeRuleIds).toEqual([640_001, 640_002, 640_003, 640_004]);
-  expect(options?.addRules).toHaveLength(4);
+  expect(options?.removeRuleIds).toEqual(Array.from({ length: 18 }, (_, index) => 640_001 + index));
+  expect(options?.addRules).toHaveLength(18);
   for (const rule of options?.addRules ?? []) {
     expect(rule).toMatchObject({
       action: { type: 'block' },
