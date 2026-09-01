@@ -35,7 +35,7 @@ function writeBaseline(findings: unknown[], envelope: Record<string, unknown> = 
   return baselinePath;
 }
 
-it('matches all ten live immutable-history debt links non-vacuously', () => {
+it('matches all eight live immutable-history debt links non-vacuously', () => {
   const baseline = JSON.parse(fs.readFileSync('tooling/configs/qa/gitleaks-baseline.json', 'utf8'));
   const findings = baseline.findings.map((finding: Record<string, unknown>) => ({
     RuleID: finding.RuleID,
@@ -51,7 +51,7 @@ it('matches all ten live immutable-history debt links non-vacuously', () => {
     scopes: ['history'],
   });
   expect(result.violations).toEqual([]);
-  expect(result.summaryText).toContain('10/10 matched');
+  expect(result.summaryText).toContain('8/8 matched');
 });
 
 it('never applies a history baseline tuple to a worktree finding', () => {
