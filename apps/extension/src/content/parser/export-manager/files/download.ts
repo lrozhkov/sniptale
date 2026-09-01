@@ -7,6 +7,7 @@ import {
 import { getCurrentExportPageUrl } from '../diagnostics/dom-driver';
 import {
   extractFilenameFromContentDisposition,
+  extractFilenameExtensionFromContentDisposition,
   extractUuidFromUrl,
   getExtensionFromMimeType,
   getFileExtension,
@@ -160,23 +161,31 @@ function finalizeDownloadedResource(args: {
   response: Response;
 }): { blob: Blob; filename: string; urlUuid: string | null } {
   const contentType = args.response.headers.get('Content-Type');
+  const contentDisposition = args.response.headers.get('Content-Disposition');
   let filename =
-    extractFilenameFromContentDisposition(args.response.headers.get('Content-Disposition')) ||
-    args.resource.filename;
-  if (shouldSkipHtmlDownloadResponse({ url: args.resolvedUrl, contentType, filename })) {
-    throw new Error(`Skipped intermediary HTML page (${contentType ?? 'unknown content type'})`);
+    extractFilenameFromContentDisposition(contentDisposition) || args.resource.filename;
+  if (
+    shouldSkipHtmlDownloadResponse({
+      url: args.resolvedUrl,
+      contentType,
+      filename,
+      resourceFilename: args.resource.filename,
+      responseFilenameExtension: extractFilenameExtensionFromContentDisposition(contentDisposition),
+    })
+  ) {
+    throw new Error(`Skipped unexpected HTML response (${contentType ?? 'unknown content type'})`);
   }
-  const admittedMimeExtension =
-    getExtensionFromMimeType(args.blob.type) ||
-    (contentType?.toLowerCase().startsWith('text/html') ? 'html' : null);
-  if (admittedMimeExtension) {
+  const admittedMimeExtension = getExtensionFromMimeType(args.blob.type);
+  if (admittedMimeExtension && admittedMimeExtension !== 'html') {
     const existingExtension = getFileExtension(filename);
     const baseName = existingExtension
       ? filename.slice(0, -(existingExtension.length + 1))
       : filename;
     filename = `${baseName}.${admittedMimeExtension}`;
   } else if (!/\.[a-zA-Z0-9]{2,5}$/.test(filename)) {
-    filename = `${filename}.${getFileExtension(args.resolvedUrl) || 'bin'}`;
+    const extension =
+      getExtensionFromMimeType(args.blob.type) || getFileExtension(args.resolvedUrl) || 'bin';
+    filename = `${filename}.${extension}`;
   }
   const sanitizedFilename = sanitizeArchiveEntryFilename(filename) ?? 'file.bin';
   const lastDot = sanitizedFilename.lastIndexOf('.');
