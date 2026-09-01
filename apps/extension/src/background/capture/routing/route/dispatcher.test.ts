@@ -150,6 +150,7 @@ it('renews a screenshot surface only for its preauthorized content document', as
   markPreauthorizedContentActionRouteMessage(message, {
     documentId: 'content-document-42',
     frameId: 0,
+    requestId: 'renew-request-1',
     senderUrl: 'https://example.test/page',
     tabId: 42,
   });

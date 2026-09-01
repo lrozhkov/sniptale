@@ -17,4 +17,28 @@ it('requires filenames for screenshot gallery save runtime messages', () => {
   expect(() => contract.parseRequest({ ...request, storageClass: 'library' })).toThrow(
     'runtime SAVE_SCREENSHOT_TO_GALLERY message'
   );
+  expect(
+    contract.parseResponse({
+      assetId: 'asset-1',
+      editorAssetCapability: { requestId: 'capture-1', token: 'editor-1' },
+      success: true,
+    })
+  ).toEqual({
+    assetId: 'asset-1',
+    editorAssetCapability: { requestId: 'capture-1', token: 'editor-1' },
+    success: true,
+  });
+  expect(() =>
+    contract.parseResponse({
+      assetId: 'asset-1',
+      editorAssetCapability: { requestId: 'capture-1', token: 'editor-1', extra: true },
+      success: true,
+    })
+  ).toThrow('runtime SAVE_SCREENSHOT_TO_GALLERY response');
+  expect(() =>
+    contract.parseResponse({
+      editorAssetCapability: { requestId: 'capture-1', token: 'editor-1' },
+      success: true,
+    })
+  ).toThrow('runtime SAVE_SCREENSHOT_TO_GALLERY response');
 });

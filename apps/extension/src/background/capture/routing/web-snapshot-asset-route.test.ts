@@ -162,7 +162,10 @@ it('routes editor and screenshot gallery messages through the shared helper bran
   expect(open.routed).toBe(true);
   expect(saveScreenshot.routed).toBe(true);
   expect(handleOpenEditorWithImageMock).toHaveBeenCalledWith(
-    'data:image/png;base64,1',
+    {
+      type: MessageType.OPEN_EDITOR_WITH_IMAGE,
+      dataUrl: 'data:image/png;base64,1',
+    },
     42,
     open.sendResponse
   );

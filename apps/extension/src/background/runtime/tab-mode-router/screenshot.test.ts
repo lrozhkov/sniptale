@@ -280,6 +280,7 @@ it('binds content-originated screenshot enable to its preauthorized document', a
   markPreauthorizedContentActionRouteMessage(message, {
     documentId: 'content-document-7',
     frameId: 0,
+    requestId: 'screenshot-enable-1',
     senderUrl: 'https://example.test/page',
     tabId: 7,
   });

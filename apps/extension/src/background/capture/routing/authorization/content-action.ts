@@ -1,10 +1,6 @@
-export type ContentSenderBinding = {
-  readonly documentId: string;
-  readonly frameId: number;
-  readonly senderUrl: string;
-  readonly tabId: number;
-  readonly libraryDestinationAuthorized?: true;
-};
+import type { PreauthorizedContentActionBinding } from '../../../routing-contracts/capabilities/content-action/route';
+
+export type ContentSenderBinding = PreauthorizedContentActionBinding;
 
 const preauthorizedContentActionRouteMessages = new WeakMap<object, ContentSenderBinding>();
 

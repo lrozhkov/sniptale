@@ -303,9 +303,24 @@ it('binds asset ids to editor-open messages rather than runtime wakeup', () => {
   const request = {
     assetId: 'asset-1',
     dataUrl: 'data:image/png;base64,c2NyZWVueXg=',
+    editorAssetCapability: { requestId: 'capture-1', token: 'editor-1' },
     type: MessageType.OPEN_EDITOR_WITH_IMAGE,
   };
   expect(openEditorContract.parseRequest(request)).toEqual(request);
+  expect(() =>
+    openEditorContract.parseRequest({
+      assetId: request.assetId,
+      dataUrl: request.dataUrl,
+      type: request.type,
+    })
+  ).toThrow('runtime OPEN_EDITOR_WITH_IMAGE message');
+  expect(() =>
+    openEditorContract.parseRequest({
+      dataUrl: request.dataUrl,
+      editorAssetCapability: request.editorAssetCapability,
+      type: request.type,
+    })
+  ).toThrow('runtime OPEN_EDITOR_WITH_IMAGE message');
   expect(() =>
     contentRuntimeWakeupContract.parseRequest({
       assetId: 'asset-1',

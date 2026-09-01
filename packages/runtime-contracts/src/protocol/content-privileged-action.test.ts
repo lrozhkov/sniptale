@@ -12,6 +12,7 @@ import {
   isContentPrivilegedActionRequestSource,
   isContentPrivilegedActionRuntimeToken,
   isContentPrivilegedActionTrustedEventProof,
+  isRecentCaptureEditorAssetCapability,
 } from './content-privileged-action';
 
 it('matches the exact protected message type set', () => {
@@ -68,6 +69,16 @@ it('validates content privileged action capabilities and request sources narrowl
   ).toBe(true);
   expect(isContentPrivilegedActionRequestSource({ kind: 'background-auto-start' })).toBe(false);
   expect(isContentPrivilegedActionRequestSource(null)).toBe(false);
+  expect(isRecentCaptureEditorAssetCapability({ requestId: 'capture-1', token: 'editor-1' })).toBe(
+    true
+  );
+  expect(
+    isRecentCaptureEditorAssetCapability({
+      requestId: 'capture-1',
+      token: 'editor-1',
+      extra: true,
+    })
+  ).toBe(false);
 });
 
 it('validates content privileged action activation and runtime tokens narrowly', () => {

@@ -14,6 +14,10 @@ import {
   type ContentPrivilegedActionIntentSource,
 } from '../../../application/privileged-action-intent';
 import { isStaleScreenshotRunError } from '../mode';
+import {
+  isRecentCaptureEditorAssetCapability,
+  type RecentCaptureEditorAssetCapability,
+} from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 
 type ScreenshotMode = 'visible' | 'full' | 'selection';
 type ContentActionRuntimeMessage = RuntimeRequestByType[RuntimeMessageType] &
@@ -110,6 +114,7 @@ async function persistImmediateSelectionAction(args: {
   assertFresh?: FreshnessAssertion | undefined;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   dataUrl: string;
+  editorAssetCapability?: RecentCaptureEditorAssetCapability;
 }): Promise<PersistenceResult | null> {
   if (args.actionType === 'edit') {
     await sendRuntimeMessageWithFreshness({
@@ -118,7 +123,12 @@ async function persistImmediateSelectionAction(args: {
       message: {
         type: MessageType.OPEN_EDITOR_WITH_IMAGE,
         dataUrl: args.dataUrl,
-        ...(args.assetId ? { assetId: args.assetId } : {}),
+        ...(args.assetId && args.editorAssetCapability
+          ? {
+              assetId: args.assetId,
+              editorAssetCapability: args.editorAssetCapability,
+            }
+          : {}),
       },
     });
     return { successMessage: translate('content.runtime.sentToEditor') };
@@ -212,6 +222,13 @@ export async function persistSelectionCapture({
     typeof saveResponse.assetId === 'string'
       ? saveResponse.assetId
       : undefined;
+  const editorAssetCapability =
+    saveResponse &&
+    typeof saveResponse === 'object' &&
+    'editorAssetCapability' in saveResponse &&
+    isRecentCaptureEditorAssetCapability(saveResponse.editorAssetCapability)
+      ? saveResponse.editorAssetCapability
+      : undefined;
 
   if (actionType === 'save_to_library') {
     return { successMessage: getSavedMessage(mode) };
@@ -223,6 +240,7 @@ export async function persistSelectionCapture({
     assertFresh: assertFreshness,
     contentIntentSource,
     dataUrl,
+    ...(editorAssetCapability ? { editorAssetCapability } : {}),
   });
   if (immediateResult) {
     return immediateResult;

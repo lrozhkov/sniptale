@@ -49,7 +49,10 @@ import {
   isRecord,
   isString,
 } from '../../../validators/index';
-import { isContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import {
+  isContentPrivilegedActionCapability,
+  isRecentCaptureEditorAssetCapability,
+} from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 import { contentActionRuntimeContracts } from './content-action';
 import { pageAccessRuntimeContracts } from './page-access';
@@ -58,6 +61,33 @@ import type { SettingsTransferMessage } from '../../../../settings-transfer';
 import { SETTINGS_TRANSFER_MAX_BYTES } from '../../../../settings-transfer';
 import { isSettingsTransferResponse } from './settings-transfer-response-guard';
 import { isFullPageCaptureGeometry } from '../../../../full-page-capture';
+import type { RuntimeContentActionRequestByType } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/content-action';
+
+type OpenEditorWithImageMessage =
+  RuntimeContentActionRequestByType[typeof MessageType.OPEN_EDITOR_WITH_IMAGE] & {
+    title?: string;
+    url?: string;
+  };
+
+const isOpenEditorWithImageMessageShape = createMessageGuard<
+  typeof MessageType.OPEN_EDITOR_WITH_IMAGE,
+  OpenEditorWithImageMessage
+>({
+  type: MessageType.OPEN_EDITOR_WITH_IMAGE,
+  required: { dataUrl: isImageDataUrl },
+  optional: {
+    assetId: isString,
+    contentIntent: isContentPrivilegedActionCapability,
+    editorAssetCapability: isRecentCaptureEditorAssetCapability,
+    title: isString,
+    url: isString,
+  },
+});
+
+function isOpenEditorWithImageMessage(value: unknown): value is OpenEditorWithImageMessage {
+  if (!isOpenEditorWithImageMessageShape(value)) return false;
+  return 'assetId' in value === 'editorAssetCapability' in value;
+}
 
 function isSettingsTransferMessage(value: unknown): value is SettingsTransferMessage {
   if (!isRecord(value) || value['type'] !== MessageType.SETTINGS_TRANSFER) return false;
@@ -595,16 +625,7 @@ export const runtimeActionCoreMessageContracts = {
   [MessageType.OPEN_EDITOR_WITH_IMAGE]: {
     parseRequest: createGuardParser(
       'runtime OPEN_EDITOR_WITH_IMAGE message',
-      createMessageGuard({
-        type: MessageType.OPEN_EDITOR_WITH_IMAGE,
-        required: { dataUrl: isImageDataUrl },
-        optional: {
-          assetId: isString,
-          contentIntent: isContentPrivilegedActionCapability,
-          title: isString,
-          url: isString,
-        },
-      })
+      isOpenEditorWithImageMessage
     ),
     parseResponse: createGuardParser(
       'runtime OPEN_EDITOR_WITH_IMAGE response',

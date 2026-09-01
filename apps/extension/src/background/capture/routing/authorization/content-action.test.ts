@@ -12,6 +12,7 @@ it('tracks content action sender bindings per route message object', () => {
   const senderBinding: ContentSenderBinding = {
     documentId: 'document-1',
     frameId: 0,
+    requestId: 'request-1',
     senderUrl: 'https://example.test/page',
     tabId: 7,
   };

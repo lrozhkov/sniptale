@@ -1,7 +1,10 @@
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
 import type { CaptureActionType } from '../../../contracts/settings';
-import type { ContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import type {
+  ContentPrivilegedActionCapability,
+  RecentCaptureEditorAssetCapability,
+} from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type { ScenarioSessionService } from '../../scenario/session-service/index';
 import type { PageAccessPort } from '../../routing-contracts/page-access-port';
 import type { WebSnapshotViewerPorts } from '../page-preparation/viewer-ports';
@@ -77,6 +80,7 @@ export type RouteCaptureMessage =
       assetId?: string;
       dataUrl: string;
       contentIntent?: ContentPrivilegedActionCapability;
+      editorAssetCapability?: RecentCaptureEditorAssetCapability;
     }
   | {
       type: 'SAVE_SCREENSHOT_TO_GALLERY';
