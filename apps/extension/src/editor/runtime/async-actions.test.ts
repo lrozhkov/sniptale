@@ -33,7 +33,7 @@ beforeEach(() => {
 
 it('logs and surfaces explicit error messages', () => {
   const message = reportEditorActionFailure('save-image', new Error('write failed'), {
-    attempt: 1,
+    context: { attempt: 1 },
   });
 
   expect(loggerErrorMock).toHaveBeenCalledWith('save-image failed', expect.any(Error), {

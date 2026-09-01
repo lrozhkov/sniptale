@@ -21,27 +21,11 @@ function resolveEditorActionErrorMessage(
     : fallbackMessage;
 }
 
-function normalizeFailureOptions(
-  contextOrOptions?: Record<string, unknown> | EditorActionFailureOptions
-): EditorActionFailureOptions {
-  if (
-    contextOrOptions &&
-    ('context' in contextOrOptions ||
-      'fallbackMessage' in contextOrOptions ||
-      'notify' in contextOrOptions)
-  ) {
-    return contextOrOptions as EditorActionFailureOptions;
-  }
-
-  return { context: contextOrOptions };
-}
-
 export function reportEditorActionFailure(
   action: string,
   error: unknown,
-  contextOrOptions?: Record<string, unknown> | EditorActionFailureOptions
+  options: EditorActionFailureOptions = {}
 ): string {
-  const options = normalizeFailureOptions(contextOrOptions);
   const message = resolveEditorActionErrorMessage(error, options.fallbackMessage);
   logger.error(`${action} failed`, error, options.context);
   if (options.notify !== false) {
@@ -53,24 +37,24 @@ export function reportEditorActionFailure(
 export function fireAndReportEditorAction(
   action: string,
   run: EditorAsyncAction,
-  context?: Record<string, unknown>
+  options: EditorActionFailureOptions = {}
 ): void {
   void Promise.resolve()
     .then(run)
     .catch((error) => {
-      reportEditorActionFailure(action, error, context);
+      reportEditorActionFailure(action, error, options);
     });
 }
 
 export async function runAndReportEditorAction(
   action: string,
   run: EditorAsyncAction,
-  contextOrOptions?: Record<string, unknown> | EditorActionFailureOptions
+  options: EditorActionFailureOptions = {}
 ): Promise<void> {
   try {
     await Promise.resolve(run());
   } catch (error) {
-    reportEditorActionFailure(action, error, contextOrOptions);
+    reportEditorActionFailure(action, error, options);
     throw error;
   }
 }
