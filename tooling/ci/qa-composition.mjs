@@ -10,10 +10,14 @@ import {
   collectReleaseDeltaStepResults,
 } from '../qa/composition/repository/full-verification/execution.mjs';
 import { resolveRepositoryVerifyScope } from '../qa/composition/repository/full-verification/scope.mjs';
+import { resolveFullVerifyScope } from '../qa/composition/repository/full-verification/scope.mjs';
+import { collectCodeFiles } from '../qa/analysis/repository/shared-files.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
 import { runNpm } from '../qa/runtime/process/shared-process.mjs';
-import { runUnitTests } from '../qa/proof/unit/verify-unit-tests.mjs';
+import { runFullHarnessUnitTests, runUnitTests } from '../qa/proof/unit/verify-unit-tests.mjs';
 import { HARNESS_QA_SUITE } from '../qa/composition/scope/qa-scope.mjs';
+import { isHarnessQaFile } from '../qa/composition/scope/qa-scope.mjs';
+import { runGit } from '../qa/runtime/scope/git-command.helpers.mjs';
 import { measureAsyncStep } from '../qa/runtime/observability/step-timing.helpers.mjs';
 import {
   ciExcludedControlLabels,
@@ -54,12 +58,12 @@ export async function collectCiProofResults({
 } = {}) {
   capability('proof');
   const verifyScope = scopeResolver();
-  const [product, audit, harnessTests, productionBuild] = await Promise.all([
+  const [product, audit, productionBuild] = await Promise.all([
     productProofCollector(verifyScope),
     auditCollector({ profileId: 'pr', session }),
-    harnessTestCollector(),
     Promise.resolve(productionBuildCollector()),
   ]);
+  const harnessTests = await harnessTestCollector(resolveCiHarnessTestPlan(verifyScope));
   const coverageStep = audit.steps.find(({ label }) => label === 'Full product coverage');
   if (!coverageStep) throw new Error('Fast proof did not produce full product coverage.');
   const unitStep = {
@@ -77,13 +81,21 @@ export async function collectCiProofResults({
   };
 }
 
-export async function collectFullHarnessUnitTestStep() {
+export async function collectFullHarnessUnitTestStep({ full = true, relatedFiles = [] } = {}) {
+  if (!full && relatedFiles.length === 0) {
+    return createOkStep('Harness unit tests', 'affected closure: no matching tests');
+  }
   const { durationMs, value } = await measureAsyncStep(() =>
-    runUnitTests({ requireTests: true, suite: HARNESS_QA_SUITE })
+    full
+      ? runFullHarnessUnitTests()
+      : runUnitTests({ relatedFiles, requireTests: false, suite: HARNESS_QA_SUITE })
   );
   return value.status === 0
     ? {
-        ...createOkStep('Harness unit tests', 'full harness suite'),
+        ...createOkStep(
+          'Harness unit tests',
+          full ? 'full partitioned harness suite' : 'affected harness closure'
+        ),
         durationMs,
       }
     : {
@@ -94,6 +106,108 @@ export async function collectFullHarnessUnitTestStep() {
         stderr: value.stderr ?? '',
         durationMs,
       };
+}
+
+export function resolveCiHarnessTestPlan(
+  verifyScope,
+  { environment = process.env, gitRunner = runGit } = {}
+) {
+  if (environment.SNIPTALE_CI_FULL_HARNESS === '1') {
+    return { full: true, relatedFiles: [], reason: 'explicit periodic/full proof' };
+  }
+  const candidateDiff = resolveCiCandidateDiff({ environment, gitRunner });
+  if (!candidateDiff.available) {
+    return { full: true, relatedFiles: [], reason: 'candidate base unavailable' };
+  }
+  const { candidateFiles, requiresFullHarness } = candidateDiff;
+  if (requiresFullHarness) {
+    return {
+      full: true,
+      relatedFiles: [],
+      reason: 'candidate deletion, rename, or type change',
+    };
+  }
+  if (candidateFiles.some(isHarnessQaFile)) {
+    return { full: true, relatedFiles: [], reason: 'CI/tooling control changed' };
+  }
+  return {
+    full: false,
+    relatedFiles: candidateFiles.filter((file) => fs.existsSync(file)),
+    reason: 'product-only candidate affected closure',
+    repositoryScope: verifyScope?.mode ?? null,
+  };
+}
+
+export function resolveCiCandidateDiff({ environment = process.env, gitRunner = runGit } = {}) {
+  const baseSha = environment.SNIPTALE_BASE_SHA;
+  if (!/^[0-9a-f]{40}$/u.test(baseSha ?? '')) {
+    return {
+      available: false,
+      candidateFiles: [],
+      comparisonRevision: null,
+      deletedFiles: [],
+      requiresFullHarness: true,
+    };
+  }
+  const mergeBaseResult = gitRunner(['merge-base', baseSha, 'HEAD']);
+  const comparisonRevision = mergeBaseResult.stdout.trim();
+  if (mergeBaseResult.skipped || !/^[0-9a-f]{40}$/u.test(comparisonRevision)) {
+    return {
+      available: false,
+      candidateFiles: [],
+      comparisonRevision: null,
+      deletedFiles: [],
+      requiresFullHarness: true,
+    };
+  }
+  const result = gitRunner([
+    'diff',
+    '--name-status',
+    '-z',
+    '--find-renames',
+    '--diff-filter=ACMRTD',
+    `${comparisonRevision}..HEAD`,
+  ]);
+  if (result.skipped) {
+    return {
+      available: false,
+      candidateFiles: [],
+      comparisonRevision: null,
+      deletedFiles: [],
+      requiresFullHarness: true,
+    };
+  }
+  const fields = result.stdout.split('\0');
+  if (fields.at(-1) === '') fields.pop();
+  const candidateFiles = [];
+  const deletedFiles = [];
+  let requiresFullHarness = false;
+  for (let index = 0; index < fields.length;) {
+    const status = fields[index++];
+    if (!/^(?:[ADMT]|[CR]\d{1,3})$/u.test(status ?? '')) {
+      throw new Error('Malformed NUL-delimited candidate diff status.');
+    }
+    const source = fields[index++];
+    if (!source) throw new Error('Malformed NUL-delimited candidate diff path.');
+    candidateFiles.push(source);
+    if (status === 'D') deletedFiles.push(source);
+    if (status === 'D' || status === 'T' || status.startsWith('R') || status.startsWith('C')) {
+      requiresFullHarness = true;
+    }
+    if (status.startsWith('R') || status.startsWith('C')) {
+      const destination = fields[index++];
+      if (!destination) throw new Error('Malformed NUL-delimited candidate rename path.');
+      candidateFiles.push(destination);
+    }
+  }
+  candidateFiles.sort();
+  return {
+    available: true,
+    candidateFiles,
+    comparisonRevision,
+    deletedFiles: deletedFiles.sort(),
+    requiresFullHarness,
+  };
 }
 
 export function collectFreshProductionBuildStep({ commandRunner = runNpm } = {}) {
@@ -114,8 +228,26 @@ export function collectFreshProductionBuildStep({ commandRunner = runNpm } = {})
 }
 
 function resolveCiScope() {
-  return runTimelineActivitySync({ activityId: 'scope-resolution', kind: 'scope-resolution' }, () =>
-    resolveRepositoryVerifyScope()
+  return runTimelineActivitySync(
+    { activityId: 'scope-resolution', kind: 'scope-resolution' },
+    () => {
+      const repositoryScope = resolveRepositoryVerifyScope();
+      const candidateDiff = resolveCiCandidateDiff();
+      const existingCandidateFiles = candidateDiff.candidateFiles.filter((file) =>
+        fs.existsSync(file)
+      );
+      const structuralCodeFiles = candidateDiff.available
+        ? existingCandidateFiles.length > 0
+          ? collectCodeFiles(existingCandidateFiles)
+          : []
+        : resolveFullVerifyScope().codeFiles;
+      return {
+        ...repositoryScope,
+        structuralCodeFiles,
+        structuralComparisonRevision: candidateDiff.comparisonRevision ?? 'HEAD',
+        structuralDeletedFiles: candidateDiff.deletedFiles,
+      };
+    }
   );
 }
 

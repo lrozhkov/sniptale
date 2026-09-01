@@ -13,7 +13,7 @@ function laneValue(lane: string) {
   if (lane === 'light') {
     return {
       lineLengthStep: step('Changed-line readability'),
-      aiHygieneStep: step('AI hygiene'),
+      deadCommentedCodeStep: step('Dead commented code'),
       structuralRiskStep: step('Structural risk'),
       namingStep: step('Naming'),
       violationSteps: [step('Messaging'), step('App-core owners'), step('Target-only paths')],
@@ -26,7 +26,6 @@ function laneValue(lane: string) {
     return {
       loggingStep: step('Logging policy'),
       oxlintStep: step('Oxlint'),
-      sonarjsStep: step('SonarJS'),
       securityStep: step('HTML sanitizer ownership'),
     };
   }
@@ -53,16 +52,20 @@ it('keeps release result order while running the pre-build lanes concurrently', 
   const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
   const scheduler = vi.fn(runBoundedTasks);
   const steps = await collectScheduledFullVerifySteps(
-    { releaseMode: true },
+    {
+      releaseMode: true,
+      structuralCodeFiles: ['src/changed.ts'],
+      structuralComparisonRevision: 'a'.repeat(40),
+      structuralDeletedFiles: ['src/removed.ts'],
+    },
     { profile, scheduler, workerRunner }
   );
 
   expect(steps.map(({ label }) => label)).toEqual([
     'Changed-line readability',
-    'AI hygiene',
+    'Dead commented code',
     'Oxlint',
     'Logging policy',
-    'SonarJS',
     'HTML sanitizer ownership',
     'Structural risk',
     'Naming',
@@ -100,6 +103,16 @@ it('keeps release result order while running the pre-build lanes concurrently', 
   expect(workerRunner).toHaveBeenCalledWith(
     expect.objectContaining({ lane: 'lint', oxlintThreadCount: 6 })
   );
+  expect(workerRunner).toHaveBeenCalledWith(
+    expect.objectContaining({
+      context: expect.objectContaining({
+        structuralCodeFiles: ['src/changed.ts'],
+        structuralComparisonRevision: 'a'.repeat(40),
+        structuralDeletedFiles: ['src/removed.ts'],
+      }),
+      lane: 'light',
+    })
+  );
   expect(scheduledTasks?.find(({ id }) => id === 'tests')).toMatchObject({
     cpuTokens: 8,
     exclusive: true,
@@ -114,6 +127,9 @@ it('executes a non-release test lane in a real worker without starting build', a
       codeFiles: [],
       excludedControlLabels: [],
       releaseMode: false,
+      structuralCodeFiles: [],
+      structuralComparisonRevision: 'HEAD',
+      structuralDeletedFiles: [],
       targetFiles: [],
     },
     lane: 'tests',

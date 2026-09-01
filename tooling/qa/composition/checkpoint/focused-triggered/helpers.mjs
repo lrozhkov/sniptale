@@ -2,7 +2,6 @@ import {
   DEPENDENCY_GRAPH_TRIGGER_FILES,
   DEPENDENCY_GRAPH_TRIGGER_PATTERNS,
   DESIGN_SYSTEM_TRIGGER_PATTERNS,
-  HEAVY_RUNTIME_IMPORT_TRIGGER_PATTERNS,
   MANIFEST_INTEGRITY_TRIGGER_FILES,
   SECURITY_DATA_FULL_CLOSURE_TRIGGER_PATTERNS,
   SECURITY_DATA_TRIGGER_PATTERNS,
@@ -41,10 +40,6 @@ export function collectFocusedSecurityDataFiles(
     return collectAllCodeFiles();
   }
   return collectTriggeredFiles(targetFiles, { patterns: SECURITY_DATA_TRIGGER_PATTERNS });
-}
-
-export function collectFocusedHeavyRuntimeImportFiles(jsLikeFiles) {
-  return collectTriggeredFiles(jsLikeFiles, { patterns: HEAVY_RUNTIME_IMPORT_TRIGGER_PATTERNS });
 }
 
 export function collectFocusedSharedStyleFiles(targetFiles) {

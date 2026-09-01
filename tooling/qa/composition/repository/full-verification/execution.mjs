@@ -1,4 +1,4 @@
-import { collectAiHygieneReport } from '../../quality/ai-hygiene.mjs';
+import { collectDeadCommentedCodeViolations } from '../../quality/dead-commented-code.mjs';
 import { collectOptionalSecurityStep } from './catalog/audit-steps.mjs';
 import { runDesignSystemCheck } from '../../../guards/product-contracts/verify-design-system.mjs';
 import { peekUnifiedAstGrepReceipt } from '../../../audits/ast-grep/unified-ast-grep.mjs';
@@ -6,7 +6,6 @@ import {
   createFailureStep,
   createOkStep,
   createViolationStep,
-  createSkippedStep,
 } from '../../checkpoint/focused-qa-results.mjs';
 import { runI18nCheck } from '../../../guards/product-contracts/verify-i18n.mjs';
 import { runLineLengthCheck } from '../../../guards/quality/readability/line-length/check.mjs';
@@ -29,11 +28,7 @@ import {
   filterAllowedViolations,
   loadBaseline,
 } from '../../../policy/baselines/shared-baseline.mjs';
-import {
-  measureAsyncStep,
-  measureSyncStep,
-} from '../../../runtime/observability/step-timing.helpers.mjs';
-import { runSonarjsCheck } from '../../../guards/quality/sonarjs/check.mjs';
+import { measureSyncStep } from '../../../runtime/observability/step-timing.helpers.mjs';
 import { runStructuralRiskCheck } from '../../../analysis/structural-risk/check.mjs';
 import { projectLoggingStepFromOxlint } from '../../quality/logging-projection.mjs';
 import {
@@ -130,33 +125,32 @@ function collectOxlintLane(context = {}) {
   };
 }
 
-function collectAiHygieneStep({ baseline, codeFiles }) {
-  const { durationMs, value: report } = measureSyncStep(() => collectAiHygieneReport(codeFiles));
+function collectDeadCommentedCodeStep({ baseline, codeFiles }) {
+  const { durationMs, value: violations } = measureSyncStep(() =>
+    collectDeadCommentedCodeViolations(codeFiles)
+  );
   return withDuration(
-    createViolationStep('AI hygiene', 'AI hygiene violations found:', {
-      violations: filterAllowedViolations(report.violations, baseline),
+    createViolationStep('Dead commented code', 'Dead commented code found:', {
+      violations: filterAllowedViolations(violations, baseline),
     }),
     durationMs
   );
 }
 
-function collectStructuralRiskStep({ codeFiles }) {
+function collectStructuralRiskStep({
+  codeFiles,
+  structuralCodeFiles = codeFiles,
+  structuralComparisonRevision = 'HEAD',
+  structuralDeletedFiles = [],
+}) {
   const { durationMs, value } = measureSyncStep(() =>
     runStructuralRiskCheck({
-      files: codeFiles,
+      files: structuralCodeFiles,
+      comparisonRevision: structuralComparisonRevision,
+      deletedFiles: structuralDeletedFiles,
       reportScope: 'current-diff',
       enforce: true,
     })
-  );
-  return withDuration(
-    createViolationStep('Structural risk', 'Structural risk violations found:', value),
-    durationMs
-  );
-}
-
-function collectRepositoryStructuralRiskStep() {
-  const { durationMs, value } = measureSyncStep(() =>
-    runStructuralRiskCheck({ reportScope: 'repository', enforce: true })
   );
   return withDuration(
     createViolationStep('Structural risk', 'Structural risk violations found:', value),
@@ -170,27 +164,9 @@ function collectNamingStep(context) {
     : collectNamingStepLegacy(context);
 }
 
-async function collectSonarjsReleaseStep({ releaseMode }) {
-  if (!releaseMode) {
-    return createSkippedStep('SonarJS', 'release-only');
-  }
-
-  const { durationMs, value: sonarjsResult } = await measureAsyncStep(() =>
-    runSonarjsCheck({ scope: 'repo-wide' })
-  );
-  return withDuration(
-    createViolationStep('SonarJS', 'SonarJS violations found:', sonarjsResult),
-    durationMs
-  );
-}
-
 export async function collectReleaseLintLane(
   context,
-  {
-    oxlintCollector = collectOxlintLane,
-    securityCollector = collectOptionalSecurityStep,
-    sonarjsCollector = collectSonarjsReleaseStep,
-  } = {}
+  { oxlintCollector = collectOxlintLane, securityCollector = collectOptionalSecurityStep } = {}
 ) {
   const oxlintResult = oxlintCollector(context);
   const normalizedOxlintResult = oxlintResult.oxlintStep
@@ -205,9 +181,6 @@ export async function collectReleaseLintLane(
       };
   return {
     ...normalizedOxlintResult,
-    sonarjsStep: (context.excludedControlLabels ?? []).includes('SonarJS')
-      ? null
-      : await sonarjsCollector(context),
     securityStep: await securityCollector(context),
   };
 }
@@ -219,6 +192,9 @@ function createReleaseContext({ releaseMode, verifyScope, baseline, excludedCont
     baseline,
     excludedControlLabels,
     codeFiles: verifyScope.codeFiles,
+    structuralCodeFiles: verifyScope.structuralCodeFiles ?? verifyScope.codeFiles,
+    structuralComparisonRevision: verifyScope.structuralComparisonRevision ?? 'HEAD',
+    structuralDeletedFiles: verifyScope.structuralDeletedFiles ?? [],
     targetFiles: verifyScope.targetFiles,
   };
 }
@@ -229,12 +205,8 @@ function createDefaultCollectors() {
     collectLineLengthStep,
     collectRepositoryReadabilityStep,
     collectOxlintLane,
-    collectSonarjsReleaseStep,
-    collectAiHygieneStep,
-    collectStructuralRiskStep: (context) =>
-      context.releaseMode
-        ? collectRepositoryStructuralRiskStep()
-        : collectStructuralRiskStep(context),
+    collectDeadCommentedCodeStep,
+    collectStructuralRiskStep,
     collectNamingStep,
     collectMockParityStep: collectRepositoryMockParityStep,
     collectViolationSteps,
@@ -298,7 +270,7 @@ export async function collectFullVerifyLane({
         context.releaseMode && !context.excludedControlLabels.includes('Repository readability')
           ? collectors.collectRepositoryReadabilityStep(context)
           : null,
-      aiHygieneStep: collectors.collectAiHygieneStep(context),
+      deadCommentedCodeStep: collectors.collectDeadCommentedCodeStep(context),
       structuralRiskStep: context.excludedControlLabels.includes('Structural risk')
         ? null
         : collectors.collectStructuralRiskStep(context),
@@ -317,7 +289,6 @@ export async function collectFullVerifyLane({
       ? collectReleaseLintLane(laneContext)
       : {
           ...collectors.collectOxlintLane(laneContext),
-          sonarjsStep: null,
           securityStep: await collectors.collectSecurityStep(context),
         };
   }
@@ -357,10 +328,7 @@ async function collectCoreStepResults(context, collectors, includeTests) {
       : [collectors.collectLineLengthStep(context)]),
     ...(context.releaseMode ? [collectors.collectRepositoryReadabilityStep(context)] : []),
     collectors.collectOxlintStep(context),
-    ...(context.releaseMode && !context.excludedControlLabels.includes('SonarJS')
-      ? [await collectors.collectSonarjsReleaseStep(context)]
-      : []),
-    collectors.collectAiHygieneStep(context),
+    collectors.collectDeadCommentedCodeStep(context),
     ...(context.excludedControlLabels.includes('Structural risk')
       ? []
       : [collectors.collectStructuralRiskStep(context)]),

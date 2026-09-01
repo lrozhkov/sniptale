@@ -4,7 +4,7 @@ This document defines the Sniptale quality model and the acceptance rules for gu
 
 ## Model
 
-Quality enforcement is hybrid. Oxfmt owns formatting. Oxlint owns ordinary JS/TS lint, type-aware rules, React, Vitest, accessibility, Security rules, and syntax-only SonarJS rules. Ast-grep owns syntax patterns that do not need semantic state. Release-only ESLint owns the small residual SonarJS set that needs parser services. Repository-specific ownership, lifecycle, topology, cross-artifact, and proof-reuse invariants remain custom only when a ready engine cannot express them without losing semantics.
+Quality enforcement is hybrid. Oxfmt owns formatting. Oxlint owns ordinary JS/TS lint, type-aware rules, React, Vitest, accessibility, Security rules, and the retained syntax-only SonarJS rules through its JS-plugin adapter. Ast-grep owns syntax patterns that do not need semantic state. The standalone typed SonarJS/ESLint lane was retired because its small residual rule set did not justify a repository-wide typed pass or the additional dependency and configuration surface. Repository-specific ownership, lifecycle, topology, cross-artifact, and proof-reuse invariants remain custom only when a ready engine cannot express them without losing semantics.
 
 A logical result may aggregate several controls, but it is not automatically one analyzer owner. Categories organize execution; they do not define filesystem ownership. One owner has one authority and one independent reason to change.
 
@@ -25,7 +25,7 @@ Documentation must not restate the full catalog, file population, lane size, or 
 
 The canonical local order is `implementation → qa:checkpoint → required review → qa:closeout`. When harness/shared-control files changed, `qa:release-harness` runs before checkpoint.
 
-`ci:proof` is the complete repository proof. It includes read-only formatting, SonarJS, full product coverage, all product and harness unit tests, and one fresh release-mode `Production build` without archive or reusable build proof. `ci:release` requires that exact admitted proof, inherits its evidence, and owns only the separate release build/package proof and release-time assurance such as CodeQL and history-scoped controls. Mutation, repository evidence, and topology inventories remain advisory artifacts.
+`ci:proof` is the complete repository proof. It includes read-only formatting, Oxlint, full product coverage and tests, then a non-competing harness wave. Product-only candidates use the affected harness closure; CI/tooling/shared-control changes and periodic full proofs run the complete balanced harness partitions. Coverage is not enabled for this harness unit step. `ci:release` requires that exact admitted proof, inherits its evidence, and owns only the separate release build/package proof and release-time assurance such as CodeQL and history-scoped controls. Mutation, repository evidence, and topology inventories remain advisory artifacts.
 
 ## Guard necessity
 
@@ -61,7 +61,17 @@ Test names and fixtures should describe the defect, not detector internals. A re
 
 Metrics are signals, not architecture boundaries. They must not force a cohesive owner to split or create a folder merely to reduce a score. Blocking structure rules require a concrete dependency, ownership, public-surface, side-effect, or state-authority invariant. Broad complexity and topology reports stay advisory/manual unless a low-noise semantic defect is demonstrated.
 
-Diff-aware structural analysis compares behavioral files with `HEAD`; unchanged, import-only, mock-only, and rename-only files are not candidates. A topology change optimizes navigation and ownership clarity, not raw file count. Forwarding-only and single-consumer modules require consolidation unless a public contract, runtime boundary, cross-owner seam, or independent change reason justifies them.
+Root scatter is a diff-only advisory smell. It may prompt an owner-placement review for changed files, but it never blocks proof or requires an extra folder, facade, or forwarding layer.
+
+Dead commented code is a blocking current-diff defect. Oversized inline literals are a separate diff-only advisory about ownership and reviewability; they are not called AI hygiene and do not pretend to measure bundle impact. Actual bundle pressure is reported by Vite's configured chunk-size warning budget.
+
+Generated documentation facts remain blocking exact machine output. Word-based contradiction and required-phrase heuristics over authored Markdown are current-diff advisories, so stale prose never turns release into baseline maintenance work.
+
+Diff-aware structural analysis compares behavioral files with `HEAD` locally and with one resolved candidate merge-base commit in CI; candidate paths, prior sources, rename identities, and deleted consolidation lineage all use that same commit. Unchanged, import-only, mock-only, and rename-only files are not candidates. `ci:proof` uses this regression model instead of an absolute repository scan. A topology change optimizes navigation and ownership clarity, not raw file count. Forwarding-only and single-consumer modules require consolidation unless a public contract, runtime boundary, cross-owner seam, or independent change reason justifies them.
+
+Heavy runtime import ownership is expressed in the canonical dependency graph: Fabric value imports belong to the editor owner, DOMPurify value imports belong to the platform sanitizer, and content code may not statically own JSZip. There is no parallel TypeScript AST scanner. Bundle size remains an independent build warning signal rather than a duplicate import-policy authority.
+
+App-core ownership blocks dependency direction, cross-feature public API bypasses, runtime implementation imports, persistence backedges, missing declared authorities, and broad public barrels. Exact directory residency is not a gate or a manually maintained allowlist. The current app-core owner shape is derived from the live tree in generated project facts, so moving or introducing a cohesive owner does not require policy admission.
 
 The blocking forwarding-drift control is narrower than the manual topology inventory. It evaluates only production modules newly becoming pure forwarding in the candidate diff and only when the module has one direct production consumer. Exact package exports, registered runtime entrypoints, runtime boundaries, and canonically classified cross-owner edges are derived Keep evidence. Independent change reasons and temporary unresolved topology require an exact forwarder/direct-consumer policy entry with owner, evidence, removal condition, and an unexpired review date. Unchanged forwarding debt remains report-only.
 

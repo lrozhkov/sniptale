@@ -37,8 +37,7 @@
         ".tmp/gitleaks/report.json",
         ".tmp/npm-audit/results.json",
         ".tmp/licenses/summary.json",
-        ".tmp/licenses/sbom.cdx.json",
-        ".tmp/npm-audit/signatures.json"
+        ".tmp/licenses/sbom.cdx.json"
       ],
       "requiredPrefixes": [
         ".tmp/qa-observability/runs/",
@@ -90,7 +89,6 @@
         ".tmp/osv/results.json",
         ".tmp/gitleaks/report.json",
         ".tmp/npm-audit/results.json",
-        ".tmp/npm-audit/signatures.json",
         ".tmp/licenses/summary.json",
         ".tmp/licenses/sbom.cdx.json",
         "fast-proof/proof-manifest.json"

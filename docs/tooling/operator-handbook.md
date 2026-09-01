@@ -10,7 +10,7 @@ Short command and review lookup. Full external behavior is in [ci-cd.md](ci-cd.m
 | Harness/shared-control proof | `npm run qa:release-harness` | Required when the live scope classifier reports executable harness targets. |
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, artifact policy, and commit. |
-| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs repository-wide deterministic controls, full product coverage, all product and harness unit tests, Fast audits, and one fresh `npm run build:release` without archive or reusable build proof. Dirty workspace is diagnostic and non-admissible externally. |
+| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs repository-wide deterministic controls, full product coverage and product tests, the affected harness closure (or the complete partitioned harness after CI/tooling changes), Fast audits, and one fresh `npm run build:release` without archive or reusable build proof. Dirty workspace is diagnostic and non-admissible externally. |
 | Local full release gate | `npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]` | Requires the exact local Fast proof for the unchanged workspace tree, inherits its deterministic/test/coverage evidence, and runs only release-time audit and build/archive owners. Run `ci:proof` first. |
 | Quick local build bypass | `npm run ci:build` | Runs the project npm build only; it is not a release build, emits no QA proof, and is never accepted for provenance. |
 | Ordinary unpacked build | `npm run build` | Production-mode Vite build only; no typecheck, QA proof, packaging, or build source maps. |
@@ -48,7 +48,7 @@ For the one-time CI bootstrap, open the PR as draft, add `ci-local-proof-bypass`
 
 Ordinary local `ci:proof` and `ci:release` do not require Docker. They restore the repository-local npm download cache, still run exact `npm ci`, verify every installed project-toolchain package, alias, native entrypoint, and TypeScript compiler-API runtime against `toolchain.lock.json`, then perform native package bootstrap and execute the same JS composition and QA owners with the locked external audit binaries. `ci:release` additionally discovers and admits only an exact host proof for the unchanged local workspace tree. This is the fastest diagnostic path, not byte-for-byte environment equivalence. The GitHub job adds the pinned Linux image and is the canonical release-provenance environment; use the clean `ci:proof -- --pr <number> --reason "<audit note>"` container bypass when external-environment equivalence is required locally.
 
-`ci:proof` scans the repository-wide candidate in both environments. `ci:release` verifies the exact admitted repository-wide proof and executes only its release delta. Diff awareness belongs only to `qa:release-harness`, `qa:checkpoint`, and `qa:closeout`; `baseSha` is provenance metadata, while resource flags affect scheduling and reuse compatibility, never the selected control or file scope.
+`ci:proof` scans the repository-wide candidate in both environments. Product tests and coverage remain repository-wide. Harness tests run as a separate resource wave after product proof: product-only candidates use Vitest's affected harness closure, while CI/tooling/shared-control changes and scheduled runs execute the complete deterministic harness partitions. Set `SNIPTALE_CI_FULL_HARNESS=1` for an explicit periodic or diagnostic full-harness proof; the external workflow sets it for scheduled gates. `ci:release` verifies the exact admitted repository-wide proof and executes only its release delta. Resource flags affect scheduling and reuse compatibility, never product control scope.
 
 Docker is required only when explicitly reproducing the external image or running the clean PR bypass mode. With Docker Desktop, enable WSL integration for this distribution and verify `docker version` before bypass proof.
 
@@ -74,6 +74,7 @@ Use direct commands only to diagnose the failed owner:
 | Area | Command |
 | --- | --- |
 | Documentation facts | `node tooling/qa/policy/documentation/documentation-facts/documentation-facts.mjs` |
+| Dead commented code | `node tooling/qa/composition/quality/dead-commented-code.mjs` |
 | Config baseline | `node tooling/qa/guards/product-contracts/config/config-policy/check.mjs` |
 | Extension build layout | `node tooling/qa/guards/product-contracts/extension-build/verify-extension-build-layout.mjs` |
 | Typecheck | `node tooling/qa/proof/typecheck/execution/check.mjs` |
@@ -81,8 +82,7 @@ Use direct commands only to diagnose the failed owner:
 | Oxlint | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
 | Oxfmt | `node tooling/qa/guards/quality/verify-oxfmt.mjs` |
 | Unified ast-grep syntax scan | `node tooling/qa/audits/ast-grep/ast-grep.mjs` |
-| Security and syntax-only SonarJS Oxlint JS-plugin rules | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
-| Release-only type-aware SonarJS ESLint residual | `node tooling/qa/guards/quality/sonarjs/check.mjs` |
+| Security and syntax-only SonarJS rules through Oxlint JS plugins | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
 | Build | `node tooling/qa/composition/build/build-step.mjs` |
 | HTML sanitizer ownership residual | `node tooling/qa/guards/security/html-sanitizer-ownership/check.mjs` |
 | jscpd 5 release audit | `node tooling/qa/audits/jscpd/check.mjs` |

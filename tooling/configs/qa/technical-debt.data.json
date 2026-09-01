@@ -300,7 +300,7 @@
       "classification": "accepted-architecture",
       "owner": "repository-owner",
       "risk": "A copyleft development dependency could be mistaken for shipped artifact content if packaging boundaries drift.",
-      "reason": "Reviewed tooling-only audit dependency; it is not bundled into the extension release artifact.",
+      "reason": "Reviewed tooling-only Oxlint plugin dependency; it is not bundled into the extension release artifact.",
       "removalCondition": "Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact.",
       "reviewBy": "2027-07-12",
       "source": {
@@ -314,7 +314,7 @@
         "expiresOn": "2027-07-12",
         "licenseExpression": "LGPL-3.0-only",
         "packageName": "eslint-plugin-sonarjs",
-        "reason": "Reviewed tooling-only audit dependency; it is not bundled into the extension release artifact.",
+        "reason": "Reviewed tooling-only Oxlint plugin dependency; it is not bundled into the extension release artifact.",
         "resolvedVersion": "4.2.0"
       },
       "targetAction": "Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact."

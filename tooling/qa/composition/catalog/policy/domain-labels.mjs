@@ -8,7 +8,6 @@ export const QA_LABELS_BY_DOMAIN = {
     'Design system',
     'Entrypoint wiring',
     'Forwarding module drift',
-    'Heavy runtime imports',
     'i18n',
     'Manifest integrity',
     'Manifest permissions',
@@ -27,14 +26,13 @@ export const QA_LABELS_BY_DOMAIN = {
     'Persistence ownership',
   ]),
   maintainability: new Set([
-    'AI hygiene',
+    'Dead commented code',
     'Changed-line readability',
     'Detached controller methods',
     'Structural risk',
     'Structural audit',
     'Naming',
     'Read path side effects',
-    'Root scatter',
   ]),
   security: new Set([
     'Dependency admission',

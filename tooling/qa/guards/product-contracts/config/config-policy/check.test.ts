@@ -39,7 +39,7 @@ function createFailingPackageJson() {
 function writeConfigPolicyPackageJson(root, packageJson) {
   writeFile(root, 'package.json', JSON.stringify(packageJson, null, 2));
   writeFile(root, '.nvmrc', '24.18.0\n');
-  writeFile(root, '.npmrc', 'legacy-peer-deps=true\nloglevel=error\nmin-release-age=7\n');
+  writeFile(root, '.npmrc', 'loglevel=error\nmin-release-age=7\n');
   writeFile(
     root,
     'package-lock.json',
@@ -233,13 +233,9 @@ it('rejects a committed release-age exclusion instead of making security bypass 
   writeFile(
     root,
     '.npmrc',
-    [
-      'legacy-peer-deps=true',
-      'loglevel=error',
-      'min-release-age=7',
-      'min-release-age-exclude[]=@zip.js/zip.js',
-      '',
-    ].join('\n')
+    ['loglevel=error', 'min-release-age=7', 'min-release-age-exclude[]=@zip.js/zip.js', ''].join(
+      '\n'
+    )
   );
   const module = await importConfigPolicyModule();
 

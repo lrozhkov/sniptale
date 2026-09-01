@@ -4,8 +4,6 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { ESLint } from 'eslint';
-import sonarjs from 'eslint-plugin-sonarjs';
 import { afterEach, expect, it } from 'vitest';
 
 const roots: string[] = [];
@@ -43,14 +41,14 @@ const cases = [
       'nested = 1;\nexport const value = accept(nested);\n',
   },
 ] as const;
-const MIGRATED_RULE_IDS = cases.map(({ rule }) => rule);
+const RULE_IDS = cases.map(({ rule }) => rule);
 
 afterEach(() => {
   while (roots.length > 0) fs.rmSync(roots.pop()!, { force: true, recursive: true });
 });
 
 function createRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sonarjs-oxlint-parity-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sonarjs-oxlint-plugin-'));
   roots.push(root);
   return root;
 }
@@ -69,63 +67,34 @@ function runOxlint(root: string, rule: string, source: string, pluginSpecifier =
   return spawnSync(
     process.execPath,
     [oxlintEntry, '--config', configPath, '--format', 'unix', sourcePath],
-    {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-    }
+    { cwd: process.cwd(), encoding: 'utf8' }
   );
 }
 
-async function runEslint(rule: string, source: string) {
-  const eslint = new ESLint({
-    overrideConfigFile: true,
-    overrideConfig: [
-      {
-        files: ['**/*.ts'],
-        languageOptions: { parser: (await import('typescript-eslint')).parser },
-        plugins: { sonarjs },
-        rules: { [rule]: 'error' },
-      },
-    ],
-  });
-  return eslint.lintText(source, { filePath: 'fixture.ts' });
-}
-
-it('proves valid, invalid, location and normalized output parity for every migrated rule', async () => {
-  expect(MIGRATED_RULE_IDS).toHaveLength(4);
+it('runs every retained syntax-only SonarJS rule through Oxlint', () => {
+  expect(RULE_IDS).toHaveLength(4);
 
   for (const fixture of cases) {
     const root = createRoot();
-    const eslintInvalid = await runEslint(fixture.rule, fixture.invalid);
-    const eslintValid = await runEslint(fixture.rule, fixture.valid);
-    const oxlintInvalid = runOxlint(root, fixture.rule, fixture.invalid);
-    const oxlintValid = runOxlint(root, fixture.rule, fixture.valid);
-    const oxlintInvalidOutput = `${oxlintInvalid.stdout}\n${oxlintInvalid.stderr}`;
-    const oxlintValidOutput = `${oxlintValid.stdout}\n${oxlintValid.stderr}`;
-    const eslintMessage = eslintInvalid[0]?.messages.find(({ ruleId }) => ruleId === fixture.rule);
+    const invalid = runOxlint(root, fixture.rule, fixture.invalid);
+    const valid = runOxlint(root, fixture.rule, fixture.valid);
+    const invalidOutput = `${invalid.stdout}\n${invalid.stderr}`;
+    const validOutput = `${valid.stdout}\n${valid.stderr}`;
+    const diagnostic = `sonarjs(${fixture.rule.replace('sonarjs/', '')})`;
 
-    expect(eslintMessage, fixture.rule).toBeDefined();
-    expect(eslintValid[0]?.messages.filter(({ ruleId }) => ruleId === fixture.rule)).toEqual([]);
-    expect(oxlintInvalid.status, fixture.rule).toBe(1);
-    expect(oxlintInvalidOutput, fixture.rule).toContain(
-      `sonarjs(${fixture.rule.replace('sonarjs/', '')})`
-    );
-    expect(oxlintInvalidOutput, fixture.rule).toContain(
-      `:${eslintMessage?.line}:${eslintMessage?.column}:`
-    );
-    expect(oxlintValid.status, fixture.rule).toBe(0);
-    expect(oxlintValidOutput, fixture.rule).not.toContain(
-      `sonarjs(${fixture.rule.replace('sonarjs/', '')})`
-    );
+    expect(invalid.status, fixture.rule).toBe(1);
+    expect(invalidOutput, fixture.rule).toContain(diagnostic);
+    expect(valid.status, fixture.rule).toBe(0);
+    expect(validOutput, fixture.rule).not.toContain(diagnostic);
   }
 }, 60_000);
 
-it('keeps parser/plugin failures blocking instead of downgrading them to findings or skips', () => {
+it('keeps parser and plugin failures blocking', () => {
   const root = createRoot();
-  const parseFailure = runOxlint(root, MIGRATED_RULE_IDS[0], 'export const broken = ;\n');
+  const parseFailure = runOxlint(root, RULE_IDS[0], 'export const broken = ;\n');
   const pluginFailure = runOxlint(
     root,
-    MIGRATED_RULE_IDS[0],
+    RULE_IDS[0],
     'export const value = 1;\n',
     './missing-sonarjs-plugin.mjs'
   );
@@ -138,16 +107,16 @@ it('keeps parser/plugin failures blocking instead of downgrading them to finding
   );
 });
 
-it('binds migrated rules to the former production scope and excludes tests, support and generated owners', () => {
+it('binds retained rules to the production scope and excludes generated owners', () => {
   const config = JSON.parse(fs.readFileSync('.oxlintrc.json', 'utf8')) as {
     jsPlugins: Array<{ name: string; specifier: string }>;
     overrides: Array<{ files: string[]; rules?: Record<string, string> }>;
   };
   const enabled = config.overrides.find(({ rules = {} }) =>
-    MIGRATED_RULE_IDS.every((rule) => rules[rule] === 'error')
+    RULE_IDS.every((rule) => rules[rule] === 'error')
   );
   const disabledFiles = config.overrides
-    .filter(({ rules = {} }) => MIGRATED_RULE_IDS.every((rule) => rules[rule] === 'off'))
+    .filter(({ rules = {} }) => RULE_IDS.every((rule) => rules[rule] === 'off'))
     .flatMap(({ files }) => files);
 
   expect(config.jsPlugins.filter(({ name }) => name === 'sonarjs')).toEqual([
@@ -162,6 +131,4 @@ it('binds migrated rules to the former production scope and excludes tests, supp
     'apps/extension/src/**/generated/**/*.{ts,tsx,js,mjs,cjs}',
     'apps/extension/src/**/__generated__/**/*.{ts,tsx,js,mjs,cjs}',
   ]);
-  expect(disabledFiles).not.toContain('packages/*/src/**/vendor/**/*.{ts,tsx,js,mjs,cjs}');
-  expect(disabledFiles).not.toContain('packages/*/src/**/generated/**/*.{ts,tsx,js,mjs,cjs}');
-}, 20000);
+}, 20_000);

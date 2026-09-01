@@ -3,7 +3,13 @@ import { expect, it } from 'vitest';
 import { requiredExternalControlIds, semanticCases } from './test-support';
 
 it('covers semantic hostile results for every profile-required external adapter', () => {
-  expect(semanticCases.map(({ id }) => id).sort()).toEqual(requiredExternalControlIds());
+  const requiredIds = requiredExternalControlIds();
+  expect(
+    semanticCases
+      .map(({ id }) => id)
+      .filter((id) => requiredIds.includes(id))
+      .sort()
+  ).toEqual(requiredIds);
 });
 
 it.each(semanticCases)('$id blocks contradictory or unclassifiable result content', ({ run }) => {

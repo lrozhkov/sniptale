@@ -12,7 +12,7 @@ Public workflow graphs live in [`pr.yml`](../../.github/workflows/pr.yml), [`pro
 
 Purpose-specific public workflows expose the shared proof graph without mixing maintenance and deployment triggers:
 
-- Fast PR Gate runs `ci:proof`: repository-wide deterministic controls, read-only formatting, SonarJS, full product coverage, all product and harness unit tests, the Fast audit profile, and one fresh `npm run build:release` without ZIP or reusable build proof. It does not claim release readiness.
+- Fast PR Gate runs `ci:proof`: repository-wide deterministic controls, read-only formatting, Oxlint, full product coverage and tests, the affected harness closure (or complete partitioned harness for CI/tooling/shared-control changes), the Fast audit profile, and one fresh `npm run build:release` without ZIP or reusable build proof. Product proof and harness proof use separate resource waves. Scheduled gates force the complete harness. It does not claim release readiness.
 - Release provenance Gate seals an exact Fast proof on the disposable external runner, admits that proof under trusted-base policy, and only then runs `ci:release`. Release inherits deterministic/test/coverage/build evidence and executes the release-time audit plus Build/Release archive. Missing, stale, cross-tree, cross-control, or cross-environment proof fails before release composition; there is no fallback.
 
 Repository audit evidence, topology inventory, and mutation results run after canonical proof sealing in an isolated, non-blocking CI job and are uploaded only as optional advisory artifacts. Their failures are visible as advisory failures and do not satisfy or block the canonical quality-control graph.

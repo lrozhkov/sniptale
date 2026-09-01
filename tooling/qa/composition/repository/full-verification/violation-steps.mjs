@@ -4,7 +4,6 @@ import { runPersistenceOwnershipCheck } from '../../../guards/lifecycle/persiste
 import { runReadPathSideEffectCheck } from '../../../guards/lifecycle/read-path-side-effects/check.mjs';
 import { runAppCoreOwnerCheck } from '../../../guards/architecture/app-core/verify-app-core-owners.mjs';
 import { runArchitectureGuardrailCheck } from '../../../guards/architecture/architecture-guardrails/check.mjs';
-import { runHeavyRuntimeImportOwnershipCheck } from '../../../guards/architecture/imports/verify-heavy-runtime-import-ownership.mjs';
 import { runManifestPermissionsCheck } from '../../../guards/architecture/manifest-permissions/check.mjs';
 import { runInstanceOwnershipCheck } from '../../../guards/architecture/ownership/instance-ownership/check.mjs';
 import { runRuntimeTopologyCheck } from '../../../guards/architecture/runtime-topology/check.mjs';
@@ -18,7 +17,6 @@ import { runManifestIntegrityCheck } from '../../../guards/product-contracts/man
 import { runPackageBoundaryCheck } from '../../../guards/product-contracts/package-boundaries/check.mjs';
 import { runParserSnapshotPurityCheck } from '../../../guards/product-contracts/verify-parser-snapshot-purity.mjs';
 import { runSharedStyleOwnershipCheck } from '../../../guards/product-contracts/verify-shared-style-ownership.mjs';
-import { runRootScatterCheck } from '../../../guards/quality/root-scatter/check.mjs';
 import { runRepoWideRootSideEffectCheck } from '../../../guards/quality/root-side-effects/check.mjs';
 import { runSuppressionDirectiveCheck } from '../../../guards/quality/verify-suppression-directives.mjs';
 import { runDependencyAdmissionCheck } from '../../../guards/security/verify-dependency-admission.mjs';
@@ -72,7 +70,6 @@ const releaseGuardrailAdapterDefinitions = [
     () => runSuppressionDirectiveCheck({ scope: 'production' }),
   ],
   ['Messaging', 'Messaging guardrail violations found:', runMessagingCheck],
-  ['Root scatter', 'Root scatter violations found:', runRootScatterCheck],
   [
     'Forwarding module drift',
     'Forwarding module drift violations found:',
@@ -98,11 +95,6 @@ const releaseGuardrailAdapterDefinitions = [
   ['Target-only paths', 'Target-only path violations found:', runTargetOnlyPathCheck],
   ['OSS release surface', 'OSS release surface violations found:', runOssReleaseSurfaceCheck],
   ['Browser adapters', 'Browser adapter guardrail violations found:', runBrowserAdapterCheck],
-  [
-    'Heavy runtime imports',
-    'Heavy runtime import ownership violations found:',
-    runHeavyRuntimeImportOwnershipCheck,
-  ],
   ['Root side effects', 'Root side-effect violations found:', runRepoWideRootSideEffectCheck],
   [
     'Shared style ownership',

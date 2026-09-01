@@ -52,21 +52,23 @@ function readProofSemanticsPolicy(repositoryRoot) {
     policy.reuseCompatibility?.authority !== 'environment-profile' ||
     policy.invariants?.fastGateNeverClaimsReleaseReadiness !== true ||
     policy.invariants?.ciProofScope !== 'repository-wide' ||
-    policy.invariants?.ciProofUsesSemanticDiff !== false ||
+    policy.invariants?.ciProofUsesSemanticDiff !== true ||
     policy.invariants?.ciProofOwnsFullProductTests !== true ||
     policy.invariants?.ciProofOwnsFullProductCoverage !== true ||
-    policy.invariants?.ciProofOwnsFullHarnessTests !== true ||
+    policy.invariants?.ciProofOwnsFullHarnessTests !== false ||
+    policy.invariants?.ciProofHarnessSelection !== 'affected-or-full-fallback' ||
     policy.invariants?.ciReleaseRequiresFastProofAdmission !== true ||
     policy.invariants?.ciReleaseExecutesProductTests !== false ||
     policy.invariants?.ciReleaseExecutesProductCoverage !== false ||
     policy.invariants?.checkpointKeepsFormatWriteBarrier !== true ||
     policy.invariants?.gitleaksScopesRemainProfileOwned !== true ||
     policy.invariants?.soloMaintainerBypassRemainsSupported !== true ||
-    policy.invariants?.baseShaIsProvenanceOnly !== true ||
-    policy.invariants?.fastGateFullVitestOwner !== 'full-product-test-proof' ||
+    policy.invariants?.baseShaIsProvenanceOnly !== false ||
+    policy.invariants?.baseShaOwnsHarnessSelection !== true ||
+    policy.invariants?.fastGateFullVitestOwner !== 'full-product-plus-required-harness-proof' ||
     policy.invariants?.releaseProvenanceAcceptsFastProofReuse !== true ||
     JSON.stringify(policy.invariants?.diffAwareWrappersExactly) !==
-      JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout']) ||
+      JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout', 'ci:proof']) ||
     policy.gateCapabilities?.proof?.scope !== 'repository-wide' ||
     policy.gateCapabilities?.proof?.fullVitest !== true ||
     policy.gateCapabilities?.proof?.releaseReady !== false ||
@@ -239,7 +241,6 @@ const LANE_FILES = {
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
     '.tmp/npm-audit/results.json',
-    '.tmp/npm-audit/signatures.json',
     '.tmp/licenses/summary.json',
     '.tmp/licenses/sbom.cdx.json',
   ],
@@ -256,7 +257,6 @@ const LANE_FILES = {
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
     '.tmp/npm-audit/results.json',
-    '.tmp/npm-audit/signatures.json',
     '.tmp/licenses/summary.json',
     '.tmp/licenses/sbom.cdx.json',
   ],
@@ -274,36 +274,45 @@ export function copyAdmittedReleaseInput({
   const relativeSource = relativePath(file, repositoryRoot);
   assertNoSymlinkComponents(relativeSource, repositoryRoot);
   const source = path.join(repositoryRoot, relativeSource);
-  let details;
+  let descriptor;
   try {
-    details = fs.lstatSync(source);
+    descriptor = fs.openSync(
+      source,
+      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK
+    );
   } catch (error) {
     if (!required && error?.code === 'ENOENT') return false;
     throw error;
   }
-  if (!details.isFile() || details.isSymbolicLink()) {
-    throw new Error(`Unsafe artifact: ${file}`);
+  try {
+    const details = fs.fstatSync(descriptor);
+    if (!details.isFile()) throw new Error(`Unsafe artifact: ${file}`);
+    const contents = fs.readFileSync(descriptor);
+    const admission = JSON.parse(contents.toString('utf8'));
+    const expectedKind =
+      environment.SNIPTALE_CI_IN_CONTAINER === '1' ? 'locked-container' : 'host-wsl';
+    const expectedEnvironmentDigest =
+      environment.SNIPTALE_CI_EXECUTION_ENVIRONMENT_DIGEST ??
+      environment.SNIPTALE_CI_CONTAINER_DIGEST;
+    if (
+      admission?.artifactKind !== 'sniptale-fast-proof-admission' ||
+      admission.outcome !== 'admitted' ||
+      admission.candidateTree !== environment.SNIPTALE_CANDIDATE_TREE ||
+      admission.commit !== environment.SNIPTALE_CANDIDATE_SHA ||
+      admission.executionEnvironment?.kind !== expectedKind ||
+      admission.executionEnvironment?.digest !== expectedEnvironmentDigest ||
+      admission.workspaceMode !== environment.SNIPTALE_WORKSPACE_MODE ||
+      admission.proofRoot !== environment.SNIPTALE_FAST_PROOF_PATH
+    ) {
+      throw new Error(`Release admitted input is stale or incompatible: ${file}`);
+    }
+    const output = path.join(destinationRoot, relativeSource);
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.writeFileSync(output, contents, { flag: 'wx' });
+    return true;
+  } finally {
+    fs.closeSync(descriptor);
   }
-  const admission = JSON.parse(fs.readFileSync(source, 'utf8'));
-  const expectedKind =
-    environment.SNIPTALE_CI_IN_CONTAINER === '1' ? 'locked-container' : 'host-wsl';
-  const expectedEnvironmentDigest =
-    environment.SNIPTALE_CI_EXECUTION_ENVIRONMENT_DIGEST ??
-    environment.SNIPTALE_CI_CONTAINER_DIGEST;
-  if (
-    admission?.artifactKind !== 'sniptale-fast-proof-admission' ||
-    admission.outcome !== 'admitted' ||
-    admission.candidateTree !== environment.SNIPTALE_CANDIDATE_TREE ||
-    admission.commit !== environment.SNIPTALE_CANDIDATE_SHA ||
-    admission.executionEnvironment?.kind !== expectedKind ||
-    admission.executionEnvironment?.digest !== expectedEnvironmentDigest ||
-    admission.workspaceMode !== environment.SNIPTALE_WORKSPACE_MODE ||
-    admission.proofRoot !== environment.SNIPTALE_FAST_PROOF_PATH
-  ) {
-    throw new Error(`Release admitted input is stale or incompatible: ${file}`);
-  }
-  copyExternalFile(source, destinationRoot, file);
-  return true;
 }
 
 function createArtifactDestination(lane, repositoryRoot) {

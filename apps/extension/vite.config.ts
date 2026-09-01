@@ -172,6 +172,7 @@ export default defineConfig(({ mode }) => ({
     emptyOutDir: true,
     // Vite's preload helper resolves chunk URLs against the host page inside content scripts.
     modulePreload: false,
+    chunkSizeWarningLimit: layoutPolicy.chunkSizeWarningLimitKb,
     target: 'chrome140',
     sourcemap: shouldEmitBuildSourcemaps(mode),
     rollupOptions: createRollupOptions(mode),

@@ -1,4 +1,4 @@
-import { collectAiHygieneReport } from '../../quality/ai-hygiene.mjs';
+import { collectDeadCommentedCodeViolations } from '../../quality/dead-commented-code.mjs';
 import { filterImportOrMockOnlyDiffFiles } from '../../../analysis/imports/import-only-diff/check.mjs';
 import {
   createFailureStep,
@@ -28,14 +28,13 @@ import { runRuntimeTopologyCheck } from '../../../guards/architecture/runtime-to
 import { runHtmlSanitizerOwnershipCheck } from '../../../guards/security/html-sanitizer-ownership/check.mjs';
 import { runUnifiedAstGrepReceipt } from '../../../audits/ast-grep/unified-ast-grep.mjs';
 import { runMessagingCheck } from '../../../guards/boundaries/verify-messaging.mjs';
-import { runSonarjsCheck } from '../../../guards/quality/sonarjs/check.mjs';
 import { runStructuralRiskCheck } from '../../../analysis/structural-risk/check.mjs';
 import {
   timeAsyncStep,
   timeSyncStep,
 } from '../../../runtime/observability/step-timing.helpers.mjs';
 
-function runAiHygieneStep(codeFiles, baseline) {
+function runDeadCommentedCodeStep(codeFiles, baseline) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
   const result =
     behavioralCodeFiles.length === 0
@@ -43,12 +42,12 @@ function runAiHygieneStep(codeFiles, baseline) {
       : {
           skipped: false,
           violations: filterAllowedViolations(
-            collectAiHygieneReport(behavioralCodeFiles).violations,
+            collectDeadCommentedCodeViolations(behavioralCodeFiles),
             baseline
           ),
         };
 
-  return createViolationStep('AI hygiene', 'AI hygiene violations found:', result);
+  return createViolationStep('Dead commented code', 'Dead commented code found:', result);
 }
 
 function runStructuralRiskStep(codeFiles) {
@@ -136,19 +135,6 @@ async function runSecurityStep(codeFiles) {
   );
 }
 
-async function runSonarjsStep(codeFiles) {
-  const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
-  if (behavioralCodeFiles.length === 0) {
-    return createSkippedStep('SonarJS');
-  }
-
-  return createViolationStep(
-    'SonarJS',
-    'SonarJS violations found:',
-    await runSonarjsCheck({ files: behavioralCodeFiles, scope: 'workspace' })
-  );
-}
-
 function runChangedLineReadabilityStep(codeFiles) {
   return createViolationStep(
     'Changed-line readability',
@@ -214,7 +200,7 @@ export async function collectFocusedLightLane({
   return {
     qualitySteps: [
       timeSyncStep(() => runChangedLineReadabilityStep(qualityCodeFiles)),
-      timeSyncStep(() => runAiHygieneStep(qualityCodeFiles, baseline)),
+      timeSyncStep(() => runDeadCommentedCodeStep(qualityCodeFiles, baseline)),
       timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles)),
       timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles)),
       ...(await runFocusedCodeSteps(qualityCodeFiles, targetFiles)),
@@ -239,7 +225,6 @@ export function collectFocusedOwnerLane({ lane }) {
 export async function collectFocusedLintLane({
   codeFiles,
   jsLikeFiles,
-  qualityCodeFiles = codeFiles,
   qualityJsLikeFiles = jsLikeFiles,
   shouldRunFullOxlint,
 }) {
@@ -249,7 +234,6 @@ export async function collectFocusedLintLane({
   return {
     loggingStep: oxlintResult.loggingStep,
     oxlintStep: oxlintResult.oxlintStep,
-    sonarjsStep: await timeAsyncStep(() => runSonarjsStep(qualityCodeFiles)),
     securityStep: await timeAsyncStep(() => runSecurityStep(codeFiles)),
   };
 }

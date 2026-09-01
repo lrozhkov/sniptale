@@ -12,7 +12,7 @@ function laneValue(lane: string) {
   if (lane === 'targetPaths') return { ownerStep: step('Target-only paths') };
   if (lane === 'light') {
     return {
-      qualitySteps: [step('Changed-line readability'), step('AI hygiene')],
+      qualitySteps: [step('Changed-line readability'), step('Dead commented code')],
       triggeredStaticSteps: [step('App-core owners'), step('Target-only paths')],
       policySteps: [step('Runtime topology')],
     };
@@ -21,7 +21,6 @@ function laneValue(lane: string) {
     return {
       loggingStep: step('Logging policy'),
       oxlintStep: step('Oxlint'),
-      sonarjsStep: step('SonarJS'),
       securityStep: step('HTML sanitizer ownership'),
     };
   }
@@ -54,10 +53,9 @@ it('assembles worker results in the canonical order rather than completion order
 
   expect(result.map(({ label }) => label)).toEqual([
     'Changed-line readability',
-    'AI hygiene',
+    'Dead commented code',
     'Oxlint',
     'Logging policy',
-    'SonarJS',
     'HTML sanitizer ownership',
     'Runtime topology',
     'App-core owners',

@@ -88,11 +88,7 @@ it('requires base-owned fast and release control matrices while permitting decla
     ])
   );
   expect(release.requiredInherited).toEqual(
-    expect.arrayContaining([
-      'qa.rule.sonarjs',
-      'qa.rule.full-product-coverage',
-      'qa.rule.production-build',
-    ])
+    expect.arrayContaining(['qa.rule.full-product-coverage', 'qa.rule.production-build'])
   );
   expect(release.requiredPassed).not.toContain('qa.rule.unit-tests');
   for (const id of ['qa.rule.changed-line-readability']) {

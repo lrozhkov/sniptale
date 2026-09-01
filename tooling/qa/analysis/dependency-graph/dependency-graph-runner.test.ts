@@ -226,6 +226,89 @@ it('executes the package-direction rule through dependency-cruiser', async () =>
   expect(result.output).toContain('foundation-package-direction');
 }, 20000);
 
+const heavyRuntimeCases = [
+  {
+    allowedPath: 'apps/extension/src/editor/canvas.ts',
+    exportSource: 'export declare class Canvas {}\n',
+    forbiddenPath: 'apps/extension/src/popup/canvas.ts',
+    importSource: "import { Canvas } from 'fabric';\nexport const value = new Canvas();\n",
+    packageName: 'fabric',
+    ruleName: 'heavy-runtime-fabric-owner',
+  },
+  {
+    allowedPath: 'apps/extension/src/composition/archive.ts',
+    exportSource: 'export default class JSZip {}\n',
+    forbiddenPath: 'apps/extension/src/content/archive.ts',
+    importSource: "import JSZip from 'jszip';\nexport const value = new JSZip();\n",
+    packageName: 'jszip',
+    ruleName: 'heavy-runtime-jszip-content',
+  },
+  {
+    allowedPath: 'packages/platform/src/security/sanitizers/html.ts',
+    exportSource:
+      'declare const DOMPurify: { sanitize(value: string): string };\nexport default DOMPurify;\n',
+    forbiddenPath: 'apps/extension/src/content/sanitize.ts',
+    importSource:
+      "import DOMPurify from 'dompurify';\nexport const value = DOMPurify.sanitize('x');\n",
+    packageName: 'dompurify',
+    ruleName: 'heavy-runtime-dompurify-owner',
+  },
+] as const;
+
+it.each(heavyRuntimeCases)(
+  'enforces $packageName value-import ownership in the canonical dependency graph',
+  async ({ allowedPath, exportSource, forbiddenPath, importSource, packageName, ruleName }) => {
+    const root = createTempRoot(`dependency-graph-${packageName}-owner-`);
+    writeJson(root, 'tsconfig.json', {
+      compilerOptions: {
+        target: 'ES2020',
+        module: 'ESNext',
+        moduleResolution: 'bundler',
+      },
+      include: ['apps', 'packages'],
+    });
+    writeJson(root, 'package.json', {
+      name: `${packageName}-owner-fixture`,
+      type: 'module',
+      dependencies: { [packageName]: '1.0.0' },
+    });
+    writeJson(root, `node_modules/${packageName}/package.json`, {
+      name: packageName,
+      version: '1.0.0',
+      types: 'index.d.ts',
+    });
+    writeFile(root, `node_modules/${packageName}/index.d.ts`, exportSource);
+    writeFile(root, 'apps/extension/src/index.ts', 'export {};\n');
+    writeFile(root, 'packages/platform/src/index.ts', 'export {};\n');
+    writeFile(root, allowedPath, importSource);
+    writeFile(root, forbiddenPath, importSource);
+    const rule = repositoryBoundaryConfig.forbidden.find(
+      ({ name }: { name: string }) => name === ruleName
+    );
+    const module = await import('../../guards/architecture/verify-boundaries.mjs');
+
+    const result = await withCwd(root, () =>
+      module.runBoundaryCheck({
+        roots: ['apps/extension/src', 'packages/platform/src'],
+        configOverride: {
+          forbidden: [rule],
+          options: {
+            doNotFollow: { path: ['node_modules'] },
+            tsPreCompilationDeps: true,
+            tsConfig: { fileName: 'tsconfig.json' },
+          },
+        },
+      })
+    );
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.output).toContain(ruleName);
+    expect(result.output).toContain(forbiddenPath);
+    expect(result.output).not.toContain(`${allowedPath} →`);
+  },
+  20_000
+);
+
 function createBoundaryFixtureRoot(prefix: string) {
   const root = createTempRoot(prefix);
   writeJson(root, 'tsconfig.json', {

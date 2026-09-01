@@ -48,6 +48,7 @@ env:
   GATE_MODE: ${{ inputs.gate }}
   PROOF_LANE: ${{ inputs.gate == 'release-provenance' && 'release' || 'proof' }}
   PROOF_KIND: ${{ inputs.gate == 'release-provenance' && 'release-provenance' || 'fast-proof' }}
+  SNIPTALE_CI_FULL_HARNESS: ${{ github.event_name == 'schedule' && '1' || '0' }}
 
 jobs:
   fast-classifier:

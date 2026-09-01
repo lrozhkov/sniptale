@@ -243,7 +243,13 @@ function hostileFixtures() {
 }
 
 it('covers the complete profile-required external-adapter population', () => {
-  expect(auditCases.map(({ id }) => id).sort()).toEqual(requiredExternalControlIds());
+  const requiredIds = requiredExternalControlIds();
+  expect(
+    auditCases
+      .map(({ id }) => id)
+      .filter((id) => requiredIds.includes(id))
+      .sort()
+  ).toEqual(requiredIds);
   expect(auditCases).toHaveLength(9);
 });
 

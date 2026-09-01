@@ -14,10 +14,10 @@ vi.mock('../../analysis/repository/shared-paths.mjs', async (importOriginal) => 
   ),
 }));
 
-import { collectAiHygieneReport } from './ai-hygiene.mjs';
+import { collectDeadCommentedCodeViolations } from './dead-commented-code.mjs';
 
-it('keeps one logical result while preserving both analyzer identities', () => {
-  expect(collectAiHygieneReport(['apps/extension/src/example.ts']).violations).toEqual([
+it('reports dead commented code without mixing in readability heuristics', () => {
+  expect(collectDeadCommentedCodeViolations(['apps/extension/src/example.ts'])).toEqual([
     expect.objectContaining({ rule: 'dead-comment-block' }),
   ]);
 });

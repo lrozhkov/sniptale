@@ -31,7 +31,6 @@ const ALWAYS_FOCUSED_TRIGGERED_LABELS = new Set([
   'App-core owners',
   'OSS release surface',
   'Package boundaries',
-  'Root scatter',
   'Root side effects',
   'Target-only paths',
 ]);
@@ -43,7 +42,6 @@ const SCHEDULER_LANE_BY_ID = new Map([
   ['qa.rule.test-coverage', 'tests'],
   ['qa.rule.oxlint', 'lint'],
   ['qa.rule.logging-policy', 'lint'],
-  ['qa.rule.sonarjs', 'lint'],
   ['qa.rule.security', 'lint'],
   ['qa.rule.dead-exports', 'graph'],
 ]);

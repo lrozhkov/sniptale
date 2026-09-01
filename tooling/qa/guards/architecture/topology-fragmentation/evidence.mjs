@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { classifyFinalAppCoreOwnerPath } from '../app-core/app-core-owner-policy.mjs';
+import { deriveAppCoreOwnerPath } from '../app-core/app-core-owner-policy.mjs';
 
 export function runtimeForPath(file, runtimes) {
   return runtimes.find(({ root }) => file === root || file.startsWith(`${root}/`)) ?? null;
@@ -46,19 +46,15 @@ export function collectExactPublicContractFiles(graph, runtimes, readFile) {
   return publicFiles;
 }
 
-export function classifyCanonicalTopologyOwner(file, { appCorePolicy, runtimes }) {
+export function classifyCanonicalTopologyOwner(file, { runtimes }) {
   const runtime = runtimeForPath(file, runtimes);
   if (runtime) {
     return { id: `runtime:${runtime.id}`, kind: 'runtime', runtimeId: runtime.id };
   }
 
   if (file.startsWith('apps/extension/src/')) {
-    try {
-      const owner = classifyFinalAppCoreOwnerPath(file, appCorePolicy);
-      return { id: `app-core:${owner}`, kind: 'app-core', runtimeId: null };
-    } catch {
-      return null;
-    }
+    const owner = deriveAppCoreOwnerPath(file);
+    return owner ? { id: `app-core:${owner}`, kind: 'app-core', runtimeId: null } : null;
   }
 
   const packageName = file.match(/^packages\/([^/]+)\//u)?.[1];

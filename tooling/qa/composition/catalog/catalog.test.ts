@@ -121,18 +121,6 @@ describe('canonical QA control catalog', () => {
     ).toBe(true);
   });
 
-  it('projects SonarJS as the typed residual without changing its control identity or membership', () => {
-    const sonarjs = QA_CONTROL_CATALOG.find(({ id }) => id === 'qa.rule.sonarjs');
-
-    expect(sonarjs).toMatchObject({
-      category: 'single-file-semantics',
-      engineProfile: 'eslint-typed-residual',
-      label: 'SonarJS',
-      tool: 'verify-sonarjs.mjs',
-    });
-    expect(sonarjs?.lanes).toEqual(expect.arrayContaining(['release-direct', 'focused-direct']));
-  });
-
   it('rejects missing and unknown executable adapters', () => {
     const occurrences = collectQaOccurrences({ lane: 'focused-direct' });
     const exact = new Map(occurrences.map(({ id }) => [id, () => undefined]));

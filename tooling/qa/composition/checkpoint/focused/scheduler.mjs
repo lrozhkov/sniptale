@@ -30,7 +30,6 @@ const FOCUSED_RESULT_SHAPES = Object.freeze({
   lint: {
     loggingStep: 'step',
     oxlintStep: 'step',
-    sonarjsStep: 'step',
     securityStep: 'step',
   },
   graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
@@ -167,7 +166,6 @@ function assembleFocusedSteps(results) {
   return orderQaResultSteps([
     lint.oxlintStep,
     lint.loggingStep,
-    lint.sonarjsStep,
     ...light.qualitySteps,
     ...replaceDeferredOwnerGuardSteps(light.triggeredStaticSteps, ownerSteps),
     ...graph.dependencySteps,

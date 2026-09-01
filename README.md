@@ -272,7 +272,7 @@ AI implementation is controlled by a repository-local quality system rather than
 
 The normal workflow combines:
 
-- native TypeScript 7 type checking, Oxlint, Oxfmt, residual security/SonarJS analysis, unit and integration tests, and Playwright extension E2E suites;
+- native TypeScript 7 type checking, Oxlint with retained Security and syntax-only SonarJS plugin rules, Oxfmt, unit and integration tests, and Playwright extension E2E suites;
 - dependency-boundary and runtime-topology checks;
 - coverage, dead-code, cycle, duplication, complexity, and ownership checks;
 - manifest-permission, message-boundary, storage-authority, network-egress, diagnostic-sanitization, and other security guards;

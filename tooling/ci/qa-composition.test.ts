@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 import { expect, it, vi } from 'vitest';
 
@@ -7,9 +8,18 @@ import {
   collectCiProofResults,
   collectCiReleaseResults,
   collectFreshProductionBuildStep,
+  resolveCiCandidateDiff,
+  resolveCiHarnessTestPlan,
 } from './qa-composition.mjs';
 import { createCiProductControlOccurrences } from './product-control-policy.mjs';
 import { createTrustedControlMatrix } from './trusted-control-matrix.mjs';
+import {
+  createTempRoot,
+  initGitRepo,
+  runGit as runFixtureGit,
+  withCwd,
+  writeFile,
+} from '../qa/test-support/test-helpers';
 
 const FAST_ADMISSION = {
   artifactKind: 'sniptale-fast-proof-admission',
@@ -27,17 +37,39 @@ const releaseDelta = () => ({
   ],
 });
 
+function createCandidateGitRunner(stdout: string, comparisonRevision = 'b'.repeat(40)) {
+  return (args: string[]) => ({
+    skipped: false,
+    status: 0,
+    stderr: '',
+    stdout: args[0] === 'merge-base' ? `${comparisonRevision}\n` : stdout,
+  });
+}
+
+function gitOutput(root: string, ...args: string[]) {
+  return execFileSync(process.platform === 'win32' ? 'git.exe' : 'git', args, {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+}
+
 it('assigns full product tests, coverage, and harness tests to Fast proof', async () => {
+  let productCoverageFinished = false;
   const productProofCollector = vi.fn(async () => ({
     steps: [{ label: 'Oxlint', status: 'ok' as const }],
   }));
-  const auditCollector = vi.fn(async () => ({
-    steps: [{ label: 'Full product coverage', status: 'ok' as const }],
-  }));
-  const harnessTestCollector = vi.fn(async () => ({
-    label: 'Harness unit tests',
-    status: 'ok' as const,
-  }));
+  const auditCollector = vi
+    .fn(async () => ({
+      steps: [{ label: 'Full product coverage', status: 'ok' as const }],
+    }))
+    .mockImplementationOnce(async () => {
+      productCoverageFinished = true;
+      return { steps: [{ label: 'Full product coverage', status: 'ok' as const }] };
+    });
+  const harnessTestCollector = vi.fn(async () => {
+    expect(productCoverageFinished).toBe(true);
+    return { label: 'Harness unit tests', status: 'ok' as const };
+  });
   const productionBuildCollector = vi.fn(() => ({
     label: 'Production build',
     status: 'ok' as const,
@@ -64,6 +96,140 @@ it('assigns full product tests, coverage, and harness tests to Fast proof', asyn
     profileId: 'pr',
     session: undefined,
   });
+  expect(harnessTestCollector).toHaveBeenCalledWith(
+    expect.objectContaining({ full: true, reason: 'candidate base unavailable' })
+  );
+});
+
+it('uses affected harness closure for product-only candidates and full harness for control changes', () => {
+  const base = 'a'.repeat(40);
+  const productPlan = resolveCiHarnessTestPlan(
+    { mode: 'full-suite' },
+    {
+      environment: { SNIPTALE_BASE_SHA: base },
+      gitRunner: createCandidateGitRunner('M\0apps/extension/src/background/index.ts\0'),
+    }
+  );
+  expect(productPlan).toMatchObject({
+    full: false,
+    reason: 'product-only candidate affected closure',
+  });
+
+  expect(
+    resolveCiHarnessTestPlan(
+      { mode: 'full-suite' },
+      {
+        environment: { SNIPTALE_BASE_SHA: base },
+        gitRunner: createCandidateGitRunner('M\0tooling/ci/qa-composition.mjs\0'),
+      }
+    )
+  ).toMatchObject({ full: true, reason: 'CI/tooling control changed' });
+});
+
+it.each([
+  ['deleted input', 'D\0apps/extension/src/removed.ts\0'],
+  ['type-changed input', 'T\0tooling/ci/qa-composition.mjs\0'],
+  ['renamed input', 'R100\0apps/extension/src/old.ts\0apps/extension/src/new.ts\0'],
+])('forces full harness for a %s whose affected closure is not sound', (_name, stdout) => {
+  expect(
+    resolveCiHarnessTestPlan(
+      {},
+      {
+        environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+        gitRunner: createCandidateGitRunner(stdout),
+      }
+    )
+  ).toMatchObject({ full: true, reason: 'candidate deletion, rename, or type change' });
+});
+
+it.each(['tooling/qa/line\nbreak.test.ts', 'tooling/qa/tab\tname.test.ts'])(
+  'preserves a NUL-delimited hostile harness path: %s',
+  (file) => {
+    expect(
+      resolveCiHarnessTestPlan(
+        {},
+        {
+          environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+          gitRunner: createCandidateGitRunner(`M\0${file}\0`),
+        }
+      )
+    ).toMatchObject({ full: true, reason: 'CI/tooling control changed' });
+  }
+);
+
+it('uses one merge-base authority for candidate paths and deleted lineage', () => {
+  const calls: string[][] = [];
+  const comparisonRevision = 'c'.repeat(40);
+  const result = resolveCiCandidateDiff({
+    environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+    gitRunner: (args) => {
+      calls.push(args);
+      return createCandidateGitRunner(
+        'M\0apps/extension/src/content/current.ts\0D\0apps/extension/src/content/removed.ts\0',
+        comparisonRevision
+      )(args);
+    },
+  });
+
+  expect(result).toMatchObject({
+    available: true,
+    comparisonRevision,
+    deletedFiles: ['apps/extension/src/content/removed.ts'],
+  });
+  expect(calls).toEqual([
+    ['merge-base', 'a'.repeat(40), 'HEAD'],
+    [
+      'diff',
+      '--name-status',
+      '-z',
+      '--find-renames',
+      '--diff-filter=ACMRTD',
+      `${comparisonRevision}..HEAD`,
+    ],
+  ]);
+});
+
+it('keeps an advanced base tip out of the candidate comparison tree', async () => {
+  const root = createTempRoot('ci-candidate-advanced-base-');
+  initGitRepo(root);
+  writeFile(root, 'src/current.ts', 'export const current = 1;\n');
+  writeFile(root, 'src/removed.ts', 'export const removed = 1;\n');
+  runFixtureGit(root, 'add', '.');
+  runFixtureGit(root, 'commit', '-m', 'common ancestor');
+  const commonAncestor = gitOutput(root, 'rev-parse', 'HEAD');
+
+  runFixtureGit(root, 'checkout', '-b', 'feature');
+  writeFile(root, 'src/current.ts', 'export const current = 2;\n');
+  fs.rmSync(`${root}/src/removed.ts`);
+  runFixtureGit(root, 'add', '-A');
+  runFixtureGit(root, 'commit', '-m', 'feature candidate');
+
+  runFixtureGit(root, 'checkout', '-b', 'advanced-base', commonAncestor);
+  writeFile(root, 'src/base-only.ts', 'export const baseOnly = true;\n');
+  runFixtureGit(root, 'add', '.');
+  runFixtureGit(root, 'commit', '-m', 'advance base');
+  const advancedBase = gitOutput(root, 'rev-parse', 'HEAD');
+  runFixtureGit(root, 'checkout', 'feature');
+
+  const result = await withCwd(root, () =>
+    resolveCiCandidateDiff({ environment: { SNIPTALE_BASE_SHA: advancedBase } })
+  );
+
+  expect(result).toMatchObject({
+    available: true,
+    candidateFiles: ['src/current.ts', 'src/removed.ts'],
+    comparisonRevision: commonAncestor,
+    deletedFiles: ['src/removed.ts'],
+  });
+});
+
+it('allows an explicit periodic proof to force the full harness', () => {
+  expect(
+    resolveCiHarnessTestPlan(
+      {},
+      { environment: { SNIPTALE_CI_FULL_HARNESS: '1' }, gitRunner: vi.fn() }
+    )
+  ).toEqual({ full: true, relatedFiles: [], reason: 'explicit periodic/full proof' });
 });
 
 it('requires an admitted exact Fast proof and runs only the release delta', async () => {

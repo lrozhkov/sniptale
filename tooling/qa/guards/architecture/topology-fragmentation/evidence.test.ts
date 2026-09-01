@@ -10,10 +10,6 @@ const runtimes = [
   { id: 'background', root: 'apps/extension/src/background', entrypointFiles: [] },
   { id: 'content', root: 'apps/extension/src/content', entrypointFiles: [] },
 ];
-const appCorePolicy = {
-  finalOwnerRules: ['apps/extension/src/features/editor', 'apps/extension/src/features/scenario'],
-};
-
 it('collects only exact package exports and runtime entrypoints as public contracts', () => {
   const graph = {
     files: [
@@ -40,7 +36,7 @@ it('collects only exact package exports and runtime entrypoints as public contra
 });
 
 it('classifies runtime, app-core, and package owners and fails closed elsewhere', () => {
-  const context = { appCorePolicy, runtimes };
+  const context = { runtimes };
 
   expect(
     classifyCanonicalTopologyOwner('apps/extension/src/content/overlay/view.ts', context)
@@ -55,7 +51,7 @@ it('classifies runtime, app-core, and package owners and fails closed elsewhere'
 });
 
 it('keeps only exact public, cross-runtime, or canonical cross-owner edges', () => {
-  const context = { appCorePolicy, publicFiles: new Set<string>(), runtimes };
+  const context = { publicFiles: new Set<string>(), runtimes };
 
   expect(
     classifyAutomaticForwardingKeep({

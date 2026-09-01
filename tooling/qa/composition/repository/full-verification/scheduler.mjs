@@ -32,7 +32,6 @@ const FULL_RESULT_SHAPES = Object.freeze({
   lint: {
     loggingStep: 'step',
     oxlintStep: 'step',
-    sonarjsStep: 'nullable-step',
     securityStep: 'step',
   },
   graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
@@ -40,7 +39,7 @@ const FULL_RESULT_SHAPES = Object.freeze({
     formatStep: 'nullable-step',
     lineLengthStep: 'nullable-step',
     repositoryReadabilityStep: 'nullable-step',
-    aiHygieneStep: 'step',
+    deadCommentedCodeStep: 'step',
     structuralRiskStep: 'nullable-step',
     namingStep: 'step',
     mockParityStep: 'nullable-step',
@@ -81,6 +80,9 @@ function createFullVerifyWorkerContext(context) {
     codeFiles: context.codeFiles,
     excludedControlLabels: context.excludedControlLabels,
     releaseMode: context.releaseMode,
+    structuralCodeFiles: context.structuralCodeFiles,
+    structuralComparisonRevision: context.structuralComparisonRevision,
+    structuralDeletedFiles: context.structuralDeletedFiles,
     targetFiles: context.targetFiles,
   };
 }
@@ -156,7 +158,7 @@ function annotate(result, profile) {
       dependencySteps: appendTaskScheduleDetailToFirst(value.dependencySteps, detail),
     };
   }
-  const scheduleOwner = value.lineLengthStep ?? value.aiHygieneStep;
+  const scheduleOwner = value.lineLengthStep ?? value.deadCommentedCodeStep;
   return {
     ...value,
     ...(value.lineLengthStep
@@ -167,7 +169,7 @@ function annotate(result, profile) {
           ),
         }
       : {
-          aiHygieneStep: appendTaskScheduleDetail(
+          deadCommentedCodeStep: appendTaskScheduleDetail(
             scheduleOwner,
             `${detail}; ${formatQaResourceProfile(profile)}`
           ),
@@ -185,8 +187,7 @@ function assemble(results, releaseMode, includeTests) {
     ...(light.repositoryReadabilityStep ? [light.repositoryReadabilityStep] : []),
     lint.oxlintStep,
     lint.loggingStep,
-    ...(releaseMode && lint.sonarjsStep ? [lint.sonarjsStep] : []),
-    light.aiHygieneStep,
+    light.deadCommentedCodeStep,
     ...(light.structuralRiskStep ? [light.structuralRiskStep] : []),
     light.namingStep,
     ...(light.mockParityStep ? [light.mockParityStep] : []),

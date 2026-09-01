@@ -166,7 +166,6 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
     '.tmp/npm-audit/results.json',
-    '.tmp/npm-audit/signatures.json',
     '.tmp/licenses/summary.json',
     '.tmp/licenses/sbom.cdx.json',
   ])

@@ -284,6 +284,7 @@ if (reusableFastProof) {
 environment.push(...resolveGithubRunIdentityEnvironment());
 for (const name of [
   'SNIPTALE_BASE_SHA',
+  'SNIPTALE_CI_FULL_HARNESS',
   'SNIPTALE_QA_CPU_TOKENS',
   'SNIPTALE_QA_MEMORY_MIB',
   'SNIPTALE_QA_VITEST_MAX_WORKERS',

@@ -15,7 +15,7 @@ const VITE_SOURCE = [
   'export default defineConfig(() => ({',
   '  root: BUILD_LAYOUT.appRoot,',
   '  plugins: [tailwindcss(), extensionHtmlInputs(BUILD_LAYOUT)],',
-  '  build: { outDir: BUILD_LAYOUT.outputRoot, emptyOutDir: true },',
+  '  build: { outDir: BUILD_LAYOUT.outputRoot, emptyOutDir: true, chunkSizeWarningLimit: layoutPolicy.chunkSizeWarningLimitKb },',
   '  server: { fs: { strict: true, allow: [BUILD_LAYOUT.appRoot, ...BUILD_LAYOUT.externalInputRoots] } },',
   '}));',
 ].join('\n');

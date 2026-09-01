@@ -13,7 +13,7 @@ const TOOL_SOURCES = new Map([
   ['package-dist.mjs', 'tooling/release/package/package-dist.mjs'],
   ['qa-scope.mjs', 'tooling/qa/composition/scope/qa-scope.mjs'],
   ['verify-advisory.mjs', 'tooling/qa/wrappers/advisory.mjs'],
-  ['verify-ai-hygiene.mjs', 'tooling/qa/composition/quality/ai-hygiene.mjs'],
+  ['verify-dead-commented-code.mjs', 'tooling/qa/composition/quality/dead-commented-code.mjs'],
   [
     'verify-app-core-owners.mjs',
     'tooling/qa/guards/architecture/app-core/verify-app-core-owners.mjs',
@@ -70,10 +70,6 @@ const TOOL_SOURCES = new Map([
     'verify-forwarding-module-drift.mjs',
     'tooling/qa/guards/architecture/forwarding-module-drift/check.mjs',
   ],
-  [
-    'verify-heavy-runtime-import-ownership.mjs',
-    'tooling/qa/guards/architecture/imports/verify-heavy-runtime-import-ownership.mjs',
-  ],
   ['verify-i18n.mjs', 'tooling/qa/guards/product-contracts/verify-i18n.mjs'],
   [
     'verify-instance-ownership.mjs',
@@ -116,7 +112,6 @@ const TOOL_SOURCES = new Map([
     'verify-read-path-side-effects.mjs',
     'tooling/qa/guards/lifecycle/read-path-side-effects/check.mjs',
   ],
-  ['verify-root-scatter.mjs', 'tooling/qa/guards/quality/root-scatter/check.mjs'],
   ['verify-root-side-effects.mjs', 'tooling/qa/guards/quality/root-side-effects/check.mjs'],
   ['verify-runtime-topology.mjs', 'tooling/qa/guards/architecture/runtime-topology/check.mjs'],
   ['verify-secret-storage.mjs', 'tooling/qa/guards/security/verify-secret-storage.mjs'],
@@ -129,7 +124,6 @@ const TOOL_SOURCES = new Map([
     'verify-shared-style-ownership.mjs',
     'tooling/qa/guards/product-contracts/verify-shared-style-ownership.mjs',
   ],
-  ['verify-sonarjs.mjs', 'tooling/qa/guards/quality/sonarjs/check.mjs'],
   [
     'verify-persistence-ownership.mjs',
     'tooling/qa/guards/lifecycle/persistence-ownership/check.mjs',

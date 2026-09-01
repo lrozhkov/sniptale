@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
-import { copyAdmittedReleaseInput, copyFreshLaneReport } from './artifacts.mjs';
+import { copyAdmittedReleaseInput } from './artifacts.mjs';
 
 const temporaryRoots: string[] = [];
 
@@ -55,31 +55,14 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
   });
 });
 
-it('keeps release signature evidence fresh instead of copying the Fast report', () => {
+it('does not require evidence for the skipped npm signature audit', () => {
   const source = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
-  expect(source).not.toContain('REUSABLE_FAST_REPORTS');
-  expect(source).not.toContain('copyReusableFastReport');
-  expect(source).toContain("'.tmp/npm-audit/signatures.json'");
-
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-fresh-release-signatures-'));
-  temporaryRoots.push(root);
-  const destinationRoot = path.join(root, 'artifact');
-  const relative = '.tmp/npm-audit/signatures.json';
-  fs.mkdirSync(path.join(root, '.tmp/npm-audit'), { recursive: true });
-  fs.mkdirSync(destinationRoot);
-  fs.writeFileSync(path.join(root, relative), '{"authority":"release"}\n');
-  expect(
-    copyFreshLaneReport({
-      destinationRoot,
-      file: relative,
-      notBeforeMs: 0,
-      repositoryRoot: root,
-      required: true,
-    })
-  ).toBe(true);
-  expect(fs.readFileSync(path.join(destinationRoot, relative), 'utf8')).toBe(
-    '{"authority":"release"}\n'
+  const admissionPolicy = fs.readFileSync(
+    'tooling/configs/ci/trusted-admission-policy.json',
+    'utf8'
   );
+  expect(source).not.toContain("'.tmp/npm-audit/signatures.json'");
+  expect(admissionPolicy).not.toContain('.tmp/npm-audit/signatures.json');
 });
 
 it('seals an exact admitted prerequisite without misclassifying its pre-lane timestamp', () => {
@@ -141,4 +124,20 @@ it('ignores only a missing admitted prerequisite when failed-lane artifacts are 
   expect(() =>
     copyAdmittedReleaseInput({ destinationRoot, file: relative, repositoryRoot: root })
   ).toThrow('ENOENT');
+});
+
+it('rejects a FIFO admitted prerequisite without waiting for a writer', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-admitted-release-input-fifo-'));
+  temporaryRoots.push(root);
+  const destinationRoot = path.join(root, 'artifact');
+  const relative = '.tmp/ci/fast-proof-admission.json';
+  const source = path.join(root, relative);
+  fs.mkdirSync(path.dirname(source), { recursive: true });
+  fs.mkdirSync(destinationRoot);
+  const result = spawnSync('mkfifo', [source], { encoding: 'utf8' });
+  expect(result.status, result.stderr).toBe(0);
+
+  expect(() =>
+    copyAdmittedReleaseInput({ destinationRoot, file: relative, repositoryRoot: root })
+  ).toThrow(`Unsafe artifact: ${relative}`);
 });

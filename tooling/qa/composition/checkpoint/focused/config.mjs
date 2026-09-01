@@ -57,11 +57,6 @@ export const SECURITY_DATA_FULL_CLOSURE_TRIGGER_PATTERNS = [
   /^tooling\/qa\/guards\/security\/security-policy-utils\.mjs$/u,
 ];
 
-export const HEAVY_RUNTIME_IMPORT_TRIGGER_PATTERNS = [
-  SRC_SOURCE_PATTERN,
-  /^tooling\/qa\/guards\/architecture\/imports\/verify-heavy-runtime-import-ownership\.mjs$/u,
-];
-
 export const MANIFEST_INTEGRITY_TRIGGER_FILES = new Set([
   'tooling/qa/guards/product-contracts/manifest-integrity/check.mjs',
   'apps/extension/src/background/offscreen-document/create-options.ts',

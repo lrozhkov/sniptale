@@ -1,7 +1,7 @@
 import { findQaStepDefinition } from '../qa/composition/catalog/definitions.mjs';
 
 const REPOSITORY_FILE_TOOL_IDS = new Set([
-  'qa.rule.ai-hygiene',
+  'qa.rule.dead-commented-code',
   'qa.rule.ast-grep',
   'qa.rule.design-system',
   'qa.rule.full-product-coverage',
@@ -13,7 +13,6 @@ const REPOSITORY_FILE_TOOL_IDS = new Set([
   'qa.rule.naming',
   'qa.rule.oxlint',
   'qa.rule.repository-readability',
-  'qa.rule.sonarjs',
   'qa.rule.structural-risk',
 ]);
 

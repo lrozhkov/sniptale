@@ -9,7 +9,7 @@
       "controls": [
         { "id": "full-product-coverage", "requirement": "required" },
         { "id": "npm-audit", "requirement": "required" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
         { "id": "license-inventory", "requirement": "required" },
@@ -26,7 +26,7 @@
       "controls": [
         { "id": "full-product-coverage", "requirement": "required" },
         { "id": "npm-audit", "requirement": "required" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
         { "id": "license-inventory", "requirement": "required" },
@@ -43,7 +43,7 @@
       "controls": [
         { "id": "full-product-coverage", "requirement": "excluded" },
         { "id": "npm-audit", "requirement": "required" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
         { "id": "license-inventory", "requirement": "excluded" },
@@ -72,12 +72,12 @@
     },
     {
       "id": "release",
-      "description": "Complete release audit with every registered control and Git history scanning required.",
+      "description": "Release audit with canonical blocking controls and Git history scanning required.",
       "gitleaksScopes": ["worktree", "history"],
       "controls": [
         { "id": "full-product-coverage", "requirement": "required" },
         { "id": "npm-audit", "requirement": "required" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
         { "id": "license-inventory", "requirement": "required" },

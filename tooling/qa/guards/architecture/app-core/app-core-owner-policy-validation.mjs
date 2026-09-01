@@ -21,15 +21,6 @@ function validPathPairs(value) {
   );
 }
 
-function validOwnerRules(value) {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every(validPath) &&
-    new Set(value).size === value.length
-  );
-}
-
 function validAuthorities(value) {
   return (
     Array.isArray(value) &&
@@ -40,14 +31,11 @@ function validAuthorities(value) {
 }
 
 export function appCoreOwnerPolicyErrors(policy) {
-  return policy?.schemaVersion === 2 &&
-    validOwnerRules(policy.finalOwnerRules) &&
+  return policy?.schemaVersion === 3 &&
     validAuthorities(policy.authorityOwners) &&
-    validPathArray(policy.forbiddenSourcePrefixes) &&
     validPathPairs(policy.forbiddenOwnerEdges) &&
     validPathArray(policy.featurePublicEntrypoints, { required: true }) &&
     validPathPairs(policy.sameConcernPersistenceEdges) &&
-    validPathArray(policy.retainedAppUiRoots, { required: true }) &&
     validPathArray(policy.forbiddenBroadBarrels)
     ? []
     : ['invalid app-core owner policy'];

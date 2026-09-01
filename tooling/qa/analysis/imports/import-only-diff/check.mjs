@@ -16,8 +16,8 @@ function normalizeModuleSpecifierExpressions(sourceText) {
     .replace(/\b(vi\.(?:doMock|doUnmock|mock|unmock))\s*\(\s*(['"])[^'"]+\2/gu, "$1(''");
 }
 
-function runGitShowHead(relativePath) {
-  const result = spawnSync('git', ['show', `HEAD:${relativePath}`], {
+function runGitShowRevision(relativePath, revision = 'HEAD') {
+  const result = spawnSync('git', ['show', `${revision}:${relativePath}`], {
     cwd: process.cwd(),
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
@@ -136,34 +136,45 @@ function memoizeValue(cacheName, key, readValue) {
   return cache.map.get(key);
 }
 
-export function collectRenameSourceByTarget() {
+export function collectRenameSourceByTarget({ comparisonRevision = 'HEAD' } = {}) {
   const cwd = process.cwd();
-  if (renameSourceByTargetCache?.cwd === cwd) {
+  const revision = comparisonRevision;
+  if (renameSourceByTargetCache?.cwd === cwd && renameSourceByTargetCache.revision === revision) {
     return renameSourceByTargetCache.map;
   }
 
-  const nativeMap = new Map([
-    ...parseRenameSourceByTarget(runGitNameStatus(['--cached'])),
-    ...parseRenameSourceByTarget(runGitNameStatus([])),
-  ]);
-  const map = new Map([...collectDeletedUntrackedRenameFallback(nativeMap), ...nativeMap]);
-  renameSourceByTargetCache = { cwd, map };
+  const nativeMap =
+    revision === 'HEAD'
+      ? new Map([
+          ...parseRenameSourceByTarget(runGitNameStatus(['--cached'])),
+          ...parseRenameSourceByTarget(runGitNameStatus([])),
+        ])
+      : parseRenameSourceByTarget(runGitNameStatus([`${revision}..HEAD`]));
+  const map =
+    revision === 'HEAD'
+      ? new Map([...collectDeletedUntrackedRenameFallback(nativeMap), ...nativeMap])
+      : nativeMap;
+  renameSourceByTargetCache = { cwd, revision, map };
   return map;
 }
 
-function readPreviousSource(relativePath) {
+function readPreviousSource(relativePath, { comparisonRevision = 'HEAD' } = {}) {
   if (!relativePath) {
     return null;
   }
 
-  return memoizeValue('previous-source', relativePath, () => {
-    const renameSource = collectRenameSourceByTarget().get(relativePath);
-    return (renameSource ? runGitShowHead(renameSource) : null) ?? runGitShowHead(relativePath);
+  const revision = comparisonRevision;
+  return memoizeValue('previous-source', `${revision}\0${relativePath}`, () => {
+    const renameSource = collectRenameSourceByTarget({ comparisonRevision }).get(relativePath);
+    return (
+      (renameSource ? runGitShowRevision(renameSource, revision) : null) ??
+      runGitShowRevision(relativePath, revision)
+    );
   });
 }
 
-export function isRenameOnlyDiffTarget(file) {
-  return collectRenameSourceByTarget().has(toWorkspaceRelativePath(file));
+export function isRenameOnlyDiffTarget(file, options = {}) {
+  return collectRenameSourceByTarget(options).has(toWorkspaceRelativePath(file));
 }
 
 function toWorkspaceRelativePath(file) {
@@ -215,7 +226,7 @@ function stripTopLevelStatements(relativePath, sourceText, predicate, version) {
   return stripped.trim();
 }
 
-export function isImportOnlyDiffFile(file) {
+export function isImportOnlyDiffFile(file, options = {}) {
   const relativePath = toWorkspaceRelativePath(file);
   if (!isJsLikeFile(relativePath)) {
     return false;
@@ -223,16 +234,17 @@ export function isImportOnlyDiffFile(file) {
 
   return memoizeValue(
     'import-only-result',
-    relativePath,
+    `${options.comparisonRevision ?? 'HEAD'}\0${relativePath}`,
     () =>
       isDiffOnlyAfterStripping(
         relativePath,
-        (statement) => ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)
-      ) || isTypeOnlyDiffFile(file)
+        (statement) => ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement),
+        options
+      ) || isTypeOnlyDiffFile(file, options)
   );
 }
 
-export function isImportOrMockOnlyDiffFile(file) {
+export function isImportOrMockOnlyDiffFile(file, options = {}) {
   const relativePath = toWorkspaceRelativePath(file);
   if (!isJsLikeFile(relativePath)) {
     return false;
@@ -240,33 +252,34 @@ export function isImportOrMockOnlyDiffFile(file) {
 
   return memoizeValue(
     'import-or-mock-only-result',
-    relativePath,
+    `${options.comparisonRevision ?? 'HEAD'}\0${relativePath}`,
     () =>
       isDiffOnlyAfterStripping(
         relativePath,
         (statement) =>
           ts.isImportDeclaration(statement) ||
           ts.isExportDeclaration(statement) ||
-          isViMockExpressionStatement(statement)
-      ) || isTypeOnlyDiffFile(file)
+          isViMockExpressionStatement(statement),
+        options
+      ) || isTypeOnlyDiffFile(file, options)
   );
 }
 
-function isDiffOnlyAfterStripping(file, predicate) {
+function isDiffOnlyAfterStripping(file, predicate, options = {}) {
   const relativePath = toWorkspaceRelativePath(file);
   const absolutePath = fromWorkspaceRelativePath(relativePath);
   if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
     return false;
   }
 
-  const previousSource = readPreviousSource(relativePath);
+  const previousSource = readPreviousSource(relativePath, options);
   if (previousSource == null) {
     return false;
   }
 
   const currentSource = readCurrentSource(relativePath);
   if (previousSource === currentSource) {
-    return isRenameOnlyDiffTarget(relativePath);
+    return isRenameOnlyDiffTarget(relativePath, options);
   }
 
   return (
@@ -304,7 +317,7 @@ function hasNoTypeErasedRuntime(relativePath, sourceText) {
   return output === '' || /^export\s*\{\s*\};?$/u.test(output);
 }
 
-function isTypeOnlyDiffFile(file) {
+function isTypeOnlyDiffFile(file, options = {}) {
   const relativePath = toWorkspaceRelativePath(file);
   if (DECLARATION_FILE_PATTERN.test(relativePath)) {
     return true;
@@ -312,31 +325,39 @@ function isTypeOnlyDiffFile(file) {
 
   const absolutePath = fromWorkspaceRelativePath(relativePath);
   if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
-    return memoizeValue('type-only-result', relativePath, () => {
-      const previousSource = readPreviousSource(relativePath);
-      return previousSource !== null && hasNoTypeErasedRuntime(relativePath, previousSource);
-    });
+    return memoizeValue(
+      'type-only-result',
+      `${options.comparisonRevision ?? 'HEAD'}\0${relativePath}`,
+      () => {
+        const previousSource = readPreviousSource(relativePath, options);
+        return previousSource !== null && hasNoTypeErasedRuntime(relativePath, previousSource);
+      }
+    );
   }
 
-  return memoizeValue('type-only-result', relativePath, () => {
-    const previousSource = readPreviousSource(relativePath);
-    if (previousSource == null) {
-      return false;
-    }
+  return memoizeValue(
+    'type-only-result',
+    `${options.comparisonRevision ?? 'HEAD'}\0${relativePath}`,
+    () => {
+      const previousSource = readPreviousSource(relativePath, options);
+      if (previousSource == null) {
+        return false;
+      }
 
-    const currentSource = readCurrentSource(relativePath);
-    if (previousSource === currentSource) {
-      return false;
-    }
+      const currentSource = readCurrentSource(relativePath);
+      if (previousSource === currentSource) {
+        return false;
+      }
 
-    return eraseTypes(relativePath, previousSource) === eraseTypes(relativePath, currentSource);
-  });
+      return eraseTypes(relativePath, previousSource) === eraseTypes(relativePath, currentSource);
+    }
+  );
 }
 
-export function filterImportOnlyDiffFiles(files) {
-  return files.filter((file) => !isImportOnlyDiffFile(file));
+export function filterImportOnlyDiffFiles(files, options = {}) {
+  return files.filter((file) => !isImportOnlyDiffFile(file, options));
 }
 
-export function filterImportOrMockOnlyDiffFiles(files) {
-  return files.filter((file) => !isImportOrMockOnlyDiffFile(file));
+export function filterImportOrMockOnlyDiffFiles(files, options = {}) {
+  return files.filter((file) => !isImportOrMockOnlyDiffFile(file, options));
 }
