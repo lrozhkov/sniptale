@@ -23,6 +23,9 @@ const SCHEMA_CONTRACT_ROOTS = [
 ];
 const POST_VALIDATION_CALLS = new Set(['finishEffectV1Validation']);
 const SAFE_ASSERTION_TYPES = new Set(['unknown', 'const']);
+const EXACT_PERSISTED_PROJECTION_PATHS = new Set([
+  'apps/extension/src/composition/persistence/document-assets/parser.ts',
+]);
 
 function createBoundaryCastViolation(rule, file, sourceFile, node, message) {
   return {
@@ -295,6 +298,19 @@ function createSchemaAssertionViolation(relativePath, sourceFile, node, typeText
   return null;
 }
 
+function createPersistedProjectionAssertionViolation(relativePath, sourceFile, node, typeText) {
+  if (!EXACT_PERSISTED_PROJECTION_PATHS.has(relativePath) || SAFE_ASSERTION_TYPES.has(typeText)) {
+    return null;
+  }
+  return createBoundaryCastViolation(
+    'boundary-cast-persisted-projection',
+    relativePath,
+    sourceFile,
+    node,
+    'Persisted document parsers must construct exact validated projections without domain-shape assertions.'
+  );
+}
+
 function createShapeAssertionViolation(relativePath, sourceFile, node, typeText) {
   if (
     !isStrictCoercionPath(relativePath) ||
@@ -330,6 +346,7 @@ function collectAssertionViolations(relativePath, sourceFile, node) {
     createNeverAssertionViolation(relativePath, sourceFile, node, typeText),
     createBoundaryPayloadAssertionViolation(relativePath, sourceFile, node, typeText),
     createSchemaAssertionViolation(relativePath, sourceFile, node, typeText),
+    createPersistedProjectionAssertionViolation(relativePath, sourceFile, node, typeText),
     createShapeAssertionViolation(relativePath, sourceFile, node, typeText),
   ].filter(Boolean);
 }
