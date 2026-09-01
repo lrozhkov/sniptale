@@ -23,7 +23,7 @@ const testEnv = {
 const WRAPPER_TIMEOUT_MODE = 'wrapper';
 const DEFAULT_COVERAGE_MODE = 'diff';
 const SUPPORTED_POOLS = new Set(['forks', 'threads']);
-const PRODUCT_PARTITIONS = ['jsdom-vm', 'threads'];
+const PRODUCT_PARTITIONS = ['jsdom-vm', 'node-vm', 'threads'];
 
 export { expandRelatedTestScope };
 
@@ -120,10 +120,11 @@ export function createUnitTestEnv({
 
 export function resolveProductUnitTestPartitions({
   coverage = false,
+  focused = false,
   pool = null,
   suite = PRODUCT_QA_SUITE,
 } = {}) {
-  return normalizeQaSuite(suite) === PRODUCT_QA_SUITE && pool == null && !coverage
+  return normalizeQaSuite(suite) === PRODUCT_QA_SUITE && pool == null && !coverage && !focused
     ? PRODUCT_PARTITIONS
     : [null];
 }
@@ -158,6 +159,7 @@ export function runUnitTests({
   const effectivePool = normalizeUnitTestPool(pool ?? inheritedProductPool);
   const partitions = resolveProductUnitTestPartitions({
     coverage,
+    focused: directFiles.length > 0 || relatedFiles.length > 0,
     pool: effectivePool,
     suite: normalizedSuite,
   });

@@ -60,6 +60,30 @@ it('uses the full wrapper coverage profile when full wrapper coverage is request
   delete process.env.SNIPTALE_PRODUCT_VITEST_POOL;
 });
 
+it('projects exact node vmThreads and compatibility threads partitions', async () => {
+  process.env.SNIPTALE_VITEST_SUITE = 'product';
+  delete process.env.SNIPTALE_PRODUCT_VITEST_POOL;
+  delete process.env.SNIPTALE_VITEST_COVERAGE_MODE;
+  process.env.SNIPTALE_PRODUCT_VITEST_PARTITION = 'node-vm';
+
+  const nodeVm = await importFresh<typeof import('../../../../vitest.config.ts')>(
+    '../../../../vitest.config.ts',
+    import.meta.url
+  );
+  expect(nodeVm.default.test?.include).toHaveLength(2782);
+  expect(nodeVm.default.test?.pool).toBe('vmThreads');
+  expect(nodeVm.default.test?.vmMemoryLimit).toBe('512MB');
+
+  process.env.SNIPTALE_PRODUCT_VITEST_PARTITION = 'threads';
+  const compatibility = await importFresh<typeof import('../../../../vitest.config.ts')>(
+    '../../../../vitest.config.ts',
+    import.meta.url
+  );
+  expect(compatibility.default.test?.include).toHaveLength(13);
+  expect(compatibility.default.test?.pool).toBe('threads');
+  delete process.env.SNIPTALE_PRODUCT_VITEST_PARTITION;
+});
+
 it('uses harness includes when the harness suite is requested', async () => {
   process.env.SNIPTALE_VITEST_SUITE = 'harness';
   process.env.SNIPTALE_COVERAGE_PROFILE = '1';

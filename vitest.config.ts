@@ -65,13 +65,16 @@ function resolveProductPoolOverride(value: string | undefined) {
 
 function resolveProductPartition(value: string | undefined) {
   if (value == null || value === '') return undefined;
-  if (value === 'jsdom-vm' || value === 'threads') return value;
+  if (value === 'jsdom-vm' || value === 'node-vm' || value === 'threads') return value;
   throw new Error(`Unsupported SNIPTALE_PRODUCT_VITEST_PARTITION "${value}"`);
 }
 
 function resolveSuiteInclude() {
   if (vitestSuite === 'product') {
-    if (productPartition === 'jsdom-vm') return productTestInventory?.vmThreadsFiles ?? [];
+    if (productPartition === 'jsdom-vm') {
+      return productTestInventory?.jsdomVmThreadsFiles ?? [];
+    }
+    if (productPartition === 'node-vm') return productTestInventory?.nodeVmThreadsFiles ?? [];
     if (productPartition === 'threads') return productTestInventory?.threadsFiles ?? [];
     return [
       'apps/extension/src/**/*.{test,spec}.{ts,tsx}',
@@ -118,7 +121,7 @@ export default defineConfig({
     hookTimeout: isWrapperTimeoutMode ? 15000 : undefined,
     ...(productPoolOverride
       ? { pool: productPoolOverride }
-      : productPartition === 'jsdom-vm'
+      : productPartition === 'jsdom-vm' || productPartition === 'node-vm'
         ? { pool: 'vmThreads' as const, vmMemoryLimit: '512MB' }
         : vitestSuite === 'product'
           ? { pool: 'threads' as const }

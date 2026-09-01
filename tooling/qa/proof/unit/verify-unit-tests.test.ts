@@ -90,8 +90,9 @@ it('uses config-owned projects by default and keeps an explicit rollback overrid
 });
 
 it('splits only the config-owned product suite into sequential partitions', () => {
-  expect(resolveProductUnitTestPartitions()).toEqual(['jsdom-vm', 'threads']);
+  expect(resolveProductUnitTestPartitions()).toEqual(['jsdom-vm', 'node-vm', 'threads']);
   expect(resolveProductUnitTestPartitions({ coverage: true })).toEqual([null]);
+  expect(resolveProductUnitTestPartitions({ focused: true })).toEqual([null]);
   expect(resolveProductUnitTestPartitions({ pool: 'threads' })).toEqual([null]);
   expect(resolveProductUnitTestPartitions({ suite: 'harness' })).toEqual([null]);
   expect(createUnitTestEnv({ productPartition: 'jsdom-vm' })).toMatchObject({
@@ -100,6 +101,53 @@ it('splits only the config-owned product suite into sequential partitions', () =
   expect(createUnitTestEnv({ pool: 'threads' })).toMatchObject({
     SNIPTALE_PRODUCT_VITEST_POOL: 'threads',
   });
+});
+
+it('runs only the complete plain product suite through all ordered partitions', () => {
+  const fullInvocations: Array<{
+    args: string[];
+    options: { env: Record<string, string | null> };
+  }> = [];
+  runUnitTests({
+    execute: (_entry, args, options) => {
+      fullInvocations.push({ args, options });
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  expect(
+    fullInvocations.map(({ options }) => options.env.SNIPTALE_PRODUCT_VITEST_PARTITION)
+  ).toEqual(['jsdom-vm', 'node-vm', 'threads']);
+
+  const requiredRelatedInvocations: typeof fullInvocations = [];
+  runUnitTests({
+    relatedFiles: ['apps/extension/src/background/index.ts'],
+    requireTests: true,
+    execute: (_entry, args, options) => {
+      requiredRelatedInvocations.push({ args, options });
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  expect(requiredRelatedInvocations).toHaveLength(1);
+  expect(requiredRelatedInvocations[0]?.args).not.toContain('--passWithNoTests');
+  expect(requiredRelatedInvocations[0]?.options.env).toMatchObject({
+    SNIPTALE_PRODUCT_VITEST_PARTITION: null,
+    SNIPTALE_PRODUCT_VITEST_POOL: null,
+  });
+
+  const optionalDirectInvocations: typeof fullInvocations = [];
+  runUnitTests({
+    directFiles: ['apps/extension/src/background/example.test.ts'],
+    execute: (_entry, args, options) => {
+      optionalDirectInvocations.push({ args, options });
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  expect(optionalDirectInvocations).toHaveLength(1);
+  expect(optionalDirectInvocations[0]?.args).toContain('--passWithNoTests');
+  expect(optionalDirectInvocations[0]?.options.env.SNIPTALE_PRODUCT_VITEST_PARTITION).toBeNull();
 });
 
 it('collapses an inherited product pool rollback to one canonical runner invocation', () => {
