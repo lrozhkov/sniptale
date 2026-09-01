@@ -17,7 +17,7 @@ function ruleBlocksUrl(
     return (
       rule.action.type === 'block' &&
       rule.condition.requestMethods?.includes(method) === true &&
-      Boolean(regexFilter && new RegExp(regexFilter, 'iu').test(new URL(url).href))
+      Boolean(regexFilter && new URL(url).href.match(regexFilter))
     );
   });
 }

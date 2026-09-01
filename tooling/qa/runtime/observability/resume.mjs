@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEFAULT_LIMITS } from './constants.mjs';
+import { DEFAULT_LIMITS, OBSERVABILITY_SCHEMA_VERSION } from './constants.mjs';
 import { ObservabilityRunController } from './run-controller.mjs';
 import { parseRunRecord } from './schema.mjs';
 import { collectSensitiveEnvironmentValues } from './sanitize.mjs';
@@ -27,7 +27,7 @@ export function resumeLatestObservabilityRun({
     for (const name of fs.readdirSync(dayRoot).filter((entry) => entry.endsWith('.json'))) {
       const record = parseRunRecord(JSON.parse(fs.readFileSync(path.join(dayRoot, name), 'utf8')));
       if (
-        record.schemaVersion === 3 &&
+        record.schemaVersion === OBSERVABILITY_SCHEMA_VERSION &&
         record.wrapperId === wrapperId &&
         record.parentRunId === null &&
         Date.parse(record.startedAt) >= notBeforeMs

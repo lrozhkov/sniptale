@@ -400,24 +400,6 @@
       }
     },
     {
-      "id": "3d76991f420ea09ed07f443bd23166e24759d57aa5df1b50aa20f1bb87f2705f",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/contracts/messaging/contracts",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/contracts/messaging/contracts/runtime-message/frame-annotation-raster.types.ts",
-        "start": 12,
-        "end": 30
-      },
-      "secondFile": {
-        "path": "apps/extension/src/contracts/messaging/contracts/runtime/actions/core.ts",
-        "start": 322,
-        "end": 340
-      }
-    },
-    {
       "id": "3febd4469c029199cfb19f8fd579b10b0c6e816581477f5c421a1886339eb67a",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",

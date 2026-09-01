@@ -216,6 +216,7 @@ export async function createReleaseArchive({ date = new Date(), repoRoot = proce
     assertSafeReleaseArchiveFile(file, contents);
     archiveFiles.push({ ...file, contents });
     zip.file(file.relativePath, contents, {
+      createFolders: false,
       date: ARCHIVE_FILE_DATE,
     });
   }

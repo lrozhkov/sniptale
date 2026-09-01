@@ -62,6 +62,7 @@ import { SETTINGS_TRANSFER_MAX_BYTES } from '../../../../settings-transfer';
 import { isSettingsTransferResponse } from './settings-transfer-response-guard';
 import { isFullPageCaptureGeometry } from '../../../../full-page-capture';
 import type { RuntimeContentActionRequestByType } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/content-action';
+import type { RuntimeFrameAnnotationRasterRequestByType } from '../../runtime-message/frame-annotation-raster.types';
 
 type OpenEditorWithImageMessage =
   RuntimeContentActionRequestByType[typeof MessageType.OPEN_EDITOR_WITH_IMAGE] & {
@@ -348,27 +349,7 @@ export const runtimeActionCoreMessageContracts = {
       'runtime FRAME_ANNOTATION_RASTERIZE message',
       (
         value
-      ): value is
-        | {
-            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
-            operation: 'prepare';
-            leaseId: string;
-          }
-        | {
-            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
-            operation: 'confirm';
-            leaseId: string;
-          }
-        | {
-            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
-            operation: 'cancel';
-            leaseId: string;
-          }
-        | {
-            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
-            operation: 'rasterize';
-            reference: { inputSha256: string; jobId: string; revision: number };
-          } =>
+      ): value is RuntimeFrameAnnotationRasterRequestByType[typeof MessageType.FRAME_ANNOTATION_RASTERIZE] =>
         isRecord(value) &&
         value['type'] === MessageType.FRAME_ANNOTATION_RASTERIZE &&
         (((value['operation'] === 'prepare' || value['operation'] === 'confirm') &&

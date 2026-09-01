@@ -2,5 +2,5 @@
   "schemaVersion": 1,
   "controlId": "qa.rule.structural-risk",
   "findingCount": 108,
-  "findingDigest": "sha256:eb07466291b3093367e81f3e36026c306119c226da149e37d799db6bcf00e33a"
+  "findingDigest": "sha256:f0d1a40718994f06470374325dc59db61af52f21f1b1393378830efeea9aa031"
 }

@@ -132,7 +132,7 @@ it('keeps every ignore class rooted and disables test-support scanning', () => {
   );
 });
 
-it('admits jscpd only in repository and release blocking profiles', () => {
+it('admits jscpd in repository, PR, and release blocking profiles', () => {
   const profiles = JSON.parse(
     fs.readFileSync('tooling/configs/qa/audit-profiles.data.json', 'utf8')
   );
@@ -145,7 +145,7 @@ it('admits jscpd only in repository and release blocking profiles', () => {
     )
   ).toEqual({
     repository: 'required',
-    pr: 'excluded',
+    pr: 'required',
     security: 'excluded',
     coverage: 'excluded',
     release: 'required',

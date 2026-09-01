@@ -92,14 +92,14 @@ it('accepts a verified Fast audit control without executing its collector', () =
 it('does not invoke a collector excluded by the PR profile', () => {
   const profile = resolveAuditProfile('pr');
   const collector = vi.fn(() => ({ violations: [] }));
-  const step = collectProfiledSyncStep(profile, 'npm-audit', 'npm audit', collector, () => ({
-    label: 'npm audit',
+  const step = collectProfiledSyncStep(profile, 'codeql', 'CodeQL', collector, () => ({
+    label: 'CodeQL',
     status: 'failed',
   }));
 
   expect(collector).not.toHaveBeenCalled();
   expect(step).toMatchObject({
-    label: 'npm audit',
+    label: 'CodeQL',
     status: 'skipped',
     skipReasonId: 'audit.profile-not-selected',
   });

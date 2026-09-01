@@ -167,12 +167,14 @@ it('routes editor and screenshot gallery messages through the shared helper bran
       dataUrl: 'data:image/png;base64,1',
     },
     42,
-    open.sendResponse
+    open.sendResponse,
+    undefined
   );
   expect(handleSaveScreenshotToGalleryMock).toHaveBeenCalledWith(
     expect.objectContaining({ filename: 'capture.png' }),
     42,
-    saveScreenshot.sendResponse
+    saveScreenshot.sendResponse,
+    undefined
   );
 });
 

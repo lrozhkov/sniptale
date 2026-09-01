@@ -149,6 +149,6 @@ it('uses deleted same-owner functions as move-only structural predecessors', () 
 
 it('does not expose repo-wide or raw JSON modes from the enforcement entrypoint', () => {
   const source = fs.readFileSync('tooling/qa/analysis/structural-risk/check.mjs', 'utf8');
-  expect(source).not.toContain("scope === 'repo-wide'");
+  expect(source).not.toContain("argv.includes('--repo-wide')");
   expect(source).not.toContain("argv.includes('--json')");
 });

@@ -70,7 +70,7 @@ it('projects exact node vmThreads and compatibility threads partitions', async (
     '../../../../vitest.config.ts',
     import.meta.url
   );
-  expect(nodeVm.default.test?.include).toHaveLength(2782);
+  expect(nodeVm.default.test?.include).toHaveLength(2787);
   expect(nodeVm.default.test?.pool).toBe('vmThreads');
   expect(nodeVm.default.test?.vmMemoryLimit).toBe('512MB');
 

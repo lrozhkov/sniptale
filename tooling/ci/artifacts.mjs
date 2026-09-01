@@ -269,10 +269,12 @@ export function copyAdmittedReleaseInput({
   environment = process.env,
   file,
   repositoryRoot,
+  required = true,
 }) {
   const relativeSource = relativePath(file, repositoryRoot);
   assertNoSymlinkComponents(relativeSource, repositoryRoot);
   const source = path.join(repositoryRoot, relativeSource);
+  if (!fs.existsSync(source) && !required) return false;
   const details = fs.lstatSync(source);
   if (!details.isFile() || details.isSymbolicLink()) {
     throw new Error(`Unsafe artifact: ${file}`);
@@ -344,7 +346,7 @@ function collectLaneReports({
   for (const file of LANE_FILES[lane] ?? []) {
     const copied =
       lane === 'release' && ADMITTED_RELEASE_INPUTS.has(file)
-        ? copyAdmittedReleaseInput({ destinationRoot, file, repositoryRoot })
+        ? copyAdmittedReleaseInput({ destinationRoot, file, repositoryRoot, required })
         : copyFreshLaneReport({
             destinationRoot,
             file,
