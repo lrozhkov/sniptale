@@ -9,7 +9,9 @@ import {
 } from './release-inheritance-policy.mjs';
 import { validateProofPopulation } from './proof-population-policy.mjs';
 
-const COMMIT_INAPPLICABLE_CONTROLS = Object.freeze({});
+const COMMIT_INAPPLICABLE_CONTROLS = Object.freeze({
+  'qa.rule.structural-risk': 'no-applicable-targets',
+});
 
 function auditProfileForLane(lane, trustedRoot) {
   return resolveAuditProfile(lane === 'proof' ? 'pr' : 'release', {
@@ -79,6 +81,10 @@ function validateInheritedControl(step, id, inheritanceContext) {
     `fast-proof/${admission?.sourceRunLog ?? ''}`,
   ].sort();
   const sourceStep = (sourceRecord?.steps ?? []).find(({ stepId }) => stepId === id);
+  const inapplicableReason = COMMIT_INAPPLICABLE_CONTROLS[id];
+  const sourceOutcomeAdmissible =
+    sourceStep?.outcome === 'passed' ||
+    (sourceStep?.outcome === 'skipped' && sourceStep.skipReasonId === inapplicableReason);
   if (
     step?.outcome !== 'inherited' ||
     !inheritance ||
@@ -88,7 +94,7 @@ function validateInheritedControl(step, id, inheritanceContext) {
     inheritance.sourceRunRecord !== expectedRunRecord ||
     JSON.stringify([...(inheritance.evidenceFiles ?? [])].sort()) !==
       JSON.stringify(expectedEvidence) ||
-    sourceStep?.outcome !== 'passed'
+    !sourceOutcomeAdmissible
   ) {
     throw new Error(`Candidate proof did not bind inherited trusted control: ${id}`);
   }
@@ -129,6 +135,9 @@ export function validateTrustedControlResults(
       throw new Error(
         `Candidate proof used an inadmissible skip reason for trusted control: ${id}`
       );
+    }
+    if (outcome === 'skipped' && COMMIT_INAPPLICABLE_CONTROLS[id]) {
+      validateProofPopulation(step, id);
     }
   }
   return matrix;

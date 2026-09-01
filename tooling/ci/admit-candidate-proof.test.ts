@@ -195,6 +195,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
           stepId,
           outcome: 'skipped',
           skipReasonId: controlMatrix.allowedSkippedReasons[stepId],
+          population: populationFor(stepId),
         })),
       ],
       timeline: { events: [], activities: [] },
@@ -385,6 +386,7 @@ function releaseFixture({ reused = false } = {}) {
       stepId,
       outcome: 'skipped',
       skipReasonId: controlMatrix.allowedSkippedReasons[stepId],
+      population: populationFor(stepId),
     })),
   ];
   write(artifact, recordPath, `${JSON.stringify(record)}\n`);

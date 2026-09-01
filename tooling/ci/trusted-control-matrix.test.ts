@@ -47,6 +47,7 @@ function recordFor(lane: 'proof' | 'release') {
         stepId,
         outcome: 'skipped',
         skipReasonId: matrix.allowedSkippedReasons[stepId],
+        population: populationFor(stepId),
       })),
     ],
   };
@@ -97,10 +98,11 @@ it('requires base-owned fast and release control matrices while permitting decla
     expect(release.requiredPassed).not.toContain(id);
     expect(release.allowedSkipped).not.toContain(id);
   }
-  for (const id of ['qa.rule.structural-risk', 'qa.rule.ui-automation-seams']) {
-    expect(proof.requiredPassed).toContain(id);
+  expect(proof.allowedSkipped).toContain('qa.rule.structural-risk');
+  expect(proof.allowedSkippedReasons['qa.rule.structural-risk']).toBe('no-applicable-targets');
+  expect(proof.requiredPassed).toContain('qa.rule.ui-automation-seams');
+  for (const id of ['qa.rule.structural-risk', 'qa.rule.ui-automation-seams'])
     expect(release.requiredInherited).toContain(id);
-  }
   expect(() => validate(recordFor('proof'), 'proof')).not.toThrow();
   expect(() => validate(recordFor('release'), 'release')).not.toThrow();
 });
@@ -128,6 +130,41 @@ it('rejects missing, skipped, failed, or duplicated mandatory candidate results'
   expect(() => validate(duplicated, 'proof')).toThrow(
     'repeats a trusted control result: qa.rule.osv-scanner'
   );
+});
+
+it('admits an inapplicable diff-only structural result in proof and release inheritance', () => {
+  const proof = recordFor('proof');
+  expect(() => validate(proof, 'proof')).not.toThrow();
+
+  const release = recordFor('release');
+  const matrix = createTrustedControlMatrix('release');
+  const sourceSteps: Array<{
+    stepId: string;
+    outcome: string;
+    population: ReturnType<typeof populationFor>;
+    skipReasonId?: string;
+  }> = matrix.requiredInherited.map((stepId) => ({
+    stepId,
+    outcome: 'passed',
+    population: populationFor(stepId),
+  }));
+  const structural = sourceSteps.find(({ stepId }) => stepId === 'qa.rule.structural-risk')!;
+  structural.outcome = 'skipped';
+  structural.skipReasonId = 'no-applicable-targets';
+  expect(() =>
+    validateTrustedControlResults(release, 'release', process.cwd(), {
+      admission: release.admission,
+      sourceRecord: { steps: sourceSteps },
+    })
+  ).not.toThrow();
+
+  structural.skipReasonId = 'unexpected-reason';
+  expect(() =>
+    validateTrustedControlResults(release, 'release', process.cwd(), {
+      admission: release.admission,
+      sourceRecord: { steps: sourceSteps },
+    })
+  ).toThrow('did not bind inherited trusted control: qa.rule.structural-risk');
 });
 
 it('requires formerly inapplicable parser controls after repo-wide activation', () => {
