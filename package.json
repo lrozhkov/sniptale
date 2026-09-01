@@ -124,6 +124,7 @@
   },
   "devDependencies": {
     "@ast-grep/cli": "^0.45.1",
+    "@bcoe/v8-coverage": "^1.0.2",
     "@crxjs/vite-plugin": "^2.7.1",
     "@playwright/test": "^1.62.1",
     "@sniptale/platform": "0.4.0",
@@ -156,6 +157,7 @@
     "playwright": "^1.62.1",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
+    "tinyglobby": "^0.2.17",
     "ts-morph": "^28.0.0",
     "tsx": "^4.23.12",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
