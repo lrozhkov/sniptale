@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+const { ensureWebSnapshotRedirectNetworkGuard } = vi.hoisted(() => ({
+  ensureWebSnapshotRedirectNetworkGuard: vi.fn(async () => undefined),
+}));
+vi.mock('./redirect-network-guard', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./redirect-network-guard')>()),
+  ensureWebSnapshotRedirectNetworkGuard,
+}));
+
 import {
   authorizeWebSnapshotCaptureRequest,
   cancelWebSnapshotCaptureRequest,
@@ -56,6 +64,8 @@ function registerSession(
 }
 
 beforeEach(() => {
+  ensureWebSnapshotRedirectNetworkGuard.mockReset();
+  ensureWebSnapshotRedirectNetworkGuard.mockResolvedValue(undefined);
   resetWebSnapshotAssetSessionsForTests();
   vi.stubGlobal('crypto', {
     randomUUID: vi.fn(() => 'snapshot-session-1'),
@@ -248,6 +258,7 @@ it('rejects external asset redirects without following their target', async () =
     sourceUrl,
     expect.objectContaining({ credentials: 'omit', redirect: 'manual' })
   );
+  expect(ensureWebSnapshotRedirectNetworkGuard).not.toHaveBeenCalled();
 });
 
 it('follows an external asset redirect only when the capture session allows it', async () => {
@@ -270,6 +281,19 @@ it('follows an external asset redirect only when the capture session allows it',
     sourceUrl,
     expect.objectContaining({ credentials: 'omit', redirect: 'follow' })
   );
+  expect(ensureWebSnapshotRedirectNetworkGuard).toHaveBeenCalledOnce();
+  expect(ensureWebSnapshotRedirectNetworkGuard).toHaveBeenCalledBefore(vi.mocked(fetch));
+});
+
+it('fails closed before fetch when the redirect network guard cannot be installed', async () => {
+  const sourceUrl = 'https://cdn.example.com/image.png';
+  const sessionId = registerSession([sourceUrl], true);
+  ensureWebSnapshotRedirectNetworkGuard.mockRejectedValueOnce(new Error('rules unavailable'));
+
+  await expect(
+    fetchWebSnapshotAssetForSession({ sessionId, tabId: 42, url: sourceUrl })
+  ).rejects.toThrow('rules unavailable');
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 it('rejects a redirected response whose final URL is not a public HTTPS target', async () => {

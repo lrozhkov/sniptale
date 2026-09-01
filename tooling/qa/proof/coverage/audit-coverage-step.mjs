@@ -20,6 +20,7 @@ import {
   recordSuccessfulCoverageProof,
   resolveReusableCoverageProof,
 } from './coverage-proof.mjs';
+import { recordSuccessfulFullUnitProof } from '../unit/unit-test-proof.mjs';
 
 const FULL_COVERAGE_DIRECTORY = '.tmp/coverage/unit';
 
@@ -44,10 +45,18 @@ function prepareFullCoverageDirectory() {
 export async function collectFullCoverageAuditStep({
   maxWorkers = resolveQaResourceProfile().vitestMaxWorkers,
 } = {}) {
+  const pool = resolveProductUnitTestPool();
   const reusable = resolveReusableCoverageProof();
   if (reusable.matched) {
     materializeReusableCoverageProof(reusable);
     recordSuccessfulCoverageProof({ reusedFrom: reusable.proof.producer ?? null });
+    recordSuccessfulFullUnitProof({
+      maxWorkers,
+      pool,
+      source: 'full-product-coverage',
+      reusedFrom: reusable.proof.proofDigest,
+      suite: PRODUCT_QA_SUITE,
+    });
     return withDuration(
       createOkStep('Full product coverage', `reused verified ${reusable.source}`),
       0
@@ -59,7 +68,7 @@ export async function collectFullCoverageAuditStep({
       coverage: true,
       coverageMode: 'manual',
       maxWorkers,
-      pool: resolveProductUnitTestPool(),
+      pool,
       suite: PRODUCT_QA_SUITE,
     })
   );
@@ -86,6 +95,12 @@ export async function collectFullCoverageAuditStep({
   try {
     writeCanonicalCoverageArtifacts({ report: coverageReport });
     recordSuccessfulCoverageProof();
+    recordSuccessfulFullUnitProof({
+      maxWorkers,
+      pool,
+      source: 'full-product-coverage',
+      suite: PRODUCT_QA_SUITE,
+    });
   } catch (error) {
     return withDuration(
       createFailureStep('Full product coverage', 'coverage publication failed', {

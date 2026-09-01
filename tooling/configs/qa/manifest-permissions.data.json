@@ -57,6 +57,17 @@
       "userFacingDisclosure": "settings.permissions.requiredWebNavigationDescription"
     },
     {
+      "name": "declarativeNetRequest",
+      "owner": "apps/extension/src/background/capture/routing/web-snapshot/redirect-network-guard.ts",
+      "feature": "Pre-network redirect destination blocking for anonymous Web Snapshot assets",
+      "runtimeRoute": "background Web Snapshot asset fetch owner",
+      "capabilityPolicy": "Session rules apply only to extension-initiated, tabless GET fetches and block HTTP or syntactically private/local destinations before network dispatch.",
+      "failureBehavior": "A redirect-enabled asset fetch fails before fetch when the blocking rules cannot be installed.",
+      "justification": "Preserves public HTTPS asset redirects while preventing an allowed public URL from redirecting an anonymous extension GET to an insecure or private/local literal destination.",
+      "reviewNote": "Keep rules extension-initiated, GET-only, fail-closed before fetch, and aligned with the canonical private-network URL validator.",
+      "userFacingDisclosure": "settings.permissions.requiredDeclarativeNetRequestDescription"
+    },
+    {
       "name": "system.display",
       "owner": "packages/platform/src/browser/displays.ts",
       "feature": "Browser-window preset fit and work-area selection",

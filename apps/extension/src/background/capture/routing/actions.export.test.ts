@@ -1,20 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { captureFullPageForArchiveMock, getPreauthorizedContentActionRouteMessageMock } = vi.hoisted(
-  () => ({
-    captureFullPageForArchiveMock: vi.fn(),
-    getPreauthorizedContentActionRouteMessageMock: vi.fn(),
-  })
-);
+const { captureFullPageForArchiveMock } = vi.hoisted(() => ({
+  captureFullPageForArchiveMock: vi.fn(),
+}));
 
 vi.mock('../index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../index')>()),
   captureFullPageForArchive: captureFullPageForArchiveMock,
-}));
-
-vi.mock('./authorization/content-action', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./authorization/content-action')>()),
-  getPreauthorizedContentActionRouteMessage: getPreauthorizedContentActionRouteMessageMock,
 }));
 
 import type { PageAccessPort } from '../../routing-contracts/page-access-port';
@@ -48,12 +40,16 @@ function createMessage(exportRunId = 'export-run-1') {
   };
 }
 
+const senderBinding = {
+  documentId: 'document-42',
+  frameId: 0,
+  requestId: 'export-run-1',
+  senderUrl: 'https://example.test/page',
+  tabId: 42,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
-  getPreauthorizedContentActionRouteMessageMock.mockReturnValue({
-    documentId: 'document-42',
-    tabId: 42,
-  });
 });
 
 it('captures through native visible authority and returns archive metadata', async () => {
@@ -64,7 +60,9 @@ it('captures through native visible authority and returns archive metadata', asy
     metadata: { captureGeometry, downscaled: true, frozenExtentWarning: false },
   });
 
-  expect(handleExportCaptureFullPage(createMessage(), 42, sendResponse, pageAccessPort)).toBe(true);
+  expect(
+    handleExportCaptureFullPage(createMessage(), 42, sendResponse, pageAccessPort, senderBinding)
+  ).toBe(true);
   await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
 
   expect(pageAccessPort.ensureActivePageAccessRuntime).toHaveBeenCalledWith(42);
@@ -88,7 +86,13 @@ it('surfaces native capture failures', async () => {
   const sendResponse = vi.fn();
   captureFullPageForArchiveMock.mockRejectedValue(new Error('archive failed'));
 
-  handleExportCaptureFullPage(createMessage(), 42, sendResponse, createPageAccessPort());
+  handleExportCaptureFullPage(
+    createMessage(),
+    42,
+    sendResponse,
+    createPageAccessPort(),
+    senderBinding
+  );
 
   await vi.waitFor(() =>
     expect(sendResponse).toHaveBeenCalledWith({ success: false, error: 'archive failed' })
@@ -97,7 +101,7 @@ it('surfaces native capture failures', async () => {
 
 it('fails closed when the page access owner is unavailable', async () => {
   const sendResponse = vi.fn();
-  handleExportCaptureFullPage(createMessage(), 42, sendResponse);
+  handleExportCaptureFullPage(createMessage(), 42, sendResponse, undefined, senderBinding);
 
   await vi.waitFor(() =>
     expect(sendResponse).toHaveBeenCalledWith({
@@ -125,7 +129,8 @@ it('does not publish success when cancellation arrives before the archive respon
     createMessage('batch-publish-cancelled'),
     42,
     sendResponse,
-    createPageAccessPort()
+    createPageAccessPort(),
+    { ...senderBinding, requestId: 'batch-publish-cancelled' }
   );
   await vi.waitFor(() => expect(captureFullPageForArchiveMock).toHaveBeenCalled());
   expect(cancelFullPageCaptureByExportRunId('batch-publish-cancelled')).toBe(true);
@@ -156,7 +161,8 @@ it('rejects export-run and capability identity mismatches before privileged effe
     },
     42,
     sendResponse,
-    createPageAccessPort()
+    createPageAccessPort(),
+    senderBinding
   );
 
   expect(sendResponse).toHaveBeenCalledWith({
@@ -168,7 +174,6 @@ it('rejects export-run and capability identity mismatches before privileged effe
 
 it('rejects missing document bindings and duplicate export-run ownership', async () => {
   const sendResponse = vi.fn();
-  getPreauthorizedContentActionRouteMessageMock.mockReturnValueOnce(null);
   handleExportCaptureFullPage(
     createMessage('missing-binding'),
     42,
@@ -195,7 +200,8 @@ it('rejects missing document bindings and duplicate export-run ownership', async
     createMessage('duplicate-run'),
     42,
     firstResponse,
-    createPageAccessPort()
+    createPageAccessPort(),
+    { ...senderBinding, requestId: 'duplicate-run' }
   );
   await vi.waitFor(() => expect(captureFullPageForArchiveMock).toHaveBeenCalled());
 
@@ -204,7 +210,8 @@ it('rejects missing document bindings and duplicate export-run ownership', async
     createMessage('duplicate-run'),
     42,
     duplicateResponse,
-    createPageAccessPort()
+    createPageAccessPort(),
+    { ...senderBinding, requestId: 'duplicate-run' }
   );
   expect(duplicateResponse).toHaveBeenCalledWith({
     error: 'A full-page capture already owns this export run',

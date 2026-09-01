@@ -31,7 +31,7 @@ function expectHarnessChangeInvalidatesFullDiff(args: {
   expect(args.harnessChangedContext.allFingerprint).not.toBe(args.context.allFingerprint);
   expect(() =>
     args.checkpointHelpers.assertFreshCheckpointState(args.harnessChangedContext, 'qa:build')
-  ).toThrow(/full-diff .*current repo diff/u);
+  ).toThrow(/checkpoint (?:controlDigest changed|full-diff .*current repo diff)/u);
 }
 
 it('validates checkpoint state freshness against the current diff fingerprint', async () => {
@@ -68,6 +68,12 @@ it('validates checkpoint state freshness against the current diff fingerprint', 
 
     expect(() => checkpointHelpers.assertFreshCheckpointState(context, 'qa:build')).not.toThrow();
 
+    writeFile(root, 'tooling/qa/unchanged-owner.mjs', 'export const authority = 1;\n');
+    expect(() => checkpointHelpers.assertFreshCheckpointState(context, 'qa:build')).toThrow(
+      /controlDigest changed/u
+    );
+    writeFile(root, 'tooling/qa/unchanged-owner.mjs', '');
+
     writeFile(root, 'tooling/qa/example.mjs', 'export const harness = true;\n');
     const harnessChangedContext = qaScope.createScopedQaContext(
       advisoryHelpers.collectCurrentDiffContext()
@@ -81,7 +87,7 @@ it('validates checkpoint state freshness against the current diff fingerprint', 
     writeFile(root, 'tracked.ts', 'export const value = 3;\n');
     const staleContext = qaScope.createScopedQaContext(advisoryHelpers.collectCurrentDiffContext());
     expect(() => checkpointHelpers.assertFreshCheckpointState(staleContext, 'qa:build')).toThrow(
-      /fingerprint does not match/u
+      /controlDigest changed|fingerprint does not match/u
     );
   });
 });

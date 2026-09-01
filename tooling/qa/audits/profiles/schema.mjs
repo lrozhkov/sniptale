@@ -12,14 +12,8 @@ export const AUDIT_CONTROL_REQUIREMENTS = Object.freeze(['required', 'optional',
 export const GITLEAKS_SCOPES = Object.freeze(['worktree', 'history']);
 
 const auditControlIds = AUDIT_STEPS.map(([id]) => id);
-const securityEngineIds = [
-  'npm-audit',
-  'npm-audit-signatures',
-  'osv-scanner',
-  'gitleaks',
-  'ast-grep',
-  'codeql',
-];
+const disabledControlIds = new Set(['npm-audit-signatures']);
+const securityEngineIds = ['npm-audit', 'osv-scanner', 'gitleaks', 'ast-grep', 'codeql'];
 
 function assertObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -79,10 +73,23 @@ function assertRequiredSecurityEngines(profile) {
   }
 }
 
+function assertDisabledControls(profile) {
+  const incorrectlyEnabled = profile.controls
+    .filter(({ id, requirement }) => disabledControlIds.has(id) && requirement !== 'excluded')
+    .map(({ id }) => id);
+  if (incorrectlyEnabled.length > 0) {
+    throw new TypeError(
+      `audit profile ${profile.id} must exclude disabled controls: ${incorrectlyEnabled.join(', ')}`
+    );
+  }
+}
+
 function assertCompleteReleaseProfile(profile) {
   if (profile.id !== 'release') return;
   const nonRequired = profile.controls
-    .filter(({ requirement }) => requirement !== 'required')
+    .filter(({ id, requirement }) =>
+      disabledControlIds.has(id) ? requirement !== 'excluded' : requirement !== 'required'
+    )
     .map(({ id }) => id);
   if (nonRequired.length > 0) {
     throw new TypeError(
@@ -107,7 +114,16 @@ function assertIsolatedCoverageProfile(profile) {
 
 function assertFastPrProfile(profile) {
   if (profile.id !== 'pr') return;
-  const required = new Set(['npm-audit-signatures', 'osv-scanner', 'gitleaks']);
+  const required = new Set([
+    'full-product-coverage',
+    'npm-audit',
+    'osv-scanner',
+    'gitleaks',
+    'license-inventory',
+    'ast-grep',
+    'knip',
+    'jscpd',
+  ]);
   const invalid = profile.controls
     .filter(({ id, requirement }) => requirement !== (required.has(id) ? 'required' : 'excluded'))
     .map(({ id }) => id);
@@ -119,7 +135,14 @@ function assertFastPrProfile(profile) {
 function assertRepositoryProfile(profile) {
   if (profile.id !== 'repository') return;
   const invalid = profile.controls
-    .filter(({ id, requirement }) => requirement !== (id === 'codeql' ? 'optional' : 'required'))
+    .filter(({ id, requirement }) => {
+      const expected = disabledControlIds.has(id)
+        ? 'excluded'
+        : id === 'codeql'
+          ? 'optional'
+          : 'required';
+      return requirement !== expected;
+    })
     .map(({ id }) => id);
   if (invalid.length > 0) {
     throw new TypeError(`audit profile repository has invalid controls: ${invalid.join(', ')}`);
@@ -161,6 +184,7 @@ function parseProfile(value) {
     controls: value.controls.map((control) => parseControl(control, value.id)),
   };
   assertCompleteControls(profile);
+  assertDisabledControls(profile);
   assertRequiredSecurityEngines(profile);
   assertRepositoryProfile(profile);
   assertFastPrProfile(profile);

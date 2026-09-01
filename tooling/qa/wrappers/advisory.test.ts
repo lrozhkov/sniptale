@@ -97,6 +97,35 @@ it('replaces legacy smell collectors with the machine-owned structural catalog',
   );
 });
 
+it('reports root scatter only for files in the current diff and never blocks the advisory run', async () => {
+  const root = createTempRoot('verify-advisory-root-scatter-');
+  const changedFile = 'src/shared/example-helper.ts';
+  const unchangedFile = 'src/shared/unchanged-helper.ts';
+  writeFile(root, changedFile, 'export const changed = true;\n');
+  writeFile(root, unchangedFile, 'export const unchanged = true;\n');
+
+  const findings = await collectAdvisoryFindings(root, [changedFile], [changedFile]);
+  const rootScatter = findings.filter(({ id }) => id === 'advisory.root-scatter');
+
+  expect(rootScatter).toEqual([expect.objectContaining({ file: changedFile, severity: 'watch' })]);
+  expect(rootScatter.map(({ file }) => file)).not.toContain(unchangedFile);
+});
+
+it('reports oversized inline literals only as current-diff advisory findings', async () => {
+  const root = createTempRoot('verify-advisory-inline-literal-');
+  const changedFile = 'src/changed.ts';
+  const unchangedFile = 'src/unchanged.ts';
+  const literal = 'x'.repeat(1201);
+  writeFile(root, changedFile, `export const changed = '${literal}';\n`);
+  writeFile(root, unchangedFile, `export const unchanged = '${literal}';\n`);
+
+  const findings = await collectAdvisoryFindings(root, [changedFile], [changedFile]);
+  const literals = findings.filter(({ id }) => id === 'advisory.oversized-inline-literal');
+
+  expect(literals).toEqual([expect.objectContaining({ file: changedFile, severity: 'watch' })]);
+  expect(literals.map(({ file }) => file)).not.toContain(unchangedFile);
+});
+
 it('does not duplicate blocking lifecycle/read-path guards in advisory', async () => {
   const root = createRuntimeAdvisoryFixtureRoot();
   const findings = await collectAdvisoryFindings(root, [
@@ -349,6 +378,9 @@ it('prints advisory check coverage so the wrapper explains what it inspects', as
   expect(output).toContain('Non-blocking advisory checks:');
   expect(output).toContain('structural file pressure');
   expect(output).toContain('structural function pressure');
+  expect(output).toContain('root scatter');
+  expect(output).toContain('documentation prose drift');
+  expect(output).toContain('oversized inline literals');
   expect(output).toContain('UI proof gaps');
   expect(output).toContain('Advisory (non-blocking): attention=0, watch=0');
 });
@@ -357,6 +389,9 @@ it('keeps the advisory catalog exact and separate from blocking guard IDs', asyn
   const { ADVISORY_CATALOG } = await import('../composition/advisory/advisory-catalog.data.mjs');
   const { QA_RULE_DEFINITIONS } = await import('../composition/catalog/definitions.mjs');
   expect(Object.keys(ADVISORY_CATALOG).sort()).toEqual([
+    'advisory.documentation-prose',
+    'advisory.oversized-inline-literal',
+    'advisory.root-scatter',
     'advisory.structural-file',
     'advisory.structural-function',
     'advisory.ui-proof-gap',

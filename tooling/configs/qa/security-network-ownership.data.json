@@ -5,7 +5,7 @@
       "file": "apps/extension/src/background/capture/routing/web-snapshot/fetch.ts",
       "owner": "background-web-snapshot-asset-fetch",
       "justification": "The capture-session owner performs anonymous public HTTPS asset fetches after URL and session authorization.",
-      "reviewNote": "Every fetch must retain private-network rejection, session authority, credentials omit, redirect policy, and final-URL revalidation."
+      "reviewNote": "Every fetch must retain private-network rejection, session authority, credentials omit, pre-network redirect guard installation, redirect policy, and final-URL revalidation."
     }
   ],
   "secretHeaderOwners": [

@@ -147,6 +147,14 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Понимает, что страница изменилась, и очищает старые состояния захвата.',
     en: 'Detects when a page changes and clears old capture state.',
   },
+  requiredDeclarativeNetRequestName: {
+    ru: 'Безопасные переходы ресурсов',
+    en: 'Safe resource redirects',
+  },
+  requiredDeclarativeNetRequestDescription: {
+    ru: 'Блокирует небезопасные адреса в цепочках переходов при сохранении веб-страницы.',
+    en: 'Blocks unsafe destinations in resource redirect chains while saving a web page.',
+  },
   requiredSystemDisplayName: {
     ru: 'Размер и рабочая область экрана',
     en: 'Display size and work area',

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "controlId": "qa.rule.domain-fixture-realism",
+  "findingCount": 4,
+  "findingDigest": "sha256:65b98aaa453dc317ae35a05109cde4d489a41c6e0c8ef0c857af8ca492d28442"
+}

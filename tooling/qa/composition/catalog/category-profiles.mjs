@@ -19,10 +19,9 @@ const CATEGORY_BY_LABEL = new Map([
   ['Format', 'preparation'],
   ['Task artifacts', 'scope-and-admission'],
   ['Changed-line readability', 'lexical-and-path'],
-  ['AI hygiene', 'lexical-and-path'],
+  ['Dead commented code', 'lexical-and-path'],
   ['Suppression directives', 'lexical-and-path'],
   ['Oxlint', 'syntax-core'],
-  ['SonarJS', 'single-file-semantics'],
   ['Boundary casts', 'syntax-core'],
   ['Root side effects', 'syntax-core'],
   ['Logging policy', 'syntax-core'],
@@ -95,7 +94,8 @@ export function resolveQaSemanticClass({ kind, category }) {
   return 'proof/build/test/tool';
 }
 
-export function resolveQaScopeProfile({ lanes, category }) {
+export function resolveQaScopeProfile({ lanes, category, label }) {
+  if (label === 'Forwarding module drift') return 'candidate diff';
   if (category === 'release-sast-and-legal') return 'release-only';
   if (category === 'behavioral-proof') return 'artifact';
   if (lanes.includes('focused-triggered')) return 'triggered repo-wide';
@@ -128,14 +128,6 @@ const ENGINE_DECISION_BY_LABEL = new Map([
     ],
   ],
   [
-    'SonarJS',
-    [
-      'eslint-typed-residual',
-      'Five parser-services rules remain in the minimal release-only ESLint owner; ' +
-        'four syntax-only rules moved into the existing Oxlint syntax-core receipt.',
-    ],
-  ],
-  [
     'Messaging',
     [
       'ast-grep-unified',
@@ -154,14 +146,6 @@ const ENGINE_DECISION_BY_LABEL = new Map([
     [
       'oxlint-native',
       'Native no-console is projected from the single Oxlint receipt with two exact tracing exemptions.',
-    ],
-  ],
-  [
-    'Heavy runtime imports',
-    [
-      'dependency-graph',
-      'The canonical dependency graph already owns value-import edges; ' +
-        'a second ast-grep import authority would duplicate it.',
     ],
   ],
   [

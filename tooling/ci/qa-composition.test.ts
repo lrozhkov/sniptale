@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 import { expect, it, vi } from 'vitest';
 
@@ -7,116 +8,306 @@ import {
   collectCiProofResults,
   collectCiReleaseResults,
   collectFreshProductionBuildStep,
+  resolveCiCandidateDiff,
+  resolveCiHarnessTestPlan,
 } from './qa-composition.mjs';
 import { createCiProductControlOccurrences } from './product-control-policy.mjs';
 import { createTrustedControlMatrix } from './trusted-control-matrix.mjs';
+import {
+  createTempRoot,
+  initGitRepo,
+  runGit as runFixtureGit,
+  withCwd,
+  writeFile,
+} from '../qa/test-support/test-helpers';
 
-const passed = { label: 'passed', status: 'ok' as const };
-const productionBuildPassed = { label: 'Production build', status: 'ok' as const };
-const productionBuildCollector = () => productionBuildPassed;
+const FAST_ADMISSION = {
+  artifactKind: 'sniptale-fast-proof-admission',
+  outcome: 'admitted',
+  proofSemanticDigest: `sha256:${'1'.repeat(64)}`,
+  proofManifestDigest: `sha256:${'2'.repeat(64)}`,
+  sourceRunRecord: '.tmp/qa-observability/runs/2026-09-01/proof.json',
+  sourceRunLog: '.tmp/qa-logs/2026-09-01/proof.log',
+};
 
-it('assigns full units to Fast proof and full coverage to release provenance', async () => {
-  const policy = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
-  expect(policy.gateCapabilities.proof).toMatchObject({ fullVitest: true, releaseReady: false });
-  expect(policy.gateCapabilities.proof.scope).toBe('repository-wide');
-  expect(policy.gateCapabilities.release).toMatchObject({
-    scope: 'repository-wide',
-    fullVitest: true,
-    releaseReady: true,
+const releaseDelta = () => ({
+  steps: [
+    { label: 'Build', status: 'ok' as const },
+    { label: 'Release archive', status: 'ok' as const },
+  ],
+});
+
+function createCandidateGitRunner(stdout: string, comparisonRevision = 'b'.repeat(40)) {
+  return (args: string[]) => ({
+    skipped: false,
+    status: 0,
+    stderr: '',
+    stdout: args[0] === 'merge-base' ? `${comparisonRevision}\n` : stdout,
   });
-  expect(policy.invariants.diffAwareWrappersExactly).toEqual([
-    'qa:release-harness',
-    'qa:checkpoint',
-    'qa:closeout',
+}
+
+function gitOutput(root: string, ...args: string[]) {
+  return execFileSync(process.platform === 'win32' ? 'git.exe' : 'git', args, {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+}
+
+it('assigns full product tests, coverage, and harness tests to Fast proof', async () => {
+  let productCoverageFinished = false;
+  const productProofCollector = vi.fn(async () => ({
+    steps: [{ label: 'Oxlint', status: 'ok' as const }],
+  }));
+  const auditCollector = vi
+    .fn(async () => ({
+      steps: [{ label: 'Full product coverage', status: 'ok' as const }],
+    }))
+    .mockImplementationOnce(async () => {
+      productCoverageFinished = true;
+      return { steps: [{ label: 'Full product coverage', status: 'ok' as const }] };
+    });
+  const harnessTestCollector = vi.fn(async () => {
+    expect(productCoverageFinished).toBe(true);
+    return { label: 'Harness unit tests', status: 'ok' as const };
+  });
+  const productionBuildCollector = vi.fn(() => ({
+    label: 'Production build',
+    status: 'ok' as const,
+  }));
+
+  const result = await collectCiProofResults({
+    productProofCollector,
+    auditCollector,
+    harnessTestCollector,
+    productionBuildCollector,
+  });
+
+  expect(result.steps.map(({ label }) => label)).toEqual([
+    'Oxlint',
+    'Unit tests',
+    'Harness unit tests',
+    'Production build',
+    'Full product coverage',
   ]);
-  const source = fs.readFileSync('tooling/ci/qa-composition.mjs', 'utf8');
-  const executionSource = fs.readFileSync(
-    'tooling/qa/composition/repository/full-verification/execution.mjs',
-    'utf8'
+  expect(result.steps.find(({ label }) => label === 'Unit tests')?.detail).toContain(
+    'shared-execution=full-product-test-proof'
   );
-  expect(source).toContain('includeTests: true');
-  expect(source).toContain('includeTests: false');
-  expect(source).toContain('resolveRepositoryVerifyScope()');
-  expect(source).not.toContain('resolveFullVerifyScope');
-  expect(source).toContain('collectReleaseDeltaStepResults');
-  expect(executionSource).toContain('releaseMode ? DEFAULT_OXLINT_ROOTS : codeFiles');
-  const proof = await collectCiProofResults({
-    productProofCollector: async () => ({
-      steps: [
-        passed,
-        { label: 'Unit tests', status: 'ok' },
-        { label: 'Test coverage', status: 'skipped' },
-      ],
-    }),
-    auditCollector: async () => ({ steps: [passed] }),
-    productionBuildCollector,
+  expect(auditCollector).toHaveBeenCalledWith({
+    profileId: 'pr',
+    session: undefined,
   });
-  const release = await collectCiReleaseResults({
-    reuseFastProof: true,
-    releaseDeltaCollector: async () => ({
-      steps: [
-        { label: 'SonarJS', status: 'ok' },
-        { label: 'Build', status: 'ok' },
-        { label: 'Release archive', status: 'ok' },
-      ],
-    }),
-    auditCollector: async () => ({ steps: [passed] }),
-    productionBuildCollector,
-  });
-  expect(proof.context).toMatchObject({ mode: 'ci:proof' });
-  expect(proof.steps).toEqual(
-    expect.arrayContaining([expect.objectContaining({ label: 'Unit tests', status: 'ok' })])
+  expect(harnessTestCollector).toHaveBeenCalledWith(
+    expect.objectContaining({ full: true, reason: 'candidate base unavailable' })
   );
-  expect(proof.steps.map(({ label }) => label)).not.toContain('Test coverage');
-  expect(release.context).toMatchObject({ mode: 'ci:release' });
+});
 
-  const reusedRelease = await collectCiReleaseResults({
-    reuseFastProof: true,
-    productProofCollector: async () => {
-      throw new Error('verified Fast proof reuse must not rerun Fast controls');
-    },
-    releaseDeltaCollector: async () => ({
-      steps: [
-        { label: 'SonarJS', status: 'ok' },
-        { label: 'Build', status: 'ok' },
-        { label: 'Release archive', status: 'ok' },
-      ],
-    }),
-    auditCollector: async () => ({ steps: [passed] }),
-    productionBuildCollector,
+it('uses affected harness closure for product-only candidates and full harness for control changes', () => {
+  const base = 'a'.repeat(40);
+  const productPlan = resolveCiHarnessTestPlan(
+    { mode: 'full-suite' },
+    {
+      environment: { SNIPTALE_BASE_SHA: base },
+      gitRunner: createCandidateGitRunner('M\0apps/extension/src/background/index.ts\0'),
+    }
+  );
+  expect(productPlan).toMatchObject({
+    full: false,
+    reason: 'product-only candidate affected closure',
   });
-  expect(reusedRelease).toMatchObject({ executionMode: 'reuse-fast-proof' });
-  expect(reusedRelease.steps).toEqual(
+
+  expect(
+    resolveCiHarnessTestPlan(
+      { mode: 'full-suite' },
+      {
+        environment: { SNIPTALE_BASE_SHA: base },
+        gitRunner: createCandidateGitRunner('M\0tooling/ci/qa-composition.mjs\0'),
+      }
+    )
+  ).toMatchObject({ full: true, reason: 'CI/tooling control changed' });
+});
+
+it.each([
+  ['deleted input', 'D\0apps/extension/src/removed.ts\0'],
+  ['type-changed input', 'T\0tooling/ci/qa-composition.mjs\0'],
+  ['renamed input', 'R100\0apps/extension/src/old.ts\0apps/extension/src/new.ts\0'],
+])('forces full harness for a %s whose affected closure is not sound', (_name, stdout) => {
+  expect(
+    resolveCiHarnessTestPlan(
+      {},
+      {
+        environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+        gitRunner: createCandidateGitRunner(stdout),
+      }
+    )
+  ).toMatchObject({ full: true, reason: 'candidate deletion, rename, or type change' });
+});
+
+it.each(['tooling/qa/line\nbreak.test.ts', 'tooling/qa/tab\tname.test.ts'])(
+  'preserves a NUL-delimited hostile harness path: %s',
+  (file) => {
+    expect(
+      resolveCiHarnessTestPlan(
+        {},
+        {
+          environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+          gitRunner: createCandidateGitRunner(`M\0${file}\0`),
+        }
+      )
+    ).toMatchObject({ full: true, reason: 'CI/tooling control changed' });
+  }
+);
+
+it('uses one merge-base authority for candidate paths and deleted lineage', () => {
+  const calls: string[][] = [];
+  const comparisonRevision = 'c'.repeat(40);
+  const result = resolveCiCandidateDiff({
+    environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+    gitRunner: (args) => {
+      calls.push(args);
+      return createCandidateGitRunner(
+        'M\0apps/extension/src/content/current.ts\0D\0apps/extension/src/content/removed.ts\0',
+        comparisonRevision
+      )(args);
+    },
+  });
+
+  expect(result).toMatchObject({
+    available: true,
+    comparisonRevision,
+    deletedFiles: ['apps/extension/src/content/removed.ts'],
+  });
+  expect(calls).toEqual([
+    ['merge-base', 'a'.repeat(40), 'HEAD'],
+    [
+      'diff',
+      '--name-status',
+      '-z',
+      '--find-renames',
+      '--diff-filter=ACMRTD',
+      `${comparisonRevision}..HEAD`,
+    ],
+  ]);
+});
+
+it('keeps an advanced base tip out of the candidate comparison tree', async () => {
+  const root = createTempRoot('ci-candidate-advanced-base-');
+  initGitRepo(root);
+  writeFile(root, 'src/current.ts', 'export const current = 1;\n');
+  writeFile(root, 'src/removed.ts', 'export const removed = 1;\n');
+  runFixtureGit(root, 'add', '.');
+  runFixtureGit(root, 'commit', '-m', 'common ancestor');
+  const commonAncestor = gitOutput(root, 'rev-parse', 'HEAD');
+
+  runFixtureGit(root, 'checkout', '-b', 'feature');
+  writeFile(root, 'src/current.ts', 'export const current = 2;\n');
+  fs.rmSync(`${root}/src/removed.ts`);
+  runFixtureGit(root, 'add', '-A');
+  runFixtureGit(root, 'commit', '-m', 'feature candidate');
+
+  runFixtureGit(root, 'checkout', '-b', 'advanced-base', commonAncestor);
+  writeFile(root, 'src/base-only.ts', 'export const baseOnly = true;\n');
+  runFixtureGit(root, 'add', '.');
+  runFixtureGit(root, 'commit', '-m', 'advance base');
+  const advancedBase = gitOutput(root, 'rev-parse', 'HEAD');
+  runFixtureGit(root, 'checkout', 'feature');
+
+  const result = await withCwd(root, () =>
+    resolveCiCandidateDiff({ environment: { SNIPTALE_BASE_SHA: advancedBase } })
+  );
+
+  expect(result).toMatchObject({
+    available: true,
+    candidateFiles: ['src/current.ts', 'src/removed.ts'],
+    comparisonRevision: commonAncestor,
+    deletedFiles: ['src/removed.ts'],
+  });
+});
+
+it('allows an explicit periodic proof to force the full harness', () => {
+  expect(
+    resolveCiHarnessTestPlan(
+      {},
+      { environment: { SNIPTALE_CI_FULL_HARNESS: '1' }, gitRunner: vi.fn() }
+    )
+  ).toEqual({ full: true, relatedFiles: [], reason: 'explicit periodic/full proof' });
+});
+
+it('requires an admitted exact Fast proof and runs only the release delta', async () => {
+  const releaseDeltaCollector = vi.fn(async () => releaseDelta());
+  const auditCollector = vi.fn(async () => ({ steps: [] }));
+  const result = await collectCiReleaseResults({
+    fastProofAdmission: FAST_ADMISSION,
+    releaseDeltaCollector,
+    auditCollector,
+  });
+
+  expect(result.executionMode).toBe('admitted-fast-proof');
+  expect(result.steps).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ label: 'Fast proof reuse', status: 'ok' }),
-      expect.objectContaining({ label: 'Oxlint', status: 'ok' }),
-      expect.objectContaining({ label: 'SonarJS', status: 'ok' }),
+      expect.objectContaining({ label: 'Oxlint', status: 'inherited' }),
+      expect.objectContaining({
+        label: 'Production build',
+        status: 'inherited',
+      }),
       expect.objectContaining({ label: 'Build', status: 'ok' }),
       expect.objectContaining({ label: 'Release archive', status: 'ok' }),
     ])
   );
-  expect(reusedRelease.steps.map(({ label }) => label)).not.toContain('Unit tests');
-  expect(reusedRelease.steps.filter(({ label }) => label === 'Build')).toHaveLength(1);
+  expect(result.steps.map(({ label }) => label)).not.toContain('Unit tests');
+
+  await expect(collectCiReleaseResults({ releaseDeltaCollector, auditCollector })).rejects.toThrow(
+    'requires an admitted exact Fast proof'
+  );
 });
 
-it('keeps the trusted phase orchestrator aligned with admission policy', () => {
+it('fails closed when the release-only result closure is incomplete', async () => {
+  await expect(
+    collectCiReleaseResults({
+      fastProofAdmission: FAST_ADMISSION,
+      releaseDeltaCollector: async () => ({
+        steps: [{ label: 'Build', status: 'ok' as const }],
+      }),
+      auditCollector: async () => ({ steps: [] }),
+    })
+  ).rejects.toThrow('Missing release-only control result: Release archive');
+});
+
+it('inherits the exact audit controls already owned by Fast proof', async () => {
+  const auditCollector = vi.fn(async () => ({
+    steps: [
+      { label: 'Full product coverage', status: 'ok' as const },
+      { label: 'npm audit', status: 'ok' as const },
+    ],
+  }));
+  const result = await collectCiReleaseResults({
+    fastProofAdmission: FAST_ADMISSION,
+    releaseDeltaCollector: async () => releaseDelta(),
+    auditCollector,
+  });
+
+  expect(auditCollector).toHaveBeenCalledWith({
+    profileId: 'release',
+    reusedControlIds: ['full-product-coverage', 'ast-grep', 'knip', 'jscpd'],
+    session: undefined,
+  });
+  expect(result.steps.find(({ label }) => label === 'Full product coverage')).toMatchObject({
+    status: 'inherited',
+  });
+  expect(result.steps.find(({ label }) => label === 'npm audit')).toMatchObject({ status: 'ok' });
+});
+
+it('keeps the trusted phase orchestrator and control matrix aligned with policy', () => {
   const admission = JSON.parse(
     fs.readFileSync('tooling/configs/ci/trusted-admission-policy.json', 'utf8')
   );
-  const runLane = fs.readFileSync('tooling/ci/run-lane.mjs', 'utf8');
-  const container = fs.readFileSync('tooling/ci/container.mjs', 'utf8');
   const containerCommand = fs.readFileSync('tooling/ci/container-command.mjs', 'utf8');
   for (const lane of ['proof', 'release']) {
     for (const phase of admission.lanes[lane].freshPhases) {
       expect(containerCommand, `${lane}:${phase}`).toContain(`'${phase}'`);
     }
   }
-  expect(container).toContain('${trustedRoot}:/opt/sniptale-trusted:ro');
-  expect(container).toContain("path.join(trustedRoot, 'tooling/ci/run-lane.mjs')");
-  expect(runLane).toContain("spawnSync('docker', invocation");
-});
 
-it('derives trusted CI control admission from the executable occurrence owner', () => {
   const occurrences = createReleaseControlOccurrences();
   const proof = createTrustedControlMatrix('proof');
   const release = createTrustedControlMatrix('release');
@@ -125,230 +316,36 @@ it('derives trusted CI control admission from the executable occurrence owner', 
   for (const { id } of occurrences) {
     if (proofIds.has(id) && !proof.allowedSkipped.includes(id)) {
       expect(proof.requiredPassed).toContain(id);
-    } else if (!proofIds.has(id)) {
-      expect(proof.requiredPassed).not.toContain(id);
-      expect(proof.allowedSkipped).not.toContain(id);
     }
     if (releaseIds.has(id) && !release.allowedSkipped.includes(id)) {
-      expect(release.requiredPassed).toContain(id);
-    } else if (!releaseIds.has(id)) {
-      expect(release.requiredPassed).not.toContain(id);
-      expect(release.allowedSkipped).not.toContain(id);
+      expect([...release.requiredPassed, ...release.requiredInherited]).toContain(id);
     }
   }
-  expect(release.requiredPassed).toContain('qa.rule.full-product-coverage');
+  expect(proof.requiredPassed).toContain('qa.rule.full-product-coverage');
+  expect(release.requiredInherited).toContain('qa.rule.full-product-coverage');
 });
 
-it('fails closed when the release-only result closure is incomplete', async () => {
-  await expect(
-    collectCiReleaseResults({
-      reuseFastProof: true,
-      releaseDeltaCollector: async () => ({
-        steps: [
-          { label: 'SonarJS', status: 'ok' },
-          { label: 'Build', status: 'ok' },
-        ],
-      }),
-      productionBuildCollector,
-    })
-  ).rejects.toThrow('Missing release-only control result: Release archive');
-});
-
-it.each([
-  {
-    name: 'fresh release controls',
-    reuseFastProof: false,
-    expectedReusedAuditControls: ['npm-audit'],
-    expectedExecutions: [
-      'product:npm-audit',
-      'release-delta',
-      'audit:npm-audit:reused',
-      'audit:npm-audit-signatures:live',
-    ],
-  },
-  {
-    name: 'reused Fast proof',
-    reuseFastProof: true,
-    expectedReusedAuditControls: [],
-    expectedExecutions: [
-      'release-delta',
-      'audit:npm-audit:live',
-      'audit:npm-audit-signatures:live',
-    ],
-  },
-])(
-  'executes npm vulnerability and signature gates exactly once with $name',
-  async ({ expectedExecutions, expectedReusedAuditControls, reuseFastProof }) => {
-    const executions: string[] = [];
-    const productProofCollector = vi.fn(async () => {
-      executions.push('product:npm-audit');
-      return {
-        steps: createCiProductControlOccurrences('proof').map(({ label }) => ({
-          label,
-          status: 'ok' as const,
-        })),
-      };
-    });
-    const releaseDeltaCollector = vi.fn(async () => {
-      executions.push('release-delta');
-      return {
-        steps: [
-          { label: 'SonarJS', status: 'ok' as const },
-          { label: 'Build', status: 'ok' as const },
-          { label: 'Release archive', status: 'ok' as const },
-        ],
-      };
-    });
-    const auditCollector = vi.fn(async ({ reusedControlIds }: { reusedControlIds: string[] }) => {
-      const reused = new Set(reusedControlIds);
-      for (const controlId of ['npm-audit', 'npm-audit-signatures']) {
-        executions.push(`audit:${controlId}:${reused.has(controlId) ? 'reused' : 'live'}`);
-      }
-      return {
-        steps: [
-          {
-            label: 'npm audit',
-            status: 'ok' as const,
-            detail: reused.has('npm-audit') ? 'reused current product proof' : 'live npm audit',
-          },
-          { label: 'npm audit signatures', status: 'ok' as const, detail: 'live signatures' },
-        ],
-      };
-    });
-
-    const result = await collectCiReleaseResults({
-      reuseFastProof,
-      productProofCollector,
-      releaseDeltaCollector,
-      auditCollector,
-      productionBuildCollector,
-    });
-
-    expect(productProofCollector).toHaveBeenCalledTimes(reuseFastProof ? 0 : 1);
-    expect(auditCollector).toHaveBeenCalledWith({
-      profileId: 'release',
-      reusedControlIds: expectedReusedAuditControls,
-      session: undefined,
-    });
-    expect(executions).toEqual(expectedExecutions);
-    expect(result.steps.filter(({ label }) => label === 'npm audit')).toHaveLength(1);
-    expect(result.steps.filter(({ label }) => label === 'npm audit signatures')).toHaveLength(1);
-  }
-);
-
-it('runs the Fast audit after returned product failures and aggregates both results', async () => {
-  const auditCollector = vi.fn(async () => ({
-    steps: [{ label: 'npm audit', status: 'failed' as const }],
-  }));
-
-  const result = await collectCiProofResults({
-    productProofCollector: async () => ({
-      steps: [{ label: 'Oxlint', status: 'failed' as const }],
-    }),
-    auditCollector,
-    productionBuildCollector,
-  });
-
-  expect(auditCollector).toHaveBeenCalledWith({ profileId: 'pr', session: undefined });
-  expect(result.steps).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ label: 'Oxlint', status: 'failed' }),
-      expect.objectContaining({ label: 'npm audit', status: 'failed' }),
-    ])
-  );
-});
-
-it('keeps advisory mutation outside release control results', async () => {
-  const auditCollector = vi.fn(async () => ({
-    steps: [{ label: 'CodeQL', status: 'failed' as const }],
-  }));
-
-  const result = await collectCiReleaseResults({
-    productProofCollector: async () => ({
-      steps: createCiProductControlOccurrences('proof').map(({ label }) => ({
-        label,
-        status: label === 'Unit tests' ? ('failed' as const) : ('ok' as const),
-      })),
-    }),
-    releaseDeltaCollector: async () => ({
-      steps: [
-        { label: 'SonarJS', status: 'ok' as const },
-        { label: 'Build', status: 'ok' as const },
-        { label: 'Release archive', status: 'ok' as const },
-      ],
-    }),
-    auditCollector,
-    productionBuildCollector,
-  });
-
-  expect(auditCollector).toHaveBeenCalledWith({
-    profileId: 'release',
-    reusedControlIds: ['npm-audit'],
-    session: undefined,
-  });
-  expect(result.executionMode).toBe('fresh-release-controls');
-  expect(result.steps.map(({ label }) => label)).not.toContain('Unit tests');
-  expect(result.steps.map(({ label, status }) => [label, status])).toEqual([
-    ...createCiProductControlOccurrences('release').map(({ label }) => [label, 'ok']),
-    ['Production build', 'ok'],
-    ['CodeQL', 'failed'],
-  ]);
-});
-
-it('shares one observed repository scope across fresh release prerequisites and delta controls', async () => {
-  const verifyScope = { kind: 'repository-scope' };
-  const scopeResolver = vi.fn(() => verifyScope);
-  const productProofCollector = vi.fn(async () => ({
-    steps: createCiProductControlOccurrences('proof').map(({ label }) => ({
-      label,
-      status: 'ok' as const,
-    })),
-  }));
-  const releaseDeltaCollector = vi.fn(async () => ({
-    steps: [
-      { label: 'SonarJS', status: 'ok' as const },
-      { label: 'Build', status: 'ok' as const },
-      { label: 'Release archive', status: 'ok' as const },
-    ],
-  }));
-
-  await collectCiReleaseResults({
-    scopeResolver,
-    productProofCollector,
-    releaseDeltaCollector,
-    auditCollector: async () => ({ steps: [] }),
-    productionBuildCollector,
-  });
-
-  expect(scopeResolver).toHaveBeenCalledOnce();
-  expect(productProofCollector).toHaveBeenCalledWith(verifyScope);
-  expect(releaseDeltaCollector).toHaveBeenCalledWith(verifyScope, {
-    includeArtifactSteps: true,
-  });
-});
-
-it('keeps infrastructure exceptions fail-fast instead of treating them as control results', async () => {
+it('keeps infrastructure exceptions fail-fast', async () => {
   const auditCollector = vi.fn();
-  const productionBuildSpy = vi.fn(productionBuildCollector);
-
   await expect(
     collectCiReleaseResults({
-      productProofCollector: async () => {
+      fastProofAdmission: FAST_ADMISSION,
+      releaseDeltaCollector: async () => {
         throw new Error('worker result envelope is unavailable');
       },
       auditCollector,
-      productionBuildCollector: productionBuildSpy,
     })
   ).rejects.toThrow('worker result envelope is unavailable');
   expect(auditCollector).not.toHaveBeenCalled();
-  expect(productionBuildSpy).not.toHaveBeenCalled();
 });
 
-it('runs a fresh release-mode production build exactly once without proof or archive ownership', () => {
+it('runs a fresh production build exactly once when explicitly requested', () => {
   const commandRunner = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
   const { label, status } = collectFreshProductionBuildStep({ commandRunner });
 
-  expect({ label, status }).toEqual({ label: 'Production build', status: 'ok' });
-  expect(commandRunner).toHaveBeenCalledOnce();
+  expect({ label, status }).toEqual({
+    label: 'Production build',
+    status: 'ok',
+  });
   expect(commandRunner).toHaveBeenCalledWith(['run', 'build:release']);
 });

@@ -13,7 +13,6 @@ import {
 import { respondAsyncRoute, respondAsyncSuccess } from '../../routing-contracts/response';
 import type { TabModeContext } from './shared';
 import { isScreenshotModeMessage } from './shared';
-import { getPreauthorizedContentActionRouteMessage } from '../../capture/routes';
 import { openVideoRecordingSurfaceFromPopup } from '../../media/video/content-surface/start';
 import {
   getVideoRecordingTabId,
@@ -89,7 +88,7 @@ export function routeScreenshotModeMessage(
         });
         return true;
       }
-      const senderBinding = getPreauthorizedContentActionRouteMessage(message);
+      const senderBinding = context.contentPreauthorization;
       const commitGuard = createWorkingModeCommitGuard(context.resolvedTabId, message.workingMode);
       respondAsyncSuccess(
         enableScreenshotMode(

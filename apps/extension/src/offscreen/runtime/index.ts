@@ -23,7 +23,7 @@ import {
 } from './routing';
 import { authorizeOffscreenRuntimeCommand } from './authorization';
 import { markOffscreenSideEffectCommand } from './idempotency';
-import { buildProjectExportCommandSuccessResponse } from './project-export-response';
+import { buildOffscreenCommandResponse } from './command-response';
 
 const logger = createLogger({ namespace: 'OffscreenRuntime' });
 
@@ -159,119 +159,6 @@ function routeDuplicateOffscreenCommand(
       });
     });
   return responseHandler ? true : undefined;
-}
-
-function buildOffscreenCommandResponse(type: HandledOffscreenRuntimeMessageType, result: unknown) {
-  return (
-    buildProjectExportCommandSuccessResponse(type, result) ??
-    buildOffscreenCommandSuccessResponse(result)
-  );
-}
-
-function buildOffscreenCommandSuccessResponse(result: unknown) {
-  if (
-    typeof result === 'object' &&
-    result !== null &&
-    'result' in result &&
-    result.result === 'leased' &&
-    'leaseId' in result &&
-    typeof result.leaseId === 'string' &&
-    'url' in result &&
-    typeof result.url === 'string'
-  ) {
-    return { success: true, result: 'leased', leaseId: result.leaseId, url: result.url };
-  }
-  if (
-    typeof result === 'object' &&
-    result !== null &&
-    'result' in result &&
-    (result.result === 'confirmed' || result.result === 'released' || result.result === 'stale')
-  ) {
-    return { success: true, result: result.result };
-  }
-  if (
-    typeof result === 'object' &&
-    result !== null &&
-    'challenge' in result &&
-    typeof result.challenge === 'string' &&
-    'offscreenStartupId' in result &&
-    typeof result.offscreenStartupId === 'string' &&
-    'state' in result &&
-    (result.state === 'failed' || result.state === 'ready')
-  ) {
-    return {
-      success: true,
-      challenge: result.challenge,
-      offscreenStartupId: result.offscreenStartupId,
-      state: result.state,
-    };
-  }
-  if (
-    typeof result === 'object' &&
-    result !== null &&
-    'mediaDevices' in result &&
-    Array.isArray(result.mediaDevices)
-  ) {
-    return { success: true, mediaDevices: result.mediaDevices };
-  }
-  if (
-    typeof result === 'object' &&
-    result !== null &&
-    'type' in result &&
-    result.type === 'answer' &&
-    'sdp' in result &&
-    typeof result.sdp === 'string'
-  ) {
-    return { success: true, sdp: result.sdp };
-  }
-  if (
-    typeof result === 'object' &&
-    result !== null &&
-    'result' in result &&
-    result.result === 'captured' &&
-    'dataUrl' in result &&
-    typeof result.dataUrl === 'string' &&
-    'width' in result &&
-    typeof result.width === 'number' &&
-    'height' in result &&
-    typeof result.height === 'number'
-  ) {
-    return {
-      success: true,
-      result: 'captured',
-      dataUrl: result.dataUrl,
-      width: result.width,
-      height: result.height,
-    };
-  }
-  if (isTerminalStopFailure(result)) {
-    return {
-      success: true,
-      result: 'terminal-failure',
-      error: result.error,
-    };
-  }
-  if (result === 'applied' || result === 'stale') {
-    return { success: true, result };
-  }
-  if (result === 'copied') {
-    return { success: true, result };
-  }
-  return { success: true, result: 'accepted' };
-}
-
-function isTerminalStopFailure(value: unknown): value is {
-  error: string;
-  result: 'terminal-failure';
-} {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'result' in value &&
-    value.result === 'terminal-failure' &&
-    'error' in value &&
-    typeof value.error === 'string'
-  );
 }
 
 function reportOffscreenRuntimeError(message: ParsedOffscreenRuntimeMessage, error: unknown): void {

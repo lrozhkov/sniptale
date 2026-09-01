@@ -51,12 +51,24 @@ function readProofSemanticsPolicy(repositoryRoot) {
     policy.invariants?.resourceProfileAffectsReuseCompatibility !== false ||
     policy.reuseCompatibility?.authority !== 'environment-profile' ||
     policy.invariants?.fastGateNeverClaimsReleaseReadiness !== true ||
-    policy.invariants?.fastGateFullVitestOwner !== 'unit-tests' ||
-    policy.invariants?.releaseGateFullVitestOwner !== 'full-product-coverage' ||
+    policy.invariants?.ciProofScope !== 'repository-wide' ||
+    policy.invariants?.ciProofUsesSemanticDiff !== true ||
+    policy.invariants?.ciProofOwnsFullProductTests !== true ||
+    policy.invariants?.ciProofOwnsFullProductCoverage !== true ||
+    policy.invariants?.ciProofOwnsFullHarnessTests !== false ||
+    policy.invariants?.ciProofHarnessSelection !== 'affected-or-full-fallback' ||
+    policy.invariants?.ciReleaseRequiresFastProofAdmission !== true ||
+    policy.invariants?.ciReleaseExecutesProductTests !== false ||
+    policy.invariants?.ciReleaseExecutesProductCoverage !== false ||
+    policy.invariants?.checkpointKeepsFormatWriteBarrier !== true ||
+    policy.invariants?.gitleaksScopesRemainProfileOwned !== true ||
+    policy.invariants?.soloMaintainerBypassRemainsSupported !== true ||
+    policy.invariants?.baseShaIsProvenanceOnly !== false ||
+    policy.invariants?.baseShaOwnsHarnessSelection !== true ||
+    policy.invariants?.fastGateFullVitestOwner !== 'full-product-plus-required-harness-proof' ||
     policy.invariants?.releaseProvenanceAcceptsFastProofReuse !== true ||
     JSON.stringify(policy.invariants?.diffAwareWrappersExactly) !==
-      JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout']) ||
-    policy.invariants?.ciGatesAreRepositoryWide !== true ||
+      JSON.stringify(['qa:release-harness', 'qa:checkpoint', 'qa:closeout', 'ci:proof']) ||
     policy.gateCapabilities?.proof?.scope !== 'repository-wide' ||
     policy.gateCapabilities?.proof?.fullVitest !== true ||
     policy.gateCapabilities?.proof?.releaseReady !== false ||
@@ -222,12 +234,20 @@ function newestReleaseArchive(startedAtMs, repositoryRoot = root) {
 const LANE_FILES = {
   proof: [
     '.tmp/qa/unit-proof.json',
+    '.tmp/qa/coverage-proof.json',
+    '.tmp/coverage/canonical/coverage-final.json',
+    '.tmp/coverage/canonical/coverage-summary.json',
+    '.tmp/coverage/canonical/lcov.info',
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
-    '.tmp/npm-audit/signatures.json',
+    '.tmp/npm-audit/results.json',
+    '.tmp/licenses/summary.json',
+    '.tmp/licenses/sbom.cdx.json',
   ],
   release: [
+    '.tmp/ci/fast-proof-admission.json',
     '.tmp/qa/build-proof.json',
+    '.tmp/qa/unit-proof.json',
     '.tmp/qa/codeql-proof.json',
     '.tmp/qa/coverage-proof.json',
     '.tmp/coverage/canonical/coverage-final.json',
@@ -237,31 +257,62 @@ const LANE_FILES = {
     '.tmp/osv/results.json',
     '.tmp/gitleaks/report.json',
     '.tmp/npm-audit/results.json',
-    '.tmp/npm-audit/signatures.json',
     '.tmp/licenses/summary.json',
     '.tmp/licenses/sbom.cdx.json',
   ],
 };
 
-const REUSABLE_FAST_REPORTS = new Set(['.tmp/npm-audit/signatures.json']);
+const ADMITTED_RELEASE_INPUTS = new Set(['.tmp/ci/fast-proof-admission.json']);
 
-export function copyReusableFastReport(
-  file,
+export function copyAdmittedReleaseInput({
   destinationRoot,
-  proofRoot = process.env.SNIPTALE_FAST_PROOF_PATH
-) {
-  if (!proofRoot) throw new Error('Verified Fast proof root is missing.');
-  const manifest = JSON.parse(fs.readFileSync(path.join(proofRoot, 'proof-manifest.json'), 'utf8'));
-  const matches = (manifest.files ?? []).filter((entry) => entry.file === file);
-  if (matches.length !== 1 || !/^[a-f0-9]{64}$/u.test(matches[0].sha256 ?? '')) {
-    throw new Error(`Reusable Fast proof report identity is malformed: ${file}`);
+  environment = process.env,
+  file,
+  repositoryRoot,
+  required = true,
+}) {
+  const relativeSource = relativePath(file, repositoryRoot);
+  assertNoSymlinkComponents(relativeSource, repositoryRoot);
+  const source = path.join(repositoryRoot, relativeSource);
+  let descriptor;
+  try {
+    descriptor = fs.openSync(
+      source,
+      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK
+    );
+  } catch (error) {
+    if (!required && error?.code === 'ENOENT') return false;
+    throw error;
   }
-  const source = path.join(proofRoot, file);
-  if (sha256(source) !== matches[0].sha256) {
-    throw new Error(`Reusable Fast proof report digest mismatch: ${file}`);
+  try {
+    const details = fs.fstatSync(descriptor);
+    if (!details.isFile()) throw new Error(`Unsafe artifact: ${file}`);
+    const contents = fs.readFileSync(descriptor);
+    const admission = JSON.parse(contents.toString('utf8'));
+    const expectedKind =
+      environment.SNIPTALE_CI_IN_CONTAINER === '1' ? 'locked-container' : 'host-wsl';
+    const expectedEnvironmentDigest =
+      environment.SNIPTALE_CI_EXECUTION_ENVIRONMENT_DIGEST ??
+      environment.SNIPTALE_CI_CONTAINER_DIGEST;
+    if (
+      admission?.artifactKind !== 'sniptale-fast-proof-admission' ||
+      admission.outcome !== 'admitted' ||
+      admission.candidateTree !== environment.SNIPTALE_CANDIDATE_TREE ||
+      admission.commit !== environment.SNIPTALE_CANDIDATE_SHA ||
+      admission.executionEnvironment?.kind !== expectedKind ||
+      admission.executionEnvironment?.digest !== expectedEnvironmentDigest ||
+      admission.workspaceMode !== environment.SNIPTALE_WORKSPACE_MODE ||
+      admission.proofRoot !== environment.SNIPTALE_FAST_PROOF_PATH
+    ) {
+      throw new Error(`Release admitted input is stale or incompatible: ${file}`);
+    }
+    const output = path.join(destinationRoot, relativeSource);
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.writeFileSync(output, contents, { flag: 'wx' });
+    return true;
+  } finally {
+    fs.closeSync(descriptor);
   }
-  copyExternalFile(source, destinationRoot, file);
-  return true;
 }
 
 function createArtifactDestination(lane, repositoryRoot) {
@@ -283,6 +334,20 @@ function createArtifactDestination(lane, repositoryRoot) {
   return { commit, destinationRoot, relativeOutput };
 }
 
+export function copyFreshLaneReport({
+  destinationRoot,
+  file,
+  notBeforeMs,
+  repositoryRoot,
+  required,
+}) {
+  return copyFile(file, destinationRoot, file, {
+    ignoreStale: !required,
+    notBeforeMs,
+    repositoryRoot,
+  });
+}
+
 function collectLaneReports({
   lane,
   startedAtMs,
@@ -294,20 +359,20 @@ function collectLaneReports({
   const required = status === 'passed';
   for (const file of LANE_FILES[lane] ?? []) {
     const copied =
-      lane === 'release' &&
-      process.env.SNIPTALE_REUSE_FAST_PROOF === '1' &&
-      REUSABLE_FAST_REPORTS.has(file)
-        ? copyReusableFastReport(file, destinationRoot)
-        : copyFile(file, destinationRoot, file, {
-            ignoreStale: !required,
+      lane === 'release' && ADMITTED_RELEASE_INPUTS.has(file)
+        ? copyAdmittedReleaseInput({ destinationRoot, file, repositoryRoot, required })
+        : copyFreshLaneReport({
+            destinationRoot,
+            file,
             notBeforeMs: startedAtMs,
             repositoryRoot,
+            required,
           });
     if (required && !copied) {
       throw new Error(`Required artifact is missing: ${file}`);
     }
   }
-  if (lane === 'release') {
+  if (lane === 'proof' || lane === 'release') {
     const copied = copyTree('.tmp/coverage/canonical/html', destinationRoot, {
       ignoreStale: !required,
       notBeforeMs: startedAtMs,
@@ -316,13 +381,28 @@ function collectLaneReports({
     if (required && !copied) {
       throw new Error('Required coverage HTML is missing.');
     }
-    if (process.env.SNIPTALE_REUSE_FAST_PROOF === '1') {
+    if (lane === 'release' && process.env.SNIPTALE_REUSE_FAST_PROOF === '1') {
       const proofPath = path.join(
         process.env.SNIPTALE_FAST_PROOF_PATH ?? '',
         'proof-manifest.json'
       );
       if (!fs.existsSync(proofPath)) throw new Error('Verified fast proof receipt is missing.');
       copyExternalFile(proofPath, destinationRoot, 'fast-proof/proof-manifest.json');
+      const admissionPath = process.env.SNIPTALE_FAST_PROOF_ADMISSION_PATH;
+      if (!admissionPath || !fs.existsSync(admissionPath)) {
+        throw new Error('Verified Fast proof admission receipt is missing.');
+      }
+      const admission = JSON.parse(fs.readFileSync(admissionPath, 'utf8'));
+      for (const relative of [admission.sourceRunRecord, admission.sourceRunLog]) {
+        if (typeof relative !== 'string' || !relative.startsWith('.tmp/')) {
+          throw new Error('Verified Fast proof observability identity is malformed.');
+        }
+        copyExternalFile(
+          path.join(process.env.SNIPTALE_FAST_PROOF_PATH, relative),
+          destinationRoot,
+          `fast-proof/${relative}`
+        );
+      }
     }
   }
   if (lane === 'release' && required) {
@@ -365,9 +445,10 @@ function writeProofManifest(destinationRoot, manifest) {
   });
 }
 
-function proofReuseStatus(destinationRoot, relativePath) {
+function proofReuseStatus(destinationRoot, relativePath, { inherited = false } = {}) {
   const proofPath = path.join(destinationRoot, relativePath);
   if (!fs.existsSync(proofPath)) return 'unavailable';
+  if (inherited) return 'inherited';
   const proof = JSON.parse(fs.readFileSync(proofPath, 'utf8'));
   return proof.reusedFrom ? 'reused' : 'fresh';
 }
@@ -492,9 +573,13 @@ export function collectLaneArtifacts({
     infrastructure,
     proofReuse: {
       build: proofReuseStatus(destinationRoot, '.tmp/qa/build-proof.json'),
-      unit: proofReuseStatus(destinationRoot, '.tmp/qa/unit-proof.json'),
+      unit: proofReuseStatus(destinationRoot, '.tmp/qa/unit-proof.json', {
+        inherited: lane === 'release',
+      }),
       codeql: proofReuseStatus(destinationRoot, '.tmp/qa/codeql-proof.json'),
-      coverage: proofReuseStatus(destinationRoot, '.tmp/qa/coverage-proof.json'),
+      coverage: proofReuseStatus(destinationRoot, '.tmp/qa/coverage-proof.json', {
+        inherited: lane === 'release',
+      }),
     },
     startedAt: new Date(startedAtMs).toISOString(),
     finishedAt: new Date().toISOString(),

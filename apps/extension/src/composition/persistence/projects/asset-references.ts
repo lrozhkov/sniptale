@@ -34,6 +34,26 @@ type ProjectAssetMediaStore = ProjectAssetDeleteStore & {
   put(value: unknown): Promise<unknown>;
 };
 
+export async function deletePublishedProjectEntry(args: {
+  countAssetOwners(assetId: string): Promise<number>;
+  deleteAssetEntry(): Promise<unknown>;
+  deleteAssetOwner(): Promise<unknown>;
+  deleteAssetRef(assetId: string): Promise<unknown>;
+  deleteMediaEntry(): Promise<unknown>;
+  entry: { assetId: string } | null;
+  operation: PhysicalDeleteAssetOperation;
+  recordOperation(): Promise<unknown>;
+}): Promise<void> {
+  await args.deleteAssetEntry();
+  await args.deleteMediaEntry();
+  if (!args.entry) return;
+  await args.deleteAssetOwner();
+  if ((await args.countAssetOwners(args.entry.assetId)) !== 0) return;
+  await args.deleteAssetRef(args.entry.assetId);
+  args.operation.assetIds.push(args.entry.assetId);
+  await args.recordOperation();
+}
+
 export function collectProjectOwnedAssetIds(project: VideoProject | undefined): string[] {
   if (!project) {
     return [];

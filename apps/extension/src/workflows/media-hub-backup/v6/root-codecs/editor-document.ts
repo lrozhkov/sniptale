@@ -174,8 +174,9 @@ export function decodePortableEditorDocument(args: {
     },
     sourceImage: assetPointer(sourceImage.objectId, args.assetsByObjectId),
   };
-  if (!parsePersistedEditorDocument(restored)) {
+  const parsed = parsePersistedEditorDocument(restored);
+  if (!parsed) {
     throw new Error('Restored editor document is invalid.');
   }
-  return restored;
+  return parsed;
 }

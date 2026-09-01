@@ -212,7 +212,70 @@ it('rejects same-origin intermediary HTML page responses instead of saving them 
 
   expect(result.files.size).toBe(0);
   expect(result.errors).toHaveLength(1);
-  expect(result.errors[0]).toContain('Skipped intermediary HTML page');
+  expect(result.errors[0]).toContain('Skipped unexpected HTML response');
+});
+
+it('rejects an HTML page returned for an image-like download URL', async () => {
+  installFetchMock(async () => {
+    return createResponse('<html><title>Wikipedia file page</title></html>', {
+      contentDisposition: 'attachment; filename="page.html"',
+      contentType: 'text/html; charset=UTF-8',
+    });
+  });
+
+  const result = await downloadFileResources(
+    [
+      createResource(
+        'https://example.com/wiki/File:Panorama_of_Anfield_(29676137824).jpg',
+        'FilePanorama_of_Anfield_(29676137824).jpg'
+      ),
+    ],
+    undefined,
+    () => false,
+    () => undefined
+  );
+
+  expect(result.files.size).toBe(0);
+  expect(result.errors).toHaveLength(1);
+  expect(result.errors[0]).toContain('Skipped unexpected HTML response');
+});
+
+it('rejects HTML when a long Content-Disposition filename hides a non-HTML extension', async () => {
+  installFetchMock(async () => {
+    return createResponse('<html><title>Unexpected page</title></html>', {
+      contentDisposition: `attachment; filename="${'a'.repeat(130)}.jpg"`,
+      contentType: 'text/html; charset=UTF-8',
+    });
+  });
+
+  const result = await downloadFileResources(
+    [createResource('https://example.com/help.html', 'help.html')],
+    undefined,
+    () => false,
+    () => undefined
+  );
+
+  expect(result.files.size).toBe(0);
+  expect(result.errors[0]).toContain('Skipped unexpected HTML response');
+});
+
+it('aligns a conflicting HTML filename with an admitted non-HTML MIME type', async () => {
+  installFetchMock(async () => {
+    return createResponse('jpeg-bytes', {
+      contentDisposition: 'attachment; filename="payload.html"',
+      contentType: 'image/jpeg',
+    });
+  });
+
+  const result = await downloadFileResources(
+    [createResource('https://example.com/image.jpg', 'image.jpg')],
+    undefined,
+    () => false,
+    () => undefined
+  );
+
+  expect(listFileNames(result)).toEqual(['payload.jpg']);
+  expect(result.errors).toEqual([]);
 });
 
 it('blocks cross-origin credentialed downloads before issuing the request', async () => {

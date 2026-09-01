@@ -12,7 +12,7 @@ This file projects changeable values and inventories from their existing machine
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
 | Protected release tags | `refs/tags/v*` | `tooling/configs/ci/github-policy.json#/releaseTagRuleset` |
-| QA controls | `92` controls in `14` ordered categories | `tooling/qa/composition/catalog/catalog.mjs#QA_CONTROL_CATALOG` |
+| QA controls | `91` controls in `14` ordered categories | `tooling/qa/composition/catalog/catalog.mjs#QA_CONTROL_CATALOG` |
 
 ## QA control categories
 
@@ -20,10 +20,10 @@ This file projects changeable values and inventories from their existing machine
 - `scope-and-admission`: 2
 - `lexical-and-path`: 3
 - `syntax-core`: 4
-- `single-file-semantics`: 6
-- `owner-state-and-diff-structure`: 28
+- `single-file-semantics`: 5
+- `owner-state-and-diff-structure`: 27
 - `dependency-graph`: 3
-- `cross-artifact-closure`: 5
+- `cross-artifact-closure`: 6
 - `behavioral-proof`: 8
 - `supply-chain-network`: 5
 - `release-sast-and-legal`: 5
@@ -32,6 +32,115 @@ This file projects changeable values and inventories from their existing machine
 - `audit-report`: 2
 
 The catalog owns control membership, order, scope, engine decision, normalized result, and proof metadata. Wrapper documentation must not restate an executable inventory.
+
+## App-core owner residency
+
+This inventory is projected from the live source tree. It is navigation data, not an allowlist or path gate.
+
+- `apps/extension/src/composition/archive-transfer`
+- `apps/extension/src/composition/frame-annotation-controls`
+- `apps/extension/src/composition/frame-annotation-raster-client`
+- `apps/extension/src/composition/gradient-preset-resources`
+- `apps/extension/src/composition/persistence/aggregate-presentations`
+- `apps/extension/src/composition/persistence/ai-settings`
+- `apps/extension/src/composition/persistence/annotation-template-tags`
+- `apps/extension/src/composition/persistence/asset-publication-recovery`
+- `apps/extension/src/composition/persistence/assets`
+- `apps/extension/src/composition/persistence/callout-presets`
+- `apps/extension/src/composition/persistence/capture-settings`
+- `apps/extension/src/composition/persistence/command-palette`
+- `apps/extension/src/composition/persistence/content-pin-session`
+- `apps/extension/src/composition/persistence/diagnostics`
+- `apps/extension/src/composition/persistence/document-assets`
+- `apps/extension/src/composition/persistence/drawing-palette`
+- `apps/extension/src/composition/persistence/editor-bootstrap`
+- `apps/extension/src/composition/persistence/editor-presets`
+- `apps/extension/src/composition/persistence/effect-bundles`
+- `apps/extension/src/composition/persistence/export-ledger`
+- `apps/extension/src/composition/persistence/frame-annotation-raster-jobs`
+- `apps/extension/src/composition/persistence/gallery-saved-views`
+- `apps/extension/src/composition/persistence/gradient-presets`
+- `apps/extension/src/composition/persistence/highlighter`
+- `apps/extension/src/composition/persistence/image-aggregates`
+- `apps/extension/src/composition/persistence/image-workspaces`
+- `apps/extension/src/composition/persistence/infrastructure`
+- `apps/extension/src/composition/persistence/library-lifecycle`
+- `apps/extension/src/composition/persistence/managed-preset-order`
+- `apps/extension/src/composition/persistence/media-library`
+- `apps/extension/src/composition/persistence/popup-export-preferences`
+- `apps/extension/src/composition/persistence/privacy-erasure`
+- `apps/extension/src/composition/persistence/project-export-inputs`
+- `apps/extension/src/composition/persistence/projects`
+- `apps/extension/src/composition/persistence/prompt-templates`
+- `apps/extension/src/composition/persistence/quick-actions`
+- `apps/extension/src/composition/persistence/recent-colors`
+- `apps/extension/src/composition/persistence/recordings`
+- `apps/extension/src/composition/persistence/scenario`
+- `apps/extension/src/composition/persistence/settings`
+- `apps/extension/src/composition/persistence/settings-transfer`
+- `apps/extension/src/composition/persistence/step-badge-presets`
+- `apps/extension/src/composition/persistence/surface-style-presets`
+- `apps/extension/src/composition/persistence/video-editor-preview-preferences`
+- `apps/extension/src/composition/persistence/video-preview-cache`
+- `apps/extension/src/composition/persistence/web-snapshots`
+- `apps/extension/src/composition/surface-style-preset-resources`
+- `apps/extension/src/composition/voice-input`
+- `apps/extension/src/contracts/aggregate-promotion.ts`
+- `apps/extension/src/contracts/ai`
+- `apps/extension/src/contracts/effect-runtime`
+- `apps/extension/src/contracts/full-page-capture`
+- `apps/extension/src/contracts/messaging`
+- `apps/extension/src/contracts/native-app`
+- `apps/extension/src/contracts/settings`
+- `apps/extension/src/contracts/settings-transfer`
+- `apps/extension/src/contracts/video`
+- `apps/extension/src/features/ai`
+- `apps/extension/src/features/drawing`
+- `apps/extension/src/features/editor`
+- `apps/extension/src/features/highlighter`
+- `apps/extension/src/features/keyboard-shortcuts`
+- `apps/extension/src/features/media-hub`
+- `apps/extension/src/features/prompt-templates`
+- `apps/extension/src/features/quick-actions-presets`
+- `apps/extension/src/features/scenario`
+- `apps/extension/src/features/tab-capabilities`
+- `apps/extension/src/features/video`
+- `apps/extension/src/features/viewport-presets`
+- `apps/extension/src/features/web-snapshot`
+- `apps/extension/src/platform/config`
+- `apps/extension/src/platform/i18n`
+- `apps/extension/src/platform/media-utils`
+- `apps/extension/src/platform/navigation`
+- `apps/extension/src/platform/runtime-messaging`
+- `apps/extension/src/platform/security-e2e-control`
+- `apps/extension/src/ui/annotation-template-query`
+- `apps/extension/src/ui/callout-background-settings`
+- `apps/extension/src/ui/color-selector`
+- `apps/extension/src/ui/command-palette`
+- `apps/extension/src/ui/compact-inspector-controls`
+- `apps/extension/src/ui/drawing-tools`
+- `apps/extension/src/ui/glass-select`
+- `apps/extension/src/ui/gradient-preset-grid`
+- `apps/extension/src/ui/highlighter-preset-editor`
+- `apps/extension/src/ui/keyboard`
+- `apps/extension/src/ui/page-bootstrap`
+- `apps/extension/src/ui/paint-selector`
+- `apps/extension/src/ui/popup-shell`
+- `apps/extension/src/ui/surface-style-selector`
+- `apps/extension/src/ui/theme`
+- `apps/extension/src/workflows/aggregate-editor-presence`
+- `apps/extension/src/workflows/ai-session`
+- `apps/extension/src/workflows/ai-settings`
+- `apps/extension/src/workflows/editor`
+- `apps/extension/src/workflows/media-hub`
+- `apps/extension/src/workflows/media-hub-backup`
+- `apps/extension/src/workflows/page-package`
+- `apps/extension/src/workflows/page-preparation`
+- `apps/extension/src/workflows/scenario-capture-edit`
+- `apps/extension/src/workflows/scenario-video`
+- `apps/extension/src/workflows/settings-transfer`
+- `apps/extension/src/workflows/video`
+- `apps/extension/src/workflows/voice-input`
 
 ## Manifest capabilities
 
@@ -42,6 +151,7 @@ Required permissions:
 - `unlimitedStorage`
 - `tabs`
 - `webNavigation`
+- `declarativeNetRequest`
 - `system.display`
 - `activeTab`
 - `scripting`

@@ -53,6 +53,8 @@ function createStaleRecoveryStep(finishedAt) {
     controlIds: [],
     problemIds: ['wrapper.interrupted.stale-run'],
     skipReasonId: null,
+    population: { scope: 'repo-wide', populationKind: 'repository-state' },
+    inheritance: null,
     diagnostic: {
       summary: 'Run owner stopped updating the record',
       locations: [],

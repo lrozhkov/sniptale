@@ -13,17 +13,23 @@ interface EffectHostMutationResult {
   project: VideoProject;
 }
 
-export function duplicateStandaloneEffectHost(
-  project: VideoProject,
-  hostClipId: string
-): EffectHostMutationResult | null {
+function findStandaloneEffectSource(project: VideoProject, hostClipId: string) {
   const sourceHost = findEffectHost(project, hostClipId);
   if (!sourceHost) return null;
   const sourceInstance = project.effectInstances?.find(
     ({ id, kind, target }) =>
       id === sourceHost.effectInstanceId && kind === 'standalone' && target.kind === 'scene'
   );
-  if (!sourceInstance) return null;
+  return sourceInstance ? { sourceHost, sourceInstance } : null;
+}
+
+export function duplicateStandaloneEffectHost(
+  project: VideoProject,
+  hostClipId: string
+): EffectHostMutationResult | null {
+  const source = findStandaloneEffectSource(project, hostClipId);
+  if (!source) return null;
+  const { sourceHost, sourceInstance } = source;
 
   const instanceId = crypto.randomUUID();
   const host: VideoProjectEffectClip = {
@@ -64,13 +70,9 @@ export function splitStandaloneEffectHost(
   hostClipId: string,
   splitTime: number
 ): VideoProject | null {
-  const sourceHost = findEffectHost(project, hostClipId);
-  if (!sourceHost) return null;
-  const sourceInstance = project.effectInstances?.find(
-    ({ id, kind, target }) =>
-      id === sourceHost.effectInstanceId && kind === 'standalone' && target.kind === 'scene'
-  );
-  if (!sourceInstance) return null;
+  const source = findStandaloneEffectSource(project, hostClipId);
+  if (!source) return null;
+  const { sourceHost, sourceInstance } = source;
   const localOffset = splitTime - sourceHost.startTime;
   if (localOffset <= 0.05 || localOffset >= sourceHost.duration - 0.05) return project;
 

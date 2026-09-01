@@ -1,10 +1,19 @@
-import { collectAiHygieneReport } from '../../quality/ai-hygiene.mjs';
-import { collectAuditStep, collectOptionalSecurityStep } from './catalog/audit-steps.mjs';
+import { collectDeadCommentedCodeViolations } from '../../quality/dead-commented-code.mjs';
+import { collectOptionalSecurityStep } from './catalog/audit-steps.mjs';
 import { runDesignSystemCheck } from '../../../guards/product-contracts/verify-design-system.mjs';
 import { peekUnifiedAstGrepReceipt } from '../../../audits/ast-grep/unified-ast-grep.mjs';
-import { createViolationStep, createSkippedStep } from '../../checkpoint/focused-qa-results.mjs';
+import {
+  createFailureStep,
+  createOkStep,
+  createViolationStep,
+} from '../../checkpoint/focused-qa-results.mjs';
 import { runI18nCheck } from '../../../guards/product-contracts/verify-i18n.mjs';
 import { runLineLengthCheck } from '../../../guards/quality/readability/line-length/check.mjs';
+import { runRepositoryReadabilityCheck } from '../../../guards/quality/readability/line-length/check.mjs';
+import { runFormatterCheck } from '../../../guards/quality/verify-oxfmt.mjs';
+import { collectFormattableFiles } from '../../../analysis/repository/shared-files.mjs';
+import { runRepositoryManualMockExportParityCheck } from '../../../guards/quality/mocks/manual-export-parity/check.mjs';
+import { runRepositoryNamingCheck } from '../../../guards/quality/naming/check.mjs';
 import { DEFAULT_OXLINT_ROOTS, runOxlint } from '../../../guards/quality/verify-oxlint.mjs';
 import {
   collectBoundaryCheckStepResult,
@@ -19,11 +28,7 @@ import {
   filterAllowedViolations,
   loadBaseline,
 } from '../../../policy/baselines/shared-baseline.mjs';
-import {
-  measureAsyncStep,
-  measureSyncStep,
-} from '../../../runtime/observability/step-timing.helpers.mjs';
-import { runSonarjsCheck } from '../../../guards/quality/sonarjs/check.mjs';
+import { measureSyncStep } from '../../../runtime/observability/step-timing.helpers.mjs';
 import { runStructuralRiskCheck } from '../../../analysis/structural-risk/check.mjs';
 import { projectLoggingStepFromOxlint } from '../../quality/logging-projection.mjs';
 import {
@@ -32,8 +37,9 @@ import {
   collectBuildStep,
   collectDeadExportsStep,
   collectReleaseArchiveStep,
+  collectMeasuredViolationStep,
   collectMeasuredStringFailureStep,
-  collectNamingStep,
+  collectNamingStep as collectNamingStepLegacy,
   withDuration,
 } from '../../closeout/closeout-step-helpers/check.mjs';
 import { PRODUCT_QA_SUITE } from '../../scope/qa-scope.mjs';
@@ -61,6 +67,41 @@ function collectLineLengthStep({ codeFiles } = {}) {
   );
 }
 
+function collectRepositoryFormatStep() {
+  const files = collectFormattableFiles();
+  const { durationMs, value } = measureSyncStep(() =>
+    runFormatterCheck(files, undefined, { repositoryWide: true })
+  );
+  return withDuration(
+    value.failures.length === 0
+      ? createOkStep('Format', `repo-wide files=${value.candidateFiles.length}`)
+      : createFailureStep('Format', 'formatting violations found', {
+          failures: value.failures,
+        }),
+    durationMs
+  );
+}
+
+function collectRepositoryReadabilityStep() {
+  const { durationMs, value } = measureSyncStep(runRepositoryReadabilityCheck);
+  return withDuration(
+    createViolationStep(
+      'Repository readability',
+      'Repository readability violations found:',
+      value
+    ),
+    durationMs
+  );
+}
+
+function collectRepositoryMockParityStep() {
+  const { durationMs, value } = measureSyncStep(runRepositoryManualMockExportParityCheck);
+  return withDuration(
+    createViolationStep('Mock export parity', 'Manual mock export parity violations:', value),
+    durationMs
+  );
+}
+
 function resolveStaticLintFiles({ codeFiles = [], releaseMode = false } = {}) {
   return releaseMode ? DEFAULT_OXLINT_ROOTS : codeFiles;
 }
@@ -84,20 +125,29 @@ function collectOxlintLane(context = {}) {
   };
 }
 
-function collectAiHygieneStep({ baseline, codeFiles }) {
-  const { durationMs, value: report } = measureSyncStep(() => collectAiHygieneReport(codeFiles));
+function collectDeadCommentedCodeStep({ baseline, codeFiles }) {
+  const { durationMs, value: violations } = measureSyncStep(() =>
+    collectDeadCommentedCodeViolations(codeFiles)
+  );
   return withDuration(
-    createViolationStep('AI hygiene', 'AI hygiene violations found:', {
-      violations: filterAllowedViolations(report.violations, baseline),
+    createViolationStep('Dead commented code', 'Dead commented code found:', {
+      violations: filterAllowedViolations(violations, baseline),
     }),
     durationMs
   );
 }
 
-function collectStructuralRiskStep({ codeFiles }) {
+function collectStructuralRiskStep({
+  codeFiles,
+  structuralCodeFiles = codeFiles,
+  structuralComparisonRevision = 'HEAD',
+  structuralDeletedFiles = [],
+}) {
   const { durationMs, value } = measureSyncStep(() =>
     runStructuralRiskCheck({
-      files: codeFiles,
+      files: structuralCodeFiles,
+      comparisonRevision: structuralComparisonRevision,
+      deletedFiles: structuralDeletedFiles,
       reportScope: 'current-diff',
       enforce: true,
     })
@@ -108,27 +158,15 @@ function collectStructuralRiskStep({ codeFiles }) {
   );
 }
 
-async function collectSonarjsReleaseStep({ releaseMode }) {
-  if (!releaseMode) {
-    return createSkippedStep('SonarJS', 'release-only');
-  }
-
-  const { durationMs, value: sonarjsResult } = await measureAsyncStep(() =>
-    runSonarjsCheck({ scope: 'repo-wide' })
-  );
-  return withDuration(
-    createViolationStep('SonarJS', 'SonarJS violations found:', sonarjsResult),
-    durationMs
-  );
+function collectNamingStep(context) {
+  return context.releaseMode
+    ? collectMeasuredViolationStep('Naming', 'Naming violations found:', runRepositoryNamingCheck)
+    : collectNamingStepLegacy(context);
 }
 
 export async function collectReleaseLintLane(
   context,
-  {
-    oxlintCollector = collectOxlintLane,
-    securityCollector = collectOptionalSecurityStep,
-    sonarjsCollector = collectSonarjsReleaseStep,
-  } = {}
+  { oxlintCollector = collectOxlintLane, securityCollector = collectOptionalSecurityStep } = {}
 ) {
   const oxlintResult = oxlintCollector(context);
   const normalizedOxlintResult = oxlintResult.oxlintStep
@@ -143,9 +181,6 @@ export async function collectReleaseLintLane(
       };
   return {
     ...normalizedOxlintResult,
-    sonarjsStep: (context.excludedControlLabels ?? []).includes('SonarJS')
-      ? null
-      : await sonarjsCollector(context),
     securityStep: await securityCollector(context),
   };
 }
@@ -157,18 +192,23 @@ function createReleaseContext({ releaseMode, verifyScope, baseline, excludedCont
     baseline,
     excludedControlLabels,
     codeFiles: verifyScope.codeFiles,
+    structuralCodeFiles: verifyScope.structuralCodeFiles ?? verifyScope.codeFiles,
+    structuralComparisonRevision: verifyScope.structuralComparisonRevision ?? 'HEAD',
+    structuralDeletedFiles: verifyScope.structuralDeletedFiles ?? [],
     targetFiles: verifyScope.targetFiles,
   };
 }
 
 function createDefaultCollectors() {
   return {
+    collectFormatStep: collectRepositoryFormatStep,
     collectLineLengthStep,
+    collectRepositoryReadabilityStep,
     collectOxlintLane,
-    collectSonarjsReleaseStep,
-    collectAiHygieneStep,
+    collectDeadCommentedCodeStep,
     collectStructuralRiskStep,
     collectNamingStep,
+    collectMockParityStep: collectRepositoryMockParityStep,
     collectViolationSteps,
     collectI18nStep: () =>
       collectMeasuredStringFailureStep('i18n', 'i18n guardrail violations found:', runI18nCheck),
@@ -178,7 +218,6 @@ function createDefaultCollectors() {
         'design-system guardrail violations found:',
         () => runDesignSystemCheck({ astGrepReceipt: peekUnifiedAstGrepReceipt() })
       ),
-    collectAuditStep,
     collectSecurityStep: collectOptionalSecurityStep,
     collectBoundaryStep: ({ targetFiles }) => collectBoundaryCheckStepResult({ targetFiles }),
     collectCycleStep: ({ targetFiles }) => collectCycleCheckStepResult({ targetFiles }),
@@ -223,21 +262,26 @@ export async function collectFullVerifyLane({
   }
   if (lane === 'light') {
     return {
+      formatStep: context.releaseMode ? collectors.collectFormatStep(context) : null,
       lineLengthStep: context.excludedControlLabels.includes('Changed-line readability')
         ? null
         : collectors.collectLineLengthStep(context),
-      aiHygieneStep: collectors.collectAiHygieneStep(context),
+      repositoryReadabilityStep:
+        context.releaseMode && !context.excludedControlLabels.includes('Repository readability')
+          ? collectors.collectRepositoryReadabilityStep(context)
+          : null,
+      deadCommentedCodeStep: collectors.collectDeadCommentedCodeStep(context),
       structuralRiskStep: context.excludedControlLabels.includes('Structural risk')
         ? null
         : collectors.collectStructuralRiskStep(context),
       namingStep: collectors.collectNamingStep(context),
+      mockParityStep: context.releaseMode ? collectors.collectMockParityStep(context) : null,
       violationSteps: await collectors.collectViolationSteps({
         ...context,
         deferOwnerGuards: true,
       }),
       i18nStep: collectors.collectI18nStep(context),
       designSystemStep: collectors.collectDesignSystemStep(context),
-      auditStep: collectors.collectAuditStep(context),
     };
   }
   if (lane === 'lint') {
@@ -245,7 +289,6 @@ export async function collectFullVerifyLane({
       ? collectReleaseLintLane(laneContext)
       : {
           ...collectors.collectOxlintLane(laneContext),
-          sonarjsStep: null,
           securityStep: await collectors.collectSecurityStep(context),
         };
   }
@@ -279,22 +322,21 @@ async function collectDependencyGraphSteps(context, collectors) {
 
 async function collectCoreStepResults(context, collectors, includeTests) {
   const steps = [
+    ...(context.releaseMode ? [collectors.collectFormatStep(context)] : []),
     ...(context.excludedControlLabels.includes('Changed-line readability')
       ? []
       : [collectors.collectLineLengthStep(context)]),
+    ...(context.releaseMode ? [collectors.collectRepositoryReadabilityStep(context)] : []),
     collectors.collectOxlintStep(context),
-    ...(context.releaseMode && !context.excludedControlLabels.includes('SonarJS')
-      ? [await collectors.collectSonarjsReleaseStep(context)]
-      : []),
-    collectors.collectAiHygieneStep(context),
+    collectors.collectDeadCommentedCodeStep(context),
     ...(context.excludedControlLabels.includes('Structural risk')
       ? []
       : [collectors.collectStructuralRiskStep(context)]),
     collectors.collectNamingStep(context),
+    ...(context.releaseMode ? [collectors.collectMockParityStep(context)] : []),
     ...(await collectors.collectViolationSteps(context)),
     collectors.collectI18nStep(context),
     collectors.collectDesignSystemStep(context),
-    collectors.collectAuditStep(context),
     await collectors.collectSecurityStep(context),
     ...(await collectDependencyGraphSteps(context, collectors)),
     collectors.collectTypecheckStep(context),
@@ -364,9 +406,7 @@ export async function collectReleaseDeltaStepResults({
     excludedControlLabels,
   });
   const resolvedCollectors = { ...createDefaultCollectors(), ...collectors };
-  const steps = context.excludedControlLabels.includes('SonarJS')
-    ? []
-    : [await resolvedCollectors.collectSonarjsReleaseStep(context)];
+  const steps = [];
   if (includeArtifactSteps) await appendPostVerifySteps(steps, context, resolvedCollectors);
   return {
     scopeDetail: 'verified Fast proof plus release-only product controls',

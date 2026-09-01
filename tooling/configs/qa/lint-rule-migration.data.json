@@ -528,18 +528,5 @@
       "roots": ["apps/extension/src/contracts/", "packages/runtime-contracts/src/"]
     }
   ],
-  "residualEslint": [
-    {
-      "owner": "tooling/qa/guards/quality/sonarjs/check.mjs",
-      "scope": ["apps/extension/src/**", "packages/*/src/**"],
-      "rules": [
-        "sonarjs/arguments-order",
-        "sonarjs/different-types-comparison",
-        "sonarjs/no-misleading-array-reverse",
-        "sonarjs/no-try-promise",
-        "sonarjs/reduce-initial-value"
-      ],
-      "defaultSeverity": "error"
-    }
-  ]
+  "residualEslint": []
 }

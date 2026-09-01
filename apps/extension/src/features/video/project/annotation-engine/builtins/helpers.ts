@@ -1,6 +1,6 @@
 import {
   VIDEO_ANNOTATION_PACK_SCHEMA_VERSION,
-  type VideoAnnotationElementKind,
+  VideoAnnotationElementKind,
   type VideoAnnotationLocalizedText,
   type VideoAnnotationPack,
   type VideoAnnotationPrimitiveValue,
@@ -133,6 +133,20 @@ export function createBuiltInContentTemplateFactory(params: {
       tracks,
     });
   };
+}
+
+export function resolveBuiltInElementKind(key: string): VideoAnnotationElementKind {
+  return key === 'intro'
+    ? VideoAnnotationElementKind.INTRO
+    : key === 'lowerThird'
+      ? VideoAnnotationElementKind.LOWER_THIRD
+      : key === 'title'
+        ? VideoAnnotationElementKind.TITLE
+        : key === 'focus'
+          ? VideoAnnotationElementKind.FOCUS
+          : key === 'scene'
+            ? VideoAnnotationElementKind.SCENE
+            : VideoAnnotationElementKind.CALLOUT;
 }
 
 export function createPack(params: {

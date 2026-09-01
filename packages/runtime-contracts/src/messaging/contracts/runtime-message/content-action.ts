@@ -16,6 +16,7 @@ import type {
   ContentPrivilegedActionRuntimeToken,
   ContentPrivilegedActionTrustedEventProof,
   ContentPrivilegedActionType,
+  RecentCaptureEditorAssetCapability,
 } from '../../../protocol/content-privileged-action';
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
@@ -54,8 +55,10 @@ export type RuntimeContentActionRequestByType = {
   };
   [MessageType.OPEN_EDITOR_WITH_IMAGE]: {
     type: typeof MessageType.OPEN_EDITOR_WITH_IMAGE;
+    assetId?: string;
     dataUrl: string;
     contentIntent?: ContentPrivilegedActionCapability;
+    editorAssetCapability?: RecentCaptureEditorAssetCapability;
   };
   [MessageType.DOWNLOAD_BROWSER_ANNOTATIONS]: {
     type: typeof MessageType.DOWNLOAD_BROWSER_ANNOTATIONS;

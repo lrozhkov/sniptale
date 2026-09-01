@@ -6,9 +6,13 @@ import {
   hasValidProducerRunId,
   requireProducerRunId,
 } from '../../../proof/contracts/qa-proof-state-provenance.mjs';
+import {
+  createQaProofRuntimeIdentity,
+  resolveQaProofRuntimeIdentityMismatch,
+} from '../../../proof/contracts/qa-proof-runtime-identity.mjs';
 
 export const HARNESS_STATE_PATH = '.tmp/qa/release-harness-state.json';
-const HARNESS_WRAPPER_VERSION = 'qa-release-harness-v2';
+const HARNESS_WRAPPER_VERSION = 'qa-release-harness-v3';
 
 function collectHarnessTargetFiles(context) {
   return [
@@ -30,13 +34,15 @@ export function createHarnessState({
   errorMessage = '',
   producerRunId,
 }) {
+  const targetFiles = collectHarnessTargetFiles(context);
   return {
     version: HARNESS_WRAPPER_VERSION,
     generatedAt: new Date().toISOString(),
     success,
     skipped,
     harnessFingerprint: collectHarnessFingerprint(context),
-    targetFiles: collectHarnessTargetFiles(context),
+    targetFiles,
+    ...createQaProofRuntimeIdentity(),
     errorMessage,
     producerRunId: requireProducerRunId(producerRunId),
   };
@@ -91,6 +97,12 @@ function resolveHarnessMismatchReason(state, context) {
     return 'release-harness state version is stale';
   }
   if (!hasValidProducerRunId(state)) return 'release-harness state has no valid producer run ID';
+
+  const runtimeMismatch = resolveQaProofRuntimeIdentityMismatch(
+    state,
+    createQaProofRuntimeIdentity()
+  );
+  if (runtimeMismatch) return `release-harness ${runtimeMismatch}`;
 
   if (!state.success) {
     return state.errorMessage

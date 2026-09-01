@@ -117,6 +117,9 @@ function hasCall(array, callee, argument = null) {
 function policyShapeErrors(policy) {
   const errors = [];
   if (policy?.schemaVersion !== 1) errors.push('layout schema must be version 1');
+  if (!Number.isInteger(policy?.chunkSizeWarningLimitKb) || policy.chunkSizeWarningLimitKb <= 0) {
+    errors.push('chunk size warning budget must be a positive integer');
+  }
   if (policy?.appRoot !== 'apps/extension') errors.push('Vite app root must be apps/extension');
   if (policy?.manifestPath !== 'apps/extension/manifest.json') {
     errors.push('manifest must be app-owned');
@@ -274,6 +277,11 @@ function configSourceErrors(source) {
       'Vite output root',
     ],
     [getProperty(build, 'emptyOutDir')?.kind === ts.SyntaxKind.TrueKeyword, 'empty output policy'],
+    [
+      normalizedNodeText(getProperty(build, 'chunkSizeWarningLimit')) ===
+        'layoutPolicy.chunkSizeWarningLimitKb',
+      'chunk size warning budget',
+    ],
     [getProperty(fileSystem, 'strict')?.kind === ts.SyntaxKind.TrueKeyword, 'strict fs policy'],
     [
       normalizedNodeText(getProperty(fileSystem, 'allow')) ===

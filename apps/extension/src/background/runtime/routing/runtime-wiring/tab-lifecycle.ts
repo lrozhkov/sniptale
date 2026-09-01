@@ -6,12 +6,14 @@ import { clearBackgroundRuntimeTabState } from '../../../application/runtime-sta
 import { handleTabClose } from '../../../media/lifecycle';
 import { cleanupScreenshotModeAfterTabClose } from '../../tab-mode-router-screenshot';
 import type { BackgroundModeState, RuntimeWiringLogger } from './shared';
+import { clearRecentCaptureEditorAssetCapabilitiesForTab } from '../../../capture/editor/recent-asset-capability';
 
 export function registerTabLifecycleListeners(
   state: BackgroundModeState,
   logger: RuntimeWiringLogger
 ): void {
   browserTabs.subscribeToRemoved((tabId) => {
+    clearRecentCaptureEditorAssetCapabilitiesForTab(tabId);
     clearPinnedToolbarOperationState(tabId);
     void (async () => {
       try {

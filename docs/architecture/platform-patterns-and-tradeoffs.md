@@ -22,6 +22,12 @@ Thin default facades are permitted when the factory-created or injectable owner 
 
 Passphrase protection is opt-in. Its unlocked key material belongs to the background runtime's in-memory owner and is lost when the worker restarts. Exact secret and retention rules live in [data handling](../security/data-handling.md).
 
+### Offscreen command binding
+
+The offscreen `capabilityToken` field and `offscreen-command-capability` helper names are retained wire and import compatibility names. Their self-contained payload, expiry, generation, and unkeyed binding hash provide freshness, payload-consistency, and idempotency inputs; they do not authenticate a sender and are not an independent capability security boundary.
+
+Offscreen authorization belongs to the browser-derived exact background sender policy that runs before the binding check. A future transport that cannot rely on that sender authority must introduce an independently verifiable MAC or issuer-side opaque-token registry rather than reuse this binding as authentication.
+
 ### Open Shadow DOM
 
 `packages/platform/src/browser/shadow-dom/index.ts` uses open Shadow DOM for inspectable, testable, extension-owned content surfaces. It provides style and ownership isolation, not a security boundary.

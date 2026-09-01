@@ -98,7 +98,7 @@ function resolveVitestWorkers({ cpuTokens, env }) {
   return requested == null ? defaultWorkers : Math.min(requested, MAX_VITEST_WORKERS, cpuTokens);
 }
 
-export function resolveQaResourceProfile({
+function resolveResourceProfileInput({
   cpuInfo = readCpuInfo(),
   env = process.env,
   logicalCpuCount = os.availableParallelism?.() ?? os.cpus().length,
@@ -106,7 +106,17 @@ export function resolveQaResourceProfile({
 } = {}) {
   const normalizedLogicalCpuCount = Math.max(1, logicalCpuCount);
   const totalMemoryMiB = Math.max(1024, Math.floor(totalMemoryBytes / MIB));
-  const physicalCoreCount = detectPhysicalCoreCount(cpuInfo, normalizedLogicalCpuCount);
+  return {
+    env,
+    normalizedLogicalCpuCount,
+    physicalCoreCount: detectPhysicalCoreCount(cpuInfo, normalizedLogicalCpuCount),
+    totalMemoryMiB,
+  };
+}
+
+export function resolveQaResourceProfile(options = {}) {
+  const { env, normalizedLogicalCpuCount, physicalCoreCount, totalMemoryMiB } =
+    resolveResourceProfileInput(options);
   const cpuTokens = resolveCpuTokenBudget({
     env,
     logicalCpuCount: normalizedLogicalCpuCount,
@@ -124,15 +134,9 @@ export function resolveQaResourceProfile({
   });
 }
 
-export function resolveQaReleaseResourceProfile({
-  cpuInfo = readCpuInfo(),
-  env = process.env,
-  logicalCpuCount = os.availableParallelism?.() ?? os.cpus().length,
-  totalMemoryBytes = os.totalmem(),
-} = {}) {
-  const normalizedLogicalCpuCount = Math.max(1, logicalCpuCount);
-  const totalMemoryMiB = Math.max(1024, Math.floor(totalMemoryBytes / MIB));
-  const physicalCoreCount = detectPhysicalCoreCount(cpuInfo, normalizedLogicalCpuCount);
+export function resolveQaReleaseResourceProfile(options = {}) {
+  const { env, normalizedLogicalCpuCount, physicalCoreCount, totalMemoryMiB } =
+    resolveResourceProfileInput(options);
   if (normalizedLogicalCpuCount < 2) {
     throw new Error('ci:release requires at least 2 WSL-visible CPU tokens.');
   }

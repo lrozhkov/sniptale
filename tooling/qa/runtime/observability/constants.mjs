@@ -1,4 +1,4 @@
-export const OBSERVABILITY_SCHEMA_VERSION = 3;
+export const OBSERVABILITY_SCHEMA_VERSION = 4;
 
 export const ACTIVITY_STATES = Object.freeze([
   'queued',
@@ -44,6 +44,8 @@ export const STEP_OUTCOMES = Object.freeze([
   'passed',
   'problems-found',
   'skipped',
+  'inherited',
+  'blocked',
   'error',
   'interrupted',
 ]);

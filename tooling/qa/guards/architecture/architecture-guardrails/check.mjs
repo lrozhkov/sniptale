@@ -55,6 +55,7 @@ export function runArchitectureGuardrailCheck({
   root = process.cwd(),
   scope = 'workspace',
 } = {}) {
+  const advisories = [];
   const targets = resolveScopedTargetFiles({
     files,
     scope,
@@ -81,6 +82,8 @@ export function runArchitectureGuardrailCheck({
         baseline: baselineOverrides.rawStorageMutation,
       }),
       ...collectPolicyStateDescriptorViolations(repoWideProductFiles, {
+        advisories,
+        enforceAll: scope === 'repo-wide',
         newFiles: collectNewFileSet(changedTargets),
         root,
       }),
@@ -88,6 +91,7 @@ export function runArchitectureGuardrailCheck({
         registry: baselineOverrides.secondLevelSccRegistry,
       }),
     ],
+    ...(advisories.length > 0 ? { advisories } : {}),
   };
 }
 

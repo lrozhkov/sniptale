@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config';
 
 import { collectProductTestInventory } from './tooling/test/harness/product-test-inventory.mjs';
+import { collectHarnessTestInventory } from './tooling/test/harness/harness-test-inventory.mjs';
 
 type SniptaleVitestSuite = 'product' | 'harness' | 'all';
+type HarnessPartition = 'node-vm-a' | 'node-vm-b' | 'jsdom-vm' | 'forks';
 
 function parseWrapperCoverageTargets() {
   const rawValue = process.env.SNIPTALE_VITEST_COVERAGE_TARGETS;
@@ -39,6 +41,14 @@ const productPartition =
     ? resolveProductPartition(process.env.SNIPTALE_PRODUCT_VITEST_PARTITION)
     : undefined;
 const productTestInventory = productPartition ? collectProductTestInventory() : null;
+const harnessPartition =
+  vitestSuite === 'harness'
+    ? resolveHarnessPartition(process.env.SNIPTALE_HARNESS_VITEST_PARTITION)
+    : undefined;
+const harnessTestInventory = harnessPartition ? collectHarnessTestInventory() : null;
+const harnessMaxWorkers = harnessPartition
+  ? resolveHarnessMaxWorkers(process.env.SNIPTALE_QA_VITEST_MAX_WORKERS)
+  : undefined;
 const TOOLING_COVERAGE_THRESHOLDS = {
   statements: 70,
   branches: 67,
@@ -69,6 +79,23 @@ function resolveProductPartition(value: string | undefined) {
   throw new Error(`Unsupported SNIPTALE_PRODUCT_VITEST_PARTITION "${value}"`);
 }
 
+function resolveHarnessPartition(value: string | undefined): HarnessPartition | undefined {
+  if (value == null || value === '') return undefined;
+  if (value === 'node-vm-a' || value === 'node-vm-b' || value === 'jsdom-vm' || value === 'forks') {
+    return value;
+  }
+  throw new Error(`Unsupported SNIPTALE_HARNESS_VITEST_PARTITION "${value}"`);
+}
+
+function resolveHarnessMaxWorkers(value: string | undefined) {
+  if (value == null || value === '') return 4;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`Unsupported SNIPTALE_QA_VITEST_MAX_WORKERS "${value}"`);
+  }
+  return parsed;
+}
+
 function resolveSuiteInclude() {
   if (vitestSuite === 'product') {
     if (productPartition === 'jsdom-vm') {
@@ -82,6 +109,10 @@ function resolveSuiteInclude() {
     ];
   }
   if (vitestSuite === 'harness') {
+    if (harnessPartition === 'node-vm-a') return harnessTestInventory?.nodeVmThreadsFilesA ?? [];
+    if (harnessPartition === 'node-vm-b') return harnessTestInventory?.nodeVmThreadsFilesB ?? [];
+    if (harnessPartition === 'jsdom-vm') return harnessTestInventory?.jsdomVmThreadsFiles ?? [];
+    if (harnessPartition === 'forks') return harnessTestInventory?.forkFiles ?? [];
     return ['tooling/**/*.{test,spec}.{ts,tsx}'];
   }
 
@@ -119,13 +150,18 @@ export default defineConfig({
     setupFiles: ['./tooling/test/harness/vitest.setup.ts'],
     testTimeout: isWrapperTimeoutMode ? 15000 : undefined,
     hookTimeout: isWrapperTimeoutMode ? 15000 : undefined,
+    ...(harnessMaxWorkers ? { maxWorkers: harnessMaxWorkers } : {}),
     ...(productPoolOverride
       ? { pool: productPoolOverride }
       : productPartition === 'jsdom-vm' || productPartition === 'node-vm'
         ? { pool: 'vmThreads' as const, vmMemoryLimit: '512MB' }
-        : vitestSuite === 'product'
-          ? { pool: 'threads' as const }
-          : {}),
+        : harnessPartition === 'forks'
+          ? { pool: 'forks' as const }
+          : harnessPartition
+            ? { pool: 'vmThreads' as const, vmMemoryLimit: '512MB' }
+            : vitestSuite === 'product'
+              ? { pool: 'threads' as const }
+              : {}),
     coverage: {
       provider: useBatchedProductCoverage ? 'custom' : 'v8',
       ...(useBatchedProductCoverage

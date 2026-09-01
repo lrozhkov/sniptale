@@ -208,9 +208,9 @@ it('does not suppress a changed finding message at the same rule, file, and line
     ]),
   });
 
-  expect(result.violations).toEqual([
+  expect(result.violations).toEqual([expect.objectContaining({ rule: 'js/baselined', line: 9 })]);
+  expect(result.advisories).toEqual([
     expect.objectContaining({ rule: 'codeql-baseline-stale', line: 9 }),
-    expect.objectContaining({ rule: 'js/baselined', line: 9 }),
   ]);
 });
 
@@ -232,12 +232,13 @@ it('does not suppress the same finding after its source content changes', () => 
     ]),
   });
 
-  expect(result.violations).toEqual([
+  expect(result.violations).toEqual([]);
+  expect(result.advisories).toEqual([
     expect.objectContaining({ rule: 'codeql-baseline-content-drift', line: 9 }),
   ]);
 });
 
-it('blocks a disappeared baseline entry and accepts its exact reintroduction', () => {
+it('reports a disappeared baseline entry as advisory and accepts its exact reintroduction', () => {
   const root = createTempRoot('verify-codeql-disappearance-');
   const outputRoot = path.join(root, 'codeql');
   const baselinePath = path.join(root, 'codeql-baseline.json');
@@ -261,9 +262,11 @@ it('blocks a disappeared baseline entry and accepts its exact reintroduction', (
     ]),
   });
 
-  expect(disappeared.violations).toEqual([
+  expect(disappeared.violations).toEqual([]);
+  expect(disappeared.advisories).toEqual([
     expect.objectContaining({ rule: 'codeql-baseline-stale', line: 9 }),
   ]);
   expect(reintroduced.violations).toEqual([]);
+  expect(reintroduced.advisories).toEqual([]);
   expect(reintroduced.summaryText).toContain('Constrained baseline findings: 1');
 });

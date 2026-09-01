@@ -5,6 +5,7 @@ import { expect, it } from 'vitest';
 
 import {
   collectDocumentationFactViolations,
+  collectDocumentationProseAdvisories,
   isBackgroundIngressDataFile,
   renderDocumentationFacts,
 } from './check.mjs';
@@ -51,7 +52,7 @@ it('accepts the exact generated projection of every registered authority', () =>
   );
 });
 
-it('rejects generated drift and alternate authored browser or reporting contradictions', () => {
+it('blocks generated drift but reports authored wording heuristics as diff-only advisory', () => {
   const root = createFixture();
   writeFile(
     root,
@@ -65,23 +66,37 @@ it('rejects generated drift and alternate authored browser or reporting contradi
       'Hosted security reporting remains outside the project.\n'
   );
   writeFile(root, 'docs/engineering/project-facts.md', '# stale\n');
-  expect(collectDocumentationFactViolations({ rootDir: root })).toEqual(
+  expect(collectDocumentationFactViolations({ rootDir: root })).toEqual([
+    expect.objectContaining({ file: 'docs/engineering/project-facts.md' }),
+  ]);
+  expect(
+    collectDocumentationProseAdvisories({
+      rootDir: root,
+      targetFiles: ['README.md', 'docs/security/threat-model.md'],
+    })
+  ).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ file: 'README.md' }),
       expect.objectContaining({ file: 'docs/security/threat-model.md' }),
-      expect.objectContaining({ file: 'docs/engineering/project-facts.md' }),
     ])
   );
 });
 
-it('fails closed when a registered authored consumer or required authority link is missing', () => {
+it('keeps missing authored consumers advisory and limited to the current diff', () => {
   const root = createFixture();
   fs.rmSync(path.join(root, 'docs/oss/release.md'));
   writeFile(root, 'README.md', '# Sniptale\n');
-  expect(collectDocumentationFactViolations({ rootDir: root })).toEqual(
+  expect(collectDocumentationFactViolations({ rootDir: root })).toEqual([]);
+  expect(
+    collectDocumentationProseAdvisories({
+      rootDir: root,
+      targetFiles: ['docs/oss/release.md', 'README.md'],
+    })
+  ).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ file: 'docs/oss/release.md' }),
       expect.objectContaining({ file: 'README.md' }),
     ])
   );
+  expect(collectDocumentationProseAdvisories({ rootDir: root, targetFiles: [] })).toEqual([]);
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseCorrelation,
   parseRunRecord,
+  parseStep,
   readCorrelationEnvironment,
   readRunIdentityEnvironment,
 } from './schema.mjs';
@@ -141,6 +142,32 @@ describe('parseRunRecord', () => {
   });
 });
 
+describe('structured inheritance', () => {
+  const inheritedStep = () => ({
+    ...validStep(),
+    outcome: 'inherited',
+    population: null,
+    inheritance: {
+      sourceProofSemanticDigest: `sha256:${'1'.repeat(64)}`,
+      sourceProofManifestDigest: `sha256:${'2'.repeat(64)}`,
+      sourceControlId: 'typescript.typecheck',
+      sourceRunRecord: 'fast-proof/.tmp/qa-observability/runs/proof.json',
+      evidenceFiles: ['fast-proof/.tmp/qa-observability/runs/proof.json'],
+    },
+  });
+
+  it('requires inheritance evidence exactly for inherited outcomes', () => {
+    expect(parseStep(inheritedStep())).toMatchObject({ outcome: 'inherited' });
+    expect(() => parseStep({ ...inheritedStep(), inheritance: null })).toThrow(/inheritance/u);
+    expect(() =>
+      parseStep({
+        ...inheritedStep(),
+        outcome: 'passed',
+      })
+    ).toThrow(/inheritance/u);
+  });
+});
+
 describe('structured run diagnostics', () => {
   it('validates structured diagnostics and timestamp consistency', () => {
     const diagnosticRecord = validRecord();
@@ -209,7 +236,11 @@ it('validates only explicit run lineage environment fields', () => {
       SNIPTALE_QA_PARENT_RUN_ID: 'closeout-17',
       SNIPTALE_QA_TASK_ID: 'not-lineage',
     })
-  ).toEqual({ runId: 'build-17', rootRunId: 'closeout-17', parentRunId: 'closeout-17' });
+  ).toEqual({
+    runId: 'build-17',
+    rootRunId: 'closeout-17',
+    parentRunId: 'closeout-17',
+  });
   expect(() => readRunIdentityEnvironment({ SNIPTALE_QA_RUN_ID: '../unsafe' })).toThrow(
     /stable lowercase identifier/u
   );

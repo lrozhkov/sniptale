@@ -189,6 +189,23 @@ export function parseCalloutPresetContent(value: unknown): StoredCalloutPresetCo
   return { titleText: value['titleText'] };
 }
 
+function parseCalloutPresetFields(value: Record<string, unknown>) {
+  const style = parseCalloutVisualStyle(value['style']);
+  const content =
+    value['content'] === undefined ? undefined : parseCalloutPresetContent(value['content']);
+  const placement =
+    value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
+  if (!style || !isValidPresetName(value['name']) || placement === null || content === null) {
+    return null;
+  }
+  return {
+    ...(content ? { content } : {}),
+    name: value['name'].trim(),
+    ...(placement ? { placement } : {}),
+    style,
+  };
+}
+
 function parseSystemOverride(value: unknown): StoredSystemCalloutPresetOverride | null {
   if (
     !isPlainRecord(value) ||
@@ -198,22 +215,14 @@ function parseSystemOverride(value: unknown): StoredSystemCalloutPresetOverride 
   ) {
     return null;
   }
-  const style = parseCalloutVisualStyle(value['style']);
-  const content =
-    value['content'] === undefined ? undefined : parseCalloutPresetContent(value['content']);
-  const placement =
-    value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
-  if (!style || !isValidPresetName(value['name']) || placement === null || content === null)
-    return null;
+  const fields = parseCalloutPresetFields(value);
+  if (!fields) return null;
   return {
     ...(isNonNegativeInteger(value['basedOnRevision'])
       ? { basedOnRevision: value['basedOnRevision'] }
       : {}),
     ...(isBoolean(value['customized']) ? { customized: value['customized'] } : {}),
-    ...(content ? { content } : {}),
-    name: value['name'].trim(),
-    ...(placement ? { placement } : {}),
-    style,
+    ...fields,
     systemPresetKey: value['systemPresetKey'],
   };
 }
@@ -227,18 +236,11 @@ function parseUserPreset(value: unknown): StoredUserCalloutPreset | null {
   ) {
     return null;
   }
-  const style = parseCalloutVisualStyle(value['style']);
-  const content =
-    value['content'] === undefined ? undefined : parseCalloutPresetContent(value['content']);
-  const placement =
-    value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
-  if (!style || placement === null || content === null) return null;
+  const fields = parseCalloutPresetFields(value);
+  if (!fields) return null;
   return {
-    ...(content ? { content } : {}),
+    ...fields,
     id: value['id'],
-    name: value['name'].trim(),
-    ...(placement ? { placement } : {}),
-    style,
   };
 }
 

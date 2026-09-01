@@ -53,6 +53,10 @@ interface CssValidationResult {
   rawError: string | null;
 }
 
+type RestrictedCssResolution = Pick<CssValidationResult, 'blockedProps' | 'styles'> & {
+  error: 'blocked' | 'syntax' | 'unsafe' | null;
+};
+
 type CssDeclaration = { name: string; value: string };
 
 const CHROMIUM_VENDOR_PROPERTIES = new Set([
@@ -117,7 +121,7 @@ function splitCssDeclarations(value: string): string[] | null {
   return declarations;
 }
 
-function parseCssDeclarations(value: string): CssDeclaration[] | null {
+export function parseCssDeclarations(value: string): CssDeclaration[] | null {
   const declarations = splitCssDeclarations(value);
   if (!declarations) return null;
   const parsed: CssDeclaration[] = [];
@@ -136,6 +140,76 @@ function parseCssDeclarations(value: string): CssDeclaration[] | null {
     parsed.push({ name, value: propertyValue });
   }
   return parsed;
+}
+
+function admitCustomCssValue(value: string, maxLength: number): 'empty' | 'unsafe' | 'valid' {
+  if (!value.trim()) return 'empty';
+  return value.length > maxLength || value.includes('@') || containsUnsafeCssSyntax(value)
+    ? 'unsafe'
+    : 'valid';
+}
+
+export function parseAdmittedCustomCssSections<Target extends string>(
+  value: string,
+  config: {
+    defaultTarget: Target;
+    maxLength: number;
+    targets: readonly Target[];
+  }
+):
+  | { result: { blockedProperties: string[]; error: 'syntax' | 'unsafe' | null }; sections: null }
+  | { result: null; sections: Record<Target, string[]> } {
+  const admission = admitCustomCssValue(value, config.maxLength);
+  if (admission === 'unsafe') {
+    return { result: { blockedProperties: [], error: 'unsafe' }, sections: null };
+  }
+  if (admission === 'empty') {
+    return { result: { blockedProperties: [], error: null }, sections: null };
+  }
+  const sections = parseNamedCssSections(value, config.targets, config.defaultTarget);
+  return sections
+    ? { result: null, sections }
+    : { result: { blockedProperties: [], error: 'syntax' }, sections: null };
+}
+
+export function prepareCustomCssResolution<Target extends string>(
+  value: string,
+  policyError: 'blocked' | 'syntax' | 'unsafe' | null,
+  config: {
+    defaultTarget: Target;
+    targets: readonly Target[];
+  }
+):
+  | { error: 'blocked' | 'syntax' | 'unsafe'; sections: null }
+  | { empty: boolean; error: null; sections: Record<Target, string[]> } {
+  if (policyError) return { error: policyError, sections: null };
+  const sections = parseNamedCssSections(value, config.targets, config.defaultTarget);
+  return sections
+    ? { empty: !value.trim(), error: null, sections }
+    : { error: 'syntax', sections: null };
+}
+
+function parseNamedCssSections<Target extends string>(
+  value: string,
+  targets: readonly Target[],
+  defaultTarget: Target
+): Record<Target, string[]> | null {
+  const sections = {} as Record<Target, string[]>;
+  for (const target of targets) sections[target] = [];
+  let target = defaultTarget;
+  for (const line of value.split('\n')) {
+    const trimmed = line.trim();
+    const sectionMatch = /^\[([a-z]+)\]$/u.exec(trimmed);
+    if (sectionMatch) {
+      const nextTarget = sectionMatch[1];
+      if (!targets.some((candidate) => candidate === nextTarget)) return null;
+      target = nextTarget as Target;
+      continue;
+    }
+    if (trimmed.startsWith('[') || trimmed.includes('{') || trimmed.includes('}')) return null;
+    sections[target].push(line);
+  }
+  return sections;
 }
 
 export function validateCssPolicyString(cssString: string): {
@@ -215,4 +289,47 @@ export function validateCssString(cssString: string): CssValidationResult {
   }
 
   return result;
+}
+
+function resolveRestrictedCssStyles(
+  declarations: string,
+  allowedProperties: ReadonlySet<string>
+): RestrictedCssResolution {
+  const validation = validateCssString(declarations);
+  if (validation.rawError) return { blockedProps: [], error: 'syntax', styles: {} };
+  if (
+    Object.values(validation.styles).some(
+      (styleValue) => typeof styleValue === 'string' && containsUnsafeCssSyntax(styleValue)
+    )
+  ) {
+    return { blockedProps: [], error: 'unsafe', styles: {} };
+  }
+  const blockedProps = [
+    ...validation.blockedProps,
+    ...Object.keys(validation.styles).filter((property) => !allowedProperties.has(property)),
+  ];
+  return blockedProps.length > 0
+    ? { blockedProps: [...new Set(blockedProps)], error: 'blocked', styles: {} }
+    : { blockedProps: [], error: null, styles: validation.styles };
+}
+
+export function resolveRestrictedCssSections<Target extends string>(args: {
+  allowedProperties: Record<Target, ReadonlySet<string>>;
+  sections: Record<Target, string[]>;
+  targets: readonly Target[];
+}): {
+  blockedProps: string[];
+  error: 'blocked' | 'syntax' | 'unsafe' | null;
+  styles: Partial<Record<Target, CSSProperties>>;
+} {
+  const styles: Partial<Record<Target, CSSProperties>> = {};
+  for (const target of args.targets) {
+    const declarations = args.sections[target].join('\n').trim();
+    if (!declarations) continue;
+    const resolved = resolveRestrictedCssStyles(declarations, args.allowedProperties[target]);
+    if (resolved.error)
+      return { blockedProps: resolved.blockedProps, error: resolved.error, styles: {} };
+    styles[target] = resolved.styles;
+  }
+  return { blockedProps: [], error: null, styles };
 }

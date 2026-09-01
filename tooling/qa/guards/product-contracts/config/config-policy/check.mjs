@@ -38,11 +38,7 @@ const REQUIRED_BUILD_TARGET = 'chrome140';
 const REQUIRED_NODE_VERSION = '24.18.0';
 const REQUIRED_NODE_ENGINE = '>=24.18.0 <25';
 const REQUIRED_PACKAGE_MANAGER = 'npm@11.19.1';
-const REQUIRED_NPM_CONFIG = Object.freeze([
-  'legacy-peer-deps=true',
-  'loglevel=error',
-  'min-release-age=7',
-]);
+const REQUIRED_NPM_CONFIG = Object.freeze(['loglevel=error', 'min-release-age=7']);
 const REQUIRED_PACKAGE_DEPENDENCY_BASELINES = {
   react: /^\^19\.2\.\d+$/u,
   'react-dom': /^\^19\.2\.\d+$/u,

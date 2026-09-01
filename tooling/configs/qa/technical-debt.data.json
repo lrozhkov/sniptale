@@ -170,6 +170,48 @@
       "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
     },
     {
+      "id": "noise.gitleaks.secret-redaction-aws-fixture.11",
+      "classification": "tool-noise",
+      "owner": "shared-security-tests",
+      "risk": "A synthetic authorization-header fixture in immutable Git history resembles a generic API key and could obscure a real secret if reviewed broadly.",
+      "reason": "The exact historical finding is a non-secret AWS authorization fixture used to prove canonical secret redaction.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-09-01",
+      "source": {
+        "kind": "gitleaks",
+        "key": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11"
+      },
+      "scope": {
+        "commit": "345c7ad7ea3308a9768e4c127dcbf011f76da716",
+        "file": "src/shared/security/secret-redaction.test.ts",
+        "fingerprint": "345c7ad7ea3308a9768e4c127dcbf011f76da716:src/shared/security/secret-redaction.test.ts:generic-api-key:11",
+        "line": 11,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
+      "id": "noise.gitleaks.release-source-e2e-prose.217",
+      "classification": "tool-noise",
+      "owner": "release-source-documentation",
+      "risk": "A prose list of release E2E scenarios in immutable Git history resembles a generic API key and could obscure a real secret if reviewed broadly.",
+      "reason": "The exact historical finding is ordinary architecture prose with no credential value or executable secret-bearing payload.",
+      "removalCondition": "Remove this entry when the referenced commit is no longer reachable from supported repository history.",
+      "reviewBy": "2027-09-01",
+      "source": {
+        "kind": "gitleaks",
+        "key": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217"
+      },
+      "scope": {
+        "commit": "9f558b7c1fffe86cd94d3a3818262779b3c88997",
+        "file": "docs/architecture/release-source-architecture.md",
+        "fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
+        "line": 217,
+        "rule": "generic-api-key"
+      },
+      "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
+    },
+    {
       "id": "accepted.codeql.locked-toolchain-download-write",
       "classification": "accepted-architecture",
       "owner": "qa-platform",
@@ -258,7 +300,7 @@
       "classification": "accepted-architecture",
       "owner": "repository-owner",
       "risk": "A copyleft development dependency could be mistaken for shipped artifact content if packaging boundaries drift.",
-      "reason": "Reviewed tooling-only audit dependency; it is not bundled into the extension release artifact.",
+      "reason": "Reviewed tooling-only Oxlint plugin dependency; it is not bundled into the extension release artifact.",
       "removalCondition": "Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact.",
       "reviewBy": "2027-07-12",
       "source": {
@@ -272,7 +314,7 @@
         "expiresOn": "2027-07-12",
         "licenseExpression": "LGPL-3.0-only",
         "packageName": "eslint-plugin-sonarjs",
-        "reason": "Reviewed tooling-only audit dependency; it is not bundled into the extension release artifact.",
+        "reason": "Reviewed tooling-only Oxlint plugin dependency; it is not bundled into the extension release artifact.",
         "resolvedVersion": "4.2.0"
       },
       "targetAction": "Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact."

@@ -457,11 +457,14 @@ export function recordPopupExportDownloadStarted(args: {
   });
 }
 
-export function recordPagePackageOutputAmbiguous(args: {
-  error: string;
-  jobId: string;
-  operationId: string;
-}): Promise<void> {
+function recordPagePackageOutputFailure(
+  args: {
+    error: string;
+    jobId: string;
+    operationId: string;
+  },
+  phase: 'ambiguous-download' | 'cleanup-failed'
+): Promise<void> {
   return mutateRecord((record) => {
     if (
       !record ||
@@ -474,10 +477,18 @@ export function recordPagePackageOutputAmbiguous(args: {
       output: {
         ...record.output,
         cleanupError: boundPagePackageCleanupError(args.error),
-        phase: 'ambiguous-download',
+        phase,
       },
     };
   });
+}
+
+export function recordPagePackageOutputAmbiguous(args: {
+  error: string;
+  jobId: string;
+  operationId: string;
+}): Promise<void> {
+  return recordPagePackageOutputFailure(args, 'ambiguous-download');
 }
 
 export function recordPagePackageOutputCleanupFailed(args: {
@@ -485,22 +496,7 @@ export function recordPagePackageOutputCleanupFailed(args: {
   jobId: string;
   operationId: string;
 }): Promise<void> {
-  return mutateRecord((record) => {
-    if (
-      !record ||
-      record.status.jobId !== args.jobId ||
-      record.output?.downloadOperationId !== args.operationId
-    )
-      return record;
-    return {
-      ...record,
-      output: {
-        ...record.output,
-        cleanupError: boundPagePackageCleanupError(args.error),
-        phase: 'cleanup-failed',
-      },
-    };
-  });
+  return recordPagePackageOutputFailure(args, 'cleanup-failed');
 }
 
 export async function cleanupRecordedPagePackageOutput(args: {

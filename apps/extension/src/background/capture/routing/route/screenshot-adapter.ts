@@ -4,14 +4,13 @@ import {
   getScreenshotSurfaceBinding,
   renewScreenshotSurfaceCapability,
 } from '../../../capture-surface/screenshot-session';
-import { getPreauthorizedContentActionRouteMessage } from '../authorization/content-action';
 import { handleFullCapture } from '../handlers.full';
 import { handleVisibleCapture, handleVisibleCaptureForCrop } from '../handlers.visible';
-import type { CaptureRouteAdapterContext } from './types';
+import type { CaptureRouteCommandContext } from './types';
 
-type ScreenshotCaptureHandler = (context: CaptureRouteAdapterContext['context']) => boolean;
+type ScreenshotCaptureHandler = (context: CaptureRouteCommandContext['context']) => boolean;
 
-export function routeScreenshotCaptureMessage(args: CaptureRouteAdapterContext): boolean {
+export function routeScreenshotCaptureMessage(args: CaptureRouteCommandContext): boolean {
   if (args.routeArgs.message.type === CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION) {
     void renewScreenshotSurfaceSession(args).catch((error: unknown) => {
       args.context.sendResponse(createRouteErrorResponse(error));
@@ -33,9 +32,9 @@ export function routeScreenshotCaptureMessage(args: CaptureRouteAdapterContext):
   return true;
 }
 
-async function renewScreenshotSurfaceSession(args: CaptureRouteAdapterContext): Promise<void> {
+async function renewScreenshotSurfaceSession(args: CaptureRouteCommandContext): Promise<void> {
   await authorizeScreenshotCapture(args);
-  const senderBinding = getPreauthorizedContentActionRouteMessage(args.routeArgs.message);
+  const senderBinding = args.routeArgs.contentPreauthorization;
   if (!senderBinding || senderBinding.tabId !== args.context.resolvedTabId) {
     throw new Error('Unauthorized screenshot surface renewal');
   }
@@ -51,7 +50,7 @@ async function renewScreenshotSurfaceSession(args: CaptureRouteAdapterContext): 
 }
 
 function resolveScreenshotCaptureHandler(
-  message: CaptureRouteAdapterContext['routeArgs']['message']
+  message: CaptureRouteCommandContext['routeArgs']['message']
 ): ScreenshotCaptureHandler | null {
   if (message.type === CaptureMessageType.CAPTURE_VISIBLE) {
     return handleVisibleCapture;
@@ -65,7 +64,7 @@ function resolveScreenshotCaptureHandler(
   return null;
 }
 
-async function authorizeScreenshotCapture(args: CaptureRouteAdapterContext): Promise<void> {
+async function authorizeScreenshotCapture(args: CaptureRouteCommandContext): Promise<void> {
   const { pageAccessPort } = args.routeArgs;
   if (!pageAccessPort) {
     throw new Error('Page access port unavailable.');
@@ -77,7 +76,7 @@ async function authorizeScreenshotCapture(args: CaptureRouteAdapterContext): Pro
   }
 }
 
-function isNativeVisibleCapture(args: CaptureRouteAdapterContext): boolean {
+function isNativeVisibleCapture(args: CaptureRouteCommandContext): boolean {
   const message = args.routeArgs.message;
   if (message.type === CaptureMessageType.CAPTURE_FULL) {
     return true;

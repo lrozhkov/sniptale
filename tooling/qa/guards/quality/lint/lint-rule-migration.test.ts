@@ -2,8 +2,6 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { SONARJS_TYPE_AWARE_RULE_IDS } from '../sonarjs/check.mjs';
-
 type RuleSetting = string | [string, ...unknown[]];
 type RuleMap = Record<string, RuleSetting>;
 
@@ -300,16 +298,12 @@ it('pins the custom TS6 guard roots and canonical execution owner', () => {
   ]);
 });
 
-it('pins Security and syntax SonarJS as Oxlint JS plugins with only type-aware Sonar residual', () => {
+it('pins Security and syntax SonarJS as Oxlint JS plugins without a separate ESLint residual', () => {
   const oxlintConfig = JSON.parse(fs.readFileSync('.oxlintrc.json', 'utf8')) as {
     jsPlugins: Array<{ name: string; specifier: string }>;
     overrides: Array<{ rules?: RuleMap }>;
     rules: Record<string, string>;
   };
-  const expectedSonarjs = migration.residualEslint.find(
-    ({ owner }) => owner === 'tooling/qa/guards/quality/sonarjs/check.mjs'
-  );
-
   expect(oxlintConfig.jsPlugins).toContainEqual({
     name: 'security',
     specifier: 'eslint-plugin-security',
@@ -318,12 +312,10 @@ it('pins Security and syntax SonarJS as Oxlint JS plugins with only type-aware S
     name: 'sonarjs',
     specifier: 'eslint-plugin-sonarjs',
   });
-  expect(migration.residualEslint).toHaveLength(1);
+  expect(migration.residualEslint).toEqual([]);
   expect(
     Object.keys(oxlintConfig.rules).filter((rule) => rule.startsWith('security/'))
   ).toHaveLength(6);
-  expect(expectedSonarjs?.rules.toSorted()).toEqual(SONARJS_TYPE_AWARE_RULE_IDS.toSorted());
-  expect(expectedSonarjs?.defaultSeverity).toBe('error');
   const configuredRules = new Set(
     oxlintConfig.overrides.flatMap(({ rules = {} }) => Object.keys(rules))
   );

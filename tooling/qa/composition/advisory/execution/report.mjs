@@ -1,6 +1,9 @@
 const ADVISORY_CHECK_DESCRIPTIONS = [
   'structural file pressure',
   'structural function pressure',
+  'root scatter',
+  'documentation prose drift',
+  'oversized inline literals',
   'UI proof gaps',
 ];
 

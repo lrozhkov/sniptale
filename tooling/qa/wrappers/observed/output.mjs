@@ -49,7 +49,9 @@ function skipReason(step) {
 
 function stepOutcome(step) {
   if (step.status === 'ok') return 'passed';
+  if (step.status === 'inherited') return 'inherited';
   if (step.status === 'failed') return 'problems-found';
+  if (step.status === 'blocked') return 'blocked';
   return 'skipped';
 }
 
@@ -58,6 +60,15 @@ function renderViolations(violations = []) {
     if (typeof violation === 'string') return `- ${violation}`;
     const line = violation.line == null ? '' : `:${violation.line}`;
     return `- ${violation.file ?? '<repository>'}${line} ${violation.message ?? 'violation'}`;
+  });
+}
+
+function renderAdvisories(advisories = []) {
+  return advisories.map((advisory) => {
+    const id = advisory.id ?? advisory.family ?? advisory.rule ?? 'advisory';
+    const reason = advisory.reason ?? advisory.message ?? 'review requested';
+    const line = advisory.line == null ? '' : `:${advisory.line}`;
+    return `- advisory ${id}: ${advisory.file ?? '<repository>'}${line} ${reason}`;
   });
 }
 
@@ -77,7 +88,7 @@ function structuredLocations(step) {
     message: String(failure),
   }));
   const advisories = (step.advisories ?? []).map((finding) => {
-    const id = finding.id ?? finding.family ?? 'advisory';
+    const id = finding.id ?? finding.family ?? finding.rule ?? 'advisory';
     const reason = finding.reason ?? finding.message ?? 'review requested';
     return {
       file: finding.file ?? '<repository>',
@@ -108,6 +119,7 @@ export function renderObservedStepLog(step, definition) {
     step.summary ? `summary: ${step.summary}` : '',
     step.detail ? `detail: ${step.detail}` : '',
     ...renderViolations(step.violations),
+    ...renderAdvisories(step.advisories),
     ...(step.failures ?? []).map((failure) => `- ${failure}`),
     step.stdout ? `stdout:\n${step.stdout}` : '',
     step.stderr ? `stderr:\n${step.stderr}` : '',
@@ -121,7 +133,7 @@ export function renderObservedStepLog(step, definition) {
 export function normalizeObservedStep(step) {
   const definition = findDefinition(step.label);
   const outcome = stepOutcome(step);
-  const failed = outcome === 'problems-found';
+  const failed = ['problems-found', 'blocked'].includes(outcome);
   return {
     definition,
     observation: {
@@ -129,9 +141,13 @@ export function normalizeObservedStep(step) {
       outcome,
       durationMs: step.durationMs ?? 0,
       controlIds: [definition.id],
-      problemIds: failed ? [`${definition.id}.${problemCategory(step)}`] : [],
+      problemIds: failed
+        ? [`${definition.id}.${outcome === 'blocked' ? 'blocked' : problemCategory(step)}`]
+        : [],
       skipReasonId: outcome === 'skipped' ? skipReason(step) : null,
       diagnostic: createStructuredDiagnostic(step, definition, failed),
+      population: step.population ?? null,
+      inheritance: step.inheritance ?? null,
       log: renderObservedStepLog(step, definition),
     },
   };

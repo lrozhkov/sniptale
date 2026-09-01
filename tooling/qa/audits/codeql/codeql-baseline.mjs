@@ -115,13 +115,13 @@ function findUnclaimedIndex(violations, claimed, key) {
 
 function partitionViolations(violations, baseline, sourceRoot) {
   const claimed = new Set();
-  const baselineViolations = [];
+  const advisories = [];
   let baselineCount = 0;
   for (const finding of baseline.findings) {
     const observedIndex = findUnclaimedIndex(violations, claimed, toBaselineKey(finding));
     const contentHash = sourceContentHash(finding.file, sourceRoot);
     if (contentHash !== finding.contentHash) {
-      baselineViolations.push(
+      advisories.push(
         baselineViolation(
           'codeql-baseline-content-drift',
           finding,
@@ -130,7 +130,7 @@ function partitionViolations(violations, baseline, sourceRoot) {
       );
     }
     if (observedIndex < 0) {
-      baselineViolations.push(
+      advisories.push(
         baselineViolation(
           'codeql-baseline-stale',
           finding,
@@ -140,14 +140,12 @@ function partitionViolations(violations, baseline, sourceRoot) {
       continue;
     }
     claimed.add(observedIndex);
-    if (contentHash === finding.contentHash) baselineCount += 1;
+    baselineCount += 1;
   }
   return {
+    advisories,
     baselineCount,
-    violations: [
-      ...baselineViolations,
-      ...violations.filter((_violation, index) => !claimed.has(index)),
-    ],
+    violations: violations.filter((_violation, index) => !claimed.has(index)),
   };
 }
 
@@ -156,7 +154,7 @@ export function applyCodeqlBaseline({ baselinePath, sourceRoot, violations }) {
   const baseline = readBaseline(baselinePath);
   const partitioned = baseline
     ? partitionViolations(filtered, baseline, sourceRoot)
-    : { baselineCount: 0, violations: filtered };
+    : { advisories: [], baselineCount: 0, violations: filtered };
   return {
     ...partitioned,
     testLikeCount: violations.length - filtered.length,

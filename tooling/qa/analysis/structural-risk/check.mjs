@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 
-import { createHeadFileTextResolver, readHeadFileTexts } from '../git/git-head-sources.mjs';
+import {
+  createHeadFileTextResolver,
+  readHeadFileTexts,
+  readRevisionFileTexts,
+} from '../git/git-head-sources.mjs';
 import {
   collectRenameSourceByTarget,
   filterImportOrMockOnlyDiffFiles,
@@ -16,62 +20,104 @@ import {
   sanitizeBoundedConsoleOutput,
 } from '../../runtime/observability/sanitize.mjs';
 import { collectChangedTargets } from '../../runtime/scope/changed-targets.helpers.mjs';
+import { applyRepositoryFindingBaseline } from '../../policy/baselines/repository-finding-baseline.mjs';
 
-function resolveStructuralFiles({ files = [] } = {}) {
+const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/structural-risk-repository-baseline.json';
+
+function resolveStructuralFiles({
+  files = [],
+  scope = 'workspace',
+  comparisonRevision = 'HEAD',
+} = {}) {
   const targets = resolveScopedTargetFiles({
     files,
-    scope: 'workspace',
+    scope,
     collectFiles: collectCodeFiles,
     relativeFilter: (file) => JAVASCRIPT_FILE_PATTERN.test(file),
   });
-  const behavioral = filterImportOrMockOnlyDiffFiles(targets.relativeFiles);
+  const behavioral =
+    scope === 'repo-wide'
+      ? targets.relativeFiles
+      : filterImportOrMockOnlyDiffFiles(targets.relativeFiles, { comparisonRevision });
   return [...new Set(behavioral.map(toRelativePath))].sort();
 }
 
-function createPreviousSourceResolver(targetFiles) {
-  const direct = createHeadFileTextResolver(targetFiles);
-  const renameMap = collectRenameSourceByTarget();
+function createPreviousSourceResolver(targetFiles, revision) {
+  if (revision === 'HEAD') return createHeadFileTextResolver(targetFiles);
+  const renameMap = collectRenameSourceByTarget({ comparisonRevision: revision });
   const renameSources = [
     ...new Set(targetFiles.map((file) => renameMap.get(file)).filter(Boolean)),
   ];
-  const renamed = createHeadFileTextResolver(renameSources);
-  return (relativePath) => direct(relativePath) ?? renamed(renameMap.get(relativePath));
+  const sources = readRevisionFileTexts([...targetFiles, ...renameSources], { revision });
+  return (relativePath) =>
+    sources.get(relativePath) ?? sources.get(renameMap.get(relativePath)) ?? null;
 }
 
-function collectPreviousCandidateSources({ enforce, reportScope }) {
+function collectPreviousCandidateSources({
+  comparisonRevision,
+  deletedFiles,
+  enforce,
+  reportScope,
+}) {
   if (!enforce || reportScope !== 'current-diff' || !fs.existsSync('.git')) return [];
-  const deletedFiles = collectChangedTargets({ scope: 'workspace' }).deletedFiles.filter(
-    (file) => JAVASCRIPT_FILE_PATTERN.test(file) && !isIgnoredRelativePath(file)
-  );
-  const sources = readHeadFileTexts(deletedFiles);
-  return deletedFiles
+  const candidateDeletedFiles = (
+    comparisonRevision === 'HEAD'
+      ? collectChangedTargets({ scope: 'workspace' }).deletedFiles
+      : deletedFiles
+  ).filter((file) => JAVASCRIPT_FILE_PATTERN.test(file) && !isIgnoredRelativePath(file));
+  const sources =
+    comparisonRevision === 'HEAD'
+      ? readHeadFileTexts(candidateDeletedFiles)
+      : readRevisionFileTexts(candidateDeletedFiles, { revision: comparisonRevision });
+  return candidateDeletedFiles
     .map((file) => ({ file, source: sources.get(file) }))
     .filter(({ source }) => typeof source === 'string');
 }
 
 export function runStructuralRiskCheck({
   files = [],
+  comparisonRevision = 'HEAD',
+  deletedFiles = [],
   reportScope = files.length > 0 ? 'preflight-explicit' : 'current-diff',
   enforce = files.length === 0,
   getCurrentSource = readText,
   getPreviousSource,
 } = {}) {
-  const targetFiles = resolveStructuralFiles({ files });
-  const previous = getPreviousSource ?? createPreviousSourceResolver(targetFiles);
+  const repositoryMode = reportScope === 'repository';
+  const targetFiles = resolveStructuralFiles({
+    files,
+    scope: repositoryMode ? 'repo-wide' : 'workspace',
+    comparisonRevision,
+  });
+  const previous =
+    getPreviousSource ??
+    (repositoryMode ? () => null : createPreviousSourceResolver(targetFiles, comparisonRevision));
   const report = createStructuralRiskReport({
     files: targetFiles,
     getCurrentSource,
     getPreviousSource: previous,
-    previousCandidateSources: collectPreviousCandidateSources({ enforce, reportScope }),
+    previousCandidateSources: collectPreviousCandidateSources({
+      comparisonRevision,
+      deletedFiles,
+      enforce,
+      reportScope,
+    }),
     scope: reportScope,
     enforce,
   });
+  const repositoryBaseline = repositoryMode
+    ? applyRepositoryFindingBaseline({
+        baselinePath: REPOSITORY_BASELINE_PATH,
+        controlId: 'qa.rule.structural-risk',
+        findings: report.violations,
+      })
+    : null;
   return {
     skipped: targetFiles.length === 0,
     files: targetFiles,
     report,
-    violations: report.violations,
-    advisories: report.advisories,
+    violations: repositoryBaseline?.violations ?? report.violations,
+    advisories: [...report.advisories, ...(repositoryBaseline?.advisories ?? [])],
     consoleOutput: formatStructuralRiskConsole(report),
   };
 }

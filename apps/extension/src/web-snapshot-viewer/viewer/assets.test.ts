@@ -515,12 +515,16 @@ it('rejects oversized entry metadata before inflating viewer package entries', a
     throw new Error('Rejected ZIP entry was inflated.');
   });
   const recordManifest = createManifest();
+  const { packageBlob } = await createPackageBlob({});
+  const packageFile = new File([packageBlob], 'snapshot.sniptale-page-package.zip', {
+    type: packageBlob.type,
+  });
   mocks.getWebSnapshotRecord.mockResolvedValue({
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageFile: new File(['zip'], 'snapshot.sniptale-page-package.zip'),
-    size: 1,
+    packageFile,
+    size: packageFile.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
   const loadAsyncSpy = mockLargeViewerZip(recordManifest, readLargeEntry);
@@ -554,12 +558,16 @@ it('rejects aggregate inflated metadata above 250 MiB before inflating viewer en
       ];
     })
   );
+  const { packageBlob } = await createPackageBlob({});
+  const packageFile = new File([packageBlob], 'snapshot.sniptale-page-package.zip', {
+    type: packageBlob.type,
+  });
   mocks.getWebSnapshotRecord.mockResolvedValue({
     createdAt: 1,
     id: 'snapshot-1',
     manifest: createManifest(),
-    packageFile: new File(['zip'], 'snapshot.sniptale-page-package.zip'),
-    size: 1,
+    packageFile,
+    size: packageFile.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
   const loadAsyncSpy = vi

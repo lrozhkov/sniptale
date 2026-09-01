@@ -26,6 +26,16 @@ import type {
 
 const logger = createLogger({ namespace: 'BackgroundScreenshotSurface' });
 
+function requireScreenshotSurfaceAuthorization(
+  tabId: number,
+  capabilityToken: string,
+  documentId: string | null | undefined
+): void {
+  if (!authorizeScreenshotSurfaceMutation({ capabilityToken, documentId, tabId })) {
+    throw new Error('authorization-expired');
+  }
+}
+
 async function notifyViewportChanged(tabId: number, viewport: ScreenshotViewport): Promise<void> {
   await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
     type: MessageType.VIEWPORT_CHANGED,
@@ -102,15 +112,7 @@ export async function handleApplyViewportPreset(
   _webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map()
 ): Promise<void> {
   return runScreenshotModeOperation(tabId, async () => {
-    if (
-      !authorizeScreenshotSurfaceMutation({
-        capabilityToken: surfaceCapabilityToken,
-        documentId: senderDocumentId,
-        tabId,
-      })
-    ) {
-      throw new Error('authorization-expired');
-    }
+    requireScreenshotSurfaceAuthorization(tabId, surfaceCapabilityToken, senderDocumentId);
     const surfaceSession = claimScreenshotSurfaceApply({
       capabilityToken: surfaceCapabilityToken,
       documentId: senderDocumentId,
@@ -152,15 +154,7 @@ export async function handleReleaseViewportPreset(
   _webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map()
 ): Promise<void> {
   return runScreenshotModeOperation(tabId, async () => {
-    if (
-      !authorizeScreenshotSurfaceMutation({
-        capabilityToken: surfaceCapabilityToken,
-        documentId: senderDocumentId,
-        tabId,
-      })
-    ) {
-      throw new Error('authorization-expired');
-    }
+    requireScreenshotSurfaceAuthorization(tabId, surfaceCapabilityToken, senderDocumentId);
     if (
       !claimScreenshotSurfaceRelease({
         capabilityToken: surfaceCapabilityToken,

@@ -17,19 +17,37 @@
         "verify-ast-grep",
         "proof"
       ],
+      "hostFreshPhases": [
+        "install",
+        "verify-project-toolchain",
+        "validate-workflows",
+        "provision-canvas",
+        "provision-ast-grep",
+        "proof"
+      ],
       "derivedPhases": ["non-gate-input-reuse"],
       "requiredFiles": [
         ".tmp/qa/unit-proof.json",
+        ".tmp/qa/coverage-proof.json",
+        ".tmp/coverage/canonical/coverage-final.json",
+        ".tmp/coverage/canonical/coverage-summary.json",
+        ".tmp/coverage/canonical/lcov.info",
         ".tmp/osv/results.json",
         ".tmp/gitleaks/report.json",
-        ".tmp/npm-audit/signatures.json"
+        ".tmp/npm-audit/results.json",
+        ".tmp/licenses/summary.json",
+        ".tmp/licenses/sbom.cdx.json"
       ],
-      "requiredPrefixes": [".tmp/qa-observability/runs/", ".tmp/qa-logs/"],
+      "requiredPrefixes": [
+        ".tmp/qa-observability/runs/",
+        ".tmp/qa-logs/",
+        ".tmp/coverage/canonical/html/"
+      ],
       "reuse": {
         "build": ["unavailable"],
         "unit": ["fresh", "reused"],
         "codeql": ["unavailable"],
-        "coverage": ["unavailable"]
+        "coverage": ["fresh", "reused"]
       }
     },
     "release": {
@@ -47,9 +65,19 @@
         "verify-ast-grep",
         "release"
       ],
+      "hostFreshPhases": [
+        "install",
+        "verify-project-toolchain",
+        "validate-workflows",
+        "provision-canvas",
+        "provision-ast-grep",
+        "release"
+      ],
       "derivedPhases": [],
       "requiredFiles": [
+        ".tmp/ci/fast-proof-admission.json",
         ".tmp/qa/build-proof.json",
+        ".tmp/qa/unit-proof.json",
         ".tmp/qa/codeql-proof.json",
         ".tmp/qa/coverage-proof.json",
         ".tmp/coverage/canonical/coverage-final.json",
@@ -59,20 +87,22 @@
         ".tmp/osv/results.json",
         ".tmp/gitleaks/report.json",
         ".tmp/npm-audit/results.json",
-        ".tmp/npm-audit/signatures.json",
         ".tmp/licenses/summary.json",
-        ".tmp/licenses/sbom.cdx.json"
+        ".tmp/licenses/sbom.cdx.json",
+        "fast-proof/proof-manifest.json"
       ],
       "requiredPrefixes": [
         ".tmp/qa-observability/runs/",
         ".tmp/qa-logs/",
-        ".tmp/coverage/canonical/html/"
+        ".tmp/coverage/canonical/html/",
+        "fast-proof/.tmp/qa-observability/runs/",
+        "fast-proof/.tmp/qa-logs/"
       ],
       "reuse": {
         "build": ["fresh", "reused"],
-        "unit": ["unavailable"],
+        "unit": ["inherited"],
         "codeql": ["fresh", "reused"],
-        "coverage": ["fresh", "reused"]
+        "coverage": ["inherited"]
       }
     }
   },

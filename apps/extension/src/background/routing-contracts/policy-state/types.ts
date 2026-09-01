@@ -27,6 +27,7 @@ export type PolicyStateId =
   | 'popup-tab-route-capabilities'
   | 'project-export-capabilities'
   | 'project-export-job-ledger'
+  | 'recent-capture-editor-asset-binding'
   | 'tab-mode-runtime-state'
   | 'video-capture-surface-sessions'
   | 'video-camera-recorder-grant'

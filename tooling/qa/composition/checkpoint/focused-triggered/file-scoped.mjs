@@ -1,14 +1,11 @@
 import { runDiagnosticSanitizationCheck } from '../../../guards/security/verify-diagnostic-sanitization.mjs';
 import { runFetchOwnershipCheck } from '../../../guards/security/network/credential-ownership/check.mjs';
 import {
-  collectFocusedHeavyRuntimeImportFiles,
   collectFocusedI18nFiles,
   collectFocusedSecurityDataFiles,
   collectFocusedSharedStyleFiles,
 } from './helpers.mjs';
-import { runHeavyRuntimeImportOwnershipCheck } from '../../../guards/architecture/imports/verify-heavy-runtime-import-ownership.mjs';
 import { runI18nCheck } from '../../../guards/product-contracts/verify-i18n.mjs';
-import { runRootScatterCheck } from '../../../guards/quality/root-scatter/check.mjs';
 import { runSecretStorageCheck } from '../../../guards/security/verify-secret-storage.mjs';
 import { runSensitiveRetentionCheck } from '../../../guards/security/verify-sensitive-retention.mjs';
 import { runSharedStyleOwnershipCheck } from '../../../guards/product-contracts/verify-shared-style-ownership.mjs';
@@ -31,11 +28,6 @@ const SECURITY_DATA_TRIGGER_DEFINITIONS = [
 ];
 
 const OWNERSHIP_TRIGGER_DEFINITIONS = [
-  [
-    'Heavy runtime imports',
-    runHeavyRuntimeImportOwnershipCheck,
-    'Heavy runtime import ownership violations found:',
-  ],
   [
     'Shared style ownership',
     runSharedStyleOwnershipCheck,
@@ -80,26 +72,15 @@ export function runFileScopedTriggeredChecks(
   } = {}
 ) {
   const securityDataFiles = collectSecurityFiles(targetFiles);
-  const heavyRuntimeImportFiles = collectFocusedHeavyRuntimeImportFiles(jsLikeFiles);
   const sharedStyleFiles = collectFocusedSharedStyleFiles(targetFiles);
   const i18nFiles = collectFocusedI18nFiles(targetFiles);
 
   return [
-    timeSyncStep(() =>
-      createViolationStep(
-        'Root scatter',
-        'Root scatter violations found:',
-        runRootScatterCheck({ files: targetFiles })
-      )
-    ),
     ...securityDefinitions.map((definition) =>
       createTimedTriggeredStep(definition, securityDataFiles)
     ),
     ...OWNERSHIP_TRIGGER_DEFINITIONS.map((definition) =>
-      createTimedTriggeredStep(
-        definition,
-        definition[0] === 'Shared style ownership' ? sharedStyleFiles : heavyRuntimeImportFiles
-      )
+      createTimedTriggeredStep(definition, sharedStyleFiles)
     ),
     ...runI18nTriggeredCheck(i18nFiles),
   ];

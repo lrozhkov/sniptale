@@ -1,7 +1,7 @@
 import { isTabModeMessage } from '../../message-guards/guards/tab';
 import { routeTabModeMessage } from '../../../tab-mode-router/router';
 import { routeWithPageAccess } from './page-access-guard';
-import { rejectUnauthorizedRouteSender } from './sender-rejection';
+import { authorizeRouteSender } from './sender-rejection';
 import type { ResolvedTabRouteArgs } from './types';
 
 function resolveSenderDocumentId(sender: chrome.runtime.MessageSender | undefined): string | null {
@@ -15,12 +15,18 @@ export function routeResolvedTabModeMessage(args: ResolvedTabRouteArgs): boolean
     return false;
   }
   const message = args.message;
-  if (rejectUnauthorizedRouteSender(args, 'tab-mode')) {
+  const authorization = authorizeRouteSender(args, 'tab-mode');
+  if (!authorization.authorized) {
     return true;
   }
+  const contentPreauthorization =
+    authorization.preauthorization?.kind === 'privileged-tab-route'
+      ? authorization.preauthorization.senderBinding
+      : undefined;
 
   return routeWithPageAccess(args, () =>
     routeTabModeMessage({
+      ...(contentPreauthorization ? { contentPreauthorization } : {}),
       message,
       resolvedTabId: args.resolvedTabId,
       senderDocumentId: resolveSenderDocumentId(args.sender),

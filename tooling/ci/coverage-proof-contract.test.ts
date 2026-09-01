@@ -22,13 +22,13 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
     owners: {
       decision: 'tooling/qa/proof/coverage/coverage-proof.mjs',
       execution: 'tooling/qa/proof/coverage/audit-coverage-step.mjs',
-      ciTransport: 'tooling/ci/select-coverage-proof.mjs',
-      ciMount: 'tooling/ci/proof-host-inputs.mjs',
+      ciTransport: 'tooling/ci/admit-candidate-proof.mjs',
+      ciMount: 'tooling/ci/release-wrapper.mjs',
     },
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
-  expect(canonicalProof).toContain('select-coverage-proof.mjs restore-latest-release');
-  expect(canonicalProof).toContain('SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof');
+  expect(canonicalProof).not.toContain('select-coverage-proof.mjs restore-latest-release');
+  expect(canonicalProof).toContain('container.mjs proof');
   expect(provenance).toContain('Download exact admitted release coverage');
   expect(provenance).toContain('verify-main-proof.mjs release');
   expect(provenance).toContain(
@@ -46,6 +46,9 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   expect(container).toContain('/opt/sniptale-coverage-proof.json:ro');
   expect(container).toContain('/opt/sniptale-coverage-reports:ro');
   expect(artifacts).toContain("'.tmp/qa/coverage-proof.json'");
+  expect(fs.readFileSync('tooling/ci/release-wrapper.mjs', 'utf8')).toContain(
+    'materializeInheritedFastProofEvidence'
+  );
   for (const report of [
     'results.filtered.sarif',
     'lcov.info',

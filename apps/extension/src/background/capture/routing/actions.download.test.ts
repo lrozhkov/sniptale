@@ -5,17 +5,18 @@ const {
   createRenderedCaptureJobMock,
   openEditorWithImageMock,
   transitionCaptureJobMock,
-  consumeRecentCaptureAssetBindingMock,
+  consumeRecentCaptureEditorAssetCapabilityMock,
 } = vi.hoisted(() => ({
   executeDownloadMock: vi.fn(),
   createRenderedCaptureJobMock: vi.fn(),
   openEditorWithImageMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
-  consumeRecentCaptureAssetBindingMock: vi.fn(),
+  consumeRecentCaptureEditorAssetCapabilityMock: vi.fn(),
 }));
 
-vi.mock('./actions.gallery-update', () => ({
-  consumeRecentCaptureAssetBinding: consumeRecentCaptureAssetBindingMock,
+vi.mock('../editor/recent-asset-capability', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../editor/recent-asset-capability')>()),
+  consumeRecentCaptureEditorAssetCapability: consumeRecentCaptureEditorAssetCapabilityMock,
 }));
 
 vi.mock('../download/download-router/index', () => ({
@@ -48,8 +49,16 @@ beforeEach(() => {
   openEditorWithImageMock.mockResolvedValue(undefined);
   createRenderedCaptureJobMock.mockResolvedValue('capture-job-route');
   transitionCaptureJobMock.mockResolvedValue(undefined);
-  consumeRecentCaptureAssetBindingMock.mockReturnValue(true);
+  consumeRecentCaptureEditorAssetCapabilityMock.mockReturnValue(true);
 });
+
+const senderBinding = {
+  documentId: 'document-1',
+  frameId: 0,
+  requestId: 'open-request-1',
+  senderUrl: 'https://example.test/page',
+  tabId: 42,
+};
 
 async function flushPromises(): Promise<void> {
   await Promise.resolve();
@@ -88,7 +97,9 @@ it('routes execute-save through async success responses', async () => {
 it('routes editor requests through async success responses', async () => {
   const sendResponse = vi.fn();
 
-  expect(handleOpenEditorWithImage('data:image/png;base64,2', 42, sendResponse)).toBe(true);
+  expect(handleOpenEditorWithImage({ dataUrl: 'data:image/png;base64,2' }, 42, sendResponse)).toBe(
+    true
+  );
 
   await flushPromises();
 
@@ -101,10 +112,25 @@ it('routes editor requests through async success responses', async () => {
 it('links editor requests to an existing draft asset when provided', async () => {
   const sendResponse = vi.fn();
 
-  expect(handleOpenEditorWithImage('data:image/png;base64,2', 42, sendResponse, 'asset-1')).toBe(
-    true
-  );
+  expect(
+    handleOpenEditorWithImage(
+      {
+        assetId: 'asset-1',
+        dataUrl: 'data:image/png;base64,2',
+        editorAssetCapability: { requestId: 'capture-request-1', token: 'editor-token-1' },
+      },
+      42,
+      sendResponse,
+      senderBinding
+    )
+  ).toBe(true);
   await flushPromises();
+
+  expect(consumeRecentCaptureEditorAssetCapabilityMock).toHaveBeenCalledWith({
+    assetId: 'asset-1',
+    capability: { requestId: 'capture-request-1', token: 'editor-token-1' },
+    senderBinding: expect.objectContaining({ documentId: 'document-1', tabId: 42 }),
+  });
 
   expect(openEditorWithImageMock).toHaveBeenCalledWith('data:image/png;base64,2', {
     assetId: 'asset-1',
@@ -113,11 +139,20 @@ it('links editor requests to an existing draft asset when provided', async () =>
 });
 
 it('rejects arbitrary editor asset ids that are not bound to the latest capture', () => {
-  consumeRecentCaptureAssetBindingMock.mockReturnValue(false);
+  consumeRecentCaptureEditorAssetCapabilityMock.mockReturnValue(false);
   const sendResponse = vi.fn();
-  expect(handleOpenEditorWithImage('data:image/png;base64,2', 42, sendResponse, 'asset-x')).toBe(
-    true
-  );
+  expect(
+    handleOpenEditorWithImage(
+      {
+        assetId: 'asset-x',
+        dataUrl: 'data:image/png;base64,2',
+        editorAssetCapability: { requestId: 'capture-request-1', token: 'editor-token-1' },
+      },
+      42,
+      sendResponse,
+      senderBinding
+    )
+  ).toBe(true);
   expect(openEditorWithImageMock).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
 });
@@ -140,9 +175,9 @@ it('reports execute-save and editor failures through route errors', async () => 
       downloadFailureResponse
     )
   ).toBe(true);
-  expect(handleOpenEditorWithImage('data:image/png;base64,2', 42, editorFailureResponse)).toBe(
-    true
-  );
+  expect(
+    handleOpenEditorWithImage({ dataUrl: 'data:image/png;base64,2' }, 42, editorFailureResponse)
+  ).toBe(true);
 
   await flushPromises();
 

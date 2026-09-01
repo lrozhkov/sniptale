@@ -105,7 +105,14 @@ it('allows content-tab capture routes from the sender tab', async () => {
   await flushPromises();
 
   expect(routeCaptureMessageMock).toHaveBeenCalledWith(
-    expect.objectContaining({ resolvedTabId: 44 })
+    expect.objectContaining({
+      contentPreauthorization: expect.objectContaining({
+        documentId: 'document-44',
+        requestId: contentIntent.requestId,
+        tabId: 44,
+      }),
+      resolvedTabId: 44,
+    })
   );
   expect(sendResponse).not.toHaveBeenCalledWith({
     error: 'Unauthorized capture route sender',

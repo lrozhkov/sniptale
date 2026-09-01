@@ -8,7 +8,8 @@ import {
 } from './helpers';
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
 
-vi.mock('../../../features/highlighter/css-sanitizer/css', () => ({
+vi.mock('../../../features/highlighter/css-sanitizer/css', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../features/highlighter/css-sanitizer/css')>()),
   validateCssPolicyString: vi.fn(() => ({ blockedProps: [], properties: [], rawError: false })),
   validateCssString: vi.fn((css: string) => ({
     blockedProps: [],

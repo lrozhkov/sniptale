@@ -43,6 +43,31 @@ function isOptionalGradientColorStopArray(value: unknown): boolean {
   );
 }
 
+function isOptionalEditorImageSettings(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      (value['borderPresetId'] === null || isString(value['borderPresetId'])) &&
+      isNumber(value['opacity']) &&
+      isNumber(value['radius']) &&
+      isNumber(value['shadow']) &&
+      isString(value['strokeColor']) &&
+      isNumber(value['strokeOpacity']) &&
+      (value['strokeStyle'] === 'solid' ||
+        value['strokeStyle'] === 'dashed' ||
+        value['strokeStyle'] === 'dotted' ||
+        value['strokeStyle'] === 'dash' ||
+        value['strokeStyle'] === 'dot' ||
+        value['strokeStyle'] === 'dash-dot' ||
+        value['strokeStyle'] === 'long-dash') &&
+      isNumber(value['strokeWidth']) &&
+      (value['shadowAngle'] === undefined || isNumber(value['shadowAngle'])) &&
+      (value['shadowBlur'] === undefined || isNumber(value['shadowBlur'])) &&
+      (value['shadowColor'] === undefined || isString(value['shadowColor'])) &&
+      (value['shadowDistance'] === undefined || isNumber(value['shadowDistance'])))
+  );
+}
+
 function isEditorFrameSettings(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -62,7 +87,9 @@ function isEditorFrameSettings(value: unknown): boolean {
     isOptionalGradientColorStopArray(value['backgroundGradientColorStops']) &&
     isNumber(value['backgroundGradientAngle']) &&
     isNullableString(value['backgroundImageData']) &&
-    BACKGROUND_IMAGE_FITS.has(String(value['backgroundImageFit'])) &&
+    isString(value['backgroundImageFit']) &&
+    BACKGROUND_IMAGE_FITS.has(value['backgroundImageFit']) &&
+    isOptionalEditorImageSettings(value['sourceImage']) &&
     (value['layoutMode'] === 'expand-canvas' || value['layoutMode'] === 'fit-image') &&
     isString(value['browserTitle']) &&
     isString(value['browserUrl'])
@@ -72,6 +99,10 @@ function isEditorFrameSettings(value: unknown): boolean {
 function isBrowserFrameState(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['enabled'] === undefined || typeof value['enabled'] === 'boolean') &&
+    (value['appearance'] === undefined ||
+      value['appearance'] === 'header' ||
+      value['appearance'] === 'window') &&
     isString(value['title']) &&
     isString(value['url']) &&
     (value['faviconDataUrl'] === undefined || isNullableString(value['faviconDataUrl'])) &&

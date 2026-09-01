@@ -25,6 +25,7 @@ function safeSource(fetchBinding = 'fetch') {
   return [
     "import { isPrivateNetworkHost } from '@sniptale/platform/security/private-network-host';",
     "import { beginWebSnapshotAssetFetch } from './session';",
+    "import { ensureWebSnapshotRedirectNetworkGuard } from './redirect-network-guard';",
     fetchBinding === 'fetch' ? '' : `const ${fetchBinding} = fetch;`,
     'function validateFetchUrl(value: string) {',
     '  const parsed = new URL(value);',
@@ -35,6 +36,7 @@ function safeSource(fetchBinding = 'fetch') {
     '  const parsed = validateFetchUrl(url);',
     '  const authority = beginWebSnapshotAssetFetch({ url: parsed.href });',
     "  const redirect = authority.allowExternalAssetRedirects ? 'follow' : 'manual';",
+    "  if (redirect === 'follow') await ensureWebSnapshotRedirectNetworkGuard();",
     `  const response = await ${fetchBinding}(parsed.href, {`,
     "    credentials: 'omit', redirect, signal: authority.signal",
     '  });',
@@ -83,6 +85,22 @@ describe('network fetch policy', () => {
         source.replace(
           "  if (response.type === 'opaqueredirect' || response.status >= 300) throw new Error('redirect');\n",
           ''
+        ),
+    ],
+    [
+      'missing pre-network redirect guard',
+      (source: string) =>
+        source.replace(
+          "  if (redirect === 'follow') await ensureWebSnapshotRedirectNetworkGuard();\n",
+          ''
+        ),
+    ],
+    [
+      'unawaited pre-network redirect guard',
+      (source: string) =>
+        source.replace(
+          "  if (redirect === 'follow') await ensureWebSnapshotRedirectNetworkGuard();",
+          "  if (redirect === 'follow') ensureWebSnapshotRedirectNetworkGuard();"
         ),
     ],
     [

@@ -10,6 +10,23 @@ const base = (stops: GradientStop[]) => ({
   repeat: { enabled: false, span: 1 },
 });
 
+function createGradientFromBase(
+  common: Pick<Gradient, 'interpolation' | 'repeat' | 'stops'>,
+  type: GradientType
+): Paint {
+  if (type === 'radial')
+    return {
+      kind: 'gradient',
+      gradient: { ...common, type, center: { x: 0.5, y: 0.5 }, radius: { x: 0.5, y: 0.5 } },
+    };
+  if (type === 'conic')
+    return {
+      kind: 'gradient',
+      gradient: { ...common, type, center: { x: 0.5, y: 0.5 }, startAngle: 0 },
+    };
+  return { kind: 'gradient', gradient: { ...common, type, angle: 90 } };
+}
+
 export function createGradientPaint(
   color: string,
   createId: PaintStopIdFactory,
@@ -23,17 +40,7 @@ export function createGradientPaint(
     midpoint: 0.5,
   }));
   const common = base(stops);
-  if (type === 'radial')
-    return {
-      kind: 'gradient',
-      gradient: { ...common, type, center: { x: 0.5, y: 0.5 }, radius: { x: 0.5, y: 0.5 } },
-    };
-  if (type === 'conic')
-    return {
-      kind: 'gradient',
-      gradient: { ...common, type, center: { x: 0.5, y: 0.5 }, startAngle: 0 },
-    };
-  return { kind: 'gradient', gradient: { ...common, type, angle: 90 } };
+  return createGradientFromBase(common, type);
 }
 
 export function instantiatePaint(paint: Paint, createId: PaintStopIdFactory): Paint {
@@ -56,17 +63,7 @@ export function convertPaintType(
     interpolation: source.gradient.interpolation,
     repeat: { ...source.gradient.repeat },
   };
-  if (type === 'radial')
-    return {
-      kind: 'gradient',
-      gradient: { ...common, type, center: { x: 0.5, y: 0.5 }, radius: { x: 0.5, y: 0.5 } },
-    };
-  if (type === 'conic')
-    return {
-      kind: 'gradient',
-      gradient: { ...common, type, center: { x: 0.5, y: 0.5 }, startAngle: 0 },
-    };
-  return { kind: 'gradient', gradient: { ...common, type, angle: 90 } };
+  return createGradientFromBase(common, type);
 }
 
 export function addGradientStop(

@@ -35,8 +35,9 @@ it('keeps verified unit proof transport subordinate to the canonical QA owner', 
   );
   const releaseFiles = artifacts.slice(
     artifacts.indexOf('release: ['),
-    artifacts.indexOf('const REUSABLE_FAST_REPORTS')
+    artifacts.indexOf('function createArtifactDestination')
   );
   expect(proofFiles).toContain("'.tmp/qa/unit-proof.json'");
-  expect(releaseFiles).not.toContain("'.tmp/qa/unit-proof.json'");
+  expect(releaseFiles).toContain("'.tmp/qa/unit-proof.json'");
+  expect(releaseFiles).toContain("'.tmp/ci/fast-proof-admission.json'");
 });

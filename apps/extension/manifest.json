@@ -20,7 +20,8 @@
     "offscreen",
     "tabCapture",
     "desktopCapture",
-    "clipboardWrite"
+    "clipboardWrite",
+    "declarativeNetRequest"
   ],
   "optional_permissions": ["nativeMessaging"],
   "optional_host_permissions": ["<all_urls>", "file:///"],

@@ -167,6 +167,33 @@ it('requests a library-bound capability for an explicit manual library save', as
   );
 });
 
+it('forwards the save-issued editor asset capability into the immediate editor request', async () => {
+  sendRuntimeMessageMock.mockImplementation(async (message: { type?: string }) =>
+    message.type === MessageType.SAVE_SCREENSHOT_TO_GALLERY
+      ? {
+          assetId: 'asset-1',
+          editorAssetCapability: { requestId: 'save-request-1', token: 'editor-token-1' },
+          success: true,
+        }
+      : { success: true }
+  );
+
+  await persistSelectionCapture({
+    actionType: 'edit',
+    dataUrl: 'data:image/png;base64,selection',
+    mode: 'selection',
+    sessionActivePresetId: null,
+    setSaveDialogState: vi.fn(),
+  });
+
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    assetId: 'asset-1',
+    dataUrl: 'data:image/png;base64,selection',
+    editorAssetCapability: { requestId: 'save-request-1', token: 'editor-token-1' },
+    type: MessageType.OPEN_EDITOR_WITH_IMAGE,
+  });
+});
+
 it('skips save dialog mutation when background ask-preset capture becomes stale', async () => {
   const setSaveDialogState = vi.fn();
   const { assertFresh, staleError } = createStaleGuard();

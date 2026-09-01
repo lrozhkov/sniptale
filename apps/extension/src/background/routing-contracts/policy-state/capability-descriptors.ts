@@ -126,6 +126,21 @@ export const capabilityPolicyStateDescriptors = [
     ttlMs: MINUTE_MS,
   },
   {
+    authorityFamily: 'recent-capture-editor-asset-binding',
+    failClosedOnRestart: true,
+    id: 'recent-capture-editor-asset-binding',
+    oneShot: true,
+    ownerModule: 'apps/extension/src/background/capture/editor/recent-asset-capability.ts',
+    proofModules: ['apps/extension/src/background/capture/editor/recent-asset-capability.test.ts'],
+    requiresTtl: true,
+    restartBehavior:
+      'Disposable editor asset capabilities fail closed after worker restart and the capture flow must save again.',
+    restartClass: 'disposable-fail-closed',
+    stateClass: 'capability',
+    storageClass: 'memory-only',
+    ttlMs: MINUTE_MS,
+  },
+  {
     authorityFamily: 'project-export-runtime',
     failClosedOnRestart: false,
     id: 'project-export-capabilities',

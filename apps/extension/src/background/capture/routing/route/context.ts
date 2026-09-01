@@ -1,8 +1,11 @@
 import type { CaptureRouteContext } from '../types';
-import type { RouteCaptureMessageArgs } from './types';
+import type { CaptureRouteCommandArgs } from './types';
 
-export function createCaptureRouteContext(args: RouteCaptureMessageArgs): CaptureRouteContext {
+export function createCaptureRouteContext(args: CaptureRouteCommandArgs): CaptureRouteContext {
   return {
+    ...(args.contentPreauthorization
+      ? { contentPreauthorization: args.contentPreauthorization }
+      : {}),
     message: args.message as NonNullable<CaptureRouteContext['message']>,
     resolvedTabId: args.resolvedTabId,
     sendResponse: args.sendResponse,

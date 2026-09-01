@@ -1,4 +1,9 @@
-import { QA_CONTROL_CATALOG, collectQaOccurrences, selectQaControls } from './catalog.mjs';
+import {
+  QA_CONTROL_CATALOG,
+  collectCiClosureReport,
+  collectQaOccurrences,
+  selectQaControls,
+} from './catalog.mjs';
 export { FOCUSED_VIOLATION_STEP_TOOLS, FULL_VIOLATION_STEP_TOOLS } from './definitions.data.mjs';
 
 export const QA_STEP_OCCURRENCES = Object.freeze(collectQaOccurrences());
@@ -30,4 +35,4 @@ export function findQaStepDefinition({ id, label, lane } = {}) {
 }
 
 export const QA_RULE_DEFINITIONS = Object.freeze(collectQaRuleDefinitions());
-export { QA_CONTROL_CATALOG, selectQaControls };
+export { collectCiClosureReport, QA_CONTROL_CATALOG, selectQaControls };

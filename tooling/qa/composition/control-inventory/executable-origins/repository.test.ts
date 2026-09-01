@@ -7,7 +7,7 @@ import { getSourceSnapshotStats } from '../../../analysis/source/source-snapshot
 import { collectRepositoryExecutableOrigins } from './repository.mjs';
 
 const EXPECTED_AUTHORITY_TARGET_PAIRS = [
-  ['tooling/ci/local.mjs', 'tooling/ci/local-playwright-smoke.mjs'],
+  ['tooling/ci/local.mjs', 'tooling/ci/local-project-bootstrap.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/proof-wrapper.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/release-wrapper.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/verify-project-toolchain.mjs'],

@@ -28,6 +28,9 @@ it('accepts the execution-only Oxlint thread allocation in the full worker contr
         codeFiles: [],
         excludedControlLabels: [],
         releaseMode: true,
+        structuralCodeFiles: ['src/current.ts'],
+        structuralComparisonRevision: 'a'.repeat(40),
+        structuralDeletedFiles: ['src/removed.ts'],
         targetFiles: [],
       },
       lane: 'lint',
@@ -71,6 +74,9 @@ it('rejects extra full-verification context authority', () => {
         codeFiles: [],
         excludedControlLabels: [],
         releaseMode: false,
+        structuralCodeFiles: [],
+        structuralComparisonRevision: 'HEAD',
+        structuralDeletedFiles: [],
         targetFiles: [],
         unexpectedAuthority: true,
       },
@@ -80,4 +86,25 @@ it('rejects extra full-verification context authority', () => {
       vitestMaxWorkers: 4,
     })
   ).toThrow(/invalid field population/u);
+});
+
+it('rejects malformed structural comparison authority in the full worker contract', () => {
+  expect(() =>
+    parseFullVerifyWorkerInput({
+      context: {
+        baseline: { allowances: [] },
+        codeFiles: [],
+        excludedControlLabels: [],
+        releaseMode: true,
+        structuralCodeFiles: [],
+        structuralComparisonRevision: 'main',
+        structuralDeletedFiles: [],
+        targetFiles: [],
+      },
+      lane: 'light',
+      oxlintThreadCount: 2,
+      typecheckCheckerCount: 4,
+      vitestMaxWorkers: 4,
+    })
+  ).toThrow(/comparison revision/u);
 });

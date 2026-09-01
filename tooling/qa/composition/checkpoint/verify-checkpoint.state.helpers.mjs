@@ -5,9 +5,13 @@ import {
   hasValidProducerRunId,
   requireProducerRunId,
 } from '../../proof/contracts/qa-proof-state-provenance.mjs';
+import {
+  createQaProofRuntimeIdentity,
+  resolveQaProofRuntimeIdentityMismatch,
+} from '../../proof/contracts/qa-proof-runtime-identity.mjs';
 
 export const CHECKPOINT_STATE_PATH = '.tmp/qa/checkpoint-state.json';
-const CHECKPOINT_WRAPPER_VERSION = 'qa-checkpoint-v2';
+const CHECKPOINT_WRAPPER_VERSION = 'qa-checkpoint-v3';
 
 export function createCheckpointState({
   context,
@@ -16,17 +20,19 @@ export function createCheckpointState({
   errorMessage = '',
   producerRunId,
 }) {
+  const allTargetFiles = [...(context.allTargetFiles ?? context.targetFiles)];
   return {
     version: CHECKPOINT_WRAPPER_VERSION,
     generatedAt: new Date().toISOString(),
     success,
     skipped,
     allDiffFingerprint: context.allFingerprint ?? context.fingerprint,
-    allTargetFiles: [...(context.allTargetFiles ?? context.targetFiles)],
+    allTargetFiles,
     diffFingerprint: context.fingerprint,
     targetFiles: [...context.targetFiles],
     errorMessage,
     producerRunId: requireProducerRunId(producerRunId),
+    ...createQaProofRuntimeIdentity(),
   };
 }
 
@@ -73,6 +79,12 @@ function resolveCheckpointMismatchReason(state, context) {
     return 'checkpoint state version is stale';
   }
   if (!hasValidProducerRunId(state)) return 'checkpoint state has no valid producer run ID';
+
+  const runtimeMismatch = resolveQaProofRuntimeIdentityMismatch(
+    state,
+    createQaProofRuntimeIdentity()
+  );
+  if (runtimeMismatch) return `checkpoint ${runtimeMismatch}`;
 
   if (!state.success) {
     return state.errorMessage

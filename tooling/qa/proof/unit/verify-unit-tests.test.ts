@@ -1,3 +1,6 @@
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+
 import { expect, it } from 'vitest';
 
 import { createUnitTestPlan } from './unit-test-plan.mjs';
@@ -6,6 +9,9 @@ import {
   createUnitTestEnv,
   resolveProductUnitTestPool,
   resolveProductUnitTestPartitions,
+  resolveHarnessUnitTestPartitions,
+  runFullHarnessUnitTests,
+  runRepoNodeEntryAsync,
   runUnitTests,
 } from './verify-unit-tests.mjs';
 import { requiresRelatedUnitTests } from '../coverage/test-coverage/thresholds.mjs';
@@ -18,12 +24,11 @@ it('builds the full-suite vitest command by default', () => {
 });
 
 it('builds a focused related-test command for changed files', () => {
-  expect(
-    createUnitTestArgs({
-      allowNoTests: true,
-      relatedFiles: ['src/shared/example.ts', 'apps/extension/src/background/example.ts'],
-    })
-  ).toEqual(
+  const args = createUnitTestArgs({
+    allowNoTests: true,
+    relatedFiles: ['src/shared/example.ts', 'apps/extension/src/background/example.ts'],
+  });
+  expect(args).toEqual(
     expect.arrayContaining([
       expect.stringContaining('node_modules/vitest/vitest.mjs'),
       'related',
@@ -31,8 +36,22 @@ it('builds a focused related-test command for changed files', () => {
       'apps/extension/src/background/example.ts',
       '--run',
       '--passWithNoTests',
+      '--',
     ])
   );
+  expect(args.indexOf('--run')).toBeLessThan(args.indexOf('--'));
+});
+
+it('keeps option-shaped hostile paths behind the Vitest operand separator', () => {
+  const args = createUnitTestArgs({
+    relatedFiles: ['--help', 'apps/extension/src/background/index.ts'],
+  });
+  expect(args.slice(args.indexOf('--'))).toEqual([
+    '--',
+    '--help',
+    'apps/extension/src/background/index.ts',
+  ]);
+  expect(args.indexOf('--run')).toBeLessThan(args.indexOf('--'));
 });
 
 it('builds a direct diff-test command when only changed test files should run', () => {
@@ -101,6 +120,106 @@ it('splits only the config-owned product suite into sequential partitions', () =
   expect(createUnitTestEnv({ pool: 'threads' })).toMatchObject({
     SNIPTALE_PRODUCT_VITEST_POOL: 'threads',
   });
+});
+
+it('splits only the complete harness suite into pool-compatible partitions', () => {
+  expect(resolveHarnessUnitTestPartitions({ suite: 'harness' })).toEqual([
+    'node-vm-a',
+    'node-vm-b',
+    'jsdom-vm',
+    'forks',
+  ]);
+  expect(resolveHarnessUnitTestPartitions({ suite: 'harness', focused: true })).toEqual([null]);
+  expect(resolveHarnessUnitTestPartitions({ suite: 'harness', coverage: true })).toEqual([null]);
+  expect(resolveHarnessUnitTestPartitions()).toEqual([null]);
+});
+
+it('runs a complete harness suite through every ordered partition', () => {
+  const invocations: Array<{ options: { env: Record<string, string | null> } }> = [];
+  runUnitTests({
+    suite: 'harness',
+    execute: (_entry, _args, options) => {
+      invocations.push({ options });
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  expect(invocations.map(({ options }) => options.env.SNIPTALE_HARNESS_VITEST_PARTITION)).toEqual([
+    'node-vm-a',
+    'node-vm-b',
+    'jsdom-vm',
+    'forks',
+  ]);
+});
+
+it('runs full harness partitions concurrently within one shared worker budget', async () => {
+  const releases: Array<() => void> = [];
+  const invocations: Array<{ env: Record<string, string | null> }> = [];
+  const pending = runFullHarnessUnitTests({
+    env: { SNIPTALE_QA_VITEST_MAX_WORKERS: '8' },
+    execute: async (_entry, _args, options) => {
+      invocations.push(options);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  await Promise.resolve();
+  expect(invocations).toHaveLength(4);
+  expect(invocations.map(({ env }) => env.SNIPTALE_QA_VITEST_MAX_WORKERS)).toEqual([
+    '2',
+    '2',
+    '2',
+    '2',
+  ]);
+  for (const release of releases) release();
+  await expect(pending).resolves.toMatchObject({ status: 0 });
+});
+
+it('waves harness partitions when the runner worker budget is smaller than the partition count', async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const workerCounts: string[] = [];
+  await runFullHarnessUnitTests({
+    env: { SNIPTALE_QA_VITEST_MAX_WORKERS: '2' },
+    execute: async (_entry, _args, options) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      workerCounts.push(options.env.SNIPTALE_QA_VITEST_MAX_WORKERS);
+      await Promise.resolve();
+      active -= 1;
+      return { status: 0, stdout: 'passed\n', stderr: '' };
+    },
+  });
+
+  expect(maximumActive).toBe(2);
+  expect(workerCounts).toEqual(['1', '1', '1', '1']);
+});
+
+it('bounds async harness child output and terminates the overflowing process group', async () => {
+  const child = new EventEmitter() as EventEmitter & {
+    pid: number;
+    stdout: PassThrough;
+    stderr: PassThrough;
+  };
+  child.pid = 42;
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  let terminated = false;
+  const resultPromise = runRepoNodeEntryAsync('tooling/example.mjs', [], {
+    maxBuffer: 4,
+    spawnImpl: () => child,
+    terminateImpl: () => {
+      terminated = true;
+      queueMicrotask(() => child.emit('close', null, 'SIGKILL'));
+    },
+  });
+
+  child.stdout.write('12345');
+  const result = await resultPromise;
+  expect(terminated).toBe(true);
+  expect(result).toMatchObject({ status: 1, signal: 'SIGKILL', stdout: '' });
+  expect(result.stderr).toContain('Harness child output exceeded 4 bytes.');
 });
 
 it('runs only the complete plain product suite through all ordered partitions', () => {

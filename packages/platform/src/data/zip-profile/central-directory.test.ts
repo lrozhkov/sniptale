@@ -39,7 +39,14 @@ it('rejects suspicious compression ratios from central metadata before inflation
   expectZipError(
     () =>
       inspectZipCentralDirectory(
-        createZip([{ compressedSize: 1, data: [1], name: 'bomb', uncompressedSize: 1001 }]),
+        createZip([
+          {
+            compressedSize: 1,
+            data: [1],
+            name: 'bomb',
+            uncompressedSize: 1001,
+          },
+        ]),
         DEFAULT_OPTIONS
       ),
     'limit-exceeded'
@@ -101,15 +108,27 @@ it('enforces archive, file, entry, and aggregate inflated limits', () => {
   ]);
 
   expectZipError(
-    () => inspectZipCentralDirectory(archive, { ...DEFAULT_OPTIONS, maxArchiveBytes: 1 }),
+    () =>
+      inspectZipCentralDirectory(archive, {
+        ...DEFAULT_OPTIONS,
+        maxArchiveBytes: 1,
+      }),
     'limit-exceeded'
   );
   expectZipError(
-    () => inspectZipCentralDirectory(archive, { ...DEFAULT_OPTIONS, maxFileCount: 1 }),
+    () =>
+      inspectZipCentralDirectory(archive, {
+        ...DEFAULT_OPTIONS,
+        maxFileCount: 1,
+      }),
     'limit-exceeded'
   );
   expectZipError(
-    () => inspectZipCentralDirectory(archive, { ...DEFAULT_OPTIONS, maxEntryBytes: 1 }),
+    () =>
+      inspectZipCentralDirectory(archive, {
+        ...DEFAULT_OPTIONS,
+        maxEntryBytes: 1,
+      }),
     'limit-exceeded'
   );
   expectZipError(
@@ -119,6 +138,17 @@ it('enforces archive, file, entry, and aggregate inflated limits', () => {
         maxTotalInflatedBytes: 3,
       }),
     'limit-exceeded'
+  );
+});
+
+it('rejects payload-bearing directory records', () => {
+  expectZipError(
+    () =>
+      inspectZipCentralDirectory(
+        createZip([{ data: [1], name: 'payload-directory/' }]),
+        DEFAULT_OPTIONS
+      ),
+    'archive-invalid'
   );
 });
 

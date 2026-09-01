@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "chunkSizeWarningLimitKb": 500,
   "appRoot": "apps/extension",
   "configPaths": [
     "apps/extension/manifest.json",

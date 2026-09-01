@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { collectTopologyModuleGraph } from './graph.mjs';
+import { collectTopologyModuleGraph, collectTopologySyntaxSignals } from './graph.mjs';
 
 function createReader(sources: Record<string, string>) {
   return (file: string) => {
@@ -108,4 +108,16 @@ it('detects forwarding, pass-through, and delegation-only test syntax without ex
   expect(modules['tooling/example/run.ts'].passThrough).toBe(true);
   expect(modules['tooling/example/run.test.ts'].delegationOnlyTest).toBe(true);
   expect(modules['tooling/example/run.test-support.ts'].delegationOnlyTest).toBe(true);
+});
+
+it('exposes the same pure forwarding predicate for baseline comparisons', () => {
+  expect(
+    collectTopologySyntaxSignals('owner/facade.ts', "export { run } from './run';").forwardingOnly
+  ).toBe(true);
+  expect(
+    collectTopologySyntaxSignals(
+      'owner/facade.ts',
+      "export { run } from './run'; export const owner = 'facade';"
+    ).forwardingOnly
+  ).toBe(false);
 });

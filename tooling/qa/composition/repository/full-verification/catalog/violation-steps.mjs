@@ -20,9 +20,12 @@ export async function collectViolationSteps(
       steps.push(createSkippedStep(label, 'scheduled in bounded owner lane'));
       continue;
     }
-    const { durationMs, value: result } = await measureAsyncStep(() =>
+    const { durationMs, value: rawResult } = await measureAsyncStep(() =>
       runner({ ...runnerScope, astGrepReceipt })
     );
+    const result = releaseMode
+      ? { ...rawResult, files: rawResult.files ?? codeFiles, scope: 'repo-wide' }
+      : rawResult;
     steps.push({ ...createViolationStep(label, header, result), durationMs });
   }
   return steps;

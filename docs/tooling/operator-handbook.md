@@ -10,8 +10,8 @@ Short command and review lookup. Full external behavior is in [ci-cd.md](ci-cd.m
 | Harness/shared-control proof | `npm run qa:release-harness` | Required when the live scope classifier reports executable harness targets. |
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, artifact policy, and commit. |
-| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs repository-wide Fast controls, full Vitest, fast PR audits, and one fresh `npm run build:release` without archive or reusable build proof. Dirty workspace is diagnostic and non-admissible externally. |
-| Local full release gate | `npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]` | Runs the same blocking composition owner as Release provenance Gate directly in WSL, including the separate release build/archive and heavy audit. CI collects mutation separately as advisory evidence after sealing. |
+| Local fast gate | `npm run ci:proof -- [--cpu N] [--memory-mib N] [--workers N]` | Runs repository-wide deterministic controls, full product coverage and product tests, the affected harness closure (or the complete partitioned harness after CI/tooling changes), Fast audits, and one fresh `npm run build:release` without archive or reusable build proof. Dirty workspace is diagnostic and non-admissible externally. |
+| Local full release gate | `npm run ci:release -- [--cpu N] [--memory-mib N] [--workers N]` | Requires the exact local Fast proof for the unchanged workspace tree, inherits its deterministic/test/coverage evidence, and runs only release-time audit and build/archive owners. Run `ci:proof` first. |
 | Quick local build bypass | `npm run ci:build` | Runs the project npm build only; it is not a release build, emits no QA proof, and is never accepted for provenance. |
 | Ordinary unpacked build | `npm run build` | Production-mode Vite build only; no typecheck, QA proof, packaging, or build source maps. |
 | Local PR bypass proof | `npm run ci:proof -- --pr <number> --reason "<audit note>" [resource flags]` | Requires clean `origin/main`, validates exact remote PR authority, posts proof hashes and the mandatory reason, and never merges. |
@@ -30,7 +30,7 @@ QA implementation, owner maps, generated inventories, and product code may chang
 
 ## GitHub operations
 
-Ready PRs run Fast PR Gate with `SELECTEL_QA_PROFILES`. A merge to `main` does not repeat that gate for the squash commit. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Release provenance → Run workflow**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`, creates the canonical `main` proof, publishes the admitted immutable images, publishes admitted coverage, and attests the exact release subjects. It reuses an exact fast proof when possible, otherwise completes the missing Fast controls on the same release VM. Full Vitest belongs to Fast proof; release readiness additionally requires the release-only controls.
+Ready PRs run Fast PR Gate with `SELECTEL_QA_PROFILES`. A merge to `main` does not repeat that gate for the squash commit. A PR whose trusted gate-input digest is unchanged and whose every changed path is explicitly non-gate-only derives a candidate-bound reuse receipt from the exact base proof and does not provision Selectel; unknown paths fail closed. Run Release provenance Gate from **Actions → Release provenance → Run workflow**; it uses the identically shaped `SELECTEL_RELEASE_PROFILES`, creates and admits an exact Fast proof on the same disposable runner before release composition, publishes both attempt-qualified proof artifacts, publishes admitted coverage, and attests the exact release subjects. Release never fills a missing Fast control and never reruns product Vitest or coverage.
 
 The proof artifact name is `fast-proof-<commit>-<run-id>-<producer-attempt>` or `release-provenance-<commit>-<run-id>-<producer-attempt>`. The job summary contains its URL and exact download command. A failed downstream-job retry discovers the highest live producer attempt from the run artifact inventory and does not rerun a green VM merely because the consumer attempt changed. Proof is uploaded before cleanup. Confirm the cleanup receipt marks the runner registration, VM, VM ports, disposable security group, router interface, router, subnet, network, and volumes deleted before treating the run as complete. When the early receipt is unavailable, the cleanup artifact must identify `recover-cleanup` for the exact run attempt rather than a repository-wide sweep. The independent daily TTL sweep is recovery, not the normal cleanup path.
 
@@ -46,9 +46,9 @@ For the one-time CI bootstrap, open the PR as draft, add `ci-local-proof-bypass`
 
 ## Local WSL setup
 
-Ordinary local `ci:proof` and `ci:release` do not require Docker. They restore the repository-local npm download cache, still run exact `npm ci`, verify every installed project-toolchain package, alias, native entrypoint, and TypeScript compiler-API runtime against `toolchain.lock.json`, then perform native package bootstrap and execute the same JS composition and QA owners with the locked external audit binaries. This is the fastest diagnostic path, not byte-for-byte environment equivalence. The GitHub job adds the pinned Linux image and is the canonical release-provenance environment; use the clean `ci:proof -- --pr <number> --reason "<audit note>"` container bypass when external-environment equivalence is required locally.
+Ordinary local `ci:proof` and `ci:release` do not require Docker. They reuse `node_modules` only while a local stamp matches the lockfile, workspace manifests, `.npmrc`, Node/npm, platform/architecture, and the installed hidden lock; pass `--fresh-install` to `ci:proof` to force exact `npm ci`. Every run still verifies the installed project toolchain against `toolchain.lock.json`. Canvas and ast-grep provisioning is reused only while the matching native artifacts remain functional and digest-identical. Workflow validation is candidate-aware locally, and an exact `ci:release` inherits it from its admitted proof. Chromium startup belongs to real Playwright/E2E execution and is not a prerequisite for these non-E2E gates. The GitHub job remains the canonical cold-start release-provenance environment and always performs exact install, full workflow validation, and native provisioning; use the clean `ci:proof -- --pr <number> --reason "<audit note>"` container bypass when external-environment equivalence is required locally.
 
-`ci:proof` and `ci:release` are repository-wide in both environments. Diff awareness belongs only to `qa:release-harness`, `qa:checkpoint`, and `qa:closeout`; resource flags affect scheduling and reuse compatibility, never the selected control or file scope.
+`ci:proof` scans the repository-wide candidate in both environments. Product tests and coverage remain repository-wide. Harness tests run as a separate resource wave after product proof: product-only candidates use Vitest's affected harness closure, while CI/tooling/shared-control changes and scheduled runs execute the complete deterministic harness partitions. Set `SNIPTALE_CI_FULL_HARNESS=1` for an explicit periodic or diagnostic full-harness proof; the external workflow sets it for scheduled gates. `ci:release` verifies the exact admitted repository-wide proof and executes only its release delta. Resource flags affect scheduling and reuse compatibility, never product control scope.
 
 Docker is required only when explicitly reproducing the external image or running the clean PR bypass mode. With Docker Desktop, enable WSL integration for this distribution and verify `docker version` before bypass proof.
 
@@ -74,6 +74,7 @@ Use direct commands only to diagnose the failed owner:
 | Area | Command |
 | --- | --- |
 | Documentation facts | `node tooling/qa/policy/documentation/documentation-facts/documentation-facts.mjs` |
+| Dead commented code | `node tooling/qa/composition/quality/dead-commented-code.mjs` |
 | Config baseline | `node tooling/qa/guards/product-contracts/config/config-policy/check.mjs` |
 | Extension build layout | `node tooling/qa/guards/product-contracts/extension-build/verify-extension-build-layout.mjs` |
 | Typecheck | `node tooling/qa/proof/typecheck/execution/check.mjs` |
@@ -81,8 +82,7 @@ Use direct commands only to diagnose the failed owner:
 | Oxlint | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
 | Oxfmt | `node tooling/qa/guards/quality/verify-oxfmt.mjs` |
 | Unified ast-grep syntax scan | `node tooling/qa/audits/ast-grep/ast-grep.mjs` |
-| Security and syntax-only SonarJS Oxlint JS-plugin rules | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
-| Release-only type-aware SonarJS ESLint residual | `node tooling/qa/guards/quality/sonarjs/check.mjs` |
+| Security and syntax-only SonarJS rules through Oxlint JS plugins | `node tooling/qa/guards/quality/verify-oxlint.mjs` |
 | Build | `node tooling/qa/composition/build/build-step.mjs` |
 | HTML sanitizer ownership residual | `node tooling/qa/guards/security/html-sanitizer-ownership/check.mjs` |
 | jscpd 5 release audit | `node tooling/qa/audits/jscpd/check.mjs` |
@@ -93,4 +93,4 @@ Use direct commands only to diagnose the failed owner:
 
 Treat DNS, proxy, TLS, registry, browser dependency, Docker engine, and missing binary failures as environment failures. Do not manually stage a closeout candidate or stage `tasks/**`.
 
-Tooling coverage writes its report to `.tmp/coverage/tooling` and enforces one repository-wide floor for statements, branches, functions, and lines. It is intentionally independent from `ci:release`, product coverage, release provenance, and the public wrapper composition.
+Tooling coverage writes its report to `.tmp/coverage/tooling` and enforces one repository-wide floor for statements, branches, functions, and lines. The normal harness test suite is blocking in `ci:proof`; this separate maintenance coverage report remains independent from product coverage and release provenance.

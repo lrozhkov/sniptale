@@ -23,7 +23,7 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
   'text/css': 'css',
 };
 
-function readBlobText(blob: Blob): Promise<string> {
+export function readBlobText(blob: Blob): Promise<string> {
   if (typeof blob.text === 'function') return blob.text();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
