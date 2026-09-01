@@ -63,6 +63,8 @@ Metrics are signals, not architecture boundaries. They must not force a cohesive
 
 Diff-aware structural analysis compares behavioral files with `HEAD`; unchanged, import-only, mock-only, and rename-only files are not candidates. A topology change optimizes navigation and ownership clarity, not raw file count. Forwarding-only and single-consumer modules require consolidation unless a public contract, runtime boundary, cross-owner seam, or independent change reason justifies them.
 
+The blocking forwarding-drift control is narrower than the manual topology inventory. It evaluates only production modules newly becoming pure forwarding in the candidate diff and only when the module has one direct production consumer. Exact package exports, registered runtime entrypoints, runtime boundaries, and canonically classified cross-owner edges are derived Keep evidence. Independent change reasons and temporary unresolved topology require an exact forwarder/direct-consumer policy entry with owner, evidence, removal condition, and an unexpired review date. Unchanged forwarding debt remains report-only.
+
 ## Security and release assurance
 
 Security syntax and ownership rules use the smallest capable engine. Global data flow remains release-only. Supply-chain locks and artifact digests are valid when they bind an external binary, dependency graph, immutable image, release payload, or proof input.

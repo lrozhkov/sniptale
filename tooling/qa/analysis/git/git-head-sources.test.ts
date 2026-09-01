@@ -5,6 +5,7 @@ import {
   listHeadCodeFilesContainingText,
   readHeadFileText,
   readHeadFileTexts,
+  readRevisionFileTexts,
 } from './git-head-sources.mjs';
 
 function createFalseEperm() {
@@ -32,6 +33,19 @@ it('reads HEAD file text without stdin-driven git batch mode', () => {
       ['src/first.ts', 'first source'],
       ['src/second.ts', 'second source'],
     ])
+  );
+});
+
+it('reads source text from an explicit candidate baseline revision', () => {
+  const spawnSyncImpl = vi.fn().mockReturnValue({ status: 0, stdout: 'base source' });
+
+  expect(
+    readRevisionFileTexts(['src/example.ts'], { revision: 'base-sha', spawnSyncImpl })
+  ).toEqual(new Map([['src/example.ts', 'base source']]));
+  expect(spawnSyncImpl).toHaveBeenCalledWith(
+    expect.stringMatching(/git(?:\.exe)?$/u),
+    ['show', 'base-sha:src/example.ts'],
+    expect.objectContaining({ encoding: 'utf8' })
   );
 });
 

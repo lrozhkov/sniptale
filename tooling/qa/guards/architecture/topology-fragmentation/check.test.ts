@@ -258,18 +258,20 @@ it('classifies single-consumer forwarding edges with explicit safety vetoes', ()
       cluster.forwardingFiles.includes('apps/extension/src/content/parser/demo/facade.ts')
     )
   ).toMatchObject({
-    decision: 'Keep',
-    confidence: 'high',
-    reasons: ['cross-owner-forwarding-edge'],
+    decision: 'Consolidate',
+    confidence: 'medium',
+    mergeTarget: 'apps/extension/src/content/overlay/cross-owner/consumer.ts',
+    reasons: ['forwarding', 'single-production-consumer'],
   });
   expect(
     edges.find((cluster) =>
       cluster.forwardingFiles.includes('apps/extension/src/content/selection/demo/types.ts')
     )
   ).toMatchObject({
-    decision: 'Keep',
-    confidence: 'high',
-    reasons: ['proven-public-or-contract-forwarder'],
+    decision: 'Consolidate',
+    confidence: 'medium',
+    mergeTarget: 'apps/extension/src/content/selection/demo/index.tsx',
+    reasons: ['forwarding', 'single-production-consumer'],
   });
 });
 
@@ -363,10 +365,10 @@ it('keeps forwarding ladders without a stable non-forwarding target', () => {
     reasons: ['unresolved-forwarding-target'],
   });
   expect(edge('apps/extension/src/content/overlay/cross/facade.ts')).toMatchObject({
-    decision: 'Keep',
-    mergeTarget: null,
-    mergeTargetBlockReason: 'cross-owner-ladder',
-    reasons: ['unresolved-forwarding-target'],
+    decision: 'Consolidate',
+    mergeTarget: 'apps/extension/src/content/parser/cross/consumer.ts',
+    mergeTargetBlockReason: null,
+    reasons: ['forwarding', 'single-production-consumer'],
   });
 });
 

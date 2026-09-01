@@ -8,6 +8,7 @@ import { runHeavyRuntimeImportOwnershipCheck } from '../../../guards/architectur
 import { runManifestPermissionsCheck } from '../../../guards/architecture/manifest-permissions/check.mjs';
 import { runInstanceOwnershipCheck } from '../../../guards/architecture/ownership/instance-ownership/check.mjs';
 import { runRuntimeTopologyCheck } from '../../../guards/architecture/runtime-topology/check.mjs';
+import { runForwardingModuleDriftCheck } from '../../../guards/architecture/forwarding-module-drift/check.mjs';
 import { runChangedUiAutomationSeamCheck } from '../../../guards/product-contracts/ui-automation/verify-ui-automation-seams.mjs';
 import { runManifestIntegrityCheck } from '../../../guards/product-contracts/manifest-integrity/check.mjs';
 import { runPackageBoundaryCheck } from '../../../guards/product-contracts/package-boundaries/check.mjs';
@@ -58,6 +59,11 @@ const releaseGuardrailAdapterDefinitions = [
   ],
   ['Messaging', 'Messaging guardrail violations found:', runMessagingCheck],
   ['Root scatter', 'Root scatter violations found:', runRootScatterCheck],
+  [
+    'Forwarding module drift',
+    'Forwarding module drift violations found:',
+    runForwardingModuleDriftCheck,
+  ],
   ['Read path side effects', 'Read-path side-effect violations found:', runReadPathSideEffectCheck],
   [
     'Persistence ownership',

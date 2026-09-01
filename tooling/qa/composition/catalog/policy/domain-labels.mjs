@@ -7,6 +7,7 @@ export const QA_LABELS_BY_DOMAIN = {
     'Dependency boundaries',
     'Design system',
     'Entrypoint wiring',
+    'Forwarding module drift',
     'Heavy runtime imports',
     'i18n',
     'Manifest integrity',

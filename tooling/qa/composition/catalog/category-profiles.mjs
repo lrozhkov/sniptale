@@ -95,7 +95,8 @@ export function resolveQaSemanticClass({ kind, category }) {
   return 'proof/build/test/tool';
 }
 
-export function resolveQaScopeProfile({ lanes, category }) {
+export function resolveQaScopeProfile({ lanes, category, label }) {
+  if (label === 'Forwarding module drift') return 'candidate diff';
   if (category === 'release-sast-and-legal') return 'release-only';
   if (category === 'behavioral-proof') return 'artifact';
   if (lanes.includes('focused-triggered')) return 'triggered repo-wide';

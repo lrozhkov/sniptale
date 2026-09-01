@@ -67,6 +67,10 @@ const TOOL_SOURCES = new Map([
     'tooling/qa/guards/security/network/credential-ownership/check.mjs',
   ],
   [
+    'verify-forwarding-module-drift.mjs',
+    'tooling/qa/guards/architecture/forwarding-module-drift/check.mjs',
+  ],
+  [
     'verify-heavy-runtime-import-ownership.mjs',
     'tooling/qa/guards/architecture/imports/verify-heavy-runtime-import-ownership.mjs',
   ],

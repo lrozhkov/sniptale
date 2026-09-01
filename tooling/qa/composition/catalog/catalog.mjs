@@ -209,7 +209,7 @@ function completeCatalogRecord(record) {
     semanticClass,
     engineProfile: engineDecision.profile,
     engineDecision,
-    scopeProfile: resolveQaScopeProfile({ lanes: record.lanes, category }),
+    scopeProfile: resolveQaScopeProfile({ lanes: record.lanes, category, label: record.label }),
     triggerProfile: record.lanes.includes('focused-triggered') ? 'catalog-trigger' : 'mode-scope',
     supportedModes: Object.freeze([...record.runsIn]),
     adapterProfiles: Object.freeze(

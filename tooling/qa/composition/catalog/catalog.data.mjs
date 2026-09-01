@@ -58,6 +58,7 @@ export const FOCUSED_CODE_VIOLATION_LABELS = Object.freeze([
   'Detached controller methods',
   'Parser snapshot purity',
   'Naming',
+  'Forwarding module drift',
   'UI automation seams',
   'Interactive controller ownership',
 ]);
@@ -321,6 +322,7 @@ export const FULL_VIOLATION_STEP_TOOLS = new Map([
   ['Suppression directives', 'verify-suppression-directives.mjs'],
   ['Messaging', 'verify-messaging.mjs'],
   ['Root scatter', 'verify-root-scatter.mjs'],
+  ['Forwarding module drift', 'verify-forwarding-module-drift.mjs'],
   ['Read path side effects', 'verify-read-path-side-effects.mjs'],
   ['Persistence ownership', 'verify-persistence-ownership.mjs'],
   ['Parser snapshot purity', 'verify-parser-snapshot-purity.mjs'],
