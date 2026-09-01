@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 it('runs local full gates directly in WSL and keeps Docker limited to external reproduction', () => {
   const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   const local = fs.readFileSync('tooling/ci/local.mjs', 'utf8');
-  const playwrightSmoke = fs.readFileSync('tooling/ci/local-playwright-smoke.mjs', 'utf8');
+  const containerCommand = fs.readFileSync('tooling/ci/container-command.mjs', 'utf8');
   const toolchain = fs.readFileSync('tooling/ci/local-toolchain.mjs', 'utf8');
   const proof = fs.readFileSync('tooling/ci/proof.mjs', 'utf8');
   expect(packageJson.scripts['ci:proof']).toBe('node tooling/ci/proof.mjs');
@@ -23,8 +23,10 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(packageJson.scripts['ci:build']).toBe('npm run build');
   expect(packageJson.scripts.build).toBe('vite build --config apps/extension/vite.config.ts');
   expect(local).toContain('tooling/ci/${lane}-wrapper.mjs');
-  expect(local).toContain("path.join(process.cwd(), 'tooling/ci/validate-workflows.mjs')");
-  expect(local).toContain("['playwright-smoke', process.execPath");
+  expect(local).toContain("path.join(process.cwd(), 'tooling/ci/local-workflow-validation.mjs')");
+  expect(local).toContain("path.join(process.cwd(), 'tooling/ci/local-project-bootstrap.mjs')");
+  expect(local).not.toContain("'playwright-smoke'");
+  expect(local).toContain("rawArgs.includes('--fresh-install')");
   expect(local).toContain('resolveLocalExecutionEnvironmentIdentity()');
   expect(local).not.toContain("spawnSync('docker'");
   expect(toolchain).not.toContain("spawnSync('docker'");
@@ -46,8 +48,10 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   for (const tool of ['OSV Scanner', 'Gitleaks', 'actionlint', 'CodeQL', 'Stryker']) {
     expect(toolchain).toContain(`name: '${tool}'`);
   }
-  expect(playwrightSmoke).toContain('installed.version !== lock.playwright.version');
-  expect(playwrightSmoke).toContain('await chromium.launch({ headless: true })');
+  expect(containerCommand).toContain("['install', 'npm', ['ci', '--ignore-scripts']]");
+  expect(containerCommand).toContain("'/opt/sniptale-trusted/tooling/ci/validate-workflows.mjs'");
+  expect(containerCommand).toContain("['provision-canvas', 'npm', ['rebuild', 'canvas']]");
+  expect(containerCommand).toContain("['provision-ast-grep', 'node'");
   expect(proof).toContain('if (prIndex < 0)');
   expect(proof).toContain("path.join(process.cwd(), 'tooling/ci/local.mjs')");
   expect(proof).toContain("'proof',");

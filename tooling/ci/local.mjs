@@ -31,13 +31,21 @@ const environment = {
   PLAYWRIGHT_BROWSERS_PATH:
     process.env.PLAYWRIGHT_BROWSERS_PATH ?? path.resolve('.playwright-browsers'),
   SNIPTALE_WORKSPACE_MODE: 'local-workspace',
+  SNIPTALE_LOCAL_CI_LANE: lane,
 };
-const args = process.argv.slice(3);
+const rawArgs = process.argv.slice(3);
+if (rawArgs.filter((value) => value === '--fresh-install').length > 1) {
+  throw new Error('Duplicate local CI argument: --fresh-install');
+}
+const freshInstall = rawArgs.includes('--fresh-install');
+const args = rawArgs.filter((value) => value !== '--fresh-install');
 for (let index = 0; index < args.length; index += 2) {
   const name = options.get(args[index]);
   const value = args[index + 1];
   if (!name || !/^\d+$/u.test(value ?? '') || Number(value) < 1) {
-    throw new Error('Resource flags are --cpu N, --memory-mib N, and --workers N.');
+    throw new Error(
+      'Local CI flags are --fresh-install, --cpu N, --memory-mib N, and --workers N.'
+    );
   }
   environment[name] = value;
 }
@@ -74,7 +82,15 @@ Object.assign(process.env, environment);
 const runtimeIdentity = resolveLocalExecutionEnvironmentIdentity();
 const startedAtMs = Date.now();
 const commands = [
-  ['install', 'npm', ['ci', '--ignore-scripts']],
+  [
+    'install',
+    process.execPath,
+    [
+      path.join(process.cwd(), 'tooling/ci/local-project-bootstrap.mjs'),
+      'install',
+      ...(freshInstall ? ['--fresh'] : []),
+    ],
+  ],
   [
     'verify-project-toolchain',
     process.execPath,
@@ -83,11 +99,18 @@ const commands = [
   [
     'validate-workflows',
     process.execPath,
-    [path.join(process.cwd(), 'tooling/ci/validate-workflows.mjs'), 'actionlint'],
+    [path.join(process.cwd(), 'tooling/ci/local-workflow-validation.mjs')],
   ],
-  ['provision-canvas', 'npm', ['rebuild', 'canvas']],
-  ['provision-ast-grep', process.execPath, ['node_modules/@ast-grep/cli/postinstall.js']],
-  ['playwright-smoke', process.execPath, ['tooling/ci/local-playwright-smoke.mjs']],
+  [
+    'provision-canvas',
+    process.execPath,
+    [path.join(process.cwd(), 'tooling/ci/local-project-bootstrap.mjs'), 'canvas'],
+  ],
+  [
+    'provision-ast-grep',
+    process.execPath,
+    [path.join(process.cwd(), 'tooling/ci/local-project-bootstrap.mjs'), 'ast-grep'],
+  ],
   [lane, process.execPath, [path.join(process.cwd(), `tooling/ci/${lane}-wrapper.mjs`)]],
 ];
 const phases = [];

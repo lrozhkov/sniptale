@@ -23,7 +23,6 @@
         "validate-workflows",
         "provision-canvas",
         "provision-ast-grep",
-        "playwright-smoke",
         "proof"
       ],
       "derivedPhases": ["non-gate-input-reuse"],
@@ -72,7 +71,6 @@
         "validate-workflows",
         "provision-canvas",
         "provision-ast-grep",
-        "playwright-smoke",
         "release"
       ],
       "derivedPhases": [],

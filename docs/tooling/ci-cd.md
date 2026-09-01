@@ -48,7 +48,7 @@ Fast proof never contains the Build/ZIP receipt or archive; those artifacts are 
 
 Candidate QA and controller images use a content-addressed identity over the candidate Git tree and commit, Dockerfile and every copied build-context input, digest-pinned base image, build arguments, BuildKit frontend, provenance/SBOM settings, and target platform. A lookup reuses only an immutable GHCR digest whose single-platform manifest, labels, provenance subject, and base-image material match that identity. A failed QA run therefore keeps the exact image available for another attempt, while a changed commit, tree, or build input derives a different image. Verified use receipts refresh a seven-day idle TTL; maintenance removes images that remain unused beyond it. Manual runs may request a separately tagged forced rebuild with a recorded reason without weakening normal cache admission.
 
-Every real run performs `npm ci` against the candidate lock. PRs may restore download cache but cannot update shared cache; trusted `main` and provenance runs may update it. Cache state never satisfies a control.
+Every external run performs `npm ci` against the candidate lock. PRs may restore download cache but cannot update shared cache; trusted `main` and provenance runs may update it. Cache state never satisfies an external control. Native local diagnostic gates may reuse a content-addressed install/native stamp; `--fresh-install` forces the cold path.
 
 ## Selectel lifecycle
 
