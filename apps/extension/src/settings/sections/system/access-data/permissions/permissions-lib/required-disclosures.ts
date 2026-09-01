@@ -7,6 +7,7 @@ import {
   MonitorUp,
   MousePointerClick,
   Navigation,
+  ShieldCheck,
   PanelTop,
   Puzzle,
   Video,
@@ -66,6 +67,14 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     id: 'webNavigation',
     kind: 'permission',
     nameKey: 'settings.permissions.requiredWebNavigationName',
+  },
+  {
+    category: 'capture',
+    descriptionKey: 'settings.permissions.requiredDeclarativeNetRequestDescription',
+    icon: ShieldCheck,
+    id: 'declarativeNetRequest',
+    kind: 'permission',
+    nameKey: 'settings.permissions.requiredDeclarativeNetRequestName',
   },
   {
     category: 'page',

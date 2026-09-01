@@ -42,6 +42,7 @@ Required permissions:
 - `unlimitedStorage`
 - `tabs`
 - `webNavigation`
+- `declarativeNetRequest`
 - `system.display`
 - `activeTab`
 - `scripting`

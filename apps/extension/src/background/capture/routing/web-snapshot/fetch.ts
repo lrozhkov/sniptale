@@ -2,6 +2,7 @@ import { isPrivateNetworkHost } from '@sniptale/platform/security/private-networ
 import { WEB_SNAPSHOT_PACKAGE_POLICY } from '../../../../features/web-snapshot/package-policy';
 import { resolveWebSnapshotCaptureAssetMimeTypeFromBytes } from '../../../../features/web-snapshot/public';
 import { beginWebSnapshotAssetFetch } from './session';
+import { ensureWebSnapshotRedirectNetworkGuard } from './redirect-network-guard';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
 const logger = createLogger({ namespace: 'BackgroundWebSnapshotAssets' });
@@ -131,6 +132,9 @@ export async function fetchWebSnapshotAssetForSession(args: {
 
   try {
     const redirect = fetchAuthority.allowExternalAssetRedirects ? 'follow' : 'manual';
+    if (redirect === 'follow') {
+      await ensureWebSnapshotRedirectNetworkGuard();
+    }
     const response = await fetch(parsedUrl.href, {
       credentials: 'omit',
       redirect,
